@@ -1,4 +1,4 @@
-import { onUnmounted, ref, unref, type MaybeRef, type Ref } from 'vue'
+import { computed, onUnmounted, ref, unref, type MaybeRef, type Ref } from 'vue'
 import { api } from '@/lib/api'
 import type { FoliateRenderer, RelocateDetail } from '../../epub/composables/useFoliate'
 
@@ -64,6 +64,12 @@ export function useReaderProgress(
   const koboLocationValue = ref<string | null>(null)
   const koboContentSourceProgressPercent = ref<number | null>(null)
   const koreaderProgress = ref<string | null>(null)
+  const positionSeconds = ref<number | null>(null)
+  const mediaOverlayFragment = ref<string | null>(null)
+  const mediaOverlaySectionIndex = ref<number | null>(null)
+  // Which of the file's two positions the pending save moved. They share one record, and the
+  // server needs telling so a narration position cannot drag the text one backwards to meet it.
+  const pendingSource = ref<'text' | 'narration'>('text')
   const chapterTitle = ref('')
   const sectionIndex = ref(0)
   const totalSections = ref(0)
@@ -93,6 +99,10 @@ export function useReaderProgress(
     return normalized
   }
 
+  const hasMediaOverlayProgress = computed(
+    () => (!!mediaOverlayFragment.value && mediaOverlaySectionIndex.value !== null) || (positionSeconds.value != null && positionSeconds.value > 0),
+  )
+
   async function load() {
     if (!unref(trackingEnabled)) return
     const res = await api(`/api/v1/books/files/${fileId}/progress`)
@@ -106,6 +116,15 @@ export function useReaderProgress(
     koboLocationValue.value = normalizeString(data.koboLocationValue)
     koboContentSourceProgressPercent.value = normalizeNullablePercentage(data.koboContentSourceProgressPercent)
     koreaderProgress.value = normalizeString(data.koreaderProgress)
+    positionSeconds.value = typeof data.positionSeconds === 'number' ? data.positionSeconds : null
+    mediaOverlayFragment.value = typeof data.mediaOverlayFragment === 'string' ? data.mediaOverlayFragment : null
+    mediaOverlaySectionIndex.value = typeof data.mediaOverlaySectionIndex === 'number' ? data.mediaOverlaySectionIndex : null
+  }
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer)
+    if (!unref(trackingEnabled)) return
+    saveTimer = setTimeout(() => save(), 2000)
   }
 
   function onRelocate(detail: RelocateDetail) {
@@ -133,9 +152,26 @@ export function useReaderProgress(
     timeSection.value = detail?.time?.section ?? 0
     timeTotal.value = detail?.time?.total ?? 0
 
-    if (saveTimer) clearTimeout(saveTimer)
-    if (!unref(trackingEnabled) || !hasSaveableLocation) return
-    saveTimer = setTimeout(() => save(), 2000)
+    if (!hasSaveableLocation) {
+      if (saveTimer) clearTimeout(saveTimer)
+      return
+    }
+    pendingSource.value = 'text'
+    scheduleSave()
+  }
+
+  function setMediaOverlayProgress(fragment: string, section: number, seconds: number | null = null) {
+    mediaOverlayFragment.value = fragment
+    mediaOverlaySectionIndex.value = section
+    positionSeconds.value = seconds
+    pendingSource.value = 'narration'
+    scheduleSave()
+  }
+
+  function clearMediaOverlayProgress() {
+    positionSeconds.value = null
+    mediaOverlayFragment.value = null
+    mediaOverlaySectionIndex.value = null
   }
 
   async function save() {
@@ -153,6 +189,10 @@ export function useReaderProgress(
         koboLocationValue: koboLocationValue.value,
         koboContentSourceProgressPercent: normalizeNullablePercentage(koboContentSourceProgressPercent.value),
         koreaderProgress: koreaderProgress.value,
+        positionSeconds: positionSeconds.value,
+        mediaOverlayFragment: mediaOverlayFragment.value,
+        mediaOverlaySectionIndex: mediaOverlaySectionIndex.value,
+        source: pendingSource.value,
       }),
     })
   }
@@ -276,6 +316,10 @@ export function useReaderProgress(
     cfi,
     pageNumber,
     percentage,
+    positionSeconds,
+    mediaOverlayFragment,
+    mediaOverlaySectionIndex,
+    hasMediaOverlayProgress,
     koboLocationSource,
     koboLocationType,
     koboLocationValue,
@@ -294,6 +338,8 @@ export function useReaderProgress(
     footerMode,
     load,
     onRelocate,
+    setMediaOverlayProgress,
+    clearMediaOverlayProgress,
     save,
     cycleFooterMode,
     updateHeadsFeet,

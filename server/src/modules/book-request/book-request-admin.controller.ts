@@ -68,7 +68,7 @@ export class BookRequestAdminController {
    */
   @Get('download-clients')
   listDownloadClients() {
-    return this.downloadClients.findEnabledSummaries('torrent');
+    return this.downloadClients.findEnabledSummaries();
   }
 
   /**

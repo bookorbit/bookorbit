@@ -23,6 +23,8 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
   return {
     id: 11,
     userId: 3,
+    mediaType: 'books',
+    libraryId: null,
     name: 'Unread Sci-Fi',
     icon: 'Aperture',
     filter: null,

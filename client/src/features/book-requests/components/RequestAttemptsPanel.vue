@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Globe, Loader2, Magnet } from '@lucide/vue'
-import type { BookRequestDownloadItem, BookRequestItem } from '@bookorbit/types'
+import { ChevronDown, Globe, Loader2, Magnet, Newspaper } from '@lucide/vue'
+import { DELIVERY_BY_DOWNLOAD_SOURCE, type BookRequestDownloadItem, type BookRequestItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import { useRequestAttempts } from '../composables/useRequestAttempts'
@@ -35,20 +35,16 @@ watch(
 )
 
 /**
- * A refused attempt never reached a client, which is what the missing hash means. Calling that
+ * A refused attempt never reached a client, which is what the missing key means. Calling that
  * "download failed" would say something that did not happen: nothing was ever downloaded.
  */
 function outcomeText(attempt: BookRequestDownloadItem): string {
-  if (attempt.status === 'failed' && attempt.clientHash === null) return t('bookRequests.attempts.refused')
+  if (attempt.status === 'failed' && attempt.clientKey === null) return t('bookRequests.attempts.refused')
   return t(`bookRequests.download.status.${attempt.status}`)
 }
 
 function isRefusal(attempt: BookRequestDownloadItem): boolean {
   return attempt.status === 'failed'
-}
-
-function seedsBack(attempt: BookRequestDownloadItem): boolean {
-  return attempt.source !== 'direct_url'
 }
 
 function facts(attempt: BookRequestDownloadItem): string[] {
@@ -83,7 +79,8 @@ function facts(attempt: BookRequestDownloadItem): string[] {
               class="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-xs font-medium"
               :class="isRefusal(attempt) ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-border text-muted-foreground'"
             >
-              <Magnet v-if="seedsBack(attempt)" :size="11" aria-hidden="true" />
+              <Magnet v-if="DELIVERY_BY_DOWNLOAD_SOURCE[attempt.source] === 'torrent'" :size="11" aria-hidden="true" />
+              <Newspaper v-else-if="DELIVERY_BY_DOWNLOAD_SOURCE[attempt.source] === 'usenet'" :size="11" aria-hidden="true" />
               <Globe v-else :size="11" aria-hidden="true" />
               {{ outcomeText(attempt) }}
             </span>

@@ -18,12 +18,9 @@ export const bookDockFiles = pgTable(
      * `absolutePath`, `format` and `fileSize` keep describing the unit's **primary** file, because
      * metadata and cover extraction on a 31-track audiobook should read exactly one of them.
      *
-     * Null is today's loose single file, which is why existing rows need no migration. Non-null
-     * also means the watcher must not descend into that directory: the row claimed it before it
-     * existed on disk, precisely so the watcher cannot win the race.
-     *
-     * Always exactly one level below the dock root, which is what keeps the watcher's claim check
-     * an equality lookup rather than an ancestor walk.
+     * Null means no exclusive directory ownership; a row may still have unit files when
+     * several books share a folder. Watched books may be nested at any depth. Imports with
+     * autoFinalizeSuppressed claim their directory before copying, so discovery skips its tree.
      */
     unitDirectory: text('unit_directory').unique(),
     status: varchar('status', { length: 20 }).notNull().default('pending'),

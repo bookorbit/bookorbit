@@ -7,7 +7,7 @@ import type { MultipartRequest } from '../../../common/types/multipart-request';
 import { IndexerController } from './indexer.controller';
 
 /**
- * The three plugin routes are the highest-privilege surface this feature has: an installed plugin
+ * The plugin routes are the highest-privilege surface this feature has: an installed plugin
  * runs inside this process with this process's reach, including the database and the request
  * encryption key. Their gate is a hand-rolled `assertSuperuser` rather than the permission guard,
  * so nothing in the authorization matrix can see it, and until this file existed no test anywhere
@@ -34,8 +34,9 @@ describe('IndexerController plugin routes', () => {
   const registry = { describe: vi.fn().mockReturnValue([]) };
   const plugins = { loadFailures: vi.fn().mockReturnValue([]) };
   const pluginInstaller = { inspect: vi.fn(), install: vi.fn(), remove: vi.fn() };
+  const pluginUpdates = { list: vi.fn(), refreshAll: vi.fn(), inspect: vi.fn(), apply: vi.fn(), setAutomatic: vi.fn() };
 
-  const controller = new IndexerController(service as never, registry as never, plugins as never, pluginInstaller as never);
+  const controller = new IndexerController(service as never, registry as never, plugins as never, pluginInstaller as never, pluginUpdates as never);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,6 +72,19 @@ describe('IndexerController plugin routes', () => {
       await expect(controller.removePlugin(operator, 'demo')).rejects.toBeInstanceOf(ForbiddenException);
       expect(pluginInstaller.remove).not.toHaveBeenCalled();
     });
+
+    it('refuses every remote update operation', async () => {
+      await expect(controller.listPluginUpdates(operator)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(controller.checkPluginUpdates(operator)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(controller.inspectPluginUpdate(operator, 'demo')).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(controller.installPluginUpdate(operator, 'demo', { sha256: '0'.repeat(64) })).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(controller.setPluginAutomaticUpdate(operator, 'demo', { enabled: true })).rejects.toBeInstanceOf(ForbiddenException);
+      expect(pluginUpdates.list).not.toHaveBeenCalled();
+      expect(pluginUpdates.refreshAll).not.toHaveBeenCalled();
+      expect(pluginUpdates.inspect).not.toHaveBeenCalled();
+      expect(pluginUpdates.apply).not.toHaveBeenCalled();
+      expect(pluginUpdates.setAutomatic).not.toHaveBeenCalled();
+    });
   });
 
   describe('lets a superuser through', () => {
@@ -105,6 +119,14 @@ describe('IndexerController plugin routes', () => {
       await controller.removePlugin(admin, 'demo');
 
       expect(pluginInstaller.remove).toHaveBeenCalledWith('demo', 'operator@example.com');
+    });
+
+    it('installs a reviewed signed update and attributes it to the caller', async () => {
+      pluginUpdates.apply.mockResolvedValue({ type: 'demo', state: 'current' });
+
+      await controller.installPluginUpdate(admin, 'demo', { sha256: 'a'.repeat(64) });
+
+      expect(pluginUpdates.apply).toHaveBeenCalledWith('demo', 'a'.repeat(64), 'operator@example.com');
     });
   });
 

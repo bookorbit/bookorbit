@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import type { MockedFunction } from 'vitest';
-import { readdir, readFile, stat } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
 import {
   AUDIO_BOOK_FILE_WRITE_FIELDS,
   EPUB_BOOK_FILE_WRITE_FIELDS,
@@ -25,13 +25,11 @@ vi.mock('fs/promises', async () => {
   const actual = await vi.importActual('fs/promises');
   return {
     ...actual,
-    readdir: vi.fn(),
     readFile: vi.fn(),
     stat: vi.fn(),
   };
 });
 
-const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
 const mockStat = stat as MockedFunction<typeof stat>;
 const POST_WRITE_MTIME = new Date('2026-07-22T12:34:56.789Z');
@@ -54,7 +52,7 @@ const DEFAULT_LIB_CONFIG = {
 };
 
 describe('FileWriteService', () => {
-  function makeService(configValues: Record<string, unknown> = {}) {
+  function makeService(configValues: Record<string, unknown> = {}, coverStore = { resolve: vi.fn().mockResolvedValue(null) }) {
     const fileWriteRepo = {
       findPrimaryFileForBook: vi.fn(),
       findFilesForBook: vi.fn(),
@@ -79,7 +77,7 @@ describe('FileWriteService', () => {
       withLock: vi.fn().mockImplementation(async (_path: string, fn: () => Promise<unknown>) => fn()),
     };
     const config = {
-      get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : configValues[key])),
+      get: vi.fn().mockImplementation((key: string) => configValues[key]),
     } as unknown as ConfigService;
 
     const notificationService = {
@@ -93,14 +91,14 @@ describe('FileWriteService', () => {
       config,
       notificationService as never,
       selfWriteRegistry,
+      coverStore as never,
     );
 
-    return { service, fileWriteRepo, registry, writer, lockService, notificationService, selfWriteRegistry };
+    return { service, fileWriteRepo, registry, writer, lockService, notificationService, selfWriteRegistry, coverStore };
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockReaddir.mockReset();
     mockReadFile.mockReset();
     mockStat.mockReset();
     mockStat.mockResolvedValue({ mtime: POST_WRITE_MTIME, size: 57n, ino: 9_007_199_254_740_993n } as never);
@@ -395,7 +393,7 @@ describe('FileWriteService', () => {
   });
 
   it('writes successfully with lock, cover loading, logging, and lastWrittenAt update', async () => {
-    const { service, fileWriteRepo, writer, lockService } = makeService();
+    const { service, fileWriteRepo, writer, lockService, coverStore } = makeService();
 
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
@@ -409,7 +407,7 @@ describe('FileWriteService', () => {
     fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: true });
 
     const coverBytes = Buffer.from('cover');
-    mockReaddir.mockResolvedValue(['cover_extracted.jpg', 'cover_custom.png'] as never);
+    coverStore.resolve.mockResolvedValue('/books/covers/5/ebook/cover_custom.png');
     mockReadFile.mockResolvedValue(coverBytes as never);
 
     writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 13 });
@@ -424,7 +422,7 @@ describe('FileWriteService', () => {
       expect.objectContaining({ title: 'Dune', coverBytes }),
       expect.objectContaining({ dryRun: false }),
     );
-    expect(mockReadFile).toHaveBeenCalledWith('/books/covers/5/cover_custom.png');
+    expect(mockReadFile).toHaveBeenCalledWith('/books/covers/5/ebook/cover_custom.png');
 
     expect(fileWriteRepo.insertLog).toHaveBeenCalledTimes(1);
     expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledWith(5, expect.any(Date));
@@ -705,8 +703,60 @@ describe('FileWriteService', () => {
     expect(result.reason).toBe('file exceeds size limit');
   });
 
+  it('embeds only the book cover into an EPUB, never the audiobook cover', async () => {
+    const coverStore = { resolve: vi.fn().mockResolvedValue('/books/covers/5/ebook/cover_extracted.jpg') };
+    const { service, fileWriteRepo, writer } = makeService({}, coverStore);
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/lib/book.epub',
+      format: 'epub',
+      sizeBytes: 40,
+      fileHash: 'oldhash',
+      libraryId: 2,
+    });
+    fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Dune' });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: true });
+    mockReadFile.mockResolvedValue(Buffer.from('portrait') as never);
+    writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['coverBytes'], durationMs: 5 });
+
+    await service.writeToFile(5, 'auto');
+
+    expect(coverStore.resolve).toHaveBeenCalledWith(5, { medium: 'ebook', variant: 'cover', strict: true });
+    expect(mockReadFile).toHaveBeenCalledWith('/books/covers/5/ebook/cover_extracted.jpg');
+    expect(writer.write).toHaveBeenCalledWith(
+      '/books/lib/book.epub',
+      expect.objectContaining({ coverBytes: Buffer.from('portrait') }),
+      expect.anything(),
+    );
+  });
+
+  it('writes no cover into audio tracks when the book has no audiobook cover of its own', async () => {
+    const coverStore = { resolve: vi.fn().mockResolvedValue(null) };
+    const { service, fileWriteRepo, writer } = makeService({}, coverStore);
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/audio/book.m4b',
+      format: 'm4b',
+      sizeBytes: 100,
+      fileHash: 'm4bhash',
+      libraryId: 2,
+    });
+    fileWriteRepo.findFilesForBook.mockResolvedValue([
+      { id: 1, absolutePath: '/books/audio/book.m4b', format: 'm4b', sizeBytes: 100, fileHash: 'm4bhash', libraryId: 2 },
+    ]);
+    fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Audio Book' });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteAudioEnabled: true, fileWriteWriteCover: true });
+    writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+    await service.writeToFile(20, 'auto');
+
+    expect(coverStore.resolve).toHaveBeenCalledWith(20, { medium: 'audio', variant: 'cover', strict: true });
+    expect(mockReadFile).not.toHaveBeenCalled();
+    expect(writer.write).toHaveBeenCalledWith('/books/audio/book.m4b', expect.objectContaining({ coverBytes: null }), expect.anything());
+  });
+
   it('writes supported multi-track audio files and skips unsupported audio tracks explicitly', async () => {
-    const { service, fileWriteRepo, registry, writer, lockService } = makeService();
+    const { service, fileWriteRepo, registry, writer, lockService, coverStore } = makeService();
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
       absolutePath: '/books/audio/book.m4b',
@@ -723,7 +773,7 @@ describe('FileWriteService', () => {
     registry.supports.mockImplementation((format: string) => ['m4b', 'mp3'].includes(format));
     fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Audio Book' });
     fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteAudioEnabled: true, fileWriteWriteCover: true });
-    mockReaddir.mockResolvedValue(['cover_custom.jpg'] as never);
+    coverStore.resolve.mockResolvedValue('/books/covers/20/audio/cover_custom.jpg');
     mockReadFile.mockResolvedValue(Buffer.from('cover') as never);
     writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['coverBytes'], durationMs: 5 });
     computeFileHashMock.mockResolvedValueOnce('new-m4b').mockResolvedValueOnce('new-mp3');
@@ -819,7 +869,7 @@ describe('FileWriteService', () => {
   });
 
   it('aggregates failed multi-track audio writes and does not mark the book written', async () => {
-    const { service, fileWriteRepo, registry, writer } = makeService();
+    const { service, fileWriteRepo, registry, writer, coverStore } = makeService();
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
       absolutePath: '/books/audio/book.m4b',
@@ -835,7 +885,7 @@ describe('FileWriteService', () => {
     registry.supports.mockImplementation((format: string) => ['m4b', 'mp3'].includes(format));
     fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Audio Book' });
     fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteAudioEnabled: true, fileWriteWriteCover: true });
-    mockReaddir.mockResolvedValue(['cover_custom.jpg'] as never);
+    coverStore.resolve.mockResolvedValue('/books/covers/20/audio/cover_custom.jpg');
     mockReadFile.mockResolvedValue(Buffer.from('cover') as never);
     writer.write.mockImplementation((filePath: string) => {
       if (filePath.endsWith('.mp3')) {
@@ -954,7 +1004,7 @@ describe('FileWriteService', () => {
   });
 
   it('dry-run bypasses disabled gate and avoids cover read', async () => {
-    const { service, fileWriteRepo, writer } = makeService();
+    const { service, fileWriteRepo, writer, coverStore } = makeService();
 
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
       id: 1,
@@ -970,7 +1020,8 @@ describe('FileWriteService', () => {
     const result = await service.writeToFile(5, 'auto', undefined, true);
 
     expect(result.status).toBe('skipped');
-    expect(mockReaddir).not.toHaveBeenCalled();
+    expect(coverStore.resolve).not.toHaveBeenCalled();
+    expect(mockReadFile).not.toHaveBeenCalled();
     expect(writer.write).toHaveBeenCalledWith(
       '/books/lib/book.epub',
       expect.not.objectContaining({ coverBytes: expect.anything() }),
@@ -1140,9 +1191,10 @@ describe('FileWriteService', () => {
         fileWriteRepo as never,
         { supports: vi.fn().mockReturnValue(true), get: vi.fn().mockReturnValue(writer) } as never,
         { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,
-        { get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : undefined)) } as unknown as ConfigService,
+        { get: vi.fn() } as unknown as ConfigService,
         notificationService as never,
         new SelfWriteRegistry(),
+        { resolve: vi.fn().mockResolvedValue(null) } as never,
       );
 
       fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
@@ -1168,9 +1220,10 @@ describe('FileWriteService', () => {
         fileWriteRepo as never,
         { supports: vi.fn().mockReturnValue(true), get: vi.fn().mockReturnValue(writer) } as never,
         { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,
-        { get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : undefined)) } as unknown as ConfigService,
+        { get: vi.fn() } as unknown as ConfigService,
         notificationService as never,
         new SelfWriteRegistry(),
+        { resolve: vi.fn().mockResolvedValue(null) } as never,
       );
 
       fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({

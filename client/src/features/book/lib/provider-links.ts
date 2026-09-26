@@ -1,4 +1,5 @@
 import { MetadataProviderKey, type ProviderIds } from '@bookorbit/types'
+import { normalizeAmazonDomain } from '@/lib/amazon-domain'
 import { providerIconPathSafe } from './provider-icons'
 
 export type BookProviderLink = {
@@ -10,8 +11,12 @@ export type BookProviderLink = {
 }
 
 type ProviderLinkDefinition = Omit<BookProviderLink, 'url' | 'iconUrl'> & {
-  url: (id: string) => string
+  url: (id: string, settings: ProviderLinkSettings) => string
 }
+
+export type ProviderLinkSettings = { amazonDomain: string }
+
+const DEFAULT_LINK_SETTINGS: ProviderLinkSettings = { amazonDomain: 'amazon.com' }
 
 function encoded(value: string): string {
   return encodeURIComponent(value)
@@ -55,7 +60,7 @@ const PROVIDER_LINK_DEFINITIONS: readonly ProviderLinkDefinition[] = [
   {
     key: MetadataProviderKey.AMAZON,
     label: 'Amazon',
-    url: (id) => `https://www.amazon.com/dp/${encoded(id)}`,
+    url: (id, settings) => `https://www.${normalizeAmazonDomain(settings.amazonDomain)}/dp/${encoded(id)}`,
     fallback: 'A',
   },
   {
@@ -126,7 +131,7 @@ const PROVIDER_LINK_DEFINITIONS: readonly ProviderLinkDefinition[] = [
   },
 ]
 
-export function createBookProviderLinks(providerIds: ProviderIds): BookProviderLink[] {
+export function createBookProviderLinks(providerIds: ProviderIds, settings: ProviderLinkSettings = DEFAULT_LINK_SETTINGS): BookProviderLink[] {
   return PROVIDER_LINK_DEFINITIONS.flatMap((definition) => {
     const id = providerIds[definition.key]?.trim()
     if (!id) return []
@@ -135,7 +140,7 @@ export function createBookProviderLinks(providerIds: ProviderIds): BookProviderL
       {
         key: definition.key,
         label: definition.label,
-        url: definition.url(id),
+        url: definition.url(id, settings),
         iconUrl: providerIconPathSafe(definition.key),
         fallback: definition.fallback,
       },

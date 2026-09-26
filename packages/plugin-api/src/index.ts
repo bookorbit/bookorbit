@@ -28,6 +28,25 @@ export interface PluginCategoryMap {
   comic: number[];
 }
 
+/** A signed update feed controlled by the plugin publisher. */
+export interface PluginUpdateChannel {
+  /** HTTPS URL of a small BookOrbit plugin update manifest. */
+  manifestUrl: string;
+  /** Base64url-encoded raw Ed25519 public key used to verify every downloaded plugin file. */
+  ed25519PublicKey: string;
+}
+
+/** Contents of the JSON document at `PluginUpdateChannel.manifestUrl`. */
+export interface PluginUpdateManifest {
+  schemaVersion: 1;
+  type: string;
+  version: string;
+  sourceUrl: string;
+  sha256: string;
+  /** Base64 Ed25519 signature of the exact plugin source bytes. */
+  signature: string;
+}
+
 /** What a request is looking for, already normalised by BookOrbit. */
 export interface PluginReleaseQuery {
   title: string;
@@ -193,6 +212,8 @@ export interface IndexerPlugin {
   apiVersion: number;
   /** The plugin release, without a leading `v`. Optional for plugins written before versions were exposed. */
   version?: string;
+  /** Optional signed update channel. BookOrbit never invents or hardcodes one for a plugin. */
+  update?: PluginUpdateChannel;
   /** A slug. May not collide with a built-in type name, and must match `^[a-z0-9][a-z0-9-]{0,29}$`. */
   type: string;
   /** Untranslated English, shown in the indexer type list. */

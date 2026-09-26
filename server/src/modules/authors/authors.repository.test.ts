@@ -223,6 +223,30 @@ describe('AuthorsRepository', () => {
     });
   });
 
+  it('uses containment rather than trigram expansion for multi-word searches', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ total: '0' }]);
+    selectBuilder.offset.mockResolvedValueOnce([]);
+    vi.mocked(sql).mockClear();
+    const repo = new AuthorsRepository(db as never);
+
+    await repo.findPage({
+      page: 0,
+      size: 20,
+      sort: 'relevance',
+      order: 'desc',
+      libraryIds: [1],
+      q: 'The Wax Child',
+    });
+
+    const sqlText = vi
+      .mocked(sql)
+      .mock.calls.map(([strings]) => strings.join(''))
+      .join(' ');
+    expect(sqlText).toContain(' ILIKE ');
+    expect(sqlText).not.toContain(' % ');
+  });
+
   it('findPage uses grouped subquery count when minBookCount is provided', async () => {
     const { db, selectBuilder } = makeDb();
     selectBuilder.from

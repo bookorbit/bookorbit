@@ -12,7 +12,7 @@ function row(overrides: Partial<BookRequestDownloadRow> = {}): BookRequestDownlo
     id: 11,
     requestId: 7,
     downloadClientId: 4,
-    clientHash: HASH_A,
+    clientKey: HASH_A,
     status: 'downloading',
     progressPercent: 10,
     downloadedBytes: 100,
@@ -28,7 +28,7 @@ function row(overrides: Partial<BookRequestDownloadRow> = {}): BookRequestDownlo
 
 function status(overrides: Partial<DownloadStatus> = {}): DownloadStatus {
   return {
-    infoHash: HASH_A,
+    clientKey: HASH_A,
     state: 'downloading',
     progressPercent: 50,
     downloadedBytes: 500,
@@ -129,10 +129,10 @@ describe('DownloadMonitorService.tick', () => {
     expect(adapter.status).not.toHaveBeenCalled();
   });
 
-  it('batches every hash for one client into a single call', async () => {
+  it('batches every client key for one client into a single call', async () => {
     const { service, adapter } = makeService({
-      active: [row(), row({ id: 12, clientHash: HASH_B })],
-      statuses: [status(), status({ infoHash: HASH_B })],
+      active: [row(), row({ id: 12, clientKey: HASH_B })],
+      statuses: [status(), status({ clientKey: HASH_B })],
     });
 
     await polled(service);
@@ -279,16 +279,19 @@ describe('DownloadMonitorService.tick', () => {
     expect(downloads.updateIf).not.toHaveBeenCalled();
   });
 
-  it('gives a just-grabbed torrent time to appear before calling it missing', async () => {
+  it('gives a just-grabbed client item time to appear before calling it missing', async () => {
     const { service, fulfillment } = makeService({ active: [row({ grabbedAt: new Date() })], statuses: [] });
     await polled(service);
     expect(fulfillment.failDownload).not.toHaveBeenCalled();
   });
 
-  it('fails a torrent the client has forgotten once the grace period is over', async () => {
+  it('fails a client item the client has forgotten once the grace period is over', async () => {
     const { service, fulfillment } = makeService({ active: [row({ grabbedAt: new Date(Date.now() - 5 * 60 * 1000) })], statuses: [] });
     await polled(service);
-    expect(fulfillment.failDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), expect.stringContaining('no longer has this torrent'));
+    expect(fulfillment.failDownload).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 11 }),
+      expect.stringContaining('no longer has this download'),
+    );
   });
 
   /**
@@ -354,8 +357,8 @@ describe('DownloadMonitorService.tick', () => {
       expect(context.imports.importDownload).toHaveBeenCalledTimes(1);
 
       // A second transfer reports five seconds later, with the first import still running.
-      context.downloads.findActive.mockResolvedValue([row({ id: 12, clientHash: HASH_B })]);
-      context.adapter.status.mockResolvedValue([status({ infoHash: HASH_B, progressPercent: 40, downloadedBytes: 400 })]);
+      context.downloads.findActive.mockResolvedValue([row({ id: 12, clientKey: HASH_B })]);
+      context.adapter.status.mockResolvedValue([status({ clientKey: HASH_B, progressPercent: 40, downloadedBytes: 400 })]);
       now.mockReturnValue(66_000);
       await polled(context.service);
 
@@ -405,8 +408,8 @@ describe('DownloadMonitorService.tick', () => {
     /** A torrent client whose read never comes back, and a direct transfer alongside it. */
     function stalledClient() {
       const context = makeService({
-        active: [row(), row({ id: 12, source: 'direct_url', downloadClientId: null, clientHash: HASH_B })],
-        statuses: [status({ infoHash: HASH_B })],
+        active: [row(), row({ id: 12, source: 'direct_url', downloadClientId: null, clientKey: HASH_B })],
+        statuses: [status({ clientKey: HASH_B })],
       });
       let release: () => void = () => {};
       context.adapter.status.mockReturnValue(new Promise<DownloadStatus[]>((resolve) => (release = () => resolve([]))));

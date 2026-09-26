@@ -31,12 +31,21 @@ describe('SmartScopeRepository Kobo sync selection', () => {
 
     const { text, values } = compile(repo.findKoboSyncScopesForUser(9));
 
-    expect(text).toContain('"smart_scopes"."user_id" = $1 and "smart_scopes"."sync_to_kobo" = $2');
-    expect(text).toContain('"smart_scopes"."user_id" <> $3 and "smart_scopes"."is_public" = $4');
+    expect(text).toContain('"smart_scopes"."user_id" = $2 and "smart_scopes"."sync_to_kobo" = $3');
+    expect(text).toContain('"smart_scopes"."user_id" <> $4 and "smart_scopes"."is_public" = $5');
     expect(text).toContain(
-      'exists (select 1 from "smart_scope_kobo_subscriptions" where ("smart_scope_kobo_subscriptions"."smart_scope_id" = "smart_scopes"."id" and "smart_scope_kobo_subscriptions"."user_id" = $5)',
+      'exists (select 1 from "smart_scope_kobo_subscriptions" where ("smart_scope_kobo_subscriptions"."smart_scope_id" = "smart_scopes"."id" and "smart_scope_kobo_subscriptions"."user_id" = $6)',
     );
-    expect(values).toEqual([9, true, 9, true, 9]);
+    expect(values).toEqual(['books', 9, true, 9, true, 9]);
+  });
+
+  it('never offers a podcast scope to Kobo, whose rules the book query builder cannot read', () => {
+    const { repo } = makeCapturingRepo();
+
+    const { text, values } = compile(repo.findKoboSyncScopesForUser(9));
+
+    expect(text).toContain('"smart_scopes"."media_type" = $1');
+    expect(values[0]).toBe('books');
   });
 
   it("never consults the owner flag for shared scopes, so opting in is the subscriber's decision alone", () => {

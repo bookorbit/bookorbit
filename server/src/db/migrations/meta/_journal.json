@@ -614,8 +614,92 @@
     {
       "idx": 87,
       "version": "7",
-      "when": 1788903359994,
-      "tag": "0087_add_mangabaka_columns",
+      "when": 1789055692244,
+      "tag": "0087_add_library_added_at_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1789098337223,
+      "tag": "0088_audiobook_contract_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1789273281909,
+      "tag": "0089_add_newznab_nzbget",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1789316739511,
+      "tag": "0090_add_indexer_seed_goals",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1789366394767,
+      "tag": "0091_add_read_aloud_and_podcasts",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1789366475035,
+      "tag": "0092_narration_progress_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1789366529464,
+      "tag": "0093_add_device_auth_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1789930465236,
+      "tag": "0094_add_book_duplicate_dismissals_and_sort_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1789949424697,
+      "tag": "0095_add_sabnzbd_and_prowlarr_support",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1790119788880,
+      "tag": "0096_add_android_reading_session_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1790137565077,
+      "tag": "0097_add_book_covers",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1790398181669,
+      "tag": "0098_add_subtitle_search_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1790450071640,
+      "tag": "0099_add_mangabaka_columns",
       "breakpoints": true
     }
   ]

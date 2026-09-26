@@ -11,16 +11,22 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 const { t } = useI18n()
 
-const props = defineProps<{
-  chapters: TocItem[]
-  bookmarks: BookmarkType[]
-  annotations: Annotation[]
-  currentCfi: string | null
-  locationMetaByCfi: Record<string, { chapterTitle: string | null; percentage: number | null }>
-  activeHref: string
-  expandedHrefs: Set<string>
-  pinned: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    chapters: TocItem[]
+    bookmarks: BookmarkType[]
+    annotations: Annotation[]
+    currentCfi: string | null
+    locationMetaByCfi: Record<string, { chapterTitle: string | null; percentage: number | null }>
+    activeHref: string
+    expandedHrefs: Set<string>
+    pinned: boolean
+    navigationLocked?: boolean
+  }>(),
+  {
+    navigationLocked: false,
+  },
+)
 
 const emit = defineEmits<{
   close: []
@@ -288,6 +294,7 @@ function togglePinned() {
             :items="chapters"
             :activeHref="activeHref"
             :expandedHrefs="expandedHrefs"
+            :navigationLocked="props.navigationLocked"
             :depth="0"
             @navigate="emit('navigateChapter', $event)"
             @toggleExpand="emit('toggleExpand', $event)"
@@ -460,6 +467,7 @@ const TocList = defineComponent({
     items: { type: Array as () => LocalTocItem[], required: true },
     activeHref: { type: String, required: true },
     expandedHrefs: { type: Object as () => Set<string>, required: true },
+    navigationLocked: { type: Boolean, default: false },
     depth: { type: Number, default: 0 },
   },
   emits: ['navigate', 'toggleExpand'],
@@ -484,11 +492,14 @@ const TocList = defineComponent({
                 class: [
                   'w-full text-left flex items-center gap-1 px-3 py-1.5 text-[13px] leading-snug transition-colors hover:bg-muted/50',
                   active ? 'text-primary font-medium bg-primary/8' : 'text-foreground',
+                  props.navigationLocked ? 'opacity-60 cursor-not-allowed hover:bg-transparent' : '',
                 ],
                 'data-reader-active-row': active ? 'chapter' : undefined,
                 'aria-current': active ? 'location' : undefined,
-                style: { paddingLeft: `${12 + props.depth * 10}px` },
+                style: { paddingLeft: `${16 + props.depth * 12}px` },
+                disabled: props.navigationLocked,
                 onClick: () => {
+                  if (props.navigationLocked) return
                   emit('navigate', item.href)
                 },
               },
@@ -514,6 +525,7 @@ const TocList = defineComponent({
                   items: item.subitems!,
                   activeHref: props.activeHref,
                   expandedHrefs: props.expandedHrefs,
+                  navigationLocked: props.navigationLocked,
                   depth: props.depth + 1,
                   onNavigate: (href: string) => emit('navigate', href),
                   onToggleExpand: (href: string) => emit('toggleExpand', href),

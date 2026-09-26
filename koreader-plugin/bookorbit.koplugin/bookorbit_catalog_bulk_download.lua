@@ -1208,7 +1208,7 @@ function CatalogBulkDownload.install(Catalog)
             return true
         end
 
-        self:bulkQueueMatch(ctx, { digest = digest, file = local_path })
+        self:bulkQueueMatch(ctx, { digest = digest, file = local_path, bookFileId = file.id })
         return true
     end
 
@@ -1226,7 +1226,11 @@ function CatalogBulkDownload.install(Catalog)
             logger.warn("BookOrbit: downloaded file partial MD5 failed", entry.file)
             return
         end
-        table.insert(ctx.pending_matches, { digest = digest, file = entry.file })
+        table.insert(ctx.pending_matches, {
+            digest = digest,
+            file = entry.file,
+            bookFileId = entry.bookFileId,
+        })
     end
 
     -- Applies queued links in one state flush and resolves the remainder with a
@@ -1245,7 +1249,10 @@ function CatalogBulkDownload.install(Catalog)
             local hashes, candidates = {}, {}
             for _, entry in ipairs(matches) do
                 table.insert(hashes, entry.digest)
-                candidates[entry.digest] = { source = "file" }
+                candidates[entry.digest] = {
+                    source = "file",
+                    book_file_id = entry.bookFileId,
+                }
             end
             local body, err = self.client:matchCheck(hashes, candidates)
             if not body then
@@ -1369,7 +1376,7 @@ function CatalogBulkDownload.install(Catalog)
         local lines = {
             ctx.cancelled and _("Bulk download stopped.") or _("Bulk download complete."),
             T(_("Downloaded: %1"), counts.downloaded),
-            T(_("Linked: %1"), counts.linked),
+            T(_("Linked for sync: %1"), counts.linked),
             T(_("Skipped on device: %1"), counts.skipped_on_device),
             T(_("Existing file (Not in BookOrbit): %1"), counts.skipped_existing),
             T(_("Renamed path conflicts: %1"), counts.path_conflicts or 0),

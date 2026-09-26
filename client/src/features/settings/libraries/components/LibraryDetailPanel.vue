@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Clock, FolderOpen, History, Pencil, Tags, Users } from '@lucide/vue'
 import type { Library, LibraryScanHistoryEntry } from '@bookorbit/types'
-import { FORMAT_LABELS } from '@bookorbit/types'
+import { formatKeyName } from '@/features/book/lib/book-formats'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatList, formatPercent } from '@/i18n/formatters'
@@ -38,7 +38,7 @@ const precedenceLabel = computed(() =>
 const formatsLabel = computed(() =>
   props.library.allowedFormats.length === 0
     ? t('settings.admin.libraries.detail.allSupported')
-    : formatList(props.library.allowedFormats.map((format) => FORMAT_LABELS[format] ?? format.toUpperCase())),
+    : formatList(props.library.allowedFormats.map((format) => formatKeyName(format))),
 )
 const accessLabel = computed(() => (props.accessCount === null ? '' : t('settings.admin.libraries.detail.peopleCount', { count: props.accessCount })))
 

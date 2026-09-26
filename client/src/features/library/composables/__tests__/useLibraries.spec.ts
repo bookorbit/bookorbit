@@ -10,6 +10,7 @@ vi.mock('@/lib/api', () => ({
 function makeLibrary(overrides: Partial<Library> = {}): Library {
   return {
     id: 3,
+    type: 'books',
     name: 'Main Library',
     icon: null,
     displayOrder: 0,
@@ -20,6 +21,7 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     formatPriority: [],
     allowedFormats: [],
     organizationMode: 'book_per_file',
+    addedAtSource: 'imported',
     excludePatterns: [],
     readingThreshold: 10,
     markAsFinishedPercentComplete: 95,

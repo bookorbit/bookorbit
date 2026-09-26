@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { UserBookStatusRow } from '../../db/schema';
-import { deriveLifecycle } from './user-book-status.repository';
+import { deriveLifecycle, UserBookStatusRepository } from './user-book-status.repository';
 import type { SessionBoundaries } from './user-book-status.repository';
 
 function makeRow(overrides: Partial<UserBookStatusRow> = {}): UserBookStatusRow {
@@ -92,5 +92,29 @@ describe('deriveLifecycle with sessionBoundaries', () => {
     for (const status of ['reading', 'on_hold', 'rereading', 'skimmed', 'abandoned'] as const) {
       expect(deriveLifecycle(status, now, null, boundaries)).toEqual({ startedAt: firstSession, finishedAt: null });
     }
+  });
+});
+
+describe('findUserTimeZone', () => {
+  function makeRepo(rows: { settings: unknown }[]) {
+    const chain = { from: () => chain, where: () => chain, limit: () => Promise.resolve(rows) };
+    return new UserBookStatusRepository({ select: () => chain } as never);
+  }
+
+  it('returns the reader configured timezone', async () => {
+    await expect(makeRepo([{ settings: { timezone: 'America/Chicago' } }]).findUserTimeZone(1)).resolves.toBe('America/Chicago');
+  });
+
+  it('falls back to UTC when the reader has set none', async () => {
+    await expect(makeRepo([{ settings: {} }]).findUserTimeZone(1)).resolves.toBe('UTC');
+  });
+
+  it('falls back to UTC rather than trusting an unusable stored value', async () => {
+    await expect(makeRepo([{ settings: { timezone: 'Mars/Olympus_Mons' } }]).findUserTimeZone(1)).resolves.toBe('UTC');
+    await expect(makeRepo([{ settings: { timezone: 42 } }]).findUserTimeZone(1)).resolves.toBe('UTC');
+  });
+
+  it('falls back to UTC when the user row is gone', async () => {
+    await expect(makeRepo([]).findUserTimeZone(1)).resolves.toBe('UTC');
   });
 });

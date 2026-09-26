@@ -4,7 +4,7 @@ import { ALL_METADATA_FIELDS } from '@bookorbit/types'
 import type { FieldPreference, FieldPreferenceOverrides, MetadataField, MetadataFetchPreferences, MetadataProviderKey } from '@bookorbit/types'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useMetadataPreferences } from './useMetadataPreferences'
-import { applyProviderAction, type ProviderBulkAction } from '../lib/field-rules'
+import { applyProviderAction, BULK_REORDER_EXEMPT_FIELDS, type ProviderBulkAction } from '../lib/field-rules'
 
 export const GLOBAL_SCOPE = 'global' as const
 export type FieldRuleScopeId = typeof GLOBAL_SCOPE | number
@@ -192,13 +192,13 @@ export function useFieldRuleScopes() {
     writeDraft(activeScopeId.value, { fields: { ...draft.fields, [field]: { ...globalPref, providers: [...globalPref.providers] } }, pending })
   }
 
-  function updateEveryField(update: (pref: FieldPreference) => FieldPreference) {
+  function updateEveryField(update: (pref: FieldPreference, field: MetadataField) => FieldPreference) {
     const draft = activeDraft.value
     if (!draft || saving.value) return
     const fields = { ...draft.fields }
     const pending = new Map(draft.pending)
     for (const field of ALL_METADATA_FIELDS) {
-      const next = update(fields[field])
+      const next = update(fields[field], field)
       if (next === fields[field]) continue
       fields[field] = next
       pending.set(field, next)
@@ -212,7 +212,8 @@ export function useFieldRuleScopes() {
 
   /** Moves or removes one provider across every field in the active scope. */
   function applyProviderToAllFields(provider: MetadataProviderKey, action: ProviderBulkAction) {
-    updateEveryField((pref) => {
+    updateEveryField((pref, field) => {
+      if (action !== 'remove' && BULK_REORDER_EXEMPT_FIELDS.has(field)) return pref
       const providers = applyProviderAction(pref.providers, provider, action)
       return providers.length === pref.providers.length && providers.every((key, index) => key === pref.providers[index])
         ? pref

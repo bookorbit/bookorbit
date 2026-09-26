@@ -1,4 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { BadRequestException, Logger } from '@nestjs/common';
 
 import type { ResolvedClientConfig } from '../download-client-adapter';
 import { QbittorrentAdapter } from './qbittorrent.adapter';
@@ -24,18 +25,19 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
 function response(body: string | object, init: { status?: number; setCookie?: string } = {}): Response {
   const headers = new Headers();
   if (init.setCookie) headers.append('set-cookie', init.setCookie);
+  const status = init.status ?? 200;
   const payload = typeof body === 'string' ? body : JSON.stringify(body);
-  return new Response(payload, { status: init.status ?? 200, headers });
+  return new Response(status === 204 ? null : payload, { status, headers });
 }
 
 function mockFetch() {
   const calls: Array<{ url: string; init: RequestInit }> = [];
-  const handlers = new Map<string, () => Response>();
+  const handlers = new Map<string, (url: URL) => Response>();
   const fetchMock = vi.fn((url: URL | string, init: RequestInit = {}) => {
     const href = url.toString();
     calls.push({ url: href, init });
     for (const [fragment, handler] of handlers) {
-      if (href.includes(fragment)) return Promise.resolve(handler());
+      if (href.includes(fragment)) return Promise.resolve(handler(new URL(href)));
     }
     return Promise.resolve(response('Ok.'));
   });
@@ -46,8 +48,9 @@ function mockFetch() {
 describe('QbittorrentAdapter', () => {
   let adapter: QbittorrentAdapter;
 
-  beforeEach(() => {
-    adapter = new QbittorrentAdapter();
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({ providers: [QbittorrentAdapter] }).compile();
+    adapter = module.get(QbittorrentAdapter);
   });
 
   afterEach(() => {
@@ -72,7 +75,8 @@ describe('QbittorrentAdapter', () => {
       handlers.set('torrents/info', () => response([]));
       await adapter.status([INFO_HASH], config({ id: 2, baseUrl: 'http://127.0.0.1:8080/qbt/' }));
 
-      expect(calls.at(-1)?.url).toBe(`http://127.0.0.1:8080/qbt/api/v2/torrents/info?hashes=${INFO_HASH}`);
+      expect(calls[1]?.url).toBe(`http://127.0.0.1:8080/qbt/api/v2/torrents/info?hashes=${INFO_HASH}`);
+      expect(calls.at(-1)?.url).toBe('http://127.0.0.1:8080/qbt/api/v2/torrents/info?sort=hash&limit=1000&offset=0');
     });
 
     it('is unchanged for a client mounted at the root', async () => {
@@ -86,8 +90,8 @@ describe('QbittorrentAdapter', () => {
     it('posts a magnet with the configured category and returns the caller-derived hash', async () => {
       const { calls } = mockFetch();
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).resolves.toEqual({
-        clientHash: INFO_HASH,
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).resolves.toEqual({
+        clientKey: INFO_HASH,
       });
 
       const add = calls.find((call) => call.url.includes('/api/v2/torrents/add'));
@@ -99,7 +103,7 @@ describe('QbittorrentAdapter', () => {
     it('passes seed goals through so the client, not BookOrbit, enforces them', async () => {
       const { calls } = mockFetch();
 
-      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH, seedRatioGoal: 2, seedTimeMinutes: 4320 }, config());
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, seedRatioGoal: 2, seedTimeMinutes: 4320 }, config());
 
       const form = calls.find((call) => call.url.includes('/torrents/add'))?.init.body as FormData;
       expect(form.get('ratioLimit')).toBe('2');
@@ -109,7 +113,7 @@ describe('QbittorrentAdapter', () => {
     it('uploads a .torrent as a file part', async () => {
       const { calls } = mockFetch();
 
-      await adapter.add({ torrentFile: Buffer.from('d4:infod4:name4:duneee'), torrentFileName: 'dune.torrent', infoHash: INFO_HASH }, config());
+      await adapter.add({ torrentFile: Buffer.from('d4:infod4:name4:duneee'), torrentFileName: 'dune.torrent', clientKey: INFO_HASH }, config());
 
       const form = calls.find((call) => call.url.includes('/torrents/add'))?.init.body as FormData;
       expect(form.get('torrents')).toBeInstanceOf(Blob);
@@ -122,7 +126,7 @@ describe('QbittorrentAdapter', () => {
       handlers.set('/torrents/add', () => response('Fails.'));
       handlers.set('/torrents/info', () => response([]));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).rejects.toThrow(
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).rejects.toThrow(
         /could not read that torrent/,
       );
     });
@@ -137,8 +141,8 @@ describe('QbittorrentAdapter', () => {
       handlers.set('/torrents/add', () => response('Fails.'));
       handlers.set('/torrents/info', () => response([{ hash: INFO_HASH, state: 'stalledUP', progress: 1 }]));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).resolves.toEqual({
-        clientHash: INFO_HASH,
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).resolves.toEqual({
+        clientKey: INFO_HASH,
       });
     });
 
@@ -147,12 +151,12 @@ describe('QbittorrentAdapter', () => {
       handlers.set('/torrents/add', () => response('Fails.'));
       handlers.set('/torrents/info', () => response('Forbidden', { status: 403 }));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
     });
 
     it('refuses a payload with neither a magnet nor a file', async () => {
       mockFetch();
-      await expect(adapter.add({ infoHash: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
+      await expect(adapter.add({ clientKey: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -172,7 +176,7 @@ describe('QbittorrentAdapter', () => {
       expect(calls.filter((call) => call.url.includes('/torrents/info'))).toHaveLength(1);
       expect(statuses).toEqual([
         {
-          infoHash: INFO_HASH,
+          clientKey: INFO_HASH,
           state: 'downloading',
           progressPercent: 42,
           downloadedBytes: 420,
@@ -243,6 +247,284 @@ describe('QbittorrentAdapter', () => {
     });
   });
 
+  describe('hybrid hash resolution', () => {
+    const V2 = 'fcaca6db3eab479062f70e78a27f51164760108979eb66c91e05b55d3720e49c';
+    const PRIMARY = V2.slice(0, 40);
+    const hybrid = { hash: PRIMARY, infohash_v1: INFO_HASH, infohash_v2: V2, state: 'stalledUP', progress: 1 };
+
+    function hybridClient() {
+      const mock = mockFetch();
+      mock.handlers.set('/torrents/info', (url) => {
+        const hashes = url.searchParams.get('hashes');
+        return response(hashes === null || hashes.split('|').includes(PRIMARY) ? [hybrid] : []);
+      });
+      return mock;
+    }
+
+    it.each([INFO_HASH, V2, PRIMARY])('reports completion under the requested identity %s', async (hash) => {
+      hybridClient();
+      await expect(adapter.status([hash.toUpperCase()], config())).resolves.toEqual([
+        expect.objectContaining({ clientKey: hash, state: 'completed', progressPercent: 100 }),
+      ]);
+    });
+
+    it('matches aliases even when a client returns them in the filtered response', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([{ ...hybrid, hash: PRIMARY.toUpperCase(), infohash_v1: INFO_HASH.toUpperCase() }]));
+      expect(await adapter.status([INFO_HASH], config())).toEqual([expect.objectContaining({ clientKey: INFO_HASH })]);
+      expect(calls.filter((call) => call.url.includes('/torrents/info'))).toHaveLength(1);
+    });
+
+    it('does not duplicate results when aliases, duplicate requests, or repeated rows overlap', async () => {
+      const { handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([hybrid, hybrid]));
+      const statuses = await adapter.status([INFO_HASH, INFO_HASH.toUpperCase(), PRIMARY, V2], config());
+      expect(statuses.map((status) => status.clientKey).sort()).toEqual([INFO_HASH, PRIMARY, V2].sort());
+    });
+
+    it.each([V2.slice(0, 12), V2.slice(0, 39), V2.slice(0, 41), '0'.repeat(40)])(
+      'never matches an arbitrary prefix or absent hash %s',
+      async (hash) => {
+        const { handlers } = mockFetch();
+        handlers.set('/torrents/info', () => response([{ ...hybrid, infohash_v1: '0'.repeat(40) }]));
+        expect(await adapter.status([hash], config())).toEqual([]);
+      },
+    );
+
+    it('ignores malformed alias fields without discarding the valid primary identity', async () => {
+      const { handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([{ ...hybrid, infohash_v1: 123, infohash_v2: { hash: V2 } }]));
+      expect(await adapter.status([PRIMARY, INFO_HASH], config())).toEqual([expect.objectContaining({ clientKey: PRIMARY })]);
+    });
+
+    it('pages the fallback once for the batch and caches only verified primary mappings', async () => {
+      const { calls, handlers } = mockFetch();
+      const other = { hash: 'f'.repeat(40) };
+      handlers.set('/torrents/info', (url) => {
+        const hashes = url.searchParams.get('hashes');
+        if (hashes !== null) return response(hashes === PRIMARY ? [hybrid] : []);
+        expect(url.searchParams.get('category')).toBeNull();
+        expect(url.searchParams.get('limit')).toBe('1000');
+        return response(url.searchParams.get('offset') === '0' ? Array.from({ length: 1000 }, () => other) : [hybrid]);
+      });
+      expect(await adapter.status([INFO_HASH, V2], config())).toHaveLength(2);
+      expect(calls.filter((call) => call.url.includes('/torrents/info'))).toHaveLength(3);
+      calls.length = 0;
+      expect(await adapter.status([INFO_HASH, V2], config())).toHaveLength(2);
+      expect(calls.map((call) => call.url)).toEqual([`http://127.0.0.1:8080/api/v2/torrents/info?hashes=${PRIMARY}`]);
+    });
+
+    it('keeps aliases scoped to a client and drops them when configuration changes', async () => {
+      const { calls } = hybridClient();
+      await adapter.status([INFO_HASH], config());
+      calls.length = 0;
+      await adapter.status([INFO_HASH], config({ id: 2 }));
+      expect(calls.find((call) => call.url.includes('/torrents/info'))?.url).toContain(`hashes=${INFO_HASH}`);
+      adapter.forget(1);
+      calls.length = 0;
+      await adapter.status([INFO_HASH], config());
+      expect(calls.find((call) => call.url.includes('/torrents/info'))?.url).toContain(`hashes=${INFO_HASH}`);
+    });
+
+    it('expires idle aliases and revalidates them', async () => {
+      const { calls } = hybridClient();
+      const now = vi.spyOn(Date, 'now');
+      try {
+        now.mockReturnValue(1_000_000);
+        await adapter.status([INFO_HASH], config());
+        now.mockReturnValue(1_000_000 + 30 * 60 * 1000);
+        calls.length = 0;
+        await adapter.status([INFO_HASH], config());
+        expect(calls.find((call) => call.url.includes('/torrents/info'))?.url).toContain(`hashes=${INFO_HASH}`);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it('does not trust a cached mapping if the response no longer contains the requested alias', async () => {
+      const { handlers } = hybridClient();
+      await adapter.status([INFO_HASH], config());
+      handlers.set('/torrents/info', () => response([{ hash: PRIMARY, infohash_v1: 'f'.repeat(40) }]));
+      expect(await adapter.status([INFO_HASH], config())).toEqual([]);
+    });
+
+    it('rediscovers an alias when the primary changes', async () => {
+      const { calls, handlers } = hybridClient();
+      await adapter.status([INFO_HASH], config());
+      handlers.set('/torrents/info', (url) => response(url.searchParams.has('hashes') ? [] : [{ ...hybrid, hash: INFO_HASH }]));
+      expect(await adapter.status([INFO_HASH], config())).toEqual([expect.objectContaining({ clientKey: INFO_HASH, state: 'completed' })]);
+      calls.length = 0;
+      await adapter.status([INFO_HASH], config());
+      expect(calls[0].url).toContain(`hashes=${INFO_HASH}`);
+    });
+
+    it('propagates an incomplete lookup instead of declaring the torrent missing', async () => {
+      const { handlers } = mockFetch();
+      handlers.set('/torrents/info', (url) =>
+        response(url.searchParams.has('hashes') ? [] : 'Unavailable', { status: url.searchParams.has('hashes') ? 200 : 503 }),
+      );
+      await expect(adapter.status([INFO_HASH], config())).rejects.toThrow('qBittorrent answered 503');
+    });
+
+    it.each([{}, [null], 'not json'])('rejects malformed listings instead of declaring torrents missing: %j', async (payload) => {
+      const { handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response(payload));
+      await expect(adapter.status([INFO_HASH], config())).rejects.toThrow(BadRequestException);
+    });
+
+    it('bounds an endless fallback and refuses to infer absence from a truncated search', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', (url) =>
+        response(url.searchParams.has('hashes') ? [] : Array.from({ length: 1000 }, () => ({ hash: 'f'.repeat(40) }))),
+      );
+      await expect(adapter.status([INFO_HASH], config())).rejects.toThrow('hash lookup exceeded its scan limit');
+      expect(calls.filter((call) => call.url.includes('sort=hash'))).toHaveLength(100);
+    });
+
+    it('keeps ordinary polling batched without an inventory lookup', async () => {
+      const { calls, handlers } = mockFetch();
+      const hashes = Array.from({ length: 205 }, (_, index) => (index + 1).toString(16).padStart(40, '0'));
+      handlers.set('/torrents/info', (url) =>
+        response(
+          url.searchParams
+            .get('hashes')!
+            .split('|')
+            .map((hash) => ({ hash })),
+        ),
+      );
+      expect(await adapter.status(hashes, config())).toHaveLength(205);
+      const queries = calls.filter((call) => call.url.includes('/torrents/info')).map((call) => new URL(call.url));
+      expect(queries.map((url) => url.searchParams.get('hashes')!.split('|').length)).toEqual([100, 100, 5]);
+    });
+
+    it('makes no HTTP calls for an empty batch', async () => {
+      const { calls } = mockFetch();
+      expect(await adapter.status([], config())).toEqual([]);
+      expect(calls).toEqual([]);
+    });
+
+    it.each([200, 409])('adopts an existing hybrid on an add rejection with HTTP %i', async (status) => {
+      const { handlers } = hybridClient();
+      handlers.set('/torrents/add', () => response(status === 409 ? 'Conflict' : 'Fails.', { status }));
+      expect(await adapter.add({ clientKey: INFO_HASH, magnet: `magnet:?xt=urn:btih:${INFO_HASH}&xt=urn:btmh:1220${V2}` }, config())).toEqual({
+        clientKey: INFO_HASH,
+      });
+    });
+
+    it.each([200, 503])('preserves a 409 rejection when presence cannot be confirmed (lookup HTTP %i)', async (status) => {
+      const { handlers } = mockFetch();
+      handlers.set('/torrents/add', () => response('Conflict', { status: 409 }));
+      handlers.set('/torrents/info', () => response([], { status }));
+      await expect(adapter.add({ clientKey: INFO_HASH, magnet: `magnet:?xt=urn:btih:${INFO_HASH}` }, config())).rejects.toThrow(
+        'qBittorrent answered 409 for /api/v2/torrents/add',
+      );
+    });
+
+    it('does not adopt after an unrelated server failure', async () => {
+      const { calls, handlers } = hybridClient();
+      handlers.set('/torrents/add', () => response('Unavailable', { status: 503 }));
+      await expect(adapter.add({ clientKey: INFO_HASH, magnet: `magnet:?xt=urn:btih:${INFO_HASH}` }, config())).rejects.toThrow(
+        'qBittorrent answered 503',
+      );
+      expect(calls.some((call) => call.url.includes('/torrents/info'))).toBe(false);
+    });
+
+    it('uses the primary hash to query trackers while keeping the stored identity in status', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([{ ...hybrid, state: 'metaDL', downloaded: 0, progress: 0 }]));
+      handlers.set('/torrents/trackers', () => response([{ url: 'https://tracker.example/announce', status: 4, msg: 'Denied' }]));
+      expect(await adapter.status([INFO_HASH], config())).toEqual([expect.objectContaining({ clientKey: INFO_HASH, trackerError: 'Denied' })]);
+      expect(calls.find((call) => call.url.includes('/torrents/trackers'))?.url).toContain(`hash=${PRIMARY}`);
+    });
+
+    it.each([false, true])('removes by primary hash with deleteFiles=%s', async (deleteFiles) => {
+      const { calls } = hybridClient();
+      await adapter.remove(INFO_HASH.toUpperCase(), config(), { deleteFiles });
+      const body = calls.find((call) => call.url.includes('/torrents/delete'))?.init.body as URLSearchParams;
+      expect(body.get('hashes')).toBe(PRIMARY);
+      expect(body.get('deleteFiles')).toBe(String(deleteFiles));
+    });
+
+    it('does not delete anything when the requested torrent is absent', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([]));
+      await adapter.remove(INFO_HASH, config(), { deleteFiles: true });
+      expect(calls.some((call) => call.url.includes('/torrents/delete'))).toBe(false);
+    });
+
+    it('does not delete anything when alias lookup fails', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response('Unavailable', { status: 503 }));
+      await expect(adapter.remove(INFO_HASH, config(), { deleteFiles: true })).rejects.toThrow('qBittorrent answered 503');
+      expect(calls.some((call) => call.url.includes('/torrents/delete'))).toBe(false);
+    });
+
+    it('does not swallow a 409 from a different endpoint', async () => {
+      const { handlers } = hybridClient();
+      handlers.set('/torrents/delete', () => response('Conflict', { status: 409 }));
+      await expect(adapter.remove(INFO_HASH, config(), { deleteFiles: false })).rejects.toThrow(
+        'qBittorrent answered 409 for /api/v2/torrents/delete',
+      );
+    });
+
+    it('resolves full and truncated v2 aliases even when v1 is primary', async () => {
+      const { handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([{ ...hybrid, hash: INFO_HASH, infohash_v2: V2.toUpperCase() }]));
+      expect((await adapter.status([V2, PRIMARY], config())).map((status) => status.clientKey).sort()).toEqual([V2, PRIMARY].sort());
+    });
+
+    it('evicts old aliases when the bounded cache fills without losing the ability to rediscover them', async () => {
+      const { calls, handlers } = mockFetch();
+      const entries = Array.from({ length: 10_001 }, (_, index) => ({
+        hash: (index + 20_000).toString(16).padStart(40, '0'),
+        infohash_v1: (index + 1).toString(16).padStart(40, '0'),
+      }));
+      const byHash = new Map(
+        entries.flatMap(
+          (entry) =>
+            [
+              [entry.hash, entry],
+              [entry.infohash_v1, entry],
+            ] as const,
+        ),
+      );
+      handlers.set('/torrents/info', (url) =>
+        response(
+          url.searchParams
+            .get('hashes')!
+            .split('|')
+            .map((hash) => byHash.get(hash)),
+        ),
+      );
+      expect(
+        await adapter.status(
+          entries.map((entry) => entry.infohash_v1),
+          config(),
+        ),
+      ).toHaveLength(entries.length);
+      calls.length = 0;
+      await adapter.status([entries[0].infohash_v1, entries.at(-1)!.infohash_v1], config());
+      const query = new URL(calls.at(-1)!.url).searchParams.get('hashes');
+      expect(query).toBe(`${entries[0].infohash_v1}|${entries.at(-1)!.hash}`);
+    });
+
+    it('marks owned inventory as truncated without returning more than the reconciliation limit', async () => {
+      const { handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response(Array.from({ length: 1001 }, () => hybrid)));
+      const inventory = await adapter.listOwned(config());
+      expect(inventory.truncated).toBe(true);
+      expect(inventory.items).toHaveLength(1000);
+    });
+
+    it('reports owned hybrids under v1 so tracked downloads cannot appear orphaned', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([hybrid, { hash: 'f'.repeat(40), infohash_v1: '0'.repeat(40) }]));
+      const inventory = await adapter.listOwned(config());
+      expect(inventory.items.map((item) => item.clientKey)).toEqual([INFO_HASH, 'f'.repeat(40)]);
+      expect(new URL(calls.at(-1)!.url).searchParams.get('limit')).toBe('1001');
+    });
+  });
+
   describe('session handling', () => {
     it('reuses the session cookie across calls', async () => {
       const { calls, handlers } = mockFetch();
@@ -267,11 +549,77 @@ describe('QbittorrentAdapter', () => {
       expect(calls.filter((call) => call.url.includes('/auth/login'))).toHaveLength(2);
     });
 
+    /**
+     * qBittorrent 5.2 renamed the cookie to `QBT_SID_<WebUI port>` and answers the login with an
+     * empty 204. Reading only `SID` left the session empty, which every later call answered with a
+     * 403 that looked like a permission problem rather than an unrecognised cookie.
+     */
+    it('accepts the 5.2 session cookie and its empty 204 login', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/auth/login', () =>
+        response('', { status: 204, setCookie: 'QBT_SID_8080=xZE+G8m4; HttpOnly; expires=Mon, 21-Sep-2026 01:34:10 GMT; path=/' }),
+      );
+      handlers.set('/torrents/info', () => response([]));
+
+      await adapter.status([INFO_HASH], config());
+
+      const infoCall = calls.find((call) => call.url.includes('/torrents/info'));
+      expect((infoCall?.init.headers as Record<string, string>).Cookie).toBe('QBT_SID_8080=xZE+G8m4');
+    });
+
+    /** The cookie is named after qBittorrent's own WebUI port, not the port BookOrbit dials. */
+    it('accepts a session cookie whose port differs from the configured one', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/auth/login', () => response('', { status: 204, setCookie: 'QBT_SID_18022=abc123; HttpOnly; path=/' }));
+      handlers.set('/torrents/info', () => response([]));
+
+      await adapter.status([INFO_HASH], config({ baseUrl: 'http://127.0.0.1:9091' }));
+
+      const infoCall = calls.find((call) => call.url.includes('/torrents/info'));
+      expect((infoCall?.init.headers as Record<string, string>).Cookie).toBe('QBT_SID_18022=abc123');
+    });
+
     it('reports rejected credentials rather than retrying forever', async () => {
       const { handlers } = mockFetch();
       handlers.set('/auth/login', () => response('Fails.'));
 
-      await expect(adapter.test(config())).resolves.toMatchObject({ success: false });
+      await expect(adapter.test(config())).resolves.toMatchObject({ success: false, error: 'qBittorrent rejected those credentials' });
+    });
+
+    /** 5.2 answers a bad password with 401 rather than the older 200 "Fails.". */
+    it('reports rejected credentials when the client answers 401', async () => {
+      const { handlers } = mockFetch();
+      handlers.set('/auth/login', () => response('Unauthorized', { status: 401 }));
+
+      await expect(adapter.test(config())).resolves.toMatchObject({ success: false, error: 'qBittorrent rejected those credentials' });
+    });
+
+    /** A client that bans the caller after repeated failures says so, and the operator needs it. */
+    it('passes on why the client refused the login with a 403', async () => {
+      const { handlers } = mockFetch();
+      handlers.set('/auth/login', () => response('Your IP address has been banned after too many failed authentication attempts.', { status: 403 }));
+
+      await expect(adapter.test(config())).resolves.toMatchObject({
+        success: false,
+        error: 'qBittorrent refused the login: Your IP address has been banned after too many failed authentication attempts.',
+      });
+    });
+
+    /**
+     * A login that sets nothing means authentication is disabled for this subnet, and the adapter
+     * carries on without a cookie. That assumption is also what an unrecognised cookie looks like,
+     * so it is worth a line in the log rather than a 403 three calls later.
+     */
+    it('says so when a successful login sets no session cookie', async () => {
+      const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const { calls, handlers } = mockFetch();
+      handlers.set('/auth/login', () => response('Ok.'));
+      handlers.set('/app/version', () => response('v5.2.3'));
+
+      await expect(adapter.test(config())).resolves.toEqual({ success: true, version: 'v5.2.3' });
+
+      expect((calls.at(-1)?.init.headers as Record<string, string>).Cookie).toBe('');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[download_client.login]'));
     });
   });
 
@@ -300,7 +648,8 @@ describe('QbittorrentAdapter', () => {
 
   describe('remove', () => {
     it('deletes by hash without touching the files on disk', async () => {
-      const { calls } = mockFetch();
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([{ hash: INFO_HASH }]));
 
       await adapter.remove(INFO_HASH, config(), { deleteFiles: false });
 

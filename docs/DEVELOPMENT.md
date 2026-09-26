@@ -12,8 +12,8 @@ BookOrbit is a pnpm monorepo with three workspaces: a Vue 3 single-page app, a N
 
 ```mermaid
 graph LR
-    Client["Client<br/><small>Vue 3 SPA</small><br/><small>localhost:5173</small>"]
-    Server["Server<br/><small>NestJS + Fastify</small><br/><small>localhost:3000/api</small>"]
+    Client["Client<br/><small>Vue 3 SPA</small><br/><small>localhost:6263</small>"]
+    Server["Server<br/><small>NestJS + Fastify</small><br/><small>localhost:6262/api</small>"]
     DB["PostgreSQL<br/><small>Drizzle ORM</small>"]
     WS["WebSocket<br/><small>Socket.IO</small>"]
     Types["Shared Types<br/><small>@bookorbit/types</small>"]
@@ -162,8 +162,8 @@ If everything worked, you will see the server, client, and types watcher start u
 
 | Check                                    | Expected                                   |
 | ---------------------------------------- | ------------------------------------------ |
-| Open http://localhost:5173               | BookOrbit login page loads                 |
-| Open http://localhost:3000/api/v1/health | Returns `{"status":"ok"}`                  |
+| Open http://localhost:6263               | BookOrbit login page loads                 |
+| Open http://localhost:6262/api/v1/health | Returns `{"status":"ok"}`                  |
 | `docker ps`                              | Shows `bookorbit-dev-db` container running |
 
 ---
@@ -178,8 +178,8 @@ This starts the server, client, and types watcher concurrently with hot reload.
 
 | Service | URL                       |
 | ------- | ------------------------- |
-| Client  | http://localhost:5173     |
-| API     | http://localhost:3000/api |
+| Client  | http://localhost:6263     |
+| API     | http://localhost:6262/api |
 
 If PostgreSQL is not running, start it first with `pnpm run db:up`.
 
@@ -195,8 +195,8 @@ When enabled, open:
 
 | Docs         | URL                                 |
 | ------------ | ----------------------------------- |
-| Swagger UI   | http://localhost:3000/api/docs      |
-| OpenAPI JSON | http://localhost:3000/api/docs-json |
+| Swagger UI   | http://localhost:6262/api/docs      |
+| OpenAPI JSON | http://localhost:6262/api/docs-json |
 
 <details>
 <summary>Running workspaces separately</summary>
@@ -224,17 +224,23 @@ pnpm --filter @bookorbit/types dev
 
 These are the variables you are most likely to need during development. See `server/.env.example` for the full list with comments.
 
-| Variable              | Purpose                            | Default (dev)                                             |
-| --------------------- | ---------------------------------- | --------------------------------------------------------- |
-| `DATABASE_URL`        | PostgreSQL connection string       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
-| `PORT`                | Server listen port                 | `3000`                                                    |
-| `NODE_ENV`            | Runtime mode                       | `development`                                             |
-| `JWT_SECRET`          | Signing key for auth tokens        | `change-me-in-production`                                 |
-| `APP_DATA_PATH`       | Storage for covers, avatars, cache | `../local/data`                                           |
-| `LIBRARY_BROWSE_ROOT` | Library folder picker root         | `/`                                                       |
-| `APP_URL`             | Base URL for email links           | `http://localhost:5173`                                   |
-| `SWAGGER_ENABLED`     | Serve Swagger UI and OpenAPI JSON  | `false`                                                   |
-| `DISABLE_LOCAL_AUTH`  | Disable password authentication    | `false`                                                   |
+| Variable                 | Purpose                                            | Default (dev)                                             |
+| ------------------------ | -------------------------------------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`           | PostgreSQL connection string                       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
+| `PORT`                   | Server listen port                                 | `3000`                                                    |
+| `HOST`                   | Server listen address (IPv4 or IPv6)               | `0.0.0.0`                                                 |
+| `NODE_ENV`               | Runtime mode                                       | `development`                                             |
+| `JWT_SECRET`             | Signing key for auth tokens                        | `change-me-in-production`                                 |
+| `PODCAST_ENCRYPTION_KEY` | Podcast URL encryption key; required in production | Falls back to `JWT_SECRET` in development                 |
+| `APP_DATA_PATH`          | Storage for covers, avatars, cache                 | `../local/data`                                           |
+| `LIBRARY_BROWSE_ROOT`    | Library folder picker root                         | `/`                                                       |
+| `APP_URL`                | Base URL for email links                           | `http://localhost:6263`                                   |
+| `SWAGGER_ENABLED`        | Serve Swagger UI and OpenAPI JSON                  | `false`                                                   |
+| `DISABLE_LOCAL_AUTH`     | Disable password authentication                    | `false`                                                   |
+
+For a native server accessible only on this machine, set `HOST=127.0.0.1` in `server/.env`. `HOST` accepts an IPv4 or IPv6 address without a port or brackets, such as `::1` for IPv6 loopback. An unset or blank value keeps the existing `0.0.0.0` default. `PORT` continues to select the listen port.
+
+With Docker bridge networking, keep `HOST` unset and set `APP_PORT=127.0.0.1:3000` in the deployment `.env` to publish only on host loopback. `HOST` controls the container's listener, while `APP_PORT` controls host port publishing. Binding to loopback inside the container prevents normal port forwarding and access from other containers. A reverse proxy in another container can instead use the shared Docker network with the app's published port removed. With host networking, `HOST` controls the host's listener directly.
 
 ---
 
@@ -465,7 +471,7 @@ pnpm run e2e:run -- <suite-id>
 
 **Port already in use**
 
-The server defaults to port 3000 (configured via `PORT` in `server/.env`) and the client to 5173 (Vite default). If either is occupied, find the process that owns it and stop it, or change the server port in `server/.env`.
+Local development runs the server on port 6262 (`PORT` in `server/.env`) and the client on 6263 (`server.port` in `client/vite.config.ts`, with `strictPort`, so Vite fails instead of silently moving). Both avoid 3000, which many other self-hosted apps and dev tools claim. A server started without `PORT`, such as the Docker image, still listens on 3000. If either is occupied, find the process that owns it and stop it, or change the server port in `server/.env`.
 
 **Hot reload not picking up changes**
 

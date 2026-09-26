@@ -1,3 +1,7 @@
+import { ValidationPipe } from '@nestjs/common';
+import { AuthSessionService } from '../src/modules/auth/auth-session.service';
+import { OidcSessionRepository } from '../src/modules/auth/oidc/oidc-session.repository';
+import type { NativeAuthResponse, NativeCredentials } from '@bookorbit/types';
 import { createHash, randomUUID } from 'crypto';
 
 import fastifyCookie from '@fastify/cookie';
@@ -36,6 +40,7 @@ interface LocalUserCredentials {
 }
 
 interface LoginResult {
+  sessionId: number;
   accessToken: string;
   refreshToken: string;
   jar: CookieJar;
@@ -128,6 +133,7 @@ async function createAuthRecoveryContext(): Promise<AuthRecoveryContext> {
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   await app.register(fastifyCookie as never);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
@@ -196,7 +202,7 @@ async function login(app: NestFastifyApplication, username: string, password: st
   });
   expect(response.statusCode).toBe(200);
 
-  const body = response.json() as { accessToken: string };
+  const body = response.json() as { accessToken: string; sessionId: number };
   const setCookieLines = getSetCookieLines(response.headers);
   const refreshToken = cookieValue(setCookieLines, 'refresh_token');
   expect(refreshToken).toBeTruthy();
@@ -206,6 +212,7 @@ async function login(app: NestFastifyApplication, username: string, password: st
 
   return {
     accessToken: body.accessToken,
+    sessionId: body.sessionId,
     refreshToken: refreshToken!,
     jar,
   };
@@ -383,7 +390,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         },
       });
       expect(refreshAfterReset.statusCode).toBe(401);
-      expect(await activeSessionCount(context.db, user.userId)).toBe(0);
+      expect(await activeSessionCount(context.db, user.userId)).toBe(1);
 
       const meAfterRevokedReuse = await context.app.inject({
         method: 'GET',
@@ -392,7 +399,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
           authorization: `Bearer ${newAccessToken}`,
         },
       });
-      expect(meAfterRevokedReuse.statusCode).toBe(401);
+      expect(meAfterRevokedReuse.statusCode).toBe(200);
 
       const tokenRowAfterReset = await context.db.query.passwordResetTokens.findFirst({
         where: eq(schema.passwordResetTokens.tokenHash, sha256(rawToken)),
@@ -573,6 +580,147 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
     });
   });
 
+  describe('native device sessions', () => {
+    async function nativeLogin(user: LocalUserCredentials) {
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        payload: { username: user.username, password: user.password, clientKind: 'native', deviceLabel: 'iOS test' },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(getSetCookieLines(response.headers)).toEqual([]);
+      expect(response.headers['cache-control']).toBe('no-store');
+      return response.json<NativeAuthResponse>();
+    }
+
+    function refresh(refreshToken: string) {
+      return context.app.inject({ method: 'POST', url: '/api/v1/auth/refresh', payload: { refreshToken } });
+    }
+
+    function me(accessToken: string) {
+      return context.app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { authorization: `Bearer ${accessToken}` } });
+    }
+
+    it('serializes concurrent rotation and recovers the same replacement after a lost response', async () => {
+      const user = await createUser(context.db);
+      const first = await nativeLogin(user);
+      const results = await Promise.all(Array.from({ length: 8 }, () => refresh(first.refreshToken)));
+      expect(results.map((result) => result.statusCode)).toEqual(Array(8).fill(200));
+      const replacements = results.map((result) => result.json<NativeCredentials>());
+      expect(new Set(replacements.map((replacement) => replacement.refreshToken)).size).toBe(1);
+      expect(replacements.every((replacement) => replacement.sessionId === first.sessionId)).toBe(true);
+      const retry = await refresh(first.refreshToken);
+      expect(retry.json<NativeCredentials>().refreshToken).toBe(replacements[0].refreshToken);
+      const rows = await context.db.select().from(schema.refreshTokens).where(eq(schema.refreshTokens.sessionId, first.sessionId));
+      expect(rows).toHaveLength(2);
+      expect(rows.filter((row) => !row.revokedAt)).toHaveLength(1);
+      expect(JSON.stringify(rows)).not.toContain(replacements[0].refreshToken);
+      expect((await refresh(replacements[0].refreshToken)).statusCode).toBe(200);
+      const list = await context.app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/sessions',
+        headers: { authorization: `Bearer ${first.accessToken}` },
+      });
+      expect(list.json()).toEqual([expect.objectContaining({ id: first.sessionId, clientKind: 'native', deviceLabel: 'iOS test' })]);
+    });
+
+    it('limits replay outside the grace window to one device', async () => {
+      const user = await createUser(context.db);
+      const first = await nativeLogin(user);
+      const second = await nativeLogin(user);
+      const rotated = await refresh(first.refreshToken);
+      expect(rotated.statusCode).toBe(200);
+      await context.db
+        .update(schema.refreshTokens)
+        .set({ rotatedAt: new Date(Date.now() - 60_000) })
+        .where(eq(schema.refreshTokens.tokenHash, sha256(first.refreshToken)));
+      expect((await refresh(first.refreshToken)).statusCode).toBe(401);
+      expect((await me(first.accessToken)).statusCode).toBe(401);
+      expect((await refresh(rotated.json<NativeCredentials>().refreshToken)).statusCode).toBe(401);
+      expect((await me(second.accessToken)).statusCode).toBe(200);
+      expect((await refresh(second.refreshToken)).statusCode).toBe(200);
+    });
+
+    it('logout revokes current access and refresh credentials without affecting another device', async () => {
+      const user = await createUser(context.db);
+      const first = await nativeLogin(user);
+      const second = await nativeLogin(user);
+      const response = await context.app.inject({ method: 'POST', url: '/api/v1/auth/logout', payload: { refreshToken: first.refreshToken } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({});
+      expect((await me(first.accessToken)).statusCode).toBe(401);
+      expect((await refresh(first.refreshToken)).statusCode).toBe(401);
+      expect((await me(second.accessToken)).statusCode).toBe(200);
+      const userAfter = await context.db.query.users.findFirst({ where: eq(schema.users.id, user.userId) });
+      expect(userAfter?.tokenVersion).toBe(1);
+    });
+
+    it('checks ownership before device removal and rejects credentials immediately after removal', async () => {
+      const user = await createUser(context.db);
+      const other = await createUser(context.db);
+      const first = await nativeLogin(user);
+      const second = await nativeLogin(user);
+      const outsider = await nativeLogin(other);
+      const remove = (token: string) =>
+        context.app.inject({ method: 'DELETE', url: `/api/v1/auth/sessions/${first.sessionId}`, headers: { authorization: `Bearer ${token}` } });
+      expect((await remove(outsider.accessToken)).statusCode).toBe(403);
+      expect((await me(first.accessToken)).statusCode).toBe(200);
+      expect((await remove(second.accessToken)).statusCode).toBe(204);
+      expect((await me(first.accessToken)).statusCode).toBe(401);
+      expect((await me(second.accessToken)).statusCode).toBe(200);
+    });
+
+    it('validates native DTOs and rejects conflicting credential transports', async () => {
+      const user = await createUser(context.db);
+      const native = await nativeLogin(user);
+      const web = await login(context.app, user.username, user.password);
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/refresh',
+        headers: { cookie: `refresh_token=${web.refreshToken}` },
+        payload: { refreshToken: native.refreshToken },
+      });
+      expect(response.statusCode).toBe(400);
+      expect((await refresh('invalid')).statusCode).toBe(400);
+      const invalid = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        payload: { username: user.username, password: user.password, clientKind: 'unknown' },
+      });
+      expect(invalid.statusCode).toBe(400);
+      expect((await me(web.accessToken)).statusCode).toBe(200);
+      expect((await me(native.accessToken)).statusCode).toBe(200);
+    });
+
+    it('isolates provider logout by issuer and sid, leaving password and other provider sessions active', async () => {
+      const user = await createUser(context.db);
+      const password = await nativeLogin(user);
+      const sessions = context.app.get(AuthSessionService);
+      const first = await sessions.issue(
+        user.userId,
+        1,
+        'oidc',
+        { clientKind: 'native' },
+        { oidcSubject: 'subject', oidcIssuer: 'https://first.example', oidcSessionId: 'shared-sid' },
+      );
+      const second = await sessions.issue(
+        user.userId,
+        1,
+        'oidc',
+        { clientKind: 'native' },
+        { oidcSubject: 'subject', oidcIssuer: 'https://second.example', oidcSessionId: 'shared-sid' },
+      );
+      const repository = context.app.get(OidcSessionRepository);
+      expect(await repository.revokeProviderSessions('https://first.example', { sid: 'shared-sid' })).toBe(1);
+      expect((await me(first.accessToken)).statusCode).toBe(401);
+      expect((await refresh(first.refreshToken)).statusCode).toBe(401);
+      expect((await me(second.accessToken)).statusCode).toBe(200);
+      expect((await me(password.accessToken)).statusCode).toBe(200);
+      expect(await repository.revokeProviderSessions('https://second.example', { subject: 'subject' })).toBe(1);
+      expect((await me(second.accessToken)).statusCode).toBe(401);
+    });
+  });
+
   describe('OIDC logout', () => {
     it('clears cookies and revokes session for local user without OIDC session', async () => {
       const user = await createUser(context.db);
@@ -598,7 +746,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
       expect(refreshAfterLogout.statusCode).toBe(401);
     });
 
-    it('returns provider logout URL and revokes local OIDC session', async () => {
+    it('revokes the local OIDC session without signing out of the identity provider', async () => {
       const user = await createUser(context.db);
       const session = await login(context.app, user.username, user.password);
 
@@ -607,6 +755,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         .insert(schema.oidcSessions)
         .values({
           userId: user.userId,
+          sessionId: session.sessionId,
           oidcSubject: `sub-${randomUUID()}`,
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,
@@ -620,17 +769,13 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         url: '/api/v1/auth/logout',
         headers: {
           cookie: cookieHeader(session.jar),
-          origin: 'http://localhost:5173',
+          origin: 'http://localhost:6263',
         },
       });
       expect(logoutResponse.statusCode).toBe(200);
 
-      const body = logoutResponse.json() as { logoutUrl?: string };
-      expect(body.logoutUrl).toEqual(expect.any(String));
-      const logoutUrl = new URL(body.logoutUrl!);
-      expect(`${logoutUrl.origin}${logoutUrl.pathname}`).toBe('https://issuer.example/logout');
-      expect(logoutUrl.searchParams.get('id_token_hint')).toBe(createdOidcSession.idTokenHint);
-      expect(logoutUrl.searchParams.get('post_logout_redirect_uri')).toBe('http://localhost:5173/login');
+      expect(logoutResponse.json()).toEqual({});
+      expect(context.oidcDiscoveryMock.getDiscoveryDoc).not.toHaveBeenCalled();
       const logoutCookies = getSetCookieLines(logoutResponse.headers);
       expect(cookieValue(logoutCookies, 'refresh_token')).toBe('');
       expect(cookieValue(logoutCookies, 'access_token')).toBe('');
@@ -668,6 +813,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         .insert(schema.oidcSessions)
         .values({
           userId: user.userId,
+          sessionId: session.sessionId,
           oidcSubject: `sub-${randomUUID()}`,
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,
@@ -702,6 +848,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         .insert(schema.oidcSessions)
         .values({
           userId: user.userId,
+          sessionId: session.sessionId,
           oidcSubject: `sub-${randomUUID()}`,
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,
@@ -740,6 +887,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         .insert(schema.oidcSessions)
         .values({
           userId: user.userId,
+          sessionId: session.sessionId,
           oidcSubject: `sub-${randomUUID()}`,
           oidcIssuer: 'https://issuer.example',
           oidcSessionId: `sid-${randomUUID()}`,

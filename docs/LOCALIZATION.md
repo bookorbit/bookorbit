@@ -95,9 +95,9 @@ The component only supplies `count`, so its message must not require other argum
 
 After an English source change reaches `main`:
 
-1. Crowdin synchronizes `client/src/locales/en.json`.
+1. The `Crowdin Source Sync` workflow uploads `client/src/locales/en.json`, preserving translations while invalidating approvals for changed source messages, and verifies every source key and value.
 2. Translators update target strings in Crowdin.
-3. The scheduled or manually dispatched `Crowdin Translation Sync` workflow verifies that Crowdin's source keys match `en.json`.
+3. The scheduled or manually dispatched `Crowdin Translation Sync` workflow repeats the source upload and verification before exporting, so a missed push workflow cannot leave the export blocked on stale source data.
 4. The workflow requests only translated strings, removes the empty values Crowdin emits for untranslated nested JSON entries, and validates the resulting sparse catalogs.
 5. Before writing, the workflow normalizes punctuation the catalogs prohibit, omits messages that fail validation, and rejects an export that drops far more translations than translator churn explains.
 6. Only after validation and retention checks pass, the workflow updates `l10n_main` and opens a pull request to `main`.
@@ -242,14 +242,9 @@ Only enable scheduled export for the new language after this manual round trip s
 
 ## Crowdin Project Settings
 
-Use the native GitHub integration in **Source and translation files mode** with only `main` connected. Do not use Target file bundles mode or automatic feature-branch discovery. Leave source synchronization enabled, but disable the integration's scheduled translation synchronization and pull-request creation. The repository workflow owns translation export and delivery.
+The repository workflows own source upload, translation export, and pull-request delivery. Do not use the native GitHub integration or its repository webhook as a second synchronization path. When migrating an existing project, first manually run `Crowdin Source Sync` and verify that it succeeds without losing translations, then disconnect the native integration and remove its webhook.
 
-Initial import settings:
-
-- Import existing translations once.
-- Allow target translations to match the source.
-- Do not continuously import translations from GitHub afterward.
-- Keep Push Sources disabled.
+Source updates use Crowdin's `keep_translations` mode. Existing translations survive an English edit, while their approvals are removed. Prefer a new message key when the English meaning changes so an old translation cannot be mistaken for current copy.
 
 Export settings:
 
@@ -257,12 +252,12 @@ Export settings:
 - Skip untranslated files: off.
 - Export only approved translations: off unless the review policy changes explicitly.
 
-Crowdin preserves untranslated nested JSON keys with empty values even when untranslated strings are skipped. `client/scripts/sync-crowdin-translations.mjs` removes those empty entries, restores English source-key ordering, validates every translated message, and refuses to write catalogs if Crowdin has not synchronized the current English keys.
+Crowdin preserves untranslated nested JSON keys with empty values even when untranslated strings are skipped. `client/scripts/sync-crowdin-translations.mjs` removes those empty entries, restores English source-key ordering, validates every translated message, and refuses to export catalogs unless Crowdin matches every current English key and value.
 
-The `Crowdin Translation Sync` workflow requires:
+The Crowdin synchronization workflows require:
 
-- `CROWDIN_TOKEN`, with permission to read project files, strings, and translation builds.
-- `CROWDIN_PR_TOKEN`, a fine-grained GitHub token with repository contents and pull-request write access.
+- `CROWDIN_TOKEN`, with permission to read and write project source files and read translation builds.
+- `CROWDIN_PR_TOKEN`, used only by `Crowdin Translation Sync`, with repository contents and pull-request write access.
 - Optional repository variable `CROWDIN_PROJECT_ID`; the BookOrbit project ID is the script default.
 
 Configure variable mismatches and leading or trailing whitespace as Crowdin QA errors. Keep punctuation and length checks enabled, and include translator instructions for Vue I18n plural branches, the HTML prohibition, and the Unicode em dash prohibition.

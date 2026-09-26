@@ -9,8 +9,6 @@ import {
   UpdateReadingAttemptDto,
 } from '../user-book-status/dto/reading-attempt.dto';
 import { BookService } from './book.service';
-import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { Permission } from '@bookorbit/types';
 
 @Controller('books/:bookId/reading-attempts')
 export class ReadingAttemptController {
@@ -31,8 +29,13 @@ export class ReadingAttemptController {
     return this.attempts.createHistorical(user.id, bookId, dto);
   }
 
+  /**
+   * Takes no permission beyond book access, like every other route here. All five are scoped by
+   * `user.id`, so they touch nothing but the caller's own reading history; gating only this one and
+   * the delete left the controller contradicting itself, since an attempt could be created and
+   * edited without the permission but not started or removed.
+   */
   @Post('start-reread')
-  @RequirePermission(Permission.LibraryEditMetadata)
   async startReread(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: StartRereadDto, @CurrentUser() user: RequestUser) {
     await this.books.verifyBookAccess(bookId, user);
     if (dto.resetProgress !== false) await this.books.clearBookProgressForReread(user.id, bookId, user);
@@ -51,7 +54,6 @@ export class ReadingAttemptController {
   }
 
   @Delete(':attemptId')
-  @RequirePermission(Permission.LibraryEditMetadata)
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('bookId', ParseIntPipe) bookId: number, @Param('attemptId', ParseIntPipe) attemptId: number, @CurrentUser() user: RequestUser) {
     await this.books.verifyBookAccess(bookId, user);

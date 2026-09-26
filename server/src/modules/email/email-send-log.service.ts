@@ -40,8 +40,8 @@ export class EmailSendLogService implements OnApplicationBootstrap {
     return { isFinal };
   }
 
-  async findForUser(user: RequestUser, page: number, size: number) {
-    return this.repo.findForUser(user.id, size, page * size);
+  async findForUser(user: RequestUser, page: number, size: number, bookId?: number) {
+    return this.repo.findForUser(user.id, size, page * size, bookId);
   }
 
   async findAllAdmin(page: number, size: number) {

@@ -92,4 +92,28 @@ export class UserPreferencesController {
   async upsertWhatsNewPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
     await this.userPreferencesService.upsertWhatsNewPreferences(user.id, dto.settings);
   }
+
+  @Get('podcast-playback')
+  async getPodcastPlaybackPreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getPodcastPlaybackPreferences(user.id);
+    return { settings };
+  }
+
+  @Put('podcast-playback')
+  @HttpCode(204)
+  async upsertPodcastPlaybackPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertPodcastPlaybackPreferences(user.id, dto.settings);
+  }
+
+  @Get('podcast-playlists')
+  async getPodcastPlaylistPreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getPodcastPlaylistPreferences(user.id);
+    return { settings };
+  }
+
+  @Put('podcast-playlists')
+  @HttpCode(204)
+  async upsertPodcastPlaylistPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertPodcastPlaylistPreferences(user.id, dto.settings);
+  }
 }

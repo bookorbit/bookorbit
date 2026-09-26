@@ -77,6 +77,17 @@ export class StatsCache {
     this.scopeIndex.delete(scope);
   }
 
+  clearForScopePrefix(prefix: string): void {
+    const scopes = new Set([...this.scopeGen.keys(), ...this.scopeIndex.keys()]);
+    for (const fullKey of this.inFlight.keys()) {
+      const separatorIndex = fullKey.indexOf('::');
+      if (separatorIndex >= 0) scopes.add(fullKey.slice(0, separatorIndex));
+    }
+    for (const scope of scopes) {
+      if (scope.startsWith(prefix)) this.clearForScope(scope);
+    }
+  }
+
   clear(): void {
     this.entries.clear();
     this.inFlight.clear();

@@ -804,4 +804,149 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(latencyResponse.statusCode).toBe(200);
     expect(latencyResponse.json()).toMatchObject({ totalCompletions: 3, medianDays: 2 });
   });
+
+  it('32. reports the same completed-book count on the reading-goal widget and the activity overview', async () => {
+    const username = `activity-goal-${randomUUID()}`;
+    const password = 'ActivityGoal123!';
+    const [user] = await ctx.db
+      .insert(schema.users)
+      .values({
+        username,
+        name: 'Activity Goal User',
+        passwordHash: await hash(password, 4),
+        isDefaultPassword: false,
+        provisioningMethod: 'local',
+      })
+      .returning({ id: schema.users.id });
+    await ctx.db.insert(schema.userLibraryAccess).values({ userId: user.id, libraryId, accessLevel: 'viewer' });
+
+    const attempts = ctx.app.get(ReadingAttemptService);
+    const thisYear = new Date().getUTCFullYear();
+    const todayKey = new Date().toISOString().slice(0, 10);
+    // Every seeded date has to be in the current year and not in the future, on Jan 1 as much as
+    // in December, so a fixed day in January is clamped to today rather than landing ahead of it.
+    const dayThisYear = (monthDay: string) => {
+      const candidate = `${thisYear}-${monthDay}`;
+      return candidate > todayKey ? todayKey : candidate;
+    };
+
+    async function addSession(book: BookFixture, attemptId: number, endProgress: number, day: string) {
+      const startedAt = new Date(`${day}T10:00:00.000Z`);
+      await ctx.db.insert(schema.readingSessions).values({
+        userId: user.id,
+        bookFileId: book.fileId,
+        bookId: book.bookId,
+        attemptId,
+        sessionId: `activity-goal-${randomUUID()}`,
+        source: 'koreader',
+        startedAt,
+        endedAt: new Date(startedAt.getTime() + 60 * 60 * 1000),
+        durationSeconds: 3600,
+        progressDelta: 10,
+        endProgress,
+      });
+    }
+
+    // Finished in the app, with a session that ran to the end. Both sources always agreed here.
+    const finishedInApp = await createBook();
+    const finishedInAppAttempt = await attempts.createHistorical(user.id, finishedInApp.bookId, {
+      startedOn: dayThisYear('02-01'),
+      endedOn: dayThisYear('02-10'),
+      outcome: 'completed',
+    });
+    await addSession(finishedInApp, finishedInAppAttempt.id, 100, dayThisYear('02-10'));
+
+    // Marked read by hand or imported from another client: no session exists at all.
+    const markedRead = await createBook();
+    await attempts.createHistorical(user.id, markedRead.bookId, {
+      startedOn: dayThisYear('03-01'),
+      endedOn: dayThisYear('03-05'),
+      outcome: 'completed',
+    });
+
+    // Finished elsewhere, so the last session this server saw stops short of the end.
+    const finishedElsewhere = await createBook();
+    const finishedElsewhereAttempt = await attempts.createHistorical(user.id, finishedElsewhere.bookId, {
+      startedOn: dayThisYear('04-01'),
+      endedOn: dayThisYear('04-08'),
+      outcome: 'completed',
+    });
+    await addSession(finishedElsewhere, finishedElsewhereAttempt.id, 97.4, dayThisYear('04-08'));
+
+    // Read twice this year. Each finish counts, rather than collapsing into the first one.
+    const reRead = await createBook();
+    const firstRead = await attempts.createHistorical(user.id, reRead.bookId, {
+      startedOn: dayThisYear('05-01'),
+      endedOn: dayThisYear('05-10'),
+      outcome: 'completed',
+    });
+    await addSession(reRead, firstRead.id, 100, dayThisYear('05-10'));
+    const secondRead = await attempts.createHistorical(user.id, reRead.bookId, {
+      startedOn: dayThisYear('06-01'),
+      endedOn: dayThisYear('06-10'),
+      outcome: 'completed',
+    });
+    await addSession(reRead, secondRead.id, 100, dayThisYear('06-10'));
+
+    // Finished last year, so it belongs to last year's total and must not reach this one.
+    const lastYearBook = await createBook();
+    const lastYearAttempt = await attempts.createHistorical(user.id, lastYearBook.bookId, {
+      startedOn: `${thisYear - 1}-11-01`,
+      endedOn: `${thisYear - 1}-11-20`,
+      outcome: 'completed',
+    });
+    await addSession(lastYearBook, lastYearAttempt.id, 100, `${thisYear - 1}-11-20`);
+
+    // Deleted, skimmed and undated attempts stay out of every count.
+    const excludedBook = await createBook();
+    const deleted = await attempts.createHistorical(user.id, excludedBook.bookId, {
+      startedOn: dayThisYear('07-01'),
+      endedOn: dayThisYear('07-02'),
+      outcome: 'completed',
+    });
+    await attempts.delete(user.id, excludedBook.bookId, deleted.id);
+    await attempts.createHistorical(user.id, excludedBook.bookId, {
+      startedOn: dayThisYear('07-03'),
+      endedOn: dayThisYear('07-04'),
+      outcome: 'skimmed',
+    });
+    await attempts.createHistorical(user.id, excludedBook.bookId, { startedOn: null, endedOn: null, outcome: 'completed' });
+
+    const login = await ctx.app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password } });
+    expect(login.statusCode).toBe(200);
+    const token = (login.json() as { accessToken: string }).accessToken;
+
+    const widgetResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/widgets/reading-goal',
+      headers: auth(token),
+    });
+    expect(widgetResponse.statusCode).toBe(200);
+    const widget = widgetResponse.json() as { completedBooks: number; year: number };
+
+    const overviewResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/user-statistics/activity-overview',
+      headers: auth(token),
+    });
+    expect(overviewResponse.statusCode).toBe(200);
+    const overview = overviewResponse.json() as {
+      snapshot: { completedBooksYtd: number };
+      goal: { year: number; completedBooks: number; points: Array<{ actualCumulative: number }> };
+      completion: { months: Array<{ year: number; month: number; count: number }> };
+    };
+
+    // Four books finished this year, one of them twice: the two surfaces have to say the same
+    // thing, and say 5, rather than the 2 a session-derived count would have reported.
+    expect(widget.completedBooks).toBe(5);
+    expect(overview.goal.completedBooks).toBe(widget.completedBooks);
+    expect(overview.snapshot.completedBooksYtd).toBe(widget.completedBooks);
+    expect(overview.goal.points.at(-1)?.actualCumulative).toBe(5);
+    expect(overview.goal.year).toBe(widget.year);
+
+    const monthsThisYear = overview.completion.months.filter((month) => month.year === thisYear);
+    expect(monthsThisYear.reduce((sum, month) => sum + month.count, 0)).toBe(5);
+    const monthsLastYear = overview.completion.months.filter((month) => month.year === thisYear - 1);
+    expect(monthsLastYear.reduce((sum, month) => sum + month.count, 0)).toBe(1);
+  });
 });

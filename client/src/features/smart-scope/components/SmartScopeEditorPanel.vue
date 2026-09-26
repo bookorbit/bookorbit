@@ -69,7 +69,8 @@ watch(
     if (isOpen && props.smartScope) {
       draftName.value = props.smartScope.name
       draftIcon.value = props.smartScope.icon ?? ''
-      draftFilter.value = props.smartScope.filter ?? undefined
+      // This panel edits book scopes; podcast scopes carry episode rules and use their own editor.
+      draftFilter.value = (props.smartScope.filter as GroupRule | null) ?? undefined
       draftSort.value = props.smartScope.defaultSort ? [...props.smartScope.defaultSort] : []
       draftIsPublic.value = props.smartScope.isPublic
       draftSyncToKobo.value = props.smartScope.syncToKobo

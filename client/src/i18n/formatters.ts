@@ -98,6 +98,28 @@ export function formatRelativeTime(
   return formatter.format(value, unit)
 }
 
+const MINUTE_MS = 60_000
+const HOUR_MS = 3_600_000
+const DAY_MS = 86_400_000
+const MONTH_MS = 2_592_000_000
+const YEAR_MS = 31_536_000_000
+
+/**
+ * Picks the unit a timestamp reads best in relative to now. Pass `now` to drive it from a
+ * reactive clock, and `smallestUnit: 'minute'` where second-by-second precision is noise.
+ */
+export function formatRelativeTimeFromNow(value: Date | number | string, options: { now?: number; smallestUnit?: 'second' | 'minute' } = {}): string {
+  const target = value instanceof Date ? value.getTime() : typeof value === 'number' ? value : new Date(value).getTime()
+  const difference = target - (options.now ?? Date.now())
+  const absolute = Math.abs(difference)
+  if (absolute < MINUTE_MS && options.smallestUnit !== 'minute') return formatRelativeTime(Math.round(difference / 1000), 'second')
+  if (absolute < HOUR_MS) return formatRelativeTime(Math.round(difference / MINUTE_MS), 'minute')
+  if (absolute < DAY_MS) return formatRelativeTime(Math.round(difference / HOUR_MS), 'hour')
+  if (absolute < MONTH_MS) return formatRelativeTime(Math.round(difference / DAY_MS), 'day')
+  if (absolute < YEAR_MS) return formatRelativeTime(Math.round(difference / MONTH_MS), 'month')
+  return formatRelativeTime(Math.round(difference / YEAR_MS), 'year')
+}
+
 export function formatLanguageName(value: string): string {
   const locale = activeLocale()
   let formatter = languageNameFormatters.get(locale)

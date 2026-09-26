@@ -29,10 +29,13 @@ const customSortFields = computed<SortField[]>(() =>
     .map((f) => customSortField(f.id)),
 )
 
+// Relevance only ranks against a search query, so the browse sort builder never offers it.
+const browseSortFields = SORT_FIELDS.filter((field) => field !== 'relevance')
+
 // Smart scopes and home shelves are not scoped to one collection, so the server rejects a
 // membership sort from them and offering it would hand the user a sort that fails.
 const offerableFields = computed<SortField[]>(() =>
-  props.collectionScoped ? SORT_FIELDS : SORT_FIELDS.filter((f) => !isCollectionScopedSortField(f)),
+  props.collectionScoped ? browseSortFields : browseSortFields.filter((f) => !isCollectionScopedSortField(f)),
 )
 
 const allFields = computed<SortField[]>(() => [...offerableFields.value, ...customSortFields.value])

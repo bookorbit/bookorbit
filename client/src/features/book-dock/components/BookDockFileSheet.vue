@@ -4,8 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/i18n/formatters'
 import { X, BookOpen, Check, Trash2, Sparkles, ArrowLeft, Wand2, AlertCircle } from '@lucide/vue'
 import {
+  getBookMediaKind,
   resolveBookDockSearchTitle,
   type BookDockFile,
+  type CoverMedium,
   type BookDockMetadata,
   type MetadataCandidate,
   type MetadataSource,
@@ -20,7 +22,7 @@ import MetadataDiffPanel from '@/features/book/components/detail/tabs/MetadataDi
 import { useBookDockDetail } from '../composables/useBookDockDetail'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useMetadataSearch } from '@/features/book/composables/useMetadataSearch'
-import type { MetadataPatch } from '@/features/book/composables/useMetadataDiff'
+import type { MetadataDiffApply } from '@/features/book/composables/useMetadataDiff'
 import { formatBytes } from '@/lib/formatting'
 import { toDisplayCoverUrl } from '@/features/book/lib/metadata-fetch'
 
@@ -279,8 +281,13 @@ function openSearch() {
   loadProviders()
 }
 
+// A dock file has one medium, so its search asks only the providers for it, and audio files get square art.
+const fileMediaKind = computed(() => getBookMediaKind(props.file.format))
+const fileCoverMedium = computed<CoverMedium>(() => (fileMediaKind.value === 'audiobook' ? 'audio' : 'ebook'))
+
 function handleSearchSubmit(params: { title: string; author: string; isbn: string }) {
-  search(params)
+  const mediaKind = fileMediaKind.value
+  search(mediaKind === 'unknown' ? params : { ...params, mediaKind })
 }
 
 function selectCandidate(candidate: MetadataCandidate) {
@@ -298,7 +305,7 @@ function backFromDiff() {
   selectedCandidate.value = null
 }
 
-async function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
+async function handleApply(patch: MetadataDiffApply) {
   const p = patch.formPatch
   const bookDockPatch = { ...p }
   delete bookDockPatch.customMetadata
@@ -317,9 +324,10 @@ async function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string 
   if ('authors' in p) form.authors = (p.authors ?? []).join(', ')
   if ('genres' in p) form.genres = (p.genres ?? []).join(', ')
 
-  if (patch.coverUrl !== undefined) {
-    selectedCoverUrl.value = patch.coverUrl
-    passthroughMetadata.value.coverUrl = patch.coverUrl
+  const coverUrl = patch.coverUrl ?? patch.audioCoverUrl
+  if (coverUrl !== undefined) {
+    selectedCoverUrl.value = coverUrl
+    passthroughMetadata.value.coverUrl = coverUrl
   }
 
   if (debounceTimer) {
@@ -683,6 +691,7 @@ onMounted(() => {
             :providers="providers"
             :back-label="diffSource === 'fetched' ? t('common.back') : t('bookDock.sheet.results')"
             :current-cover-url="currentBookDockCoverUrl"
+            :cover-medium="fileCoverMedium"
             :provider-ids="providerIds"
             @back="backFromDiff"
             @apply="handleApply"

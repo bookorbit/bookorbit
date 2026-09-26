@@ -27,6 +27,7 @@ const ADMIN_SETUP_DTO = {
 
 interface EnvSnapshot {
   appDataPath: string | undefined;
+  fileWriteDebounceMs: string | undefined;
 }
 
 export interface BookDockE2EContext {
@@ -81,9 +82,13 @@ export async function createBookDockE2EContext(): Promise<BookDockE2EContext> {
   const fixture = await createBookDockFixtureRoot();
   const envSnapshot: EnvSnapshot = {
     appDataPath: process.env.APP_DATA_PATH,
+    fileWriteDebounceMs: process.env.FILE_WRITE_DEBOUNCE_MS,
   };
 
   process.env.APP_DATA_PATH = fixture.booksPath;
+  // Read at config-factory time and cached in the FileWriteService constructor, so it has to be set
+  // before the module compiles.
+  process.env.FILE_WRITE_DEBOUNCE_MS = '25';
 
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
@@ -137,6 +142,8 @@ export async function createLibraryWithFolder(
     mode?: 'book_per_file' | 'book_per_folder';
     allowedFormats?: string[];
     name?: string;
+    fileWriteEnabled?: boolean;
+    fileWriteFb2Enabled?: boolean;
   } = {},
 ): Promise<CreatedLibrary> {
   const folderPath = join(ctx.fixture.booksPath, `library-${randomUUID()}`);
@@ -149,6 +156,17 @@ export async function createLibraryWithFolder(
     watch: false,
     name: options.name,
   });
+
+  // FB2 writes have their own toggle which is off by default, so `fileWriteEnabled` alone still skips them.
+  if (options.fileWriteEnabled !== undefined || options.fileWriteFb2Enabled !== undefined) {
+    await ctx.db
+      .update(schema.libraries)
+      .set({
+        ...(options.fileWriteEnabled !== undefined ? { fileWriteEnabled: options.fileWriteEnabled } : {}),
+        ...(options.fileWriteFb2Enabled !== undefined ? { fileWriteFb2Enabled: options.fileWriteFb2Enabled } : {}),
+      })
+      .where(eq(schema.libraries.id, libraryId));
+  }
 
   return {
     libraryId,
@@ -391,4 +409,6 @@ async function setSetting(db: Db, key: string, value: string): Promise<void> {
 function restoreEnv(snapshot: EnvSnapshot): void {
   if (snapshot.appDataPath === undefined) delete process.env.APP_DATA_PATH;
   else process.env.APP_DATA_PATH = snapshot.appDataPath;
+  if (snapshot.fileWriteDebounceMs === undefined) delete process.env.FILE_WRITE_DEBOUNCE_MS;
+  else process.env.FILE_WRITE_DEBOUNCE_MS = snapshot.fileWriteDebounceMs;
 }

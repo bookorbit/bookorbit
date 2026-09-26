@@ -130,6 +130,16 @@ describe('MigrationModal reset setup', () => {
     )
   })
 
+  it('shows BookLore compatibility with the latest verified release', async () => {
+    migrationApiMocks.getWorkflowState.mockResolvedValueOnce({ active: null, hasActiveRun: false })
+
+    const wrapper = mountModal()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Verified against: v2.4.0')
+    expect(wrapper.text()).not.toContain('v2.2.2')
+  })
+
   it('resets saved source setup and clears the form', async () => {
     migrationApiMocks.getWorkflowState.mockResolvedValueOnce(sourceState()).mockResolvedValueOnce({ active: null, hasActiveRun: false })
 

@@ -27,6 +27,7 @@ const SHELF_NAME_KEYS: Record<ScrollerType, ShelfNameKey> = {
   'recently-added': 'recentlyAdded',
   'continue-reading': 'continueReading',
   'continue-listening': 'continueListening',
+  'continue-podcasts': 'continuePodcasts',
   'want-to-read': 'wantToRead',
   'up-next-in-series': 'upNextInSeries',
   random: 'random',

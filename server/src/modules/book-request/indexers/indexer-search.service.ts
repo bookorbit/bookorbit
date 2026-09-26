@@ -28,17 +28,20 @@ import { buildSearchText } from './search-text';
  * and a repeat open of the picker is served from the cache instead of hitting the trackers again.
  */
 const MAX_CONCURRENT_SEARCHES = 3;
-const PER_INDEXER_TIMEOUT_MS = 20_000;
 const RESULT_LIMIT_PER_INDEXER = 50;
 const CACHE_TTL_MS = 3 * 60 * 1000;
-const MAX_CACHE_ENTRIES_PER_REQUEST = 5;
+const ACTIONABLE_CACHE_TTL_MS = 60 * 60 * 1000;
+const MAX_CACHE_ENTRIES_PER_REQUEST = 10;
+const MAX_CACHE_ENTRIES = 500;
 /** A ceiling on the merged list. The picker shows a ranked shortlist, not a tracker browser. */
 const MAX_MERGED_RELEASES = 100;
 
 interface CacheEntry {
   requestId: number;
   result: ReleaseSearchResult;
-  expiresAt: number;
+  resultExpiresAt: number;
+  candidatesExpireAt: number;
+  query: ReleaseQuery;
   /** The resolved release, kept server-side so a grab names an id and never a URL. */
   candidates: Map<string, ReleaseCandidate>;
 }
@@ -68,8 +71,8 @@ export class IndexerSearchService {
     const searchKey = JSON.stringify({ overrides: options.overrides ?? null, indexerMode: options.indexerMode ?? 'all' });
     const cacheKey = `${request.id}:${searchKey}`;
     const cached = this.cache.get(cacheKey);
-    if (!options.refresh && cached && cached.expiresAt > Date.now()) {
-      return { ...cached.result, cached: true };
+    if (!options.refresh && cached && cached.resultExpiresAt > Date.now()) {
+      return { ...(await this.withCurrentColors(cached.result)), cached: true };
     }
 
     // Counted alongside the resolve rather than derived from it: an empty result has to be able to
@@ -94,10 +97,11 @@ export class IndexerSearchService {
 
     const candidates = new Map<string, ReleaseCandidate>();
     const statuses: IndexerSearchStatus[] = [];
-    const scored: Array<{ scored: ScoredRelease; indexerName: string }> = [];
+    const scored: Array<{ scored: ScoredRelease; indexerName: string; managerPriority: number | null }> = [];
 
     for (const { config, releases, query: indexerQuery, failure, error } of outcomes) {
       const seedsBack = this.registry.seedsBack(config.adapterType);
+      const delivery = this.registry.delivery(config.adapterType);
       if (failure) {
         statuses.push({
           indexerId: config.id,
@@ -110,6 +114,7 @@ export class IndexerSearchService {
           failure,
           error,
           seedsBack,
+          delivery,
         });
         continue;
       }
@@ -135,7 +140,7 @@ export class IndexerSearchService {
           if (candidates.has(key)) continue;
 
           candidates.set(key, candidate);
-          scored.push({ scored: scoreRelease(candidate, scoringRequest), indexerName: config.name });
+          scored.push({ scored: scoreRelease(candidate, scoringRequest), indexerName: config.name, managerPriority: config.managerPriority });
           kept++;
         }
       } catch (error) {
@@ -155,6 +160,7 @@ export class IndexerSearchService {
           failure: 'error',
           error: `${config.name} returned a release BookOrbit could not read: ${message}`,
           seedsBack,
+          delivery,
         });
         continue;
       }
@@ -168,6 +174,7 @@ export class IndexerSearchService {
         filtered,
         query: indexerQuery,
         seedsBack,
+        delivery,
       });
     }
 
@@ -175,10 +182,19 @@ export class IndexerSearchService {
     // has to be cut on the same axis the automation will read it by: tier first, so truncating at
     // a hundred can never drop a release from a tier the operator asked for in favour of an
     // untiered one that merely scored well.
-    const items = scored.map((entry) => toReleaseItem(entry.scored, entry.indexerName, scoringRequest));
+    const items = scored.map((entry) => ({
+      item: toReleaseItem(entry.scored, entry.indexerName, scoringRequest),
+      managerPriority: entry.managerPriority,
+    }));
     // An unreported seeder count sorts below a stated one rather than above every zero.
-    items.sort((a, b) => compareByTier(a.tier, b.tier) || b.score - a.score || (b.seeders ?? -1) - (a.seeders ?? -1));
-    const releases = items.slice(0, MAX_MERGED_RELEASES);
+    items.sort(
+      (a, b) =>
+        compareByTier(a.item.tier, b.item.tier) ||
+        b.item.score - a.item.score ||
+        (b.item.seeders ?? -1) - (a.item.seeders ?? -1) ||
+        (a.managerPriority ?? Number.MAX_SAFE_INTEGER) - (b.managerPriority ?? Number.MAX_SAFE_INTEGER),
+    );
+    const releases = items.slice(0, MAX_MERGED_RELEASES).map(({ item }) => item);
 
     const result: ReleaseSearchResult = {
       releases,
@@ -192,7 +208,15 @@ export class IndexerSearchService {
       cached: false,
     };
     this.cache.delete(cacheKey);
-    this.cache.set(cacheKey, { requestId: request.id, result, expiresAt: Date.now() + CACHE_TTL_MS, candidates });
+    const cachedAt = Date.now();
+    this.cache.set(cacheKey, {
+      requestId: request.id,
+      result,
+      resultExpiresAt: cachedAt + CACHE_TTL_MS,
+      candidatesExpireAt: cachedAt + ACTIONABLE_CACHE_TTL_MS,
+      query,
+      candidates,
+    });
     this.prune(request.id);
 
     // Not awaited: the picker is waiting on this response, and how a source has been behaving is
@@ -221,17 +245,49 @@ export class IndexerSearchService {
   find(requestId: number, indexerId: number, guid: string): ReleaseCandidate | undefined {
     const key = `${indexerId}:${guid}`;
     for (const entry of [...this.cache.values()].reverse()) {
-      if (entry.requestId !== requestId || entry.expiresAt <= Date.now()) continue;
+      if (entry.requestId !== requestId || entry.candidatesExpireAt <= Date.now()) continue;
       const candidate = entry.candidates.get(key);
       if (candidate) return candidate;
     }
     return undefined;
   }
 
+  async refreshCandidate(requestId: number, indexerId: number, stale: ReleaseCandidate): Promise<ReleaseCandidate | undefined> {
+    const key = candidateKey(stale);
+    const entry = [...this.cache.values()]
+      .reverse()
+      .find(
+        (candidateEntry) =>
+          candidateEntry.requestId === requestId && candidateEntry.candidatesExpireAt > Date.now() && candidateEntry.candidates.get(key) === stale,
+      );
+    if (!entry) return undefined;
+
+    const config = await this.indexers.resolveConfig(indexerId);
+    const outcome = await this.searchOne(config, entry.query, Date.now() + config.perIndexerTimeoutSeconds * 1000);
+    if (outcome.failure) return undefined;
+    const refreshed = outcome.releases.find((candidate) => sameRelease(candidate, stale));
+    if (!refreshed) return undefined;
+
+    entry.candidates.set(candidateKey(refreshed), refreshed);
+    entry.candidatesExpireAt = Date.now() + ACTIONABLE_CACHE_TTL_MS;
+    return refreshed;
+  }
+
   forget(requestId: number): void {
     for (const [key, entry] of this.cache) {
       if (entry.requestId === requestId) this.cache.delete(key);
     }
+  }
+
+  private async withCurrentColors(result: ReleaseSearchResult): Promise<ReleaseSearchResult> {
+    const rows = await this.indexers.findColorsByIds(result.indexers.map((indexer) => indexer.indexerId));
+    const colors = new Map(rows.map((row) => [row.id, row.color]));
+    return {
+      ...result,
+      indexers: result.indexers.map((indexer) =>
+        colors.has(indexer.indexerId) ? { ...indexer, color: colors.get(indexer.indexerId) ?? null } : indexer,
+      ),
+    };
   }
 
   /**
@@ -258,10 +314,17 @@ export class IndexerSearchService {
   private async searchAll(configs: ResolvedIndexerConfig[], query: ReleaseQuery): Promise<SearchOutcome[]> {
     const outcomes: SearchOutcome[] = [];
     const queue = [...configs];
+    const managerDeadlines = new Map<number, number>();
+    const now = Date.now();
+    for (const config of configs) {
+      if (config.managerId != null && config.overallSearchBudgetSeconds != null && !managerDeadlines.has(config.managerId)) {
+        managerDeadlines.set(config.managerId, now + config.overallSearchBudgetSeconds * 1000);
+      }
+    }
 
     const worker = async (): Promise<void> => {
       for (let config = queue.shift(); config !== undefined; config = queue.shift()) {
-        outcomes.push(await this.searchOne(config, query));
+        outcomes.push(await this.searchOne(config, query, config.managerId == null ? undefined : managerDeadlines.get(config.managerId)));
       }
     };
 
@@ -271,7 +334,7 @@ export class IndexerSearchService {
     return outcomes.sort((a, b) => (order.get(a.config.id) ?? 0) - (order.get(b.config.id) ?? 0));
   }
 
-  private async searchOne(config: ResolvedIndexerConfig, query: ReleaseQuery): Promise<SearchOutcome> {
+  private async searchOne(config: ResolvedIndexerConfig, query: ReleaseQuery, managerDeadlineAt?: number): Promise<SearchOutcome> {
     // A credential nothing can read is this source's own problem and nobody else's. Reported here
     // rather than thrown at the resolve, so a rotated encryption key costs the operator one row in
     // the source list instead of the entire search.
@@ -279,9 +342,13 @@ export class IndexerSearchService {
       return { config, releases: [], failure: 'unauthorized', error: `${config.name}: ${config.credentialError}` };
     }
 
+    if (managerDeadlineAt !== undefined && managerDeadlineAt <= Date.now()) {
+      return { config, releases: [], failure: 'timeout', error: `${config.name} was not started before the Prowlarr search budget expired` };
+    }
+
     return this.operationLock.run(config.id, async () => {
       try {
-        return await this.searchResolved(await this.indexers.resolveConfig(config.id), query);
+        return await this.searchResolved(await this.indexers.resolveConfig(config.id), query, managerDeadlineAt);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return { config, releases: [], failure: 'error', error: message };
@@ -289,7 +356,7 @@ export class IndexerSearchService {
     });
   }
 
-  private async searchResolved(config: ResolvedIndexerConfig, query: ReleaseQuery): Promise<SearchOutcome> {
+  private async searchResolved(config: ResolvedIndexerConfig, query: ReleaseQuery, managerDeadlineAt?: number): Promise<SearchOutcome> {
     const adapter = this.registry.find(config.adapterType);
     if (!adapter) {
       // A row whose adapter is no longer part of the build. It is kept rather than deleted, so
@@ -303,11 +370,13 @@ export class IndexerSearchService {
     }
 
     // Withheld rather than flagged, so an adapter cannot search an identifier it was never given.
-    const indexerQuery: IndexerSearchQuery =
+    let indexerQuery: IndexerSearchQuery =
       this.searchesIsbn(config) && query.isbn13 ? { kind: 'isbn', value: query.isbn13 } : { kind: 'titleAuthor', value: buildSearchText(query) };
-    const indexerScopedQuery: ReleaseQuery = indexerQuery.kind === 'isbn' ? query : { ...query, isbn13: null, isbn13s: [] };
+    let indexerScopedQuery: ReleaseQuery = indexerQuery.kind === 'isbn' ? query : { ...query, isbn13: null, isbn13s: [] };
 
-    const deadline = AbortSignal.timeout(PER_INDEXER_TIMEOUT_MS);
+    const configuredTimeoutMs = (config.perIndexerTimeoutSeconds ?? 20) * 1000;
+    const managerRemainingMs = managerDeadlineAt === undefined ? configuredTimeoutMs : Math.max(1, managerDeadlineAt - Date.now());
+    const deadline = AbortSignal.timeout(Math.min(configuredTimeoutMs, managerRemainingMs));
     try {
       // Raced against the deadline rather than merely handed it. An adapter that never settles -
       // a plugin awaiting a dead promise, an HTTP client that loses its own timeout - holds one of
@@ -318,10 +387,32 @@ export class IndexerSearchService {
         deadline,
         () => new IndexerSearchException('timeout', `${config.name} did not answer in time`),
       );
+      if (releases.length === 0 && indexerQuery.kind === 'isbn') {
+        indexerQuery = { kind: 'titleAuthor', value: buildSearchText(query) };
+        indexerScopedQuery = { ...query, isbn13: null, isbn13s: [] };
+        releases = await withDeadline(
+          adapter.search(indexerScopedQuery, config, deadline),
+          deadline,
+          () => new IndexerSearchException('timeout', `${config.name} did not answer in time`),
+        );
+      }
       if (releases.length === 0 && indexerQuery.kind === 'titleAuthor' && query.author?.trim()) {
         const titleOnlyQuery = { ...indexerScopedQuery, author: null };
         releases = await withDeadline(
           adapter.search(titleOnlyQuery, config, deadline),
+          deadline,
+          () => new IndexerSearchException('timeout', `${config.name} did not answer in time`),
+        );
+      }
+      if (releases.length === 0 && config.autoExpandCategories && config.categories[query.mediaKind].length > 0) {
+        releases = await withDeadline(
+          adapter.search(
+            // The author was already tried and answered nothing, so the widest retry drops it here
+            // too rather than narrowing the text again while it widens the categories.
+            { ...indexerScopedQuery, author: null },
+            { ...config, categories: { ...config.categories, [query.mediaKind]: [] } },
+            deadline,
+          ),
           deadline,
           () => new IndexerSearchException('timeout', `${config.name} did not answer in time`),
         );
@@ -342,12 +433,18 @@ export class IndexerSearchService {
   private prune(requestId: number): void {
     const now = Date.now();
     for (const [key, entry] of this.cache) {
-      if (entry.expiresAt <= now) this.cache.delete(key);
+      if (entry.candidatesExpireAt <= now) this.cache.delete(key);
     }
 
     const requestEntries = [...this.cache.entries()].filter(([, entry]) => entry.requestId === requestId);
     for (const [key] of requestEntries.slice(0, -MAX_CACHE_ENTRIES_PER_REQUEST)) {
       this.cache.delete(key);
+    }
+
+    while (this.cache.size > MAX_CACHE_ENTRIES) {
+      const oldest = this.cache.keys().next().value as string | undefined;
+      if (!oldest) break;
+      this.cache.delete(oldest);
     }
   }
 }
@@ -362,6 +459,13 @@ interface SearchOutcome {
 
 function candidateKey(candidate: ReleaseCandidate): string {
   return `${candidate.indexerId}:${candidate.guid}`;
+}
+
+function sameRelease(candidate: ReleaseCandidate, stale: ReleaseCandidate): boolean {
+  const candidateHash = candidate.infoHash?.toLowerCase();
+  const staleHash = stale.infoHash?.toLowerCase();
+  if (candidateHash && staleHash) return candidateHash === staleHash;
+  return candidate.guid === stale.guid;
 }
 
 function toQuery(request: ScoringRequest): ReleaseQuery {

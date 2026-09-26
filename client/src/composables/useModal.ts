@@ -1,4 +1,4 @@
-import { nextTick, onBeforeUnmount, onMounted, type Ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, watch, type Ref, type WatchStopHandle } from 'vue'
 
 interface UseModalOptions {
   /** The modal panel root. The focus trap cycles within it and it receives initial focus as a fallback. */
@@ -9,6 +9,8 @@ interface UseModalOptions {
   disabled?: () => boolean
   /** Element to focus on open; falls back to the first focusable element in the container. */
   initialFocus?: Ref<HTMLElement | null>
+  /** Reactive open state for dialogs that are conditionally rendered inside an already-mounted component. */
+  active?: Readonly<Ref<boolean>>
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -27,6 +29,8 @@ const FOCUSABLE_SELECTOR = [
 export function useModal(options: UseModalOptions): void {
   let previouslyFocused: HTMLElement | null = null
   let previousOverflow = ''
+  let engaged = false
+  let stopWatching: WatchStopHandle | null = null
 
   function focusable(): HTMLElement[] {
     const root = options.container.value
@@ -57,7 +61,9 @@ export function useModal(options: UseModalOptions): void {
     }
   }
 
-  onMounted(() => {
+  function engage(): void {
+    if (engaged) return
+    engaged = true
     previouslyFocused = document.activeElement as HTMLElement | null
     previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -66,11 +72,27 @@ export function useModal(options: UseModalOptions): void {
       const target = options.initialFocus?.value ?? focusable()[0] ?? options.container.value
       target?.focus()
     })
-  })
+  }
 
-  onBeforeUnmount(() => {
+  function disengage(): void {
+    if (!engaged) return
+    engaged = false
     window.removeEventListener('keydown', handleKeydown)
     document.body.style.overflow = previousOverflow
     previouslyFocused?.focus?.()
+    previouslyFocused = null
+  }
+
+  onMounted(() => {
+    if (options.active) {
+      stopWatching = watch(options.active, (active) => (active ? engage() : disengage()), { immediate: true, flush: 'post' })
+    } else {
+      engage()
+    }
+  })
+
+  onBeforeUnmount(() => {
+    stopWatching?.()
+    disengage()
   })
 }

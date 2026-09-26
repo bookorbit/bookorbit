@@ -235,7 +235,6 @@ describe('CbzReaderView', () => {
 
     wrapper.unmount()
   })
-
   it('zooms with desktop controls and Ctrl-wheel without turning the page', async () => {
     mocks.savedMode = 'paginated'
     mocks.pageCount = 6

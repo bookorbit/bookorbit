@@ -156,6 +156,23 @@ describe('DashboardWidgetService', () => {
       expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenNthCalledWith(1, 7, [3, 5], EMPTY_CONTENT_FILTER_RULES);
       expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenNthCalledWith(2, 7, [3], EMPTY_CONTENT_FILTER_RULES);
     });
+
+    it('loads fresh data after the user cache is cleared', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      const user = makeUser({ id: 7 });
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([3]);
+      widgetRepo.getCurrentlyReadingBooks
+        .mockResolvedValueOnce({ books: [{ bookId: 10, title: 'First', authors: [], progress: 10, hasCover: false }] })
+        .mockResolvedValueOnce({ books: [{ bookId: 10, title: 'First', authors: [], progress: 25, hasCover: false }] });
+
+      const initial = await service.getCurrentlyReading(user);
+      service.clearCacheForUser(user.id);
+      const refreshed = await service.getCurrentlyReading(user);
+
+      expect(initial.books[0]?.progress).toBe(10);
+      expect(refreshed.books[0]?.progress).toBe(25);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getReadingStreak', () => {
@@ -485,6 +502,29 @@ describe('DashboardWidgetService', () => {
 
       await service.getLibraryOverview(userA);
       await service.getLibraryOverview(userB);
+      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledTimes(2);
+    });
+
+    it('clearing a user cache invalidates both live and stale widgets', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      const user = makeUser();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingStreak.mockResolvedValue({ currentStreak: 5, longestStreak: 10, lastSevenDays: [] });
+      widgetRepo.getLibraryOverview.mockResolvedValue({
+        totalBooks: 100,
+        totalAuthors: 25,
+        totalSeries: 10,
+        totalStorageBytes: 1_000,
+        booksAddedThisYear: 8,
+      });
+
+      await service.getReadingStreak(user);
+      await service.getLibraryOverview(user);
+      service.clearCacheForUser(user.id);
+      await service.getReadingStreak(user);
+      await service.getLibraryOverview(user);
+
+      expect(widgetRepo.getReadingStreak).toHaveBeenCalledTimes(2);
       expect(widgetRepo.getLibraryOverview).toHaveBeenCalledTimes(2);
     });
   });

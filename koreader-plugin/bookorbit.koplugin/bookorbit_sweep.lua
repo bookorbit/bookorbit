@@ -163,9 +163,10 @@ end
 
 local function chunkSummary(ctx)
     return string.format(
-        "enumerateMs=%.0f partialMd5Ms=%.0f partialMd5Count=%d sidecarMs=%.0f slowestItemMs=%.0f statsSkipped=%d",
+        "enumerateMs=%.0f partialMd5Ms=%.0f partialMd5Count=%d sidecarMs=%.0f slowestItemMs=%.0f statsSkipped=%d ambiguousStats=%d",
         ctx.timing.enumerate_ms, ctx.timing.partial_md5_ms, ctx.timing.partial_md5_count,
-        ctx.timing.sidecar_ms, ctx.timing.max_item_ms, ctx.counts.stats_skipped or 0)
+        ctx.timing.sidecar_ms, ctx.timing.max_item_ms, ctx.counts.stats_skipped or 0,
+        ctx.counts.stats_ambiguous or 0)
 end
 
 local function finish(ctx, err)
@@ -204,10 +205,15 @@ local function finish(ctx, err)
         elseif not err and ctx.had_errors then
             ctx.plugin:recordSyncError("sweep", "partial_failure")
         elseif not err and ctx.plugin.recordSyncSuccess then
+            local message = T(_("%1 books, %2 reading events, %3 highlights"),
+                ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations)
+            if (ctx.counts.stats_ambiguous or 0) > 0 then
+                message = message .. ". " .. T(_("%1 books need to be opened and synced once to recover their reading history."),
+                    ctx.counts.stats_ambiguous)
+            end
             ctx.plugin:recordSyncSuccess(
                 "sweep",
-                T(_("%1 books, %2 reading events, %3 highlights"),
-                    ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations))
+                message)
         end
     end
 
@@ -269,6 +275,10 @@ local function finish(ctx, err)
         end
         if ctx.had_errors then
             text = text .. "\n" .. _("Some books failed and will retry on the next sync.")
+        end
+        if (ctx.counts.stats_ambiguous or 0) > 0 then
+            text = text .. "\n" .. T(_("%1 books need to be opened and synced once to recover their reading history."),
+                ctx.counts.stats_ambiguous)
         end
         UIManager:show(InfoMessage:new{ text = text, timeout = 5 })
     end
@@ -421,12 +431,13 @@ local function stepEnumerateCandidates(ctx)
         BookOrbitStatsReader.finalizeBookEntry(entry)
         chunk_ctx.candidates[entry.md5] = {
             stat_ids = entry.ids,
+            stats_rows = entry.rows,
             last_open = entry.last_open,
             title = entry.title,
             authors = entry.authors,
             source = "statistics",
             metadata_ambiguous = entry.metadata_ambiguous,
-            stats_metadata_ambiguous = entry.metadata_ambiguous,
+            stats_metadata_ambiguous = entry.stats_ambiguous,
         }
     end
 
@@ -445,6 +456,20 @@ local function historyEntry(ctx, file)
 
     local file_exists = lfs.attributes(file, "mode") == "file"
     local md5 = ctx.state.files[file]
+    local mapped_book = md5 and ctx.state:getBook(md5) or nil
+    local identity_conflict = mapped_book and mapped_book.file and mapped_book.file ~= file
+    if identity_conflict and file_exists then
+        local started = nowMs()
+        local ok, computed = pcall(util.partialMD5, file)
+        ctx.timing.partial_md5_ms = ctx.timing.partial_md5_ms + elapsedMs(started)
+        ctx.timing.partial_md5_count = ctx.timing.partial_md5_count + 1
+        if ok and computed then
+            if computed ~= md5 then
+                ctx.state:repairFileIdentity(file, md5, computed)
+            end
+            md5 = computed
+        end
+    end
     if not md5 and file_exists and DocSettings:hasSidecarFile(file) then
         local doc_settings = DocSettings:open(file)
         md5 = doc_settings:readSetting("partial_md5_checksum")
@@ -476,6 +501,9 @@ local function historyEntry(ctx, file)
     end
     ctx.candidates[md5] = cand
     local book = ctx.state:getBook(md5)
+    if book and file_exists then
+        cand.book_file_id = book.fileId
+    end
     if book and file_exists and not book.file then
         book.file = file
     end
@@ -583,11 +611,30 @@ local function buildStatsQueue(ctx)
     local latest = ctx.stats_session and ctx.stats_session:latestEventTimes() or nil
     ctx.stats_queue = BookOrbitQueue.new()
     ctx.counts.stats_skipped = 0
+    ctx.counts.stats_ambiguous = 0
 
     for md5, cand in pairs(ctx.candidates) do
-        if cand.stat_ids and not cand.stats_metadata_ambiguous then
-            local book = ctx.state:getBook(md5)
-            if book then
+        local book = ctx.state:getBook(md5)
+        if cand.stat_ids and book then
+            if cand.stats_metadata_ambiguous then
+                for _, row in ipairs(cand.stats_rows or {}) do
+                    local target = ctx.state:getStatsRow(row.id, md5, row.title, row.authors)
+                    if target.bookFileId then
+                        if latest and not hasNewEvents(latest, { row.id }, target.statsWatermark or 0) then
+                            ctx.counts.stats_skipped = ctx.counts.stats_skipped + 1
+                        else
+                            ctx.stats_queue:push({
+                                md5 = md5,
+                                ids = { row.id },
+                                target = target,
+                                book_file_id = target.bookFileId,
+                            })
+                        end
+                    elseif not latest or (latest[row.id] or 0) > (target.statsWatermark or 0) then
+                        ctx.counts.stats_ambiguous = ctx.counts.stats_ambiguous + 1
+                    end
+                end
+            else
                 if latest and not hasNewEvents(latest, cand.stat_ids, book.statsWatermark or 0) then
                     ctx.counts.stats_skipped = ctx.counts.stats_skipped + 1
                 else
@@ -664,7 +711,8 @@ local function stepStatsNext(ctx)
         return
     end
 
-    local watermark = book.statsWatermark or 0
+    local stats_target = item.target or book
+    local watermark = stats_target.statsWatermark or 0
     local events = ctx.stats_session
         and ctx.stats_session:eventsAfter(item.ids, watermark, STATS_BATCH)
         or BookOrbitStatsReader.getEventsAfter(item.ids, watermark, STATS_BATCH)
@@ -673,7 +721,9 @@ local function stepStatsNext(ctx)
         return
     end
 
-    local body, err = ctx.client:uploadPageStats({ { hash = item.md5, events = events } })
+    local upload = { hash = item.md5, events = events }
+    if item.book_file_id then upload.bookFileId = item.book_file_id end
+    local body, err = ctx.client:uploadPageStats({ upload })
     if aborted(ctx) then return end
     if not body then
         if isAuthError(err) then return finish(ctx, "auth") end
@@ -685,13 +735,20 @@ local function stepStatsNext(ctx)
 
     for _, unmatched in ipairs(body.unmatched or {}) do
         if unmatched == item.md5 then
-            ctx.state:setUnmatched(item.md5)
+            if item.book_file_id then
+                stats_target.bookFileId = nil
+                stats_target.bookId = nil
+                stats_target.statsWatermark = 0
+                ctx.had_errors = true
+            else
+                ctx.state:setUnmatched(item.md5)
+            end
             step(ctx, ctx.steps.statsNext)
             return
         end
     end
 
-    local more = BookOrbitState.applyStatsAck(book, events, body, item.md5, STATS_BATCH, watermark)
+    local more = BookOrbitState.applyStatsAck(stats_target, events, body, item.md5, STATS_BATCH, watermark)
     ctx.counts.page_stats = ctx.counts.page_stats + #events
     if more then
         ctx.current_stats = item

@@ -1,5 +1,41 @@
 [
   {
+    "file": "server/src/modules/book-duplicates/book-duplicates.controller.ts",
+    "className": "BookDuplicatesController",
+    "methodName": "listDismissals",
+    "httpMethod": "GET",
+    "path": "/book-duplicates/dismissals",
+    "permissions": ["Permission.LibraryDeleteBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-duplicates/book-duplicates.controller.ts",
+    "className": "BookDuplicatesController",
+    "methodName": "dismissGroup",
+    "httpMethod": "POST",
+    "path": "/book-duplicates/dismissals",
+    "permissions": ["Permission.LibraryDeleteBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-duplicates/book-duplicates.controller.ts",
+    "className": "BookDuplicatesController",
+    "methodName": "restoreDismissal",
+    "httpMethod": "DELETE",
+    "path": "/book-duplicates/dismissals/:bookIdA/:bookIdB",
+    "permissions": ["Permission.LibraryDeleteBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
     "file": "server/src/modules/book-dock/book-dock.controller.ts",
     "className": "BookDockController",
     "methodName": "getSummary",

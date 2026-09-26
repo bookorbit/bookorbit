@@ -16,6 +16,8 @@ const baseBook = (): BookEligibilityData => ({
   seriesName: 'Series',
   seriesIndex: '1',
   coverSource: 'cover.jpg',
+  hasAudioCoverMedia: false,
+  hasAudioCover: false,
   hasAuthors: true,
   hasGenres: true,
   hasNarrators: true,
@@ -149,5 +151,23 @@ describe('BookMetadataFetchEligibilityService', () => {
       config.conditions.missingFields.fields = [testCase.field as never];
       expect(service.isEligible(testCase.book, config)).toBe(testCase.eligible);
     }
+  });
+
+  it('counts the audiobook cover as missing only for a book whose cover media include audio', () => {
+    const config = baseConfig();
+    config.conditions.missingFields.enabled = true;
+    config.conditions.missingFields.fields = ['audioCover'];
+
+    expect(service.isEligible({ ...baseBook(), hasAudioCoverMedia: true, hasAudioCover: false }, config)).toBe(true);
+    expect(service.isEligible({ ...baseBook(), hasAudioCoverMedia: true, hasAudioCover: true }, config)).toBe(false);
+    expect(service.isEligible({ ...baseBook(), hasAudioCoverMedia: false, hasAudioCover: false }, config)).toBe(false);
+  });
+
+  it('keeps the cover trigger meaning no cover at all, so an empty audio slot alone does not queue a book', () => {
+    const config = baseConfig();
+    config.conditions.missingFields.enabled = true;
+    config.conditions.missingFields.fields = ['cover'];
+
+    expect(service.isEligible({ ...baseBook(), hasAudioCoverMedia: true, hasAudioCover: false }, config)).toBe(false);
   });
 });

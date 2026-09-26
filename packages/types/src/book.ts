@@ -7,6 +7,7 @@ import type { CustomMetadataBookValue } from "./custom-metadata";
 import type { CoverAspectRatio } from "./library";
 import { DEFAULT_FORMAT_PRIORITY } from "./library";
 import type { SeriesIndex } from "./series-index";
+import type { EpubMediaOverlayCapability } from "./epub";
 
 // Derived rather than duplicated: these two lists describe the same set of formats,
 // and maintaining them separately let BOOK_FORMATS fall behind on azw and kepub.
@@ -24,6 +25,21 @@ export const COMIC_FORMAT_LIST = ["cbz", "cbr", "cb7", "cbx"] as const;
 const COMIC_FORMATS = new Set<string>(COMIC_FORMAT_LIST);
 export function isComicFormat(format: string): boolean {
   return COMIC_FORMATS.has(format.toLowerCase());
+}
+
+const BOOK_FORMAT_SET = new Set<string>(BOOK_FORMATS);
+
+/** A format BookOrbit reads or plays. Covers, sidecars and anything else a book folder holds are not. */
+export function isBookFormat(format: string | null | undefined): boolean {
+  return format != null && BOOK_FORMAT_SET.has(format.toLowerCase());
+}
+
+/**
+ * A readable or listenable edition of the book, as opposed to its cover or a sidecar such as an
+ * OPF or a text file. `primary` is the role the API reports for the book's primary file.
+ */
+export function isContentBookFile(file: { format: string | null; role: string }): boolean {
+  return (file.role === "content" || file.role === "primary") && isBookFormat(file.format);
 }
 
 /** What BookOrbit accepts as an ebook, and what an ebook tier may therefore ask for. */
@@ -84,6 +100,7 @@ export type BookFileRef = {
   format: string | null;
   role: string;
   sizeBytes: number | null;
+  mediaOverlay?: EpubMediaOverlayCapability | null;
 };
 
 /** The kinds a real file can be. `BookMediaKind` adds the case where no format identifies one. */
@@ -101,8 +118,43 @@ export type BookMediaProfile = {
 
 type BookMediaFile = Pick<BookFileRef, "format" | "role">;
 
+export const COVER_MEDIA = ["ebook", "audio"] as const;
+export type CoverMedium = (typeof COVER_MEDIA)[number];
+
+type CoverMediaFile = BookMediaFile & {
+  mediaOverlay?: Pick<EpubMediaOverlayCapability, "available"> | null;
+  mediaOverlayAvailable?: boolean | null;
+};
+
+export type CoverMedia = {
+  hasEbook: boolean;
+  hasAudio: boolean;
+};
+
+export function getCoverMedia(files: readonly CoverMediaFile[]): CoverMedia {
+  let hasEbook = false;
+  let hasAudio = false;
+
+  for (const file of files) {
+    if (file.role !== "content" && file.role !== "primary") continue;
+    const format = file.format?.trim().toLowerCase();
+    if (!format) continue;
+    if (isAudioFormat(format)) hasAudio = true;
+    else hasEbook = true;
+    if (format === "epub" && (file.mediaOverlay?.available === true || file.mediaOverlayAvailable === true)) hasAudio = true;
+  }
+
+  return { hasEbook, hasAudio };
+}
+
 export function getPrimaryBookFile<T extends BookMediaFile>(files: readonly T[]): T | null {
-  return files.find((file) => file.role === "primary") ?? files.find((file) => file.format != null) ?? files[0] ?? null;
+  return (
+    files.find((file) => file.role === "primary") ??
+    files.find((file) => isContentBookFile(file)) ??
+    files.find((file) => file.format != null) ??
+    files[0] ??
+    null
+  );
 }
 
 export function getBookMediaKind(format: string | null | undefined): BookMediaKind {
@@ -152,6 +204,7 @@ export type BookCard = {
   readStatus: UserBookStatus | null;
   addedAt: string;
   updatedAt: string | null;
+  coverVersion: string;
   metadataScore: number | null;
   hasCover: boolean;
   hasMetadataLocks: boolean;
@@ -177,6 +230,7 @@ export type BookDetailFile = {
   createdAt: string;
   filename: string | null;
   durationSeconds: number | null;
+  mediaOverlay?: EpubMediaOverlayCapability | null;
 };
 
 export type ProviderIds = Partial<Record<MetadataProviderKey, string | null>>;
@@ -186,6 +240,24 @@ export type AudioMetadata = {
   durationSeconds: number | null;
   abridged: boolean;
   chapters: AudiobookChapter[] | null;
+};
+
+export type ReadAloudProgressSyncMode = "auto" | "disabled";
+
+export type ReadAloudProgressSyncState = "enabled" | "disabled" | "unavailable";
+
+export type ReadAloudProgressSyncUnavailableReason = "no_media_overlay_epub" | "no_audio_files" | "missing_duration" | "duration_mismatch";
+
+export type ReadAloudProgressSync = {
+  mode: ReadAloudProgressSyncMode;
+  state: ReadAloudProgressSyncState;
+  unavailableReason: ReadAloudProgressSyncUnavailableReason | null;
+  overlayFileId: number | null;
+  audioDurationSeconds: number | null;
+  overlayDurationSeconds: number | null;
+  durationDifferenceSeconds: number | null;
+  durationDifferenceRatio: number | null;
+  koreaderDownloadAvailable: boolean;
 };
 
 export type BookFileWriteDisabledReason =
@@ -225,6 +297,9 @@ export type BookDetail = {
   personalNoteUpdatedAt: string | null;
   communityRatings: BookCommunityRating[];
   coverSource: "extracted" | "custom" | null;
+  coverMedia: CoverMedium[];
+  covers: Record<CoverMedium, BookCoverSlot | null>;
+  coverVersion: string;
   hardcoverEditionId: string | null;
   mangabakaSeriesId: string | null;
   providerIds: ProviderIds;
@@ -236,12 +311,20 @@ export type BookDetail = {
   metadataScore: number | null;
   readStatus: UserBookStatus | null;
   audioMetadata: AudioMetadata | null;
+  readAloudSync: ReadAloudProgressSync;
   formatPriority: string[];
   comicMetadata: ComicMetadataFields | null;
   customMetadata: CustomMetadataBookValue[];
   lockedFields: BookMetadataLockField[];
   collections: { id: number; name: string }[];
   fileWriteStatus?: BookFileWriteStatus;
+};
+
+export type BookCoverSlot = {
+  source: "extracted" | "custom";
+  updatedAt: string;
+  width: number | null;
+  height: number | null;
 };
 
 export type BookMetadataSaveResult = {
@@ -266,6 +349,7 @@ export type BookMetadataRefreshPreviewFields = {
   seriesMemberships?: MetadataSeriesMembership[] | null;
   communityRatings?: BookCommunityRating[];
   coverUrl?: string;
+  audioCoverUrl?: string;
   googleBooksId?: string | null;
   goodreadsId?: string | null;
   amazonId?: string | null;

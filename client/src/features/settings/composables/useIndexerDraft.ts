@@ -1,7 +1,8 @@
-import { computed, reactive, ref, type Ref } from 'vue'
+import { computed, nextTick, reactive, ref, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { BOOK_REQUEST_MEDIA_KINDS, INDEXER_ADAPTER_TYPES, pickUnusedIndexerColor } from '@bookorbit/types'
+import { BOOK_REQUEST_MEDIA_KINDS, INDEXER_ADAPTER_TYPES, MAX_INDEXER_SEED_TIME_MINUTES, pickUnusedIndexerColor } from '@bookorbit/types'
+import { formatNumber } from '@/i18n/formatters'
 import { useSettingsDraft } from './useSettingsDraft'
 import type {
   BookRequestMediaKind,
@@ -32,6 +33,11 @@ export interface IndexerDraft {
   credentialCleared: boolean
   enabled: boolean
   allowPrivateAddress: boolean
+  applyTrackerSeedGoals: boolean
+  seedRatioGoal: string
+  seedTimeMinutes: string
+  seedRatioBadInput: boolean
+  seedTimeBadInput: boolean
   categories: CategoryDraft
   /**
    * Held as what the source *is* searched for, because that is what the form shows and what an
@@ -47,7 +53,7 @@ export interface IndexerDraft {
 }
 
 /** The fields a save can be rejected for, so the diagnosis lands on the box that caused it. */
-export type FieldKey = 'name' | 'baseUrl' | 'credential'
+export type FieldKey = 'name' | 'baseUrl' | 'credential' | 'seedRatioGoal' | 'seedTimeMinutes'
 
 /**
  * Server codes carry the copy; the English `message` is a last resort for anything unmapped, which
@@ -151,6 +157,11 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
       credentialCleared: false,
       enabled: true,
       allowPrivateAddress: false,
+      applyTrackerSeedGoals: true,
+      seedRatioGoal: '',
+      seedTimeMinutes: '',
+      seedRatioBadInput: false,
+      seedTimeBadInput: false,
       categories: toCategoryDraft(adapter?.defaultCategories ?? { ebook: [], audiobook: [], comic: [] }),
       searchedMediaKinds: [...BOOK_REQUEST_MEDIA_KINDS],
       searchByIsbn: true,
@@ -166,9 +177,15 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
     clearFieldErrors()
   }
 
-  /** Torznab is the only built-in, so adding an indexer is adding a Torznab one. Nothing to pick. */
+  /** Start on the first built-in; a fresh draft may switch type before any adapter-specific values are entered. */
   function startCreate() {
-    openDraft(emptyDraft('torznab'))
+    openDraft(emptyDraft(INDEXER_ADAPTER_TYPES[0]))
+  }
+
+  function handleCreateTypeChange(event: Event) {
+    if (draft.value?.id !== null) return
+    const type = (event.target as HTMLSelectElement).value
+    openDraft({ ...emptyDraft(type), name: draft.value.name })
   }
 
   /**
@@ -194,6 +211,11 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
       credentialCleared: false,
       enabled: indexer.enabled,
       allowPrivateAddress: indexer.allowPrivateAddress,
+      applyTrackerSeedGoals: indexer.applyTrackerSeedGoals,
+      seedRatioGoal: indexer.seedRatioGoal === null ? '' : String(indexer.seedRatioGoal),
+      seedTimeMinutes: indexer.seedTimeMinutes === null ? '' : String(indexer.seedTimeMinutes),
+      seedRatioBadInput: false,
+      seedTimeBadInput: false,
       categories: toCategoryDraft(indexer.categories),
       searchedMediaKinds: BOOK_REQUEST_MEDIA_KINDS.filter((mediaKind) => !indexer.disabledMediaKinds.includes(mediaKind)),
       searchByIsbn: !indexer.isbnSearchDisabled,
@@ -223,6 +245,70 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
   function handleBaseUrlInput() {
     clearFieldError('baseUrl')
   }
+
+  type SeedDraftKey = 'seedRatioGoal' | 'seedTimeMinutes'
+  type SeedBadInputKey = 'seedRatioBadInput' | 'seedTimeBadInput'
+
+  function handleSeedInput(event: Event, field: SeedDraftKey, badInputField: SeedBadInputKey) {
+    const current = draft.value
+    if (!current) return
+    const input = event.target as HTMLInputElement
+    current[badInputField] = input.validity.badInput
+    current[field] = input.value
+    clearFieldError(field)
+  }
+
+  function handleSeedRatioInput(event: Event) {
+    handleSeedInput(event, 'seedRatioGoal', 'seedRatioBadInput')
+  }
+
+  function handleSeedTimeInput(event: Event) {
+    handleSeedInput(event, 'seedTimeMinutes', 'seedTimeBadInput')
+  }
+
+  const seedingAtDefaults = computed(() => {
+    const current = draft.value
+    return (
+      !current ||
+      (current.applyTrackerSeedGoals &&
+        current.seedRatioGoal === '' &&
+        current.seedTimeMinutes === '' &&
+        !current.seedRatioBadInput &&
+        !current.seedTimeBadInput)
+    )
+  })
+
+  function resetSeedingSettings() {
+    const current = draft.value
+    if (!current) return
+    current.applyTrackerSeedGoals = true
+    current.seedRatioGoal = ''
+    current.seedTimeMinutes = ''
+    current.seedRatioBadInput = false
+    current.seedTimeBadInput = false
+    clearFieldError('seedRatioGoal')
+    clearFieldError('seedTimeMinutes')
+  }
+
+  function summaryFor(raw: string, trackerFallback: boolean): string {
+    const parsed = Number(raw)
+    if (raw !== '' && Number.isFinite(parsed) && parsed > 0) {
+      return t('settings.system.requests.indexers.seeding.summary.manual', { value: formatNumber(parsed) })
+    }
+    return trackerFallback
+      ? t('settings.system.requests.indexers.seeding.summary.tracker')
+      : t('settings.system.requests.indexers.seeding.summary.client')
+  }
+
+  const timeSeedSummary = computed(() => {
+    const current = draft.value
+    return current ? summaryFor(current.seedTimeMinutes, current.applyTrackerSeedGoals) : ''
+  })
+
+  const ratioSeedSummary = computed(() => {
+    const current = draft.value
+    return current ? summaryFor(current.seedRatioGoal, current.applyTrackerSeedGoals) : ''
+  })
 
   function markCredentialTouched() {
     if (!draft.value) return
@@ -372,6 +458,13 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
       ...(current.credentialCleared ? { credential: '' } : current.credentialTouched ? { credential: current.credential } : {}),
       enabled: current.enabled,
       allowPrivateAddress: current.allowPrivateAddress,
+      ...(currentAdapter.value?.seedsBack
+        ? {
+            applyTrackerSeedGoals: current.applyTrackerSeedGoals,
+            seedRatioGoal: current.seedRatioGoal === '' ? null : Number(current.seedRatioGoal),
+            seedTimeMinutes: current.seedTimeMinutes === '' ? null : Number(current.seedTimeMinutes),
+          }
+        : {}),
       categories: {
         ebook: parseCategories(current.categories.ebook),
         audiobook: parseCategories(current.categories.audiobook),
@@ -399,7 +492,11 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
     clearFieldErrors()
     if (!current.name.trim()) fieldErrors.name = t('settings.system.requests.indexers.errors.nameRequired')
     if (!current.baseUrl.trim()) fieldErrors.baseUrl = t('settings.system.requests.indexers.errors.urlRequired')
-    if (Object.keys(fieldErrors).length > 0) return
+    if (currentAdapter.value?.seedsBack) validateSeedDraft(current)
+    if (Object.keys(fieldErrors).length > 0) {
+      await focusFirstInvalidField()
+      return
+    }
 
     const failure = await save(current.id, toPayload(current))
     if (failure) {
@@ -410,6 +507,43 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
     }
     toast.success(t('settings.system.requests.indexers.saved'))
     cancelEdit()
+  }
+
+  function validateSeedDraft(current: IndexerDraft) {
+    if (current.seedRatioBadInput || !validRatio(current.seedRatioGoal)) {
+      fieldErrors.seedRatioGoal = t('settings.system.requests.indexers.seeding.errors.ratio')
+    }
+    if (current.seedTimeBadInput || !validMinutes(current.seedTimeMinutes)) {
+      fieldErrors.seedTimeMinutes = t('settings.system.requests.indexers.seeding.errors.minutes')
+    }
+  }
+
+  function validRatio(raw: string): boolean {
+    if (raw === '') return true
+    if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return false
+    const value = Number(raw)
+    return Number.isFinite(value) && value > 0
+  }
+
+  function validMinutes(raw: string): boolean {
+    if (raw === '') return true
+    if (!/^\d+$/.test(raw)) return false
+    const value = Number(raw)
+    return Number.isSafeInteger(value) && value >= 1 && value <= MAX_INDEXER_SEED_TIME_MINUTES
+  }
+
+  const FIELD_IDS: Record<FieldKey, string> = {
+    name: 'indexer-name',
+    baseUrl: 'indexer-url',
+    credential: 'indexer-credential',
+    seedRatioGoal: 'indexer-seed-ratio',
+    seedTimeMinutes: 'indexer-seed-time',
+  }
+
+  async function focusFirstInvalidField() {
+    await nextTick()
+    const field = (Object.keys(fieldErrors) as FieldKey[])[0]
+    if (field) document.getElementById(FIELD_IDS[field])?.focus()
   }
 
   return {
@@ -425,10 +559,17 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
     describeFailure,
     startCreate,
     startCreateFor,
+    handleCreateTypeChange,
     startEdit,
     cancelEdit,
     handleNameInput,
     handleBaseUrlInput,
+    handleSeedRatioInput,
+    handleSeedTimeInput,
+    seedingAtDefaults,
+    resetSeedingSettings,
+    timeSeedSummary,
+    ratioSeedSummary,
     markCredentialTouched,
     canClearCredential,
     toggleClearCredential,

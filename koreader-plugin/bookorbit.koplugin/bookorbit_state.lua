@@ -42,6 +42,7 @@ function BookOrbitState.snapshot(tables, flush_handler)
         books = deepCopy(tables.books or {}),
         unmatched = deepCopy(tables.unmatched or {}),
         files = deepCopy(tables.files or {}),
+        statsRows = deepCopy(tables.statsRows or {}),
         global = deepCopy(tables.global or {}),
         flush_handler = flush_handler,
     }, BookOrbitState)
@@ -57,12 +58,47 @@ function BookOrbitState:reload()
     self.books = settings:readSetting("books", {})
     self.unmatched = settings:readSetting("unmatched", {})
     self.files = settings:readSetting("files", {})
+    self.statsRows = settings:readSetting("statsRows", {})
     self.global = settings:readSetting("global", {})
     return self
 end
 
 function BookOrbitState:getBook(md5)
     return self.books[md5]
+end
+
+-- A partial MD5 may identify several KOReader statistics rows. Those rows
+-- need independent cursors: advancing one book's watermark must never hide
+-- an older event belonging to another book with the same digest. Row ids are
+-- local to statistics.sqlite3, so the persisted metadata guards against an id
+-- being reused after that database is rebuilt.
+function BookOrbitState:getStatsRow(id, md5, title, authors)
+    id = tonumber(id)
+    if not id or not md5 then return nil end
+    local key = tostring(id)
+    local row = self.statsRows[key]
+    if not row or row.md5 ~= md5 or row.title ~= title or row.authors ~= authors then
+        row = {
+            md5 = md5,
+            title = title,
+            authors = authors,
+            statsWatermark = 0,
+        }
+        self.statsRows[key] = row
+    end
+    row.statsWatermark = row.statsWatermark or 0
+    return row
+end
+
+function BookOrbitState:bindStatsRow(id, md5, title, authors, book_file_id, book_id)
+    local row = self:getStatsRow(id, md5, title, authors)
+    if not row then return nil end
+    if row.bookFileId ~= book_file_id or row.bookId ~= book_id then
+        row.statsWatermark = 0
+    end
+    row.bookFileId = book_file_id
+    row.bookId = book_id
+    return row
 end
 
 -- Maps BookOrbit bookId -> local file path and bookFileId -> local file path
@@ -164,6 +200,34 @@ function BookOrbitState:rememberFile(file, md5)
             book.file = file
         end
     end
+end
+
+-- Repairs a path whose cached digest no longer matches the file on disk. A
+-- server identity is never copied between digests: only an identity already
+-- verified for the recomputed digest may be used to recover an ambiguous
+-- server match.
+function BookOrbitState:repairFileIdentity(file, old_md5, new_md5)
+    if not file or not new_md5 then return nil end
+    self.files[file] = new_md5
+
+    if old_md5 and old_md5 ~= new_md5 then
+        local old_book = self.books[old_md5]
+        if old_book and old_book.file == file then
+            old_book.file = nil
+            BookOrbitState.expireMatch(old_book)
+        end
+        self.unmatched[new_md5] = nil
+    end
+
+    local new_book = self.books[new_md5]
+    if new_book then
+        new_book.file = file
+        if old_md5 ~= new_md5 then
+            BookOrbitState.expireMatch(new_book)
+            new_book.statsWatermark = 0
+        end
+    end
+    return new_book
 end
 
 function BookOrbitState:flush()

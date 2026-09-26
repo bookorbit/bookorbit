@@ -51,8 +51,8 @@ describe('AuthController', () => {
     await controller.setupStatus();
     await controller.setup({ username: 'owner' } as never, 'setup-token', reply);
     await controller.login({ username: 'jdoe', password: 'pass' } as never, req, reply);
-    await controller.refresh(req, reply);
-    await controller.logout(req, reply);
+    await controller.refresh(req, reply, {});
+    await controller.logout({ refreshToken: 'a'.repeat(64) }, req, reply);
     controller.me({ id: 1 } as never);
     await controller.getSessions({ id: 1 } as never);
     await controller.revokeSession({ id: 1 } as never, 5);
@@ -64,8 +64,8 @@ describe('AuthController', () => {
     expect(authService.setupStatus).toHaveBeenCalled();
     expect(authService.setup).toHaveBeenCalledWith({ username: 'owner' }, 'setup-token', reply);
     expect(authService.login).toHaveBeenCalledWith({ username: 'jdoe', password: 'pass' }, reply, '10.0.0.8');
-    expect(authService.refresh).toHaveBeenCalledWith(req, reply);
-    expect(authService.logout).toHaveBeenCalledWith(req, reply);
+    expect(authService.refresh).toHaveBeenCalledWith(req, reply, {});
+    expect(authService.logout).toHaveBeenCalledWith(req, reply, { refreshToken: 'a'.repeat(64) });
     expect(authService.buildUserResponse).toHaveBeenCalledWith({ id: 1 });
     expect(authService.getSessions).toHaveBeenCalledWith(1);
     expect(authService.revokeSession).toHaveBeenCalledWith(1, 5);

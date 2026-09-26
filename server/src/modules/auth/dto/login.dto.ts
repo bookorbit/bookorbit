@@ -1,6 +1,7 @@
+import { AuthClientDto } from './auth-client.dto';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
-export class LoginDto {
+export class LoginDto extends AuthClientDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)

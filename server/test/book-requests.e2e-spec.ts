@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 
 import { and, eq } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
-import type { BookRequestBulkResult, BookRequestItem, BookRequestPage, BookRequestSubmitResult } from '@bookorbit/types';
+import type { BookRequestBulkResult, BookRequestItem, BookRequestPage, BookRequestSubmitResult, IndexerItem } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import {
@@ -88,7 +88,7 @@ describe('Book requests (e2e)', () => {
     await closeAuthorizationMatrixE2EContext(ctx);
   });
 
-  function inject(method: 'GET' | 'POST' | 'DELETE', url: string, session: TestUserSession, payload?: unknown) {
+  function inject(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, session: TestUserSession, payload?: unknown) {
     return ctx.app.inject({
       method,
       url: `/api/v1${url}`,
@@ -633,6 +633,124 @@ describe('Book requests (e2e)', () => {
     );
   });
 
+  describe('indexer seed policy', () => {
+    it(
+      'round-trips independent updates and null clears for a settings administrator',
+      async () => {
+        const created = await inject('POST', '/admin/request-indexers', settingsAdmin, {
+          name: `seed-policy-${randomUUID()}`,
+          adapterType: 'torznab',
+          baseUrl: 'http://203.0.113.10:9117',
+          applyTrackerSeedGoals: false,
+          seedRatioGoal: 1.25,
+          seedTimeMinutes: 60,
+        });
+        expect(created.statusCode).toBe(201);
+        const item = created.json() as IndexerItem;
+        expect(item).toMatchObject({
+          applyTrackerSeedGoals: false,
+          seedRatioGoal: 1.25,
+          seedTimeMinutes: 60,
+        });
+        expect(created.body).not.toContain('credentialsEnc');
+
+        try {
+          const updated = await inject('PUT', `/admin/request-indexers/${item.id}`, settingsAdmin, { seedTimeMinutes: 90 });
+          expect(updated.statusCode).toBe(200);
+          expect(updated.json()).toMatchObject({ seedRatioGoal: 1.25, seedTimeMinutes: 90 });
+
+          const cleared = await inject('PUT', `/admin/request-indexers/${item.id}`, settingsAdmin, {
+            seedRatioGoal: null,
+            seedTimeMinutes: null,
+          });
+          expect(cleared.statusCode).toBe(200);
+          expect(cleared.json()).toMatchObject({ seedRatioGoal: null, seedTimeMinutes: null });
+        } finally {
+          await inject('DELETE', `/admin/request-indexers/${item.id}`, settingsAdmin);
+        }
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'enforces settings permission and rejects invalid policy before writing',
+      async () => {
+        const payload = {
+          name: `seed-policy-denied-${randomUUID()}`,
+          adapterType: 'torznab',
+          baseUrl: 'http://203.0.113.10:9117',
+          seedTimeMinutes: 60,
+        };
+        expect((await inject('POST', '/admin/request-indexers', moderator, payload)).statusCode).toBe(403);
+        expect((await inject('POST', '/admin/request-indexers', requester, payload)).statusCode).toBe(403);
+
+        const invalid = await inject('POST', '/admin/request-indexers', settingsAdmin, { ...payload, seedTimeMinutes: 2_147_483_648 });
+        expect(invalid.statusCode).toBe(400);
+        expect(
+          await ctx.db.select({ id: schema.requestIndexers.id }).from(schema.requestIndexers).where(eq(schema.requestIndexers.name, payload.name)),
+        ).toHaveLength(0);
+
+        const nonTorrentName = `seed-policy-non-torrent-${randomUUID()}`;
+        const nonTorrent = await inject('POST', '/admin/request-indexers', settingsAdmin, {
+          name: nonTorrentName,
+          adapterType: 'newznab',
+          baseUrl: 'http://203.0.113.10:9117',
+          credential: 'api-key',
+          applyTrackerSeedGoals: false,
+        });
+        expect(nonTorrent.statusCode).toBe(400);
+        expect(
+          await ctx.db.select({ id: schema.requestIndexers.id }).from(schema.requestIndexers).where(eq(schema.requestIndexers.name, nonTorrentName)),
+        ).toHaveLength(0);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'enforces seed-goal constraints in PostgreSQL',
+      async () => {
+        const validName = `seed-policy-db-${randomUUID()}`;
+        const [valid] = await ctx.db
+          .insert(schema.requestIndexers)
+          .values({
+            name: validName,
+            adapterType: 'torznab',
+            baseUrl: 'http://203.0.113.10:9117',
+            seedRatioGoal: 1.25,
+            seedTimeMinutes: 2_147_483_647,
+          })
+          .returning({ id: schema.requestIndexers.id, applyTrackerSeedGoals: schema.requestIndexers.applyTrackerSeedGoals });
+        expect(valid?.applyTrackerSeedGoals).toBe(true);
+
+        try {
+          for (const ratio of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+            await expect(
+              ctx.db.insert(schema.requestIndexers).values({
+                name: `seed-policy-bad-ratio-${randomUUID()}`,
+                adapterType: 'torznab',
+                baseUrl: 'http://203.0.113.10:9117',
+                seedRatioGoal: ratio,
+              }),
+            ).rejects.toBeDefined();
+          }
+          for (const minutes of [0, -1, 2_147_483_648]) {
+            await expect(
+              ctx.db.insert(schema.requestIndexers).values({
+                name: `seed-policy-bad-time-${randomUUID()}`,
+                adapterType: 'torznab',
+                baseUrl: 'http://203.0.113.10:9117',
+                seedTimeMinutes: minutes,
+              }),
+            ).rejects.toBeDefined();
+          }
+        } finally {
+          if (valid) await ctx.db.delete(schema.requestIndexers).where(eq(schema.requestIndexers.id, valid.id));
+        }
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+  });
+
   describe('request contract', () => {
     /**
      * `forbidNonWhitelisted` is assumed by every DTO in this feature, and an unknown field
@@ -647,6 +765,20 @@ describe('Book requests (e2e)', () => {
           url: '/api/v1/book-requests',
           headers: authHeader(requester.accessToken),
           payload: { title: `Whitelist E2E ${randomUUID()}`, mediaKind: 'ebook', notAField: 'nope' },
+        });
+
+        expect(response.statusCode).toBe(400);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'refuses browser-supplied seed goals on a grab',
+      async () => {
+        const { request } = await submitOk(selfFulfiller, { selfServe: true });
+        const response = await inject('POST', `/book-request-fulfilment/${request.id}/grab`, selfFulfiller, {
+          magnet: 'magnet:?xt=urn:btih:c9e15763f722f23e98a29decdfae341b98d53056',
+          seedRatioGoal: 1,
         });
 
         expect(response.statusCode).toBe(400);

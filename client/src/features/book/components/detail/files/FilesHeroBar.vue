@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, ArrowUpDown, CircleCheck, FilePlus, TriangleAlert } from '@lucide/vue'
 import type { BookDetail } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
+import { formatList } from '@/i18n/formatters'
+import { formatKeyName } from '@/features/book/lib/book-formats'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import type { FormatShare, SortDirection, SortKey } from '@/features/book/composables/useBookFileTree'
@@ -28,7 +30,7 @@ const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
 
 const hasCover = computed(() => props.book.coverSource !== null)
-const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.updatedAt ?? props.book.addedAt))
+const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.coverVersion))
 const isMissing = computed(() => props.book.status === 'missing')
 
 /**
@@ -37,14 +39,14 @@ const isMissing = computed(() => props.book.status === 'missing')
  */
 const meterSegments = computed(() =>
   props.formatShares.map((share) => ({
-    format: share.format,
-    color: formatColorVar(share.format),
+    key: share.key,
+    color: formatColorVar(share.key),
     width: `${Math.max(share.fraction * 100, 1.5)}%`,
   })),
 )
 
 const meterLabel = computed(() =>
-  [t('book.detail.files.compositionAria'), props.formatShares.map((share) => share.format.toUpperCase()).join(', ')].join(': '),
+  [t('book.detail.files.compositionAria'), formatList(props.formatShares.map((share) => formatKeyName(share.key)))].join(': '),
 )
 
 function handleSort(key: SortKey) {
@@ -100,7 +102,7 @@ function handleAddFile() {
           <span class="flex h-1.5 flex-1 gap-px overflow-hidden rounded-full bg-muted" role="img" :aria-label="meterLabel">
             <span
               v-for="segment in meterSegments"
-              :key="segment.format"
+              :key="segment.key"
               class="block h-full first:rounded-l-full last:rounded-r-full"
               :style="{ width: segment.width, backgroundColor: segment.color }"
             />

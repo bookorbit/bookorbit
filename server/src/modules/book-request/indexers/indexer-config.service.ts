@@ -16,11 +16,12 @@ import type {
 import { isUniqueViolation } from '../../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { PrivateAddressException, ensureSafeUrl } from '../../../common/utils/ssrf.utils';
-import type { RequestIndexerRow } from '../../../db/schema';
+import type { RequestIndexerManagerRow, RequestIndexerRow } from '../../../db/schema';
 import { RequestCredentialService } from '../request-credential.service';
-import type { ResolvedIndexerConfig } from './indexer-adapter';
+import type { ResolvedIndexerConfig, ResolvedIndexerSeedPolicy } from './indexer-adapter';
 import { IndexerRegistry } from './indexer-registry';
 import { IndexerRepository } from './indexer.repository';
+import { IndexerManagerRepository } from './indexer-manager.repository';
 import type { CreateIndexerDto, UpdateIndexerDto } from './dto/indexer.dto';
 
 const MAX_INDEXER_SETTING_STRING_LENGTH = 2_048;
@@ -36,6 +37,7 @@ export class IndexerConfigService {
     private readonly repo: IndexerRepository,
     private readonly credentials: RequestCredentialService,
     private readonly registry: IndexerRegistry,
+    private readonly managers: IndexerManagerRepository,
   ) {}
 
   async findAll(): Promise<IndexerListResult> {
@@ -65,6 +67,8 @@ export class IndexerConfigService {
     // not leave a half-made indexer behind whose name the operator then cannot save over.
     await this.assertReachableUrl(dto.baseUrl, dto.allowPrivateAddress ?? false);
     this.assertCredentialPresent(dto.adapterType, Boolean(dto.credential?.trim()));
+    const seedsBack = this.registry.seedsBack(dto.adapterType);
+    this.assertSeedPolicyCompatible(seedsBack, dto);
     const credentialsEnc = dto.credential ? this.credentials.encrypt(dto.credential) : null;
     const color = dto.color === undefined ? pickUnusedIndexerColor(await this.repo.findAssignedColors()) : dto.color;
 
@@ -77,6 +81,9 @@ export class IndexerConfigService {
         credentialsEnc,
         enabled: dto.enabled ?? true,
         allowPrivateAddress: dto.allowPrivateAddress ?? false,
+        applyTrackerSeedGoals: seedsBack ? (dto.applyTrackerSeedGoals ?? true) : true,
+        seedRatioGoal: seedsBack ? (dto.seedRatioGoal ?? null) : null,
+        seedTimeMinutes: seedsBack ? (dto.seedTimeMinutes ?? null) : null,
         categories: mergeCategories(this.registry.defaultCategories(dto.adapterType), dto.categories),
         disabledMediaKinds: normalizeDisabledMediaKinds(dto.disabledMediaKinds),
         isbnSearchDisabled: dto.isbnSearchDisabled ?? false,
@@ -92,6 +99,7 @@ export class IndexerConfigService {
 
   async update(id: number, dto: UpdateIndexerDto): Promise<IndexerItem> {
     const existing = await this.requireIndexer(id);
+    if (existing.managerId !== null) throw new BadRequestException('A managed indexer must be changed through its indexer manager');
 
     const baseUrl = dto.baseUrl?.trim() ?? existing.baseUrl;
     const allowPrivate = dto.allowPrivateAddress ?? existing.allowPrivateAddress;
@@ -107,6 +115,8 @@ export class IndexerConfigService {
     const changesAdapter = adapterType !== existing.adapterType;
     const keepsCredential = dto.credential === undefined ? !changesAdapter && existing.credentialsEnc !== null : Boolean(dto.credential.trim());
     this.assertCredentialPresent(adapterType, keepsCredential);
+    const seedsBack = this.registry.seedsBack(adapterType);
+    this.assertSeedPolicyCompatible(seedsBack, dto);
 
     const patch: Partial<RequestIndexerRow> = {};
     if (dto.name !== undefined) patch.name = dto.name.trim();
@@ -115,6 +125,15 @@ export class IndexerConfigService {
     if (dto.baseUrl !== undefined) patch.baseUrl = baseUrl;
     if (dto.enabled !== undefined) patch.enabled = dto.enabled;
     if (dto.allowPrivateAddress !== undefined) patch.allowPrivateAddress = dto.allowPrivateAddress;
+    if (seedsBack) {
+      if (dto.applyTrackerSeedGoals !== undefined) patch.applyTrackerSeedGoals = dto.applyTrackerSeedGoals;
+      if (dto.seedRatioGoal !== undefined) patch.seedRatioGoal = dto.seedRatioGoal;
+      if (dto.seedTimeMinutes !== undefined) patch.seedTimeMinutes = dto.seedTimeMinutes;
+    } else {
+      patch.applyTrackerSeedGoals = true;
+      patch.seedRatioGoal = null;
+      patch.seedTimeMinutes = null;
+    }
     if (dto.categories !== undefined) patch.categories = mergeCategories(this.registry.defaultCategories(adapterType), dto.categories);
     if (dto.disabledMediaKinds !== undefined) patch.disabledMediaKinds = normalizeDisabledMediaKinds(dto.disabledMediaKinds);
     if (dto.isbnSearchDisabled !== undefined) patch.isbnSearchDisabled = dto.isbnSearchDisabled;
@@ -144,6 +163,7 @@ export class IndexerConfigService {
 
   async remove(id: number): Promise<void> {
     const existing = await this.requireIndexer(id);
+    if (existing.managerId !== null) throw new BadRequestException('A managed indexer must be deleted with its indexer manager');
     if (!(INDEXER_ADAPTER_TYPES as readonly string[]).includes(existing.adapterType)) {
       throw new BadRequestException('A plugin-backed source must be deleted with its plugin');
     }
@@ -178,6 +198,10 @@ export class IndexerConfigService {
     return this.repo.countSources();
   }
 
+  findColorsByIds(ids: number[]) {
+    return this.repo.findColorsByIds(ids);
+  }
+
   /**
    * How the last real search went, per source. Written by the search rather than read by it: the
    * settings list is where this is shown, and a picker's live failure list stops existing the
@@ -198,15 +222,18 @@ export class IndexerConfigService {
    */
   async resolveEnabledConfigs(): Promise<ResolvedIndexerConfig[]> {
     const rows = await this.repo.findAllEnabled();
+    const managerIds = [...new Set(rows.flatMap((row) => (row.managerId === null ? [] : [row.managerId])))];
+    const managers = new Map((managerIds.length === 0 ? [] : await this.managers.findRowsByIds(managerIds)).map((manager) => [manager.id, manager]));
     return rows.map((row) => {
+      const manager = row.managerId === null ? null : (managers.get(row.managerId) ?? null);
       try {
-        return this.toConfig(row);
+        return this.toConfig(row, manager);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `[request_indexer.resolve] [fail] indexerId=${row.id} error="${sanitizeLogValue(message)}" - the stored credential could not be read, so this source is reported as unauthorized`,
         );
-        return { ...this.toConfig({ ...row, credentialsEnc: null }), credentialError: message };
+        return { ...this.toConfig({ ...row, credentialsEnc: null }, manager ? { ...manager, credentialsEnc: '' } : null), credentialError: message };
       }
     });
   }
@@ -216,24 +243,52 @@ export class IndexerConfigService {
    * `credentialsEnc` blob cannot reach a response body or a log line by accident.
    */
   async resolveConfig(id: number): Promise<ResolvedIndexerConfig> {
-    return this.toConfig(await this.requireIndexer(id));
+    const row = await this.requireIndexer(id);
+    const manager = row.managerId === null ? null : ((await this.managers.findRowById(row.managerId)) ?? null);
+    return this.toConfig(row, manager);
   }
 
-  private toConfig(row: RequestIndexerRow): ResolvedIndexerConfig {
+  async resolveSeedPolicy(id: number): Promise<ResolvedIndexerSeedPolicy> {
+    const row = await this.repo.findSeedPolicyById(id);
+    if (!row) throw new NotFoundException('Indexer not found');
+    this.registry.require(row.adapterType);
+    return {
+      ...row,
+      adapterType: row.adapterType as IndexerAdapterType,
+      seedsBack: this.registry.seedsBack(row.adapterType),
+    };
+  }
+
+  private toConfig(row: RequestIndexerRow, manager: RequestIndexerManagerRow | null = null): ResolvedIndexerConfig {
+    const managed = row.managerId !== null;
     return {
       id: row.id,
-      name: row.name,
+      managerId: row.managerId,
+      managerPriority: row.managerMetadata?.priority ?? null,
+      name: managed ? (row.managerMetadata?.displayName ?? row.name) : row.name,
       color: row.color ?? null,
       adapterType: row.adapterType as IndexerAdapterType,
       baseUrl: row.baseUrl,
-      credential: row.credentialsEnc ? this.credentials.decrypt(row.credentialsEnc) : null,
+      credential: managed
+        ? manager?.credentialsEnc
+          ? this.credentials.decrypt(manager.credentialsEnc)
+          : null
+        : row.credentialsEnc
+          ? this.credentials.decrypt(row.credentialsEnc)
+          : null,
       credentialError: null,
-      allowPrivateAddress: row.allowPrivateAddress,
+      allowPrivateAddress: manager?.allowPrivateAddress ?? row.allowPrivateAddress,
+      applyTrackerSeedGoals: row.applyTrackerSeedGoals,
+      seedRatioGoal: row.seedRatioGoal,
+      seedTimeMinutes: row.seedTimeMinutes,
       categories: this.resolveCategories(row),
       disabledMediaKinds: normalizeDisabledMediaKinds(row.disabledMediaKinds),
       isbnSearchDisabled: row.isbnSearchDisabled,
       settings: row.settings ?? null,
-      networkProfile: row.networkProfile ?? null,
+      networkProfile: manager?.networkProfile ?? row.networkProfile ?? null,
+      perIndexerTimeoutSeconds: manager?.perIndexerTimeoutSeconds ?? 20,
+      overallSearchBudgetSeconds: manager?.overallSearchBudgetSeconds ?? null,
+      autoExpandCategories: manager?.autoExpandCategories ?? false,
     };
   }
 
@@ -315,6 +370,13 @@ export class IndexerConfigService {
     }
   }
 
+  private assertSeedPolicyCompatible(seedsBack: boolean, dto: CreateIndexerDto | UpdateIndexerDto): void {
+    if (seedsBack) return;
+    if (dto.applyTrackerSeedGoals === false || dto.seedRatioGoal != null || dto.seedTimeMinutes != null) {
+      throw indexerError('INDEXER_SETTINGS_INVALID', 'Seed goals can only be configured for an indexer that returns torrents');
+    }
+  }
+
   /**
    * Unlike a download client this defaults to off: a public tracker has no business resolving to
    * a private address, and a self-hosted torznab proxy is the one case worth opting into.
@@ -378,6 +440,9 @@ function toItem(row: RequestIndexerRow, categories: IndexerCategoryMap): Indexer
     baseUrl: row.baseUrl,
     hasCredential: row.credentialsEnc !== null,
     allowPrivateAddress: row.allowPrivateAddress,
+    applyTrackerSeedGoals: row.applyTrackerSeedGoals,
+    seedRatioGoal: row.seedRatioGoal,
+    seedTimeMinutes: row.seedTimeMinutes,
     categories,
     disabledMediaKinds: normalizeDisabledMediaKinds(row.disabledMediaKinds),
     isbnSearchDisabled: row.isbnSearchDisabled,

@@ -147,10 +147,8 @@ function makeController() {
     resolveDownloadFilename: vi.fn(),
     getProgress: vi.fn(),
     getBookProgress: vi.fn(),
-    getAudioProgress: vi.fn(),
     saveProgress: vi.fn(),
     clearFileProgress: vi.fn(),
-    saveAudioProgress: vi.fn(),
     updatePersonalNote: vi.fn(),
     updateAddedAt: vi.fn(),
     updateMetadata: vi.fn(),
@@ -231,7 +229,7 @@ describe('BookController', () => {
     bookService.getCoverPath.mockResolvedValue('/tmp/cover.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 1234 } as never);
 
-    await controller.getCover(7, makeUser(), reply, '1234567890', '"1234"');
+    await controller.getCover(7, makeUser(), reply, { t: '1234567890' }, '"1234"');
 
     expect(reply.status).toHaveBeenCalledWith(304);
     expect(headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
@@ -258,7 +256,7 @@ describe('BookController', () => {
     bookService.getCoverPath.mockResolvedValue('/tmp/cover.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 4321 } as never);
 
-    await controller.getCover(7, makeUser(), reply, '1234567890', undefined);
+    await controller.getCover(7, makeUser(), reply, { t: '1234567890' }, undefined);
 
     expect(headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
@@ -734,7 +732,7 @@ describe('BookController', () => {
     bookService.getThumbnailPath.mockResolvedValue('/tmp/thumb.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 1000 } as never);
 
-    await controller.getThumbnail(7, makeUser(), reply, '1234567890', undefined);
+    await controller.getThumbnail(7, makeUser(), reply, { t: '1234567890' }, undefined);
     expect(headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
   });
 
@@ -756,6 +754,16 @@ describe('BookController', () => {
     expect(bookService.bulkReExtractCover).toHaveBeenCalledWith([42], user);
   });
 
+  it('passes an explicit medium through re-extract-cover', async () => {
+    const { controller, bookService } = makeController();
+    const user = makeUser();
+    bookService.bulkReExtractCover.mockResolvedValue({ processed: 1, updated: 1 });
+
+    await controller.reExtractCover(42, user, { medium: 'audio' });
+
+    expect(bookService.bulkReExtractCover).toHaveBeenCalledWith([42], user, undefined, { medium: 'audio' });
+  });
+
   it('logs and rethrows download failures', async () => {
     const { controller, bookService } = makeController();
     const { reply } = makeReply();
@@ -773,11 +781,17 @@ describe('BookController', () => {
       cfi: null,
       pageNumber: null,
       percentage: 0,
+      positionSeconds: null,
+      mediaOverlayFragment: null,
+      mediaOverlaySectionIndex: null,
       koboLocationSource: null,
       koboLocationType: null,
       koboLocationValue: null,
       koboContentSourceProgressPercent: null,
       koreaderProgress: null,
+      narrationPercentage: null,
+      narrationUpdatedAt: null,
+      textUpdatedAt: null,
     });
     expect(bookService.getProgress).toHaveBeenCalledWith(user.id, 9, user);
   });
@@ -788,11 +802,9 @@ describe('BookController', () => {
 
     await controller.saveFileProgress(9, { percentage: 25 } as never, user);
     await controller.clearFileProgress(9, user);
-    await controller.saveAudioProgress(11, { currentFileId: 2, positionSeconds: 90, percentage: 20 } as never, user);
 
     expect(bookService.saveProgress).toHaveBeenCalledWith(user.id, 9, { percentage: 25 }, user);
     expect(bookService.clearFileProgress).toHaveBeenCalledWith(user.id, 9, user);
-    expect(bookService.saveAudioProgress).toHaveBeenCalledWith(user.id, 11, { currentFileId: 2, positionSeconds: 90, percentage: 20 }, user);
   });
 
   it('delegates remaining book endpoints to service methods', async () => {
@@ -808,7 +820,6 @@ describe('BookController', () => {
     bookService.refreshMetadata.mockResolvedValue({ id: 7 });
     bookService.getMetadataFromFile.mockResolvedValue({ title: 'File Title' });
     bookService.getKoboState.mockResolvedValue({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] });
-    bookService.getAudioProgress.mockResolvedValue({ positionSeconds: 15 });
     bookService.getDetail.mockResolvedValue({ id: 7, title: 'Detail' });
 
     await controller.updateMetadata(7, { title: 'New' } as never, user);
@@ -820,7 +831,6 @@ describe('BookController', () => {
     await controller.getMetadataFromFile(7, user);
     await controller.getKoboState(7, user);
     await controller.setReadStatus(7, { status: 'reading' } as never, user);
-    await controller.getAudioProgress(7, user);
     await controller.getDetail(7, user);
 
     expect(bookService.updateMetadata).toHaveBeenCalledWith(7, { title: 'New' }, user, { postSaveMode: 'schedule' });
@@ -834,7 +844,6 @@ describe('BookController', () => {
     expect(bookService.getMetadataFromFile).toHaveBeenCalledWith(7, user);
     expect(bookService.getKoboState).toHaveBeenCalledWith(7, user);
     expect(bookService.setReadStatus).toHaveBeenCalledWith(7, { status: 'reading' }, user);
-    expect(bookService.getAudioProgress).toHaveBeenCalledWith(user.id, 7, user);
     expect(bookService.getDetail).toHaveBeenCalledWith(7, user);
   });
 
@@ -978,6 +987,18 @@ describe('BookController', () => {
     }
 
     expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, BookController.prototype.refreshMetadata)).toBeUndefined();
+  });
+
+  // Both routes previously verified library access only, so a library editor without delete
+  // rights could remove a file from disk, and the web client already assumed otherwise.
+  it('gates per-file mutations on the same permissions as the book-level routes', () => {
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookController.prototype.deleteFile)).toBe(Permission.LibraryDeleteBooks);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookController.prototype.renameFile)).toBe(Permission.LibraryEditMetadata);
+  });
+
+  // Progress is the caller's own, so clearing it stays available to every account with access.
+  it('leaves per-file progress clearing ungated', () => {
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookController.prototype.clearFileProgress)).toBeUndefined();
   });
 
   it('marks bulk-download endpoints as demo-restricted', () => {

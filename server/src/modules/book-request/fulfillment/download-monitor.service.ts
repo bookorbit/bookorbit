@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import { ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES } from '@bookorbit/types';
 import type { BookRequestDownloadStatus, BookRequestStatus } from '@bookorbit/types';
 
+import { SystemCron } from '../../../common/decorators/system-cron.decorator';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { BookRequestDownloadRow } from '../../../db/schema';
 import { BookRequestGateway } from '../book-request.gateway';
@@ -21,7 +21,7 @@ import { RequestImportService } from './request-import.service';
  * A torrent the client has never heard of is usually one it has not indexed yet. Only treat it
  * as gone once it has had time to appear.
  */
-const MISSING_TORRENT_GRACE_MS = 2 * 60 * 1000;
+const MISSING_CLIENT_ITEM_GRACE_MS = 2 * 60 * 1000;
 
 /**
  * A tracker that is briefly down is indistinguishable from one that is refusing us, and only the
@@ -94,7 +94,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
   }
 
   /** Direct transfers report once a second; external torrent clients are polled every five. */
-  @Cron('* * * * * *')
+  @SystemCron('* * * * * *')
   async tick(): Promise<void> {
     if (this.running) return;
     this.running = true;
@@ -222,19 +222,19 @@ export class DownloadMonitorService implements OnModuleDestroy {
 
   private async pollTarget(target: PollTarget, rows: BookRequestDownloadRow[]): Promise<void> {
     // A refused attempt is a record of having asked, with nothing handed to anything: there is no
-    // hash to ask about, and it is never in a status this polls for anyway.
-    const polled = rows.filter((row): row is BookRequestDownloadRow & { clientHash: string } => row.clientHash !== null);
+    // client key to ask about, and it is never in a status this polls for anyway.
+    const polled = rows.filter((row): row is BookRequestDownloadRow & { clientKey: string } => row.clientKey !== null);
     if (polled.length === 0) return;
-    const hashes = polled.map((row) => row.clientHash);
+    const clientKeys = polled.map((row) => row.clientKey);
 
     let statuses: DownloadStatus[];
     try {
       if (target === DIRECT) {
-        statuses = await this.direct.status(hashes);
+        statuses = await this.direct.status(clientKeys);
       } else {
         const config = await this.clients.resolveConfig(target);
         const adapter = this.registry.require(config.adapterType);
-        statuses = await adapter.status(hashes, config);
+        statuses = await adapter.status(clientKeys, config);
       }
     } catch (error) {
       // A client that is down, misconfigured or mid-restart must not fail every download it
@@ -246,13 +246,13 @@ export class DownloadMonitorService implements OnModuleDestroy {
       return;
     }
 
-    const byHash = new Map(statuses.map((status) => [status.infoHash.toLowerCase(), status]));
+    const byKey = new Map(statuses.map((status) => [status.clientKey.toLowerCase(), status]));
     // Once for the batch rather than once per progress tick: the audience of a tick is the same
     // set the request list is scoped by, and reading it per download would add a round trip per
     // active transfer per poll.
     const viewers = await this.requests.findRequestViewerIds([...new Set(polled.map((row) => row.requestId))]);
     for (const row of polled) {
-      const status = byHash.get(row.clientHash.toLowerCase());
+      const status = byKey.get(row.clientKey.toLowerCase());
       if (!status) {
         await this.handleMissing(row);
         continue;
@@ -262,17 +262,17 @@ export class DownloadMonitorService implements OnModuleDestroy {
   }
 
   /**
-   * A hash the target did not report. For a torrent that is usually a client that has not indexed
-   * it yet, so it gets a grace period; for a direct transfer it means startup could not resume it
+   * A client key the target did not report. An external client may not have indexed a newly added
+   * item yet, so it gets a grace period; for a direct transfer it means startup could not resume it
    * or the in-process transfer disappeared, so waiting longer cannot make it return.
    */
   private async handleMissing(row: BookRequestDownloadRow): Promise<void> {
-    if (!this.olderThan(row, MISSING_TORRENT_GRACE_MS)) return;
+    if (!this.olderThan(row, MISSING_CLIENT_ITEM_GRACE_MS)) return;
     await this.fulfillment.failDownload(
       row,
       row.source === 'direct_url'
         ? 'The download was interrupted before it finished and cannot be resumed'
-        : 'The download client no longer has this torrent',
+        : 'The download client no longer has this download',
     );
   }
 

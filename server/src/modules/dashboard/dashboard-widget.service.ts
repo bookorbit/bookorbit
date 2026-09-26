@@ -68,6 +68,12 @@ export class DashboardWidgetService {
     return resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
   }
 
+  clearCacheForUser(userId: number): void {
+    const scopePrefix = `${userId}:`;
+    this.liveCache.clearForScopePrefix(scopePrefix);
+    this.staleCache.clearForScopePrefix(scopePrefix);
+  }
+
   async getReadingGoal(user: RequestUser): Promise<ReadingGoalWidgetData> {
     const settings = user.settings as UserSettings | undefined;
     const goalBooks = settings?.dashboardConfig?.readingGoal ?? null;

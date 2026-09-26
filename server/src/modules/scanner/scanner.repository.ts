@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -19,10 +19,11 @@ import {
   userLibraryAccess,
   users,
 } from '../../db/schema';
+import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
-type MoveBookToLibraryResult = Pick<typeof books.$inferSelect, 'id' | 'libraryId' | 'libraryFolderId' | 'folderPath' | 'status'> & {
+type MoveBookToLibraryResult = Pick<typeof books.$inferSelect, 'id' | 'libraryId' | 'libraryFolderId' | 'folderPath' | 'status' | 'primaryFileId'> & {
   previousLibraryId: number;
   libraryChanged: boolean;
 };
@@ -107,6 +108,7 @@ export class ScannerRepository {
         metadataPrecedence: libraries.metadataPrecedence,
         excludePatterns: libraries.excludePatterns,
         organizationMode: libraries.organizationMode,
+        addedAtSource: libraries.addedAtSource,
       })
       .from(libraries)
       .where(eq(libraries.id, libraryId));
@@ -243,7 +245,11 @@ export class ScannerRepository {
         sizeBytes: bookFiles.sizeBytes,
         mtime: bookFiles.mtime,
         fileHash: bookFiles.fileHash,
+        format: bookFiles.format,
         sortOrder: bookFiles.sortOrder,
+        durationSeconds: bookFiles.durationSeconds,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+        mediaOverlayCheckedAt: bookFiles.mediaOverlayCheckedAt,
       })
       .from(bookFiles)
       .where(eq(bookFiles.libraryFolderId, libraryFolderId));
@@ -283,7 +289,12 @@ export class ScannerRepository {
     const whereClause =
       libraryId == null ? eq(bookFiles.absolutePath, absolutePath) : and(eq(bookFiles.absolutePath, absolutePath), eq(books.libraryId, libraryId));
     const [row] = await this.db
-      .select({ file: bookFiles, libraryId: books.libraryId, primaryFileId: books.primaryFileId, libraryFolderPath: libraryFolders.path })
+      .select({
+        file: bookFiles,
+        libraryId: books.libraryId,
+        primaryFileId: books.primaryFileId,
+        libraryFolderPath: libraryFolders.path,
+      })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
       .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
@@ -338,6 +349,7 @@ export class ScannerRepository {
           libraryFolderId: books.libraryFolderId,
           folderPath: books.folderPath,
           status: books.status,
+          primaryFileId: books.primaryFileId,
         })
         .from(books)
         .where(eq(books.id, bookId))
@@ -366,6 +378,7 @@ export class ScannerRepository {
           libraryFolderId: books.libraryFolderId,
           folderPath: books.folderPath,
           status: books.status,
+          primaryFileId: books.primaryFileId,
         });
       return book ? { ...book, previousLibraryId: current.libraryId, libraryChanged } : null;
     });
@@ -571,12 +584,13 @@ export class ScannerRepository {
   async findBookCardData(bookIds: number[]) {
     if (bookIds.length === 0) return { rows: [], authorRows: [], fileRows: [], genreRows: [] };
 
-    const [rows, authorRows, fileRows, genreRows] = await Promise.all([
+    const [rows, authorRows, unrankedFileRows, genreRows] = await Promise.all([
       this.db
         .select({
           id: books.id,
           status: books.status,
           coverAspectRatio: libraries.coverAspectRatio,
+          formatPriority: libraries.formatPriority,
           primaryFileId: books.primaryFileId,
           folderPath: books.folderPath,
           addedAt: books.addedAt,
@@ -607,9 +621,19 @@ export class ScannerRepository {
         .where(inArray(bookAuthors.bookId, bookIds))
         .orderBy(bookAuthors.displayOrder),
       this.db
-        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role, sizeBytes: bookFiles.sizeBytes })
+        .select({
+          bookId: bookFiles.bookId,
+          id: bookFiles.id,
+          format: bookFiles.format,
+          role: bookFiles.role,
+          sizeBytes: bookFiles.sizeBytes,
+          mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+          mediaOverlayDurationSeconds: bookFiles.mediaOverlayDurationSeconds,
+          mediaOverlayCheckedAt: bookFiles.mediaOverlayCheckedAt,
+        })
         .from(bookFiles)
-        .where(inArray(bookFiles.bookId, bookIds)),
+        .where(inArray(bookFiles.bookId, bookIds))
+        .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id)),
       this.db
         .select({ bookId: bookGenres.bookId, name: genres.name })
         .from(bookGenres)
@@ -617,6 +641,10 @@ export class ScannerRepository {
         .where(inArray(bookGenres.bookId, bookIds)),
     ]);
 
+    const fileRows = rankFileRowsByBook(
+      unrankedFileRows,
+      new Map(rows.map((row) => [row.id, { formatPriority: row.formatPriority as string[] | null, primaryFileId: row.primaryFileId }])),
+    );
     return { rows, authorRows, fileRows, genreRows };
   }
 

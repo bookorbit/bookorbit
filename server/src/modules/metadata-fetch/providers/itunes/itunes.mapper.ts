@@ -1,4 +1,4 @@
-import { MetadataCandidate, MetadataProviderKey, type ITunesCoverResolution } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, type ITunesCoverResolution, type MetadataCoverShape } from '@bookorbit/types';
 import { parsePublishedDateKey, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { ITunesResult } from './itunes.types';
 
@@ -8,6 +8,13 @@ function mapCoverUrl(artworkUrl100: string | undefined, coverResolution: ITunesC
 
   const target = coverResolution === 'high' ? '10000x10000bb.jpg' : '600x600bb.jpg';
   return artworkUrl100.replace('100x100bb.jpg', target);
+}
+
+// Apple sells ebooks with their print-shaped jackets and audiobooks with square art.
+function coverShapeOf(result: ITunesResult): MetadataCoverShape {
+  if (result.kind === 'ebook') return 'portrait';
+  if (result.kind === 'audiobook' || result.wrapperType === 'audiobook') return 'square';
+  return 'unknown';
 }
 
 function normalizeCommunityRating(value: number | undefined): number | undefined {
@@ -43,6 +50,7 @@ export function mapITunesResult(result: ITunesResult, coverResolution: ITunesCov
     language: result.languageCodesISO2A?.[0],
     genres: result.genres,
     coverUrl,
+    ...(coverUrl ? { coverShape: coverShapeOf(result) } : {}),
     sourceUrl: result.trackViewUrl ?? result.collectionViewUrl,
     ...(communityRating !== undefined ? { communityRating } : {}),
     ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),

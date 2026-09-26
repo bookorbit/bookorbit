@@ -12,6 +12,7 @@ vi.mock('@/router', () => ({
 
 vi.mock('@/lib/api', () => ({
   api: vi.fn<() => void>(),
+  fetchWithAuthProxyRecovery: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, redirect: 'manual' }),
   refreshAccessToken: vi.fn<() => void>(),
   setAccessToken: vi.fn<() => void>(),
   setOnAuthFailure: vi.fn<() => void>(),
@@ -59,6 +60,7 @@ describe('useAuth.register', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
+      redirect: 'manual',
       body: JSON.stringify(PAYLOAD),
     })
   })

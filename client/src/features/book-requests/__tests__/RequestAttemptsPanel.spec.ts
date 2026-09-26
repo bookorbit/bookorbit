@@ -21,7 +21,7 @@ function attempt(overrides: Partial<BookRequestDownloadItem> = {}): BookRequestD
     automated: true,
     releaseTitle: 'Stalked by Seduction and Shadows [EPUB]',
     releaseSizeBytes: 2_300_000,
-    clientHash: null,
+    clientKey: null,
     status: 'failed',
     progressPercent: 0,
     downloadedBytes: 0,
@@ -41,7 +41,7 @@ const CURRENT = attempt({
   indexerId: 2,
   indexerName: 'Library Genesis',
   source: 'direct_url',
-  clientHash: 'a'.repeat(40),
+  clientKey: 'a'.repeat(40),
   status: 'imported',
   errorMessage: null,
 })
@@ -90,6 +90,14 @@ describe('RequestAttemptsPanel', () => {
 
     expect(text).toContain('Refused, nothing downloaded')
     expect(text).not.toContain('Download failed')
+  })
+
+  it('identifies an NZB attempt as Usenet rather than a torrent', async () => {
+    const nzb = attempt({ id: 14, source: 'nzb_file', clientKey: 'b'.repeat(64) })
+    const wrapper = await render([CURRENT, nzb])
+
+    expect(wrapper.find('.lucide-newspaper').exists()).toBe(true)
+    expect(wrapper.find('.lucide-magnet').exists()).toBe(false)
   })
 
   /** The transfer section above is already showing it; saying it twice is not history. */

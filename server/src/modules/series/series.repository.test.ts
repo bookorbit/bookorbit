@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { SeriesRepository } from './series.repository';
 
@@ -230,6 +232,20 @@ describe('SeriesRepository', () => {
 
       expect(result.page).toBe(3);
       expect(result.size).toBe(15);
+    });
+
+    it('uses containment rather than trigram expansion for multi-word searches', async () => {
+      const { select, baseChain } = makeFindPageDb([{ ...NO_FACETS }], []);
+      db.select = select;
+      stubPageHelpers(repo);
+
+      await repo.findPage({ ...BASE_PARAMS, q: 'The Wax Child', sort: 'relevance', order: 'desc' });
+
+      const where = (baseChain.where as ReturnType<typeof vi.fn>).mock.calls[0]![0] as SQL;
+      const query = new PgDialect().sqlToQuery(where);
+      expect(query.sql).toContain(' ILIKE ');
+      expect(query.sql).not.toContain(' % ');
+      expect(query.params).toContain('%The Wax Child%');
     });
   });
 

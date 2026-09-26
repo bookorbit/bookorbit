@@ -8,7 +8,7 @@ function download(overrides: Partial<BookRequestDownloadRow> = {}): BookRequestD
     id: 11,
     requestId: 7,
     downloadClientId: 4,
-    clientHash: INFO_HASH,
+    clientKey: INFO_HASH,
     source: 'torrent_file',
     status: 'downloading',
     ...overrides,

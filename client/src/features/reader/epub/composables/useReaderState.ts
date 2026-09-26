@@ -16,6 +16,7 @@ import {
 } from '@bookorbit/types'
 import { themes } from '../constants/themes'
 import type { Theme, ThemeMode } from '../constants/themes'
+import { MEDIA_OVERLAY_HIGHLIGHT_CSS_VARIABLE } from '../../media-overlay/lib/media-overlay-highlight'
 import type { FoliateRenderer } from './useFoliate'
 
 export interface ReaderState {
@@ -135,7 +136,6 @@ export function useReaderState() {
     const mode = activeMode.value
     const theme = currentTheme.value
     const lightMode = theme.light
-    const mediaActiveClass = 'media-active'
     const dark = isDark.value
     // Force bg whenever dark mode is active OR the light theme uses a non-white background.
     // Styles are applied unconditionally (no prefers-color-scheme wrappers) so the app's
@@ -230,7 +230,7 @@ export function useReaderState() {
           }
       }
       html {
-          line-height: ${lh};
+          line-height: ${lh} !important;
           hanging-punctuation: allow-end last;
           orphans: 2;
           widows: 2;
@@ -256,6 +256,7 @@ export function useReaderState() {
       html, body {
           color: ${mode.fg} !important;
           background: none !important;
+          ${MEDIA_OVERLAY_HIGHLIGHT_CSS_VARIABLE}: color-mix(in hsl, ${mode.fg}, ${mode.bg} ${dark ? '75%' : '85%'});
       }
       body * {
           color: inherit !important;
@@ -269,14 +270,11 @@ export function useReaderState() {
           background-color: transparent !important;
           ${!dark ? 'mix-blend-mode: multiply;' : ''}
       }
-      .${mediaActiveClass}, .${mediaActiveClass} * {
-          color: ${mode.fg} !important;
-          background: color-mix(in hsl, ${mode.fg}, ${mode.bg} ${dark ? '75%' : '85%'}) !important;
       }`
           : ''
       }
       p, li, blockquote, dd {
-          line-height: ${lh};
+          line-height: ${lh} !important;
           text-align: ${j ? 'justify' : 'start'} !important;
           hyphens: ${h ? 'auto' : 'none'};
       }

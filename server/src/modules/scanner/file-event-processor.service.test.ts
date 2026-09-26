@@ -65,8 +65,11 @@ const mockRepo: Mocked<
   replaceDuplicateBookWithMovedBook: vi.fn(),
 };
 
+const coverStore = { removeCoverDirectory: vi.fn().mockResolvedValue(undefined) };
+const coverReconciler = { enqueue: vi.fn().mockResolvedValue(undefined) };
+
 function makeService() {
-  return new FileEventProcessorService(mockRepo as unknown as ScannerRepository);
+  return new FileEventProcessorService(mockRepo as unknown as ScannerRepository, coverStore as never, coverReconciler as never);
 }
 
 function makeFileStat(overrides: Partial<{ ino: bigint; size: number | bigint; mtime: Date; isDirectory: boolean; isFile: boolean }> = {}) {
@@ -130,7 +133,21 @@ describe('handleUnlink', () => {
     expect(mockRepo.deleteBookFile).toHaveBeenCalledWith(55);
     expect(mockRepo.markBooksAsMissing).not.toHaveBeenCalled();
     expect(mockRepo.findBookFilesByBookId).not.toHaveBeenCalled();
+    expect(coverReconciler.enqueue).not.toHaveBeenCalled();
     expect(result).toEqual({ type: 'noop' });
+  });
+
+  it('reconciles cover slots when a non-selected content file goes away', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 56, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+
+    await expect(makeService().handleUnlink('/books/Solo/solo.m4b')).resolves.toEqual({ type: 'noop' });
+
+    expect(mockRepo.deleteBookFile).toHaveBeenCalledWith(56);
+    expect(coverReconciler.enqueue).toHaveBeenCalledWith([12], { filesChanged: true });
   });
 
   it('marks book missing when primary file is deleted and no other files remain', async () => {
@@ -195,6 +212,7 @@ describe('handleUnlink', () => {
       duplicateFileId: 700,
     });
     expect(result).toEqual({ type: 'book-transferred', fromLibraryId: 5, toLibraryId: 9, bookIds: [12] });
+    expect(coverStore.removeCoverDirectory).toHaveBeenCalledWith(77);
   });
 
   it('keeps delayed duplicate repair as book-moved when source and destination are in the same library', async () => {
@@ -256,6 +274,24 @@ describe('handleUnlink', () => {
     expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, 100);
     expect(mockRepo.markBooksAsMissing).not.toHaveBeenCalled();
     expect(result).toEqual({ type: 'book-restored', libraryId: 5, bookIds: [12] });
+  });
+
+  it('prefers the remaining read-aloud EPUB when the selected file is deleted', async () => {
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 99, bookId: 12, role: 'content' },
+      libraryId: 5,
+      primaryFileId: 99,
+    } as any);
+    mockRepo.findBookFilesByBookId.mockResolvedValue([
+      { id: 99, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000, mediaOverlayAvailable: false },
+      { id: 100, bookId: 12, role: 'content', format: 'epub', sizeBytes: 1000, mediaOverlayAvailable: false },
+      { id: 101, bookId: 12, role: 'content', format: 'epub', sizeBytes: 2000, mediaOverlayAvailable: true },
+    ] as any);
+    mockRepo.findLibrarySettings.mockResolvedValue({ formatPriority: ['epub'] } as any);
+
+    await makeService().handleUnlink('/books/Solo/selected.epub');
+
+    expect(mockRepo.updateBookPrimaryFile).toHaveBeenCalledWith(12, 101);
   });
 
   it('falls back to DEFAULT_FORMAT_PRIORITY when library settings are null', async () => {
@@ -385,8 +421,27 @@ describe('handleCreate — file', () => {
 
   it('returns noop for non-content file formats', async () => {
     mockStat.mockResolvedValue(makeFileStat());
-    const result = await makeService().handleCreate('/books/Author/cover.jpg');
-    expect(result).toEqual({ type: 'noop' });
+    mockRepo.findBooksByFolderPath.mockResolvedValue([]);
+    await expect(makeService().handleCreate('/books/Author/cover.jpg')).resolves.toEqual({ type: 'noop' });
+    await expect(makeService().handleCreate('/books/Author/Book/metadata.opf')).resolves.toEqual({ type: 'noop' });
+  });
+
+  it('rescans a book folder when a folder image appears or changes in it', async () => {
+    mockStat.mockResolvedValue(makeFileStat());
+    mockRepo.findBooksByFolderPath.mockResolvedValue([
+      { id: 3, folderPath: '/books/Author/Book/Nested', status: 'present' },
+      { id: 4, folderPath: '/books/Author/Book', status: 'present' },
+    ] as any);
+
+    await expect(makeService().handleCreate('/books/Author/Book/folder.jpg')).resolves.toEqual({ type: 'scan-required', scope: 'file' });
+    expect(mockRepo.findBooksByFolderPath).toHaveBeenCalledWith('/books/Author/Book', undefined);
+  });
+
+  it('ignores a folder image beside a missing book', async () => {
+    mockStat.mockResolvedValue(makeFileStat());
+    mockRepo.findBooksByFolderPath.mockResolvedValue([{ id: 4, folderPath: '/books/Author/Book', status: 'missing' }] as any);
+
+    await expect(makeService().handleCreate('/books/Author/Book/cover.jpg')).resolves.toEqual({ type: 'noop' });
   });
 
   it('returns noop when a tracked file matches its persisted post-write state', async () => {

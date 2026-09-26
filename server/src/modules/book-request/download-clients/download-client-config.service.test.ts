@@ -94,16 +94,17 @@ describe('DownloadClientConfigService', () => {
   });
 
   /** An approver may pick a client without being trusted with how to reach it. */
-  it('summarises only compatible enabled clients as names and ids', async () => {
+  it('summarises enabled clients with their delivery capability', async () => {
     const { service } = makeService({
       repo: {
-        findAllEnabled: vi.fn().mockResolvedValue([clientRow()]),
+        findAllEnabled: vi.fn().mockResolvedValue([clientRow(), clientRow({ id: 5, name: 'usenet', adapterType: 'nzbget' })]),
       },
     });
 
-    await expect(service.findEnabledSummaries('torrent')).resolves.toEqual([{ id: 4, name: 'qbit', color: null }]);
-    // Direct files are fetched by BookOrbit itself, so there is never a client row to pick.
-    await expect(service.findEnabledSummaries('file')).resolves.toEqual([]);
+    await expect(service.findEnabledSummaries()).resolves.toEqual([
+      { id: 4, name: 'qbit', color: null, delivery: 'torrent' },
+      { id: 5, name: 'usenet', color: null, delivery: 'usenet' },
+    ]);
   });
 
   it('answers with nothing rather than inventing a client when none is configured', async () => {
@@ -124,6 +125,13 @@ describe('DownloadClientConfigService', () => {
     const { service, adapter } = makeService();
     await service.update(4, { priority: 9 });
     expect(adapter.forget).not.toHaveBeenCalled();
+  });
+
+  it('refuses to change the type of a saved client', async () => {
+    const { service, repo } = makeService();
+
+    await expect(service.update(4, { adapterType: 'nzbget' })).rejects.toThrow('cannot change type');
+    expect(repo.update).not.toHaveBeenCalled();
   });
 
   it('persists an assigned color without reopening the client connection', async () => {
@@ -186,6 +194,32 @@ describe('DownloadClientConfigService', () => {
 
     expect(credentials.encrypt).toHaveBeenCalledWith('hunter2');
     expect(repo.createWithPathMappings).toHaveBeenCalledWith(expect.objectContaining({ credentialsEnc: 'cipher' }), expect.anything());
+  });
+
+  it('requires an API key when creating SABnzbd and stores it in the encrypted credential field', async () => {
+    const { service, credentials, repo } = makeService();
+    const sabDto = { ...createDto, name: 'sab', adapterType: 'sabnzbd' as const };
+
+    await expect(service.create(sabDto)).rejects.toMatchObject({ response: { errorCode: 'DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED' } });
+    expect(repo.createWithPathMappings).not.toHaveBeenCalled();
+
+    await service.create({ ...sabDto, password: 'api-key' });
+    expect(credentials.encrypt).toHaveBeenCalledWith('api-key');
+    expect(repo.createWithPathMappings).toHaveBeenCalledWith(
+      expect.objectContaining({ adapterType: 'sabnzbd', username: null, credentialsEnc: 'cipher' }),
+      expect.anything(),
+    );
+  });
+
+  it('does not allow the required SABnzbd API key to be cleared', async () => {
+    const { service, repo } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue({ client: clientRow({ adapterType: 'sabnzbd' }), pathMappings: [] }) },
+    });
+
+    await expect(service.update(4, { password: '' })).rejects.toMatchObject({
+      response: { errorCode: 'DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED' },
+    });
+    expect(repo.update).not.toHaveBeenCalled();
   });
 
   it('lets the credential service refuse a save when no encryption key is set', async () => {

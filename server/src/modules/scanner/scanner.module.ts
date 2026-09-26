@@ -7,6 +7,7 @@ import { SelfWriteRegistryModule } from '../../common/self-write-registry.module
 import { AchievementModule } from '../achievement/achievement.module';
 import { AuthModule } from '../auth/auth.module';
 import { BookMetadataFetchModule } from '../book-metadata-fetch/book-metadata-fetch.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { NotificationModule } from '../notification/notification.module';
 import { FileEventProcessorService } from './file-event-processor.service';
@@ -20,6 +21,7 @@ import { ScannerService } from './scanner.service';
 @Module({
   imports: [
     MetadataModule,
+    BookCoverStoreModule,
     AuthModule,
     AchievementModule,
     SelfWriteRegistryModule,

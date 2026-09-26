@@ -1292,7 +1292,7 @@ interface SourceTypeCompatibility {
 const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
   const compatibility: Record<string, SourceTypeCompatibility> = {
     booklore: {
-      testedVersions: ['v2.2.2'],
+      testedVersions: ['v2.4.0'],
       note: t('migration.source.compatibility.note'),
     },
     grimmory: {

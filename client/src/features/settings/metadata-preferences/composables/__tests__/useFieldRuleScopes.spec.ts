@@ -197,15 +197,25 @@ describe('useFieldRuleScopes', () => {
     expect(body.overrides).toEqual({})
   })
 
-  it('applies a provider action across every field in one edit', async () => {
+  it('applies a provider action across every field in one edit, leaving the Audiobook cover order alone', async () => {
     const { api } = await setup()
     api.applyProviderToAllFields(key('google'), 'first')
     await nextTick()
 
-    expect(api.unsavedFields.value.size).toBe(ALL_METADATA_FIELDS.length)
-    for (const field of ALL_METADATA_FIELDS) {
+    const reordered = ALL_METADATA_FIELDS.filter((field) => field !== 'audioCover')
+    expect([...api.unsavedFields.value].sort()).toEqual([...reordered].sort())
+    for (const field of reordered) {
       expect(api.activeFields.value?.[field].providers).toEqual(['google', 'goodreads'])
     }
+    expect(api.activeFields.value?.audioCover.providers).toEqual(['goodreads', 'google'])
+  })
+
+  it('still removes a provider from the Audiobook cover rule when removing it everywhere', async () => {
+    const { api } = await setup()
+    api.applyProviderToAllFields(key('google'), 'remove')
+    await nextTick()
+
+    expect(api.activeFields.value?.audioCover.providers).toEqual(['goodreads'])
   })
 
   it('removing a provider everywhere leaves the other providers in order', async () => {

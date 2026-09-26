@@ -66,8 +66,20 @@ async function search(wrapper: Wrapper, term: string): Promise<string[]> {
 
 describe('SettingsNav', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.restoreAllMocks()
     push.mockClear()
+  })
+
+  describe('shortcut hint', () => {
+    it('names the command key on Apple platforms', () => {
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36')
+      expect(mountNav().text()).toContain('Press \u2318K to jump to any setting')
+    })
+
+    it('names Ctrl everywhere else, since those keyboards have no command key', () => {
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0')
+      expect(mountNav().text()).toContain('Press Ctrl+K to jump to any setting')
+    })
   })
 
   it('places an icon-only back action beside search', () => {

@@ -102,6 +102,7 @@ const missingBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: null,
+  coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
   metadataScore: null,
   hasCover: false,
   hasMetadataLocks: false,
@@ -133,6 +134,7 @@ const presentBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: null,
+  coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
   metadataScore: null,
   hasCover: false,
   hasMetadataLocks: false,
@@ -197,7 +199,19 @@ describe('BookCoverCard — cover aspect override', () => {
   })
 })
 
-describe('BookCoverCard — present state', () => {
+describe('BookCoverCard - present state', () => {
+  it('marks the EPUB format overlay for media-overlay read-along files', () => {
+    cardOverlays.value = ['format']
+    const wrapper = mountCard({
+      ...presentBook,
+      files: [{ id: 10, format: 'epub', role: 'primary', sizeBytes: null, mediaOverlay: { available: true, durationSeconds: 42 } }],
+    })
+
+    expect(wrapper.text()).toContain('EPUB')
+    expect(wrapper.text()).not.toContain('NARR')
+    expect(wrapper.find('.lucide-headphones').exists()).toBe(true)
+  })
+
   it('opens the reader on desktop card click by default', async () => {
     const wrapper = mountCard(presentBook)
 
@@ -224,6 +238,30 @@ describe('BookCoverCard — present state', () => {
 
     expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
     expect(routerPushMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+  })
+
+  it('labels and describes the quick-view and start-reading actions', () => {
+    const wrapper = mountCard(presentBook)
+
+    expect(wrapper.get('button[aria-label="Quick View"]')).toBeTruthy()
+    expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Start reading')
+    expect(wrapper.findAll('[data-testid="tooltip-content"]').map((content) => content.text())).toEqual(
+      expect.arrayContaining(['Quick View', 'Start reading']),
+    )
+  })
+
+  it('uses a continue-reading label when the book has progress', () => {
+    const wrapper = mountCard({ ...presentBook, readingProgress: 20 })
+
+    expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Continue reading')
+  })
+
+  it('labels the explicit reading action when thumbnail clicks prefer details', () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mountCard(presentBook)
+
+    expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Book Details')
+    expect(wrapper.get('button[aria-label="Start reading"]')).toBeTruthy()
   })
 
   it('opens book details for missing books when thumbnail clicks prefer details', async () => {

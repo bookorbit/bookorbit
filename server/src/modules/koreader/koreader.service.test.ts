@@ -81,7 +81,6 @@ describe('KoreaderService', () => {
     setKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
     setDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
     clearDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
-    findBookFileIdByBookId: ReturnType<typeof vi.fn>;
     getBookProgressForDashboard: ReturnType<typeof vi.fn>;
     getChapters: ReturnType<typeof vi.fn>;
     getLastFileWriteTime: ReturnType<typeof vi.fn>;
@@ -106,6 +105,7 @@ describe('KoreaderService', () => {
   };
   let mockBookService: {
     syncKoboReadingStateForExternalProgress: ReturnType<typeof vi.fn>;
+    syncAudioProgressForExternalEbookProgress: ReturnType<typeof vi.fn>;
     autoUpdateReadStatusForProgress: ReturnType<typeof vi.fn>;
   };
   let mockPackageService: {
@@ -160,7 +160,6 @@ describe('KoreaderService', () => {
       setKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(undefined),
       setDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
       clearDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
-      findBookFileIdByBookId: vi.fn(),
       getBookProgressForDashboard: vi.fn(),
       getChapters: vi.fn(),
       getLastFileWriteTime: vi.fn(),
@@ -190,6 +189,7 @@ describe('KoreaderService', () => {
 
     mockBookService = {
       syncKoboReadingStateForExternalProgress: vi.fn().mockResolvedValue(undefined),
+      syncAudioProgressForExternalEbookProgress: vi.fn().mockResolvedValue(undefined),
       autoUpdateReadStatusForProgress: vi.fn().mockResolvedValue(undefined),
     };
     mockPackageService = {
@@ -906,7 +906,7 @@ describe('KoreaderService', () => {
     });
 
     it('does not report a held device as KOReader-latest', async () => {
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(10);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getProgressReset.mockResolvedValue(resetAt);
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
         deviceProgress: [
@@ -926,7 +926,7 @@ describe('KoreaderService', () => {
     });
 
     it('counts a converged device as canonical again even while the marker is still live', async () => {
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(10);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getProgressReset.mockResolvedValue(resetAt);
       mockRepo.getConvergedResetDeviceIds.mockResolvedValue(new Set(['device-1']));
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
@@ -980,7 +980,7 @@ describe('KoreaderService', () => {
       // A device progress row outlives the library grant that created it, so holding a row is
       // not proof of access to the book it points at.
       await expect(service.releaseResetHold(7, 20, 'device-1')).rejects.toThrow(NotFoundException);
-      expect(mockRepo.findProgressBookFileByBookId).toHaveBeenCalledWith(20, [3]);
+      expect(mockRepo.findProgressBookFileByBookId).toHaveBeenCalledWith(20, 7, [3]);
     });
   });
 
@@ -1600,7 +1600,7 @@ describe('KoreaderService', () => {
   describe('getBookProgress', () => {
     it('returns full sync info with chapters when KOReader is the canonical source', async () => {
       const latestDeviceTime = new Date('2026-03-01T10:00:00.000Z');
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(31);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 31, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
         deviceProgress: [
           {
@@ -1660,14 +1660,34 @@ describe('KoreaderService', () => {
       });
     });
 
-    it('returns null when there is no primary book file', async () => {
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(null);
+    it('returns null when the book has no file to report on', async () => {
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue(null);
 
       await expect(service.getBookProgress(7, 99)).resolves.toBeNull();
     });
 
+    it('reports the file the user devices sync, resolved within libraries the user can reach', async () => {
+      mockRepo.getAccessibleLibraryIds.mockResolvedValue([3]);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 44, bookId: 99, libraryId: 3, format: 'epub' });
+      mockRepo.getBookProgressForDashboard.mockResolvedValue({
+        deviceProgress: [
+          { device: 'Kindle', deviceId: 'device-1', percentage: 0.69, chapterIndex: 6, updatedAt: new Date('2026-03-01T10:00:00.000Z') },
+        ],
+        readingProgress: null,
+      });
+      mockRepo.getChapters.mockResolvedValue([]);
+      mockRepo.getLastFileWriteTime.mockResolvedValue(null);
+
+      const info = await service.getBookProgress(7, 99);
+
+      // The same resolver the release action uses, so a hold shown here is one it can release.
+      expect(mockRepo.findProgressBookFileByBookId).toHaveBeenCalledWith(99, 7, [3]);
+      expect(mockRepo.getBookProgressForDashboard).toHaveBeenCalledWith(44, 7);
+      expect(info).toEqual(expect.objectContaining({ bookFileId: 44, canonicalSource: 'koreader', canonicalPercentage: 69 }));
+    });
+
     it('returns null when no progress data exists for the book', async () => {
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(31);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 31, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
         deviceProgress: [],
         readingProgress: null,
@@ -1677,7 +1697,7 @@ describe('KoreaderService', () => {
     });
 
     it('uses web reader as the canonical source when its progress is newer', async () => {
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(31);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 31, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
         deviceProgress: [
           {
@@ -1720,7 +1740,7 @@ describe('KoreaderService', () => {
     });
 
     it('marks the file stale when any device synced before the last file write', async () => {
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(31);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 31, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
         deviceProgress: [
           {
@@ -1756,7 +1776,7 @@ describe('KoreaderService', () => {
     });
 
     it('keeps the file fresh when every device synced after the last file write', async () => {
-      mockRepo.findBookFileIdByBookId.mockResolvedValue(31);
+      mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 31, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
         deviceProgress: [
           {

@@ -14,15 +14,60 @@
     "previous": "上一個",
     "retry": "重試",
     "yes": "確定",
-    "no": "否"
+    "no": "否",
+    "show": "顯示",
+    "hide": "隱藏"
   },
   "settings": {
     "privacySharing": {
       "title": "私密与分享",
+      "subtitle": "选择是否允许管理员查看包含您个人身份信息的阅读活动摘要。",
+      "levelLegend": "閲讀見解分享權限設置",
       "current": "目前設定",
       "levels": {
         "private": {
-          "title": "不公開"
+          "title": "不公開",
+          "description": "閲讀數據儘自己可見"
+        },
+        "summary": {
+          "title": "分享摘要",
+          "description": "分享閲讀習慣的匯總數據，不含書名，作者，系列或朗讀者等信息。"
+        }
+      }
+    },
+    "appearance": {
+      "language": {
+        "title": "語言",
+        "description": "選擇界面語言。",
+        "label": "語言",
+        "loadError": "已選擇語言下載失敗",
+        "saveError": "語言偏好保存失敗"
+      },
+      "pageTitle": "顯示",
+      "pageSubtitle": "管理書庫主題，封面，佈局，呈現效果。",
+      "mobileSummary": "主題： {theme} • 側重 {accent} • 背景： {background}",
+      "themeMode": {
+        "light": "淺色",
+        "dark": "深色",
+        "system": "系統"
+      },
+      "theme": {
+        "title": "主題",
+        "colorScheme": {
+          "label": "顔色主題",
+          "hint": "淺色/深色界面"
+        },
+        "accents": {
+          "grey": "灰色",
+          "scarlet": "鮮紅色",
+          "vermilion": "朱紅色",
+          "rose": "玫瑰紅",
+          "copper": "銅色",
+          "orange": "橙色",
+          "chartreuse": "翠綠色",
+          "marigold": "金黃色",
+          "wasabi": "芥末綠",
+          "amber": "琥珀色"
         }
       }
     }

@@ -1,51 +1,65 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookSelectionPayload, Collection, CreateCollectionPayload } from '@bookorbit/types'
+import { createCoalescedFetch, createRequestGeneration } from '@/lib/async'
+import type { BookSelectionPayload, Collection, CreateCollectionPayload, MediaType, PodcastListItem, PodcastPage } from '@bookorbit/types'
 
 const collections = ref<Collection[]>([])
 const loaded = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
-let fetchPromise: Promise<void> | null = null
-let requestGeneration = 0
+const listGeneration = createRequestGeneration()
+
+const loadCollectionList = createCoalescedFetch(async (): Promise<void> => {
+  loading.value = true
+  error.value = null
+  const generation = listGeneration.current()
+  try {
+    const res = await api('/api/v1/collections')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const nextCollections: Collection[] = await res.json()
+    if (!listGeneration.isCurrent(generation)) return
+    collections.value = nextCollections
+    loaded.value = true
+  } catch (e: unknown) {
+    if (!listGeneration.isCurrent(generation)) return
+    error.value = e instanceof Error ? e.message : 'Failed to load collections'
+  } finally {
+    if (listGeneration.isCurrent(generation)) loading.value = false
+  }
+})
+
+const fetchCollectionPodcastPage = createCoalescedFetch(
+  async (path: string): Promise<PodcastPage<PodcastListItem>> => {
+    const res = await api(path)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json() as Promise<PodcastPage<PodcastListItem>>
+  },
+  (path) => path,
+)
 
 export function resetCollections(): void {
-  requestGeneration += 1
+  listGeneration.invalidate()
   collections.value = []
   loaded.value = false
   loading.value = false
   error.value = null
-  fetchPromise = null
+  loadCollectionList.clear()
+  fetchCollectionPodcastPage.clear()
 }
+
+/** The list endpoint returns every medium; each surface picks the one it renders. */
+const bookCollections = computed(() => collections.value.filter((collection) => collection.mediaType !== 'podcasts'))
+const podcastCollections = computed(() => collections.value.filter((collection) => collection.mediaType === 'podcasts'))
 
 export function useCollections() {
   async function fetchCollections(): Promise<void> {
     if (loaded.value) return
-    if (fetchPromise) return fetchPromise
-    loading.value = true
-    error.value = null
-    const generation = requestGeneration
-    fetchPromise = api('/api/v1/collections')
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`)
-        }
-        const nextCollections: Collection[] = await res.json()
-        if (generation !== requestGeneration) return
-        collections.value = nextCollections
-        loaded.value = true
-      })
-      .catch((e: unknown) => {
-        if (generation !== requestGeneration) return
-        error.value = e instanceof Error ? e.message : 'Failed to load collections'
-      })
-      .finally(() => {
-        if (generation === requestGeneration) {
-          loading.value = false
-          fetchPromise = null
-        }
-      })
-    return fetchPromise
+    return loadCollectionList()
+  }
+
+  /** Forces a re-fetch after any in-flight list request finishes. */
+  async function refreshCollections(): Promise<void> {
+    return loadCollectionList()
   }
 
   async function fetchCollectionsWithMembership(selectionPayload: BookSelectionPayload): Promise<Collection[]> {
@@ -58,8 +72,22 @@ export function useCollections() {
     return res.json()
   }
 
-  async function createCollection(name: string, icon: string, description?: string, isPublic?: boolean): Promise<Collection> {
-    const payload: CreateCollectionPayload = { name, icon, description, ...(isPublic !== undefined && { isPublic }) }
+  async function createCollection(
+    name: string,
+    icon: string,
+    description?: string,
+    isPublicOrMediaType?: boolean | MediaType,
+    explicitMediaType?: MediaType,
+  ): Promise<Collection> {
+    const isPublic = typeof isPublicOrMediaType === 'boolean' ? isPublicOrMediaType : undefined
+    const mediaType = typeof isPublicOrMediaType === 'string' ? isPublicOrMediaType : explicitMediaType
+    const payload: CreateCollectionPayload = {
+      name,
+      icon,
+      description,
+      ...(isPublic !== undefined && { isPublic }),
+      ...(mediaType !== undefined && { mediaType }),
+    }
     const res = await api('/api/v1/collections', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -129,12 +157,59 @@ export function useCollections() {
     collections.value = collections.value.filter((collection) => collection.id !== id)
   }
 
+  async function fetchCollectionPodcasts(id: number, page = 0, size = 50): Promise<PodcastPage<PodcastListItem>> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    return fetchCollectionPodcastPage(`/api/v1/collections/${id}/podcasts?${params.toString()}`)
+  }
+
+  /**
+   * A collection's stored count is a snapshot; paging its shows is the freshest count anyone has.
+   * Reconciling here keeps the sidebar badge honest without a view reaching into this cache.
+   */
+  function applyCollectionPodcastCount(id: number, podcastCount: number): void {
+    const collection = collections.value.find((candidate) => candidate.id === id)
+    if (collection) collection.podcastCount = Math.max(0, podcastCount)
+  }
+
+  /** One request instead of one per collection, so opening the sheet stays cheap at scale. */
+  async function fetchPodcastCollectionMembership(podcastId: number): Promise<Collection[]> {
+    const res = await api(`/api/v1/collections/podcast-membership?podcastId=${podcastId}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  }
+
+  async function addPodcastsToCollection(id: number, podcastIds: number[]): Promise<void> {
+    const res = await api(`/api/v1/collections/${id}/podcasts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ podcastIds }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  }
+
+  async function removePodcastsFromCollection(id: number, podcastIds: number[]): Promise<void> {
+    const res = await api(`/api/v1/collections/${id}/podcasts`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ podcastIds }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  }
+
   return {
     collections,
+    bookCollections,
+    podcastCollections,
+    fetchCollectionPodcasts,
+    applyCollectionPodcastCount,
+    fetchPodcastCollectionMembership,
+    addPodcastsToCollection,
+    removePodcastsFromCollection,
     loaded,
     loading,
     error,
     fetchCollections,
+    refreshCollections,
     fetchCollectionsWithMembership,
     createCollection,
     updateCollection,

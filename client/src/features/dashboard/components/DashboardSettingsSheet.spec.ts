@@ -13,6 +13,12 @@ import pt from '@/locales/pt.json'
 // behind a new dashboard key.
 const PT_WIDGET_NAMES = { ...en.dashboard.settings.widgetNames, ...pt.dashboard.settings.widgetNames }
 const PT_SHELF_NAMES = { ...en.dashboard.settings.shelfNames, ...pt.dashboard.settings.shelfNames }
+const ENABLED_EN_SHELF_NAMES = Object.entries(en.dashboard.settings.shelfNames)
+  .filter(([key]) => key !== 'continuePodcasts')
+  .map(([, label]) => label)
+const ENABLED_PT_SHELF_NAMES = Object.entries(PT_SHELF_NAMES)
+  .filter(([key]) => key !== 'continuePodcasts')
+  .map(([, label]) => label)
 
 type UseSmartScopesMock = () => {
   smartScopes: Ref<unknown[]>
@@ -203,7 +209,7 @@ describe('DashboardSettingsSheet', () => {
     const wrapper = await openSheet()
     await openShelvesTab(wrapper)
 
-    expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(en.dashboard.settings.shelfNames).sort())
+    expect(shelfOptionLabels(wrapper).sort()).toEqual(ENABLED_EN_SHELF_NAMES.sort())
   })
 
   it('offers wide-row and two-column shelf layouts', async () => {
@@ -229,7 +235,7 @@ describe('DashboardSettingsSheet', () => {
     await setI18nLocale('pt')
     await nextTick()
 
-    expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(PT_SHELF_NAMES).sort())
+    expect(shelfOptionLabels(wrapper).sort()).toEqual(ENABLED_PT_SHELF_NAMES.sort())
   })
 
   it('opens on the shelves tab and lists it before widgets', async () => {

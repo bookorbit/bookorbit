@@ -3,8 +3,9 @@ import { and, eq, inArray, max, min } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import * as schema from '../../db/schema';
-import { readingSessions, userBookStatus } from '../../db/schema';
+import { readingSessions, userBookStatus, users } from '../../db/schema';
 import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 import type { UserBookStatusRow } from '../../db/schema';
 
@@ -50,6 +51,16 @@ export class UserBookStatusRepository {
       .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.bookId, bookId)))
       .limit(1);
     return row ?? null;
+  }
+
+  /**
+   * Reading dates are calendar days in the reader's own timezone, so every path that stamps
+   * one has to resolve it. Device syncs carry no request user, so it is read here rather than
+   * threaded from the caller: a caller that forgets would silently file the day in UTC.
+   */
+  async findUserTimeZone(userId: number): Promise<string> {
+    const [row] = await this.db.select({ settings: users.settings }).from(users).where(eq(users.id, userId)).limit(1);
+    return resolveTimeZone((row?.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
   }
 
   async findByBookIds(userId: number, bookIds: number[]) {

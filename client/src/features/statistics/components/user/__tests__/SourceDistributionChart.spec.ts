@@ -65,9 +65,11 @@ describe('SourceDistributionChart', () => {
   it('builds a donut series from the source slices', async () => {
     apiMock.mockResolvedValue(
       makeResponse({
-        totalSeconds: 4800,
+        totalSeconds: 6000,
         slices: [
           { bucket: 'bookorbit', readingSeconds: 3600 },
+          { bucket: 'ios', readingSeconds: 600 },
+          { bucket: 'watchos', readingSeconds: 600 },
           { bucket: 'kobo', readingSeconds: 1200 },
         ],
       }),
@@ -83,8 +85,8 @@ describe('SourceDistributionChart', () => {
       tooltip: { formatter: (p: { name: string; value: number; percent: number; color: string }) => string }
     }
     const data = option.series[0]!.data
-    expect(data.map((d) => d.name)).toEqual(['BookOrbit', 'Kobo'])
-    expect(data.map((d) => d.value)).toEqual([3600, 1200])
+    expect(data.map((d) => d.name)).toEqual(['BookOrbit', 'iOS app', 'Apple Watch', 'Kobo'])
+    expect(data.map((d) => d.value)).toEqual([3600, 600, 600, 1200])
 
     // The tooltip formatter exercises the duration helper across all 3 branches.
     const fmt = option.tooltip.formatter

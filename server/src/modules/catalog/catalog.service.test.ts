@@ -1,80 +1,38 @@
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn((...clauses: unknown[]) => ({ type: 'and', clauses })),
-  eq: vi.fn((left: unknown, right: unknown) => ({ type: 'eq', left, right })),
-  ilike: vi.fn((left: unknown, pattern: string) => ({ type: 'ilike', left, pattern })),
-  isNotNull: vi.fn((value: unknown) => ({ type: 'isNotNull', value })),
-  sql: vi.fn((parts: TemplateStringsArray, ...values: unknown[]) => ({ type: 'sql', parts, values })),
-}));
+import type { Mocked } from 'vitest';
 
-vi.mock('../../common/utils/accent-insensitive-search.utils', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../common/utils/accent-insensitive-search.utils')>()),
-  accentInsensitiveExactMatchRank: vi.fn((left: unknown, term: string) => ({ type: 'sql', left, term })),
-  accentInsensitiveIlike: vi.fn((left: unknown, pattern: string) => ({ type: 'accentInsensitiveIlike', left, pattern })),
-}));
-
-import { and, eq, isNotNull } from 'drizzle-orm';
-
-import { accentInsensitiveExactMatchRank, accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
-import { authors, bookMetadata, bookSeries, collections, genres, narrators, tags } from '../../db/schema';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import type { RequestUser } from '../../common/types/request-user';
+import { CatalogRepository } from './catalog.repository';
 import { CatalogService } from './catalog.service';
 
-interface QueryChain<T> {
-  from: ReturnType<typeof vi.fn>;
-  where: ReturnType<typeof vi.fn>;
-  orderBy: ReturnType<typeof vi.fn>;
-  limit: ReturnType<typeof vi.fn>;
-  rows: T[];
+function requestUser(overrides: Partial<RequestUser> = {}): RequestUser {
+  return {
+    id: 7,
+    isSuperuser: false,
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    ...overrides,
+  } as RequestUser;
 }
 
-function createQueryChain<T>(rows: T[]): QueryChain<T> {
-  const chain: QueryChain<T> = {
-    from: vi.fn(),
-    where: vi.fn(),
-    orderBy: vi.fn(),
-    limit: vi.fn().mockResolvedValue(rows),
-    rows,
+function makeService(libraryIds: number[] = [1, 2]) {
+  const catalogRepository = {
+    searchAuthors: vi.fn(),
+    searchGenres: vi.fn(),
+    searchTags: vi.fn(),
+    searchNarrators: vi.fn(),
+    searchPublishers: vi.fn(),
+    searchSeries: vi.fn(),
+    searchLanguages: vi.fn(),
+    searchCollections: vi.fn(),
+  } as unknown as Mocked<CatalogRepository>;
+  const libraryService = {
+    findAccessibleLibraryIds: vi.fn().mockResolvedValue(libraryIds),
   };
 
-  chain.from.mockReturnValue(chain);
-  chain.where.mockReturnValue(chain);
-  chain.orderBy.mockReturnValue(chain);
-
-  return chain;
-}
-
-function makeService() {
-  let selectRows: { name: string }[] = [];
-  let selectDistinctRows: { name: string | null }[] = [];
-
-  const selectChains: QueryChain<{ name: string }>[] = [];
-  const selectDistinctChains: QueryChain<{ name: string | null }>[] = [];
-
-  const db = {
-    select: vi.fn(() => {
-      const chain = createQueryChain(selectRows);
-      selectChains.push(chain);
-      return chain;
-    }),
-    selectDistinct: vi.fn(() => {
-      const chain = createQueryChain(selectDistinctRows);
-      selectDistinctChains.push(chain);
-      return chain;
-    }),
-  } as const;
-
-  const service = new CatalogService(db as never);
-
   return {
-    service,
-    db,
-    selectChains,
-    selectDistinctChains,
-    setSelectRows: (rows: { name: string }[]) => {
-      selectRows = rows;
-    },
-    setSelectDistinctRows: (rows: { name: string | null }[]) => {
-      selectDistinctRows = rows;
-    },
+    service: new CatalogService(catalogRepository, libraryService as never),
+    catalogRepository,
+    libraryService,
   };
 }
 
@@ -83,106 +41,80 @@ describe('CatalogService', () => {
     vi.clearAllMocks();
   });
 
-  it('returns an empty result without querying the database for blank author terms', async () => {
-    const { service, db } = makeService();
+  it('does not resolve library access or query the repository for blank terms', async () => {
+    const { service, catalogRepository, libraryService } = makeService();
 
-    await expect(service.searchAuthors('   ')).resolves.toEqual([]);
-    expect(db.select).not.toHaveBeenCalled();
+    await expect(service.searchAuthors(requestUser(), '   ')).resolves.toEqual([]);
+
+    expect(libraryService.findAccessibleLibraryIds).not.toHaveBeenCalled();
+    expect(catalogRepository.searchAuthors).not.toHaveBeenCalled();
   });
 
-  it('trims and escapes wildcard characters for name searches', async () => {
-    const { service, setSelectRows, selectChains } = makeService();
-    setSelectRows([{ name: 'A%_\\B' }]);
+  it('returns no suggestions without an accessible library', async () => {
+    const { service, catalogRepository, libraryService } = makeService([]);
+    const user = requestUser();
 
-    const result = await service.searchAuthors('  A%_\\B  ');
+    await expect(service.searchTags(user, 'history')).resolves.toEqual([]);
 
-    expect(result).toEqual([{ name: 'A%_\\B' }]);
-    expect(accentInsensitiveIlike).toHaveBeenCalledWith(authors.name, '%A\\%\\_\\\\B%');
-    expect(selectChains[0]?.from).toHaveBeenCalledWith(authors);
-    expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(authors.name);
-    expect(selectChains[0]?.limit).toHaveBeenCalledWith(15);
+    expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
+    expect(catalogRepository.searchTags).not.toHaveBeenCalled();
   });
 
-  it('uses the shared name-search helper for narrators', async () => {
-    const { service, setSelectRows, selectChains } = makeService();
-    setSelectRows([{ name: 'Ray Porter' }]);
+  it('passes accessible libraries and content filters for a regular user', async () => {
+    const { service, catalogRepository } = makeService([4, 9]);
+    const contentFilters = { ...EMPTY_CONTENT_FILTER_RULES, excludeTagIds: [3] };
+    const user = requestUser({ contentFilters });
+    catalogRepository.searchGenres.mockResolvedValue([{ id: 11, name: 'History' }]);
 
-    const result = await service.searchNarrators('Ray');
+    await expect(service.searchGenres(user, 'history')).resolves.toEqual([{ id: 11, name: 'History' }]);
 
-    expect(result).toEqual([{ name: 'Ray Porter' }]);
-    expect(selectChains[0]?.from).toHaveBeenCalledWith(narrators);
-    expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(narrators.name);
-    expect(selectChains[0]?.limit).toHaveBeenCalledWith(15);
+    expect(catalogRepository.searchGenres).toHaveBeenCalledWith('history', {
+      libraryIds: [4, 9],
+      contentFilters,
+    });
+  });
+
+  it('omits content filters for a superuser', async () => {
+    const { service, catalogRepository } = makeService([1, 2]);
+    const user = requestUser({
+      isSuperuser: true,
+      contentFilters: { ...EMPTY_CONTENT_FILTER_RULES, excludeGenreIds: [5] },
+    });
+
+    await service.searchPublishers(user, 'orbit');
+
+    expect(catalogRepository.searchPublishers).toHaveBeenCalledWith('orbit', {
+      libraryIds: [1, 2],
+      contentFilters: undefined,
+    });
   });
 
   it.each([
-    ['genres', genres, (service: CatalogService, q: string) => service.searchGenres(q)],
-    ['tags', tags, (service: CatalogService, q: string) => service.searchTags(q)],
-  ] as const)('ranks an exact %s match before alphabetical partial matches', async (_label, table, search) => {
-    const { service, selectChains } = makeService();
+    ['authors', 'searchAuthors'],
+    ['tags', 'searchTags'],
+    ['narrators', 'searchNarrators'],
+    ['publishers', 'searchPublishers'],
+    ['series', 'searchSeries'],
+    ['languages', 'searchLanguages'],
+  ] as const)('scopes %s searches before delegating', async (_label, method) => {
+    const { service, catalogRepository } = makeService([12]);
+    const user = requestUser();
 
-    await search(service, '  Young\u00a0 Adult  ');
+    await service[method](user, 'term');
 
-    expect(accentInsensitiveIlike).toHaveBeenCalledWith(table.name, '%Young Adult%');
-    expect(accentInsensitiveExactMatchRank).toHaveBeenCalledWith(table.name, 'Young Adult');
-    expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(expect.objectContaining({ type: 'sql' }), table.name);
-    expect(selectChains[0]?.limit).toHaveBeenCalledWith(15);
+    expect(catalogRepository[method]).toHaveBeenCalledWith('term', {
+      libraryIds: [12],
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
   });
 
-  it('uses distinct metadata lookup for publishers and filters null rows defensively', async () => {
-    const { service, setSelectDistinctRows, selectDistinctChains } = makeService();
-    setSelectDistinctRows([{ name: 'Orbit' }, { name: null }, { name: 'Tor' }]);
+  it('keeps collection searches scoped directly by owner id', async () => {
+    const { service, catalogRepository, libraryService } = makeService();
+    catalogRepository.searchCollections.mockResolvedValue([{ name: 'Favorites' }]);
 
-    const result = await service.searchPublishers('  or  ');
+    await expect(service.searchCollections(42, 'favorites')).resolves.toEqual([{ name: 'Favorites' }]);
 
-    expect(result).toEqual([{ name: 'Orbit' }, { name: 'Tor' }]);
-    expect(isNotNull).toHaveBeenCalledWith(bookMetadata.publisher);
-    expect(accentInsensitiveIlike).toHaveBeenCalledWith(bookMetadata.publisher, '%or%');
-    expect(selectDistinctChains[0]?.from).toHaveBeenCalledWith(bookMetadata);
-    expect(selectDistinctChains[0]?.limit).toHaveBeenCalledWith(15);
-  });
-
-  it('queries the expected metadata column for series search', async () => {
-    const { service, setSelectRows, selectChains } = makeService();
-    setSelectRows([{ name: 'The Expanse' }]);
-
-    await service.searchSeries('Expanse');
-
-    expect(accentInsensitiveIlike).toHaveBeenCalledWith(bookSeries.name, '%Expanse%');
-    expect(selectChains[0]?.from).toHaveBeenCalledWith(bookSeries);
-    expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(bookSeries.name);
-  });
-
-  it('queries the expected metadata column for language search', async () => {
-    const { service, setSelectDistinctRows } = makeService();
-    setSelectDistinctRows([{ name: 'English' }]);
-
-    await service.searchLanguages('English');
-
-    expect(isNotNull).toHaveBeenCalledWith(bookMetadata.language);
-    expect(accentInsensitiveIlike).toHaveBeenCalledWith(bookMetadata.language, '%English%');
-  });
-
-  it('returns an empty result for blank collection terms to match other search endpoints', async () => {
-    const { service, db } = makeService();
-
-    await expect(service.searchCollections(7, '   ')).resolves.toEqual([]);
-    expect(db.select).not.toHaveBeenCalled();
-  });
-
-  it('enforces user scoping and collection limit for collection searches', async () => {
-    const { service, setSelectRows, selectChains } = makeService();
-    setSelectRows([{ name: 'Sci-Fi Favorites' }]);
-
-    const result = await service.searchCollections(42, ' sci_fi% ');
-
-    expect(result).toEqual([{ name: 'Sci-Fi Favorites' }]);
-    expect(eq).toHaveBeenCalledWith(collections.userId, 42);
-    expect(accentInsensitiveIlike).toHaveBeenCalledWith(collections.name, '%sci\\_fi\\%%');
-    expect(and).toHaveBeenCalledTimes(1);
-    expect(selectChains[0]?.from).toHaveBeenCalledWith(collections);
-    expect(selectChains[0]?.where).toHaveBeenCalledWith(expect.objectContaining({ type: 'and' }));
-    expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(collections.name);
-    expect(selectChains[0]?.limit).toHaveBeenCalledWith(20);
+    expect(catalogRepository.searchCollections).toHaveBeenCalledWith(42, 'favorites');
+    expect(libraryService.findAccessibleLibraryIds).not.toHaveBeenCalled();
   });
 });

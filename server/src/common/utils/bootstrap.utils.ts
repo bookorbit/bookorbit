@@ -158,3 +158,17 @@ export function registerConditionalHsts(fastify: FastifyInstance): void {
     done(null, payload);
   });
 }
+
+/**
+ * Nest's `@RouteConfig({ bodyLimit })` only reaches Fastify's user-space `config` object, while
+ * Fastify reads `bodyLimit` from the route options. Without copying it across, a route that asks
+ * for a larger body silently keeps the 1 MiB default and its DTO length limit is unreachable.
+ */
+export function applyDeclaredBodyLimit(route: { config?: unknown; bodyLimit?: number }): void {
+  const declared = (route.config as { bodyLimit?: unknown } | undefined)?.bodyLimit;
+  if (typeof declared === 'number' && Number.isInteger(declared) && declared > 0) route.bodyLimit = declared;
+}
+
+export function registerDeclaredBodyLimits(fastify: FastifyInstance): void {
+  fastify.addHook('onRoute', applyDeclaredBodyLimit);
+}

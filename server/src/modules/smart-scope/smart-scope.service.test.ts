@@ -1,10 +1,18 @@
 import { BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+
+vi.mock('@bookorbit/types', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@bookorbit/types')>();
+  return {
+    ...actual,
+    APP_FEATURES: Object.freeze({ ...actual.APP_FEATURES, podcasts: true }),
+  };
+});
 import type { BookQuery } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { SmartScope } from '../../db/schema/smart-scopes';
 import { SmartScopeService } from './smart-scope.service';
-import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, PODCAST_PLAYLIST_MAX_SAVED } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -30,6 +38,8 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
   return {
     id: 5,
     userId: 12,
+    mediaType: 'books',
+    libraryId: null,
     name: 'Favorites',
     icon: 'Aperture',
     filter: null,
@@ -53,6 +63,7 @@ function makeService() {
     updateDisplayOrders: vi.fn(),
     findKoboSyncScopesForUser: vi.fn(),
     findKoboSubscribedScopeIds: vi.fn().mockResolvedValue([]),
+    countOwnedByMediaType: vi.fn().mockResolvedValue(0),
     subscribeToKobo: vi.fn(),
     unsubscribeFromKobo: vi.fn(),
   };
@@ -72,6 +83,14 @@ function makeService() {
     executeBookIdsQuery: vi.fn(),
     executeJumpBucketsQuery: vi.fn(),
   };
+  const podcastEpisodeRepo = {
+    countEpisodes: vi.fn(),
+    listEpisodes: vi.fn(),
+  };
+  const podcastAccess = {
+    requirePodcastLibrary: vi.fn().mockResolvedValue(undefined),
+    requirePodcastLibraryAccess: vi.fn().mockResolvedValue(undefined),
+  };
 
   const service = new SmartScopeService(
     smartScopeRepo as never,
@@ -79,8 +98,10 @@ function makeService() {
     queryBuilder as never,
     libraryService as never,
     bookService as never,
+    podcastEpisodeRepo as never,
+    podcastAccess as never,
   );
-  return { service, smartScopeRepo, bookReadService, queryBuilder, libraryService, bookService };
+  return { service, smartScopeRepo, bookReadService, queryBuilder, libraryService, bookService, podcastEpisodeRepo, podcastAccess };
 }
 
 describe('SmartScopeService', () => {
@@ -139,6 +160,35 @@ describe('SmartScopeService', () => {
     ]);
   });
 
+  // One listing must not take the whole connection pool: the counts are full aggregates, and the
+  // number of them is whatever the user has saved.
+  it('findAll counts scopes in bounded batches rather than all at once, keeping them in order', async () => {
+    const { service, smartScopeRepo, libraryService, queryBuilder, bookReadService } = makeService();
+    const filter = { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'space' }] };
+    const scopes = Array.from({ length: 12 }, (_, index) => makeSmartScope({ id: index + 1, filter: filter as never }));
+
+    smartScopeRepo.findAllForUser.mockResolvedValue(scopes);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([2, 3]);
+    queryBuilder.buildWhere.mockReturnValue('where');
+
+    let inFlight = 0;
+    let peakInFlight = 0;
+    bookReadService.countWhere.mockImplementation(async () => {
+      inFlight += 1;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await new Promise((resolve) => setImmediate(resolve));
+      inFlight -= 1;
+      return 3;
+    });
+
+    const result = await service.findAll(makeUser({ id: 8 }));
+
+    expect(peakInFlight).toBeLessThanOrEqual(4);
+    expect(bookReadService.countWhere).toHaveBeenCalledTimes(12);
+    expect(result.map((scope) => scope.id)).toEqual(scopes.map((scope) => scope.id));
+    expect(result.every((scope) => scope.bookCount === 3)).toBe(true);
+  });
+
   it('findAll marks a single broken scope count unavailable instead of failing the whole list (issue #787 regression)', async () => {
     const { service, smartScopeRepo, libraryService, queryBuilder, bookReadService } = makeService();
     const logger = (service as unknown as { logger: Logger }).logger;
@@ -176,6 +226,187 @@ describe('SmartScopeService', () => {
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[smart_scope.count] [fail] scopeId=1 userId=8'));
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('durationMs='));
+  });
+
+  describe('podcast scopes', () => {
+    const RULES = {
+      filter: 'unplayed',
+      sort: 'shortest',
+      minDurationMinutes: null,
+      maxDurationMinutes: 30,
+      publishedWithinDays: null,
+      podcastIds: [],
+      followedOnly: false,
+    };
+
+    function podcastScope(overrides: Partial<SmartScope> = {}): SmartScope {
+      return makeSmartScope({ id: 9, mediaType: 'podcasts', libraryId: 4, filter: RULES as never, ...overrides });
+    }
+
+    /**
+     * The saved-playlist cap lived only in the client, so anything not going through the web app,
+     * iOS included, could create podcast scopes without limit.
+     */
+    it('refuses a saved playlist past the cap', async () => {
+      const { service, smartScopeRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([4]);
+      smartScopeRepo.countOwnedByMediaType.mockResolvedValue(PODCAST_PLAYLIST_MAX_SAVED);
+
+      await expect(
+        service.create({ name: 'One too many', icon: 'Podcast', mediaType: 'podcasts', libraryId: 4, filter: RULES } as never, makeUser({ id: 8 })),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(smartScopeRepo.insert).not.toHaveBeenCalled();
+    });
+
+    it('still allows the last saved playlist under the cap', async () => {
+      const { service, smartScopeRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([4]);
+      smartScopeRepo.countOwnedByMediaType.mockResolvedValue(PODCAST_PLAYLIST_MAX_SAVED - 1);
+      smartScopeRepo.insert.mockResolvedValue([podcastScope()]);
+
+      await expect(
+        service.create({ name: 'Just fits', icon: 'Podcast', mediaType: 'podcasts', libraryId: 4, filter: RULES } as never, makeUser({ id: 8 })),
+      ).resolves.toBeTruthy();
+
+      expect(smartScopeRepo.insert).toHaveBeenCalled();
+    });
+
+    it('leaves book scopes uncapped, which has always been their contract', async () => {
+      const { service, smartScopeRepo } = makeService();
+      smartScopeRepo.countOwnedByMediaType.mockResolvedValue(PODCAST_PLAYLIST_MAX_SAVED * 10);
+      smartScopeRepo.insert.mockResolvedValue([makeSmartScope({ id: 3 })]);
+
+      await expect(service.create({ name: 'Books', icon: 'BookOpen', defaultSort: [] } as never, makeUser({ id: 8 }))).resolves.toBeTruthy();
+
+      expect(smartScopeRepo.insert).toHaveBeenCalled();
+    });
+
+    it('counts episodes rather than books, and never touches the book query builder', async () => {
+      const { service, smartScopeRepo, libraryService, queryBuilder, bookReadService, podcastEpisodeRepo } = makeService();
+      const scope = podcastScope();
+      smartScopeRepo.findAllForUser.mockResolvedValue([scope]);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([4]);
+      podcastEpisodeRepo.countEpisodes.mockResolvedValue(12);
+
+      const result = await service.findAll(makeUser({ id: 8 }));
+
+      expect(podcastEpisodeRepo.countEpisodes).toHaveBeenCalledWith(4, 8, expect.objectContaining({ filter: 'unplayed', maxDurationMinutes: 30 }));
+      expect(queryBuilder.buildWhere).not.toHaveBeenCalled();
+      expect(bookReadService.countWhere).not.toHaveBeenCalled();
+      expect(result).toEqual([{ ...scope, isOwner: false, koboSyncEnabled: false, episodeCount: 12 }]);
+    });
+
+    it('reports an unreadable rule set as an unavailable episode count, not a failed list', async () => {
+      const { service, smartScopeRepo, libraryService, podcastEpisodeRepo } = makeService();
+      const logger = (service as unknown as { logger: Logger }).logger;
+      vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      smartScopeRepo.findAllForUser.mockResolvedValue([podcastScope({ filter: { filter: 'archived' } as never })]);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([4]);
+
+      const [row] = await service.findAll(makeUser({ id: 8 }));
+
+      expect((row as { episodeCount: number | null }).episodeCount).toBeNull();
+      expect(podcastEpisodeRepo.countEpisodes).not.toHaveBeenCalled();
+    });
+
+    it('lists episodes for a podcast scope, checking library access first', async () => {
+      const { service, smartScopeRepo, podcastEpisodeRepo, podcastAccess } = makeService();
+      smartScopeRepo.findById.mockResolvedValue([podcastScope({ userId: 12 })]);
+      podcastEpisodeRepo.listEpisodes.mockResolvedValue({ items: [], total: 0, totalDurationSeconds: 0, page: 1, size: 50 });
+
+      await service.queryEpisodes(9, makeUser({ id: 12 }), 1, 50, ' dune ');
+
+      expect(podcastAccess.requirePodcastLibraryAccess).toHaveBeenCalledWith(4, expect.objectContaining({ id: 12 }));
+      expect(podcastEpisodeRepo.listEpisodes).toHaveBeenCalledWith(4, 12, expect.objectContaining({ q: 'dune', page: 1, size: 50 }));
+    });
+
+    it('refuses to create a podcast scope against a library the user cannot access', async () => {
+      const { service, smartScopeRepo, podcastAccess } = makeService();
+      podcastAccess.requirePodcastLibraryAccess.mockRejectedValue(new ForbiddenException());
+
+      await expect(
+        service.create({ name: 'Sneaky', icon: 'Podcast', mediaType: 'podcasts', libraryId: 7, defaultSort: [] }, makeUser({ id: 12 })),
+      ).rejects.toThrow(ForbiddenException);
+      expect(smartScopeRepo.insert).not.toHaveBeenCalled();
+    });
+
+    it('refuses to list episodes when the requester cannot access the scope library', async () => {
+      const { service, smartScopeRepo, podcastEpisodeRepo, podcastAccess } = makeService();
+      // A public scope is readable, but its library is not automatically.
+      smartScopeRepo.findById.mockResolvedValue([podcastScope({ userId: 20, isPublic: true })]);
+      podcastAccess.requirePodcastLibraryAccess.mockRejectedValue(new ForbiddenException());
+
+      await expect(service.queryEpisodes(9, makeUser({ id: 12 }), 1, 50)).rejects.toThrow(ForbiddenException);
+      expect(podcastEpisodeRepo.listEpisodes).not.toHaveBeenCalled();
+    });
+
+    it('does not count episodes of a shared scope whose library the viewer cannot see', async () => {
+      const { service, smartScopeRepo, libraryService, podcastEpisodeRepo } = makeService();
+      smartScopeRepo.findAllForUser.mockResolvedValue([podcastScope({ userId: 20, isPublic: true, libraryId: 7 })]);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);
+
+      const [row] = await service.findAll(makeUser({ id: 12 }));
+
+      expect((row as { episodeCount: number | null }).episodeCount).toBeNull();
+      expect(podcastEpisodeRepo.countEpisodes).not.toHaveBeenCalled();
+    });
+
+    it('still counts a shared scope when the viewer can access its library', async () => {
+      const { service, smartScopeRepo, libraryService, podcastEpisodeRepo } = makeService();
+      smartScopeRepo.findAllForUser.mockResolvedValue([podcastScope({ userId: 20, isPublic: true, libraryId: 7 })]);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([7]);
+      podcastEpisodeRepo.countEpisodes.mockResolvedValue(3);
+
+      const [row] = await service.findAll(makeUser({ id: 12 }));
+
+      expect((row as { episodeCount: number | null }).episodeCount).toBe(3);
+    });
+
+    it('refuses to run a podcast scope through the book query path', async () => {
+      const { service, smartScopeRepo } = makeService();
+      smartScopeRepo.findById.mockResolvedValue([podcastScope({ userId: 12 })]);
+
+      await expect(service.queryBooks(9, makeUser({ id: 12 }), { sort: [], pagination: { page: 1, size: 20 } } as BookQuery)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('refuses to run a book scope through the episode path', async () => {
+      const { service, smartScopeRepo } = makeService();
+      smartScopeRepo.findById.mockResolvedValue([makeSmartScope({ userId: 12 })]);
+
+      await expect(service.queryEpisodes(5, makeUser({ id: 12 }), 1, 50)).rejects.toThrow(BadRequestException);
+    });
+
+    it('refuses Kobo sync for a podcast scope', async () => {
+      const { service, smartScopeRepo } = makeService();
+      smartScopeRepo.findById.mockResolvedValue([podcastScope({ userId: 12 })]);
+
+      await expect(service.setKoboSync(9, makeUser({ id: 12 }), true)).rejects.toThrow(BadRequestException);
+    });
+
+    it('requires a library when creating a podcast scope and refuses one for a book scope', async () => {
+      const { service } = makeService();
+
+      await expect(service.create({ name: 'P', icon: 'Podcast', mediaType: 'podcasts', defaultSort: [] }, makeUser())).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create({ name: 'B', icon: 'BookCopy', libraryId: 4, defaultSort: [] }, makeUser())).rejects.toThrow(BadRequestException);
+    });
+
+    it('forces syncToKobo off when a podcast scope is created', async () => {
+      const { service, smartScopeRepo, podcastAccess } = makeService();
+      smartScopeRepo.insert.mockResolvedValue([podcastScope()]);
+
+      await service.create(
+        { name: 'Fresh', icon: 'Podcast', mediaType: 'podcasts', libraryId: 4, defaultSort: [], syncToKobo: true, filter: RULES as never },
+        makeUser({ id: 12 }),
+      );
+
+      expect(podcastAccess.requirePodcastLibraryAccess).toHaveBeenCalledWith(4, expect.objectContaining({ id: 12 }));
+      expect(smartScopeRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ mediaType: 'podcasts', libraryId: 4, syncToKobo: false }));
+    });
   });
 
   describe('Kobo sync opt-in for shared scopes', () => {
@@ -340,6 +571,8 @@ describe('SmartScopeService', () => {
 
     expect(smartScopeRepo.insert).toHaveBeenCalledWith({
       userId: 44,
+      mediaType: 'books',
+      libraryId: null,
       name: 'New Smart Scope',
       icon: 'Aperture',
       filter: null,

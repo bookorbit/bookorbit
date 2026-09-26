@@ -61,7 +61,7 @@ describe('AnnotationListItem', () => {
     const wrapper = mountItem({ annotation: makeHubAnnotation(), mode: 'hub' })
     const pill = wrapper.findAll('span').find((span) => span.text() === 'MOBI')
 
-    expect(pill?.attributes('style')).toContain('color: rgb(99, 102, 241)')
+    expect(pill?.attributes('style')).toContain('color: var(--pill-format-mobi)')
   })
 
   it('renders the quote and the note', () => {

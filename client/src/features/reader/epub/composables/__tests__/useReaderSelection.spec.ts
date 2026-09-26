@@ -9,6 +9,7 @@ describe('useReaderSelection', () => {
     selection.show({
       text: 'Selected text',
       cfi: 'epubcfi(/6/2)',
+      range: null,
       popupPosition: { x: 120, y: 240, showBelow: true },
     })
 
@@ -27,6 +28,7 @@ describe('useReaderSelection', () => {
       {
         text: 'Highlighted text',
         cfi: 'epubcfi(/6/4!/4/2,/1:0,/1:10)',
+        range: null,
         popupPosition: { x: 100, y: 200, showBelow: false },
       },
       42,

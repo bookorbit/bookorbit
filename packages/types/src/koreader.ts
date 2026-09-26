@@ -196,6 +196,7 @@ export interface KoreaderCatalogFile {
   id: number;
   format: string;
   role: string;
+  downloadVariant: "original" | "audioless_epub";
   sizeBytes: number | null;
   durationSeconds: number | null;
   downloadUrl: string;
@@ -368,6 +369,7 @@ export interface KoreaderCatalogDashboardSectionResponse {
 export interface KoreaderCatalogManifestFile {
   id: number;
   format: string;
+  downloadVariant: "original" | "audioless_epub";
   sizeBytes: number | null;
   contentVersion: string;
   fileHash: string | null;

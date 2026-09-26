@@ -48,7 +48,7 @@ local BookOrbitProgressSync = require("bookorbit_progress_sync")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "1.5.2"
+local PLUGIN_VERSION = "1.5.5"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -938,7 +938,8 @@ function BookOrbit:matchOpenBookForAutoSync(on_done)
         digests = { digest },
         files = { self.ui.document.file },
     })
-    local had_local_match = state:getBook(digest) ~= nil
+    local local_book = state:getBook(digest)
+    local had_local_match = local_book ~= nil
     -- Any local match used to end this path, with no freshness bound at all, so
     -- a book whose server-side file was deleted or re-imported could stay
     -- wrongly matched forever. The bound here is a correctness fix.
@@ -956,6 +957,7 @@ function BookOrbit:matchOpenBookForAutoSync(on_done)
             [digest] = {
                 title = titleFromFile(self.ui.document.file),
                 source = "current_file",
+                book_file_id = local_book and local_book.fileId or nil,
             },
         })
         if not body then

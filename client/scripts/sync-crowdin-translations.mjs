@@ -14,6 +14,7 @@ const SOURCE_PATH_SUFFIX = '/client/src/locales/en.json'
 const MAX_API_RESPONSE_BYTES = 2 * 1024 * 1024
 const MAX_CATALOG_BYTES = 10 * 1024 * 1024
 const REQUEST_TIMEOUT_MS = 30_000
+const SOURCE_SYNC_RETRY_DELAYS_MS = [0, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000]
 const scriptDirectory = import.meta.dirname ?? path.join(process.cwd(), 'scripts')
 const clientRoot = path.resolve(scriptDirectory, '..')
 const localesDirectory = path.join(clientRoot, 'src/locales')
@@ -175,14 +176,29 @@ export function createCrowdinClient({ token, projectId, fetchImpl = fetch }) {
       throw new Error(`Crowdin source file ending in ${SOURCE_PATH_SUFFIX} was not found`)
     },
 
-    async sourceIdentifiers(fileId) {
-      const identifiers = new Set()
-      for (let offset = 0; offset < 20_000; offset += 500) {
-        const page = await request(`/projects/${projectId}/strings?fileId=${fileId}&limit=500&offset=${offset}`)
-        for (const entry of page.data) identifiers.add(entry.data.identifier)
-        if (page.data.length < 500) return identifiers
-      }
-      throw new Error('Crowdin source contains more than 20,000 messages')
+    async sourceCatalog(fileId) {
+      const download = await request(`/projects/${projectId}/files/${fileId}/download`)
+      return downloadCatalog(fetchImpl, download.data.url)
+    },
+
+    async uploadSource(filename, content) {
+      const storage = await request('/storages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Crowdin-API-FileName': filename,
+        },
+        body: content,
+      })
+      return storage.data.id
+    },
+
+    async updateSourceFile(fileId, storageId) {
+      await request(`/projects/${projectId}/files/${fileId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storageId, updateOption: 'keep_translations' }),
+      })
     },
 
     async exportedCatalog(fileId, languageId) {
@@ -242,10 +258,13 @@ async function mapWithConcurrency(values, concurrency, operation) {
   return results
 }
 
-export function sourceDrift(referenceMessages, identifiers) {
-  const missing = [...referenceMessages.keys()].filter((key) => !identifiers.has(key))
-  const unexpected = [...identifiers].filter((key) => !referenceMessages.has(key))
-  return { missing, unexpected }
+export function sourceDrift(referenceMessages, crowdinMessages) {
+  const missing = [...referenceMessages.keys()].filter((key) => !crowdinMessages.has(key))
+  const unexpected = [...crowdinMessages.keys()].filter((key) => !referenceMessages.has(key))
+  const changed = [...referenceMessages]
+    .filter(([key, message]) => crowdinMessages.has(key) && crowdinMessages.get(key) !== message)
+    .map(([key]) => key)
+  return { missing, unexpected, changed }
 }
 
 export function parseAllowedTranslationLosses(value = '') {
@@ -401,6 +420,70 @@ async function reportSyncIssues({ rejections, corrections, repairs, losses, repo
   }
 }
 
+function hasSourceDrift({ missing, unexpected, changed }) {
+  return missing.length > 0 || unexpected.length > 0 || changed.length > 0
+}
+
+function formatSourceDrift(drift) {
+  return [
+    ...drift.missing.slice(0, 10).map((key) => `missing in Crowdin: ${key}`),
+    ...drift.unexpected.slice(0, 10).map((key) => `missing in Git: ${key}`),
+    ...drift.changed.slice(0, 10).map((key) => `different source text: ${key}`),
+  ].join('\n')
+}
+
+async function prepareCrowdinSource({ token, projectId, fetchImpl, catalogDirectory, assertTargetConfiguration, wait }) {
+  if (!token) throw new Error('CROWDIN_TOKEN is required')
+  await assertTargetConfiguration()
+
+  const sourcePath = path.join(catalogDirectory, 'en.json')
+  const sourceContent = await readFile(sourcePath, 'utf8')
+  const reference = JSON.parse(sourceContent)
+  const referenceMessages = flattenCatalog(reference)
+  const client = createCrowdinClient({ token, projectId, fetchImpl })
+  const fileId = await client.sourceFileId()
+  let drift = sourceDrift(referenceMessages, flattenCatalog(await client.sourceCatalog(fileId)))
+  let updated = false
+
+  if (hasSourceDrift(drift)) {
+    const storageId = await client.uploadSource(path.basename(sourcePath), sourceContent)
+    await client.updateSourceFile(fileId, storageId)
+    updated = true
+
+    for (const delayMs of SOURCE_SYNC_RETRY_DELAYS_MS) {
+      if (delayMs > 0) await wait(delayMs)
+      drift = sourceDrift(referenceMessages, flattenCatalog(await client.sourceCatalog(fileId)))
+      if (!hasSourceDrift(drift)) break
+    }
+  }
+
+  if (hasSourceDrift(drift)) {
+    throw new Error(`Crowdin source did not match en.json after update\n${formatSourceDrift(drift)}`)
+  }
+
+  return { client, fileId, reference, referenceMessages, updated }
+}
+
+export async function syncCrowdinSource({
+  token,
+  projectId = '912891',
+  fetchImpl = fetch,
+  catalogDirectory = localesDirectory,
+  assertTargetConfiguration = assertCrowdinTargetConfiguration,
+  wait = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
+}) {
+  const { fileId, referenceMessages, updated } = await prepareCrowdinSource({
+    token,
+    projectId,
+    fetchImpl,
+    catalogDirectory,
+    assertTargetConfiguration,
+    wait,
+  })
+  console.log(`${updated ? 'Synchronized' : 'Verified'} ${referenceMessages.size} English source messages in Crowdin`)
+  return { fileId, messageCount: referenceMessages.size, updated }
+}
+
 export async function syncCrowdinTranslations({
   token,
   projectId = '912891',
@@ -413,12 +496,17 @@ export async function syncCrowdinTranslations({
   collectMessageKeys = collectSourceMessageKeys,
   protectedTerms = PROTECTED_SOURCE_TERMS,
   reportPath = process.env.CROWDIN_REJECTION_REPORT || '',
+  wait = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
 }) {
-  if (!token) throw new Error('CROWDIN_TOKEN is required')
-  await assertTargetConfiguration()
-
-  const reference = JSON.parse(await readFile(path.join(catalogDirectory, 'en.json'), 'utf8'))
-  const referenceMessages = flattenCatalog(reference)
+  const { client, fileId, reference, referenceMessages, updated } = await prepareCrowdinSource({
+    token,
+    projectId,
+    fetchImpl,
+    catalogDirectory,
+    assertTargetConfiguration,
+    wait,
+  })
+  console.log(`${updated ? 'Synchronized' : 'Verified'} ${referenceMessages.size} English source messages in Crowdin`)
   const currentCatalogs = new Map(
     await Promise.all(
       targetCatalogs.map(async ({ locale }) => {
@@ -427,17 +515,6 @@ export async function syncCrowdinTranslations({
       }),
     ),
   )
-  const client = createCrowdinClient({ token, projectId, fetchImpl })
-  const fileId = await client.sourceFileId()
-  const identifiers = await client.sourceIdentifiers(fileId)
-  const drift = sourceDrift(referenceMessages, identifiers)
-  if (drift.missing.length > 0 || drift.unexpected.length > 0) {
-    const details = [
-      ...drift.missing.slice(0, 10).map((key) => `missing in Crowdin: ${key}`),
-      ...drift.unexpected.slice(0, 10).map((key) => `missing in Git: ${key}`),
-    ]
-    throw new Error(`Crowdin source is not synchronized with en.json\n${details.join('\n')}`)
-  }
 
   const downloaded = await mapWithConcurrency(targetCatalogs, 4, async ({ languageId, locale }) => ({
     locale,

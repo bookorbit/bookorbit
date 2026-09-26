@@ -29,7 +29,8 @@ describe('LibraryController', () => {
     execute: vi.fn(),
   };
 
-  const controller = new LibraryController(libraryService as any, bookService as any, bulkRenameService as any);
+  const addedAtService = { start: vi.fn(), get: vi.fn() };
+  const controller = new LibraryController(libraryService as any, bookService as any, bulkRenameService as any, addedAtService as any);
 
   beforeEach(() => {
     vi.resetAllMocks();

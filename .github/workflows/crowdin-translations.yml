@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: crowdin-translation-sync
+  group: crowdin-synchronization
   cancel-in-progress: false
 
 env:

@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="T extends string">
 import { nextTick, ref, watch } from 'vue'
+import { useScrollOverflow } from '@/composables/useScrollOverflow'
 
 interface SettingsTabItem {
   id: T
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const container = ref<HTMLElement | null>(null)
+const { hasStartOverflow, hasEndOverflow } = useScrollOverflow(container)
 
 async function revealActiveTab(): Promise<void> {
   await nextTick()
@@ -44,36 +46,51 @@ function handleSelect(tab: T): void {
 </script>
 
 <template>
-  <div
-    ref="container"
-    :role="variant === 'page' ? 'tablist' : undefined"
-    :class="
-      variant === 'section'
-        ? 'flex h-11 shrink-0 snap-x snap-mandatory items-stretch overflow-x-auto border-b px-4 scrollbar-none md:snap-none'
-        : 'sticky top-0 z-20 mb-5 flex snap-x gap-1 overflow-x-auto border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:mb-6 md:overflow-visible'
-    "
-  >
-    <button
-      v-for="tab in tabs"
-      :key="tab.id"
-      :role="variant === 'page' ? 'tab' : undefined"
-      :id="idPrefix ? `${idPrefix}-${tab.id}-tab` : undefined"
-      :aria-selected="variant === 'page' ? activeTab === tab.id : undefined"
-      :aria-pressed="variant === 'page' ? activeTab === tab.id : undefined"
-      :aria-current="variant === 'section' && activeTab === tab.id ? 'page' : undefined"
-      :aria-controls="variant === 'page' ? tab.controls : undefined"
-      :data-testid="testIdPrefix ? `${testIdPrefix}-${tab.id}` : undefined"
-      :class="[
+  <!-- The section strip hides its scrollbar, so a pointer would otherwise have nothing to say that
+       tabs sit past the edge. Only that variant needs the positioned wrapper, so the page variant
+       keeps its exact layout box and its sticky positioning. -->
+  <div :class="variant === 'section' ? 'relative shrink-0' : 'contents'">
+    <div
+      ref="container"
+      :role="variant === 'page' ? 'tablist' : undefined"
+      :class="
         variant === 'section'
-          ? 'h-full shrink-0 snap-start whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors'
-          : '-mb-px shrink-0 snap-start border-b-2 px-3 py-3 text-sm font-medium transition-colors md:py-2',
-        activeTab === tab.id
-          ? 'border-primary text-foreground'
-          : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
-      ]"
-      @click="handleSelect(tab.id)"
+          ? 'flex h-11 shrink-0 snap-x snap-mandatory items-stretch overflow-x-auto border-b px-4 scrollbar-none md:snap-none'
+          : 'sticky top-0 z-20 mb-5 flex snap-x gap-1 overflow-x-auto border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:mb-6 md:overflow-visible'
+      "
     >
-      {{ tab.label }}
-    </button>
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        :role="variant === 'page' ? 'tab' : undefined"
+        :id="idPrefix ? `${idPrefix}-${tab.id}-tab` : undefined"
+        :aria-selected="variant === 'page' ? activeTab === tab.id : undefined"
+        :aria-pressed="variant === 'page' ? activeTab === tab.id : undefined"
+        :aria-current="variant === 'section' && activeTab === tab.id ? 'page' : undefined"
+        :aria-controls="variant === 'page' ? tab.controls : undefined"
+        :data-testid="testIdPrefix ? `${testIdPrefix}-${tab.id}` : undefined"
+        :class="[
+          variant === 'section'
+            ? 'h-full shrink-0 snap-start whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors'
+            : '-mb-px shrink-0 snap-start border-b-2 px-3 py-3 text-sm font-medium transition-colors md:py-2',
+          activeTab === tab.id
+            ? 'border-primary text-foreground'
+            : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
+        ]"
+        @click="handleSelect(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+    <div
+      v-if="variant === 'section' && hasStartOverflow"
+      class="pointer-events-none absolute inset-y-px start-0 w-8 bg-linear-to-r from-background to-transparent"
+      aria-hidden="true"
+    />
+    <div
+      v-if="variant === 'section' && hasEndOverflow"
+      class="pointer-events-none absolute inset-y-px end-0 w-8 bg-linear-to-l from-background to-transparent"
+      aria-hidden="true"
+    />
   </div>
 </template>

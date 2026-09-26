@@ -17,7 +17,10 @@ const insightsMock = vi.hoisted(() => ({
       booksCompleted: 1,
       formatDistribution: [{ name: 'EPUB', readingSeconds: 3600 }],
       genreDistribution: [],
-      sourceCoverage: [{ source: 'web', readingSeconds: 3600, sessionsCount: 3 }],
+      sourceCoverage: [
+        { source: 'ios', readingSeconds: 2400, sessionsCount: 2 },
+        { source: 'watchos', readingSeconds: 1200, sessionsCount: 1 },
+      ],
       trend: [],
     },
   },
@@ -47,6 +50,8 @@ describe('SharedReadingInsightsPage', () => {
     expect(wrapper.text()).toContain('Sessions')
     expect(wrapper.text()).toContain('Reading time')
     expect(wrapper.text()).toContain('Daily reading trend')
+    expect(wrapper.text()).toContain('iOS app')
+    expect(wrapper.text()).toContain('Apple Watch')
     expect(wrapper.text()).not.toContain('adminFeature.sharedInsights')
     expect(wrapper.text()).not.toContain('Most-read books')
   })

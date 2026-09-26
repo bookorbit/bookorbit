@@ -15,9 +15,12 @@ import { useBookDuplicates } from './useBookDuplicates'
 vi.mock('../api/book-duplicates', () => ({
   createBookDuplicateScan: vi.fn<(...args: unknown[]) => unknown>(),
   deleteDuplicateBooks: vi.fn<(...args: unknown[]) => unknown>(),
+  dismissBookDuplicateGroup: vi.fn<(...args: unknown[]) => unknown>(),
   getActiveBookDuplicateScan: vi.fn<(...args: unknown[]) => unknown>(),
+  getBookDuplicateDismissals: vi.fn<(...args: unknown[]) => unknown>(),
   getBookDuplicateGroups: vi.fn<(...args: unknown[]) => unknown>(),
   getBookDuplicateScan: vi.fn<(...args: unknown[]) => unknown>(),
+  restoreBookDuplicateDismissal: vi.fn<(...args: unknown[]) => unknown>(),
 }))
 
 const runningScan: BookDuplicateScan = {
@@ -30,6 +33,8 @@ const runningScan: BookDuplicateScan = {
   totalBooks: 10,
   progressPercent: 50,
   totalGroups: null,
+  totalExtraCopies: null,
+  totalReclaimableBytes: null,
   errorCode: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   completedAt: null,
@@ -41,6 +46,8 @@ const completedScan: BookDuplicateScan = {
   processedBooks: 10,
   progressPercent: 100,
   totalGroups: 0,
+  totalExtraCopies: 0,
+  totalReclaimableBytes: 0,
   completedAt: '2026-01-01T00:01:00.000Z',
 }
 
@@ -85,7 +92,7 @@ describe('useBookDuplicates', () => {
     await vi.advanceTimersByTimeAsync(1000)
 
     expect(getBookDuplicateScan).toHaveBeenCalledTimes(2)
-    expect(getBookDuplicateGroups).toHaveBeenCalledWith(11, { page: 1, pageSize: 20, reason: undefined })
+    expect(getBookDuplicateGroups).toHaveBeenCalledWith(11, { page: 1, pageSize: 20, reason: undefined, sortBy: 'reclaimable', order: 'desc' })
     expect(duplicates.scan.value?.status).toBe('completed')
     expect(duplicates.error.value).toBeNull()
   })
@@ -112,7 +119,7 @@ describe('useBookDuplicates', () => {
     await duplicates.fetchGroups()
 
     expect(duplicates.page.value).toBe(1)
-    expect(getBookDuplicateGroups).toHaveBeenNthCalledWith(2, 11, { page: 1, pageSize: 20, reason: undefined })
+    expect(getBookDuplicateGroups).toHaveBeenNthCalledWith(2, 11, { page: 1, pageSize: 20, reason: undefined, sortBy: 'reclaimable', order: 'desc' })
   })
 
   it('reloads server results after deleting a subset of a duplicate group', async () => {
@@ -123,7 +130,7 @@ describe('useBookDuplicates', () => {
     await expect(duplicates.discardBooks([2])).resolves.toBe(true)
 
     expect(deleteDuplicateBooks).toHaveBeenCalledWith([2])
-    expect(getBookDuplicateGroups).toHaveBeenCalledWith(11, { page: 1, pageSize: 20, reason: undefined })
+    expect(getBookDuplicateGroups).toHaveBeenCalledWith(11, { page: 1, pageSize: 20, reason: undefined, sortBy: 'reclaimable', order: 'desc' })
   })
 
   it('does not schedule another poll after the owner component unmounts', async () => {
@@ -164,7 +171,7 @@ describe('useBookDuplicates', () => {
 
     expect(duplicates.reason.value).toBe('isbn')
     expect(duplicates.page.value).toBe(3)
-    expect(getBookDuplicateGroups).toHaveBeenLastCalledWith(11, { page: 3, pageSize: 20, reason: 'isbn' })
+    expect(getBookDuplicateGroups).toHaveBeenLastCalledWith(11, { page: 3, pageSize: 20, reason: 'isbn', sortBy: 'reclaimable', order: 'desc' })
   })
 
   it('keeps results available and reports an unsuccessful deletion', async () => {

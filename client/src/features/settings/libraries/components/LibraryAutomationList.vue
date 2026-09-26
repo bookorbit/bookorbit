@@ -7,14 +7,14 @@ import { parseCronToHuman } from '@/features/library/utils/cron'
 
 const props = defineProps<{ library: Library }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 /**
  * Every setting renders in both states with its real value, so a schedule reads as its actual
  * cron description rather than an icon, and "off" is stated rather than left out.
  */
 const rows = computed(() => {
-  const schedule = parseCronToHuman(props.library.autoScanCronExpression)
+  const schedule = parseCronToHuman(props.library.autoScanCronExpression, locale.value)
   const off = t('settings.admin.libraries.stateOff')
   const on = t('settings.admin.libraries.stateOn')
   return [

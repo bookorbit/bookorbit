@@ -56,6 +56,7 @@ describe('Foliate navigation', () => {
   let Paginator: new () => {
     sections: { load: () => Promise<string | null> }[]
     goTo: (target: { index: number }) => Promise<void>
+    snap: (vx: number, vy: number) => void
   }
 
   beforeAll(async () => {
@@ -220,8 +221,13 @@ describe('Foliate navigation', () => {
     expect(getPageScrollOffset(1, 800, true, false)).toBe(800)
   })
 
-  it('does not intercept paginated touch movement while native text selection is active', () => {
+  it('does not intercept or snap paginated touch gestures while native text selection is active', () => {
     const paginator = new Paginator() as InstanceType<typeof Paginator> & EventTarget
+    const snap = vi.spyOn(paginator, 'snap').mockImplementation(() => {})
+    const animationFrame = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0)
+      return 0
+    })
     const doc = new EventTarget() as EventTarget & Document
     Object.defineProperty(doc, 'getSelection', {
       value: () => ({ rangeCount: 1, isCollapsed: false }),
@@ -244,7 +250,58 @@ describe('Foliate navigation', () => {
     })
     doc.dispatchEvent(move)
 
+    const end = new Event('touchend', { bubbles: true, cancelable: true }) as TouchEvent
+    Object.defineProperties(end, {
+      touches: { value: [] },
+      changedTouches: { value: [touch] },
+    })
+    doc.dispatchEvent(end)
+
     expect(move.defaultPrevented).toBe(false)
+    expect(end.defaultPrevented).toBe(false)
+    expect(snap).not.toHaveBeenCalled()
+
+    animationFrame.mockRestore()
+  })
+
+  it('still snaps ordinary paginated touch gestures', () => {
+    const paginator = new Paginator() as InstanceType<typeof Paginator> & EventTarget
+    const snap = vi.spyOn(paginator, 'snap').mockImplementation(() => {})
+    const originalVisualViewport = Object.getOwnPropertyDescriptor(globalThis, 'visualViewport')
+    Object.defineProperty(globalThis, 'visualViewport', {
+      configurable: true,
+      value: { scale: 1 },
+    })
+    const animationFrame = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0)
+      return 0
+    })
+    const doc = new EventTarget() as EventTarget & Document
+    Object.defineProperty(doc, 'getSelection', {
+      value: () => null,
+    })
+    paginator.dispatchEvent(new CustomEvent('load', { detail: { doc } }))
+
+    const touch = { clientX: 30, clientY: 40, screenX: 30, screenY: 40 }
+    const start = new Event('touchstart', { bubbles: true, cancelable: true }) as TouchEvent
+    Object.defineProperties(start, {
+      touches: { value: [touch] },
+      changedTouches: { value: [touch] },
+    })
+    doc.dispatchEvent(start)
+
+    const end = new Event('touchend', { bubbles: true, cancelable: true }) as TouchEvent
+    Object.defineProperties(end, {
+      touches: { value: [] },
+      changedTouches: { value: [touch] },
+    })
+    doc.dispatchEvent(end)
+
+    expect(snap).toHaveBeenCalledWith(0, undefined)
+
+    animationFrame.mockRestore()
+    if (originalVisualViewport) Object.defineProperty(globalThis, 'visualViewport', originalVisualViewport)
+    else Reflect.deleteProperty(globalThis, 'visualViewport')
   })
 
   it('maps physical left and right navigation using OPF RTL page progression', async () => {

@@ -53,6 +53,24 @@ export function resolveCandidateAgreement(candidates: readonly MetadataCandidate
 }
 
 /**
+ * Holds candidates from a later search to an anchor chosen earlier, such as the audiobook edition's
+ * art to the book a first pass identified. Unlike `resolveCandidateAgreement`, a single candidate
+ * is checked too: it has no peers to outvote it, but the anchor still describes the book.
+ */
+export function acceptAgainstAnchor(
+  anchor: MetadataCandidate,
+  candidates: readonly MetadataCandidate[],
+): Pick<CandidateAgreement, 'accepted' | 'rejected'> {
+  const accepted: MetadataCandidate[] = [];
+  const rejected: MetadataCandidate[] = [];
+  for (const candidate of candidates) {
+    if (candidate === anchor || describesSameBook(anchor, candidate)) accepted.push(candidate);
+    else rejected.push(candidate);
+  }
+  return { accepted, rejected };
+}
+
+/**
  * The candidate the others are measured against: an edition confirmed by the book's own ISBN when
  * one is available, otherwise whichever candidate the query supports most strongly. Ties fall to
  * the caller's trust order.

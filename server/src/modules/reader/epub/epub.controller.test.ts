@@ -6,6 +6,8 @@ import { EpubController } from './epub.controller';
 describe('EpubController', () => {
   const epubService = {
     getBookInfo: vi.fn(),
+    getMediaOverlayPlaylist: vi.fn(),
+    streamMediaOverlayFile: vi.fn(),
     streamFile: vi.fn(),
   };
 
@@ -60,6 +62,39 @@ describe('EpubController', () => {
     expect(reply.header).toHaveBeenNthCalledWith(2, 'Content-Length', 321);
     expect(reply.header).toHaveBeenNthCalledWith(3, 'Cache-Control', 'public, max-age=3600');
     expect(reply.send).toHaveBeenCalledWith(stream);
+  });
+
+  it('delegates media-overlay playlist requests', async () => {
+    const user = { id: 5, isSuperuser: false, permissions: [] } as any;
+    epubService.getMediaOverlayPlaylist.mockResolvedValue({ items: [] });
+
+    await controller.getMediaOverlay(11, '12', user);
+
+    expect(epubService.getMediaOverlayPlaylist).toHaveBeenCalledWith(11, 12, user);
+  });
+
+  it('sets range headers for media-overlay audio files', async () => {
+    const user = { id: 1, isSuperuser: false, permissions: [] } as any;
+    const reply = {
+      code: vi.fn().mockReturnThis(),
+      header: vi.fn(),
+      send: vi.fn(),
+    };
+    epubService.streamMediaOverlayFile.mockResolvedValue({
+      data: Buffer.from('2345'),
+      contentType: 'audio/mpeg',
+      size: 10,
+      status: 206,
+      contentRange: 'bytes 2-5/10',
+    });
+
+    await controller.getMediaOverlayFile(9, 'OPS/audio/ch1.mp3', '13', user, { headers: { range: 'bytes=2-5' } } as any, reply as any);
+
+    expect(epubService.streamMediaOverlayFile).toHaveBeenCalledWith(9, 'OPS/audio/ch1.mp3', 13, 'bytes=2-5', user);
+    expect(reply.code).toHaveBeenCalledWith(206);
+    expect(reply.header).toHaveBeenCalledWith('Accept-Ranges', 'bytes');
+    expect(reply.header).toHaveBeenCalledWith('Content-Range', 'bytes 2-5/10');
+    expect(reply.send).toHaveBeenCalledWith(Buffer.from('2345'));
   });
 
   it('does not set content-length when size is zero', async () => {

@@ -17,6 +17,8 @@ vi.mock('dns/promises', async (importOriginal) => ({
   lookup: vi.fn(() => Promise.resolve([{ address: '93.184.216.34', family: 4 }])),
 }));
 
+import { lookup } from 'dns/promises';
+
 import type { IndexerCredentialStore } from '../indexer-credential-store';
 import { IndexerSearchException, type ReleaseQuery, type ResolvedIndexerConfig } from '../indexer-adapter';
 import { PluginIndexerAdapter } from './plugin-host';
@@ -28,9 +30,16 @@ function config(overrides: Partial<ResolvedIndexerConfig> = {}): ResolvedIndexer
     adapterType: 'torznab',
     baseUrl: 'https://tracker.example.com',
     credential: 'a-key',
+    credentialError: null,
     allowPrivateAddress: false,
+    applyTrackerSeedGoals: true,
+    seedRatioGoal: null,
+    seedTimeMinutes: null,
     categories: { ebook: [7020], audiobook: [3030], comic: [7030] },
+    disabledMediaKinds: [],
+    isbnSearchDisabled: false,
     settings: null,
+    networkProfile: null,
     ...overrides,
   };
 }
@@ -142,6 +151,39 @@ describe('PluginIndexerAdapter', () => {
       expect(release.sizeBytes).toBe(2_000_000);
       expect(release.seeders).toBe(0);
       expect(release.leechers).toBeNull();
+    });
+
+    it('normalizes seed goals without coercing plugin values or converting minutes twice', async () => {
+      const releases = await searched([
+        { guid: 'valid', title: 'Dune', seedRatioGoal: 1.5, seedTimeMinutes: 60.2 },
+        { guid: 'string', title: 'Dune', seedRatioGoal: '2', seedTimeMinutes: '120' },
+        { guid: 'zero', title: 'Dune', seedRatioGoal: 0, seedTimeMinutes: 0 },
+        { guid: 'oversized', title: 'Dune', seedRatioGoal: 2, seedTimeMinutes: 2_147_483_648 },
+      ]);
+
+      expect(releases[0]).toMatchObject({ seedRatioGoal: 1.5, seedTimeMinutes: 61 });
+      expect(releases[1]).not.toHaveProperty('seedRatioGoal');
+      expect(releases[1]).not.toHaveProperty('seedTimeMinutes');
+      expect(releases[2]).not.toHaveProperty('seedRatioGoal');
+      expect(releases[2]).not.toHaveProperty('seedTimeMinutes');
+      expect(releases[3]).toHaveProperty('seedRatioGoal', 2);
+      expect(releases[3]).not.toHaveProperty('seedTimeMinutes');
+    });
+
+    it('does not expose host seed policy to a plugin', async () => {
+      let seen: Record<string, unknown> | undefined;
+      const { adapter } = makeAdapter({
+        search: (_query, given) => {
+          seen = given as unknown as Record<string, unknown>;
+          return Promise.resolve([]);
+        },
+      });
+
+      await adapter.search(query(), config({ applyTrackerSeedGoals: false, seedRatioGoal: 3, seedTimeMinutes: 60 }), AbortSignal.timeout(1000));
+
+      expect(seen).not.toHaveProperty('applyTrackerSeedGoals');
+      expect(seen).not.toHaveProperty('seedRatioGoal');
+      expect(seen).not.toHaveProperty('seedTimeMinutes');
     });
 
     it('reads a flag as the boolean it is meant to be', async () => {
@@ -269,6 +311,37 @@ describe('PluginIndexerAdapter', () => {
           AbortSignal.timeout(1000),
         ),
       ).rejects.toThrow();
+    });
+
+    it('treats a source DNS failure as a temporary outage', async () => {
+      vi.mocked(lookup).mockRejectedValueOnce(new Error('ENOTFOUND'));
+      const { adapter } = makeAdapter({
+        search: (_query, _config, host) => host.fetch('https://does-not-resolve.invalid').then(() => []),
+      });
+
+      await expect(adapter.search(query(), config(), AbortSignal.timeout(1000))).rejects.toMatchObject({
+        failure: 'unreachable',
+        message: 'Example Tracker: the source host could not be resolved',
+      });
+    });
+
+    it('treats an unresolved download host as a temporary outage', async () => {
+      vi.mocked(lookup).mockRejectedValueOnce(new Error('ENOTFOUND'));
+      const { adapter } = makeAdapter({
+        fetchTorrentFile: undefined,
+        resolveFile: () => Promise.resolve({ url: 'https://does-not-resolve.invalid/book', fileName: 'book.epub', sizeBytes: 1, format: 'epub' }),
+      });
+
+      await expect(
+        adapter.resolveFile!(
+          { indexerId: 4, guid: 'g', title: 't', sizeBytes: null, seeders: null, leechers: null },
+          config(),
+          AbortSignal.timeout(1000),
+        ),
+      ).rejects.toMatchObject({
+        failure: 'unreachable',
+        message: 'Example Tracker: the download host could not be resolved',
+      });
     });
 
     it('refuses a torrent file too large to be one', async () => {

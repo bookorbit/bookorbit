@@ -84,6 +84,23 @@ describe('BookSortBuilder', () => {
     expect(raw).toHaveBeenNthCalledWith(2, 'DESC');
   });
 
+  it('builds weighted relevance sorting when a query is present', () => {
+    const raw = (sql as unknown as { raw: vi.Mock }).raw;
+
+    const result = service.build([{ field: 'relevance', dir: 'desc' }], 42, undefined, { query: 'dune' });
+
+    expect(result).toHaveLength(3);
+    expect(result[0]).toMatchObject({ type: 'sql' });
+    expect(result[1]).toMatchObject({ type: 'sql', text: ' ASC NULLS LAST' });
+    expect(raw).toHaveBeenCalledWith('DESC');
+  });
+
+  it('rejects relevance sorting without a query', () => {
+    expect(() => service.build([{ field: 'relevance', dir: 'desc' }], 42)).toThrow(
+      new BadRequestException('relevance sort requires a non-empty search query'),
+    );
+  });
+
   it('builds author sort with the denormalized sort key', () => {
     const raw = (sql as unknown as { raw: vi.Mock }).raw;
 

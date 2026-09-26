@@ -18,6 +18,9 @@ const { t } = useI18n()
 
 const BUCKET_TOKEN: Record<ReadingSessionSourceBucket, string> = {
   bookorbit: '--pill-web',
+  ios: '--pill-ios',
+  watchos: '--pill-watchos',
+  android: '--pill-android',
   koreader: '--pill-koreader',
   kobo: '--pill-kobo',
 }

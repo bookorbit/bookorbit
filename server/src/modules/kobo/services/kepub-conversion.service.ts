@@ -10,12 +10,18 @@ import { KepubifyBinaryService } from './kepubify-binary.service';
 
 const execFileAsync = promisify(execFile);
 const KEPUBIFY_TIMEOUT_MS = 60_000;
+const AUDIOLESS_EPUB_CACHE_VERSION = 1;
 
 interface KepubConversionInput {
   sourcePath: string;
   fileHash?: string | null;
   bookId: number;
   hyphenate: boolean;
+  /**
+   * The source was rebuilt without its narration. It carries the original file's hash, so it needs
+   * its own cache entry to avoid being served in place of a conversion of the full archive.
+   */
+  audioless?: boolean;
 }
 
 @Injectable()
@@ -32,7 +38,8 @@ export class KepubConversionService {
   async getKepubPath(input: KepubConversionInput): Promise<string> {
     const cacheDir = join(this.kepubCachePath, String(input.bookId));
     const fileHash = input.fileHash ?? 'nohash';
-    const cacheKey = input.hyphenate ? `${fileHash}-hyph` : fileHash;
+    // Keep the original two key shapes byte for byte so existing cache entries still hit.
+    const cacheKey = `${fileHash}${input.audioless ? `-noaudio-v${AUDIOLESS_EPUB_CACHE_VERSION}` : ''}${input.hyphenate ? '-hyph' : ''}`;
     const cachedPath = join(cacheDir, `${cacheKey}.kepub.epub`);
 
     try {

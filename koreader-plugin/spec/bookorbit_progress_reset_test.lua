@@ -49,9 +49,10 @@ package.loaded["ui/uimanager"] = {
     unschedule = function() end,
     getElapsedTimeSinceBoot = function() return 10000 end,
 }
-package.loaded["logger"] = { dbg = function() end }
+package.loaded["logger"] = { dbg = function() end, warn = function() end }
 package.loaded["ui/time"] = { s = function(value) return value end }
 package.loaded["util"] = { partialMD5 = function(file) return "digest:" .. tostring(file) end }
+package.loaded["bookorbit_state_manager"] = { repairFileIdentity = function() end }
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 

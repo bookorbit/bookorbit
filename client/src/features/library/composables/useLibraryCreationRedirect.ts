@@ -13,10 +13,10 @@ export function useLibraryCreationRedirect() {
   const router = useRouter()
   const { refreshLibraries } = useLibraries()
 
-  async function handleLibraryCreated(library: Pick<Library, 'id'>) {
+  async function handleLibraryCreated(library: Pick<Library, 'id' | 'type'>) {
     setDefaultSortForLibrary(library.id)
     await refreshLibraries()
-    await router.push({ name: 'library', params: { id: library.id } })
+    await router.push({ name: library.type === 'podcasts' ? 'podcast-library' : 'library', params: { id: library.id } })
   }
 
   return { handleLibraryCreated }

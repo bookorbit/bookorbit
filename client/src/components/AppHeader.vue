@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Sparkles,
   Languages,
+  Info,
 } from '@lucide/vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -53,10 +54,12 @@ import NotificationSheet from '@/features/notifications/components/NotificationS
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, Permission, type Locale } from '@bookorbit/types'
+import { LOCALE_LABELS, Permission, type Locale } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 import { useLocaleStore } from '@/stores/locale'
-import { getFormatColor } from '@/features/book/lib/format-colors'
+import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
+import { bookFormatEntries } from '@/features/book/lib/book-formats'
+import { useLegalNotices } from '@/components/legal/useLegalNotices'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -69,6 +72,7 @@ const { subscribe: subscribeNotifications } = useNotifications()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const themeStore = useThemeStore()
 const localeStore = useLocaleStore()
+const { openLegalNotices } = useLegalNotices()
 const currentLanguageLabel = computed(() => LOCALE_LABELS[localeStore.locale])
 const documentationUrl = 'https://bookorbit.app/what-is-bookorbit'
 
@@ -332,34 +336,8 @@ function highlightSegments(text: string | null, query: string) {
   return parts.map((part) => ({ text: part, match: part.toLowerCase() === lower }))
 }
 
-function sortFormats(formats: string[]): string[] {
-  return [...formats].sort((a, b) => {
-    const aIndex = (DEFAULT_FORMAT_PRIORITY as readonly string[]).indexOf(a.toLowerCase())
-    const bIndex = (DEFAULT_FORMAT_PRIORITY as readonly string[]).indexOf(b.toLowerCase())
-
-    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b)
-    if (aIndex === -1) return 1
-    if (bIndex === -1) return -1
-    return aIndex - bIndex
-  })
-}
-
-function resultFormats(result: GlobalSearchResult): string[] {
-  const formats = new Set<string>()
-  for (const file of result.files) {
-    const fmt = file.format?.toLowerCase()
-    if (fmt) formats.add(fmt)
-  }
-  return sortFormats([...formats])
-}
-
-function formatBadgeStyle(fmt: string) {
-  const color = getFormatColor(fmt)
-  return {
-    color,
-    backgroundColor: `color-mix(in oklch, ${color} 10%, transparent)`,
-    borderColor: `color-mix(in oklch, ${color} 20%, transparent)`,
-  }
+function resultFormatEntries(result: GlobalSearchResult) {
+  return bookFormatEntries(result.files)
 }
 </script>
 
@@ -418,7 +396,7 @@ function formatBadgeStyle(fmt: string) {
                 <BookCoverImage
                   :book-id="row.result.id"
                   type="thumbnail"
-                  :version="row.result.updatedAt"
+                  :version="row.result.coverVersion"
                   class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
                   :alt="row.result.title ?? ''"
                 />
@@ -444,15 +422,13 @@ function formatBadgeStyle(fmt: string) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
-                  <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
-                    :style="formatBadgeStyle(fmt)"
-                  >
-                    {{ fmt }}
-                  </span>
+                <div v-if="resultFormatEntries(row.result).length" class="flex shrink-0 gap-1">
+                  <BookFormatChip
+                    v-for="entry in resultFormatEntries(row.result)"
+                    :key="entry.key"
+                    :format-key="entry.key"
+                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded"
+                  />
                 </div>
               </button>
             </div>
@@ -545,7 +521,7 @@ function formatBadgeStyle(fmt: string) {
                 <BookCoverImage
                   :book-id="row.result.id"
                   type="thumbnail"
-                  :version="row.result.updatedAt"
+                  :version="row.result.coverVersion"
                   class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
                   :alt="row.result.title ?? ''"
                 />
@@ -571,15 +547,13 @@ function formatBadgeStyle(fmt: string) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
-                  <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
-                    :style="formatBadgeStyle(fmt)"
-                  >
-                    {{ fmt }}
-                  </span>
+                <div v-if="resultFormatEntries(row.result).length" class="flex shrink-0 gap-1">
+                  <BookFormatChip
+                    v-for="entry in resultFormatEntries(row.result)"
+                    :key="entry.key"
+                    :format-key="entry.key"
+                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded"
+                  />
                 </div>
               </button>
             </div>
@@ -604,7 +578,13 @@ function formatBadgeStyle(fmt: string) {
         <!-- Mobile: search icon -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :class="['md:hidden', controlClass]" @click="mobileSearchOpen = true">
+            <Button
+              variant="ghost"
+              size="icon"
+              :class="['md:hidden', controlClass]"
+              :aria-label="t('common.search')"
+              @click="mobileSearchOpen = true"
+            >
               <Search :size="15" />
             </Button>
           </TooltipTrigger>
@@ -669,6 +649,10 @@ function formatBadgeStyle(fmt: string) {
                 <ExternalLink :size="12" class="ml-auto text-muted-foreground" />
               </a>
             </DropdownMenuItem>
+            <DropdownMenuItem @click="openLegalNotices">
+              <Info :size="15" class="mr-2 text-muted-foreground" />
+              {{ t('components.legalNotices.about') }}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -685,6 +669,7 @@ function formatBadgeStyle(fmt: string) {
                 variant="ghost"
                 size="icon"
                 :class="destinationClass(isStatisticsActive)"
+                :aria-label="t('components.appHeader.statistics')"
                 @click="navigateToStatistics"
               >
                 <BarChart3 :size="15" />
@@ -695,7 +680,13 @@ function formatBadgeStyle(fmt: string) {
 
           <Tooltip v-if="achievementsEnabled">
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" :class="destinationClass(isAchievementsActive)" @click="navigateToAchievements">
+              <Button
+                variant="ghost"
+                size="icon"
+                :class="destinationClass(isAchievementsActive)"
+                :aria-label="t('components.appHeader.achievements')"
+                @click="navigateToAchievements"
+              >
                 <Trophy :size="15" />
               </Button>
             </TooltipTrigger>
@@ -704,7 +695,14 @@ function formatBadgeStyle(fmt: string) {
 
           <Tooltip v-if="hasPermission('library_upload')">
             <TooltipTrigger as-child>
-              <Button data-tour="upload-button" variant="ghost" size="icon" :class="controlClass" @click="uploadOpen = true">
+              <Button
+                data-tour="upload-button"
+                variant="ghost"
+                size="icon"
+                :class="controlClass"
+                :aria-label="t('components.appHeader.uploadBooks')"
+                @click="uploadOpen = true"
+              >
                 <Upload :size="15" />
               </Button>
             </TooltipTrigger>
@@ -719,7 +717,13 @@ function formatBadgeStyle(fmt: string) {
             <DropdownMenu>
               <TooltipTrigger as-child>
                 <DropdownMenuTrigger as-child>
-                  <Button data-tour="documentation-link" variant="ghost" size="icon" :class="['relative', controlClass]">
+                  <Button
+                    data-tour="documentation-link"
+                    variant="ghost"
+                    size="icon"
+                    :class="['relative', controlClass]"
+                    :aria-label="t('components.appHeader.help')"
+                  >
                     <BadgeQuestionMark :size="15" />
                     <span
                       v-if="hasUnseenWhatsNew"
@@ -742,6 +746,10 @@ function formatBadgeStyle(fmt: string) {
                   {{ t('components.appHeader.whatsNew') }}
                   <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
                 </DropdownMenuItem>
+                <DropdownMenuItem @click="openLegalNotices">
+                  <Info :size="14" class="mr-2 text-muted-foreground" />
+                  {{ t('components.legalNotices.about') }}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <TooltipContent>{{ t('components.appHeader.help') }}</TooltipContent>
@@ -751,7 +759,13 @@ function formatBadgeStyle(fmt: string) {
             <Popover>
               <TooltipTrigger as-child>
                 <PopoverTrigger as-child>
-                  <Button data-tour="appearance-picker" variant="ghost" size="icon" :class="controlClass">
+                  <Button
+                    data-tour="appearance-picker"
+                    variant="ghost"
+                    size="icon"
+                    :class="controlClass"
+                    :aria-label="t('components.appHeader.appearance')"
+                  >
                     <Palette :size="15" />
                   </Button>
                 </PopoverTrigger>
@@ -813,7 +827,14 @@ function formatBadgeStyle(fmt: string) {
 
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button data-tour="settings-nav" variant="ghost" size="icon" :class="controlClass" @click="navigateToSettings">
+              <Button
+                data-tour="settings-nav"
+                variant="ghost"
+                size="icon"
+                :class="controlClass"
+                :aria-label="t('components.appHeader.settings')"
+                @click="navigateToSettings"
+              >
                 <Settings :size="15" />
               </Button>
             </TooltipTrigger>

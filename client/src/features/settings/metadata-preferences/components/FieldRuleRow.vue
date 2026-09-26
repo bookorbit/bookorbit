@@ -10,7 +10,7 @@ import ProviderChipList from './ProviderChipList.vue'
 import ProviderAddMenu from './ProviderAddMenu.vue'
 import MergeStrategySegmented from './MergeStrategySegmented.vue'
 import FieldRuleDetail from './FieldRuleDetail.vue'
-import { resolvedProviders, skippedProviders } from '../lib/field-rules'
+import { fieldRuleLabelKey, resolvedProviders, skippedProviders } from '../lib/field-rules'
 
 const { t } = useI18n()
 
@@ -32,7 +32,7 @@ const emit = defineEmits<{
   'update:expanded': [value: boolean]
 }>()
 
-const label = computed(() => t(`settings.metadata.fields.${props.field}`))
+const label = computed(() => t(fieldRuleLabelKey(props.field)))
 const resolved = computed(() => resolvedProviders(props.preference.providers, props.statuses))
 const skipped = computed(() => skippedProviders(props.preference.providers, props.statuses))
 const hasNoUsableProvider = computed(() => props.preference.enabled && resolved.value.length === 0)

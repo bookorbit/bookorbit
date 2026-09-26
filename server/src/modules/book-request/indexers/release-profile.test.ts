@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyFileLayout,
   compareByTier,
+  explainReleaseProfileMismatch,
   matchReleaseTier,
   releaseMatchesTier,
   releaseProfileIsActive,
@@ -173,6 +174,48 @@ describe('matchReleaseTier', () => {
     expect(releaseProfileIsActive([])).toBe(false);
     expect(releaseProfileIsActive(undefined)).toBe(false);
     expect(releaseProfileIsActive(tiers)).toBe(true);
+  });
+});
+
+describe('explainReleaseProfileMismatch', () => {
+  it('explains an unstated format instead of treating it as the requested format', () => {
+    const mismatch = explainReleaseProfileMismatch(release({ formats: [] }), [tier('EPUB only', { formats: ['epub'] })]);
+
+    expect(mismatch).toEqual({
+      tier: 0,
+      tierName: 'EPUB only',
+      failures: [{ code: 'formatUnknown', expected: ['epub'] }],
+    });
+  });
+
+  it('chooses the tier with the fewest failed conditions and preserves every reason', () => {
+    const mismatch = explainReleaseProfileMismatch(release({ formats: ['pdf'], language: null, sizeBytes: null }), [
+      tier('Strict EPUB', { formats: ['epub'], languages: ['en'], fileLayout: 'multi' }),
+      tier('Everyday EPUB', { formats: ['epub'], languages: ['en'], maxSizeBytes: 20_000_000 }),
+      tier('Any English release', { languages: ['en'] }),
+    ]);
+
+    expect(mismatch).toEqual({
+      tier: 2,
+      tierName: 'Any English release',
+      failures: [{ code: 'languageUnknown', expected: ['en'] }],
+    });
+  });
+
+  it('uses tier order to break a tie and returns null when a tier already matches', () => {
+    const outside = explainReleaseProfileMismatch(release({ formats: ['pdf'] }), [
+      tier('First', { formats: ['epub'] }),
+      tier('Second', { formats: ['mobi'] }),
+    ]);
+    expect(outside?.tierName).toBe('First');
+
+    expect(
+      explainReleaseProfileMismatch(release({ formats: ['epub'] }), [
+        tier('First', { formats: ['mobi'] }),
+        tier('Match', { formats: ['epub'] }),
+        tier('Later', { formats: ['pdf'] }),
+      ]),
+    ).toBeNull();
   });
 });
 

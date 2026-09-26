@@ -11,6 +11,7 @@ function makeCollection(overrides: Partial<Collection> = {}): Collection {
   return {
     id: 7,
     userId: 1,
+    mediaType: 'books',
     name: 'Favorites',
     icon: 'FolderOpen',
     description: null,
@@ -19,6 +20,7 @@ function makeCollection(overrides: Partial<Collection> = {}): Collection {
     syncToKobo: false,
     displayOrder: 0,
     bookCount: 0,
+    podcastCount: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -156,5 +158,62 @@ describe('useCollections', () => {
     expect(apiMock).toHaveBeenCalledTimes(2)
     expect(collections.value).toEqual([second])
     expect(loaded.value).toBe(true)
+  })
+
+  it('splits collections by medium so each surface renders only its own', async () => {
+    const { useCollections } = await import('../useCollections')
+    apiMock.mockResolvedValueOnce(makeResponse([makeCollection({ id: 1, mediaType: 'books' }), makeCollection({ id: 2, mediaType: 'podcasts' })]))
+    const { bookCollections, podcastCollections, fetchCollections } = useCollections()
+
+    await fetchCollections()
+
+    expect(bookCollections.value.map((collection) => collection.id)).toEqual([1])
+    expect(podcastCollections.value.map((collection) => collection.id)).toEqual([2])
+  })
+
+  it('coalesces concurrent requests for the same podcast collection page', async () => {
+    let resolveRequest!: (response: Response) => void
+    apiMock.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveRequest = resolve)))
+    const { useCollections } = await import('../useCollections')
+    const { fetchCollectionPodcasts } = useCollections()
+
+    const first = fetchCollectionPodcasts(5, 1, 50)
+    const second = fetchCollectionPodcasts(5, 1, 50)
+
+    expect(apiMock).toHaveBeenCalledTimes(1)
+    resolveRequest(makeResponse({ items: [], total: 0, page: 1, size: 50 }))
+    await Promise.all([first, second])
+  })
+
+  it('sends the media type when creating a podcast collection', async () => {
+    const { useCollections } = await import('../useCollections')
+    apiMock.mockResolvedValueOnce(makeResponse(makeCollection({ mediaType: 'podcasts' })))
+    const { createCollection } = useCollections()
+
+    await createCollection('Sci-fi', 'Podcast', undefined, 'podcasts')
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/collections',
+      expect.objectContaining({ body: JSON.stringify({ name: 'Sci-fi', icon: 'Podcast', mediaType: 'podcasts' }) }),
+    )
+  })
+
+  it('adds and removes shows through the podcasts membership endpoint', async () => {
+    const { useCollections } = await import('../useCollections')
+    const { addPodcastsToCollection, removePodcastsFromCollection } = useCollections()
+
+    apiMock.mockResolvedValueOnce(makeResponse(null))
+    await addPodcastsToCollection(5, [7, 8])
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/collections/5/podcasts',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ podcastIds: [7, 8] }) }),
+    )
+
+    apiMock.mockResolvedValueOnce(makeResponse(null))
+    await removePodcastsFromCollection(5, [7])
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/collections/5/podcasts',
+      expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ podcastIds: [7] }) }),
+    )
   })
 })

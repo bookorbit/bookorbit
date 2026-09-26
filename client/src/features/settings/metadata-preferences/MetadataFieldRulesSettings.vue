@@ -11,7 +11,7 @@ import FieldRulesToolbar from './components/FieldRulesToolbar.vue'
 import FieldRulesTable from './components/FieldRulesTable.vue'
 import FieldRulesSaveBar from './components/FieldRulesSaveBar.vue'
 import AdvancedFetchOptions from './components/AdvancedFetchOptions.vue'
-import { fieldsMatching, type ProviderBulkAction } from './lib/field-rules'
+import { fieldRuleLabelKey, fieldsMatching, type ProviderBulkAction } from './lib/field-rules'
 
 const { t } = useI18n()
 const { statuses, fetchConfig } = useProviderConfig()
@@ -36,7 +36,7 @@ watch(
   },
 )
 
-const fieldLabel = (field: MetadataField) => t(`settings.metadata.fields.${field}`)
+const fieldLabel = (field: MetadataField) => t(fieldRuleLabelKey(field))
 
 const visibleFields = computed(() => {
   const fields = scopes.activeFields.value

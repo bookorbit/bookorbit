@@ -4,7 +4,7 @@ import { JwtStrategy } from './jwt.strategy';
 
 function makeStrategy() {
   const authService = {
-    validateUser: vi.fn(),
+    validateSessionUser: vi.fn(),
   };
   const config = {
     get: vi.fn().mockReturnValue('test-jwt-secret'),
@@ -48,32 +48,32 @@ describe('JwtStrategy.validate', () => {
   it('returns user when validation passes', async () => {
     const { strategy, authService } = makeStrategy();
     const user = { id: 1, username: 'jdoe' };
-    authService.validateUser.mockResolvedValue(user);
+    authService.validateSessionUser.mockResolvedValue(user);
 
     const result = await strategy.validate({ sub: 1, ver: 2 });
     expect(result).toEqual(user);
-    expect(authService.validateUser).toHaveBeenCalledWith(1, 2, 'legacy');
+    expect(authService.validateSessionUser).toHaveBeenCalledWith(1, 2, 'legacy', undefined);
   });
 
   it('passes the authentication method through to user validation', async () => {
     const { strategy, authService } = makeStrategy();
-    authService.validateUser.mockResolvedValue({ id: 1 });
+    authService.validateSessionUser.mockResolvedValue({ id: 1 });
 
     await strategy.validate({ sub: 1, ver: 2, amr: 'oidc' });
 
-    expect(authService.validateUser).toHaveBeenCalledWith(1, 2, 'oidc');
+    expect(authService.validateSessionUser).toHaveBeenCalledWith(1, 2, 'oidc', undefined);
   });
 
-  it('throws UnauthorizedException when validateUser returns null', async () => {
+  it('throws UnauthorizedException when validateSessionUser returns null', async () => {
     const { strategy, authService } = makeStrategy();
-    authService.validateUser.mockResolvedValue(null);
+    authService.validateSessionUser.mockResolvedValue(null);
 
     await expect(strategy.validate({ sub: 1, ver: 1 })).rejects.toThrow(UnauthorizedException);
   });
 
-  it('propagates UnauthorizedException from validateUser', async () => {
+  it('propagates UnauthorizedException from validateSessionUser', async () => {
     const { strategy, authService } = makeStrategy();
-    authService.validateUser.mockRejectedValue(new UnauthorizedException());
+    authService.validateSessionUser.mockRejectedValue(new UnauthorizedException());
 
     await expect(strategy.validate({ sub: 1, ver: 1 })).rejects.toThrow(UnauthorizedException);
   });

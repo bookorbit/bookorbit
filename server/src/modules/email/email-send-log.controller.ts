@@ -18,7 +18,7 @@ export class EmailSendLogController {
 
   @Get()
   findForUser(@Query() query: QuerySendLogDto, @CurrentUser() user: RequestUser) {
-    return this.logService.findForUser(user, query.page ?? 0, query.size ?? 20);
+    return this.logService.findForUser(user, query.page ?? 0, query.size ?? 20, query.bookId);
   }
 
   @Delete(':id')

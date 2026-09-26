@@ -5,6 +5,7 @@ import { toast } from 'vue-sonner'
 import { findGrabRefusal, releaseInspectionBlocksGrab } from '@bookorbit/types'
 import type {
   BookRequestItem,
+  DownloadDelivery,
   GrabBookRequestPayload,
   GrabFailureCode,
   GrabRefusal,
@@ -36,8 +37,8 @@ export interface ReleaseGrabOptions {
   inspectRelease: (requestId: number, release: ReleaseCandidateItem) => Promise<ReleaseFileInspection | null>
   /** Opens a row's file list, which is where a blocked inspection explains itself. */
   setFilesExpanded: (release: ReleaseCandidateItem, expanded: boolean) => void
-  /** Whether this release's source joins a swarm, which decides if a client refusal generalises. */
-  seedsBack: (release: ReleaseCandidateItem) => boolean
+  /** Which download path this release uses. */
+  deliveryFor: (release: ReleaseCandidateItem) => DownloadDelivery
 }
 
 /**
@@ -50,7 +51,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const { request, requestId, grab, setRequest, inspectRelease, setFilesExpanded, seedsBack } = options
+  const { request, requestId, grab, setRequest, inspectRelease, setFilesExpanded, deliveryFor } = options
 
   const manualOpen = ref(false)
   const refusals = ref<GrabRefusal[]>([])
@@ -79,11 +80,11 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
   }
 
   /** A sent release leaves nothing to pick, so the drawer pops back to the request it belongs to. */
-  async function sendGrab(body: GrabBookRequestPayload) {
+  async function sendGrab(body: GrabBookRequestPayload, delivery: DownloadDelivery) {
     if (!request.value) return
     const outcome = await grab(request.value.id, body)
     if (!outcome.item) {
-      rememberRefusal(body, outcome.errorCode)
+      rememberRefusal(body, delivery, outcome.errorCode)
       toast.error(t('bookRequests.errors.grabFailed'), outcome.reason ? { description: outcome.reason } : undefined)
       return
     }
@@ -97,7 +98,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     if (grabbing.value) return
     grabbing.value = true
     try {
-      await sendGrab(body)
+      await sendGrab(body, 'torrent')
     } finally {
       grabbing.value = false
     }
@@ -116,7 +117,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
         setFilesExpanded(release, true)
         return
       }
-      await sendGrab({ indexerId: release.indexerId, releaseGuid: release.guid })
+      await sendGrab({ indexerId: release.indexerId, releaseGuid: release.guid }, deliveryFor(release))
     } finally {
       grabbing.value = false
     }
@@ -127,13 +128,13 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
   }
 
   /** Only a refusal the server classified; anything else says nothing about the other releases. */
-  function rememberRefusal(body: GrabBookRequestPayload, code: GrabFailureCode | null) {
+  function rememberRefusal(body: GrabBookRequestPayload, delivery: DownloadDelivery, code: GrabFailureCode | null) {
     if (!code) return
-    refusals.value = [...refusals.value, { indexerId: body.indexerId ?? null, code }]
+    refusals.value = [...refusals.value, { indexerId: body.indexerId ?? null, delivery, code }]
   }
 
   function refusalFor(release: ReleaseCandidateItem): GrabRefusal | null {
-    return findGrabRefusal({ indexerId: release.indexerId, vipOnly: release.vipOnly, seedsBack: seedsBack(release) }, refusals.value)
+    return findGrabRefusal({ indexerId: release.indexerId, vipOnly: release.vipOnly, delivery: deliveryFor(release) }, refusals.value)
   }
 
   function isRefused(release: ReleaseCandidateItem): boolean {

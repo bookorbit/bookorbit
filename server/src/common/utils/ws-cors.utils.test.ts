@@ -12,7 +12,7 @@ afterEach(() => {
 describe('wsCorsOrigin', () => {
   it('falls back to the dev client when nothing is configured', () => {
     delete process.env.CLIENT_URL;
-    expect(wsCorsOrigin()).toBe('http://localhost:5173');
+    expect(wsCorsOrigin()).toBe('http://localhost:6263');
   });
 
   it('drops a trailing slash, which no Origin header ever carries', () => {
@@ -32,6 +32,6 @@ describe('wsCorsOrigin', () => {
 
   it('falls back rather than throwing on a malformed value', () => {
     process.env.CLIENT_URL = 'not a url';
-    expect(wsCorsOrigin()).toBe('http://localhost:5173');
+    expect(wsCorsOrigin()).toBe('http://localhost:6263');
   });
 });

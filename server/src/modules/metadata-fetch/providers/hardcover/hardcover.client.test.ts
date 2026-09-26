@@ -73,6 +73,26 @@ describe('HardcoverClient', () => {
     );
   });
 
+  it.each([
+    ['ISBN search', () => client.searchByIsbn('9780756404079', apiKey)],
+    ['stored ID lookup', () => client.lookupBySlug('the-name-of-the-wind', apiKey)],
+  ])('requests cached tags for %s', async (_label, request) => {
+    const mockFetch = vi.mocked(fetchWithThrottleModule.fetchWithThrottle);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ data: { books: [] } }),
+    } as Response);
+
+    await request();
+
+    const options = mockFetch.mock.calls[0][1];
+    expect(typeof options?.body).toBe('string');
+    if (typeof options?.body !== 'string') throw new TypeError('Expected a JSON request body');
+    const body = JSON.parse(options.body) as { query: string };
+    expect(body.query).toMatch(/\bcached_tags\b/);
+  });
+
   it('returns empty array when API returns non-ok status', async () => {
     const mockFetch = vi.mocked(fetchWithThrottleModule.fetchWithThrottle);
     mockFetch.mockResolvedValue({

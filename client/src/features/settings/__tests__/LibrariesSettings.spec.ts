@@ -66,6 +66,7 @@ const apiMock = vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; json: () =>
 function makeLibrary(overrides: Partial<Library> = {}): Library {
   return {
     id: 1,
+    type: 'books',
     name: 'Test Library',
     icon: null,
     displayOrder: 0,
@@ -76,6 +77,7 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     formatPriority: [],
     allowedFormats: [],
     organizationMode: 'book_per_file',
+    addedAtSource: 'imported',
     excludePatterns: [],
     readingThreshold: 10,
     markAsFinishedPercentComplete: 90,
@@ -95,7 +97,7 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     fileWriteAudioEnabled: false,
     fileWriteAudioMaxFileSizeMb: 500,
     fileRenameEnabled: false,
-    folders: [{ id: 1, path: '/books', createdAt: '2024-01-01T00:00:00.000Z' }],
+    folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }],
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
@@ -225,24 +227,59 @@ describe('LibrariesSettings ledger', () => {
       expect(tableText(wrapper)).not.toContain('File mode')
     })
 
+    it('does not show both mode badges at the same time', async () => {
+      librariesRef.value = [makeLibrary({ organizationMode: 'book_per_file' })]
+      const wrapper = mountComponent()
+      await flushPromises()
+      expect(wrapper.text()).not.toContain('Folder mode')
+    })
+
     it('prints the whole folder path in the ledger rather than hiding it behind a hover', async () => {
-      librariesRef.value = [makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', createdAt: '2024-01-01T00:00:00.000Z' }] })]
+      librariesRef.value = [
+        makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }] }),
+      ]
       const wrapper = await mountLoaded()
       expect(tableText(wrapper)).toContain('/srv/media/books/novels')
     })
 
     it('keeps the identifying tail of the path on the narrower mobile card', async () => {
-      librariesRef.value = [makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', createdAt: '2024-01-01T00:00:00.000Z' }] })]
+      librariesRef.value = [
+        makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }] }),
+      ]
       const wrapper = await mountLoaded()
       expect(wrapper.get('[data-testid="libraries-ledger-cards"]').text()).toContain('…/books/novels')
+    })
+  })
+
+  describe('folders badge', () => {
+    it('shows "1 folder" for a single folder', async () => {
+      librariesRef.value = [makeLibrary({ folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }] })]
+      const wrapper = mountComponent()
+      await flushPromises()
+      expect(wrapper.text()).toContain('1 folder')
+    })
+
+    it('shows "3 folders" for three folders', async () => {
+      librariesRef.value = [
+        makeLibrary({
+          folders: [
+            { id: 1, path: '/books/a', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 2, path: '/books/b', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 3, path: '/books/c', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
+          ],
+        }),
+      ]
+      const wrapper = mountComponent()
+      await flushPromises()
+      expect(wrapper.text()).toContain('3 folders')
     })
 
     it('counts the remaining folders and keeps every path in the tooltip', async () => {
       librariesRef.value = [
         makeLibrary({
           folders: [
-            { id: 1, path: '/books/fiction', createdAt: '2024-01-01T00:00:00.000Z' },
-            { id: 2, path: '/books/nonfiction', createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 1, path: '/books/fiction', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 2, path: '/books/nonfiction', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
           ],
         }),
       ]
@@ -362,8 +399,8 @@ describe('LibrariesSettings ledger', () => {
   describe('filtering and sorting', () => {
     beforeEach(() => {
       librariesRef.value = [
-        makeLibrary({ id: 1, name: 'Novels', folders: [{ id: 1, path: '/srv/novels', createdAt: '2024-01-01T00:00:00.000Z' }] }),
-        makeLibrary({ id: 2, name: 'Comics', folders: [{ id: 2, path: '/srv/comics', createdAt: '2024-01-01T00:00:00.000Z' }] }),
+        makeLibrary({ id: 1, name: 'Novels', folders: [{ id: 1, path: '/srv/novels', role: 'downloads', createdAt: '2024-01-01T00:00:00.000Z' }] }),
+        makeLibrary({ id: 2, name: 'Comics', folders: [{ id: 2, path: '/srv/comics', role: 'downloads', createdAt: '2024-01-01T00:00:00.000Z' }] }),
       ]
       overviewRef.value = [makeEntry({ libraryId: 1, totalBooks: 381 }), makeEntry({ libraryId: 2, totalBooks: 23 })]
     })

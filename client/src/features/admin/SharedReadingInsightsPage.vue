@@ -75,7 +75,7 @@ function genreLabel(genre: BroadReadingGenre): string {
 }
 
 function sourceLabel(source: string): string {
-  if (['web', 'koreader', 'manual', 'kobo', 'unknown'].includes(source)) {
+  if (['web', 'ios', 'watchos', 'android', 'koreader', 'manual', 'kobo', 'unknown'].includes(source)) {
     return t(`adminFeature.sharedInsights.sourceNames.${source}`)
   }
   return source

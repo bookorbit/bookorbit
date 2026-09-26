@@ -1,4 +1,18 @@
-import { check, index, integer, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  check,
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  real,
+  serial,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 import { users } from './auth';
@@ -18,6 +32,8 @@ export const bookDuplicateScans = pgTable(
     processedBooks: integer('processed_books').notNull().default(0),
     totalBooks: integer('total_books'),
     totalGroups: integer('total_groups'),
+    totalExtraCopies: integer('total_extra_copies'),
+    totalReclaimableBytes: bigint('total_reclaimable_bytes', { mode: 'number' }),
     errorCode: varchar('error_code', { length: 50 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
@@ -62,11 +78,42 @@ export const bookDuplicateGroups = pgTable(
     reasons: text('reasons').array().notNull(),
     maxTitleSimilarity: real('max_title_similarity'),
     memberCount: integer('member_count').notNull(),
+    confidence: smallint('confidence').notNull().default(1),
+    memberBytesTotal: bigint('member_bytes_total', { mode: 'number' }).notNull().default(0),
+    memberBytesMax: bigint('member_bytes_max', { mode: 'number' }).notNull().default(0),
   },
   (t) => [
     uniqueIndex('book_duplicate_groups_scan_root_uidx').on(t.scanId, t.rootBookId),
     index('book_duplicate_groups_scan_id_idx').on(t.scanId, t.id),
     index('book_duplicate_groups_scan_member_count_idx').on(t.scanId, t.memberCount),
+    index('book_duplicate_groups_scan_reclaimable_idx').on(t.scanId, sql`(${t.memberBytesTotal} - ${t.memberBytesMax}) desc`),
+    index('book_duplicate_groups_scan_confidence_idx').on(t.scanId, t.confidence),
+    check('book_duplicate_groups_confidence_chk', sql`${t.confidence} between 1 and 4`),
+  ],
+);
+
+/**
+ * A pair the user has judged not to be duplicates. Stored per user and outside any scan so the
+ * judgement survives a rescan; the scan deletes matching pairs before groups are formed.
+ */
+export const bookDuplicateDismissals = pgTable(
+  'book_duplicate_dismissals',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookIdA: integer('book_id_a')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    bookIdB: integer('book_id_b')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.bookIdA, t.bookIdB] }),
+    index('book_duplicate_dismissals_user_created_idx').on(t.userId, sql`${t.createdAt} desc`),
+    check('book_duplicate_dismissals_order_chk', sql`${t.bookIdA} < ${t.bookIdB}`),
   ],
 );
 
@@ -112,3 +159,4 @@ export const bookDuplicateGroupMembers = pgTable(
 );
 
 export type BookDuplicateScanRow = typeof bookDuplicateScans.$inferSelect;
+export type BookDuplicateDismissalRow = typeof bookDuplicateDismissals.$inferSelect;

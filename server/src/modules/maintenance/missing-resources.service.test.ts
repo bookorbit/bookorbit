@@ -33,7 +33,28 @@ describe('MissingResourcesService', () => {
     for (const [name, content] of Object.entries(files)) await writeFile(join(dir, name), content);
   }
 
-  function setup(overrides: Partial<Record<string, unknown>> = {}) {
+  function slotRow(bookId: number, medium: 'ebook' | 'audio', source: 'extracted' | 'custom' = 'extracted') {
+    return { bookId, medium, source, origin: 'embedded', width: null, height: null, updatedAt: new Date(), dormantSince: null };
+  }
+
+  function coverStoreWith(rows: ReturnType<typeof slotRow>[]) {
+    return {
+      slotsFor: vi.fn().mockImplementation((ids: number[]) => {
+        const byBook = new Map<number, ReturnType<typeof slotRow>[]>();
+        for (const row of rows.filter((candidate) => ids.includes(candidate.bookId))) {
+          byBook.set(row.bookId, [...(byBook.get(row.bookId) ?? []), row]);
+        }
+        return Promise.resolve(byBook);
+      }),
+      removeBrokenSlots: vi
+        .fn()
+        .mockImplementation((bookId: number) =>
+          Promise.resolve(rows.some((row) => row.bookId === bookId) ? { hadSlots: true, removed: 1 } : { hadSlots: false, removed: 0 }),
+        ),
+    };
+  }
+
+  function setup(overrides: Partial<Record<string, unknown>> = {}, coverStore = coverStoreWith([])) {
     const repo = {
       countMissingBooks: vi.fn().mockResolvedValue(0),
       findMissingBooks: vi.fn().mockResolvedValue([]),
@@ -50,8 +71,15 @@ describe('MissingResourcesService', () => {
     const libraryService = { findAccessibleLibraryIds: vi.fn().mockResolvedValue([1, 2]) };
     const bookService = { deleteBooks: vi.fn().mockImplementation((ids: number[]) => Promise.resolve({ total: ids.length, books: [], omitted: 0 })) };
     const config = { get: vi.fn().mockReturnValue(appDataPath) };
-    const service = new MissingResourcesService(repo as never, store, libraryService as never, bookService as never, config as never);
-    return { service, repo, libraryService, bookService };
+    const service = new MissingResourcesService(
+      repo as never,
+      store,
+      libraryService as never,
+      bookService as never,
+      config as never,
+      coverStore as never,
+    );
+    return { service, repo, libraryService, bookService, coverStore };
   }
 
   async function runSweep(service: MissingResourcesService): Promise<void> {
@@ -106,8 +134,39 @@ describe('MissingResourcesService', () => {
 
       await runSweep(service);
 
-      expect(store.get(user.id)?.orphanedCoverDirs).toEqual([{ bookId: 42, fileCount: 1, sizeBytes: 2 }]);
+      expect(store.get(user.id)?.orphanedCoverDirs).toEqual([{ bookId: 42, fileCount: 1, sizeBytes: 2, media: [] }]);
       expect(service.getSweep(user)).toMatchObject({ orphanedCoverDirs: 1, orphanedBytes: 2 });
+    });
+
+    it('names the slot folders an orphaned cover directory holds', async () => {
+      await makeCoverDir(43, {});
+      await mkdir(join(coversRoot, '43', 'audio'), { recursive: true });
+      await writeFile(join(coversRoot, '43', 'audio', 'cover_custom.jpg'), 'abc');
+      const { service } = setup();
+
+      await runSweep(service);
+
+      expect(store.get(user.id)?.orphanedCoverDirs).toEqual([{ bookId: 43, fileCount: 1, sizeBytes: 3, media: ['audio'] }]);
+    });
+
+    it('flags a book whose audiobook slot lost its image while its book slot still serves', async () => {
+      await mkdir(join(coversRoot, '5', 'ebook'), { recursive: true });
+      await writeFile(join(coversRoot, '5', 'ebook', 'cover_extracted.jpg'), 'image');
+      await mkdir(join(coversRoot, '6', 'ebook'), { recursive: true });
+      await writeFile(join(coversRoot, '6', 'ebook', 'cover_extracted.jpg'), 'image');
+      const coverStore = coverStoreWith([slotRow(5, 'ebook'), slotRow(5, 'audio', 'custom'), slotRow(6, 'ebook')]);
+      const { service } = setup(
+        {
+          countBooksWithCoverSource: vi.fn().mockResolvedValue(2),
+          findBookIdsWithCoverSource: vi.fn().mockResolvedValueOnce([5, 6]).mockResolvedValue([]),
+          findExistingBookIds: vi.fn().mockResolvedValue([5, 6]),
+        },
+        coverStore,
+      );
+
+      await runSweep(service);
+
+      expect(store.get(user.id)?.brokenCoverBookIds).toEqual([5]);
     });
 
     it('records a failure when the sweep throws', async () => {
@@ -198,10 +257,73 @@ describe('MissingResourcesService', () => {
     });
   });
 
+  describe('listBrokenCovers', () => {
+    it('names the broken slots of each book, and none for a book without slots', async () => {
+      await mkdir(join(coversRoot, '5', 'ebook'), { recursive: true });
+      await writeFile(join(coversRoot, '5', 'ebook', 'cover_extracted.jpg'), 'image');
+      const coverStore = coverStoreWith([slotRow(5, 'audio', 'custom'), slotRow(5, 'ebook')]);
+      const { service } = setup(
+        {
+          findBrokenCoverEntries: vi.fn().mockResolvedValue([
+            { id: 5, title: 'Dune', authors: ['Frank Herbert'], libraryId: 1, libraryName: 'Main', coverSource: 'custom' },
+            { id: 8, title: 'Legacy', authors: null, libraryId: 1, libraryName: 'Main', coverSource: 'extracted' },
+          ]),
+        },
+        coverStore,
+      );
+      await runSweep(service);
+      store.get(user.id)!.brokenCoverBookIds = [5, 8];
+
+      const page = await service.listBrokenCovers(user, 1, 50);
+
+      expect(page.items).toEqual([
+        {
+          id: 5,
+          title: 'Dune',
+          authors: ['Frank Herbert'],
+          libraryId: 1,
+          libraryName: 'Main',
+          coverSource: 'custom',
+          slots: [{ medium: 'audio', source: 'custom' }],
+        },
+        { id: 8, title: 'Legacy', authors: [], libraryId: 1, libraryName: 'Main', coverSource: 'extracted', slots: [] },
+      ]);
+    });
+  });
+
   describe('cleanBrokenCovers', () => {
+    it('removes a broken slot even when the other slot of the book still serves', async () => {
+      await mkdir(join(coversRoot, '5', 'ebook'), { recursive: true });
+      await writeFile(join(coversRoot, '5', 'ebook', 'cover_extracted.jpg'), 'image');
+      const coverStore = coverStoreWith([slotRow(5, 'ebook'), slotRow(5, 'audio')]);
+      const { service, repo } = setup({}, coverStore);
+      await runSweep(service);
+      store.get(user.id)!.brokenCoverBookIds = [5];
+
+      const result = await service.cleanBrokenCovers(user, { bookIds: [5] });
+
+      expect(coverStore.removeBrokenSlots).toHaveBeenCalledWith(5);
+      expect(repo.clearCoverSource).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ cleaned: 1, skipped: 0 });
+    });
+
+    it('skips a slotted book whose slots all serve again', async () => {
+      await mkdir(join(coversRoot, '5', 'audio'), { recursive: true });
+      await writeFile(join(coversRoot, '5', 'audio', 'cover_custom.jpg'), 'image');
+      const coverStore = coverStoreWith([slotRow(5, 'audio', 'custom')]);
+      const { service } = setup({}, coverStore);
+      await runSweep(service);
+      store.get(user.id)!.brokenCoverBookIds = [5];
+
+      const result = await service.cleanBrokenCovers(user, { bookIds: [5] });
+
+      expect(coverStore.removeBrokenSlots).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ cleaned: 0, skipped: 1 });
+    });
+
     it('clears only the books that are still missing a cover on disk', async () => {
       await makeCoverDir(2, { 'cover_extracted.jpg': 'image' });
-      const { service, repo } = setup({
+      const { service, repo, coverStore } = setup({
         countBooksWithCoverSource: vi.fn().mockResolvedValue(2),
         findBookIdsWithCoverSource: vi.fn().mockResolvedValueOnce([1, 2]).mockResolvedValue([]),
       });
@@ -211,6 +333,7 @@ describe('MissingResourcesService', () => {
 
       const result = await service.cleanBrokenCovers(user, { bookIds: [1, 2] });
 
+      expect(coverStore.removeBrokenSlots).toHaveBeenCalledWith(1);
       expect(repo.clearCoverSource).toHaveBeenCalledWith([1]);
       expect(result).toMatchObject({ category: 'broken_covers', requested: 2, cleaned: 1, skipped: 1 });
     });

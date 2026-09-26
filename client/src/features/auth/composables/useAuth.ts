@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import type { AuthUser, AuthResponse } from '@bookorbit/types'
-import { api, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
+import { api, fetchWithAuthProxyRecovery, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
 import router from '@/router'
 import { cancelPendingDisplaySettingsSync, initDisplaySettingsSync, loadDisplaySettingsFromServer } from '@/composables/useDisplaySettingsSync'
 import { cancelPendingThemeSync, initThemeSync, loadFromServer } from '@/composables/useThemeSync'
@@ -70,6 +70,9 @@ function clearAuth() {
 
 setOnAuthFailure(() => {
   clearAuth()
+  // Public pages are reached without a session, so a rejected request there is not a reason to
+  // leave. Moving on would strand a reset or magic link, or drop the sign-in redirect.
+  if (router.currentRoute.value.meta.public) return
   const { needsSetup } = useSetupStatus()
   router.push(needsSetup.value ? '/setup' : '/login')
 })
@@ -134,7 +137,7 @@ export function useAuth() {
   }
 
   async function login(username: string, password: string): Promise<void> {
-    const res = await fetch('/api/v1/auth/login', {
+    const res = await fetchWithAuthProxyRecovery('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -166,7 +169,7 @@ export function useAuth() {
       headers['x-setup-token'] = payload.setupToken
     }
 
-    const res = await fetch('/api/v1/auth/setup', {
+    const res = await fetchWithAuthProxyRecovery('/api/v1/auth/setup', {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -194,7 +197,7 @@ export function useAuth() {
   }
 
   async function register(payload: { username: string; name: string; email: string; password: string }): Promise<void> {
-    const res = await fetch('/api/v1/auth/register', {
+    const res = await fetchWithAuthProxyRecovery('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -211,23 +214,15 @@ export function useAuth() {
 
   async function logout(): Promise<void> {
     try {
-      const res = await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' })
+      await fetchWithAuthProxyRecovery('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined)
+    } finally {
       clearAuth()
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}))
-        if (data?.logoutUrl) {
-          window.location.href = data.logoutUrl
-          return
-        }
-      }
-    } catch {
-      clearAuth()
+      router.push('/login')
     }
-    router.push('/login')
   }
 
   async function loginWithMagicLink(token: string): Promise<void> {
-    const res = await fetch('/api/v1/auth/magic-links/login', {
+    const res = await fetchWithAuthProxyRecovery('/api/v1/auth/magic-links/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

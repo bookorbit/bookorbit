@@ -26,7 +26,7 @@ function seed(overrides: Partial<BookRequestSeedStatus> = {}): BookRequestSeedSt
     downloadId: 11,
     downloadClientId: 4,
     downloadClientName: 'qbit',
-    clientHash: 'c9e15763f722f23e98a29decdfae341b98d53056',
+    clientKey: 'c9e15763f722f23e98a29decdfae341b98d53056',
     seeding: true,
     ratio: 1.25,
     ratioGoal: 2,
@@ -78,6 +78,33 @@ describe('RequestSeedPanel', () => {
 
     expect(apiMock).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('1.25 of 2')
+  })
+
+  it('shows an active transfer as downloading rather than stopped', async () => {
+    apiMock.mockResolvedValue(response(JSON.stringify(seed({ seeding: false, ratio: 0, seedingTimeSeconds: 0, uploadedBytes: 0 }))))
+
+    const wrapper = await mountPanel({
+      request: request({ download: { ...request().download!, status: 'downloading' } }),
+    })
+
+    expect(wrapper.text()).toContain('Downloading')
+    expect(wrapper.text()).not.toContain('Stopped')
+  })
+
+  it('re-reads the seed state when the download advances', async () => {
+    apiMock
+      .mockResolvedValueOnce(response(JSON.stringify(seed({ seeding: false, ratio: 0, seedingTimeSeconds: 0, uploadedBytes: 0 }))))
+      .mockResolvedValueOnce(response(JSON.stringify(seed())))
+    const wrapper = await mountPanel({
+      request: request({ download: { ...request().download!, status: 'downloading' } }),
+    })
+
+    await wrapper.setProps({ request: request() })
+    await flushPromises()
+
+    expect(apiMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('Seeding')
+    expect(wrapper.text()).not.toContain('Stopped')
   })
 
   it('shows the ratio and the time against the goals the client was given', async () => {

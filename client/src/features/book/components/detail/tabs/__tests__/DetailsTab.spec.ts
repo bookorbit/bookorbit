@@ -5,6 +5,7 @@ import type { BookDetail } from '@bookorbit/types'
 import DetailsTab from '../DetailsTab.vue'
 import BookReadingActivityCard from '../../details/BookReadingActivityCard.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useProviderLinkSettings } from '@/features/book/composables/useProviderLinkSettings'
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(),
@@ -59,6 +60,9 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: 'extracted',
+    coverMedia: ['ebook'],
+    covers: { ebook: null, audio: null },
+    coverVersion: 'legacy:2024-01-01T00:00:00.000Z',
     hardcoverEditionId: null,
     mangabakaSeriesId: null,
     providerIds: {},
@@ -81,6 +85,17 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     metadataScore: null,
     readStatus: null,
     audioMetadata: null,
+    readAloudSync: {
+      mode: 'auto',
+      state: 'unavailable',
+      unavailableReason: 'no_media_overlay_epub',
+      overlayFileId: null,
+      audioDurationSeconds: null,
+      overlayDurationSeconds: null,
+      durationDifferenceSeconds: null,
+      durationDifferenceRatio: null,
+      koreaderDownloadAvailable: false,
+    },
     formatPriority: [],
     comicMetadata: null,
     customMetadata: [],
@@ -155,11 +170,13 @@ describe('DetailsTab cover surface', () => {
     mocks.hasPermission.mockReset()
     mocks.hasPermission.mockReturnValue(true)
     mocks.user.value.settings.timezone = 'UTC'
+    useProviderLinkSettings().settings.value = { amazonDomain: 'amazon.com' }
 
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)
+      if (url.includes('/metadata-preferences/provider-links')) return response({ amazonDomain: 'amazon.com' })
       if (url.includes('/metadata-score/weights')) return response({})
-      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/playback-state')) return response(null)
       if (url.includes('/collections/membership')) return response([])
       if (url.includes('/kobo-state')) {
         return response({
@@ -426,7 +443,7 @@ describe('DetailsTab cover surface', () => {
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)
       if (url.includes('/metadata-score/weights')) return response({})
-      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/playback-state')) return response(null)
       if (url.includes('/collections/membership')) return response([])
       if (url.includes('/kobo-state')) {
         return response({
@@ -540,6 +557,19 @@ describe('DetailsTab cover surface', () => {
     const tooltips = titledEls.map((el) => el.attributes('title') ?? '')
     expect(tooltips.some((t) => t.includes('4.8 / 5') && t.includes('104,451'))).toBe(true)
     expect(tooltips.some((t) => t.includes('4.3 / 5') && t.includes('12,345'))).toBe(true)
+  })
+
+  it('uses the configured Amazon domain for the book provider link', async () => {
+    const defaultImplementation = mocks.api.getMockImplementation()!
+    mocks.api.mockImplementation(async (input, init) => {
+      if (String(input).includes('/metadata-preferences/provider-links')) return response({ amazonDomain: 'amazon.de' })
+      return defaultImplementation(input, init)
+    })
+
+    const wrapper = mountDetails(makeBook({ providerIds: { amazon: 'B012345678' } }))
+    await flushPromises()
+
+    expect(wrapper.find('a[href="https://www.amazon.de/dp/B012345678"]').exists()).toBe(true)
   })
 
   it('places the sync grid items with the current book id', async () => {
@@ -657,7 +687,7 @@ describe('DetailsTab cover surface', () => {
       const url = String(input)
       if (url.endsWith('/added-at')) return response(updated)
       if (url.includes('/metadata-score/weights')) return response({})
-      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/playback-state')) return response(null)
       if (url.includes('/collections/membership')) return response([])
       if (url.includes('/kobo-state')) return response({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] })
       if (url.includes('/koreader/books/')) return response(null)
@@ -696,11 +726,186 @@ describe('DetailsTab cover surface', () => {
     expect((wrapper.get('input[aria-label="Added"]').element as HTMLInputElement).value).toBe('2022-07-13')
   })
 
+  it('keeps projected reading dates on their canonical day west of UTC', async () => {
+    mocks.user.value.settings.timezone = 'America/Sao_Paulo'
+    const wrapper = mountDetails(
+      makeBook({
+        readStatus: {
+          status: 'read',
+          source: 'auto',
+          startedAt: '2026-09-07T00:00:00.000Z',
+          finishedAt: '2026-09-07T00:00:00Z',
+          updatedAt: '2026-09-07T00:00:00.000Z',
+        },
+      }),
+    )
+    await flushPromises()
+
+    expect(wrapper.text().match(/Sep 7, 2026/g)).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('Sep 6, 2026')
+  })
+
   it('hides added date editing when the user cannot edit metadata', async () => {
     mocks.hasPermission.mockReturnValue(false)
     const wrapper = mountDetails(makeBook())
     await flushPromises()
 
     expect(wrapper.find('button[aria-label="Edit date added"]').exists()).toBe(false)
+  })
+
+  it('shows read-aloud sync state and persists the toggle', async () => {
+    const book = makeBook({
+      files: [
+        {
+          ...makeBook().files[0]!,
+          mediaOverlay: { available: true, durationSeconds: 3600 },
+        },
+        {
+          id: 102,
+          format: 'm4b',
+          role: 'content',
+          sizeBytes: 5000,
+          absolutePath: '/books/cover-behavior-test.m4b',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          filename: 'cover-behavior-test.m4b',
+          durationSeconds: 3600,
+        },
+      ],
+      readAloudSync: {
+        mode: 'auto',
+        state: 'enabled',
+        unavailableReason: null,
+        overlayFileId: 101,
+        audioDurationSeconds: 3600,
+        overlayDurationSeconds: 3600,
+        durationDifferenceSeconds: 0,
+        durationDifferenceRatio: 0,
+        koreaderDownloadAvailable: true,
+      },
+    })
+    const updated = makeBook({ ...book, readAloudSync: { ...book.readAloudSync, mode: 'disabled', state: 'disabled' } })
+    mocks.api.mockImplementation(async (input) => {
+      const url = String(input)
+      if (url.endsWith('/read-aloud-sync')) return response(updated)
+      if (url.includes('/metadata-preferences/provider-links')) return response({ amazonDomain: 'amazon.com' })
+      if (url.includes('/metadata-score/weights')) return response({})
+      if (url.includes('/playback-state')) return response(null)
+      if (url.includes('/collections/membership')) return response([])
+      if (url.includes('/kobo-state')) return response({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] })
+      if (url.includes('/koreader/books/')) return response(null)
+      if (url.includes('/progress')) return response([])
+      return response({})
+    })
+    const wrapper = mountDetails(book)
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('Enabled')
+    await wrapper.get('[data-test="read-aloud-sync-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/books/12/read-aloud-sync', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'disabled' }),
+    })
+    expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('Disabled')
+    expect(wrapper.emitted('saved')).toEqual([[updated]])
+  })
+
+  it('explains a duration mismatch and exposes a localized save failure', async () => {
+    const book = makeBook({
+      files: [
+        { ...makeBook().files[0]!, mediaOverlay: { available: true, durationSeconds: 3600 } },
+        {
+          id: 102,
+          format: 'mp3',
+          role: 'content',
+          sizeBytes: 5000,
+          absolutePath: '/books/audio.mp3',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          filename: 'audio.mp3',
+          durationSeconds: 4000,
+        },
+      ],
+      readAloudSync: {
+        mode: 'auto',
+        state: 'unavailable',
+        unavailableReason: 'duration_mismatch',
+        overlayFileId: 101,
+        audioDurationSeconds: 4000,
+        overlayDurationSeconds: 3600,
+        durationDifferenceSeconds: 400,
+        durationDifferenceRatio: 400 / 3600,
+        koreaderDownloadAvailable: true,
+      },
+    })
+    const wrapper = mountDetails(book)
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('audiobook 1h 6m, read-along EPUB 1h')
+    mocks.api.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) } as Response)
+    await wrapper.get('[data-test="read-aloud-sync-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toBe('Could not update read-aloud progress sync.')
+    expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  describe('read-aloud sync with a second EPUB beside the read-along file', () => {
+    const readAlongEpub = { ...makeBook().files[0]!, mediaOverlay: { available: true, durationSeconds: 3600 } }
+    const originalEpub = {
+      id: 103,
+      format: 'epub',
+      role: 'content',
+      sizeBytes: 1200,
+      absolutePath: '/books/Title.epub',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      filename: 'Title.epub',
+      durationSeconds: null,
+    }
+    const unavailable = (unavailableReason: 'no_audio_files' | 'duration_mismatch', audioDurationSeconds: number | null) => ({
+      mode: 'auto' as const,
+      state: 'unavailable' as const,
+      unavailableReason,
+      overlayFileId: 101,
+      audioDurationSeconds,
+      overlayDurationSeconds: 3600,
+      durationDifferenceSeconds: audioDurationSeconds === null ? null : audioDurationSeconds - 3600,
+      durationDifferenceRatio: audioDurationSeconds === null ? null : (audioDurationSeconds - 3600) / 3600,
+      koreaderDownloadAvailable: true,
+    })
+
+    it('reports the EPUB copies as in sync when no audiobook is imported', async () => {
+      const wrapper = mountDetails(makeBook({ files: [readAlongEpub, originalEpub], readAloudSync: unavailable('no_audio_files', null) }))
+      await flushPromises()
+
+      const panel = wrapper.get('[data-test="read-aloud-sync"]').text()
+      expect(panel).toContain('EPUB copies only')
+      expect(panel).toContain('Web reader, Kobo, and KOReader positions stay in sync across the EPUB copies.')
+      expect(panel).not.toContain('Unavailable')
+      // A missing audiobook is already what the description asks for, so there is nothing to add.
+      expect(wrapper.find('[data-test="read-aloud-sync-audiobook-note"]').exists()).toBe(false)
+    })
+
+    it('keeps the reason an existing audiobook is left out beside the EPUB copies status', async () => {
+      const audiobook = { ...originalEpub, id: 104, format: 'mp3', absolutePath: '/books/audio.mp3', filename: 'audio.mp3', durationSeconds: 4000 }
+      const wrapper = mountDetails(
+        makeBook({ files: [readAlongEpub, originalEpub, audiobook], readAloudSync: unavailable('duration_mismatch', 4000) }),
+      )
+      await flushPromises()
+
+      expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('EPUB copies only')
+      expect(wrapper.get('[data-test="read-aloud-sync-audiobook-note"]').text()).toContain('audiobook 1h 6m, read-along EPUB 1h')
+    })
+
+    it('still reports a lone read-along EPUB without an audiobook as unavailable', async () => {
+      const wrapper = mountDetails(makeBook({ files: [readAlongEpub], readAloudSync: unavailable('no_audio_files', null) }))
+      await flushPromises()
+
+      const panel = wrapper.get('[data-test="read-aloud-sync"]').text()
+      expect(panel).toContain('Unavailable')
+      expect(panel).toContain('Matching standalone audiobook files are required.')
+      expect(panel).not.toContain('EPUB copies only')
+    })
   })
 })

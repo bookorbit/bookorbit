@@ -5,6 +5,7 @@ import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import type { BookQuery, BulkRenameProgressEvent, JumpBucketsQuery, LibraryFileSyncProgressEvent } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
+import { RequireLibraryType } from '../../common/decorators/require-library-type.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
@@ -20,6 +21,7 @@ import { UpdateLibraryAccessDto } from './dto/update-library-access.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
 import { BulkRenameService } from './bulk-rename.service';
 import { LibraryService } from './library.service';
+import { LibraryAddedAtService } from './library-added-at.service';
 
 @Controller('libraries')
 export class LibraryController {
@@ -27,6 +29,7 @@ export class LibraryController {
     private readonly libraryService: LibraryService,
     private readonly bookService: BookService,
     private readonly bulkRenameService: BulkRenameService,
+    private readonly addedAtService: LibraryAddedAtService,
   ) {}
 
   @Get()
@@ -53,12 +56,14 @@ export class LibraryController {
 
   @Post(':id/books')
   @RequireLibraryAccess('viewer')
+  @RequireLibraryType('books')
   queryBooks(@Param('id', ParseIntPipe) libraryId: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.bookService.queryForLibrary(user, libraryId, query);
   }
 
   @Post(':id/books/jump-buckets')
   @RequireLibraryAccess('viewer')
+  @RequireLibraryType('books')
   queryJumpBuckets(
     @Param('id', ParseIntPipe) libraryId: number,
     @Body(JumpBucketsQueryPipe) query: JumpBucketsQuery,
@@ -119,12 +124,35 @@ export class LibraryController {
 
   @Get(':id/stats')
   @RequireLibraryAccess('viewer')
+  @RequireLibraryType('books')
   getStats(@Param('id', ParseIntPipe) id: number) {
     return this.libraryService.getStats(id);
   }
 
+  @Get(':id/recompute-added-at')
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  getAddedAtRecompute(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.addedAtService.get(id, user);
+  }
+
+  @Post(':id/recompute-added-at')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryRecomputeAddedAt,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Started added_at recompute for library #${req.params['id']}`,
+  })
+  recomputeAddedAt(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.addedAtService.start(id, user);
+  }
+
   @Post(':id/write-metadata-to-files')
   @RequireLibraryAccess('editor')
+  @RequireLibraryType('books')
   @RequirePermission(Permission.LibraryEditMetadata)
   @Auditable({
     action: AuditAction.LibraryWriteMetadataToFiles,
@@ -249,6 +277,7 @@ export class LibraryController {
 
   @Get(':id/bulk-rename/preview')
   @RequireLibraryAccess('editor')
+  @RequireLibraryType('books')
   @RequirePermission(Permission.ManageLibraries)
   getBulkRenamePreview(@Param('id', ParseIntPipe) libraryId: number, @Query() query: BulkRenamePreviewQueryDto) {
     return this.bulkRenameService.getPreview(libraryId, query.page, query.pageSize, query.status, query.search);
@@ -256,6 +285,7 @@ export class LibraryController {
 
   @Get(':id/bulk-rename/status')
   @RequireLibraryAccess('editor')
+  @RequireLibraryType('books')
   @RequirePermission(Permission.ManageLibraries)
   getBulkRenameStatus(@Param('id', ParseIntPipe) libraryId: number) {
     return { running: this.bulkRenameService.isRunning(libraryId) };
@@ -263,6 +293,7 @@ export class LibraryController {
 
   @Post(':id/bulk-rename/execute')
   @RequireLibraryAccess('editor')
+  @RequireLibraryType('books')
   @RequirePermission(Permission.ManageLibraries)
   @Auditable({
     action: AuditAction.LibraryBulkRename,

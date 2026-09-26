@@ -3,6 +3,7 @@ import { Inject, Injectable, InternalServerErrorException, Logger } from '@nestj
 import { SQL, and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { GroupRule } from '@bookorbit/types';
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
 import { mapWithConcurrency } from '../../../common/utils/batch.utils';
@@ -113,6 +114,15 @@ export interface KoboBookEntry {
   collectionNames: string[];
   addedAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * The size the kepub limit is judged by. A read-along is delivered with its narration stripped, which
+ * the download measures after the rebuild; announcing by the size with audio would pick EPUB3 for a
+ * book the download then streams as a kepub.
+ */
+function deliverySizeBytes(row: { fileSizeBytes: number | null; fileMediaOverlayAvailable: boolean | null }): number | null {
+  return row.fileMediaOverlayAvailable ? null : row.fileSizeBytes;
 }
 
 @Injectable()
@@ -666,8 +676,10 @@ export class KoboSyncService {
   }
 
   private async buildTagItems(userId: number, eligibleIds: Set<number>, smartScopeMatchCache: SmartScopeMatchCache): Promise<unknown[]> {
+    // Book collections only. A Kobo tag is a set of book entitlements, so a podcast collection
+    // would emit an empty tag; the schema also refuses the sync flag on one.
     const collections = await this.db.query.collections.findMany({
-      where: and(eq(schema.collections.userId, userId), eq(schema.collections.syncToKobo, true)),
+      where: and(eq(schema.collections.userId, userId), eq(schema.collections.syncToKobo, true), eq(schema.collections.mediaType, 'books')),
     });
 
     const collectionIds = collections.map((c) => c.id);
@@ -755,10 +767,12 @@ export class KoboSyncService {
         // A scope without a filter matches zero books everywhere else in the app
         // (SmartScopeService.findAll/prepareBooksQuery), so mirror that here rather
         // than syncing the whole library for an unconfigured scope.
-        if (!scope.filter) {
+        // Kobo holds books. The scope query already excludes podcast scopes, whose rules are not a
+        // GroupRule; this second check keeps that guarantee local to where the filter is read.
+        if (!scope.filter || scope.mediaType !== 'books') {
           return [scope.id, { name: scope.name, bookIds: [], where: undefined }];
         }
-        const where = this.queryBuilder.buildWhere(scope.filter, { accessibleLibraryIds: libraryIds, userId, timeZone });
+        const where = this.queryBuilder.buildWhere(scope.filter as GroupRule, { accessibleLibraryIds: libraryIds, userId, timeZone });
         const bookIds = await this.fetchSmartScopeBookIds(where);
         return [scope.id, { name: scope.name, bookIds, where }];
       }),
@@ -1106,6 +1120,7 @@ export class KoboSyncService {
         coverUpdatedAt: schema.bookMetadata.coverUpdatedAt,
         fileFormat: schema.bookFiles.format,
         fileSizeBytes: schema.bookFiles.sizeBytes,
+        fileMediaOverlayAvailable: schema.bookFiles.mediaOverlayAvailable,
         fileHash: schema.bookFiles.fileHash,
         fileId: schema.bookFiles.id,
         fileAbsolutePath: schema.bookFiles.absolutePath,
@@ -1146,7 +1161,7 @@ export class KoboSyncService {
 
     return rows.map((row) => {
       const isFixedLayout = row.isFixedLayout ?? fixedLayoutByFileId.get(row.fileId) ?? null;
-      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings, isFixedLayout);
+      const delivery = this.getDeliveryInfo(row.fileFormat, deliverySizeBytes(row), deliverySettings, isFixedLayout);
       const identity = identitiesById.get(row.bookId);
       const coverImageId = identity
         ? this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.coverUpdatedAt)
@@ -1199,6 +1214,7 @@ export class KoboSyncService {
         seriesIndex: schema.bookMetadata.seriesIndex,
         fileFormat: schema.bookFiles.format,
         fileSizeBytes: schema.bookFiles.sizeBytes,
+        fileMediaOverlayAvailable: schema.bookFiles.mediaOverlayAvailable,
         fileHash: schema.bookFiles.fileHash,
         isFixedLayout: schema.bookFiles.isFixedLayout,
         metadataUpdatedAt: schema.bookMetadata.updatedAt,
@@ -1253,7 +1269,7 @@ export class KoboSyncService {
     const byId = new Map<number, KoboBookEntry>();
     for (const row of rows) {
       const authors = authorsByBook.get(row.bookId) ?? [];
-      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings, row.isFixedLayout);
+      const delivery = this.getDeliveryInfo(row.fileFormat, deliverySizeBytes(row), deliverySettings, row.isFixedLayout);
       const identity = identitiesById.get(row.bookId);
       if (!identity) continue;
       const coverImageId = this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.coverUpdatedAt);

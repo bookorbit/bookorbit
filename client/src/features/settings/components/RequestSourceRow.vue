@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, Pencil, Plug, Server, Trash2, TriangleAlert, Upload } from '@lucide/vue'
-import type { IndexerItem } from '@bookorbit/types'
+import type { IndexerItem, PluginUpdateStatus } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -10,6 +10,7 @@ import ConnectionHealth from '../ConnectionHealth.vue'
 import SearchHealth from '../SearchHealth.vue'
 import { sourceDotClass } from '@/features/book-requests/sourceColors'
 import PluginVersionBadge from './PluginVersionBadge.vue'
+import PluginUpdateControls from './PluginUpdateControls.vue'
 
 /**
  * One configured source. The same row in both groups on the Requests page: a plugin and a Torznab
@@ -24,6 +25,8 @@ const props = defineProps<{
   plugin?: boolean
   /** The installed plugin release. Missing for legacy plugins that predate this metadata. */
   pluginVersion?: string
+  pluginUpdateable?: boolean
+  pluginUpdateStatus?: PluginUpdateStatus
   /** True while this row's enabled flag is in flight, so the switch cannot be double-flipped. */
   busy?: boolean
   /**
@@ -35,7 +38,15 @@ const props = defineProps<{
   pluginBusy?: boolean
 }>()
 
-const emit = defineEmits<{ test: []; edit: []; toggle: [enabled: boolean]; updatePlugin: []; removePlugin: [] }>()
+const emit = defineEmits<{
+  test: []
+  edit: []
+  toggle: [enabled: boolean]
+  updatePlugin: []
+  removePlugin: []
+  reviewPluginUpdate: []
+  automaticPluginUpdate: [enabled: boolean]
+}>()
 
 const { t } = useI18n()
 
@@ -61,6 +72,14 @@ function handleUpdatePlugin() {
 
 function handleRemovePlugin() {
   emit('removePlugin')
+}
+
+function handleReviewPluginUpdate() {
+  emit('reviewPluginUpdate')
+}
+
+function handleAutomaticPluginUpdate(enabled: boolean) {
+  emit('automaticPluginUpdate', enabled)
 }
 </script>
 
@@ -112,6 +131,14 @@ function handleRemovePlugin() {
           </p>
           <p v-if="failing && indexer.lastErrorMessage" class="mt-1.5 text-xs text-destructive">{{ indexer.lastErrorMessage }}</p>
           <p v-if="searchFailing && indexer.lastSearchError" class="mt-1.5 text-xs text-foreground">{{ indexer.lastSearchError }}</p>
+          <PluginUpdateControls
+            v-if="plugin"
+            :updateable="pluginUpdateable === true"
+            :status="pluginUpdateStatus"
+            :busy="pluginBusy"
+            @review="handleReviewPluginUpdate"
+            @automatic="handleAutomaticPluginUpdate"
+          />
         </div>
       </div>
 

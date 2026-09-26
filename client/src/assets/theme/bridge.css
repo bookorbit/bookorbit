@@ -35,6 +35,8 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-star-highlight: var(--star-highlight);
+  --color-android-highlight: var(--android-highlight);
+  --color-info-foreground: var(--info-foreground);
   --color-volume-read: var(--volume-read);
   --color-volume-reading: var(--volume-reading);
   --color-volume-unread: var(--volume-unread);

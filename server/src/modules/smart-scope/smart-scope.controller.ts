@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  DefaultValuePipe,
   Delete,
   Get,
   HttpCode,
@@ -21,6 +20,7 @@ import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pag
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { OptionalIntQueryPipe } from '../../common/pipes/optional-int-query.pipe';
 import { BookQueryPipe, JumpBucketsQueryPipe } from '../book/pipes/book-query.pipe';
 import { CreateSmartScopeDto } from './dto/create-smart-scope.dto';
 import { ReorderSmartScopesDto } from './dto/reorder-smart-scopes.dto';
@@ -118,8 +118,8 @@ export class SmartScopeController {
   executeSmartScope(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
-    @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
-    @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
+    @Query('page', new OptionalIntQueryPipe(0)) page: number,
+    @Query('size', new OptionalIntQueryPipe(50)) size: number,
     @Query('q') q?: string,
   ) {
     this.validateSizeQuery(size);
@@ -135,5 +135,19 @@ export class SmartScopeController {
   @Post(':id/books/jump-buckets')
   queryJumpBuckets(@Param('id', ParseIntPipe) id: number, @Body(JumpBucketsQueryPipe) query: JumpBucketsQuery, @CurrentUser() user: RequestUser) {
     return this.smartScopeService.queryJumpBuckets(id, user, query);
+  }
+
+  /** Podcast scopes match episodes, so they page through this rather than /books. */
+  @Get(':id/episodes')
+  queryEpisodes(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: RequestUser,
+    @Query('page', new OptionalIntQueryPipe(0)) page: number,
+    @Query('size', new OptionalIntQueryPipe(50)) size: number,
+    @Query('q') q?: string,
+  ) {
+    this.validateSizeQuery(size);
+    this.validatePageQuery(page, size);
+    return this.smartScopeService.queryEpisodes(id, user, page, size, q);
   }
 }

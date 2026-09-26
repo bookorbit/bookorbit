@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { CronExpression } from '@nestjs/schedule';
 
+import { SystemCron } from '../../../common/decorators/system-cron.decorator';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { OidcCleanupService } from './oidc-cleanup.service';
 
@@ -10,7 +11,7 @@ export class OidcCleanupJob {
 
   constructor(private readonly oidcCleanupService: OidcCleanupService) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @SystemCron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async runCleanup(): Promise<void> {
     const start = Date.now();
     this.logger.log('[auth.oidc_cleanup] [start] - OIDC cleanup started');

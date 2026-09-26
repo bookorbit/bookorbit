@@ -2,6 +2,10 @@ import { Body, Controller, Get, Param, ParseIntPipe, Patch, Query } from '@nestj
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { ActivityCalendarQueryDto } from './dto/activity-calendar-query.dto';
+import { ActivityCompletionSpeedQueryDto } from './dto/activity-completion-speed-query.dto';
+import { ActivityDayQueryDto } from './dto/activity-day-query.dto';
+import { ActivityPaceQueryDto } from './dto/activity-pace-query.dto';
 import { UserDailyReadingQueryDto } from './dto/user-daily-reading-query.dto';
 import { UserGoalTrajectoryQueryDto } from './dto/user-goal-trajectory-query.dto';
 import { UserSessionTimelineQueryDto } from './dto/user-session-timeline-query.dto';
@@ -12,6 +16,41 @@ import { UserStatisticsService } from './user-statistics.service';
 @Controller('user-statistics')
 export class UserStatisticsController {
   constructor(private readonly userStatisticsService: UserStatisticsService) {}
+
+  @Get('activity-overview')
+  getActivityOverview(@CurrentUser() user: RequestUser, @Query() query: UserStatisticsFilterQueryDto) {
+    return this.userStatisticsService.getActivityOverview(user, query);
+  }
+
+  @Get('activity-calendar/:year')
+  getActivityCalendar(@CurrentUser() user: RequestUser, @Param('year', ParseIntPipe) year: number, @Query() query: ActivityCalendarQueryDto) {
+    return this.userStatisticsService.getActivityCalendar(user, year, query);
+  }
+
+  @Get('activity-days/:day')
+  getActivityDay(@CurrentUser() user: RequestUser, @Param('day') day: string, @Query() query: ActivityDayQueryDto) {
+    return this.userStatisticsService.getActivityDay(user, day, query);
+  }
+
+  @Get('activity-details/session-patterns')
+  getActivitySessionPatterns(@CurrentUser() user: RequestUser, @Query() query: UserStatisticsFilterQueryDto) {
+    return this.userStatisticsService.getActivitySessionPatterns(user, query);
+  }
+
+  @Get('activity-details/completion-speed')
+  getActivityCompletionSpeed(@CurrentUser() user: RequestUser, @Query() query: ActivityCompletionSpeedQueryDto) {
+    return this.userStatisticsService.getActivityCompletionSpeed(user, query);
+  }
+
+  @Get('activity-details/genre-time')
+  getActivityGenreTime(@CurrentUser() user: RequestUser, @Query() query: UserStatisticsFilterQueryDto) {
+    return this.userStatisticsService.getActivityGenreTime(user, query);
+  }
+
+  @Get('activity-details/pace')
+  getActivityPaceDetail(@CurrentUser() user: RequestUser, @Query() query: ActivityPaceQueryDto) {
+    return this.userStatisticsService.getActivityPaceDetail(user, query);
+  }
 
   @Get('summary')
   getSummary(@CurrentUser() user: RequestUser, @Query() query: UserStatisticsFilterQueryDto) {

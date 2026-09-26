@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 
 import type { MetadataCandidate } from '@bookorbit/types';
 
+import { GOOGLE_BOOKS_PLACEHOLDER_HASHES, GOOGLE_BOOKS_PLACEHOLDER_LENGTHS } from '../../../../common/utils/placeholder-cover.utils';
 import { buildRequestSignal } from '../provider-utils';
 
 const GOOGLE_BOOKS_COVER_HOST = 'books.google.com';
@@ -10,9 +11,6 @@ const VALIDATION_CONCURRENCY = 5;
 const MAX_FINGERPRINT_BYTES = 32 * 1024;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1_000;
 const CACHE_MAX_ENTRIES = 500;
-
-const GOOGLE_BOOKS_PLACEHOLDER_LENGTHS = new Set([9_103]);
-const GOOGLE_BOOKS_PLACEHOLDER_HASHES = new Set(['3efa8c43e5b4348f303a528c81adf435f0111ea752fe9f0f6241478b60987fa6']);
 
 type FetchImage = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 

@@ -61,9 +61,16 @@ function config(overrides: Partial<ResolvedIndexerConfig> = {}): ResolvedIndexer
     // A Jackett on the LAN, which is the deployment the private-address opt-in exists for.
     baseUrl: 'http://127.0.0.1:9117/api/v2.0/indexers/all/results/torznab',
     credential: 'secret-key',
+    credentialError: null,
     allowPrivateAddress: true,
+    applyTrackerSeedGoals: true,
+    seedRatioGoal: null,
+    seedTimeMinutes: null,
     categories: DEFAULT_INDEXER_CATEGORIES.torznab,
+    disabledMediaKinds: [],
+    isbnSearchDisabled: false,
     settings: null,
+    networkProfile: null,
     ...overrides,
   };
 }
@@ -289,6 +296,33 @@ describe('TorznabAdapter', () => {
     expect(release.bookTitle).toBeUndefined();
     expect(release.seedRatioGoal).toBeUndefined();
     expect(release.seedTimeMinutes).toBeUndefined();
+  });
+
+  it.each([
+    ['1', 1],
+    ['60', 1],
+    ['61', 2],
+  ])('rounds a positive minimum seed time of %s seconds upward to %s minutes', async (seconds, minutes) => {
+    fetchMock.mockResolvedValue(
+      new Response(feed(`<item><title>Dune</title><guid>g</guid><torznab:attr name="minimumseedtime" value="${seconds}" /></item>`)),
+    );
+
+    const [release] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+    expect(release.seedTimeMinutes).toBe(minutes);
+  });
+
+  it.each([
+    ['minimumratio', '0'],
+    ['minimumratio', '-1'],
+    ['minimumratio', 'Infinity'],
+    ['minimumseedtime', '0'],
+    ['minimumseedtime', '-1'],
+    ['minimumseedtime', String(2_147_483_647 * 60 + 1)],
+  ])('omits invalid tracker goal %s=%s', async (name, value) => {
+    fetchMock.mockResolvedValue(new Response(feed(`<item><title>Dune</title><guid>g</guid><torznab:attr name="${name}" value="${value}" /></item>`)));
+
+    const [release] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+    expect(name === 'minimumratio' ? release.seedRatioGoal : release.seedTimeMinutes).toBeUndefined();
   });
 });
 

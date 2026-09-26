@@ -1,11 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull, lt } from 'drizzle-orm';
+import { lt } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
 import { OidcProviderService } from '../../app-settings/oidc-provider.service';
-import { UserService } from '../../user/user.service';
 import { OidcDiscoveryService } from './oidc-discovery.service';
 import { OidcSessionRepository } from './oidc-session.repository';
 import { OidcTokenValidatorService } from './oidc-token-validator.service';
@@ -33,7 +32,6 @@ export class BackchannelLogoutService {
     private readonly discovery: OidcDiscoveryService,
     private readonly tokenValidator: OidcTokenValidatorService,
     private readonly sessionRepo: OidcSessionRepository,
-    private readonly userService: UserService,
   ) {}
 
   async handleLogout(logoutToken: string): Promise<void> {
@@ -88,38 +86,8 @@ export class BackchannelLogoutService {
     const rawSid = claims['sid'];
     const sid = typeof rawSid === 'string' ? rawSid : undefined;
 
-    let userId: number | undefined;
-
-    if (sid) {
-      const session = await this.sessionRepo.findActiveBySid(sid);
-      if (session) {
-        userId = session.userId;
-        await this.sessionRepo.revokeBySid(sid);
-      }
-    }
-
-    if (!userId && subject) {
-      const sessions = await this.sessionRepo.findActiveBySubjectAndIssuer(subject, discovery.issuer);
-      if (sessions.length > 0) {
-        userId = sessions[0].userId;
-        await this.sessionRepo.revokeBySubjectAndIssuer(subject, discovery.issuer);
-      }
-    }
-
-    if (!userId) {
-      this.logger.warn(
-        `[auth.oidc_backchannel_logout] [fail] subject=${subject} sid=${sid ?? 'none'} errorClass=UnauthorizedException error="no active oidc session" - backchannel logout skipped`,
-      );
-      return;
-    }
-
-    await this.db
-      .update(schema.refreshTokens)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(schema.refreshTokens.userId, userId), isNull(schema.refreshTokens.revokedAt)));
-
-    await this.userService.incrementTokenVersion(userId);
-
-    this.logger.log(`[auth.oidc_backchannel_logout] [end] userId=${userId} - backchannel logout completed`);
+    if (!sid && !subject) return;
+    const revoked = await this.sessionRepo.revokeProviderSessions(discovery.issuer, sid ? { sid } : { subject });
+    this.logger.log(`[auth.oidc_backchannel_logout] [end] sessionsRevoked=${revoked} - backchannel logout completed`);
   }
 }

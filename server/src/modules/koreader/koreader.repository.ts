@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, notExists, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { chunk } from '../../common/utils/batch.utils';
@@ -25,11 +25,20 @@ type KoreaderHashLinkMetadata = {
 };
 
 type HashedResolvedBookFile = ResolvedBookFileByHashes & { hash: string | null };
+type CountedResolvedBookFile = ResolvedBookFileByHash & { matchingFileCount: number };
 
 function resolveUniqueBook<T extends { bookId: number }>(rows: T[]): T | null {
   const first = rows[0];
   if (!first) return null;
   return rows.every((row) => row.bookId === first.bookId) ? first : null;
+}
+
+function hasDuplicateFileMatches(rows: CountedResolvedBookFile[]): boolean {
+  return rows.length > 1 || rows.some((row) => Number(row.matchingFileCount) > 1);
+}
+
+function withoutMatchCount(row: CountedResolvedBookFile): ResolvedBookFileByHash {
+  return { id: row.id, bookId: row.bookId, libraryId: row.libraryId, format: row.format };
 }
 
 function addUnambiguousHashMatches(rows: HashedResolvedBookFile[], result: Map<string, ResolvedBookFileByHashes>): Set<string> {
@@ -111,8 +120,8 @@ export class KoreaderRepository {
     await this.db.delete(schema.koreaderUsers).where(eq(schema.koreaderUsers.userId, userId));
   }
 
-  // KOReader's partial hash can collide for different files. Multiple matching files are safe only
-  // when they belong to the same book; otherwise a user-scoped manual link must disambiguate them.
+  // KOReader's partial hash can collide for different files. Same-book matches have a safe
+  // deterministic fallback, while a user-scoped hash link preserves the exact downloaded file.
   async resolveBookFileByHash(hash: string, accessibleLibraryIds: number[] | null, userId?: number): Promise<ResolvedBookFileByHash | null> {
     if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return null;
 
@@ -124,6 +133,7 @@ export class KoreaderRepository {
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
         format: schema.bookFiles.format,
+        matchingFileCount: sql<number>`count(*) over (partition by ${schema.bookFiles.fileHash})`,
       })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
@@ -132,7 +142,10 @@ export class KoreaderRepository {
       .limit(2);
 
     if (byFileHash.length > 0) {
-      return resolveUniqueBook(byFileHash) ?? (userId === undefined ? null : this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId));
+      const resolved = resolveUniqueBook(byFileHash);
+      if (resolved && (!hasDuplicateFileMatches(byFileHash) || userId === undefined)) return withoutMatchCount(resolved);
+      if (userId === undefined) return null;
+      return (await this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId)) ?? (resolved ? withoutMatchCount(resolved) : null);
     }
 
     const byFileHashHistory = await this.db
@@ -141,6 +154,7 @@ export class KoreaderRepository {
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
         format: schema.bookFiles.format,
+        matchingFileCount: sql<number>`count(*) over (partition by ${schema.bookFileHashHistory.fileHash})`,
       })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
@@ -150,9 +164,10 @@ export class KoreaderRepository {
       .limit(2);
 
     if (byFileHashHistory.length > 0) {
-      return (
-        resolveUniqueBook(byFileHashHistory) ?? (userId === undefined ? null : this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId))
-      );
+      const resolved = resolveUniqueBook(byFileHashHistory);
+      if (resolved && (!hasDuplicateFileMatches(byFileHashHistory) || userId === undefined)) return withoutMatchCount(resolved);
+      if (userId === undefined) return null;
+      return (await this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId)) ?? (resolved ? withoutMatchCount(resolved) : null);
     }
 
     return userId === undefined ? null : this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId);
@@ -183,6 +198,15 @@ export class KoreaderRepository {
       .orderBy(asc(schema.bookFiles.id));
 
     const directHashes = addUnambiguousHashMatches(direct, result);
+    const duplicateHashes = new Set<string>();
+    const directCounts = new Map<string, number>();
+    for (const row of direct) {
+      if (!row.hash) continue;
+      directCounts.set(row.hash, (directCounts.get(row.hash) ?? 0) + 1);
+    }
+    for (const [hash, count] of directCounts) {
+      if (count > 1) duplicateHashes.add(hash);
+    }
 
     const missing = hashes.filter((hash) => !directHashes.has(hash));
     if (missing.length > 0) {
@@ -201,10 +225,18 @@ export class KoreaderRepository {
         .orderBy(asc(schema.bookFiles.id));
 
       addUnambiguousHashMatches(history, result);
+      const historyCounts = new Map<string, number>();
+      for (const row of history) {
+        if (!row.hash) continue;
+        historyCounts.set(row.hash, (historyCounts.get(row.hash) ?? 0) + 1);
+      }
+      for (const [hash, count] of historyCounts) {
+        if (count > 1) duplicateHashes.add(hash);
+      }
     }
 
-    const stillMissing = hashes.filter((hash) => !result.has(hash));
-    if (stillMissing.length === 0 || userId === undefined) return result;
+    const linkCandidates = hashes.filter((hash) => !result.has(hash) || duplicateHashes.has(hash));
+    if (linkCandidates.length === 0 || userId === undefined) return result;
 
     const manualLinks = await this.db
       .select({
@@ -217,12 +249,10 @@ export class KoreaderRepository {
       .from(schema.koreaderBookHashLinks)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.koreaderBookHashLinks.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
-      .where(and(eq(schema.koreaderBookHashLinks.userId, userId), inArray(schema.koreaderBookHashLinks.hash, stillMissing), libraryFilter));
+      .where(and(eq(schema.koreaderBookHashLinks.userId, userId), inArray(schema.koreaderBookHashLinks.hash, linkCandidates), libraryFilter));
 
     for (const row of manualLinks) {
-      if (!result.has(row.hash)) {
-        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, format: row.format });
-      }
+      result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, format: row.format });
     }
 
     return result;
@@ -731,13 +761,22 @@ export class KoreaderRepository {
   }
 
   /**
-   * The file a book's KOReader progress hangs off, in the shape the shared-progress path needs.
-   * Resolved through the book's primary file, matching findBookFileIdByBookId: the book page
-   * reports one file's holds, so the release action has to act on that same file rather than
-   * whichever one a marker happens to be found on first.
+   * The file a book's KOReader progress hangs off, in the shape the shared-progress path needs:
+   * the copy this user's devices synced most recently, or the primary file when none has. A
+   * device syncs whichever copy it was given, and a Storyteller read-along EPUB becomes the
+   * primary while devices usually hold the original beside it. The book page reports one file's
+   * devices and holds, and the release action resolves through this same query, so it acts on
+   * the file the page showed rather than whichever one a marker happens to be found on first.
    */
-  async findProgressBookFileByBookId(bookId: number, accessibleLibraryIds: number[] | null) {
+  async findProgressBookFileByBookId(bookId: number, userId: number, accessibleLibraryIds: number[] | null) {
     if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return null;
+    const lastDeviceSyncAt = sql`(
+      select max(${schema.koreaderDeviceProgress.updatedAt})
+      from ${schema.koreaderDeviceProgress}
+      where ${schema.koreaderDeviceProgress.bookFileId} = ${schema.bookFiles.id}
+        and ${schema.koreaderDeviceProgress.userId} = ${userId}
+        and ${schema.koreaderDeviceProgress.orphaned} = false
+    )`;
     const [row] = await this.db
       .select({
         id: schema.bookFiles.id,
@@ -750,13 +789,14 @@ export class KoreaderRepository {
       .where(
         and(
           eq(schema.books.id, bookId),
-          eq(schema.books.primaryFileId, schema.bookFiles.id),
+          or(eq(schema.books.primaryFileId, schema.bookFiles.id), sql`${lastDeviceSyncAt} is not null`),
           // Scoped the same way every other entry point into this module is. A device progress
           // row outlives the library grant that created it, so ownership of the row is not
           // ownership of the book, and this path writes.
           accessibleLibraryIds === null ? undefined : inArray(schema.books.libraryId, accessibleLibraryIds),
         ),
       )
+      .orderBy(sql`${lastDeviceSyncAt} desc nulls last`, asc(schema.bookFiles.id))
       .limit(1);
     return row ?? null;
   }

@@ -115,18 +115,18 @@ export class DownloadRemovalService {
   /** A direct file is ours to drop; a torrent is detached from the client that holds it. */
   private async detach(download: BookRequestDownloadRow, deleteFiles: boolean): Promise<void> {
     // An attempt a source refused was never handed to anything, so there is nothing holding it.
-    if (download.clientHash === null) return;
+    if (download.clientKey === null) return;
 
     const isDirect = download.source === 'direct_url';
     // There is no swarm to preserve on a staged file, so its bytes always go with the attempt.
     const shouldDeleteFiles = isDirect || deleteFiles;
 
     if (isDirect) {
-      await this.direct.remove(download.clientHash, { deleteFiles: shouldDeleteFiles });
+      await this.direct.remove(download.clientKey, { deleteFiles: shouldDeleteFiles });
     } else {
       const config = await this.clients.resolveConfig(download.downloadClientId as number);
       const adapter = this.registry.require(config.adapterType);
-      await adapter.remove(download.clientHash, config, { deleteFiles: shouldDeleteFiles });
+      await adapter.remove(download.clientKey, config, { deleteFiles: shouldDeleteFiles });
     }
 
     this.logger.log(

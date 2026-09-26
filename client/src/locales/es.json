@@ -1,6 +1,6 @@
 {
   "common": {
-    "resetSortAria": "Restablecer orden al predeterminado",
+    "resetSortAria": "Restablecer orden predeterminado",
     "save": "Guardar",
     "cancel": "Cancelar",
     "delete": "Eliminar",
@@ -47,7 +47,7 @@
         "books": "Títulos de libros actuales, recientes y más leídos",
         "authors": "Autores principales",
         "series": "Series destacadas",
-        "narrators": "Narradores principales"
+        "narrators": "Narradores destacados"
       },
       "confirm": {
         "shareTitle": "¿Habilitar {level}?",
@@ -174,7 +174,7 @@
           "hint": "Controla aspectos destacados y elementos interactivos."
         },
         "cornerRadius": {
-          "label": "Radio de esquina",
+          "label": "Curvatura de las esquinas",
           "hint": "Redondez de tarjetas y elementos de interfaz de usuario"
         },
         "surfaceBrightness": {
@@ -734,6 +734,7 @@
         "connected": "Conectado - {issuer}",
         "connectionFailed": "La conexión falló",
         "privateIssuerAddress": "La URL del emisor apunta a una dirección de red privada o local, por lo que el servidor rechazó la conexión. Establece OIDC_ALLOW_LOCAL_ISSUERS=true en el servidor de BookOrbit para permitirlo.",
+        "tlsCertificateUntrusted": "BookOrbit no pudo verificar el certificado TLS del proveedor OIDC. Si el proveedor utiliza una autoridad de certificación privada, monte su paquete PEM CA, configure NODE_EXTRA_CA_CERTS en la ruta del paquete en el contenedor y reinicie BookOrbit.",
         "hide": "Ocultar",
         "details": "Detalles",
         "supported": "apoyado",
@@ -1357,6 +1358,71 @@
         "oidc": "OIDC/SSO",
         "server-fonts": "Fuentes del servidor"
       },
+      "tts": {
+        "title": "Providers",
+        "subtitle": "Speech engines available to readers. Voices are curated per provider.",
+        "summary": "{providers, plural, one {# provider} many {# providers} other {# providers}} · {enabled} enabled · {voices, plural, one {# voice curated} many {# voices curated} other {# voices curated}}",
+        "addProvider": "Add provider",
+        "loadFailed": "Failed to load text-to-speech configuration",
+        "empty": "No speech providers configured.",
+        "reorderHint": "Drag to reorder. Readers see providers in this order.",
+        "dragHandle": "Reorder {name}",
+        "moveUp": "Move {name} up",
+        "moveDown": "Move {name} down",
+        "reorderFailed": "Failed to save the provider order",
+        "expand": "Show details for {name}",
+        "collapse": "Hide details for {name}",
+        "toggleEnabled": "Enable {name}",
+        "enableFailed": "Failed to update {name}",
+        "statusConnected": "Connected",
+        "statusUnreachable": "Unreachable",
+        "statusUnchecked": "Not checked",
+        "voiceCount": "{count, plural, one {# voice} many {# voices} other {# voices}}",
+        "configuration": "Configuration",
+        "fieldType": "Type",
+        "fieldTypeOpenAi": "OpenAI-compatible",
+        "fieldApiKey": "API key",
+        "apiKeySet": "Set",
+        "apiKeyNotSet": "Not set",
+        "fieldModel": "Default model",
+        "fieldModelNone": "Provider default",
+        "fieldDiscovery": "Voice discovery",
+        "discoverySupported": "Supported",
+        "discoveryUnsupported": "Not supported",
+        "voices": "Voices",
+        "voicesCurated": "{count} curated",
+        "voicesTapToPreview": "Tap a voice to preview it",
+        "voicesNone": "No voices configured yet",
+        "manageVoices": "Manage voices",
+        "previewVoice": "Preview {name}",
+        "previewStop": "Stop preview",
+        "previewFailed": "Could not play a preview for {name}",
+        "previewNeedsEnabled": "Enable this provider to preview its voices",
+        "editConfiguration": "Edit configuration",
+        "testConnection": "Test connection",
+        "testPassed": "Connected · {count, plural, one {# voice found} many {# voices found} other {# voices found}}",
+        "testFailed": "Connection failed",
+        "delete": "Delete",
+        "deleteConfirm": "Delete the provider \"{name}\"? Readers using its voices fall back to another provider.",
+        "deleteFailed": "Failed to delete {name}",
+        "deleted": "Provider deleted",
+        "saveFailed": "Failed to save {name}",
+        "saved": "Provider saved",
+        "formAddTitle": "New provider",
+        "formEditTitle": "Edit provider",
+        "formName": "Name",
+        "formNamePlaceholder": "Kokoro",
+        "formBaseUrl": "Base URL",
+        "formBaseUrlPlaceholder": "http://localhost:8880/v1",
+        "formApiKey": "API key",
+        "formApiKeyOptional": "Optional",
+        "formApiKeyPlaceholder": "sk-...",
+        "formApiKeyKeep": "Leave blank to keep the current key",
+        "formModel": "Default model",
+        "formModelPlaceholder": "tts-1",
+        "formDiscovery": "This provider can list its own voices",
+        "formRequired": "Name and base URL are required"
+      },
       "serverFonts": {
         "title": "Fuentes del servidor",
         "subtitle": "Sube fuentes que cada usuario puede elegir en el lector de libros electrónicos, sin subir las suyas.",
@@ -1371,7 +1437,7 @@
         "display": "Visualización",
         "reader": "Lector",
         "metadata": "Metadatos",
-        "usersAccess": "Usuarios y Acceso",
+        "usersAccess": "Usuarios y acceso",
         "email": "Correo electrónico",
         "opds": "OPDS",
         "kobo": "Kobo",
@@ -1502,7 +1568,7 @@
             "summary": "Puntuación < {threshold}"
           },
           "missingFields": {
-            "label": "Campos faltantes",
+            "label": "Faltan campos",
             "hint": "Recuperar si alguno de los campos seleccionados está vacío.",
             "summary": "{count, plural, one {desaparecido # campo} other {desaparecido # campos} many {desaparecido # campos}}"
           }
@@ -2851,7 +2917,8 @@
         "clientTypes": {
           "qbittorrent": "qBittorrent",
           "transmission": "Transmission",
-          "deluge": "Deluge"
+          "deluge": "Deluge",
+          "nzbget": "NZBGet"
         },
         "color": {
           "label": "Color",
@@ -2950,7 +3017,9 @@
             "pluginTitle": "Instalar un plugin",
             "pluginBody": "Un archivo que enseña a BookOrbit a buscar en un sitio específico. Tú lo proporcionas y, después, completas su configuración.",
             "torznabTitle": "Añadir un indexador Torznab",
-            "torznabBody": "Indica una fuente de Prowlarr, Jackett o NZBHydra que ya tengas configurada. Una por cada fuente."
+            "torznabBody": "Indica una fuente de Prowlarr, Jackett o NZBHydra que ya tengas configurada. Una por cada fuente.",
+            "builtInTitle": "Añadir un indexador",
+            "builtInBody": "Apunta a un canal Torznab o Newznab que ya usas. Una configuración por feed."
           },
           "add": "Añadir indexador",
           "edit": "Editar indexador",
@@ -2980,14 +3049,16 @@
             "proxyBrief": "Un proxy http o https para esta fuente. SOCKS no es compatible."
           },
           "types": {
-            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)"
+            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)",
+            "newznab": "Newznab"
           },
           "fields": {
             "name": "Nombre",
             "type": "Tipo de indexador",
             "baseUrl": "URL base",
             "baseUrlHint": {
-              "torznab": "La URL de la fuente Torznab, sin la cadena de consulta. Jackett la muestra en cada indexador como «Torznab Feed»."
+              "torznab": "La URL de la fuente Torznab, sin la cadena de consulta. Jackett la muestra en cada indexador como «Torznab Feed».",
+              "newznab": "La URL del sitio de Newznab o punto final de la API, sin una consulta de búsqueda."
             },
             "credential": {
               "apiKey": "Clave API",
@@ -3033,6 +3104,29 @@
           "settings": {
             "restoreDefault": "Restablecer valores predeterminados"
           },
+          "seeding": {
+            "applyTracker": "Aplicar objetivos de semilla",
+            "applyTrackerBrief": "Cuando un valor manual está vacío, se utiliza un objetivo válido indicado por el tracker. Cuando esta opción está desactivada, los valores vacíos utilizan los valores predeterminados del cliente de descargas. Los valores manuales siguen aplicándose.",
+            "ratio": "Proporción de semillas",
+            "ratioBrief": "Un número decimal positivo. Si se deja en blanco, se hereda el valor del tracker o del cliente.",
+            "time": "Tiempo de semilla (minutos)",
+            "timeBrief": "Un número entero positivo. En blanco hereda del rastreador o cliente.",
+            "clientSupport": "qBittorrent admite tanto una proporción de compartición como un tiempo total de siembra. Deluge y Transmission solo admiten la proporción de compartición. Las reglas globales del cliente y el límite que se alcance primero pueden detener la siembra, por lo que estos valores no garantizan que se cumpla el mínimo establecido por cada tracker.",
+            "futureGrabs": "Los cambios se aplican a las descargas futuras. Los torrents existentes o ya adoptados pueden mantener límites específicos del cliente. Desactivar el fallback del tracker deja activos los valores predeterminados del cliente; no significa que la subida sea ilimitada.",
+            "reset": "Restablecer la configuración de siembra",
+            "summary": {
+              "title": "Resumen de políticas",
+              "ratio": "Proporción",
+              "time": "Tiempo sembrando",
+              "manual": "Manual: {value}",
+              "tracker": "Fallback del tracker",
+              "client": "Cliente por defecto"
+            },
+            "errors": {
+              "ratio": "Introduzca un número finito mayor que cero, o deje esto en blanco.",
+              "minutes": "Introduzca un número entero de 1 a 2,147,483,647, o deje este número en blanco."
+            }
+          },
           "confirmDelete": {
             "title": "¿Eliminar esta fuente?",
             "description": "La dirección, configuración y credenciales almacenadas de {name} se eliminan. Desactívalos para dejar de buscarla sin perderlos.",
@@ -3059,7 +3153,8 @@
           "builtIn": "Construido en",
           "plugin": "Plugin",
           "typeDescriptions": {
-            "torznab": "Tu propio Jackett, Prowlarr o NZBHydra. Utiliza categorías y objetivos de semillas."
+            "torznab": "Tu propio Jackett, Prowlarr o NZBHydra. Utiliza categorías y objetivos de semillas.",
+            "newznab": "Un índice Usenet compatible con Newznab. Utiliza categorías y requiere una clave API."
           },
           "plugins": {
             "title": "Plugins",
@@ -3087,6 +3182,25 @@
             "usedBy": "{count, plural, one {usado por # fuente} other {usado por # fuentes}}",
             "unused": "ninguna fuente lo usa aún",
             "update": "Actualizar plugin",
+            "checkUpdates": "Buscar actualizaciones",
+            "updateCheckComplete": "Comprobación de actualización de plugins completada.",
+            "updateCheckFailed": "No se pudo comprobar actualizaciones de plugin.",
+            "updateInspectFailed": "No se ha podido verificar la actualización del plugin publicado.",
+            "reviewUpdate": "Revisar actualizaciones",
+            "updated": "Actualizado {label} a {version}.",
+            "autoUpdate": "Instalar actualizaciones firmadas automáticamente",
+            "autoUpdateFailed": "No se han podido cambiar las actualizaciones automáticas para este plugin.",
+            "installedVersion": "Versión Instalada",
+            "updateChannel": "Canal de actualización firmado",
+            "signatureVerified": "La fuente descargada coincide con la firma Ed25519 del editor.",
+            "updateStates": {
+              "unsupported": "Actualizaciones manuales",
+              "unchecked": "Aún no comprobado",
+              "current": "Actualizado",
+              "available": "Versión {version} disponible.",
+              "custom": "Versión personalizada",
+              "failed": "Fallo al actualizar"
+            },
             "wrongType": "Ese archivo es el plugin {found} , no {expected}.",
             "replaceTitle": "¿Reemplazar este plugin?",
             "replace": "Reemplazar plugin",
@@ -3137,6 +3251,7 @@
           "autoGrabDisabled": "Descargas automáticas desactivadas",
           "minScore": "Puntuación mínima de la versión",
           "minScoreHint": "Una versión con una puntuación inferior a esta nunca se descargará automáticamente. Las puntuaciones van de 0 a 100, y la coincidencia del título y el autor representa la mayor parte de la puntuación, seguida del formato, el tamaño del archivo, los seeders y la prioridad de la fuente. Si ninguna versión alcanza una puntuación suficientemente alta, la solicitud queda a la espera de que alguien elija una versión manualmente y muestra el motivo por el que se detuvo.",
+          "minScoreHintV2": "Una versión con una puntuación inferior a esta nunca se descargará automáticamente. Las puntuaciones van de 0 a 100. La relevancia del título y del autor es lo que más contribuye a la puntuación, seguida del formato y de un tamaño de archivo razonable. La salud del enjambre y el freeleech se tienen en cuenta cuando la fuente proporciona esos datos. Si ninguna versión alcanza una puntuación suficientemente alta, la solicitud queda a la espera de que alguien seleccione una versión manualmente e indica por qué se ha detenido.",
           "autoRetry": "Prueba la siguiente versión después de un error",
           "autoRetryHint": "Cuando una descarga automática falla, se intenta la siguiente versión mejor valorada en lugar de darse por vencido. Esto incluye tanto que una fuente se niegue a entregar el archivo como que una descarga se interrumpa a mitad de camino. Solo se aplica a las versiones que BookOrbit haya elegido automáticamente: una versión seleccionada manualmente por quien aprueba la solicitud permanece como fallida y queda a la espera de esa persona.",
           "maxAttempts": "Intentos por petición",
@@ -3181,6 +3296,9 @@
         },
         "profiles": {
           "title": "Publicar perfiles",
+          "effectiveRule": "Regla de descarga automática: primer nivel que coincida con el nivel más alto y luego el puntaje más alto (mínimo {score}).",
+          "summary": "Las versiones que quedan fuera del perfil siguen disponibles para su selección manual. Si no hay niveles, las versiones se ordenan únicamente por puntuación.",
+          "howProfiles": "Cómo funcionan los perfiles de versiones",
           "hint": "La edición que quieres, empezando por la mejor. Las versiones se comparan con estas opciones de arriba abajo y se asignan al primer nivel con el que coincidan. Esto es lo que utiliza la descarga automática: una versión que no coincida con ningún nivel nunca se descargará automáticamente, aunque seguirá apareciendo en el selector para que puedas enviarla manualmente. Deja un medio vacío y no se filtrará ni rechazará nada; las versiones se ordenarán únicamente por puntuación.",
           "bitrateNote": "Un límite mínimo de bitrate descarta una versión que indique un bitrate inferior. La mayoría de las fuentes miden muy pocas de sus versiones, y una versión sin medir no se descarta, por lo que esto restringe menos de lo que parece.",
           "empty": "No hay perfil. Las versiones para este medio están clasificadas solo por puntuación.",
@@ -3195,6 +3313,10 @@
           "anyLayout": "Cualquiera",
           "minBitrate": "Kbps mínimos",
           "minSeeders": "Seeders mínimos",
+          "torrentConditions": "Condiciones de torrent",
+          "nonTorrentConditions": "Las condiciones de Seeder, freeleech y VIP no se aplican a las fuentes seleccionadas.",
+          "incompatibleTorrentConditions": "Este nivel que no es de torrents todavía tiene condiciones de torrent guardadas. Es posible que se ignoren o que impidan que el nivel coincida.",
+          "removeTorrentConditions": "Eliminar condiciones de torrent",
           "channels": "Canales",
           "anyChannels": "Cualquiera",
           "mono": "Mono",
@@ -3220,6 +3342,7 @@
           "connection": "Conexión",
           "search": "Qué buscar",
           "access": "Acceso",
+          "seeding": "Sembrando",
           "availability": "Disponibilidad",
           "behaviour": "Comportamiento"
         },
@@ -3231,7 +3354,8 @@
         "clientTypeDescriptions": {
           "qbittorrent": "Tu propio qBittorrent. Necesita una dirección y una cuenta.",
           "transmission": "Tu propio transmisión. No tiene categorías, por lo que la categoría se convierte en una subcarpeta de su directorio de descargas.",
-          "deluge": "Tu propio Deluge. Inicia sesión con la contraseña de la Web UI; la categoría necesita que el plugin de etiqueta encenda."
+          "deluge": "Tu propio Deluge. Inicia sesión con la contraseña de la Web UI; la categoría necesita que el plugin de etiqueta encenda.",
+          "nzbget": "Tu propio NZBGet. BookOrbit envía archivos NZB sobre su API JSON-RPC."
         },
         "searchHealth": {
           "failingOnce": "Última búsqueda fallida",
@@ -3246,14 +3370,13 @@
       "searchPlaceholder": "Ajustes de búsqueda",
       "clearSearch": "Borrar búsqueda",
       "noResults": "No hay ajustes que coincidan con {query}.",
-      "shortcutHint": "Presiona Cmd K para saltar a cualquier ajuste",
       "status": {
         "scanning": "Escaneando"
       },
       "groups": {
         "you": "Tú",
         "library": "Biblioteca",
-        "devices": "Dispositivos y sincronización",
+        "devices": "Dispositivos",
         "accounts": "Cuentas",
         "server": "Servidor"
       },
@@ -4131,6 +4254,7 @@
       "LibraryAccessRevoke": "Revocar el acceso a la biblioteca",
       "LibraryWriteMetadataToFiles": "Escribir metadatos en archivos",
       "LibraryBulkRename": "Cambiar el nombre de los archivos de la biblioteca",
+      "LibraryRecomputeAddedAt": "Recalcular la fecha añadida",
       "BookUpload": "Subir libro",
       "BookMetadataUpdate": "Actualizar metadatos del libro",
       "BookMetadataLocksUpdate": "Actualizar bloqueos de metadatos",
@@ -4529,15 +4653,19 @@
       "readCount": "{count} leer"
     },
     "card": {
-      "missing": "desaparecido"
+      "missing": "Faltante"
     },
     "file": {
       "primary": "Principal",
       "audiobook": "Audiolibro"
     },
     "actions": {
-      "read": "Marcar como leído",
+      "read": "Leer",
       "listen": "Escuchar",
+      "startReading": "Comenzar a leer",
+      "continueReading": "Continuar leyendo",
+      "startListening": "Empezar a escuchar",
+      "continueListening": "Continuar escuchando",
       "peek": "Vistazo",
       "quickView": "Vista rápida",
       "details": "Detalles",
@@ -5942,6 +6070,7 @@
         "unread": "No leído"
       },
       "series": {
+        "seriesRow": "Fila de series",
         "bookCount": "{count, plural, =0 {(sin libros)} one {(# libro)} other {(# libros)} many {(# libros)}}",
         "readOfCount": "{read} de {total} leído"
       },
@@ -6668,7 +6797,10 @@
       "grab": "Descargar versión",
       "viewFiles": "Ver archivos",
       "hideFiles": "Ocultar archivos",
+      "viewDetails": "Acerca del contenido",
+      "hideDetails": "Ocultar detalles",
       "inspectingFiles": "Leyendo la lista de archivos de la versión…",
+      "inspectingNzb": "Obteniendo y validando el NZB...",
       "inspectingShort": "Comprobando archivos...",
       "inspectionFailed": "No se ha podido leer la lista de archivos de esta versión.",
       "manifest": {
@@ -6678,6 +6810,7 @@
         "multipleBooks": "Esta versión contiene {count} libros separados. Después de descargar, se le pedirá cuál importar.",
         "multiPartBook": "{count, plural, one {Esta versión es un libro hecho de # archivo.} other {Esta versión es un libro hecho de # archivos, importados juntos como un solo libro.}}",
         "metadataUnavailable": "Este es un enlace magnet. Su lista de archivos no está disponible hasta que un cliente de torrents obtiene los metadatos de la red de pares.",
+        "usenetMetadataUnavailable": "Esta es una versión de Usenet. Su lista final de archivos no estará disponible hasta que NZBGet la descargue y la procese posteriormente.",
         "bookFile": "Archivo del libro",
         "extraFile": "Extra",
         "truncated": "Mostrando {shown} de archivos {total}.",
@@ -6692,6 +6825,7 @@
         }
       },
       "manual": "Pega un enlace en su lugar",
+      "manualTorrent": "Usa un magnet o un archivo .torrent en su lugar",
       "indexer": "Indexador",
       "size": "Tamaño",
       "seeders": "Semillas",
@@ -6718,6 +6852,27 @@
       "vipOnly": "Solo VIP",
       "hideVipOnly": "Ocultar solo VIP",
       "noneMatchedProfile": "Ninguna versión disponible aquí coincide con tu perfil para este formato, por lo que ninguno se descargará automáticamente. Aun así, puedes enviar uno manualmente. Para ampliar los resultados, añade un nivel con menos condiciones debajo de los que ya tienes.",
+      "profileMismatch": {
+        "summary": "{count, plural, one {# versión encontrada, pero la descarga automática se saltará porque no coincide con ningún perfil de {medium}} other {# lanzamientos fueron encontrados, pero la descarga automática los omitirá porque ninguno coincide con un nivel de perfil {medium}}} Las reglas de puntuación y perfil son comprobaciones separadas. Todavía puedes hacer clic en Enviar.",
+        "review": "Revisar perfil {medium}",
+        "row": "La descarga automática omitirá esta versión. Nivel más cercano: {tier}. {reasons}",
+        "failures": {
+          "formatUnknown": "{source} no indicó un formato; este nivel requiere {expected}.",
+          "format": "El formato es {actual}; este nivel requiere {expected}.",
+          "fileLayoutUnknown": "{source} no indicó el número de archivos; este nivel requiere {expected}.",
+          "fileLayout": "El diseño del archivo es {actual}; este nivel requiere {expected}.",
+          "bitrate": "La tasa de bits es {actual} kbps; este nivel requiere al menos {expected} kbps.",
+          "channels": "El audio es {actual}; este nivel requiere {expected}.",
+          "languageUnknown": "{source} no indicó un idioma; este nivel requiere {expected}.",
+          "language": "El idioma es {actual}; este nivel requiere {expected}.",
+          "source": "Esta fuente no está incluida en el nivel.",
+          "seeders": "Este lanzamiento tiene {actual} seeders; este nivel requiere al menos {expected}.",
+          "sizeUnknown": "{source} no indicó un tamaño; este nivel permite hasta {expected}.",
+          "size": "El tamaño es {actual}; este nivel permite hasta {expected}.",
+          "freeleech": "Este nivel requiere freeleech.",
+          "vipOnly": "Este nivel excluye las versiones solo VIP."
+        }
+      },
       "alreadyGrabbed": "Ya capturado",
       "freeleechLabel": "Freeleech",
       "published": "Publicado",
@@ -6758,6 +6913,7 @@
       "onlyBestMatch": "Esa es la única versión que coincide.",
       "tiedWithBest": "{count, plural, one {# otra edición obtuvo la misma puntuación} other {# otras ediciones obtuvieron la misma puntuación}}",
       "inspectionFailedHint": "No se ha enviado a un cliente de descarga. Inténtalo de nuevo o usa Pegar un enlace en su lugar.",
+      "inspectionFailedHintGeneric": "No se ha enviado a ningún cliente de descargas. Inténtalo de nuevo o elige otra versión.",
       "mediumUncovered": "Ninguna fuente lleva este tipo de libro.",
       "mediumUncoveredHint": "Ninguno de tus indexadores habilitados lo ofrece. Añade uno que sí lo haga o pega tú mismo un enlace.",
       "noSourcesConfigured": "Aún no se han configurado fuentes de búsqueda.",
@@ -6769,6 +6925,7 @@
       "reviewSources": "Revisar fuentes",
       "protocol": {
         "torrent": "Torrent",
+        "usenet": "Usenet",
         "direct": "Descarga directa",
         "directPill": "Directo"
       }
@@ -7171,7 +7328,7 @@
       "fieldPlaceholder": "Dejar en blanco para borrar",
       "fieldPlaceholderArray": "Separados por comas (dejar en blanco para borrar)",
       "deleteConfirm": "{count, plural, =0 {Eliminar # libro?} one {Eliminar # libro?} other {Eliminar # libros?} many {Eliminar # libros?}}",
-      "typeDelete": "Tipo BORRAR"
+      "typeDelete": "Escribe BORRAR"
     },
     "viewHeader": {
       "select": "Seleccionar",
@@ -7180,6 +7337,8 @@
       "columnVisibilityHint": "Utilice el panel de visibilidad de columnas en el encabezado de la tabla para mostrar u ocultar columnas.",
       "columnVisibilityMobileHint": "La visibilidad de las columnas se puede gestionar desde el encabezado de la tabla.",
       "searchPlaceholder": "Buscar título, autor, serie, narrador...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
       "mobileSearch": {
         "description": "Busque artículos por título, autor, serie o narrador.",
         "done": "Hecho"
@@ -7194,6 +7353,7 @@
         "display": "Visualización",
         "coverSize": "Tamaño de la cubierta",
         "gridGap": "Espacio de red",
+        "pixelValue": "{value} pixels",
         "showJumpRails": "Mostrar carriles de salto",
         "columnsHint": "Utilice el panel de visibilidad de columnas en el encabezado de la tabla para mostrar u ocultar columnas.",
         "coverShape": "Forma de la cubierta",
@@ -7229,6 +7389,11 @@
       "description": "Este {entity} no existe o ha sido eliminado.",
       "goBack": "Volver"
     },
+    "media": {
+      "volume": "Volume",
+      "mute": "Mute",
+      "unmute": "Unmute"
+    },
     "themePicker": {
       "light": "Luz",
       "dark": "Oscuro",
@@ -7255,7 +7420,11 @@
       "sidebar": {
         "title": "Barra lateral",
         "mobileDescription": "Muestra la barra lateral móvil.",
-        "toggle": "Alternar barra lateral"
+        "toggle": "Alternar barra lateral",
+        "collapse": "Contraer barra lateral",
+        "expand": "Expandir barra lateral",
+        "open": "Abrir barra lateral",
+        "close": "Cerrar barra lateral"
       },
       "chipInput": {
         "typeAndEnter": "Escribe y presiona Enter para agregar",
@@ -7282,9 +7451,24 @@
       "noMatches": "Sin coincidencias",
       "noMatchesHint": "Prueba con otro término de búsqueda.",
       "bookCount": "Libros: {count}",
+      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Crea una biblioteca para empezar a añadir libros.",
       "smartScopesEmptyHint": "Los Alcances Inteligentes guardan un conjunto de filtros que usas a menudo.",
       "collectionsEmptyHint": "Las colecciones agrupan libros que eliges manualmente."
+    },
+    "legalNotices": {
+      "about": "Acerca de BookOrbit",
+      "trigger": "Avisos legales",
+      "title": "Acerca de BookOrbit",
+      "description": "Atribución de BookkOrbit, licencias y código fuente.",
+      "poweredBy": "Desarrollado por BookOrbit",
+      "originalDevelopment": "Este software contiene material desarrollado originalmente como BookOrbit.",
+      "copyright": "Copyright (C) 2025-2026 neon.",
+      "contributors": "Los respectivos colaboradores de BookkOrbit tienen derechos de autor adicionales.",
+      "licenseSummary": "Licencia bajo licencia GNU Affero General Public License, versión 3 solamente, con términos adicionales. Este software se proporciona sin garantía. Usted puede redistribuirlo y modificarlo bajo estos términos.",
+      "sourceCode": "Código fuente",
+      "license": "Licencia AGPLv3",
+      "additionalTerms": "Términos adicionales"
     }
   },
   "customIcons": {
@@ -7332,6 +7516,7 @@
       "empty": {
         "continueReading": "Aún no hay libros en progreso. Empieza a leer uno para verlo aquí.",
         "continueListening": "Aún no hay audiolibros en progreso. Empieza a escuchar uno para verlo aquí.",
+        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "Ningún libro marcado quiere leer todavía.",
         "upNextInSeries": "Aún no hay selecciones de la próxima serie. Termina un volumen para que salga a la superficie el siguiente.",
         "recentlyAdded": "Aún no hay libros en tu biblioteca.",
@@ -7363,6 +7548,7 @@
         "recentlyAdded": "Agregado recientemente",
         "continueReading": "Seguir leyendo",
         "continueListening": "Continuar escuchando",
+        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Quiero Leer",
         "upNextInSeries": "Siguiente en la Serie",
         "random": "Descubre Algo Nuevo",
@@ -7692,6 +7878,17 @@
       "failed": "No se pudo enviar"
     }
   },
+  "errors": {
+    "network": "Could not reach BookOrbit. Check your connection, then try again.",
+    "codes": {
+      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
+      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
+      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
+      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
+      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
+      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
+    }
+  },
   "hardcover": {
     "settings": {
       "subtitle": "Sincronice su progreso de lectura, estado y calificaciones con Hardcover."
@@ -7993,6 +8190,49 @@
           "fileAsBook": {
             "title": "Archivo como libro",
             "hint": "Trata cada archivo como un libro individual. Ideal para bibliotecas con un formato por título. Evítelo si sus audiolibros abarcan varios archivos."
+          }
+        },
+        "addedAt": {
+          "title": "Fecha de adición",
+          "hint": "Elige qué representa la \"fecha de adición\" de un libro. Esto se aplicará a los libros importados a partir de ahora.",
+          "options": {
+            "imported": {
+              "title": "Cuando importado",
+              "hint": "La fecha en la que BookOrbit importó el libro por primera vez. Esta es la opción predeterminada."
+            },
+            "file_modified": {
+              "title": "Fecha de modificación de archivo",
+              "hint": "La última vez que se modificó el archivo (mtime), a menudo se conserva cuando se copian los archivos."
+            },
+            "file_created": {
+              "title": "Fecha de creación del archivo",
+              "hint": "Cuando el archivo se creó por primera vez en el disco (fecha de nacimiento). Se utiliza la fecha de modificación en los sistemas de archivos que no registran la fecha de creación."
+            }
+          },
+          "recompute": "Recalcular ahora",
+          "recomputing": "Recalculando...",
+          "recomputeHint": "Actualice la fecha añadida para los libros existentes utilizando este ajuste.",
+          "recomputeSaveFirst": "Guarde los cambios primero, luego recalcule los libros existentes.",
+          "backgroundConfirm": "¿Recalcular las fechas de los libros existentes? Esto se ejecuta en segundo plano, y puede cerrar este editor. Los libros con archivos ilegibles mantienen su fecha actual.",
+          "progressSummary": "{processed} procesado de {total}: {updated} actualizado, {unchanged} sin cambios, {skipped} omitido, {failed} falló.",
+          "failedBooksHint": "Los libros que fallaron conservaron sus fechas. Comprueba el acceso a los archivos y vuelve a ejecutar el recálculo para intentarlo de nuevo.",
+          "jobStatus": {
+            "running": "Recalculando fechas en segundo plano.",
+            "completed": "Fecha recalculada terminada.",
+            "failed": "El recálculo se detuvo antes de finalizar. Los cambios realizados se conservaron; puedes ejecutarlo de nuevo sin riesgo."
+          },
+          "errors": {
+            "sourceImported": "Guarda una fuente de fecha del archivo antes de volver a calcular las fechas.",
+            "alreadyRunning": "Ya se está ejecutando un recálculo para esta biblioteca.",
+            "busy": "Hay otros recálculos en ejecución. Inténtalo de nuevo dentro de unos instantes.",
+            "requestFailed": "No se ha podido conectar con el servicio de recálculo. Cierra y vuelve a abrir este editor para comprobar su estado.",
+            "interrupted": "El estado de la tarea ya no está disponible. Es posible que se haya interrumpido debido a un reinicio del servidor. Puedes volver a ejecutar el recálculo sin riesgo."
+          },
+          "failureSample": "Libro {bookId}: {reason}",
+          "failureReasons": {
+            "file_unavailable": "No se ha podido leer un archivo de contenido.",
+            "unsafe_path": "Un archivo de contenido está fuera de su carpeta de librerías permitida.",
+            "database_error": "Error al actualizar la base de datos."
           }
         },
         "allowedFormats": {
@@ -8336,7 +8576,7 @@
       "targetUser": "Usuario objetivo",
       "doNotImport": "No importar este usuario",
       "noSourceUsersLoaded": "Aún no se han cargado usuarios de origen.",
-      "noActiveTargetUsers": "No se encontraron usuarios objetivo activos. Cree o vuelva a habilitar un usuario BookOrbit antes de realizar la asignación.",
+      "noActiveTargetUsers": "No se encontraron usuarios de destino activos. Crea o reactiva un usuario de BookOrbit antes de realizar la asignación.",
       "pathPrefixMappings": "Asignaciones de prefijos de ruta",
       "addMapping": "Agregar mapeo",
       "pathMappingsExplanation": "Las asignaciones de rutas traducen las rutas de los archivos de origen en rutas de destino para que los libros puedan coincidir según la ubicación del archivo. Los libros también coinciden con ISBN, hash de archivo y título/autor, independientemente de las asignaciones de rutas.",
@@ -9108,10 +9348,10 @@
       "reading": "Leyendo",
       "unread": "Sin leer",
       "complete": "Completado",
-      "gaps": "Saltos",
+      "gaps": "Faltantes",
       "read": "Leído",
       "inProgress": "En progreso",
-      "hasGaps": "Tiene saltos",
+      "hasGaps": "Tiene huecos",
       "notStarted": "No comenzado"
     },
     "index": {
@@ -9521,9 +9761,7 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Configuración de escaneo",
       "title": "Libros duplicados",
-      "description": "Escanee archivos y metadatos en busca de posibles registros duplicados. No se elimina nada durante un escaneo.",
       "scope": "Alcance de la biblioteca",
       "allLibraries": "Todas las bibliotecas accesibles",
       "similarity": "Umbral de títulos similares",
@@ -9535,7 +9773,6 @@
         "queued": "Escaneo en cola",
         "running": "Escaneando libros"
       },
-      "groupsFound": "{count, plural, =0 {No hay grupos duplicados} one {Un grupo duplicado} other {# grupos duplicados} many {# grupos duplicados}}",
       "filter": "Tipo de coincidencia",
       "allReasons": "Todos los tipos de coincidencia",
       "reasons": {
@@ -9544,17 +9781,7 @@
         "exact_metadata": "Título exacto y autores.",
         "fuzzy_metadata": "Título y autor similares"
       },
-      "similarityValue": "{percent}% similitud del título",
       "notDuplicates": "No duplicados",
-      "keepThis": "Guarde este libro",
-      "discardThis": "Descartar este libro",
-      "selectKeeperFirst": "Seleccione primero el libro que desea conservar",
-      "noDirectMatch": "No hay ninguna coincidencia directa con el libro que se conservará",
-      "moreFiles": "+{count} más",
-      "showDetails": "Mostrar detalles",
-      "hideDetails": "Ocultar detalles",
-      "deleteSelected": "Eliminar {count} seleccionado",
-      "openBook": "Abrir detalles para {title}",
       "unknownAuthor": "Autor desconocido",
       "unknown": "Desconocido",
       "none": "Ninguno",
@@ -9565,14 +9792,8 @@
         "library": "Biblioteca",
         "isbn": "ISBN",
         "formats": "Formatos",
-        "fileLocation": "Archivo",
-        "files": "Archivos",
-        "readingStatus": "Estado de lectura",
-        "progress": "Progreso",
-        "path": "Ruta de la biblioteca",
         "collections": "Colecciones",
-        "added": "Añadido",
-        "updated": "Actualizado"
+        "added": "Añadido"
       },
       "initial": {
         "title": "Encuentra libros duplicados",
@@ -9583,8 +9804,6 @@
         "description": "Ningún libro coincidió con el alcance, el nivel de similitud y el filtro de coincidencia actuales."
       },
       "deleteDialog": {
-        "title": "¿Eliminar permanentemente libros duplicados?",
-        "description": "{count, plural, =0 {Esto eliminará permanentemente # libro seleccionado y sus archivos.} one {Esto eliminará permanentemente # libro seleccionado y sus archivos.} other {Esto eliminará permanentemente # libros seleccionados y sus archivos.} many {Esto eliminará permanentemente # libros seleccionados y sus archivos.}}",
         "warning": "Los metadatos, las colecciones, los datos de lectura y el estado del dispositivo no se transfieren al libro llevado. También se eliminan los datos asociados de otros usuarios.",
         "confirm": "{count, plural, =0 {Eliminar # libro} one {Eliminar # libro} other {Eliminar # libros} many {Eliminar # libros}}",
         "success": "{count, plural, =0 {No se eliminaron libros} one {Se ha eliminado un libro duplicado.} other {# libros duplicados eliminados} many {# libros duplicados eliminados}}"

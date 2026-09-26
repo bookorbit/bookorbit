@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -12,6 +13,7 @@ import {
   timestamp,
   unique,
   uniqueIndex,
+  uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
 
@@ -68,6 +70,7 @@ export const bookFiles = pgTable(
   'book_files',
   {
     id: serial('id').primaryKey(),
+    publicId: uuid('public_id').notNull().defaultRandom(),
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
@@ -86,6 +89,9 @@ export const bookFiles = pgTable(
     durationSeconds: integer('duration_seconds'),
     // null means "not determined yet"; rows predating this column are backfilled lazily on Kobo sync.
     isFixedLayout: boolean('is_fixed_layout'),
+    mediaOverlayAvailable: boolean('media_overlay_available').notNull().default(false),
+    mediaOverlayDurationSeconds: doublePrecision('media_overlay_duration_seconds'),
+    mediaOverlayCheckedAt: timestamp('media_overlay_checked_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
@@ -93,12 +99,16 @@ export const bookFiles = pgTable(
       .$onUpdateFn(() => new Date()),
   },
   (t) => [
+    uniqueIndex('book_files_public_id_uidx').on(t.publicId),
     uniqueIndex('book_files_absolute_path_uidx').on(t.absolutePath),
     index('book_files_book_id_idx').on(t.bookId),
     index('book_files_library_folder_id_idx').on(t.libraryFolderId),
     index('book_files_file_hash_idx').on(t.fileHash),
     index('book_files_ino_idx').on(t.ino),
     index('book_files_format_idx').on(t.format),
+    index('book_files_media_overlay_available_idx')
+      .on(t.mediaOverlayAvailable)
+      .where(sql`${t.mediaOverlayAvailable} = true`),
     index('book_files_library_folder_file_hash_idx').on(t.libraryFolderId, t.fileHash),
     index('book_files_library_folder_ino_idx').on(t.libraryFolderId, t.ino),
     foreignKey({
@@ -111,6 +121,10 @@ export const bookFiles = pgTable(
     check('book_files_role_chk', sql`${t.role} in ('content', 'cover', 'metadata', 'supplement')`),
     check('book_files_size_bytes_nonnegative_chk', sql`${t.sizeBytes} is null or ${t.sizeBytes} >= 0`),
     check('book_files_duration_seconds_nonnegative_chk', sql`${t.durationSeconds} is null or ${t.durationSeconds} >= 0`),
+    check(
+      'book_files_media_overlay_duration_seconds_nonnegative_chk',
+      sql`${t.mediaOverlayDurationSeconds} is null or ${t.mediaOverlayDurationSeconds} >= 0`,
+    ),
   ],
 );
 

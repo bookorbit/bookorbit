@@ -40,7 +40,8 @@ function getSocket(): Socket {
     })
 
     socket.on('cover:refreshed', (event: CoverRefreshedEvent) => {
-      useCoverVersions().bumpVersion(event.bookId)
+      const coverVersions = useCoverVersions()
+      for (const bookId of event.bookIds) coverVersions.bumpVersion(bookId)
     })
 
     socket.on('disconnect', () => {

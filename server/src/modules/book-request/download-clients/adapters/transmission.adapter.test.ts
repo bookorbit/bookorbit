@@ -141,8 +141,8 @@ describe('TransmissionAdapter', () => {
       handlers.set('session-get', () => success({ 'download-dir': '/downloads' }));
       handlers.set('torrent-add', () => success({ 'torrent-added': { hashString: INFO_HASH } }));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).resolves.toEqual({
-        clientHash: INFO_HASH,
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).resolves.toEqual({
+        clientKey: INFO_HASH,
       });
 
       const add = calls.find((call) => call.method === 'torrent-add');
@@ -155,7 +155,7 @@ describe('TransmissionAdapter', () => {
       const { calls, handlers } = mockRpc();
       handlers.set('torrent-add', () => success({ 'torrent-added': { hashString: INFO_HASH } }));
 
-      await adapter.add({ torrentFile: Buffer.from('d4:infod4:name4:duneee'), torrentFileName: 'dune.torrent', infoHash: INFO_HASH }, config());
+      await adapter.add({ torrentFile: Buffer.from('d4:infod4:name4:duneee'), torrentFileName: 'dune.torrent', clientKey: INFO_HASH }, config());
 
       const add = calls.find((call) => call.method === 'torrent-add');
       expect(add?.args.metainfo).toBe(Buffer.from('d4:infod4:name4:duneee').toString('base64'));
@@ -170,8 +170,8 @@ describe('TransmissionAdapter', () => {
       const { handlers } = mockRpc();
       handlers.set('torrent-add', () => success({ 'torrent-duplicate': { hashString: INFO_HASH } }));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).resolves.toEqual({
-        clientHash: INFO_HASH,
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).resolves.toEqual({
+        clientKey: INFO_HASH,
       });
     });
 
@@ -179,7 +179,7 @@ describe('TransmissionAdapter', () => {
       const { calls, handlers } = mockRpc();
       handlers.set('torrent-add', () => success({ 'torrent-added': { hashString: INFO_HASH } }));
 
-      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH, seedRatioGoal: 2 }, config());
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, seedRatioGoal: 2 }, config());
 
       const set = calls.find((call) => call.method === 'torrent-set');
       expect(set?.args).toEqual({ ids: [INFO_HASH], seedRatioLimit: 2, seedRatioMode: 1 });
@@ -195,8 +195,8 @@ describe('TransmissionAdapter', () => {
       handlers.set('torrent-add', () => success({ 'torrent-added': { hashString: INFO_HASH } }));
       handlers.set('torrent-set', () => new Response('', { status: 500 }));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH, seedRatioGoal: 2 }, config())).resolves.toEqual({
-        clientHash: INFO_HASH,
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, seedRatioGoal: 2 }, config())).resolves.toEqual({
+        clientKey: INFO_HASH,
       });
     });
 
@@ -209,14 +209,14 @@ describe('TransmissionAdapter', () => {
       const { calls, handlers } = mockRpc();
       handlers.set('torrent-add', () => success({ 'torrent-added': { hashString: INFO_HASH } }));
 
-      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH, seedTimeMinutes: 4320 }, config());
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, seedTimeMinutes: 4320 }, config());
 
       expect(calls.find((call) => call.method === 'torrent-set')).toBeUndefined();
     });
 
     it('rejects a grab carrying neither a magnet nor a file', async () => {
       mockRpc();
-      await expect(adapter.add({ infoHash: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
+      await expect(adapter.add({ clientKey: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
     });
 
     /** `..` is inside the category's permitted character set and would escape the download root. */
@@ -225,7 +225,7 @@ describe('TransmissionAdapter', () => {
       handlers.set('session-get', () => success({ 'download-dir': '/downloads' }));
       handlers.set('torrent-add', () => success({ 'torrent-added': { hashString: INFO_HASH } }));
 
-      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config({ category: '..' }));
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config({ category: '..' }));
 
       expect(calls.find((call) => call.method === 'torrent-add')?.args['download-dir']).toBeUndefined();
     });
@@ -260,7 +260,7 @@ describe('TransmissionAdapter', () => {
 
       await expect(adapter.status([INFO_HASH], config())).resolves.toEqual([
         expect.objectContaining({
-          infoHash: INFO_HASH,
+          clientKey: INFO_HASH,
           state: 'downloading',
           progressPercent: 50,
           downloadedBytes: 512,

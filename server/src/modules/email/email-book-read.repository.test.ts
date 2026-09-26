@@ -1,5 +1,6 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
+  asc: vi.fn((column: unknown) => ({ op: 'asc', column })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   sql: vi.fn((parts: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', parts, values })),
 }));
@@ -65,15 +66,27 @@ describe('EmailBookReadRepository', () => {
     expect(and).toHaveBeenCalledWith({ op: 'eq', left: bookFiles.id, right: 5 }, { op: 'eq', left: bookFiles.bookId, right: 3 });
   });
 
-  it('findFilesByBookId returns all file rows for the book', async () => {
+  it('findFilesByBookId returns all file rows for the book in stored order', async () => {
     const chain = selectChain();
-    chain.where.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    chain.orderBy.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     const db = { select: vi.fn().mockReturnValue(chain) };
     const repo = new EmailBookReadRepository(db as never);
 
     await expect(repo.findFilesByBookId(8)).resolves.toEqual([{ id: 1 }, { id: 2 }]);
     expect(chain.from).toHaveBeenCalledWith(bookFiles);
     expect(eq).toHaveBeenCalledWith(bookFiles.bookId, 8);
+    expect(chain.orderBy).toHaveBeenCalledWith({ op: 'asc', column: bookFiles.sortOrder }, { op: 'asc', column: bookFiles.id });
+  });
+
+  it('findLibraryFormatPriority returns the book library priority or null', async () => {
+    const chain = selectChain();
+    chain.limit.mockResolvedValueOnce([{ formatPriority: ['m4b', 'epub'] }]).mockResolvedValueOnce([]);
+    const db = { select: vi.fn().mockReturnValue(chain) };
+    const repo = new EmailBookReadRepository(db as never);
+
+    await expect(repo.findLibraryFormatPriority(3)).resolves.toEqual(['m4b', 'epub']);
+    await expect(repo.findLibraryFormatPriority(4)).resolves.toBeNull();
+    expect(eq).toHaveBeenCalledWith(books.id, 3);
   });
 
   it('findMetadataByBookId returns metadata row or null', async () => {

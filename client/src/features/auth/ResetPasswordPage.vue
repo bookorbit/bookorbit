@@ -4,7 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
+import { fetchWithAuthProxyRecovery } from '@/lib/api'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
@@ -73,7 +75,7 @@ async function handleSubmit() {
 
   loading.value = true
   try {
-    const res = await fetch('/api/v1/auth/reset-password', {
+    const res = await fetchWithAuthProxyRecovery('/api/v1/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token.value, newPassword: newPassword.value }),
@@ -95,7 +97,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="login-bg min-h-screen flex items-center justify-center px-4 overflow-hidden">
+  <div class="login-bg min-h-screen flex flex-col items-center justify-center gap-3 px-4 overflow-hidden">
     <!-- Compact theme picker -->
     <div class="fixed bottom-5 right-5 z-20 flex items-center gap-1.5">
       <!-- Dark / light toggle -->
@@ -267,6 +269,7 @@ async function handleSubmit() {
         <RouterLink to="/login" class="text-primary hover:underline">{{ t('auth.backToSignIn') }}</RouterLink>
       </p>
     </div>
+    <PublicLegalNotices />
   </div>
 </template>
 

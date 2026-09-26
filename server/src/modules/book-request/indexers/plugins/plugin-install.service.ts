@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { INDEXER_ADAPTER_TYPES, type PluginInspection, type PluginInstallResult } from '@bookorbit/types';
@@ -46,6 +47,7 @@ process.stdout.write(
   JSON.stringify({
     apiVersion: plugin.apiVersion,
     version: plugin.version,
+    update: plugin.update,
     type: plugin.type,
     label: plugin.label,
     requiresCredential: plugin.requiresCredential,
@@ -120,6 +122,7 @@ export class PluginInstallService {
       type,
       label: declared.label as string,
       ...(declared.version ? { version: declared.version as string } : {}),
+      ...(declared.update ? { update: declared.update as import('@bookorbit/types').PluginUpdateChannel } : {}),
       requiresCredential: declared.requiresCredential as boolean,
       credentialKind: declared.credentialKind,
       mediaKinds: declared.mediaKinds as PluginInspection['mediaKinds'],
@@ -144,7 +147,7 @@ export class PluginInstallService {
     const directory = this.directoryFor(directoryName);
 
     await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, 'index.mjs'), source, 'utf8');
+    await writeAtomically(join(directory, 'index.mjs'), source);
     const active = await this.activate(inspection.type, directoryName);
 
     this.logger.log(
@@ -152,6 +155,31 @@ export class PluginInstallService {
         `active=${active} user="${sanitizeLogValue(installedBy)}" - plugin installed`,
     );
     return { ...inspection, active };
+  }
+
+  /** A verified remote update is rolled back on activation failure, so automation cannot strand a working plugin. */
+  async installVerifiedUpdate(source: string, expectedType: string, installedBy: string): Promise<PluginInstallResult> {
+    const inspection = await this.inspect(source);
+    if (inspection.type !== expectedType) throw new BadRequestException(`The update declares "${inspection.type}" instead of "${expectedType}"`);
+
+    const directoryName = this.loader.directoryForType(expectedType);
+    if (!directoryName) throw new BadRequestException(`No installed plugin called "${expectedType}" exists`);
+    const directory = this.directoryFor(directoryName);
+    const entrypoint = join(directory, 'index.mjs');
+    const previous = await readOptional(entrypoint);
+
+    await writeAtomically(entrypoint, source);
+    if (!(await this.activate(expectedType, directoryName))) {
+      if (previous === null) await rm(entrypoint, { force: true });
+      else await writeAtomically(entrypoint, previous);
+      await this.activate(expectedType, directoryName);
+      throw new BadRequestException(`The ${expectedType} update did not load, so the previous version was restored`);
+    }
+
+    this.logger.log(
+      `[request_indexer.plugin_update] [end] type=${expectedType} bytes=${Buffer.byteLength(source)} user="${sanitizeLogValue(installedBy)}" - verified update installed`,
+    );
+    return { ...inspection, active: true };
   }
 
   /**
@@ -251,6 +279,24 @@ export class PluginInstallService {
     } finally {
       await rm(staging, { recursive: true, force: true });
     }
+  }
+}
+
+async function readOptional(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+async function writeAtomically(path: string, source: string): Promise<void> {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, source, { encoding: 'utf8', mode: 0o600 });
+    await rename(temporary, path);
+  } finally {
+    await rm(temporary, { force: true });
   }
 }
 

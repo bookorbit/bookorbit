@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 
 import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { BookModule } from '../book/book.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -13,7 +14,15 @@ import { BookMoveRepository } from './book-move.repository';
 import { BookMoveService } from './book-move.service';
 
 @Module({
-  imports: [BookModule, ScannerModule, FileWriteModule, AppSettingsModule, SelfWriteRegistryModule, forwardRef(() => NotificationModule)],
+  imports: [
+    BookModule,
+    BookCoverStoreModule,
+    ScannerModule,
+    FileWriteModule,
+    AppSettingsModule,
+    SelfWriteRegistryModule,
+    forwardRef(() => NotificationModule),
+  ],
   controllers: [BookMoveController],
   providers: [BookMoveService, BookMovePlannerService, BookMoveExecutorService, BookMoveRepository],
   exports: [BookMoveService],

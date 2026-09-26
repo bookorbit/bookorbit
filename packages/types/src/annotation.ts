@@ -98,6 +98,7 @@ export interface AnnotationItem {
   chapterIndex: number | null;
   highlightedAt: string;
   createdAt: string;
+  updatedAt?: string | null;
   /** Present for PDF highlights; null/absent for EPUB and device-synced formats. */
   pdf?: AnnotationPdfPosition | null;
 }

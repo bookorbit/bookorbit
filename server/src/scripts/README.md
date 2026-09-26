@@ -30,6 +30,7 @@ GITHUB_RELEASES_REPO=neonsolstice/playground pnpm whats-new:preview v4.2.0
 | File                                 | Run with                                             | Purpose                                       |
 | ------------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
 | `db-seed.ts`                         | `pnpm db:seed`                                       | Seed the dev database.                        |
+| `seed-apple-source-stats.ts`         | `pnpm db:seed:apple-stats`                           | Seed realistic iOS and Watch reading history. |
 | `db-prepare-e2e.ts`                  | `pnpm e2e:db:prepare`                                | Prepare the e2e test database.                |
 | `migrate.ts`                         | `pnpm db:migrate:runtime` (compiled)                 | Apply database migrations at runtime/startup. |
 | `setup-kobo-cloudscraper.ts`         | `pnpm setup:kobo-cloudscraper`                       | Set up the Kobo cloudscraper integration.     |

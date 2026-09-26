@@ -11,6 +11,9 @@ import type {
   IndexerTestResult,
   PluginInspection,
   PluginInstallResult,
+  PluginUpdateListResult,
+  PluginUpdateReview,
+  PluginUpdateStatus,
   UpdateIndexerPayload,
 } from '@bookorbit/types'
 
@@ -46,6 +49,7 @@ export function useIndexers() {
   const adapters = ref<IndexerAdapterDescriptor[]>([])
   /** Plugins that would not load. Shown, because one that silently vanishes cannot be debugged. */
   const pluginFailures = ref<IndexerPluginFailure[]>([])
+  const pluginUpdates = ref<PluginUpdateStatus[]>([])
   /** False when `BOOK_REQUEST_ENCRYPTION_KEY` is unset, which is what refuses a saved credential. */
   const encryptionConfigured = ref(true)
   const loading = ref(false)
@@ -183,10 +187,62 @@ export function useIndexers() {
     }
   }
 
+  async function fetchPluginUpdates(refresh = false): Promise<boolean> {
+    try {
+      const res = await api(`${BASE_PATH}/plugins/updates${refresh ? '/check' : ''}`, { method: refresh ? 'POST' : 'GET' })
+      if (!res.ok) return false
+      const result = (await res.json()) as Partial<PluginUpdateListResult>
+      if (!Array.isArray(result.updates)) return false
+      pluginUpdates.value = result.updates
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function inspectPluginUpdate(type: string): Promise<{ inspection: PluginUpdateReview | null; error: string | null }> {
+    try {
+      const res = await api(`${BASE_PATH}/plugins/${encodeURIComponent(type)}/update/inspect`, { method: 'POST' })
+      if (!res.ok) return { inspection: null, error: (await toFailure(res)).message }
+      return { inspection: (await res.json()) as PluginUpdateReview, error: null }
+    } catch {
+      return { inspection: null, error: null }
+    }
+  }
+
+  async function installPluginUpdate(type: string, sha256: string): Promise<{ status: PluginUpdateStatus | null; error: string | null }> {
+    try {
+      const res = await api(`${BASE_PATH}/plugins/${encodeURIComponent(type)}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sha256 }),
+      })
+      if (!res.ok) return { status: null, error: (await toFailure(res)).message }
+      return { status: (await res.json()) as PluginUpdateStatus, error: null }
+    } catch {
+      return { status: null, error: null }
+    }
+  }
+
+  async function setPluginAutomaticUpdate(type: string, enabled: boolean): Promise<{ status: PluginUpdateStatus | null; error: string | null }> {
+    try {
+      const res = await api(`${BASE_PATH}/plugins/${encodeURIComponent(type)}/auto-update`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      if (!res.ok) return { status: null, error: (await toFailure(res)).message }
+      return { status: (await res.json()) as PluginUpdateStatus, error: null }
+    } catch {
+      return { status: null, error: null }
+    }
+  }
+
   return {
     indexers,
     adapters,
     pluginFailures,
+    pluginUpdates,
     adapterFor,
     encryptionConfigured,
     loading,
@@ -199,5 +255,9 @@ export function useIndexers() {
     inspectPlugin,
     installPlugin,
     removePlugin,
+    fetchPluginUpdates,
+    inspectPluginUpdate,
+    installPluginUpdate,
+    setPluginAutomaticUpdate,
   }
 }

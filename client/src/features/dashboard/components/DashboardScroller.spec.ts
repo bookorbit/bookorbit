@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick, ref, type Ref } from 'vue'
-import type { BookCard, ScrollerType } from '@bookorbit/types'
+import type { BookCard, BookScrollerType } from '@bookorbit/types'
 
 type DashboardScrollerState = {
   books: Ref<BookCard[]>
@@ -10,7 +10,7 @@ type DashboardScrollerState = {
   refresh: () => Promise<void>
 }
 
-type UseDashboardScrollerMock = (type: ScrollerType, limit?: number, smartScopeId?: number) => DashboardScrollerState
+type UseDashboardScrollerMock = (type: BookScrollerType, limit?: number, smartScopeId?: number) => DashboardScrollerState
 
 // `sm` is true at or above the Tailwind sm breakpoint, so a false value is the
 // compact viewport where the row count gets capped. A real ref keeps the mock
@@ -111,6 +111,7 @@ function makeBook(id: number, format: string, coverAspectRatio: BookCard['coverA
     readStatus: null,
     addedAt: '2026-01-01T00:00:00.000Z',
     updatedAt: null,
+    coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
     metadataScore: null,
     hasCover: false,
     hasMetadataLocks: false,
@@ -134,7 +135,7 @@ function mountScroller({
   limit,
   refresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }: {
-  type: ScrollerType
+  type: BookScrollerType
   books?: BookCard[]
   loading?: boolean
   error?: boolean

@@ -5,8 +5,10 @@ import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
 import { UserBookNoteService, type UserBookNoteDto } from '../user-book-note/user-book-note.service';
+import { BookService } from '../book/book.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import type { BookStateDto, BookStatesUploadDto, BulkProgressDto, MatchCheckDto, SweepCompleteDto } from './dto';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
@@ -19,6 +21,9 @@ const BULK_PROGRESS_EVENT = 'koreader.plugin.bulk_progress';
 const SWEEP_EVENT = 'koreader.plugin.sweep';
 const UNMATCHED_SOURCE_RANK = { statistics: 0, file: 1, current_file: 2 } as const;
 const STATUS_WRITE_CONCURRENCY = 8;
+
+type MatchCheckBookCandidate = NonNullable<MatchCheckDto['books']>[number];
+type ResolvedBookFile = { bookFileId: number; bookId: number; libraryId: number; format: string | null };
 
 const DEVICE_STATUS_TO_READ_STATUS: Record<string, ReadStatus> = {
   reading: 'reading',
@@ -71,6 +76,8 @@ interface BookStateBatch {
   ratingWrites: Map<number, number | null>;
   noteWrites: Map<number, string | null>;
   appliedAt: Date;
+  /** Resolved once for the request so a large batch does not look the reader's day up per book. */
+  timeZone: string;
 }
 
 export interface BulkProgressResult {
@@ -95,6 +102,7 @@ export class KoreaderPluginService {
     private readonly userBookStatusService: UserBookStatusService,
     private readonly userBookNoteService: UserBookNoteService,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly bookService: BookService,
   ) {}
 
   async matchCheck(user: RequestUser, dto: MatchCheckDto): Promise<MatchCheckResult> {
@@ -106,6 +114,8 @@ export class KoreaderPluginService {
     const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
     const hashes = [...new Set(dto.hashes.map((hash) => hash.toLowerCase()))];
     const resolved = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
+    const linked = await this.linkRequestedFileHashes(user, hashes, resolved, this.buildCandidateMap(dto));
+    for (const [hash, match] of linked) resolved.set(hash, match);
     const matchedHashes = [...resolved.keys()];
     const unmatchedCandidates = this.buildUnmatchedCandidates(hashes, matchedHashes, dto);
     await Promise.all([
@@ -121,7 +131,7 @@ export class KoreaderPluginService {
     const libraryVersion = await this.computeLibraryVersion(user.id, accessibleLibraryIds);
 
     this.logger.log(
-      `[${MATCH_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} matched=${matches.length} total=${hashes.length} - match check completed`,
+      `[${MATCH_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} matched=${matches.length} linked=${linked.size} total=${hashes.length} - match check completed`,
     );
 
     return { matches, libraryVersion };
@@ -165,6 +175,7 @@ export class KoreaderPluginService {
         ratingWrites: new Map<number, number | null>(),
         noteWrites: new Map<number, string | null>(),
         appliedAt: new Date(),
+        timeZone: resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC'),
       };
 
       // Several input entries can resolve to one book (duplicate hashes, or different
@@ -232,10 +243,12 @@ export class KoreaderPluginService {
         results.push({ hash, accepted: true });
       }
 
-      const applied = await this.koreaderService.applyBulkProgress(user.id, entries, {
-        device: dto.deviceModel,
-        deviceId: dto.deviceId,
-      });
+      const applied = await this.koreaderService.applyBulkProgress(
+        user.id,
+        entries,
+        { device: dto.deviceModel, deviceId: dto.deviceId },
+        resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC'),
+      );
 
       this.logger.log(
         `[${BULK_PROGRESS_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} accepted=${results.length} shared=${applied.shared} stale=${applied.stale} held=${applied.held} unmatched=${unmatched.length} - bulk progress completed`,
@@ -293,6 +306,39 @@ export class KoreaderPluginService {
       .update(`${libraryKey}|${maxTs ? maxTs.toISOString() : 'none'}|${linkKey}`)
       .digest('hex')
       .slice(0, 16);
+  }
+
+  private buildCandidateMap(dto: MatchCheckDto): Map<string, MatchCheckBookCandidate> {
+    const candidates = new Map<string, MatchCheckBookCandidate>();
+    for (const book of dto.books ?? []) {
+      candidates.set(book.hash.toLowerCase(), book);
+    }
+    return candidates;
+  }
+
+  private async linkRequestedFileHashes(
+    user: RequestUser,
+    hashes: string[],
+    resolved: Map<string, ResolvedBookFile>,
+    candidates: Map<string, MatchCheckBookCandidate>,
+  ): Promise<Map<string, ResolvedBookFile>> {
+    const linked = new Map<string, ResolvedBookFile>();
+    for (const hash of hashes) {
+      const candidate = candidates.get(hash);
+      if (!candidate?.bookFileId || (candidate.source !== 'file' && candidate.source !== 'current_file')) continue;
+      if (resolved.get(hash)?.bookFileId === candidate.bookFileId) continue;
+
+      const file = await this.bookService.verifyFileAccess(candidate.bookFileId, user).catch(() => null);
+      if (!file || file.role !== 'content') continue;
+
+      await this.koreaderRepo.upsertBookHashLink(user.id, hash, file.id, {
+        title: candidate.title ?? null,
+        authors: candidate.authors ?? null,
+        lastOpen: candidate.lastOpen ?? null,
+      });
+      linked.set(hash, { bookFileId: file.id, bookId: file.bookId, libraryId: file.libraryId, format: file.format });
+    }
+    return linked;
   }
 
   private buildUnmatchedCandidates(hashes: string[], matchedHashes: string[], dto: MatchCheckDto) {
@@ -396,7 +442,7 @@ export class KoreaderPluginService {
       if (!statusModified || statusModified <= serverDate) return false;
     }
 
-    await this.userBookStatusService.setManual(userId, bookId, mapped);
+    await this.userBookStatusService.setManual(userId, bookId, mapped, state.timeZone);
     state.staleStatusBookIds.add(bookId);
     return true;
   }

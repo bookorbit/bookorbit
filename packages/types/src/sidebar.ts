@@ -1,8 +1,23 @@
-export const SIDEBAR_SECTION_IDS = ["browse", "libraries", "smartScopes", "collections"] as const;
+export const SIDEBAR_SECTION_IDS = [
+  "browse",
+  "libraries",
+  "podcasts",
+  "smartScopes",
+  "collections",
+  "podcastScopes",
+  "podcastCollections",
+] as const;
 export type SidebarSectionId = (typeof SIDEBAR_SECTION_IDS)[number];
 
 /** Sections backed by a variable-length entity list, so only these carry a rows-shown cap. */
-export const SIDEBAR_CAPPED_SECTION_IDS = ["libraries", "smartScopes", "collections"] as const;
+export const SIDEBAR_CAPPED_SECTION_IDS = [
+  "libraries",
+  "podcasts",
+  "smartScopes",
+  "collections",
+  "podcastScopes",
+  "podcastCollections",
+] as const;
 export type SidebarCappedSectionId = (typeof SIDEBAR_CAPPED_SECTION_IDS)[number];
 
 /** How many rows a sidebar entity section renders before the See-all link takes over. */

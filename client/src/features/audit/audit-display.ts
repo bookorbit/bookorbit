@@ -7,7 +7,7 @@ export function getAuditCategory(action: string): AuditCategory {
   if (action.startsWith('auth.') || action.startsWith('magic_link.')) return 'authentication'
   if (action.startsWith('book.')) return 'books'
   if (action.startsWith('user.') || action.startsWith('reading_insights.')) return 'users'
-  if (action.startsWith('library.')) return 'libraries'
+  if (action.startsWith('library.') || action.startsWith('podcast.')) return 'libraries'
   if (action.startsWith('collection.') || action.startsWith('smart_scope.')) return 'collections'
   if (action.startsWith('kobo.') || action.startsWith('email.')) return 'integrations'
   if (action.startsWith('app_settings.') || action.startsWith('entity_manager.') || action.startsWith('author.')) return 'settings'

@@ -10,6 +10,7 @@ function createResolver() {
   return {
     getDefaultPreferences: vi.fn(() => resolver.getDefaultPreferences()),
     resolve: vi.fn((global, overrides) => resolver.resolve(global, overrides)),
+    withSeededAudioCoverRule: vi.fn((fields) => resolver.withSeededAudioCoverRule(fields)),
   } as unknown as Mocked<MetadataPreferenceResolver>;
 }
 
@@ -17,6 +18,11 @@ function createDb() {
   const insertChain = {
     values: vi.fn().mockReturnThis(),
     onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+    onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+  };
+  const selectChain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockResolvedValue([]),
   };
 
   const updateChain = {
@@ -36,8 +42,10 @@ function createDb() {
     },
     insert: vi.fn().mockReturnValue(insertChain),
     update: vi.fn().mockReturnValue(updateChain),
+    select: vi.fn().mockReturnValue(selectChain),
     __insertChain: insertChain,
     __updateChain: updateChain,
+    __selectChain: selectChain,
   };
 }
 
@@ -199,5 +207,40 @@ describe('MetadataPreferencesService', () => {
 
     db.__updateChain.returning.mockResolvedValueOnce([]);
     await expect(service.resetLibraryToGlobal(50)).rejects.toThrow(NotFoundException);
+  });
+
+  describe('seedAudioCoverRules', () => {
+    const cover = { enabled: false, mergeStrategy: 'fillMissing', providers: [MetadataProviderKey.AMAZON] };
+
+    it('writes an Audiobook cover rule into every stored scope that has only a Cover rule, then marks itself done', async () => {
+      db.query.appSettings.findFirst.mockResolvedValueOnce(undefined).mockResolvedValueOnce({
+        key: 'metadata_fetch_preferences',
+        value: JSON.stringify({ fields: { cover }, options: { saveProviderIds: true } }),
+      });
+      db.__selectChain.where.mockResolvedValue([
+        { id: 1, overrides: { cover } },
+        { id: 2, overrides: { cover, audioCover: { enabled: true, mergeStrategy: 'overwrite', providers: [] } } },
+        { id: 3, overrides: { title: { enabled: true, mergeStrategy: 'overwrite', providers: [] } } },
+      ]);
+
+      await expect(service.seedAudioCoverRules()).resolves.toEqual({ global: true, libraries: 1 });
+
+      const [globalWrite, libraryWrite] = db.__updateChain.set.mock.calls.map(([values]) => values as Record<string, unknown>);
+      const storedGlobal = JSON.parse(globalWrite!.value as string);
+      expect(storedGlobal.options).toEqual({ saveProviderIds: true });
+      expect(storedGlobal.fields.audioCover).toMatchObject({ enabled: false, mergeStrategy: 'fillMissing' });
+      expect(libraryWrite!.metadataFetchPreferences).toMatchObject({ cover, audioCover: { enabled: false, mergeStrategy: 'fillMissing' } });
+      expect(db.__updateChain.set).toHaveBeenCalledTimes(2);
+      expect(db.__insertChain.values).toHaveBeenCalledWith(expect.objectContaining({ key: 'metadata_fetch_audio_cover_rule_seeded' }));
+    });
+
+    it('does nothing once marked done, so a removed library override stays removed', async () => {
+      db.query.appSettings.findFirst.mockResolvedValueOnce({ key: 'metadata_fetch_audio_cover_rule_seeded', value: '2026-09-23T00:00:00.000Z' });
+
+      await expect(service.seedAudioCoverRules()).resolves.toBeNull();
+
+      expect(db.select).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
   });
 });

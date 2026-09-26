@@ -20,11 +20,11 @@ import { MetadataExportDto } from './metadata-export.dto';
 import { GetBooksDto } from './get-books.dto';
 import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
+import { UpsertAudioProgressDto } from './upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './update-book-metadata.dto';
 import { UpdateBookAddedAtDto } from './update-book-added-at.dto';
 import { UpdatePersonalNoteDto } from './update-personal-note.dto';
 import { UpdateRatingDto } from './update-rating.dto';
-import { UpsertAudioProgressDto } from './upsert-audio-progress.dto';
 
 async function errorsFor<T extends object>(cls: new () => T, value: Record<string, unknown>) {
   const dto = plainToInstance(cls, value);
@@ -134,6 +134,8 @@ describe('Book DTO validation', () => {
           percentage: 100,
           cfi: 'epubcfi(/6/2)',
           pageNumber: 5,
+          mediaOverlayFragment: 'OPS/ch1.xhtml#s1',
+          mediaOverlaySectionIndex: 3,
           koreaderProgress: '/body/DocFragment[2]/body/p[1]/text()[1].0',
         })
       ).length,
@@ -142,6 +144,8 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(SaveProgressDto, { percentage: -1 })).length).toBeGreaterThan(0);
     expect((await errorsFor(SaveProgressDto, { percentage: 50, cfi: 123 })).length).toBeGreaterThan(0);
     expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: 'five' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, mediaOverlayFragment: 123 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, mediaOverlaySectionIndex: -1 })).length).toBeGreaterThan(0);
     expect((await errorsFor(SaveProgressDto, { percentage: 50, koreaderProgress: 123 })).length).toBeGreaterThan(0);
   });
 

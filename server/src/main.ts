@@ -14,6 +14,7 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
 import type { FastifyInstance } from 'fastify';
 import { appConfig } from './config/config';
+import { DEV_CLIENT_ORIGIN } from './config/dev-client-origin';
 import { setupSwaggerDocs } from './swagger';
 import {
   parseBooleanEnv,
@@ -21,6 +22,7 @@ import {
   buildHelmetOptions,
   buildEmptyJsonBodyStream,
   registerConditionalHsts,
+  registerDeclaredBodyLimits,
   registerEmptyBodyContentTypeParser,
   shouldInjectEmptyJsonBody,
   shouldServeSpaFallback,
@@ -38,6 +40,8 @@ async function bootstrap() {
   const fastify = adapter.getInstance();
   // Nest adds originalUrl to the raw request, but these helpers only use standard Fastify APIs.
   const standardFastify = fastify as unknown as FastifyInstance;
+
+  registerDeclaredBodyLimits(fastify);
 
   // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.
   fastify.addHook('preParsing', (request, _reply, payload, done) => {
@@ -90,7 +94,7 @@ async function bootstrap() {
 
   if (process.env.NODE_ENV !== 'production') {
     app.enableCors({
-      origin: process.env.CLIENT_URL ?? 'http://localhost:5173',
+      origin: process.env.CLIENT_URL ?? DEV_CLIENT_ORIGIN,
       credentials: true,
     });
   }
@@ -121,7 +125,7 @@ async function bootstrap() {
   }
 
   app.enableShutdownHooks();
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  await app.listen(process.env.PORT ?? 3000, appConfiguration.host);
 }
 
 bootstrap().catch((err: unknown) => {

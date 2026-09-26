@@ -108,7 +108,7 @@ describe('BookDockFileRow with a multi-file unit', () => {
 
   /** The anchor row's own size is one track's; the row must show what the whole unit weighs. */
   it('sums the unit size rather than reporting the primary file alone', () => {
-    expect(mountUnitRow({ unitFiles: TRACKS }).text()).toContain('2.5 KB')
+    expect(mountUnitRow({ unitFiles: TRACKS }).text()).toContain('2.5 kB')
   })
 
   it('lists the unit files in order with their roles once expanded', () => {

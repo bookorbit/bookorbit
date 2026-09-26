@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
 
 import type { UserSettings } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
@@ -9,6 +9,7 @@ import {
   ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
   AchievementEventsService,
 } from '../achievement/achievement-events.service';
+import { BookService } from '../book/book.service';
 import type { PageStatsUploadDto } from './dto';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderRepository } from './koreader.repository';
@@ -37,6 +38,7 @@ export class KoreaderStatsService {
     private readonly koreaderRepo: KoreaderRepository,
     private readonly pluginRepo: KoreaderPluginRepository,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly bookService: BookService,
   ) {}
 
   async uploadPageStats(user: RequestUser, dto: PageStatsUploadDto): Promise<PageStatsUploadResult> {
@@ -65,7 +67,23 @@ export class KoreaderStatsService {
 
       for (const book of dto.books) {
         const hash = book.hash.toLowerCase();
-        const match = matches.get(hash);
+        let match = matches.get(hash);
+        if (book.bookFileId) {
+          const explicitFile = await this.bookService.verifyFileAccess(book.bookFileId, user).catch((error: unknown) => {
+            if (error instanceof HttpException) return null;
+            throw error;
+          });
+          if (explicitFile?.role === 'content' && explicitFile.fileHash?.toLowerCase() === hash) {
+            match = {
+              bookFileId: explicitFile.id,
+              bookId: explicitFile.bookId,
+              libraryId: explicitFile.libraryId,
+              format: explicitFile.format,
+            };
+          } else {
+            match = undefined;
+          }
+        }
         if (!match) {
           unmatched.push(hash);
           continue;
@@ -137,6 +155,7 @@ export class KoreaderStatsService {
         progressDelta: session.progressDelta,
         endProgress: session.endProgress,
         timezone,
+        source: 'koreader',
       });
     }
   }

@@ -1,6 +1,7 @@
 import { ConflictException, Logger } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 
+import { SYSTEM_TIME_ZONE } from '../../common/utils/timezone.utils';
 import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 
 describe('LibraryScanSchedulerService', () => {
@@ -46,7 +47,7 @@ describe('LibraryScanSchedulerService', () => {
 
     expect(service.syncSchedule(7, '0 4 * * *')).toBe(true);
     const job = schedulerRegistry.getCronJob('library-auto-scan:7');
-    expect(job.nextDate().zoneName).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    expect(job.nextDate().zoneName).toBe(SYSTEM_TIME_ZONE);
     await job.fireOnTick();
 
     expect(scannerService.startScan).toHaveBeenCalledWith(7, 'schedule');

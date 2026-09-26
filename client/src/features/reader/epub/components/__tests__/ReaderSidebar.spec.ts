@@ -289,6 +289,29 @@ describe('ReaderSidebar', () => {
     expect(visibleRows[0]?.text()).toContain('Beta insight')
   })
 
+  it('does not navigate chapters when navigation is locked', async () => {
+    const wrapper = mount(ReaderSidebar, {
+      props: {
+        ...makeBaseProps(),
+        chapters: [
+          {
+            label: 'Chapter 1',
+            href: 'ch1.xhtml#start',
+            subitems: [],
+          },
+        ],
+        navigationLocked: true,
+      },
+      global,
+    })
+
+    const chapterButton = wrapper.findAll('button').find((btn) => btn.text().includes('Chapter 1'))
+    await chapterButton?.trigger('click')
+
+    expect(chapterButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.emitted('navigateChapter')).toBeUndefined()
+  })
+
   it('filters bookmarks, sorts by date, and skips bookmark navigation when CFI is missing', async () => {
     const wrapper = mount(ReaderSidebar, {
       props: {

@@ -3,6 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { SYSTEM_TIME_ZONE } from '../../common/utils/timezone.utils';
 import { ScannerService } from '../scanner/scanner.service';
 import { LibraryRepository } from './library.repository';
 
@@ -12,7 +13,7 @@ const LIBRARY_SCAN_JOB_PREFIX = 'library-auto-scan:';
 export class LibraryScanSchedulerService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(LibraryScanSchedulerService.name);
   private readonly registeredJobNames = new Set<string>();
-  private readonly timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  private readonly timeZone = SYSTEM_TIME_ZONE;
 
   constructor(
     private readonly libraryRepo: LibraryRepository,

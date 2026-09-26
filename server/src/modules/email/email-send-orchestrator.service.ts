@@ -1,12 +1,16 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import { createReadStream } from 'fs';
-import { basename } from 'path';
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { basename, join } from 'path';
 
 import { NotificationType } from '@bookorbit/types';
 import type { BookFile } from '../../db/schema';
 import type { RequestUser } from '../../common/types/request-user';
 import { NotificationService } from '../notification/notification.service';
+import { AudiolessEpubService } from '../book/audioless-epub.service';
 import { BookService } from '../book/book.service';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { EmailBookAccessService } from './email-book-access.service';
 import { EmailFileSelector } from './email-file-selector';
 import { EmailPreferencesService } from './email-preferences.service';
@@ -54,6 +58,7 @@ export class EmailSendOrchestrator {
     private readonly sendLogService: EmailSendLogService,
     private readonly transportService: EmailTransportService,
     private readonly notificationService: NotificationService,
+    @Optional() private readonly audiolessEpubService?: AudiolessEpubService,
   ) {}
 
   async send(dto: SendBookDto, user: RequestUser): Promise<{ queued: number }> {
@@ -248,6 +253,7 @@ export class EmailSendOrchestrator {
     bodyText: string,
     attemptCount: number,
   ) {
+    const attachment = await this.prepareAttachment(file, task);
     try {
       const transporter = this.transportService.buildTransporter(smtpConfig);
       const effectiveSubject = task.deviceType === 'kindle' ? KINDLE_CONVERT_SUBJECT : subject;
@@ -261,7 +267,7 @@ export class EmailSendOrchestrator {
         attachments: [
           {
             filename: this.buildAttachmentFilename(file),
-            content: createReadStream(file.absolutePath),
+            content: createReadStream(attachment.path),
           },
         ],
       });
@@ -308,6 +314,32 @@ export class EmailSendOrchestrator {
           })
           .catch(() => {});
       }
+    } finally {
+      await attachment.cleanup().catch(() => undefined);
+    }
+  }
+
+  /**
+   * A read-along EPUB is mailed without its narration audio, as Kobo and KOReader receive it: the
+   * audio is most of its size and an e-reader cannot play it. A failed rebuild sends the original.
+   */
+  private async prepareAttachment(file: BookFile, task: SendTask): Promise<{ path: string; cleanup: () => Promise<void> }> {
+    const original = { path: file.absolutePath, cleanup: () => Promise.resolve() };
+    if (!this.audiolessEpubService || file.format?.toLowerCase() !== 'epub' || !file.mediaOverlayAvailable) return original;
+
+    const tempDir = await mkdtemp(join(tmpdir(), 'bookorbit-email-epub-'));
+    const cleanup = () => rm(tempDir, { recursive: true, force: true });
+    try {
+      const path = join(tempDir, 'attachment.epub');
+      await this.audiolessEpubService.writeArchive(file.absolutePath, path);
+      return { path, cleanup };
+    } catch (error) {
+      await cleanup().catch(() => undefined);
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[${EMAIL_DISPATCH_EVENT}] [fail] bookId=${task.bookId} fileId=${file.id} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - audioless rebuild failed, sending original EPUB`,
+      );
+      return original;
     }
   }
 

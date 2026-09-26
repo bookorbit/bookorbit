@@ -242,7 +242,7 @@ watch(
   >
     <div
       v-if="visible"
-      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100svw-24px)] rounded-full bg-card/90 backdrop-blur-xl border border-primary/40 shadow-[0_8px_32px_rgba(0,0,0,0.35)] overflow-hidden"
+      class="fixed bottom-[max(1.5rem,var(--podcast-mini-player-clearance,0px))] left-1/2 -translate-x-1/2 z-50 max-w-[calc(100svw-24px)] rounded-full bg-card/90 backdrop-blur-xl border border-primary/40 shadow-[0_8px_32px_rgba(0,0,0,0.35)] overflow-hidden"
     >
       <div class="flex items-center gap-1 px-2.5 py-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <TooltipProvider :delay-duration="0">
@@ -484,7 +484,11 @@ watch(
 
             <Tooltip>
               <TooltipTrigger as-child>
-                <button :class="[BTN_ICON, 'text-muted-foreground hover:text-foreground hover:bg-muted']" @click="emit('exit')">
+                <button
+                  :class="[BTN_ICON, 'text-muted-foreground hover:text-foreground hover:bg-muted']"
+                  :aria-label="t('components.selectionActionBar.exitSelection')"
+                  @click="emit('exit')"
+                >
                   <X :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>

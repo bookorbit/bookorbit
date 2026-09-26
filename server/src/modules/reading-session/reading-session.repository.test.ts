@@ -3,9 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readingSessions, userReadingDailyStats } from '../../db/schema';
 import { ReadingSessionRepository } from './reading-session.repository';
 
-function makeDbHarness(options?: { fileRow?: { bookId: number; libraryId: number } | null; insertedIds?: Array<{ id: number }> }) {
+function makeDbHarness(options?: {
+  fileRow?: { bookId: number; libraryId: number } | null;
+  insertedIds?: Array<{ id: number }>;
+  /// The row a conflicting sessionId already occupies. `saveSession` reads it to decide whether the
+  /// incoming write supersedes a checkpoint or is a sync-queue retry of one already stored.
+  existingSession?: { id: number; durationSeconds: number; progressDelta: number | null } | null;
+}) {
   const fileRow = options?.fileRow === undefined ? { bookId: 7, libraryId: 11 } : options.fileRow;
   const insertedIds = options?.insertedIds ?? [{ id: 1 }];
+  const existingSession = options?.existingSession === undefined ? null : options.existingSession;
 
   const limit = vi.fn().mockResolvedValue(fileRow == null ? [] : [fileRow]);
   const where = vi.fn().mockReturnValue({ limit });
@@ -20,8 +27,19 @@ function makeDbHarness(options?: { fileRow?: { bookId: number; libraryId: number
   const dailyConflictUpdate = vi.fn().mockResolvedValue(undefined);
   const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: dailyConflictUpdate });
 
+  const existingLimit = vi.fn().mockResolvedValue(existingSession == null ? [] : [existingSession]);
+  const existingWhere = vi.fn().mockReturnValue({ limit: existingLimit });
+  const existingFrom = vi.fn().mockReturnValue({ where: existingWhere });
+  const txSelect = vi.fn().mockReturnValue({ from: existingFrom });
+
+  const updateWhere = vi.fn().mockResolvedValue(undefined);
+  const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+  const txUpdate = vi.fn().mockReturnValue({ set: updateSet });
+
   const tx = {
     execute: vi.fn().mockResolvedValue(undefined),
+    select: txSelect,
+    update: txUpdate,
     insert: vi.fn((table: unknown) => {
       if (table === readingSessions) return { values: sessionValues };
       if (table === userReadingDailyStats) return { values: dailyValues };
@@ -43,6 +61,8 @@ function makeDbHarness(options?: { fileRow?: { bookId: number; libraryId: number
     sessionReturning,
     dailyValues,
     dailyConflictUpdate,
+    updateSet,
+    updateWhere,
     tx,
   };
 }
@@ -81,7 +101,11 @@ describe('ReadingSessionRepository', () => {
   });
 
   it('skips when session id already exists (idempotent duplicate)', async () => {
-    const { repo, dailyValues } = makeDbHarness({ insertedIds: [] });
+    // A sync-queue retry of a write already stored: same id, same duration. It must stay a no-op.
+    const { repo, dailyValues } = makeDbHarness({
+      insertedIds: [],
+      existingSession: { id: 42, durationSeconds: 60, progressDelta: 3.2 },
+    });
 
     const result = await repo.saveSession(
       5,
@@ -95,6 +119,60 @@ describe('ReadingSessionRepository', () => {
     );
 
     expect(result).toEqual({ kind: 'skipped', reason: 'duplicate_session_id' });
+    expect(dailyValues).not.toHaveBeenCalled();
+  });
+
+  it('supersedes a checkpointed session when the later write carries more time', async () => {
+    // The iOS player checkpoints a session when the app is backgrounded, because `willTerminate`
+    // is not delivered if it is then killed, and the later close carries the same sessionId
+    // deliberately to replace that partial row. Dropping the second write capped every
+    // backgrounded session at the checkpoint: a measured 50s listen recorded 17s.
+    const { repo, dailyValues, updateSet } = makeDbHarness({
+      fileRow: { bookId: 9, libraryId: 3 },
+      insertedIds: [],
+      existingSession: { id: 77, durationSeconds: 17, progressDelta: 1.0 },
+    });
+
+    const result = await repo.saveSession(
+      5,
+      8,
+      'checkpointed-id',
+      new Date('2026-04-15T10:00:00.000Z'),
+      new Date('2026-04-15T10:01:00.000Z'),
+      56,
+      4.0,
+      12.5,
+    );
+
+    expect(result).toEqual({ kind: 'superseded', addedSeconds: 39 });
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: 56 }));
+    // Daily stats accumulate, so only the difference may be added or the checkpoint's seconds are
+    // counted twice.
+    expect(dailyValues).toHaveBeenCalled();
+    const segments = dailyValues.mock.calls[0][0] as Array<{ readingSeconds: number }>;
+    const added = segments.reduce((sum, segment) => sum + segment.readingSeconds, 0);
+    expect(added).toBe(39);
+  });
+
+  it('does not let a stale retry shrink a session', async () => {
+    const { repo, dailyValues, updateSet } = makeDbHarness({
+      insertedIds: [],
+      existingSession: { id: 78, durationSeconds: 90, progressDelta: 2.0 },
+    });
+
+    const result = await repo.saveSession(
+      5,
+      8,
+      'already-longer',
+      new Date('2026-04-15T10:00:00.000Z'),
+      new Date('2026-04-15T10:02:00.000Z'),
+      30,
+      1.0,
+      5.0,
+    );
+
+    expect(result).toEqual({ kind: 'skipped', reason: 'duplicate_session_id' });
+    expect(updateSet).not.toHaveBeenCalled();
     expect(dailyValues).not.toHaveBeenCalled();
   });
 
@@ -479,7 +557,7 @@ describe('ReadingSessionRepository - listByBook', () => {
     await expect(repo.listByBook(1, 2, 1, 25, 'startedAt', 'asc')).resolves.toBeDefined();
   });
 
-  it('folds sessions into the 3 display buckets, ordered and excluding empty buckets', async () => {
+  it('keeps native Apple sources distinct while folding legacy BookOrbit sessions', async () => {
     const { db } = makeListDb({
       count: [{ total: 5 }],
       stats: [{ totalSessions: 5, totalSeconds: 380, avgDurationSeconds: 76, firstSessionAt: null, lastSessionAt: null }],
@@ -487,6 +565,8 @@ describe('ReadingSessionRepository - listByBook', () => {
         { source: 'web', totalSeconds: 100, totalSessions: 1 },
         { source: 'manual', totalSeconds: 50, totalSessions: 1 },
         { source: null, totalSeconds: 30, totalSessions: 1 },
+        { source: 'ios', totalSeconds: 70, totalSessions: 1 },
+        { source: 'watchos', totalSeconds: 40, totalSessions: 1 },
         { source: 'kobo', totalSeconds: 200, totalSessions: 2 },
       ],
     });
@@ -494,9 +574,11 @@ describe('ReadingSessionRepository - listByBook', () => {
 
     const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
 
-    // web + manual + null collapse into bookorbit; koreader has no rows and is omitted.
+    // web + manual + null collapse into bookorbit; native clients retain identity.
     expect(result.stats.bySource).toEqual([
       { bucket: 'bookorbit', totalSeconds: 180, totalSessions: 3 },
+      { bucket: 'ios', totalSeconds: 70, totalSessions: 1 },
+      { bucket: 'watchos', totalSeconds: 40, totalSessions: 1 },
       { bucket: 'kobo', totalSeconds: 200, totalSessions: 2 },
     ]);
   });

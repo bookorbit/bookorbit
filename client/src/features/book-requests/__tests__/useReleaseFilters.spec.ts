@@ -26,6 +26,7 @@ function release(overrides: Partial<ReleaseCandidateItem> = {}): ReleaseCandidat
     score: 50,
     tier: null,
     tierName: null,
+    profileMismatch: null,
     reasons: [],
     ...overrides,
   }

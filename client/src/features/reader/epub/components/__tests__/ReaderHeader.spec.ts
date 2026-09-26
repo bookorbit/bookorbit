@@ -61,6 +61,8 @@ describe('ReaderHeader', () => {
     await wrapper.get('button[aria-label="Cycle footer info mode"]').trigger('click')
     await wrapper.get('button[aria-label="Keyboard Shortcuts"]').trigger('click')
     await wrapper.get('button[aria-label="Enter fullscreen"]').trigger('click')
+    await wrapper.get('button[aria-label="Toggle tap zones"]').trigger('click')
+    await wrapper.get('button[aria-label="Pin menu"]').trigger('click')
 
     expect(wrapper.emitted('back')?.length).toBe(1)
     expect(wrapper.emitted('toggleSidebar')?.length).toBe(1)
@@ -70,6 +72,8 @@ describe('ReaderHeader', () => {
     expect(wrapper.emitted('toggleHelp')?.length).toBe(1)
     expect(wrapper.emitted('toggleFullscreen')?.length).toBe(1)
     expect(wrapper.get('button[aria-label="Enter fullscreen"]').classes()).not.toContain('hidden')
+    expect(wrapper.emitted('toggleTapZones')?.length).toBe(1)
+    expect(wrapper.emitted('togglePin')?.length).toBe(1)
   })
 
   describe('settings container', () => {
@@ -132,5 +136,20 @@ describe('ReaderHeader', () => {
 
       viewport.isCompact = false
     })
+  })
+
+  it('hides TTS control when unavailable for current format', () => {
+    const wrapper = mount(ReaderHeader, {
+      props: {
+        chapterTitle: 'Chapter 4',
+        isBookmarked: true,
+        settingsOpen: false,
+        footerMode: 0,
+        isTtsAvailable: false,
+      },
+      global,
+    })
+
+    expect(wrapper.find('button[aria-label="Listen with TTS"]').exists()).toBe(false)
   })
 })

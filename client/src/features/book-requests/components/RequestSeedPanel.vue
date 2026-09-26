@@ -33,6 +33,17 @@ const removalInFlight = ref(false)
 const download = computed(() => props.request.download)
 const isTorrentDownload = computed(() => download.value?.source === 'magnet' || download.value?.source === 'torrent_file')
 
+const clientActivity = computed(() => {
+  if (!status.value) return null
+  if (status.value.seeding) {
+    return { label: t('bookRequests.seed.seeding'), className: 'border-success/40 bg-success/10 text-success' }
+  }
+  if (download.value?.status === 'queued' || download.value?.status === 'downloading') {
+    return { label: t(`bookRequests.download.status.${download.value.status}`), className: 'border-info/40 bg-info/10 text-info' }
+  }
+  return { label: t('bookRequests.seed.stopped'), className: 'border-border bg-muted text-muted-foreground' }
+})
+
 /**
  * Ratio and seeding time are not two more figures: they are the two goals the client stops on, so
  * whichever of them the client actually reported a target for is drawn as a fraction of it. A goal
@@ -87,14 +98,27 @@ const meters = computed<SeedMeter[]>(() => {
   return rows
 })
 
-// A fresh request means a fresh read: a ratio from the request before this one is worse than none.
+// A fresh request means a fresh read, and an advancing attempt replaces any pre-seeding snapshot.
 watch(
-  [() => props.request.id, () => download.value?.id, () => download.value?.source],
-  ([id]) => {
-    deleteFiles.value = false
-    removalInFlight.value = false
-    reset()
-    if (isTorrentDownload.value) void fetchStatus(id)
+  () => ({
+    requestId: props.request.id,
+    downloadId: download.value?.id,
+    source: download.value?.source,
+    status: download.value?.status,
+  }),
+  (current, previous) => {
+    const identityChanged =
+      !previous || current.requestId !== previous.requestId || current.downloadId !== previous.downloadId || current.source !== previous.source
+
+    if (identityChanged) {
+      deleteFiles.value = false
+      removalInFlight.value = false
+      reset()
+    }
+
+    if (isTorrentDownload.value && (identityChanged || current.status !== previous.status)) {
+      void fetchStatus(current.requestId)
+    }
   },
   { immediate: true },
 )
@@ -142,12 +166,9 @@ function confirmRemove() {
     <template v-else>
       <!-- Whether it is still seeding is the whole question, so it leads and never rides on colour alone. -->
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
-          :class="status.seeding ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-muted text-muted-foreground'"
-        >
+        <span class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium" :class="clientActivity?.className">
           <span class="size-1.5 rounded-full bg-current" aria-hidden="true" />
-          {{ status.seeding ? t('bookRequests.seed.seeding') : t('bookRequests.seed.stopped') }}
+          {{ clientActivity?.label }}
         </span>
         <span v-if="status.downloadClientName" class="truncate text-xs text-muted-foreground">{{ status.downloadClientName }}</span>
       </div>

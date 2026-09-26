@@ -173,8 +173,8 @@ describe('DelugeAdapter', () => {
       const { calls, handlers } = mockRpc();
       handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).resolves.toEqual({
-        clientHash: INFO_HASH,
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).resolves.toEqual({
+        clientKey: INFO_HASH,
       });
 
       const add = calls.find((call) => call.method === 'core.add_torrent_magnet');
@@ -186,7 +186,7 @@ describe('DelugeAdapter', () => {
       const { calls, handlers } = mockRpc();
       handlers.set('core.add_torrent_file', () => result(INFO_HASH));
 
-      await adapter.add({ torrentFile: Buffer.from('d4:infod4:name4:duneee'), torrentFileName: 'dune.torrent', infoHash: INFO_HASH }, config());
+      await adapter.add({ torrentFile: Buffer.from('d4:infod4:name4:duneee'), torrentFileName: 'dune.torrent', clientKey: INFO_HASH }, config());
 
       const add = calls.find((call) => call.method === 'core.add_torrent_file');
       expect(add?.params[0]).toBe('dune.torrent');
@@ -197,7 +197,7 @@ describe('DelugeAdapter', () => {
       const { calls, handlers } = mockRpc();
       handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
 
-      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH, seedRatioGoal: 2 }, config());
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, seedRatioGoal: 2 }, config());
 
       expect(calls.find((call) => call.method === 'core.add_torrent_magnet')?.params[1]).toEqual({
         add_paused: false,
@@ -205,6 +205,15 @@ describe('DelugeAdapter', () => {
         stop_ratio: 2,
         remove_at_ratio: false,
       });
+    });
+
+    it('does not synthesize a ratio from an unsupported seed-time goal', async () => {
+      const { calls, handlers } = mockRpc();
+      handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
+
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, seedTimeMinutes: 4320 }, config());
+
+      expect(calls.find((call) => call.method === 'core.add_torrent_magnet')?.params[1]).toEqual({ add_paused: false });
     });
 
     /**
@@ -217,8 +226,8 @@ describe('DelugeAdapter', () => {
       handlers.set('core.add_torrent_magnet', () => failure('Torrent already in session'));
       handlers.set('core.get_torrents_status', () => result({ [INFO_HASH]: { hash: INFO_HASH } }));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).resolves.toEqual({
-        clientHash: INFO_HASH,
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).resolves.toEqual({
+        clientKey: INFO_HASH,
       });
     });
 
@@ -227,12 +236,12 @@ describe('DelugeAdapter', () => {
       handlers.set('core.add_torrent_magnet', () => failure('Unable to add torrent'));
       handlers.set('core.get_torrents_status', () => result({}));
 
-      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
+      await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
     });
 
     it('rejects a grab carrying neither a magnet nor a file', async () => {
       mockRpc();
-      await expect(adapter.add({ infoHash: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
+      await expect(adapter.add({ clientKey: INFO_HASH }, config())).rejects.toThrow(BadRequestException);
     });
 
     describe('labels', () => {
@@ -241,7 +250,7 @@ describe('DelugeAdapter', () => {
         handlers.set('core.get_enabled_plugins', () => result(['Label']));
         handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
 
-        await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config());
+        await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config());
 
         expect(calls.find((call) => call.method === 'label.add')?.params).toEqual(['bookorbit']);
         expect(calls.find((call) => call.method === 'label.set_torrent')?.params).toEqual([INFO_HASH, 'bookorbit']);
@@ -253,7 +262,7 @@ describe('DelugeAdapter', () => {
         handlers.set('core.get_enabled_plugins', () => result(['Label']));
         handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
 
-        await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config({ category: 'Book Orbit v2.0' }));
+        await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config({ category: 'Book Orbit v2.0' }));
 
         expect(calls.find((call) => call.method === 'label.add')?.params).toEqual(['book-orbit-v2-0']);
       });
@@ -262,7 +271,7 @@ describe('DelugeAdapter', () => {
         const { calls, handlers } = mockRpc();
         handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
 
-        await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config());
+        await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config());
 
         expect(calls.some((call) => call.method.startsWith('label.'))).toBe(false);
       });
@@ -277,8 +286,8 @@ describe('DelugeAdapter', () => {
         handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
         handlers.set('label.set_torrent', () => failure('Unknown label'));
 
-        await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, infoHash: INFO_HASH }, config())).resolves.toEqual({
-          clientHash: INFO_HASH,
+        await expect(adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH }, config())).resolves.toEqual({
+          clientKey: INFO_HASH,
         });
       });
     });
@@ -310,7 +319,7 @@ describe('DelugeAdapter', () => {
 
       await expect(adapter.status([INFO_HASH], config())).resolves.toEqual([
         expect.objectContaining({
-          infoHash: INFO_HASH,
+          clientKey: INFO_HASH,
           state: 'downloading',
           progressPercent: 50,
           downloadedBytes: 512,

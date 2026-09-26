@@ -37,6 +37,8 @@ describe('ReaderPreferencesController', () => {
       getAllDefaults: vi.fn(),
       upsertDefault: vi.fn(),
       deleteDefault: vi.fn(),
+      patchPreference: vi.fn(),
+      patchDefault: vi.fn(),
     } as unknown as Mocked<ReaderPreferencesService>;
 
     controller = new ReaderPreferencesController(service);
@@ -104,5 +106,27 @@ describe('ReaderPreferencesController', () => {
     await controller.deleteDefault('pdf', makeUser({ id: 55 }));
 
     expect(service.deleteDefault).toHaveBeenCalledWith(55, 'pdf');
+  });
+  it('delegates a per-book patch to service, passing both lists through', async () => {
+    const user = makeUser({ id: 15 });
+    const dto = { set: { isDark: true }, unset: ['themeName'] };
+
+    await controller.patchPreference(5, dto, user);
+
+    expect(service.patchPreference).toHaveBeenCalledWith(user, 5, dto.set, dto.unset);
+  });
+
+  it('passes an absent set or unset straight through, so the service owns the empty-body rule', async () => {
+    const user = makeUser({ id: 15 });
+
+    await controller.patchPreference(5, {}, user);
+
+    expect(service.patchPreference).toHaveBeenCalledWith(user, 5, undefined, undefined);
+  });
+
+  it('delegates a defaults patch to service', async () => {
+    await controller.patchDefault('epub', { set: { isDark: true } }, makeUser({ id: 55 }));
+
+    expect(service.patchDefault).toHaveBeenCalledWith(55, 'epub', { isDark: true });
   });
 });

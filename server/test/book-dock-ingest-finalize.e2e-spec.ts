@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, realpath, utimes, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { afterEach } from 'vitest';
 
@@ -12,6 +12,8 @@ import {
 } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
+import { parseFb2File } from '../src/modules/metadata/lib/fb2-parser';
+import { waitForCondition } from './e2e/app-harness';
 import { buildFb2Fixture } from './e2e/book-dock/book-dock-fixture-builder';
 import { createPdfFixture } from './e2e/metadata-write/metadata-write-fixture-builder';
 import {
@@ -310,6 +312,69 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(await fileExists(untouched.absolutePath)).toBe(true);
   });
 
+  it.each(['finalize', 'discard'] as const)('rescans nested shared-folder books and %ss only the selected book', async (action) => {
+    const destination = await createLibraryWithFolder(context);
+    const dock = await realpath(context.fixture.bookDockPath);
+    const directory = join(dock, 'ebooks', 'Author', 'Title');
+    await mkdir(directory, { recursive: true });
+    const firstPath = join(directory, 'first.fb2');
+    const old = new Date(Date.now() - 120_000);
+    await writeFile(firstPath, buildFb2Fixture({ title: 'First Nested Book' }));
+    await utimes(firstPath, old, old);
+
+    const rescan = () => context.app.inject({ method: 'POST', url: '/api/v1/book-dock/rescan', headers: authHeader(context.adminToken) });
+    expect((await rescan()).statusCode).toBe(204);
+    const [first] = await context.db.select().from(schema.bookDockFiles).where(eq(schema.bookDockFiles.absolutePath, firstPath));
+    expect(first?.unitDirectory).toBe(directory);
+    await waitForBookDockStatus(context, first.id, ['ready']);
+
+    const secondPath = join(directory, 'second.fb2');
+    await writeFile(secondPath, buildFb2Fixture({ title: 'Second Nested Book' }));
+    const pdfPath = await createPdfFixture(directory, 'second.pdf', 'Second Nested Book');
+    await utimes(secondPath, old, old);
+    await utimes(pdfPath, old, old);
+    expect((await rescan()).statusCode).toBe(204);
+    expect((await rescan()).statusCode).toBe(204);
+    const dockRows = await context.db.select().from(schema.bookDockFiles);
+    expect(dockRows).toHaveLength(2);
+    const second = dockRows.find((row) => row.absolutePath === secondPath)!;
+    expect(second.unitDirectory).toBeNull();
+    await waitForBookDockStatus(context, second.id, ['ready']);
+
+    const detail = await context.app.inject({ method: 'GET', url: `/api/v1/book-dock/files/${second.id}`, headers: authHeader(context.adminToken) });
+    expect(detail.statusCode).toBe(200);
+    expect((detail.json() as BookDockFile).unitFiles.map((file) => file.fileName).sort()).toEqual(['second.fb2', 'second.pdf']);
+
+    if (action === 'finalize') {
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/book-dock/finalize',
+        headers: authHeader(context.adminToken),
+        payload: { fileIds: [second.id], defaultLibraryId: destination.libraryId, defaultFolderId: destination.libraryFolderId },
+      });
+      expect(response.statusCode).toBe(201);
+      const result = response.json() as BookDockFinalizeResult;
+      expect(result).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+      const files = await context.db.select().from(schema.bookFiles).where(eq(schema.bookFiles.bookId, result.results[0].bookId!));
+      expect(files.map((file) => file.format).sort()).toEqual(['fb2', 'pdf']);
+      expect(new Set(files.map((file) => dirname(file.absolutePath))).size).toBe(1);
+      for (const file of files) expect(await fileExists(file.absolutePath)).toBe(true);
+    } else {
+      const response = await context.app.inject({
+        method: 'DELETE',
+        url: `/api/v1/book-dock/files/${second.id}`,
+        headers: authHeader(context.adminToken),
+      });
+      expect(response.statusCode).toBe(204);
+    }
+
+    expect(await fileExists(firstPath)).toBe(true);
+    expect(await getBookDockRow(context, first.id)).toBeDefined();
+    expect(await fileExists(secondPath)).toBe(false);
+    expect(await fileExists(pdfPath)).toBe(false);
+    expect(await getBookDockRow(context, second.id)).toBeUndefined();
+  });
+
   it('finalize moves files into destination and creates book records', async () => {
     const destination = await createLibraryWithFolder(context);
     const bookDockRow = await createBookDockRow(context, {
@@ -383,6 +448,134 @@ describe('Book Dock ingest + finalize (e2e)', () => {
       openLibraryId: 'OL456W',
     });
     expect(await getBookDockRow(context, bookDockRow.id)).toBeUndefined();
+  });
+
+  /**
+   * An ebook and its audiobook finalized one after the other land in one folder, so the second joins
+   * the book the first created. The book has to open with whichever the library ranks first, not
+   * with whichever arrived first.
+   */
+  describe('when a second format joins a finalized book', () => {
+    const metadata = { title: 'Two Media Title', authors: ['Two Media Author'] };
+
+    async function libraryRanking(formatPriority: string[] | null) {
+      const destination = await createLibraryWithFolder(context, { allowedFormats: ['epub', 'm4b'] });
+      if (formatPriority) {
+        await context.db.update(schema.libraries).set({ formatPriority }).where(eq(schema.libraries.id, destination.libraryId));
+      }
+      return destination;
+    }
+
+    async function finalizeInto(destination: Awaited<ReturnType<typeof createLibraryWithFolder>>, fileName: string): Promise<number> {
+      const row = await createBookDockRow(context, {
+        fileName,
+        selectedMetadata: metadata,
+        targetLibraryId: destination.libraryId,
+        targetFolderId: destination.libraryFolderId,
+      });
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/book-dock/finalize',
+        headers: authHeader(context.adminToken),
+        payload: { fileIds: [row.id] },
+      });
+      expect(response.statusCode).toBe(201);
+      const result = (response.json() as BookDockFinalizeResult).results[0];
+      expect(result).toMatchObject({ success: true, bookId: expect.any(Number) });
+      return result!.bookId!;
+    }
+
+    async function primaryFormatOf(bookId: number) {
+      const files = await context.db
+        .select({ id: schema.bookFiles.id, format: schema.bookFiles.format })
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.bookId, bookId));
+      const [book] = await context.db
+        .select({ primaryFileId: schema.books.primaryFileId })
+        .from(schema.books)
+        .where(eq(schema.books.id, bookId))
+        .limit(1);
+      return { formats: files.map((file) => file.format).sort(), primary: files.find((file) => file.id === book?.primaryFileId)?.format };
+    }
+
+    it('makes the audiobook primary when it joins an ebook in a library that ranks audio first', async () => {
+      const destination = await libraryRanking(['m4b', 'epub']);
+
+      const bookId = await finalizeInto(destination, 'two-media-audio-first.epub');
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub'], primary: 'epub' });
+
+      expect(await finalizeInto(destination, 'two-media-audio-first.m4b')).toBe(bookId);
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub', 'm4b'], primary: 'm4b' });
+    });
+
+    it('keeps the audiobook primary when an ebook joins it in a library that ranks audio first', async () => {
+      const destination = await libraryRanking(['m4b', 'epub']);
+
+      const bookId = await finalizeInto(destination, 'two-media-audio-kept.m4b');
+      expect(await finalizeInto(destination, 'two-media-audio-kept.epub')).toBe(bookId);
+
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub', 'm4b'], primary: 'm4b' });
+    });
+
+    it('keeps the ebook primary when an audiobook joins it under the default ranking', async () => {
+      const destination = await libraryRanking(null);
+
+      const bookId = await finalizeInto(destination, 'two-media-default.epub');
+      expect(await finalizeInto(destination, 'two-media-default.m4b')).toBe(bookId);
+
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub', 'm4b'], primary: 'epub' });
+    });
+  });
+
+  it('finalize writes the dock metadata into the file when the library writes metadata to files', async () => {
+    const destination = await createLibraryWithFolder(context, {
+      fileWriteEnabled: true,
+      fileWriteFb2Enabled: true,
+    });
+    const uploader = await createUserAndLogin(context, { permissions: [Permission.ManageBookDock] });
+    const bookDockRow = await createBookDockRow(context, {
+      fileName: 'write-back.fb2',
+      content: buildFb2Fixture({ title: 'Uploaded File Title', authors: ['Uploaded File Author'] }),
+      embeddedMetadata: { title: 'Uploaded File Title', authors: ['Uploaded File Author'] },
+      selectedMetadata: { title: 'Dock Edited Title', authors: ['Dock Edited Author'] },
+      targetLibraryId: destination.libraryId,
+      targetFolderId: destination.libraryFolderId,
+      uploadedBy: uploader.userId,
+    });
+
+    const response = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/finalize',
+      headers: authHeader(context.adminToken),
+      payload: { fileIds: [bookDockRow.id] },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as BookDockFinalizeResult;
+    expect(body).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+    const finalizedBookId = body.results[0]!.bookId!;
+
+    const [bookFile] = await context.db
+      .select({ absolutePath: schema.bookFiles.absolutePath })
+      .from(schema.bookFiles)
+      .where(eq(schema.bookFiles.bookId, finalizedBookId))
+      .limit(1);
+    expect(bookFile).toBeDefined();
+
+    // The write is debounced, so the file is polled rather than drained: draining cancels a timer
+    // that has not fired yet.
+    await waitForCondition(async () => {
+      const parsed = await parseFb2File(bookFile!.absolutePath);
+      expect(parsed?.title).toBe('Dock Edited Title');
+      expect(parsed?.authors.map((author) => author.name)).toEqual(['Dock Edited Author']);
+
+      const [writeLog] = await context.db
+        .select({ status: schema.fileWriteLog.status, triggeredBy: schema.fileWriteLog.triggeredBy, userId: schema.fileWriteLog.userId })
+        .from(schema.fileWriteLog)
+        .where(eq(schema.fileWriteLog.bookId, finalizedBookId))
+        .limit(1);
+      expect(writeLog).toMatchObject({ status: 'success', triggeredBy: 'auto', userId: uploader.userId });
+    });
   });
 
   it('finalize returns partial success with duplicate and destination conflicts', async () => {

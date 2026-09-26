@@ -17,10 +17,18 @@ function release(overrides: Partial<ReleaseCandidateItem> = {}): ReleaseCandidat
     seeders: 40,
     leechers: 1,
     format: 'epub',
+    formats: ['epub'],
     language: 'en',
+    fileCount: 1,
     freeleech: false,
+    vipOnly: false,
+    alreadyGrabbed: false,
     publishedAt: null,
+    audio: null,
     score: 92,
+    tier: null,
+    tierName: null,
+    profileMismatch: null,
     reasons: [],
     ...overrides,
   };
@@ -31,8 +39,8 @@ function refusal(errorCode: GrabFailureCode, message: string): BadRequestExcepti
   return new BadRequestException({ message, errorCode, statusCode: 400 });
 }
 
-function indexerStatus(indexerId: number, seedsBack: boolean): IndexerSearchStatus {
-  return { indexerId, indexerName: `indexer-${indexerId}`, ok: true, count: 1, filtered: 0, seedsBack };
+function indexerStatus(indexerId: number, delivery: IndexerSearchStatus['delivery']): IndexerSearchStatus {
+  return { indexerId, indexerName: `indexer-${indexerId}`, ok: true, count: 1, filtered: 0, seedsBack: delivery === 'torrent', delivery };
 }
 
 function joined(overrides: Partial<BookRequestRow> = {}) {
@@ -556,7 +564,7 @@ describe('RequestAutomationService.considerRequest', () => {
         release({ indexerId: 4, indexerName: 'other-tracker', guid: 'torrent-2', score: 88 }),
         release({ indexerId: 5, indexerName: 'libgen', guid: 'direct-1', score: 70 }),
       ],
-      indexers: [indexerStatus(9, true), indexerStatus(4, true), indexerStatus(5, false)],
+      indexers: [indexerStatus(9, 'torrent'), indexerStatus(4, 'torrent'), indexerStatus(5, 'file')],
     });
     fulfillment.grab.mockRejectedValueOnce(refusal('GRAB_CLIENT_REFUSED', 'qBittorrent rejected the torrent'));
 
@@ -564,6 +572,23 @@ describe('RequestAutomationService.considerRequest', () => {
     await settle();
 
     expect(fulfillment.grab.mock.calls.map((call) => (call[1] as { releaseGuid: string }).releaseGuid)).toEqual(['torrent-1', 'direct-1']);
+  });
+
+  it('keeps trying Usenet releases after a torrent client refuses one', async () => {
+    const { service, fulfillment } = makeService({
+      settings: { autoGrabMinScore: 70 },
+      releases: [
+        release({ indexerId: 9, guid: 'torrent-1', score: 92 }),
+        release({ indexerId: 5, indexerName: 'usenet-indexer', guid: 'usenet-1', score: 88 }),
+      ],
+      indexers: [indexerStatus(9, 'torrent'), indexerStatus(5, 'usenet')],
+    });
+    fulfillment.grab.mockRejectedValueOnce(refusal('GRAB_CLIENT_REFUSED', 'qBittorrent rejected the torrent'));
+
+    service.considerRequest(7);
+    await settle();
+
+    expect(fulfillment.grab.mock.calls.map((call) => (call[1] as { releaseGuid: string }).releaseGuid)).toEqual(['torrent-1', 'usenet-1']);
   });
 
   /** The switch is what "stop at the first failure" means, so it has to stop a classified one too. */

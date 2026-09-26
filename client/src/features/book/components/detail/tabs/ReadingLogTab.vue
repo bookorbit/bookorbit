@@ -2,7 +2,8 @@
 import { computed, nextTick, onActivated, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Ellipsis, RotateCcw } from '@lucide/vue'
-import { Permission, type BookDetail, type UserBookStatus } from '@bookorbit/types'
+import { formatOfKey, Permission, type BookDetail, type UserBookStatus } from '@bookorbit/types'
+import { bookFormatEntries } from '@/features/book/lib/book-formats'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeferredLoading } from '@/composables/useDeferredLoading'
 import { useBookReadingLog, type AddReadingSessionPayload } from '@/features/book/composables/useBookReadingLog'
@@ -89,10 +90,10 @@ type QuickFilter = 'all' | 'last30' | 'last90' | 'thisYear'
 const activeQuick = ref<QuickFilter>('all')
 const selectedFormat = ref<string | undefined>(undefined)
 
-const uniqueFormats = computed(() => {
-  const formats = props.book.files.map((file) => file.format).filter((format): format is string => format != null && format.length > 0)
-  return [...new Set(formats)]
-})
+// Sessions record the file format, so a read-along and a plain EPUB share the `epub` filter.
+const uniqueFormats = computed(() => [
+  ...new Set(bookFormatEntries(props.book.files, props.book.formatPriority).map((entry) => formatOfKey(entry.key))),
+])
 
 const hasMultipleFormats = computed(() => uniqueFormats.value.length >= 2)
 

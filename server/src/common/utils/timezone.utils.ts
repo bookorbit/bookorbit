@@ -30,6 +30,16 @@ export function resolveTimeZone(value: unknown, fallback = 'UTC'): string {
   return isValidTimeZone(normalized) ? normalized : fallback;
 }
 
+export function resolveSystemTimeZone(): string {
+  try {
+    return resolveTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } catch {
+    return 'UTC';
+  }
+}
+
+export const SYSTEM_TIME_ZONE = resolveSystemTimeZone();
+
 export function isDateKey(value: string): boolean {
   const match = DATE_KEY_RE.exec(value);
   if (!match) return false;

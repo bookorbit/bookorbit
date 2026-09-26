@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 vi.mock('../app-settings/app-settings.module', () => ({ AppSettingsModule: class AppSettingsModule {} }));
 vi.mock('../auth/auth.module', () => ({ AuthModule: class AuthModule {} }));
+vi.mock('../file-write/file-write.module', () => ({ FileWriteModule: class FileWriteModule {} }));
 vi.mock('../library/library.module', () => ({ LibraryModule: class LibraryModule {} }));
 vi.mock('../metadata-fetch/metadata-fetch.module', () => ({ MetadataFetchModule: class MetadataFetchModule {} }));
 vi.mock('../metadata/metadata.module', () => ({ MetadataModule: class MetadataModule {} }));

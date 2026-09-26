@@ -80,7 +80,7 @@ watchEffect(() => {
     :error
     :empty="isEmpty"
     :empty-title="t('statistics.charts.sourceDistribution.emptyTitle')"
-    :empty-description="t('statistics.charts.sourceDistribution.emptyDescription')"
+    :empty-description="t('statistics.charts.sourceDistribution.emptyDescriptionWithNativeClients')"
   >
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>

@@ -485,6 +485,8 @@ describe('UsersPage superuser access', () => {
     await flushPromises()
 
     expect(document.body.textContent).toContain('Grant Ada Lovelace unrestricted server access.')
+    const dialog = document.body.querySelector('[role="dialog"]')
+    expect(dialog?.className).toContain('z-[70]')
     const confirm = Array.from(document.body.querySelectorAll('button'))
       .filter((button) => button.textContent?.trim() === 'Promote to superuser')
       .at(-1)

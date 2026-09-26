@@ -156,6 +156,7 @@ export class HardcoverSyncService {
   private readonly cancelRequests = new Set<number>();
   private readonly syncStatusEvents = new Subject<{ userId: number; status: HardcoverActiveSyncStatus | null }>();
   private readonly activeSyncs = new Map<number, HardcoverActiveSyncStatus>();
+  private readonly bookSyncLocks = new Map<string, Promise<void>>();
   private syncRunCounter = 0;
 
   constructor(
@@ -167,6 +168,10 @@ export class HardcoverSyncService {
   ) {}
 
   async syncBook(userId: number, bookId: number): Promise<HardcoverSyncBookResult> {
+    return this.withBookSyncLock(userId, bookId, () => this.syncBookUnlocked(userId, bookId));
+  }
+
+  private async syncBookUnlocked(userId: number, bookId: number): Promise<HardcoverSyncBookResult> {
     const token = await this.settingsService.getTokenForUser(userId);
     if (!token) return 'skipped';
 
@@ -178,6 +183,24 @@ export class HardcoverSyncService {
     if (!this.isBookInSyncScope(settings, book, state)) return 'skipped';
 
     return this.syncSingleBook(userId, token, book, state);
+  }
+
+  private async withBookSyncLock<T>(userId: number, bookId: number, operation: () => Promise<T>): Promise<T> {
+    const key = `${userId}:${bookId}`;
+    const previous = this.bookSyncLocks.get(key);
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.bookSyncLocks.set(key, current);
+
+    if (previous) await previous;
+    try {
+      return await operation();
+    } finally {
+      if (this.bookSyncLocks.get(key) === current) this.bookSyncLocks.delete(key);
+      release();
+    }
   }
 
   async syncAll(userId: number): Promise<number> {
@@ -353,6 +376,10 @@ export class HardcoverSyncService {
   }
 
   async setEdition(userId: number, bookId: number, editionId: number): Promise<SetHardcoverEditionResult> {
+    return this.withBookSyncLock(userId, bookId, () => this.setEditionUnlocked(userId, bookId, editionId));
+  }
+
+  private async setEditionUnlocked(userId: number, bookId: number, editionId: number): Promise<SetHardcoverEditionResult> {
     const { token, hardcoverBookId } = await this.requireMatchedBook(userId, bookId);
 
     const edition = await this.matchService.findEditionForBook(userId, token, hardcoverBookId, editionId);
@@ -370,7 +397,7 @@ export class HardcoverSyncService {
       lastSyncedAt: null,
     });
 
-    await this.syncBook(userId, bookId);
+    await this.syncBookUnlocked(userId, bookId);
 
     await this.bookService.setHardcoverEditionIdIfEmpty(bookId, String(editionId)).catch((err) => {
       this.logger.warn(
@@ -406,14 +433,11 @@ export class HardcoverSyncService {
         return;
       }
 
-      const state = await this.repo.findBookState(userId, book.bookId);
-      if (!this.isBookInSyncScope(settings, book, state)) {
-        skipped++;
-        this.emitProgress(userId, synced);
-        continue;
-      }
-
-      const result = await this.syncSingleBook(userId, token, book, state);
+      const result = await this.withBookSyncLock(userId, book.bookId, async () => {
+        const state = await this.repo.findBookState(userId, book.bookId);
+        if (!this.isBookInSyncScope(settings, book, state)) return 'skipped';
+        return this.syncSingleBook(userId, token, book, state);
+      });
       if (result === 'synced') synced++;
       else if (result === 'skipped') skipped++;
       else failed++;

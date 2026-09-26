@@ -2,14 +2,14 @@
 import { computed } from 'vue'
 import { X } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
+import { useModifierKey } from '@/composables/useModifierKey'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 
 const { t } = useI18n()
 
-const isMac = computed(() => typeof navigator !== 'undefined' && /Mac/i.test(navigator.userAgent))
-const modKey = computed(() => (isMac.value ? '⌘' : 'Ctrl'))
+const { modifierKey: modKey } = useModifierKey()
 
 function handleClose() {
   emit('update:open', false)

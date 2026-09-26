@@ -35,8 +35,11 @@ describe('useSidebarPrefs', () => {
       expect(parseSidebarConfig(undefined)).toEqual({
         browse: { open: true },
         libraries: { open: true, cap: 8 },
+        podcasts: { open: true, cap: 8 },
         smartScopes: { open: true, cap: 8 },
         collections: { open: true, cap: 8 },
+        podcastScopes: { open: true, cap: 8 },
+        podcastCollections: { open: true, cap: 8 },
       })
     })
 
@@ -140,8 +143,11 @@ describe('useSidebarPrefs', () => {
                 sections: {
                   browse: { open: true },
                   libraries: { open: true, cap: 8 },
+                  podcasts: { open: true, cap: 8 },
                   smartScopes: { open: true, cap: 8 },
                   collections: { open: false, cap: 20 },
+                  podcastScopes: { open: true, cap: 8 },
+                  podcastCollections: { open: true, cap: 8 },
                 },
               },
             },

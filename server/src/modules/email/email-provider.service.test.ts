@@ -4,7 +4,7 @@ import { EmailProviderRepository } from './email-provider.repository';
 import { EmailEncryptionService } from './email-encryption.service';
 import { EmailTransportService } from './email-transport.service';
 import type { RequestUser } from '../../common/types/request-user';
-import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, Permission } from '@bookorbit/types';
 
 describe('EmailProviderService', () => {
   let service: EmailProviderService;
@@ -36,6 +36,11 @@ describe('EmailProviderService', () => {
     contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
+  const mockEmailManager: RequestUser = {
+    ...mockUser,
+    permissions: [Permission.ManageEmail],
+  };
+
   const mockProvider = {
     id: 10,
     userId: 1,
@@ -62,6 +67,8 @@ describe('EmailProviderService', () => {
       clearDefault: vi.fn(),
       setDefault: vi.fn().mockResolvedValue([mockProvider]),
       setSharedByOwner: vi.fn().mockResolvedValue([{ ...mockProvider, isShared: true }]),
+      setSystemProvider: vi.fn().mockResolvedValue({ ...mockProvider, isSystemProvider: true }),
+      clearSystemProvider: vi.fn(),
     } as unknown as EmailProviderRepository;
 
     encryption = {
@@ -186,14 +193,43 @@ describe('EmailProviderService', () => {
   });
 
   describe('toggleShared', () => {
-    it('should allow superuser to toggle sharing', async () => {
+    it('allows a superuser to toggle sharing', async () => {
       const result = await service.toggleShared(10, mockAdmin);
       expect(result.isShared).toBe(true);
-      expect(repo.setSharedByOwner).toHaveBeenCalled();
+      expect(repo.setSharedByOwner).toHaveBeenCalledWith(10, mockAdmin.id, true);
     });
 
-    it('should throw ForbiddenException for non-superuser', async () => {
+    it('allows a manage_email user to toggle sharing on an owned provider', async () => {
+      const result = await service.toggleShared(10, mockEmailManager);
+
+      expect(result.isShared).toBe(true);
+      expect(repo.setSharedByOwner).toHaveBeenCalledWith(10, mockEmailManager.id, true);
+    });
+
+    it('rejects a caller without manage_email before looking up the provider', async () => {
       await expect(service.toggleShared(10, mockUser)).rejects.toThrow(ForbiddenException);
+      expect(repo.findById).not.toHaveBeenCalled();
+      expect(repo.setSharedByOwner).not.toHaveBeenCalled();
+    });
+
+    it('does not let manage_email bypass provider ownership', async () => {
+      (repo.findById as vi.Mock).mockResolvedValue([{ ...mockProvider, userId: 99 }]);
+
+      await expect(service.toggleShared(10, mockEmailManager)).rejects.toThrow(ForbiddenException);
+      expect(repo.setSharedByOwner).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('system provider authorization', () => {
+    it('keeps setting the system provider restricted to superusers', async () => {
+      await expect(service.setSystemProvider(10, mockEmailManager)).rejects.toThrow(ForbiddenException);
+      expect(repo.findById).not.toHaveBeenCalled();
+      expect(repo.setSystemProvider).not.toHaveBeenCalled();
+    });
+
+    it('keeps clearing the system provider restricted to superusers', async () => {
+      await expect(service.clearSystemProvider(mockEmailManager)).rejects.toThrow(ForbiddenException);
+      expect(repo.clearSystemProvider).not.toHaveBeenCalled();
     });
   });
 

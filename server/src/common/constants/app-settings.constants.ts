@@ -27,6 +27,7 @@ export const APP_SETTING_KEYS = {
   INITIAL_SETUP_COMPLETED_AT: 'initial_setup_completed_at',
   UPDATE_CHECK_ENABLED: 'update_check_enabled',
   MAX_UPLOAD_SIZE_MB: 'max_upload_size_mb',
+  HARDCOVER_ENABLED: 'hardcover_enabled',
 } as const;
 
 export const BOOK_DOCK_MANAGED_SETTING_KEYS: readonly string[] = [

@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import { sql } from 'drizzle-orm';
 import { eq, isNotNull, lt, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { SystemCron } from '../../common/decorators/system-cron.decorator';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { getSanitizedErrorInfo } from './seed-log.util';
@@ -33,12 +33,12 @@ export class CleanupService implements OnApplicationBootstrap {
       select table_name
       from information_schema.tables
       where table_schema = 'public'
-        and table_name in ('refresh_tokens', 'password_reset_tokens', 'oidc_sessions')
+        and table_name in ('refresh_tokens', 'password_reset_tokens', 'oidc_sessions', 'auth_sessions')
     `);
-    return result.rows.length === 3;
+    return result.rows.length === 4;
   }
 
-  @Cron('0 3 * * *')
+  @SystemCron('0 3 * * *')
   async cleanup() {
     const startedAt = Date.now();
     const event = 'seed.cleanup_auth_state';
@@ -51,9 +51,9 @@ export class CleanupService implements OnApplicationBootstrap {
 
       const now = new Date();
 
-      const { rowCount: refreshCount } = await this.db
-        .delete(schema.refreshTokens)
-        .where(or(lt(schema.refreshTokens.expiresAt, now), isNotNull(schema.refreshTokens.revokedAt)));
+      const { rowCount: refreshCount } = await this.db.delete(schema.refreshTokens).where(lt(schema.refreshTokens.expiresAt, now));
+
+      await this.db.delete(schema.authSessions).where(lt(schema.authSessions.expiresAt, now));
 
       const { rowCount: resetCount } = await this.db
         .delete(schema.passwordResetTokens)

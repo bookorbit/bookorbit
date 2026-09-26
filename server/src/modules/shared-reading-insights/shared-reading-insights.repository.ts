@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { BroadReadingGenre, ReadingInsightsSharingLevel } from '@bookorbit/types';
+import type { BroadReadingGenre, ReadingInsightsSharingLevel, ReadingSessionSource } from '@bookorbit/types';
 import { and, desc, eq, gte, gt, inArray, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -125,7 +125,7 @@ export class SharedReadingInsightsRepository {
         .limit(14),
       this.db
         .select({
-          source: sql<string>`coalesce(${schema.readingSessions.source}, 'unknown')`,
+          source: sql<ReadingSessionSource | 'unknown'>`coalesce(${schema.readingSessions.source}, 'unknown')`,
           readingSeconds: sql<number>`sum(${schema.readingSessions.durationSeconds})::int`,
           sessionsCount: sql<number>`count(*)::int`,
         })

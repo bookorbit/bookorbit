@@ -4,13 +4,17 @@ import { useI18n } from 'vue-i18n'
 import { ArrowLeft, CopyCheck, Copy, CheckCheck, Eye, EyeOff, Info } from '@lucide/vue'
 import type {
   BookMetadataLockField,
+  CoverMedium,
   MetadataCandidate,
   MetadataProviderInfo,
   MetadataProviderKey,
   MetadataSource,
   ProviderIds,
 } from '@bookorbit/types'
-import { useMetadataDiff, type DiffFieldKey, type MetadataPatch } from '../../../composables/useMetadataDiff'
+import { useMetadataDiff, type DiffField, type DiffFieldKey, type MetadataDiffApply } from '../../../composables/useMetadataDiff'
+import { useSecondCoverRow, type SecondCoverInput } from '../../../composables/useSecondCoverRow'
+import { useCoverShapes } from '../../../composables/useCoverShapes'
+import { coverLockField } from '../../../lib/cover-slots'
 import {
   getProviderColor,
   getProviderLabel,
@@ -20,6 +24,7 @@ import {
   toDisplayCoverUrl,
 } from '../../../lib/metadata-fetch'
 import MetadataDiffRow from './MetadataDiffRow.vue'
+import MetadataDiffCoverResults from './MetadataDiffCoverResults.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 
 const props = defineProps<{
@@ -32,15 +37,25 @@ const props = defineProps<{
   currentCoverUrl?: string
   providerIds?: ProviderIds
   lockedFields?: BookMetadataLockField[]
+  /** The slot the main cover row fills. Defaults to the ebook slot. */
+  coverMedium?: CoverMedium
+  /** The other medium's cover row, for a book that has both media; fed by its own search. */
+  secondCover?: SecondCoverInput | null
 }>()
 
 const emit = defineEmits<{
   back: []
-  apply: [{ formPatch: MetadataPatch; coverUrl?: string }]
+  apply: [MetadataDiffApply]
 }>()
 
 const { t } = useI18n()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const libraryAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const mainMedium = computed<CoverMedium>(() => props.coverMedium ?? 'ebook')
+/** Result thumbnails take the main cover row's slot shape, or the library's when the panel has no slot. */
+const coverAspectRatio = computed(() => {
+  if (!props.coverMedium) return libraryAspectRatio.value
+  return props.coverMedium === 'audio' ? '1/1' : '2/3'
+})
 
 const activeProvider = ref<MetadataProviderKey>(props.initialCandidate.provider)
 const showUnchanged = ref(false)
@@ -94,6 +109,8 @@ const activeCandidate = computed(
     props.initialCandidate,
 )
 
+const { shapeOf: coverShapeOf } = useCoverShapes(() => [...representativeCandidates.value, ...(props.secondCover?.candidates ?? [])])
+
 const {
   fields,
   picksPerProvider,
@@ -111,9 +128,38 @@ const {
   representativeCandidates,
   activeProvider,
   computed(() => props.providers),
-  props.currentCoverUrl,
+  () => props.currentCoverUrl,
   computed(() => props.providerIds),
   computed(() => props.lockedFields ?? []),
+  {
+    coverMedium: mainMedium,
+    coverLabelKey: () =>
+      props.secondCover ? `book.detail.editMetadata.diff.fields.${mainMedium.value === 'audio' ? 'audioCover' : 'bookCover'}` : undefined,
+    coverShapeOf,
+  },
+)
+
+const secondCoverLocked = computed(() => Boolean(props.secondCover && (props.lockedFields ?? []).includes(coverLockField(props.secondCover.medium))))
+const {
+  choices: secondCoverChoices,
+  active: secondCoverActive,
+  row: secondCoverRow,
+  picked: secondCoverPicked,
+  pickedCoverUrl: secondCoverPickedUrl,
+  select: selectSecondCover,
+  togglePick: toggleSecondCoverPick,
+} = useSecondCoverRow(
+  () =>
+    props.secondCover
+      ? {
+          medium: props.secondCover.medium,
+          candidates: props.secondCover.candidates,
+          priority: props.secondCover.priority,
+          currentUrl: props.secondCover.currentUrl,
+          locked: secondCoverLocked.value,
+        }
+      : null,
+  coverShapeOf,
 )
 
 const activeProviderLabel = computed(() => getProviderLabel(activeProvider.value, props.providers))
@@ -125,12 +171,13 @@ const candidateSeed = computed(() => activeCandidate.value.title ?? t('book.deta
 const candidateAuthorLine = computed(() => activeCandidate.value.authors?.join(', ') || null)
 
 const selectedFieldCount = computed(() => {
-  let total = 0
+  let total = secondCoverPicked.value ? 1 : 0
   for (const count of picksPerProvider.value.values()) {
     total += count
   }
   return total
 })
+const hasSelection = computed(() => hasCopied.value || secondCoverPicked.value !== null)
 
 const selectedCountLabel = computed(() => {
   if (!selectedFieldCount.value) return t('book.detail.editMetadata.diffPanel.noFieldsSelected')
@@ -160,6 +207,16 @@ const activeResultMeta = computed(
 )
 
 const visibleFields = computed(() => fields.value.filter((field) => showUnchanged.value || field.hasDiff || !field.bookValue))
+
+/** The second cover row always shows, right after the main cover row, since its results arrive on their own. */
+const displayRows = computed<{ field: DiffField; second: boolean }[]>(() => {
+  const rows = visibleFields.value.map((field) => ({ field, second: false }))
+  const second = secondCoverRow.value
+  if (!second) return rows
+  const coverIndex = rows.findIndex((row) => row.field.key === 'coverUrl')
+  rows.splice(coverIndex + 1, 0, { field: second, second: true })
+  return rows
+})
 
 function isSameCandidate(a: MetadataCandidate, b: MetadataCandidate): boolean {
   if (a.provider !== b.provider) return false
@@ -214,6 +271,14 @@ function handlePickFromProvider(key: DiffFieldKey, provider: MetadataProviderKey
   pickFieldFromProvider(key, provider)
 }
 
+function handleSecondCoverToggle() {
+  toggleSecondCoverPick()
+}
+
+function handleSecondCoverSelect(candidate: MetadataCandidate) {
+  selectSecondCover(candidate)
+}
+
 function candidateCoverUrl(candidate: MetadataCandidate): string {
   return toDisplayCoverUrl(candidate.coverUrl)
 }
@@ -235,7 +300,16 @@ function goBack() {
 }
 
 function apply() {
-  emit('apply', buildPatch())
+  const { formPatch, coverUrl } = buildPatch()
+  const covers: Partial<Record<CoverMedium, string>> = {}
+  if (coverUrl) covers[mainMedium.value] = coverUrl
+  const secondUrl = secondCoverPickedUrl.value
+  if (props.secondCover && secondUrl && !secondCoverLocked.value) covers[props.secondCover.medium] = secondUrl
+  emit('apply', {
+    formPatch,
+    ...(covers.ebook ? { coverUrl: covers.ebook } : {}),
+    ...(covers.audio ? { audioCoverUrl: covers.audio } : {}),
+  })
 }
 
 onBeforeUnmount(() => {
@@ -311,7 +385,8 @@ onBeforeUnmount(() => {
             <span class="min-w-0 flex-1">
               <span class="block text-xs font-medium text-foreground line-clamp-1">{{ resolveCandidateDisplayTitle(candidate) }}</span>
               <span class="block text-[10px] text-muted-foreground line-clamp-1">
-                {{ candidate.publishedDate ?? candidate.publishedYear ?? 'Date unknown' }} - {{ index + 1 }} of {{ resultsForActiveProvider.length }}
+                {{ candidate.publishedDate ?? candidate.publishedYear ?? t('book.detail.editMetadata.diffPanel.yearUnknown') }} -
+                {{ t('book.detail.editMetadata.diffPanel.indexOf', { index: index + 1, total: resultsForActiveProvider.length }) }}
               </span>
             </span>
           </button>
@@ -329,7 +404,7 @@ onBeforeUnmount(() => {
       <div class="sticky top-0 z-10 -mx-4 px-4 py-2.5 border-b border-border bg-background/95 backdrop-blur-sm">
         <div class="flex items-center gap-1.5 pb-1">
           <div class="min-w-0 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pr-2">
-            <p v-if="hasCopied" class="shrink-0 text-xs text-muted-foreground inline-flex items-center gap-1.5">
+            <p v-if="hasSelection" class="shrink-0 text-xs text-muted-foreground inline-flex items-center gap-1.5">
               <CheckCheck class="size-3.5 text-primary" />
               {{ selectedCountLabel }}
             </p>
@@ -375,22 +450,47 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <MetadataDiffRow
-        v-for="field in visibleFields"
-        :key="field.key"
-        :field="field"
-        :active-provider="activeProvider"
-        :providers="providers"
-        :book-seed="bookSeed"
-        :book-author-line="bookAuthorLine"
-        :candidate-seed="candidateSeed"
-        :candidate-author-line="candidateAuthorLine"
-        :genre-write-mode="genreWriteMode"
-        @toggle="toggleField"
-        @pick-from-provider="handlePickFromProvider"
-        @update:genre-write-mode="setGenreWriteMode"
-      />
-      <p v-if="visibleFields.length === 0" class="py-8 text-center text-sm text-muted-foreground">
+      <template v-for="row in displayRows" :key="row.field.key">
+        <MetadataDiffRow
+          v-if="row.second"
+          :field="row.field"
+          :active-provider="secondCoverActive?.provider ?? activeProvider"
+          :providers="providers"
+          :book-seed="bookSeed"
+          :book-author-line="bookAuthorLine"
+          :candidate-seed="candidateSeed"
+          :candidate-author-line="candidateAuthorLine"
+          @toggle="handleSecondCoverToggle"
+        >
+          <template #coverResults>
+            <MetadataDiffCoverResults
+              v-if="secondCover"
+              :medium="secondCover.medium"
+              :choices="secondCoverChoices"
+              :active="secondCoverActive"
+              :picked="secondCoverPicked"
+              :providers="providers"
+              :searching="secondCover.searching"
+              @select="handleSecondCoverSelect"
+            />
+          </template>
+        </MetadataDiffRow>
+        <MetadataDiffRow
+          v-else
+          :field="row.field"
+          :active-provider="activeProvider"
+          :providers="providers"
+          :book-seed="bookSeed"
+          :book-author-line="bookAuthorLine"
+          :candidate-seed="candidateSeed"
+          :candidate-author-line="candidateAuthorLine"
+          :genre-write-mode="genreWriteMode"
+          @toggle="toggleField"
+          @pick-from-provider="handlePickFromProvider"
+          @update:genre-write-mode="setGenreWriteMode"
+        />
+      </template>
+      <p v-if="displayRows.length === 0" class="py-8 text-center text-sm text-muted-foreground">
         {{ showUnchanged ? t('book.detail.editMetadata.diffPanel.noMetadata') : t('book.detail.editMetadata.diffPanel.noChangedFields') }}
       </p>
     </div>
@@ -403,7 +503,7 @@ onBeforeUnmount(() => {
         </button>
         <button
           class="relative h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95 overflow-hidden group"
-          :disabled="!hasCopied"
+          :disabled="!hasSelection"
           @click="apply"
         >
           <span class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />

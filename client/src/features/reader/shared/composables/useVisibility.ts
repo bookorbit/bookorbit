@@ -1,57 +1,57 @@
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onUnmounted, ref } from 'vue'
+
+const AUTO_HIDE_DELAY_MS = 3000
 
 export function useVisibility() {
   const headerVisible = ref(false)
   const footerVisible = ref(false)
+  const isPinned = ref(false)
 
-  let isPinned = false
   let isVisibilityLocked = false
   let hideTimer: ReturnType<typeof setTimeout> | null = null
 
-  const HEADER_TRIGGER = 24
-  const FOOTER_TRIGGER = 24
+  function clearHideTimer() {
+    if (!hideTimer) return
+    clearTimeout(hideTimer)
+    hideTimer = null
+  }
 
   function scheduleHide() {
-    if (hideTimer) clearTimeout(hideTimer)
+    clearHideTimer()
     hideTimer = setTimeout(() => {
-      if (!isPinned && !isVisibilityLocked) {
+      if (!isPinned.value && !isVisibilityLocked) {
         headerVisible.value = false
         footerVisible.value = false
       }
-    }, 3000)
-  }
-
-  function onMouseMove(e: MouseEvent) {
-    if (isVisibilityLocked) return
-
-    const y = e.clientY
-    const height = window.innerHeight
-
-    if (!isPinned) {
-      if (y < HEADER_TRIGGER) {
-        headerVisible.value = true
-        scheduleHide()
-      } else if (headerVisible.value) {
-        scheduleHide()
-      }
-
-      if (y > height - FOOTER_TRIGGER) {
-        footerVisible.value = true
-        scheduleHide()
-      } else if (footerVisible.value) {
-        scheduleHide()
-      }
-    }
+      hideTimer = null
+    }, AUTO_HIDE_DELAY_MS)
   }
 
   function handleMiddleTap() {
     if (isVisibilityLocked) return
+    if (isPinned.value) return
 
-    isPinned = !isPinned
-    headerVisible.value = isPinned
-    footerVisible.value = isPinned
-    if (!isPinned) {
-      if (hideTimer) clearTimeout(hideTimer)
+    if (headerVisible.value || footerVisible.value) {
+      clearHideTimer()
+      headerVisible.value = false
+      footerVisible.value = false
+      return
+    }
+
+    headerVisible.value = true
+    footerVisible.value = true
+    scheduleHide()
+  }
+
+  function togglePinned() {
+    isPinned.value = !isPinned.value
+    headerVisible.value = true
+    footerVisible.value = true
+
+    if (isPinned.value) {
+      clearHideTimer()
+    } else {
+      scheduleHide()
     }
   }
 
@@ -61,7 +61,7 @@ export function useVisibility() {
       return
     }
 
-    if (!isPinned) {
+    if (!isPinned.value) {
       headerVisible.value = true
       scheduleHide()
     }
@@ -73,23 +73,32 @@ export function useVisibility() {
       return
     }
 
-    if (!isPinned) {
+    if (!isPinned.value) {
       footerVisible.value = true
       scheduleHide()
     }
   }
 
+  function hideOverlays(force = false) {
+    if (isVisibilityLocked && !force) return
+
+    clearHideTimer()
+    isPinned.value = false
+    headerVisible.value = false
+    footerVisible.value = false
+  }
+
   function setVisibilityLock(locked: boolean) {
     isVisibilityLocked = locked
 
-    if (hideTimer) clearTimeout(hideTimer)
+    clearHideTimer()
 
     if (locked) {
       headerVisible.value = true
       return
     }
 
-    if (isPinned) {
+    if (isPinned.value) {
       headerVisible.value = true
       footerVisible.value = true
       return
@@ -99,14 +108,7 @@ export function useVisibility() {
     footerVisible.value = false
   }
 
-  onMounted(() => {
-    document.addEventListener('mousemove', onMouseMove)
-  })
+  onUnmounted(clearHideTimer)
 
-  onUnmounted(() => {
-    document.removeEventListener('mousemove', onMouseMove)
-    if (hideTimer) clearTimeout(hideTimer)
-  })
-
-  return { headerVisible, footerVisible, handleMiddleTap, onMouseMove, showHeader, showFooter, setVisibilityLock }
+  return { headerVisible, footerVisible, isPinned, handleMiddleTap, togglePinned, showHeader, showFooter, hideOverlays, setVisibilityLock }
 }

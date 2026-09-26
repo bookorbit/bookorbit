@@ -3,12 +3,14 @@ import { BadRequestException, Controller, HttpCode, HttpStatus, Param, ParseIntP
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { RequireLibraryType } from '../../common/decorators/require-library-type.decorator';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UploadService } from './upload.service';
 
 @Controller('libraries')
+@RequireLibraryType('books')
 export class UploadController {
   constructor(
     private readonly uploadService: UploadService,

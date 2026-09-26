@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -13,7 +13,14 @@ import {
   MIN_AUTO_SEARCH_INTERVAL_HOURS,
   MIN_AUTO_SEARCH_MAX_AGE_DAYS,
 } from '@bookorbit/types'
-import type { BookRequestImportFormats, BookRequestMediaKind, ReleaseTier, RequestDestination } from '@bookorbit/types'
+import type {
+  BookRequestImportFormats,
+  BookRequestMediaKind,
+  IndexerItem,
+  IndexerManagerListResult,
+  ReleaseTier,
+  RequestDestination,
+} from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import ReleaseProfileEditor from './components/ReleaseProfileEditor.vue'
 import RequestDestinationRow from './components/RequestDestinationRow.vue'
@@ -23,12 +30,28 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useIndexers } from '@/features/book-requests/composables/useIndexers'
 import { useRequestAutomation } from '@/features/book-requests/composables/useRequestAutomation'
 import { useRequestSourceStatus } from '@/features/book-requests/composables/useRequestSourceStatus'
+import { api } from '@/lib/api'
 
 const { t } = useI18n()
 
 const { settings, loading, loadFailed, fetchSettings, save } = useRequestAutomation()
 const { libraries, fetchLibraries } = useLibraries()
-const { indexers, fetchIndexers } = useIndexers()
+const { indexers, adapters, fetchIndexers } = useIndexers()
+const managedIndexers = ref<Array<Pick<IndexerItem, 'id' | 'name' | 'adapterType'>>>([])
+const profileIndexers = computed(() => [...indexers.value, ...managedIndexers.value])
+
+async function fetchManagedIndexers() {
+  try {
+    const res = await api('/api/v1/admin/request-indexer-managers')
+    if (!res.ok) throw new Error('manager load failed')
+    const result = (await res.json()) as IndexerManagerListResult
+    managedIndexers.value = result.managers.flatMap((manager) =>
+      manager.sources.map((source) => ({ id: source.id, name: `${manager.name} / ${source.name}`, adapterType: source.adapterType })),
+    )
+  } catch {
+    toast.error(t('settings.system.requests.managers.errors.load'))
+  }
+}
 /**
  * Auto-grab switched on with nothing to search is the one setting on this tab that reports success
  * and does nothing. Every request it touches is handed straight back, and the summary above it
@@ -89,7 +112,14 @@ watch(settings, (next) => {
 onMounted(fetchSettings)
 onMounted(fetchLibraries)
 onMounted(fetchSourceStatus)
-onMounted(() => fetchIndexers({ withAdapters: false }))
+onMounted(fetchIndexers)
+onMounted(fetchManagedIndexers)
+
+watch(loading, async (isLoading) => {
+  if (isLoading || !/^#release-profile-(ebook|audiobook|comic)$/.test(window.location.hash)) return
+  await nextTick()
+  document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
+})
 
 /**
  * What this server will actually do to an approved request, in one sentence. Assembled from the
@@ -412,7 +442,7 @@ function handleVerificationChange(enabled: boolean) {
         </summary>
         <div class="mt-2 space-y-2 settings-prose">
           <p class="settings-hint">{{ t('settings.system.requests.automation.autoGrabHint') }}</p>
-          <p class="settings-hint">{{ t('settings.system.requests.automation.minScoreHint') }}</p>
+          <p class="settings-hint">{{ t('settings.system.requests.automation.minScoreHintV2') }}</p>
           <p class="settings-hint">{{ t('settings.system.requests.automation.autoRetryHint') }}</p>
           <p class="settings-hint">{{ t('settings.system.requests.automation.maxAttemptsHint') }}</p>
           <p class="settings-hint">{{ t('settings.system.requests.automation.autoSearchHint') }}</p>
@@ -420,6 +450,47 @@ function handleVerificationChange(enabled: boolean) {
           <p class="settings-hint">{{ t('settings.system.requests.automation.autoSearchMaxAgeHint') }}</p>
         </div>
       </details>
+    </div>
+
+    <div class="settings-card">
+      <fieldset>
+        <legend class="settings-card-header w-full">
+          <span class="settings-card-title">{{ t('settings.system.requests.profiles.title') }}</span>
+        </legend>
+
+        <div class="border-t border-border px-4 py-3.5 md:px-5 md:py-4">
+          <p class="text-xs font-medium text-foreground">
+            {{ t('settings.system.requests.profiles.effectiveRule', { score: minScore }) }}
+          </p>
+          <p class="mt-1 settings-hint">{{ t('settings.system.requests.profiles.summary') }}</p>
+
+          <details class="group mt-2">
+            <summary
+              class="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <ChevronRight class="size-3.5 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
+              {{ t('settings.system.requests.profiles.howProfiles') }}
+            </summary>
+            <p class="mt-2 settings-hint settings-prose">{{ t('settings.system.requests.profiles.hint') }}</p>
+          </details>
+
+          <div class="mt-3 grid gap-4">
+            <div v-for="mediaKind in MEDIA_KINDS" :id="`release-profile-${mediaKind}`" :key="mediaKind" class="scroll-mt-6">
+              <h3 class="text-xs font-medium text-foreground">{{ t(`bookRequests.mediaKind.${mediaKind}`) }}</h3>
+              <div class="mt-1.5">
+                <ReleaseProfileEditor
+                  :key="`${mediaKind}-${editorRevision}`"
+                  :media-kind="mediaKind"
+                  :tiers="settings.profiles[mediaKind]"
+                  :indexers="profileIndexers"
+                  :adapters="adapters"
+                  @update="handleProfileChange"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </fieldset>
     </div>
 
     <div class="settings-card">
@@ -480,33 +551,6 @@ function handleVerificationChange(enabled: boolean) {
               :destination="settings.destinations[mediaKind]"
               @update="handleDestinationChange"
             />
-          </div>
-        </div>
-      </fieldset>
-    </div>
-
-    <div class="settings-card">
-      <fieldset>
-        <legend class="settings-card-header w-full">
-          <span class="settings-card-title">{{ t('settings.system.requests.profiles.title') }}</span>
-        </legend>
-
-        <div class="border-t border-border px-4 py-3.5 md:px-5 md:py-4">
-          <p class="settings-hint settings-prose">{{ t('settings.system.requests.profiles.hint') }}</p>
-
-          <div class="mt-3 grid gap-4">
-            <div v-for="mediaKind in MEDIA_KINDS" :key="mediaKind">
-              <h3 class="text-xs font-medium text-foreground">{{ t(`bookRequests.mediaKind.${mediaKind}`) }}</h3>
-              <div class="mt-1.5">
-                <ReleaseProfileEditor
-                  :key="`${mediaKind}-${editorRevision}`"
-                  :media-kind="mediaKind"
-                  :tiers="settings.profiles[mediaKind]"
-                  :indexers="indexers"
-                  @update="handleProfileChange"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </fieldset>

@@ -72,15 +72,18 @@ import { resolveFormat } from '../indexers/release-scoring';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DirectDownloadService, stagedDirectFileName } from './direct-download.service';
 import { infoHashFromMagnet, magnetDisplayName, MAX_TORRENT_FILE_BYTES, torrentMetadataFromFile, type TorrentFileMetadata } from './torrent.utils';
+import { newznabClientKey } from '../indexers/adapters/newznab.adapter';
 import type { InspectBookRequestReleaseDto } from '../dto/inspect-book-request-release.dto';
 import type { GrabBookRequestDto } from '../dto/grab-book-request.dto';
 import type { SearchBookRequestReleasesDto } from '../dto/search-book-request-releases.dto';
+import { resolveEffectiveSeedGoals } from './indexer-seed-policy';
 
 /** One metadata lookup against the source, spent only on the release an approver actually picked. */
 const RESOLVE_FILE_TIMEOUT_MS = 20_000;
 const TRANSIENT_GRAB_RETRY_DELAY_MS = 500;
 const RESOLVED_RELEASE_TTL_MS = 60_000;
 const MAX_RESOLVED_RELEASES = 25;
+const MAX_RESOLVED_RELEASE_CACHE_BYTES = 64 * 1024 * 1024;
 const MAX_DISPLAYED_MANIFEST_FILES = 200;
 /** A chooser is a list a human reads, and a release with more books than this is not one. */
 const MAX_DISPLAYED_UNITS = 25;
@@ -265,7 +268,7 @@ export class RequestFulfillmentService {
         releaseSeeders: grab.releaseSeeders ?? null,
         releaseFormat: grab.releaseFormat ?? null,
         freeleech: grab.freeleech ?? false,
-        clientHash: grab.infoHash,
+        clientKey: grab.clientKey,
         directUrl,
         directFileName,
         status: 'queued',
@@ -284,7 +287,7 @@ export class RequestFulfillmentService {
           downloadId: download.id,
           fileUrl: directUrl as string,
           fileName: directFileName as string,
-          infoHash: grab.infoHash,
+          clientKey: grab.clientKey,
         });
       } else {
         const config = await this.clients.resolveConfig(client.id);
@@ -295,7 +298,9 @@ export class RequestFulfillmentService {
               magnet: grab.magnet,
               torrentFile: grab.torrentFile,
               torrentFileName: grab.torrentFileName ?? dto.torrentFileName,
-              infoHash: grab.infoHash,
+              nzbFile: grab.nzbFile,
+              nzbFileName: grab.nzbFileName,
+              clientKey: grab.clientKey,
               // The indexer's goals, enforced by the client: BookOrbit never stops a seed itself.
               ...(grab.seedRatioGoal !== null && grab.seedRatioGoal !== undefined ? { seedRatioGoal: grab.seedRatioGoal } : {}),
               ...(grab.seedTimeMinutes !== null && grab.seedTimeMinutes !== undefined ? { seedTimeMinutes: grab.seedTimeMinutes } : {}),
@@ -329,7 +334,7 @@ export class RequestFulfillmentService {
     // the book when it lands. Leaving the dismissal on would hide the arrival too.
     await this.requests.clearDismissals(requestId);
     this.logger.log(
-      `[book_request.grab] [end] requestId=${requestId} downloadId=${download.id} clientId=${client?.id ?? 'direct'} indexerId=${grab.indexerId ?? 'none'} indexer="${sanitizeLogValue(grab.indexerName ?? 'pasted by hand')}" userId=${user?.id ?? 'automation'} source=${grab.source} hash=${grab.infoHash} - release grab started`,
+      `[book_request.grab] [end] requestId=${requestId} downloadId=${download.id} clientId=${client?.id ?? 'direct'} indexerId=${grab.indexerId ?? 'none'} indexer="${sanitizeLogValue(grab.indexerName ?? 'pasted by hand')}" userId=${user?.id ?? 'automation'} source=${grab.source} key=${grab.clientKey} - release grab started`,
     );
     this.gateway.emitChanged();
 
@@ -381,7 +386,7 @@ export class RequestFulfillmentService {
         releaseSeeders: release.seeders,
         releaseFormat: resolveFormat(release)?.slice(0, 20) ?? null,
         freeleech: release.freeleech ?? false,
-        clientHash: null,
+        clientKey: null,
         status: 'failed',
         errorMessage: error instanceof Error ? error.message : String(error),
         grabbedAt: new Date(),
@@ -403,7 +408,10 @@ export class RequestFulfillmentService {
     if (release.magnet) return 'magnet';
     try {
       const indexer = await this.indexers.resolveConfig(release.indexerId);
-      return this.indexerRegistry.require(indexer.adapterType).resolveFile ? 'direct_url' : 'torrent_file';
+      const adapter = this.indexerRegistry.require(indexer.adapterType);
+      if (adapter.resolveFile) return 'direct_url';
+      if (adapter.fetchNzbFile) return 'nzb_file';
+      return 'torrent_file';
     } catch {
       return 'torrent_file';
     }
@@ -544,10 +552,10 @@ export class RequestFulfillmentService {
 
     if (!named[0]) return parseGrabPayload(dto);
 
-    return this.resolvePickedRelease(requestId, dto.indexerId!, dto.releaseGuid!.trim());
+    return this.resolvePickedRelease(requestId, dto.indexerId!, dto.releaseGuid!.trim(), true);
   }
 
-  private async resolvePickedRelease(requestId: number, indexerId: number, releaseGuid: string): Promise<ResolvedGrab> {
+  private async resolvePickedRelease(requestId: number, indexerId: number, releaseGuid: string, applyCurrentPolicy = false): Promise<ResolvedGrab> {
     const release = this.releases.find(requestId, indexerId, releaseGuid);
     if (!release) {
       throw grabError('GRAB_RELEASE_REFUSED', 'That release is no longer in the search results. Search again and pick one.');
@@ -555,11 +563,38 @@ export class RequestFulfillmentService {
 
     const key = `${requestId}:${indexerId}:${releaseGuid}`;
     const cached = this.resolvedReleases.get(key);
-    if (cached && cached.candidate === release && cached.expiresAt > Date.now()) return cached.grab;
+    let grab: ResolvedGrab;
+    if (cached && cached.candidate === release && cached.expiresAt > Date.now()) grab = cached.grab;
+    else {
+      grab = await this.resolveRelease(requestId, release);
+      this.rememberResolvedRelease(key, release, grab);
+    }
+    return applyCurrentPolicy ? this.applyCurrentSeedPolicy(grab) : grab;
+  }
 
-    const grab = await this.resolveRelease(requestId, release);
-    this.rememberResolvedRelease(key, release, grab);
-    return grab;
+  private async applyCurrentSeedPolicy(grab: ResolvedGrab): Promise<ResolvedGrab> {
+    if (grab.indexerId === undefined || (grab.source !== 'magnet' && grab.source !== 'torrent_file')) return withoutSeedGoals(grab);
+
+    let policy;
+    try {
+      policy = await this.indexers.resolveSeedPolicy(grab.indexerId);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw grabError('GRAB_RELEASE_REFUSED', 'That release source is no longer available. Search again and pick a release.');
+      }
+      throw error;
+    }
+    if (policy.adapterType !== grab.indexerAdapterType) {
+      throw grabError('GRAB_RELEASE_REFUSED', 'That release source has changed. Search again and pick a release.');
+    }
+    if (!policy.seedsBack) return withoutSeedGoals(grab);
+
+    const goals = resolveEffectiveSeedGoals(policy, grab);
+    return {
+      ...withoutSeedGoals(grab),
+      ...(goals.seedRatioGoal !== undefined ? { seedRatioGoal: goals.seedRatioGoal } : {}),
+      ...(goals.seedTimeMinutes !== undefined ? { seedTimeMinutes: goals.seedTimeMinutes } : {}),
+    };
   }
 
   private async resolveRelease(requestId: number, release: ReleaseCandidate): Promise<ResolvedGrab> {
@@ -567,14 +602,34 @@ export class RequestFulfillmentService {
     try {
       return await this.resolveReleaseFor(indexer, release);
     } catch (error) {
+      let finalError = error;
+      if (indexer.managerId != null && release.downloadUrl && isRefreshableManagedReleaseError(error)) {
+        // A failed refresh is not an answer about the release. The original refusal is what the
+        // caller and the log line below are owed, so nothing here may replace or escape it - but a
+        // swallowed error still gets its own line, or the second search leaves nothing behind.
+        const refreshStartedAt = Date.now();
+        const refreshed = await this.releases.refreshCandidate(requestId, release.indexerId, release).catch((refreshError: unknown) => {
+          this.logger.warn(
+            `[book_request.release_refresh] [fail] requestId=${requestId} indexerId=${release.indexerId} durationMs=${Date.now() - refreshStartedAt} errorClass=${refreshError instanceof Error ? refreshError.constructor.name : typeof refreshError} error="${sanitizeLogValue(refreshError instanceof Error ? refreshError.message : String(refreshError))}" - could not re-search the managed release`,
+          );
+          return undefined;
+        });
+        if (refreshed) {
+          try {
+            return await this.resolveReleaseFor(indexer, refreshed);
+          } catch (retryError) {
+            finalError = retryError;
+          }
+        }
+      }
       // The refusal travels to the caller as a 4xx, and the filter deliberately logs no client
       // error, so without this line a source that searches fine and only fails on download leaves
       // nothing behind but a route and a status. Searching already logs its own failures; this is
       // the other half, and it is the half that names which source refused.
       this.logger.warn(
-        `[book_request.release_resolve] [fail] requestId=${requestId} indexerId=${indexer.id} indexerName="${sanitizeLogValue(indexer.name)}" errorCode=${errorCodeOf(error)} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - could not resolve the picked release`,
+        `[book_request.release_resolve] [fail] requestId=${requestId} indexerId=${indexer.id} indexerName="${sanitizeLogValue(indexer.name)}" errorCode=${errorCodeOf(finalError)} error="${sanitizeLogValue(finalError instanceof Error ? finalError.message : String(finalError))}" - could not resolve the picked release`,
       );
-      throw error;
+      throw finalError;
     }
   }
 
@@ -582,6 +637,7 @@ export class RequestFulfillmentService {
     const snapshot = {
       indexerId: release.indexerId,
       indexerName: indexer.name,
+      indexerAdapterType: indexer.adapterType,
       releaseGuid: release.guid,
       releaseTitle: release.title.slice(0, 500),
       releaseSizeBytes: release.sizeBytes,
@@ -590,9 +646,8 @@ export class RequestFulfillmentService {
       // release name, which is what the picker showed the approver.
       releaseFormat: resolveFormat(release)?.slice(0, 20) ?? null,
       freeleech: release.freeleech ?? false,
-      // Both come from the tracker itself, via torznab's `minimumratio` and `minimumseedtime`.
-      // There is no per-source override for either: the download client's own defaults are the
-      // fallback where a feed states nothing.
+      // Raw tracker metadata is cached with the transport. Current host policy is applied later,
+      // once per grab attempt, so a settings edit does not require another credentialed fetch.
       seedRatioGoal: release.seedRatioGoal ?? null,
       seedTimeMinutes: release.seedTimeMinutes ?? null,
     };
@@ -602,7 +657,7 @@ export class RequestFulfillmentService {
         ...snapshot,
         source: 'magnet',
         magnet: release.magnet,
-        infoHash: infoHashFromMagnet(release.magnet),
+        clientKey: infoHashFromMagnet(release.magnet),
         inspection: metadataUnavailableInspection('magnet'),
       };
     }
@@ -623,7 +678,7 @@ export class RequestFulfillmentService {
         fileUrl: file.url,
         fileName,
         // A digest of the URL, because there is no infohash and the poll loop still needs a key.
-        infoHash: createHash('sha1').update(file.url).digest('hex'),
+        clientKey: createHash('sha1').update(file.url).digest('hex'),
         releaseFormat: file.format.slice(0, 20),
         // The one figure the search could not state: an item's size is not the book's size.
         releaseSizeBytes: file.sizeBytes ?? snapshot.releaseSizeBytes,
@@ -631,6 +686,21 @@ export class RequestFulfillmentService {
         seedRatioGoal: null,
         seedTimeMinutes: null,
         inspection: directFileInspection(fileName, file.sizeBytes),
+      };
+    }
+
+    if (adapter.fetchNzbFile) {
+      const clientKey = newznabClientKey(indexer.id, release.guid);
+      const nzbFile = await fetchNzbFile(adapter, release, indexer);
+      return {
+        ...snapshot,
+        source: 'nzb_file',
+        nzbFile,
+        nzbFileName: `${snapshot.releaseTitle}.nzb`,
+        clientKey,
+        seedRatioGoal: null,
+        seedTimeMinutes: null,
+        inspection: metadataUnavailableInspection('nzb_file'),
       };
     }
 
@@ -646,7 +716,7 @@ export class RequestFulfillmentService {
         ...snapshot,
         source: 'magnet',
         magnet: torrentFile.magnet,
-        infoHash: infoHashFromMagnet(torrentFile.magnet),
+        clientKey: infoHashFromMagnet(torrentFile.magnet),
         inspection: metadataUnavailableInspection('magnet'),
       };
     }
@@ -658,7 +728,7 @@ export class RequestFulfillmentService {
       // Named after the hash rather than the guid, which on torznab is a URL and would put path
       // separators into a multipart filename.
       torrentFileName: `${metadata.infoHash}.torrent`,
-      infoHash: metadata.infoHash,
+      clientKey: metadata.infoHash,
       releaseSizeBytes: snapshot.releaseSizeBytes ?? metadata.totalLength,
       inspection: torrentInspection(metadata),
     };
@@ -669,9 +739,15 @@ export class RequestFulfillmentService {
     for (const [cachedKey, cached] of this.resolvedReleases) {
       if (cached.expiresAt <= now) this.resolvedReleases.delete(cachedKey);
     }
-    if (this.resolvedReleases.size >= MAX_RESOLVED_RELEASES) {
+    const grabBytes = resolvedGrabBytes(grab);
+    while (
+      this.resolvedReleases.size > 0 &&
+      (this.resolvedReleases.size >= MAX_RESOLVED_RELEASES ||
+        resolvedReleaseCacheBytes(this.resolvedReleases) + grabBytes > MAX_RESOLVED_RELEASE_CACHE_BYTES)
+    ) {
       const oldest = this.resolvedReleases.keys().next().value as string | undefined;
-      if (oldest) this.resolvedReleases.delete(oldest);
+      if (!oldest) break;
+      this.resolvedReleases.delete(oldest);
     }
     this.resolvedReleases.set(key, { candidate, grab, expiresAt: now + RESOLVED_RELEASE_TTL_MS });
   }
@@ -689,10 +765,11 @@ export class RequestFulfillmentService {
     if (requestedId === null) {
       if (DELIVERY_BY_DOWNLOAD_SOURCE[source] === 'file') return null;
 
-      const types = DOWNLOAD_CLIENT_TYPES.filter((type) => DOWNLOAD_CLIENT_DELIVERY[type] === 'torrent');
+      const delivery = DELIVERY_BY_DOWNLOAD_SOURCE[source];
+      const types = DOWNLOAD_CLIENT_TYPES.filter((type) => DOWNLOAD_CLIENT_DELIVERY[type] === delivery);
       const preferred = await this.clients.findPreferredEnabled(types);
       if (!preferred) {
-        throw grabError('GRAB_CLIENT_REFUSED', 'No torrent download client is configured. Add one under Settings > System > Requests.');
+        throw grabError('GRAB_CLIENT_REFUSED', `No ${delivery} download client is configured. Add one under Settings > System > Requests.`);
       }
       const preferredClient = await this.clients.findOne(preferred.id);
       this.assertClientCanImport(preferredClient);
@@ -727,9 +804,16 @@ export class RequestFulfillmentService {
       'GRAB_CLIENT_REFUSED',
       expected === 'file'
         ? `Download client "${client.name}" cannot fetch a direct file`
-        : `Download client "${client.name}" cannot accept a magnet link or .torrent file`,
+        : expected === 'usenet'
+          ? `Download client "${client.name}" cannot accept an NZB file`
+          : `Download client "${client.name}" cannot accept a magnet link or .torrent file`,
     );
   }
+}
+
+function isRefreshableManagedReleaseError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(401|403|404|410)\b|empty \.torrent|invalid .*torrent|not a valid NZB|empty NZB/i.test(message);
 }
 
 /**
@@ -740,6 +824,15 @@ export class RequestFulfillmentService {
 async function fetchTorrentFile(adapter: IndexerAdapter, release: ReleaseCandidate, indexer: ResolvedIndexerConfig): Promise<TorrentFetchResult> {
   try {
     return await adapter.fetchTorrentFile!(release, indexer);
+  } catch (error) {
+    if (!(error instanceof IndexerSearchException)) throw error;
+    throw indexerRefusal(error, release);
+  }
+}
+
+async function fetchNzbFile(adapter: IndexerAdapter, release: ReleaseCandidate, indexer: ResolvedIndexerConfig): Promise<Buffer> {
+  try {
+    return await adapter.fetchNzbFile!(release, indexer);
   } catch (error) {
     if (!(error instanceof IndexerSearchException)) throw error;
     throw indexerRefusal(error, release);
@@ -840,10 +933,12 @@ export function grabFailureCode(error: unknown): GrabFailureCode | null {
 
 interface ParsedGrab {
   source: BookRequestDownloadSource;
-  infoHash: string;
+  clientKey: string;
   magnet?: string;
   torrentFile?: Buffer;
   torrentFileName?: string;
+  nzbFile?: Buffer;
+  nzbFileName?: string;
   fileUrl?: string;
   fileName?: string;
   releaseTitle: string;
@@ -856,6 +951,7 @@ interface ParsedGrab {
 interface ResolvedGrab extends ParsedGrab {
   indexerId?: number;
   indexerName?: string;
+  indexerAdapterType?: string;
   releaseGuid?: string;
   releaseSeeders?: number | null;
   releaseFormat?: string | null;
@@ -870,13 +966,23 @@ interface CachedResolvedRelease {
   expiresAt: number;
 }
 
+function resolvedGrabBytes(grab: ResolvedGrab): number {
+  return (grab.torrentFile?.byteLength ?? 0) + (grab.nzbFile?.byteLength ?? 0);
+}
+
+function resolvedReleaseCacheBytes(cache: ReadonlyMap<string, CachedResolvedRelease>): number {
+  let total = 0;
+  for (const { grab } of cache.values()) total += resolvedGrabBytes(grab);
+  return total;
+}
+
 function parseGrabPayload(dto: GrabBookRequestDto): ParsedGrab {
   if (dto.magnet?.trim()) {
     const magnet = dto.magnet!.trim();
     const infoHash = infoHashFromMagnet(magnet);
     return {
       source: 'magnet',
-      infoHash,
+      clientKey: infoHash,
       magnet,
       releaseTitle: magnetDisplayName(magnet, infoHash).slice(0, 500),
       releaseSizeBytes: null,
@@ -892,7 +998,7 @@ function parseGrabPayload(dto: GrabBookRequestDto): ParsedGrab {
   const releaseTitle = (metadata.name ?? dto.torrentFileName ?? metadata.infoHash).slice(0, 500);
   return {
     source: 'torrent_file',
-    infoHash: metadata.infoHash,
+    clientKey: metadata.infoHash,
     torrentFile,
     releaseTitle,
     releaseSizeBytes: metadata.totalLength,
@@ -924,6 +1030,13 @@ function torrentInspection(metadata: TorrentFileMetadata): ReleaseFileInspection
     truncated: displayed.length < allFiles.length,
     ...unitFields(plan),
   };
+}
+
+function withoutSeedGoals(grab: ResolvedGrab): ResolvedGrab {
+  const copy = { ...grab };
+  delete copy.seedRatioGoal;
+  delete copy.seedTimeMinutes;
+  return copy;
 }
 
 /**
@@ -966,7 +1079,7 @@ function directFileInspection(fileName: string, sizeBytes: number | null | undef
   };
 }
 
-function metadataUnavailableInspection(source: 'magnet'): ReleaseFileInspection {
+function metadataUnavailableInspection(source: 'magnet' | 'nzb_file'): ReleaseFileInspection {
   return {
     source,
     status: 'metadata_unavailable',

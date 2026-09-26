@@ -25,7 +25,7 @@ function boundValues(node: unknown, out: unknown[] = [], seen = new Set<unknown>
 
 function makeSelectChain(resolvedValue: unknown) {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-  const methods = ['from', 'where', 'orderBy', 'limit', 'groupBy', 'innerJoin', 'leftJoin', 'having', 'as', '$dynamic'];
+  const methods = ['from', 'where', 'orderBy', 'limit', 'groupBy', 'innerJoin', 'leftJoin', 'having', 'as', '$dynamic', 'for'];
   methods.forEach((m) => {
     chain[m] = vi.fn().mockReturnValue(chain);
   });
@@ -52,11 +52,81 @@ function makeDeleteChain() {
   return chain;
 }
 
+function makeUpdateChain(resolvedValue: unknown) {
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+  const methods = ['set', 'where', 'returning'];
+  methods.forEach((method) => {
+    chain[method] = vi.fn().mockReturnValue(chain);
+  });
+  (chain as unknown as { then: (resolve: (value: unknown) => unknown) => Promise<unknown> }).then = (resolve) =>
+    Promise.resolve(resolvedValue).then(resolve);
+  return chain;
+}
+
 function makeRepo(db: Record<string, unknown> = {}) {
   return new AchievementRepository(db as never);
 }
 
 describe('AchievementRepository', () => {
+  describe('celebration state', () => {
+    it('backfills existing awards once using a transactional marker', async () => {
+      const insertChain = makeInsertChain([{ key: 'achievement_celebration_backfill_v1' }]);
+      const updateChain = makeUpdateChain([{ id: 1 }, { id: 2 }]);
+      const tx = {
+        insert: vi.fn().mockReturnValue(insertChain),
+        update: vi.fn().mockReturnValue(updateChain),
+      };
+      const db = { transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)) };
+      const repo = makeRepo(db);
+
+      await expect(repo.backfillExistingCelebrations()).resolves.toBe(2);
+      expect(insertChain.onConflictDoNothing).toHaveBeenCalledOnce();
+      expect(updateChain.set).toHaveBeenCalledOnce();
+    });
+
+    it('does not repeat the backfill when the marker already exists', async () => {
+      const insertChain = makeInsertChain([]);
+      const tx = { insert: vi.fn().mockReturnValue(insertChain), update: vi.fn() };
+      const db = { transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)) };
+      const repo = makeRepo(db);
+
+      await expect(repo.backfillExistingCelebrations()).resolves.toBe(0);
+      expect(tx.update).not.toHaveBeenCalled();
+    });
+
+    it('claims one pending award with a skip-locked row lock', async () => {
+      const candidate = {
+        award: { id: 9, userId: 4, achievementKey: 'reader', awardedAt: new Date(), contextJson: null },
+        achievement: { key: 'reader', category: 'reading' },
+      };
+      const selectChain = makeSelectChain([candidate]);
+      const claimedAward = { ...candidate.award, celebrationClaimId: 'claim-id' };
+      const updateChain = makeUpdateChain([claimedAward]);
+      const tx = {
+        select: vi.fn().mockReturnValue(selectChain),
+        update: vi.fn().mockReturnValue(updateChain),
+      };
+      const db = { transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)) };
+      const repo = makeRepo(db);
+
+      const result = await repo.claimNextCelebration(4, 'claim-id', new Date(), new Date());
+
+      expect(result).toEqual({ award: claimedAward, achievement: candidate.achievement });
+      expect(selectChain.for).toHaveBeenCalledWith('update', expect.objectContaining({ skipLocked: true }));
+      expect(updateChain.set).toHaveBeenCalledWith(expect.objectContaining({ celebrationClaimId: 'claim-id' }));
+    });
+
+    it('rejects acknowledgement of another user claim', async () => {
+      const selectChain = makeSelectChain([{ id: 9, userId: 5 }]);
+      const tx = { select: vi.fn().mockReturnValue(selectChain), update: vi.fn() };
+      const db = { transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)) };
+      const repo = makeRepo(db);
+
+      await expect(repo.acknowledgeCelebration(4, 'claim-id', new Date())).resolves.toBe('foreign');
+      expect(tx.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('upsertCatalogue', () => {
     it('inserts seed rows and deletes stale ones when seed is non-empty', async () => {
       const insertChain = makeInsertChain(undefined);
@@ -2078,29 +2148,18 @@ describe('AchievementRepository', () => {
   });
 
   describe('countDistinctSources', () => {
-    it('returns 3 when all sources are active', async () => {
-      const webChain = makeSelectChain([{ id: 1 }]);
-      const koreaderChain = makeSelectChain([{ id: 1 }]);
-      const koboChain = makeSelectChain([{ id: 1 }]);
-      let callCount = 0;
-      const db = {
-        select: vi.fn().mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) return webChain;
-          if (callCount === 2) return koreaderChain;
-          return koboChain;
-        }),
-      };
+    it('returns the distinct source count from first-party sessions and external readers', async () => {
+      const db = { execute: vi.fn().mockResolvedValue({ rows: [{ source_count: 5 }] }) };
       const repo = makeRepo(db);
 
       const result = await repo.countDistinctSources(1);
 
-      expect(result).toBe(3);
+      expect(result).toBe(5);
+      expect(db.execute).toHaveBeenCalledOnce();
     });
 
     it('returns 0 when no sources active', async () => {
-      const emptyChain = makeSelectChain([]);
-      const db = { select: vi.fn().mockReturnValue(emptyChain) };
+      const db = { execute: vi.fn().mockResolvedValue({ rows: [{ source_count: 0 }] }) };
       const repo = makeRepo(db);
 
       const result = await repo.countDistinctSources(1);
@@ -2108,21 +2167,13 @@ describe('AchievementRepository', () => {
       expect(result).toBe(0);
     });
 
-    it('returns 1 when only web is active', async () => {
-      const webChain = makeSelectChain([{ id: 1 }]);
-      const emptyChain = makeSelectChain([]);
-      let callCount = 0;
-      const db = {
-        select: vi.fn().mockImplementation(() => {
-          callCount++;
-          return callCount === 1 ? webChain : emptyChain;
-        }),
-      };
+    it('returns 0 when the aggregate query returns no rows', async () => {
+      const db = { execute: vi.fn().mockResolvedValue({ rows: [] }) };
       const repo = makeRepo(db);
 
       const result = await repo.countDistinctSources(1);
 
-      expect(result).toBe(1);
+      expect(result).toBe(0);
     });
   });
 

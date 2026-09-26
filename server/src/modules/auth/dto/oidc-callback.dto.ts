@@ -1,6 +1,7 @@
+import { AuthClientDto } from './auth-client.dto';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
-export class OidcCallbackDto {
+export class OidcCallbackDto extends AuthClientDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(2048)

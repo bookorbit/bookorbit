@@ -1,5 +1,5 @@
 import { BOOK_REQUEST_MEDIA_KINDS } from '@bookorbit/types';
-import type { PluginSettingsField } from '@bookorbit/plugin-api';
+import type { PluginSettingsField, PluginUpdateChannel } from '@bookorbit/plugin-api';
 
 /** Bumped when a change to the contract would break a plugin written against the old one. */
 export const PLUGIN_API_VERSION = 1;
@@ -21,6 +21,7 @@ export function isPluginTypeSlug(value: string): boolean {
 export interface DeclaredPluginShape {
   apiVersion?: unknown;
   version?: unknown;
+  update?: unknown;
   type?: unknown;
   label?: unknown;
   requiresCredential?: unknown;
@@ -48,6 +49,7 @@ export function assertPluginShape(plugin: DeclaredPluginShape): void {
   if (plugin.version !== undefined && (typeof plugin.version !== 'string' || !isPluginVersion(plugin.version))) {
     throw new Error('its version must be a semantic version such as 1.2.3, without a leading "v"');
   }
+  if (plugin.update !== undefined) assertUpdateChannel(plugin.update);
   if (typeof plugin.label !== 'string' || plugin.label.trim() === '') throw new Error('it declares no label');
   if (!plugin.hasSearch) throw new Error('it exports no search function');
   if (!plugin.hasTest) throw new Error('it exports no test function');
@@ -71,6 +73,21 @@ export function assertPluginShape(plugin: DeclaredPluginShape): void {
   }
 
   for (const field of plugin.settingsFields ?? []) assertField(field);
+}
+
+function assertUpdateChannel(value: unknown): asserts value is PluginUpdateChannel {
+  if (typeof value !== 'object' || value === null) throw new Error('its update channel is not an object');
+  const update = value as Partial<PluginUpdateChannel>;
+  let manifest: URL;
+  try {
+    manifest = new URL(update.manifestUrl ?? '');
+  } catch {
+    throw new Error('its update manifest URL is invalid');
+  }
+  if (manifest.protocol !== 'https:') throw new Error('its update manifest URL must use https');
+  if (typeof update.ed25519PublicKey !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(update.ed25519PublicKey)) {
+    throw new Error('its update public key must be a base64url-encoded Ed25519 key');
+  }
 }
 
 function isPluginVersion(version: string): boolean {

@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+
 export const MAX_OFFSET_ROWS = 50_000;
 
 // Book query endpoints support jump-rail deep links (e.g. jumping to 'Z' in a
@@ -12,4 +14,10 @@ export function isOffsetWithinLimit(offset: number): boolean {
 
 export function isBookQueryOffsetWithinLimit(offset: number): boolean {
   return offset <= MAX_BOOK_QUERY_OFFSET_ROWS;
+}
+
+export function assertOffsetWithinLimit(page: number, size: number): void {
+  if (!isOffsetWithinLimit(page * size)) {
+    throw new BadRequestException(`pagination window is too deep; page * size must be <= ${MAX_OFFSET_ROWS}`);
+  }
 }

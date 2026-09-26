@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 
+import { SystemCron } from '../../common/decorators/system-cron.decorator';
 import { UserStatisticsService } from './user-statistics.service';
 
 @Injectable()
@@ -13,7 +13,7 @@ export class UserStatisticsAggregationJob implements OnApplicationBootstrap {
     await this.recomputeRecent();
   }
 
-  @Cron('15 * * * *')
+  @SystemCron('15 * * * *')
   async runHourlyAggregation() {
     await this.recomputeRecent();
   }

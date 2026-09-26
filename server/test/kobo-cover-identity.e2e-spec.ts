@@ -4,6 +4,7 @@ import { join } from 'path';
 import { and, eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
+import { CoverSlotBackfillService } from '../src/modules/cover/cover-slot-backfill.service';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -177,6 +178,30 @@ describe('Kobo cover image identity (e2e)', { timeout: 180_000 }, () => {
 
   afterAll(async () => {
     if (ctx) await closeReaderStateIsolationE2EContext(ctx);
+  });
+
+  it('keeps the CoverImageId when Stage A converts the legacy cover', async () => {
+    const coverIdBefore = coverIdHeldByDevice;
+    const [before] = await ctx.db
+      .select({ coverUpdatedAt: schema.bookMetadata.coverUpdatedAt })
+      .from(schema.bookMetadata)
+      .where(eq(schema.bookMetadata.bookId, bookId));
+
+    const result = await ctx.app.get(CoverSlotBackfillService).run();
+
+    expect(result.converted).toBeGreaterThanOrEqual(1);
+    const [after] = await ctx.db
+      .select({ coverUpdatedAt: schema.bookMetadata.coverUpdatedAt })
+      .from(schema.bookMetadata)
+      .where(eq(schema.bookMetadata.bookId, bookId));
+    const [slot] = await ctx.db.select().from(schema.bookCovers).where(eq(schema.bookCovers.bookId, bookId));
+    expect(slot).toMatchObject({ medium: 'ebook', source: 'custom', origin: 'legacy' });
+    expect(after!.coverUpdatedAt!.getTime()).toBe(before!.coverUpdatedAt!.getTime());
+
+    await editMetadata({ title: 'Kobo Cover Identity, Converted' });
+    const delivered = await drainDelivered();
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]!.CoverImageId).toBe(coverIdBefore);
   });
 
   it('keeps the CoverImageId across a metadata edit while still delivering the change', async () => {

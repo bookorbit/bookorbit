@@ -37,6 +37,12 @@ export class DashboardController {
     return this.widgetService.getWidgets([...new Set(dto.widgets)], user);
   }
 
+  @Post('refresh')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  refresh(@CurrentUser() user: RequestUser) {
+    this.widgetService.clearCacheForUser(user.id);
+  }
+
   @Get('widgets/reading-goal')
   getReadingGoal(@CurrentUser() user: RequestUser) {
     return this.widgetService.getReadingGoal(user);

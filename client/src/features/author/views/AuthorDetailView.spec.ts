@@ -29,12 +29,16 @@ const mocks = vi.hoisted(() => ({
   authorNotFound: null as unknown as Ref<boolean>,
   books: null as unknown as Ref<BookCard[]>,
   total: null as unknown as Ref<number>,
+  bookTotal: null as unknown as Ref<number>,
   loadingBooks: null as unknown as Ref<boolean>,
   booksError: null as unknown as Ref<string | null>,
   hasMore: null as unknown as Ref<boolean>,
   sort: null as unknown as Ref<'addedAt' | 'title' | 'publishedYear'>,
   order: null as unknown as Ref<'asc' | 'desc'>,
   libraryId: null as unknown as Ref<number | null>,
+  collapseSeries: null as unknown as Ref<boolean>,
+  collapsePreference: false,
+  setCollapsePreference: vi.fn<(ctx: unknown, value: boolean | null) => Promise<void>>(),
 }))
 
 vi.mock('vue-router', () => ({
@@ -102,13 +106,23 @@ vi.mock('../composables/useAuthorBooks', () => ({
   useAuthorBooks: () => ({
     items: mocks.books,
     total: mocks.total,
+    bookTotal: mocks.bookTotal,
     loading: mocks.loadingBooks,
     error: mocks.booksError,
     hasMore: mocks.hasMore,
     sort: mocks.sort,
     order: mocks.order,
     libraryId: mocks.libraryId,
+    collapseSeries: mocks.collapseSeries,
     load: mocks.loadBooks,
+  }),
+}))
+
+vi.mock('@/features/book/composables/useSeriesCollapsePreference', () => ({
+  useSeriesCollapsePreference: () => ({
+    getEffectivePreference: () => mocks.collapsePreference,
+    setPreference: mocks.setCollapsePreference,
+    prefs: ref(undefined),
   }),
 }))
 
@@ -228,12 +242,16 @@ describe('AuthorDetailView', () => {
     mocks.authorNotFound = ref(false)
     mocks.books = ref([makeBook(101), makeBook(102)])
     mocks.total = ref(2)
+    mocks.bookTotal = ref(2)
     mocks.loadingBooks = ref(false)
     mocks.booksError = ref(null)
     mocks.hasMore = ref(false)
     mocks.sort = ref('addedAt')
     mocks.order = ref('desc')
     mocks.libraryId = ref(null)
+    mocks.collapseSeries = ref(false)
+    mocks.collapsePreference = false
+    mocks.setCollapsePreference.mockResolvedValue()
   })
 
   afterEach(() => {
@@ -274,6 +292,49 @@ describe('AuthorDetailView', () => {
     await input.trigger('change')
     await flushPromises()
   }
+
+  describe('series collapse toggle', () => {
+    it('starts from the saved author pages preference', async () => {
+      mocks.collapsePreference = true
+
+      const wrapper = await mountView()
+
+      expect(mocks.collapseSeries.value).toBe(true)
+      expect(wrapper.get('[data-testid="author-collapse-series-toggle"]').attributes('aria-pressed')).toBe('true')
+    })
+
+    it('turns collapsing on and remembers it for every author page', async () => {
+      const wrapper = await mountView()
+
+      await wrapper.get('[data-testid="author-collapse-series-toggle"]').trigger('click')
+      await flushPromises()
+
+      expect(mocks.collapseSeries.value).toBe(true)
+      expect(mocks.setCollapsePreference).toHaveBeenCalledWith({ authorPages: true }, true)
+    })
+
+    it('turns collapsing back off', async () => {
+      mocks.collapsePreference = true
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="author-collapse-series-toggle"]').trigger('click')
+      await flushPromises()
+
+      expect(mocks.collapseSeries.value).toBe(false)
+      expect(mocks.setCollapsePreference).toHaveBeenCalledWith({ authorPages: true }, false)
+    })
+
+    it('counts books rather than rows in the all-loaded label', async () => {
+      // 2 collapsed rows standing for 200 books: the reader should be told about the books.
+      mocks.total = ref(2)
+      mocks.bookTotal = ref(200)
+      mocks.hasMore = ref(false)
+
+      const wrapper = await mountView()
+
+      expect(wrapper.text()).toContain(i18n.global.t('author.detail.books.allLoaded', { total: '200' }))
+    })
+  })
 
   it('keeps unsaved edit fields when an author image is uploaded', async () => {
     vi.mocked(uploadAuthorImage).mockResolvedValue(makeAuthor({ imageUrl: '/api/v1/authors/7/image' }))

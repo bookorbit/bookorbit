@@ -6,6 +6,9 @@ import BookCoverCard from './BookCoverCard.vue'
 
 // -- module mocks (must precede imports) -------------------------------------
 
+const mockToastError = vi.hoisted(() => vi.fn<(message: string) => void>())
+vi.mock('vue-sonner', () => ({ toast: { error: mockToastError, success: vi.fn<(message: string) => void>() } }))
+
 const mockRouterPush = vi.fn<() => void>()
 vi.mock('vue-router', () => ({
   useRoute: () => ({ fullPath: '/' }),
@@ -153,6 +156,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     readStatus: null,
     addedAt: '2024-01-01T00:00:00Z',
     updatedAt: null,
+    coverVersion: 'legacy:2024-01-01T00:00:00Z',
     metadataScore: 90,
     hasCover: false,
     hasMetadataLocks: false,
@@ -165,6 +169,16 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     customMetadata: [],
     tags: [],
     ...overrides,
+  }
+}
+
+function makeReadStatus(status: NonNullable<BookCard['readStatus']>['status']): NonNullable<BookCard['readStatus']> {
+  return {
+    status,
+    source: 'auto',
+    startedAt: null,
+    finishedAt: status === 'read' ? '2026-09-21T00:00:00.000Z' : null,
+    updatedAt: '2026-09-21T00:00:00.000Z',
   }
 }
 
@@ -457,7 +471,7 @@ describe('BookCoverCard', () => {
     it('uses coverUrl composable for the image src', () => {
       const book = makeBook({ id: 42, hasCover: true })
       mountCard({ book })
-      expect(mockCoverUrl).toHaveBeenCalledWith(42, 'thumbnail', book.addedAt)
+      expect(mockCoverUrl).toHaveBeenCalledWith(42, 'thumbnail', book.coverVersion)
     })
 
     it('constrains overlays to the natural fitted cover frame after image load', async () => {
@@ -588,7 +602,7 @@ describe('BookCoverCard', () => {
     it('downloads a pure multi-track audiobook as an audio ZIP', async () => {
       const book = makeBook({
         id: 42,
-        files: [makeFile({ id: 10, format: 'mp3', role: 'primary' }), makeFile({ id: 11, format: 'mp3', role: 'secondary' })],
+        files: [makeFile({ id: 10, format: 'mp3', role: 'primary' }), makeFile({ id: 11, format: 'mp3', role: 'content' })],
       })
       const wrapper = mountCard({ book })
       const downloadItem = wrapper.findAll('[data-testid="dropdown-item"]').find((item) => item.text().trim() === 'Download')
@@ -605,8 +619,8 @@ describe('BookCoverCard', () => {
         id: 77,
         files: [
           makeFile({ id: 20, format: 'mp3', role: 'primary' }),
-          makeFile({ id: 21, format: 'mp3', role: 'secondary' }),
-          makeFile({ id: 22, format: 'epub', role: 'secondary' }),
+          makeFile({ id: 21, format: 'mp3', role: 'content' }),
+          makeFile({ id: 22, format: 'epub', role: 'content' }),
         ],
       })
       const wrapper = mountCard({ book })
@@ -620,12 +634,40 @@ describe('BookCoverCard', () => {
       mockExportBooks.mockClear()
       mockDownloadFile.mockClear()
 
-      const epubItems = wrapper.findAll('[data-testid="dropdown-item"]').filter((item) => item.text().trim() === 'EPUB')
+      const epubItems = wrapper.findAll('[data-testid="dropdown-item"]').filter((item) => item.text().trim() === 'EPUB e-book')
       expect(epubItems).toHaveLength(2)
       await epubItems[1]!.trigger('click')
 
       expect(mockDownloadFile).toHaveBeenCalledWith(22)
       expect(mockExportBooks).not.toHaveBeenCalled()
+    })
+
+    it('reports a failed cover regeneration and keeps the cached cover', async () => {
+      const fetchMock = vi.fn<() => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: false })
+      vi.stubGlobal('fetch', fetchMock)
+      const wrapper = mountCard({ book: makeBook({ id: 42 }) })
+      const regenerate = wrapper.findAll('[data-testid="dropdown-item"]').find((item) => item.text().trim() === 'Regenerate Cover')
+
+      await regenerate!.trigger('click')
+      await flushPromises()
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/books/42/re-extract-cover', { method: 'POST' })
+      expect(mockToastError).toHaveBeenCalledWith('Could not regenerate the cover')
+      expect(mockBumpVersion).not.toHaveBeenCalled()
+      vi.unstubAllGlobals()
+    })
+
+    it('refreshes the cover after a successful regeneration', async () => {
+      vi.stubGlobal('fetch', vi.fn<() => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true }))
+      const wrapper = mountCard({ book: makeBook({ id: 42 }) })
+      const regenerate = wrapper.findAll('[data-testid="dropdown-item"]').find((item) => item.text().trim() === 'Regenerate Cover')
+
+      await regenerate!.trigger('click')
+      await flushPromises()
+
+      expect(mockBumpVersion).toHaveBeenCalledWith(42)
+      expect(mockToastError).not.toHaveBeenCalled()
+      vi.unstubAllGlobals()
     })
   })
 
@@ -637,6 +679,57 @@ describe('BookCoverCard', () => {
       // The cover wrapper has style with aspectRatio
       const coverWrapper = wrapper.find('[style*="aspect-ratio"]')
       expect(coverWrapper.exists()).toBe(true)
+    })
+  })
+
+  // ── reading progress bar ──────────────────────────────────────────────────
+
+  describe('reading progress bar', () => {
+    it.each([
+      { percentage: 98, status: 'read' as const },
+      { percentage: 99.99974, status: 'read' as const },
+    ])('uses the completed color at $percentage percent when status is $status', ({ percentage, status }) => {
+      mockCardOverlays.value = ['progress-bar']
+      const wrapper = mountCard({
+        book: makeBook({
+          files: [makeFile({ format: 'mp3' })],
+          readingProgress: percentage,
+          readStatus: makeReadStatus(status),
+        }),
+      })
+
+      const progressBar = wrapper.get('[data-testid="reading-progress-bar"]')
+      expect(progressBar.classes()).toContain('bg-green-500/80')
+      expect(progressBar.classes()).not.toContain('bg-primary/70')
+    })
+
+    it('uses the in-progress color below 100 percent when status is not read', () => {
+      mockCardOverlays.value = ['progress-bar']
+      const wrapper = mountCard({
+        book: makeBook({
+          readingProgress: 99.99974,
+          readStatus: makeReadStatus('reading'),
+        }),
+      })
+
+      const progressBar = wrapper.get('[data-testid="reading-progress-bar"]')
+      expect(progressBar.classes()).toContain('bg-primary/70')
+      expect(progressBar.classes()).not.toContain('bg-green-500/80')
+    })
+
+    it('updates the color when the read status changes', async () => {
+      mockCardOverlays.value = ['progress-bar']
+      const book = makeBook({
+        readingProgress: 99.99974,
+        readStatus: makeReadStatus('reading'),
+      })
+      const wrapper = mountCard({ book })
+
+      await wrapper.setProps({ book: { ...book, readStatus: makeReadStatus('read') } })
+
+      const progressBar = wrapper.get('[data-testid="reading-progress-bar"]')
+      expect(progressBar.classes()).toContain('bg-green-500/80')
+      expect(progressBar.classes()).not.toContain('bg-primary/70')
     })
   })
 

@@ -1,13 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { BookDuplicateMatchReason } from '@bookorbit/types';
+import type { BookDuplicateGroupSort, BookDuplicateMatchReason, BookDuplicateSortOrder } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import {
+  bookDuplicateDismissals,
   bookDuplicateGroupMembers,
   bookDuplicateGroups,
   bookDuplicatePairs,
@@ -407,11 +409,40 @@ export class BookDuplicatesRepository {
           CROSS JOIN LATERAL unnest(pair.reasons) AS reason
           WHERE pair.scan_id = ${scanId}
           GROUP BY component.root_id
+        ), member_bytes AS (
+          SELECT
+            component.root_id,
+            component.book_id,
+            COALESCE((
+              SELECT sum(member_file.size_bytes)
+              FROM ${bookFiles} member_file
+              WHERE member_file.book_id = component.book_id AND member_file.role = 'content'
+            ), 0)::bigint AS bytes
+          FROM tmp_book_duplicate_components component
+        ), byte_stats AS (
+          SELECT root_id, sum(bytes)::bigint AS total_bytes, max(bytes)::bigint AS max_bytes
+          FROM member_bytes
+          GROUP BY root_id
         )
-        INSERT INTO ${bookDuplicateGroups} (scan_id, root_book_id, reasons, max_title_similarity, member_count)
-        SELECT CAST(${scanId} AS integer), member_counts.root_id, reason_stats.reasons, reason_stats.max_title_similarity, member_counts.member_count
+        INSERT INTO ${bookDuplicateGroups}
+          (scan_id, root_book_id, reasons, max_title_similarity, member_count, confidence, member_bytes_total, member_bytes_max)
+        SELECT
+          CAST(${scanId} AS integer),
+          member_counts.root_id,
+          reason_stats.reasons,
+          reason_stats.max_title_similarity,
+          member_counts.member_count,
+          CASE
+            WHEN 'file_hash' = ANY(reason_stats.reasons) THEN 4
+            WHEN 'isbn' = ANY(reason_stats.reasons) THEN 3
+            WHEN 'exact_metadata' = ANY(reason_stats.reasons) THEN 2
+            ELSE 1
+          END,
+          byte_stats.total_bytes,
+          byte_stats.max_bytes
         FROM member_counts
         JOIN reason_stats USING (root_id)
+        JOIN byte_stats USING (root_id)
       `);
 
       await tx.execute(sql`
@@ -451,7 +482,16 @@ export class BookDuplicatesRepository {
     });
   }
 
-  async findGroups(scanId: number, page: number, pageSize: number, libraryIds: number[], user: RequestUser, reason?: BookDuplicateMatchReason) {
+  async findGroups(
+    scanId: number,
+    page: number,
+    pageSize: number,
+    libraryIds: number[],
+    user: RequestUser,
+    reason: BookDuplicateMatchReason | undefined,
+    sortBy: BookDuplicateGroupSort,
+    order: BookDuplicateSortOrder,
+  ) {
     const accessibleGroupIds = this.db
       .select({ groupId: bookDuplicateGroupMembers.groupId })
       .from(bookDuplicateGroupMembers)
@@ -463,13 +503,111 @@ export class BookDuplicatesRepository {
     const where = and(eq(bookDuplicateGroups.scanId, scanId), inArray(bookDuplicateGroups.id, accessibleGroupIds), reasonFilter)!;
     const [countRow] = await this.db.select({ count: count() }).from(bookDuplicateGroups).where(where);
     const groups = await this.db
-      .select()
+      .select({
+        id: bookDuplicateGroups.id,
+        reasons: bookDuplicateGroups.reasons,
+        maxTitleSimilarity: bookDuplicateGroups.maxTitleSimilarity,
+        memberCount: bookDuplicateGroups.memberCount,
+        memberBytesTotal: bookDuplicateGroups.memberBytesTotal,
+        memberBytesMax: bookDuplicateGroups.memberBytesMax,
+      })
       .from(bookDuplicateGroups)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookDuplicateGroups.rootBookId))
       .where(where)
-      .orderBy(desc(bookDuplicateGroups.memberCount), bookDuplicateGroups.id)
+      .orderBy(...this.groupOrderBy(sortBy, order))
       .limit(pageSize)
       .offset((page - 1) * pageSize);
     return { groups, total: countRow?.count ?? 0 };
+  }
+
+  private groupOrderBy(sortBy: BookDuplicateGroupSort, order: BookDuplicateSortOrder): SQL[] {
+    const direction = order === 'asc' ? asc : desc;
+    const reclaimable = sql`(${bookDuplicateGroups.memberBytesTotal} - ${bookDuplicateGroups.memberBytesMax})`;
+    const tiebreak = sql`${bookDuplicateGroups.id} asc`;
+    switch (sortBy) {
+      case 'copies':
+        return [direction(bookDuplicateGroups.memberCount), desc(reclaimable), tiebreak];
+      case 'confidence':
+        return [direction(bookDuplicateGroups.confidence), desc(reclaimable), tiebreak];
+      case 'title':
+        return [direction(sql`lower(coalesce(${bookMetadata.title}, ''))`), tiebreak];
+      default:
+        return [direction(reclaimable), desc(bookDuplicateGroups.memberCount), tiebreak];
+    }
+  }
+
+  /**
+   * Pairs the user has already judged, removed before groups are formed so a dismissal survives
+   * a rescan and does not just hide a group that keeps coming back.
+   */
+  async deleteDismissedPairs(scanId: number, userId: number): Promise<number> {
+    const result = await this.db.execute(sql`
+      DELETE FROM ${bookDuplicatePairs} pair
+      USING ${bookDuplicateDismissals} dismissal
+      WHERE pair.scan_id = ${scanId}
+        AND dismissal.user_id = ${userId}
+        AND dismissal.book_id_a = pair.book_id_a
+        AND dismissal.book_id_b = pair.book_id_b
+    `);
+    return result.rowCount ?? 0;
+  }
+
+  async computeScanTotals(scanId: number): Promise<{ totalExtraCopies: number; totalReclaimableBytes: number }> {
+    const [row] = await this.db
+      .select({
+        extraCopies: sql<string>`COALESCE(sum(${bookDuplicateGroups.memberCount} - 1), 0)`,
+        reclaimable: sql<string>`COALESCE(sum(${bookDuplicateGroups.memberBytesTotal} - ${bookDuplicateGroups.memberBytesMax}), 0)`,
+      })
+      .from(bookDuplicateGroups)
+      .where(eq(bookDuplicateGroups.scanId, scanId));
+    return { totalExtraCopies: Number(row?.extraCopies ?? 0), totalReclaimableBytes: Number(row?.reclaimable ?? 0) };
+  }
+
+  async findGroupMemberIds(scanId: number, groupId: number): Promise<number[]> {
+    const rows = await this.db
+      .select({ bookId: bookDuplicateGroupMembers.bookId })
+      .from(bookDuplicateGroupMembers)
+      .where(and(eq(bookDuplicateGroupMembers.scanId, scanId), eq(bookDuplicateGroupMembers.groupId, groupId)));
+    return rows.map((row) => row.bookId);
+  }
+
+  async insertDismissals(userId: number, pairs: { bookIdA: number; bookIdB: number }[]): Promise<void> {
+    if (pairs.length === 0) return;
+    await this.db
+      .insert(bookDuplicateDismissals)
+      .values(pairs.map((pair) => ({ userId, bookIdA: pair.bookIdA, bookIdB: pair.bookIdB })))
+      .onConflictDoNothing();
+  }
+
+  async deleteDismissal(userId: number, bookIdA: number, bookIdB: number): Promise<number> {
+    const result = await this.db
+      .delete(bookDuplicateDismissals)
+      .where(
+        and(eq(bookDuplicateDismissals.userId, userId), eq(bookDuplicateDismissals.bookIdA, bookIdA), eq(bookDuplicateDismissals.bookIdB, bookIdB)),
+      );
+    return result.rowCount ?? 0;
+  }
+
+  async listDismissals(
+    userId: number,
+    limit: number,
+  ): Promise<{ bookIdA: number; bookIdB: number; titleA: string | null; titleB: string | null; createdAt: Date }[]> {
+    const metadataA = alias(bookMetadata, 'metadata_a');
+    const metadataB = alias(bookMetadata, 'metadata_b');
+    return this.db
+      .select({
+        bookIdA: bookDuplicateDismissals.bookIdA,
+        bookIdB: bookDuplicateDismissals.bookIdB,
+        titleA: metadataA.title,
+        titleB: metadataB.title,
+        createdAt: bookDuplicateDismissals.createdAt,
+      })
+      .from(bookDuplicateDismissals)
+      .leftJoin(metadataA, eq(metadataA.bookId, bookDuplicateDismissals.bookIdA))
+      .leftJoin(metadataB, eq(metadataB.bookId, bookDuplicateDismissals.bookIdB))
+      .where(eq(bookDuplicateDismissals.userId, userId))
+      .orderBy(desc(bookDuplicateDismissals.createdAt))
+      .limit(limit);
   }
 
   async findPairs(groupIds: number[]) {

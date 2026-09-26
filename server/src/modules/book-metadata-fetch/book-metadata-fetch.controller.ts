@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query } from '@n
 import { type BookMetadataFetchConfig, type BookMetadataFetchConfigOverride, Permission } from '@bookorbit/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { RequireLibraryType } from '../../common/decorators/require-library-type.decorator';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orchestrator.service';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
@@ -32,12 +33,14 @@ export class BookMetadataFetchController {
 
   @Get('config/libraries/:id')
   @RequirePermission(Permission.ManageMetadataConfig)
+  @RequireLibraryType('books')
   getLibraryConfig(@Param('id', ParseIntPipe) libraryId: number) {
     return this.configService.getLibraryConfigWithLastRun(libraryId);
   }
 
   @Put('config/libraries/:id')
   @RequirePermission(Permission.ManageMetadataConfig)
+  @RequireLibraryType('books')
   async updateLibraryConfig(@Param('id', ParseIntPipe) libraryId: number, @Body() dto: UpdateLibraryBookMetadataFetchConfigDto) {
     const override: BookMetadataFetchConfigOverride = Object.keys(dto).length === 0 ? null : dto;
     await this.configService.setLibraryOverride(libraryId, override);
@@ -60,6 +63,7 @@ export class BookMetadataFetchController {
 
   @Post('run/:libraryId')
   @RequirePermission(Permission.ManageMetadataConfig)
+  @RequireLibraryType('books')
   async triggerForLibrary(@Param('libraryId', ParseIntPipe) libraryId: number) {
     const queued = await this.orchestrator.triggerForLibrary(libraryId);
     return { queued };
@@ -95,6 +99,7 @@ export class BookMetadataFetchController {
 
   @Post('preview-count')
   @RequirePermission(Permission.ManageMetadataConfig)
+  @RequireLibraryType('books', { optional: true })
   async previewCount(@Body() dto: PreviewCountDto) {
     const config: BookMetadataFetchConfig = {
       enabled: true,

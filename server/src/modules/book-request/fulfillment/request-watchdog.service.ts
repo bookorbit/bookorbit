@@ -1,8 +1,9 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { CronExpression } from '@nestjs/schedule';
 import { AuditAction, AuditResource } from '@bookorbit/types';
 import type { BookRequestDownloadStatus, BookRequestStatus } from '@bookorbit/types';
 
+import { SystemCron } from '../../../common/decorators/system-cron.decorator';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { AUDIT_EVENT, AuditEventsService } from '../../audit/audit-events.service';
 import { BookRequestGateway } from '../book-request.gateway';
@@ -108,7 +109,7 @@ export class RequestWatchdogService implements OnApplicationBootstrap {
    * conditional at the repository: `failDownload` refuses an attempt or a request that settled in
    * the meantime, and `cancelAbandoned` refuses a row somebody picked a release for.
    */
-  @Cron(CronExpression.EVERY_10_MINUTES)
+  @SystemCron(CronExpression.EVERY_10_MINUTES)
   async sweep(): Promise<void> {
     try {
       await this.failStalled();
@@ -160,11 +161,11 @@ export class RequestWatchdogService implements OnApplicationBootstrap {
    * Staging directories with no attempt behind them any more.
    *
    * Direct-download progress lives in memory, so a transfer a restart interrupted leaves bytes
-   * nothing will poll, import or remove - and each failed URL stages under its own hash, so this
+   * nothing will poll, import or remove - and each failed URL stages under its own client key, so this
    * accumulates rather than overwrites.
    */
   private async reapStagedDownloads(): Promise<void> {
-    const live = new Set(await this.downloads.findLiveDirectHashes());
+    const live = new Set(await this.downloads.findLiveDirectClientKeys());
     const reaped = await this.direct.reapStaging(live);
     if (reaped === 0) return;
 

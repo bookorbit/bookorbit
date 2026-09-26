@@ -46,6 +46,7 @@ export const BOOK_METADATA_LOCK_FIELDS = [
   "comicTeams",
   "comicLocations",
   "cover",
+  "audioCover",
 ] as const;
 
 export type BookMetadataLockField = (typeof BOOK_METADATA_LOCK_FIELDS)[number];

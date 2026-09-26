@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
+import { computed, type HTMLAttributes } from 'vue'
 import { useVModel } from '@vueuse/core'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
   defaultValue?: string | number
   modelValue?: string | number
+  /** `v-model.number` and `v-model.trim`, which Vue applies on its own only to native elements. */
+  modelModifiers?: { number?: boolean; trim?: boolean }
   class?: HTMLAttributes['class']
 }>()
 
@@ -13,15 +15,31 @@ const emits = defineEmits<{
   (e: 'update:modelValue', payload: string | number): void
 }>()
 
-const modelValue = useVModel(props, 'modelValue', emits, {
+const inner = useVModel(props, 'modelValue', emits, {
   passive: true,
   defaultValue: props.defaultValue,
 })
+
+const model = computed({
+  get: () => inner.value,
+  set: (value: string | number) => {
+    inner.value = applyModifiers(value)
+  },
+})
+
+/** Text that will not parse stays text, matching `v-model.number` on a native input. */
+function applyModifiers(value: string | number): string | number {
+  if (typeof value !== 'string') return value
+  const trimmed = props.modelModifiers?.trim ? value.trim() : value
+  if (!props.modelModifiers?.number) return trimmed
+  const parsed = Number.parseFloat(trimmed)
+  return Number.isNaN(parsed) ? trimmed : parsed
+}
 </script>
 
 <template>
   <input
-    v-model="modelValue"
+    v-model="model"
     data-slot="input"
     :class="
       cn(

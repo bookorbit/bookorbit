@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Columns2, GripVertical, Plus, RotateCcw, Rows3, Trash2 } from '@lucide/vue'
 
-import type { ScrollerConfig, ScrollerType, WidgetConfig } from '@bookorbit/types'
+import { APP_FEATURES, type ScrollerConfig, type ScrollerType, type WidgetConfig } from '@bookorbit/types'
 import { formatList } from '@/i18n/formatters'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
@@ -81,6 +81,7 @@ const {
 const ALL_TYPES: ScrollerType[] = [
   'continue-reading',
   'continue-listening',
+  ...(APP_FEATURES.podcasts ? (['continue-podcasts'] as const) : []),
   'want-to-read',
   'up-next-in-series',
   'recently-added',

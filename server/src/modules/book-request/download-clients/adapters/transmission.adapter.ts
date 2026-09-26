@@ -94,7 +94,7 @@ export class TransmissionAdapter implements DownloadClientAdapter {
   /** The CSRF token the daemon issued, per client row. Not a login: it survives no restart. */
   private readonly sessions = new Map<number, string>();
 
-  async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientHash: string }> {
+  async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientKey: string }> {
     const args: Record<string, unknown> = { paused: false };
     if (release.torrentFile) {
       args.metainfo = release.torrentFile.toString('base64');
@@ -121,14 +121,14 @@ export class TransmissionAdapter implements DownloadClientAdapter {
     }
     // The poll loop asks about the hash the grab was recorded under, so a client that named a
     // different one would leave the download sitting in `queued` until the watchdog gave up.
-    if (hash !== release.infoHash.toLowerCase()) {
+    if (hash !== release.clientKey.toLowerCase()) {
       this.logger.warn(
-        `[download_client.add] [fail] clientId=${config.id} hash=${hash} expected=${release.infoHash.toLowerCase()} - Transmission named a different infohash`,
+        `[download_client.add] [fail] clientId=${config.id} hash=${hash} expected=${release.clientKey.toLowerCase()} - Transmission named a different infohash`,
       );
     }
 
     await this.applySeedGoal(hash, release, config);
-    return { clientHash: hash };
+    return { clientKey: hash };
   }
 
   /**
@@ -288,7 +288,7 @@ function toDownloadStatus(hash: string, entry: TransmissionTorrent): DownloadSta
   const totalBytes = entry.sizeWhenDone ?? entry.totalSize ?? null;
   const state = mapState(entry);
   return {
-    infoHash: hash,
+    clientKey: hash,
     state,
     progressPercent: Math.max(0, Math.min(100, Math.round((entry.percentDone ?? 0) * 100))),
     downloadedBytes: entry.downloadedEver ?? 0,

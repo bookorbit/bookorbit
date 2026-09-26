@@ -1,7 +1,9 @@
+import { usableFileTime } from '../../../common/utils/file-time.utils';
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
 import { naturalCompare } from '../../../common/utils/natural-sort.utils';
+import { buildNameExcludeMatcher, walkDirectoryTree, WALK_MAX_PATH_LENGTH } from '../../../common/fs-walk.utils';
 import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
 
 export interface FileStat {
@@ -10,6 +12,7 @@ export interface FileStat {
   ino: bigint;
   sizeBytes: number;
   mtime: Date;
+  birthtime: Date;
   format: string | null;
   role: FileRole;
 }
@@ -26,8 +29,35 @@ export interface WalkResult {
   dirMtimes: Map<string, number>;
 }
 
-const MAX_PATH_LENGTH = 4096;
-const DIR_CONCURRENCY_LIMIT = 50;
+/**
+ * Derive a book's "date added" from the earliest on-disk time of its content
+ * files. This approximates when the book first landed on disk, rather than when
+ * BookOrbit happened to import it. Cover/metadata/supplement sidecars are
+ * excluded because they can be added later without meaning the book is "newer".
+ *
+ * For 'file_modified' the earliest valid mtime is used. For 'file_created' the
+ * earliest valid birthtime is used, falling back to that same file's mtime when
+ * its birthtime is missing or invalid (some filesystems do not track creation
+ * time). Returns undefined when no content file yields a usable time, so callers
+ * can fall back to the DB defaultNow() (import time).
+ */
+export function earliestContentTime(files: FileStat[], source: 'file_modified' | 'file_created'): Date | undefined {
+  let earliest: Date | undefined;
+  for (const file of files) {
+    if (file.role !== 'content') continue;
+    let candidate: Date | undefined;
+    if (source === 'file_modified') {
+      candidate = usableFileTime(file.mtime);
+    } else {
+      candidate = usableFileTime(file.birthtime) ?? usableFileTime(file.mtime);
+    }
+    if (candidate === undefined) continue;
+    if (earliest === undefined || candidate < earliest) earliest = candidate;
+  }
+  return earliest;
+}
+
+const MAX_PATH_LENGTH = WALK_MAX_PATH_LENGTH;
 
 // Matches common disc subdirectory names: "CD 1", "Disc 2", "Disk03", "Part A", "Side IV"
 // but avoids broad matches like "Discography".
@@ -41,21 +71,6 @@ export function isDiscDirectory(name: string): boolean {
 export function stemOf(name: string): string {
   const i = name.lastIndexOf('.');
   return i > 0 ? name.slice(0, i) : name;
-}
-
-function buildExcludeMatcher(patterns: string[]): (name: string) => boolean {
-  if (patterns.length === 0) return () => false;
-  const compiled = patterns.map((p) => {
-    if (!p.includes('*')) return { literal: p, regex: null as RegExp | null };
-    const escaped = p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-    return { literal: null as string | null, regex: new RegExp(`^${escaped}$`) };
-  });
-  return (name: string) => {
-    for (const { literal, regex } of compiled) {
-      if (literal !== null ? name === literal : regex!.test(name)) return true;
-    }
-    return false;
-  };
 }
 
 async function statFilesIntoAcc(
@@ -89,111 +104,76 @@ async function statFilesIntoAcc(
       ino,
       sizeBytes: Number(s.size),
       mtime: s.mtime,
+      birthtime: s.birthtime,
       format,
       role,
     });
   }
 }
 
-// Recursively collect files, grouped by their parent directory.
+// Recursively collect files, grouped by their parent directory. Traversal itself comes from the
+// shared walker; what stays here is the book-shaped part: which directories may be skipped on an
+// unchanged mtime, and turning the surviving files into FileStat rows.
 async function collectByDir(
-  dir: string,
   libraryRoot: string,
   acc: Map<string, FileStat[]>,
   shouldExclude: (name: string) => boolean,
-  skippedDirs: Set<string>,
   logger?: (msg: string) => void,
   knownDirMtimes?: Map<string, number>,
   unchangedDirs?: Set<string>,
   dirMtimes?: Map<string, number>,
-): Promise<void> {
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'EACCES' || code === 'EPERM') {
-      logger?.(`Permission denied reading folder, skipping: ${dir}`);
-      skippedDirs.add(dir);
-      return;
-    }
-    throw err;
-  }
-
-  // Record this directory's mtime for incremental scan state
-  if (dirMtimes) {
-    try {
-      const dirStat = await stat(dir);
-      dirMtimes.set(dir, Math.round(dirStat.mtimeMs));
-    } catch {
-      // Dir was readable (readdir succeeded) but stat failed - unusual, just skip mtime tracking
-    }
-  }
-
-  const subdirs: string[] = [];
-  const filePaths: string[] = [];
-
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-
-    if (entry.name.startsWith('.')) continue;
-    if (shouldExclude(entry.name)) continue;
-
-    if (entry.isDirectory() && !entry.isSymbolicLink()) {
-      subdirs.push(full);
-    } else if (entry.isFile() && !entry.isSymbolicLink()) {
-      if (full.length > MAX_PATH_LENGTH) {
-        logger?.(`Path exceeds ${MAX_PATH_LENGTH} characters, skipping: ${full}`);
-        continue;
+): Promise<Set<string>> {
+  const { skippedDirs } = await walkDirectoryTree(libraryRoot, {
+    shouldExclude,
+    logger,
+    visit: async ({ path: dir, filePaths, subdirectoryPaths }) => {
+      // Record this directory's mtime for incremental scan state
+      if (dirMtimes) {
+        try {
+          const dirStat = await stat(dir);
+          dirMtimes.set(dir, Math.round(dirStat.mtimeMs));
+        } catch {
+          // Dir was readable (readdir succeeded) but stat failed - unusual, just skip mtime tracking
+        }
       }
-      filePaths.push(full);
-    }
-  }
 
-  // Leaf-level mtime skip: if this dir has files, check if its mtime is unchanged.
-  // Safety rules:
-  // 1. Never skip disc dirs (they get flattened into parent)
-  // 2. Never skip dirs with disc subdirs (flattening merges disc files into parent,
-  //    so parent must always have its own files scanned for a complete candidate)
-  // 3. Never skip non-root dirs if parent dir's mtime changed (parent may have new files
-  //    that turn this dir into a stem-named subdir needing flattening).
-  //    Root is exempt: root-level files are never stem-merged into a parent (see
-  //    buildBookCandidates: parent === libraryFolderPath is explicitly skipped).
-  const hasDiscSubdirs = subdirs.some((s) => isDiscDirectory(basename(s)));
-  const canSkip = knownDirMtimes && unchangedDirs && dirMtimes && filePaths.length > 0 && !isDiscDirectory(basename(dir)) && !hasDiscSubdirs;
+      // Leaf-level mtime skip: if this dir has files, check if its mtime is unchanged.
+      // Safety rules:
+      // 1. Never skip disc dirs (they get flattened into parent)
+      // 2. Never skip dirs with disc subdirs (flattening merges disc files into parent,
+      //    so parent must always have its own files scanned for a complete candidate)
+      // 3. Never skip non-root dirs if parent dir's mtime changed (parent may have new files
+      //    that turn this dir into a stem-named subdir needing flattening).
+      //    Root is exempt: root-level files are never stem-merged into a parent (see
+      //    buildBookCandidates: parent === libraryFolderPath is explicitly skipped).
+      const hasDiscSubdirs = subdirectoryPaths.some((s) => isDiscDirectory(basename(s)));
+      const canSkip = knownDirMtimes && unchangedDirs && dirMtimes && filePaths.length > 0 && !isDiscDirectory(basename(dir)) && !hasDiscSubdirs;
 
-  if (canSkip) {
-    // For non-root dirs, also require parent mtime to be unchanged (guards stem-named merging).
-    // Root has no library parent, so this check is skipped — root-level files are never
-    // stem-merged and the stem-flattening loop explicitly skips root children.
-    let parentChanged = false;
-    if (dir !== libraryRoot) {
-      const parentDir = dirname(dir);
-      const parentStoredMtime = knownDirMtimes!.get(parentDir);
-      const parentCurrentMtime = dirMtimes!.get(parentDir);
-      parentChanged = parentStoredMtime === undefined || parentCurrentMtime === undefined || parentStoredMtime !== parentCurrentMtime;
-    }
+      if (canSkip) {
+        // For non-root dirs, also require parent mtime to be unchanged (guards stem-named merging).
+        // Root has no library parent, so this check is skipped; root-level files are never
+        // stem-merged and the stem-flattening loop explicitly skips root children.
+        let parentChanged = false;
+        if (dir !== libraryRoot) {
+          const parentDir = dirname(dir);
+          const parentStoredMtime = knownDirMtimes.get(parentDir);
+          const parentCurrentMtime = dirMtimes.get(parentDir);
+          parentChanged = parentStoredMtime === undefined || parentCurrentMtime === undefined || parentStoredMtime !== parentCurrentMtime;
+        }
 
-    const storedMtime = knownDirMtimes!.get(dir);
-    const currentMtime = dirMtimes!.get(dir);
-    if (!parentChanged && storedMtime !== undefined && currentMtime !== undefined && storedMtime === currentMtime) {
-      unchangedDirs!.add(dir);
-    } else {
-      await statFilesIntoAcc(filePaths, dir, libraryRoot, acc, logger);
-    }
-  } else {
-    if (filePaths.length > 0) {
-      await statFilesIntoAcc(filePaths, dir, libraryRoot, acc, logger);
-    }
-  }
-
-  // Bounded concurrency: process subdirs in chunks to avoid EMFILE
-  for (let i = 0; i < subdirs.length; i += DIR_CONCURRENCY_LIMIT) {
-    const chunk = subdirs.slice(i, i + DIR_CONCURRENCY_LIMIT);
-    await Promise.all(
-      chunk.map((full) => collectByDir(full, libraryRoot, acc, shouldExclude, skippedDirs, logger, knownDirMtimes, unchangedDirs, dirMtimes)),
-    );
-  }
+        const storedMtime = knownDirMtimes.get(dir);
+        const currentMtime = dirMtimes.get(dir);
+        if (!parentChanged && storedMtime !== undefined && currentMtime !== undefined && storedMtime === currentMtime) {
+          unchangedDirs.add(dir);
+        } else {
+          await statFilesIntoAcc(filePaths, dir, libraryRoot, acc, logger);
+        }
+      } else if (filePaths.length > 0) {
+        await statFilesIntoAcc(filePaths, dir, libraryRoot, acc, logger);
+      }
+    },
+  });
+  return skippedDirs;
 }
 
 /**
@@ -220,11 +200,10 @@ export async function findBookCandidates(
   knownDirMtimes?: Map<string, number>,
 ): Promise<WalkResult> {
   const byDir = new Map<string, FileStat[]>();
-  const shouldExclude = buildExcludeMatcher(excludePatterns);
-  const skippedDirs = new Set<string>();
+  const shouldExclude = buildNameExcludeMatcher(excludePatterns);
   const unchangedDirs = new Set<string>();
   const dirMtimes = new Map<string, number>();
-  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, skippedDirs, logger, knownDirMtimes, unchangedDirs, dirMtimes);
+  const skippedDirs = await collectByDir(libraryFolderPath, byDir, shouldExclude, logger, knownDirMtimes, unchangedDirs, dirMtimes);
 
   // Flatten disc subdirectories (e.g. "CD 1", "Disc 2") into their parent.
   // Collect disc dirs first to avoid mutating the map while iterating.
@@ -327,11 +306,10 @@ export async function findLooseFileCandidates(
   knownDirMtimes?: Map<string, number>,
 ): Promise<WalkResult> {
   const byDir = new Map<string, FileStat[]>();
-  const shouldExclude = buildExcludeMatcher(excludePatterns);
-  const skippedDirs = new Set<string>();
+  const shouldExclude = buildNameExcludeMatcher(excludePatterns);
   const unchangedDirs = new Set<string>();
   const dirMtimes = new Map<string, number>();
-  await collectByDir(libraryFolderPath, libraryFolderPath, byDir, shouldExclude, skippedDirs, logger, knownDirMtimes, unchangedDirs, dirMtimes);
+  const skippedDirs = await collectByDir(libraryFolderPath, byDir, shouldExclude, logger, knownDirMtimes, unchangedDirs, dirMtimes);
 
   const candidates: BookCandidate[] = [];
 
@@ -369,7 +347,7 @@ export async function buildSingleBookCandidate(
     return null;
   }
 
-  const shouldExclude = buildExcludeMatcher(excludePatterns);
+  const shouldExclude = buildNameExcludeMatcher(excludePatterns);
   const filePaths: string[] = [];
   const discDirs: string[] = [];
   const nonDiscDirs: { name: string; path: string }[] = [];
@@ -426,6 +404,7 @@ export async function buildSingleBookCandidate(
         ino: s.ino,
         sizeBytes: Number(s.size),
         mtime: s.mtime,
+        birthtime: s.birthtime,
         format,
         role,
       } satisfies FileStat;

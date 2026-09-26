@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { MEDIA_OVERLAY_HIGHLIGHT_CSS_VARIABLE } from '../../../media-overlay/lib/media-overlay-highlight'
 import { useReaderState } from '../useReaderState'
 
 describe('useReaderState', () => {
@@ -73,6 +74,28 @@ describe('useReaderState', () => {
     expect(dark.bg).not.toBe(light.bg)
   })
 
+  it('provides a theme-aware media-overlay highlight whenever the page background is forced', () => {
+    const state = useReaderState()
+
+    for (const theme of state.themes) {
+      state.setThemeName(theme.name)
+      for (const dark of [false, true]) {
+        state.setIsDark(dark)
+        const css = state.generateCSS()
+        const shouldForceBackground = dark || theme.light.bg !== '#ffffff'
+
+        expect(css.includes(`${MEDIA_OVERLAY_HIGHLIGHT_CSS_VARIABLE}:`), `${theme.name} ${dark ? 'dark' : 'light'}`).toBe(shouldForceBackground)
+      }
+    }
+  })
+
+  it('does not couple media-overlay highlighting to a hard-coded active class', () => {
+    const state = useReaderState()
+    state.setThemeName('sepia')
+
+    expect(state.generateCSS()).not.toContain('.media-active')
+  })
+
   it('applies renderer attributes and CSS in paginated flow', () => {
     const state = useReaderState()
     state.setFlow('paginated')
@@ -142,10 +165,31 @@ describe('useReaderState', () => {
     const css = state.generateCSS()
 
     expect(css).toContain('font-family: serif !important;')
-    expect(css).toContain('line-height: 1.8;')
+    expect(css).toContain('line-height: 1.8 !important;')
     expect(css).toContain('font-size: 20px;')
     expect(css).toContain('text-align: start !important;')
     expect(css).toContain('hyphens: none;')
+  })
+
+  it('overrides a more specific publisher line height on body text', () => {
+    const state = useReaderState()
+    state.setLineHeight(3)
+
+    const publisherStyle = document.createElement('style')
+    publisherStyle.textContent = '.TX { line-height: 1.31; }'
+    const readerStyle = document.createElement('style')
+    readerStyle.textContent = state.generateCSS()
+    const paragraph = document.createElement('p')
+    paragraph.className = 'TX'
+
+    document.head.append(publisherStyle, readerStyle)
+    document.body.append(paragraph)
+
+    expect(getComputedStyle(paragraph).lineHeight).toBe('3')
+
+    paragraph.remove()
+    publisherStyle.remove()
+    readerStyle.remove()
   })
 
   it('preserves publisher paragraph margins at the default spacing', () => {

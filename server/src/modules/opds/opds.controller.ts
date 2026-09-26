@@ -4,7 +4,9 @@ import {
   DefaultValuePipe,
   Get,
   Headers,
+  Logger,
   NotFoundException,
+  Optional,
   Param,
   ParseIntPipe,
   Query,
@@ -12,12 +14,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { createReadStream } from 'fs';
-import { readdir, stat } from 'fs/promises';
+import { mkdtemp, rm, stat } from 'fs/promises';
+import { tmpdir } from 'os';
 import { join } from 'path';
-import { ConfigService } from '@nestjs/config';
 import type { FastifyReply } from 'fastify';
 
-import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { Public } from '../../common/decorators/public.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
@@ -29,22 +30,24 @@ import { OpdsEnabledGuard } from './opds-enabled.guard';
 import { OpdsUser } from './opds-user.decorator';
 import { OpdsBookService } from './opds-book.service';
 import { OpdsService } from './opds.service';
+import { AudiolessEpubService } from '../book/audioless-epub.service';
 import { BookService } from '../book/book.service';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 
 @Controller('opds')
 @Public()
 @UseGuards(OpdsEnabledGuard, OpdsAuthGuard)
 export class OpdsController {
-  private readonly appDataPath: string;
-
   constructor(
     private readonly opdsService: OpdsService,
     private readonly opdsBookService: OpdsBookService,
-    private readonly config: ConfigService,
     private readonly bookService: BookService,
-  ) {
-    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
-  }
+    private readonly coverStore: BookCoverStore,
+    @Optional() private readonly audiolessEpubService?: AudiolessEpubService,
+  ) {}
+
+  private readonly logger = new Logger(OpdsController.name);
 
   private assertPaginationWindow(page: number, size: number): void {
     if (!isOffsetWithinLimit((page - 1) * size)) {
@@ -215,12 +218,9 @@ export class OpdsController {
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser, user.contentFilters);
     reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
-      const files = await readdir(dir);
-      const cover = findPreferredBookCoverFileName(files);
-      if (!cover) throw new NotFoundException('No cover');
-      const coverPath = join(dir, cover);
+      const coverPath = await this.coverStore.resolve(bookId, { medium: 'ebook', variant: 'cover' });
+      if (!coverPath) throw new NotFoundException('No cover');
       const { mtimeMs } = await stat(coverPath);
       const etag = `"${Math.floor(mtimeMs)}"`;
       if (ifNoneMatch === etag) {
@@ -245,21 +245,37 @@ export class OpdsController {
   ) {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser, user.contentFilters);
     reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
+    let thumbnailPath = await this.coverStore.resolve(bookId, { medium: 'ebook', variant: 'thumbnail' });
+    if (!thumbnailPath) throw new NotFoundException('No thumbnail');
+    let mtimeMs: number;
     try {
-      const { mtimeMs } = await stat(thumbnailPath);
-      const etag = `"${Math.floor(mtimeMs)}"`;
-      if (ifNoneMatch === etag) {
-        reply.status(304).send();
-        return;
+      ({ mtimeMs } = await stat(thumbnailPath));
+    } catch (error) {
+      // Only a missing thumbnail is repairable. Every other failure keeps the answer this route has
+      // always given, without spending a cover read and a resize to arrive at it.
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw new NotFoundException('No thumbnail');
+
+      // A thumbnail can be missing beside an intact cover (issue #1475); rebuild it once on demand.
+      const repaired = await this.coverStore.resolve(bookId, { medium: 'ebook', variant: 'thumbnail' });
+      if (!repaired) throw new NotFoundException('No thumbnail');
+      try {
+        ({ mtimeMs } = await stat(repaired));
+      } catch {
+        throw new NotFoundException('No thumbnail');
       }
-      reply.header('Cache-Control', 'no-cache');
-      reply.header('ETag', etag);
-      reply.type('image/jpeg');
-      reply.send(createReadStream(thumbnailPath));
-    } catch {
-      throw new NotFoundException('No thumbnail');
+      thumbnailPath = repaired;
     }
+
+    const etag = `"${Math.floor(mtimeMs)}"`;
+    if (ifNoneMatch === etag) {
+      reply.status(304).send();
+      return;
+    }
+    reply.header('Cache-Control', 'no-cache');
+    reply.header('ETag', etag);
+    reply.type('image/jpeg');
+    reply.send(createReadStream(thumbnailPath));
   }
 
   @Get(':bookId/download')
@@ -275,19 +291,49 @@ export class OpdsController {
     if (!bookFiles) throw new NotFoundException('File not found');
 
     const { absolutePath, format } = bookFiles;
-    const { size: fileSize } = await stat(absolutePath);
-    const mime = fileMimeType(format);
+    const served = bookFiles.readAlong ? await this.audiolessCopy(absolutePath, bookId, fileId) : null;
+    const servedPath = served?.path ?? absolutePath;
+    try {
+      const { size: fileSize } = await stat(servedPath);
+      const filename = await this.bookService.resolveDownloadFilename({
+        bookId,
+        absolutePath,
+        format: format === 'unknown' ? null : format,
+      });
 
-    const filename = await this.bookService.resolveDownloadFilename({
-      bookId,
-      absolutePath,
-      format: format === 'unknown' ? null : format,
-    });
+      reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
+      reply.header('Content-Length', fileSize);
+      reply.type(fileMimeType(format));
+      const stream = createReadStream(servedPath);
+      // The rebuilt copy is only safe to delete once the response has finished reading it.
+      if (served) stream.once('close', () => void served.cleanup().catch(() => undefined));
+      reply.send(stream);
+    } catch (error) {
+      await served?.cleanup().catch(() => undefined);
+      throw error;
+    }
+  }
 
-    reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
-    reply.header('Content-Length', fileSize);
-    reply.type(mime);
-    reply.send(createReadStream(absolutePath));
+  /**
+   * A read-along EPUB reaches an OPDS reader without its narration audio, as it reaches Kobo and
+   * KOReader: the audio is most of its size and a reader cannot play it. A failed rebuild serves the original.
+   */
+  private async audiolessCopy(absolutePath: string, bookId: number, fileId: number): Promise<{ path: string; cleanup: () => Promise<void> } | null> {
+    if (!this.audiolessEpubService) return null;
+    const tempDir = await mkdtemp(join(tmpdir(), 'bookorbit-opds-epub-'));
+    const cleanup = () => rm(tempDir, { recursive: true, force: true });
+    try {
+      const path = join(tempDir, 'download.epub');
+      await this.audiolessEpubService.writeArchive(absolutePath, path);
+      return { path, cleanup };
+    } catch (error) {
+      await cleanup().catch(() => undefined);
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[opds.download] [fail] bookId=${bookId} fileId=${fileId} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - audioless rebuild failed, serving original EPUB`,
+      );
+      return null;
+    }
   }
 
   private sendXml(reply: FastifyReply, xml: string, mimeType: string) {

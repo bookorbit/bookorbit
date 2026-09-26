@@ -8,7 +8,7 @@ function makeService(
 ) {
   const downloads = {
     findByStatusOlderThan: vi.fn().mockImplementation((statuses: string[]) => Promise.resolve(byStatus[statuses.join(',')] ?? [])),
-    findLiveDirectHashes: vi.fn().mockResolvedValue([]),
+    findLiveDirectClientKeys: vi.fn().mockResolvedValue([]),
     findActiveDirect: vi.fn().mockResolvedValue([]),
   };
   const fulfillment = { failDownload: vi.fn().mockResolvedValue(undefined) };
@@ -146,7 +146,7 @@ describe('RequestWatchdogService stranded searches', () => {
 
 describe('RequestWatchdogService direct-download startup reconciliation', () => {
   it('resumes every active direct attempt before reaping staging', async () => {
-    const row = { id: 11, source: 'direct_url', clientHash: 'aaa' } as BookRequestDownloadRow;
+    const row = { id: 11, source: 'direct_url', clientKey: 'aaa' } as BookRequestDownloadRow;
     const { service, downloads, direct, fulfillment } = makeService();
     downloads.findActiveDirect.mockResolvedValue([row]);
 
@@ -158,7 +158,7 @@ describe('RequestWatchdogService direct-download startup reconciliation', () => 
   });
 
   it('fails an interrupted attempt immediately when it cannot be resumed safely', async () => {
-    const row = { id: 11, source: 'direct_url', clientHash: 'aaa' } as BookRequestDownloadRow;
+    const row = { id: 11, source: 'direct_url', clientKey: 'aaa' } as BookRequestDownloadRow;
     const { service, downloads, direct, fulfillment } = makeService();
     downloads.findActiveDirect.mockResolvedValue([row]);
     direct.resume.mockResolvedValue(false);
@@ -170,7 +170,7 @@ describe('RequestWatchdogService direct-download startup reconciliation', () => 
 
   it('reaps staging against the attempts that could still read it', async () => {
     const { service, downloads, direct } = makeService();
-    downloads.findLiveDirectHashes.mockResolvedValue(['aaa', 'bbb']);
+    downloads.findLiveDirectClientKeys.mockResolvedValue(['aaa', 'bbb']);
 
     await service.onApplicationBootstrap();
 
@@ -182,7 +182,7 @@ describe('RequestWatchdogService direct-download startup reconciliation', () => 
     const { service, downloads, requests } = makeService();
     // Reset first: the harness queues a one-shot batch that would be consumed before the rejection.
     requests.findStrandedSearching.mockReset().mockRejectedValue(new Error('db down'));
-    downloads.findLiveDirectHashes.mockRejectedValue(new Error('db down'));
+    downloads.findLiveDirectClientKeys.mockRejectedValue(new Error('db down'));
 
     await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
   });

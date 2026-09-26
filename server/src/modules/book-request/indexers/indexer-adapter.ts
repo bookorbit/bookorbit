@@ -14,12 +14,14 @@ import type {
 /** An indexer row with its credential already decrypted. Never logged, never returned over HTTP. */
 export interface ResolvedIndexerConfig {
   id: number;
+  managerId: number | null;
+  managerPriority: number | null;
   name: string;
   /** The operator's colour for this source, carried so a search status can report it unlooked-up. */
   color: IndexerColor | null;
   adapterType: IndexerAdapterType;
   baseUrl: string;
-  /** A torznab API key or a tracker session id, depending on the adapter. */
+  /** An API key or tracker session id, depending on the adapter. */
   credential: string | null;
   /**
    * Why the stored credential could not be read, where that is what happened. Set only on the
@@ -29,6 +31,9 @@ export interface ResolvedIndexerConfig {
    */
   credentialError: string | null;
   allowPrivateAddress: boolean;
+  applyTrackerSeedGoals: boolean;
+  seedRatioGoal: number | null;
+  seedTimeMinutes: number | null;
   categories: IndexerCategoryMap;
   /** Media the operator took this source out of, on top of what its adapter declares it carries. */
   disabledMediaKinds: readonly BookRequestMediaKind[];
@@ -41,6 +46,19 @@ export interface ResolvedIndexerConfig {
   settings: IndexerSettings | null;
   /** How to reach this source, applied by the host rather than chosen by the adapter. */
   networkProfile: NetworkProfile | null;
+  perIndexerTimeoutSeconds: number;
+  overallSearchBudgetSeconds: number | null;
+  autoExpandCategories: boolean;
+}
+
+/** Non-secret host policy read immediately before a configured-indexer torrent is added. */
+export interface ResolvedIndexerSeedPolicy {
+  id: number;
+  adapterType: IndexerAdapterType;
+  seedsBack: boolean;
+  applyTrackerSeedGoals: boolean;
+  seedRatioGoal: number | null;
+  seedTimeMinutes: number | null;
 }
 
 export interface ReleaseQuery {
@@ -174,6 +192,8 @@ export interface IndexerAdapter {
   test(config: ResolvedIndexerConfig): Promise<IndexerTestResult>;
   /** Private trackers need an authenticated .torrent fetch rather than a public magnet. */
   fetchTorrentFile?(release: ReleaseCandidate, config: ResolvedIndexerConfig): Promise<TorrentFetchResult>;
+  /** Newznab download endpoint resolved to an NZB before its credential can reach the client. */
+  fetchNzbFile?(release: ReleaseCandidate, config: ResolvedIndexerConfig): Promise<Buffer>;
   /**
    * Sources that serve the file itself. An adapter implements this or `fetchTorrentFile`, never
    * both: which one it declares is what decides whether a grab becomes a torrent or a download.

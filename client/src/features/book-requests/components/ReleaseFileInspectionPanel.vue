@@ -3,18 +3,19 @@ import { computed } from 'vue'
 import { AudioLines, BookOpen, FileCheck2, FileWarning, Images, Loader2 } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import { releaseInspectionBlocksGrab } from '@bookorbit/types'
-import type { ReleaseFileInspection, ReleaseUnitSummary } from '@bookorbit/types'
+import type { DownloadDelivery, ReleaseFileInspection, ReleaseUnitSummary } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 
 const props = withDefaults(
   defineProps<{
     inspection: ReleaseFileInspection | null
+    delivery?: DownloadDelivery
     loading: boolean
     failed: boolean
     /** What the tracker or the server said, where either said anything worth repeating. */
     failureReason?: string | null
   }>(),
-  { failureReason: null },
+  { delivery: 'torrent', failureReason: null },
 )
 
 const { t } = useI18n()
@@ -62,7 +63,11 @@ function summary(): string {
     case 'multiple_supported_files':
       return t('bookRequests.releases.manifest.multipleBooks', { count: inspection.unitCount })
     case 'metadata_unavailable':
-      return t('bookRequests.releases.manifest.metadataUnavailable')
+      return t(
+        inspection.source === 'nzb_file'
+          ? 'bookRequests.releases.manifest.usenetMetadataUnavailable'
+          : 'bookRequests.releases.manifest.metadataUnavailable',
+      )
   }
 }
 
@@ -91,7 +96,7 @@ function fileSize(sizeBytes: number | null): string | null {
   <div class="mt-3 rounded-lg border border-border bg-background/60 p-3">
     <p v-if="loading" role="status" class="flex items-center gap-2 text-xs text-muted-foreground">
       <Loader2 class="size-3.5 animate-spin" aria-hidden="true" />
-      {{ t('bookRequests.releases.inspectingFiles') }}
+      {{ t(props.delivery === 'usenet' ? 'bookRequests.releases.inspectingNzb' : 'bookRequests.releases.inspectingFiles') }}
     </p>
 
     <p v-else-if="failed" role="alert" class="flex items-start gap-2 text-xs text-destructive">
@@ -100,7 +105,7 @@ function fileSize(sizeBytes: number | null): string | null {
         <!-- The tracker's own sentence where there is one: "VIP torrent and you are not VIP or
              higher" says what to do next, where the generic line says only that something broke. -->
         <span class="block">{{ props.failureReason ?? t('bookRequests.releases.inspectionFailed') }}</span>
-        <span class="mt-0.5 block text-muted-foreground">{{ t('bookRequests.releases.inspectionFailedHint') }}</span>
+        <span class="mt-0.5 block text-muted-foreground">{{ t('bookRequests.releases.inspectionFailedHintGeneric') }}</span>
       </span>
     </p>
 

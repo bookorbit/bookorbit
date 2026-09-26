@@ -43,8 +43,10 @@ export class BookRequestGateway implements OnGatewayConnection, OnGatewayDisconn
     try {
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new UnauthorizedException('No token provided');
-      const payload = this.jwtService.verify<{ sub: number; ver: number; amr?: AuthenticationMethod }>(token, { algorithms: ['HS256'] });
-      const user = await this.authService.validateUser(payload.sub, payload.ver, payload.amr ?? 'legacy');
+      const payload = this.jwtService.verify<{ sub: number; ver: number; sid?: number; amr?: AuthenticationMethod }>(token, {
+        algorithms: ['HS256'],
+      });
+      const user = await this.authService.validateSessionUser(payload.sub, payload.ver, payload.amr ?? 'legacy', payload.sid);
       if (!user) throw new UnauthorizedException('User not found or token revoked');
       if (!user.isSuperuser && !user.permissions.includes(Permission.BookRequestAccess)) {
         throw new UnauthorizedException('Missing book request access');

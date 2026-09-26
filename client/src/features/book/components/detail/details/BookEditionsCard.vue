@@ -2,15 +2,15 @@
 import { computed } from 'vue'
 import { RotateCcw } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
+import type { BookDetail } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 import { formatNumber, formatPercent } from '@/i18n/formatters'
-import { formatColorVar } from '@/features/book/lib/format-colors'
-import { FORMAT_TO_GROUP } from '@bookorbit/types'
-import type { BookDetail } from '@bookorbit/types'
+import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
+import { bookFormatEntries, formatKeyName, type BookFormatEntry } from '@/features/book/lib/book-formats'
 
 export interface EditionProgress {
-  /** Lower-cased format the bar belongs to. */
-  format: string
+  /** The edition's format key, as `bookFormatEntries` gives it. */
+  key: string
   percentage: number
   finished: boolean
   /** Present when this edition's progress can be reset. */
@@ -28,99 +28,27 @@ const props = withDefaults(
   { progress: () => [], maxRows: 4, resettingFileIds: () => [] },
 )
 
-const emit = defineEmits<{ resetProgress: [format: string] }>()
+const emit = defineEmits<{ resetProgress: [key: string] }>()
 
-function handleReset(row: EditionRow) {
-  emit('resetProgress', row.format)
+function handleReset(row: BookFormatEntry) {
+  emit('resetProgress', row.key)
 }
 
-function isResetting(row: EditionRow): boolean {
+function isResetting(row: BookFormatEntry): boolean {
   const entry = progressFor(row)
   return entry?.resetFileId != null && props.resettingFileIds.includes(entry.resetFileId)
 }
 
 const { t } = useI18n()
 
-interface EditionRow {
-  key: string
-  format: string
-  sizeBytes: number
-  durationSeconds: number | null
-  trackCount: number
-  isPrimary: boolean
-  isAudio: boolean
-}
-
-/**
- * A multi-track audiobook is one edition, not thirty-eight. Collapsing it here matches how the
- * reader treats those files and keeps a 38-file book from printing 38 rows.
- */
-const rows = computed<EditionRow[]>(() => {
-  const files = props.book.files.filter((file) => file.format != null)
-  const audio = files.filter((file) => FORMAT_TO_GROUP[file.format!] === 'audio')
-  const rest = files.filter((file) => FORMAT_TO_GROUP[file.format!] !== 'audio')
-  const result: EditionRow[] = []
-
-  const firstAudio = audio[0]
-  if (firstAudio?.format != null) {
-    result.push({
-      key: 'audio',
-      format: firstAudio.format,
-      sizeBytes: audio.reduce((total, file) => total + (file.sizeBytes ?? 0), 0),
-      durationSeconds: props.book.audioMetadata?.durationSeconds ?? null,
-      trackCount: audio.length,
-      isPrimary: audio.some((file) => file.role === 'primary'),
-      isAudio: true,
-    })
-  }
-
-  const byFormat = new Map<string, EditionRow>()
-  for (const file of rest) {
-    const format = file.format!
-    const existing = byFormat.get(format)
-    if (existing) {
-      existing.sizeBytes += file.sizeBytes ?? 0
-      existing.trackCount += 1
-      existing.isPrimary = existing.isPrimary || file.role === 'primary'
-      continue
-    }
-    byFormat.set(format, {
-      key: format,
-      format,
-      sizeBytes: file.sizeBytes ?? 0,
-      durationSeconds: null,
-      trackCount: 1,
-      isPrimary: file.role === 'primary',
-      isAudio: false,
-    })
-  }
-  result.push(...byFormat.values())
-
-  return result.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.format.localeCompare(b.format))
-})
+const rows = computed(() => bookFormatEntries(props.book.files, props.book.formatPriority))
 
 const visibleRows = computed(() => rows.value.slice(0, props.maxRows))
 const hiddenCount = computed(() => Math.max(0, rows.value.length - visibleRows.value.length))
 const totalBytes = computed(() => rows.value.reduce((total, row) => total + row.sizeBytes, 0))
-const fileCount = computed(() => props.book.files.filter((file) => file.format != null).length)
 
-const progressByFormat = computed(() => {
-  const map = new Map<string, EditionProgress>()
-  for (const entry of props.progress) map.set(entry.format.toLowerCase(), entry)
-  return map
-})
-
-function progressFor(row: EditionRow): EditionProgress | null {
-  return progressByFormat.value.get(row.format.toLowerCase()) ?? null
-}
-
-function formatBadgeStyle(format: string) {
-  const color = formatColorVar(format)
-  return {
-    color,
-    borderColor: `color-mix(in oklch, ${color} 45%, transparent)`,
-    backgroundColor: `color-mix(in oklch, ${color} 12%, transparent)`,
-  }
+function progressFor(row: BookFormatEntry): EditionProgress | null {
+  return props.progress.find((entry) => entry.key === row.key) ?? null
 }
 
 function formatDuration(seconds: number): string {
@@ -137,8 +65,9 @@ function progressLabel(percentage: number): string {
   return formatPercent(Math.round(clamped) / 100)
 }
 
-function rowMeasure(row: EditionRow): string {
-  if (row.isAudio && row.durationSeconds != null) return formatDuration(row.durationSeconds)
+function rowMeasure(row: BookFormatEntry): string {
+  const durationSeconds = row.audio ? props.book.audioMetadata?.durationSeconds : null
+  if (durationSeconds != null) return formatDuration(durationSeconds)
   return formatBytes(row.sizeBytes)
 }
 </script>
@@ -156,13 +85,11 @@ function rowMeasure(row: EditionRow): string {
 
     <ul class="mt-2.5 flex flex-col gap-2">
       <li v-for="row in visibleRows" :key="row.key" class="flex items-center gap-2.5">
-        <span
-          class="inline-flex h-5 w-13 shrink-0 items-center justify-center gap-1 rounded-md border text-[10px] font-bold uppercase leading-none tracking-wider"
-          :style="formatBadgeStyle(row.format)"
-        >
-          <span v-if="row.isPrimary" class="size-1.5 shrink-0 rounded-full bg-current" />
-          {{ row.format }}
-        </span>
+        <BookFormatChip
+          :format-key="row.key"
+          :primary="row.primary"
+          class="h-5 min-w-13 shrink-0 justify-center rounded-md px-1.5 text-[10px] leading-none tracking-wider"
+        />
 
         <template v-if="progressFor(row)">
           <span class="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
@@ -186,7 +113,7 @@ function rowMeasure(row: EditionRow): string {
           v-if="progressFor(row)?.resetFileId != null"
           type="button"
           class="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          :aria-label="t('book.detail.details.resetFileProgress')"
+          :aria-label="t('book.detail.details.resetEditionProgress', { format: formatKeyName(row.key) })"
           :disabled="isResetting(row)"
           @click="handleReset(row)"
         >
@@ -201,7 +128,7 @@ function rowMeasure(row: EditionRow): string {
 
     <div class="mt-2.5 flex items-baseline gap-2 border-t border-border pt-2">
       <p class="text-[11px] text-muted-foreground">{{ t('book.detail.details.filesOnDisk') }}</p>
-      <p class="ml-auto text-[11px] font-semibold tabular-nums">{{ formatNumber(fileCount) }}</p>
+      <p class="ml-auto text-[11px] font-semibold tabular-nums">{{ formatNumber(book.files.length) }}</p>
     </div>
   </section>
 </template>

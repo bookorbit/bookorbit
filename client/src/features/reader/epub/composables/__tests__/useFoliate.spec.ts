@@ -20,8 +20,11 @@ vi.mock('../useFoliateAnnotations', () => ({
 vi.mock('../useFoliateSelection', () => ({
   useFoliateSelection: () => ({
     setHandler: vi.fn<() => void>(),
+    setInteractionStartHandler: vi.fn<() => void>(),
     handleSelectionEnd: vi.fn<() => void>(),
     handleSelectionChange: vi.fn<() => void>(),
+    handleInteractionStart: vi.fn<() => void>(),
+    handleInteractionEnd: vi.fn<() => void>(),
   }),
 }))
 
@@ -130,6 +133,28 @@ describe('useFoliate.open', () => {
     expect(String(fetchFile)).toBe('reader-token')
     vi.mocked(getAccessToken).mockReturnValue('fresh-reader-token')
     expect(`${fetchFile}`).toBe('fresh-reader-token')
+  })
+
+  it('applies the EPUB default media-overlay active class before Foliate opens the book', async () => {
+    const book = { media: {}, sections: [{ mediaOverlay: { id: 'overlay' } }] }
+    ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce(book)
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    expect(book.media).toEqual({ activeClass: '-epub-media-overlay-active' })
+    expect(mockOpen).toHaveBeenCalledWith(book)
+  })
+
+  it('preserves a book-defined media-overlay active class', async () => {
+    const book = { media: { activeClass: 'book-active' }, sections: [{ mediaOverlay: { id: 'overlay' } }] }
+    ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce(book)
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    expect(book.media.activeClass).toBe('book-active')
+    expect(mockOpen).toHaveBeenCalledWith(book)
   })
 
   it('forces fixed-layout EPUB spreads off before opening when requested', async () => {
@@ -279,5 +304,21 @@ describe('useFoliate.open', () => {
     expect(inputMock.suppressNextTapNavigation).toHaveBeenCalledTimes(1)
     expect(onAnnotationClick).toHaveBeenCalledWith('epubcfi(/6/4)', expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }))
     expect(inputMock.suppressNextTapNavigation.mock.invocationCallOrder[0]!).toBeLessThan(onAnnotationClick.mock.invocationCallOrder[0]!)
+  })
+
+  it('prefers media-overlay fragment when requested', async () => {
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', {
+      cfi: 'epubcfi(/6/4!)',
+      fallbackFraction: 0.75,
+      mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+      mediaOverlaySectionIndex: 2,
+      preferMediaOverlay: true,
+    })
+
+    expect(mockGoTo).toHaveBeenCalledWith('OPS/ch1.xhtml#s12')
+    expect(mockGoTo).not.toHaveBeenCalledWith('epubcfi(/6/4!)')
+    expect(mockGoToFraction).not.toHaveBeenCalled()
   })
 })

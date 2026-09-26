@@ -14,9 +14,10 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { ICON_VALUE_MAX_LENGTH, type CoverAspectRatio, type OrganizationMode } from '@bookorbit/types';
+import { ICON_VALUE_MAX_LENGTH, type AddedAtSource, type CoverAspectRatio, type OrganizationMode } from '@bookorbit/types';
 
 import {
+  LIBRARY_ADDED_AT_SOURCES,
   LIBRARY_COVER_ASPECT_RATIOS,
   LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX,
   LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN,
@@ -58,6 +59,18 @@ export class UpdateLibraryDto {
   @IsNotEmpty({ each: true })
   folders?: string[];
 
+  /** Podcast-only: roots holding podcast folders the user already has. Never written to. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  localFolders?: string[];
+
+  /** Podcast-only: automatically discover changes beneath local podcast roots. */
+  @IsOptional()
+  @IsBoolean()
+  watchLocalFolders?: boolean;
+
   @IsOptional()
   @IsIn(LIBRARY_COVER_ASPECT_RATIOS)
   coverAspectRatio?: CoverAspectRatio;
@@ -90,6 +103,10 @@ export class UpdateLibraryDto {
   @IsOptional()
   @IsIn(LIBRARY_ORGANIZATION_MODES)
   organizationMode?: OrganizationMode;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsIn(LIBRARY_ADDED_AT_SOURCES)
+  addedAtSource?: AddedAtSource;
 
   @IsOptional()
   @IsArray()

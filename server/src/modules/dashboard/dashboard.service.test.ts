@@ -33,6 +33,10 @@ function makeService() {
     findWantToReadBookIds: vi.fn(),
     findUpNextInSeriesBookIds: vi.fn(),
     findRandomBookIds: vi.fn(),
+    countBooksAddedThisMonth: vi.fn().mockResolvedValue(0),
+    countContinueReadingBooks: vi.fn().mockResolvedValue(0),
+    countContinueListeningBooks: vi.fn().mockResolvedValue(0),
+    countWantToReadBooks: vi.fn().mockResolvedValue(0),
   };
   const bookReadService = {
     findCardsByBookIds: vi.fn(),
@@ -43,9 +47,17 @@ function makeService() {
   const smartScopeService = {
     executeSmartScope: vi.fn(),
     executeSmartScopeBookIds: vi.fn(),
+    findOne: vi.fn().mockResolvedValue({ mediaType: 'books' }),
   };
 
-  const service = new DashboardService(dashboardRepo as never, bookReadService as never, libraryService as never, smartScopeService as never);
+  const coverStore = { enrichCardVersions: vi.fn().mockResolvedValue(undefined) };
+  const service = new DashboardService(
+    dashboardRepo as never,
+    bookReadService as never,
+    libraryService as never,
+    smartScopeService as never,
+    coverStore as never,
+  );
   return { service, dashboardRepo, bookReadService, libraryService, smartScopeService };
 }
 
@@ -100,7 +112,7 @@ describe('DashboardService', () => {
     const result = await service.getScroller(ScrollerType.SMART_SCOPE, user, 999, 88);
 
     expect(smartScopeService.executeSmartScope).toHaveBeenCalledWith(88, user, 0, 50, undefined, [12]);
-    expect(result).toEqual(items);
+    expect(result).toEqual({ books: items, total: 2 });
   });
 
   it('intersects standard shelves with the saved dashboard library selection', async () => {
@@ -121,8 +133,9 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.RECENTLY_ADDED, makeUser(), 20);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ books: [], total: 0 });
     expect(dashboardRepo.findRecentlyAddedBookIds).not.toHaveBeenCalled();
+    expect(dashboardRepo.countBooksAddedThisMonth).not.toHaveBeenCalled();
     expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
   });
 
@@ -149,8 +162,9 @@ describe('DashboardService', () => {
 
     expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([100, 200], 1, EMPTY_CONTENT_FILTER_RULES);
     expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([9, 3], 5);
-    expect(result.map((card) => card.id)).toEqual([9, 3]);
-    expect(result[0]?.readStatus?.status).toBe('reading');
+    expect(dashboardRepo.countBooksAddedThisMonth).toHaveBeenCalledWith([100, 200], EMPTY_CONTENT_FILTER_RULES);
+    expect(result.books.map((card) => card.id)).toEqual([9, 3]);
+    expect(result.books[0]?.readStatus?.status).toBe('reading');
   });
 
   it('routes continue reading requests to repository with clamped max limit', async () => {
@@ -158,12 +172,17 @@ describe('DashboardService', () => {
     const user = makeUser({ id: 9 });
     libraryService.findAccessibleLibraryIds.mockResolvedValue([301]);
     dashboardRepo.findContinueReadingBookIds.mockResolvedValue([4]);
+    // The shelf is a window onto a larger set, which is the whole point of reporting a total: one
+    // card comes back and the count still says how many the shelf could have drawn from.
+    dashboardRepo.countContinueReadingBooks.mockResolvedValue(37);
     bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([4]));
 
     const result = await service.getScroller(ScrollerType.CONTINUE_READING, user, 500);
 
     expect(dashboardRepo.findContinueReadingBookIds).toHaveBeenCalledWith([301], 9, 50, EMPTY_CONTENT_FILTER_RULES);
-    expect(result.map((card) => card.id)).toEqual([4]);
+    expect(dashboardRepo.countContinueReadingBooks).toHaveBeenCalledWith([301], 9, EMPTY_CONTENT_FILTER_RULES);
+    expect(result.books.map((card) => card.id)).toEqual([4]);
+    expect(result.total).toBe(37);
   });
 
   it('routes continue listening requests to repository with user scope and content filters', async () => {
@@ -177,7 +196,7 @@ describe('DashboardService', () => {
 
     expect(dashboardRepo.findContinueListeningBookIds).toHaveBeenCalledWith([302, 303], 14, 50, EMPTY_CONTENT_FILTER_RULES);
     expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([6], 14);
-    expect(result.map((card) => card.id)).toEqual([6]);
+    expect(result.books.map((card) => card.id)).toEqual([6]);
   });
 
   it('routes want-to-read requests to repository and preserves response order', async () => {
@@ -190,7 +209,7 @@ describe('DashboardService', () => {
     const result = await service.getScroller(ScrollerType.WANT_TO_READ, user, 7);
 
     expect(dashboardRepo.findWantToReadBookIds).toHaveBeenCalledWith([404], 21, 7, EMPTY_CONTENT_FILTER_RULES);
-    expect(result.map((card) => card.id)).toEqual([31, 22]);
+    expect(result.books.map((card) => card.id)).toEqual([31, 22]);
   });
 
   it('routes up-next-in-series requests to repository and preserves response order', async () => {
@@ -203,7 +222,9 @@ describe('DashboardService', () => {
     const result = await service.getScroller(ScrollerType.UP_NEXT_IN_SERIES, user, 25);
 
     expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([707], 11, 25, EMPTY_CONTENT_FILTER_RULES);
-    expect(result.map((card) => card.id)).toEqual([19, 8]);
+    expect(result.books.map((card) => card.id)).toEqual([19, 8]);
+    // The recursive CTE is not worth materialising twice, so this shelf never reports a total.
+    expect(result.total).toBeNull();
   });
 
   it('passes undefined content filters for up-next-in-series when user is superuser', async () => {
@@ -238,7 +259,9 @@ describe('DashboardService', () => {
     const result = await service.getScroller(ScrollerType.RANDOM, makeUser({ id: 3 }), 20);
 
     expect(dashboardRepo.findRandomBookIds).toHaveBeenCalledWith([901], 3, 20, EMPTY_CONTENT_FILTER_RULES);
-    expect(result).toEqual([]);
+    // Null, not zero. Sizing the pool this shelf samples would anti-join the whole library, so it
+    // declines to answer rather than reporting an empty row as an empty library.
+    expect(result).toEqual({ books: [], total: null });
     expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
   });
 

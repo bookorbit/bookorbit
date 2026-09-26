@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -25,6 +25,7 @@ import {
   bookMetadata,
   books,
   genres,
+  libraries,
   readingProgress,
   readingAttempts,
   readingSessions,
@@ -33,7 +34,8 @@ import {
   userReadingDailyStats,
 } from '../../db/schema';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
-import { computeLongestStreak, computeStreakData, formatDay } from './dashboard-widget.calculations';
+import { computeLongestStreak, computeStreakData, formatDay, resolveResumeModes } from './dashboard-widget.calculations';
+import type { ResumeModeFile } from './dashboard-widget.calculations';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -105,9 +107,12 @@ export class DashboardWidgetRepository {
         lastReadAt: mergedLastReadAt,
         fileId: bookFiles.id,
         fileFormat: bookFiles.format,
+        primaryFileId: books.primaryFileId,
+        formatPriority: libraries.formatPriority,
       })
       .from(userBookStatus)
       .innerJoin(books, eq(books.id, userBookStatus.bookId))
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .leftJoin(readingProgress, and(isNotNull(bookFiles.id), eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
@@ -126,20 +131,42 @@ export class DashboardWidgetRepository {
     if (rows.length === 0) return { books: [] };
 
     const bookIds = rows.map((r) => r.bookId);
-    const authorRows = await this.db
-      .select({
-        bookId: bookAuthors.bookId,
-        authorName: authors.name,
-      })
-      .from(bookAuthors)
-      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(inArray(bookAuthors.bookId, bookIds));
+    const [authorRows, fileRows] = await Promise.all([
+      this.db
+        .select({
+          bookId: bookAuthors.bookId,
+          authorName: authors.name,
+        })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(inArray(bookAuthors.bookId, bookIds)),
+      // Every file of these books, not just the primary one: which resume modes exist is a
+      // question about the whole set, and the widget's clients would otherwise ask for each
+      // book's detail to find out.
+      this.db
+        .select({
+          bookId: bookFiles.bookId,
+          id: bookFiles.id,
+          format: bookFiles.format,
+          mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+        })
+        .from(bookFiles)
+        .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content')))
+        .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id)),
+    ]);
 
     const authorsByBookId = new Map<number, string[]>();
     for (const row of authorRows) {
       const list = authorsByBookId.get(row.bookId) ?? [];
       list.push(row.authorName);
       authorsByBookId.set(row.bookId, list);
+    }
+
+    const filesByBookId = new Map<number, ResumeModeFile[]>();
+    for (const row of fileRows) {
+      const list = filesByBookId.get(row.bookId) ?? [];
+      list.push({ id: row.id, format: row.format, mediaOverlayAvailable: row.mediaOverlayAvailable });
+      filesByBookId.set(row.bookId, list);
     }
 
     const result: CurrentlyReadingBook[] = rows.map((row) => ({
@@ -150,6 +177,7 @@ export class DashboardWidgetRepository {
       hasCover: row.coverSource != null,
       fileId: row.fileId ?? null,
       fileFormat: row.fileFormat ?? null,
+      ...resolveResumeModes(filesByBookId.get(row.bookId) ?? [], row.primaryFileId, row.formatPriority as string[] | null),
     }));
 
     return { books: result };

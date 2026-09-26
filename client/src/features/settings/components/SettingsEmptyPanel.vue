@@ -27,7 +27,7 @@ const headingId = `settings-empty-${useId()}`
 </script>
 
 <template>
-  <section :aria-labelledby="headingId" class="settings-empty-state max-w-3xl p-5 text-start md:p-6">
+  <section :aria-labelledby="headingId" class="settings-empty-state max-w-5xl p-5 text-start md:p-6">
     <div class="flex gap-3.5">
       <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true">
         <slot name="icon" />

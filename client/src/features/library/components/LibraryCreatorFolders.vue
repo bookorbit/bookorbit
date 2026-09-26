@@ -2,23 +2,35 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FolderOpen, FolderPlus, Loader2, Plus, RefreshCw, Trash2, XCircle } from '@lucide/vue'
-import type { PrescanPathResult, PrescanResult } from '@bookorbit/types'
+import type { LibraryType, PrescanPathResult, PrescanResult } from '@bookorbit/types'
 import { useLibraryFolderSelection } from '../composables/useLibraryFolderSelection'
 import FolderPickerModal from './FolderPickerModal.vue'
+import LibraryCreatorLocalFolders from './LibraryCreatorLocalFolders.vue'
 
 const { t } = useI18n()
 
 const props = defineProps<{
   folders: string[]
+  localFolders: string[]
   prescanResult: PrescanResult | null
   prescanLoading: boolean
+  libraryType: LibraryType
 }>()
 
 const emit = defineEmits<{
   'update:folders': [value: string[]]
+  'update:localFolders': [value: string[]]
   'update:pickerOpen': [value: boolean]
   prescan: []
 }>()
+
+function handleLocalFoldersUpdate(value: string[]) {
+  emit('update:localFolders', value)
+}
+
+function handleNestedPickerChange(value: boolean) {
+  emit('update:pickerOpen', value)
+}
 
 const {
   pickerOpen,
@@ -27,7 +39,7 @@ const {
   manualError,
   openPicker,
   closePicker,
-  addBrowsedFolders,
+  addBrowsedFolders: addSelectedFolders,
   removeFolder,
   toggleManualEntry,
   closeManualEntry,
@@ -42,8 +54,9 @@ const {
 const prescanByPath = computed(() => new Map(props.prescanResult?.paths.map((result) => [result.path, result]) ?? []))
 
 const validationSummary = computed(() => {
-  if (props.prescanLoading) return 'Checking accessibility and counting matching book files...'
-  if (!props.prescanResult) return 'Verify access and estimate matching book files.'
+  const itemLabel = props.libraryType === 'podcasts' ? 'podcast episode files' : 'book files'
+  if (props.prescanLoading) return `Checking accessibility and counting matching ${itemLabel}...`
+  if (!props.prescanResult) return `Verify access and estimate matching ${itemLabel}.`
   const accessibleCount = props.prescanResult.paths.filter((path) => path.accessible).length
   const inaccessibleCount = props.prescanResult.paths.length - accessibleCount
   const files = `${props.prescanResult.totalFiles.toLocaleString()} matching file${props.prescanResult.totalFiles === 1 ? '' : 's'}`
@@ -81,6 +94,10 @@ function statusTitle(path: string): string | undefined {
 function handlePrescan() {
   emit('prescan')
 }
+
+function addBrowsedFolders(paths: string[]) {
+  addSelectedFolders(props.libraryType === 'podcasts' ? paths.slice(0, 1) : paths)
+}
 </script>
 
 <template>
@@ -96,17 +113,24 @@ function handlePrescan() {
       </span>
       <span>
         <span class="block text-sm font-semibold text-foreground">{{ t('library.creator.folders.browseTitle') }}</span>
-        <span class="mt-1 block text-sm text-muted-foreground">{{ t('library.creator.folders.browseDescription') }}</span>
+        <span class="mt-1 block text-sm text-muted-foreground">
+          {{
+            libraryType === 'podcasts' ? 'Choose where downloaded podcast episodes will be stored.' : t('library.creator.folders.browseDescription')
+          }}
+        </span>
       </span>
     </button>
 
     <section v-else aria-labelledby="selected-folders-title">
       <div class="mb-3 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
-          <h4 id="selected-folders-title" class="text-sm font-semibold text-foreground">{{ t('library.creator.folders.selectedTitle') }}</h4>
+          <h4 id="selected-folders-title" class="text-sm font-semibold text-foreground">
+            {{ libraryType === 'podcasts' ? 'Storage folder' : t('library.creator.folders.selectedTitle') }}
+          </h4>
           <span class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{{ folders.length }}</span>
         </div>
         <button
+          v-if="libraryType === 'books'"
           type="button"
           class="flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           @click="openPicker"
@@ -141,7 +165,7 @@ function handlePrescan() {
       </div>
     </section>
 
-    <div>
+    <div v-if="libraryType === 'books' || folders.length === 0">
       <button
         type="button"
         class="flex h-9 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -161,7 +185,7 @@ function handlePrescan() {
             id="manual-folder-path"
             v-model="manualPath"
             type="text"
-            :placeholder="t('library.creator.folders.pathPlaceholder')"
+            :placeholder="libraryType === 'podcasts' ? '/path/to/podcasts' : t('library.creator.folders.pathPlaceholder')"
             class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             @input="clearManualError"
           />
@@ -201,6 +225,13 @@ function handlePrescan() {
       </div>
     </div>
   </div>
+
+  <LibraryCreatorLocalFolders
+    v-if="libraryType === 'podcasts'"
+    :local-folders="localFolders"
+    @update:local-folders="handleLocalFoldersUpdate"
+    @update:picker-open="handleNestedPickerChange"
+  />
 
   <FolderPickerModal v-if="pickerOpen" :selected-paths="folders" @select="addBrowsedFolders" @close="closePicker" />
 </template>

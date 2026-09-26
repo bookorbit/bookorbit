@@ -4,7 +4,7 @@ import { BookRequestGateway } from './book-request.gateway';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
-  const authService = { validateUser: vi.fn() };
+  const authService = { validateSessionUser: vi.fn() };
   const gateway = new BookRequestGateway(jwtService as any, authService as any);
   return { gateway, jwtService, authService };
 }
@@ -23,7 +23,7 @@ function makeClient(id = 'socket-1') {
 async function connect(user: { id: number; isSuperuser: boolean; permissions: Permission[] }) {
   const { gateway, jwtService, authService } = makeGateway();
   jwtService.verify.mockReturnValue({ sub: user.id, ver: 1 });
-  authService.validateUser.mockResolvedValue(user);
+  authService.validateSessionUser.mockResolvedValue(user);
   const client = makeClient();
   await gateway.handleConnection(client);
   return { gateway, client };

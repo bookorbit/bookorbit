@@ -63,7 +63,7 @@ const { bookDetailCoverTint } = useDisplaySettings()
 const tintSource = computed(() => {
   const book = detail.value
   if (bookDetailCoverTint.value === 'off' || tab.value !== 'details' || !book || book.coverSource === null) return null
-  return coverUrl(book.id, 'cover', book.updatedAt ?? book.addedAt)
+  return coverUrl(book.id, 'cover', book.coverVersion)
 })
 const { tint } = useCoverTint(tintSource)
 const coverTint = computed(() => {
@@ -126,8 +126,9 @@ function onLocksChanged(lockedFields: BookMetadataLockField[]) {
   if (detail.value) detail.value.lockedFields = lockedFields
 }
 
-function onCoverChanged(source: 'extracted' | 'custom' | null) {
-  if (detail.value) detail.value = { ...detail.value, coverSource: source }
+// A cover write can change either slot, the summary and the face version, so take the server's view.
+function onCoverChanged() {
+  void fetch(bookId.value)
 }
 </script>
 

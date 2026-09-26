@@ -24,6 +24,7 @@ describe('audit display helpers', () => {
     [AuditAction.BookDelete, 'books'],
     [AuditAction.UserUpdate, 'users'],
     [AuditAction.LibraryUpdate, 'libraries'],
+    [AuditAction.PodcastUpdate, 'libraries'],
     [AuditAction.CollectionUpdate, 'collections'],
     [AuditAction.KoboDeviceRename, 'integrations'],
     [AuditAction.AppSettingsUpdate, 'settings'],

@@ -17,6 +17,7 @@ import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
 import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
 import { makeMetadataNoopMock, seedLibrary, waitForScanCompletion, type MetadataNoopMock } from '../app-harness';
+import { createSlotCoverArtifacts, type SlotCoverArtifactOptions } from '../slot-cover-artifacts';
 import {
   buildFb2Fixture,
   createAuthorizationFixtureRoot,
@@ -159,6 +160,7 @@ export async function createLibraryWithFolder(
   ctx: AuthorizationMatrixE2EContext,
   options: {
     mode?: 'book_per_file' | 'book_per_folder';
+    type?: 'books' | 'podcasts';
     allowedFormats?: string[];
     name?: string;
   } = {},
@@ -169,6 +171,7 @@ export async function createLibraryWithFolder(
   const { libraryId, libraryFolderId } = await seedLibrary(ctx.db, {
     rootPath: folderPath,
     mode: options.mode ?? 'book_per_file',
+    type: options.type,
     allowedFormats: options.allowedFormats ?? [],
     watch: false,
     name: options.name,
@@ -308,18 +311,9 @@ export async function locateBookByAbsolutePath(ctx: AuthorizationMatrixE2EContex
 export async function createBookCoverArtifacts(
   ctx: AuthorizationMatrixE2EContext,
   bookId: number,
-  options: {
-    coverExtension?: 'jpg' | 'png';
-    coverContent?: Buffer;
-    thumbnailContent?: Buffer;
-  } = {},
+  options: SlotCoverArtifactOptions = {},
 ): Promise<void> {
-  const coverExtension = options.coverExtension ?? 'jpg';
-  const coverContent = options.coverContent ?? Buffer.from(`cover-${bookId}`, 'utf8');
-  const thumbnailContent = options.thumbnailContent ?? Buffer.from(`thumbnail-${bookId}`, 'utf8');
-
-  await writeFixtureFile(ctx.fixture.booksPath, `covers/${bookId}/cover.${coverExtension}`, coverContent);
-  await writeFixtureFile(ctx.fixture.booksPath, `covers/${bookId}/thumbnail.jpg`, thumbnailContent);
+  await createSlotCoverArtifacts(ctx, bookId, options);
 }
 
 export async function createBookDockRow(

@@ -3,6 +3,7 @@ import {
   bookRequestIsbn10To13,
   COMIC_FORMAT_LIST,
   EBOOK_FORMAT_LIST,
+  explainReleaseProfileMismatch,
   ISO_639_2_TO_1,
   isAudioFormat,
   isComicFormat,
@@ -13,7 +14,7 @@ import {
 import type { BookRequestMediaKind, ReleaseCandidateItem, ReleaseScoreReason, ReleaseTier } from '@bookorbit/types';
 
 import { normalizeIsbn, normalizeMetadataIsbn } from '../../../common/text-match/isbn-normalize';
-import { TITLE_MATCH_SCORES, scoreTitleMatch } from '../../../common/text-match/title-match';
+import { normalizeTitleText, significantTokens, symmetricTitleSimilarity, tokenizeTitleText } from '../../../common/text-match/title-match';
 import type { ReleaseCandidate } from './indexer-adapter';
 
 /**
@@ -89,6 +90,41 @@ const FORMATS_BY_MEDIA_KIND: Record<BookRequestMediaKind, (format: string) => bo
  * so a comic release naming that format read as having no format at all.
  */
 const FORMAT_TOKENS: readonly string[] = [...EBOOK_FORMAT_LIST, ...AUDIO_FORMAT_LIST, ...COMIC_FORMAT_LIST];
+
+const SCENE_LANGUAGE_NAMES: ReadonlyMap<string, string> = new Map([
+  ['chinese', 'zh'],
+  ['danish', 'da'],
+  ['dutch', 'nl'],
+  ['english', 'en'],
+  ['finnish', 'fi'],
+  ['french', 'fr'],
+  ['german', 'de'],
+  ['italian', 'it'],
+  ['japanese', 'ja'],
+  ['korean', 'ko'],
+  ['norwegian', 'no'],
+  ['polish', 'pl'],
+  ['portuguese', 'pt'],
+  ['russian', 'ru'],
+  ['spanish', 'es'],
+  ['swedish', 'sv'],
+]);
+
+/** Release-scene labels that describe packaging rather than the work's title. */
+const RELEASE_TITLE_NOISE = new Set([
+  ...FORMAT_TOKENS,
+  ...SCENE_LANGUAGE_NAMES.keys(),
+  'abridged',
+  'audiobook',
+  'digital',
+  'ebook',
+  'proper',
+  'repack',
+  'retail',
+  'retag',
+  'unabridged',
+  'xpost',
+]);
 
 /** The work a release is scored against: the request snapshot, never the library. */
 export interface ScoringRequest {
@@ -192,6 +228,7 @@ export function toReleaseItem(scored: ScoredRelease, indexerName: string, reques
     score: scored.score,
     tier,
     tierName: tier === null ? null : (request.tiers[tier]?.name ?? null),
+    profileMismatch: tier === null ? explainReleaseProfileMismatch(base, request.tiers) : null,
     reasons: scored.reasons,
   };
 }
@@ -204,24 +241,14 @@ export function toReleaseItem(scored: ScoredRelease, indexerName: string, reques
  * wrong book used to score a full match and lead the picker ahead of the right one, with no other
  * signal able to outweigh it.
  *
- * Title and author agreement is the qualifier because `scoreTitleMatch` already answers exactly
- * the question being asked: it returns zero for two unrelated titles rather than a small number,
- * so this only rejects a release that describes some other book. Anything that agrees even loosely
- * still takes the full points.
- *
- * `scoreTitleMatch` is deliberately generous about a candidate that extends the query, which is
- * right here (a release name carries the author, the year and the format) and is why a sequel can
- * still rank well. Import verification, which compares symmetrically, is the gate that catches it.
+ * Title and author agreement is the qualifier. The decorated release name is cleaned before a
+ * symmetric comparison so an exact work stays exact after its author, year and format are removed,
+ * while a sequel or a picture book that merely contains the requested title loses points.
  */
 function matchReason(candidate: ReleaseCandidate, request: ScoringRequest): ReleaseScoreReason {
-  // The bare work title where the indexer published one, since the release name carries the
-  // author, the year and the format flags and only dilutes the comparison.
-  const titleText = candidate.bookTitle ?? candidate.title;
-  const titleScore = scoreTitleMatch(request.title, titleText) / TITLE_MATCH_SCORES.exact;
-  const authorText = candidate.author ?? candidate.title;
+  const titleScore = titleSimilarity(candidate, request);
   const authors = request.authors.filter(Boolean);
-  const authorScore =
-    authors.length > 0 ? Math.max(...authors.map((author) => scoreTitleMatch(author, authorText) / TITLE_MATCH_SCORES.exact)) : null;
+  const authorScore = authors.length > 0 ? authorSimilarity(candidate, authors) : null;
 
   const requestedIsbns = [...request.isbns, normalizeMetadataIsbn(request.isbn13), normalizeMetadataIsbn(request.isbn10)].filter(Boolean);
   if (requestedIsbns.length > 0 && (titleScore > 0 || (authorScore ?? 0) > 0)) {
@@ -239,6 +266,45 @@ function matchReason(candidate: ReleaseCandidate, request: ScoringRequest): Rele
     code: authorScore !== null && authorScore > 0 && titleScore > 0 ? 'authorMatch' : 'titleMatch',
     points: round(combined * WEIGHTS.match),
   };
+}
+
+/**
+ * Compares the work, not the scene label. A requested number is retained because it may be the
+ * whole identity of a title such as 1984; other bare numbers are years, series positions or
+ * version flags. Requested author tokens are removed only where they are not also title tokens.
+ */
+function titleSimilarity(candidate: ReleaseCandidate, request: ScoringRequest): number {
+  if (candidate.bookTitle?.trim()) return symmetricTitleSimilarity(request.title, candidate.bookTitle);
+
+  const requestedTokens = new Set(significantTokens(tokenizeTitleText(normalizeTitleText(request.title))));
+  const authorTokens = new Set(request.authors.flatMap((author) => significantTokens(tokenizeTitleText(normalizeTitleText(author)))));
+  const candidateTokens = tokenizeTitleText(normalizeTitleText(candidate.title));
+  const hasTerminalReleaseGroup = /-\s*[\p{L}\p{N}]{2,20}$/u.test(candidate.title.trim());
+  const comparable = candidateTokens.filter((token, index) => {
+    if (requestedTokens.has(token)) return true;
+    if (authorTokens.has(token) || RELEASE_TITLE_NOISE.has(token)) return false;
+    if (/^\d+(?:\.\d+)?$/.test(token) || /^(?:v|ver|version)\d+$/.test(token)) return false;
+    if (hasTerminalReleaseGroup && index === candidateTokens.length - 1) return false;
+    return true;
+  });
+
+  return symmetricTitleSimilarity(request.title, comparable.join(' '));
+}
+
+/** An author embedded in a decorated release name is still an exact author signal. */
+function authorSimilarity(candidate: ReleaseCandidate, authors: string[]): number {
+  if (candidate.author?.trim()) {
+    return Math.max(...authors.map((author) => symmetricTitleSimilarity(author, candidate.author!)));
+  }
+
+  const candidateTokens = new Set(tokenizeTitleText(normalizeTitleText(candidate.title)));
+  return Math.max(
+    ...authors.map((author) => {
+      const tokens = significantTokens(tokenizeTitleText(normalizeTitleText(author)));
+      if (tokens.length === 0) return 0;
+      return tokens.filter((token) => candidateTokens.has(token)).length / tokens.length;
+    }),
+  );
 }
 
 function formatReason(formats: string[], request: ScoringRequest): ReleaseScoreReason {
@@ -358,8 +424,9 @@ const TITLE_LANGUAGE_TOKENS: ReadonlySet<string> = new Set(
  * fallback `candidate.language` is undefined for every release it returns, and the hard filter in
  * `rejectRelease` silently stops running rather than failing.
  *
- * Only bracketed segments are considered. A bare three-letter word in a title is far more likely
- * to be part of the title.
+ * Three-letter codes are considered only inside brackets. Full language names are also accepted
+ * when immediately followed by a release label such as RETAIL or EPUB, which distinguishes a
+ * scene flag such as `DANiSH.RETAiL` from a book whose title happens to contain "Danish".
  */
 export function resolveLanguage(candidate: ReleaseCandidate): string | null {
   if (candidate.language) return candidate.language;
@@ -369,6 +436,12 @@ export function resolveLanguage(candidate: ReleaseCandidate): string | null {
       const token = part.trim();
       if (TITLE_LANGUAGE_TOKENS.has(token.toLowerCase())) return token;
     }
+  }
+
+  const sceneTokens = tokenizeTitleText(normalizeTitleText(candidate.title));
+  for (let index = 0; index < sceneTokens.length - 1; index++) {
+    const language = SCENE_LANGUAGE_NAMES.get(sceneTokens[index]);
+    if (language && RELEASE_TITLE_NOISE.has(sceneTokens[index + 1])) return language;
   }
   return null;
 }

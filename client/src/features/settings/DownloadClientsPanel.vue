@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Download, Link2, Loader2, Pencil, Plug, Plus, RefreshCw, Trash2, TriangleAlert } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { DOWNLOAD_CLIENT_TYPES } from '@bookorbit/types'
+import { DOWNLOAD_CLIENT_CREDENTIAL_KIND, DOWNLOAD_CLIENT_TYPES } from '@bookorbit/types'
 import type {
   CreateDownloadClientPayload,
   DownloadClientItem,
@@ -11,6 +11,7 @@ import type {
   DownloadClientReconciliationItem,
   DownloadClientType,
   IndexerColor,
+  UpdateDownloadClientPayload,
 } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
@@ -87,7 +88,7 @@ const testingId = ref<number | null>(null)
 const passwordVisible = ref(false)
 const hardlinkResults = reactive<Record<string, string>>({})
 const fieldErrors = reactive<Partial<Record<FieldKey, string>>>({})
-const pendingOrphanRemoval = ref<{ clientId: number; infoHash: string; name: string } | null>(null)
+const pendingOrphanRemoval = ref<{ clientId: number; clientKey: string; name: string } | null>(null)
 
 /**
  * Server codes carry the copy; the English `message` is a last resort for anything unmapped, which
@@ -101,6 +102,7 @@ const SAVE_ERROR_KEYS: Record<string, string> = {
   REQUEST_ENCRYPTION_KEY_CHANGED: 'settings.system.requests.errors.encryptionKeyChanged',
   DOWNLOAD_CLIENT_PATH_NOT_ABSOLUTE: 'settings.system.requests.errors.pathNotAbsolute',
   DOWNLOAD_CLIENT_MAPPING_REQUIRED: 'settings.system.requests.errors.mappingRequired',
+  DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED: 'settings.system.requests.errors.apiKeyRequired',
   DOWNLOAD_CLIENT_RECONCILIATION_UNSUPPORTED: 'settings.system.requests.reconciliation.unsupported',
   DOWNLOAD_CLIENT_RECONCILIATION_NOT_ORPHAN: 'settings.system.requests.reconciliation.notOrphan',
   DOWNLOAD_CLIENT_RECONCILIATION_NOT_ADOPTABLE: 'settings.system.requests.reconciliation.notAdoptable',
@@ -115,6 +117,7 @@ const SAVE_ERROR_FIELDS: Record<string, FieldKey> = {
   REQUEST_ENCRYPTION_KEY_CHANGED: 'password',
   DOWNLOAD_CLIENT_PATH_NOT_ABSOLUTE: 'mappings',
   DOWNLOAD_CLIENT_MAPPING_REQUIRED: 'mappings',
+  DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED: 'password',
 }
 
 function describeFailure(failure: DownloadClientFailure): string {
@@ -204,7 +207,21 @@ function markPasswordTouched() {
   delete fieldErrors.password
 }
 
-const canClearPassword = computed(() => editingClient.value?.hasPassword === true)
+const credentialKind = computed(() => (draft.value ? DOWNLOAD_CLIENT_CREDENTIAL_KIND[draft.value.adapterType] : 'usernamePassword'))
+const usesApiKey = computed(() => credentialKind.value === 'apiKey')
+const hasStoredCredential = computed(() => editingClient.value?.hasPassword === true)
+const canClearPassword = computed(() => hasStoredCredential.value && !usesApiKey.value)
+const credentialLabel = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKey' : 'password'}`))
+const credentialBrief = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyBrief' : 'passwordBrief'}`))
+const credentialKeep = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyKeep' : 'passwordKeep'}`))
+const credentialWillClear = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyWillClear' : 'passwordWillClear'}`))
+
+// Watched rather than reset in the picker's handler: the create form changes the type through its
+// own select, and a username left behind there is saved, hidden by the form it was saved from, and
+// then no longer editable.
+watch(usesApiKey, (apiKey) => {
+  if (apiKey && draft.value) draft.value.username = ''
+})
 
 function toggleClearPassword() {
   const current = draft.value
@@ -238,7 +255,8 @@ const typeOptions = computed<AdapterTypeOption[]>(() =>
 )
 
 function handleTypePicked(type: string) {
-  if (draft.value) draft.value.adapterType = type as DownloadClientType
+  if (!draft.value) return
+  draft.value.adapterType = type as DownloadClientType
 }
 
 /** Leaves the picker for the form the chosen client actually needs. */
@@ -264,11 +282,10 @@ function filledMappings(current: ClientDraft): MappingDraft[] {
     .map((mapping) => ({ remotePath: mapping.remotePath.trim(), localPath: mapping.localPath.trim() }))
 }
 
-function toPayload(current: ClientDraft): CreateDownloadClientPayload {
-  return {
+function toPayload(current: ClientDraft): CreateDownloadClientPayload | UpdateDownloadClientPayload {
+  const payload: UpdateDownloadClientPayload = {
     name: current.name.trim(),
     color: current.color,
-    adapterType: current.adapterType,
     baseUrl: current.baseUrl.trim(),
     username: current.username.trim(),
     ...(current.passwordCleared ? { password: '' } : current.passwordTouched ? { password: current.password } : {}),
@@ -279,6 +296,7 @@ function toPayload(current: ClientDraft): CreateDownloadClientPayload {
     allowPrivateAddress: current.allowPrivateAddress,
     pathMappings: filledMappings(current),
   }
+  return current.id === null ? { ...payload, adapterType: current.adapterType } : payload
 }
 
 const editingClient = computed(() => (draft.value?.id === null ? null : (clients.value.find((row) => row.id === draft.value?.id) ?? null)))
@@ -296,6 +314,12 @@ async function handleSave() {
   clearFieldErrors()
   if (!current.name.trim()) fieldErrors.name = t('settings.system.requests.errors.nameRequired')
   if (!current.baseUrl.trim()) fieldErrors.baseUrl = t('settings.system.requests.errors.urlRequired')
+  if (current.adapterType === 'sabnzbd' && current.id === null && !current.password.trim()) {
+    fieldErrors.password = t('settings.system.requests.errors.apiKeyRequired')
+  }
+  if (current.adapterType === 'sabnzbd' && current.id !== null && !hasStoredCredential.value && !current.password.trim()) {
+    fieldErrors.password = t('settings.system.requests.errors.apiKeyRequired')
+  }
   if (filledMappings(current).length === 0) fieldErrors.mappings = t('settings.system.requests.errors.mappingRequired')
   if (Object.keys(fieldErrors).length > 0) return
 
@@ -378,13 +402,13 @@ async function handleReconcile(client: DownloadClientItem) {
 }
 
 async function handleAdopt(client: DownloadClientItem, item: DownloadClientReconciliationItem, attempt: DownloadClientReconciliationAttempt) {
-  const failure = await adopt(client.id, item.infoHash, attempt.downloadId)
+  const failure = await adopt(client.id, item.clientKey, attempt.downloadId)
   if (failure) toast.error(describeFailure(failure))
   else toast.success(t('settings.system.requests.reconciliation.adopted', { title: attempt.requestTitle }))
 }
 
 function requestOrphanRemoval(client: DownloadClientItem, item: DownloadClientReconciliationItem) {
-  pendingOrphanRemoval.value = { clientId: client.id, infoHash: item.infoHash, name: item.name }
+  pendingOrphanRemoval.value = { clientId: client.id, clientKey: item.clientKey, name: item.name }
 }
 
 function cancelOrphanRemoval() {
@@ -394,7 +418,7 @@ function cancelOrphanRemoval() {
 async function confirmOrphanRemoval() {
   const pending = pendingOrphanRemoval.value
   if (!pending) return
-  const failure = await removeOrphan(pending.clientId, pending.infoHash)
+  const failure = await removeOrphan(pending.clientId, pending.clientKey)
   if (failure) toast.error(describeFailure(failure))
   else {
     toast.success(t('settings.system.requests.reconciliation.removed'))
@@ -534,11 +558,11 @@ async function confirmOrphanRemoval() {
                   {{ t('settings.system.requests.reconciliation.clean') }}
                 </p>
                 <ul v-else class="space-y-2">
-                  <li v-for="item in reconciliationIssues(client.id)" :key="item.infoHash" class="rounded-lg border border-border p-3">
+                  <li v-for="item in reconciliationIssues(client.id)" :key="item.clientKey" class="rounded-lg border border-border p-3">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                       <div class="min-w-0">
                         <p class="text-sm font-medium text-foreground">{{ item.name }}</p>
-                        <p class="mt-0.5 break-all font-mono text-xs text-muted-foreground">{{ item.infoHash }}</p>
+                        <p class="mt-0.5 break-all font-mono text-xs text-muted-foreground">{{ item.clientKey }}</p>
                         <p class="mt-1 text-xs text-muted-foreground">
                           {{
                             item.trackedAttempt
@@ -669,7 +693,11 @@ async function confirmOrphanRemoval() {
               </template>
             </SettingsField>
 
-            <SettingsField v-if="hasTypeChoice" :label="t('settings.system.requests.fields.type')" input-id="download-client-type">
+            <SettingsField
+              v-if="hasTypeChoice && draft.id === null"
+              :label="t('settings.system.requests.fields.type')"
+              input-id="download-client-type"
+            >
               <select id="download-client-type" v-model="draft.adapterType" class="settings-control">
                 <option v-for="type in DOWNLOAD_CLIENT_TYPES" :key="type" :value="type">
                   {{ t(`settings.system.requests.clientTypes.${type}`) }}
@@ -693,16 +721,22 @@ async function confirmOrphanRemoval() {
             </template>
           </SettingsField>
 
-          <SettingsField class="sm:max-w-80" :label="t('settings.system.requests.fields.username')" input-id="download-client-username">
+          <SettingsField
+            v-if="!usesApiKey"
+            class="sm:max-w-80"
+            :label="t('settings.system.requests.fields.username')"
+            input-id="download-client-username"
+          >
             <input id="download-client-username" v-model="draft.username" type="text" class="settings-control" autocomplete="off" />
           </SettingsField>
 
           <!-- Full width like the indexer credential: the Show button and a "keep the stored
                password" placeholder do not both fit in half a row. -->
           <SettingsField
-            :label="t('settings.system.requests.fields.password')"
+            :label="credentialLabel"
             input-id="download-client-password"
-            :brief="t('settings.system.requests.fields.passwordBrief')"
+            :brief="credentialBrief"
+            :required="usesApiKey"
             :error="fieldErrors.password"
           >
             <template #default="{ describedBy, invalid }">
@@ -717,13 +751,7 @@ async function confirmOrphanRemoval() {
                   class="settings-control"
                   :class="{ 'input-secret': !passwordVisible }"
                   :disabled="draft.passwordCleared"
-                  :placeholder="
-                    draft.passwordCleared
-                      ? t('settings.system.requests.fields.passwordWillClear')
-                      : draft.id === null
-                        ? ''
-                        : t('settings.system.requests.fields.passwordKeep')
-                  "
+                  :placeholder="draft.passwordCleared ? credentialWillClear : draft.id === null ? '' : credentialKeep"
                   :aria-describedby="describedBy"
                   :aria-invalid="invalid || undefined"
                   @input="markPasswordTouched"

@@ -155,6 +155,22 @@ describe('BookFilterBuilder', () => {
     expect(wrapper.find('input').exists()).toBe(false)
   })
 
+  it('offers Audiobook Cover as a missing or present rule with no value input', async () => {
+    const wrapper = mount(BookFilterBuilder, {
+      props: {
+        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
+      },
+    })
+
+    const [fieldSelect] = wrapper.findAll('select')
+    expect(fieldSelect!.findAll('option').map((opt) => opt.text())).toEqual(expect.arrayContaining(['Cover', 'Audiobook Cover']))
+    await fieldSelect!.setValue('audioCover')
+
+    const operatorSelect = wrapper.findAll('select')[1]
+    expect(operatorSelect!.findAll('option').map((opt) => opt.text())).toEqual(['is missing', 'is present'])
+    expect(wrapper.find('input').exists()).toBe(false)
+  })
+
   it('includes Series Status in field options', () => {
     const wrapper = mount(BookFilterBuilder, {
       props: {

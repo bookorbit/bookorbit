@@ -4,7 +4,20 @@ import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useMediaQuery } from '@vueuse/core'
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Maximize, Minimize, Minus, Plus, Settings } from '@lucide/vue'
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Maximize,
+  Minimize,
+  Minus,
+  Pin,
+  PinOff,
+  Plus,
+  Settings,
+} from '@lucide/vue'
 import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
@@ -36,7 +49,7 @@ const route = useRoute()
 const router = useRouter()
 const trackingEnabled = computed(() => !props.peekMode)
 
-const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter, setVisibilityLock } = useVisibility()
+const { headerVisible, footerVisible, isPinned, handleMiddleTap, togglePinned, showHeader, showFooter, setVisibilityLock } = useVisibility()
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 
 const { onActivity, elapsedMinutes } = useReadingSession(
@@ -825,6 +838,20 @@ onUnmounted(() => {
           <TooltipContent>{{ fullscreenLabel }}</TooltipContent>
         </Tooltip>
 
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="viewer-btn"
+              :class="isPinned ? '!bg-muted !text-primary' : ''"
+              :aria-label="isPinned ? 'Unpin menu' : 'Pin menu'"
+              @click="togglePinned"
+            >
+              <PinOff v-if="isPinned" :size="15" />
+              <Pin v-else :size="15" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ isPinned ? 'Unpin menu' : 'Pin menu' }}</TooltipContent>
+        </Tooltip>
         <template v-if="isCompact">
           <button
             class="viewer-btn"
@@ -1017,8 +1044,8 @@ onUnmounted(() => {
     </div>
 
     <!-- Hover zones to reveal header / footer -->
-    <div class="absolute top-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showHeader()" />
-    <div class="absolute bottom-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showFooter()" />
+    <div class="absolute top-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showHeader" />
+    <div class="absolute bottom-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showFooter" />
 
     <!-- ── Loading / error overlays ─────────────────────────────────────────── -->
     <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-50 bg-background">

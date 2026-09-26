@@ -4462,6 +4462,18 @@
       "seeAllLibraries": "Se alla bibliotek ({count})",
       "seeAllSmartScopes": "Se alla smarta omfattningar ({count})",
       "seeAllCollections": "Se alla samlingar ({count})",
+      "podcasts": "Podcasts",
+      "newPodcastLibrary": "New Podcast Library",
+      "noPodcastLibraries": "No podcast libraries yet",
+      "filterPodcastLibraries": "Filter podcast libraries",
+      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
+      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
+      "queue": "Queue",
+      "mode": {
+        "books": "Books",
+        "podcasts": "Podcasts",
+        "switcherAria": "Switch between books and podcasts"
+      },
       "updateAvailable": "Uppdatera {version}",
       "zones": {
         "browse": "Bläddra"
@@ -4514,6 +4526,8 @@
       "columnVisibilityHint": "Använd panelen för kolumnsynlighet i tabellhuvudet för att visa eller dölja kolumner.",
       "columnVisibilityMobileHint": "Kolumnsynlighet kan hanteras från tabellhuvudet.",
       "searchPlaceholder": "Sök titel, författare, serier, berättare...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
       "mobileSearch": {
         "description": "Sök objekt efter titel, författare, serie eller berättare.",
         "done": "Klar"
@@ -4528,6 +4542,7 @@
         "display": "Visa",
         "coverSize": "Omslagets storlek",
         "gridGap": "Rutnät mellanrum",
+        "pixelValue": "{value} pixels",
         "showJumpRails": "Visa hoppskenor",
         "columnsHint": "Använd panelen för kolumnsynlighet i tabellhuvudet för att visa eller dölja kolumner.",
         "coverShape": "Omslagsform",
@@ -4578,7 +4593,8 @@
       "sort": {
         "custom": "Anpassad beställning",
         "name": "Namn",
-        "bookCount": "Antal böcker"
+        "bookCount": "Antal böcker",
+        "showCount": "Show count"
       },
       "ascending": "Stigande",
       "descending": "Fallande",
@@ -4587,7 +4603,9 @@
       "noMatches": "Inga träffar",
       "noMatchesHint": "Prova en annan sökterm.",
       "bookCount": "Böcker: {count}",
+      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Skapa ett bibliotek för att börja lägga till böcker.",
+      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Smart räckvidd spara en uppsättning filter som du använder ofta.",
       "collectionsEmptyHint": "Samlingar gruppböcker du plockar för hand."
     }
@@ -4631,6 +4649,7 @@
       "empty": {
         "continueReading": "Inga böcker pågår än. Börja läsa en för att se den här.",
         "continueListening": "Inga ljudböcker pågår än. Börja lyssna på en för att se den här.",
+        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "Inga böcker markerade vill läsa än.",
         "upNextInSeries": "Inga nästa i serien plockar ännu. Avsluta en volym för att ytan nästa.",
         "recentlyAdded": "Inga böcker i ditt bibliotek ännu.",
@@ -4662,6 +4681,7 @@
         "recentlyAdded": "Nyligen tillagda",
         "continueReading": "Fortsätt läsa",
         "continueListening": "Fortsätt lyssna",
+        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Vill läsa",
         "upNextInSeries": "Nästa i serien",
         "random": "Upptäck något nytt",
@@ -4968,6 +4988,17 @@
       "sending": "Skickar...",
       "queued": "{count, plural, =0 {inga e-postmeddelanden köade} one {ett e-postmeddelande köade} other {# e-postmeddelanden köade}}",
       "failed": "Det gick inte att skicka"
+    }
+  },
+  "errors": {
+    "network": "Could not reach BookOrbit. Check your connection, then try again.",
+    "codes": {
+      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
+      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
+      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
+      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
+      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
+      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
     }
   },
   "hardcover": {
@@ -6363,9 +6394,7 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Skanna inställningar",
       "title": "Duplicera böcker",
-      "description": "Skanna filer och metadata för potentiella dubbletter poster. Ingenting tas bort under en skanning.",
       "scope": "Bibliotekets omfattning",
       "allLibraries": "Alla tillgängliga bibliotek",
       "similarity": "Motsvarande titel tröskel",
@@ -6377,7 +6406,6 @@
         "queued": "Skanna köad",
         "running": "Skannar böcker"
       },
-      "groupsFound": "{count, plural, =0 {Inga dubblettgrupper} one {En dubblettgrupp} other {# dubblettgrupper}}",
       "filter": "Matchande typ",
       "allReasons": "Alla matchningstyper",
       "reasons": {
@@ -6386,17 +6414,7 @@
         "exact_metadata": "Exakt titel och författare",
         "fuzzy_metadata": "Liknande titel och författare"
       },
-      "similarityValue": "{percent}% titel likhet",
       "notDuplicates": "Inte dubbletter",
-      "keepThis": "Behåll denna bok",
-      "discardThis": "Ignorera denna bok",
-      "selectKeeperFirst": "Välj en målvakt först",
-      "noDirectMatch": "Ingen direktmatch med målvakten",
-      "moreFiles": "+{count} fler",
-      "showDetails": "Visa detaljer",
-      "hideDetails": "Dölj detaljer",
-      "deleteSelected": "Ta bort {count} markerat",
-      "openBook": "Öppna detaljer för {title}",
       "unknownAuthor": "Okänd författare",
       "unknown": "Okänd",
       "none": "Ingen",
@@ -6407,14 +6425,8 @@
         "library": "Bibliotek",
         "isbn": "ISBN",
         "formats": "Format",
-        "fileLocation": "Fil",
-        "files": "Filer",
-        "readingStatus": "Läser status",
-        "progress": "Förlopp",
-        "path": "Sökväg till bibliotek",
         "collections": "Samlingar",
-        "added": "Tillagd",
-        "updated": "Uppdaterad"
+        "added": "Tillagd"
       },
       "initial": {
         "title": "Hitta dubblettböcker",
@@ -6425,8 +6437,6 @@
         "description": "Inga böcker matchade nuvarande omfattning, likhetsnivå och matcha filter."
       },
       "deleteDialog": {
-        "title": "Ta bort dubbla böcker permanent?",
-        "description": "{count, plural, =0 {Detta kommer permanent radera # vald bok och dess filer.} one {Detta kommer att permanent ta bort # vald bok och dess filer.} other {Detta raderar permanent # utvalda böcker och deras filer.}}",
         "warning": "Metadata, insamlingar, läsning av data och enhetstillstånd överförs inte till den bevarade boken. Kopplade data för andra användare tas också bort.",
         "confirm": "{count, plural, =0 {Ta bort # bok} one {Ta bort # bok} other {Ta bort # böcker}}",
         "success": "{count, plural, =0 {Inga böcker raderade} one {En duplicerad bok raderad} other {# duplicerade böcker raderade}}"
@@ -6729,6 +6739,7 @@
   "titles": {
     "dashboard": "Instrumentpanel",
     "libraries": "Bibliotek",
+    "podcastLibraries": "Podcast Libraries",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader Sync",

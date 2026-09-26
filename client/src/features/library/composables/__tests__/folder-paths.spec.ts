@@ -11,6 +11,10 @@ describe('folder path selection', () => {
     expect(consolidateFolderPaths(['/books/fiction', '/audio', '/books', '/books/fantasy'])).toEqual(['/audio', '/books'])
   })
 
+  it('preserves the order of unrelated folders', () => {
+    expect(consolidateFolderPaths(['/library/zz', '/library/alpha-long', '/library/m'])).toEqual(['/library/zz', '/library/alpha-long', '/library/m'])
+  })
+
   it('finds the selected path that already covers a nested folder', () => {
     expect(coveringFolderPath('/books/fiction/scifi', ['/books', '/books/fiction'])).toBe('/books/fiction')
   })

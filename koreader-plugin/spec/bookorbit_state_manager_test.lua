@@ -139,6 +139,47 @@ assertEqual(after_batch.byFileId[66], "/books/e.epub", "the second batched link 
 assertEqual(after_batch.generation, batch_generation, "patched maps carry the batch generation")
 assertEqual(disk.books.fff.bookId, 6, "every batched link is persisted")
 
+-- A stale path mapping moves to the recomputed digest without copying an
+-- identity between hashes. An identity already verified for the new digest is
+-- retained and expired so the next match check can establish a server link.
+StateManager.mutate(function(current)
+    current.books.old = {
+        bookId = 70,
+        fileId = 700,
+        file = "/books/repaired.epub",
+        matchVerifiedAt = 100,
+        matchVerifiedVersion = "old-version",
+    }
+    current.books.actual = {
+        bookId = 71,
+        fileId = 701,
+        file = "/books/other.epub",
+        statsWatermark = 250,
+        matchVerifiedAt = 200,
+        matchVerifiedVersion = "current-version",
+    }
+    current.unmatched.actual = 300
+    current.files["/books/repaired.epub"] = "old"
+end)
+flushes = 0
+StateManager.repairFileIdentity("/books/repaired.epub", "old", "actual")
+assertEqual(flushes, 1, "identity repair is persisted once")
+assertEqual(disk.files["/books/repaired.epub"], "actual", "path points at the recomputed digest")
+assertEqual(disk.books.old.file, nil, "stale digest releases the repaired path")
+assertEqual(disk.books.actual.file, "/books/repaired.epub", "known actual digest owns the path")
+assertEqual(disk.books.actual.fileId, 701, "actual digest keeps its independently verified file id")
+assertEqual(disk.books.actual.matchVerifiedAt, nil, "actual digest is due for explicit recovery")
+assertEqual(disk.books.actual.statsWatermark, 0, "identity repair replays the possibly stranded history")
+assertEqual(disk.unmatched.actual, nil, "an old unmatched stamp cannot suppress recovery")
+
+StateManager.mutate(function(current)
+    current.books.orphaned = { bookId = 80, fileId = 800, file = "/books/unknown.epub" }
+    current.files["/books/unknown.epub"] = "orphaned"
+end)
+StateManager.repairFileIdentity("/books/unknown.epub", "orphaned", "unknown")
+assertEqual(disk.books.unknown, nil, "identity is never copied to an unknown digest")
+assertEqual(disk.books.orphaned.file, nil, "unknown replacement still releases the stale path")
+
 -- A session write publishes a new generation, so the next read rebuilds rather
 -- than serving a stale map.
 local state = StateManager.session({ digests = { "bbb" }, global = false })
@@ -146,7 +187,7 @@ state:setUnmatched("bbb")
 state:flush()
 attribute_calls = 0
 local rebuilt = StateManager.onDeviceMaps()
-assertEqual(attribute_calls, 5, "an external write forces one rebuild")
+assertEqual(attribute_calls, 6, "an external write forces one rebuild")
 assertEqual(rebuilt.byBookId[2], nil, "unmatched book leaves the map")
 assertEqual(rebuilt.byBookId[1], "/books/a.epub", "unaffected entries survive")
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import { and, eq } from 'drizzle-orm';
+import type { AudiobookManifest, AudiobookPlaybackState } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import {
@@ -20,17 +21,22 @@ describe('Dashboard continue-listening scroller (e2e)', { timeout: SCENARIO_TIME
   let ctx!: AuthorizationMatrixE2EContext;
   let reader!: TestUserSession;
   let bookId!: number;
-  let audioFileId!: number;
+  let assetId!: string;
+  let manifestRevision!: string;
+  let playbackRevision = 0;
 
   async function saveAudioProgress(percentage: number) {
     return ctx.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/books/${bookId}/audio-progress`,
+      method: 'PUT',
+      url: `/api/v1/audiobooks/${bookId}/playback-state`,
       headers: authHeader(reader.accessToken),
       payload: {
-        percentage,
-        currentFileId: audioFileId,
-        positionSeconds: percentage * 100,
+        assetId,
+        positionMs: percentage * 100_000,
+        capturedAt: new Date().toISOString(),
+        operationId: randomUUID(),
+        baseRevision: playbackRevision,
+        manifestRevision,
       },
     });
   }
@@ -100,8 +106,17 @@ describe('Dashboard continue-listening scroller (e2e)', { timeout: SCENARIO_TIME
       ])
       .returning({ id: schema.bookFiles.id, format: schema.bookFiles.format });
     const epubFileId = files.find((file) => file.format === 'epub')!.id;
-    audioFileId = files.find((file) => file.format === 'm4b')!.id;
     await ctx.db.update(schema.books).set({ primaryFileId: epubFileId }).where(eq(schema.books.id, bookId));
+
+    const manifestResponse = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/audiobooks/${bookId}/manifest`,
+      headers: authHeader(reader.accessToken),
+    });
+    expect(manifestResponse.statusCode).toBe(200);
+    const manifest = manifestResponse.json<AudiobookManifest>();
+    assetId = manifest.assets[0]!.assetId;
+    manifestRevision = manifest.revision;
   });
 
   afterAll(async () => {
@@ -111,13 +126,14 @@ describe('Dashboard continue-listening scroller (e2e)', { timeout: SCENARIO_TIME
   it('removes a multi-format audiobook when progress crosses its configured finish threshold', async () => {
     const started = await saveAudioProgress(50);
 
-    expect(started.statusCode).toBe(204);
+    expect(started.statusCode).toBe(200);
+    playbackRevision = started.json<AudiobookPlaybackState>().revision;
     await expect(getReadStatus()).resolves.toBe('reading');
     await expect(getContinueListeningIds()).resolves.toContain(bookId);
 
     const finished = await saveAudioProgress(99);
 
-    expect(finished.statusCode).toBe(204);
+    expect(finished.statusCode).toBe(200);
     await expect(getReadStatus()).resolves.toBe('read');
     await expect(getContinueListeningIds()).resolves.not.toContain(bookId);
   });

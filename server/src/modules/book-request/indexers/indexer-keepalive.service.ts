@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 
+import { SystemCron } from '../../../common/decorators/system-cron.decorator';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { withDeadline } from '../../../common/utils/with-deadline.utils';
 import { IndexerConfigService } from './indexer-config.service';
@@ -37,7 +37,7 @@ export class IndexerKeepaliveService {
     private readonly operationLock: IndexerOperationLock,
   ) {}
 
-  @Cron('0 0 */6 * * *')
+  @SystemCron('0 0 */6 * * *')
   async tick(): Promise<void> {
     if (this.running) return;
     this.running = true;

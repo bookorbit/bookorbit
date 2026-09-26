@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import type {
   BookDuplicateCandidate,
+  BookDuplicateDismissal,
   BookDuplicateGroupsResponse,
   BookDuplicateMatchReason,
   BookDuplicateScan,
@@ -15,9 +16,10 @@ import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
 import { LibraryService } from '../library/library.service';
 import { canonicalizeIsbn, mediaFamilyForFormat } from './book-duplicate-normalize';
 import { BookDuplicatesRepository } from './book-duplicates.repository';
-import type { CreateBookDuplicateScanDto, ListBookDuplicateGroupsDto } from './dto/book-duplicate.dto';
+import type { CreateBookDuplicateDismissalDto, CreateBookDuplicateScanDto, ListBookDuplicateGroupsDto } from './dto/book-duplicate.dto';
 
 const ISBN_BATCH_SIZE = 500;
+const DISMISSAL_LIST_LIMIT = 200;
 
 @Injectable()
 export class BookDuplicatesService implements OnApplicationBootstrap {
@@ -68,7 +70,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
     if (scan.status !== 'completed') throw new ConflictException('Duplicate book scan is not complete');
     await this.assertScopeStillAccessible(scan.libraryIds, user);
 
-    const { groups, total } = await this.repo.findGroups(scanId, dto.page, dto.pageSize, scan.libraryIds, user, dto.reason);
+    const { groups, total } = await this.repo.findGroups(scanId, dto.page, dto.pageSize, scan.libraryIds, user, dto.reason, dto.sortBy, dto.order);
     const groupIds = groups.map((group) => group.id);
     const [pairs, previews] = await Promise.all([this.repo.findPairs(groupIds), this.repo.findCandidatePreviews(groupIds, scan.libraryIds, user)]);
 
@@ -122,6 +124,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
           id: group.id,
           reasons: group.reasons as BookDuplicateMatchReason[],
           maxTitleSimilarity: group.maxTitleSimilarity,
+          reclaimableBytes: Math.max(0, group.memberBytesTotal - group.memberBytesMax),
           books: previewsByGroup.get(group.id) ?? [],
           pairs: (pairsByGroup.get(group.id) ?? []).map((pair) => ({
             bookIdA: pair.bookIdA,
@@ -135,6 +138,40 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       page: dto.page,
       pageSize: dto.pageSize,
     };
+  }
+
+  async dismissGroup(dto: CreateBookDuplicateDismissalDto, user: RequestUser): Promise<void> {
+    const scan = await this.findOwnedScan(dto.scanId, user);
+    await this.assertScopeStillAccessible(scan.libraryIds, user);
+    const bookIds = await this.repo.findGroupMemberIds(dto.scanId, dto.groupId);
+    if (bookIds.length < 2) throw new NotFoundException('Duplicate group not found');
+
+    const pairs: { bookIdA: number; bookIdB: number }[] = [];
+    const sorted = [...bookIds].sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) pairs.push({ bookIdA: sorted[i]!, bookIdB: sorted[j]! });
+    }
+    await this.repo.insertDismissals(user.id, pairs);
+    this.logger.log(
+      `[book_duplicates.dismiss] [end] scanId=${dto.scanId} groupId=${dto.groupId} userId=${user.id} pairCount=${pairs.length} - duplicate group dismissed`,
+    );
+  }
+
+  async listDismissals(user: RequestUser): Promise<BookDuplicateDismissal[]> {
+    const rows = await this.repo.listDismissals(user.id, DISMISSAL_LIST_LIMIT);
+    return rows.map((row) => ({
+      bookIdA: row.bookIdA,
+      bookIdB: row.bookIdB,
+      titleA: row.titleA,
+      titleB: row.titleB,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  async restoreDismissal(bookIdA: number, bookIdB: number, user: RequestUser): Promise<void> {
+    const [low, high] = bookIdA < bookIdB ? [bookIdA, bookIdB] : [bookIdB, bookIdA];
+    const removed = await this.repo.deleteDismissal(user.id, low, high);
+    if (removed === 0) throw new NotFoundException('Dismissed pair not found');
   }
 
   private async drainQueue(): Promise<void> {
@@ -165,7 +202,14 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       await this.repo.updateScan(scanId, { status: 'running', totalBooks, processedBooks: 0, errorCode: null });
 
       if (totalBooks === 0) {
-        await this.repo.updateScan(scanId, { status: 'completed', processedBooks: 0, totalGroups: 0, completedAt: new Date() });
+        await this.repo.updateScan(scanId, {
+          status: 'completed',
+          processedBooks: 0,
+          totalGroups: 0,
+          totalExtraCopies: 0,
+          totalReclaimableBytes: 0,
+          completedAt: new Date(),
+        });
         await this.repo.deleteOlderScans(user.id, scanId);
         this.logger.log(
           `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=0 totalGroups=0 durationMs=${Date.now() - startedAt} - duplicate scan completed`,
@@ -196,19 +240,24 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       await this.repo.createExactPairs(scanId);
       await this.updateProgress(scanId, totalBooks, 65);
       await this.repo.createFuzzyPairs(scanId, scan.libraryIds, user, scan.similarityPercent);
+      await this.updateProgress(scanId, totalBooks, 80);
+      const dismissedPairs = await this.repo.deleteDismissedPairs(scanId, user.id);
       await this.updateProgress(scanId, totalBooks, 85);
       const totalGroups = await this.repo.finalizeGroups(scanId);
+      const totals = await this.repo.computeScanTotals(scanId);
       await this.repo.deleteScanKeys(scanId);
       await this.repo.updateScan(scanId, {
         status: 'completed',
         processedBooks: totalBooks,
         totalGroups,
+        totalExtraCopies: totals.totalExtraCopies,
+        totalReclaimableBytes: totals.totalReclaimableBytes,
         completedAt: new Date(),
       });
       await this.repo.deleteOlderScans(user.id, scanId);
 
       this.logger.log(
-        `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=${totalBooks} totalGroups=${totalGroups} durationMs=${Date.now() - startedAt} - duplicate scan completed`,
+        `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=${totalBooks} totalGroups=${totalGroups} dismissedPairs=${dismissedPairs} reclaimableBytes=${totals.totalReclaimableBytes} durationMs=${Date.now() - startedAt} - duplicate scan completed`,
       );
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
@@ -247,6 +296,8 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
     processedBooks: number;
     totalBooks: number | null;
     totalGroups: number | null;
+    totalExtraCopies: number | null;
+    totalReclaimableBytes: number | null;
     errorCode: string | null;
     createdAt: Date;
     completedAt: Date | null;
@@ -269,6 +320,8 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       totalBooks: scan.totalBooks,
       progressPercent,
       totalGroups: scan.totalGroups,
+      totalExtraCopies: scan.totalExtraCopies,
+      totalReclaimableBytes: scan.totalReclaimableBytes === null ? null : Number(scan.totalReclaimableBytes),
       errorCode: scan.errorCode,
       createdAt: scan.createdAt.toISOString(),
       completedAt: scan.completedAt?.toISOString() ?? null,

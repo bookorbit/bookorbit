@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { Aperture, BookMarked, BookmarkPlus, ChevronLeft, ChevronRight, Headphones, ListOrdered, RefreshCw, Shuffle, Sparkles } from '@lucide/vue'
 
-import type { BookCard, ScrollerType } from '@bookorbit/types'
+import type { BookCard, BookScrollerType } from '@bookorbit/types'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
@@ -18,7 +18,7 @@ defineOptions({
 })
 
 const props = defineProps<{
-  type: ScrollerType
+  type: BookScrollerType
   title: string
   limit?: number
   rows?: number

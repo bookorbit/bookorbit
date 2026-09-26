@@ -165,8 +165,7 @@ describe('BookMetadataFetchWidget', () => {
     })
     await nextTick()
 
-    expect(toastWarning).toHaveBeenCalledOnce()
-    expect(toastWarning).toHaveBeenCalledWith('Author enrichment done - 1 processed, 1 failed')
+    expect(toastWarning).toHaveBeenCalledExactlyOnceWith('Author enrichment done - 1 processed, 1 failed')
     expect(toastSuccess).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Author enrichment finished')
   })

@@ -26,8 +26,29 @@ async function mountPanel(loaded: BookRequestAutomationSettings = settings()) {
     if (url === '/api/v1/admin/request-indexers') {
       return response({
         indexers: [
-          { id: 11, name: 'Public books' },
-          { id: 12, name: 'Private books' },
+          { id: 11, name: 'Public books', adapterType: 'torznab' },
+          { id: 12, name: 'Private books', adapterType: 'newznab' },
+        ],
+        encryptionConfigured: true,
+      })
+    }
+    if (url === '/api/v1/admin/request-indexers/adapters') {
+      return response({
+        adapters: [
+          { type: 'torznab', delivery: 'torrent' },
+          { type: 'newznab', delivery: 'usenet' },
+        ],
+        pluginFailures: [],
+      })
+    }
+    if (url === '/api/v1/admin/request-indexer-managers') {
+      return response({
+        managers: [
+          {
+            id: 3,
+            name: 'Prowlarr',
+            sources: [{ id: 13, name: 'Managed books', adapterType: 'torznab' }],
+          },
         ],
         encryptionConfigured: true,
       })
@@ -83,10 +104,19 @@ describe('RequestAutomationPanel', () => {
   it('keeps the score floor out of the way until unattended grabbing is on', async () => {
     const wrapper = await mountPanel()
 
-    expect(wrapper.text()).not.toContain('Minimum release score')
+    expect(wrapper.text()).not.toContain('Minimum score for automatic download')
 
     const enabled = await mountPanel(settings({ autoGrabEnabled: true }))
-    expect(enabled.text()).toContain('Minimum release score')
+    expect(enabled.text()).toContain('Minimum score for automatic download')
+  })
+
+  it('puts release profiles directly after automatic downloads and explains the combined gate', async () => {
+    const wrapper = await mountPanel(settings({ autoGrabMinScore: 85 }))
+    const cardTitles = wrapper.findAll('.settings-card-title').map((title) => title.text())
+
+    expect(cardTitles.slice(0, 2)).toEqual(['Automatic downloads', 'Release profiles'])
+    expect(wrapper.text()).toContain('first matching tier, then highest score (minimum 85)')
+    expect(wrapper.text()).toContain('Releases outside the profile remain available for manual selection')
   })
 
   /**
@@ -125,6 +155,7 @@ describe('RequestAutomationPanel', () => {
       await slider.trigger('input')
 
       expect(wrapper.text()).toContain('scores 95 or more')
+      expect(wrapper.text()).toContain('minimum 95')
       expect(apiMock).not.toHaveBeenCalled()
     })
   })
@@ -294,10 +325,8 @@ describe('RequestAutomationPanel', () => {
    * those used to be its own PUT and its own "Saved" toast.
    */
   describe('release profiles', () => {
-    async function profilePanel() {
-      const wrapper = await mountPanel(
-        settings({ profiles: { ebook: [{ id: 'tier-1', name: 'Retail', conditions: {} }], audiobook: [], comic: [] } }),
-      )
+    async function profilePanel(conditions: BookRequestAutomationSettings['profiles']['ebook'][number]['conditions'] = {}) {
+      const wrapper = await mountPanel(settings({ profiles: { ebook: [{ id: 'tier-1', name: 'Retail', conditions }], audiobook: [], comic: [] } }))
       apiMock.mockClear()
       apiMock.mockResolvedValue(response(settings()))
       return wrapper
@@ -344,13 +373,72 @@ describe('RequestAutomationPanel', () => {
       vi.useFakeTimers()
       try {
         const wrapper = await profilePanel()
-        const boxes = wrapper.findAll('input[type="number"]')
+        const maxSize = wrapper.findAll('label').find((label) => label.text().includes('Max MB'))
 
-        await boxes[boxes.length - 1]!.setValue('700')
+        await maxSize!.get('input').setValue('700')
         await vi.advanceTimersByTimeAsync(1000)
 
         const profiles = lastBody().profiles as { ebook: { conditions: { maxSizeBytes: number } }[] }
         expect(profiles.ebook[0]!.conditions.maxSizeBytes).toBe(700 * 1024 * 1024)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('shows torrent conditions for an unrestricted tier', async () => {
+      const wrapper = await profilePanel()
+      const tier = wrapper.get('li')
+
+      expect(tier.text()).toContain('Torrent conditions')
+      expect(tier.text()).toContain('Min seeders')
+      expect(tier.text()).toContain('Freeleech')
+      expect(tier.text()).toContain('Hide VIP only')
+    })
+
+    it('places source selection after files and before capability-specific conditions', async () => {
+      const wrapper = await profilePanel()
+      const text = wrapper.get('li').text()
+
+      expect(text.indexOf('Files')).toBeLessThan(text.indexOf('Sources'))
+      expect(text.indexOf('Sources')).toBeLessThan(text.indexOf('Torrent conditions'))
+    })
+
+    it('keeps torrent conditions labelled when a tier mixes torrent and non-torrent sources', async () => {
+      const wrapper = await profilePanel({ indexerIds: [11, 12] })
+
+      expect(wrapper.get('li').text()).toContain('Torrent conditions')
+    })
+
+    it('hides torrent conditions from a Newznab-only tier while keeping its size ceiling', async () => {
+      const wrapper = await profilePanel({ indexerIds: [12], maxSizeBytes: 700 * 1024 * 1024 })
+      const tier = wrapper.get('li')
+
+      expect(tier.text()).not.toContain('Min seeders')
+      expect(tier.text()).not.toContain('Freeleech')
+      expect(tier.text()).not.toContain('Hide VIP only')
+      expect(tier.text()).toContain('Max MB')
+      expect(tier.text()).toContain('do not apply to the selected sources')
+    })
+
+    it('exposes and removes incompatible saved torrent conditions from a Newznab-only tier', async () => {
+      vi.useFakeTimers()
+      try {
+        const wrapper = await profilePanel({
+          indexerIds: [12],
+          minSeeders: 5,
+          maxSizeBytes: 700 * 1024 * 1024,
+          freeleechOnly: true,
+          excludeVipOnly: true,
+        })
+        const tier = wrapper.get('li')
+
+        expect(tier.text()).toContain('still has saved torrent conditions')
+        const removeConditions = tier.findAll('button').find((button) => button.text().includes('Remove torrent conditions'))
+        await removeConditions!.trigger('click')
+        await vi.advanceTimersByTimeAsync(1000)
+
+        const profiles = lastBody().profiles as { ebook: { conditions: Record<string, unknown> }[] }
+        expect(profiles.ebook[0]!.conditions).toEqual({ indexerIds: [12], maxSizeBytes: 700 * 1024 * 1024 })
       } finally {
         vi.useRealTimers()
       }
@@ -376,14 +464,14 @@ describe('RequestAutomationPanel', () => {
         }
 
         await pick('languages', 'English', 'French')
-        await pick('indexers', 'Public books', 'Private books')
+        await pick('indexers', 'Public books', 'Private books', 'Prowlarr / Managed books')
         await vi.advanceTimersByTimeAsync(1000)
 
         const profiles = lastBody().profiles as {
           ebook: { conditions: { languages: string[]; indexerIds: number[] } }[]
         }
         expect(profiles.ebook[0]!.conditions.languages).toEqual(['en', 'fr'])
-        expect(profiles.ebook[0]!.conditions.indexerIds).toEqual([11, 12])
+        expect(profiles.ebook[0]!.conditions.indexerIds).toEqual([11, 12, 13])
       } finally {
         vi.useRealTimers()
       }

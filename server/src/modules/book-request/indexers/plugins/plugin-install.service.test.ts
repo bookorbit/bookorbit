@@ -116,6 +116,16 @@ describe('PluginInstallService', () => {
     it.each([
       ['a different contract version', { apiVersion: '99' }, /version/i],
       ['an invalid plugin version', { version: "'next'" }, /semantic version/i],
+      [
+        'an insecure update URL',
+        { update: "{ manifestUrl: 'http://updates.example/plugin.json', ed25519PublicKey: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }" },
+        /https/i,
+      ],
+      [
+        'an invalid update public key',
+        { update: "{ manifestUrl: 'https://updates.example/plugin.json', ed25519PublicKey: 'short' }" },
+        /public key/i,
+      ],
       ['no label', { label: "''" }, /label/i],
       ['no search function', { search: 'OMIT' }, /search/i],
       ['no test function', { test: 'OMIT' }, /test/i],
@@ -360,6 +370,19 @@ describe('PluginInstallService', () => {
 
       expect(result.active).toBe(false);
       await expect(readFile(installed('example-tracker'), 'utf8')).resolves.toContain('example-tracker');
+    });
+
+    it('rolls a verified update back when its activation fails', async () => {
+      const previous = pluginSource({ version: "'1.0.0'", label: "'Working'" });
+      await service.install(previous, 'someone');
+      vi.spyOn(loader, 'loadDirectory').mockRejectedValueOnce(new Error('nope'));
+
+      await expect(
+        service.installVerifiedUpdate(pluginSource({ version: "'1.1.0'", label: "'Broken'" }), 'example-tracker', 'system:auto-update'),
+      ).rejects.toThrow(/restored/i);
+
+      await expect(readFile(installed('example-tracker'), 'utf8')).resolves.toBe(previous);
+      expect(registry.register.mock.calls.at(-1)?.[0]).toMatchObject({ type: 'example-tracker' });
     });
   });
 

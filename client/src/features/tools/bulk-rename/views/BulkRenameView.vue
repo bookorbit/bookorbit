@@ -246,7 +246,7 @@ function handleRetryPreview(): void {
       <span>{{ t('tools.bulkRename.executionFailed') }} - {{ executionErrorMessage }}</span>
     </div>
 
-    <div v-if="bulk.selectedLibraryId.value === null" class="flex flex-1 flex-col items-center justify-center gap-4 p-10 text-center">
+    <div v-if="bulk.selectedLibraryId.value === null" class="flex flex-1 flex-col items-center justify-start gap-4 px-10 pt-12 pb-10 text-center">
       <span class="grid size-14 place-items-center rounded-full bg-muted text-muted-foreground">
         <SlidersHorizontal class="size-6" aria-hidden="true" />
       </span>

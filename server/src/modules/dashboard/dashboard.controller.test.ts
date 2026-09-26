@@ -28,6 +28,7 @@ function makeController() {
     getScrollers: vi.fn(),
   };
   const widgetService = {
+    clearCacheForUser: vi.fn(),
     getReadingGoal: vi.fn(),
     getCurrentlyReading: vi.fn(),
     getReadingStreak: vi.fn(),
@@ -100,6 +101,15 @@ describe('DashboardController', () => {
       await controller.getWidgets(user, { widgets: ['reading-goal', 'reading-goal', 'reading-dna'] });
 
       expect(widgetService.getWidgets).toHaveBeenCalledWith(['reading-goal', 'reading-dna'], user);
+    });
+
+    it('refresh clears cached widgets for the current user', () => {
+      const { controller, widgetService } = makeController();
+      const user = makeUser({ id: 7 });
+
+      controller.refresh(user);
+
+      expect(widgetService.clearCacheForUser).toHaveBeenCalledWith(7);
     });
 
     it('getReadingGoal delegates to widgetService', async () => {

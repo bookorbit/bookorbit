@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import type { ReleaseFileInspection } from '@bookorbit/types'
+import type { DownloadDelivery, ReleaseFileInspection } from '@bookorbit/types'
 import ReleaseFileInspectionPanel from '../components/ReleaseFileInspectionPanel.vue'
 
 function inspection(overrides: Partial<ReleaseFileInspection> = {}): ReleaseFileInspection {
@@ -20,7 +20,13 @@ function inspection(overrides: Partial<ReleaseFileInspection> = {}): ReleaseFile
 }
 
 function mountPanel(
-  overrides: Partial<{ inspection: ReleaseFileInspection | null; loading: boolean; failed: boolean; failureReason: string | null }> = {},
+  overrides: Partial<{
+    inspection: ReleaseFileInspection | null
+    delivery: DownloadDelivery
+    loading: boolean
+    failed: boolean
+    failureReason: string | null
+  }> = {},
 ) {
   return mount(ReleaseFileInspectionPanel, {
     props: { inspection: inspection(), loading: false, failed: false, ...overrides },
@@ -32,7 +38,7 @@ describe('ReleaseFileInspectionPanel', () => {
     const wrapper = mountPanel()
 
     expect(wrapper.text()).toContain('Pride and Prejudice/Pride and Prejudice.epub')
-    expect(wrapper.text()).toContain('2 KB')
+    expect(wrapper.text()).toContain('2 kB')
     expect(wrapper.get('[role="status"]').text()).toContain('1 file')
   })
 
@@ -181,6 +187,29 @@ describe('ReleaseFileInspectionPanel', () => {
     })
 
     expect(wrapper.get('[role="status"]').text()).toContain('until a torrent client fetches the metadata from the swarm')
+  })
+
+  it('explains why a Usenet file list is unavailable without mentioning torrents', () => {
+    const wrapper = mountPanel({
+      delivery: 'usenet',
+      inspection: inspection({
+        source: 'nzb_file',
+        status: 'metadata_unavailable',
+        files: [],
+        totalFiles: null,
+        primaryFileCount: null,
+      }),
+    })
+
+    expect(wrapper.get('[role="status"]').text()).toContain('until NZBGet downloads and post-processes it')
+    expect(wrapper.text()).not.toContain('magnet')
+    expect(wrapper.text()).not.toContain('swarm')
+  })
+
+  it('states what inspection is doing for a Usenet release', () => {
+    const wrapper = mountPanel({ inspection: null, delivery: 'usenet', loading: true })
+
+    expect(wrapper.get('[role="status"]').text()).toContain('Fetching and validating the NZB')
   })
 
   it('exposes loading and failed inspection states accessibly', async () => {

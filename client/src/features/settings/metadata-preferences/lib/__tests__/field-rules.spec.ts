@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_METADATA_FIELDS } from '@bookorbit/types'
 import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
+import en from '@/locales/en.json'
 import {
   applyProviderAction,
+  FIELD_GROUPS,
+  fieldRuleLabelKey,
   fieldsMatching,
   isProviderUsable,
   providerRank,
@@ -154,5 +157,30 @@ describe('fieldsMatching', () => {
     const overridden = new Set<MetadataField>(['title', 'subtitle'])
     const result = fieldsMatching(fields, { query: 't', provider: key('goodreads'), overriddenOnly: true, overridden }, label)
     expect([...result]).toEqual(['title'])
+  })
+})
+
+function messageAt(path: string): unknown {
+  return path.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], en)
+}
+
+describe('metadata field labels and groups', () => {
+  // Label keys are built at runtime, so the locale check, which reads literal keys, cannot see them.
+  it('has an English label for every field, in the rule editor and everywhere else', () => {
+    const unlabelled = ALL_METADATA_FIELDS.filter(
+      (field) => typeof messageAt(`settings.metadata.fields.${field}`) !== 'string' || typeof messageAt(fieldRuleLabelKey(field)) !== 'string',
+    )
+    expect(unlabelled).toEqual([])
+  })
+
+  it('names the two cover rules apart in the rule editor only', () => {
+    expect(messageAt(fieldRuleLabelKey('cover'))).toBe('Book cover')
+    expect(messageAt(fieldRuleLabelKey('audioCover'))).toBe('Audiobook cover')
+    expect(messageAt('settings.metadata.fields.cover')).toBe('Cover')
+  })
+
+  it('puts every field in exactly one group, since a field in none is never shown', () => {
+    const grouped = FIELD_GROUPS.flatMap((group) => group.fields)
+    expect([...grouped].sort()).toEqual([...ALL_METADATA_FIELDS].sort())
   })
 })

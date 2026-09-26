@@ -198,8 +198,8 @@ export class BookRequestDownloadRepository {
   /**
    * Attempts one download client is still working on, which is what makes deleting it unsafe.
    *
-   * The FK nulls on delete, so a torrent whose client is removed stops being pollable, mappable
-   * and removable in the same instant while the client goes on seeding it. Counting first is what
+   * The FK nulls on delete, so a client-managed download stops being pollable, mappable and
+   * removable in the same instant while the client continues handling it. Counting first is what
    * lets the operator be told that rather than discover it.
    */
   async countInFlightForClient(clientId: number): Promise<number> {
@@ -212,25 +212,25 @@ export class BookRequestDownloadRepository {
     return row?.total ?? 0;
   }
 
-  async findTrackedForClientHashes(clientId: number, hashes: string[]): Promise<ReconciliationAttemptRow[]> {
-    if (hashes.length === 0) return [];
+  async findTrackedForClientKeys(clientId: number, clientKeys: string[]): Promise<ReconciliationAttemptRow[]> {
+    if (clientKeys.length === 0) return [];
     return this.db
       .select({ download: bookRequestDownloads, requestTitle: bookRequests.title })
       .from(bookRequestDownloads)
       .innerJoin(bookRequests, eq(bookRequests.id, bookRequestDownloads.requestId))
-      .where(and(eq(bookRequestDownloads.downloadClientId, clientId), inArray(bookRequestDownloads.clientHash, hashes)))
+      .where(and(eq(bookRequestDownloads.downloadClientId, clientId), inArray(bookRequestDownloads.clientKey, clientKeys)))
       .orderBy(desc(bookRequestDownloads.id));
   }
 
-  async findAdoptableForHashes(hashes: string[]): Promise<ReconciliationAttemptRow[]> {
-    if (hashes.length === 0) return [];
+  async findAdoptableForClientKeys(clientKeys: string[]): Promise<ReconciliationAttemptRow[]> {
+    if (clientKeys.length === 0) return [];
     return this.db
       .select({ download: bookRequestDownloads, requestTitle: bookRequests.title })
       .from(bookRequestDownloads)
       .innerJoin(bookRequests, eq(bookRequests.id, bookRequestDownloads.requestId))
       .where(
         and(
-          inArray(bookRequestDownloads.clientHash, hashes),
+          inArray(bookRequestDownloads.clientKey, clientKeys),
           eq(bookRequestDownloads.status, 'failed'),
           inArray(bookRequests.status, [...GRABBABLE_BOOK_REQUEST_STATUSES]),
         ),
@@ -254,7 +254,7 @@ export class BookRequestDownloadRepository {
   async adoptFailedAttempt(
     downloadId: number,
     clientId: number,
-    clientHash: string,
+    clientKey: string,
     data: Pick<NewBookRequestDownloadRow, 'status' | 'progressPercent' | 'downloadedBytes' | 'totalBytes' | 'contentPath'>,
   ): Promise<BookRequestDownloadRow | undefined> {
     try {
@@ -263,7 +263,7 @@ export class BookRequestDownloadRepository {
           .update(bookRequestDownloads)
           .set({ ...data, downloadClientId: clientId, errorMessage: null })
           .where(
-            and(eq(bookRequestDownloads.id, downloadId), eq(bookRequestDownloads.clientHash, clientHash), eq(bookRequestDownloads.status, 'failed')),
+            and(eq(bookRequestDownloads.id, downloadId), eq(bookRequestDownloads.clientKey, clientKey), eq(bookRequestDownloads.status, 'failed')),
           )
           .returning();
         if (!download) throw new AdoptionRaceError();
@@ -307,18 +307,18 @@ export class BookRequestDownloadRepository {
    * an import or a held review has not finished with. Every other directory under the direct
    * download root is spent, which is what the bootstrap reap acts on.
    */
-  async findLiveDirectHashes(): Promise<string[]> {
+  async findLiveDirectClientKeys(): Promise<string[]> {
     const rows = await this.db
-      .select({ clientHash: bookRequestDownloads.clientHash })
+      .select({ clientKey: bookRequestDownloads.clientKey })
       .from(bookRequestDownloads)
       .where(
         and(
           eq(bookRequestDownloads.source, 'direct_url'),
-          isNotNull(bookRequestDownloads.clientHash),
+          isNotNull(bookRequestDownloads.clientKey),
           inArray(bookRequestDownloads.status, [...UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES]),
         ),
       );
-    return rows.map((row) => row.clientHash).filter((hash): hash is string => hash !== null);
+    return rows.map((row) => row.clientKey).filter((key): key is string => key !== null);
   }
 
   /** How many times the automation has already tried this request, which is what bounds retries. */
@@ -373,7 +373,7 @@ export class BookRequestDownloadRepository {
         download: bookRequestDownloads,
         downloadClientName: downloadClients.name,
         downloadClientColor: downloadClients.color,
-        indexerName: requestIndexers.name,
+        indexerName: sql<string | null>`coalesce(${requestIndexers.managerMetadata}->>'displayName', ${requestIndexers.name})`,
         indexerColor: requestIndexers.color,
       })
       .from(bookRequestDownloads)
@@ -396,7 +396,7 @@ export class BookRequestDownloadRepository {
         download: bookRequestDownloads,
         downloadClientName: downloadClients.name,
         downloadClientColor: downloadClients.color,
-        indexerName: requestIndexers.name,
+        indexerName: sql<string | null>`coalesce(${requestIndexers.managerMetadata}->>'displayName', ${requestIndexers.name})`,
         indexerColor: requestIndexers.color,
       })
       .from(bookRequestDownloads)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { CoverAspectRatio } from '@bookorbit/types'
+import { APP_FEATURES, type CoverAspectRatio, type LibraryType } from '@bookorbit/types'
 import AppIcon from '@/components/AppIcon.vue'
 import IconPicker from '@/components/IconPicker.vue'
 
@@ -16,16 +16,27 @@ defineProps<{
   name: string
   icon: string | null
   coverAspectRatio: CoverAspectRatio
+  type: LibraryType
+  typeLocked: boolean
 }>()
 
 const emit = defineEmits<{
   'update:name': [value: string]
   'update:icon': [value: string | null]
   'update:coverAspectRatio': [value: CoverAspectRatio]
+  'update:type': [value: LibraryType]
 }>()
 
 function updateIcon(value: string) {
   emit('update:icon', value || null)
+}
+
+function selectBooksType() {
+  emit('update:type', 'books')
+}
+
+function selectPodcastsType() {
+  emit('update:type', 'podcasts')
 }
 
 function updateName(event: Event) {
@@ -40,8 +51,34 @@ function updateCoverAspectRatio(event: Event) {
 <template>
   <div class="px-6 py-6 flex flex-col gap-7 h-full min-h-0">
     <div>
+      <p class="mb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground">Library type</p>
+      <div class="grid gap-3" :class="APP_FEATURES.podcasts ? 'grid-cols-2' : 'grid-cols-1'">
+        <button
+          type="button"
+          class="rounded-lg border px-4 py-3 text-left transition-colors"
+          :class="type === 'books' ? 'border-primary bg-primary/8' : 'border-border hover:bg-muted/50'"
+          :disabled="typeLocked"
+          @click="selectBooksType"
+        >
+          <span class="block text-sm font-medium">Books</span>
+          <span class="mt-1 block text-xs text-muted-foreground">Ebooks, comics, and audiobooks</span>
+        </button>
+        <button
+          v-if="APP_FEATURES.podcasts"
+          type="button"
+          class="rounded-lg border px-4 py-3 text-left transition-colors"
+          :class="type === 'podcasts' ? 'border-primary bg-primary/8' : 'border-border hover:bg-muted/50'"
+          :disabled="typeLocked"
+          @click="selectPodcastsType"
+        >
+          <span class="block text-sm font-medium">Podcasts</span>
+          <span class="mt-1 block text-xs text-muted-foreground">RSS feeds and managed episode storage</span>
+        </button>
+      </div>
+    </div>
+    <div>
       <label for="library-name" class="mb-3 block text-[11px] font-semibold uppercase tracking-widest text-foreground">
-        {{ t('library.creator.details.libraryName') }}
+        {{ type === 'podcasts' ? 'Podcast library name' : t('library.creator.details.libraryName') }}
       </label>
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20">
@@ -51,7 +88,7 @@ function updateCoverAspectRatio(event: Event) {
           id="library-name"
           type="text"
           :value="name"
-          :placeholder="t('library.creator.details.namePlaceholder')"
+          :placeholder="type === 'podcasts' ? 'My Podcasts' : t('library.creator.details.namePlaceholder')"
           maxlength="255"
           class="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           autocomplete="off"
@@ -68,7 +105,7 @@ function updateCoverAspectRatio(event: Event) {
       <IconPicker :model-value="icon ?? ''" :placeholder="t('library.creator.details.icon.placeholder')" @update:model-value="updateIcon" />
     </div>
 
-    <fieldset aria-describedby="cover-style-description">
+    <fieldset v-if="type === 'books'" aria-describedby="cover-style-description">
       <legend class="mb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground">
         {{ t('library.creator.details.coverStyle.title') }}
       </legend>
@@ -96,7 +133,7 @@ function updateCoverAspectRatio(event: Event) {
         </label>
       </div>
       <p id="cover-style-description" class="mt-2 text-xs text-muted-foreground">
-        {{ t('library.creator.details.coverStyle.hint') }}
+        {{ t('library.creator.details.coverStyle.hintSlots') }}
       </p>
     </fieldset>
   </div>

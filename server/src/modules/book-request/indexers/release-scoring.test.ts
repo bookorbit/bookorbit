@@ -94,6 +94,19 @@ describe('rejectRelease', () => {
     expect(rejectRelease(candidate, request({ language: 'en' }))).toBeNull();
   });
 
+  it('reads a full scene language flag when a release label follows it', () => {
+    const danish = release({ title: 'Hilary.Mantel.Wolf.Hall.2011.DANiSH.RETAiL.ePub.eBOOK-DECiPHER', language: undefined });
+
+    expect(rejectRelease(danish, request({ title: 'Wolf Hall', authors: ['Hilary Mantel'], language: 'en' }))).toContain('not en');
+    expect(rejectRelease(danish, request({ title: 'Wolf Hall', authors: ['Hilary Mantel'], language: 'da' }))).toBeNull();
+  });
+
+  it('does not read a full language name in the work title as a scene flag', () => {
+    const titled = release({ title: 'Peter Ho Davies - The Welsh Girl [EPUB]', language: undefined });
+
+    expect(rejectRelease(titled, request({ title: 'The Welsh Girl', authors: ['Peter Ho Davies'], language: 'en' }))).toBeNull();
+  });
+
   /**
    * The filter must stay skipped rather than reject on a language it invented. `normalizeLanguage`
    * truncates an unknown token to two letters, which would otherwise read "[VIP]" as Vietnamese.
@@ -146,6 +159,42 @@ describe('scoreRelease', () => {
     const wrongAuthor = scoreRelease(release({ title: 'Dune - Someone Else [EPUB]' }), request());
 
     expect(matched.score).toBeGreaterThan(wrongAuthor.score);
+  });
+
+  it('ranks an exact work above related titles from the same author and series', () => {
+    const asked = request({ title: 'Wolf Hall', authors: ['Hilary Mantel'] });
+    const exact = scoreRelease(release({ title: 'Hilary Mantel - [Wolf Hall 01] - Wolf Hall (epub)', seeders: null }), asked);
+    const pictureBook = scoreRelease(
+      release({ title: 'Hilary.Mantel.Ben.Miles.-.The.Wolf.Hall.Picture.Book.2022.RETAIL.EPUB.eBook-CTO', seeders: null }),
+      asked,
+    );
+    const sequel = scoreRelease(
+      release({ title: 'Hilary Mantel - [The Wolf Hall Trilogy 03] - The Mirror and the Light (epub)', seeders: null }),
+      asked,
+    );
+
+    expect(pointsFor(exact, 'authorMatch')).toBe(61);
+    expect(exact.score).toBeGreaterThan(pictureBook.score);
+    expect(exact.score).toBeGreaterThan(sequel.score);
+    expect(new Set([exact.score, pictureBook.score, sequel.score]).size).toBe(3);
+  });
+
+  it('retains numbers that are part of the requested title', () => {
+    const scored = scoreRelease(
+      release({ title: 'George Orwell - 1984 (Retail EPUB)', seeders: null }),
+      request({ title: '1984', authors: ['George Orwell'] }),
+    );
+
+    expect(pointsFor(scored, 'authorMatch')).toBe(61);
+  });
+
+  it('does not count a terminal scene group as part of the work title', () => {
+    const scored = scoreRelease(
+      release({ title: 'Hilary.Mantel.Wolf.Hall.2011.DANiSH.RETAiL.ePub.eBOOK-DECiPHER', seeders: null }),
+      request({ title: 'Wolf Hall', authors: ['Hilary Mantel'] }),
+    );
+
+    expect(pointsFor(scored, 'authorMatch')).toBe(61);
   });
 
   it('treats an ISBN in the release name as decisive', () => {
@@ -342,5 +391,21 @@ describe('toReleaseItem', () => {
 
     expect(item.formats).toEqual([]);
     expect(item.format).toBeNull();
+  });
+
+  it('carries the closest profile tier and why an unknown format missed it', () => {
+    const scoringRequest = request({
+      tiers: [
+        { id: 'strict', name: 'Strict EPUB', conditions: { formats: ['epub'], languages: ['en'] } },
+        { id: 'everyday', name: 'Everyday EPUB', conditions: { formats: ['epub'] } },
+      ],
+    });
+    const scored = scoreRelease(release({ title: 'Frank Herbert - Dune', format: null }), scoringRequest);
+
+    expect(toReleaseItem(scored, 'nzb.life', scoringRequest).profileMismatch).toEqual({
+      tier: 1,
+      tierName: 'Everyday EPUB',
+      failures: [{ code: 'formatUnknown', expected: ['epub'] }],
+    });
   });
 });

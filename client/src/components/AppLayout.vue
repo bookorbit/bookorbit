@@ -32,6 +32,9 @@ const GRID_VIEW_NAMES = [
   'SeriesDetailView',
   'AuthorDetailView',
   'LibrariesView',
+  'PodcastLibrariesView',
+  'PodcastCollectionView',
+  'PodcastScopeView',
   'SmartScopesView',
   'CollectionsView',
 ]
@@ -53,9 +56,13 @@ const viewKey = computed(() => {
       <!-- 1. Global App Header: Fixed at the top, independent of views -->
       <AppHeader />
 
-      <!-- 2. Independent View Area: Everything below the header scrolls here -->
+      <!--
+        2. Independent View Area: Everything below the header scrolls here. The bottom padding is the
+        floating podcast player's measured height, so scrolled-to-bottom content clears it without a
+        document-level scrollbar.
+      -->
       <div
-        class="app-shell-scroll px-(--shell-content-gutter) pt-(--shell-gap) flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent"
+        class="app-shell-scroll px-(--shell-content-gutter) pt-(--shell-gap) pb-[var(--podcast-mini-player-clearance,0px)] flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent"
       >
         <router-view v-slot="{ Component }">
           <Transition name="page" mode="out-in">

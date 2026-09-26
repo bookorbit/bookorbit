@@ -123,11 +123,12 @@ local function scopeTables(state, scope)
             books = state.books,
             unmatched = state.unmatched,
             files = state.files,
+            statsRows = state.statsRows,
             global = state.global,
         }
     end
 
-    local tables = { books = {}, unmatched = {}, files = {}, global = {} }
+    local tables = { books = {}, unmatched = {}, files = {}, statsRows = {}, global = {} }
     for digest in pairs(scope.digests) do
         tables.books[digest] = state.books[digest]
         tables.unmatched[digest] = state.unmatched[digest]
@@ -135,20 +136,27 @@ local function scopeTables(state, scope)
     for file in pairs(scope.files) do
         tables.files[file] = state.files[file]
     end
+    for row_id in pairs(scope.statsRows) do
+        tables.statsRows[row_id] = state.statsRows[row_id]
+    end
     if scope.global then tables.global = state.global end
     return tables
 end
 
 local function normalizeScope(opts)
     if not opts or opts.full then
-        return { full = true, digests = {}, files = {}, global = true }
+        return { full = true, digests = {}, files = {}, statsRows = {}, global = true }
     end
-    local scope = { full = false, digests = {}, files = {}, global = opts.global ~= false }
+    local scope = { full = false, digests = {}, files = {}, statsRows = {}, global = opts.global ~= false }
     for _, digest in ipairs(opts.digests or {}) do
         if digest then scope.digests[digest] = true end
     end
     for _, file in ipairs(opts.files or {}) do
         if file then scope.files[file] = true end
+    end
+    for _, row_id in ipairs(opts.statsRows or {}) do
+        row_id = tonumber(row_id)
+        if row_id then scope.statsRows[tostring(row_id)] = true end
     end
     return scope
 end
@@ -158,6 +166,7 @@ local function refreshSession(session)
     session.books = deepCopy(current.books)
     session.unmatched = deepCopy(current.unmatched)
     session.files = deepCopy(current.files)
+    session.statsRows = deepCopy(current.statsRows)
     session.global = deepCopy(current.global)
     session.manager_base = deepCopy(current)
     session.manager_generation = generation
@@ -172,6 +181,7 @@ local function commitSession(session)
         replaceTable(state.books, mergeValue(base.books, session.books, state.books))
         replaceTable(state.unmatched, mergeValue(base.unmatched, session.unmatched, state.unmatched))
         replaceTable(state.files, mergeValue(base.files, session.files, state.files))
+        replaceTable(state.statsRows, mergeValue(base.statsRows, session.statsRows, state.statsRows))
         replaceTable(state.global, mergeValue(base.global, session.global, state.global))
     else
         for digest in pairs(scope.digests) do
@@ -181,6 +191,9 @@ local function commitSession(session)
         end
         for file in pairs(scope.files) do
             state.files[file] = mergeValue(base.files[file], session.files[file], state.files[file])
+        end
+        for row_id in pairs(scope.statsRows) do
+            state.statsRows[row_id] = mergeValue(base.statsRows[row_id], session.statsRows[row_id], state.statsRows[row_id])
         end
         if scope.global then
             replaceTable(state.global, mergeValue(base.global, session.global, state.global))
@@ -413,6 +426,24 @@ function StateManager.linkFile(digest, book_file_id, book_id, file)
     return StateManager.linkFiles({
         { digest = digest, bookFileId = book_file_id, bookId = book_id, file = file },
     })
+end
+
+function StateManager.repairFileIdentity(file, old_digest, new_digest)
+    if not file or not new_digest then return generation end
+    if old_digest == new_digest and ensure().files[file] == new_digest then
+        return generation
+    end
+    local digests = { new_digest }
+    if old_digest and old_digest ~= new_digest then
+        table.insert(digests, old_digest)
+    end
+    return StateManager.mutateScoped({
+        digests = digests,
+        files = { file },
+        global = false,
+    }, function(session)
+        session:repairFileIdentity(file, old_digest, new_digest)
+    end)
 end
 
 -- Test seam: forgets the shared instance and every derived cache.

@@ -19,6 +19,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
 import { compareSeriesIndexSql, seriesIndexSortKey, seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
 import * as schema from '../../db/schema';
+import { activeCoverSlotSql, coverMediaSql } from '../book-cover-store/book-cover-store.repository';
 import { BookSortBuilder, customMetadataValueColumn, resolveRandomSortSeed, type BookSortContext } from './book-sort-builder.service';
 import {
   audiobookProgress,
@@ -123,6 +124,7 @@ export class BookQueryBuilder {
 
     return or(
       accentInsensitiveIlike(bookMetadata.title, pattern),
+      accentInsensitiveIlike(bookMetadata.subtitle, pattern),
       existsAuthor,
       accentInsensitiveIlike(bookMetadata.seriesName, pattern),
       existsSeries,
@@ -228,6 +230,8 @@ export class BookQueryBuilder {
         return this.numericRuleToSql(bookMetadata.metadataScore, operator, value as number, valueTo as number | undefined);
       case 'cover':
         return this.coverRuleToSql(operator);
+      case 'audioCover':
+        return this.audioCoverRuleToSql(operator);
       case 'lockStatus':
         return this.lockStatusRuleToSql(operator);
       case 'seriesStatus':
@@ -834,6 +838,21 @@ export class BookQueryBuilder {
     }
   }
 
+  // Only books whose cover media include audio have an audio slot to fill, so both operators
+  // leave ebook-only books out rather than reporting them as missing one.
+  private audioCoverRuleToSql(operator: string): SQL {
+    const activeAudioSlot = activeCoverSlotSql(books.id, 'audio');
+    const { hasAudio } = coverMediaSql(books.id);
+    switch (operator) {
+      case 'isMissing':
+        return and(hasAudio, not(activeAudioSlot))!;
+      case 'isPresent':
+        return and(hasAudio, activeAudioSlot)!;
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for audio cover field`);
+    }
+  }
+
   private lockStatusRuleToSql(operator: string): SQL {
     switch (operator) {
       case 'isLocked':
@@ -1019,7 +1038,11 @@ export class BookQueryBuilder {
       const sq = this.db
         .select({ one: sql`1` })
         .from(collectionBooks)
-        .innerJoin(collections, and(eq(collectionBooks.collectionId, collections.id), eq(collections.userId, userId)))
+        .innerJoin(
+          collections,
+          // Book collections only: a podcast collection sharing a name must never widen a book filter.
+          and(eq(collectionBooks.collectionId, collections.id), eq(collections.userId, userId), eq(collections.mediaType, 'books')),
+        )
         .where(and(...predicates)!);
       return sql`exists (${sq})`;
     };

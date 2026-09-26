@@ -6,6 +6,7 @@ import { MetadataPreferencesModule } from './metadata-preferences.module';
 import { MetadataPreferencesService } from './metadata-preferences.service';
 import { ProviderConfigController } from './provider-config.controller';
 import { ProviderConfigService } from './provider-config.service';
+import { ProviderLinkSettingsController } from './provider-link-settings.controller';
 
 describe('MetadataPreferencesModule', () => {
   it('registers expected controllers and providers', () => {
@@ -13,7 +14,7 @@ describe('MetadataPreferencesModule', () => {
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, MetadataPreferencesModule);
     const exports = Reflect.getMetadata(MODULE_METADATA.EXPORTS, MetadataPreferencesModule);
 
-    expect(controllers).toEqual(expect.arrayContaining([MetadataPreferencesController, ProviderConfigController]));
+    expect(controllers).toEqual(expect.arrayContaining([MetadataPreferencesController, ProviderConfigController, ProviderLinkSettingsController]));
     expect(providers).toEqual(expect.arrayContaining([MetadataPreferencesService, MetadataPreferenceResolver, ProviderConfigService]));
     expect(exports).toEqual(expect.arrayContaining([MetadataPreferencesService, MetadataPreferenceResolver, ProviderConfigService]));
   });

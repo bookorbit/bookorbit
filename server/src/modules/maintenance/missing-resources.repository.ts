@@ -5,6 +5,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, books, libraries } from '../../db/schema';
+import { formatKeyRank, normalizeFormatPriority } from '@bookorbit/types';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -18,7 +19,7 @@ const authorsSubquery = sql<string[]>`COALESCE((
 const formatsSubquery = sql<string[]>`COALESCE((
   SELECT array_agg(DISTINCT file.format)
   FROM book_files file
-  WHERE file.book_id = ${books.id} AND file.format IS NOT NULL
+  WHERE file.book_id = ${books.id} AND file.format IS NOT NULL AND file.role = 'content'
 ), ARRAY[]::varchar[])`;
 
 @Injectable()
@@ -34,9 +35,10 @@ export class MissingResourcesRepository {
     return row?.value ?? 0;
   }
 
+  /** Each book's formats are its editions, in its library's format priority. */
   async findMissingBooks(libraryIds: number[], offset: number, limit: number) {
     if (libraryIds.length === 0) return [];
-    return this.db
+    const rows = await this.db
       .select({
         id: books.id,
         title: bookMetadata.title,
@@ -45,6 +47,7 @@ export class MissingResourcesRepository {
         libraryName: libraries.name,
         folderPath: books.folderPath,
         formats: formatsSubquery,
+        formatPriority: libraries.formatPriority,
         updatedAt: books.updatedAt,
       })
       .from(books)
@@ -54,6 +57,13 @@ export class MissingResourcesRepository {
       .orderBy(asc(books.libraryId), asc(books.id))
       .offset(offset)
       .limit(limit);
+    return rows.map(({ formatPriority, ...row }) => {
+      const priority = normalizeFormatPriority(formatPriority as string[] | null);
+      return {
+        ...row,
+        formats: [...row.formats].sort((a, b) => formatKeyRank(a.toLowerCase(), priority) - formatKeyRank(b.toLowerCase(), priority)),
+      };
+    });
   }
 
   async findMissingBookIds(libraryIds: number[], afterId: number, limit: number): Promise<number[]> {

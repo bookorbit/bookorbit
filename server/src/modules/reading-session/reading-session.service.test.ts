@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
-import { ReadingSessionRepository, type SaveReadingSessionResult } from './reading-session.repository';
+import { ReadingSessionRepository, type ReadingSessionSyncOptions, type SaveReadingSessionResult } from './reading-session.repository';
 import { ReadingSessionService } from './reading-session.service';
 import { EMPTY_CONTENT_FILTER_RULES, type ReadingSessionSource } from '@bookorbit/types';
 
@@ -31,7 +31,20 @@ const mockRepo = {
   saveSession:
     vi.fn<
       (
-        ...args: [number, number, string, Date, Date, number, number | null, number | null, ReadingSessionSource, string]
+        ...args: [
+          number,
+          number,
+          string,
+          Date,
+          Date,
+          number,
+          number | null,
+          number | null,
+          ReadingSessionSource,
+          string,
+          ReadingSessionSyncOptions | undefined,
+          'read' | 'tts' | 'listen',
+        ]
       ) => Promise<SaveReadingSessionResult>
     >(),
 };
@@ -39,6 +52,8 @@ const mockRepo = {
 const mockBookService = {
   verifyFileAccess: vi.fn<(...args: [number, RequestUser]) => Promise<void>>(),
 };
+
+const mockUserStatistics = { invalidateUser: vi.fn() };
 
 describe('ReadingSessionService', () => {
   let service: ReadingSessionService;
@@ -53,6 +68,7 @@ describe('ReadingSessionService', () => {
       mockRepo as unknown as ReadingSessionRepository,
       mockBookService as unknown as BookService,
       { emit: vi.fn() } as never,
+      mockUserStatistics as never,
     );
   });
 
@@ -82,7 +98,10 @@ describe('ReadingSessionService', () => {
       10,
       'web',
       'UTC',
+      undefined,
+      'read',
     );
+    expect(mockUserStatistics.invalidateUser).toHaveBeenCalledWith(12);
   });
 
   it('passes nullable progress values through as null', async () => {
@@ -110,6 +129,8 @@ describe('ReadingSessionService', () => {
       null,
       'web',
       'UTC',
+      undefined,
+      'read',
     );
   });
 
@@ -139,6 +160,8 @@ describe('ReadingSessionService', () => {
       null,
       'kobo',
       'UTC',
+      undefined,
+      'read',
     );
   });
 
@@ -232,6 +255,7 @@ function makeServiceExtended() {
     mockRepoExtended as unknown as ReadingSessionRepository,
     mockBookServiceExtended as unknown as BookService,
     { emit: vi.fn() } as never,
+    mockUserStatistics as never,
   );
 }
 
@@ -315,6 +339,7 @@ describe('ReadingSessionService - createManualSession', () => {
       mockRepoExtended as unknown as ReadingSessionRepository,
       mockBookServiceExtended as unknown as BookService,
       { emit: achievementEmit } as never,
+      mockUserStatistics as never,
     );
   }
 
@@ -349,6 +374,7 @@ describe('ReadingSessionService - createManualSession', () => {
     const { sessionId } = mockRepoExtended.insertManualSession.mock.calls[0][0] as { sessionId: string };
     expect(sessionId.startsWith('manual:')).toBe(true);
     expect(result).toMatchObject({ id: 555, bookFileId: 42, durationSeconds: 2700, format: 'epub', source: 'manual' });
+    expect(mockUserStatistics.invalidateUser).toHaveBeenCalledWith(5);
   });
 
   it('computes progressDelta from the latest prior endProgress', async () => {
@@ -476,6 +502,7 @@ describe('ReadingSessionService - deleteSessionByBook', () => {
 
     const svc = makeServiceExtended();
     await expect(svc.deleteSessionByBook(10, 5, makeUser())).resolves.toBeUndefined();
+    expect(mockUserStatistics.invalidateUser).toHaveBeenCalledWith(7);
   });
 
   it('rethrows when access check fails', async () => {
@@ -495,5 +522,66 @@ describe('ReadingSessionService - deleteSessionByBook', () => {
     const bookAccessOrder = mockBookServiceExtended.verifyBookAccess.mock.invocationCallOrder[0];
     const repoOrder = mockRepoExtended.deleteSessionByBook.mock.invocationCallOrder[0];
     expect(bookAccessOrder).toBeLessThan(repoOrder);
+  });
+});
+
+/**
+ * Issue #1458: the session itself was filed on the reader's local day while the read status it
+ * triggers was filed on UTC's, so an evening finish showed a session on one date and a Finish
+ * Date on the next. Both now come off the same timezone.
+ */
+describe('ReadingSessionService - read status activity', () => {
+  const repo = { saveSession: vi.fn() };
+  const bookService = {
+    verifyFileAccess: vi.fn(),
+    autoUpdateReadStatusForProgress: vi.fn(),
+  };
+  let service: ReadingSessionService;
+
+  // 8:08 PM on the 19th in Chicago, which is already the 20th in UTC.
+  const ENDED_AT = '2026-09-20T01:08:15.815Z';
+  const chicagoReader = makeUser({ id: 12, settings: { timezone: 'America/Chicago' } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    repo.saveSession.mockResolvedValue({ kind: 'saved' });
+    bookService.verifyFileAccess.mockResolvedValue({ id: 6558, bookId: 2179, libraryId: 1 });
+    bookService.autoUpdateReadStatusForProgress.mockResolvedValue(undefined);
+    service = new ReadingSessionService(repo as never, bookService as never, { emit: vi.fn() } as never, { invalidateUser: vi.fn() } as never);
+  });
+
+  async function saveFinishingSession(user: RequestUser) {
+    await service.save(
+      6558,
+      { sessionId: 'session-1', startedAt: '2026-09-20T01:02:15.815Z', endedAt: ENDED_AT, durationSeconds: 360, progressDelta: 58, endProgress: 100 },
+      user,
+    );
+  }
+
+  it('hands the status update the instant, not a pre-truncated UTC day', async () => {
+    await saveFinishingSession(chicagoReader);
+
+    expect(bookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
+      12,
+      expect.objectContaining({ bookId: 2179 }),
+      100,
+      expect.objectContaining({ occurredAt: new Date(ENDED_AT), origin: 'bookorbit', meaningfulActivity: true }),
+    );
+  });
+
+  it('files the session and the status against the same timezone', async () => {
+    await saveFinishingSession(chicagoReader);
+
+    const sessionTimeZone = repo.saveSession.mock.calls[0]?.[9];
+    const statusTimeZone = bookService.autoUpdateReadStatusForProgress.mock.calls[0]?.[3]?.timeZone;
+    expect(sessionTimeZone).toBe('America/Chicago');
+    expect(statusTimeZone).toBe(sessionTimeZone);
+  });
+
+  it('falls back to UTC for a reader who has set no timezone', async () => {
+    await saveFinishingSession(makeUser({ id: 12 }));
+
+    expect(bookService.autoUpdateReadStatusForProgress.mock.calls[0]?.[3]?.timeZone).toBe('UTC');
   });
 });

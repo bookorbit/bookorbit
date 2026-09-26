@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  DefaultValuePipe,
   Delete,
   Get,
   HttpCode,
@@ -21,8 +20,10 @@ import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pag
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { OptionalIntQueryPipe } from '../../common/pipes/optional-int-query.pipe';
 import { BookQueryPipe, JumpBucketsQueryPipe } from '../book/pipes/book-query.pipe';
 import { CollectionBooksDto } from './dto/collection-books.dto';
+import { CollectionPodcastsDto } from './dto/collection-podcasts.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { ReorderCollectionsDto } from './dto/reorder-collections.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
@@ -84,6 +85,12 @@ export class CollectionController {
   @Post('membership')
   findAllWithMembership(@Body() dto: CollectionBooksDto, @CurrentUser() user: RequestUser) {
     return this.collectionService.findAllWithSelectionMembership(dto, user);
+  }
+
+  /** Podcast collections for the add-to-collection sheet, flagged with existing membership. */
+  @Get('podcast-membership')
+  findPodcastMembership(@Query('podcastId', ParseIntPipe) podcastId: number, @CurrentUser() user: RequestUser) {
+    return this.collectionService.findAllWithPodcastMembership(user, podcastId);
   }
 
   @Get(':id')
@@ -161,14 +168,37 @@ export class CollectionController {
   getBooks(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
-    @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
-    @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
+    @Query('page', new OptionalIntQueryPipe(0)) page: number,
+    @Query('size', new OptionalIntQueryPipe(50)) size: number,
     @Query('collapseSeries', new ParseBoolPipe({ optional: true })) collapseSeries?: boolean,
     @Query('q') q?: string,
   ) {
     this.validateSizeQuery(size);
     this.validatePageQuery(page, size);
     return this.collectionService.getBooks(id, user, page, size, collapseSeries, q);
+  }
+
+  /** Podcast collections group shows, so membership is by show id rather than a book selection. */
+  @Get(':id/podcasts')
+  getPodcasts(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: RequestUser,
+    @Query('page', new OptionalIntQueryPipe(0)) page: number,
+    @Query('size', new OptionalIntQueryPipe(50)) size: number,
+  ) {
+    this.validateSizeQuery(size);
+    this.validatePageQuery(page, size);
+    return this.collectionService.getPodcasts(id, user, page, size);
+  }
+
+  @Post(':id/podcasts')
+  addPodcasts(@Param('id', ParseIntPipe) id: number, @Body() dto: CollectionPodcastsDto, @CurrentUser() user: RequestUser) {
+    return this.collectionService.addPodcasts(id, dto, user);
+  }
+
+  @Delete(':id/podcasts')
+  removePodcasts(@Param('id', ParseIntPipe) id: number, @Body() dto: CollectionPodcastsDto, @CurrentUser() user: RequestUser) {
+    return this.collectionService.removePodcasts(id, dto, user);
   }
 
   @Post(':id/books/query')

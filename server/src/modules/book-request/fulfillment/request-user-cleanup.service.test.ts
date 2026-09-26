@@ -3,7 +3,7 @@ import { USER_DELETING, UserEventsService, type UserDeletingEvent } from '../../
 import { RequestUserCleanupService } from './request-user-cleanup.service';
 
 function attempt(overrides: Partial<BookRequestDownloadRow> = {}): BookRequestDownloadRow {
-  return { id: 11, requestId: 5, clientHash: 'a'.repeat(40), source: 'torrent_file', downloadClientId: 2, ...overrides } as BookRequestDownloadRow;
+  return { id: 11, requestId: 5, clientKey: 'a'.repeat(40), source: 'torrent_file', downloadClientId: 2, ...overrides } as BookRequestDownloadRow;
 }
 
 function makeService(rows: BookRequestDownloadRow[] = []) {

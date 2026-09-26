@@ -14,6 +14,7 @@ import {
   type ResolvedIndexerConfig,
   type TorrentFetchResult,
 } from '../indexer-adapter';
+import { normalizeProviderSeedRatio, normalizeTorznabSeedTimeSeconds } from '../seed-goal.utils';
 // An ISBN is the one query a tracker almost never indexes, so it stays out of the search text.
 import { buildSearchText } from '../search-text';
 import { infoHashFromMagnet, MAX_TORRENT_FILE_BYTES } from '../../fulfillment/torrent.utils';
@@ -276,9 +277,8 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
     const publishedAt = parseDate(item.pubDate);
     // What the tracker asks of a grab, which a proxy passes through from the tracker's own rules.
     // Torznab states the seed time in seconds; our column and the download clients want minutes.
-    const seedRatioGoal = toNumber(attrs.get('minimumratio'));
-    const seedTimeSeconds = toNumber(attrs.get('minimumseedtime'));
-    const seedTimeMinutes = seedTimeSeconds === null ? null : Math.round(seedTimeSeconds / 60);
+    const seedRatioGoal = normalizeProviderSeedRatio(toNumber(attrs.get('minimumratio')));
+    const seedTimeMinutes = normalizeTorznabSeedTimeSeconds(toNumber(attrs.get('minimumseedtime')));
     const bookTitle = attrs.get('booktitle')?.trim();
 
     releases.push({
@@ -298,8 +298,8 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
       freeleech: toNumber(attrs.get('downloadvolumefactor')) === 0,
       ...(publishedAt ? { publishedAt } : {}),
       ...(fileCount !== null ? { fileCount } : {}),
-      ...(seedRatioGoal !== null ? { seedRatioGoal } : {}),
-      ...(seedTimeMinutes !== null ? { seedTimeMinutes } : {}),
+      ...(seedRatioGoal !== undefined ? { seedRatioGoal } : {}),
+      ...(seedTimeMinutes !== undefined ? { seedTimeMinutes } : {}),
     });
   }
 

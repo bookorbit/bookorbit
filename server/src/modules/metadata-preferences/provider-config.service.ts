@@ -354,6 +354,11 @@ export class ProviderConfigService {
     return this.normalizeConfig(this.parsePersistedConfig(row.value, defaults, 'get', startedAt));
   }
 
+  async getLinkSettings() {
+    const config = await this.getConfig();
+    return { amazonDomain: config.amazon.domain };
+  }
+
   async updateConfig(patch: ProviderConfigPatch): Promise<ProviderConfigurations> {
     const startedAt = Date.now();
     return this.db.transaction(async (tx) => {

@@ -22,6 +22,7 @@ function queryBuilder<T>(result: T) {
     'returning',
     'set',
     'innerJoin',
+    'leftJoin',
     'groupBy',
     'having',
     'onConflictDoNothing',
@@ -217,10 +218,40 @@ describe('BookDuplicatesRepository', () => {
     const repo = new BookDuplicatesRepository(db as never);
     const user = { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never;
 
-    await expect(repo.findGroups(9, 1, 20, [2], user, 'isbn')).resolves.toEqual({ groups, total: 1 });
+    await expect(repo.findGroups(9, 1, 20, [2], user, 'isbn', 'reclaimable', 'desc')).resolves.toEqual({ groups, total: 1 });
     await expect(repo.findPairs([])).resolves.toEqual([]);
     await expect(repo.findPairs([5])).resolves.toEqual([{ groupId: 5 }]);
     await expect(repo.findCandidatePreviews([], [2], user)).resolves.toEqual([]);
     await expect(repo.findCandidatePreviews([5], [], user)).resolves.toEqual([]);
+  });
+
+  it('orders by reclaimable bytes, copies, confidence or title', async () => {
+    const user = { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never;
+    const orderings: Record<string, string> = {};
+    for (const sortBy of ['reclaimable', 'copies', 'confidence', 'title'] as const) {
+      const db = mockDb({ selectResults: [[], [{ count: 0 }], []] });
+      const repo = new BookDuplicatesRepository(db as never);
+      await repo.findGroups(9, 1, 20, [2], user, undefined, sortBy, 'desc');
+      const builder = (db.select as ReturnType<typeof vi.fn>).mock.results.at(-1)!.value as Record<string, ReturnType<typeof vi.fn>>;
+      orderings[sortBy] = builder.orderBy.mock.calls[0]!.map((clause) => renderSql(clause).sql).join(' | ');
+    }
+
+    expect(orderings.reclaimable).toContain('member_bytes_total');
+    expect(orderings.reclaimable).toContain('member_bytes_max');
+    expect(orderings.copies).toContain('member_count');
+    expect(orderings.confidence).toContain('confidence');
+    expect(orderings.title).toContain('lower(coalesce(');
+  });
+
+  it('deletes dismissed pairs for the scanning user before groups are formed', async () => {
+    const execute = vi.fn().mockResolvedValue({ rowCount: 3 });
+    const repo = new BookDuplicatesRepository({ execute } as never);
+
+    await expect(repo.deleteDismissedPairs(9, 7)).resolves.toBe(3);
+
+    const query = renderSql(execute.mock.calls[0]![0]).sql.replace(/\s+/g, ' ');
+    expect(query).toContain('DELETE FROM "book_duplicate_pairs"');
+    expect(query).toContain('"book_duplicate_dismissals"');
+    expect(query).toContain('dismissal.book_id_a = pair.book_id_a');
   });
 });

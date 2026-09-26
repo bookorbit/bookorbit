@@ -3,13 +3,24 @@ import { AnyColumn, SQL, sql } from 'drizzle-orm';
 
 import { MAX_RANDOM_SORT_SEED, parseCustomSortFieldId } from '@bookorbit/types';
 import type { CustomMetadataFieldType, CustomMetadataFieldTypeMap, SortField, SortSpec } from '@bookorbit/types';
-import { bookMetadata, books, collectionBooks } from '../../db/schema';
+import {
+  authors,
+  bookAuthors,
+  bookMetadata,
+  bookNarrators,
+  bookSeries,
+  bookSeriesMemberships,
+  books,
+  collectionBooks,
+  narrators,
+} from '../../db/schema';
 import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 
 export type BookSortContext = {
   defaultCollectionId?: number;
   /** Seed for the `random` sort field. See `resolveRandomSortSeed`. */
   randomSeed?: number;
+  query?: string;
 };
 
 /**
@@ -91,6 +102,13 @@ export class BookSortBuilder {
     }
 
     switch (field) {
+      case 'relevance': {
+        const q = context?.query?.trim();
+        if (!q) throw new BadRequestException('relevance sort requires a non-empty search query');
+        result.push(sql`${this.buildRelevanceScore(q)} ${sql.raw(D)}`);
+        result.push(sql`${bookMetadata.title} ASC NULLS LAST`);
+        break;
+      }
       case 'author':
         result.push(sql`${books.primaryAuthorSortName} ${sql.raw(D)} NULLS LAST`);
         break;
@@ -170,4 +188,40 @@ export class BookSortBuilder {
       }
     }
   }
+
+  private buildRelevanceScore(query: string): SQL {
+    const title = searchTextScore(bookMetadata.title, query, 1000, 850, 650, 400);
+    const legacySeries = searchTextScore(bookMetadata.seriesName, query, 700, 620, 500, 300);
+    const author = sql`COALESCE((
+      SELECT max(${searchTextScore(authors.name, query, 800, 700, 550, 350)})
+      FROM ${bookAuthors}
+      INNER JOIN ${authors} ON ${authors.id} = ${bookAuthors.authorId}
+      WHERE ${bookAuthors.bookId} = ${books.id}
+    ), 0)`;
+    const series = sql`COALESCE((
+      SELECT max(${searchTextScore(bookSeries.name, query, 700, 620, 500, 300)})
+      FROM ${bookSeriesMemberships}
+      INNER JOIN ${bookSeries} ON ${bookSeries.id} = ${bookSeriesMemberships.seriesId}
+      WHERE ${bookSeriesMemberships.bookId} = ${books.id}
+    ), 0)`;
+    const narrator = sql`COALESCE((
+      SELECT max(${searchTextScore(narrators.name, query, 500, 440, 360, 240)})
+      FROM ${bookNarrators}
+      INNER JOIN ${narrators} ON ${narrators.id} = ${bookNarrators.narratorId}
+      WHERE ${bookNarrators.bookId} = ${books.id}
+    ), 0)`;
+
+    return sql`GREATEST(${title}, ${author}, ${legacySeries}, ${series}, ${narrator})`;
+  }
+}
+
+function searchTextScore(value: AnyColumn | SQL, query: string, exact: number, prefix: number, contains: number, fuzzy: number): SQL {
+  const normalizedValue = sql`lower(public.bookorbit_unaccent(COALESCE(${value}, '')))`;
+  const normalizedQuery = sql`lower(public.bookorbit_unaccent(${query}))`;
+  return sql`CASE
+    WHEN ${normalizedValue} = ${normalizedQuery} THEN ${exact}
+    WHEN ${normalizedValue} LIKE ${normalizedQuery} || '%' THEN ${prefix}
+    WHEN ${normalizedValue} LIKE '%' || ${normalizedQuery} || '%' THEN ${contains}
+    ELSE similarity(${normalizedValue}, ${normalizedQuery}) * ${fuzzy}
+  END`;
 }

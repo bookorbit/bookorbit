@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, type AchievementEventsService } from '../achievement/achievement-events.service';
+import type { BookService } from '../book/book.service';
 import type { UserBookNoteService } from '../user-book-note/user-book-note.service';
 import type { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import type { BookStatesUploadDto, BulkProgressDto, MatchCheckDto, SweepCompleteDto } from './dto';
@@ -15,8 +16,8 @@ const DEVICE_ID = 'abcdef12-3456-7890-abcd-ef1234567890';
 const HASH_A = 'a'.repeat(32);
 const HASH_B = 'b'.repeat(32);
 
-function makeUser(): RequestUser {
-  return { id: 7, settings: {} } as unknown as RequestUser;
+function makeUser(settings: Record<string, unknown> = {}): RequestUser {
+  return { id: 7, settings } as unknown as RequestUser;
 }
 
 function deviceFields() {
@@ -30,6 +31,7 @@ describe('KoreaderPluginService', () => {
     upsertUnmatchedBooks: ReturnType<typeof vi.fn>;
     clearUnmatchedBooks: ReturnType<typeof vi.fn>;
     restoreDevice: ReturnType<typeof vi.fn>;
+    upsertBookHashLink: ReturnType<typeof vi.fn>;
   };
   let pluginRepo: {
     getRatings: ReturnType<typeof vi.fn>;
@@ -52,6 +54,7 @@ describe('KoreaderPluginService', () => {
     normalizeNote: (value: string | null | undefined) => string | null;
   };
   let achievementEvents: { emit: ReturnType<typeof vi.fn> };
+  let bookService: { verifyFileAccess: ReturnType<typeof vi.fn> };
   let service: KoreaderPluginService;
 
   beforeEach(() => {
@@ -65,6 +68,7 @@ describe('KoreaderPluginService', () => {
       upsertUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
       clearUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
       restoreDevice: vi.fn().mockResolvedValue(undefined),
+      upsertBookHashLink: vi.fn().mockResolvedValue(undefined),
     };
     pluginRepo = {
       getRatings: vi.fn().mockResolvedValue(new Map()),
@@ -90,6 +94,7 @@ describe('KoreaderPluginService', () => {
       },
     };
     achievementEvents = { emit: vi.fn() };
+    bookService = { verifyFileAccess: vi.fn() };
     service = new KoreaderPluginService(
       koreaderRepo as unknown as KoreaderRepository,
       pluginRepo as unknown as KoreaderPluginRepository,
@@ -97,6 +102,7 @@ describe('KoreaderPluginService', () => {
       userBookStatusService as unknown as UserBookStatusService,
       userBookNoteService as unknown as UserBookNoteService,
       achievementEvents as unknown as AchievementEventsService,
+      bookService as unknown as BookService,
     );
   });
 
@@ -111,6 +117,87 @@ describe('KoreaderPluginService', () => {
       expect(koreaderRepo.upsertUnmatchedBooks).toHaveBeenCalledWith(7, [{ hash: HASH_B, source: 'statistics' }], DEVICE_ID);
       expect(result.matches).toEqual([{ hash: HASH_A, bookId: 20, bookFileId: 10 }]);
       expect(result.libraryVersion).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('links an explicitly downloaded catalog file when its hash resolved to another file', async () => {
+      bookService.verifyFileAccess.mockResolvedValue({ id: 11, bookId: 20, libraryId: 1, format: 'epub', role: 'content' });
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_A],
+        books: [{ hash: HASH_A, source: 'file', bookFileId: 11, title: 'Read-along edition' }],
+      } as MatchCheckDto;
+
+      const result = await service.matchCheck(makeUser(), dto);
+
+      expect(bookService.verifyFileAccess).toHaveBeenCalledWith(11, makeUser());
+      expect(koreaderRepo.upsertBookHashLink).toHaveBeenCalledWith(7, HASH_A, 11, {
+        title: 'Read-along edition',
+        authors: null,
+        lastOpen: null,
+      });
+      expect(result.matches).toEqual([{ hash: HASH_A, bookId: 20, bookFileId: 11 }]);
+    });
+
+    it('links an opened file using its previously verified file identity', async () => {
+      koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(new Map());
+      bookService.verifyFileAccess.mockResolvedValue({ id: 11, bookId: 21, libraryId: 1, format: 'epub', role: 'content' });
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_B],
+        books: [{ hash: HASH_B, source: 'current_file', bookFileId: 11, title: 'Recovered book' }],
+      } as MatchCheckDto;
+
+      const result = await service.matchCheck(makeUser(), dto);
+
+      expect(koreaderRepo.upsertBookHashLink).toHaveBeenCalledWith(7, HASH_B, 11, {
+        title: 'Recovered book',
+        authors: null,
+        lastOpen: null,
+      });
+      expect(result.matches).toEqual([{ hash: HASH_B, bookId: 21, bookFileId: 11 }]);
+    });
+
+    it('does not trust a file id reported only by a statistics row', async () => {
+      koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(new Map());
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_B],
+        books: [{ hash: HASH_B, source: 'statistics', bookFileId: 11 }],
+      } as MatchCheckDto;
+
+      const result = await service.matchCheck(makeUser(), dto);
+
+      expect(bookService.verifyFileAccess).not.toHaveBeenCalled();
+      expect(koreaderRepo.upsertBookHashLink).not.toHaveBeenCalled();
+      expect(result.matches).toEqual([]);
+    });
+
+    it('does not link an opened file when the reported file is inaccessible', async () => {
+      koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(new Map());
+      bookService.verifyFileAccess.mockRejectedValue(new Error('forbidden'));
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_B],
+        books: [{ hash: HASH_B, source: 'current_file', bookFileId: 11 }],
+      } as MatchCheckDto;
+
+      const result = await service.matchCheck(makeUser(), dto);
+
+      expect(koreaderRepo.upsertBookHashLink).not.toHaveBeenCalled();
+      expect(result.matches).toEqual([]);
+    });
+
+    it('does not rewrite an existing link when the explicit catalog file already resolves', async () => {
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_A],
+        books: [{ hash: HASH_A, source: 'file', bookFileId: 10 }],
+      } as MatchCheckDto;
+
+      await service.matchCheck(makeUser(), dto);
+
+      expect(bookService.verifyFileAccess).not.toHaveBeenCalled();
+      expect(koreaderRepo.upsertBookHashLink).not.toHaveBeenCalled();
     });
 
     it('persists unmatched candidate metadata from the device statistics database', async () => {
@@ -241,8 +328,17 @@ describe('KoreaderPluginService', () => {
     it('applies a status when no server status exists', async () => {
       const result = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-06-01' }]));
 
-      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read');
+      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read', 'UTC');
       expect(result.results[0]).toMatchObject({ hash: HASH_A, statusApplied: true, ratingApplied: false, reviewApplied: false });
+    });
+
+    it('files a batched status change on the reader own calendar, resolved once for the batch', async () => {
+      await service.uploadBookStates(
+        makeUser({ timezone: 'America/Chicago' }),
+        statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-06-01' }]),
+      );
+
+      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read', 'America/Chicago');
     });
 
     it('treats an identical status as applied without writing', async () => {
@@ -259,7 +355,7 @@ describe('KoreaderPluginService', () => {
 
       await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'abandoned', statusModified: '2026-06-06' }]));
 
-      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'abandoned');
+      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'abandoned', 'UTC');
     });
 
     it('keeps the server status on a same-day tie or older device date', async () => {
@@ -482,6 +578,7 @@ describe('KoreaderPluginService', () => {
           { bookFile: { id: 11, bookId: 21, libraryId: 1 }, percentage: 0.1, progress: undefined, timestamp: undefined },
         ],
         { device: 'Kobo Libra 2', deviceId: DEVICE_ID },
+        'UTC',
       );
       expect(result.results).toEqual([
         { hash: HASH_A, accepted: true },
@@ -504,7 +601,23 @@ describe('KoreaderPluginService', () => {
         7,
         [{ bookFile: { id: 10, bookId: 20, libraryId: 1 }, percentage: 0.4, progress: undefined, timestamp: undefined }],
         expect.any(Object),
+        'UTC',
       );
+    });
+  });
+
+  describe('bulkProgress timezone', () => {
+    it('resolves the reader own timezone once for the whole sweep', async () => {
+      koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1, format: 'epub' }]]));
+      koreaderService.applyBulkProgress.mockResolvedValue({ shared: 1, stale: 0, held: 0 });
+
+      await service.bulkProgress(makeUser({ timezone: 'America/Chicago' }), {
+        ...deviceFields(),
+        items: [{ hash: HASH_A, percentage: 0.4 }],
+      } as BulkProgressDto);
+
+      expect(koreaderService.applyBulkProgress).toHaveBeenCalledTimes(1);
+      expect(koreaderService.applyBulkProgress.mock.calls[0]![3]).toBe('America/Chicago');
     });
   });
 

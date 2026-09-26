@@ -1,8 +1,14 @@
+import { isReadAlongFormatKey } from '@bookorbit/types'
+
 const DEFAULT_FORMAT_COLOR = '#6b7280'
 
-/** Every format BookOrbit imports, plus `txt`. Each one also has a `--pill-format-*` token. */
+/**
+ * Every format BookOrbit imports, plus `txt` and the read-along EPUB. Each one also has a
+ * `--pill-format-*` token. Keys are formats, or `epub:readalong` via `paletteKey`.
+ */
 const FORMAT_COLORS: Record<string, string> = {
   epub: '#16a34a',
+  readalong: '#0f766e',
   kepub: '#0d9488',
   mobi: '#6366f1',
   azw3: '#14b8a6',
@@ -23,13 +29,18 @@ const FORMAT_COLORS: Record<string, string> = {
   flac: '#10b981',
 }
 
+function paletteKey(formatOrKey: string): string {
+  return isReadAlongFormatKey(formatOrKey) ? 'readalong' : formatOrKey.toLowerCase()
+}
+
 /**
  * A fixed hex per format, for the places a CSS variable cannot reach: a chart draws to a canvas,
- * where `var(--x)` is not a colour. Everything rendered as DOM should use `formatColorVar`.
+ * where `var(--x)` is not a colour. It is also fine as a solid fill under white text. Everything
+ * that paints text in a format colour uses `formatColorVar`.
  */
 export function getFormatColor(format: string | null | undefined): string {
   if (!format) return DEFAULT_FORMAT_COLOR
-  return FORMAT_COLORS[format.toLowerCase()] ?? DEFAULT_FORMAT_COLOR
+  return FORMAT_COLORS[paletteKey(format)] ?? DEFAULT_FORMAT_COLOR
 }
 
 /**
@@ -41,6 +52,25 @@ export function getFormatColor(format: string | null | undefined): string {
  * label paints with. Alpha variants belong in `color-mix`, never composited onto the text itself.
  */
 export function formatColorVar(format: string | null | undefined): string {
-  const key = format?.toLowerCase()
+  const key = format ? paletteKey(format) : null
   return key && key in FORMAT_COLORS ? `var(--pill-format-${key})` : 'var(--pill-format-default)'
+}
+
+export type FormatChipVariant = 'soft' | 'solid'
+
+/**
+ * How every format chip is painted. `soft` carries the colour in its text over a faint tint;
+ * `solid` is only the fill, for a chip whose text is white (over a cover, in a dense table).
+ */
+export function formatChipStyle(format: string | null | undefined, variant: FormatChipVariant = 'soft'): Record<string, string> {
+  if (variant === 'solid') {
+    const fill = getFormatColor(format)
+    return { borderColor: fill, backgroundColor: fill }
+  }
+  const color = formatColorVar(format)
+  return {
+    color,
+    borderColor: `color-mix(in oklch, ${color} 40%, transparent)`,
+    backgroundColor: `color-mix(in oklch, ${color} 10%, transparent)`,
+  }
 }

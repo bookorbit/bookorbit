@@ -36,18 +36,18 @@ export class DownloadClientController {
     return this.reconciliation.reconcile(id);
   }
 
-  @Post(':id/reconciliation/:hash/adopt')
+  @Post(':id/reconciliation/:clientKey/adopt')
   @Auditable({
     action: AuditAction.DownloadClientUpdate,
     resource: AuditResource.DownloadClient,
     getResourceId: (req) => Number(req.params.id),
     description: (req) => `Adopted an owned download into client #${req.params.id}`,
   })
-  adopt(@Param('id', ParseIntPipe) id: number, @Param('hash') hash: string, @Body() dto: AdoptDownloadClientItemDto) {
-    return this.reconciliation.adopt(id, hash, dto.downloadId);
+  adopt(@Param('id', ParseIntPipe) id: number, @Param('clientKey') clientKey: string, @Body() dto: AdoptDownloadClientItemDto) {
+    return this.reconciliation.adopt(id, clientKey, dto.downloadId);
   }
 
-  @Delete(':id/reconciliation/:hash')
+  @Delete(':id/reconciliation/:clientKey')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Auditable({
     action: AuditAction.DownloadClientUpdate,
@@ -55,8 +55,8 @@ export class DownloadClientController {
     getResourceId: (req) => Number(req.params.id),
     description: (req) => `Removed an orphaned owned download from client #${req.params.id}`,
   })
-  removeOrphan(@Param('id', ParseIntPipe) id: number, @Param('hash') hash: string, @Body() dto: RemoveOrphanedDownloadClientItemDto) {
-    return this.reconciliation.removeOrphan(id, hash, dto.deleteFiles ?? false);
+  removeOrphan(@Param('id', ParseIntPipe) id: number, @Param('clientKey') clientKey: string, @Body() dto: RemoveOrphanedDownloadClientItemDto) {
+    return this.reconciliation.removeOrphan(id, clientKey, dto.deleteFiles ?? false);
   }
 
   @Post()

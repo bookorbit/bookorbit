@@ -6,9 +6,13 @@ import type {
   BookCommunityRating,
   CustomMetadataBookValue,
   ComicMetadataFields,
+  BookCoverSlot,
+  CoverMedium,
   NarratorRef,
   ProviderIds,
+  ReadAloudProgressSync,
   UserBookStatus,
+  EpubMediaOverlayCapability,
 } from '@bookorbit/types';
 
 export class BookFileDto {
@@ -20,6 +24,7 @@ export class BookFileDto {
   createdAt: Date;
   filename: string | null;
   durationSeconds: number | null;
+  mediaOverlay: EpubMediaOverlayCapability | null;
 }
 
 export class AudioMetadataDto {
@@ -56,6 +61,9 @@ export class BookDetailDto {
   personalNoteUpdatedAt: Date | null;
   communityRatings: BookCommunityRating[];
   coverSource: 'extracted' | 'custom' | null;
+  coverMedia: CoverMedium[];
+  covers: Record<CoverMedium, BookCoverSlot | null>;
+  coverVersion: string;
   hardcoverEditionId: string | null;
   mangabakaSeriesId: string | null;
   providerIds: ProviderIds;
@@ -67,6 +75,7 @@ export class BookDetailDto {
   metadataScore: number | null;
   readStatus: UserBookStatus | null;
   audioMetadata: AudioMetadataDto | null;
+  readAloudSync: ReadAloudProgressSync;
   formatPriority: string[];
   comicMetadata: ComicMetadataFields | null;
   customMetadata: CustomMetadataBookValue[];

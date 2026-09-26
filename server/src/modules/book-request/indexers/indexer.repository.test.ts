@@ -12,6 +12,17 @@ describe('IndexerRepository', () => {
     expect(queries[0].sql).toMatch(/^select "color" from "request_indexers"/);
   });
 
+  it('selects current colors for a bounded set of cached search sources', async () => {
+    const { db, queries } = createCapturingDb();
+    const repository = new IndexerRepository(db);
+
+    await repository.findColorsByIds([3, 8]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toMatch(/^select "id", "color" from "request_indexers" where "request_indexers"\."id" in \(\$1, \$2\)/);
+    expect(queries[0].params).toEqual([3, 8]);
+  });
+
   it('deletes every indexer with the requested adapter type in one query', async () => {
     const { db, queries } = createCapturingDb();
     const repository = new IndexerRepository(db);
@@ -54,6 +65,7 @@ describe('IndexerRepository', () => {
 
     expect(queries).toHaveLength(1);
     expect(queries[0].sql).toMatch(/update "request_indexers" set "last_search_at" = \$1, "last_search_ok" = case when/);
+    expect(queries[0].sql).toMatch(/"last_search_ok" = case when .* then \$\d+::boolean/);
     expect(queries[0].sql).toMatch(/"request_indexers"\."id" in \(\$\d+, \$\d+\)/);
     expect(queries[0].sql).toMatch(/"request_indexers"\."last_search_at" is null or "request_indexers"\."last_search_at" < \$\d+/);
     expect(queries[0].params).toContain('The tracker answered 429');

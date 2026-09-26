@@ -90,6 +90,7 @@ describe('UploadService', () => {
   const validator = {
     sanitizeFilename: vi.fn(),
     validateFormat: vi.fn(),
+    validateContent: vi.fn(),
   };
   const storage = {
     streamToTemp: vi.fn(),
@@ -101,11 +102,14 @@ describe('UploadService', () => {
     processNewBookImportAsync: vi.fn(),
     extractMetadataAsync: vi.fn(),
     extractAudioDurationAsync: vi.fn(),
+    extractAddedAudioChaptersAsync: vi.fn(),
+    reconcileCoversAsync: vi.fn(),
   };
 
   const user = { id: 7, isSuperuser: false, permissions: [] } as any;
 
   const moduleRef = { get: vi.fn().mockReturnValue(null) };
+  const pathPolicy = { assertWithinRoot: vi.fn() };
 
   let service: UploadService;
 
@@ -123,10 +127,13 @@ describe('UploadService', () => {
       storage as any,
       processor as any,
       moduleRef as any,
+      pathPolicy as any,
     );
 
     validator.sanitizeFilename.mockReturnValue('book.epub');
     validator.validateFormat.mockReturnValue('epub');
+    validator.validateContent.mockResolvedValue(undefined);
+    pathPolicy.assertWithinRoot.mockResolvedValue('/library/book.epub');
     storage.streamToTemp.mockResolvedValue({ tempPath: '/tmp/upload.bin', sizeBytes: 456 });
     storage.moveToPath.mockResolvedValue(undefined);
     storage.cleanup.mockResolvedValue(undefined);
@@ -896,7 +903,7 @@ describe('UploadService', () => {
 
     function mockElection(
       lockedBook: { primaryFileId: number | null; status: string; formatPriority: string[] },
-      files: Array<{ id: number; format: string | null; sizeBytes: number | null }>,
+      files: Array<{ id: number; format: string | null; sizeBytes: number | null; mediaOverlayAvailable?: boolean }>,
     ) {
       tx.select
         .mockReset()
@@ -1020,6 +1027,19 @@ describe('UploadService', () => {
       expect(result.role).toBe('content');
     });
 
+    it('promotes an uploaded read-aloud EPUB over an automatically selected plain EPUB', async () => {
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 99, status: 'present', formatPriority: ['epub'] }, [
+        { id: 55, format: 'epub', sizeBytes: 456, mediaOverlayAvailable: true },
+        { id: 99, format: 'epub', sizeBytes: 1000, mediaOverlayAvailable: false },
+      ]);
+
+      const result = await service.addFileToBook(10, 'book.epub', {} as any, user);
+
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 55 }));
+      expect(result.role).toBe('primary');
+    });
+
     it('repairs a stale primary reference using the highest-priority eligible file', async () => {
       mockUploadedFormat('m4b');
       db.select.mockReturnValueOnce(selectJoinChain([makeBookRow({ primaryFileId: 777 })])).mockReturnValueOnce(noHashConflict());
@@ -1071,6 +1091,21 @@ describe('UploadService', () => {
       await service.addFileToBook(10, 'chapter-02.mp3', {} as any, user);
 
       expect(processor.extractAudioDurationAsync).toHaveBeenCalledWith(10, '/library/Book Title/chapter-02.mp3', 'mp3');
+      expect(processor.reconcileCoversAsync).toHaveBeenCalledWith([10]);
+    });
+
+    it('schedules audio chapter extraction when an M4B is added to an EPUB-primary book', async () => {
+      mockUploadedFormat('m4b');
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 99, status: 'present', formatPriority: ['epub', 'm4b'] }, [
+        { id: 99, format: 'epub', sizeBytes: 1000 },
+        { id: 55, format: 'm4b', sizeBytes: 456 },
+      ]);
+
+      await service.addFileToBook(10, 'book.m4b', {} as any, user);
+
+      expect(processor.extractAudioDurationAsync).toHaveBeenCalledWith(10, expect.stringMatching(/book\.m4b$/), 'm4b');
+      expect(processor.extractAddedAudioChaptersAsync).toHaveBeenCalledWith(10, 'm4b');
     });
 
     it('delegates duration extraction to the processor regardless of format (processor gates on audio)', async () => {
@@ -1218,6 +1253,7 @@ describe('UploadService', () => {
       await expect(service.addFileToBook(10, 'book.epub', {} as any, user)).rejects.toThrow('primary update failed');
 
       expect(processor.extractAudioDurationAsync).not.toHaveBeenCalled();
+      expect(processor.extractAddedAudioChaptersAsync).not.toHaveBeenCalled();
       expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
       expect(storage.cleanup).not.toHaveBeenCalledWith('/library/Book Title/book.epub');
     });

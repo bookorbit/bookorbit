@@ -53,6 +53,8 @@ describe('ReadingLogSourceSplit', () => {
       props: {
         stats: makeStats([
           { bucket: 'bookorbit', totalSeconds: 3600, totalSessions: 4 },
+          { bucket: 'ios', totalSeconds: 60, totalSessions: 1 },
+          { bucket: 'watchos', totalSeconds: 60, totalSessions: 1 },
           { bucket: 'koreader', totalSeconds: 120, totalSessions: 1 },
           { bucket: 'kobo', totalSeconds: 30, totalSessions: 1 },
         ]),
@@ -62,10 +64,12 @@ describe('ReadingLogSourceSplit', () => {
     const text = wrapper.text()
     expect(text).toContain('Reading sources')
     expect(text).toContain('BookOrbit')
+    expect(text).toContain('iOS app')
+    expect(text).toContain('Apple Watch')
     expect(text).toContain('KOReader')
     expect(text).toContain('Kobo')
-    // total = 3750s -> 96% / 3% / 1%
-    expect(text).toContain('96%')
+    // total = 3870s, with visible independent native-client segments.
+    expect(text).toContain('93%')
     expect(text).toContain('3%')
     expect(text).toContain('1%')
     expect(text).toContain('1h 0m')

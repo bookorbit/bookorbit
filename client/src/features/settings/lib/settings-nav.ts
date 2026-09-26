@@ -1,6 +1,7 @@
 import type { Component } from 'vue'
 import {
   Activity,
+  AudioLines,
   Bell,
   BookMarked,
   BookOpen,
@@ -22,6 +23,7 @@ import {
   Mail,
   Palette,
   PanelBottom,
+  Podcast,
   Rss,
   ScrollText,
   Server,
@@ -31,6 +33,7 @@ import {
   SlidersHorizontal,
   Smartphone,
   Sparkles,
+  Speech,
   Star,
   Tablet,
   Tag,
@@ -40,7 +43,7 @@ import {
   Wrench,
   Zap,
 } from '@lucide/vue'
-import { Permission } from '@bookorbit/types'
+import { APP_FEATURES, Permission } from '@bookorbit/types'
 
 export interface SettingsNavContext {
   isSuperuser: boolean
@@ -205,8 +208,26 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
             icon: SlidersHorizontal,
             keywords: 'resume progress sync screen awake defaults',
           },
+          {
+            id: 'tts',
+            routeName: 'settings-tts',
+            labelKey: 'settings.common.nav.tts',
+            icon: AudioLines,
+            keywords: 'tts text to speech read aloud voice narration speed',
+          },
         ],
       },
+      ...(APP_FEATURES.podcasts
+        ? [
+            {
+              id: 'podcasts',
+              routeName: 'settings-podcasts',
+              labelKey: 'settings.common.nav.podcasts',
+              icon: Podcast,
+              keywords: 'podcast show episode feed download playback queue',
+            },
+          ]
+        : []),
       {
         id: 'notifications',
         routeName: 'settings-notifications',
@@ -476,6 +497,14 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         icon: DownloadCloud,
         keywords: 'request download client qbittorrent torrent magnet path mapping hardlink',
         isVisible: anyPermission(Permission.ManageAppSettings),
+      },
+      {
+        id: 'admin-tts',
+        routeName: 'settings-admin-tts',
+        labelKey: 'settings.admin.tabs.tts',
+        icon: Speech,
+        keywords: 'tts text to speech provider voice engine openai kokoro',
+        isVisible: anyPermission('manage_app_settings'),
       },
       {
         id: 'book-dock',

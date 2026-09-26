@@ -1,6 +1,7 @@
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 
 import { readBoundedText, ResponseTooLargeError } from '../../../../common/utils/bounded-response';
+import { safeFetch, type SafeFetchOptions } from '../../../../common/utils/safe-fetch';
 
 /** Every adapter talks to somebody else's daemon over the network, so none of them may hang. */
 const CLIENT_REQUEST_TIMEOUT_MS = 20_000;
@@ -36,11 +37,12 @@ export function endpointUrl(base: URL, path: string): URL {
  * `fetch` reports them as the same opaque `TypeError`. `label` is the client's own name so the
  * settings form says which daemon went quiet when several are configured.
  */
-export async function fetchClient(url: URL, init: RequestInit, label: string): Promise<Response> {
+export async function fetchClient(url: URL, init: RequestInit, label: string, safety?: SafeFetchOptions): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CLIENT_REQUEST_TIMEOUT_MS);
   try {
-    return await fetch(url, { ...init, signal: controller.signal, redirect: 'manual' });
+    const request = { ...init, signal: controller.signal, redirect: 'manual' as const };
+    return safety ? await safeFetch(url.href, request, safety) : await fetch(url, request);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new ServiceUnavailableException(`${label} did not answer in time`);

@@ -1,29 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { readdir, stat } from 'fs/promises';
+import { stat } from 'fs/promises';
 import { createReadStream } from 'fs';
-import { join } from 'path';
 import type { FastifyReply } from 'fastify';
-import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../../common/book-cover-storage';
 import { imageContentTypeFromPath } from '../../../common/image-content-type';
 import { KoboBookAccessService } from './kobo-book-access.service';
+import { BookCoverStore } from '../../book-cover-store/book-cover-store.service';
 
 @Injectable()
 export class KoboThumbnailService {
-  private readonly appDataPath: string;
-
   constructor(
-    private readonly config: ConfigService,
     private readonly bookAccessService: KoboBookAccessService,
-  ) {
-    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
-  }
+    private readonly coverStore: BookCoverStore,
+  ) {}
 
   async serveThumbnail(userId: number, bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
     await this.bookAccessService.assertBookAccessible(userId, bookId);
 
-    const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
+    const thumbnailPath = await this.coverStore.resolve(bookId, { medium: 'ebook', variant: 'thumbnail' });
     try {
+      if (!thumbnailPath) throw new NotFoundException('No thumbnail');
       const { mtimeMs } = await stat(thumbnailPath);
       const etag = `"${Math.floor(mtimeMs)}"`;
       if (ifNoneMatch === etag) {
@@ -40,12 +35,9 @@ export class KoboThumbnailService {
   }
 
   async serveCover(bookId: number, ifNoneMatch: string | undefined, reply: FastifyReply) {
-    const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
-      const files = await readdir(dir);
-      const cover = findPreferredBookCoverFileName(files);
-      if (!cover) throw new NotFoundException('No cover');
-      const coverPath = join(dir, cover);
+      const coverPath = await this.coverStore.resolve(bookId, { medium: 'ebook', variant: 'cover' });
+      if (!coverPath) throw new NotFoundException('No cover');
       const { mtimeMs } = await stat(coverPath);
       const etag = `"${Math.floor(mtimeMs)}"`;
       if (ifNoneMatch === etag) {

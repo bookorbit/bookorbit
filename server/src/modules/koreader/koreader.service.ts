@@ -7,6 +7,7 @@ import { StatsCache } from '../../common/cache/stats-cache';
 import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { isSemverNewer } from '../../common/utils/semver.utils';
 import { KoreaderRepository, type DeviceProgressUpsert } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
@@ -176,13 +177,12 @@ export class KoreaderService {
       throw new NotFoundException('Book not found for the given document hash');
     }
 
-    await this.applyProgressForResolvedFile(userId, bookFile, {
-      percentage: data.percentage,
-      progress: data.progress,
-      device,
-      deviceId,
-      timestamp: data.timestamp,
-    });
+    await this.applyProgressForResolvedFile(
+      userId,
+      bookFile,
+      { percentage: data.percentage, progress: data.progress, device, deviceId, timestamp: data.timestamp },
+      { timeZone: resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC') },
+    );
 
     this.logger.log(
       `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
@@ -195,7 +195,7 @@ export class KoreaderService {
     userId: number,
     bookFile: KoreaderProgressBookFile,
     data: { percentage: number; progress?: string; device: string; deviceId: string; timestamp?: number },
-    options?: { skipSharedProgress?: boolean },
+    options?: { skipSharedProgress?: boolean; timeZone?: string },
   ): Promise<KoreaderProgressApplyResult> {
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
@@ -226,7 +226,7 @@ export class KoreaderService {
 
     if (!(await this.resolveResetHold(userId, bookFile, data))) return result;
 
-    await this.applySharedProgress(userId, bookFile, data, result.previousPercentage);
+    await this.applySharedProgress(userId, bookFile, data, result.previousPercentage, options?.timeZone);
     result.shared = true;
     return result;
   }
@@ -288,6 +288,7 @@ export class KoreaderService {
     userId: number,
     entries: BulkProgressEntry[],
     device: { device: string; deviceId: string },
+    timeZone?: string,
   ): Promise<{ shared: number; stale: number; held: number }> {
     if (entries.length === 0) return { shared: 0, stale: 0, held: 0 };
 
@@ -394,6 +395,7 @@ export class KoreaderService {
           plan.entry.bookFile,
           { percentage: plan.entry.percentage, progress: plan.entry.progress, timestamp: plan.entry.timestamp },
           plan.previousPercentage,
+          timeZone,
         );
       }
     });
@@ -406,6 +408,7 @@ export class KoreaderService {
     bookFile: KoreaderProgressBookFile,
     data: { percentage: number; progress?: string; timestamp?: number },
     previousPercentage: number | null,
+    timeZone?: string,
   ) {
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
     // KOReader reports a paged document's position as a page number and a reflowable one's as
@@ -423,10 +426,18 @@ export class KoreaderService {
       pageNumber,
     });
     await this.bookService.syncKoboReadingStateForExternalProgress(userId, bookFile.id, bookorbitPercentage).catch(() => undefined);
+    await this.bookService
+      .syncAudioProgressForExternalEbookProgress(userId, bookFile.bookId, bookFile.id, bookorbitPercentage, {
+        cfi,
+        koreaderProgress: data.progress ?? null,
+        sourceUpdatedAt: data.timestamp ? new Date(data.timestamp * 1000) : undefined,
+      })
+      .catch(() => undefined);
     const strongRereadEvidence = previousPercentage !== null && previousPercentage - bookorbitPercentage >= 10;
     await this.bookService.autoUpdateReadStatusForProgress(userId, bookFile, bookorbitPercentage, {
       origin: 'koreader',
-      occurredOn: data.timestamp ? new Date(data.timestamp * 1000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      occurredAt: data.timestamp ? new Date(data.timestamp * 1000) : new Date(),
+      timeZone,
       strongRereadEvidence,
     });
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
@@ -715,8 +726,10 @@ export class KoreaderService {
   }
 
   async getBookProgress(userId: number, bookId: number): Promise<KoreaderBookSyncInfo | null> {
-    const bookFileId = await this.repo.findBookFileIdByBookId(bookId);
-    if (!bookFileId) return null;
+    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
+    const bookFile = await this.repo.findProgressBookFileByBookId(bookId, userId, accessibleLibraryIds);
+    if (!bookFile) return null;
+    const bookFileId = bookFile.id;
 
     const { deviceProgress, readingProgress } = await this.repo.getBookProgressForDashboard(bookFileId, userId);
     if (deviceProgress.length === 0 && !readingProgress) return null;
@@ -781,7 +794,7 @@ export class KoreaderService {
   async releaseResetHold(userId: number, bookId: number, deviceId: string): Promise<void> {
     const startedAt = Date.now();
     const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
-    const bookFile = await this.repo.findProgressBookFileByBookId(bookId, accessibleLibraryIds);
+    const bookFile = await this.repo.findProgressBookFileByBookId(bookId, userId, accessibleLibraryIds);
     if (!bookFile) throw new NotFoundException(`No synced file found for book ${bookId}`);
 
     const held = await this.repo.getDeviceProgressForDevice(bookFile.id, userId, deviceId);

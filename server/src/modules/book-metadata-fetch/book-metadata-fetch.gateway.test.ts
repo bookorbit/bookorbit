@@ -4,7 +4,7 @@ import { BOOK_METADATA_FETCH_STATUS_EVENT, BookMetadataFetchGateway } from './bo
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
-  const authService = { validateUser: vi.fn() };
+  const authService = { validateSessionUser: vi.fn() };
   const queueRepo = { getStatusSummary: vi.fn() };
   const configService = { isPaused: vi.fn() };
   const session = { getSnapshot: vi.fn() };
@@ -41,7 +41,7 @@ describe('BookMetadataFetchGateway', () => {
   it('rejects authenticated users lacking metadata-config permission', async () => {
     const { gateway, jwtService, authService } = makeGateway();
     jwtService.verify.mockReturnValue({ sub: 5, ver: 3 });
-    authService.validateUser.mockResolvedValue({ id: 5, isSuperuser: false, permissions: [] });
+    authService.validateSessionUser.mockResolvedValue({ id: 5, isSuperuser: false, permissions: [] });
     const client = {
       id: 'sock-2',
       handshake: { auth: { token: 'jwt' } },
@@ -59,7 +59,7 @@ describe('BookMetadataFetchGateway', () => {
   it('emits status snapshot for permitted users', async () => {
     const { gateway, jwtService, authService, queueRepo, configService, session } = makeGateway();
     jwtService.verify.mockReturnValue({ sub: 7, ver: 9 });
-    authService.validateUser.mockResolvedValue({
+    authService.validateSessionUser.mockResolvedValue({
       id: 7,
       isSuperuser: false,
       permissions: [Permission.ManageMetadataConfig],

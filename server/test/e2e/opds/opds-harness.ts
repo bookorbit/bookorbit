@@ -14,7 +14,8 @@ import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
 import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
 import { seedLibrary, waitForScanCompletion } from '../app-harness';
-import { createOpdsFixtureRoot, type OpdsFixtureRoot, writeFixtureFile } from './opds-fixture-builder';
+import { createSlotCoverArtifacts, type SlotCoverArtifactOptions } from '../slot-cover-artifacts';
+import { createOpdsFixtureRoot, type OpdsFixtureRoot } from './opds-fixture-builder';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -193,26 +194,8 @@ export async function locateBookByAbsolutePath(ctx: OpdsE2EContext, absolutePath
   return row;
 }
 
-export async function createBookCoverArtifacts(
-  ctx: OpdsE2EContext,
-  bookId: number,
-  options: {
-    coverExtension?: 'jpg' | 'png';
-    coverContent?: Buffer;
-    thumbnailContent?: Buffer;
-  } = {},
-): Promise<void> {
-  const coverExtension = options.coverExtension ?? 'jpg';
-  const coverContent = options.coverContent ?? Buffer.from(`cover-${bookId}`, 'utf8');
-  const thumbnailContent = options.thumbnailContent ?? Buffer.from(`thumbnail-${bookId}`, 'utf8');
-
-  await writeFixtureFile(ctx.fixture.booksPath, `covers/${bookId}/cover.${coverExtension}`, coverContent);
-  await writeFixtureFile(ctx.fixture.booksPath, `covers/${bookId}/thumbnail.jpg`, thumbnailContent);
-
-  await ctx.db
-    .insert(schema.bookMetadata)
-    .values({ bookId, coverSource: 'custom' })
-    .onConflictDoUpdate({ target: schema.bookMetadata.bookId, set: { coverSource: 'custom' } });
+export async function createBookCoverArtifacts(ctx: OpdsE2EContext, bookId: number, options: SlotCoverArtifactOptions = {}): Promise<void> {
+  await createSlotCoverArtifacts(ctx, bookId, options);
 }
 
 export async function createUserAndLogin(

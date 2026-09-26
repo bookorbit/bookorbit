@@ -12,6 +12,7 @@ const props = defineProps<{
   results: SearchResult[]
   isSearching: boolean
   initialQuery?: string
+  navigationLocked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -49,6 +50,11 @@ onUnmounted(() => {
 function onClear() {
   inputValue.value = ''
   emit('clear')
+}
+
+function handleNavigate(cfi: string) {
+  if (props.navigationLocked) return
+  emit('navigate', cfi)
 }
 </script>
 
@@ -109,8 +115,9 @@ function onClear() {
           <li
             v-for="(result, idx) in results"
             :key="idx"
-            class="px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
-            @click="emit('navigate', result.cfi)"
+            class="px-4 py-3 transition-colors"
+            :class="props.navigationLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-muted/50'"
+            @click="handleNavigate(result.cfi)"
           >
             <p class="text-sm leading-relaxed line-clamp-3 mb-1">
               <span class="text-muted-foreground">{{ result.excerpt.pre }}</span

@@ -164,6 +164,26 @@ assert(unscoped:getBook("legacy-cursor").annWatermark == "",
 replaced:setUnmatched("moved")
 assert(replaced:getBook("moved") == nil, "an unmatched response removes the complete matched record")
 
+-- Partial-MD5 collisions use one guarded cursor per KOReader statistics row.
+-- Rebinding a row to a different server file replays it, while another row
+-- sharing the same digest remains independent.
+local collision = newState({ libraryVersion = "lib-v1" })
+local first_row = collision:bindStatsRow(41, "shared", "First", "Author A", 11, 1)
+first_row.statsWatermark = 500
+local second_row = collision:bindStatsRow(42, "shared", "Second", "Author B", 22, 2)
+second_row.statsWatermark = 600
+assert(collision:getStatsRow(41, "shared", "First", "Author A").statsWatermark == 500,
+    "the first collision row keeps its own watermark")
+assert(collision:getStatsRow(42, "shared", "Second", "Author B").statsWatermark == 600,
+    "the second collision row keeps its own watermark")
+collision:bindStatsRow(41, "shared", "First", "Author A", 33, 3)
+assert(collision:getStatsRow(41, "shared", "First", "Author A").statsWatermark == 0,
+    "a changed explicit target replays that row")
+assert(collision:getStatsRow(42, "shared", "Second", "Author B").statsWatermark == 600,
+    "rebinding one collision row does not reset another")
+assert(collision:getStatsRow(42, "shared", "Second renamed", "Author B").bookFileId == nil,
+    "changed row metadata invalidates a potentially reused local row id")
+
 -- State written before the stamp existed must recheck once, not be trusted.
 local legacy = newState({ libraryVersion = "lib-v1" })
 legacy.books["legacy1"] = { bookId = 3, fileId = 4, file = "/books/legacy.epub" }

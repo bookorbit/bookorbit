@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter } from 'events';
+import type { ReadingSessionSource } from '@bookorbit/types';
 
 export const ACHIEVEMENT_EVENT_READING_SESSION_SAVED = 'reading-session.saved';
 export const ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED = 'book.status-changed';
@@ -21,6 +22,7 @@ export interface ReadingSessionSavedPayload {
   progressDelta: number | null;
   endProgress: number | null;
   timezone: string;
+  source: ReadingSessionSource;
 }
 
 export interface BookStatusChangedPayload {

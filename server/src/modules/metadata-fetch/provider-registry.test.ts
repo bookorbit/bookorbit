@@ -89,4 +89,31 @@ describe('ProviderRegistry', () => {
     expect(registry.find(MetadataProviderKey.GOOGLE)).toBe(google);
     expect(registry.find(MetadataProviderKey.AMAZON)).toBeUndefined();
   });
+
+  it('keeps comic specialists wherever there is an ebook, and audiobook specialists only with audio', () => {
+    const registry = new ProviderRegistry([
+      createProvider(MetadataProviderKey.GOOGLE),
+      createProvider(MetadataProviderKey.COMICVINE, 'ComicVine', ['comic']),
+      createProvider(MetadataProviderKey.AUDIBLE, 'Audible', ['audiobook']),
+    ]);
+    const keys = [MetadataProviderKey.GOOGLE, MetadataProviderKey.COMICVINE, MetadataProviderKey.AUDIBLE];
+
+    expect(registry.keysForMedia(keys, { hasEbook: true, hasAudio: false })).toEqual([MetadataProviderKey.GOOGLE, MetadataProviderKey.COMICVINE]);
+    expect(registry.keysForMedia(keys, { hasEbook: false, hasAudio: true })).toEqual([MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE]);
+    expect(registry.keysForMedia(keys, { hasEbook: true, hasAudio: true })).toEqual(keys);
+  });
+
+  it('knows which providers serve only audiobooks and which answer per medium', () => {
+    const itunes = { ...createProvider(MetadataProviderKey.ITUNES), editionFollowsMedium: true };
+    const registry = new ProviderRegistry([
+      createProvider(MetadataProviderKey.GOOGLE),
+      createProvider(MetadataProviderKey.AUDIBLE, 'Audible', ['audiobook']),
+      itunes,
+    ]);
+
+    expect(registry.servesOnlyAudiobooks(MetadataProviderKey.AUDIBLE)).toBe(true);
+    expect(registry.servesOnlyAudiobooks(MetadataProviderKey.GOOGLE)).toBe(false);
+    expect(registry.editionFollowsMedium(MetadataProviderKey.ITUNES)).toBe(true);
+    expect(registry.editionFollowsMedium(MetadataProviderKey.GOOGLE)).toBe(false);
+  });
 });

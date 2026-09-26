@@ -10,9 +10,9 @@ import { DownloadRemovalService } from './download-removal.service';
  * rows with it.
  *
  * `book_requests.user_id` cascades, and every attempt hangs off the request, so deleting somebody
- * removes the only record of which torrents and which staged files were theirs. The client goes on
- * seeding a torrent nothing points at, and a direct download this process is still writing goes on
- * writing. Detaching first is the only moment either is still findable.
+ * removes the only record of which client items and which staged files were theirs. An external
+ * client goes on handling a download nothing points at, and a direct download this process is still
+ * writing goes on writing. Detaching first is the only moment either is still findable.
  *
  * Its own service rather than a branch in `UserService`, because the user module must not learn
  * what a book request is: the dependency runs one way, from here to the event the user module

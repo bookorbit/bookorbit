@@ -2262,7 +2262,6 @@
       "searchPlaceholder": "検索設定",
       "clearSearch": "検索をクリア",
       "noResults": "{query} に一致する設定がありません。",
-      "shortcutHint": "Cmd K を押して任意の設定にジャンプします",
       "groups": {
         "you": "あなたです",
         "library": "ライブラリ",
@@ -6578,9 +6577,7 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "設定をスキャン",
       "title": "本を複製",
-      "description": "潜在的な重複レコードのファイルとメタデータをスキャンします。スキャン中に何も削除されません。",
       "scope": "ライブラリスコープ",
       "allLibraries": "すべてのアクセス可能なライブラリ",
       "similarity": "類似タイトルのしきい値",
@@ -6592,7 +6589,6 @@
         "queued": "スキャンがキューに追加されました",
         "running": "本をスキャン中"
       },
-      "groupsFound": "{count, plural, =0 {グループはありません} one {グループは} other {# 重複グループ}}",
       "filter": "一致するタイプ",
       "allReasons": "すべての一致タイプ",
       "reasons": {
@@ -6601,17 +6597,7 @@
         "exact_metadata": "正確なタイトルと著者",
         "fuzzy_metadata": "似たようなタイトルと著者"
       },
-      "similarityValue": "{percent}%のタイトルの類似度",
       "notDuplicates": "重複しません",
-      "keepThis": "この本を保存する",
-      "discardThis": "この本を破棄する",
-      "selectKeeperFirst": "最初に飼育員を選択してください",
-      "noDirectMatch": "キーパーと直接一致しません",
-      "moreFiles": "+{count} 以上",
-      "showDetails": "詳細を表示",
-      "hideDetails": "詳細を隠す",
-      "deleteSelected": "選択した {count} を削除",
-      "openBook": "{title} の詳細を開く",
       "unknownAuthor": "不明な作成者",
       "unknown": "不明",
       "none": "なし",
@@ -6621,14 +6607,8 @@
         "library": "ライブラリ",
         "isbn": "ISBN",
         "formats": "書式",
-        "fileLocation": "ファイル",
-        "files": "ファイル",
-        "readingStatus": "読み込み状態",
-        "progress": "進捗状況",
-        "path": "ライブラリのパス",
         "collections": "コレクション",
-        "added": "追加しました",
-        "updated": "更新日時"
+        "added": "追加しました"
       },
       "initial": {
         "title": "重複した本を探す",
@@ -6639,8 +6619,6 @@
         "description": "現在のスコープ、類似度レベル、一致フィルターに一致する書籍はありません。"
       },
       "deleteDialog": {
-        "title": "重複した本を完全に削除しますか？",
-        "description": "{count, plural, =0 {選択した本とそのファイルを # 個完全に削除します。} one {選択した本とそのファイルを # 個完全に削除します。} other {選択した本とそのファイルを完全に削除します。}}",
         "warning": "メタデータ、コレクション、読み取りデータ、およびデバイスの状態は保持されたブックに転送されません。他のユーザーのための関連付けられたデータも削除されます。",
         "confirm": "{count, plural, =0 {# 本を削除} one {#冊の本を削除} other {#冊の本を削除}}",
         "success": "{count, plural, =0 {ブックが削除されません} one {ブックが削除されました} other {#重複ブックが削除されました}}"

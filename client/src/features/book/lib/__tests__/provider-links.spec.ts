@@ -139,6 +139,23 @@ describe('book provider links', () => {
     expect(comicVineIssueUrl(' 1126983 ')).toBe('https://comicvine.gamespot.com/issue/4000-1126983/')
   })
 
+  it('uses the configured Amazon domain for Amazon links', () => {
+    const links = createBookProviderLinks({ amazon: 'B012345678' }, { amazonDomain: 'amazon.de' })
+
+    expect(links).toEqual([
+      expect.objectContaining({
+        key: MetadataProviderKey.AMAZON,
+        url: 'https://www.amazon.de/dp/B012345678',
+      }),
+    ])
+  })
+
+  it('falls back to Amazon US for an unsupported domain', () => {
+    const links = createBookProviderLinks({ amazon: 'B012345678' }, { amazonDomain: 'example.invalid/path' })
+
+    expect(links[0]?.url).toBe('https://www.amazon.com/dp/B012345678')
+  })
+
   it('builds a trimmed and encoded Libro.fm audiobook URL', () => {
     expect(libroFmAudiobookUrl(' 978 123 ')).toBe('https://libro.fm/audiobooks/978%20123')
   })

@@ -11,6 +11,7 @@ import { and, asc, count, eq, inArray, isNull, max, or, sql } from 'drizzle-orm'
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { activeCoverSlotSql, coverMediaSql } from '../book-cover-store/book-cover-store.repository';
 import * as schema from '../../db/schema';
 import {
   bookAuthors,
@@ -363,6 +364,10 @@ export class BookMetadataFetchQueueRepository {
         return sql`${bookMetadata.abridged} IS NULL`;
       case 'cover':
         return sql`${bookMetadata.coverSource} IS NULL`;
+      case 'audioCover': {
+        const { hasAudio } = coverMediaSql(bookMetadata.bookId);
+        return sql`(${hasAudio} AND NOT ${activeCoverSlotSql(bookMetadata.bookId, 'audio')})`;
+      }
       case 'title':
         return sql`(${bookMetadata.title} IS NULL OR ${bookMetadata.title} = '')`;
       case 'subtitle':

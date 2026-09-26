@@ -22,6 +22,7 @@ import BookDockFinalizeDialog from '@/features/book-dock/components/BookDockFina
 import BookDockBulkEditDialog from '@/features/book-dock/components/BookDockBulkEditDialog.vue'
 import BookDockSetDestinationDialog from '@/features/book-dock/components/BookDockSetDestinationDialog.vue'
 import BookDockDiscardDialog from '@/features/book-dock/components/BookDockDiscardDialog.vue'
+import PaginationNav from '@/components/PaginationNav.vue'
 
 type ApplyFetchedResult = {
   total: number
@@ -649,17 +650,7 @@ onUnmounted(() => {
           />
         </div>
 
-        <div v-if="pageCount > 1" class="flex items-center justify-center gap-1">
-          <button
-            v-for="p in pageCount"
-            :key="p"
-            class="size-8 rounded-lg text-xs font-medium transition-all active:scale-95"
-            :class="filters.page === p ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'"
-            @click="setPage(p)"
-          >
-            {{ p }}
-          </button>
-        </div>
+        <PaginationNav :page="filters.page" :total-pages="pageCount" @update:page="setPage" />
       </div>
     </main>
 

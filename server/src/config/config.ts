@@ -1,9 +1,15 @@
 import { registerAs } from '@nestjs/config';
 import { join, resolve } from 'path';
 
+import { DEV_CLIENT_ORIGIN } from './dev-client-origin';
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
-  appUrl: process.env.APP_URL ?? 'http://localhost:5173',
+  host: process.env.HOST?.trim() || '0.0.0.0',
+  appUrl: process.env.APP_URL ?? DEV_CLIENT_ORIGIN,
+  // Private-use scheme the iOS app registers with ASWebAuthenticationSession. Compiled into the
+  // client binary, so it is the same for every provider on every deployment; configurable only so
+  // a rebranded fork can change it.
+  nativeRedirectUri: process.env.NATIVE_REDIRECT_URI?.trim() || 'bookorbit://oauth2-callback',
   version: process.env.APP_VERSION ?? 'Local build',
   githubReleasesRepo: process.env.GITHUB_RELEASES_REPO?.trim() || 'bookorbit/bookorbit',
   githubReleasesToken: process.env.GITHUB_RELEASES_TOKEN?.trim() || undefined,
@@ -38,9 +44,20 @@ export const storageConfig = registerAs('storage', () => {
   };
 });
 
+export const coverSlotsConfig = registerAs('coverSlots', () => ({
+  backfillMode: process.env.COVER_SLOTS_BACKFILL_MODE?.trim().toLowerCase() || (process.env.NODE_ENV === 'test' ? 'skip' : 'background'),
+}));
+
 export const fileWriteConfig = registerAs('fileWrite', () => ({
   debounceMs: parsePositiveInteger(process.env.FILE_WRITE_DEBOUNCE_MS, 3_000),
   maxConcurrentWrites: parsePositiveInteger(process.env.FILE_WRITE_MAX_CONCURRENT_WRITES, 2),
+}));
+
+export const audiolessEpubConfig = registerAs('audiolessEpub', () => ({
+  maxConcurrentBuilds: parsePositiveInteger(process.env.AUDIOLESS_EPUB_MAX_CONCURRENT_BUILDS, 2),
+  maxSourceEntries: parsePositiveInteger(process.env.AUDIOLESS_EPUB_MAX_SOURCE_ENTRIES, 50_000),
+  maxMetadataBytes: parsePositiveInteger(process.env.AUDIOLESS_EPUB_MAX_METADATA_BYTES, 16 * 1024 * 1024),
+  maxOutputBytes: parsePositiveInteger(process.env.AUDIOLESS_EPUB_MAX_OUTPUT_BYTES, 2 * 1024 * 1024 * 1024),
 }));
 
 export const emailConfig = registerAs('email', () => ({
@@ -59,6 +76,15 @@ export const migrationConfig = registerAs('migration', () => ({
  */
 export const bookRequestConfig = registerAs('bookRequest', () => ({
   encryptionKey: process.env.BOOK_REQUEST_ENCRYPTION_KEY ?? '',
+}));
+
+export const podcastConfig = registerAs('podcast', () => ({
+  encryptionKey: process.env.PODCAST_ENCRYPTION_KEY?.trim() || process.env.JWT_SECRET || 'change-me-in-production',
+  maxFeedBytes: parsePositiveInteger(process.env.PODCAST_MAX_FEED_BYTES, 10 * 1024 * 1024),
+  maxEpisodeBytes: parsePositiveInteger(process.env.PODCAST_MAX_EPISODE_BYTES, 2 * 1024 * 1024 * 1024),
+  maxConcurrentDownloads: parsePositiveInteger(process.env.PODCAST_MAX_CONCURRENT_DOWNLOADS, 2),
+  requestTimeoutMs: parsePositiveInteger(process.env.PODCAST_REQUEST_TIMEOUT_MS, 30_000),
+  maxDownloadDurationMs: parsePositiveInteger(process.env.PODCAST_MAX_DOWNLOAD_DURATION_MS, 6 * 60 * 60_000),
 }));
 
 export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({

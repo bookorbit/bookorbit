@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { CronExpression } from '@nestjs/schedule';
 
+import { SystemCron } from '../../common/decorators/system-cron.decorator';
 import { NotificationService } from './notification.service';
 
 @Injectable()
 export class NotificationCleanupJob {
   constructor(private readonly notificationService: NotificationService) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @SystemCron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async runCleanup() {
     try {
       await this.notificationService.runRetentionCleanup();

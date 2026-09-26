@@ -8,6 +8,9 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 const apiAgent = new Agent({ keepAlive: true })
+/** Lets a second dev client point at a throwaway API instance, so restart testing leaves the main stack alone. */
+const apiTarget = process.env.BOOKORBIT_API_TARGET ?? 'http://localhost:6262'
+const offlineShellUrl = '__bookorbit_offline_shell'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -88,11 +91,40 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         globIgnores: ['**/assets/foliate/**'],
-        navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        // Keep the offline shell at a separate path. Workbox maps '/' and its query variants to
+        // precached index.html before the NetworkFirst route can contact the auth proxy.
+        manifestTransforms: [
+          (entries) => ({
+            manifest: entries.map((entry) => (entry.url === 'index.html' ? { ...entry, url: offlineShellUrl } : entry)),
+          }),
+        ],
+        navigateFallback: null,
         runtimeCaching: [
           {
-            urlPattern: /^.*\/api\/v1\/books\/\d+\/cover(\?.*)?$/,
+            // Page loads must hit the network first: an edge auth proxy (e.g. Cloudflare Access) needs to
+            // see every navigation to redirect an expired session to its login page. Serving the precached
+            // shell unconditionally (the old `navigateFallback` behavior) hid the request from the proxy
+            // entirely and left the app stuck logged out with no way back in short of clearing site data.
+            urlPattern: ({ request, url }) => request.mode === 'navigate' && !url.pathname.startsWith('/api/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-shell',
+              // No networkTimeoutSeconds: a slow proxy redirect must win over the cached page.
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7,
+              },
+              precacheFallback: {
+                fallbackURL: offlineShellUrl,
+              },
+              // Status 0 here would include an auth proxy's opaqueredirect and cache it as the page.
+              cacheableResponse: {
+                statuses: [200],
+              },
+            },
+          },
+          {
+            urlPattern: /^.*\/api\/v1\/books\/\d+\/cover\?(?:[^#]*&)?t=[^#]*$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'book-covers',
@@ -106,8 +138,36 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^.*\/api\/v1\/books\/\d+\/thumbnail(\?.*)?$/,
+            urlPattern: /^.*\/api\/v1\/books\/\d+\/thumbnail\?(?:[^#]*&)?t=[^#]*$/,
             handler: 'CacheFirst',
+            options: {
+              cacheName: 'book-thumbnails',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /^.*\/api\/v1\/books\/\d+\/cover(\?.*)?$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'book-covers',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /^.*\/api\/v1\/books\/\d+\/thumbnail(\?.*)?$/,
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'book-thumbnails',
               expiration: {
@@ -139,11 +199,13 @@ export default defineConfig({
     exclude: ['@embedpdf/core', '@embedpdf/core/vue'],
   },
   server: {
+    port: 6263,
+    strictPort: true,
     host: true,
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: apiTarget,
         agent: apiAgent,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
@@ -155,7 +217,7 @@ export default defineConfig({
         },
       },
       '/socket.io': {
-        target: 'http://localhost:3000',
+        target: apiTarget,
         ws: true,
         changeOrigin: true,
       },

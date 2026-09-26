@@ -14,6 +14,7 @@ import {
   Globe,
   Loader2,
   Magnet,
+  Newspaper,
   Pencil,
   Plus,
   RefreshCw,
@@ -23,10 +24,17 @@ import {
   Zap,
 } from '@lucide/vue'
 import { Permission, releaseInspectionBlocksGrab } from '@bookorbit/types'
-import type { IndexerSearchFailure, ReleaseCandidateItem, ReleaseFileInspection, ReleaseSearchCriteria } from '@bookorbit/types'
+import type {
+  DownloadDelivery,
+  IndexerSearchFailure,
+  ReleaseCandidateItem,
+  ReleaseFileInspection,
+  ReleaseProfileMismatchFailure,
+  ReleaseSearchCriteria,
+} from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { formatColorVar } from '@/features/book/lib/format-colors'
-import { formatDate, formatLanguageName } from '@/i18n/formatters'
+import { formatDate, formatLanguageName, formatList } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import GrabReleaseDialog from './GrabReleaseDialog.vue'
 import ReleaseFileInspectionPanel from './ReleaseFileInspectionPanel.vue'
@@ -77,6 +85,7 @@ const {
 } = useReleasePicker(canManage)
 const { request, loading: requestLoading, error: requestError, fetchRequest, setRequest } = useBookRequestDetail()
 const { clients, fetchClients } = useDownloadClientSummaries(canManage)
+const torrentClients = computed(() => clients.value.filter((client) => client.delivery === 'torrent'))
 const actions = useBookRequestActions(canManage)
 
 /** Near-universal for spoken audio, so stating it on every row would be noise, not information. */
@@ -132,7 +141,7 @@ const { manualOpen, grabbing, openManual, closeManual, forgetRefusals, handleGra
   setRequest,
   inspectRelease,
   setFilesExpanded,
-  seedsBack,
+  deliveryFor,
 })
 
 /**
@@ -153,6 +162,18 @@ const localOnlyCriteriaFacts = computed(() => (criteria.value ? localOnlyFacts(c
  */
 const canFixSources = computed(() => hasPermission(Permission.ManageAppSettings))
 /**
+ * The requested ISBN is not necessarily what a source ultimately searched. When every source
+ * used the same fallback, headline that real query instead of claiming the ISBN produced rows.
+ */
+const searchHeadline = computed<{ isbn: boolean; value: string }>(() => {
+  const queries = indexers.value.flatMap((indexer) => (indexer.query ? [indexer.query] : []))
+  const first = queries[0]
+  if (first && queries.length === indexers.value.length && queries.every((query) => query.kind === first.kind && query.value === first.value)) {
+    return { isbn: first.kind === 'isbn', value: first.value }
+  }
+  return { isbn: Boolean(criteria.value?.activeIsbn), value: activeKeyText.value }
+})
+/**
  * One line per searched source, saying what it was asked and what it gave back. The query alone
  * was the old panel: it repeated the ISBN already stated above it, and stayed silent about the
  * count, the rows the hard filters dropped, and the session that had expired.
@@ -163,9 +184,7 @@ const sourceRows = computed<SourceRow[]>(() =>
     name: indexer.indexerName,
     query: indexer.query?.value ?? null,
     echoesKey: indexer.query
-      ? indexer.query.kind === 'isbn'
-        ? indexer.query.value === criteria.value?.activeIsbn
-        : !criteria.value?.activeIsbn
+      ? indexer.query.value === searchHeadline.value.value && (indexer.query.kind === 'isbn') === searchHeadline.value.isbn
       : false,
     isbnQuery: indexer.query?.kind === 'isbn',
     ok: indexer.ok,
@@ -209,6 +228,11 @@ const noSourcesHint = computed(() => {
 const nothingMatchedProfile = computed(
   () => profileActive.value && releases.value.length > 0 && releases.value.every((release) => release.tier === null),
 )
+const profileSettingsLink = computed(() => ({
+  name: 'settings-admin-requests',
+  query: { tab: 'automation' },
+  hash: `#release-profile-${criteria.value?.mediaKind ?? 'ebook'}`,
+}))
 /**
  * A search that ran and found nothing is stated by the panel itself, which is also where the next
  * key to try lives. Repeating it below the list only put the explanation further from the fix.
@@ -299,6 +323,7 @@ const summaryFacts = computed(() => {
  * source omitting a count, but a plain HTTP library that has no swarm to count.
  */
 const swarmByIndexer = computed(() => new Map(indexers.value.map((indexer) => [indexer.indexerId, indexer.seedsBack])))
+const deliveryByIndexer = computed(() => new Map(indexers.value.map((indexer) => [indexer.indexerId, indexer.delivery])))
 
 const { facetGroups } = useReleaseFacetGroups(filters, colorByIndexer, allFreeleech)
 
@@ -425,6 +450,21 @@ function seedsBack(release: ReleaseCandidateItem): boolean {
   return swarmByIndexer.value.get(release.indexerId) ?? release.seeders !== null
 }
 
+function deliveryFor(release: ReleaseCandidateItem): DownloadDelivery {
+  return deliveryByIndexer.value.get(release.indexerId) ?? (seedsBack(release) ? 'torrent' : 'file')
+}
+
+function protocolText(release: ReleaseCandidateItem): string {
+  return t(`bookRequests.releases.protocol.${deliveryFor(release) === 'file' ? 'directPill' : deliveryFor(release)}`)
+}
+
+function fileToggleText(release: ReleaseCandidateItem): string {
+  if (deliveryFor(release) === 'usenet') {
+    return t(filesAreExpanded(release) ? 'bookRequests.releases.hideDetails' : 'bookRequests.releases.viewDetails')
+  }
+  return t(filesAreExpanded(release) ? 'bookRequests.releases.hideFiles' : 'bookRequests.releases.viewFiles')
+}
+
 function indexerChipClass(release: ReleaseCandidateItem): string {
   return sourceChipClass(colorByIndexer.value.get(release.indexerId))
 }
@@ -489,6 +529,54 @@ function reasonText(reason: ReleaseCandidateItem['reasons'][number]): string {
 
 function reasonPoints(points: number): string {
   return points > 0 ? `+${points}` : String(points)
+}
+
+function profileFailureText(release: ReleaseCandidateItem, failure: ReleaseProfileMismatchFailure): string {
+  const key = `bookRequests.releases.profileMismatch.failures.${failure.code}`
+  switch (failure.code) {
+    case 'formatUnknown':
+      return t(key, { source: release.indexerName, expected: formatList(failure.expected.map((format) => format.toUpperCase())) })
+    case 'format':
+      return t(key, {
+        actual: formatList(failure.actual.map((format) => format.toUpperCase())),
+        expected: formatList(failure.expected.map((format) => format.toUpperCase())),
+      })
+    case 'fileLayoutUnknown':
+      return t(key, { source: release.indexerName, expected: t(`bookRequests.releases.fileLayout.${failure.expected}`) })
+    case 'fileLayout':
+      return t(key, {
+        actual: t(`bookRequests.releases.fileLayout.${failure.actual}`),
+        expected: t(`bookRequests.releases.fileLayout.${failure.expected}`),
+      })
+    case 'channels':
+      return t(key, {
+        actual: t(`bookRequests.releases.channels.${failure.actual === 1 ? 'mono' : 'stereo'}`),
+        expected: t(`bookRequests.releases.channels.${failure.expected === 1 ? 'mono' : 'stereo'}`),
+      })
+    case 'bitrate':
+    case 'seeders':
+      return t(key, { actual: failure.actual, expected: failure.expected })
+    case 'languageUnknown':
+      return t(key, { source: release.indexerName, expected: formatList(failure.expected.map(formatLanguageName)) })
+    case 'language':
+      return t(key, { actual: formatLanguageName(failure.actual), expected: formatList(failure.expected.map(formatLanguageName)) })
+    case 'sizeUnknown':
+      return t(key, { source: release.indexerName, expected: formatBytes(failure.expected) })
+    case 'size':
+      return t(key, { actual: formatBytes(failure.actual), expected: formatBytes(failure.expected) })
+    case 'source':
+    case 'freeleech':
+    case 'vipOnly':
+      return t(key)
+  }
+}
+
+function profileMismatchText(release: ReleaseCandidateItem): string | null {
+  if (!release.profileMismatch) return null
+  return t('bookRequests.releases.profileMismatch.row', {
+    tier: release.profileMismatch.tierName,
+    reasons: release.profileMismatch.failures.map((failure) => profileFailureText(release, failure)).join(' '),
+  })
 }
 
 /**
@@ -589,7 +677,7 @@ function showEverySource(): void {
           <RefreshCw :size="14" aria-hidden="true" />
           {{ t('bookRequests.releases.refresh') }}
         </Button>
-        <Button variant="ghost" size="sm" @click="openManual">{{ t('bookRequests.releases.manual') }}</Button>
+        <Button variant="ghost" size="sm" @click="openManual">{{ t('bookRequests.releases.manualTorrent') }}</Button>
       </template>
     </RequestDrawerToolbar>
 
@@ -647,16 +735,16 @@ function showEverySource(): void {
               class="min-w-0 text-sm font-medium text-foreground"
             >
               <template #key>
-                <span :class="criteria.activeIsbn && 'font-mono tabular-nums'">{{ activeKeyText }}</span>
+                <span :class="searchHeadline.isbn && 'font-mono tabular-nums'">{{ searchHeadline.value }}</span>
               </template>
             </i18n-t>
             <p v-else class="flex min-w-0 items-center gap-2 text-sm">
               <Search :size="14" class="shrink-0 text-muted-foreground" aria-hidden="true" />
               <span class="shrink-0 text-muted-foreground">
-                {{ t(criteria.activeIsbn ? 'bookRequests.releases.criteria.searched' : 'bookRequests.releases.criteria.searchedTitleAuthor') }}
+                {{ t(searchHeadline.isbn ? 'bookRequests.releases.criteria.searched' : 'bookRequests.releases.criteria.searchedTitleAuthor') }}
               </span>
-              <span class="truncate text-foreground" :class="criteria.activeIsbn && 'font-mono tabular-nums'" :title="activeKeyText">
-                {{ activeKeyText }}
+              <span class="truncate text-foreground" :class="searchHeadline.isbn && 'font-mono tabular-nums'" :title="searchHeadline.value">
+                {{ searchHeadline.value }}
               </span>
             </p>
 
@@ -968,7 +1056,7 @@ function showEverySource(): void {
                 <ArrowUpRight :size="14" aria-hidden="true" />
               </RouterLink>
             </Button>
-            <Button variant="ghost" size="sm" @click="openManual">{{ t('bookRequests.releases.manual') }}</Button>
+            <Button variant="ghost" size="sm" @click="openManual">{{ t('bookRequests.releases.manualTorrent') }}</Button>
           </RequestEmptyState>
 
           <!--
@@ -986,7 +1074,7 @@ function showEverySource(): void {
               <RefreshCw :size="14" aria-hidden="true" />
               {{ t('bookRequests.releases.refresh') }}
             </Button>
-            <Button variant="ghost" size="sm" @click="openManual">{{ t('bookRequests.releases.manual') }}</Button>
+            <Button variant="ghost" size="sm" @click="openManual">{{ t('bookRequests.releases.manualTorrent') }}</Button>
           </RequestEmptyState>
 
           <template v-else-if="releases.length > 0">
@@ -1009,14 +1097,31 @@ function showEverySource(): void {
               </template>
             </p>
 
-            <p
+            <div
               v-if="nothingMatchedProfile"
               role="status"
               class="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-foreground"
             >
               <TriangleAlert :size="14" class="mt-px shrink-0 text-warning" aria-hidden="true" />
-              <span class="settings-prose">{{ t('bookRequests.releases.noneMatchedProfile') }}</span>
-            </p>
+              <div class="min-w-0 flex-1">
+                <p>
+                  {{
+                    t('bookRequests.releases.profileMismatch.summary', {
+                      count: releases.length,
+                      medium: t(`bookRequests.mediaKind.${criteria?.mediaKind ?? 'ebook'}`),
+                    })
+                  }}
+                </p>
+                <RouterLink
+                  v-if="canFixSources"
+                  :to="profileSettingsLink"
+                  class="mt-1.5 inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-2 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  {{ t('bookRequests.releases.profileMismatch.review', { medium: t(`bookRequests.mediaKind.${criteria?.mediaKind ?? 'ebook'}`) }) }}
+                  <ArrowUpRight :size="12" aria-hidden="true" />
+                </RouterLink>
+              </div>
+            </div>
 
             <!--
               Sort is one choice among a few, so it reads as a segmented control; the facets are
@@ -1133,11 +1238,12 @@ function showEverySource(): void {
                       <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                         <span
                           class="inline-flex items-center gap-1 rounded-full border px-1.5 py-px font-medium"
-                          :class="protocolChipClass(seedsBack(release))"
+                          :class="protocolChipClass(deliveryFor(release))"
                         >
-                          <Magnet v-if="seedsBack(release)" :size="11" aria-hidden="true" />
+                          <Magnet v-if="deliveryFor(release) === 'torrent'" :size="11" aria-hidden="true" />
+                          <Newspaper v-else-if="deliveryFor(release) === 'usenet'" :size="11" aria-hidden="true" />
                           <Globe v-else :size="11" aria-hidden="true" />
-                          {{ seedsBack(release) ? t('bookRequests.releases.protocol.torrent') : t('bookRequests.releases.protocol.directPill') }}
+                          {{ protocolText(release) }}
                         </span>
                         <!--
                           Neutral until an operator says otherwise. There is no closed set of
@@ -1218,6 +1324,11 @@ function showEverySource(): void {
                         {{ audioParts(release).join(' · ') }}
                       </p>
 
+                      <p v-if="profileMismatchText(release)" class="mt-1 flex items-start gap-1.5 text-xs text-warning">
+                        <TriangleAlert :size="12" class="mt-px shrink-0" aria-hidden="true" />
+                        <span>{{ profileMismatchText(release) }}</span>
+                      </p>
+
                       <span
                         v-for="penalty in penalties(release)"
                         :key="penalty.code"
@@ -1243,7 +1354,7 @@ function showEverySource(): void {
                     <Button variant="ghost" size="sm" :aria-expanded="filesAreExpanded(release)" @click="toggleFiles(release)">
                       <EyeOff v-if="filesAreExpanded(release)" :size="14" aria-hidden="true" />
                       <Eye v-else :size="14" aria-hidden="true" />
-                      {{ filesAreExpanded(release) ? t('bookRequests.releases.hideFiles') : t('bookRequests.releases.viewFiles') }}
+                      {{ fileToggleText(release) }}
                     </Button>
                     <Button
                       :variant="isBest(index) ? 'default' : 'outline'"
@@ -1267,6 +1378,7 @@ function showEverySource(): void {
                 <ReleaseFileInspectionPanel
                   v-if="filesAreExpanded(release)"
                   :inspection="inspectionFor(release)"
+                  :delivery="deliveryFor(release)"
                   :loading="isInspecting(release)"
                   :failed="inspectionHasFailed(release)"
                   :failure-reason="inspectionFailureReason(release)"
@@ -1277,7 +1389,13 @@ function showEverySource(): void {
           </template>
         </template>
 
-        <GrabReleaseDialog :request="manualOpen ? request : null" :clients="clients" :busy="busy" @close="closeManual" @grab="handleManualGrab" />
+        <GrabReleaseDialog
+          :request="manualOpen ? request : null"
+          :clients="torrentClients"
+          :busy="busy"
+          @close="closeManual"
+          @grab="handleManualGrab"
+        />
       </template>
     </div>
   </div>

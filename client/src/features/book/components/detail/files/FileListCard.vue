@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { ChevronDown, MoreVertical } from '@lucide/vue'
 import { formatBytes } from '@/lib/formatting'
 import { formatPercent } from '@/i18n/formatters'
+import { formatKeyName } from '@/features/book/lib/book-formats'
 import { splitExtension } from '@/features/book/lib/filename-stem'
 import type { FileGroup, TreeFile } from '@/features/book/composables/useBookFileTree'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -95,7 +96,7 @@ function durationLabel(seconds: number | null): string | null {
 
 /** The stacked phone row states format, size and length once, where the columns cannot fit. */
 function stackedMeta(file: TreeFile): string {
-  const parts = [file.formatKey.toUpperCase() || '?', formatBytes(file.sizeBytes)]
+  const parts = [file.editionKey ? formatKeyName(file.editionKey) : file.formatKey.toUpperCase() || '?', formatBytes(file.sizeBytes)]
   const duration = durationLabel(file.durationSeconds)
   if (duration) parts.push(duration)
   return parts.join(' · ')
@@ -216,7 +217,7 @@ function handleCopyPath(file: TreeFile) {
               :aria-current="file.id === selectedId ? 'true' : undefined"
               @click="handleSelect(file)"
             />
-            <FileFormatGlyph :format="file.formatKey" size="sm" class="pointer-events-none relative" />
+            <FileFormatGlyph :format="file.editionKey ?? file.formatKey" size="sm" class="pointer-events-none relative" />
             <span class="pointer-events-none relative min-w-0 flex-1">
               <span class="row-name flex items-baseline text-[13.5px] leading-tight" :title="file.leaf">
                 <span class="row-base min-w-0 truncate">{{ splitExtension(file.display).base }}</span>

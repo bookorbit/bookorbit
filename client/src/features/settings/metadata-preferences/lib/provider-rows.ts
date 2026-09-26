@@ -1,4 +1,5 @@
 import type { ProviderConfigurations } from '@bookorbit/types'
+export { AMAZON_DOMAINS } from '@/lib/amazon-domain'
 
 /**
  * The medium a source supplies metadata for. Sources are picked by medium ("I want
@@ -12,7 +13,7 @@ export interface ProviderFieldDef {
   key: string
   label: string
   type: 'text' | 'password' | 'select'
-  options?: string[]
+  options?: readonly string[]
   placeholder?: string
   helper?: string
   /** Editable while the provider is still off, because enabling it depends on this value. */
@@ -38,28 +39,6 @@ export interface ProviderRowDef {
 
 /** A provider slice of the draft, addressed by field key rather than by concrete shape. */
 export type ProviderDraftEntry = { enabled: boolean } & Record<string, unknown>
-
-export const AMAZON_DOMAINS = [
-  'amazon.com',
-  'amazon.co.uk',
-  'amazon.de',
-  'amazon.fr',
-  'amazon.it',
-  'amazon.es',
-  'amazon.ca',
-  'amazon.com.au',
-  'amazon.co.jp',
-  'amazon.in',
-  'amazon.com.br',
-  'amazon.com.mx',
-  'amazon.nl',
-  'amazon.se',
-  'amazon.pl',
-  'amazon.sg',
-  'amazon.ae',
-  'amazon.sa',
-  'amazon.tr',
-]
 
 export const AUDIBLE_DOMAINS = [
   'audible.com',

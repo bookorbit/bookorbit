@@ -1,3 +1,5 @@
+import type { CoverMedium } from "./book";
+
 export const MISSING_RESOURCE_CATEGORIES = ["missing_books", "broken_covers", "orphaned_cover_dirs"] as const;
 export type MissingResourceCategory = (typeof MISSING_RESOURCE_CATEGORIES)[number];
 
@@ -35,6 +37,11 @@ export type MissingBookEntry = {
   updatedAt: string | null;
 };
 
+export type BrokenCoverSlot = {
+  medium: CoverMedium;
+  source: "extracted" | "custom";
+};
+
 export type BrokenCoverEntry = {
   id: number;
   title: string | null;
@@ -42,12 +49,16 @@ export type BrokenCoverEntry = {
   libraryId: number;
   libraryName: string;
   coverSource: "extracted" | "custom";
+  /** The slots whose image is gone. Empty for a cover the upgrade has not moved into a slot yet. */
+  slots: BrokenCoverSlot[];
 };
 
 export type OrphanedCoverDirEntry = {
   bookId: number;
   fileCount: number;
   sizeBytes: number;
+  /** The slot folders it holds. Empty for a folder from before covers had slots. */
+  media: CoverMedium[];
 };
 
 export type MissingResourcePage<TEntry> = {

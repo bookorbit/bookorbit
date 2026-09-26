@@ -42,6 +42,7 @@ local snapshot = {
     progress = "/4/2",
     annotations = { { datetime = "2026-01-01", pos0 = "/1" } },
     stats_ids = { 17, 23 },
+    stats_identity_repaired = true,
 }
 
 local first = assert(outbox:enqueue(snapshot, { reason = "close", annotation_sync = true }))
@@ -50,10 +51,28 @@ assertEqual(first.snapshot.annotations[1].pos0, "/1", "captured annotations are 
 assertEqual(first.snapshot.stats_ids[2], 23, "stable statistics ids are stored")
 
 now = 1001
-local replacement = assert(outbox:enqueue(snapshot, { reason = "suspend", annotation_sync = true }))
+local replacement_snapshot = {}
+for key, value in pairs(snapshot) do replacement_snapshot[key] = value end
+replacement_snapshot.stats_ids = { 23, 29 }
+local replacement = assert(outbox:enqueue(replacement_snapshot, { reason = "suspend", annotation_sync = true }))
 assertEqual(replacement.id, first.id, "unstarted snapshot is deduplicated by digest")
 assertEqual(replacement.generation, first.generation + 1, "dedupe publishes a new generation")
 assertEqual(outbox:status().count, 1, "dedupe keeps one logical entry")
+assertEqual(#replacement.snapshot.stats_ids, 3, "unacknowledged statistics rows survive snapshot replacement")
+assertEqual(replacement.snapshot.stats_ids[1], 17, "the oldest pending statistics row is retained")
+assertEqual(replacement.snapshot.stats_ids[2], 23, "duplicate statistics rows are deduplicated")
+assertEqual(replacement.snapshot.stats_ids[3], 29, "the newest statistics row is appended")
+assertEqual(replacement.snapshot.stats_identity_repaired, true,
+    "a pending identity-repair replay survives snapshot replacement")
+
+local collision_snapshot = {}
+for key, value in pairs(snapshot) do collision_snapshot[key] = value end
+collision_snapshot.file = "/books/collision.epub"
+collision_snapshot.stats_ids = { 41 }
+local collision = assert(outbox:enqueue(collision_snapshot, { reason = "close", annotation_sync = true }))
+assert(collision.id ~= replacement.id, "colliding files keep independent outbox entries")
+assertEqual(outbox:status().count, 2, "a shared digest cannot coalesce distinct files")
+outbox:removeEntry(collision.id)
 
 fixture.fail_write = true
 local failed, failure = outbox:enqueue(snapshot, { reason = "close" })

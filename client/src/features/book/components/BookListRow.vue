@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@bookorbit/types'
-import { getBookMediaProfile } from '@bookorbit/types'
+import { getBookMediaProfile, getPrimaryBookFile } from '@bookorbit/types'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { api } from '@/lib/api'
@@ -14,6 +14,7 @@ import {
   Eye,
   ExternalLink,
   FolderPlus,
+  Headphones,
   LibraryBig,
   Loader2,
   FolderInput,
@@ -36,6 +37,8 @@ import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { displayPublishedDate } from '../lib/published-date'
+import { bookFormatEntries, formatKeyCode, type BookFormatEntry } from '@/features/book/lib/book-formats'
+import { formatChipStyle } from '@/features/book/lib/format-colors'
 
 const COLLAPSED_SERIES_COVER_LIMIT = 3
 
@@ -92,24 +95,11 @@ const seriesLine = computed(() => {
 })
 
 const isMissing = computed(() => props.book.status === 'missing')
-const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+const primaryFile = computed(() => getPrimaryBookFile(props.book.files))
 const mediaProfile = computed(() => getBookMediaProfile(props.book.files))
 const isAudiobook = computed(() => mediaProfile.value.primaryMediaKind === 'audiobook')
 const isComic = computed(() => mediaProfile.value.primaryMediaKind === 'comic')
-const secondaryFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
-
-const uniqueSecondaryFiles = computed(() => {
-  const seenFormats = new Set<string>()
-  if (primaryFile.value?.format) seenFormats.add(primaryFile.value.format)
-
-  return secondaryFiles.value.filter((f) => {
-    const format = f.format
-    if (!format) return true
-    if (seenFormats.has(format)) return false
-    seenFormats.add(format)
-    return true
-  })
-})
+const formatEntries = computed(() => bookFormatEntries(props.book.files))
 
 const metaLine = computed(() => {
   const parts: string[] = []
@@ -144,7 +134,7 @@ async function setRating(star: number) {
 }
 
 const { coverUrl } = useCoverVersions()
-const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.updatedAt ?? props.book.addedAt))
+const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.coverVersion))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
@@ -156,6 +146,21 @@ function openFile(file: BookFileRef, mode?: 'peek') {
     params: { bookId: props.book.id, fileId: file.id },
     query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
   })
+}
+
+function formatButtonClasses(entry: BookFormatEntry): string {
+  if (entry.readAlong) return 'text-white hover:opacity-90 transition-opacity'
+  return entry.primary
+    ? 'bg-primary/15 text-primary hover:bg-primary/25 transition-colors'
+    : 'bg-muted text-foreground hover:bg-muted/70 transition-colors'
+}
+
+function formatButtonStyle(entry: BookFormatEntry): Record<string, string> | undefined {
+  return entry.readAlong ? formatChipStyle(entry.key, 'solid') : undefined
+}
+
+function formatButtonTooltip(entry: BookFormatEntry): string {
+  return entry.readAlong ? t('book.actions.openReadAlong') : t('book.actions.openAs', { format: formatKeyCode(entry.key) })
 }
 
 function peekPrimaryFile() {
@@ -178,7 +183,7 @@ function openSeriesDetails() {
 }
 
 function collapsedCoverVersion(bookId: number): string | null | undefined {
-  if (bookId === props.book.id) return props.book.updatedAt ?? props.book.addedAt
+  if (bookId === props.book.id) return props.book.coverVersion
   return collapsedSeries.value?.coverUpdatedAtByBookId?.[bookId]
 }
 
@@ -373,28 +378,23 @@ function handleRowClick(event: MouseEvent) {
           <TriangleAlert class="size-3 shrink-0" />
           <span class="hidden sm:inline">{{ t('book.card.missing') }}</span>
         </span>
-        <Tooltip v-if="primaryFile && !isMissing">
-          <TooltipTrigger as-child>
-            <button
-              class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
-              @click="openFile(primaryFile)"
-            >
-              {{ primaryFile.format ?? '?' }}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('book.actions.openAs', { format: primaryFile.format?.toUpperCase() ?? t('book.unknownFormat') }) }}</TooltipContent>
-        </Tooltip>
-        <Tooltip v-for="file in uniqueSecondaryFiles" :key="file.id">
-          <TooltipTrigger as-child>
-            <button
-              class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
-              @click="openFile(file)"
-            >
-              {{ file.format ?? '?' }}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('book.actions.openAs', { format: file.format?.toUpperCase() ?? t('book.unknownFormat') }) }}</TooltipContent>
-        </Tooltip>
+        <template v-if="!isMissing">
+          <Tooltip v-for="entry in formatEntries" :key="entry.key">
+            <TooltipTrigger as-child>
+              <button
+                class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                :class="formatButtonClasses(entry)"
+                :style="formatButtonStyle(entry)"
+                :aria-label="formatButtonTooltip(entry)"
+                @click="openFile(entry.files[0]!)"
+              >
+                <span aria-hidden="true">{{ formatKeyCode(entry.key) }}</span>
+                <Headphones v-if="entry.readAlong" class="size-2.5 shrink-0" :stroke-width="2.5" aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ formatButtonTooltip(entry) }}</TooltipContent>
+          </Tooltip>
+        </template>
       </div>
 
       <DropdownMenu>

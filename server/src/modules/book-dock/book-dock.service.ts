@@ -39,7 +39,7 @@ export class BookDockService {
     const { items, total } = await this.repo.findAll(query);
     // One query for the whole page rather than one per unit row, which at a page of 100 units
     // would be 100 round trips for a list nobody has even expanded yet.
-    const unitFiles = await this.repo.findUnitFilesByDockFileIds(items.filter((row) => row.unitDirectory).map((row) => row.id));
+    const unitFiles = await this.repo.findUnitFilesByDockFileIds(items.map((row) => row.id));
 
     return {
       items: items.map((row) => toDto(row, unitFiles.get(row.id) ?? [])),
@@ -51,7 +51,7 @@ export class BookDockService {
 
   async getFile(id: number, userId: number, canManageAll: boolean): Promise<BookDockFile> {
     const row = await this.findFileForUser(id, userId, canManageAll);
-    return toDto(row, row.unitDirectory ? await this.repo.findUnitFiles(row.id) : []);
+    return toDto(row, await this.repo.findUnitFiles(row.id));
   }
 
   async getCoverPath(id: number, userId: number, canManageAll: boolean): Promise<string> {
@@ -406,8 +406,8 @@ export class BookDockService {
 
   /** A unit is N files plus the directory holding them, and deleting it takes all of them. */
   private async cleanupFiles(row: BookDockFileRow): Promise<void> {
+    for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
     if (row.unitDirectory) {
-      for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
       // Non-recursive: anything still in there is unaccounted for, and worth leaving for a human.
       await rmdir(row.unitDirectory).catch(() => {});
     }

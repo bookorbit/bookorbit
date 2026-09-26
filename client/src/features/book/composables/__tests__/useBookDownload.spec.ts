@@ -63,6 +63,17 @@ describe('useBookDownload', () => {
     expect(isDownloading.value).toBe(false)
   })
 
+  it('downloads an audioless EPUB through the shared download path', async () => {
+    const useBookDownload = await loadComposable()
+    const { downloadAudiolessEpub, isDownloading } = useBookDownload()
+
+    await downloadAudiolessEpub(42)
+
+    expect(downloadMock.downloadFromUrl).toHaveBeenCalledWith('/api/v1/books/files/42/audioless-epub/download', 'book.epub')
+    expect(toastMock.error).not.toHaveBeenCalled()
+    expect(isDownloading.value).toBe(false)
+  })
+
   it('uses primary export scope by default', async () => {
     const useBookDownload = await loadComposable()
     const { exportBooks } = useBookDownload()
@@ -242,7 +253,7 @@ describe('useBookDownload progress reporting', () => {
 
     await exportBooks([1, 2, 3], false)
 
-    expect(toastMock.loading.mock.calls.map((call) => call[0])).toEqual(['Preparing 3 books for download...', 'Downloading 25% of 100 B'])
+    expect(toastMock.loading.mock.calls.map((call) => call[0])).toEqual(['Preparing 3 books for download...', 'Downloading 25% of 100 byte'])
   })
 
   it('pluralises the export label for a single book', async () => {

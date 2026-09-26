@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-import { SCROLLER_TYPES, type ScrollerConfig, type ScrollerType } from '@bookorbit/types'
+import { APP_FEATURES, SCROLLER_TYPES, type ScrollerConfig, type ScrollerType } from '@bookorbit/types'
 import { normalizeShelfRows } from '../lib/shelf-rows'
 
 const STORAGE_KEY = 'bookorbit:dashboard:config'
@@ -18,20 +18,24 @@ interface StoredDashboardConfig {
   shelfLayout: DashboardShelfLayout
 }
 
-export const DEFAULT_SCROLLERS: ScrollerConfig[] = [
+const ALL_DEFAULT_SCROLLERS: ScrollerConfig[] = [
   { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20, rows: 1 },
   { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 2, limit: 20, rows: 1 },
   { id: '1', type: 'continue-reading', label: 'Continue Reading', enabled: true, order: 3, limit: 20, rows: 1 },
   { id: '5', type: 'continue-listening', label: 'Continue Listening', enabled: true, order: 4, limit: 20, rows: 1 },
-  { id: '6', type: 'want-to-read', label: 'Want to Read', enabled: false, order: 5, limit: 20, rows: 1 },
-  { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 6, limit: 20, rows: 1 },
+  { id: '7', type: 'continue-podcasts', label: 'Continue Podcasts', enabled: false, order: 5, limit: 20, rows: 1 },
+  { id: '6', type: 'want-to-read', label: 'Want to Read', enabled: false, order: 6, limit: 20, rows: 1 },
+  { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 7, limit: 20, rows: 1 },
 ]
+
+export const DEFAULT_SCROLLERS = ALL_DEFAULT_SCROLLERS.filter((scroller) => APP_FEATURES.podcasts || scroller.type !== 'continue-podcasts')
 
 // Persisted-only. Shelf headings and the type selector resolve their text from the active
 // locale via useDashboardLabels(); these values just keep stored configs shaped as before.
 export const SCROLLER_LABELS: Record<ScrollerType, string> = {
   'continue-reading': 'Continue Reading',
   'continue-listening': 'Continue Listening',
+  'continue-podcasts': 'Continue Podcasts',
   'want-to-read': 'Want to Read',
   'up-next-in-series': 'Up Next in Series',
   'recently-added': 'Recently Added',
@@ -39,7 +43,7 @@ export const SCROLLER_LABELS: Record<ScrollerType, string> = {
   'smart-scope': 'Smart Scope',
 }
 
-const VALID_SCROLLER_TYPES = new Set<ScrollerType>(SCROLLER_TYPES)
+const VALID_SCROLLER_TYPES = new Set<ScrollerType>(SCROLLER_TYPES.filter((type) => APP_FEATURES.podcasts || type !== 'continue-podcasts'))
 
 function cloneDefaultScrollers(): ScrollerConfig[] {
   return DEFAULT_SCROLLERS.map((scroller) => ({ ...scroller }))

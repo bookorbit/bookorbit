@@ -2,17 +2,18 @@ import { join } from 'path';
 
 import {
   bookCoverDirPath,
-  bookThumbnailPath,
-  findExtractedBookCoverFileName,
+  bookCoverSlotDirPath,
+  bookCoverSlotThumbnailPath,
   findPreferredBookCoverFileName,
   isCustomBookCoverFileName,
   isExtractedBookCoverFileName,
 } from './book-cover-storage';
 
 describe('book-cover-storage', () => {
-  it('builds cover and thumbnail paths under the book cover directory', () => {
+  it('builds slot cover and thumbnail paths under the book cover directory', () => {
     expect(bookCoverDirPath('/books', 42)).toBe(join('/books', 'covers', '42'));
-    expect(bookThumbnailPath('/books', 42)).toBe(join('/books', 'covers', '42', 'thumbnail.jpg'));
+    expect(bookCoverSlotDirPath('/books', 42, 'audio')).toBe(join('/books', 'covers', '42', 'audio'));
+    expect(bookCoverSlotThumbnailPath('/books', 42, 'ebook')).toBe(join('/books', 'covers', '42', 'ebook', 'thumbnail.jpg'));
   });
 
   it('detects custom and extracted cover file names', () => {
@@ -28,10 +29,5 @@ describe('book-cover-storage', () => {
     expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover.jpg'])).toBe('cover.jpg');
     expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover.png'])).toBe('cover.png');
     expect(findPreferredBookCoverFileName(['thumbnail.jpg'])).toBeNull();
-  });
-
-  it('finds extracted cover files when present', () => {
-    expect(findExtractedBookCoverFileName(['cover_custom.png', 'cover_extracted.jpg'])).toBe('cover_extracted.jpg');
-    expect(findExtractedBookCoverFileName(['cover_custom.png'])).toBeNull();
   });
 });

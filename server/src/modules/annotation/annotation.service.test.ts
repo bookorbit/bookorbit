@@ -150,14 +150,14 @@ describe('AnnotationService', () => {
       expect(result).toEqual([]);
     });
 
-    it('strips userId and updatedAt from response', async () => {
+    it('strips userId but exposes updatedAt in the response', async () => {
       const { service, annotationRepo } = await makeService();
       annotationRepo.findByBookId.mockResolvedValue([makeAnnotationRow()]);
 
       const result = await service.getAnnotations(5, makeUser());
 
       expect(result[0]).not.toHaveProperty('userId');
-      expect(result[0]).not.toHaveProperty('updatedAt');
+      expect(result[0]).toHaveProperty('updatedAt');
     });
   });
 

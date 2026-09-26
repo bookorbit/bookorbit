@@ -1,3 +1,4 @@
+import { RefreshDto } from './dto/refresh.dto';
 import {
   Body,
   Controller,
@@ -29,6 +30,7 @@ import { MagicLinkService } from './magic-link.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { OidcCallbackDto } from './dto/oidc-callback.dto';
 import { OidcUnlinkDto } from './dto/oidc-unlink.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -88,15 +90,15 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
-    return this.authService.refresh(req, reply);
+  refresh(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply, @Body() dto: RefreshDto) {
+    return this.authService.refresh(req, reply, dto);
   }
 
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
-    return this.authService.logout(req, reply);
+  logout(@Body() dto: LogoutDto, @Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    return this.authService.logout(req, reply, dto);
   }
 
   @Get('me')

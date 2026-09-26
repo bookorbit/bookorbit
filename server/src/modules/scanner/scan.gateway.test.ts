@@ -5,11 +5,11 @@ import { ScanGateway } from './scan.gateway';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
-  const authService = { validateUser: vi.fn() };
+  const authService = { validateSessionUser: vi.fn() };
   const scanJobStore = { get: vi.fn(), isRunning: vi.fn() };
   const achievementEvents = new AchievementEventsService();
-  const configService = { get: vi.fn().mockReturnValue('http://localhost:5173') };
-  const gateway = new ScanGateway(jwtService as any, authService as any, scanJobStore as any, achievementEvents, configService as any);
+  const appConfiguration = { appUrl: 'http://localhost:6263' };
+  const gateway = new ScanGateway(jwtService as any, authService as any, scanJobStore as any, achievementEvents, appConfiguration as any);
   return { gateway, jwtService, authService, scanJobStore, achievementEvents };
 }
 
@@ -82,7 +82,7 @@ describe('emitCoverRefreshed', () => {
     const { server, to, emit } = mockServer();
     gateway['server'] = server as any;
 
-    const event: CoverRefreshedEvent = { bookId: 9, libraryId: 2 };
+    const event: CoverRefreshedEvent = { bookIds: [9], libraryId: 2 };
     gateway.emitCoverRefreshed(event);
 
     expect(to).toHaveBeenCalledWith('library:2');
@@ -94,7 +94,7 @@ describe('handleConnection', () => {
   it('stores validated user on the socket when token is valid', async () => {
     const { gateway, jwtService, authService } = makeGateway();
     jwtService.verify.mockReturnValue({ sub: 42, ver: 3 });
-    authService.validateUser.mockResolvedValue({ id: 42, username: 'reader' });
+    authService.validateSessionUser.mockResolvedValue({ id: 42, username: 'reader' });
     const disconnect = vi.fn();
     const join = vi.fn().mockResolvedValue(undefined);
     const client = {
@@ -109,7 +109,7 @@ describe('handleConnection', () => {
     await gateway.handleConnection(client);
 
     expect(jwtService.verify).toHaveBeenCalledWith('valid', { algorithms: ['HS256'] });
-    expect(authService.validateUser).toHaveBeenCalledWith(42, 3, 'legacy');
+    expect(authService.validateSessionUser).toHaveBeenCalledWith(42, 3, 'legacy', undefined);
     expect(client.data.user).toEqual({ id: 42, username: 'reader' });
     expect(join).toHaveBeenCalledWith('user:42');
     expect(disconnect).not.toHaveBeenCalled();
@@ -180,7 +180,7 @@ describe('subscription lifecycle', () => {
 
     expect(server.engine.opts.cors).toEqual({
       methods: ['GET'],
-      origin: 'http://localhost:5173',
+      origin: 'http://localhost:6263',
       credentials: true,
     });
   });

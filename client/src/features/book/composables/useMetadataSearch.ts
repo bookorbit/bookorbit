@@ -18,6 +18,8 @@ export interface SearchParams {
   isAudiobook?: boolean
   /** Narrows the search to the providers that serve one medium; the server derives isAudiobook from it. */
   mediaKind?: ConcreteBookMediaKind
+  /** Asks exactly these providers, whatever the provider filter holds. */
+  providers?: MetadataProviderKey[]
 }
 
 export function useMetadataSearch() {
@@ -67,7 +69,7 @@ export function useMetadataSearch() {
     if (params.isAudiobook != null) query.set('isAudiobook', String(params.isAudiobook))
     if (params.mediaKind) query.set('mediaKind', params.mediaKind)
     const onlyProvider = providers.value.length === 1 ? providers.value[0] : undefined
-    const requestedProviders = selectedProviders.value.length ? selectedProviders.value : onlyProvider ? [onlyProvider.key] : []
+    const requestedProviders = params.providers ?? (selectedProviders.value.length ? selectedProviders.value : onlyProvider ? [onlyProvider.key] : [])
     if (requestedProviders.length) query.set('providers', requestedProviders.join(','))
 
     try {
@@ -159,12 +161,15 @@ export function useMetadataSearch() {
     return sortResults(filtered)
   })
 
-  const coverProviderOrder = computed(() =>
-    providers.value
-      .filter((provider) => provider.coverPriority !== undefined)
-      .sort((a, b) => a.coverPriority! - b.coverPriority!)
-      .map((provider) => provider.key),
-  )
+  const coverProviderOrder = computed(() => providerOrderBy('coverPriority'))
+  const audioCoverProviderOrder = computed(() => providerOrderBy('audioCoverPriority'))
+
+  function providerOrderBy(priority: 'coverPriority' | 'audioCoverPriority'): MetadataProviderKey[] {
+    return providers.value
+      .filter((provider) => provider[priority] !== undefined)
+      .sort((a, b) => a[priority]! - b[priority]!)
+      .map((provider) => provider.key)
+  }
 
   const resultProviderOrder = computed(() => {
     const available = new Set(providers.value.map((provider) => provider.key))
@@ -203,8 +208,10 @@ export function useMetadataSearch() {
   )
 
   return {
+    results,
     filteredResults,
     coverProviderOrder,
+    audioCoverProviderOrder,
     resultProviderOrder,
     providerCounts,
     providerStatuses,

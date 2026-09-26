@@ -60,8 +60,8 @@ describe('useDashboardConfig', () => {
       ['random', 'Discover Something New', true, 2],
       ['continue-reading', 'Continue Reading', true, 3],
       ['continue-listening', 'Continue Listening', true, 4],
-      ['want-to-read', 'Want to Read', false, 5],
-      ['up-next-in-series', 'Up Next in Series', false, 6],
+      ['want-to-read', 'Want to Read', false, 6],
+      ['up-next-in-series', 'Up Next in Series', false, 7],
     ])
 
     addScroller('smart-scope')

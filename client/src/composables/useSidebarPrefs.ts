@@ -16,7 +16,8 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 
 const PERSIST_DEBOUNCE_MS = 600
 
-/** Section open/closed state predating the account-scoped sidebarConfig blob. */
+/** Section open/closed state predating the account-scoped sidebarConfig blob.
+ *  Sections added after that migration have no legacy key. */
 const LEGACY_SECTION_KEYS: Partial<Record<SidebarSectionId, string>> = {
   libraries: 'bookorbit:sidebar:libraries',
   smartScopes: 'bookorbit:sidebar:smart-scopes',
@@ -33,8 +34,11 @@ function defaultSections(): Record<SidebarSectionId, SidebarSectionState> {
   return {
     browse: { open: true },
     libraries: { open: true, cap: SIDEBAR_DEFAULT_CAP },
+    podcasts: { open: true, cap: SIDEBAR_DEFAULT_CAP },
     smartScopes: { open: true, cap: SIDEBAR_DEFAULT_CAP },
     collections: { open: true, cap: SIDEBAR_DEFAULT_CAP },
+    podcastScopes: { open: true, cap: SIDEBAR_DEFAULT_CAP },
+    podcastCollections: { open: true, cap: SIDEBAR_DEFAULT_CAP },
   }
 }
 

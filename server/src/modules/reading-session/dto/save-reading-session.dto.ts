@@ -1,4 +1,5 @@
-import { IsDateString, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { CLIENT_READING_SESSION_SOURCES, type ClientReadingSessionSource } from '@bookorbit/types';
 
 export class SaveReadingSessionDto {
   @IsString()
@@ -28,4 +29,16 @@ export class SaveReadingSessionDto {
   @Min(0)
   @Max(100)
   endProgress?: number | null;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['read', 'tts', 'listen'])
+  sessionType?: 'read' | 'tts' | 'listen';
+
+  // Browser clients omit this field. Native clients may report only their own
+  // first-party platform; integration and manual sources remain server-owned.
+  @IsOptional()
+  @IsString()
+  @IsIn(CLIENT_READING_SESSION_SOURCES)
+  source?: ClientReadingSessionSource;
 }

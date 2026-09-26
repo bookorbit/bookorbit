@@ -14,7 +14,14 @@ import {
   Req,
 } from '@nestjs/common';
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
-import type { IndexerAdapterListResult, PluginInspection, PluginInstallResult } from '@bookorbit/types';
+import type {
+  IndexerAdapterListResult,
+  PluginInspection,
+  PluginInstallResult,
+  PluginUpdateListResult,
+  PluginUpdateReview,
+  PluginUpdateStatus,
+} from '@bookorbit/types';
 
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Auditable } from '../../../common/decorators/auditable.decorator';
@@ -23,7 +30,8 @@ import { IndexerConfigService } from './indexer-config.service';
 import { IndexerRegistry } from './indexer-registry';
 import { PluginLoaderService } from './plugins/plugin-loader.service';
 import { MAX_PLUGIN_BYTES, PluginInstallService } from './plugins/plugin-install.service';
-import { CreateIndexerDto, UpdateIndexerDto } from './dto/indexer.dto';
+import { PluginUpdateService } from './plugins/plugin-update.service';
+import { CreateIndexerDto, InstallPluginUpdateDto, UpdateIndexerDto, UpdatePluginAutomaticDto } from './dto/indexer.dto';
 import type { RequestUser } from '../../../common/types/request-user';
 import type { MultipartRequest } from '../../../common/types/multipart-request';
 
@@ -40,6 +48,7 @@ export class IndexerController {
     private readonly registry: IndexerRegistry,
     private readonly plugins: PluginLoaderService,
     private readonly pluginInstaller: PluginInstallService,
+    private readonly pluginUpdates: PluginUpdateService,
   ) {}
 
   @Get()
@@ -92,6 +101,53 @@ export class IndexerController {
   })
   async installPlugin(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest): Promise<PluginInstallResult> {
     return this.pluginInstaller.install(await readPluginUpload(user, req), user.email ?? `user:${user.id}`);
+  }
+
+  @Get('plugins/updates')
+  async listPluginUpdates(@CurrentUser() user: RequestUser): Promise<PluginUpdateListResult> {
+    assertSuperuser(user);
+    return { updates: await this.pluginUpdates.list() };
+  }
+
+  @Post('plugins/updates/check')
+  @HttpCode(HttpStatus.OK)
+  async checkPluginUpdates(@CurrentUser() user: RequestUser): Promise<PluginUpdateListResult> {
+    assertSuperuser(user);
+    return { updates: await this.pluginUpdates.refreshAll(true, false) };
+  }
+
+  @Post('plugins/:type/update/inspect')
+  @HttpCode(HttpStatus.OK)
+  async inspectPluginUpdate(@CurrentUser() user: RequestUser, @Param('type') type: string): Promise<PluginUpdateReview> {
+    assertSuperuser(user);
+    return this.pluginUpdates.inspect(type);
+  }
+
+  @Post('plugins/:type/update')
+  @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: AuditAction.RequestIndexerPluginInstall,
+    resource: AuditResource.RequestIndexer,
+    description: (req: unknown) =>
+      `Installed signed update for indexer plugin '${(req as { params?: { type?: string } })?.params?.type ?? 'unknown'}'`,
+  })
+  async installPluginUpdate(
+    @CurrentUser() user: RequestUser,
+    @Param('type') type: string,
+    @Body() dto: InstallPluginUpdateDto,
+  ): Promise<PluginUpdateStatus> {
+    assertSuperuser(user);
+    return this.pluginUpdates.apply(type, dto.sha256, user.email ?? `user:${user.id}`);
+  }
+
+  @Put('plugins/:type/auto-update')
+  async setPluginAutomaticUpdate(
+    @CurrentUser() user: RequestUser,
+    @Param('type') type: string,
+    @Body() dto: UpdatePluginAutomaticDto,
+  ): Promise<PluginUpdateStatus> {
+    assertSuperuser(user);
+    return this.pluginUpdates.setAutomatic(type, dto.enabled);
   }
 
   @Delete('plugins/:type')

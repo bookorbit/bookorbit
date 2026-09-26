@@ -10,7 +10,14 @@ import {
   MAX_RELEASE_TIERS,
   REQUEST_LANGUAGE_CODES,
 } from '@bookorbit/types'
-import type { BookRequestMediaKind, IndexerItem, ReleaseFileLayout, ReleaseTier, ReleaseTierConditions } from '@bookorbit/types'
+import type {
+  BookRequestMediaKind,
+  IndexerAdapterDescriptor,
+  IndexerItem,
+  ReleaseFileLayout,
+  ReleaseTier,
+  ReleaseTierConditions,
+} from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import TokenSelect from '@/components/ui/TokenSelect.vue'
 import { formatLanguageName } from '@/i18n/formatters'
@@ -22,7 +29,8 @@ import { formatLanguageName } from '@/i18n/formatters'
 const props = defineProps<{
   mediaKind: BookRequestMediaKind
   tiers: ReleaseTier[]
-  indexers: readonly Pick<IndexerItem, 'id' | 'name'>[]
+  indexers: readonly Pick<IndexerItem, 'id' | 'name' | 'adapterType'>[]
+  adapters: readonly Pick<IndexerAdapterDescriptor, 'type' | 'delivery'>[]
 }>()
 
 const emit = defineEmits<{ update: [mediaKind: BookRequestMediaKind, tiers: ReleaseTier[]] }>()
@@ -80,6 +88,7 @@ const languageOptions = computed(() =>
   ),
 )
 const indexerOptions = computed(() => props.indexers.map((indexer) => ({ value: String(indexer.id), label: indexer.name })))
+const adapterDelivery = computed(() => new Map(props.adapters.map((adapter) => [adapter.type, adapter.delivery])))
 
 /** One hint for both pickers, so each field points at the same sentence rather than repeating it. */
 const multiSelectHintId = `release-profile-multi-select-hint-${props.mediaKind}`
@@ -206,6 +215,39 @@ function handleExcludeVip(index: number, event: Event) {
   patch(index, { excludeVipOnly: (event.target as HTMLInputElement).checked })
 }
 
+/**
+ * Only hide torrent controls when every explicitly selected source is known to be non-torrent.
+ * An unrestricted tier or a missing adapter can still produce torrent releases, so keeping the
+ * controls visible is the safe and honest fallback.
+ */
+function usesOnlyNonTorrentSources(tier: ReleaseTier): boolean {
+  const selected = tier.conditions.indexerIds
+  if (!selected || selected.length === 0) return false
+
+  return selected.every((id) => {
+    const indexer = props.indexers.find((candidate) => candidate.id === id)
+    return (
+      indexer !== undefined &&
+      adapterDelivery.value.get(indexer.adapterType) !== undefined &&
+      adapterDelivery.value.get(indexer.adapterType) !== 'torrent'
+    )
+  })
+}
+
+function hasTorrentConditions(tier: ReleaseTier): boolean {
+  return tier.conditions.minSeeders !== undefined || tier.conditions.freeleechOnly === true || tier.conditions.excludeVipOnly === true
+}
+
+function clearTorrentConditions(index: number) {
+  const next = clone(tiers.value)
+  const tier = next[index]
+  if (!tier) return
+  delete tier.conditions.minSeeders
+  delete tier.conditions.freeleechOnly
+  delete tier.conditions.excludeVipOnly
+  commit(next)
+}
+
 function hasFormat(index: number, format: string): boolean {
   return (tiers.value[index]?.conditions.formats ?? []).includes(format)
 }
@@ -261,124 +303,45 @@ function hasFormat(index: number, format: string): boolean {
           </div>
         </div>
 
-        <div class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              {{ t('settings.system.requests.profiles.formats') }}
-            </span>
-            <button
-              v-for="format in formats"
-              :key="format"
-              type="button"
-              class="rounded-full border px-2 py-0.5 text-xs uppercase transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-              :class="
-                hasFormat(index, format)
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border text-muted-foreground hover:border-ring hover:text-foreground'
-              "
-              :aria-pressed="hasFormat(index, format)"
-              @click="toggleFormat(index, format)"
-            >
-              {{ format }}
-            </button>
-          </div>
+        <div class="mt-2.5 grid gap-2.5">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {{ t('settings.system.requests.profiles.formats') }}
+              </span>
+              <button
+                v-for="format in formats"
+                :key="format"
+                type="button"
+                class="rounded-full border px-2 py-0.5 text-xs uppercase transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
+                :class="
+                  hasFormat(index, format)
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-muted-foreground hover:border-ring hover:text-foreground'
+                "
+                :aria-pressed="hasFormat(index, format)"
+                @click="toggleFormat(index, format)"
+              >
+                {{ format }}
+              </button>
+            </div>
 
-          <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {{ t('settings.system.requests.profiles.files') }}
-            <select
-              :value="tier.conditions.fileLayout ?? ''"
-              class="rounded-md border border-input bg-background px-1.5 py-1 text-xs text-foreground"
-              @change="handleLayout(index, $event)"
-            >
-              <option value="">{{ t('settings.system.requests.profiles.anyLayout') }}</option>
-              <option v-for="layout in LAYOUTS" :key="layout" :value="layout">
-                {{ t(`bookRequests.releases.fileLayout.${layout}`) }}
-              </option>
-            </select>
-          </label>
-
-          <label v-if="isAudio" class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {{ t('settings.system.requests.profiles.minBitrate') }}
-            <input
-              :value="tier.conditions.minBitrateKbps ?? ''"
-              type="number"
-              min="0"
-              step="16"
-              class="w-16 rounded-md border border-input bg-background px-1.5 py-1 text-xs tabular-nums text-foreground"
-              @change="handleNumber(index, 'minBitrateKbps', $event)"
-            />
-          </label>
-
-          <label v-if="isAudio" class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {{ t('settings.system.requests.profiles.channels') }}
-            <select
-              :value="tier.conditions.channels ?? ''"
-              class="rounded-md border border-input bg-background px-1.5 py-1 text-xs text-foreground"
-              @change="handleChannels(index, $event)"
-            >
-              <option value="">{{ t('settings.system.requests.profiles.anyChannels') }}</option>
-              <option :value="MONO">{{ t('settings.system.requests.profiles.mono') }}</option>
-              <option :value="STEREO">{{ t('settings.system.requests.profiles.stereo') }}</option>
-            </select>
-          </label>
-
-          <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {{ t('settings.system.requests.profiles.minSeeders') }}
-            <input
-              :value="tier.conditions.minSeeders ?? ''"
-              type="number"
-              min="0"
-              class="w-16 rounded-md border border-input bg-background px-1.5 py-1 text-xs tabular-nums text-foreground"
-              @change="handleNumber(index, 'minSeeders', $event)"
-            />
-          </label>
-
-          <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {{ t('settings.system.requests.profiles.maxSize') }}
-            <input
-              :value="sizeInMegabytes(tier.conditions.maxSizeBytes)"
-              type="number"
-              min="0"
-              class="w-20 rounded-md border border-input bg-background px-1.5 py-1 text-xs tabular-nums text-foreground"
-              @change="handleMaxSize(index, $event)"
-            />
-          </label>
-
-          <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              class="accent-primary"
-              :checked="tier.conditions.freeleechOnly === true"
-              @change="handleFreeleech(index, $event)"
-            />
-            {{ t('bookRequests.releases.freeleech') }}
-          </label>
-
-          <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              class="accent-primary"
-              :checked="tier.conditions.excludeVipOnly === true"
-              @change="handleExcludeVip(index, $event)"
-            />
-            {{ t('bookRequests.releases.hideVipOnly') }}
-          </label>
-
-          <div class="flex min-w-48 flex-1 basis-56 flex-col items-stretch gap-1">
-            <label :for="`${tier.id}-languages`" class="text-xs text-muted-foreground">
-              {{ t('settings.system.requests.profiles.languages') }}
+            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {{ t('settings.system.requests.profiles.files') }}
+              <select
+                :value="tier.conditions.fileLayout ?? ''"
+                class="rounded-md border border-input bg-background px-1.5 py-1 text-xs text-foreground"
+                @change="handleLayout(index, $event)"
+              >
+                <option value="">{{ t('settings.system.requests.profiles.anyLayout') }}</option>
+                <option v-for="layout in LAYOUTS" :key="layout" :value="layout">
+                  {{ t(`bookRequests.releases.fileLayout.${layout}`) }}
+                </option>
+              </select>
             </label>
-            <TokenSelect
-              :input-id="`${tier.id}-languages`"
-              :options="languageOptions"
-              :model-value="tier.conditions.languages ?? []"
-              :placeholder="t('settings.system.requests.profiles.multiSelectAny')"
-              :described-by="multiSelectHintId"
-              @update:model-value="handleLanguages(index, $event)"
-            />
           </div>
 
-          <div class="flex min-w-48 flex-1 basis-56 flex-col items-stretch gap-1">
+          <div class="flex min-w-0 flex-col items-stretch gap-1">
             <label :for="`${tier.id}-indexers`" class="text-xs text-muted-foreground">
               {{ t('settings.system.requests.profiles.indexers') }}
             </label>
@@ -392,6 +355,115 @@ function hasFormat(index: number, format: string): boolean {
               @update:model-value="handleIndexers(index, $event)"
             />
           </div>
+
+          <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
+            <div class="flex min-w-48 flex-1 basis-56 flex-col items-stretch gap-1">
+              <label :for="`${tier.id}-languages`" class="text-xs text-muted-foreground">
+                {{ t('settings.system.requests.profiles.languages') }}
+              </label>
+              <TokenSelect
+                :input-id="`${tier.id}-languages`"
+                :options="languageOptions"
+                :model-value="tier.conditions.languages ?? []"
+                :placeholder="t('settings.system.requests.profiles.multiSelectAny')"
+                :described-by="multiSelectHintId"
+                @update:model-value="handleLanguages(index, $event)"
+              />
+            </div>
+
+            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {{ t('settings.system.requests.profiles.maxSize') }}
+              <input
+                :value="sizeInMegabytes(tier.conditions.maxSizeBytes)"
+                type="number"
+                min="0"
+                class="w-20 rounded-md border border-input bg-background px-1.5 py-1 text-xs tabular-nums text-foreground"
+                @change="handleMaxSize(index, $event)"
+              />
+            </label>
+          </div>
+
+          <div v-if="isAudio" class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {{ t('settings.system.requests.profiles.minBitrate') }}
+              <input
+                :value="tier.conditions.minBitrateKbps ?? ''"
+                type="number"
+                min="0"
+                step="16"
+                class="w-16 rounded-md border border-input bg-background px-1.5 py-1 text-xs tabular-nums text-foreground"
+                @change="handleNumber(index, 'minBitrateKbps', $event)"
+              />
+            </label>
+
+            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {{ t('settings.system.requests.profiles.channels') }}
+              <select
+                :value="tier.conditions.channels ?? ''"
+                class="rounded-md border border-input bg-background px-1.5 py-1 text-xs text-foreground"
+                @change="handleChannels(index, $event)"
+              >
+                <option value="">{{ t('settings.system.requests.profiles.anyChannels') }}</option>
+                <option :value="MONO">{{ t('settings.system.requests.profiles.mono') }}</option>
+                <option :value="STEREO">{{ t('settings.system.requests.profiles.stereo') }}</option>
+              </select>
+            </label>
+          </div>
+
+          <fieldset
+            v-if="!usesOnlyNonTorrentSources(tier)"
+            class="flex max-w-full flex-wrap items-center justify-self-start gap-x-3 gap-y-2 rounded-md border border-border px-2.5 py-1.5"
+          >
+            <legend class="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              {{ t('settings.system.requests.profiles.torrentConditions') }}
+            </legend>
+
+            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {{ t('settings.system.requests.profiles.minSeeders') }}
+              <input
+                :value="tier.conditions.minSeeders ?? ''"
+                type="number"
+                min="0"
+                class="w-16 rounded-md border border-input bg-background px-1.5 py-1 text-xs tabular-nums text-foreground"
+                @change="handleNumber(index, 'minSeeders', $event)"
+              />
+            </label>
+
+            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                class="accent-primary"
+                :checked="tier.conditions.freeleechOnly === true"
+                @change="handleFreeleech(index, $event)"
+              />
+              {{ t('bookRequests.releases.freeleech') }}
+            </label>
+
+            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                class="accent-primary"
+                :checked="tier.conditions.excludeVipOnly === true"
+                @change="handleExcludeVip(index, $event)"
+              />
+              {{ t('bookRequests.releases.hideVipOnly') }}
+            </label>
+          </fieldset>
+
+          <div
+            v-else-if="hasTorrentConditions(tier)"
+            role="status"
+            class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2"
+          >
+            <p class="text-xs text-warning">{{ t('settings.system.requests.profiles.incompatibleTorrentConditions') }}</p>
+            <Button variant="outline" size="sm" @click="clearTorrentConditions(index)">
+              {{ t('settings.system.requests.profiles.removeTorrentConditions') }}
+            </Button>
+          </div>
+
+          <p v-else class="text-xs text-muted-foreground">
+            {{ t('settings.system.requests.profiles.nonTorrentConditions') }}
+          </p>
         </div>
       </li>
     </ol>

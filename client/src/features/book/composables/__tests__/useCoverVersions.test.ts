@@ -46,6 +46,17 @@ describe('useCoverVersions', () => {
     expect(coverUrl(42, 'thumbnail', '2026-05-01T12:00:00.000Z')).toBe('/api/v1/books/42/thumbnail?t=1777636800000')
   })
 
+  it('preserves opaque server cover versions in the URL', async () => {
+    const { coverUrl } = await load()
+    expect(coverUrl(42, 'cover', 'ebook:2026-09-23T12:34:56.000Z:-')).toBe('/api/v1/books/42/cover?t=ebook%3A2026-09-23T12%3A34%3A56.000Z%3A-')
+  })
+
+  it('requests an explicit cover medium without losing the version', async () => {
+    const { coverUrl } = await load()
+    expect(coverUrl(42, 'cover', 'slot-version', 'audio')).toBe('/api/v1/books/42/cover?t=slot-version&medium=audio')
+    expect(coverUrl(42, 'thumbnail', undefined, 'audio')).toBe('/api/v1/books/42/thumbnail?medium=audio')
+  })
+
   it('combines local and server versions when both are present', async () => {
     const { coverUrl, bumpVersion } = await load()
     bumpVersion(42)
@@ -95,19 +106,25 @@ describe('useCoverVersions', () => {
   it('persists bumped version to localStorage', async () => {
     const { bumpVersion } = await load()
     bumpVersion(11)
-    const stored = JSON.parse(localStorage.getItem('cover-versions') ?? '[]') as [number, number][]
+    const stored = JSON.parse(localStorage.getItem('cover-versions-v2') ?? '[]') as [number, number][]
     expect(stored).toContainEqual([11, Date.now()])
   })
 
   it('loads pre-existing versions from localStorage on init', async () => {
     const ts = Date.now()
-    localStorage.setItem('cover-versions', JSON.stringify([[20, ts]]))
+    localStorage.setItem('cover-versions-v2', JSON.stringify([[20, ts]]))
     const { coverUrl } = await load()
     expect(coverUrl(20)).toBe(`/api/v1/books/20/thumbnail?t=${ts}`)
   })
 
+  it('does not reuse cover bumps from the pre-slot storage key', async () => {
+    localStorage.setItem('cover-versions', JSON.stringify([[20, Date.now()]]))
+    const { coverUrl } = await load()
+    expect(coverUrl(20)).toBe('/api/v1/books/20/thumbnail')
+  })
+
   it('returns empty map when localStorage contains corrupt data', async () => {
-    localStorage.setItem('cover-versions', 'not-json')
+    localStorage.setItem('cover-versions-v2', 'not-json')
     const { coverUrl } = await load()
     expect(coverUrl(1)).toBe('/api/v1/books/1/thumbnail')
   })

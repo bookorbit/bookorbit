@@ -7,6 +7,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { normalizeSeriesTotalBooks } from '../../common/utils/series-total-books.utils';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { BookReadService } from '../book/book-read.service';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { LibraryService } from '../library/library.service';
 import { FindNextSeriesBookDto } from './dto/find-next-series-book.dto';
 import { ListSeriesBooksDto } from './dto/list-series-books.dto';
@@ -23,6 +24,7 @@ export class SeriesService {
     private readonly seriesRepo: SeriesRepository,
     private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
+    private readonly coverStore: BookCoverStore,
   ) {}
 
   private assertPaginationWindow(page: number, size: number): void {
@@ -162,6 +164,7 @@ export class SeriesService {
         cardData.tagRows,
         cardData.seriesMembershipRows,
       );
+      await this.coverStore.enrichCardVersions(cards);
       const orderMap = new Map(bookPage.bookIds.map((id, i) => [id, i]));
       items = cards
         .map((card) => {

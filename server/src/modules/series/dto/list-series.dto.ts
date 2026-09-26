@@ -1,7 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
-export const SERIES_LIST_SORTS = ['name', 'bookCount', 'lastAddedAt', 'readProgress'] as const;
+export const SERIES_LIST_SORTS = ['relevance', 'name', 'bookCount', 'lastAddedAt', 'readProgress'] as const;
 export type SeriesListSort = (typeof SERIES_LIST_SORTS)[number];
 
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const;

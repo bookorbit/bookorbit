@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookRequestItem, ReleaseCandidateItem, ReleaseFileInspection } from '@bookorbit/types'
+import type { BookRequestItem, DownloadDelivery, ReleaseCandidateItem, ReleaseFileInspection } from '@bookorbit/types'
 
 const { toastMock } = vi.hoisted(() => ({
   toastMock: { error: vi.fn<(title: string, options?: unknown) => void>(), success: vi.fn<(title: string) => void>() },
@@ -30,6 +30,7 @@ function makeGrab(
   overrides: {
     grab?: ReturnType<typeof vi.fn>
     inspectRelease?: ReturnType<typeof vi.fn>
+    deliveryFor?: (release: ReleaseCandidateItem) => DownloadDelivery
   } = {},
 ) {
   const grab = overrides.grab ?? vi.fn<() => Promise<ReleaseGrabOutcome>>().mockResolvedValue({ item: request, reason: null, errorCode: null })
@@ -45,7 +46,7 @@ function makeGrab(
       setRequest,
       inspectRelease: inspectRelease as never,
       setFilesExpanded,
-      seedsBack: () => true,
+      deliveryFor: overrides.deliveryFor ?? (() => 'torrent'),
     }),
     grab,
     inspectRelease,
@@ -153,5 +154,19 @@ describe('useReleaseGrab', () => {
 
     expect(picker.isRefused(release({ guid: 'g2' }))).toBe(true)
     expect(toastMock.error).toHaveBeenCalledWith('bookRequests.errors.grabFailed', { description: 'the tracker answered 406' })
+  })
+
+  it('scopes a download-client refusal to the release delivery', async () => {
+    const picker = makeGrab({
+      grab: vi
+        .fn<() => Promise<ReleaseGrabOutcome>>()
+        .mockResolvedValue({ item: null, reason: 'the torrent client is offline', errorCode: 'GRAB_CLIENT_UNAVAILABLE' }),
+      deliveryFor: (candidate) => (candidate.indexerId === 5 ? 'usenet' : 'torrent'),
+    })
+
+    await picker.handleGrab(release({ indexerId: 9 }))
+
+    expect(picker.isRefused(release({ indexerId: 9, guid: 'torrent-2' }))).toBe(true)
+    expect(picker.isRefused(release({ indexerId: 5, guid: 'usenet-1' }))).toBe(false)
   })
 })

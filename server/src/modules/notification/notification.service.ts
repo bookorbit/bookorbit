@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NOTIFICATION_TYPE_META, NotificationType, Permission, isNotificationAllowed, resolveNotificationLevel } from '@bookorbit/types';
+import {
+  APP_FEATURES,
+  NOTIFICATION_TYPE_META,
+  NotificationType,
+  Permission,
+  isNotificationAllowed,
+  resolveNotificationLevel,
+} from '@bookorbit/types';
 import type { NotificationItem, NotificationPreferences } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
@@ -8,7 +15,12 @@ import { NotificationRepository } from './notification.repository';
 import type { NewNotification } from '../../db/schema';
 
 export type NotificationScope =
-  { kind: 'library'; libraryId: number } | { kind: 'user'; userId: number } | { kind: 'permission'; permission: Permission } | { kind: 'all' };
+  | { kind: 'library'; libraryId: number }
+  | { kind: 'library_permission'; libraryId: number; permission: Permission }
+  | { kind: 'user'; userId: number }
+  | { kind: 'users'; userIds: number[] }
+  | { kind: 'permission'; permission: Permission }
+  | { kind: 'all' };
 
 /** Notifications are a transient feed, not an audit trail; the audit log is the durable record. */
 const NOTIFICATION_RETENTION_DAYS = 30;
@@ -24,6 +36,12 @@ const COALESCED_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
   NotificationType.FileWriteBackFailed,
   NotificationType.FileRenameCompleted,
   NotificationType.FileRenameFailed,
+]);
+
+const PODCAST_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
+  NotificationType.PodcastEpisodePublished,
+  NotificationType.PodcastFeedUnhealthy,
+  NotificationType.PodcastDownloadFailed,
 ]);
 
 export interface NotifyPayload {
@@ -45,6 +63,7 @@ export class NotificationService {
   ) {}
 
   async notify(payload: NotifyPayload): Promise<void> {
+    if (!APP_FEATURES.podcasts && PODCAST_NOTIFICATION_TYPES.has(payload.type)) return;
     const event = 'notification.notify';
     const scopeLabel = this.formatScope(payload.scope);
     this.logger.log(`[${event}] [start] type=${payload.type} ${scopeLabel} - notification dispatch started`);
@@ -175,8 +194,12 @@ export class NotificationService {
     switch (scope.kind) {
       case 'user':
         return [scope.userId];
+      case 'users':
+        return [...new Set(scope.userIds.filter((userId) => Number.isSafeInteger(userId) && userId > 0))];
       case 'library':
         return this.repo.findUserIdsWithLibraryAccess(scope.libraryId);
+      case 'library_permission':
+        return this.repo.findUserIdsWithLibraryPermission(scope.libraryId, scope.permission);
       case 'permission':
         return this.repo.findUserIdsWithPermission(scope.permission);
       case 'all':
@@ -190,6 +213,9 @@ export class NotificationService {
     switch (payload.scope.kind) {
       case 'library':
         return `${payload.type}:library:${payload.scope.libraryId}`;
+      case 'library_permission':
+      case 'users':
+        return null;
       case 'user':
         return `${payload.type}:user`;
       case 'permission':
@@ -237,8 +263,12 @@ export class NotificationService {
     switch (scope.kind) {
       case 'library':
         return `scope=library libraryId=${scope.libraryId}`;
+      case 'library_permission':
+        return `scope=library_permission libraryId=${scope.libraryId} permission=${scope.permission}`;
       case 'user':
         return `scope=user userId=${scope.userId}`;
+      case 'users':
+        return `scope=users userCount=${scope.userIds.length}`;
       case 'permission':
         return `scope=permission permission=${scope.permission}`;
       case 'all':

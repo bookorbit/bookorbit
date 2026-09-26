@@ -23,7 +23,16 @@ export default defineConfigWithVueTs(
 
   {
     ...pluginVitest.configs.recommended,
-    files: ['src/**/__tests__/*'],
+    // Specs are colocated as `*.spec.ts`; `__tests__/` remains only in features not yet converted.
+    files: ['src/**/__tests__/*', 'src/**/*.spec.ts', 'src/**/*.test.ts'],
+  },
+
+  // Named handlers only: an inline arrow in a template cannot be named, reused or tested, and the
+  // podcast feature was swept clean of them. The rest of the app still carries several hundred, so
+  // widening this is its own task rather than a side effect of one feature's refactor.
+  {
+    files: ['src/features/podcast/**/*.vue', 'src/components/FormSheet.vue', 'src/features/collection/components/CollectionMembershipList.vue'],
+    rules: { 'vue/v-on-handler-style': ['error', ['method', 'inline']] },
   },
 
   {

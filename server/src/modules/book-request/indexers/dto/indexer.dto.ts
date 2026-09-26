@@ -6,20 +6,41 @@ import {
   IsIP,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
+  IsPositive,
   IsString,
   Matches,
   MaxLength,
   Min,
   MinLength,
+  Max,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { BOOK_REQUEST_MEDIA_KINDS, INDEXER_COLORS } from '@bookorbit/types';
+import { BOOK_REQUEST_MEDIA_KINDS, INDEXER_COLORS, MAX_INDEXER_SEED_TIME_MINUTES } from '@bookorbit/types';
 import type { BookRequestMediaKind, IndexerAdapterTypeName, IndexerColor } from '@bookorbit/types';
 
 /** The same slug shape the `adapter_type` CHECK enforces. */
 const ADAPTER_TYPE_SLUG = /^[a-z0-9][a-z0-9-]{0,29}$/;
+
+abstract class IndexerSeedPolicyDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  applyTrackerSeedGoals?: boolean;
+
+  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @IsPositive()
+  seedRatioGoal?: number | null;
+
+  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INDEXER_SEED_TIME_MINUTES)
+  seedTimeMinutes?: number | null;
+}
 
 /** Category ids are the indexer's own numbering, so the only thing to validate is the shape. */
 class IndexerCategoriesDto {
@@ -50,7 +71,7 @@ class IndexerCategoriesDto {
  * it is validated here in full: the proxy address is the one value that decides where a request
  * actually goes, and a bad one must be refused at the form.
  */
-class NetworkProfileDto {
+export class NetworkProfileDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(4)
@@ -64,7 +85,7 @@ class NetworkProfileDto {
   proxyUrl?: string;
 }
 
-export class CreateIndexerDto {
+export class CreateIndexerDto extends IndexerSeedPolicyDto {
   @IsString()
   @MinLength(1)
   @MaxLength(100)
@@ -144,7 +165,7 @@ export class CreateIndexerDto {
  * means the accepted field list has to be exact, and an inherited-then-loosened field is easy to
  * get subtly wrong.
  */
-export class UpdateIndexerDto {
+export class UpdateIndexerDto extends IndexerSeedPolicyDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -217,4 +238,15 @@ export class UpdateIndexerDto {
   @ValidateNested()
   @Type(() => NetworkProfileDto)
   networkProfile?: NetworkProfileDto | null;
+}
+
+export class InstallPluginUpdateDto {
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  sha256!: string;
+}
+
+export class UpdatePluginAutomaticDto {
+  @IsBoolean()
+  enabled!: boolean;
 }

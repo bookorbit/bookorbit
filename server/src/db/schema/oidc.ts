@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
-import { users } from './auth';
+import { authSessions, users } from './auth';
 
 export const oidcProviders = pgTable(
   'oidc_providers',
@@ -92,6 +92,7 @@ export const oidcSessions = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    sessionId: integer('session_id').references(() => authSessions.id, { onDelete: 'cascade' }),
     providerId: integer('provider_id').references(() => oidcProviders.id, { onDelete: 'set null' }),
     oidcSubject: text('oidc_subject').notNull(),
     oidcIssuer: text('oidc_issuer').notNull(),
@@ -108,6 +109,7 @@ export const oidcSessions = pgTable(
       .where(sql`${t.revoked} = false`),
     index('oidc_sessions_subject_issuer_idx').on(t.oidcSubject, t.oidcIssuer),
     index('oidc_sessions_sid_idx').on(t.oidcSessionId),
+    uniqueIndex('oidc_sessions_session_id_idx').on(t.sessionId),
     index('oidc_sessions_expires_at_idx').on(t.expiresAt),
     index('oidc_sessions_provider_id_idx').on(t.providerId),
   ],

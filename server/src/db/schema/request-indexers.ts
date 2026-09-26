@@ -1,6 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, doublePrecision, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 import type { BookRequestMediaKind, IndexerCategoryMap, IndexerColor, IndexerSettings, NetworkProfile } from '@bookorbit/types';
+import { requestIndexerManagers } from './request-indexer-managers';
+
+export interface ManagedIndexerMetadata {
+  displayName: string;
+  implementation: string | null;
+  protocol: 'torrent' | 'usenet';
+  priority: number | null;
+}
 
 /**
  * Configured indexer instances. The adapter *types* live in code; no tracker is bundled, and a
@@ -19,6 +27,11 @@ export const requestIndexers = pgTable(
      */
     color: varchar('color', { length: 16 }).$type<IndexerColor>(),
     adapterType: varchar('adapter_type', { length: 30 }).notNull(),
+    managerId: integer('manager_id').references(() => requestIndexerManagers.id, { onDelete: 'cascade' }),
+    managerExternalId: varchar('manager_external_id', { length: 100 }),
+    managerAvailable: boolean('manager_available').notNull().default(true),
+    managerLastSeenAt: timestamp('manager_last_seen_at', { withTimezone: true }),
+    managerMetadata: jsonb('manager_metadata').$type<ManagedIndexerMetadata>(),
     enabled: boolean('enabled').notNull().default(true),
     baseUrl: text('base_url').notNull(),
     /** AES-256-GCM blob: a torznab API key or a tracker session id. Never returned, never logged. */
@@ -29,6 +42,9 @@ export const requestIndexers = pgTable(
      * is an explicit per-row opt-in with the implication stated in the UI.
      */
     allowPrivateAddress: boolean('allow_private_address').notNull().default(false),
+    applyTrackerSeedGoals: boolean('apply_tracker_seed_goals').notNull().default(true),
+    seedRatioGoal: doublePrecision('seed_ratio_goal'),
+    seedTimeMinutes: integer('seed_time_minutes'),
 
     /** Which of this indexer's own categories to search per requested medium. */
     categories: jsonb('categories').$type<IndexerCategoryMap>(),
@@ -84,12 +100,23 @@ export const requestIndexers = pgTable(
   },
   (t) => [
     uniqueIndex('request_indexers_name_lower_uidx').on(sql`lower(${t.name})`),
+    uniqueIndex('request_indexers_manager_external_uidx').on(t.managerId, t.managerExternalId),
     index('request_indexers_enabled_idx').on(t.enabled),
+    index('request_indexers_manager_idx').on(t.managerId),
     // A slug, not a list. Two reasons: a row whose adapter was removed from the build has to
     // survive so the operator can see and replace it rather than losing a stored credential, and
     // externally loaded adapters name themselves. `IndexerRegistry.require()` is what actually
     // rejects an unknown type, loudly, at search and grab time.
     check('request_indexers_adapter_type_chk', sql`${t.adapterType} ~ '^[a-z0-9][a-z0-9-]{0,29}$'`),
+    check(
+      'request_indexers_manager_fields_chk',
+      sql`(${t.managerId} is null and ${t.managerExternalId} is null and ${t.managerMetadata} is null) or (${t.managerId} is not null and ${t.managerExternalId} is not null and ${t.managerMetadata} is not null and ${t.credentialsEnc} is null and ${t.adapterType} in ('torznab', 'newznab'))`,
+    ),
+    check(
+      'request_indexers_seed_ratio_goal_chk',
+      sql`${t.seedRatioGoal} is null or (${t.seedRatioGoal} > 0 and ${t.seedRatioGoal} < 'Infinity'::double precision)`,
+    ),
+    check('request_indexers_seed_time_minutes_chk', sql`${t.seedTimeMinutes} is null or ${t.seedTimeMinutes} > 0`),
   ],
 );
 

@@ -99,4 +99,25 @@ describe('ReaderSearchPanel', () => {
     await dismissOverlay.trigger('click')
     expect(wrapper.emitted('close')?.length).toBe(1)
   })
+
+  it('does not emit navigate when navigation is locked', async () => {
+    const wrapper = mount(ReaderSearchPanel, {
+      props: {
+        initialQuery: 'dragons',
+        isSearching: false,
+        navigationLocked: true,
+        results: [
+          {
+            cfi: 'epubcfi(/6/4)',
+            sectionTitle: 'Chapter 1',
+            excerpt: { pre: 'A ', match: 'dragon', post: ' appears' },
+          },
+        ],
+      },
+      global: globalStubs,
+    })
+
+    await wrapper.get('li').trigger('click')
+    expect(wrapper.emitted('navigate')).toBeUndefined()
+  })
 })

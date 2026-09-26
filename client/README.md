@@ -6,9 +6,9 @@ Vue 3 SPA built with Vite and Tailwind CSS v4.
 
 From the repo root: `pnpm dev` (starts both server and client).
 
-Client only: `pnpm dev` (from this directory). Runs at http://localhost:5173.
+Client only: `pnpm dev` (from this directory). Runs at http://localhost:6263.
 
-The Vite dev server proxies `/api` and `/socket.io` requests to the backend at `localhost:3000`.
+The Vite dev server proxies `/api` and `/socket.io` requests to the backend at `localhost:6262`.
 
 ## IDE setup
 

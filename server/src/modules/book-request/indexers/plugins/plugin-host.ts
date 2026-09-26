@@ -14,7 +14,7 @@ import { boundedResponse } from '../../../../common/utils/bounded-response';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { safeFetch } from '../../../../common/utils/safe-fetch';
 import { withDeadline } from '../../../../common/utils/with-deadline.utils';
-import { ensureSafeUrl } from '../../../../common/utils/ssrf.utils';
+import { ensureSafeUrl, RemoteHostResolutionException } from '../../../../common/utils/ssrf.utils';
 import { buildSearchText } from '../search-text';
 import { MAX_TORRENT_FILE_BYTES } from '../../fulfillment/torrent.utils';
 import type { IndexerCredentialStore } from '../indexer-credential-store';
@@ -26,6 +26,7 @@ import {
   type ReleaseQuery,
   type ResolvedIndexerConfig,
 } from '../indexer-adapter';
+import { normalizeProviderSeedRatio, normalizeProviderSeedTimeMinutes } from '../seed-goal.utils';
 
 /**
  * A ceiling on any one request a plugin makes, and one it cannot opt out of.
@@ -130,7 +131,14 @@ export class PluginIndexerAdapter implements IndexerAdapter {
       );
       // The URL is about to be handed to a download client, so it is checked here rather than
       // trusted: this is the one value a plugin produces that reaches the network on its own.
-      await ensureSafeUrl(file.url, { allowPrivate: config.allowPrivateAddress });
+      try {
+        await ensureSafeUrl(file.url, { allowPrivate: config.allowPrivateAddress });
+      } catch (error) {
+        if (error instanceof RemoteHostResolutionException) {
+          throw new IndexerSearchException('unreachable', `${config.name}: the download host could not be resolved`);
+        }
+        throw error;
+      }
       return file;
     };
   }
@@ -227,6 +235,9 @@ export class PluginIndexerAdapter implements IndexerAdapter {
       return await run();
     } catch (error) {
       if (error instanceof IndexerSearchException) throw error;
+      if (error instanceof RemoteHostResolutionException) {
+        throw new IndexerSearchException('unreachable', `${config.name}: the source host could not be resolved`);
+      }
       if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
         throw new IndexerSearchException('timeout', `${config.name} did not answer in time`);
       }
@@ -313,8 +324,8 @@ function sanitizeCandidate(raw: PluginReleaseCandidate, indexerId: number): Rele
     vipOnly: raw.vipOnly === true,
     ...optionalNumber('primaryFileCount', raw.primaryFileCount),
     ...optionalNumber('fileCount', raw.fileCount),
-    ...optionalNumber('seedRatioGoal', raw.seedRatioGoal),
-    ...optionalNumber('seedTimeMinutes', raw.seedTimeMinutes),
+    ...optionalNormalizedNumber('seedRatioGoal', normalizeProviderSeedRatio(raw.seedRatioGoal)),
+    ...optionalNormalizedNumber('seedTimeMinutes', normalizeProviderSeedTimeMinutes(raw.seedTimeMinutes)),
     ...(raw.audio && typeof raw.audio === 'object' ? { audio: sanitizeAudio(raw.audio) } : {}),
   };
 }
@@ -354,6 +365,10 @@ function optional<K extends string>(key: K, value: string | null): Record<K, str
 function optionalNumber<K extends string>(key: K, value: unknown): Record<K, number> | Record<string, never> {
   const parsed = finite(value);
   return parsed === null ? {} : ({ [key]: parsed } as Record<K, number>);
+}
+
+function optionalNormalizedNumber<K extends string>(key: K, value: number | undefined): Record<K, number> | Record<string, never> {
+  return value === undefined ? {} : ({ [key]: value } as Record<K, number>);
 }
 
 function toPluginQuery(query: ReleaseQuery): PluginReleaseQuery {

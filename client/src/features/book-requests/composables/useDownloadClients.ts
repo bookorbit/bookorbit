@@ -155,10 +155,10 @@ export function useDownloadClients() {
     }
   }
 
-  async function adopt(clientId: number, infoHash: string, downloadId: number): Promise<DownloadClientFailure | null> {
+  async function adopt(clientId: number, clientKey: string, downloadId: number): Promise<DownloadClientFailure | null> {
     markReconciling(clientId, true)
     try {
-      const res = await api(`${BASE_PATH}/${clientId}/reconciliation/${encodeURIComponent(infoHash)}/adopt`, {
+      const res = await api(`${BASE_PATH}/${clientId}/reconciliation/${encodeURIComponent(clientKey)}/adopt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ downloadId }),
@@ -172,10 +172,10 @@ export function useDownloadClients() {
     }
   }
 
-  async function removeOrphan(clientId: number, infoHash: string): Promise<DownloadClientFailure | null> {
+  async function removeOrphan(clientId: number, clientKey: string): Promise<DownloadClientFailure | null> {
     markReconciling(clientId, true)
     try {
-      const res = await api(`${BASE_PATH}/${clientId}/reconciliation/${encodeURIComponent(infoHash)}`, {
+      const res = await api(`${BASE_PATH}/${clientId}/reconciliation/${encodeURIComponent(clientKey)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleteFiles: false }),

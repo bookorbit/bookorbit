@@ -2,6 +2,13 @@ import { UserStatisticsController } from './user-statistics.controller';
 
 function makeService() {
   return {
+    getActivityOverview: vi.fn().mockResolvedValue('activity-overview'),
+    getActivityCalendar: vi.fn().mockResolvedValue('activity-calendar'),
+    getActivityDay: vi.fn().mockResolvedValue('activity-day'),
+    getActivitySessionPatterns: vi.fn().mockResolvedValue('activity-session-patterns'),
+    getActivityCompletionSpeed: vi.fn().mockResolvedValue('activity-completion-speed'),
+    getActivityGenreTime: vi.fn().mockResolvedValue('activity-genre-time'),
+    getActivityPaceDetail: vi.fn().mockResolvedValue('activity-pace-detail'),
     getSummary: vi.fn().mockResolvedValue('summary'),
     getDailyReading: vi.fn().mockResolvedValue('daily'),
     getReadingHeatmap: vi.fn().mockResolvedValue('heatmap'),
@@ -34,6 +41,13 @@ describe('UserStatisticsController', () => {
     const goal = { ...daily, goalBooks: 18 } as never;
     const updateDto = { startedAt: '2026-04-10T10:00:00.000Z', endedAt: '2026-04-10T10:30:00.000Z' } as never;
 
+    await expect(controller.getActivityOverview(user, filter)).resolves.toBe('activity-overview');
+    await expect(controller.getActivityCalendar(user, 2026, filter)).resolves.toBe('activity-calendar');
+    await expect(controller.getActivityDay(user, '2026-04-08', filter)).resolves.toBe('activity-day');
+    await expect(controller.getActivitySessionPatterns(user, filter)).resolves.toBe('activity-session-patterns');
+    await expect(controller.getActivityCompletionSpeed(user, { ...filter, format: 'EPUB' })).resolves.toBe('activity-completion-speed');
+    await expect(controller.getActivityGenreTime(user, filter)).resolves.toBe('activity-genre-time');
+    await expect(controller.getActivityPaceDetail(user, { ...filter, media: 'reading' })).resolves.toBe('activity-pace-detail');
     await expect(controller.getSummary(user, filter)).resolves.toBe('summary');
     await expect(controller.getDailyReading(user, daily)).resolves.toBe('daily');
     await expect(controller.getReadingHeatmap(user, daily)).resolves.toBe('heatmap');
@@ -53,6 +67,13 @@ describe('UserStatisticsController', () => {
     await expect(controller.getSessionArchetypes(user, daily)).resolves.toBe('archetypes');
     await expect(controller.getAuthorGenreChord(user, daily)).resolves.toBe('chord');
 
+    expect(service.getActivityOverview).toHaveBeenCalledWith(user, filter);
+    expect(service.getActivityCalendar).toHaveBeenCalledWith(user, 2026, filter);
+    expect(service.getActivityDay).toHaveBeenCalledWith(user, '2026-04-08', filter);
+    expect(service.getActivitySessionPatterns).toHaveBeenCalledWith(user, filter);
+    expect(service.getActivityCompletionSpeed).toHaveBeenCalledWith(user, { ...filter, format: 'EPUB' });
+    expect(service.getActivityGenreTime).toHaveBeenCalledWith(user, filter);
+    expect(service.getActivityPaceDetail).toHaveBeenCalledWith(user, { ...filter, media: 'reading' });
     expect(service.getSummary).toHaveBeenCalledWith(user, filter);
     expect(service.getDailyReading).toHaveBeenCalledWith(user, daily);
     expect(service.getReadingHeatmap).toHaveBeenCalledWith(user, daily);

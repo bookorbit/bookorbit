@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RefreshCw } from '@lucide/vue'
+import { DELIVERY_BY_DOWNLOAD_SOURCE } from '@bookorbit/types'
 import type { BookRequestDownloadItem, BookRequestProgressEvent } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { formatPercent } from '@/i18n/formatters'
@@ -46,9 +47,9 @@ const showCancel = computed(() => showBar.value && props.canCancel)
  * the one thing an approver asks about it afterwards is where it came from - not least because
  * the release that worked is often not the one the request started with.
  */
-const isTorrent = computed(() => props.download.source !== 'direct_url')
+const delivery = computed(() => DELIVERY_BY_DOWNLOAD_SOURCE[props.download.source])
 const sourceName = computed(() => props.download.indexerName ?? t('bookRequests.download.source.pasted'))
-const protocolName = computed(() => t(isTorrent.value ? 'bookRequests.releases.protocol.torrent' : 'bookRequests.releases.protocol.direct'))
+const protocolName = computed(() => t(`bookRequests.releases.protocol.${delivery.value === 'file' ? 'direct' : delivery.value}`))
 const selectionName = computed(() => t(props.download.automated ? 'bookRequests.download.source.automatic' : 'bookRequests.download.source.manual'))
 
 const sizeLine = computed(() => {
@@ -105,7 +106,7 @@ function handleCancel() {
       <span class="rounded-full border px-1.5 py-px font-medium" :class="sourceChipClass(download.indexerColor)">
         {{ sourceName }}
       </span>
-      <span class="rounded-full border px-1.5 py-px font-medium" :class="protocolChipClass(isTorrent)">
+      <span class="rounded-full border px-1.5 py-px font-medium" :class="protocolChipClass(delivery)">
         {{ protocolName }}
       </span>
       <span

@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useMediaQuery } from '@vueuse/core'
 import type { AuditLogEntry } from '@bookorbit/types'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RefreshCw, Search, SlidersHorizontal, X } from '@lucide/vue'
-import { formatDateTime, formatRelativeTime } from '@/i18n/formatters'
+import { formatDateTime, formatRelativeTimeFromNow } from '@/i18n/formatters'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import AuditActionPicker from './AuditActionPicker.vue'
 import AuditActorPicker from './AuditActorPicker.vue'
@@ -52,14 +52,7 @@ const activeFilterChips = computed(() => {
 const hasFilters = computed(() => activeFilterChips.value.length > 0)
 
 function relativeTimestamp(value: string): string {
-  const differenceMs = new Date(value).getTime() - currentTime.value
-  const absoluteMs = Math.abs(differenceMs)
-  if (absoluteMs < 60_000) return formatRelativeTime(Math.round(differenceMs / 1000), 'second')
-  if (absoluteMs < 3_600_000) return formatRelativeTime(Math.round(differenceMs / 60_000), 'minute')
-  if (absoluteMs < 86_400_000) return formatRelativeTime(Math.round(differenceMs / 3_600_000), 'hour')
-  if (absoluteMs < 2_592_000_000) return formatRelativeTime(Math.round(differenceMs / 86_400_000), 'day')
-  if (absoluteMs < 31_536_000_000) return formatRelativeTime(Math.round(differenceMs / 2_592_000_000), 'month')
-  return formatRelativeTime(Math.round(differenceMs / 31_536_000_000), 'year')
+  return formatRelativeTimeFromNow(value, { now: currentTime.value })
 }
 
 function exactTimestamp(value: string): string {

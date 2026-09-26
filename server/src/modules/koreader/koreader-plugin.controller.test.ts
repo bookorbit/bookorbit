@@ -157,15 +157,29 @@ describe('KoreaderPluginController', () => {
     expect(pluginService.sweepComplete).toHaveBeenCalledWith(user, dto);
   });
 
-  it('getVersion scopes the version check to the calling user so self-update can be gated', async () => {
+  it('getVersion passes the authenticated user and device identity to the self-update gate', async () => {
     const { controller, packageService } = makeController();
     const user = { id: 7 } as never;
 
-    const result = await controller.getVersion(user);
+    const result = await controller.getVersion(user, 'device-1', '1.5.4');
 
-    expect(packageService.getVersionInfoForSelfUpdate).toHaveBeenCalledWith(7);
+    expect(packageService.getVersionInfoForSelfUpdate).toHaveBeenCalledWith(7, {
+      deviceId: 'device-1',
+      pluginVersion: '1.5.4',
+    });
     expect(packageService.getVersionInfo).not.toHaveBeenCalled();
     expect(result).toEqual({ pluginVersion: '0.4.0', serverVersion: '1.0.0' });
+  });
+
+  it('getVersion preserves absent identity headers for the legacy fallback', async () => {
+    const { controller, packageService } = makeController();
+
+    await controller.getVersion({ id: 7 } as never, undefined, undefined);
+
+    expect(packageService.getVersionInfoForSelfUpdate).toHaveBeenCalledWith(7, {
+      deviceId: undefined,
+      pluginVersion: undefined,
+    });
   });
 
   it('downloadUpdatePackage builds a raw package and streams it with correct headers', async () => {

@@ -155,6 +155,7 @@ function makeResult(id: number, title = 'Prey'): GlobalSearchResult {
     readStatus: null,
     addedAt: '2026-01-01T00:00:00.000Z',
     updatedAt: null,
+    coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
     metadataScore: null,
     hasCover: false,
     hasMetadataLocks: false,
@@ -326,6 +327,15 @@ describe('AppHeader global search', () => {
     const settingsControlIndex = controls.findIndex((control) => control.contains(buttons[settingsIndex]?.element ?? null))
 
     expect(settingsControlIndex).toBe(languageControlIndex + 1)
+  })
+
+  it('labels the icon-only desktop destinations and preference controls', () => {
+    const wrapper = mountHeader()
+
+    expect(wrapper.get('[data-tour="statistics-btn"]').attributes('aria-label')).toBe('Statistics')
+    expect(wrapper.get('[data-tour="documentation-link"]').attributes('aria-label')).toBe('Help')
+    expect(wrapper.get('[data-tour="appearance-picker"]').attributes('aria-label')).toBe('Appearance')
+    expect(wrapper.get('[data-tour="settings-nav"]').attributes('aria-label')).toBe('Settings')
   })
 
   it('opens settings from the mobile overflow menu', async () => {

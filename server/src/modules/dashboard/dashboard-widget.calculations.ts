@@ -1,3 +1,4 @@
+import { formatKeyRank, isAudioFormat, normalizeFormatPriority } from '@bookorbit/types';
 import type {
   ChallengeType,
   DiversityScoreWidgetData,
@@ -425,5 +426,63 @@ export function computeRhythm(days: { readingSeconds: number }[]): Omit<ReadingR
     avgSecondsPerDay: Math.round(totalSeconds / totalDays),
     activeDays,
     totalDays,
+  };
+}
+
+// ── Currently Reading resume modes ──────────────────────────────────
+
+/**
+ * Formats a BookOrbit reader opens. KEPUB is deliberately absent: it is a Kobo delivery format that
+ * no reader in the product opens directly, so offering it as the read file would hand a client a
+ * file it cannot display. Which of them wins is the library's format priority.
+ */
+const READABLE_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'fb2', 'pdf', 'cbz', 'cbr', 'cb7']);
+
+export type ResumeModeFile = {
+  id: number;
+  format: string | null;
+  mediaOverlayAvailable: boolean;
+};
+
+export type ResumeModes = {
+  readFileId: number | null;
+  readFileFormat: string | null;
+  readAlongFileId: number | null;
+  hasAudio: boolean;
+};
+
+function isReadable(format: string | null): boolean {
+  return READABLE_FORMATS.has((format ?? '').toLowerCase());
+}
+
+/**
+ * Which of read, read-along, and listen a book can offer, from its files alone.
+ *
+ * The primary file wins the read slot when it is readable at all, so the resumed file matches the
+ * one the book's own page leads with; otherwise the best readable file stands in, which is what
+ * lets an audiobook-primary book still be read. That stand-in follows the library's format priority,
+ * and a plain EPUB beats a read-along copy, which has a slot of its own. Read-along needs an EPUB with
+ * media overlays, and prefers the primary for the same reason.
+ */
+export function resolveResumeModes(files: ResumeModeFile[], primaryFileId: number | null, formatPriority?: readonly string[] | null): ResumeModes {
+  const primary = files.find((file) => file.id === primaryFileId) ?? null;
+  const priority = normalizeFormatPriority(formatPriority);
+  const rank = (file: ResumeModeFile) => formatKeyRank((file.format ?? '').toLowerCase(), priority);
+
+  const readFile =
+    primary && isReadable(primary.format)
+      ? primary
+      : ([...files.filter((file) => isReadable(file.format))].sort(
+          (a, b) => rank(a) - rank(b) || Number(a.mediaOverlayAvailable) - Number(b.mediaOverlayAvailable),
+        )[0] ?? null);
+
+  const overlayFiles = files.filter((file) => file.mediaOverlayAvailable && (file.format ?? '').toLowerCase() === 'epub');
+  const readAlongFile = overlayFiles.find((file) => file.id === primaryFileId) ?? overlayFiles[0] ?? null;
+
+  return {
+    readFileId: readFile?.id ?? null,
+    readFileFormat: readFile?.format ?? null,
+    readAlongFileId: readAlongFile?.id ?? null,
+    hasAudio: files.some((file) => file.format != null && isAudioFormat(file.format)),
   };
 }

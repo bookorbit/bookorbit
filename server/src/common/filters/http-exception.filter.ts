@@ -1,6 +1,8 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { FastifyReply, FastifyRequest } from 'fastify';
 
+import { redactUrlCredentials } from '../utils/log-url.utils';
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
@@ -44,7 +46,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     reply.status(status).send({
       statusCode: status,
       message,
-      path: request.url,
+      path: redactUrlCredentials(request.url),
       timestamp: new Date().toISOString(),
       requestId: request.id,
       ...(errorCode ? { errorCode } : {}),

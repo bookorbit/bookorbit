@@ -16,6 +16,7 @@ import {
   parseAllowedTranslationLosses,
   retentionLossLimit,
   sourceDrift,
+  syncCrowdinSource,
   syncCrowdinTranslations,
 } from './sync-crowdin-translations.mjs'
 
@@ -43,20 +44,38 @@ async function createCatalogFixture(targetCatalogs, currentCatalogs = new Map(),
   return directory
 }
 
-function createSynchronizationFetch({ identifiers = ['common.save'], catalogs = new Map(), onDownload = async () => {} } = {}) {
+function createSynchronizationFetch({
+  sourceCatalog = { common: { save: 'Save' } },
+  catalogs = new Map(),
+  applySourceUpdate = true,
+  onDownload = async () => {},
+} = {}) {
+  let currentSourceCatalog = sourceCatalog
+  let uploadedSourceCatalog
+
   return vi.fn(async (input, init = {}) => {
     const url = new URL(input)
-    if (url.hostname === 'api.crowdin.com' && url.pathname.endsWith('/files')) {
+    const method = init.method ?? 'GET'
+    if (url.hostname === 'api.crowdin.com' && url.pathname.endsWith('/files') && method === 'GET') {
       return new Response(JSON.stringify({ data: [{ data: { id: 7, path: '/client/src/locales/en.json' } }] }))
     }
-    if (url.hostname === 'api.crowdin.com' && url.pathname.endsWith('/strings')) {
-      return new Response(JSON.stringify({ data: identifiers.map((identifier) => ({ data: { identifier } })) }))
+    if (url.hostname === 'api.crowdin.com' && url.pathname.endsWith('/files/7/download')) {
+      return new Response(JSON.stringify({ data: { url: 'https://downloads.example.test/source.json' } }))
+    }
+    if (url.hostname === 'api.crowdin.com' && url.pathname === '/api/v2/storages' && method === 'POST') {
+      uploadedSourceCatalog = JSON.parse(init.body)
+      return new Response(JSON.stringify({ data: { id: 9 } }))
+    }
+    if (url.hostname === 'api.crowdin.com' && url.pathname.endsWith('/files/7') && method === 'PUT') {
+      if (applySourceUpdate) currentSourceCatalog = uploadedSourceCatalog
+      return new Response(JSON.stringify({ data: { id: 7 } }))
     }
     if (url.hostname === 'api.crowdin.com' && url.pathname.includes('/translations/builds/files/')) {
       const { targetLanguageId } = JSON.parse(init.body)
       return new Response(JSON.stringify({ data: { url: `https://downloads.example.test/${encodeURIComponent(targetLanguageId)}.json` } }))
     }
     if (url.hostname === 'downloads.example.test') {
+      if (url.pathname === '/source.json') return new Response(JSON.stringify(currentSourceCatalog))
       const languageId = decodeURIComponent(path.basename(url.pathname, '.json'))
       await onDownload(languageId)
       return new Response(JSON.stringify(catalogs.get(languageId) ?? { common: { save: `Translated ${languageId}` } }))
@@ -82,9 +101,18 @@ describe('Crowdin translation synchronization', () => {
   })
 
   it('detects when Crowdin has not synchronized the current English keys', () => {
-    expect(sourceDrift(new Map([['common.save', 'Save']]), new Set(['common.cancel']))).toEqual({
+    expect(sourceDrift(new Map([['common.save', 'Save']]), new Map([['common.cancel', 'Cancel']]))).toEqual({
       missing: ['common.save'],
       unexpected: ['common.cancel'],
+      changed: [],
+    })
+  })
+
+  it('detects changed English source text under an existing key', () => {
+    expect(sourceDrift(new Map([['common.save', 'Save now']]), new Map([['common.save', 'Save']]))).toEqual({
+      missing: [],
+      unexpected: [],
+      changed: ['common.save'],
     })
   })
 
@@ -231,6 +259,45 @@ describe('Crowdin translation synchronization', () => {
     })
   })
 
+  it('leaves an identical Crowdin source file unchanged', async () => {
+    const catalogDirectory = await createCatalogFixture([], new Map(), { common: { save: 'Save' } })
+    const fetchImpl = createSynchronizationFetch()
+
+    await expect(
+      syncCrowdinSource({
+        token: 'secret',
+        fetchImpl,
+        catalogDirectory,
+        assertTargetConfiguration: async () => {},
+      }),
+    ).resolves.toEqual({ fileId: 7, messageCount: 1, updated: false })
+    expect(fetchImpl.mock.calls.some(([, init]) => ['POST', 'PUT'].includes(init.method))).toBe(false)
+  })
+
+  it('updates changed Crowdin source text without discarding translations', async () => {
+    const catalogDirectory = await createCatalogFixture([], new Map(), { common: { save: 'Save now' } })
+    const fetchImpl = createSynchronizationFetch({ sourceCatalog: { common: { save: 'Save' } } })
+
+    await expect(
+      syncCrowdinSource({
+        token: 'secret',
+        fetchImpl,
+        catalogDirectory,
+        assertTargetConfiguration: async () => {},
+      }),
+    ).resolves.toEqual({ fileId: 7, messageCount: 1, updated: true })
+
+    const storageCall = fetchImpl.mock.calls.find(([input]) => new URL(input).pathname === '/api/v2/storages')
+    expect(storageCall[1].headers['Crowdin-API-FileName']).toBe('en.json')
+    expect(JSON.parse(storageCall[1].body)).toEqual({ common: { save: 'Save now' } })
+
+    const updateCall = fetchImpl.mock.calls.find(([input, init]) => new URL(input).pathname.endsWith('/files/7') && init.method === 'PUT')
+    expect(JSON.parse(updateCall[1].body)).toEqual({
+      storageId: 9,
+      updateOption: 'keep_translations',
+    })
+  })
+
   it('rejects non-HTTPS export URLs returned by Crowdin', () => {
     expect(() => assertSafeDownloadUrl('http://127.0.0.1/catalog.json')).toThrow('Crowdin export URL must use HTTPS')
   })
@@ -322,11 +389,11 @@ describe('Crowdin translation synchronization', () => {
     await expect(readFile(path.join(outputDirectory, 'cs.json'), 'utf8')).resolves.toContain('Translated cs')
   })
 
-  it('rejects source drift before downloading or writing catalogs', async () => {
+  it('rejects source drift that remains after updating Crowdin', async () => {
     const targetCatalogs = TARGET_CATALOGS.slice(0, 2)
     const catalogDirectory = await createCatalogFixture(targetCatalogs)
     const outputDirectory = path.join(catalogDirectory, 'output')
-    const fetchImpl = createSynchronizationFetch({ identifiers: [] })
+    const fetchImpl = createSynchronizationFetch({ sourceCatalog: {}, applySourceUpdate: false })
 
     await expect(
       syncCrowdinTranslations({
@@ -337,9 +404,10 @@ describe('Crowdin translation synchronization', () => {
         targetCatalogs,
         assertTargetConfiguration: async () => {},
         protectedTerms: [],
+        wait: async () => {},
       }),
-    ).rejects.toThrow('Crowdin source is not synchronized with en.json')
-    expect(fetchImpl.mock.calls.some(([input]) => new URL(input).hostname === 'downloads.example.test')).toBe(false)
+    ).rejects.toThrow('Crowdin source did not match en.json after update')
+    expect(fetchImpl.mock.calls.some(([input]) => new URL(input).pathname.includes('/translations/builds/files/'))).toBe(false)
     await expect(access(outputDirectory)).rejects.toThrow()
   })
 
@@ -431,7 +499,7 @@ describe('Crowdin translation synchronization', () => {
 
     const { rejections, repairs } = await syncCrowdinTranslations({
       token: 'secret',
-      fetchImpl: createSynchronizationFetch({ identifiers: ['books.count'], catalogs }),
+      fetchImpl: createSynchronizationFetch({ sourceCatalog: referenceCatalog, catalogs }),
       catalogDirectory,
       outputDirectory,
       targetCatalogs,
@@ -460,7 +528,7 @@ describe('Crowdin translation synchronization', () => {
     await expect(
       syncCrowdinTranslations({
         token: 'secret',
-        fetchImpl: createSynchronizationFetch({ identifiers: keys.map((key) => `common.${key}`), catalogs }),
+        fetchImpl: createSynchronizationFetch({ sourceCatalog: referenceCatalog, catalogs }),
         catalogDirectory,
         outputDirectory,
         targetCatalogs,
@@ -510,7 +578,7 @@ describe('Crowdin translation synchronization', () => {
 
     const { rejections } = await syncCrowdinTranslations({
       token: 'secret',
-      fetchImpl: createSynchronizationFetch({ identifiers: [key], catalogs }),
+      fetchImpl: createSynchronizationFetch({ sourceCatalog: referenceCatalog, catalogs }),
       catalogDirectory,
       outputDirectory,
       targetCatalogs,
@@ -596,7 +664,7 @@ describe('Crowdin translation synchronization', () => {
 
     const { rejections, corrections } = await syncCrowdinTranslations({
       token: 'secret',
-      fetchImpl: createSynchronizationFetch({ identifiers: [key, 'annotations.hub.exportMarkdown'], catalogs }),
+      fetchImpl: createSynchronizationFetch({ sourceCatalog: referenceCatalog, catalogs }),
       catalogDirectory,
       outputDirectory,
       targetCatalogs,

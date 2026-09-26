@@ -94,6 +94,16 @@ describe('ProviderConfigService', () => {
     expect(second.amazon.domain).toBe('amazon.com');
   });
 
+  it('returns only the normalized Amazon domain for provider links', async () => {
+    db.query.appSettings.findFirst.mockResolvedValue({
+      value: JSON.stringify({
+        amazon: { enabled: true, domain: 'amazon.de', cookie: 'private-session-cookie' },
+      }),
+    });
+
+    await expect(service.getLinkSettings()).resolves.toEqual({ amazonDomain: 'amazon.de' });
+  });
+
   it('merges stored partial config with defaults', async () => {
     db.query.appSettings.findFirst.mockResolvedValue({
       value: JSON.stringify({

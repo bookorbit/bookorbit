@@ -5,6 +5,7 @@ import type { StringValue } from 'ms';
 
 import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { BookMetadataLockModule } from '../book-metadata-lock/book-metadata-lock.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataModule } from '../metadata/metadata.module';
@@ -21,6 +22,7 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
 @Module({
   imports: [
     forwardRef(() => BookModule),
+    BookCoverStoreModule,
     BookMetadataLockModule,
     MetadataModule,
     MetadataFetchModule,

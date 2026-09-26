@@ -49,7 +49,7 @@ export const downloadClients = pgTable(
   (t) => [
     uniqueIndex('download_clients_name_lower_uidx').on(sql`lower(${t.name})`),
     index('download_clients_enabled_priority_idx').on(t.enabled, t.priority),
-    check('download_clients_adapter_type_chk', sql`${t.adapterType} in ('qbittorrent', 'transmission', 'deluge')`),
+    check('download_clients_adapter_type_chk', sql`${t.adapterType} in ('qbittorrent', 'transmission', 'deluge', 'nzbget', 'sabnzbd')`),
 
     check('download_clients_priority_range_chk', sql`${t.priority} >= 1 and ${t.priority} <= 100`),
   ],
@@ -108,7 +108,7 @@ export const bookRequestDownloads = pgTable(
      * Null for an attempt that was refused before anything was handed over: a tracker that would
      * not serve the .torrent leaves a record of having been asked, and nothing to poll.
      */
-    clientHash: varchar('client_hash', { length: 64 }),
+    clientKey: varchar('client_key', { length: 64 }),
     status: varchar('status', { length: 20 }).notNull().default('queued'),
     progressPercent: integer('progress_percent').notNull().default(0),
     downloadedBytes: bigint('downloaded_bytes', { mode: 'number' }).notNull().default(0),
@@ -152,7 +152,7 @@ export const bookRequestDownloads = pgTable(
     // transaction share a timestamp, and the id is what puts them in order.
     index('book_request_downloads_request_latest_idx').on(t.requestId, t.id.desc()),
     index('book_request_downloads_book_dock_file_id_idx').on(t.bookDockFileId),
-    // One live attempt per infohash per client: re-grabbing a torrent the client is already
+    // One live attempt per client key per client: re-grabbing a release the client is already
     // working on would produce two rows racing to import the same file. Coalesced because the
     // built-in downloader has no client row, and two direct grabs of one URL would otherwise
     // both be let through to write the same staging file.
@@ -163,10 +163,10 @@ export const bookRequestDownloads = pgTable(
     // failure cleanup or its removal then deletes the files the held attempt's import is waiting
     // to read.
     uniqueIndex('book_request_downloads_active_hash_uidx')
-      .on(sql`coalesce(${t.downloadClientId}, 0)`, t.clientHash)
+      .on(sql`coalesce(${t.downloadClientId}, 0)`, t.clientKey)
 
       .where(sql`${t.status} in ('queued', 'downloading', 'completed', 'importing', 'needs_review')`),
-    check('book_request_downloads_source_chk', sql`${t.source} in ('magnet', 'torrent_file', 'direct_url')`),
+    check('book_request_downloads_source_chk', sql`${t.source} in ('magnet', 'torrent_file', 'direct_url', 'nzb_file')`),
     check(
       'book_request_downloads_status_chk',
       sql`${t.status} in ('queued', 'downloading', 'completed', 'importing', 'needs_review', 'imported', 'failed')`,

@@ -4,27 +4,27 @@ import type { BookRequestDownloadRow } from '../../../db/schema';
 import type { ReconciliationAttemptRow } from '../fulfillment/book-request-download.repository';
 import { DownloadClientReconciliationService } from './download-client-reconciliation.service';
 
-const CLIENT_HASH = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const ORPHAN_HASH = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-const MISSING_HASH = 'cccccccccccccccccccccccccccccccccccccccc';
+const CLIENT_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const ORPHAN_KEY = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const MISSING_KEY = 'cccccccccccccccccccccccccccccccccccccccc';
 
 function attempt(
   id: number,
   requestId: number,
-  clientHash: string,
+  clientKey: string,
   status: BookRequestDownloadRow['status'],
   requestTitle: string,
 ): ReconciliationAttemptRow {
   return {
-    download: { id, requestId, clientHash, status } as BookRequestDownloadRow,
+    download: { id, requestId, clientKey, status } as BookRequestDownloadRow,
     requestTitle,
   };
 }
 
-function owned(infoHash: string, state: 'queued' | 'downloading' | 'completed' = 'downloading') {
+function owned(clientKey: string, state: 'queued' | 'downloading' | 'completed' = 'downloading') {
   return {
-    infoHash,
-    name: `Item ${infoHash.slice(0, 4)}`,
+    clientKey,
+    name: `Item ${clientKey.slice(0, 4)}`,
     state,
     progressPercent: state === 'completed' ? 100 : 35,
     downloadedBytes: 350,
@@ -43,8 +43,8 @@ function makeService() {
   };
   const registry = { require: vi.fn().mockReturnValue(adapter) };
   const downloads = {
-    findTrackedForClientHashes: vi.fn().mockResolvedValue([]),
-    findAdoptableForHashes: vi.fn().mockResolvedValue([]),
+    findTrackedForClientKeys: vi.fn().mockResolvedValue([]),
+    findAdoptableForClientKeys: vi.fn().mockResolvedValue([]),
     findActiveForClient: vi.fn().mockResolvedValue([]),
     adoptFailedAttempt: vi.fn(),
   };
@@ -57,16 +57,16 @@ function makeService() {
 describe('DownloadClientReconciliationService', () => {
   it('diffs the client inventory against tracked, adoptable, and missing attempts', async () => {
     const { service, adapter, downloads } = makeService();
-    const tracked = attempt(11, 7, CLIENT_HASH, 'downloading', 'Tracked book');
-    const adoptable = attempt(12, 8, ORPHAN_HASH, 'failed', 'Retry this book');
-    const missing = attempt(13, 9, MISSING_HASH, 'queued', 'Missing book');
+    const tracked = attempt(11, 7, CLIENT_KEY, 'downloading', 'Tracked book');
+    const adoptable = attempt(12, 8, ORPHAN_KEY, 'failed', 'Retry this book');
+    const missing = attempt(13, 9, MISSING_KEY, 'queued', 'Missing book');
     adapter.listOwned.mockResolvedValue({
       supported: true,
       truncated: false,
-      items: [owned(CLIENT_HASH), owned(ORPHAN_HASH, 'completed')],
+      items: [owned(CLIENT_KEY), owned(ORPHAN_KEY, 'completed')],
     });
-    downloads.findTrackedForClientHashes.mockResolvedValue([tracked]);
-    downloads.findAdoptableForHashes.mockResolvedValue([adoptable]);
+    downloads.findTrackedForClientKeys.mockResolvedValue([tracked]);
+    downloads.findAdoptableForClientKeys.mockResolvedValue([adoptable]);
     downloads.findActiveForClient.mockResolvedValue([tracked, missing]);
 
     const result = await service.reconcile(4);
@@ -78,12 +78,12 @@ describe('DownloadClientReconciliationService', () => {
       truncated: false,
       items: [
         {
-          infoHash: CLIENT_HASH,
+          clientKey: CLIENT_KEY,
           trackedAttempt: { downloadId: 11, requestId: 7, requestTitle: 'Tracked book', status: 'downloading' },
           adoptableAttempts: [],
         },
         {
-          infoHash: ORPHAN_HASH,
+          clientKey: ORPHAN_KEY,
           trackedAttempt: null,
           adoptableAttempts: [{ downloadId: 12, requestId: 8, requestTitle: 'Retry this book', status: 'failed' }],
         },
@@ -94,7 +94,7 @@ describe('DownloadClientReconciliationService', () => {
 
   it('does not report missing attempts from a truncated client inventory', async () => {
     const { service, adapter, downloads } = makeService();
-    adapter.listOwned.mockResolvedValue({ supported: true, truncated: true, items: [owned(CLIENT_HASH)] });
+    adapter.listOwned.mockResolvedValue({ supported: true, truncated: true, items: [owned(CLIENT_KEY)] });
 
     const result = await service.reconcile(4);
 
@@ -108,24 +108,24 @@ describe('DownloadClientReconciliationService', () => {
     adapter.listOwned.mockResolvedValue({ supported: false, truncated: false, items: [] });
 
     await expect(service.reconcile(4)).resolves.toMatchObject({ supported: false, ownershipMarker: 'bookorbit', items: [] });
-    expect(downloads.findTrackedForClientHashes).not.toHaveBeenCalled();
+    expect(downloads.findTrackedForClientKeys).not.toHaveBeenCalled();
   });
 
   it('rechecks the client item and adopts the exact failed attempt atomically', async () => {
     const { service, adapter, downloads, gateway } = makeService();
-    const candidate = attempt(12, 8, ORPHAN_HASH, 'failed', 'Retry this book');
+    const candidate = attempt(12, 8, ORPHAN_KEY, 'failed', 'Retry this book');
     const adopted = { ...candidate.download, downloadClientId: 4, status: 'completed' } as BookRequestDownloadRow;
-    adapter.listOwned.mockResolvedValue({ supported: true, truncated: false, items: [owned(ORPHAN_HASH, 'completed')] });
-    downloads.findAdoptableForHashes.mockResolvedValue([candidate]);
+    adapter.listOwned.mockResolvedValue({ supported: true, truncated: false, items: [owned(ORPHAN_KEY, 'completed')] });
+    downloads.findAdoptableForClientKeys.mockResolvedValue([candidate]);
     downloads.adoptFailedAttempt.mockResolvedValue(adopted);
 
-    await expect(service.adopt(4, ORPHAN_HASH.toUpperCase(), 12)).resolves.toEqual({
+    await expect(service.adopt(4, ORPHAN_KEY.toUpperCase(), 12)).resolves.toEqual({
       downloadId: 12,
       requestId: 8,
       requestTitle: 'Retry this book',
       status: 'completed',
     });
-    expect(downloads.adoptFailedAttempt).toHaveBeenCalledWith(12, 4, ORPHAN_HASH, {
+    expect(downloads.adoptFailedAttempt).toHaveBeenCalledWith(12, 4, ORPHAN_KEY, {
       status: 'completed',
       progressPercent: 100,
       downloadedBytes: 350,
@@ -137,10 +137,10 @@ describe('DownloadClientReconciliationService', () => {
 
   it('refuses to remove an item once any database attempt owns it', async () => {
     const { service, adapter, downloads } = makeService();
-    adapter.listOwned.mockResolvedValue({ supported: true, truncated: false, items: [owned(ORPHAN_HASH)] });
-    downloads.findTrackedForClientHashes.mockResolvedValue([attempt(12, 8, ORPHAN_HASH, 'failed', 'Tracked book')]);
+    adapter.listOwned.mockResolvedValue({ supported: true, truncated: false, items: [owned(ORPHAN_KEY)] });
+    downloads.findTrackedForClientKeys.mockResolvedValue([attempt(12, 8, ORPHAN_KEY, 'failed', 'Tracked book')]);
 
-    await expect(service.removeOrphan(4, ORPHAN_HASH, false)).rejects.toMatchObject({
+    await expect(service.removeOrphan(4, ORPHAN_KEY, false)).rejects.toMatchObject({
       response: { errorCode: 'DOWNLOAD_CLIENT_RECONCILIATION_NOT_ORPHAN' },
     });
     expect(adapter.remove).not.toHaveBeenCalled();
@@ -148,14 +148,14 @@ describe('DownloadClientReconciliationService', () => {
 
   it('removes a freshly confirmed orphan while preserving its files', async () => {
     const { service, adapter } = makeService();
-    adapter.listOwned.mockResolvedValue({ supported: true, truncated: false, items: [owned(ORPHAN_HASH)] });
+    adapter.listOwned.mockResolvedValue({ supported: true, truncated: false, items: [owned(ORPHAN_KEY)] });
 
-    await service.removeOrphan(4, ORPHAN_HASH, false);
+    await service.removeOrphan(4, ORPHAN_KEY, false);
 
-    expect(adapter.remove).toHaveBeenCalledWith(ORPHAN_HASH, expect.anything(), { deleteFiles: false });
+    expect(adapter.remove).toHaveBeenCalledWith(ORPHAN_KEY, expect.anything(), { deleteFiles: false });
   });
 
-  it('rejects malformed hashes before asking the client', async () => {
+  it('rejects malformed client keys before asking the client', async () => {
     const { service, adapter } = makeService();
 
     await expect(service.adopt(4, '../not-a-hash', 12)).rejects.toBeInstanceOf(BadRequestException);

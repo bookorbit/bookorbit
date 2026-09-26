@@ -53,11 +53,13 @@ const MetadataSearchPanelStub = defineComponent({
       required: true,
     },
   },
+  emits: ['search', 'select'],
   template: '<div data-test="metadata-search-panel" />',
 })
 
 const MetadataDiffPanelStub = defineComponent({
   name: 'MetadataDiffPanel',
+  props: { coverMedium: { type: String, default: undefined } },
   emits: ['apply'],
   template: '<div data-test="metadata-diff-panel" />',
 })
@@ -247,6 +249,27 @@ describe('BookDockFileSheet metadata search defaults', () => {
         coverUrl: 'https://covers.example/dune.jpg',
       }),
     )
+  })
+
+  it('searches a docked audio file as an audiobook and stages the audiobook cover it picks', async () => {
+    const candidate: MetadataCandidate = { provider: 'audible', providerId: 'B0DUNE', title: 'Dune' }
+    mocks.filteredResults.push(candidate)
+    const wrapper = mountSheet(makeFile({ fileName: 'Dune.m4b', format: 'm4b' }))
+    const searchButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Search')
+    await searchButton!.trigger('click')
+
+    wrapper.getComponent(MetadataSearchPanelStub).vm.$emit('search', { title: 'Dune', author: 'Frank Herbert', isbn: '' })
+    expect(mocks.search).toHaveBeenLastCalledWith({ title: 'Dune', author: 'Frank Herbert', isbn: '', mediaKind: 'audiobook' })
+
+    wrapper.getComponent(MetadataSearchPanelStub).vm.$emit('select', candidate)
+    await wrapper.vm.$nextTick()
+    const diff = wrapper.getComponent(MetadataDiffPanelStub)
+    expect(diff.props('coverMedium')).toBe('audio')
+
+    diff.vm.$emit('apply', { formPatch: {}, audioCoverUrl: 'https://covers.example/dune-audio.jpg' })
+    await wrapper.vm.$nextTick()
+
+    expect(mocks.saveMetadata).toHaveBeenCalledWith(1, expect.objectContaining({ coverUrl: 'https://covers.example/dune-audio.jpg' }))
   })
 
   it('requests confirmation before discarding the file', async () => {

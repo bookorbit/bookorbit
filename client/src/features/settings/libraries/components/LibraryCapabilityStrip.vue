@@ -7,14 +7,14 @@ import { parseCronToHuman } from '@/features/library/utils/cron'
 
 const props = defineProps<{ library: Library }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 /**
  * Every slot renders in both states. An omitted chip and a disabled setting used to look the same,
  * which made a library's configuration unreadable from the list.
  */
 const slots = computed(() => {
-  const schedule = parseCronToHuman(props.library.autoScanCronExpression)
+  const schedule = parseCronToHuman(props.library.autoScanCronExpression, locale.value)
   return [
     { key: 'watch', icon: Eye, on: props.library.watch, label: t('settings.admin.libraries.capability.watch'), detail: null },
     { key: 'schedule', icon: CalendarClock, on: Boolean(schedule), label: t('settings.admin.libraries.capability.schedule'), detail: schedule },

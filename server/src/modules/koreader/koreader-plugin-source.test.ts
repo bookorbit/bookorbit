@@ -114,6 +114,15 @@ describe('KOReader plugin update source wiring', () => {
     expect(detail).toContain('if section_focus.is_grid then');
   });
 
+  it('labels derived read-along EPUB downloads without showing an original archive size', async () => {
+    const detail = await readPluginFile('bookorbit_catalog_detail.lua');
+
+    expect(detail).toContain('file.downloadVariant == "audioless_epub"');
+    expect(detail).toContain('_("Read Along (audio removed)")');
+    expect(detail).toContain('local label = fileFormatLabel(file)');
+    expect(detail).toContain('local format_label = fileFormatLabel(file)');
+  });
+
   it('reconciles remote progress before manual book sync uploads progress', async () => {
     const main = await readPluginFile('main.lua');
     const menu = await readPluginFile('bookorbit_main_menu.lua');
@@ -311,20 +320,27 @@ describe('KOReader plugin update source wiring', () => {
     expect(bookSync).toContain('metadata = BookOrbitStatsReader.primeIdentity(digest)');
     expect(statsReader).toContain('function BookOrbitStatsReader.primeIdentity(md5)');
     expect(statsReader).toContain('local book = BookOrbitStatsReader.getBook(md5)');
-    expect(bookSync).toContain('local stats_ambiguous = metadata.metadata_ambiguous == true');
+    expect(bookSync).toContain('local current_stats_id = stats and tonumber(stats.id_curr_book) or nil');
+    expect(bookSync).toContain('local stats_ambiguous = current_stats_id == nil and metadata.stats_ambiguous == true');
+    expect(bookSync).toContain('table.insert(stats_ids, current_stats_id)');
     expect(bookSync).toContain('title = stats_ambiguous and titleFromFile(file) or (metadata.title or titleFromFile(file))');
     expect(bookSync).toContain('authors = stats_ambiguous and nil or metadata.authors');
     expect(bookSync).toContain('last_open = metadata.last_open or ts');
     expect(bookSync).toContain('metadata_ambiguous = false');
     expect(bookSync).toContain('stats_metadata_ambiguous = stats_ambiguous');
+    expect(bookSync).toContain('stats_row_ambiguous = current_stats_row ~= nil and metadata.stats_ambiguous == true');
+    expect(bookSync).toContain('and not ctx.snap.stats_row_ambiguous');
     expect(bookSync).toContain('local body, err = ctx.client:matchCheck({ ctx.snap.digest }, {');
     expect(bookSync).toContain('title = ctx.snap.title');
     expect(bookSync).toContain('authors = ctx.snap.authors');
     expect(bookSync).toContain('last_open = ctx.snap.last_open');
     expect(bookSync).toContain('source = "current_file"');
+    expect(bookSync).toContain('book_file_id = matchedFileCandidate(ctx, book)');
+    expect(bookSync).toContain('if not ctx.snap.stats_row_ambiguous then return book and book.fileId or nil end');
     expect(bookSync).toContain('metadata_ambiguous = ctx.snap.metadata_ambiguous');
     expect(bookSync).toContain('if ctx.snap.stats_metadata_ambiguous then');
     expect(bookSync).toContain('ctx.state:setMatched(match.hash, match.bookFileId, match.bookId, ctx.snap.file)');
+    expect(bookSync).toContain('if ctx.snap.stats_row_ambiguous then upload.bookFileId = stats_target.bookFileId end');
     expect(bookSync).not.toContain(
       'if book then\n        if ctx.snap.file and not book.file then\n            book.file = ctx.snap.file\n        end\n        return step(ctx, stepStats)\n    end',
     );
@@ -348,12 +364,15 @@ describe('KOReader plugin update source wiring', () => {
     expect(api).toContain('source = validMatchSource(cand.source)');
     expect(api).toContain('metadataAmbiguous = optionalBoolean(cand.metadata_ambiguous)');
     expect(statsReader).toContain('entry.metadata_ambiguous = (entry._variant_count or 0) > 1');
+    expect(statsReader).toContain('entry.stats_ambiguous = #entry.ids > 1');
     expect(sweep).toContain('source = "statistics"');
     expect(sweep).toContain('metadata_ambiguous = entry.metadata_ambiguous');
-    expect(sweep).toContain('stats_metadata_ambiguous = entry.metadata_ambiguous');
+    expect(sweep).toContain('stats_metadata_ambiguous = entry.stats_ambiguous');
     expect(sweep).toContain('local file_exists = lfs.attributes(file, "mode") == "file"');
     expect(sweep).toContain('cand.source = "file"');
     expect(sweep).toContain('cand.metadata_ambiguous = false');
-    expect(sweep).toContain('if cand.stat_ids and not cand.stats_metadata_ambiguous then');
+    expect(sweep).toContain('for _, row in ipairs(cand.stats_rows or {}) do');
+    expect(sweep).toContain('if item.book_file_id then upload.bookFileId = item.book_file_id end');
+    expect(sweep).toContain('%1 books need to be opened and synced once to recover their reading history.');
   });
 });

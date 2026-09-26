@@ -14,7 +14,7 @@ describe('SettingsTabs', () => {
         activeTab: 'first',
       },
     })
-    const container = wrapper.element as HTMLElement
+    const container = wrapper.get('[role="tablist"]').element as HTMLElement
     Object.defineProperties(container, {
       clientWidth: { configurable: true, value: 320 },
       scrollWidth: { configurable: true, value: 640 },

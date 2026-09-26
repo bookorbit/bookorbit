@@ -73,7 +73,9 @@ function handleKeydown(event: KeyboardEvent) {
           />
           <button
             v-if="(searchQuery ?? '').trim().length > 0"
-            class="ml-1 text-muted-foreground transition-colors hover:text-foreground"
+            type="button"
+            :aria-label="t('components.viewHeader.clearSearch')"
+            class="ml-1 flex size-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
             @click="clear"
           >
             <X :size="12" />

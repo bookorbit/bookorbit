@@ -1110,6 +1110,71 @@
         "magic-links": "Kouzelné odkazy",
         "oidc": "OIDC / SSO"
       },
+      "tts": {
+        "title": "Providers",
+        "subtitle": "Speech engines available to readers. Voices are curated per provider.",
+        "summary": "{providers, plural, one {# provider} few {# providers} many {# providers} other {# providers}} · {enabled} enabled · {voices, plural, one {# voice curated} few {# voices curated} many {# voices curated} other {# voices curated}}",
+        "addProvider": "Add provider",
+        "loadFailed": "Failed to load text-to-speech configuration",
+        "empty": "No speech providers configured.",
+        "reorderHint": "Drag to reorder. Readers see providers in this order.",
+        "dragHandle": "Reorder {name}",
+        "moveUp": "Move {name} up",
+        "moveDown": "Move {name} down",
+        "reorderFailed": "Failed to save the provider order",
+        "expand": "Show details for {name}",
+        "collapse": "Hide details for {name}",
+        "toggleEnabled": "Enable {name}",
+        "enableFailed": "Failed to update {name}",
+        "statusConnected": "Connected",
+        "statusUnreachable": "Unreachable",
+        "statusUnchecked": "Not checked",
+        "voiceCount": "{count, plural, one {# voice} few {# voices} many {# voices} other {# voices}}",
+        "configuration": "Configuration",
+        "fieldType": "Type",
+        "fieldTypeOpenAi": "OpenAI-compatible",
+        "fieldApiKey": "API key",
+        "apiKeySet": "Set",
+        "apiKeyNotSet": "Not set",
+        "fieldModel": "Default model",
+        "fieldModelNone": "Provider default",
+        "fieldDiscovery": "Voice discovery",
+        "discoverySupported": "Supported",
+        "discoveryUnsupported": "Not supported",
+        "voices": "Voices",
+        "voicesCurated": "{count} curated",
+        "voicesTapToPreview": "Tap a voice to preview it",
+        "voicesNone": "No voices configured yet",
+        "manageVoices": "Manage voices",
+        "previewVoice": "Preview {name}",
+        "previewStop": "Stop preview",
+        "previewFailed": "Could not play a preview for {name}",
+        "previewNeedsEnabled": "Enable this provider to preview its voices",
+        "editConfiguration": "Edit configuration",
+        "testConnection": "Test connection",
+        "testPassed": "Connected · {count, plural, one {# voice found} few {# voices found} many {# voices found} other {# voices found}}",
+        "testFailed": "Connection failed",
+        "delete": "Delete",
+        "deleteConfirm": "Delete the provider \"{name}\"? Readers using its voices fall back to another provider.",
+        "deleteFailed": "Failed to delete {name}",
+        "deleted": "Provider deleted",
+        "saveFailed": "Failed to save {name}",
+        "saved": "Provider saved",
+        "formAddTitle": "New provider",
+        "formEditTitle": "Edit provider",
+        "formName": "Name",
+        "formNamePlaceholder": "Kokoro",
+        "formBaseUrl": "Base URL",
+        "formBaseUrlPlaceholder": "http://localhost:8880/v1",
+        "formApiKey": "API key",
+        "formApiKeyOptional": "Optional",
+        "formApiKeyPlaceholder": "sk-...",
+        "formApiKeyKeep": "Leave blank to keep the current key",
+        "formModel": "Default model",
+        "formModelPlaceholder": "tts-1",
+        "formDiscovery": "This provider can list its own voices",
+        "formRequired": "Name and base URL are required"
+      },
       "serverFonts": {
         "noFontsYet": "Zatím žádná písma serveru"
       }
@@ -4434,6 +4499,18 @@
       "seeAllLibraries": "Zobrazit všechny knihovny ({count})",
       "seeAllSmartScopes": "Zobrazit všechny chytré rozsahy ({count})",
       "seeAllCollections": "Zobrazit všechny kolekce ({count})",
+      "podcasts": "Podcasts",
+      "newPodcastLibrary": "New Podcast Library",
+      "noPodcastLibraries": "No podcast libraries yet",
+      "filterPodcastLibraries": "Filter podcast libraries",
+      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
+      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
+      "queue": "Queue",
+      "mode": {
+        "books": "Books",
+        "podcasts": "Podcasts",
+        "switcherAria": "Switch between books and podcasts"
+      },
       "updateAvailable": "Aktualizovat {version}",
       "zones": {
         "browse": "Procházet"
@@ -4486,6 +4563,8 @@
       "columnVisibilityHint": "Použijte panel viditelnosti sloupce v záhlaví tabulky pro zobrazení nebo skrytí sloupců.",
       "columnVisibilityMobileHint": "Viditelnost sloupců může být spravována z záhlaví tabulky.",
       "searchPlaceholder": "Hledat název, autor, série, narrator...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
       "mobileSearch": {
         "description": "Hledat položky podle názvu, autora, série, nebo narratoru.",
         "done": "Hotovo"
@@ -4500,6 +4579,7 @@
         "display": "Zobrazení",
         "coverSize": "Velikost obalu",
         "gridGap": "Mezera mřížky",
+        "pixelValue": "{value} pixels",
         "showJumpRails": "Zobrazit skokové koleje",
         "columnsHint": "Použijte panel viditelnosti sloupce v záhlaví tabulky pro zobrazení nebo skrytí sloupců.",
         "coverShape": "Krycí tvar",
@@ -4550,7 +4630,8 @@
       "sort": {
         "custom": "Vlastní objednávka",
         "name": "Název",
-        "bookCount": "Počet knih"
+        "bookCount": "Počet knih",
+        "showCount": "Show count"
       },
       "ascending": "Vzestupně",
       "descending": "sestupně",
@@ -4559,7 +4640,9 @@
       "noMatches": "Žádné shody",
       "noMatchesHint": "Vyzkoušejte jiný hledaný výraz.",
       "bookCount": "Knihy: {count}",
+      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Vytvořte knihovnu, abyste mohli začít přidávat knihy.",
+      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Chytré rozsahy ukládají často používanou sadu filtrů.",
       "collectionsEmptyHint": "Sbírky skupinových knih, které si vyberete ručně."
     }
@@ -4605,6 +4688,7 @@
       "empty": {
         "continueReading": "Zatím neprobíhají žádné knihy. Začněte číst jednu a uvidíte ji zde.",
         "continueListening": "Zatím žádné audioboky neprobíhají. Začněte naslouchat jedné a uvidíte to zde.",
+        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "Žádné knihy označené ještě nechtějí přečíst.",
         "upNextInSeries": "Zatím žádná další série nevybírá. Dokončete objem pro další povrch.",
         "recentlyAdded": "Zatím v knihovně nejsou žádné knihy.",
@@ -4636,6 +4720,7 @@
         "recentlyAdded": "Nedávno přidané",
         "continueReading": "Pokračovat ve čtení",
         "continueListening": "Pokračovat v poslechu",
+        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Chcete přečíst",
         "upNextInSeries": "Další v řadě",
         "random": "Objevte něco nového",
@@ -4939,6 +5024,17 @@
       "sending": "Odesílání...",
       "queued": "{count, plural, =0 {Žádné e-maily ve frontě} one {Jeden email ve frontě} few {# e-mailů ve frontě} many {# e-mailů ve frontě} other {# e-mailů ve frontě}}",
       "failed": "Odeslání se nezdařilo"
+    }
+  },
+  "errors": {
+    "network": "Could not reach BookOrbit. Check your connection, then try again.",
+    "codes": {
+      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
+      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
+      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
+      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
+      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
+      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
     }
   },
   "hardcover": {
@@ -6326,9 +6422,7 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Nastavení skenování",
       "title": "Duplikovat knihy",
-      "description": "Naskenujte soubory a metadata pro možné duplicitní záznamy. Během skenování není nic smazáno.",
       "scope": "Rozsah knihovny",
       "allLibraries": "Všechny dostupné knihovny",
       "similarity": "Práh podobného názvu",
@@ -6340,7 +6434,6 @@
         "queued": "Skenovat ve frontě",
         "running": "Skenování knih"
       },
-      "groupsFound": "{count, plural, =0 {Žádné duplicitní skupiny} one {Jedna duplicitní skupina} few {# duplicitní skupiny} many {# duplicitní skupiny} other {# duplicitní skupiny}}",
       "filter": "Typ zápasu",
       "allReasons": "Všechny typy bitev",
       "reasons": {
@@ -6349,17 +6442,7 @@
         "exact_metadata": "Přesný název a autoři",
         "fuzzy_metadata": "Podobný název a autor"
       },
-      "similarityValue": "Podobnost názvu {percent}%",
       "notDuplicates": "Bez duplikátů",
-      "keepThis": "Ponechat tuto knihu",
-      "discardThis": "Zahodit tuto knihu",
-      "selectKeeperFirst": "Nejprve vyberte chovatele",
-      "noDirectMatch": "Žádná přímá shoda s chovatelem",
-      "moreFiles": "+{count} další",
-      "showDetails": "Zobrazit podrobnosti",
-      "hideDetails": "Skrýt podrobnosti",
-      "deleteSelected": "Odstranit vybrané {count}",
-      "openBook": "Otevřít podrobnosti pro {title}",
       "unknownAuthor": "Neznámý autor",
       "unknown": "Neznámý",
       "none": "Nic",
@@ -6370,14 +6453,8 @@
         "library": "Knihovna",
         "isbn": "ISBN",
         "formats": "Formáty",
-        "fileLocation": "Soubor",
-        "files": "Soubory",
-        "readingStatus": "Stav čtení",
-        "progress": "Průběh",
-        "path": "Cesta ke knihovně",
         "collections": "Sbírky",
-        "added": "Přidáno",
-        "updated": "Aktualizováno"
+        "added": "Přidáno"
       },
       "initial": {
         "title": "Najít duplicitní knihy",
@@ -6388,8 +6465,6 @@
         "description": "Současný rozsah, úroveň podobnosti a filtr neodpovídají žádné knihy."
       },
       "deleteDialog": {
-        "title": "Trvale odstranit duplicitní knihy?",
-        "description": "{count, plural, =0 {Tímto trvale smažete # vybranou knihu a její soubory.} one {Tím bude trvale odstraněna # vybraná kniha a její soubory.} few {Tímto trvale smažete # vybraných knih a jejich souborů.} many {Tímto trvale smažete # vybraných knih a jejich souborů.} other {Tímto trvale smažete # vybraných knih a jejich souborů.}}",
         "warning": "Metadata, sbírky, čtení dat a stav zařízení nejsou přenášeny do archivu. Přidružená data pro ostatní uživatele jsou také odstraněna.",
         "confirm": "{count, plural, =0 {Odstraňte # knihu} one {Odstraňte # knihu} few {Odstraňte # knihy} many {Odstraňte # knihy} other {Odstraňte # knihy}}",
         "success": "{count, plural, =0 {Žádné knihy nebyly smazány} one {Jedna duplicitní kniha smazána} few {# duplicitní knihy smazány} many {# duplicitní knihy smazány} other {# duplicitní knihy smazány}}"
@@ -6693,6 +6768,7 @@
   "titles": {
     "dashboard": "Nástěnka",
     "libraries": "Knihovny",
+    "podcastLibraries": "Podcast Libraries",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader synchronizace",

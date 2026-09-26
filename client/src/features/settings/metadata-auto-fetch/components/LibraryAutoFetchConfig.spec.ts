@@ -83,6 +83,7 @@ function makeRunHistoryConfig(lastRunAt: string, lastQueuedCount: number | null)
 function makeLibrary(): Library {
   return {
     id: 2,
+    type: 'books',
     name: 'PDFs',
     icon: null,
     displayOrder: 0,
@@ -93,6 +94,7 @@ function makeLibrary(): Library {
     formatPriority: [],
     allowedFormats: [],
     organizationMode: 'book_per_file',
+    addedAtSource: 'imported',
     excludePatterns: [],
     readingThreshold: 10,
     markAsFinishedPercentComplete: 90,

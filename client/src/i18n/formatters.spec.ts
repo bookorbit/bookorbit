@@ -44,11 +44,14 @@ describe('locale formatters', () => {
     expect(formatLanguageName('Custom language')).toBe('Custom language')
   })
 
-  it('formats file sizes with localized decimals', async () => {
+  it('formats file sizes with localized decimals and unit names', async () => {
     await setI18nLocale('en')
-    expect(formatBytes(1536)).toBe('1.5 KB')
+    expect(formatBytes(1536)).toBe('1.5 kB')
+    expect(formatBytes(0)).toBe('0 byte')
+    expect(formatBytes(null)).toBe('-')
+    expect(formatBytes('42000000')).toBe('40.1 MB')
 
     await setI18nLocale('nl')
-    expect(formatBytes(1536)).toBe('1,5 KB')
+    expect(formatBytes(1536)).toBe('1,5 kB')
   })
 })

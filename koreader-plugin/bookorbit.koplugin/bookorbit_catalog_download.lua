@@ -379,7 +379,7 @@ function CatalogDownload.install(Catalog)
                 return
             end
 
-            local linked = self:linkDownloadedFile(local_path)
+            local linked = self:linkDownloadedFile(local_path, file)
             if linked then
                 self:refreshOnDevice()
                 if self.markStackDirty then self:markStackDirty() end
@@ -395,14 +395,18 @@ function CatalogDownload.install(Catalog)
         end)
     end
 
-    function Catalog:linkDownloadedFile(local_path)
+    function Catalog:linkDownloadedFile(local_path, file)
         local ok, digest = pcall(util.partialMD5, local_path)
         if not ok or not digest then
             logger.warn("BookOrbit: downloaded file partial MD5 failed", local_path)
             return false
         end
 
-        local body, err = self.client:matchCheck({ digest }, { [digest] = { source = "file" } })
+        local candidate = { source = "file" }
+        if file and file.id then
+            candidate.book_file_id = file.id
+        end
+        local body, err = self.client:matchCheck({ digest }, { [digest] = candidate })
         if not body then
             logger.warn("BookOrbit: downloaded file match-check failed", err)
             return false
@@ -429,7 +433,7 @@ function CatalogDownload.install(Catalog)
     end
 
     function Catalog:showDownloadedDialog(local_path, linked)
-        local message = linked and _("File saved and linked to BookOrbit sync:\n%1\n\nOpen now?")
+        local message = linked and _("File saved and linked for BookOrbit progress sync:\n%1\n\nOpen now?")
             or _("File saved:\n%1\n\nOpen now?")
         UIManager:nextTick(function()
             UIManager:show(ConfirmBox:new{

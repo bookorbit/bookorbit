@@ -1159,7 +1159,7 @@ export const ACHIEVEMENT_SEED: NewAchievement[] = [
     tier: null,
     category: 'devices',
     name: 'Full Orbit',
-    description: 'Log reading from the web reader, a Kobo, and a KOReader device',
+    description: 'Log reading from three different reading sources',
     iconName: 'orbit',
     rarity: 'legendary',
     threshold: 3,

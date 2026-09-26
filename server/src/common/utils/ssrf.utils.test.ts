@@ -5,7 +5,7 @@ vi.mock('dns/promises', () => ({
 }));
 
 import { lookup } from 'dns/promises';
-import { ensureSafeUrl, ensureSafeRemoteHost, PrivateAddressException } from './ssrf.utils';
+import { ensureSafeUrl, ensureSafeRemoteHost, PrivateAddressException, RemoteHostResolutionException } from './ssrf.utils';
 
 const lookupMock = vi.mocked(lookup);
 
@@ -73,7 +73,9 @@ describe('ensureSafeRemoteHost', () => {
 
   it('throws BadRequestException when DNS lookup fails', async () => {
     lookupMock.mockRejectedValue(new Error('ENOTFOUND'));
-    await expect(ensureSafeRemoteHost('unresolvable.invalid')).rejects.toBeInstanceOf(BadRequestException);
+    const error = await ensureSafeRemoteHost('unresolvable.invalid').catch((caught) => caught);
+    expect(error).toBeInstanceOf(RemoteHostResolutionException);
+    expect(error).toBeInstanceOf(BadRequestException);
   });
 
   it('throws PrivateAddressException when any resolved address is private (even if some are public)', async () => {

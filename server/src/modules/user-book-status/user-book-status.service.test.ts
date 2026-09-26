@@ -32,6 +32,7 @@ const mockRepo = {
       ) => Promise<void>
     >(),
   findSessionBoundariesForBook: vi.fn<(...args: [number, number]) => Promise<SessionBoundaries>>(),
+  findUserTimeZone: vi.fn<(...args: [number]) => Promise<string>>(),
 };
 const mockAchievementEvents = {
   emit: vi.fn(),
@@ -50,6 +51,7 @@ beforeEach(() => {
   mockRepo.upsert.mockResolvedValue(undefined);
   mockRepo.upsertState.mockResolvedValue(undefined);
   mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: null, lastEndedAt: null });
+  mockRepo.findUserTimeZone.mockResolvedValue('UTC');
   mockKoboProjection.isEnabled.mockResolvedValue(true);
   mockKoboProjection.project.mockResolvedValue([]);
   service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository, mockAchievementEvents as never, mockKoboProjection as never);
@@ -764,5 +766,136 @@ describe('kobo status projection', () => {
       expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'rereading');
       expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [11], 'reading');
     });
+  });
+});
+
+/**
+ * Reading dates are calendar days, so the only question that matters is whose calendar.
+ * Issue #1458: they were filed against UTC's, which puts an evening read west of Greenwich
+ * on tomorrow and an early-morning read east of it on yesterday.
+ */
+describe('reading dates are filed on the reader local day', () => {
+  const mockAttempts = {
+    recordActivity: vi.fn(),
+    applyManualStatus: vi.fn(),
+  };
+  let attemptService: UserBookStatusService;
+
+  beforeEach(() => {
+    mockAttempts.recordActivity.mockReset();
+    mockAttempts.applyManualStatus.mockReset();
+    mockAttempts.recordActivity.mockResolvedValue(null);
+    mockAttempts.applyManualStatus.mockResolvedValue({
+      status: 'read',
+      source: 'manual',
+      startedAt: null,
+      finishedAt: null,
+      updatedAt: '2026-09-20T01:08:15.815Z',
+    });
+    attemptService = new UserBookStatusService(
+      mockRepo as unknown as UserBookStatusRepository,
+      mockAchievementEvents as never,
+      mockKoboProjection as never,
+      mockAttempts as never,
+    );
+  });
+
+  // 8:08 PM on the 19th in Chicago is already the 20th in UTC.
+  const EVENING_IN_CHICAGO = new Date('2026-09-20T01:08:15.815Z');
+
+  it('files an evening finish west of UTC on the day the reader just lived', async () => {
+    await attemptService.autoUpdate(1, 10, 100, 25, 98, { occurredAt: EVENING_IN_CHICAGO, timeZone: 'America/Chicago' });
+
+    expect(mockAttempts.recordActivity).toHaveBeenCalledWith(expect.objectContaining({ occurredOn: '2026-09-19' }));
+  });
+
+  it('files an early-morning read east of UTC on the day the reader is actually in', async () => {
+    // 6:08 AM on the 20th in Tokyo is still the 19th in UTC.
+    await attemptService.autoUpdate(1, 10, 100, 25, 98, { occurredAt: new Date('2026-09-19T21:08:15.815Z'), timeZone: 'Asia/Tokyo' });
+
+    expect(mockAttempts.recordActivity).toHaveBeenCalledWith(expect.objectContaining({ occurredOn: '2026-09-20' }));
+  });
+
+  it('keeps the UTC day for a reader who is actually in UTC', async () => {
+    await attemptService.autoUpdate(1, 10, 100, 25, 98, { occurredAt: EVENING_IN_CHICAGO, timeZone: 'UTC' });
+
+    expect(mockAttempts.recordActivity).toHaveBeenCalledWith(expect.objectContaining({ occurredOn: '2026-09-20' }));
+  });
+
+  it('looks the timezone up when the caller has no request user to read it from', async () => {
+    mockRepo.findUserTimeZone.mockResolvedValue('America/Chicago');
+
+    await attemptService.autoUpdate(1, 10, 100, 25, 98, { occurredAt: EVENING_IN_CHICAGO });
+
+    expect(mockRepo.findUserTimeZone).toHaveBeenCalledWith(1);
+    expect(mockAttempts.recordActivity).toHaveBeenCalledWith(expect.objectContaining({ occurredOn: '2026-09-19' }));
+  });
+
+  it('trusts the caller timezone over a lookup', async () => {
+    await attemptService.autoUpdate(1, 10, 100, 25, 98, { occurredAt: EVENING_IN_CHICAGO, timeZone: 'America/Chicago' });
+
+    expect(mockRepo.findUserTimeZone).not.toHaveBeenCalled();
+  });
+
+  it('uses the reader current day when the caller reports no instant', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(EVENING_IN_CHICAGO);
+    try {
+      await attemptService.autoUpdate(1, 10, 100, 25, 98, { timeZone: 'America/Chicago' });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(mockAttempts.recordActivity).toHaveBeenCalledWith(expect.objectContaining({ occurredOn: '2026-09-19' }));
+  });
+
+  it('falls back to now rather than dropping the update when a device sends an unparseable time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(EVENING_IN_CHICAGO);
+    try {
+      await attemptService.autoUpdate(1, 10, 100, 25, 98, { occurredAt: new Date('not a date'), timeZone: 'America/Chicago' });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(mockAttempts.recordActivity).toHaveBeenCalledWith(expect.objectContaining({ occurredOn: '2026-09-19' }));
+  });
+
+  it('marks a book read in the evening as read today, not tomorrow', async () => {
+    mockRepo.findUserTimeZone.mockResolvedValue('America/Chicago');
+    vi.useFakeTimers();
+    vi.setSystemTime(EVENING_IN_CHICAGO);
+    try {
+      await attemptService.setManual(1, 10, 'read');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    // applyManualStatus(userId, bookId, status, startedOn, endedOn, today, options)
+    expect(mockAttempts.applyManualStatus.mock.calls[0]?.[5]).toBe('2026-09-19');
+  });
+
+  it('converts an explicitly patched instant on the reader calendar', async () => {
+    mockRepo.findUserTimeZone.mockResolvedValue('America/Chicago');
+
+    await attemptService.updateManual(1, 10, { finishedAt: EVENING_IN_CHICAGO });
+
+    expect(mockAttempts.applyManualStatus.mock.calls[0]?.[4]).toBe('2026-09-19');
+  });
+
+  it('resolves the timezone once for a bulk edit rather than once per book', async () => {
+    mockRepo.findUserTimeZone.mockResolvedValue('America/Chicago');
+    mockAttempts.applyManualStatus.mockResolvedValue({
+      status: 'read',
+      source: 'manual',
+      startedAt: null,
+      finishedAt: null,
+      updatedAt: '2026-09-20T01:08:15.815Z',
+    });
+
+    await attemptService.bulkSetManual(1, [10, 11, 12, 13], 'read');
+
+    expect(mockAttempts.applyManualStatus).toHaveBeenCalledTimes(4);
+    expect(mockRepo.findUserTimeZone).toHaveBeenCalledTimes(1);
   });
 });

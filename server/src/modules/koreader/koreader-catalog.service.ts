@@ -3,8 +3,7 @@ import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { basename } from 'path';
 
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { ConfigType } from '@nestjs/config';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { DEFAULT_KOREADER_DEVICE_PATTERN, resolveUploadPath } from '@bookorbit/types';
@@ -36,12 +35,11 @@ import type {
   KoreaderCatalogSort,
   KoreaderCatalogSortOrder,
 } from '@bookorbit/types';
-import { bookThumbnailPath } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
-import { storageConfig } from '../../config/config';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
 import { BrowseCountsService } from '../browse-counts/browse-counts.service';
@@ -136,6 +134,8 @@ const ROOT_SECTIONS: KoreaderCatalogEntry[] = [
 
 @Injectable()
 export class KoreaderCatalogService {
+  private readonly logger = new Logger(KoreaderCatalogService.name);
+
   constructor(
     private readonly opdsBookService: OpdsBookService,
     private readonly bookService: BookService,
@@ -148,7 +148,6 @@ export class KoreaderCatalogService {
     private readonly appSettingsService: AppSettingsService,
     private readonly koreaderService: KoreaderService,
     private readonly pluginService: KoreaderPluginService,
-    @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
   getRoot(): { sections: KoreaderCatalogEntry[] } {
@@ -354,37 +353,41 @@ export class KoreaderCatalogService {
   private mapManifestBook(row: OpdsManifestBookRow, pattern: string, sanitizeForCrossPlatform: boolean): KoreaderCatalogManifestBook {
     const files = row.files.map<KoreaderCatalogManifestFile>((file) => {
       const extension = this.normalizeFormat(file.format);
+      const downloadVariant = extension === 'epub' && file.mediaOverlayAvailable ? 'audioless_epub' : 'original';
+      const hasSameFormatSibling = row.files.some((candidate) => candidate.id !== file.id && this.normalizeFormat(candidate.format) === extension);
+      const devicePath =
+        resolveUploadPath(
+          pattern,
+          buildPatternTokens({
+            metadata: {
+              title: row.title,
+              subtitle: row.subtitle,
+              publisher: row.publisher,
+              language: row.language,
+              isbn13: row.isbn13 ?? row.isbn10,
+              publishedYear: row.publishedYear,
+              seriesName: row.seriesName,
+              seriesIndex: row.seriesIndex,
+            },
+            authors: row.authors,
+            originalStem: basename(file.filename ?? row.title, `.${extension}`),
+            format: extension,
+            libraryName: row.libraryName,
+          }),
+          extension,
+          { sanitizeForCrossPlatform },
+        ) ??
+        file.filename ??
+        `${row.title}.${extension}`;
       return {
         id: file.id,
         format: extension,
-        sizeBytes: file.sizeBytes,
+        downloadVariant,
+        sizeBytes: downloadVariant === 'audioless_epub' ? null : file.sizeBytes,
         contentVersion: file.contentVersion.toISOString(),
-        fileHash: file.fileHash,
+        fileHash: downloadVariant === 'audioless_epub' ? null : file.fileHash,
         downloadUrl: `${CATALOG_BASE}/files/${file.id}/download`,
-        devicePath:
-          resolveUploadPath(
-            pattern,
-            buildPatternTokens({
-              metadata: {
-                title: row.title,
-                subtitle: row.subtitle,
-                publisher: row.publisher,
-                language: row.language,
-                isbn13: row.isbn13 ?? row.isbn10,
-                publishedYear: row.publishedYear,
-                seriesName: row.seriesName,
-                seriesIndex: row.seriesIndex,
-              },
-              authors: row.authors,
-              originalStem: basename(file.filename ?? row.title, `.${extension}`),
-              format: extension,
-              libraryName: row.libraryName,
-            }),
-            extension,
-            { sanitizeForCrossPlatform },
-          ) ??
-          file.filename ??
-          `${row.title}.${extension}`,
+        devicePath: this.variantDevicePath(devicePath, downloadVariant, hasSameFormatSibling),
       };
     });
 
@@ -474,8 +477,8 @@ export class KoreaderCatalogService {
   }
 
   async streamThumbnail(user: RequestUser, bookId: number, reply: FastifyReply, ifNoneMatch?: string): Promise<void> {
-    await this.bookService.verifyBookAccess(bookId, user);
-    const thumbnailPath = bookThumbnailPath(this.storage.appDataPath, bookId);
+    const thumbnailPath = await this.bookService.getThumbnailPath(bookId, user, { medium: 'ebook' });
+    if (!thumbnailPath) throw new NotFoundException('No thumbnail');
     try {
       const { mtimeMs } = await stat(thumbnailPath);
       const etag = `"${Math.floor(mtimeMs)}"`;
@@ -499,6 +502,27 @@ export class KoreaderCatalogService {
       throw new NotFoundException('File not found');
     }
 
+    if (file.format?.toLowerCase() === 'epub' && file.mediaOverlayAvailable === true) {
+      try {
+        const result = await this.bookService.createAudiolessEpubDownload(fileId, user, { linkKoreaderHash: true });
+        const stream = createReadStream(result.path);
+        stream.once('close', () => {
+          void result.cleanup();
+        });
+        reply.header('Content-Disposition', contentDispositionHeader('attachment', result.filename, 'download'));
+        reply.header('Content-Length', result.size);
+        reply.type('application/epub+zip');
+        reply.send(stream);
+        return;
+      } catch (err) {
+        const errorClass = err instanceof Error ? err.name : 'Error';
+        const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+        this.logger.warn(
+          `[koreader.stream_file] [fail] fileId=${fileId} userId=${user.id} errorClass=${errorClass} error="${errorMessage}" - audioless rebuild failed`,
+        );
+        throw new InternalServerErrorException('Unable to create audio-free EPUB');
+      }
+    }
     const format = this.normalizeFormat(file.format);
     const filename = await this.bookService.resolveDownloadFilename({
       bookId: file.bookId,
@@ -705,37 +729,43 @@ export class KoreaderCatalogService {
       .filter((file) => file.role === 'primary' || file.role === 'content')
       .map<KoreaderCatalogFile>((file) => {
         const extension = this.normalizeFormat(file.format);
+        const downloadVariant = extension === 'epub' && file.mediaOverlay?.available === true ? 'audioless_epub' : 'original';
+        const hasSameFormatSibling = detail.files.some(
+          (candidate) => candidate.id !== file.id && this.normalizeFormat(candidate.format) === extension,
+        );
+        const devicePath =
+          resolveUploadPath(
+            filePattern,
+            buildPatternTokens({
+              metadata: {
+                title,
+                subtitle: detail.subtitle,
+                publisher: detail.publisher,
+                language: detail.language,
+                isbn13: detail.isbn13 ?? detail.isbn10,
+                publishedYear: detail.publishedYear,
+                seriesName: detail.seriesName,
+                seriesIndex: detail.seriesIndex,
+              },
+              authors: detail.authors.map((author) => author.name),
+              originalStem: basename(file.filename ?? title, `.${extension}`),
+              format: extension,
+              libraryName: detail.libraryName,
+            }),
+            extension,
+            { sanitizeForCrossPlatform },
+          ) ??
+          file.filename ??
+          `${title}.${extension}`;
         return {
           id: file.id,
           format: extension,
           role: file.role,
-          sizeBytes: file.sizeBytes,
+          downloadVariant,
+          sizeBytes: downloadVariant === 'audioless_epub' ? null : file.sizeBytes,
           durationSeconds: file.durationSeconds,
           downloadUrl: `${CATALOG_BASE}/files/${file.id}/download`,
-          devicePath:
-            resolveUploadPath(
-              filePattern,
-              buildPatternTokens({
-                metadata: {
-                  title,
-                  subtitle: detail.subtitle,
-                  publisher: detail.publisher,
-                  language: detail.language,
-                  isbn13: detail.isbn13 ?? detail.isbn10,
-                  publishedYear: detail.publishedYear,
-                  seriesName: detail.seriesName,
-                  seriesIndex: detail.seriesIndex,
-                },
-                authors: detail.authors.map((author) => author.name),
-                originalStem: basename(file.filename ?? title, `.${extension}`),
-                format: extension,
-                libraryName: detail.libraryName,
-              }),
-              extension,
-              { sanitizeForCrossPlatform },
-            ) ??
-            file.filename ??
-            `${title}.${extension}`,
+          devicePath: this.variantDevicePath(devicePath, downloadVariant, hasSameFormatSibling),
         };
       });
 
@@ -774,6 +804,11 @@ export class KoreaderCatalogService {
       files,
       relatedSections,
     };
+  }
+
+  private variantDevicePath(path: string, variant: KoreaderCatalogFile['downloadVariant'], hasSameFormatSibling: boolean): string {
+    if (variant !== 'audioless_epub' || !hasSameFormatSibling) return path;
+    return /\.epub$/i.test(path) ? path.replace(/\.epub$/i, ' - Read Along.epub') : `${path} - Read Along.epub`;
   }
 
   private async buildRelatedSections(user: RequestUser, bookId: number): Promise<KoreaderCatalogRelatedSection[]> {

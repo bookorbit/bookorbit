@@ -16,7 +16,7 @@ function download(overrides: Partial<BookRequestDownloadRow> = {}): BookRequestD
     id: 11,
     requestId: 7,
     downloadClientId: 4,
-    clientHash: INFO_HASH,
+    clientKey: INFO_HASH,
     source: 'torrent_file',
     status: 'imported',
     ...overrides,
@@ -50,7 +50,7 @@ function makeService(
     status: vi.fn().mockResolvedValue(
       options.status ?? [
         {
-          infoHash: INFO_HASH,
+          clientKey: INFO_HASH,
           seed: { seeding: true, ratio: 1.4, ratioGoal: 2, seedingTimeSeconds: 60, seedingTimeGoalMinutes: 4320, uploadedBytes: 900 },
         },
       ],
@@ -86,7 +86,7 @@ describe('RequestSeedService.getSeedStatus', () => {
       downloadId: 11,
       downloadClientId: 4,
       downloadClientName: 'qbit',
-      clientHash: INFO_HASH,
+      clientKey: INFO_HASH,
       seeding: true,
       ratio: 1.4,
       ratioGoal: 2,
@@ -123,9 +123,17 @@ describe('RequestSeedService.getSeedStatus', () => {
     expect(adapter.status).not.toHaveBeenCalled();
   });
 
+  it('does not ask a Usenet client for seed state', async () => {
+    const { service, clients, adapter } = makeService({ latest: download({ source: 'nzb_file' }) });
+
+    await expect(service.getSeedStatus(7)).resolves.toBeNull();
+    expect(clients.resolveConfig).not.toHaveBeenCalled();
+    expect(adapter.status).not.toHaveBeenCalled();
+  });
+
   /** An adapter with nothing to say about seeding must not read as a torrent seeding at zero. */
   it('reads a client that reports no seed detail as not seeding', async () => {
-    const { service } = makeService({ status: [{ infoHash: INFO_HASH }] });
+    const { service } = makeService({ status: [{ clientKey: INFO_HASH }] });
     await expect(service.getSeedStatus(7)).resolves.toMatchObject({ seeding: false, ratio: null });
   });
 });

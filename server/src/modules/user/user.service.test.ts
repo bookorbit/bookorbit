@@ -52,7 +52,7 @@ describe('UserService', () => {
     replaceFilters: vi.fn(),
   };
 
-  const config = { get: vi.fn() };
+  const appConfiguration = { appUrl: '' };
   const appSettingsService = {
     getDefaultLibraryAccessLibraryIds: vi.fn(),
   };
@@ -68,13 +68,21 @@ describe('UserService', () => {
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     events = new UserEventsService();
-    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any, userStatistics as any, events, {
-      assertPasswordLoginEnabled: vi.fn(),
-    } as any);
+    service = new UserService(
+      userRepo as any,
+      appConfiguration as any,
+      contentFilterRepo as any,
+      appSettingsService as any,
+      userStatistics as any,
+      events,
+      {
+        assertPasswordLoginEnabled: vi.fn(),
+      } as any,
+    );
 
     mockHash.mockResolvedValue('hashed-secret');
     mockRandomBytes.mockReturnValue(Buffer.from('abcd', 'hex'));
-    config.get.mockReturnValue('https://app.example.com');
+    appConfiguration.appUrl = 'https://app.example.com';
     appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
 
     userRepo.create.mockResolvedValue({ id: 10, username: 'newuser', name: 'New User' });
@@ -196,7 +204,6 @@ describe('UserService', () => {
 
   it('createUser skips permission/library writes when lists are empty', async () => {
     userRepo.findByUsername.mockResolvedValue(null);
-    config.get.mockReturnValue(undefined);
 
     const result = await service.createUser({
       username: 'newuser',
@@ -208,7 +215,7 @@ describe('UserService', () => {
 
     expect(userRepo.setPermissions).not.toHaveBeenCalled();
     expect(userRepo.assignViewerLibraries).not.toHaveBeenCalled();
-    expect(result.resetUrl).toBe('http://localhost:5173/reset-password?token=reset-token');
+    expect(result.resetUrl).toBe('https://app.example.com/reset-password?token=reset-token');
   });
 
   it('findById returns user and throws when missing', async () => {
@@ -657,10 +664,27 @@ describe('UserService', () => {
     expect(contentFilterRepo.findByUserIdWithNames).toHaveBeenCalledWith(5);
   });
 
-  it('getContentFilters blocks non-superusers from reading another user filters', async () => {
+  it('getContentFilters allows manage_users to read another user filters', async () => {
+    const filters = {
+      includeTags: [{ id: 1, name: 'Sci-Fi' }],
+      excludeTags: [],
+      includeGenres: [],
+      excludeGenres: [],
+    };
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
+    contentFilterRepo.findByUserIdWithNames.mockResolvedValue(filters);
 
-    await expect(service.getContentFilters(5, reqUser({ id: 1, isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getContentFilters(5, reqUser({ id: 1, isSuperuser: false, permissions: [Permission.ManageUsers] }))).resolves.toEqual(
+      filters,
+    );
+    expect(contentFilterRepo.findByUserIdWithNames).toHaveBeenCalledWith(5);
+  });
+
+  it('getContentFilters blocks callers without manage_users from reading another user filters', async () => {
+    await expect(
+      service.getContentFilters(5, reqUser({ id: 1, isSuperuser: false, permissions: [Permission.LibraryDownload] })),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(userRepo.findByIdWithPermissions).not.toHaveBeenCalled();
     expect(contentFilterRepo.findByUserIdWithNames).not.toHaveBeenCalled();
   });
 
@@ -687,17 +711,41 @@ describe('UserService', () => {
     await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('setContentFilters blocks non-superusers from updating filters', async () => {
+  it('setContentFilters allows manage_users to update filters', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
 
-    await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
-    expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
+    await expect(
+      service.setContentFilters(
+        5,
+        { includeTagIds: [1], excludeGenreIds: [3], seeOwnRequestedBooks: true } as any,
+        reqUser({ isSuperuser: false, permissions: [Permission.ManageUsers] }),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(contentFilterRepo.replaceFilters).toHaveBeenCalledWith(5, {
+      includeTagIds: [1],
+      excludeTagIds: [],
+      includeGenreIds: [],
+      excludeGenreIds: [3],
+    });
+    expect(userRepo.update).toHaveBeenCalledWith(5, { seeOwnRequestedBooks: true });
   });
 
-  it('setContentFilters rejects administrator targets', async () => {
+  it('setContentFilters blocks callers without manage_users from updating filters', async () => {
+    await expect(
+      service.setContentFilters(5, {} as any, reqUser({ isSuperuser: false, permissions: [Permission.LibraryDownload] })),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(userRepo.findByIdWithPermissions).not.toHaveBeenCalled();
+    expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
+    expect(userRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('setContentFilters rejects superuser targets even for manage_users callers', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: true });
 
-    await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.setContentFilters(5, {} as any, reqUser({ isSuperuser: false, permissions: [Permission.ManageUsers] })),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
   });
 
@@ -734,13 +782,13 @@ describe('UserService', () => {
     await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('adminResetPassword returns default app URL when config is missing', async () => {
+  it('adminResetPassword builds the reset link from the configured app URL', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false, provisioningMethod: 'local' });
     userRepo.generateResetToken.mockResolvedValue('token-2');
-    config.get.mockReturnValue(undefined);
+    appConfiguration.appUrl = 'http://localhost:6263';
 
     await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).resolves.toEqual({
-      resetUrl: 'http://localhost:5173/reset-password?token=token-2',
+      resetUrl: 'http://localhost:6263/reset-password?token=token-2',
     });
   });
 });
@@ -773,7 +821,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
     findByUserIdWithNames: vi.fn(),
     replaceFilters: vi.fn(),
   };
-  const config = { get: vi.fn() };
+  const appConfiguration = { appUrl: '' };
   const appSettingsService = {
     getDefaultLibraryAccessLibraryIds: vi.fn(),
   };
@@ -783,11 +831,11 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    config.get.mockReturnValue('http://localhost:5173');
+    appConfiguration.appUrl = 'http://localhost:6263';
     appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
     service = new UserService(
       userRepo as any,
-      config as any,
+      appConfiguration as any,
       contentFilterRepo as any,
       appSettingsService as any,
       userStatistics as any,
@@ -809,7 +857,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: true, libraries: {}, collections: {}, smartScopes: {} },
+        seriesCollapsePreferences: { global: true, libraries: {}, collections: {}, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -826,7 +874,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: true, libraries: { '3': true }, collections: { '7': false }, smartScopes: {} },
+        seriesCollapsePreferences: { global: true, libraries: { '3': true }, collections: { '7': false }, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -843,7 +891,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: false, libraries: { '1': true, '2': false }, collections: {}, smartScopes: {} },
+        seriesCollapsePreferences: { global: false, libraries: { '1': true, '2': false }, collections: {}, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -860,7 +908,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: true, libraries: {}, collections: { '5': false, '9': true }, smartScopes: {} },
+        seriesCollapsePreferences: { global: true, libraries: {}, collections: { '5': false, '9': true }, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -897,8 +945,45 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, smartScopes: { '3': true } },
+        seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, smartScopes: { '3': true }, authorPages: false },
       },
     });
+  });
+
+  it('sets the author pages flag on its own', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '3': true }, collections: {} },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { authorPages: true });
+
+    expect(userRepo.update).toHaveBeenCalledWith(1, {
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '3': true }, collections: {}, smartScopes: {}, authorPages: true },
+      },
+    });
+  });
+
+  it('leaves the author pages flag alone when another scope is written', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, authorPages: true },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { global: true });
+
+    expect(userRepo.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          seriesCollapsePreferences: expect.objectContaining({ authorPages: true }),
+        }),
+      }),
+    );
   });
 });

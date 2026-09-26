@@ -129,7 +129,7 @@ export class SeriesRepository {
 
     const hasGapsExpr = this.buildHasGapsExpression(bookCountExpr);
     const completionHaving = this.buildCompletionHaving(params.completionStatus, bookCountExpr, readCountExpr, hasGapsExpr);
-    const sortExpr = this.buildSortExpression(params.sort, params.order, nameExpr, bookCountExpr, lastAddedExpr, readProgressExpr);
+    const sortExpr = this.buildSortExpression(params.sort, params.order, nameExpr, bookCountExpr, lastAddedExpr, readProgressExpr, params.q);
 
     // Facets are counted before the completion filter, so the tab a user is standing on can
     // still show what the other tabs hold. One pass replaces the separate total query.
@@ -604,11 +604,23 @@ export class SeriesRepository {
     bookCountExpr: SQL<number>,
     lastAddedExpr: SQL<string | null>,
     readProgressExpr: SQL<number>,
+    query?: string,
   ): SQL[] {
     const dir = order === 'asc' ? asc : desc;
     const tiebreaker = asc(nameExpr);
 
     switch (sort) {
+      case 'relevance': {
+        if (!query) return [asc(nameExpr)];
+        const authorScore = sql`COALESCE(max((
+          SELECT max(${seriesSearchScore(authors.name, query, 800, 680, 520, 340)})
+          FROM ${bookAuthors}
+          INNER JOIN ${authors} ON ${authors.id} = ${bookAuthors.authorId}
+          WHERE ${bookAuthors.bookId} = ${books.id}
+        )), 0)`;
+        const score = sql`GREATEST(${seriesSearchScore(bookSeries.name, query, 1000, 820, 620, 400)}, ${authorScore})`;
+        return [dir(score), tiebreaker];
+      }
       case 'bookCount':
         return [dir(bookCountExpr), tiebreaker];
       case 'lastAddedAt':
@@ -634,4 +646,22 @@ export class SeriesRepository {
         return [...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, order === 'asc' ? 'ASC' : 'DESC'), asc(books.id)];
     }
   }
+}
+
+function seriesSearchScore(
+  value: typeof authors.name | typeof bookSeries.name,
+  query: string,
+  exact: number,
+  prefix: number,
+  contains: number,
+  fuzzy: number,
+): SQL {
+  const normalizedValue = sql`lower(public.bookorbit_unaccent(COALESCE(${value}, '')))`;
+  const normalizedQuery = sql`lower(public.bookorbit_unaccent(${query}))`;
+  return sql`CASE
+    WHEN ${normalizedValue} = ${normalizedQuery} THEN ${exact}
+    WHEN ${normalizedValue} LIKE ${normalizedQuery} || '%' THEN ${prefix}
+    WHEN ${normalizedValue} LIKE '%' || ${normalizedQuery} || '%' THEN ${contains}
+    ELSE similarity(${normalizedValue}, ${normalizedQuery}) * ${fuzzy}
+  END`;
 }

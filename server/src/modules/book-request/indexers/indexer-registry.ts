@@ -3,6 +3,7 @@ import {
   DEFAULT_INDEXER_CATEGORIES,
   INDEXER_CREDENTIAL_KINDS,
   INDEXER_DEFAULT_BASE_URLS,
+  INDEXER_DELIVERY,
   INDEXER_MEDIA_KINDS,
   INDEXER_SEEDS_BACK,
   INDEXER_USES_CATEGORIES,
@@ -92,6 +93,13 @@ export class IndexerRegistry implements OnModuleInit {
     return adapter instanceof PluginIndexerAdapter ? adapter.plugin.seedsBack : INDEXER_SEEDS_BACK[adapter.type];
   }
 
+  delivery(type: IndexerAdapterType | string) {
+    const adapter = this.find(type);
+    if (!adapter) return 'torrent' as const;
+    if (adapter instanceof PluginIndexerAdapter) return adapter.plugin.seedsBack ? ('torrent' as const) : ('file' as const);
+    return INDEXER_DELIVERY[adapter.type];
+  }
+
   /**
    * The categories a source of this type searches when the operator has not chosen any.
    *
@@ -127,6 +135,7 @@ function describeBuiltIn(adapter: IndexerAdapter): IndexerAdapterDescriptor {
     mediaKinds: [...INDEXER_MEDIA_KINDS[type]],
     usesCategories: INDEXER_USES_CATEGORIES[type],
     seedsBack: INDEXER_SEEDS_BACK[type],
+    delivery: INDEXER_DELIVERY[type],
     supportsIsbnSearch: adapter.supportsIsbnSearch,
     defaultCategories: DEFAULT_INDEXER_CATEGORIES[type],
     ...(INDEXER_DEFAULT_BASE_URLS[type] ? { defaultBaseUrl: INDEXER_DEFAULT_BASE_URLS[type] } : {}),
@@ -149,11 +158,13 @@ function describePlugin(adapter: PluginIndexerAdapter): IndexerAdapterDescriptor
     label: plugin.label,
     builtIn: false,
     ...(plugin.version ? { version: plugin.version } : {}),
+    ...(plugin.update ? { updateable: true } : {}),
     requiresCredential: plugin.requiresCredential,
     credentialKind: plugin.credentialKind,
     mediaKinds: [...plugin.mediaKinds],
     usesCategories: plugin.usesCategories,
     seedsBack: plugin.seedsBack,
+    delivery: plugin.seedsBack ? 'torrent' : 'file',
     // The adapter's, not the plugin's: a plugin may leave the field off entirely.
     supportsIsbnSearch: adapter.supportsIsbnSearch,
     defaultCategories: plugin.defaultCategories ?? { ebook: [], audiobook: [], comic: [] },

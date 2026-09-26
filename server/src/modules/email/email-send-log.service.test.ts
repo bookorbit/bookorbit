@@ -72,8 +72,13 @@ describe('EmailSendLogService', () => {
   describe('findForUser', () => {
     it('should find for user with pagination', async () => {
       const result = await service.findForUser(mockUser, 1, 10);
-      expect(repo.findForUser).toHaveBeenCalledWith(1, 10, 10);
+      expect(repo.findForUser).toHaveBeenCalledWith(1, 10, 10, undefined);
       expect(result).toHaveLength(1);
+    });
+
+    it('should pass the book filter through', async () => {
+      await service.findForUser(mockUser, 0, 20, 965);
+      expect(repo.findForUser).toHaveBeenCalledWith(1, 20, 0, 965);
     });
   });
 

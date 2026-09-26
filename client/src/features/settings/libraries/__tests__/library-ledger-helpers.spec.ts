@@ -8,6 +8,7 @@ import { isLibrarySortField, matchesLibraryQuery, sortLibraries } from '../lib/l
 
 function library(overrides: Partial<Library> & Pick<Library, 'id' | 'name'>): Library {
   return {
+    type: 'books',
     icon: null,
     displayOrder: 0,
     coverAspectRatio: '2/3',
@@ -17,6 +18,7 @@ function library(overrides: Partial<Library> & Pick<Library, 'id' | 'name'>): Li
     formatPriority: [],
     allowedFormats: [],
     organizationMode: 'book_per_folder',
+    addedAtSource: 'imported',
     excludePatterns: [],
     readingThreshold: 10,
     markAsFinishedPercentComplete: 90,
@@ -102,7 +104,7 @@ describe('matchesLibraryQuery', () => {
   const novels = library({
     id: 1,
     name: 'Novels',
-    folders: [{ id: 1, path: '/srv/media/novels', createdAt: '2024-01-01T00:00:00.000Z' }],
+    folders: [{ id: 1, path: '/srv/media/novels', role: 'downloads', createdAt: '2024-01-01T00:00:00.000Z' }],
   })
 
   it('matches on name, case insensitively', () => {

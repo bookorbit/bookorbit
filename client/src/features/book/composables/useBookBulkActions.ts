@@ -10,6 +10,8 @@ import {
   type ReadStatus,
   type UserBookStatus,
 } from '@bookorbit/types'
+import { i18n } from '@/i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { api } from '@/lib/api'
 import { toast } from 'vue-sonner'
 import { useCoverVersions } from './useCoverVersions'
@@ -208,7 +210,7 @@ export function useBookBulkActions(
     const ids = querySelection?.value ? [] : [...selectedIds.value]
     const total = querySelection?.value ? querySelection.value.total : ids.length
     markRefreshing(ids)
-    inFlight.value = { label: 'Re-extracting covers', processed: 0, total }
+    inFlight.value = { label: i18n.global.t('book.coverRegeneration.bulkInProgress'), processed: 0, total }
     const res = await api('/api/v1/books/bulk-re-extract-cover', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -217,7 +219,7 @@ export function useBookBulkActions(
     if (!res.ok) {
       clearRefreshing(ids)
       inFlight.value = null
-      toast.error('Failed to re-extract covers')
+      toast.error(i18n.global.t('book.coverRegeneration.bulkFailed'))
       return
     }
     const reader = res.body!.getReader()
@@ -237,7 +239,7 @@ export function useBookBulkActions(
               bumpedIds.add(data.bookId)
               bumpVersion(data.bookId)
               clearRefreshing([data.bookId])
-              inFlight.value = { label: 'Re-extracting covers', processed: inFlight.value!.processed + 1, total }
+              inFlight.value = { label: i18n.global.t('book.coverRegeneration.bulkInProgress'), processed: inFlight.value!.processed + 1, total }
             }
             if (data.done) {
               processed = data.processed
@@ -255,7 +257,7 @@ export function useBookBulkActions(
       clearRefreshing(ids)
       inFlight.value = null
     }
-    toast.success(`Re-extracted ${updated} of ${processed} cover${processed === 1 ? '' : 's'}`)
+    toast.success(i18n.global.t('book.coverRegeneration.bulkCompleted', { updated: formatNumber(updated), processed }))
   }
 
   async function handleDownloadFiles(scope: ExportScope) {

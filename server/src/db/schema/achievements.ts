@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, jsonb, pgTable, serial, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, pgTable, serial, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { users } from './auth';
 
@@ -42,11 +42,16 @@ export const userAchievements = pgTable(
       .references(() => achievements.key, { onDelete: 'cascade' }),
     awardedAt: timestamp('awarded_at', { withTimezone: true }).notNull().defaultNow(),
     contextJson: jsonb('context_json'),
+    celebrationClaimId: uuid('celebration_claim_id'),
+    celebrationClaimedAt: timestamp('celebration_claimed_at', { withTimezone: true }),
+    celebratedAt: timestamp('celebrated_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('user_achievements_user_key_uidx').on(t.userId, t.achievementKey),
     index('user_achievements_user_id_idx').on(t.userId),
     index('user_achievements_user_awarded_at_idx').on(t.userId, t.awardedAt),
+    index('user_achievements_pending_celebration_idx').on(t.userId, t.celebratedAt, t.awardedAt),
+    uniqueIndex('user_achievements_celebration_claim_uidx').on(t.celebrationClaimId),
   ],
 );
 

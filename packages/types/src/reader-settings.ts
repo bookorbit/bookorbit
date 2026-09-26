@@ -196,6 +196,34 @@ export const AUDIO_READER_DEFAULTS: AudioReaderSettings = {
   skipForwardSeconds: 30,
 };
 
+/**
+ * Body of `PATCH /reader/defaults/:formatGroup`.
+ *
+ * Only the keys present in `set` are written. Every other key of the group keeps whatever the
+ * stored row already holds, so a client that owns a subset of the fields can save its own without
+ * having to send, and therefore without having to know, the rest. The iOS app is the only caller:
+ * it keeps the layout fields on the device and sends only the look fields.
+ */
+export interface ReaderDefaultsPatchBody<
+  G extends ReaderFormatGroup = ReaderFormatGroup,
+> {
+  set: Partial<ReaderSettingsMap[G]>;
+}
+
+/**
+ * Body of `PATCH /reader/preferences/:bookFileId`.
+ *
+ * `set` pins fields on the book; `unset` removes them so the field falls back to the account
+ * default. At least one of the two must be non-empty, and a key may not appear in both. A row left
+ * with no keys is deleted, which is the same state as never having been customized.
+ */
+export interface ReaderPreferencePatchBody<
+  G extends ReaderFormatGroup = ReaderFormatGroup,
+> {
+  set?: Partial<ReaderSettingsMap[G]>;
+  unset?: string[];
+}
+
 export const READER_GROUP_DEFAULTS: ReaderSettingsMap = {
   epub: EPUB_READER_DEFAULTS,
   pdf: PDF_READER_DEFAULTS,

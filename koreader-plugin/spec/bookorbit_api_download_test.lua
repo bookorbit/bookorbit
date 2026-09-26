@@ -9,9 +9,11 @@ local response = {
     on_chunk = nil,
 }
 local requests = {}
+local last_global_proxy
 
 package.loaded["socket.http"] = {
     request = function(request)
+        last_global_proxy = package.loaded["socket.http"].PROXY
         table.insert(requests, request)
         local active = response
         if response.queue and #response.queue > 0 then
@@ -334,6 +336,63 @@ local cancelled, cancel_err = api:download("/thumb", final_path, { temp_path = t
 assertEqual(cancelled, nil, "dismissed download fails")
 assertEqual(cancel_err, "cancelled", "dismissed download reports cancellation")
 assertEqual(exists(final_path), false, "dismissed download publishes no file")
+
+local mock_http = package.loaded["socket.http"]
+mock_http.PROXY = "http://127.0.0.1:8080"
+assertEqual(api:downloadBlocking("/thumb", final_path, { temp_path = temp_path }), true,
+    "HTTPS download succeeds without the global HTTP proxy")
+assertEqual(last_global_proxy, nil, "HTTPS download clears LuaSocket's global proxy")
+assertEqual(mock_http.PROXY, "http://127.0.0.1:8080",
+    "HTTPS download restores LuaSocket's global proxy")
+os.remove(final_path)
+mock_http.PROXY = nil
+
+local proxied_https_api = BookOrbitApi.new{
+    server_url = "https://books.example.com/api/v1",
+    username = "reader",
+    userkey = "key",
+    proxy = "http://127.0.0.1:8080",
+}
+assertEqual(proxied_https_api:downloadBlocking("/thumb", final_path, { temp_path = temp_path }), true,
+    "HTTPS download succeeds with a CONNECT proxy")
+assertEqual(requests[#requests].proxy, nil, "HTTPS download keeps the proxy URL out of LuaSocket")
+assertEqual(type(requests[#requests].create), "function", "HTTPS download uses a CONNECT socket")
+os.remove(final_path)
+
+G_reader_settings = {
+    isTrue = function(_, key) return key == "http_proxy_enabled" end,
+    readSetting = function(_, key)
+        if key == "http_proxy" then return "http://127.0.0.1:8080" end
+    end,
+}
+local http_api = BookOrbitApi.new{
+    server_url = "http://books.example.com/api/v1",
+    username = "reader",
+    userkey = "key",
+}
+assertEqual(http_api:downloadBlocking("/thumb", final_path, { temp_path = temp_path }), true,
+    "HTTP download succeeds with KOReader's configured proxy")
+assertEqual(requests[#requests].proxy, "http://127.0.0.1:8080",
+    "HTTP download passes the configured proxy to LuaSocket")
+os.remove(final_path)
+
+mock_http.PROXY = "http://127.0.0.1:8080"
+response.queue = {
+    { code = 301, headers = { location = "https://books.example.com/api/v1/file" } },
+    { code = 200, headers = { ["content-type"] = "image/jpeg" }, chunks = { "upgraded image" } },
+}
+assertEqual(http_api:downloadBlocking("/thumb", final_path, { temp_path = temp_path }), true,
+    "HTTP download follows a same-host HTTPS upgrade through CONNECT")
+assertEqual(requests[#requests - 1].proxy, "http://127.0.0.1:8080",
+    "HTTP download starts through the configured proxy")
+assertEqual(requests[#requests].proxy, nil, "HTTPS upgrade keeps proxy URL out of LuaSocket")
+assertEqual(type(requests[#requests].create), "function", "HTTPS upgrade uses a CONNECT socket")
+assertEqual(last_global_proxy, nil, "HTTPS upgrade clears LuaSocket's global proxy")
+assertEqual(mock_http.PROXY, "http://127.0.0.1:8080", "HTTPS upgrade restores the global proxy")
+os.remove(final_path)
+response.queue = nil
+mock_http.PROXY = nil
+G_reader_settings = nil
 
 os.execute("rm -rf '" .. temp_root .. "'")
 

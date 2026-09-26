@@ -238,7 +238,38 @@ describe('useSeriesCollapsePreference', () => {
 
       await setPreference('global', true)
 
-      expect(prefs.value).toEqual({ global: true, libraries: {}, collections: {}, smartScopes: {} })
+      expect(prefs.value).toEqual({ global: true, libraries: {}, collections: {}, smartScopes: {}, authorPages: false })
+    })
+
+    it('writes the author pages flag without touching the other scopes', async () => {
+      const userRef = ref(makeUser({ seriesCollapsePreferences: { global: true, libraries: { '2': true }, collections: {} } }))
+      mockUseAuth.mockReturnValue({ user: userRef } as ReturnType<typeof useAuth>)
+
+      const { setPreference, prefs } = useSeriesCollapsePreference()
+
+      await setPreference({ authorPages: true }, true)
+
+      expect(prefs.value!.authorPages).toBe(true)
+      expect(prefs.value!.global).toBe(true)
+      expect(prefs.value!.libraries).toEqual({ '2': true })
+      expect(mockApi).toHaveBeenCalledWith(
+        '/api/v1/users/me/series-collapse-preferences',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ authorPages: true }),
+        }),
+      )
+    })
+
+    it('turns the author pages flag back off', async () => {
+      const userRef = ref(makeUser({ seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, authorPages: true } }))
+      mockUseAuth.mockReturnValue({ user: userRef } as ReturnType<typeof useAuth>)
+
+      const { setPreference, prefs } = useSeriesCollapsePreference()
+
+      await setPreference({ authorPages: true }, false)
+
+      expect(prefs.value!.authorPages).toBe(false)
     })
 
     it('preserves existing library overrides when setting global', async () => {

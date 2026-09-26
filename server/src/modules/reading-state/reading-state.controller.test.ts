@@ -1,4 +1,4 @@
-import { EMPTY_CONTENT_FILTER_RULES, AuditAction, AuditResource, Permission } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, AuditAction, AuditResource } from '@bookorbit/types';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
@@ -55,7 +55,10 @@ describe('ReadingStateController', () => {
     expect(service.resetBookReadingState).toHaveBeenCalledWith(42, user);
   });
 
-  it('requires metadata-edit permission and defines the expected book audit event', () => {
+  // The reset clears only the caller's own sessions, progress and Kobo state, scoped by user id in
+  // the repository. Gating it on LibraryEditMetadata stopped read-only accounts from clearing
+  // their own reading history.
+  it('requires no permission beyond book access and defines the expected book audit event', () => {
     const method = ReadingStateController.prototype.resetBookReadingState;
     const permission = Reflect.getMetadata(PERMISSION_KEY, method);
     const audit = Reflect.getMetadata(AUDITABLE_KEY, method) as {
@@ -65,7 +68,7 @@ describe('ReadingStateController', () => {
       description: (request: { params: Record<string, string> }, response: unknown) => string;
     };
 
-    expect(permission).toBe(Permission.LibraryEditMetadata);
+    expect(permission).toBeUndefined();
     expect(audit).toMatchObject({ action: AuditAction.BookReadingStateReset, resource: AuditResource.Book });
     expect(audit.getResourceId({ params: { bookId: '42' } }, null)).toBe(42);
     expect(audit.description({ params: { bookId: '42' } }, null)).toBe('Reset reading state for book #42');

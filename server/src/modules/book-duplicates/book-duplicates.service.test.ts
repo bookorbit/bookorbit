@@ -45,6 +45,12 @@ function setup(accessibleLibraryIds = [2]) {
     createExactPairs: vi.fn().mockResolvedValue(undefined),
     createFuzzyPairs: vi.fn().mockResolvedValue(undefined),
     finalizeGroups: vi.fn().mockResolvedValue(0),
+    deleteDismissedPairs: vi.fn().mockResolvedValue(0),
+    computeScanTotals: vi.fn().mockResolvedValue({ totalExtraCopies: 0, totalReclaimableBytes: 0 }),
+    findGroupMemberIds: vi.fn().mockResolvedValue([]),
+    insertDismissals: vi.fn().mockResolvedValue(undefined),
+    deleteDismissal: vi.fn().mockResolvedValue(1),
+    listDismissals: vi.fn().mockResolvedValue([]),
     deleteScanKeys: vi.fn().mockResolvedValue(undefined),
     findGroups: vi.fn().mockResolvedValue({ groups: [], total: 0 }),
     findPairs: vi.fn().mockResolvedValue([]),
@@ -108,7 +114,7 @@ describe('BookDuplicatesService', () => {
     const { service, repo } = setup();
     repo.findScan.mockResolvedValue(scanRow({ status: 'completed', totalBooks: 3, processedBooks: 3, totalGroups: 1 }));
     repo.findGroups.mockResolvedValue({
-      groups: [{ id: 5, reasons: ['isbn'], maxTitleSimilarity: null }],
+      groups: [{ id: 5, reasons: ['isbn'], maxTitleSimilarity: null, memberCount: 2, memberBytesTotal: 900, memberBytesMax: 500 }],
       total: 1,
     });
     repo.findPairs.mockResolvedValue([
@@ -139,10 +145,42 @@ describe('BookDuplicatesService', () => {
       })),
     );
 
-    const result = await service.getGroups(11, { page: 1, pageSize: 20 }, user);
+    const result = await service.getGroups(11, { page: 1, pageSize: 20, sortBy: 'reclaimable', order: 'desc' }, user);
 
-    expect(repo.findGroups).toHaveBeenCalledWith(11, 1, 20, [2], user, undefined);
+    expect(repo.findGroups).toHaveBeenCalledWith(11, 1, 20, [2], user, undefined, 'reclaimable', 'desc');
     expect(result.groups[0]?.pairs).toEqual([{ bookIdA: 1, bookIdB: 2, reasons: ['isbn'], titleSimilarity: null }]);
+    expect(result.groups[0]?.reclaimableBytes).toBe(400);
+  });
+
+  it('dismisses every pair in a group so the judgement survives a rescan', async () => {
+    const { service, repo } = setup();
+    repo.findScan.mockResolvedValue(scanRow({ status: 'completed' }));
+    repo.findGroupMemberIds.mockResolvedValue([9, 4, 7]);
+
+    await service.dismissGroup({ scanId: 11, groupId: 5 }, user);
+
+    expect(repo.insertDismissals).toHaveBeenCalledWith(7, [
+      { bookIdA: 4, bookIdB: 7 },
+      { bookIdA: 4, bookIdB: 9 },
+      { bookIdA: 7, bookIdB: 9 },
+    ]);
+  });
+
+  it('refuses to dismiss a group that is not in the scan', async () => {
+    const { service, repo } = setup();
+    repo.findScan.mockResolvedValue(scanRow({ status: 'completed' }));
+    repo.findGroupMemberIds.mockResolvedValue([9]);
+
+    await expect(service.dismissGroup({ scanId: 11, groupId: 5 }, user)).rejects.toThrow(NotFoundException);
+    expect(repo.insertDismissals).not.toHaveBeenCalled();
+  });
+
+  it('normalises pair order when a dismissal is restored', async () => {
+    const { service, repo } = setup();
+
+    await service.restoreDismissal(9, 4, user);
+
+    expect(repo.deleteDismissal).toHaveBeenCalledWith(7, 4, 9);
   });
 
   it('cleans partial artifacts when a background scan fails', async () => {
@@ -169,6 +207,8 @@ describe('BookDuplicatesService', () => {
     expect(repo.insertExactMetadataKeys).toHaveBeenCalledWith(11, [2], user);
     expect(repo.createExactPairs).toHaveBeenCalledWith(11);
     expect(repo.createFuzzyPairs).toHaveBeenCalledWith(11, [2], user, 85);
+    expect(repo.deleteDismissedPairs).toHaveBeenCalledWith(11, 7);
+    expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'completed', totalExtraCopies: 0, totalReclaimableBytes: 0 }));
     expect(repo.deleteScanKeys).toHaveBeenCalledWith(11);
   });
 
@@ -176,7 +216,7 @@ describe('BookDuplicatesService', () => {
     const { service, repo } = setup([3]);
     repo.findScan.mockResolvedValue(scanRow({ status: 'completed' }));
 
-    await expect(service.getGroups(11, { page: 1, pageSize: 20 }, user)).rejects.toThrow(ForbiddenException);
+    await expect(service.getGroups(11, { page: 1, pageSize: 20, sortBy: 'reclaimable', order: 'desc' }, user)).rejects.toThrow(ForbiddenException);
     expect(repo.findGroups).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@ interface UseDraggableOrderOptions<T extends OrderableItem> {
   source: Ref<T[]>
   persist: (order: { id: number; displayOrder: number }[]) => Promise<void>
   debounceMs?: number
+  onPersistError?: (error: unknown, order: { id: number; displayOrder: number }[]) => void
 }
 
 export type ReorderStatusKind = 'lifted' | 'moved' | 'dropped' | 'cancelled'
@@ -21,7 +22,7 @@ export interface ReorderStatus<T> {
   total: number
 }
 
-export function useDraggableOrder<T extends OrderableItem>({ source, persist, debounceMs = 600 }: UseDraggableOrderOptions<T>) {
+export function useDraggableOrder<T extends OrderableItem>({ source, persist, debounceMs = 600, onPersistError }: UseDraggableOrderOptions<T>) {
   const localItems = ref<T[]>([]) as Ref<T[]>
   const liftedId = ref<number | null>(null)
   const status = ref<ReorderStatus<T> | null>(null)
@@ -49,8 +50,9 @@ export function useDraggableOrder<T extends OrderableItem>({ source, persist, de
           const item = source.value.find((i) => i.id === id)
           if (item) item.displayOrder = displayOrder
         })
-      } catch {
+      } catch (error) {
         localItems.value = [...snapshot]
+        onPersistError?.(error, order)
       }
     }, debounceMs)
   }

@@ -217,8 +217,12 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
       expect(senderListBeforeShare.statusCode).toBe(200);
       expect(senderListBeforeShare.json()).toEqual([]);
 
+      const senderToggleShare = await apiAs(senderOnly, 'PATCH', `/api/v1/email/providers/${createdProvider.id}/share`);
+      expectError(senderToggleShare, 403, Permission.ManageEmail);
+
       const managerToggleShare = await apiAs(managerOnly, 'PATCH', `/api/v1/email/providers/${createdProvider.id}/share`);
-      expectError(managerToggleShare, 403, 'Only superusers can share providers');
+      expect(managerToggleShare.statusCode).toBe(200);
+      expect((managerToggleShare.json() as { isShared: boolean }).isShared).toBe(true);
 
       const superToggleShare = await apiAs(superManager, 'PATCH', `/api/v1/email/providers/${createdProvider.id}/share`);
       expectError(superToggleShare, 403, 'Cannot modify this provider');

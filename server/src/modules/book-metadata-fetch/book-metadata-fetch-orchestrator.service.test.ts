@@ -78,6 +78,9 @@ function makeService(withGateway = true) {
   const notificationService = {
     notify: vi.fn().mockResolvedValue(undefined),
   };
+  const coverStore = {
+    fetchState: vi.fn().mockResolvedValue({ media: { hasEbook: true, hasAudio: false }, filled: { ebook: false, audio: false }, locked: [] }),
+  };
 
   const service = new BookMetadataFetchOrchestratorService(
     queueRepo as never,
@@ -92,6 +95,7 @@ function makeService(withGateway = true) {
     session,
     throttleTracker as never,
     notificationService as never,
+    coverStore as never,
     withGateway ? (gateway as never) : undefined,
   );
 
@@ -110,6 +114,7 @@ function makeService(withGateway = true) {
     throttleTracker,
     gateway,
     notificationService,
+    coverStore,
   };
 }
 
@@ -222,6 +227,47 @@ describe('BookMetadataFetchOrchestratorService', () => {
     expect(session.getSnapshot().sessionDone).toBe(1);
   });
 
+  it('processOne marks queue row as done when the book disappears before its cover state is read', async () => {
+    const { service, queueRepo, bookReadService, pipeline, session, coverStore } = makeService();
+    session.addToTotal(1);
+    bookReadService.findById.mockResolvedValue({
+      book: { books: { libraryId: 2, status: 'present' }, book_metadata: { title: 'Gone' } },
+      authorRows: [],
+      genreRows: [],
+      narratorRows: [],
+      communityRatingRows: [],
+    });
+    coverStore.fetchState.mockResolvedValue(null);
+
+    await (service as any).processOne(16, 'Gone');
+
+    expect(queueRepo.markDone).toHaveBeenCalledWith(16);
+    expect(queueRepo.markFailed).not.toHaveBeenCalled();
+    expect(pipeline.runWithSources).not.toHaveBeenCalled();
+    expect(session.getSnapshot().sessionDone).toBe(1);
+  });
+
+  it('processOne passes the cover slot state from the store to the pipeline', async () => {
+    const { service, bookReadService, pipeline, coverStore } = makeService();
+    bookReadService.findById.mockResolvedValue({
+      book: { books: { libraryId: 2, status: 'present' }, book_metadata: { title: 'Both media' } },
+      authorRows: [],
+      genreRows: [],
+      narratorRows: [],
+      communityRatingRows: [],
+    });
+    coverStore.fetchState.mockResolvedValue({ media: { hasEbook: true, hasAudio: true }, filled: { ebook: false, audio: true }, locked: ['ebook'] });
+    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(undefined);
+
+    await (service as any).processOne(17, 'Both media');
+
+    expect(coverStore.fetchState).toHaveBeenCalledWith(17);
+    expect(pipeline.runWithSources).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ cover: null, audioCover: true }), 2, {
+      coverMedia: { hasEbook: true, hasAudio: true },
+      lockedCoverSlots: ['ebook'],
+    });
+  });
+
   it('processOne persists resolved metadata and handles provider ids + related entities', async () => {
     const { service, bookMetadataLockService, bookReadService, metadataService } = makeService();
     bookMetadataLockService.filterResolvedMetadata.mockResolvedValue({
@@ -281,7 +327,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
     expect(metadataService.replaceGenres).toHaveBeenCalledWith(88, ['Genre A']);
     expect(metadataService.replaceNarrators).toHaveBeenCalledWith(88, [{ name: 'Narrator A', sortName: null }]);
     expect(metadataService.upsertComicMetadata).toHaveBeenCalledWith(88, { issueNumber: '12' });
-    expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith('https://cover', 88);
+    expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith([{ url: 'https://cover' }], 88, 'ebook');
   });
 
   it('processOne marks failures with extracted http status', async () => {
@@ -465,7 +511,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
         comicMetadata: { issueNumber: '28', volumeName: null },
       }),
       2,
-      { preserveExisting: true },
+      expect.objectContaining({ preserveExisting: true }),
     );
   });
 
@@ -647,6 +693,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       }),
       expect.any(Object),
       5,
+      expect.any(Object),
     );
   });
 

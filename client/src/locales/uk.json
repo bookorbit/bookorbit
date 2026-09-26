@@ -4567,6 +4567,18 @@
       "seeAllLibraries": "Переглянути всі бібліотеки ({count})",
       "seeAllSmartScopes": "Переглянути всі розумні обсяги ({count})",
       "seeAllCollections": "Переглянути всі колекції ({count})",
+      "podcasts": "Podcasts",
+      "newPodcastLibrary": "New Podcast Library",
+      "noPodcastLibraries": "No podcast libraries yet",
+      "filterPodcastLibraries": "Filter podcast libraries",
+      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
+      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
+      "queue": "Queue",
+      "mode": {
+        "books": "Books",
+        "podcasts": "Podcasts",
+        "switcherAria": "Switch between books and podcasts"
+      },
       "updateAvailable": "Оновити {version}",
       "zones": {
         "browse": "Переглянути"
@@ -4617,6 +4629,8 @@
       "columnVisibilityHint": "Використовуйте панель видимості стовпців у заголовку таблиці, щоб показати або приховати стовпці.",
       "columnVisibilityMobileHint": "Видимість стовпців може бути керована з заголовка таблиці.",
       "searchPlaceholder": "Пошук назви, автора, серії, оповіщення...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
       "mobileSearch": {
         "description": "Пошук елементів за заголовком, автором, серіями або оповідачем.",
         "done": "Виконано"
@@ -4631,6 +4645,7 @@
         "display": "Відображати",
         "coverSize": "Розмір обкладинки",
         "gridGap": "Ґратка проміжка",
+        "pixelValue": "{value} pixels",
         "showJumpRails": "Показувати рейки стрибків",
         "columnsHint": "Використовуйте панель видимості стовпців у заголовку таблиці, щоб показати або приховати стовпці.",
         "coverShape": "Форма обкладинки",
@@ -4685,7 +4700,8 @@
       "sort": {
         "custom": "Власне замовлення",
         "name": "Ім'я",
-        "bookCount": "Книжки"
+        "bookCount": "Книжки",
+        "showCount": "Show count"
       },
       "ascending": "За зростанням",
       "descending": "За спаданням",
@@ -4695,6 +4711,7 @@
       "noMatchesHint": "Спробуйте інший пошуковий термін.",
       "bookCount": "Книги: {count}",
       "librariesEmptyHint": "Створіть бібліотеку, щоб почати додавати книги.",
+      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Розумні області зберігають набір фільтрів, які ви часто використовуєте.",
       "collectionsEmptyHint": "Колекції згрупованих книг, які ви обираєте вручну."
     }
@@ -4738,6 +4755,7 @@
       "empty": {
         "continueReading": "Поки немає жодної книги. Почніть читати книжку, щоб побачити її тут.",
         "continueListening": "Поки що немає аудіокнижок. Почніть слухати один з них, щоб побачити його тут.",
+        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "Жодного листа ще не позначені як прочитані.",
         "upNextInSeries": "Ще немає наступних наборів виборів. Завершіть об'єм до поверхні наступного набору.",
         "recentlyAdded": "У вашій бібліотеці поки що немає книжок.",
@@ -4769,6 +4787,7 @@
         "recentlyAdded": "Нещодавно додані",
         "continueReading": "Читати далі",
         "continueListening": "Продовжити слухати",
+        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Хочу читати",
         "upNextInSeries": "Наступне завдання серії",
         "random": "Відкрийте щось нове",
@@ -5068,6 +5087,17 @@
       "sending": "Надсилається...",
       "queued": "{count, plural, =0 {Листи в черзі} one {одну е-пошту поставлено в чергу} few {# листів в черзі} many {# листів в черзі} other {# листів в черзі}}",
       "failed": "Не вдалося надіслати"
+    }
+  },
+  "errors": {
+    "network": "Could not reach BookOrbit. Check your connection, then try again.",
+    "codes": {
+      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
+      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
+      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
+      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
+      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
+      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
     }
   },
   "hardcover": {
@@ -6470,9 +6500,7 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Параметри сканування",
       "title": "Дублікати книг",
-      "description": "Сканувати файли та метадані для усіх потенційних дублікатів. Нічого не видаляється під час сканування.",
       "scope": "Область бібліотеки",
       "allLibraries": "Всі доступні бібліотеки",
       "similarity": "Коефіцієнт схожого заголовку",
@@ -6484,7 +6512,6 @@
         "queued": "Сканування поставлено в чергу",
         "running": "Сканування книг"
       },
-      "groupsFound": "{count, plural, =0 {Жодних дублікатів груп} one {Одна дублююча група} few {# дубльованих груп} many {# дубльованих груп} other {# дубльованих груп}}",
       "filter": "Тип співпадання",
       "allReasons": "Всі типи збігів",
       "reasons": {
@@ -6493,16 +6520,7 @@
         "exact_metadata": "Точна назва та автори",
         "fuzzy_metadata": "Аналогічний заголовок і автора"
       },
-      "similarityValue": "Подібність {percent}%",
       "notDuplicates": "Не дублікати",
-      "keepThis": "Залишити цю книгу",
-      "discardThis": "Видалити цю книгу",
-      "selectKeeperFirst": "Спочатку виберіть утримувач",
-      "noDirectMatch": "Немає прямого збігу з автором",
-      "moreFiles": "+{count} більше",
-      "showDetails": "Детальніше про твіт",
-      "hideDetails": "Приховати подробиці",
-      "deleteSelected": "Видалити вибране {count}",
       "unknownAuthor": "Невідомий автор",
       "unknown": "Не вказано",
       "none": "Без ефекту",
@@ -6513,14 +6531,8 @@
         "library": "Бібліотека",
         "isbn": "ІСБН",
         "formats": "Формати",
-        "fileLocation": "Файл",
-        "files": "Файли",
-        "readingStatus": "Стан читання",
-        "progress": "Прогрес",
-        "path": "Шлях до бібліотеки",
         "collections": "Колекції",
-        "added": "Додано",
-        "updated": "Оновлено"
+        "added": "Додано"
       },
       "initial": {
         "title": "Знайти повторювані книги",
@@ -6531,8 +6543,6 @@
         "description": "Жодна книга не відповідає поточному рівня схожості та фільтру збігів."
       },
       "deleteDialog": {
-        "title": "Остаточно видалити повторювані книги?",
-        "description": "{count, plural, =0 {Це остаточно видалить # вибрану книгу та її файли.} one {Це остаточно видалить # вибрану книгу та її файли.} few {Це остаточно видалить # обрані книги та їх файли.} many {Це остаточно видалить # обрані книги та їх файли.} other {Це остаточно видалить # обрані книги та їх файли.}}",
         "warning": "Метадата, колекції, дані читання та стан пристрою не передаються до збереженої книги. Усі інші користувачі також вилучаються.",
         "confirm": "{count, plural, =0 {Видаліть # книгу} one {Видалити # книгу} few {Видалити # книг} many {Видалити # книг} other {Видалити # книг}}",
         "success": "{count, plural, =0 {Книги не видалено} one {Одна дубліката книга видалена} few {# дублікатів видалено} many {# дублікатів видалено} other {# дублікатів видалено}}"
@@ -6828,6 +6838,7 @@
   "titles": {
     "dashboard": "Приладна дошка",
     "libraries": "Бібліотеки",
+    "podcastLibraries": "Podcast Libraries",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "Синхронізація KOReader",

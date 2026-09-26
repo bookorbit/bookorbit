@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import type { BookCard, BooksPage } from '@bookorbit/types'
+import type { AuthorBooksPage, BookCard } from '@bookorbit/types'
 
 vi.mock('../api/author', () => ({
   fetchAuthorBooks: vi.fn<typeof import('../api/author').fetchAuthorBooks>(),
@@ -15,8 +15,8 @@ function makeBook(id: number): BookCard {
   return { id, title: `Book ${id}` } as BookCard
 }
 
-function makePage(items: BookCard[], total = items.length): BooksPage {
-  return { items, total, page: 0, size: 50 }
+function makePage(items: BookCard[], total = items.length, bookTotal = total): AuthorBooksPage {
+  return { items, total, bookTotal, page: 0, size: 50 }
 }
 
 describe('useAuthorBooks', () => {
@@ -56,24 +56,82 @@ describe('useAuthorBooks', () => {
     expect(mockFetchAuthorBooks).not.toHaveBeenCalled()
   })
 
-  it('skips fetch when already loading', async () => {
+  it('does not fire a second request while one is in flight', async () => {
     const authorId = ref(1)
-    let resolveFirst!: (v: BooksPage) => void
+    let resolveFirst!: (v: AuthorBooksPage) => void
     mockFetchAuthorBooks.mockImplementation(
       () =>
-        new Promise<BooksPage>((resolve) => {
+        new Promise<AuthorBooksPage>((resolve) => {
           resolveFirst = resolve
         }),
     )
 
     const { load } = useAuthorBooks(authorId)
     const firstLoad = load(true)
-    const secondLoad = load(true)
+    const secondLoad = load(false)
 
     resolveFirst(makePage([makeBook(1)]))
     await Promise.all([firstLoad, secondLoad])
 
     expect(mockFetchAuthorBooks).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads with the new flag when collapseSeries changes during an unresolved load', async () => {
+    const authorId = ref(1)
+    let resolveFirst!: (v: AuthorBooksPage) => void
+    mockFetchAuthorBooks
+      .mockImplementationOnce(
+        () =>
+          new Promise<AuthorBooksPage>((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockResolvedValueOnce(makePage([makeBook(50)], 1, 4))
+
+    const { load, items, total, bookTotal, collapseSeries } = useAuthorBooks(authorId)
+    const flatLoad = load(true)
+
+    // The toggle flips while the flat request is still out, so the reset it asks for is the one
+    // that has to win.
+    collapseSeries.value = true
+    void load(true)
+
+    resolveFirst(makePage([makeBook(1), makeBook(2), makeBook(3), makeBook(4)], 4, 4))
+    await flatLoad
+    await vi.waitFor(() => expect(mockFetchAuthorBooks).toHaveBeenCalledTimes(2))
+
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ collapseSeries: false }))
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(2, 1, expect.objectContaining({ collapseSeries: true, page: 0 }))
+    expect(items.value).toHaveLength(1)
+    expect(items.value[0]!.id).toBe(50)
+    expect(total.value).toBe(1)
+    expect(bookTotal.value).toBe(4)
+  })
+
+  it('keeps the error of a stale request off the page when a reset is queued behind it', async () => {
+    const authorId = ref(1)
+    let rejectFirst!: (e: unknown) => void
+    mockFetchAuthorBooks
+      .mockImplementationOnce(
+        () =>
+          new Promise<AuthorBooksPage>((_resolve, reject) => {
+            rejectFirst = reject
+          }),
+      )
+      .mockResolvedValueOnce(makePage([makeBook(7)], 1))
+
+    const { load, error, items, collapseSeries } = useAuthorBooks(authorId)
+    const flatLoad = load(true)
+
+    collapseSeries.value = true
+    void load(true)
+
+    rejectFirst(new Error('stale request failed'))
+    await flatLoad
+    await vi.waitFor(() => expect(items.value).toHaveLength(1))
+
+    expect(error.value).toBeNull()
+    expect(items.value[0]!.id).toBe(7)
   })
 
   it('skips non-reset load when no more items to load', async () => {
@@ -101,6 +159,46 @@ describe('useAuthorBooks', () => {
     expect(items.value).toHaveLength(2)
     expect(total.value).toBe(5)
     expect(hasMore.value).toBe(true)
+  })
+
+  it('sends collapseSeries only once it is turned on', async () => {
+    const authorId = ref(1)
+    mockFetchAuthorBooks.mockResolvedValue(makePage([makeBook(1)]))
+
+    const { load, collapseSeries } = useAuthorBooks(authorId)
+    await load(true)
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ collapseSeries: false }))
+
+    collapseSeries.value = true
+    await load(true)
+
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(2, 1, expect.objectContaining({ collapseSeries: true }))
+  })
+
+  it('paginates on rows while keeping the book count separately', async () => {
+    const authorId = ref(1)
+    // 30 collapsed rows standing for 200 books: the row count is what says there is more to load,
+    // and the book count must not be the thing driving it.
+    mockFetchAuthorBooks.mockResolvedValueOnce(makePage([makeBook(1), makeBook(2)], 30, 200))
+
+    const { load, items, total, bookTotal, hasMore } = useAuthorBooks(authorId)
+    await load(true)
+
+    expect(items.value).toHaveLength(2)
+    expect(total.value).toBe(30)
+    expect(bookTotal.value).toBe(200)
+    expect(hasMore.value).toBe(true)
+  })
+
+  it('stops loading once every row has arrived, however many books they stand for', async () => {
+    const authorId = ref(1)
+    mockFetchAuthorBooks.mockResolvedValueOnce(makePage([makeBook(1), makeBook(2)], 2, 200))
+
+    const { load, hasMore, bookTotal } = useAuthorBooks(authorId)
+    await load(true)
+
+    expect(hasMore.value).toBe(false)
+    expect(bookTotal.value).toBe(200)
   })
 
   it('resets items and page on reset=true', async () => {
@@ -199,14 +297,15 @@ describe('useAuthorBooks', () => {
     expect(loading.value).toBe(false)
   })
 
-  it('passes sort, order, and libraryId to fetchAuthorBooks', async () => {
+  it('passes sort, order, libraryId, and collapseSeries to fetchAuthorBooks', async () => {
     const authorId = ref(5)
     mockFetchAuthorBooks.mockResolvedValue(makePage([]))
 
-    const { load, sort, order, libraryId } = useAuthorBooks(authorId)
+    const { load, sort, order, libraryId, collapseSeries } = useAuthorBooks(authorId)
     sort.value = 'title'
     order.value = 'asc'
     libraryId.value = 7
+    collapseSeries.value = true
 
     await load(true)
 
@@ -216,6 +315,7 @@ describe('useAuthorBooks', () => {
       sort: 'title',
       order: 'asc',
       libraryId: 7,
+      collapseSeries: true,
     })
   })
 
@@ -270,10 +370,10 @@ describe('useAuthorBooks', () => {
     await load(true)
     expect(items.value).toHaveLength(1)
 
-    let resolve!: (v: BooksPage) => void
+    let resolve!: (v: AuthorBooksPage) => void
     mockFetchAuthorBooks.mockImplementation(
       () =>
-        new Promise<BooksPage>((r) => {
+        new Promise<AuthorBooksPage>((r) => {
           resolve = r
         }),
     )

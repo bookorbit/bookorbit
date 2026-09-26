@@ -26,10 +26,13 @@ import {
   VolumeX,
   X,
 } from '@lucide/vue'
-import type { AudiobookChapter, BookDetail, BookDetailFile } from '@bookorbit/types'
+import type { AudiobookManifest, AudiobookManifestAsset, AudiobookManifestChapter, BookDetail } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import CoverFill from '@/features/book/components/CoverFill.vue'
 import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { bookCoverPalette } from '@/features/book/lib/book-cover'
+import { createCoverFillArtworkUrl } from '@/features/book/lib/cover-fill-artwork'
 import { useAudioProgress } from './composables/useAudioProgress'
 import { useAudioQueue } from './composables/useAudioQueue'
 import { useAudioSettings } from './composables/useAudioSettings'
@@ -42,9 +45,11 @@ const { t } = useI18n()
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
 const router = useRouter()
+const { coverUrl } = useCoverVersions()
 const trackingEnabled = computed(() => !props.peekMode)
 
 const detail = ref<BookDetail | null>(null)
+const manifest = ref<AudiobookManifest | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showChapters = ref(false)
@@ -67,27 +72,25 @@ watch(showChapters, (val) => {
 
 // ── Audio files ───────────────────────────────────────────────────────────────
 
-const audioFiles = computed<BookDetailFile[]>(() => {
-  if (!detail.value) return []
-  const AUDIO_EXTS = new Set(['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'])
-  return detail.value.files.filter((f) => f.format && AUDIO_EXTS.has(f.format.toLowerCase()))
-})
+const audioFiles = computed<AudiobookManifestAsset[]>(() => manifest.value?.assets ?? [])
 
 // ── Progress ──────────────────────────────────────────────────────────────────
 
-const progress = useAudioProgress(props.bookId, { trackingEnabled })
+const manifestRevision = computed(() => manifest.value?.revision ?? '')
+const progress = useAudioProgress(props.bookId, { trackingEnabled, manifestRevision })
 
 // ── Queue (created lazily after files load) ───────────────────────────────────
 
 let queue: ReturnType<typeof useAudioQueue> | null = null
 let stopQueuePlayingWatch: WatchStopHandle | null = null
+let stopQueueErrorWatch: WatchStopHandle | null = null
 const isPlaying = ref(false)
 const currentPosition = ref(0)
 const currentFileIndex = ref(0)
 
-function onFileEnd(fileId: number) {
+function onFileEnd(assetId: string) {
   if (!queue) return
-  const endedIdx = audioFiles.value.findIndex((f) => f.id === fileId)
+  const endedIdx = audioFiles.value.findIndex((f) => f.assetId === assetId)
   const nextIdx = (endedIdx >= 0 ? endedIdx : queue.currentIndex.value) + 1
   if (nextIdx < audioFiles.value.length) {
     queue.activateIndex(nextIdx, 0)
@@ -99,16 +102,17 @@ function onFileEnd(fileId: number) {
   }
 }
 
-function initQueue(startFileId: number, startPosition: number) {
+function initQueue(startAssetId: string, startPosition: number) {
   queue = useAudioQueue(
+    props.bookId,
     audioFiles.value.map((f) => ({
-      id: f.id,
+      assetId: f.assetId,
       format: f.format,
-      durationSeconds: f.durationSeconds,
+      durationMs: f.durationMs,
     })),
     onFileEnd,
   )
-  queue.goToFile(startFileId, startPosition)
+  queue.goToAsset(startAssetId, startPosition)
   queue.setSpeed(settings.playbackSpeed.value)
   queue.setVolume(settings.volume.value)
   stopQueuePlayingWatch?.()
@@ -118,6 +122,14 @@ function initQueue(startFileId: number, startPosition: number) {
       if (isPlaying.value !== playing) {
         isPlaying.value = playing
       }
+    },
+    { immediate: true },
+  )
+  stopQueueErrorWatch?.()
+  stopQueueErrorWatch = watch(
+    queue.loadError,
+    (message) => {
+      if (message && !error.value) error.value = message
     },
     { immediate: true },
   )
@@ -165,8 +177,8 @@ function startTicker() {
     currentFileIndex.value = queue.currentIndex.value
 
     if (queue.isPlaying.value) {
-      const fileId = audioFiles.value[queue.currentIndex.value]?.id
-      if (fileId) progress.update(fileId, pos, progressPct.value)
+      const assetId = audioFiles.value[queue.currentIndex.value]?.assetId
+      if (assetId) progress.update(assetId, pos)
 
       // Keep the reading session alive during continuous playback (every ~60s)
       activityTickCount++
@@ -213,11 +225,23 @@ watch(isPlaying, (val) => {
 })
 
 let mounted = true
+let mediaSessionArtworkUrl: string | null = null
+let mediaSessionArtworkRevision = 0
+
+function releaseMediaSessionArtwork() {
+  mediaSessionArtworkRevision++
+  if (!mediaSessionArtworkUrl) return
+  URL.revokeObjectURL(mediaSessionArtworkUrl)
+  mediaSessionArtworkUrl = null
+}
 
 onUnmounted(() => {
   mounted = false
+  releaseMediaSessionArtwork()
   stopQueuePlayingWatch?.()
   stopQueuePlayingWatch = null
+  stopQueueErrorWatch?.()
+  stopQueueErrorWatch = null
   queue?.destroy()
   stopTicker()
   progress.flush()
@@ -235,14 +259,14 @@ onUnmounted(() => {
 
 const displayTitle = computed(() => {
   if (!detail.value) return t('reader.audiobook.untitled')
+  if (manifest.value?.book.title) return manifest.value.book.title
   if (detail.value.title) return detail.value.title
-  const currentFile = audioFiles.value[currentFileIndex.value]
-  if (currentFile?.filename) return currentFile.filename
   return detail.value.folderPath.split('/').pop() || t('reader.audiobook.untitled')
 })
 
 const coverSeed = computed(() => detail.value?.title ?? detail.value?.folderPath.split('/').pop() ?? String(props.bookId))
 const coverPalette = computed(() => bookCoverPalette(coverSeed.value))
+const coverSrc = computed(() => (detail.value?.coverSource ? coverUrl(props.bookId, 'cover', detail.value.coverVersion, 'audio') : null))
 
 // ── Media Session ─────────────────────────────────────────────────────────────
 
@@ -256,6 +280,32 @@ function updateMediaPlaybackState() {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = isPlaying.value ? 'playing' : 'paused'
   }
+}
+
+function updateMediaSessionMetadata(book: BookDetail) {
+  if (!('mediaSession' in navigator)) return
+  releaseMediaSessionArtwork()
+  const revision = mediaSessionArtworkRevision
+  const src = book.coverSource ? coverUrl(props.bookId, 'cover', book.coverVersion, 'audio') : null
+  const metadata = (artwork: MediaImage[] = []) =>
+    new MediaMetadata({
+      title: displayTitle.value,
+      artist: book.authors.map((author) => author.name).join(', '),
+      artwork,
+    })
+
+  navigator.mediaSession.metadata = metadata()
+  if (!src) return
+
+  void createCoverFillArtworkUrl(src).then((artworkUrl) => {
+    if (!artworkUrl) return
+    if (!mounted || revision !== mediaSessionArtworkRevision) {
+      URL.revokeObjectURL(artworkUrl)
+      return
+    }
+    mediaSessionArtworkUrl = artworkUrl
+    navigator.mediaSession.metadata = metadata([{ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' }])
+  })
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
@@ -339,7 +389,7 @@ function nextTrack() {
 function fileAndOffsetForSeconds(targetSecs: number): { fileIndex: number; posInFile: number } | null {
   let offset = 0
   for (let i = 0; i < audioFiles.value.length; i++) {
-    const fileDur = audioFiles.value[i]!.durationSeconds ?? 0
+    const fileDur = (audioFiles.value[i]!.durationMs ?? 0) / 1000
     if (i === audioFiles.value.length - 1 || offset + fileDur > targetSecs) {
       return { fileIndex: i, posInFile: Math.max(0, targetSecs - offset) }
     }
@@ -423,29 +473,29 @@ function openSpeedPicker() {
   showSpeedPicker.value = !showSpeedPicker.value
 }
 
-function seekToChapter(chapter: AudiobookChapter) {
+function seekToChapter(chapter: AudiobookManifestChapter) {
   seekToAbsoluteSeconds(chapter.startMs / 1000, true)
 }
 
 function seekToBookmark(bm: AudioBookmark) {
-  seekToAbsoluteSeconds(bm.positionSeconds, true)
+  seekToAbsoluteSeconds(bm.positionMs / 1000, true)
 }
 
-function deleteBookmark(id: number) {
+function deleteBookmark(id: string) {
   audioBookmarks.remove(id)
 }
 
 // ── Bookmarks toggle ──────────────────────────────────────────────────────────
 
 async function toggleBookmark() {
-  const nearby = audioBookmarks.bookmarks.value.find((b) => Math.abs(b.positionSeconds - absolutePositionSeconds.value) < 5)
+  const nearby = audioBookmarks.bookmarks.value.find((b) => Math.abs(b.positionMs / 1000 - absolutePositionSeconds.value) < 5)
   if (nearby) {
     await audioBookmarks.remove(nearby.id)
   } else {
     const title = currentChapter.value?.title
       ? `${currentChapter.value.title} - ${formatTime(absolutePositionSeconds.value)}`
       : formatTime(absolutePositionSeconds.value)
-    await audioBookmarks.add(absolutePositionSeconds.value, title)
+    await audioBookmarks.add(absolutePositionSeconds.value, title, currentChapter.value?.id)
   }
 }
 
@@ -499,7 +549,7 @@ function setSleepTimer(minutes: number) {
 
 function setEndOfChapterSleep() {
   // If there are no chapters to watch, fall back to a 30-minute timer.
-  if (!detail.value?.audioMetadata?.chapters?.length) {
+  if (!manifest.value?.chapters.length) {
     setSleepTimer(30)
     return
   }
@@ -575,9 +625,9 @@ async function startTrackedReading() {
   delete query.mode
   await router.replace({ name: 'reader', params: route.params, query })
   await nextTick()
-  const fileId = audioFiles.value[currentFileIndex.value]?.id
-  if (fileId) {
-    progress.update(fileId, currentPosition.value, progressPct.value)
+  const assetId = audioFiles.value[currentFileIndex.value]?.assetId
+  if (assetId) {
+    progress.update(assetId, currentPosition.value)
     progress.flush()
   }
   session.onActivity()
@@ -588,7 +638,7 @@ async function startTrackedReading() {
 const absolutePositionSeconds = computed(() => {
   let offset = 0
   for (let i = 0; i < currentFileIndex.value; i++) {
-    offset += audioFiles.value[i]!.durationSeconds ?? 0
+    offset += (audioFiles.value[i]!.durationMs ?? 0) / 1000
   }
   return offset + currentPosition.value
 })
@@ -596,13 +646,7 @@ const absolutePositionSeconds = computed(() => {
 const absolutePositionMs = computed(() => absolutePositionSeconds.value * 1000)
 
 const totalBookDuration = computed(() => {
-  const durationFromFiles = audioFiles.value.reduce((sum, f) => sum + (f.durationSeconds ?? 0), 0)
-
-  if (durationFromFiles === 0) {
-    return detail.value?.audioMetadata?.durationSeconds ?? 0
-  }
-
-  return durationFromFiles
+  return (manifest.value?.totalDurationMs ?? 0) / 1000
 })
 
 const progressPct = computed(() => {
@@ -612,8 +656,8 @@ const progressPct = computed(() => {
 })
 
 const chapterTicks = computed(() => {
-  if (!detail.value?.audioMetadata?.chapters?.length || !totalBookDuration.value) return []
-  return detail.value.audioMetadata.chapters
+  if (!manifest.value?.chapters.length || !totalBookDuration.value) return []
+  return manifest.value.chapters
     .filter((ch) => ch.startMs > 0)
     .map((ch) => ({
       startMs: ch.startMs,
@@ -627,26 +671,25 @@ const bookmarkTicks = computed(() => {
   if (!total) return []
   return audioBookmarks.bookmarks.value.map((bm) => ({
     id: bm.id,
-    pct: Math.min((bm.positionSeconds / total) * 100, 100),
+    pct: Math.min((bm.positionMs / 1000 / total) * 100, 100),
   }))
 })
 
 const chapterDurations = computed<number[]>(() => {
-  const chapters = detail.value?.audioMetadata?.chapters
+  const chapters = manifest.value?.chapters
   if (!chapters?.length) return []
-  return chapters.map((ch, i) => {
-    const nextStartMs = chapters[i + 1]?.startMs ?? totalBookDuration.value * 1000
-    return Math.max(0, (nextStartMs - ch.startMs) / 1000)
+  return chapters.map((ch) => {
+    return Math.max(0, (ch.endMs - ch.startMs) / 1000)
   })
 })
 
 const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0] as const
 
-const currentChapter = computed<AudiobookChapter | null>(() => {
-  const chapters = detail.value?.audioMetadata?.chapters
+const currentChapter = computed<AudiobookManifestChapter | null>(() => {
+  const chapters = manifest.value?.chapters
   if (!chapters?.length) return null
   const pos = absolutePositionMs.value
-  let current: AudiobookChapter | null = null
+  let current: AudiobookManifestChapter | null = null
   for (const ch of chapters) {
     if (ch.startMs <= pos) current = ch
     else break
@@ -654,12 +697,12 @@ const currentChapter = computed<AudiobookChapter | null>(() => {
   return current
 })
 
-const scrubberHoverChapter = computed<AudiobookChapter | null>(() => {
+const scrubberHoverChapter = computed<AudiobookManifestChapter | null>(() => {
   if (scrubberHoverSeconds.value === null) return null
-  const chapters = detail.value?.audioMetadata?.chapters
+  const chapters = manifest.value?.chapters
   if (!chapters?.length) return null
   const posMs = scrubberHoverSeconds.value * 1000
-  let cur: AudiobookChapter | null = null
+  let cur: AudiobookManifestChapter | null = null
   for (const ch of chapters) {
     if (ch.startMs <= posMs) cur = ch
     else break
@@ -667,7 +710,7 @@ const scrubberHoverChapter = computed<AudiobookChapter | null>(() => {
   return cur
 })
 
-const isNearBookmark = computed(() => audioBookmarks.bookmarks.value.some((b) => Math.abs(b.positionSeconds - absolutePositionSeconds.value) < 5))
+const isNearBookmark = computed(() => audioBookmarks.bookmarks.value.some((b) => Math.abs(b.positionMs / 1000 - absolutePositionSeconds.value) < 5))
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 
@@ -709,23 +752,18 @@ onMounted(async () => {
   document.addEventListener('keydown', handleKey)
 
   try {
-    const [detailRes] = await Promise.all([
+    const [detailRes, manifestRes] = await Promise.all([
       api(`/api/v1/books/${props.bookId}`).then((r) => r.json() as Promise<BookDetail>),
+      api(`/api/v1/audiobooks/${props.bookId}/manifest`).then((r) => r.json() as Promise<AudiobookManifest>),
       progress.load(),
       settings.init(),
     ])
     if (!mounted) return
     detail.value = detailRes
-    if (detailRes.audioMetadata?.chapters) {
-      detailRes.audioMetadata.chapters.sort((a, b) => a.startMs - b.startMs)
-    }
+    manifest.value = manifestRes
 
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: displayTitle.value,
-        artist: detailRes.authors.map((a: { name: string }) => a.name).join(', '),
-        artwork: detailRes.coverSource ? [{ src: `/api/v1/books/${props.bookId}/cover`, sizes: '512x512', type: 'image/jpeg' }] : [],
-      })
+      updateMediaSessionMetadata(detailRes)
       navigator.mediaSession.setActionHandler('play', togglePlay)
       navigator.mediaSession.setActionHandler('pause', togglePlay)
       navigator.mediaSession.setActionHandler('seekbackward', skipBack)
@@ -748,18 +786,20 @@ onMounted(async () => {
     return
   }
 
-  let startFileId = props.fileId
+  let startAssetId = audioFiles.value[0]!.assetId
   let startPosition = 0
 
-  if (progress.loaded.value && progress.resumeFileId.value !== null) {
-    startFileId = progress.resumeFileId.value
+  if (progress.loaded.value && progress.resumeAssetId.value !== null) {
+    startAssetId = progress.resumeAssetId.value
     startPosition = progress.resumePosition.value
   } else {
-    const isAudio = audioFiles.value.some((f) => f.id === startFileId)
-    if (!isAudio) startFileId = audioFiles.value[0]!.id
+    const detailAudioFiles =
+      detail.value?.files.filter((file) => file.format && ['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'].includes(file.format.toLowerCase())) ?? []
+    const detailIndex = detailAudioFiles.findIndex((file) => file.id === props.fileId)
+    startAssetId = audioFiles.value[Math.max(0, detailIndex)]?.assetId ?? startAssetId
   }
 
-  initQueue(startFileId, startPosition)
+  initQueue(startAssetId, startPosition)
   void audioBookmarks.load()
 })
 </script>
@@ -769,9 +809,9 @@ onMounted(async () => {
     <!-- Blurred cover backdrop -->
     <div class="absolute inset-0">
       <div
-        v-if="detail?.coverSource"
+        v-if="coverSrc"
         class="absolute inset-0 scale-110"
-        :style="{ backgroundImage: `url(/api/v1/books/${props.bookId}/cover)`, backgroundSize: 'cover', backgroundPosition: 'center' }"
+        :style="{ backgroundImage: `url(${coverSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }"
       />
       <div v-else class="absolute inset-0" :style="{ background: coverPalette.gradient }" />
       <div class="absolute inset-0 backdrop-blur-3xl bg-black/60" />
@@ -804,8 +844,8 @@ onMounted(async () => {
           </button>
           <div class="flex-1 min-w-0 px-1">
             <p class="text-sm font-semibold truncate">{{ displayTitle }}</p>
-            <p v-if="detail.audioMetadata?.narrators.length" class="text-xs text-white/55 truncate">
-              {{ detail.audioMetadata.narrators.map((n) => n.name).join(', ') }}
+            <p v-if="manifest?.book.narrators.length" class="text-xs text-white/55 truncate">
+              {{ manifest.book.narrators.join(', ') }}
             </p>
           </div>
           <div v-if="props.peekMode" class="flex h-8 items-center gap-1 rounded-md border border-white/20 bg-white/10 px-1.5 text-white">
@@ -846,14 +886,14 @@ onMounted(async () => {
               class="absolute -inset-4 rounded-2xl blur-3xl pointer-events-none transition-opacity duration-700"
               :class="isPlaying ? 'opacity-50' : 'opacity-15'"
               :style="
-                detail.coverSource
-                  ? { backgroundImage: `url(/api/v1/books/${props.bookId}/cover)`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                coverSrc
+                  ? { backgroundImage: `url(${coverSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                   : { background: coverPalette.gradient }
               "
             />
             <!-- Cover -->
             <div class="absolute inset-0 rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl">
-              <img v-if="detail.coverSource" :src="`/api/v1/books/${props.bookId}/cover`" class="w-full h-full object-cover" :alt="displayTitle" />
+              <CoverFill v-if="coverSrc" :src="coverSrc" :alt="displayTitle" loading="eager" />
               <BookCoverPlaceholder
                 v-else
                 :title="detail.title"
@@ -1063,9 +1103,9 @@ onMounted(async () => {
               </button>
               <button
                 class="text-sm text-left px-3 py-2 rounded-lg transition-colors text-white"
-                :class="detail?.audioMetadata?.chapters?.length ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'"
-                :disabled="!detail?.audioMetadata?.chapters?.length"
-                :title="!detail?.audioMetadata?.chapters?.length ? t('reader.audiobook.noChaptersAvailable') : undefined"
+                :class="manifest?.chapters.length ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'"
+                :disabled="!manifest?.chapters.length"
+                :title="!manifest?.chapters.length ? t('reader.audiobook.noChaptersAvailable') : undefined"
                 @click="setEndOfChapterSleep"
               >
                 {{ t('reader.audiobook.endOfChapter') }}
@@ -1168,9 +1208,9 @@ onMounted(async () => {
 
           <!-- Chapters list -->
           <div v-if="chaptersTab === 'chapters'" class="flex-1 overflow-y-auto">
-            <div v-if="detail.audioMetadata?.chapters?.length">
+            <div v-if="manifest?.chapters.length">
               <button
-                v-for="(chapter, i) in detail.audioMetadata.chapters"
+                v-for="(chapter, i) in manifest.chapters"
                 :key="chapter.startMs"
                 class="w-full text-left px-5 py-3 hover:bg-white/10 transition-colors text-sm"
                 :class="currentChapter?.startMs === chapter.startMs ? 'text-white font-semibold' : 'text-white/65'"
@@ -1196,7 +1236,7 @@ onMounted(async () => {
               >
                 <button class="flex-1 text-left min-w-0" @click="seekToBookmark(bm)">
                   <span class="block text-sm text-white truncate">{{ bm.title }}</span>
-                  <span class="text-xs text-white/35 tabular-nums">{{ formatTime(bm.positionSeconds) }}</span>
+                  <span class="text-xs text-white/35 tabular-nums">{{ formatTime(bm.positionMs / 1000) }}</span>
                 </button>
                 <button
                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-white/10 text-white/50 hover:text-red-400 transition-all shrink-0"

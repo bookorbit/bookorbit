@@ -1,4 +1,4 @@
-import { INDEXER_COLORS, type IndexerColor } from '@bookorbit/types'
+import { INDEXER_COLORS, type DownloadDelivery, type IndexerColor } from '@bookorbit/types'
 
 /**
  * Written out rather than built from the slug, because Tailwind reads these files as text: a class
@@ -37,6 +37,7 @@ const DOT_CLASSES: Record<IndexerColor, string> = {
  */
 const PROTOCOL_CLASSES = {
   torrent: 'border-[var(--pill-torrent)]/40 bg-[var(--pill-torrent)]/10 text-[var(--pill-torrent)]',
+  usenet: 'border-[var(--pill-usenet)]/40 bg-[var(--pill-usenet)]/10 text-[var(--pill-usenet)]',
   direct: 'border-[var(--pill-direct)]/40 bg-[var(--pill-direct)]/10 text-[var(--pill-direct)]',
 } as const
 
@@ -56,6 +57,6 @@ export function sourceDotClass(color: IndexerColor | null | undefined): string {
   return isIndexerColor(color) ? DOT_CLASSES[color] : 'bg-muted-foreground/40'
 }
 
-export function protocolChipClass(seedsBack: boolean): string {
-  return seedsBack ? PROTOCOL_CLASSES.torrent : PROTOCOL_CLASSES.direct
+export function protocolChipClass(delivery: DownloadDelivery): string {
+  return delivery === 'file' ? PROTOCOL_CLASSES.direct : PROTOCOL_CLASSES[delivery]
 }

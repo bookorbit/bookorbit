@@ -108,7 +108,7 @@ export class DelugeAdapter implements DownloadClientAdapter {
   private readonly sessions = new Map<number, DelugeSession>();
   private requestId = 0;
 
-  async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientHash: string }> {
+  async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientKey: string }> {
     if (!release.torrentFile && !release.magnet) {
       throw new BadRequestException('A grab needs either a magnet link or a .torrent file');
     }
@@ -131,28 +131,28 @@ export class DelugeAdapter implements DownloadClientAdapter {
             options,
           ])
         : await this.rpc<string | null>(config, 'core.add_torrent_magnet', [release.magnet, options]);
-      hash = (added ?? release.infoHash).toLowerCase();
+      hash = (added ?? release.clientKey).toLowerCase();
     } catch (error) {
       // Deluge refuses a torrent it already holds outright rather than adopting it. An earlier
       // attempt on this release leaves its torrent behind when the import fails, and without this
       // every retry of that release is refused forever. Only the client can say which case it is.
-      if (!(await this.holds(release.infoHash, config))) throw error;
+      if (!(await this.holds(release.clientKey, config))) throw error;
       this.logger.log(
-        `[download_client.add] [end] clientId=${config.id} hash=${release.infoHash.toLowerCase()} adopted=true - the client already held this torrent`,
+        `[download_client.add] [end] clientId=${config.id} hash=${release.clientKey.toLowerCase()} adopted=true - the client already held this torrent`,
       );
-      hash = release.infoHash.toLowerCase();
+      hash = release.clientKey.toLowerCase();
     }
 
     await this.applyLabel(hash, config);
-    return { clientHash: hash };
+    return { clientKey: hash };
   }
 
   /**
    * Whether the client is already holding this exact infohash. Any failure to find out answers
    * "no", so an unreachable client surfaces the add failure rather than a false success.
    */
-  private async holds(infoHash: string, config: ResolvedClientConfig): Promise<boolean> {
-    const hash = infoHash.toLowerCase();
+  private async holds(clientKey: string, config: ResolvedClientConfig): Promise<boolean> {
+    const hash = clientKey.toLowerCase();
     try {
       const result = await this.rpc<Record<string, DelugeTorrent> | null>(config, 'core.get_torrents_status', [{ id: [hash] }, ['hash']]);
       return Object.keys(result ?? {}).some((key) => key.toLowerCase() === hash);
@@ -388,7 +388,7 @@ function toDownloadStatus(hash: string, entry: DelugeTorrent): DownloadStatus {
   const state = mapState(entry);
   const tracker = trackerFailure(entry);
   return {
-    infoHash: hash,
+    clientKey: hash,
     state,
     progressPercent: Math.max(0, Math.min(100, Math.round(entry.progress ?? 0))),
     downloadedBytes: entry.total_done ?? 0,

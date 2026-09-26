@@ -198,6 +198,11 @@ module.exports = {
       {
         preset: "conventionalcommits",
         releaseRules: [
+          // Must stay first: custom rules short-circuit the analyzer, and the
+          // default `{ breaking: true }` rule is only consulted when no custom
+          // rule matched. Without this, a `feat` carrying a BREAKING CHANGE
+          // footer releases as a minor.
+          { breaking: true, release: "major" },
           { type: "feat", release: "minor" },
           { type: "fix", release: "patch" },
           { type: "i18n", release: "patch" },

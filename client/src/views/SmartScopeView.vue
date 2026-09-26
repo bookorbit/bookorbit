@@ -58,7 +58,7 @@ import { useBookNavigation } from '@/features/book/composables/useBookNavigation
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
 import { useBookViewContext } from '@/features/book/composables/useBookViewContext'
 import { useBookTableShell } from '@/features/book/composables/useBookTableShell'
-import { useInfiniteScrollSentinel } from '@/features/book/composables/useInfiniteScrollSentinel'
+import { useInfiniteScrollSentinel } from '@/composables/useInfiniteScrollSentinel'
 import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'

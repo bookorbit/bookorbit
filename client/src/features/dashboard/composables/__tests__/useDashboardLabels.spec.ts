@@ -64,6 +64,7 @@ const SHELF_KEY_BY_TYPE: Record<ScrollerType, string> = {
   'recently-added': 'recentlyAdded',
   'continue-reading': 'continueReading',
   'continue-listening': 'continueListening',
+  'continue-podcasts': 'continuePodcasts',
   'want-to-read': 'wantToRead',
   'up-next-in-series': 'upNextInSeries',
   random: 'random',

@@ -1,9 +1,8 @@
 import { Controller, Param, ParseIntPipe, Post } from '@nestjs/common';
 
-import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { ReadingStateService } from './reading-state.service';
 
@@ -11,8 +10,12 @@ import { ReadingStateService } from './reading-state.service';
 export class ReadingStateController {
   constructor(private readonly service: ReadingStateService) {}
 
+  /**
+   * Clears only the caller's own sessions, progress and Kobo state, scoped by `user.id` in the
+   * repository. It therefore takes no permission beyond access to the book: requiring
+   * `LibraryEditMetadata` stopped read-only accounts from clearing their own reading history.
+   */
   @Post(':bookId/reset-reading-state')
-  @RequirePermission(Permission.LibraryEditMetadata)
   @Auditable({
     action: AuditAction.BookReadingStateReset,
     resource: AuditResource.Book,

@@ -30,13 +30,6 @@ export class DevicesEvaluator implements IAchievementEvaluator {
       return awards;
     }
 
-    // A web reading session alone can only complete a device badge if an external device already exists,
-    // so web-only users short-circuit here instead of running the heavier source queries every session.
-    if (ctx.eventName === ACHIEVEMENT_EVENT_READING_SESSION_SAVED) {
-      const hasDevice = await this.repo.hasAnyExternalDevice(ctx.userId);
-      if (!hasDevice) return awards;
-    }
-
     await this.evaluateSyncedUp(ctx.userId, earnedKeys, awards);
     await this.evaluateFullOrbit(ctx.userId, earnedKeys, awards);
     await this.evaluateTwoWorlds(ctx.userId, earnedKeys, awards);

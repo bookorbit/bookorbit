@@ -24,6 +24,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     readStatus: null,
     addedAt: '2026-01-01T00:00:00.000Z',
     updatedAt: null,
+    coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
     metadataScore: null,
     hasCover: false,
     hasMetadataLocks: false,
@@ -67,6 +68,9 @@ function mountDispatcher(overrides: Partial<typeof baseProps> = {}) {
         Lock: { template: '<svg data-test="lock-icon" />' },
         LockOpen: { template: '<svg data-test="lock-open-icon" />' },
         BookTableCoverCell: CoverCellStub,
+        Tooltip: { template: '<div><slot /></div>' },
+        TooltipTrigger: { template: '<div><slot /></div>' },
+        TooltipContent: { template: '<div data-testid="tooltip-content"><slot /></div>' },
       },
     },
   })
@@ -79,6 +83,7 @@ describe('BookTableCellDispatcher lock row', () => {
 
     expect(button.attributes('aria-label')).toBe('Lock all fields')
     expect(button.classes()).toContain('text-muted-foreground')
+    expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Lock all fields')
 
     await button.trigger('click')
     expect(wrapper.emitted('lockAll')).toBeTruthy()
@@ -117,6 +122,7 @@ describe('BookTableCellDispatcher lock row', () => {
 
     expect(button.attributes('aria-label')).toBe('Unlock all fields')
     expect(button.classes()).toContain('text-primary')
+    expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Unlock all fields')
 
     await button.trigger('click')
     expect(wrapper.emitted('unlockAll')).toBeTruthy()

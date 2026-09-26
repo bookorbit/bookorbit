@@ -1,4 +1,4 @@
-import { BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -10,6 +10,7 @@ import {
 import type { PageStatsUploadDto } from './dto';
 import type { KoreaderPluginRepository } from './koreader-plugin.repository';
 import type { KoreaderRepository } from './koreader.repository';
+import type { BookService } from '../book/book.service';
 import { KoreaderStatsService } from './koreader-stats.service';
 import type { DerivedKoreaderSession } from './koreader-stats.util';
 
@@ -44,6 +45,7 @@ describe('KoreaderStatsService', () => {
   };
   let pluginRepo: { ingestAndDeriveForBook: ReturnType<typeof vi.fn> };
   let achievementEvents: { emit: ReturnType<typeof vi.fn> };
+  let bookService: { verifyFileAccess: ReturnType<typeof vi.fn> };
   let service: KoreaderStatsService;
 
   beforeEach(() => {
@@ -62,11 +64,13 @@ describe('KoreaderStatsService', () => {
         .mockResolvedValue({ accepted: 2, duplicates: 0, insertedSessions: [], updatedSessions: [], deletedSessions: 0 }),
     };
     achievementEvents = { emit: vi.fn() };
+    bookService = { verifyFileAccess: vi.fn() };
 
     service = new KoreaderStatsService(
       koreaderRepo as unknown as KoreaderRepository,
       pluginRepo as unknown as KoreaderPluginRepository,
       achievementEvents as unknown as AchievementEventsService,
+      bookService as unknown as BookService,
     );
   });
 
@@ -121,6 +125,108 @@ describe('KoreaderStatsService', () => {
     expect(result.results[0]).toEqual({ hash: HASH_A, accepted: 0, duplicates: 2, watermark: 9000 });
   });
 
+  it('routes a colliding statistics row to its explicit accessible file when the hash matches', async () => {
+    koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(new Map());
+    bookService.verifyFileAccess.mockResolvedValue({
+      id: 11,
+      bookId: 21,
+      libraryId: 1,
+      format: 'epub',
+      role: 'content',
+      fileHash: HASH_A,
+    });
+    const dto = makeDto([
+      {
+        hash: HASH_A,
+        bookFileId: 11,
+        events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }],
+      },
+    ]);
+
+    const result = await service.uploadPageStats(makeUser(), dto);
+
+    expect(bookService.verifyFileAccess).toHaveBeenCalledWith(11, makeUser());
+    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 11, bookId: 21, libraryId: 1 }));
+    expect(result.unmatched).toEqual([]);
+  });
+
+  it('refuses an explicit statistics target whose server hash does not match', async () => {
+    bookService.verifyFileAccess.mockResolvedValue({
+      id: 11,
+      bookId: 21,
+      libraryId: 1,
+      format: 'epub',
+      role: 'content',
+      fileHash: HASH_B,
+    });
+    const dto = makeDto([
+      {
+        hash: HASH_A,
+        bookFileId: 11,
+        events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }],
+      },
+    ]);
+
+    const result = await service.uploadPageStats(makeUser(), dto);
+
+    expect(pluginRepo.ingestAndDeriveForBook).not.toHaveBeenCalled();
+    expect(result.unmatched).toEqual([HASH_A]);
+  });
+
+  it('refuses an inaccessible explicit statistics target instead of falling back to the hash match', async () => {
+    bookService.verifyFileAccess.mockRejectedValue(new NotFoundException());
+    const dto = makeDto([
+      {
+        hash: HASH_A,
+        bookFileId: 11,
+        events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }],
+      },
+    ]);
+
+    const result = await service.uploadPageStats(makeUser(), dto);
+
+    expect(pluginRepo.ingestAndDeriveForBook).not.toHaveBeenCalled();
+    expect(result.unmatched).toEqual([HASH_A]);
+  });
+
+  it('refuses a non-content file as an explicit statistics target', async () => {
+    bookService.verifyFileAccess.mockResolvedValue({
+      id: 11,
+      bookId: 21,
+      libraryId: 1,
+      format: 'jpg',
+      role: 'cover',
+      fileHash: HASH_A,
+    });
+    const dto = makeDto([
+      {
+        hash: HASH_A,
+        bookFileId: 11,
+        events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }],
+      },
+    ]);
+
+    const result = await service.uploadPageStats(makeUser(), dto);
+
+    expect(pluginRepo.ingestAndDeriveForBook).not.toHaveBeenCalled();
+    expect(result.unmatched).toEqual([HASH_A]);
+  });
+
+  it('does not disguise an unexpected explicit-target lookup failure as an unmatched book', async () => {
+    const failure = new Error('database unavailable');
+    bookService.verifyFileAccess.mockRejectedValue(failure);
+    const dto = makeDto([
+      {
+        hash: HASH_A,
+        bookFileId: 11,
+        events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }],
+      },
+    ]);
+
+    await expect(service.uploadPageStats(makeUser(), dto)).rejects.toBe(failure);
+    expect(pluginRepo.ingestAndDeriveForBook).not.toHaveBeenCalled();
+  });
+
   it('emits one reading-session event per inserted session below the backfill threshold', async () => {
     pluginRepo.ingestAndDeriveForBook.mockResolvedValue({
       accepted: 2,
@@ -136,7 +242,7 @@ describe('KoreaderStatsService', () => {
     expect(achievementEvents.emit).toHaveBeenCalledTimes(2);
     expect(achievementEvents.emit).toHaveBeenCalledWith(
       ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
-      expect.objectContaining({ userId: 7, bookFileId: 10, durationSeconds: 60, timezone: 'Asia/Kolkata' }),
+      expect.objectContaining({ userId: 7, bookFileId: 10, durationSeconds: 60, timezone: 'Asia/Kolkata', source: 'koreader' }),
     );
   });
 
@@ -168,6 +274,7 @@ describe('KoreaderStatsService', () => {
       progressDelta: 56,
       endProgress: 56.5,
       timezone: 'Asia/Kolkata',
+      source: 'koreader',
     });
   });
 

@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+script_dir="$(dirname -- "$0")"
+. "$script_dir/file-env.sh"
+
 log() {
   echo "BookOrbit startup: $*" >&2
 }
@@ -108,6 +111,8 @@ auto_old_space_size_mb() {
 urlencode() {
   node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$1"
 }
+
+load_file_env
 
 if [ -z "$DATABASE_URL" ]; then
   encoded_user="$(urlencode "$POSTGRES_USER")"

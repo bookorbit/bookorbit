@@ -3,12 +3,12 @@ import { ADMIN_TABS, ADMIN_TAB_INFO, normalizeAdminTab } from '../lib/admin-tabs
 
 describe('admin-tabs', () => {
   describe('ADMIN_TABS', () => {
-    it('contains exactly users, account activity, oidc, magic-links, and server-fonts', () => {
-      expect(ADMIN_TABS).toEqual(['users', 'account-activity', 'oidc', 'magic-links', 'server-fonts'])
+    it('contains exactly users, account activity, oidc, magic-links, server-fonts, and tts', () => {
+      expect(ADMIN_TABS).toEqual(['users', 'account-activity', 'oidc', 'magic-links', 'server-fonts', 'tts'])
     })
 
-    it('has length 5', () => {
-      expect(ADMIN_TABS.length).toBe(5)
+    it('has length 6', () => {
+      expect(ADMIN_TABS.length).toBe(6)
     })
 
     it('places server-fonts immediately after magic-links', () => {
@@ -51,6 +51,11 @@ describe('admin-tabs', () => {
       expect(ADMIN_TAB_INFO['server-fonts'].permission).toBe('manage_app_settings')
       expect(ADMIN_TAB_INFO['server-fonts'].titleKey).toBe('titles.admin.server-fonts')
     })
+
+    it('tts entry has manage_app_settings permission', () => {
+      expect(ADMIN_TAB_INFO.tts.permission).toBe('manage_app_settings')
+      expect(ADMIN_TAB_INFO.tts.titleKey).toBe('titles.admin.tts')
+    })
   })
 
   describe('normalizeAdminTab', () => {
@@ -92,6 +97,10 @@ describe('admin-tabs', () => {
 
     it('returns server-fonts when given "server-fonts"', () => {
       expect(normalizeAdminTab('server-fonts')).toBe('server-fonts')
+    })
+
+    it('returns tts when given "tts"', () => {
+      expect(normalizeAdminTab('tts')).toBe('tts')
     })
 
     it('is case-sensitive (Users is not valid)', () => {

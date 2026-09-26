@@ -74,7 +74,7 @@ const MAX_REDIRECTS = 5;
  * a terminal state, so this is several thousand times longer than the outcome needs to survive.
  * It is generous because the alternative to a stale entry is an outcome nobody ever saw: an
  * attempt whose `failed` is dropped too early reads as `unknown` instead, and the reason it
- * failed is replaced by "the download client no longer has this torrent".
+ * failed is replaced by "the download client no longer has this download".
  */
 const TERMINAL_RETENTION_MS = 10 * 60 * 1000;
 
@@ -118,7 +118,7 @@ export interface DirectDownloadRequest {
    * How the poll loop identifies this transfer. A direct file has no infohash, so the caller
    * derives a stable digest of the URL, which keeps the duplicate-grab index meaningful.
    */
-  infoHash: string;
+  clientKey: string;
 }
 
 /**
@@ -157,32 +157,32 @@ export class DirectDownloadService {
     return directDownloadRoot(this.storage.appDataPath);
   }
 
-  async add(release: DirectDownloadRequest): Promise<{ clientHash: string }> {
+  async add(release: DirectDownloadRequest): Promise<{ clientKey: string }> {
     const url = await ensureSafeUrl(release.fileUrl, { allowPrivate: ALLOW_PRIVATE });
 
-    const directory = join(this.root, release.infoHash);
+    const directory = join(this.root, release.clientKey);
     const target = safeJoin(directory, stagedDirectFileName(release.fileName, release.format));
 
     await mkdir(directory, { recursive: true });
-    this.start(release.downloadId, release.infoHash, url, target, directory, 0, null, null);
+    this.start(release.downloadId, release.clientKey, url, target, directory, 0, null, null);
 
-    return { clientHash: release.infoHash };
+    return { clientKey: release.clientKey };
   }
 
   /** Restores one active direct attempt left by the previous process. */
   async resume(download: BookRequestDownloadRow): Promise<boolean> {
     if (
       download.source !== 'direct_url' ||
-      download.clientHash === null ||
+      download.clientKey === null ||
       download.directUrl === null ||
       download.directFileName === null ||
-      this.progress.has(download.clientHash)
+      this.progress.has(download.clientKey)
     ) {
       return false;
     }
 
     const url = await ensureSafeUrl(download.directUrl, { allowPrivate: ALLOW_PRIVATE });
-    const directory = join(this.root, download.clientHash);
+    const directory = join(this.root, download.clientKey);
     const target = safeJoin(directory, download.directFileName);
     const existingBytes = await stat(target)
       .then((entry) => (entry.isFile() ? entry.size : 0))
@@ -192,16 +192,16 @@ export class DirectDownloadService {
     if (existingBytes > MAX_FILE_BYTES) return false;
 
     await mkdir(directory, { recursive: true });
-    this.start(download.id, download.clientHash, url, target, directory, existingBytes, validator, download.totalBytes);
+    this.start(download.id, download.clientKey, url, target, directory, existingBytes, validator, download.totalBytes);
     this.logger.log(
-      `[direct_download.resume] [start] downloadId=${download.id} hash=${download.clientHash} bytes=${existingBytes} - resuming an interrupted direct download`,
+      `[direct_download.resume] [start] downloadId=${download.id} key=${download.clientKey} bytes=${existingBytes} - resuming an interrupted direct download`,
     );
     return true;
   }
 
   private start(
     downloadId: number,
-    infoHash: string,
+    clientKey: string,
     url: URL,
     target: string,
     directory: string,
@@ -209,23 +209,23 @@ export class DirectDownloadService {
     validator: string | null,
     expectedBytes: number | null,
   ): void {
-    this.progress.set(infoHash, {
+    this.progress.set(clientKey, {
       state: 'downloading',
       downloadedBytes: offset,
       totalBytes: expectedBytes,
       contentPath: null,
     });
     const controller = new AbortController();
-    this.controllers.set(infoHash, controller);
+    this.controllers.set(clientKey, controller);
 
     // Deliberately not awaited: `add` hands the work over the way a torrent client does, and the
     // poll loop is what reports on it from here.
-    const task = this.run(downloadId, infoHash, url, target, controller.signal, offset, validator, expectedBytes)
+    const task = this.run(downloadId, clientKey, url, target, controller.signal, offset, validator, expectedBytes)
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
-        const current = this.progress.get(infoHash);
-        this.progress.set(infoHash, {
+        const current = this.progress.get(clientKey);
+        this.progress.set(clientKey, {
           state: 'failed',
           downloadedBytes: current?.downloadedBytes ?? offset,
           totalBytes: current?.totalBytes ?? expectedBytes,
@@ -233,14 +233,14 @@ export class DirectDownloadService {
           errorMessage: message,
           terminalAt: Date.now(),
         });
-        this.logger.warn(`[direct_download.fetch] [fail] hash=${infoHash} error="${sanitizeLogValue(message)}" - direct download failed`);
+        this.logger.warn(`[direct_download.fetch] [fail] key=${clientKey} error="${sanitizeLogValue(message)}" - direct download failed`);
       })
       .finally(async () => {
-        this.controllers.delete(infoHash);
-        this.tasks.delete(infoHash);
-        if (this.progress.get(infoHash)?.state !== 'completed') await this.discard(infoHash, directory);
+        this.controllers.delete(clientKey);
+        this.tasks.delete(clientKey);
+        if (this.progress.get(clientKey)?.state !== 'completed') await this.discard(clientKey, directory);
       });
-    this.tasks.set(infoHash, task);
+    this.tasks.set(clientKey, task);
     void task;
   }
 
@@ -253,14 +253,14 @@ export class DirectDownloadService {
    * read to the poll loop as an unmapped state, which it spells `downloading`, so an interrupted
    * transfer sat at "downloading 0%" until the twelve-hour stall timeout - a timeout sized for a
    * seederless torrent that might still finish, not for a transfer that certainly will not.
-   * Leaving the hash out puts it on the monitor's missing path, which gives it two minutes to
+   * Leaving the key out puts it on the monitor's missing path, which gives it two minutes to
    * reappear and then fails it with a reason.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- matches the client adapters it is polled alongside.
-  async status(hashes: string[]): Promise<DownloadStatus[]> {
+  async status(clientKeys: string[]): Promise<DownloadStatus[]> {
     this.pruneTerminal();
-    return hashes.flatMap((infoHash) => {
-      const current = this.progress.get(infoHash);
+    return clientKeys.flatMap((clientKey) => {
+      const current = this.progress.get(clientKey);
       if (!current) return [];
       const percent =
         current.state === 'completed'
@@ -270,7 +270,7 @@ export class DirectDownloadService {
             : 0;
       return [
         {
-          infoHash,
+          clientKey,
           state: current.state,
           progressPercent: percent,
           downloadedBytes: current.downloadedBytes,
@@ -286,27 +286,27 @@ export class DirectDownloadService {
    * There is no swarm to leave, so removing is only ever about the staged copy. The import has
    * already hardlinked what it wanted, and dropping our link does not touch the library's.
    */
-  async remove(hash: string, opts: { deleteFiles: boolean }): Promise<void> {
-    this.controllers.get(hash)?.abort();
-    await this.tasks.get(hash);
-    this.progress.delete(hash);
-    if (opts.deleteFiles) await rm(join(this.root, hash), { recursive: true, force: true });
+  async remove(clientKey: string, opts: { deleteFiles: boolean }): Promise<void> {
+    this.controllers.get(clientKey)?.abort();
+    await this.tasks.get(clientKey);
+    this.progress.delete(clientKey);
+    if (opts.deleteFiles) await rm(join(this.root, clientKey), { recursive: true, force: true });
   }
 
   /**
-   * Drops staging directories no attempt is behind any more, against the hashes of the attempts
+   * Drops staging directories no attempt is behind any more, against the keys of the attempts
    * that are. Bootstrap first resumes safe partial transfers and fails the rest, then calls this
    * to remove directories whose attempts no longer have work behind them.
    *
    * Safe to call while transfers are running only because anything this process is working on is
    * held in `progress` and skipped; the caller is still expected to be the boot path.
    */
-  async reapStaging(liveHashes: ReadonlySet<string>): Promise<number> {
+  async reapStaging(liveClientKeys: ReadonlySet<string>): Promise<number> {
     const entries = await readdir(this.root, { withFileTypes: true }).catch(() => []);
 
     let reaped = 0;
     for (const entry of entries) {
-      if (!entry.isDirectory() || liveHashes.has(entry.name) || this.progress.has(entry.name)) continue;
+      if (!entry.isDirectory() || liveClientKeys.has(entry.name) || this.progress.has(entry.name)) continue;
       await this.discard(entry.name, join(this.root, entry.name));
       reaped++;
     }
@@ -317,12 +317,14 @@ export class DirectDownloadService {
    * Best-effort: staging that could not be removed is wasted disk, and failing the transfer over
    * it would replace the reason it actually ended with a filesystem error nobody can act on.
    */
-  private async discard(hash: string, directory: string): Promise<void> {
+  private async discard(clientKey: string, directory: string): Promise<void> {
     try {
       await rm(directory, { recursive: true, force: true });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`[direct_download.discard] [fail] hash=${hash} error="${sanitizeLogValue(message)}" - staged download could not be removed`);
+      this.logger.warn(
+        `[direct_download.discard] [fail] key=${clientKey} error="${sanitizeLogValue(message)}" - staged download could not be removed`,
+      );
     }
   }
 
@@ -333,14 +335,14 @@ export class DirectDownloadService {
    */
   private pruneTerminal(): void {
     const cutoff = Date.now() - TERMINAL_RETENTION_MS;
-    for (const [hash, entry] of this.progress) {
-      if (entry.terminalAt !== undefined && entry.terminalAt <= cutoff) this.progress.delete(hash);
+    for (const [clientKey, entry] of this.progress) {
+      if (entry.terminalAt !== undefined && entry.terminalAt <= cutoff) this.progress.delete(clientKey);
     }
   }
 
   private async run(
     downloadId: number,
-    infoHash: string,
+    clientKey: string,
     url: URL,
     target: string,
     signal: AbortSignal,
@@ -357,7 +359,7 @@ export class DirectDownloadService {
 
     if (responseMeta.alreadyComplete) {
       await response.body?.cancel().catch(() => {});
-      this.progress.set(infoHash, {
+      this.progress.set(clientKey, {
         state: 'completed',
         downloadedBytes: offset,
         totalBytes: offset,
@@ -413,8 +415,8 @@ export class DirectDownloadService {
     };
     transfer.addEventListener('abort', cancelReader, { once: true });
     const onProgress = (bytes: number) => {
-      const current = this.progress.get(infoHash);
-      if (current) this.progress.set(infoHash, { ...current, downloadedBytes: bytes, totalBytes });
+      const current = this.progress.get(clientKey);
+      if (current) this.progress.set(clientKey, { ...current, downloadedBytes: bytes, totalBytes });
     };
 
     // Counted as it streams rather than buffered: an audiobook is gigabytes, and the point of
@@ -452,14 +454,14 @@ export class DirectDownloadService {
     if (totalBytes !== null && downloaded !== totalBytes) {
       throw new Error(`That source ended after ${downloaded} of ${totalBytes} bytes`);
     }
-    this.progress.set(infoHash, {
+    this.progress.set(clientKey, {
       state: 'completed',
       downloadedBytes: downloaded,
       totalBytes: totalBytes ?? downloaded,
       contentPath: target,
       terminalAt: Date.now(),
     });
-    this.logger.log(`[direct_download.fetch] [end] hash=${infoHash} bytes=${downloaded} - direct download finished`);
+    this.logger.log(`[direct_download.fetch] [end] key=${clientKey} bytes=${downloaded} - direct download finished`);
   }
 
   /**

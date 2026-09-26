@@ -4382,6 +4382,18 @@
       "seeAllLibraries": "Näytä kaikki kirjastot ({count})",
       "seeAllSmartScopes": "Näytä kaikki älykkäät soveltamisalat ({count})",
       "seeAllCollections": "Katso kaikki kokoelmat ({count})",
+      "podcasts": "Podcasts",
+      "newPodcastLibrary": "New Podcast Library",
+      "noPodcastLibraries": "No podcast libraries yet",
+      "filterPodcastLibraries": "Filter podcast libraries",
+      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
+      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
+      "queue": "Queue",
+      "mode": {
+        "books": "Books",
+        "podcasts": "Podcasts",
+        "switcherAria": "Switch between books and podcasts"
+      },
       "updateAvailable": "Päivitä {version}",
       "zones": {
         "browse": "Selaa"
@@ -4430,6 +4442,8 @@
       "columnVisibilityHint": "Käytä sarakkeen näkyvyyspaneelia taulukon otsakkeessa nähdäksesi tai piilottaaksesi sarakkeet.",
       "columnVisibilityMobileHint": "Sarakkeen näkyvyyttä voidaan hallita taulukon otsakkeesta.",
       "searchPlaceholder": "Etsi otsikko, tekijä, sarja, kertoja...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
       "mobileSearch": {
         "description": "Etsi kohteita otsikon, tekijän, sarjan, tai kertojan.",
         "done": "Valmis"
@@ -4444,6 +4458,7 @@
         "display": "Näyttö",
         "coverSize": "Kansien koko",
         "gridGap": "Ruudukon väli",
+        "pixelValue": "{value} pixels",
         "showJumpRails": "Näytä hyppykiskot",
         "columnsHint": "Käytä sarakkeen näkyvyyspaneelia taulukon otsakkeessa nähdäksesi tai piilottaaksesi sarakkeet.",
         "coverShape": "Kansikuva muoto",
@@ -4493,7 +4508,8 @@
       "sort": {
         "custom": "Mukautettu tilaus",
         "name": "Nimi",
-        "bookCount": "Kirjojen määrä"
+        "bookCount": "Kirjojen määrä",
+        "showCount": "Show count"
       },
       "ascending": "Nouseva",
       "descending": "Laskeva",
@@ -4501,7 +4517,9 @@
       "noMatches": "Ei osumia",
       "noMatchesHint": "Kokeile toista hakutermiä.",
       "bookCount": "Kirjat: {count}",
+      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Luo kirjasto aloittaaksesi kirjojen lisäämisen.",
+      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Smart scopes tallentaa joukon suodattimia, joita käytät usein.",
       "collectionsEmptyHint": "Kokoelmat ryhmä kirjoja valitset käsin."
     }
@@ -4545,6 +4563,7 @@
       "empty": {
         "continueReading": "Yhtään kirjaa ei ole vielä käynnissä. Aloita lukeminen nähdäksesi se täällä.",
         "continueListening": "Äänikirjoja ei ole vielä käynnissä. Aloita kuunteleminen nähdäksesi ne täällä.",
+        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "Yhtään merkittyä kirjaa ei halua lukea vielä.",
         "upNextInSeries": "Ei vielä seuraavalle sarjalle poimia. Viimeistele äänenvoimakkuus seuraavan sarjan pinnoittamiseksi.",
         "recentlyAdded": "Kirjastossa ei ole vielä kirjoja.",
@@ -4576,6 +4595,7 @@
         "recentlyAdded": "Viimeksi Lisätty",
         "continueReading": "Jatka Lukemista",
         "continueListening": "Jatka Kuuntelemista",
+        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Haluatko lukea",
         "upNextInSeries": "Seuraava ylös Sarjassa",
         "random": "Löydä Jotain Uutta",
@@ -4881,6 +4901,17 @@
       "sending": "Lähetetään...",
       "queued": "{count, plural, =0 {ei yhtään sähköpostia jonossa} one {yksi sähköposti jonossa} other {# sähköpostia jonossa}}",
       "failed": "Lähetys epäonnistui"
+    }
+  },
+  "errors": {
+    "network": "Could not reach BookOrbit. Check your connection, then try again.",
+    "codes": {
+      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
+      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
+      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
+      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
+      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
+      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
     }
   },
   "hardcover": {
@@ -6242,9 +6273,7 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Skannaa asetukset",
       "title": "Monista Kirjat",
-      "description": "Skannaa tiedostoja ja metatietoja mahdollisten kaksoiskappaleiden tietueille. Mitään ei poisteta skannauksen aikana.",
       "scope": "Kirjaston laajuus",
       "allLibraries": "Kaikki käytettävissä olevat kirjastot",
       "similarity": "Samankaltaisen otsikon kynnysarvo",
@@ -6256,7 +6285,6 @@
         "queued": "Skannaa jonossa",
         "running": "Skannataan kirjoja"
       },
-      "groupsFound": "{count, plural, =0 {Ei kaksoiskappaleita ryhmiä} one {Yksi kaksoiskappale ryhmä} other {# kaksoiskappaleita ryhmiä}}",
       "filter": "Täsmää tyyppi",
       "allReasons": "Kaikki ottelutyypit",
       "reasons": {
@@ -6265,16 +6293,7 @@
         "exact_metadata": "Tarkka otsikko ja kirjoittajat",
         "fuzzy_metadata": "Samanlainen otsikko ja tekijä"
       },
-      "similarityValue": "{percent}% otsikon samankaltaisuus",
       "notDuplicates": "Ei kaksoiskappaleita",
-      "keepThis": "Pidä tämä kirja",
-      "discardThis": "Hylkää tämä kirja",
-      "selectKeeperFirst": "Valitse pitäjä ensin",
-      "noDirectMatch": "Ei suoraa ottelua pitäjän kanssa",
-      "moreFiles": "+{count} lisää",
-      "showDetails": "Näytä tiedot",
-      "hideDetails": "Piilota tiedot",
-      "openBook": "Avaa tiedot kohteelle {title}",
       "unknownAuthor": "Tuntematon tekijä",
       "unknown": "Tuntematon",
       "none": "Ei Mitään",
@@ -6284,14 +6303,8 @@
         "library": "Kirjasto",
         "isbn": "ISBN",
         "formats": "Muodot",
-        "fileLocation": "Tiedosto",
-        "files": "Tiedostot",
-        "readingStatus": "Lukemisen tila",
-        "progress": "Edistyminen",
-        "path": "Kirjaston polku",
         "collections": "Kokoelmat",
-        "added": "Lisätty",
-        "updated": "Päivitetty"
+        "added": "Lisätty"
       },
       "initial": {
         "title": "Etsi kaksoiskirjoja",
@@ -6302,8 +6315,6 @@
         "description": "Mikään kirja ei vastannut nykyistä soveltamisalaa, samankaltaisuuden tasoa ja ottelu suodatin."
       },
       "deleteDialog": {
-        "title": "Poistetaanko kaksoiskirjoja pysyvästi?",
-        "description": "{count, plural, =0 {Tämä poistaa pysyvästi # valitun kirjan ja sen tiedostot.} one {Tämä poistaa pysyvästi # valitun kirjan ja sen tiedostot.} other {Tämä poistaa pysyvästi # valitut kirjat ja niiden tiedostot.}}",
         "warning": "Metatietoja, kokoelmia, lukutietoja ja laitteen tilaa ei siirretä säilytettyyn kirjaan. Myös muiden käyttäjien yhdistettyjä tietoja poistetaan.",
         "confirm": "{count, plural, =0 {Poista # kirja} one {Poista # kirja} other {Poista # kirjaa}}",
         "success": "{count, plural, =0 {Kirjoja ei poistettu} one {Yksi kaksoiskappale kirja poistettu} other {# kaksoiskappaletta poistettu}}"
@@ -6600,6 +6611,7 @@
   "titles": {
     "dashboard": "Hallintapaneeli",
     "libraries": "Kirjastot",
+    "podcastLibraries": "Podcast Libraries",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReaderin Synkronointi",

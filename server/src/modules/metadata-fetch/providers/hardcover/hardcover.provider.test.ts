@@ -105,7 +105,12 @@ describe('HardcoverProvider', () => {
     });
 
     it('searches by ISBN and returns mapped editions when found', async () => {
-      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([mockBook]);
+      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([
+        {
+          ...mockBook,
+          cached_tags: { Genre: [{ tag: 'Fantasy' }, { tag: 'Fiction' }] },
+        },
+      ]);
 
       const results = await provider.search({ isbn: '9780756404079' });
 
@@ -114,6 +119,7 @@ describe('HardcoverProvider', () => {
       expect(results).toHaveLength(1);
       expect(results[0].providerId).toBe('the-name-of-the-wind');
       expect(results[0].isbn13).toBe('9780756404079');
+      expect(results[0].genres).toEqual(['Fantasy', 'Fiction']);
     });
 
     it('orders physical editions before audiobooks in ISBN search results', async () => {
@@ -239,7 +245,10 @@ describe('HardcoverProvider', () => {
     });
 
     it('looks up by slug and returns the first mapped candidate', async () => {
-      vi.spyOn(client, 'lookupBySlug').mockResolvedValue(mockBook);
+      vi.spyOn(client, 'lookupBySlug').mockResolvedValue({
+        ...mockBook,
+        cached_tags: { Genre: [{ tag: 'Fantasy' }, { tag: 'Fiction' }] },
+      });
 
       const result = await provider.lookupById('the-name-of-the-wind');
 
@@ -247,6 +256,7 @@ describe('HardcoverProvider', () => {
       expect(result).not.toBeNull();
       expect(result?.providerId).toBe('the-name-of-the-wind');
       expect(result?.isbn13).toBe('9780756404079');
+      expect(result?.genres).toEqual(['Fantasy', 'Fiction']);
     });
 
     it('returns the physical edition even when an audiobook is listed first', async () => {

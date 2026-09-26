@@ -1,5 +1,7 @@
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
+  mkdtemp: vi.fn(),
+  rm: vi.fn(),
 }));
 
 vi.mock('fs', () => ({
@@ -8,11 +10,13 @@ vi.mock('fs', () => ({
 
 import { NotFoundException } from '@nestjs/common';
 import { createReadStream } from 'fs';
-import { stat } from 'fs/promises';
+import { mkdtemp, rm, stat } from 'fs/promises';
 
 import { KoboDownloadService } from './kobo-download.service';
 
 const statMock = vi.mocked(stat);
+const mkdtempMock = vi.mocked(mkdtemp);
+const rmMock = vi.mocked(rm);
 const createReadStreamMock = vi.mocked(createReadStream);
 
 function makeReply() {
@@ -34,6 +38,7 @@ function makeDeps() {
     kepubConversionService: { getKepubPath: vi.fn() },
     settingsService: { getSettings: vi.fn() },
     bookAccessService: { assertBookAccessible: vi.fn() },
+    audiolessEpubService: { writeArchive: vi.fn() },
   };
 }
 
@@ -43,7 +48,30 @@ function makeService(deps: ReturnType<typeof makeDeps>) {
     deps.kepubConversionService as never,
     deps.settingsService as never,
     deps.bookAccessService as never,
+    deps.audiolessEpubService as never,
   );
+}
+
+/** A narrated EPUB whose audio makes it far larger than the conversion limit. */
+function narratedEpubFile() {
+  return {
+    id: 22,
+    format: 'epub',
+    absolutePath: '/books/narrated.epub',
+    fileHash: 'h1',
+    sizeBytes: 1_500 * 1024 * 1024,
+    mediaOverlayAvailable: true,
+  };
+}
+
+function kepubSettings(overrides: Record<string, unknown> = {}) {
+  return {
+    convertToKepub: true,
+    forceEnableHyphenation: false,
+    kepubConversionLimitMb: 10,
+    twoWayProgressSync: false,
+    ...overrides,
+  };
 }
 
 describe('KoboDownloadService', () => {
@@ -132,7 +160,107 @@ describe('KoboDownloadService', () => {
 
     await service.streamBook(7, 11, makeReply() as never);
 
-    expect(streamKepubSpy).toHaveBeenCalledWith('/books/file.epub', 'h1', 11, 22, true, expect.anything());
+    expect(streamKepubSpy).toHaveBeenCalledWith('/books/file.epub', 'h1', 11, 22, true, false, expect.anything(), undefined);
+  });
+
+  it('strips narration before the size check so a read-along book still converts', async () => {
+    const deps = makeDeps();
+    deps.db.query.books.findFirst.mockResolvedValue({ id: 11, primaryFileId: 22 });
+    deps.db.query.bookFiles.findFirst.mockResolvedValue(narratedEpubFile());
+    deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
+    deps.settingsService.getSettings.mockResolvedValue(kepubSettings());
+    deps.audiolessEpubService.writeArchive.mockResolvedValue({ removedEntries: 9, sanitizedEntries: 9 });
+    mkdtempMock.mockResolvedValue('/tmp/kobo-epub' as never);
+    // The rebuilt copy is a couple of megabytes, well under the ten megabyte limit the original
+    // 1.5 GB archive could never meet.
+    statMock.mockResolvedValueOnce({ size: 2 * 1024 * 1024 } as never);
+    const service = makeService(deps);
+    const streamKepubSpy = vi.spyOn(service as any, 'streamKepub').mockResolvedValue(undefined);
+
+    await service.streamBook(7, 11, makeReply() as never);
+
+    expect(deps.audiolessEpubService.writeArchive).toHaveBeenCalledWith('/books/narrated.epub', '/tmp/kobo-epub/book.epub');
+    expect(streamKepubSpy).toHaveBeenCalledWith('/tmp/kobo-epub/book.epub', 'h1', 11, 22, false, true, expect.anything(), expect.any(Function));
+  });
+
+  it('streams the stripped copy when kepub conversion is turned off', async () => {
+    const deps = makeDeps();
+    deps.db.query.books.findFirst.mockResolvedValue({ id: 11, primaryFileId: 22 });
+    deps.db.query.bookFiles.findFirst.mockResolvedValue(narratedEpubFile());
+    deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
+    deps.settingsService.getSettings.mockResolvedValue(kepubSettings({ convertToKepub: false }));
+    deps.audiolessEpubService.writeArchive.mockResolvedValue({ removedEntries: 9, sanitizedEntries: 9 });
+    mkdtempMock.mockResolvedValue('/tmp/kobo-epub' as never);
+    statMock.mockResolvedValueOnce({ size: 2 * 1024 * 1024 } as never);
+    const service = makeService(deps);
+    const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
+
+    await service.streamBook(7, 11, makeReply() as never);
+
+    expect(streamFileSpy).toHaveBeenCalledWith('/tmp/kobo-epub/book.epub', 22, 'epub', expect.anything(), expect.any(Function));
+  });
+
+  it('serves the original archive and cleans up when the rebuild fails', async () => {
+    const deps = makeDeps();
+    deps.db.query.books.findFirst.mockResolvedValue({ id: 11, primaryFileId: 22 });
+    deps.db.query.bookFiles.findFirst.mockResolvedValue(narratedEpubFile());
+    deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
+    deps.settingsService.getSettings.mockResolvedValue(kepubSettings({ convertToKepub: false }));
+    deps.audiolessEpubService.writeArchive.mockRejectedValue(new Error('corrupt archive'));
+    mkdtempMock.mockResolvedValue('/tmp/kobo-epub' as never);
+    rmMock.mockResolvedValue(undefined as never);
+    const service = makeService(deps);
+    const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
+
+    await service.streamBook(7, 11, makeReply() as never);
+
+    expect(rmMock).toHaveBeenCalledWith('/tmp/kobo-epub', { recursive: true, force: true });
+    expect(streamFileSpy).toHaveBeenCalledWith('/books/narrated.epub', 22, 'epub', expect.anything());
+  });
+
+  it('leaves books without narration on the original path', async () => {
+    const deps = makeDeps();
+    deps.db.query.books.findFirst.mockResolvedValue({ id: 11, primaryFileId: 22 });
+    deps.db.query.bookFiles.findFirst.mockResolvedValue({
+      id: 22,
+      format: 'epub',
+      absolutePath: '/books/plain.epub',
+      fileHash: 'h1',
+      sizeBytes: 5 * 1024 * 1024,
+      mediaOverlayAvailable: false,
+    });
+    deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
+    deps.settingsService.getSettings.mockResolvedValue(kepubSettings({ convertToKepub: false }));
+    const service = makeService(deps);
+    const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
+
+    await service.streamBook(7, 11, makeReply() as never);
+
+    expect(deps.audiolessEpubService.writeArchive).not.toHaveBeenCalled();
+    expect(streamFileSpy).toHaveBeenCalledWith('/books/plain.epub', 22, 'epub', expect.anything());
+  });
+
+  it('removes the rebuilt copy only once the response has finished reading it', async () => {
+    const deps = makeDeps();
+    const service = makeService(deps);
+    const reply = makeReply();
+    const listeners: Record<string, () => void> = {};
+    const stream = {
+      once: vi.fn((event: string, handler: () => void) => {
+        listeners[event] = handler;
+      }),
+    };
+    statMock.mockResolvedValueOnce({ size: 2048 } as never);
+    createReadStreamMock.mockReturnValue(stream as never);
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+
+    await (service as any).streamFile('/tmp/kobo-epub/book.epub', 99, 'epub', reply, cleanup);
+
+    expect(reply.send).toHaveBeenCalledWith(stream);
+    expect(cleanup).not.toHaveBeenCalled();
+
+    listeners.close();
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to epub stream when conversion is disabled or over limit', async () => {
@@ -210,15 +338,30 @@ describe('KoboDownloadService', () => {
     deps.kepubConversionService.getKepubPath.mockResolvedValue('/app-data/.kepub-cache/44/abc.kepub.epub');
     const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
 
-    await (service as any).streamKepub('/books/source.epub', 'abc', 44, 55, false, makeReply());
+    await (service as any).streamKepub('/books/source.epub', 'abc', 44, 55, false, false, makeReply());
 
     expect(deps.kepubConversionService.getKepubPath).toHaveBeenCalledWith({
       sourcePath: '/books/source.epub',
       fileHash: 'abc',
       bookId: 44,
       hyphenate: false,
+      audioless: false,
     });
-    expect(streamFileSpy).toHaveBeenCalledWith('/app-data/.kepub-cache/44/abc.kepub.epub', 55, 'kepub.epub', expect.anything());
+    expect(streamFileSpy).toHaveBeenCalledWith('/app-data/.kepub-cache/44/abc.kepub.epub', 55, 'kepub.epub', expect.anything(), undefined);
+  });
+
+  it('streamKepub hands the stripped copy its own cache entry and cleanup', async () => {
+    const deps = makeDeps();
+    const service = makeService(deps);
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    deps.kepubConversionService.getKepubPath.mockResolvedValue('/app-data/.kepub-cache/44/abc-noaudio.kepub.epub');
+    const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
+
+    await (service as any).streamKepub('/tmp/kobo-epub/book.epub', 'abc', 44, 55, false, true, makeReply(), cleanup);
+
+    expect(deps.kepubConversionService.getKepubPath).toHaveBeenCalledWith(expect.objectContaining({ audioless: true }));
+    // The temp rebuild outlives the conversion: whichever file is sent carries the cleanup.
+    expect(streamFileSpy).toHaveBeenCalledWith('/app-data/.kepub-cache/44/abc-noaudio.kepub.epub', 55, 'kepub.epub', expect.anything(), cleanup);
   });
 
   it('streamKepub falls back when conversion fails', async () => {
@@ -227,8 +370,8 @@ describe('KoboDownloadService', () => {
     const service = makeService(deps);
     const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
 
-    await (service as any).streamKepub('/books/source.epub', 'hash', 44, 55, false, makeReply());
+    await (service as any).streamKepub('/books/source.epub', 'hash', 44, 55, false, false, makeReply());
 
-    expect(streamFileSpy).toHaveBeenLastCalledWith('/books/source.epub', 55, 'epub', expect.anything());
+    expect(streamFileSpy).toHaveBeenLastCalledWith('/books/source.epub', 55, 'epub', expect.anything(), undefined);
   });
 });

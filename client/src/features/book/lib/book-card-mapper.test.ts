@@ -159,6 +159,35 @@ describe('mergeBookCardWithDetail', () => {
     expect(result.files[0]).not.toHaveProperty('filename')
   })
 
+  it('preserves mediaOverlay capability when mapping files', () => {
+    const book = makeBook()
+    const detail = makeDetail({
+      files: [
+        {
+          id: 10,
+          format: 'epub',
+          role: 'primary',
+          sizeBytes: 1024,
+          absolutePath: '/some/path.epub',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          filename: 'book.epub',
+          durationSeconds: null,
+          mediaOverlay: { available: true, durationSeconds: 42 },
+        },
+      ],
+    })
+
+    const result = mergeBookCardWithDetail(book, detail)
+
+    expect(result.files[0]).toEqual({
+      id: 10,
+      format: 'epub',
+      role: 'primary',
+      sizeBytes: 1024,
+      mediaOverlay: { available: true, durationSeconds: 42 },
+    })
+  })
+
   it('sets hasCover = true when coverSource is non-null', () => {
     const result = mergeBookCardWithDetail(makeBook(), makeDetail({ coverSource: 'extracted' }))
     expect(result.hasCover).toBe(true)

@@ -39,6 +39,33 @@ export class DashboardRepository {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * How many books the shelf could have drawn from.
+   *
+   * Each of these mirrors the `find` above it clause for clause, minus the ordering and the limit.
+   * They are deliberately duplicated rather than factored into a shared predicate builder: the
+   * pairs have to be read side by side to stay honest, and a count that quietly drifts from the
+   * selection it describes is a wrong number on the screen rather than a failing query.
+   */
+  /**
+   * Books added since the start of the current calendar month.
+   *
+   * Deliberately not a count of everything the recently-added shelf could return, which is the
+   * whole library: that number answers "how many books do you own", a question the shelf is not
+   * asking and the library widget already answers. A recency shelf is only interesting for how
+   * much is new, so this counts the window and clients label it as one.
+   */
+  async countBooksAddedThisMonth(accessibleLibraryIds: number[], contentFilters?: ContentFilterRules): Promise<number> {
+    if (accessibleLibraryIds.length === 0) return 0;
+    const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const rows = await this.db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(books)
+      .where(and(inArray(books.libraryId, accessibleLibraryIds), gte(books.addedAt, sql`date_trunc('month', now())`), ...cfClauses));
+
+    return rows[0]?.value ?? 0;
+  }
+
   async findContinueReadingBookIds(
     accessibleLibraryIds: number[],
     userId: number,
@@ -68,6 +95,29 @@ export class DashboardRepository {
       .limit(limit);
 
     return rows.map((row) => row.id);
+  }
+
+  async countContinueReadingBooks(accessibleLibraryIds: number[], userId: number, contentFilters?: ContentFilterRules): Promise<number> {
+    if (accessibleLibraryIds.length === 0) return 0;
+    const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const rows = await this.db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(books)
+      .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
+      .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)))
+      .where(
+        and(
+          inArray(books.libraryId, accessibleLibraryIds),
+          eq(books.status, 'present'),
+          or(isNull(bookFiles.format), notInArray(bookFiles.format, AUDIO_FORMATS)),
+          sql`${readingProgress.percentage} > 0 and ${readingProgress.percentage} < 100`,
+          or(isNull(userBookStatus.bookId), notInArray(userBookStatus.status, [...CONTINUE_SCROLLER_EXCLUDED_READ_STATUSES])),
+          ...cfClauses,
+        ),
+      );
+
+    return rows[0]?.value ?? 0;
   }
 
   async findContinueListeningBookIds(
@@ -106,6 +156,48 @@ export class DashboardRepository {
       .limit(limit);
 
     return rows.map((row) => row.id);
+  }
+
+  async countContinueListeningBooks(accessibleLibraryIds: number[], userId: number, contentFilters?: ContentFilterRules): Promise<number> {
+    if (accessibleLibraryIds.length === 0) return 0;
+    const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const rows = await this.db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(books)
+      .innerJoin(audiobookProgress, and(eq(audiobookProgress.bookId, books.id), eq(audiobookProgress.userId, userId)))
+      .innerJoin(
+        bookFiles,
+        and(
+          eq(bookFiles.id, audiobookProgress.currentFileId),
+          eq(bookFiles.bookId, books.id),
+          eq(bookFiles.role, 'content'),
+          inArray(bookFiles.format, AUDIO_FORMATS),
+        ),
+      )
+      .where(
+        and(
+          inArray(books.libraryId, accessibleLibraryIds),
+          eq(books.status, 'present'),
+          sql`${audiobookProgress.percentage} > 0 and ${audiobookProgress.percentage} < 100`,
+          ...cfClauses,
+        ),
+      );
+
+    return rows[0]?.value ?? 0;
+  }
+
+  async countWantToReadBooks(accessibleLibraryIds: number[], userId: number, contentFilters?: ContentFilterRules): Promise<number> {
+    if (accessibleLibraryIds.length === 0) return 0;
+    const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const rows = await this.db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(books)
+      .innerJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)))
+      .where(
+        and(inArray(books.libraryId, accessibleLibraryIds), eq(books.status, 'present'), eq(userBookStatus.status, 'want_to_read'), ...cfClauses),
+      );
+
+    return rows[0]?.value ?? 0;
   }
 
   async findWantToReadBookIds(accessibleLibraryIds: number[], userId: number, limit: number, contentFilters?: ContentFilterRules): Promise<number[]> {

@@ -10,6 +10,7 @@ import { useOidc } from './composables/useOidc'
 import { useSetupStatus } from './composables/useSetupStatus'
 import { useLoginOptions } from './composables/useLoginOptions'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
@@ -125,7 +126,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
 </script>
 
 <template>
-  <div class="login-bg min-h-screen flex items-center justify-center px-4 overflow-hidden">
+  <div class="login-bg min-h-screen flex flex-col items-center justify-center gap-3 px-4 overflow-hidden">
     <!-- Compact theme picker -->
     <div class="fixed top-5 right-5 z-20 flex items-center gap-1.5">
       <!-- Dark / light toggle -->
@@ -334,6 +335,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         <RouterLink to="/register" class="text-primary hover:underline">{{ t('auth.login.signUp') }}</RouterLink>
       </p>
     </div>
+    <PublicLegalNotices />
   </div>
 </template>
 

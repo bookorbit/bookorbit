@@ -45,6 +45,7 @@ export class KoboProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.KOBO;
   readonly label = 'Kobo';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
   readonly timeoutMs = PROVIDER_TIMEOUT_MS.KOBO_SCRAPE;
 
   private readonly logger = new Logger(KoboProvider.name);

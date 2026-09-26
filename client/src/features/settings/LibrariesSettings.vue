@@ -11,6 +11,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
+import { jsonBody } from '@/lib/api-json'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -74,7 +75,9 @@ const hasLibraries = computed(() => libraries.value.length > 0)
 const showSkeleton = computed(() => !overview.loaded.value && !overview.error.value && hasLibraries.value)
 
 function subscribeAll() {
-  for (const library of libraries.value) subscribeLibrary(library.id)
+  for (const library of libraries.value) {
+    if (library.type !== 'podcasts') subscribeLibrary(library.id)
+  }
 }
 
 onMounted(async () => {
@@ -158,12 +161,19 @@ function clearQuery() {
   query.value = ''
 }
 
+function startScan(lib: LibraryType): Promise<Response> {
+  if (lib.type === 'podcasts') {
+    return api(`/api/v1/podcast-libraries/${lib.id}/import-scan`, jsonBody('POST', { dryRun: false }))
+  }
+  return api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
+}
+
 async function scan(lib: LibraryType) {
   try {
-    const res = await api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
+    const res = await startScan(lib)
     if (res.ok) {
       toast.success(t('settings.admin.libraries.scanStarted', { name: lib.name }))
-      subscribeLibrary(lib.id)
+      if (lib.type !== 'podcasts') subscribeLibrary(lib.id)
     } else {
       toast.error(t('settings.admin.libraries.scanStartFailed', { name: lib.name }))
     }
@@ -184,7 +194,7 @@ async function refreshCovers(lib: LibraryType) {
 async function scanAll() {
   scanningAll.value = true
   try {
-    const results = await Promise.all(libraries.value.map((lib) => api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
+    const results = await Promise.all(libraries.value.map((lib) => startScan(lib)))
     const failed = results.filter((res) => !res.ok).length
     if (failed === 0) {
       toast.success(t('settings.admin.libraries.scanStartedAll'))

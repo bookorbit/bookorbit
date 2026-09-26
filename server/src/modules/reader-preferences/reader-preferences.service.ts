@@ -103,6 +103,29 @@ const PARTIAL_SETTINGS_SCHEMA_BY_GROUP = {
   audio: AUDIO_SETTINGS_SCHEMA.partial(),
 } satisfies Record<ReaderFormatGroup, z.ZodTypeAny>;
 
+const SETTINGS_KEYS_BY_GROUP = {
+  epub: new Set(Object.keys(EPUB_SETTINGS_SCHEMA.shape)),
+  pdf: new Set(Object.keys(PDF_SETTINGS_SCHEMA.shape)),
+  cbx: new Set(Object.keys(CBX_SETTINGS_SCHEMA.shape)),
+  audio: new Set(Object.keys(AUDIO_SETTINGS_SCHEMA.shape)),
+} satisfies Record<ReaderFormatGroup, Set<string>>;
+
+/**
+ * Zod applies `.default()` while parsing a partial, so a cbx patch that never mentioned
+ * `spreadGap` comes back carrying one. Writing that would pin the key on the book. Keep only the
+ * keys the caller actually sent, while keeping the parsed value for each so schema transforms
+ * (the pdf `wrapped` -> `vertical` rewrite) survive.
+ */
+function keepProvidedKeys(input: Record<string, unknown>, parsed: Record<string, unknown>): Record<string, unknown> {
+  const kept: Record<string, unknown> = {};
+  for (const key of Object.keys(parsed)) {
+    if (Object.hasOwn(input, key)) {
+      kept[key] = parsed[key];
+    }
+  }
+  return kept;
+}
+
 function normalizeFormatGroup(formatGroup: string): ReaderFormatGroup {
   const normalized = formatGroup.trim().toLowerCase();
   if (!VALID_FORMAT_GROUPS_SET.has(normalized as ReaderFormatGroup)) {
@@ -130,6 +153,20 @@ export class ReaderPreferencesService {
     return result.data as Record<string, unknown>;
   }
 
+  /** Validates a sparse settings object and narrows it back to the keys the caller sent. */
+  private validatePartialSettings(formatGroup: ReaderFormatGroup, settings: Record<string, unknown>): Record<string, unknown> {
+    return keepProvidedKeys(settings, this.validateSettings(formatGroup, settings, true));
+  }
+
+  private validateUnsetKeys(formatGroup: ReaderFormatGroup, keys: string[]): string[] {
+    const known = SETTINGS_KEYS_BY_GROUP[formatGroup];
+    const unknown = keys.filter((key) => !known.has(key));
+    if (unknown.length > 0) {
+      throw new BadRequestException(`Invalid ${formatGroup} reader settings key in "unset": ${unknown.join(', ')}`);
+    }
+    return [...new Set(keys)];
+  }
+
   async getPreference(user: RequestUser, bookFileId: number) {
     await this.bookService.verifyFileAccess(bookFileId, user);
     return this.repo.findPreference(user.id, bookFileId);
@@ -138,8 +175,29 @@ export class ReaderPreferencesService {
   async upsertPreference(user: RequestUser, bookFileId: number, settings: Record<string, unknown>) {
     const file = await this.bookService.verifyFileAccess(bookFileId, user);
     const formatGroup = getFormatGroup(file.format ?? '');
-    const validatedSettings = this.validateSettings(formatGroup, settings, true);
+    const validatedSettings = this.validatePartialSettings(formatGroup, settings);
     await this.repo.upsertPreference(user.id, bookFileId, validatedSettings);
+  }
+
+  async patchPreference(user: RequestUser, bookFileId: number, set?: Record<string, unknown>, unset?: string[]) {
+    const file = await this.bookService.verifyFileAccess(bookFileId, user);
+    const formatGroup = getFormatGroup(file.format ?? '');
+
+    const hasSet = !!set && Object.keys(set).length > 0;
+    const hasUnset = !!unset && unset.length > 0;
+    if (!hasSet && !hasUnset) {
+      throw new BadRequestException('Reader preference patch must carry at least one key in "set" or "unset"');
+    }
+
+    const validatedSet = hasSet ? this.validatePartialSettings(formatGroup, set) : {};
+    const validatedUnset = hasUnset ? this.validateUnsetKeys(formatGroup, unset) : [];
+
+    const conflicting = validatedUnset.filter((key) => Object.hasOwn(validatedSet, key));
+    if (conflicting.length > 0) {
+      throw new BadRequestException(`Reader preference patch sets and unsets the same key: ${conflicting.join(', ')}`);
+    }
+
+    await this.repo.patchPreference(user.id, bookFileId, validatedSet, validatedUnset);
   }
 
   async deletePreference(user: RequestUser, bookFileId: number) {
@@ -155,6 +213,15 @@ export class ReaderPreferencesService {
     const normalizedGroup = normalizeFormatGroup(formatGroup);
     const validatedSettings = this.validateSettings(normalizedGroup, settings, false);
     await this.repo.upsertDefault(userId, normalizedGroup, validatedSettings);
+  }
+
+  async patchDefault(userId: number, formatGroup: string, set?: Record<string, unknown>) {
+    const normalizedGroup = normalizeFormatGroup(formatGroup);
+    if (!set || Object.keys(set).length === 0) {
+      throw new BadRequestException('Reader defaults patch must carry at least one key in "set"');
+    }
+    const validatedSet = this.validatePartialSettings(normalizedGroup, set);
+    await this.repo.patchDefault(userId, normalizedGroup, { ...READER_GROUP_DEFAULTS[normalizedGroup] } as Record<string, unknown>, validatedSet);
   }
 
   async deleteDefault(userId: number, formatGroup: string) {

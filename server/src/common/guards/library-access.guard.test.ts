@@ -1,8 +1,10 @@
-import { BadRequestException, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ExecutionContext, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../types/request-user';
 import { LibraryAccessGuard } from './library-access.guard';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { LIBRARY_ACCESS_KEY } from '../decorators/require-library-access.decorator';
+import { LIBRARY_TYPE_KEY, OPTIONAL_LIBRARY_TYPE_KEY } from '../decorators/require-library-type.decorator';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -24,12 +26,12 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   };
 }
 
-function makeContext(user: RequestUser, params: Record<string, string> = {}): ExecutionContext {
+function makeContext(user: RequestUser, params: Record<string, string> = {}, body?: { libraryId?: unknown }): ExecutionContext {
   return {
     getHandler: vi.fn(),
     getClass: vi.fn(),
     switchToHttp: () => ({
-      getRequest: () => ({ user, params }),
+      getRequest: () => ({ user, params, body }),
     }),
   } as unknown as ExecutionContext;
 }
@@ -37,23 +39,38 @@ function makeContext(user: RequestUser, params: Record<string, string> = {}): Ex
 function makeGuard(
   overrides: {
     required?: 'viewer' | 'editor' | 'owner' | undefined;
+    requiredType?: 'books' | 'podcasts' | undefined;
+    optionalType?: boolean;
     row?: { accessLevel: 'viewer' | 'editor' | 'owner' } | undefined;
+    library?: { type: 'books' | 'podcasts' } | undefined;
   } = {},
 ) {
   const reflector = {
-    getAllAndOverride: vi.fn().mockReturnValue(overrides.required),
+    getAllAndOverride: vi.fn((key: string) =>
+      key === LIBRARY_ACCESS_KEY
+        ? overrides.required
+        : key === LIBRARY_TYPE_KEY
+          ? overrides.requiredType
+          : key === OPTIONAL_LIBRARY_TYPE_KEY
+            ? overrides.optionalType
+            : undefined,
+    ),
   };
   const findFirst = vi.fn().mockResolvedValue(overrides.row);
+  const findLibrary = vi.fn().mockResolvedValue(overrides.library);
   const db = {
     query: {
       userLibraryAccess: {
         findFirst,
       },
+      libraries: {
+        findFirst: findLibrary,
+      },
     },
   };
 
   const guard = new LibraryAccessGuard(reflector as never, db as never);
-  return { guard, findFirst };
+  return { guard, findFirst, findLibrary };
 }
 
 describe('LibraryAccessGuard', () => {
@@ -69,6 +86,26 @@ describe('LibraryAccessGuard', () => {
     expect(findFirst).not.toHaveBeenCalled();
   });
 
+  it('enforces the required library type for superusers', async () => {
+    const { guard, findFirst, findLibrary } = makeGuard({ requiredType: 'books', library: { type: 'podcasts' } });
+
+    await expect(guard.canActivate(makeContext(makeUser({ isSuperuser: true }), { id: '1' }))).rejects.toThrow(
+      'This endpoint requires a books library',
+    );
+    expect(findLibrary).toHaveBeenCalled();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundException when a type-guarded library does not exist', async () => {
+    const { guard } = makeGuard({ requiredType: 'podcasts', library: undefined });
+    await expect(guard.canActivate(makeContext(makeUser(), { libraryId: '99' }))).rejects.toThrow(NotFoundException);
+  });
+
+  it('allows the required library type before checking access', async () => {
+    const { guard } = makeGuard({ required: 'viewer', requiredType: 'podcasts', library: { type: 'podcasts' }, row: { accessLevel: 'viewer' } });
+    await expect(guard.canActivate(makeContext(makeUser(), { libraryId: '5' }))).resolves.toBe(true);
+  });
+
   it('throws BadRequestException when libraryId is missing', async () => {
     const { guard } = makeGuard({ required: 'viewer' });
     await expect(guard.canActivate(makeContext(makeUser(), {}))).rejects.toThrow(BadRequestException);
@@ -81,6 +118,26 @@ describe('LibraryAccessGuard', () => {
     });
     await expect(guard.canActivate(makeContext(makeUser(), { id: '12' }))).resolves.toBe(true);
     expect(findFirst).toHaveBeenCalled();
+  });
+
+  it('accepts a body libraryId for type-only guards', async () => {
+    const { guard, findLibrary } = makeGuard({ requiredType: 'books', library: { type: 'books' } });
+
+    await expect(guard.canActivate(makeContext(makeUser(), {}, { libraryId: 12 }))).resolves.toBe(true);
+    expect(findLibrary).toHaveBeenCalled();
+  });
+
+  it('allows an omitted libraryId for optional type-only guards', async () => {
+    const { guard, findLibrary } = makeGuard({ requiredType: 'books', optionalType: true });
+
+    await expect(guard.canActivate(makeContext(makeUser()))).resolves.toBe(true);
+    expect(findLibrary).not.toHaveBeenCalled();
+  });
+
+  it('rejects partially numeric library ids', async () => {
+    const { guard } = makeGuard({ requiredType: 'books' });
+
+    await expect(guard.canActivate(makeContext(makeUser(), { libraryId: '12x' }))).rejects.toThrow(BadRequestException);
   });
 
   it('throws ForbiddenException when no access row exists', async () => {

@@ -20,6 +20,8 @@ local util = require("util")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
+local BookOrbitStateManager = require("bookorbit_state_manager")
+
 local API_CALL_DEBOUNCE_DELAY = time.s(25)
 
 -- Assigned from the plugin class on install; shared with the menu module.
@@ -54,16 +56,31 @@ end
 -- partial MD5 of the file, so the filename checksum method does not exist here.
 function ProgressSync:getDocumentDigest()
     if not self.ui or not self.ui.document then return nil end
-    local doc_settings = self.ui.doc_settings
-    local digest = doc_settings and doc_settings:readSetting("partial_md5_checksum") or nil
-    if digest then return digest end
-
     local file = self.ui.document.file
     if not file then return nil end
+    if self.bookorbit_document_digest and self.bookorbit_document_digest.file == file then
+        return self.bookorbit_document_digest.digest
+    end
+
+    local doc_settings = self.ui.doc_settings
+    local cached = doc_settings and doc_settings:readSetting("partial_md5_checksum") or nil
     local ok, computed = pcall(util.partialMD5, file)
-    if not ok or not computed then return nil end
-    if doc_settings then
-        doc_settings:saveSetting("partial_md5_checksum", computed)
+    if not ok or not computed then return cached end
+
+    self.bookorbit_document_digest = {
+        file = file,
+        digest = computed,
+        repaired = cached ~= nil and cached ~= computed,
+    }
+    if cached ~= computed then
+        if doc_settings then
+            doc_settings:saveSetting("partial_md5_checksum", computed)
+        end
+        local repaired, repair_err = pcall(
+            BookOrbitStateManager.repairFileIdentity, file, cached, computed)
+        if not repaired then
+            logger.warn("BookOrbit: could not repair cached file identity:", repair_err)
+        end
     end
     return computed
 end

@@ -7,27 +7,27 @@ import { CreateBookmarkDto } from './dto/create-bookmark.dto';
 
 async function errorsFor(value: Record<string, unknown>) {
   const dto = plainToInstance(CreateBookmarkDto, value);
-  return validate(dto);
+  return validate(dto, { whitelist: true, forbidNonWhitelisted: true });
 }
 
 describe('Bookmark DTO validation', () => {
-  it('requires at least one location field: cfi or positionSeconds', async () => {
+  it('requires a CFI location', async () => {
     const errors = await errorsFor({ title: 'Chapter 1' });
 
     expect(errors).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           constraints: expect.objectContaining({
-            bookmarkLocation: 'Either cfi or positionSeconds must be provided',
+            isString: 'cfi must be a string',
           }),
         }),
       ]),
     );
   });
 
-  it('accepts valid CFI bookmarks and valid audio-position bookmarks', async () => {
+  it('accepts valid CFI bookmarks and rejects the deleted audio shape', async () => {
     expect((await errorsFor({ title: 'Chapter 1', cfi: 'epubcfi(/6/2)' })).length).toBe(0);
-    expect((await errorsFor({ title: '00:01:40', positionSeconds: 100 })).length).toBe(0);
+    expect((await errorsFor({ title: '00:01:40', positionSeconds: 100 })).length).toBeGreaterThan(0);
   });
 
   it('rejects empty title and empty CFI', async () => {
@@ -38,10 +38,5 @@ describe('Bookmark DTO validation', () => {
   it('enforces CFI and title max lengths', async () => {
     expect((await errorsFor({ title: 'x', cfi: 'a'.repeat(2001) })).length).toBeGreaterThan(0);
     expect((await errorsFor({ title: 'a'.repeat(501), cfi: 'epubcfi(/6/2)' })).length).toBeGreaterThan(0);
-  });
-
-  it('enforces non-negative numeric positionSeconds', async () => {
-    expect((await errorsFor({ title: 'x', positionSeconds: -0.1 })).length).toBeGreaterThan(0);
-    expect((await errorsFor({ title: 'x', positionSeconds: 0 })).length).toBe(0);
   });
 });

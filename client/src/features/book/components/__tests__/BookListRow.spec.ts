@@ -68,6 +68,7 @@ const missingBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: null,
+  coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
   metadataScore: null,
   hasCover: false,
   hasMetadataLocks: false,
@@ -99,6 +100,7 @@ const presentBook: BookCard = {
   readStatus: null,
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: null,
+  coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
   metadataScore: null,
   hasCover: false,
   hasMetadataLocks: false,
@@ -202,7 +204,7 @@ describe('BookListRow - present state', () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
 
-    const formatButton = wrapper.findAll('button').find((button) => button.text() === 'epub')
+    const formatButton = wrapper.findAll('button').find((button) => button.text() === 'EPUB')
     expect(formatButton).toBeDefined()
     await formatButton!.trigger('click')
 
@@ -219,6 +221,23 @@ describe('BookListRow - present state', () => {
   it('does not render the missing badge', () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
     expect(wrapper.find('[class*="bg-amber-500"]').exists()).toBe(false)
+  })
+
+  it('marks the EPUB format button for media-overlay read-along files', () => {
+    const wrapper = mount(BookListRow, {
+      props: {
+        book: {
+          ...presentBook,
+          files: [{ id: 10, format: 'epub', role: 'primary', sizeBytes: null, mediaOverlay: { available: true, durationSeconds: 42 } }],
+        },
+      },
+      global: globalStubs,
+    })
+
+    expect(wrapper.text()).toContain('EPUB')
+    expect(wrapper.text()).not.toContain('NARR')
+    expect(wrapper.text()).toContain('Open read-along EPUB')
+    expect(wrapper.find('.lucide-headphones').exists()).toBe(true)
   })
 
   it('applies hover:bg-muted/50 when present with a readable file', () => {

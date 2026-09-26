@@ -8,6 +8,7 @@ import * as schema from '../../../db/schema';
 import { UserBookStatusService } from '../../user-book-status/user-book-status.service';
 import { ReadingSessionService } from '../../reading-session/reading-session.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
+import { BookService } from '../../book/book.service';
 import {
   KOBO_STATISTICS_CURSOR_SOURCE,
   koboSourceDeviceKey,
@@ -89,6 +90,7 @@ export class KoboReadingStateService {
     private readonly achievementEvents: AchievementEventsService,
     private readonly analyticsResolver: KoboAnalyticsResolverService,
     private readonly readingSessions: ReadingSessionService,
+    private readonly bookService: BookService,
   ) {}
 
   async upsertState(
@@ -207,7 +209,7 @@ export class KoboReadingStateService {
 
     if ((bookmarkChanged || statusChanged) && mergedPercent !== null) {
       await this.autoUpdateReadStatus(userId, bookId, mergedPercent, readingThreshold, finishedThreshold, {
-        occurredOn: effectiveLastModified.slice(0, 10),
+        occurredAt: new Date(effectiveLastModified),
         strongRereadEvidence,
       });
     }
@@ -331,13 +333,14 @@ export class KoboReadingStateService {
     percent: number,
     readingThreshold: number,
     finishedThreshold: number,
-    activity: { occurredOn: string; strongRereadEvidence: boolean },
+    activity: { occurredAt: Date; strongRereadEvidence: boolean },
   ): Promise<void> {
     const startedAt = Date.now();
     try {
       await this.userBookStatusService.autoUpdate(userId, bookId, percent, readingThreshold, finishedThreshold, {
         origin: 'kobo',
-        occurredOn: activity.occurredOn,
+        occurredAt: activity.occurredAt,
+        timeZone: await this.findUserTimeZone(userId),
         strongRereadEvidence: activity.strongRereadEvidence,
       });
     } catch (error: unknown) {
@@ -603,6 +606,12 @@ export class KoboReadingStateService {
           lastReadAt: sourceUpdatedAt,
         },
       });
+
+    await this.bookService.syncAudioProgressForExternalEbookProgress(userId, bookId, primaryFile.fileId, percentage, {
+      cfi: nextCfi,
+      koreaderProgress: nextXpointer,
+      sourceUpdatedAt,
+    });
   }
 
   private async markSnapshotBookUnsyncedForOtherDevices(userId: number, bookId: number, sourceDeviceId: number): Promise<void> {

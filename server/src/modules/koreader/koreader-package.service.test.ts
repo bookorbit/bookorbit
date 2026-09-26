@@ -6,6 +6,7 @@ import * as unzipper from 'unzipper';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KoreaderPackageService } from './koreader-package.service';
+import { SELF_UPDATE_MIN_PLUGIN_VERSION } from './koreader-plugin-update.util';
 
 function makeCredentialsRow(overrides?: Record<string, unknown>) {
   return {
@@ -205,6 +206,63 @@ describe('KoreaderPackageService', () => {
   });
 
   describe('getVersionInfoForSelfUpdate', () => {
+    it('evaluates a current identified device independently of stale devices on the account', async () => {
+      mockPluginRepo.listDevicePluginVersions.mockResolvedValue(['1.3.1']);
+
+      const result = await service.getVersionInfoForSelfUpdate(7, {
+        deviceId: 'current-device',
+        pluginVersion: '1.5.4',
+      });
+
+      expect(result.pluginVersion).toBe('1.2.3');
+      expect(mockPluginRepo.listDevicePluginVersions).not.toHaveBeenCalled();
+    });
+
+    it('allows the first self-update-safe version for an identified device', async () => {
+      const result = await service.getVersionInfoForSelfUpdate(7, {
+        deviceId: 'current-device',
+        pluginVersion: SELF_UPDATE_MIN_PLUGIN_VERSION,
+      });
+
+      expect(result.pluginVersion).toBe('1.2.3');
+      expect(mockPluginRepo.listDevicePluginVersions).not.toHaveBeenCalled();
+    });
+
+    it('withholds the version from an identified device whose updater can crash', async () => {
+      mockPluginRepo.listDevicePluginVersions.mockResolvedValue(['1.5.4']);
+
+      const result = await service.getVersionInfoForSelfUpdate(7, {
+        deviceId: 'outdated-device',
+        pluginVersion: '1.3.1',
+      });
+
+      expect(result.pluginVersion).toBe('unknown');
+      expect(mockPluginRepo.listDevicePluginVersions).not.toHaveBeenCalled();
+    });
+
+    it.each(['', 'nightly'])('withholds the version for an identified device reporting %j', async (pluginVersion) => {
+      const result = await service.getVersionInfoForSelfUpdate(7, {
+        deviceId: 'current-device',
+        pluginVersion,
+      });
+
+      expect(result.pluginVersion).toBe('unknown');
+      expect(mockPluginRepo.listDevicePluginVersions).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { client: { pluginVersion: '1.5.4' }, label: 'a missing device id' },
+      { client: { deviceId: 'current-device' }, label: 'a missing plugin version' },
+      { client: { deviceId: '../current-device', pluginVersion: '1.5.4' }, label: 'an invalid device id' },
+    ])('retains the user-wide fallback for $label', async ({ client }) => {
+      mockPluginRepo.listDevicePluginVersions.mockResolvedValue(['1.3.1']);
+
+      const result = await service.getVersionInfoForSelfUpdate(7, client);
+
+      expect(result.pluginVersion).toBe('unknown');
+      expect(mockPluginRepo.listDevicePluginVersions).toHaveBeenCalledWith(7);
+    });
+
     it('returns the real plugin version when every device can self-update', async () => {
       mockPluginRepo.listDevicePluginVersions.mockResolvedValue(['1.4.0', '1.5.2']);
 

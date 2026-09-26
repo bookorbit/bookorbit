@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, asc, desc, eq, inArray, isNull, max, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, desc, eq, exists, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
@@ -90,18 +90,21 @@ export class AuthorsRepository {
 
     const sortNameExpr = sql`COALESCE(${authors.sortName}, ${authors.name})`;
 
+    const trimmedQuery = params.q?.trim();
     const orderBy =
-      params.sort === 'bookCount'
-        ? this.orderByDirection(bookCountExpr, params.order)
-        : params.sort === 'lastAddedAt'
-          ? this.orderByDirection(lastAddedExpr, params.order)
-          : params.sort === 'lastEnrichedAt'
-            ? params.order === 'asc'
-              ? sql`${authors.lastEnrichedAt} ASC NULLS LAST`
-              : sql`${authors.lastEnrichedAt} DESC NULLS LAST`
-            : params.sort === 'sortName'
-              ? this.orderByDirection(sortNameExpr, params.order)
-              : this.orderByDirection(authors.name, params.order);
+      params.sort === 'relevance' && trimmedQuery
+        ? this.orderByDirection(searchRelevance(authors.name, trimmedQuery), params.order)
+        : params.sort === 'bookCount'
+          ? this.orderByDirection(bookCountExpr, params.order)
+          : params.sort === 'lastAddedAt'
+            ? this.orderByDirection(lastAddedExpr, params.order)
+            : params.sort === 'lastEnrichedAt'
+              ? params.order === 'asc'
+                ? sql`${authors.lastEnrichedAt} ASC NULLS LAST`
+                : sql`${authors.lastEnrichedAt} DESC NULLS LAST`
+              : params.sort === 'sortName'
+                ? this.orderByDirection(sortNameExpr, params.order)
+                : this.orderByDirection(authors.name, params.order);
 
     const having = params.minBookCount !== undefined ? sql`count(distinct ${books.id}) >= ${params.minBookCount}` : undefined;
 
@@ -288,6 +291,30 @@ export class AuthorsRepository {
     ]);
 
     return { bookIds: rows.map((row: AuthorBookIdRow) => row.id), total: Number(total), page: params.page, size: params.size };
+  }
+
+  /**
+   * The same "books of this author the user may see" predicate as {@link findBookIdsPage}, shaped
+   * for the collapsed book query. That query folds series in SQL over a CTE selecting from books
+   * alone, so authorship has to arrive as a correlated EXISTS rather than the join used above.
+   *
+   * Keyed on the author id, not the author name: merged authors and two writers sharing a name
+   * stay distinct here, which a name-based filter would silently collapse together.
+   */
+  buildBooksWhere(params: { authorId: number; libraryIds: number[]; contentFilters?: ContentFilterRules }): SQL {
+    // Never `undefined` for the empty case: an absent predicate reads as "no restriction" to the
+    // query that consumes this, which is the opposite of what no accessible library means.
+    if (params.libraryIds.length === 0) return sql`false`;
+
+    const byThisAuthor = exists(
+      this.db
+        .select({ one: sql`1` })
+        .from(bookAuthors)
+        .where(and(sql`${bookAuthors.bookId} = ${books.id}`, eq(bookAuthors.authorId, params.authorId))),
+    );
+
+    const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
+    return and(byThisAuthor, inArray(books.libraryId, params.libraryIds), ...filterClauses)!;
   }
 
   async updateAuthorById(
@@ -568,4 +595,15 @@ export class AuthorsRepository {
   ) {
     return order === 'asc' ? asc(expression) : desc(expression);
   }
+}
+
+function searchRelevance(column: typeof authors.name, query: string): SQL {
+  const value = sql`lower(public.bookorbit_unaccent(COALESCE(${column}, '')))`;
+  const q = sql`lower(public.bookorbit_unaccent(${query}))`;
+  return sql`CASE
+    WHEN ${value} = ${q} THEN 1000
+    WHEN ${value} LIKE ${q} || '%' THEN 800
+    WHEN ${value} LIKE '%' || ${q} || '%' THEN 600
+    ELSE similarity(${value}, ${q}) * 400
+  END`;
 }

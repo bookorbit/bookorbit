@@ -25,6 +25,8 @@ export interface AchievementItem {
   earned: boolean;
   awardedAt: string | null;
   context: Record<string, unknown> | null;
+  contextBookId?: number | null;
+  contextBookTitle?: string | null;
   currentProgress: number | null;
 }
 
@@ -40,4 +42,10 @@ export interface AchievementCatalogueResponse {
   categories: AchievementCategoryGroup[];
   totalEarned: number;
   totalAvailable: number;
+}
+
+export interface AchievementCelebrationClaim {
+  claimId: string;
+  expiresAt: string;
+  achievement: AchievementItem;
 }

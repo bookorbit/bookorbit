@@ -152,6 +152,24 @@ describe('KoreaderRepository', () => {
       expect(db.select).toHaveBeenCalledTimes(2);
     });
 
+    it('prefers a user-scoped link when a current hash matches multiple files in one book', async () => {
+      const linkedFile = { id: 11, bookId: 20, libraryId: 1, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain([{ id: 10, bookId: 20, libraryId: 1, format: 'epub', matchingFileCount: 2 }]))
+        .mockReturnValueOnce(makeQueryChain([linkedFile]));
+
+      await expect(repo.resolveBookFileByHash('abc123', null, 7)).resolves.toEqual(linkedFile);
+      expect(db.select).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the deterministic first file when a same-book duplicate has no user-scoped link', async () => {
+      const firstFile = { id: 10, bookId: 20, libraryId: 1, format: 'epub', matchingFileCount: 2 };
+      db.select.mockReturnValueOnce(makeQueryChain([firstFile])).mockReturnValueOnce(makeQueryChain([]));
+
+      await expect(repo.resolveBookFileByHash('abc123', null, 7)).resolves.toEqual({ id: 10, bookId: 20, libraryId: 1, format: 'epub' });
+      expect(db.select).toHaveBeenCalledTimes(2);
+    });
+
     it('falls back to hash history when current hash lookup returns nothing', async () => {
       const file = { id: 10, bookId: 20, libraryId: 1, format: 'pdf' };
       db.select.mockReturnValueOnce(makeQueryChain([])).mockReturnValueOnce(makeQueryChain([file]));
@@ -291,6 +309,38 @@ describe('KoreaderRepository', () => {
       const result = await repo.resolveBookFilesByHashes(['current'], null, 7);
 
       expect(result.get('current')).toEqual({ bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' });
+      expect(db.select).toHaveBeenCalledTimes(2);
+    });
+
+    it('prefers a user-scoped link for duplicate current hashes within one book', async () => {
+      db.select
+        .mockReturnValueOnce(
+          makeQueryChain([
+            { hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' },
+            { hash: 'current', bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' },
+          ]),
+        )
+        .mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' }]));
+
+      const result = await repo.resolveBookFilesByHashes(['current'], null, 7);
+
+      expect(result.get('current')).toEqual({ bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' });
+      expect(db.select).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the deterministic first file when a same-book duplicate has no user-scoped bulk link', async () => {
+      db.select
+        .mockReturnValueOnce(
+          makeQueryChain([
+            { hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' },
+            { hash: 'current', bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' },
+          ]),
+        )
+        .mockReturnValueOnce(makeQueryChain([]));
+
+      const result = await repo.resolveBookFilesByHashes(['current'], null, 7);
+
+      expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' });
       expect(db.select).toHaveBeenCalledTimes(2);
     });
 

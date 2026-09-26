@@ -1,6 +1,7 @@
 import type { Mocked } from 'vitest';
 import {
   ALL_METADATA_FIELDS,
+  CoverMedia,
   FieldPreference,
   MetadataCandidate,
   MetadataFetchPreferences,
@@ -18,6 +19,8 @@ import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
+import type { MetadataProvider } from './providers/metadata-provider';
+import type { MetadataSearchParams } from './providers/metadata-search-params';
 
 function createPreferences(mutate?: (fields: Record<MetadataField, FieldPreference>) => void): MetadataFetchPreferences {
   const fields = Object.fromEntries(
@@ -34,6 +37,15 @@ function createPreferences(mutate?: (fields: Record<MetadataField, FieldPreferen
   mutate?.(fields);
   return { fields };
 }
+
+const PROVIDER_TRAITS: Partial<Record<MetadataProviderKey, Partial<MetadataProvider>>> = {
+  [MetadataProviderKey.AUDIBLE]: { mediaKinds: ['audiobook'], coverShape: 'square' },
+  [MetadataProviderKey.AUDNEXUS]: { mediaKinds: ['audiobook'], coverShape: 'square' },
+  [MetadataProviderKey.LIBROFM]: { mediaKinds: ['audiobook'], coverShape: 'square' },
+  [MetadataProviderKey.COMICVINE]: { mediaKinds: ['comic'], coverShape: 'portrait' },
+  [MetadataProviderKey.ITUNES]: { editionFollowsMedium: true },
+  [MetadataProviderKey.HARDCOVER]: { editionFollowsMedium: true },
+};
 
 // Candidates share a title by default so that fixtures exercising field-rule precedence describe
 // one book. Cross-provider agreement drops candidates that describe a different book, which is a
@@ -62,6 +74,7 @@ describe('MetadataFetchPipeline', () => {
   beforeEach(() => {
     fetchService = {
       search: vi.fn(),
+      searchCandidates: vi.fn(),
     } as unknown as Mocked<MetadataFetchService>;
 
     preferencesService = {
@@ -78,8 +91,15 @@ describe('MetadataFetchPipeline', () => {
       withForwardCompatibility: vi.fn(),
     } as unknown as Mocked<MetadataPreferenceResolver>;
 
+    // The media helpers run the real registry over whatever providers a test registers, with each
+    // provider's real media and edition traits.
+    const live = () =>
+      new ProviderRegistry(((registry.all() ?? []) as MetadataProvider[]).map((provider) => ({ ...PROVIDER_TRAITS[provider.key], ...provider })));
     registry = {
       all: vi.fn(),
+      keysForMedia: vi.fn((keys: MetadataProviderKey[], media: CoverMedia) => live().keysForMedia(keys, media)),
+      servesOnlyAudiobooks: vi.fn((key: MetadataProviderKey) => live().servesOnlyAudiobooks(key)),
+      editionFollowsMedium: vi.fn((key: MetadataProviderKey) => live().editionFollowsMedium(key)),
     } as unknown as Mocked<ProviderRegistry>;
 
     throttleTracker = { isThrottled: vi.fn().mockReturnValue(false) };
@@ -118,11 +138,11 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(global);
     resolver.withForwardCompatibility.mockReturnValue(global);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Title' })));
 
     await pipeline.run({ title: 'Query' }, {});
 
-    expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
   });
 
   it('restricts established-book refreshes to providers with stored ids in existing-only mode', async () => {
@@ -136,7 +156,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(preferences);
     resolver.withForwardCompatibility.mockReturnValue(preferences);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'stored-google', { title: 'Fetched Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'stored-google', { title: 'Fetched Title' })));
 
     const params = {
       title: 'Query',
@@ -145,7 +165,7 @@ describe('MetadataFetchPipeline', () => {
     const { resolved } = await pipeline.runWithSources(params, {});
 
     expect(resolved.title).toBe('Fetched Title');
-    expect(fetchService.search).toHaveBeenCalledWith({ ...params, existingProviderIdsOnly: true }, [MetadataProviderKey.GOOGLE]);
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith({ ...params, existingProviderIdsOnly: true }, [MetadataProviderKey.GOOGLE]);
   });
 
   it('reports when existing-only mode has no stored ids for active field-rule providers', async () => {
@@ -165,7 +185,7 @@ describe('MetadataFetchPipeline', () => {
     expect(resolved).toEqual({});
     expect(diagnostics.reason).toBe('no_existing_provider_ids');
     expect(diagnostics.activeProviders).toEqual([]);
-    expect(fetchService.search).not.toHaveBeenCalled();
+    expect(fetchService.searchCandidates).not.toHaveBeenCalled();
   });
 
   it('lets AudNexus refresh through an existing Audible id in existing-only mode', async () => {
@@ -181,7 +201,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(preferences);
     resolver.withForwardCompatibility.mockReturnValue(preferences);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDNEXUS }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.AUDNEXUS, 'B0EXISTING', { title: 'Audio Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.AUDNEXUS, 'B0EXISTING', { title: 'Audio Title' })));
 
     const params = {
       title: 'Audio Title',
@@ -190,7 +210,7 @@ describe('MetadataFetchPipeline', () => {
     };
     await pipeline.run(params, {});
 
-    expect(fetchService.search).toHaveBeenCalledWith({ ...params, existingProviderIdsOnly: true, includeAudiobookProviders: true }, [
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith({ ...params, existingProviderIdsOnly: true, includeAudiobookProviders: true }, [
       MetadataProviderKey.AUDNEXUS,
     ]);
   });
@@ -206,12 +226,12 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(preferences);
     resolver.withForwardCompatibility.mockReturnValue(preferences);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'new-google', { title: 'Discovered Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'new-google', { title: 'Discovered Title' })));
 
     const resolved = await pipeline.run({ title: 'Query' }, {});
 
     expect(resolved.title).toBe('Discovered Title');
-    expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
   });
 
   describe('series expected counts', () => {
@@ -225,7 +245,7 @@ describe('MetadataFetchPipeline', () => {
 
     it('forwards every candidate, not just the one that wins field resolution', async () => {
       primePreferences();
-      fetchService.search.mockReturnValue(
+      fetchService.searchCandidates.mockReturnValue(
         of(
           candidate(MetadataProviderKey.GOOGLE, 'g1', { seriesName: 'Dune', seriesTotalBooks: 6 }),
           candidate(MetadataProviderKey.OPEN_LIBRARY, 'o1', { seriesName: 'Dune', seriesTotalBooks: 8 }),
@@ -244,7 +264,7 @@ describe('MetadataFetchPipeline', () => {
     it('still resolves fields when recording the totals fails', async () => {
       primePreferences();
       seriesExpectedCount.recordFromCandidates.mockRejectedValueOnce(new Error('unreachable'));
-      fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
+      fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
 
       const resolved = await pipeline.run({ title: 'Query' }, {});
 
@@ -277,18 +297,18 @@ describe('MetadataFetchPipeline', () => {
       { key: MetadataProviderKey.OPEN_LIBRARY },
       { key: MetadataProviderKey.KOBO },
     ] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.KOBO, 'k1', { title: 'Kobo Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.KOBO, 'k1', { title: 'Kobo Title' })));
 
     await pipeline.run({ title: 'Query' }, {});
 
-    expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.KOBO]);
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.KOBO]);
   });
 
-  it('lets Field Rules run an audiobook provider without switching the search to audiobook editions', async () => {
+  it('keeps an audiobook-only provider out of a book without audio, even when a Field Rule names it', async () => {
     const global = createPreferences((fields) => {
       fields.title = {
         enabled: true,
-        providers: [MetadataProviderKey.LIBROFM],
+        providers: [MetadataProviderKey.LIBROFM, MetadataProviderKey.GOOGLE],
         mergeStrategy: 'overwriteIfProvided',
       };
     });
@@ -301,36 +321,16 @@ describe('MetadataFetchPipeline', () => {
     preferencesService.getGlobal.mockResolvedValue(global);
     resolver.resolve.mockReturnValue(global);
     resolver.withForwardCompatibility.mockReturnValue(global);
-    registry.all.mockReturnValue([{ key: MetadataProviderKey.LIBROFM }] as never);
-    fetchService.search.mockReturnValue(
-      of(
-        candidate(MetadataProviderKey.LIBROFM, '9798217174331', {
-          title: 'Yesteryear: A GMA Book Club Pick',
-          authors: ['Caro Claire Burke'],
-        }),
-      ),
-    );
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.LIBROFM }, { key: MetadataProviderKey.GOOGLE }] as never);
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Yesteryear' })));
 
-    await pipeline.run(
-      {
-        title: 'Yesteryear',
-        author: 'Caro Claire Burke',
-        isbn: '9780593804223',
-        isAudiobook: false,
-      },
-      {},
-    );
+    const params = { title: 'Yesteryear', author: 'Caro Claire Burke', isbn: '9780593804223', isAudiobook: false };
+    const { diagnostics } = await pipeline.runWithSources(params, {}, undefined, { coverMedia: { hasEbook: true, hasAudio: false } });
 
-    expect(fetchService.search).toHaveBeenCalledWith(
-      {
-        title: 'Yesteryear',
-        author: 'Caro Claire Burke',
-        isbn: '9780593804223',
-        isAudiobook: false,
-        includeAudiobookProviders: true,
-      },
-      [MetadataProviderKey.LIBROFM],
-    );
+    expect(fetchService.searchCandidates).toHaveBeenCalledTimes(1);
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith(params, [MetadataProviderKey.GOOGLE]);
+    expect(diagnostics.fieldRuleProviders).not.toContain(MetadataProviderKey.LIBROFM);
+    expect(diagnostics.enabledUnreferencedProviders).not.toContain(MetadataProviderKey.LIBROFM);
   });
 
   it('returns diagnostics when field rules only reference disabled providers', async () => {
@@ -354,7 +354,7 @@ describe('MetadataFetchPipeline', () => {
     const { resolved, diagnostics } = await pipeline.runWithSources({ title: 'Query' }, {});
 
     expect(resolved).toEqual({});
-    expect(fetchService.search).not.toHaveBeenCalled();
+    expect(fetchService.searchCandidates).not.toHaveBeenCalled();
     expect(diagnostics).toMatchObject({
       reason: 'no_active_providers',
       activeProviders: [],
@@ -385,7 +385,7 @@ describe('MetadataFetchPipeline', () => {
 
     const { diagnostics } = await pipeline.runWithSources({ title: 'Query' }, {});
 
-    expect(fetchService.search).not.toHaveBeenCalled();
+    expect(fetchService.searchCandidates).not.toHaveBeenCalled();
     expect(diagnostics.reason).toBe('providers_throttled');
     expect(diagnostics.throttledProviders).toEqual([MetadataProviderKey.GOOGLE]);
   });
@@ -403,7 +403,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(global);
     resolver.withForwardCompatibility.mockReturnValue(global);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of() as never);
+    fetchService.searchCandidates.mockReturnValue(of() as never);
 
     const { diagnostics } = await pipeline.runWithSources({ title: 'Query' }, {});
 
@@ -425,7 +425,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(global);
     resolver.withForwardCompatibility.mockReturnValue(global);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
 
     const { resolved, diagnostics } = await pipeline.runWithSources({ title: 'Query' }, { title: 'Existing Title' });
 
@@ -453,7 +453,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', {
           title: 'Fetched Title',
@@ -517,7 +517,7 @@ describe('MetadataFetchPipeline', () => {
 
     it('never assembles one record out of candidates describing different books', async () => {
       primeAgreementPreferences();
-      fetchService.search.mockReturnValue(
+      fetchService.searchCandidates.mockReturnValue(
         of(
           candidate(MetadataProviderKey.GOODREADS, 'gr1', {
             title: 'The Girl on the Train',
@@ -554,7 +554,7 @@ describe('MetadataFetchPipeline', () => {
 
     it('reports no candidates when every provider matched a different book', async () => {
       primeAgreementPreferences();
-      fetchService.search.mockReturnValue(
+      fetchService.searchCandidates.mockReturnValue(
         of(
           candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'The Girl on the Train', authors: ['Paula Hawkins'] }),
           candidate(MetadataProviderKey.AMAZON, 'az1', { title: 'The Silence of the Lambs', authors: ['Thomas Harris'] }),
@@ -571,7 +571,7 @@ describe('MetadataFetchPipeline', () => {
 
     it('still fills a field from a lower-priority provider that agrees on the book', async () => {
       primeAgreementPreferences();
-      fetchService.search.mockReturnValue(
+      fetchService.searchCandidates.mockReturnValue(
         of(
           candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'The Hobbit', authors: ['J.R.R. Tolkien'] }),
           candidate(MetadataProviderKey.AMAZON, 'az1', {
@@ -608,7 +608,7 @@ describe('MetadataFetchPipeline', () => {
       resolver.resolve.mockReturnValue(prefs);
       resolver.withForwardCompatibility.mockReturnValue(prefs);
       registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.GOODREADS }] as never);
-      fetchService.search.mockReturnValue(
+      fetchService.searchCandidates.mockReturnValue(
         of(
           candidate(MetadataProviderKey.GOOGLE, 'gg1', { title: 'The Hobbit', authors: ['J.R.R. Tolkien'] }),
           candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'The Girl on the Train', authors: ['Paula Hawkins'] }),
@@ -623,7 +623,7 @@ describe('MetadataFetchPipeline', () => {
 
     it('leaves a single provider untouched, having nothing to disagree with', async () => {
       primeAgreementPreferences();
-      fetchService.search.mockReturnValue(
+      fetchService.searchCandidates.mockReturnValue(
         of(candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'A Loosely Matching Title', authors: ['Someone'] })),
       );
 
@@ -646,7 +646,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { description: undefined }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { description: 'OpenLibrary Description' }),
@@ -672,7 +672,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { authors: ['Fallback Author'] }),
@@ -698,7 +698,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] }), candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { authors: [] })),
     );
 
@@ -721,7 +721,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { authors: ['Fallback Author'] }),
@@ -747,7 +747,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { description: '   ' }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { description: 'Fallback Description' }),
@@ -773,7 +773,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] })));
 
     const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { authors: ['Existing Author'] });
 
@@ -799,7 +799,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { durationSeconds: 0, abridged: false })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { durationSeconds: 0, abridged: false })));
 
     const { resolved } = await pipeline.runWithSources({ title: 'Query' }, { duration: 60, abridged: true });
 
@@ -827,7 +827,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { communityRating: 4.1 }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { communityRating: 4.2, communityRatingCount: 999 }),
@@ -858,7 +858,9 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { coverUrl: 'https://img.example/cover.jpg' })));
+    fetchService.searchCandidates.mockReturnValue(
+      of(candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { coverUrl: 'https://img.example/cover.jpg' })),
+    );
 
     const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, {});
 
@@ -879,7 +881,9 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { coverUrl: 'https://img.example/cover.jpg' })));
+    fetchService.searchCandidates.mockReturnValue(
+      of(candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { coverUrl: 'https://img.example/cover.jpg' })),
+    );
 
     const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { cover: 'extracted' });
 
@@ -920,7 +924,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', {
           title: 'Provider Title',
@@ -970,7 +974,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.COMICVINE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.COMICVINE, 'cv1', {
           comicMetadata: {
@@ -1016,7 +1020,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.COMICVINE }, { key: MetadataProviderKey.AMAZON }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.COMICVINE, 'cv1', {
           comicMetadata: {
@@ -1055,7 +1059,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Sci-Fi', 'Space Opera'] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['Sci-Fi', 'Classic'] }),
@@ -1086,7 +1090,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['romance', 'Magic'] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['Dark Academia', 'MAGIC'] }),
@@ -1120,7 +1124,9 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Adult', 'Fantasy', 'Mystery', 'Classic'] })));
+    fetchService.searchCandidates.mockReturnValue(
+      of(candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Adult', 'Fantasy', 'Mystery', 'Classic'] })),
+    );
 
     const { resolved } = await pipeline.runWithSources({ title: 'Query' }, { genres: ['Adult', 'Romance'] });
 
@@ -1145,7 +1151,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['romance', 'FANTASY'] })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['romance', 'FANTASY'] })));
 
     const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { genres: ['Romance', 'Fantasy'] });
 
@@ -1171,7 +1177,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['New Genre'] })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['New Genre'] })));
 
     const { resolved } = await pipeline.runWithSources({ title: 'Query' }, { genres: ['One', 'Two', 'Three'] });
 
@@ -1196,7 +1202,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Sci-Fi', 'Audiobook', 'Adult'] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['audiobook', 'Fantasy'] }),
@@ -1227,7 +1233,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Fiction', 'Fantasy', 'fantasy', 'Adult'] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['fiction', 'Mystery', 'Classic'] }),
@@ -1258,7 +1264,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['audiobook'] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['Fantasy', 'Adventure'] }),
@@ -1289,7 +1295,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Fantasy', 'Adventure', 'Epic'] }),
         candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['Classic'] }),
@@ -1320,7 +1326,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
 
     const { resolved, providerIds } = await pipeline.runWithSources({ title: 'Query' }, { title: 'Existing Title' });
 
@@ -1346,7 +1352,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDNEXUS }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.AUDNEXUS, 'B0TEST12345', {
           audibleId: 'B0TEST12345',
@@ -1378,7 +1384,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.HARDCOVER }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(candidate(MetadataProviderKey.HARDCOVER, 'the-name-of-the-wind', { title: 'Fetched Title', hardcoverEditionId: '1001' })),
     );
 
@@ -1406,7 +1412,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
 
     const { providerIds } = await pipeline.runWithSources({ title: 'Query' }, {});
 
@@ -1431,7 +1437,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.HARDCOVER }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(candidate(MetadataProviderKey.HARDCOVER, 'the-name-of-the-wind', { title: 'Fetched Title', hardcoverEditionId: '1001' })),
     );
 
@@ -1454,7 +1460,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOOGLE, 'g-first', { description: 'First description' }),
         candidate(MetadataProviderKey.GOOGLE, 'g-second', { description: 'Second description' }),
@@ -1482,7 +1488,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.GOODREADS }, { key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.GOODREADS, 'gr1', { pageCount: 404 }),
         candidate(MetadataProviderKey.GOOGLE, 'g1', { description: 'The whole blurb, all the way to the end.' }),
@@ -1512,7 +1518,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDIBLE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.AUDIBLE, 'B002V1NSN2', {
           seriesName: 'Sword of Truth',
@@ -1554,7 +1560,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDIBLE }, { key: MetadataProviderKey.GOOGLE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.AUDIBLE, 'B002V1NSN2', {
           seriesName: 'Sword of Truth',
@@ -1593,7 +1599,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(prefs);
     resolver.withForwardCompatibility.mockReturnValue(prefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDIBLE }] as never);
-    fetchService.search.mockReturnValue(
+    fetchService.searchCandidates.mockReturnValue(
       of(
         candidate(MetadataProviderKey.AUDIBLE, 'B002V1NSN2', {
           seriesName: 'Sword of Truth',
@@ -1632,7 +1638,7 @@ describe('MetadataFetchPipeline', () => {
     resolver.resolve.mockReturnValue(resolvedPrefs);
     resolver.withForwardCompatibility.mockReturnValue(resolvedPrefs);
     registry.all.mockReturnValue([{ key: MetadataProviderKey.OPEN_LIBRARY }] as never);
-    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { title: 'Library Title' })));
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { title: 'Library Title' })));
 
     const result = await pipeline.run({ title: 'Query' }, {}, 10);
 
@@ -1686,6 +1692,366 @@ describe('MetadataFetchPipeline', () => {
     expect(preferencesService.getForLibrary).toHaveBeenCalledWith(10, global);
     expect(result).toEqual([MetadataProviderKey.KOBO, MetadataProviderKey.GOOGLE]);
   });
+
+  describe('cover slots', () => {
+    const EBOOK_ONLY: CoverMedia = { hasEbook: true, hasAudio: false };
+    const AUDIO_ONLY: CoverMedia = { hasEbook: false, hasAudio: true };
+    const BOTH: CoverMedia = { hasEbook: true, hasAudio: true };
+    type Editions = { ebook?: Partial<MetadataCandidate>; audio?: Partial<MetadataCandidate> };
+
+    function usePreferences(mutate?: (preferences: MetadataFetchPreferences) => void): MetadataFetchPreferences {
+      const preferences = new MetadataPreferenceResolver().getDefaultPreferences();
+      mutate?.(preferences);
+      preferencesService.getGlobal.mockResolvedValue(preferences);
+      resolver.resolve.mockReturnValue(preferences);
+      resolver.withForwardCompatibility.mockReturnValue(preferences);
+      return preferences;
+    }
+
+    function register(...keys: MetadataProviderKey[]): void {
+      registry.all.mockReturnValue(keys.map((key) => ({ key })) as never);
+    }
+
+    /** Answers every search from a table, giving each provider's edition for the medium asked about. */
+    function answer(table: Partial<Record<MetadataProviderKey, Editions>>): void {
+      fetchService.searchCandidates.mockImplementation((params: MetadataSearchParams, providers?: MetadataProviderKey[]) =>
+        of(
+          ...(providers ?? []).flatMap((provider) => {
+            const data = table[provider]?.[params.isAudiobook ? 'audio' : 'ebook'];
+            return data ? [candidate(provider, `${provider}-${params.isAudiobook ? 'audio' : 'ebook'}`, data)] : [];
+          }),
+        ),
+      );
+    }
+
+    function searches(): { params: MetadataSearchParams; providers: MetadataProviderKey[] }[] {
+      return fetchService.searchCandidates.mock.calls.map(([params, providers]) => ({ params, providers: providers ?? [] }));
+    }
+
+    const square = (url: string): Partial<MetadataCandidate> => ({ coverUrl: url, coverShape: 'square' });
+    const portrait = (url: string): Partial<MetadataCandidate> => ({ coverUrl: url, coverShape: 'portrait' });
+
+    it('never asks an audiobook provider about a book without audio, even with a stored Audible id', async () => {
+      usePreferences();
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.AUDIBLE, MetadataProviderKey.LIBROFM);
+      answer({ [MetadataProviderKey.GOOGLE]: { ebook: portrait('https://google/e.jpg') } });
+
+      const { resolved } = await pipeline.runWithSources(
+        { title: 'Dune', isAudiobook: false, existingProviderIds: { [MetadataProviderKey.AUDIBLE]: 'B0STORED' } },
+        {},
+        undefined,
+        { coverMedia: EBOOK_ONLY },
+      );
+
+      expect(searches()).toHaveLength(1);
+      expect(searches()[0]!.providers).not.toContain(MetadataProviderKey.AUDIBLE);
+      expect(searches()[0]!.providers).not.toContain(MetadataProviderKey.LIBROFM);
+      expect(searches()[0]!.params.includeAudiobookProviders).toBeUndefined();
+      expect(resolved.coverUrl).toBe('https://google/e.jpg');
+      expect(resolved.audioCoverUrl).toBeUndefined();
+    });
+
+    it('fills the audio slot of an audiobook in one pass, Audible first', async () => {
+      usePreferences();
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.AUDIBLE);
+      answer({
+        [MetadataProviderKey.AUDIBLE]: { audio: square('https://audible/a.jpg') },
+        [MetadataProviderKey.ITUNES]: { audio: square('https://itunes/a.jpg') },
+        [MetadataProviderKey.GOOGLE]: { audio: portrait('https://google/a.jpg') },
+      });
+
+      const { resolved, sources, diagnostics } = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, {}, undefined, {
+        coverMedia: AUDIO_ONLY,
+      });
+
+      expect(searches()).toHaveLength(1);
+      expect(searches()[0]!.params.includeAudiobookProviders).toBe(true);
+      expect(resolved.coverUrl).toBeUndefined();
+      expect(resolved.audioCoverUrl).toBe('https://audible/a.jpg');
+      expect(resolved.audioCoverChoices?.map((choice) => [choice.provider, choice.fit])).toEqual([
+        [MetadataProviderKey.AUDIBLE, 'match'],
+        [MetadataProviderKey.ITUNES, 'match'],
+        [MetadataProviderKey.GOOGLE, 'mismatch'],
+      ]);
+      expect(sources.audioCoverUrl).toBe(MetadataProviderKey.AUDIBLE);
+      expect(diagnostics.coverSlots).toEqual({ audio: { provider: MetadataProviderKey.AUDIBLE, pass: 1 } });
+    });
+
+    it('asks only the edition-aware providers again, as the other medium and without the ids naming the first edition', async () => {
+      usePreferences();
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.AMAZON);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { ebook: portrait('https://google/e.jpg') },
+        [MetadataProviderKey.AMAZON]: { ebook: portrait('https://amazon/e.jpg') },
+        [MetadataProviderKey.ITUNES]: { ebook: portrait('https://itunes/e.jpg'), audio: square('https://itunes/a.jpg') },
+      });
+
+      const { resolved, diagnostics } = await pipeline.runWithSources(
+        {
+          title: 'Dune',
+          isbn: '9780441013593',
+          hardcoverEditionId: '42',
+          isAudiobook: false,
+          existingProviderIds: { [MetadataProviderKey.ITUNES]: 'itunes-ebook', [MetadataProviderKey.GOOGLE]: 'g1' },
+        },
+        { cover: null, audioCover: null },
+        undefined,
+        { coverMedia: BOTH },
+      );
+
+      expect(searches()).toHaveLength(2);
+      const pass2 = searches()[1]!;
+      expect(pass2.providers).toEqual([MetadataProviderKey.ITUNES]);
+      expect(pass2.params).toMatchObject({ title: 'Dune', isAudiobook: true, includeAudiobookProviders: false });
+      expect(pass2.params.isbn).toBeUndefined();
+      expect(pass2.params.hardcoverEditionId).toBeUndefined();
+      expect(pass2.params.existingProviderIds).toEqual({ [MetadataProviderKey.GOOGLE]: 'g1' });
+      expect(resolved.coverUrl).toBe('https://amazon/e.jpg');
+      expect(resolved.audioCoverUrl).toBe('https://itunes/a.jpg');
+      expect(diagnostics.coverSlots).toEqual({
+        ebook: { provider: MetadataProviderKey.AMAZON, pass: 1 },
+        audio: { provider: MetadataProviderKey.ITUNES, pass: 2 },
+      });
+    });
+
+    it('holds pass-2 candidates to the book pass 1 identified', async () => {
+      usePreferences((preferences) => {
+        preferences.fields.audioCover.providers = [MetadataProviderKey.ITUNES];
+      });
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { ebook: { title: 'Dune', authors: ['Frank Herbert'] } },
+        [MetadataProviderKey.ITUNES]: {
+          ebook: { title: 'Dune', authors: ['Frank Herbert'] },
+          audio: { title: 'The Dune Cookbook Companion', authors: ['Someone Else'], ...square('https://itunes/wrong.jpg') },
+        },
+      });
+
+      const { resolved, diagnostics } = await pipeline.runWithSources({ title: 'Dune', author: 'Frank Herbert', isAudiobook: false }, {}, undefined, {
+        coverMedia: BOTH,
+      });
+
+      expect(searches()).toHaveLength(2);
+      expect(resolved.audioCoverUrl).toBeUndefined();
+      expect(diagnostics.coverSlots?.audio).toEqual({ provider: null, pass: null });
+    });
+
+    it('never saves the ids pass 2 found, since each id column is shared by both media', async () => {
+      usePreferences((preferences) => {
+        preferences.fields.title.providers = [MetadataProviderKey.ITUNES, MetadataProviderKey.HARDCOVER];
+        preferences.fields.audioCover.providers = [MetadataProviderKey.ITUNES, MetadataProviderKey.HARDCOVER];
+      });
+      register(MetadataProviderKey.ITUNES, MetadataProviderKey.HARDCOVER);
+      answer({
+        [MetadataProviderKey.ITUNES]: { ebook: {}, audio: square('https://itunes/a.jpg') },
+        [MetadataProviderKey.HARDCOVER]: { ebook: { hardcoverEditionId: 'ebook-edition' }, audio: { hardcoverEditionId: 'audio-edition' } },
+      });
+
+      const { resolved, providerIds } = await pipeline.runWithSources({ title: 'Dune', isAudiobook: false }, {}, undefined, { coverMedia: BOTH });
+
+      expect(searches()).toHaveLength(2);
+      expect(resolved.audioCoverUrl).toBe('https://itunes/a.jpg');
+      expect(providerIds[MetadataProviderKey.ITUNES]).toBe('itunes-ebook');
+      expect(providerIds[MetadataProviderKey.HARDCOVER]).toBe('hardcover-ebook');
+      expect(resolved.hardcoverEditionId).toBe('ebook-edition');
+    });
+
+    it('takes nothing but art from a provider only a cover rule brought in, apart from an audiobook id', async () => {
+      usePreferences((preferences) => {
+        // Community ratings name Audible and Hardcover by default, which would make them full providers.
+        preferences.fields.communityRating.providers = [MetadataProviderKey.GOOGLE];
+        preferences.fields.audioCover.providers = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.HARDCOVER];
+      });
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE, MetadataProviderKey.HARDCOVER);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { audio: { description: 'From Google' } },
+        [MetadataProviderKey.AUDIBLE]: {
+          audio: {
+            ...square('https://audible/a.jpg'),
+            providerId: 'B0AUDIBLE',
+            description: 'From Audible',
+            chapters: [{ title: 'One', startMs: 0 }],
+            comicMetadata: { issueNumber: '3' },
+          },
+        },
+        [MetadataProviderKey.HARDCOVER]: { audio: { hardcoverEditionId: 'hc-edition' } },
+      });
+
+      const { resolved, providerIds } = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, {}, undefined, {
+        coverMedia: AUDIO_ONLY,
+      });
+
+      expect(resolved.audioCoverUrl).toBe('https://audible/a.jpg');
+      expect(resolved.description).toBe('From Google');
+      expect(resolved.chapters).toBeUndefined();
+      expect(resolved.comicMetadata).toBeUndefined();
+      expect(resolved.hardcoverEditionId).toBeUndefined();
+      expect(providerIds[MetadataProviderKey.AUDIBLE]).toBe('B0AUDIBLE');
+      expect(providerIds[MetadataProviderKey.HARDCOVER]).toBeUndefined();
+    });
+
+    it('lets a cover-only provider be checked against the anchor without choosing it', async () => {
+      usePreferences((preferences) => {
+        preferences.fields.communityRating.providers = [MetadataProviderKey.GOOGLE];
+        preferences.fields.audioCover.providers = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.GOOGLE];
+      });
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { audio: { title: 'Dune', authors: ['Frank Herbert'], ...portrait('https://google/a.jpg') } },
+        [MetadataProviderKey.AUDIBLE]: { audio: { title: 'The Hobbit', authors: ['J. R. R. Tolkien'], ...square('https://audible/wrong.jpg') } },
+      });
+
+      // The query suits Audible's record better, but only a provider that supplies fields may say which book this is.
+      const { resolved } = await pipeline.runWithSources({ title: 'The Hobbit', isAudiobook: true }, {}, undefined, {
+        coverMedia: AUDIO_ONLY,
+      });
+
+      expect(resolved.audioCoverUrl).toBe('https://google/a.jpg');
+    });
+
+    it('fills an empty ebook slot under fill-missing while the audio slot is already filled', async () => {
+      usePreferences((preferences) => {
+        preferences.fields.cover.mergeStrategy = 'fillMissing';
+        preferences.fields.audioCover.mergeStrategy = 'fillMissing';
+      });
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.AUDIBLE);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { ebook: portrait('https://google/e.jpg') },
+        [MetadataProviderKey.AUDIBLE]: { ebook: square('https://audible/a.jpg') },
+      });
+
+      const { resolved } = await pipeline.runWithSources({ title: 'Dune', isAudiobook: false }, { cover: null, audioCover: true }, undefined, {
+        coverMedia: BOTH,
+      });
+
+      expect(resolved.coverUrl).toBe('https://google/e.jpg');
+      expect(resolved.audioCoverUrl).toBeUndefined();
+      expect(searches()).toHaveLength(1);
+    });
+
+    it('runs the Audiobook cover rule for a book whose only file is a read-along EPUB', async () => {
+      usePreferences();
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.AUDIBLE);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { ebook: portrait('https://google/e.jpg') },
+        [MetadataProviderKey.ITUNES]: { ebook: portrait('https://itunes/e.jpg'), audio: square('https://itunes/a.jpg') },
+        [MetadataProviderKey.AUDIBLE]: { ebook: square('https://audible/a.jpg') },
+      });
+
+      const { resolved } = await pipeline.runWithSources({ title: 'Dune', isAudiobook: false }, {}, undefined, { coverMedia: BOTH });
+
+      const [pass1, pass2] = searches();
+      expect(pass1!.params).toMatchObject({ isAudiobook: false, includeAudiobookProviders: true });
+      expect(pass1!.providers).toContain(MetadataProviderKey.AUDIBLE);
+      expect(pass2!.params.isAudiobook).toBe(true);
+      expect(pass2!.providers).toEqual([MetadataProviderKey.ITUNES]);
+      expect(resolved.coverUrl).toBe('https://itunes/e.jpg');
+      expect(resolved.audioCoverUrl).toBe('https://audible/a.jpg');
+      expect(resolved.audioCoverChoices?.map((choice) => [choice.provider, choice.fit])).toEqual([
+        [MetadataProviderKey.AUDIBLE, 'match'],
+        [MetadataProviderKey.ITUNES, 'match'],
+        [MetadataProviderKey.GOOGLE, 'mismatch'],
+      ]);
+    });
+
+    it('orders a slot by shape and offers wrong-shape art only to an empty slot', async () => {
+      usePreferences((preferences) => {
+        preferences.fields.audioCover.providers = [MetadataProviderKey.AMAZON, MetadataProviderKey.GOODREADS, MetadataProviderKey.KOBO];
+      });
+      register(MetadataProviderKey.AMAZON, MetadataProviderKey.GOODREADS, MetadataProviderKey.KOBO);
+      answer({
+        [MetadataProviderKey.AMAZON]: { audio: portrait('https://amazon/a.jpg') },
+        [MetadataProviderKey.GOODREADS]: { audio: { coverUrl: 'https://goodreads/a.jpg' } },
+        [MetadataProviderKey.KOBO]: { audio: square('https://kobo/a.jpg') },
+      });
+      const params = { title: 'Dune', isAudiobook: true };
+
+      const empty = await pipeline.runWithSources(params, { audioCover: null }, undefined, { coverMedia: AUDIO_ONLY });
+      const filled = await pipeline.runWithSources(params, { audioCover: true }, undefined, { coverMedia: AUDIO_ONLY });
+
+      expect(empty.resolved.audioCoverChoices?.map((choice) => [choice.provider, choice.fit])).toEqual([
+        [MetadataProviderKey.KOBO, 'match'],
+        [MetadataProviderKey.GOODREADS, 'unknown'],
+        [MetadataProviderKey.AMAZON, 'mismatch'],
+      ]);
+      expect(filled.resolved.audioCoverChoices?.map((choice) => choice.provider)).toEqual([MetadataProviderKey.KOBO, MetadataProviderKey.GOODREADS]);
+    });
+
+    it('skips a cover the provider says is a thumbnail', async () => {
+      usePreferences((preferences) => {
+        preferences.fields.audioCover.providers = [MetadataProviderKey.HARDCOVER, MetadataProviderKey.KOBO];
+      });
+      register(MetadataProviderKey.HARDCOVER, MetadataProviderKey.KOBO);
+      answer({
+        [MetadataProviderKey.HARDCOVER]: { audio: { ...square('https://hardcover/thumb.jpg'), coverWidth: 98, coverHeight: 98 } },
+        [MetadataProviderKey.KOBO]: { audio: square('https://kobo/a.jpg') },
+      });
+
+      const { resolved } = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, {}, undefined, { coverMedia: AUDIO_ONLY });
+
+      expect(resolved.audioCoverChoices?.map((choice) => choice.url)).toEqual(['https://kobo/a.jpg']);
+    });
+
+    it('neither resolves nor searches for a locked slot', async () => {
+      usePreferences();
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.AUDIBLE);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { ebook: portrait('https://google/e.jpg') },
+        [MetadataProviderKey.AUDIBLE]: { ebook: square('https://audible/a.jpg') },
+      });
+
+      const { resolved, diagnostics } = await pipeline.runWithSources({ title: 'Dune', isAudiobook: false }, {}, undefined, {
+        coverMedia: BOTH,
+        lockedCoverSlots: ['audio'],
+      });
+
+      expect(searches()).toHaveLength(1);
+      expect(resolved.coverUrl).toBe('https://google/e.jpg');
+      expect(resolved.audioCoverUrl).toBeUndefined();
+      expect(diagnostics.coverSlots).toEqual({ ebook: { provider: MetadataProviderKey.GOOGLE, pass: 1 } });
+    });
+
+    it('asks nobody again in existing-only mode and fills the other slot from pass 1', async () => {
+      usePreferences((preferences) => {
+        preferences.options = { ...preferences.options!, providerIdMode: 'existingOnly' };
+      });
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.AUDIBLE);
+      answer({
+        [MetadataProviderKey.GOOGLE]: { ebook: portrait('https://google/e.jpg') },
+        [MetadataProviderKey.ITUNES]: { ebook: portrait('https://itunes/e.jpg') },
+        [MetadataProviderKey.AUDIBLE]: { ebook: square('https://audible/a.jpg') },
+      });
+
+      const { resolved } = await pipeline.runWithSources(
+        {
+          title: 'Dune',
+          isAudiobook: false,
+          existingProviderIds: {
+            [MetadataProviderKey.GOOGLE]: 'g1',
+            [MetadataProviderKey.ITUNES]: 'i1',
+            [MetadataProviderKey.AUDIBLE]: 'B0',
+          },
+        },
+        {},
+        undefined,
+        { coverMedia: BOTH },
+      );
+
+      expect(searches()).toHaveLength(1);
+      expect(resolved.audioCoverUrl).toBe('https://audible/a.jpg');
+      expect(resolved.audioCoverChoices?.map((choice) => choice.provider)).not.toContain(MetadataProviderKey.ITUNES);
+    });
+
+    it('narrows the effective provider keys to a book without audio', async () => {
+      usePreferences();
+      register(MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE, MetadataProviderKey.LIBROFM);
+
+      await expect(pipeline.getEffectiveProviderKeys(undefined, EBOOK_ONLY)).resolves.toEqual([MetadataProviderKey.GOOGLE]);
+      await expect(pipeline.getEffectiveProviderKeys(undefined, AUDIO_ONLY)).resolves.toEqual(
+        expect.arrayContaining([MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE, MetadataProviderKey.LIBROFM]),
+      );
+    });
+  });
 });
 
 function makeProviderConfig(overrides: Partial<ProviderConfigurations> = {}): ProviderConfigurations {
@@ -1704,6 +2070,6 @@ function makeProviderConfig(overrides: Partial<ProviderConfigurations> = {}): Pr
     lubimyczytac: { enabled: false, ...overrides.lubimyczytac },
     aladin: { enabled: false, ttbKey: '', ...overrides.aladin },
     mangabaka: { enabled: false, ...overrides.mangabaka },
-    librofm: { enabled: false, ...overrides.librofm },
+    librofm: { enabled: true, ...overrides.librofm },
   };
 }

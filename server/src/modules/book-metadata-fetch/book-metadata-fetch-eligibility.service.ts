@@ -15,6 +15,9 @@ export interface BookEligibilityData {
   seriesName: string | null;
   seriesIndex: string | null;
   coverSource: string | null;
+  /** The book's cover media include audio: real audio files, or an EPUB with read-along audio. */
+  hasAudioCoverMedia: boolean;
+  hasAudioCover: boolean;
   hasAuthors: boolean;
   hasGenres: boolean;
   hasNarrators: boolean;
@@ -61,6 +64,8 @@ export class BookMetadataFetchEligibilityService {
         return book.abridged === null;
       case 'cover':
         return book.coverSource === null;
+      case 'audioCover':
+        return book.hasAudioCoverMedia && !book.hasAudioCover;
       case 'title':
         return book.title === null || book.title === '';
       case 'subtitle':

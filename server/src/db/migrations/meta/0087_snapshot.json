@@ -1,5 +1,5 @@
 {
-  "id": "cb2bbbd9-43dd-40b1-9382-15f0bd7f7b87",
+  "id": "6e3f296e-0e4d-4d6b-87ef-a9473eeef893",
   "prevId": "1d34bd1a-5c8f-4a78-92a7-06a66281d909",
   "version": "7",
   "dialect": "postgresql",
@@ -2872,6 +2872,13 @@
           "notNull": true,
           "default": "'book_per_folder'"
         },
+        "added_at_source": {
+          "name": "added_at_source",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'imported'"
+        },
         "exclude_patterns": {
           "name": "exclude_patterns",
           "type": "jsonb",
@@ -3086,6 +3093,10 @@
         "libraries_organization_mode_chk": {
           "name": "libraries_organization_mode_chk",
           "value": "\"libraries\".\"organization_mode\" in ('book_per_folder', 'book_per_file')"
+        },
+        "libraries_added_at_source_chk": {
+          "name": "libraries_added_at_source_chk",
+          "value": "\"libraries\".\"added_at_source\" in ('imported', 'file_modified', 'file_created')"
         },
         "libraries_reading_threshold_range_chk": {
           "name": "libraries_reading_threshold_range_chk",
@@ -6397,18 +6408,6 @@
         "aladin_id": {
           "name": "aladin_id",
           "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mangabaka_id": {
-          "name": "mangabaka_id",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mangabaka_series_id": {
-          "name": "mangabaka_series_id",
-          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },

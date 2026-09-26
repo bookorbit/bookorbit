@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent } from 'vue'
-import type { ScrollerType } from '@bookorbit/types'
+import type { BookScrollerType } from '@bookorbit/types'
 
 const bookEventsMock = vi.hoisted(() => ({
   progressChangedCallback: null as (() => void) | null,
@@ -44,7 +44,7 @@ function batchBody(): { items: Array<{ id: string; type: string; limit: number; 
   return JSON.parse(String(init?.body))
 }
 
-function mountComposable(type: ScrollerType, limit = 20, smartScopeId?: number) {
+function mountComposable(type: BookScrollerType, limit = 20, smartScopeId?: number) {
   let result!: ReturnType<typeof useDashboardScroller>
   mount(
     defineComponent({

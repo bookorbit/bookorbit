@@ -1,3 +1,5 @@
+import type { ReadingSessionSource } from "./reading-session";
+
 export const READING_INSIGHTS_SHARING_LEVELS = ["private", "summary", "detailed"] as const;
 export type ReadingInsightsSharingLevel = (typeof READING_INSIGHTS_SHARING_LEVELS)[number];
 
@@ -55,7 +57,7 @@ export interface SharedReadingGenreDistributionItem {
 }
 
 export interface SharedReadingSourceItem {
-  source: string;
+  source: ReadingSessionSource | "unknown";
   readingSeconds: number;
   sessionsCount: number;
 }
@@ -105,6 +107,4 @@ export interface SharedReadingInsightsViewSession {
 }
 
 export type ReadingInsightsPreview =
-  | ReadingInsightsSharingSettings
-  | SharedReadingInsightsSummary
-  | { summary: SharedReadingInsightsSummary; detail: SharedReadingInsightsDetail };
+  ReadingInsightsSharingSettings | SharedReadingInsightsSummary | { summary: SharedReadingInsightsSummary; detail: SharedReadingInsightsDetail };

@@ -11,9 +11,10 @@ import { getProviderColor } from '@/lib/provider-colors'
 import { createBookProviderLinks } from '@/features/book/lib/provider-links'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
-import { getFormatColor } from '../lib/format-colors'
+import BookFormatChip from './BookFormatChip.vue'
+import { bookFormatEntries, fileFormatKey } from '../lib/book-formats'
 import { displayPublishedDate } from '../lib/published-date'
-import { FORMAT_TO_GROUP } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, getPrimaryBookFile } from '@bookorbit/types'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -59,7 +60,7 @@ watch(
 )
 
 const { coverUrl } = useCoverVersions()
-const coverSrc = computed(() => (detail.value ? coverUrl(detail.value.id, 'cover', detail.value.updatedAt ?? detail.value.addedAt) : null))
+const coverSrc = computed(() => (detail.value ? coverUrl(detail.value.id, 'cover', detail.value.coverVersion) : null))
 
 const coverSeed = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? String(detail.value.id)) : ''))
 const coverPlaceholderTitle = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? null) : null))
@@ -92,12 +93,10 @@ const quickViewCoverAspectRatio = computed(() => {
   return `${coverImageRatio.value} / 1`
 })
 
-const primaryFile = computed(() => detail.value?.files.find((f) => f.role === 'primary') ?? detail.value?.files[0] ?? null)
+const primaryFile = computed(() => (detail.value ? getPrimaryBookFile(detail.value.files) : null))
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
-const knownFormats = computed(() => [
-  ...new Set((detail.value?.files ?? []).filter((f) => f.format && FORMAT_TO_GROUP[f.format]).map((f) => f.format!)),
-])
+const formatEntries = computed(() => (detail.value ? bookFormatEntries(detail.value.files, detail.value.formatPriority) : []))
 const publishedDisplay = computed(() => (detail.value ? displayPublishedDate(detail.value.publishedDate, detail.value.publishedYear) : null))
 
 function providerLinkStyle(provider: string) {
@@ -105,15 +104,6 @@ function providerLinkStyle(provider: string) {
   return {
     borderColor: `${color}66`,
     backgroundColor: `${color}12`,
-  }
-}
-
-function formatBadgeStyle(fmt: string) {
-  const color = getFormatColor(fmt)
-  return {
-    color,
-    borderColor: `${color}66`,
-    backgroundColor: `${color}1a`,
   }
 }
 
@@ -286,14 +276,13 @@ function handleDelete() {
             <template v-else-if="detail">
               <!-- Format badges + meta chips -->
               <div class="flex flex-wrap gap-1.5">
-                <span
-                  v-for="fmt in knownFormats"
-                  :key="fmt"
-                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
-                  :style="formatBadgeStyle(fmt)"
-                >
-                  {{ fmt }}
-                </span>
+                <BookFormatChip
+                  v-for="entry in formatEntries"
+                  :key="entry.key"
+                  :format-key="entry.key"
+                  :primary="entry.primary"
+                  class="rounded px-2 py-0.5 text-[10px] tracking-wider"
+                />
                 <span v-if="detail.pageCount" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
                   {{ t('book.quickView.pages', { count: detail.pageCount }) }}
                 </span>
@@ -320,12 +309,7 @@ function handleDelete() {
                   {{ primaryFile.filename ?? t('book.quickView.fileNumber', { id: primaryFile.id }) }}
                 </p>
                 <div class="mt-1.5 flex items-center gap-1.5">
-                  <span
-                    class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
-                    :style="formatBadgeStyle(primaryFile.format ?? '?')"
-                  >
-                    {{ (primaryFile.format ?? '?').toUpperCase() }}
-                  </span>
+                  <BookFormatChip :format-key="fileFormatKey(primaryFile) ?? '?'" class="rounded px-2 py-0.5 text-[10px] tracking-wider" />
                   <span class="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">
                     {{ formatBytes(primaryFile.sizeBytes) }}
                   </span>

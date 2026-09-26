@@ -99,6 +99,87 @@ export interface ReleaseTierInput {
   sizeBytes: number | null;
 }
 
+export type ReleaseProfileMismatchFailure =
+  | { code: "formatUnknown"; expected: string[] }
+  | { code: "format"; expected: string[]; actual: string[] }
+  | { code: "fileLayoutUnknown"; expected: ReleaseFileLayout }
+  | { code: "fileLayout"; expected: ReleaseFileLayout; actual: ReleaseFileLayout }
+  | { code: "bitrate"; expected: number; actual: number }
+  | { code: "channels"; expected: number; actual: number }
+  | { code: "languageUnknown"; expected: string[] }
+  | { code: "language"; expected: string[]; actual: string }
+  | { code: "source" }
+  | { code: "seeders"; expected: number; actual: number }
+  | { code: "sizeUnknown"; expected: number }
+  | { code: "size"; expected: number; actual: number }
+  | { code: "freeleech" }
+  | { code: "vipOnly" };
+
+/** The nearest configured tier and the exact conditions that kept a release out of it. */
+export interface ReleaseProfileMismatch {
+  tier: number;
+  /** Operator-authored text. Never translated. */
+  tierName: string;
+  failures: ReleaseProfileMismatchFailure[];
+}
+
+/**
+ * Every condition a release fails in one tier. Kept alongside `releaseMatchesTier` so the reason
+ * shown to an approver cannot drift from the rule automation enforces.
+ */
+export function releaseTierFailures(release: ReleaseTierInput, conditions: ReleaseTierConditions): ReleaseProfileMismatchFailure[] {
+  const failures: ReleaseProfileMismatchFailure[] = [];
+  const { formats, fileLayout, minBitrateKbps, channels, languages, indexerIds, minSeeders, maxSizeBytes } = conditions;
+
+  if (formats && formats.length > 0) {
+    const wanted = formats.map((format) => format.toLowerCase());
+    if (release.formats.length === 0) failures.push({ code: "formatUnknown", expected: formats });
+    else if (!release.formats.some((format) => wanted.includes(format.toLowerCase()))) {
+      failures.push({ code: "format", expected: formats, actual: release.formats });
+    }
+  }
+
+  if (fileLayout) {
+    const actual = classifyFileLayout(release.fileCount);
+    if (actual === null) failures.push({ code: "fileLayoutUnknown", expected: fileLayout });
+    else if (actual !== fileLayout) failures.push({ code: "fileLayout", expected: fileLayout, actual });
+  }
+
+  if (minBitrateKbps !== undefined && release.audio?.bitrateKbps != null && release.audio.bitrateKbps < minBitrateKbps) {
+    failures.push({ code: "bitrate", expected: minBitrateKbps, actual: release.audio.bitrateKbps });
+  }
+
+  if (channels !== undefined && release.audio?.channels != null && release.audio.channels !== channels) {
+    failures.push({ code: "channels", expected: channels, actual: release.audio.channels });
+  }
+
+  if (languages && languages.length > 0) {
+    if (!release.language) failures.push({ code: "languageUnknown", expected: languages });
+    else {
+      const stated = release.language;
+      if (!languages.some((language) => languagesAgree(language, stated))) {
+        failures.push({ code: "language", expected: languages, actual: stated });
+      }
+    }
+  }
+
+  if (indexerIds && indexerIds.length > 0 && !indexerIds.includes(release.indexerId)) failures.push({ code: "source" });
+
+  if (minSeeders !== undefined && release.seeders !== null && release.seeders < minSeeders) {
+    failures.push({ code: "seeders", expected: minSeeders, actual: release.seeders });
+  }
+
+  if (maxSizeBytes !== undefined) {
+    if (release.sizeBytes === null) failures.push({ code: "sizeUnknown", expected: maxSizeBytes });
+    else if (release.sizeBytes > maxSizeBytes) failures.push({ code: "size", expected: maxSizeBytes, actual: release.sizeBytes });
+  }
+
+  if (conditions.freeleechOnly === true && !release.freeleech) failures.push({ code: "freeleech" });
+  if (conditions.excludeVipOnly === true && release.vipOnly) failures.push({ code: "vipOnly" });
+
+  return failures;
+}
+
 /**
  * Whether one release satisfies every condition a tier states.
  *
@@ -118,48 +199,24 @@ export interface ReleaseTierInput {
  * null, and holding that against it would bar every direct download from every tier wanting seeds.
  */
 export function releaseMatchesTier(release: ReleaseTierInput, conditions: ReleaseTierConditions): boolean {
-  const { formats, fileLayout, minBitrateKbps, channels, languages, indexerIds, minSeeders, maxSizeBytes } = conditions;
+  return releaseTierFailures(release, conditions).length === 0;
+}
 
-  if (formats && formats.length > 0) {
-    const wanted = formats.map((format) => format.toLowerCase());
-    if (!release.formats.some((format) => wanted.includes(format.toLowerCase()))) return false;
+/**
+ * The tier needing the fewest changes for this release, with earlier tiers winning a tie. Null
+ * means either no profile is configured or the release already matches a tier.
+ */
+export function explainReleaseProfileMismatch(release: ReleaseTierInput, tiers: readonly ReleaseTier[]): ReleaseProfileMismatch | null {
+  let closest: ReleaseProfileMismatch | null = null;
+  for (const [index, tier] of tiers.entries()) {
+    const failures = releaseTierFailures(release, tier.conditions);
+    if (failures.length === 0) return null;
+    if (closest === null || failures.length < closest.failures.length) {
+      closest = { tier: index, tierName: tier.name, failures };
+    }
   }
 
-  if (fileLayout && classifyFileLayout(release.fileCount) !== fileLayout) return false;
-
-  // Stated and short fails; unstated passes. See the note above: MediaInfo is optional per torrent.
-  if (minBitrateKbps !== undefined && release.audio?.bitrateKbps != null && release.audio.bitrateKbps < minBitrateKbps) {
-    return false;
-  }
-
-  if (channels !== undefined && release.audio?.channels != null && release.audio.channels !== channels) return false;
-
-  if (languages && languages.length > 0) {
-    if (!release.language) return false;
-    // Compared by subtag rather than as strings: a tier stores the two-letter code the form
-    // offers, while a source states whatever it states. MyAnonaMouse reports "ENG", which no
-    // amount of lowercasing makes equal to "en", so a raw comparison put every one of its
-    // releases outside every tier that named a language.
-    const stated = release.language;
-    if (!languages.some((language) => languagesAgree(language, stated))) return false;
-  }
-
-  if (indexerIds && indexerIds.length > 0 && !indexerIds.includes(release.indexerId)) return false;
-
-  // Seeders are the one exception to "unstated never matches": a source with no swarm at all
-  // reports null, and holding that against a direct download would exclude every such source from
-  // every tier that asks for a healthy swarm.
-  if (minSeeders !== undefined && release.seeders !== null && release.seeders < minSeeders) return false;
-
-  if (maxSizeBytes !== undefined) {
-    if (release.sizeBytes === null) return false;
-    if (release.sizeBytes > maxSizeBytes) return false;
-  }
-
-  if (conditions.freeleechOnly === true && !release.freeleech) return false;
-  if (conditions.excludeVipOnly === true && release.vipOnly) return false;
-
-  return true;
+  return closest;
 }
 
 /**

@@ -27,21 +27,21 @@ const { md } = useBreakpoints(breakpointsTailwind)
 const isEditEnabled = computed(() => !props.readOnly && md.value)
 
 const mode = ref<'view' | 'edit'>('view')
-const savedCover = ref(false)
 
 const { detail, loading, fetch } = useBookDetail()
-const { isLocked, toggle, load: loadLocks } = useMetadataLocks()
+const { lockedFields, toggle, load: loadLocks } = useMetadataLocks()
 const { coverUrl } = useCoverVersions()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const editor = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 
-const hasCoverResolved = computed(() => savedCover.value || (props.book?.hasCover ?? false))
-const coverVersion = computed(() => detail.value?.updatedAt ?? props.book?.updatedAt ?? props.book?.addedAt ?? null)
+const currentDetail = computed(() => (detail.value && detail.value.id === props.book?.id ? detail.value : null))
+const hasCoverResolved = computed(() => (currentDetail.value ? currentDetail.value.coverSource !== null : (props.book?.hasCover ?? false)))
+const coverVersion = computed(() => currentDetail.value?.coverVersion ?? props.book?.coverVersion ?? null)
 
 watch(
   () => props.book?.id,
   () => {
     mode.value = 'view'
-    savedCover.value = false
     detail.value = null
   },
 )
@@ -61,19 +61,23 @@ function switchToView() {
   mode.value = 'view'
 }
 
-function handleCoverChanged() {
-  savedCover.value = true
-  if (props.book) emit('update:book', props.book.id, true)
-  mode.value = 'view'
+// The other tile may still hold an unsaved image, so the editor stays open until nothing is pending.
+async function handleCoverChanged() {
+  const bookId = props.book?.id
+  if (bookId === undefined) return
+  await fetch(bookId)
+  if (!currentDetail.value || currentDetail.value.id !== bookId) return
+  emit('update:book', bookId, currentDetail.value.coverSource !== null)
+  if (!editor.value?.hasPending) mode.value = 'view'
 }
 
 function handleOpenChange(open: boolean) {
   if (!open) emit('close')
 }
 
-async function handleToggleCoverLock() {
-  if (!detail.value) return
-  await toggle(detail.value.id, 'cover')
+async function handleToggleCoverLock(field: 'cover' | 'audioCover') {
+  if (!currentDetail.value) return
+  await toggle(currentDetail.value.id, field)
 }
 </script>
 
@@ -144,16 +148,18 @@ async function handleToggleCoverLock() {
 
           <!-- Edit mode -->
           <template v-else>
-            <div v-if="loading" class="flex items-center justify-center py-12">
-              <Loader2 class="size-5 animate-spin text-muted-foreground" />
-            </div>
+            <!-- A refetch after a save keeps the editor mounted, or the other tile's pending image is lost. -->
             <CoverEditorPanel
-              v-else-if="detail"
-              :book="detail"
-              :locked="isLocked('cover')"
+              v-if="currentDetail"
+              ref="editor"
+              :book="currentDetail"
+              :locked-fields="lockedFields"
               @cover-changed="handleCoverChanged"
               @toggle-lock="handleToggleCoverLock"
             />
+            <div v-else-if="loading" class="flex items-center justify-center py-12">
+              <Loader2 class="size-5 animate-spin text-muted-foreground" />
+            </div>
           </template>
         </div>
       </DialogContent>

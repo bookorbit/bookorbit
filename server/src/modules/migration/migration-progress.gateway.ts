@@ -1,5 +1,5 @@
-import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ForbiddenException, Inject, Logger, UnauthorizedException } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
@@ -11,6 +11,7 @@ import { AuthService } from '../auth/auth.service';
 import { MigrationRepository } from './migration.repository';
 import { sanitizeRunForApi } from './core/api-sanitizers';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
+import { appConfig } from '../../config/config';
 
 @WebSocketGateway({ namespace: '/migration', cors: { credentials: true } })
 export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -22,9 +23,9 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
     private readonly jwtService: JwtService,
     private readonly authService: AuthService,
     private readonly repo: MigrationRepository,
-    config: ConfigService,
+    @Inject(appConfig.KEY) app: ConfigType<typeof appConfig>,
   ) {
-    this.clientOrigin = config.get<string>('app.appUrl') ?? 'http://localhost:5173';
+    this.clientOrigin = app.appUrl;
   }
 
   afterInit(server: Server): void {
@@ -40,8 +41,10 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
     try {
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new UnauthorizedException('No token provided');
-      const payload = this.jwtService.verify<{ sub: number; ver: number; amr?: AuthenticationMethod }>(token, { algorithms: ['HS256'] });
-      const user = await this.authService.validateUser(payload.sub, payload.ver, payload.amr ?? 'legacy');
+      const payload = this.jwtService.verify<{ sub: number; ver: number; sid?: number; amr?: AuthenticationMethod }>(token, {
+        algorithms: ['HS256'],
+      });
+      const user = await this.authService.validateSessionUser(payload.sub, payload.ver, payload.amr ?? 'legacy', payload.sid);
       if (!user) throw new UnauthorizedException('User not found or token revoked');
       this.assertCanViewMigrationProgress(user);
       (client.data as Record<string, unknown>).user = user;

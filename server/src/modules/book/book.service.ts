@@ -10,13 +10,13 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { access, readdir, rm, stat, rename } from 'fs/promises';
+import { mkdtemp, rm, stat, rename } from 'fs/promises';
 import { inArray, type SQL } from 'drizzle-orm';
 
-import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
-import { resolveIsAudiobook } from '../../common/utils/book-media.utils';
+import { coverFetchInputs, resolveIsAudiobook } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { naturalCompare } from '../../common/utils/natural-sort.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
@@ -31,10 +31,13 @@ import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { basename, dirname, extname, join, relative } from 'path';
+import { tmpdir } from 'os';
 
 import {
   BOOK_METADATA_LOCK_FIELDS,
   DEFAULT_DOWNLOAD_PATTERN,
+  COVER_MEDIA,
+  DEFAULT_FORMAT_PRIORITY,
   MetadataProviderKey,
   Permission,
   customSortFieldIds,
@@ -56,6 +59,7 @@ import type {
   BookWriteAndRenameResult,
   BooksPage,
   CustomMetadataFieldTypeMap,
+  CoverMedium,
   FileRenameResult,
   GroupRule,
   JumpBucketsResponse,
@@ -63,9 +67,12 @@ import type {
   MetadataFetchDiagnostics,
   MetadataField,
   ReadStatus,
+  ReadAloudProgressSync,
+  ReadAloudProgressSyncMode,
   SortSpec,
   UserBookStatus,
   WriteResult,
+  EpubMediaOverlayCapability,
 } from '@bookorbit/types';
 import type { ContentFilterRules } from '@bookorbit/types';
 import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
@@ -90,7 +97,12 @@ import {
   AchievementEventsService,
 } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
+import { selectEmbeddedCoverSources } from '../book-cover-store/cover-sources';
+import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { BookQueryBuilder } from './book-query-builder.service';
+import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sync.service';
+import { AudiolessEpubService } from './audioless-epub.service';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { CustomMetadataService } from '../custom-metadata/custom-metadata.service';
@@ -109,6 +121,8 @@ import type { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-a
 import { buildBookDetailSupplementalFields } from './utils/build-book-detail-supplemental-fields';
 import type { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { READING_DATE_ERROR_CODES } from '../user-book-status/user-book-status.constants';
+import { inspectEpubMediaOverlayFields, mediaOverlayCapabilityFromFields } from '../reader/epub/epub-media-overlay-capability';
+import { computeFileHash } from '../scanner/lib/hash';
 
 type SeriesCollapseQueryOptions = {
   seriesSelectionFilter: GroupRule | undefined;
@@ -133,6 +147,9 @@ const METADATA_PROVIDER_KEY_SET = new Set<string>(Object.values(MetadataProvider
 
 export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
 export type ExportScope = 'primary' | 'all' | 'audio';
+
+const READ_ALOUD_MAX_DURATION_DIFF_RATIO = 0.05;
+const READ_ALOUD_MAX_DURATION_DIFF_SECONDS = 300;
 
 export type BulkEditFieldResult = { updated: number; skippedLocked: number };
 export type BulkEditMetadataResult = {
@@ -274,12 +291,16 @@ export class BookService {
     private readonly comicMetadataService: ComicMetadataRepository,
     private readonly customMetadataService: CustomMetadataService,
     private readonly bookMetadataLockService: BookMetadataLockService,
+    private readonly coverStore: BookCoverStore,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
     @Optional() private readonly fileRenameService: FileRenameService,
     @Optional() private readonly achievementEvents: AchievementEventsService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
     @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
+    @Optional() private readonly audiobookEbookProgressSync?: AudiobookEbookProgressSyncService,
+    @Optional() private readonly audiolessEpubService?: AudiolessEpubService,
+    @Optional() private readonly coverReconciler?: CoverSlotReconciler,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -411,6 +432,7 @@ export class BookService {
     if (r.seriesIndex !== undefined) preview.seriesIndex = r.seriesIndex as string | null;
     if (r.seriesMemberships !== undefined) preview.seriesMemberships = r.seriesMemberships as BookMetadataRefreshPreviewFields['seriesMemberships'];
     if (r.coverUrl !== undefined) preview.coverUrl = r.coverUrl as string;
+    if (r.audioCoverUrl !== undefined) preview.audioCoverUrl = r.audioCoverUrl as string;
     if (r.hardcoverEditionId !== undefined) preview.hardcoverEditionId = r.hardcoverEditionId as string | null;
     if (r.mangabakaSeriesId !== undefined) preview.mangabakaSeriesId = r.mangabakaSeriesId as string | null;
     if (r.comicMetadata !== undefined) preview.comicMetadata = r.comicMetadata as BookMetadataRefreshPreviewFields['comicMetadata'];
@@ -500,7 +522,19 @@ export class BookService {
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+    // Not found, rather than forbidden. A 403 tells the caller the book exists, and book ids are
+    // sequential integers, so the id space can be walked to learn which books a server holds. The
+    // upload session routes already answer 404 for another account's session, and the content
+    // filter branch below already answers 404 here, so this is the one denial reason in this method
+    // that was disclosing existence. Measured as F-013.
+    try {
+      await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw new NotFoundException(`Book ${bookId} not found`);
+      }
+      throw error;
+    }
 
     if (!this.isSuperuser(user) && user.contentFilters) {
       const passes = await this.checkBookPassesContentFilters(bookId, user.contentFilters);
@@ -1107,18 +1141,20 @@ export class BookService {
           ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
         });
       // Collapsed rows render BookTableCollapsedSeriesCell which does not display custom metadata.
+      const cards = assembleCollapsedBookCards(
+        rows,
+        authorRows,
+        fileRows,
+        genreRows,
+        progressRows,
+        statusRows,
+        narratorRows,
+        tagRows,
+        seriesMembershipRows,
+      );
+      await this.coverStore.enrichCardVersions(cards);
       const result = {
-        items: assembleCollapsedBookCards(
-          rows,
-          authorRows,
-          fileRows,
-          genreRows,
-          progressRows,
-          statusRows,
-          narratorRows,
-          tagRows,
-          seriesMembershipRows,
-        ),
+        items: cards,
         total,
         page,
         size,
@@ -1135,6 +1171,7 @@ export class BookService {
     const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, {
       ...(options?.defaultCollectionId !== undefined ? { defaultCollectionId: options.defaultCollectionId } : {}),
       ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
+      ...(query.q !== undefined ? { query: query.q } : {}),
     });
     const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
       await this.bookRepo.findCards({
@@ -1146,19 +1183,21 @@ export class BookService {
       });
     const bookIds = rows.map((r) => r.id);
     const customMetadataRows = await this.customMetadataService.getCardValues(bookIds);
+    const cards = assembleBookCards(
+      rows,
+      authorRows,
+      fileRows,
+      genreRows,
+      progressRows,
+      statusRows,
+      narratorRows,
+      tagRows,
+      seriesMembershipRows,
+      customMetadataRows,
+    );
+    await this.coverStore.enrichCardVersions(cards);
     const result = {
-      items: assembleBookCards(
-        rows,
-        authorRows,
-        fileRows,
-        genreRows,
-        progressRows,
-        statusRows,
-        narratorRows,
-        tagRows,
-        seriesMembershipRows,
-        customMetadataRows,
-      ),
+      items: cards,
       total,
       page,
       size,
@@ -1248,7 +1287,10 @@ export class BookService {
           ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort, customFieldTypes, ...randomSeedOption })
           : await this.bookRepo.findJumpBuckets({
               ...discreteOpts,
-              orderBy: this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, randomSeedOption),
+              orderBy: this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, {
+                ...randomSeedOption,
+                ...(query.q !== undefined ? { query: query.q } : {}),
+              }),
             });
       }
       this.logger.log(
@@ -1265,43 +1307,14 @@ export class BookService {
     }
   }
 
-  async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
-    const event = 'book.get_cover_path';
+  async getCoverPath(id: number, user: RequestUser, options: { medium?: CoverMedium; strict?: boolean } = {}): Promise<string | null> {
     await this.verifyBookAccess(id, user);
-    const dir = bookCoverDirPath(this.appDataPath, id);
-    try {
-      const files = await readdir(dir);
-      const cover = findPreferredBookCoverFileName(files);
-      return cover ? join(dir, cover) : null;
-    } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) return null;
-      const errorClass = err instanceof Error ? err.name : 'Error';
-      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      const pathValue = sanitizeLogValue(dir);
-      this.logger.warn(
-        `[${event}] [fail] bookId=${id} userId=${user.id} path="${pathValue}" errorClass=${errorClass} error="${errorMessage}" - get cover path failed`,
-      );
-      throw err;
-    }
+    return this.coverStore.resolve(id, { variant: 'cover', ...options });
   }
 
-  async getThumbnailPath(id: number, user: RequestUser): Promise<string | null> {
-    const event = 'book.get_thumbnail_path';
+  async getThumbnailPath(id: number, user: RequestUser, options: { medium?: CoverMedium; strict?: boolean } = {}): Promise<string | null> {
     await this.verifyBookAccess(id, user);
-    const path = bookThumbnailPath(this.appDataPath, id);
-    try {
-      await access(path);
-      return path;
-    } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) return null;
-      const errorClass = err instanceof Error ? err.name : 'Error';
-      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      const pathValue = sanitizeLogValue(path);
-      this.logger.warn(
-        `[${event}] [fail] bookId=${id} userId=${user.id} path="${pathValue}" errorClass=${errorClass} error="${errorMessage}" - get thumbnail path failed`,
-      );
-      throw err;
-    }
+    return this.coverStore.resolve(id, { variant: 'thumbnail', ...options });
   }
 
   private sanitizeFilenameSegment(raw: string, fallback = 'download'): string {
@@ -1376,6 +1389,12 @@ export class BookService {
     return this.sanitizeFilenameSegment(resolvedName ?? fallback, fallback);
   }
 
+  private withDownloadFilenameLabel(filename: string, label: string, extension: string): string {
+    const dot = filename.lastIndexOf('.');
+    if (dot > 0) return `${filename.slice(0, dot)}${label}.${extension}`;
+    return `${filename}${label}.${extension}`;
+  }
+
   private buildDownloadPatternTokens(
     absolutePath: string,
     format: string | null,
@@ -1437,6 +1456,56 @@ export class BookService {
 
   async resolveDownloadFilename(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {
     return this.resolveDownloadFilenameForFile(file);
+  }
+
+  async createAudiolessEpubDownload(
+    fileId: number,
+    user: RequestUser,
+    options: { linkKoreaderHash?: boolean } = {},
+  ): Promise<{
+    path: string;
+    size: number;
+    filename: string;
+    bookId: number;
+    removedEntries: number;
+    sanitizedEntries: number;
+    koreaderHash: string;
+    cleanup: () => Promise<void>;
+  }> {
+    if (!this.audiolessEpubService) throw new InternalServerErrorException('Audioless EPUB service unavailable');
+    const file = await this.verifyFileAccess(fileId, user);
+    if (file.format?.toLowerCase() !== 'epub') throw new BadRequestException('Audioless export is only available for EPUB files');
+
+    const filename = this.withDownloadFilenameLabel(await this.resolveDownloadFilenameForFile(file), ' - KOReader', 'epub');
+    const tempDir = await mkdtemp(join(tmpdir(), 'bookorbit-koreader-epub-'));
+    const tempPath = join(tempDir, 'download.epub');
+    try {
+      const result = await this.audiolessEpubService.writeArchive(file.absolutePath, tempPath);
+      const [{ size }, koreaderHash] = await Promise.all([stat(tempPath), computeFileHash(tempPath)]);
+      if (options.linkKoreaderHash) {
+        await this.bookRepo.upsertKoreaderBookHashLink(user.id, koreaderHash, file.id);
+      }
+
+      return {
+        path: tempPath,
+        size,
+        filename,
+        bookId: file.bookId,
+        removedEntries: result.removedEntries,
+        sanitizedEntries: result.sanitizedEntries,
+        koreaderHash,
+        cleanup: () => rm(tempDir, { recursive: true, force: true }),
+      };
+    } catch (err) {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  async updateReadAloudSyncMode(bookId: number, mode: ReadAloudProgressSyncMode, user: RequestUser): Promise<BookDetailDto> {
+    await this.verifyBookAccess(bookId, user);
+    await this.bookRepo.upsertReadAloudSyncMode(user.id, bookId, mode);
+    return this.getDetail(bookId, user);
   }
 
   async renameFile(fileId: number, dto: UpdateBookFileDto, user: RequestUser): Promise<void> {
@@ -1511,10 +1580,12 @@ export class BookService {
         // mark book as missing if no files left
         await this.bookRepo.updateBookPrimaryFile(file.bookId, null);
       } else if (wasPrimary) {
-        // pick the first remaining content file or just the first remaining
-        const newPrimary = remaining.find((f) => f.role === 'content') || remaining[0];
+        const contentFiles = remaining.filter((candidate) => candidate.role === 'content');
+        const library = await this.libraryService.findOne(file.libraryId);
+        const newPrimary = selectPrimaryFile(contentFiles, library.formatPriority ?? DEFAULT_FORMAT_PRIORITY, { allowZeroByteFallback: true });
         await this.bookRepo.updateBookPrimaryFile(file.bookId, newPrimary?.id ?? null);
       }
+      void this.coverReconciler?.enqueue([file.bookId], { filesChanged: true });
 
       this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} - delete file completed`);
     } catch (err) {
@@ -2037,6 +2108,9 @@ export class BookService {
       fileId: row.fileId,
       cfi: row.cfi ?? null,
       pageNumber: row.pageNumber ?? null,
+      positionSeconds: row.positionSeconds ?? null,
+      mediaOverlayFragment: row.mediaOverlayFragment ?? null,
+      mediaOverlaySectionIndex: row.mediaOverlaySectionIndex ?? null,
       percentage: row.percentage ?? 0,
       koboLocationSource: row.koboLocationSource ?? null,
       koboLocationType: row.koboLocationType ?? null,
@@ -2061,14 +2135,42 @@ export class BookService {
       throw new BadRequestException(`currentFileId ${dto.currentFileId} does not belong to book ${bookId}`);
     }
     const previous = await this.bookRepo.findAudioProgress(userId, bookId);
-    await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
-    const strongRereadEvidence = previous != null && previous.percentage - dto.percentage >= 10;
-    await this.autoUpdateReadStatusForProgress(
+    const saved = await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
+    if (!saved) return;
+    await this.audiobookEbookProgressSync?.syncFromAudioProgress({
       userId,
-      { bookId, libraryId },
-      dto.percentage,
-      strongRereadEvidence ? { origin: 'bookorbit', strongRereadEvidence: true } : {},
-    );
+      bookId,
+      currentFileId: dto.currentFileId,
+      positionSeconds: dto.positionSeconds,
+      percentage: dto.percentage,
+      syncKobo: this.hasPermission(user, Permission.KoboSync),
+      sourceUpdatedAt: saved.capturedAt,
+    });
+    const strongRereadEvidence = previous != null && previous.percentage - dto.percentage >= 10;
+    await this.autoUpdateReadStatusForProgress(userId, { bookId, libraryId }, dto.percentage, {
+      origin: 'bookorbit',
+      timeZone: this.resolveUserTimeZone(user),
+      strongRereadEvidence,
+    });
+  }
+
+  async syncEbookProgressForAudiobookPlayback(
+    user: RequestUser,
+    bookId: number,
+    currentFileId: number,
+    positionSeconds: number,
+    percentage: number,
+    sourceUpdatedAt: Date,
+  ): Promise<void> {
+    await this.audiobookEbookProgressSync?.syncFromAudioProgress({
+      userId: user.id,
+      bookId,
+      currentFileId,
+      positionSeconds,
+      percentage,
+      syncKobo: this.hasPermission(user, Permission.KoboSync),
+      sourceUpdatedAt,
+    });
   }
 
   async autoUpdateReadStatusForProgress(
@@ -2080,18 +2182,14 @@ export class BookService {
     const startedAt = Date.now();
     try {
       const library = await this.libraryService.findOne(file.libraryId);
-      if (Object.keys(activity).length > 0) {
-        await this.userBookStatusService.autoUpdate(
-          userId,
-          file.bookId,
-          percentage,
-          library.readingThreshold,
-          library.markAsFinishedPercentComplete,
-          activity,
-        );
-      } else {
-        await this.userBookStatusService.autoUpdate(userId, file.bookId, percentage, library.readingThreshold, library.markAsFinishedPercentComplete);
-      }
+      await this.userBookStatusService.autoUpdate(
+        userId,
+        file.bookId,
+        percentage,
+        library.readingThreshold,
+        library.markAsFinishedPercentComplete,
+        activity,
+      );
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.warn(
@@ -2110,40 +2208,111 @@ export class BookService {
     await this.bookRepo.syncKoboReadingStateFromProgress(userId, fileId, percentage, null, null, null, null);
   }
 
+  /**
+   * Where a write leaves the file's text position.
+   *
+   * A text write speaks for it outright, backwards included, because turning back is reading. A
+   * narration write only ever carries it forward: the narration marker and the page a reader
+   * reached are different places, and a read-along that resumes behind the page must not drag the
+   * page back to it. The audiobook-to-ebook sync deliberately does not come through here, since
+   * moving the text position is that feature's whole purpose and it has its own setting.
+   */
+  private resolveTextPosition(dto: SaveProgressDto, previous: { percentage: number; cfi: string | null; pageNumber: number | null } | null) {
+    if (dto.source !== 'narration') {
+      return { percentage: dto.percentage, cfi: dto.cfi ?? null, pageNumber: dto.pageNumber ?? null, moved: true };
+    }
+    const stored = previous?.percentage ?? 0;
+    if (dto.percentage > stored) {
+      return { percentage: dto.percentage, cfi: dto.cfi ?? previous?.cfi ?? null, pageNumber: previous?.pageNumber ?? null, moved: true };
+    }
+    return { percentage: stored, cfi: previous?.cfi ?? null, pageNumber: previous?.pageNumber ?? null, moved: false };
+  }
+
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     const file = await this.verifyFileAccess(fileId, user);
     const previous = await this.bookRepo.findProgress(userId, fileId);
+    const now = new Date();
+    const text = this.resolveTextPosition(dto, previous ?? null);
     await this.bookRepo.upsertProgress(
       userId,
       fileId,
-      dto.cfi ?? null,
-      dto.pageNumber ?? null,
-      dto.percentage,
+      text.cfi,
+      text.pageNumber,
+      text.percentage,
       dto.positionSeconds ?? null,
+      dto.mediaOverlayFragment ?? null,
+      dto.mediaOverlaySectionIndex ?? null,
       dto.koboLocationSource ?? null,
       dto.koboLocationType ?? null,
       dto.koboLocationValue ?? null,
       dto.koboContentSourceProgressPercent ?? null,
       dto.koreaderProgress ?? null,
+      dto.source === 'narration' ? { percentage: dto.percentage, updatedAt: now } : null,
+      text.moved ? now : null,
     );
+    // Everything downstream reads the position the file now holds, not the one the client sent.
+    // A narration write that did not move the text position must not move a Kobo bookmark, an
+    // audiobook position, or a read status either.
     if (file.format === 'epub' && this.hasPermission(user, Permission.KoboSync) && (await this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId))) {
       await this.bookRepo.syncKoboReadingStateFromProgress(
         userId,
         fileId,
-        dto.percentage,
+        text.percentage,
         dto.koboLocationSource ?? null,
         dto.koboLocationType ?? null,
         dto.koboLocationValue ?? null,
         dto.koboContentSourceProgressPercent ?? null,
       );
     }
-    const strongRereadEvidence = previous != null && previous.percentage - dto.percentage >= 10;
-    await this.autoUpdateReadStatusForProgress(
+    await this.audiobookEbookProgressSync?.syncFromEbookProgress({
       userId,
-      file,
-      dto.percentage,
-      strongRereadEvidence ? { origin: 'bookorbit', strongRereadEvidence: true } : {},
-    );
+      bookId: file.bookId,
+      bookFileId: fileId,
+      percentage: text.percentage,
+      cfi: text.cfi,
+      koreaderProgress: dto.koreaderProgress ?? null,
+      positionSeconds: dto.positionSeconds ?? null,
+      mediaOverlayFragment: dto.mediaOverlayFragment ?? null,
+      mediaOverlaySectionIndex: dto.mediaOverlaySectionIndex ?? null,
+      sourceUpdatedAt: now,
+      syncSiblingEpubs: text.moved,
+    });
+    const strongRereadEvidence = previous != null && previous.percentage - text.percentage >= 10;
+    await this.autoUpdateReadStatusForProgress(userId, file, text.percentage, {
+      origin: 'bookorbit',
+      timeZone: this.resolveUserTimeZone(user),
+      strongRereadEvidence,
+    });
+  }
+
+  async syncAudioProgressForExternalEbookProgress(
+    userId: number,
+    bookId: number,
+    bookFileId: number,
+    percentage: number,
+    locators: {
+      cfi?: string | null;
+      koreaderProgress?: string | null;
+      positionSeconds?: number | null;
+      mediaOverlayFragment?: string | null;
+      mediaOverlaySectionIndex?: number | null;
+      sourceUpdatedAt?: Date;
+      syncSiblingEpubs?: boolean;
+    } = {},
+  ): Promise<void> {
+    await this.audiobookEbookProgressSync?.syncFromEbookProgress({
+      userId,
+      bookId,
+      bookFileId,
+      percentage,
+      cfi: locators.cfi ?? null,
+      koreaderProgress: locators.koreaderProgress ?? null,
+      positionSeconds: locators.positionSeconds ?? null,
+      mediaOverlayFragment: locators.mediaOverlayFragment ?? null,
+      mediaOverlaySectionIndex: locators.mediaOverlaySectionIndex ?? null,
+      sourceUpdatedAt: locators.sourceUpdatedAt,
+      syncSiblingEpubs: locators.syncSiblingEpubs,
+    });
   }
 
   async clearFileProgress(userId: number, fileId: number, user: RequestUser): Promise<void> {
@@ -2708,16 +2877,19 @@ export class BookService {
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
-        cover: meta?.coverSource,
         duration: meta?.durationSeconds ?? undefined,
         abridged: meta?.abridged ?? undefined,
       };
+      const coverState = await this.coverStore.fetchState(id);
+      if (!coverState) throw new NotFoundException(`Book ${id} not found`);
+      const coverInputs = coverFetchInputs(coverState);
+      Object.assign(existingFields, coverInputs.existing);
 
       const {
         resolved,
         providerIds: resolvedProviderIds,
         diagnostics,
-      } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId);
+      } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId, coverInputs.options);
 
       if (preview) {
         const previewResult = this.buildMetadataRefreshPreview(resolved, resolvedProviderIds);
@@ -2774,11 +2946,14 @@ export class BookService {
       await this.bookRepo.updateMetadataFields(id, { lastMetadataFetchAt: new Date(), updatedAt: new Date() });
 
       let coverDownloaded = false;
-      if (filteredResolved.coverUrl) {
-        await this.metadataService.downloadAndSaveCover(filteredResolved.coverUrl, id);
-        detail = await this.getDetail(id, user);
-        coverDownloaded = true;
+      for (const { medium, url, choices } of [
+        { medium: 'ebook' as const, url: filteredResolved.coverUrl, choices: filteredResolved.coverChoices },
+        { medium: 'audio' as const, url: filteredResolved.audioCoverUrl, choices: filteredResolved.audioCoverChoices },
+      ]) {
+        if (!url) continue;
+        if (await this.metadataService.downloadAndSaveCover(choices ?? [{ url }], id, medium)) coverDownloaded = true;
       }
+      if (coverDownloaded) detail = await this.getDetail(id, user);
 
       const result = detail ?? (await this.getDetail(id, user));
       this.logger.log(
@@ -2862,7 +3037,7 @@ export class BookService {
     bookIds: number[],
     user: RequestUser,
     onProgress?: (bookId: number) => void,
-    options?: { isCancelled?: () => boolean },
+    options?: { isCancelled?: () => boolean; medium?: CoverMedium },
   ): Promise<{ processed: number; updated: number }> {
     const event = 'book.bulk_reextract_cover';
     const startedAt = Date.now();
@@ -2874,11 +3049,18 @@ export class BookService {
       }
       await this.verifyLibraryAccessForBookIds(bookIds, user);
 
-      const [files, coverLockedBookIds] = await Promise.all([
-        this.bookRepo.findPrimaryFilesByBookIds(bookIds),
+      const [files, coverLockedBookIds, audioCoverLockedBookIds] = await Promise.all([
+        this.bookRepo.findCoverSourceFilesByBookIds(bookIds),
         this.bookMetadataLockService.getCoverLockedBookIds(bookIds),
+        this.bookMetadataLockService.getBookIdsWithLockedField(bookIds, 'audioCover'),
       ]);
-      const filesByBookId = new Map(files.map((f) => [f.bookId, f]));
+      const filesByBookId = new Map<number, (typeof files)[number][]>();
+      for (const file of files) {
+        const entries = filesByBookId.get(file.bookId) ?? [];
+        entries.push(file);
+        filesByBookId.set(file.bookId, entries);
+      }
+      const media: readonly CoverMedium[] = options?.medium ? [options.medium] : COVER_MEDIA;
 
       let processed = 0;
       let updated = 0;
@@ -2890,17 +3072,27 @@ export class BookService {
           cancelled = true;
           break;
         }
-        const file = filesByBookId.get(id);
-        if (!file) continue;
-        if (coverLockedBookIds.has(id)) {
+        const candidateFiles = filesByBookId.get(id) ?? [];
+        const sources = selectEmbeddedCoverSources(candidateFiles, candidateFiles[0]?.formatPriority ?? DEFAULT_FORMAT_PRIORITY);
+        const targets = media.flatMap((medium) => {
+          const source = sources[medium];
+          return source ? [{ medium, source }] : [];
+        });
+        if (targets.length === 0) continue;
+        const unlocked = targets.filter(({ medium }) => !(medium === 'audio' ? audioCoverLockedBookIds : coverLockedBookIds).has(id));
+        if (unlocked.length === 0) {
           skipped++;
           continue;
         }
         processed++;
-        const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
+        let saved = false;
+        for (const { medium, source } of unlocked) {
+          saved = (await this.metadataService.refreshCoverForBook(id, source.absolutePath, source.format ?? '', medium)) || saved;
+        }
         if (saved) {
           updated++;
         }
+        if (!options?.medium) await this.coverReconciler?.enqueue([id]);
         try {
           onProgress?.(id);
         } catch {
@@ -3030,13 +3222,15 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const [result, personalRating, personalNote, readStatus, comicMeta, collectionRows] = await Promise.all([
+    const [result, personalRating, personalNote, readStatus, comicMeta, collectionRows, readAloudSyncMode, coverContext] = await Promise.all([
       this.bookRepo.findById(id),
       this.bookRepo.findRatingByBookAndUser(id, user.id),
       this.userBookNoteService.findOne(user.id, id),
       this.userBookStatusService.findOne(user.id, id),
       this.comicMetadataService.findByBookId(id),
       this.bookRepo.findCollectionsByBookId(id, user.id),
+      this.bookRepo.findReadAloudSyncMode(user.id, id),
+      this.coverStore.contextFor(id),
     ]);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
@@ -3060,6 +3254,8 @@ export class BookService {
       comicMeta,
       collections: collectionRows,
     });
+    const mediaOverlayByFileId = await this.resolveMediaOverlayCapabilities(fileRows);
+    const readAloudSync = this.buildReadAloudProgressSync(fileRows, mediaOverlayByFileId, book.books.primaryFileId, readAloudSyncMode);
 
     return {
       id: book.books.id,
@@ -3088,6 +3284,13 @@ export class BookService {
       personalNoteUpdatedAt: personalNote ? new Date(personalNote.updatedAt) : null,
       communityRatings: this.mapCommunityRatingRows(communityRatingRows),
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
+      coverMedia: [...(coverContext?.media.hasEbook ? (['ebook'] as const) : []), ...(coverContext?.media.hasAudio ? (['audio'] as const) : [])],
+      covers: coverContext ? this.coverStore.slotDtos(coverContext) : { ebook: null, audio: null },
+      coverVersion: this.coverStore.coverVersion(
+        book.libraries?.coverAspectRatio ?? '2/3',
+        coverContext?.slots ?? [],
+        (meta?.coverUpdatedAt ?? book.books.updatedAt ?? book.books.addedAt).toISOString(),
+      ),
       hardcoverEditionId: meta?.hardcoverEditionId ?? null,
       lockedFields: this.bookMetadataLockService.normalizeLockedFields(meta?.lockedFields),
       providerIds: {
@@ -3119,9 +3322,11 @@ export class BookService {
         createdAt: f.createdAt,
         filename: basename(f.absolutePath),
         durationSeconds: f.durationSeconds,
+        mediaOverlay: mediaOverlayByFileId.get(f.id) ?? null,
       })),
       lastWrittenAt: meta?.lastWrittenAt ?? null,
       metadataScore: meta?.metadataScore ?? null,
+      readAloudSync,
       formatPriority: (book.libraries?.formatPriority as string[] | null) ?? [],
       customMetadata,
       fileWriteStatus: this.fileWriteService?.resolveBookFileWriteStatus(book.libraries, orderedFileRows, book.books.primaryFileId) ?? {
@@ -3132,6 +3337,96 @@ export class BookService {
       },
       ...supplementalFields,
     };
+  }
+
+  private async resolveMediaOverlayCapabilities(
+    fileRows: Array<{
+      id: number;
+      format: string | null;
+      absolutePath: string;
+      mediaOverlayAvailable?: boolean | null;
+      mediaOverlayDurationSeconds?: number | null;
+      mediaOverlayCheckedAt?: Date | null;
+    }>,
+  ): Promise<Map<number, EpubMediaOverlayCapability | null>> {
+    const entries = await Promise.all(
+      fileRows.map(async (file) => {
+        if (file.format?.toLowerCase() !== 'epub') return [file.id, null] as const;
+
+        const stored = mediaOverlayCapabilityFromFields(file);
+        if (stored) return [file.id, stored] as const;
+
+        const fields = await inspectEpubMediaOverlayFields(file.absolutePath, file.format, (err) => {
+          const error = err instanceof Error ? err : new Error(String(err));
+          this.logger.warn(
+            `[book.media_overlay_capability] [fail] fileId=${file.id} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - EPUB media-overlay inspection failed`,
+          );
+        });
+        await this.bookRepo.updateBookFile(file.id, fields);
+        return [file.id, mediaOverlayCapabilityFromFields({ ...file, ...fields })] as const;
+      }),
+    );
+    return new Map(entries);
+  }
+
+  private buildReadAloudProgressSync(
+    fileRows: Array<{ id: number; format: string | null; durationSeconds: number | null }>,
+    mediaOverlayByFileId: Map<number, EpubMediaOverlayCapability | null>,
+    primaryFileId: number | null,
+    mode: ReadAloudProgressSyncMode,
+  ): ReadAloudProgressSync {
+    const overlayFiles = fileRows
+      .map((file) => ({ file, mediaOverlay: mediaOverlayByFileId.get(file.id) ?? null }))
+      .filter(({ file, mediaOverlay }) => file.format?.toLowerCase() === 'epub' && mediaOverlay?.available === true);
+    const selectedOverlay = overlayFiles.find(({ file }) => file.id === primaryFileId) ?? overlayFiles[0] ?? null;
+    const audioFiles = fileRows.filter((file) => file.format && isAudioFormat(file.format));
+    const audioDurationSeconds = this.sumPositiveDurations(audioFiles);
+    const overlayDurationSeconds = selectedOverlay?.mediaOverlay?.durationSeconds ?? null;
+    const durationDifferenceSeconds =
+      audioDurationSeconds != null && overlayDurationSeconds != null ? Math.abs(audioDurationSeconds - overlayDurationSeconds) : null;
+    const durationDifferenceRatio =
+      durationDifferenceSeconds != null && overlayDurationSeconds != null && overlayDurationSeconds > 0
+        ? durationDifferenceSeconds / overlayDurationSeconds
+        : null;
+
+    const base: Omit<ReadAloudProgressSync, 'state' | 'unavailableReason'> = {
+      mode,
+      overlayFileId: selectedOverlay?.file.id ?? null,
+      audioDurationSeconds,
+      overlayDurationSeconds,
+      durationDifferenceSeconds,
+      durationDifferenceRatio,
+      koreaderDownloadAvailable: selectedOverlay != null,
+    };
+
+    if (mode === 'disabled') {
+      return { ...base, state: 'disabled', unavailableReason: null };
+    }
+    if (!selectedOverlay) {
+      return { ...base, state: 'unavailable', unavailableReason: 'no_media_overlay_epub' };
+    }
+    if (audioFiles.length === 0) {
+      return { ...base, state: 'unavailable', unavailableReason: 'no_audio_files' };
+    }
+    if (audioDurationSeconds == null || overlayDurationSeconds == null || overlayDurationSeconds <= 0) {
+      return { ...base, state: 'unavailable', unavailableReason: 'missing_duration' };
+    }
+
+    const tolerance = Math.min(READ_ALOUD_MAX_DURATION_DIFF_SECONDS, overlayDurationSeconds * READ_ALOUD_MAX_DURATION_DIFF_RATIO);
+    if (durationDifferenceSeconds != null && durationDifferenceSeconds > tolerance) {
+      return { ...base, state: 'unavailable', unavailableReason: 'duration_mismatch' };
+    }
+
+    return { ...base, state: 'enabled', unavailableReason: null };
+  }
+
+  private sumPositiveDurations(files: Array<{ durationSeconds: number | null }>): number | null {
+    let total = 0;
+    for (const file of files) {
+      if (typeof file.durationSeconds !== 'number' || !Number.isFinite(file.durationSeconds) || file.durationSeconds <= 0) return null;
+      total += file.durationSeconds;
+    }
+    return total > 0 ? total : null;
   }
 
   async writeAndRename(bookId: number, user: RequestUser): Promise<BookWriteAndRenameResult> {

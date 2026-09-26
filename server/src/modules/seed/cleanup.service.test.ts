@@ -27,7 +27,12 @@ function makeDb(options?: {
   const authTablesResult = {
     rows:
       (options?.authStateTablesPresent ?? true)
-        ? [{ table_name: 'refresh_tokens' }, { table_name: 'password_reset_tokens' }, { table_name: 'oidc_sessions' }]
+        ? [
+            { table_name: 'refresh_tokens' },
+            { table_name: 'password_reset_tokens' },
+            { table_name: 'oidc_sessions' },
+            { table_name: 'auth_sessions' },
+          ]
         : [],
   };
   const notificationsTableResult = {
@@ -39,6 +44,7 @@ function makeDb(options?: {
     delete: vi
       .fn()
       .mockReturnValueOnce(refreshDeleteBuilder)
+      .mockReturnValueOnce({ where: vi.fn().mockResolvedValue({ rowCount: 0 }) })
       .mockReturnValueOnce(resetDeleteBuilder)
       .mockReturnValueOnce(oidcDeleteBuilder)
       .mockReturnValueOnce(notificationDeleteBuilder),
@@ -64,7 +70,7 @@ describe('CleanupService', () => {
     expect(cleanupSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes expired or invalid auth state from all three tables and logs completion', async () => {
+  it('deletes expired or invalid auth state from all auth tables and logs completion', async () => {
     const db = makeDb();
     const logSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     const service = new CleanupService(db as never);
@@ -73,9 +79,9 @@ describe('CleanupService', () => {
 
     expect(db.execute).toHaveBeenCalledTimes(2);
     expect(db.delete).toHaveBeenNthCalledWith(1, schema.refreshTokens);
-    expect(db.delete).toHaveBeenNthCalledWith(2, schema.passwordResetTokens);
-    expect(db.delete).toHaveBeenNthCalledWith(3, schema.oidcSessions);
-    expect(db.delete).toHaveBeenNthCalledWith(4, schema.notifications);
+    expect(db.delete).toHaveBeenNthCalledWith(3, schema.passwordResetTokens);
+    expect(db.delete).toHaveBeenNthCalledWith(4, schema.oidcSessions);
+    expect(db.delete).toHaveBeenNthCalledWith(5, schema.notifications);
     expect(db.__refreshDeleteBuilder.where).toHaveBeenCalledTimes(1);
     expect(db.__resetDeleteBuilder.where).toHaveBeenCalledTimes(1);
     expect(db.__oidcDeleteBuilder.where).toHaveBeenCalledTimes(1);

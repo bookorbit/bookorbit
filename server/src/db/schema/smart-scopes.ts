@@ -1,7 +1,9 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
-import type { GroupRule, SortSpec } from '@bookorbit/types';
+import { sql } from 'drizzle-orm';
+import { boolean, check, index, integer, jsonb, pgTable, primaryKey, serial, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import type { GroupRule, MediaType, PodcastScopeRules, SortSpec } from '@bookorbit/types';
 
 import { users } from './auth';
+import { libraries } from './libraries';
 
 export const smartScopes = pgTable(
   'smart_scopes',
@@ -10,9 +12,16 @@ export const smartScopes = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    /** Discriminates which rule vocabulary `filter` holds and which query path evaluates it. */
+    mediaType: varchar('media_type', { length: 20 }).$type<MediaType>().notNull().default('books'),
+    /**
+     * Podcast scopes evaluate episodes within one library, mirroring the playlists they replace,
+     * so the library owns them. Book scopes span every accessible library and leave this null.
+     */
+    libraryId: integer('library_id').references(() => libraries.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
     icon: varchar('icon', { length: 100 }),
-    filter: jsonb('filter').$type<GroupRule | null>(),
+    filter: jsonb('filter').$type<GroupRule | PodcastScopeRules | null>(),
     defaultSort: jsonb('default_sort').$type<SortSpec[]>().notNull().default([]),
     isPublic: boolean('is_public').notNull().default(false),
     syncToKobo: boolean('sync_to_kobo').notNull().default(false),
@@ -23,7 +32,14 @@ export const smartScopes = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [unique().on(t.userId, t.name)],
+  (t) => [
+    unique().on(t.userId, t.mediaType, t.name),
+    index('smart_scopes_user_media_type_idx').on(t.userId, t.mediaType),
+    check('smart_scopes_media_type_chk', sql`${t.mediaType} in ('books', 'podcasts')`),
+    check('smart_scopes_library_scope_chk', sql`(${t.mediaType} = 'podcasts') = (${t.libraryId} is not null)`),
+    /** Kobo takes books only, so a podcast scope must never carry the owner sync flag. */
+    check('smart_scopes_kobo_books_only_chk', sql`${t.syncToKobo} = false or ${t.mediaType} = 'books'`),
+  ],
 );
 
 export type SmartScope = typeof smartScopes.$inferSelect;

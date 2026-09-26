@@ -43,4 +43,19 @@ describe('request indexer schema SQL matches the shared constants', () => {
       expect(slug.test(bad)).toBe(false);
     }
   });
+
+  it('defaults tracker fallback on and keeps manual goals nullable', () => {
+    expect(requestIndexers.applyTrackerSeedGoals.notNull).toBe(true);
+    expect(requestIndexers.applyTrackerSeedGoals.hasDefault).toBe(true);
+    expect(requestIndexers.applyTrackerSeedGoals.default).toBe(true);
+    expect(requestIndexers.seedRatioGoal.notNull).toBe(false);
+    expect(requestIndexers.seedTimeMinutes.notNull).toBe(false);
+  });
+
+  it('declares finite-positive ratio and positive-minute checks', () => {
+    const checks = new Map(config.checks.map((constraint) => [constraint.name, toSql(constraint.value)]));
+    expect(checks.get('request_indexers_seed_ratio_goal_chk')).toContain("< 'Infinity'::double precision");
+    expect(checks.get('request_indexers_seed_ratio_goal_chk')).toContain('> 0');
+    expect(checks.get('request_indexers_seed_time_minutes_chk')).toContain('> 0');
+  });
 });

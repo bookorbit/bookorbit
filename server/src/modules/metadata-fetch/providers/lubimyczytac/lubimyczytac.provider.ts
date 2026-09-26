@@ -35,6 +35,7 @@ export class LubimyczytacProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.LUBIMYCZYTAC;
   readonly label = 'LubimyCzytac';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
   readonly timeoutMs = PROVIDER_TIMEOUT_MS.SCRAPE;
 
   private readonly logger = new Logger(LubimyczytacProvider.name);

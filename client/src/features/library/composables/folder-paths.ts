@@ -15,8 +15,8 @@ export function coveringFolderPath(path: string, candidates: string[]): string |
 }
 
 export function consolidateFolderPaths(paths: string[]): string[] {
-  const unique = [...new Set(paths.map(normalizeFolderPath))].sort((a, b) => a.length - b.length || a.localeCompare(b))
-  return unique.filter((path, index) => !unique.slice(0, index).some((candidate) => isPathInside(path, candidate)))
+  const unique = [...new Set(paths.map(normalizeFolderPath))]
+  return unique.filter((path) => !unique.some((candidate) => candidate !== path && isPathInside(path, candidate)))
 }
 
 function isPathInside(path: string, parent: string): boolean {

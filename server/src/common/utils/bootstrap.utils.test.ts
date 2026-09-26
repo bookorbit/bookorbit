@@ -10,6 +10,7 @@ import {
   buildHelmetOptions,
   buildEmptyJsonBodyStream,
   registerEmptyBodyContentTypeParser,
+  applyDeclaredBodyLimit,
   shouldInjectEmptyJsonBody,
   isSecureProtocol,
   applyConditionalHsts,
@@ -581,3 +582,32 @@ async function requestApp(
     req.end();
   });
 }
+
+describe('applyDeclaredBodyLimit', () => {
+  it('copies a declared limit onto the route option Fastify actually reads', () => {
+    const route: { config?: unknown; bodyLimit?: number } = { config: { bodyLimit: 6 * 1024 * 1024 } };
+    applyDeclaredBodyLimit(route);
+    expect(route.bodyLimit).toBe(6 * 1024 * 1024);
+  });
+
+  it('leaves a route without a declared limit on the Fastify default', () => {
+    const routes: Array<{ config?: unknown; bodyLimit?: number }> = [
+      {},
+      { config: {} },
+      { config: { bodyLimit: 0 } },
+      { config: { bodyLimit: -1 } },
+      { config: { bodyLimit: '6mb' } },
+      { config: { bodyLimit: 1.5 } },
+    ];
+    for (const route of routes) {
+      applyDeclaredBodyLimit(route);
+      expect(route.bodyLimit).toBeUndefined();
+    }
+  });
+
+  it('does not overwrite a limit already set on the route options', () => {
+    const route: { config?: unknown; bodyLimit?: number } = { config: {}, bodyLimit: 1024 };
+    applyDeclaredBodyLimit(route);
+    expect(route.bodyLimit).toBe(1024);
+  });
+});

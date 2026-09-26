@@ -97,6 +97,8 @@ function handleShowJumpRailsChange(event: Event) {
           <span class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.coverSize') }}</span>
           <span class="text-xs font-medium tabular-nums text-foreground">{{ coverSize }}px</span>
         </div>
+        <!-- The label and the value sit in the row above for sighted users; the slider carries them
+             itself so assistive technology is not handed an unnamed control reading a bare number. -->
         <input
           :value="coverSize"
           @input="emit('update:coverSize', Number(($event.target as HTMLInputElement).value))"
@@ -104,6 +106,8 @@ function handleShowJumpRailsChange(event: Event) {
           :min="coverSizeMin"
           :max="coverSizeMax"
           :step="coverSizeStep"
+          :aria-label="t('components.viewHeader.displayControls.coverSize')"
+          :aria-valuetext="t('components.viewHeader.displayControls.pixelValue', { value: coverSize })"
           class="w-full accent-primary cursor-pointer"
         />
       </div>
@@ -120,6 +124,8 @@ function handleShowJumpRailsChange(event: Event) {
           :min="gridGapMin"
           :max="gridGapMax"
           :step="gridGapStep"
+          :aria-label="t('components.viewHeader.displayControls.gridGap')"
+          :aria-valuetext="t('components.viewHeader.displayControls.pixelValue', { value: gridGap })"
           class="w-full accent-primary cursor-pointer"
         />
       </div>

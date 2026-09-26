@@ -35,11 +35,14 @@ export function fileMimeType(format: string): string {
   switch (format.toLowerCase()) {
     case 'epub':
       return 'application/epub+zip';
+    case 'kepub':
+      return 'application/kepub+zip';
     case 'pdf':
       return 'application/pdf';
     case 'mobi':
       return 'application/x-mobipocket-ebook';
     case 'azw3':
+    case 'azw':
       return 'application/vnd.amazon.ebook';
     case 'fb2':
       return 'application/x-fictionbook+xml';
@@ -47,6 +50,18 @@ export function fileMimeType(format: string): string {
       return 'application/vnd.comicbook+zip';
     case 'cbr':
       return 'application/vnd.comicbook-rar';
+    case 'cb7':
+      return 'application/x-cb7';
+    case 'm4b':
+    case 'm4a':
+      return 'audio/mp4';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'ogg':
+    case 'opus':
+      return 'audio/ogg';
+    case 'flac':
+      return 'audio/flac';
     default:
       return 'application/octet-stream';
   }

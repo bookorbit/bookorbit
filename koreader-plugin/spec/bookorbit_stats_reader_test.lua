@@ -45,6 +45,46 @@ do
     assertEqual(stats.queries, 0, "and never reaches the database")
 end
 
+-- Collision groups retain each row's metadata, not just the combined id list,
+-- so callers can persist a guarded per-row server identity and cursor.
+do
+    local Reader = load(function(sql)
+        if sql:find("FROM book WHERE md5", 1, true) then
+            return FakeSqlite.resultSet{
+                { "7", "Collision One", "Author A", "100" },
+                { "9", "Collision Two", "Author B", "200" },
+            }
+        end
+        return nil
+    end)
+
+    local book = Reader.getBook("abc123")
+    assertEqual(book.metadata_ambiguous, true, "different metadata marks the digest ambiguous")
+    assertEqual(book.stats_ambiguous, true, "multiple rows mark statistics routing ambiguous")
+    assertEqual(#book.rows, 2, "both guarded row identities are retained")
+    assertEqual(book.rows[1].id, 7, "the first row id is numeric")
+    assertEqual(book.rows[2].title, "Collision Two", "row metadata stays attached to its id")
+    assertEqual(book.rows[2].last_open, 200, "row activity remains available independently")
+end
+
+-- SQLite UNIQUE constraints permit repeated NULL values, so the collision
+-- guard must count rows rather than relying on distinct metadata variants.
+do
+    local Reader = load(function(sql)
+        if sql:find("FROM book WHERE md5", 1, true) then
+            return FakeSqlite.resultSet{
+                { "7", "Same Title", nil, "100" },
+                { "9", "Same Title", nil, "200" },
+            }
+        end
+        return nil
+    end)
+
+    local book = Reader.getBook("abc123")
+    assertEqual(book.metadata_ambiguous, false, "identical metadata remains usable for matching")
+    assertEqual(book.stats_ambiguous, true, "two rows still require independent statistics routing")
+end
+
 -- Event batching binds the row ids, then the watermark, then the limit.
 do
     local seen

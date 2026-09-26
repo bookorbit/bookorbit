@@ -1,5 +1,6 @@
 import type { BookRequestMediaKind } from "./book-request";
-import type { BookRequestDownloadSource } from "./download-client";
+import type { ReleaseProfileMismatch } from "./book-request-profile";
+import type { BookRequestDownloadSource, DownloadDelivery } from "./download-client";
 import type { NetworkProfile } from "./network-profile";
 import { REQUEST_CREDENTIAL_ERROR_CODES } from "./request-credential";
 
@@ -8,10 +9,10 @@ import { REQUEST_CREDENTIAL_ERROR_CODES } from "./request-credential";
  * tracker-specific beyond the type name: BookOrbit ships adapter code, never a tracker, never a
  * credential, and no indexer is preconfigured or enabled by default.
  *
- * Only the generic protocol is built in. Every named source, open library or otherwise, is a
+ * Only generic protocols are built in. Every named source, open library or otherwise, is a
  * plugin loaded from disk and maintained outside this repository.
  */
-export const INDEXER_ADAPTER_TYPES = ["torznab"] as const;
+export const INDEXER_ADAPTER_TYPES = ["torznab", "newznab"] as const;
 export type IndexerAdapterType = (typeof INDEXER_ADAPTER_TYPES)[number];
 
 /** Maximum size of an opaque release identifier accepted from an indexer feed and grab request. */
@@ -53,16 +54,19 @@ export type IndexerCategoryMap = Record<BookRequestMediaKind, number[]>;
  */
 export const DEFAULT_INDEXER_CATEGORIES: Record<IndexerAdapterType, IndexerCategoryMap> = {
   torznab: { ebook: [7020], audiobook: [3030], comic: [7030] },
+  newznab: { ebook: [7020], audiobook: [3030], comic: [7030] },
 };
 
 /** What the credential field holds. Null where the source needs none, as an open library does. */
 export const INDEXER_CREDENTIAL_KINDS: Record<IndexerAdapterType, "apiKey" | "sessionId" | null> = {
   torznab: "apiKey",
+  newznab: "apiKey",
 };
 
 /** Whether the adapter searches by numeric category at all, which decides if the editor shows. */
 export const INDEXER_USES_CATEGORIES: Record<IndexerAdapterType, boolean> = {
   torznab: true,
+  newznab: true,
 };
 
 /**
@@ -72,6 +76,16 @@ export const INDEXER_USES_CATEGORIES: Record<IndexerAdapterType, boolean> = {
  */
 export const INDEXER_SEEDS_BACK: Record<IndexerAdapterType, boolean> = {
   torznab: true,
+  newznab: false,
+};
+
+/** Largest whole-minute seed goal that can be stored in PostgreSQL's integer type. */
+export const MAX_INDEXER_SEED_TIME_MINUTES = 2_147_483_647;
+
+/** How a selected release from each built-in reaches BookOrbit. */
+export const INDEXER_DELIVERY: Record<IndexerAdapterType, DownloadDelivery> = {
+  torznab: "torrent",
+  newznab: "usenet",
 };
 
 /**
@@ -80,6 +94,7 @@ export const INDEXER_SEEDS_BACK: Record<IndexerAdapterType, boolean> = {
  */
 export const INDEXER_MEDIA_KINDS: Record<IndexerAdapterType, readonly BookRequestMediaKind[]> = {
   torznab: ["ebook", "audiobook", "comic"],
+  newznab: ["ebook", "audiobook", "comic"],
 };
 
 /**
@@ -119,6 +134,33 @@ export interface IndexerSettingsField {
   minItems?: number;
 }
 
+export interface PluginUpdateChannel {
+  manifestUrl: string;
+  ed25519PublicKey: string;
+}
+
+export type PluginUpdateState = "unsupported" | "unchecked" | "current" | "available" | "custom" | "failed";
+
+export interface PluginUpdateStatus {
+  type: string;
+  currentVersion?: string;
+  latestVersion?: string;
+  state: PluginUpdateState;
+  autoUpdate: boolean;
+  checkedAt?: string;
+  error?: string;
+}
+
+export interface PluginUpdateListResult {
+  updates: PluginUpdateStatus[];
+}
+
+export interface PluginUpdateReview extends PluginInspection {
+  currentVersion?: string;
+  sha256: string;
+  verified: true;
+}
+
 /**
  * Everything the settings form needs to render one adapter, served at runtime rather than
  * compiled into the client, so an adapter that arrived from a plugin looks like any other.
@@ -130,11 +172,15 @@ export interface IndexerAdapterDescriptor {
   builtIn: boolean;
   /** The plugin release. Omitted by built-ins and legacy plugins that do not declare one. */
   version?: string;
+  /** Whether the publisher supplied a signed update channel. */
+  updateable?: boolean;
   requiresCredential: boolean;
   credentialKind: "apiKey" | "sessionId" | null;
   mediaKinds: BookRequestMediaKind[];
   usesCategories: boolean;
   seedsBack: boolean;
+  /** Which kind of downloader can accept a release from this source. */
+  delivery: DownloadDelivery;
   /**
    * Whether this adapter can search an ISBN at all. The operator decides per source whether it
    * should, because a catalogue that answers an ISBN badly is worse than one that cannot.
@@ -158,6 +204,8 @@ export interface PluginInspection {
   label: string;
   /** The plugin release. Omitted by plugins written before versions were exposed. */
   version?: string;
+  /** Signed update channel declared by the plugin, if it supports managed updates. */
+  update?: PluginUpdateChannel;
   requiresCredential: boolean;
   credentialKind: "apiKey" | "sessionId" | null;
   mediaKinds: BookRequestMediaKind[];
@@ -215,6 +263,12 @@ export interface IndexerItem {
    * exception, so it is an explicit per-row opt-in rather than a blanket relaxation.
    */
   allowPrivateAddress: boolean;
+  /** Whether valid tracker-provided goals fill manual dimensions that are left unset. */
+  applyTrackerSeedGoals: boolean;
+  /** Null explicitly leaves this manual dimension unset. */
+  seedRatioGoal: number | null;
+  /** Null explicitly leaves manual torrent seed time unset. */
+  seedTimeMinutes: number | null;
   categories: IndexerCategoryMap;
   /**
    * Media this source is not to be searched for, on the operator's say-so rather than the
@@ -279,6 +333,12 @@ export interface CreateIndexerPayload {
   credential?: string | null;
   enabled?: boolean;
   allowPrivateAddress?: boolean;
+  /** Controls tracker fallback only; configured manual values still apply when false. */
+  applyTrackerSeedGoals?: boolean;
+  /** Null explicitly clears the manual ratio. */
+  seedRatioGoal?: number | null;
+  /** Null explicitly clears the manual seed time. */
+  seedTimeMinutes?: number | null;
   categories?: Partial<IndexerCategoryMap>;
   disabledMediaKinds?: BookRequestMediaKind[];
   isbnSearchDisabled?: boolean;
@@ -394,6 +454,8 @@ export interface ReleaseCandidateItem {
   tier: number | null;
   /** The operator's own name for that tier, carried so the row need not resolve it. */
   tierName: string | null;
+  /** Why the release missed its closest tier. Null when it matched or no profile is configured. */
+  profileMismatch: ReleaseProfileMismatch | null;
   reasons: ReleaseScoreReason[];
 }
 
@@ -432,6 +494,8 @@ export interface IndexerSearchStatus {
    * are the same silence and completely different facts.
    */
   seedsBack: boolean;
+  /** Which downloader capability a selected release from this source requires. */
+  delivery: DownloadDelivery;
 }
 
 /** Request metadata used across indexer retrieval, hard filters, and release scoring. */

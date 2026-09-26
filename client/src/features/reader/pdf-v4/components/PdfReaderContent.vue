@@ -6,7 +6,6 @@ import type { DocumentState } from '@embedpdf/core'
 import { PdfErrorCode } from '@embedpdf/models'
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/vue'
 import { DocumentContent } from '@embedpdf/plugin-document-manager/vue'
-import { usePan } from '@embedpdf/plugin-pan/vue'
 import { useRotate } from '@embedpdf/plugin-rotate/vue'
 import { ScrollStrategy, useScroll, useScrollCapability } from '@embedpdf/plugin-scroll/vue'
 import { useSelectionCapability } from '@embedpdf/plugin-selection/vue'
@@ -22,6 +21,7 @@ import PdfReaderToolbar from './PdfReaderToolbar.vue'
 import { fromRotation, safeExternalPdfUrl } from '../pdf-viewer-utils'
 import { usePdfFullscreenChrome } from '../composables/usePdfFullscreenChrome'
 import { usePdfHighlights } from '../composables/usePdfHighlights'
+import { usePdfInteractionMode } from '../composables/usePdfInteractionMode'
 import { usePdfPagination } from '../composables/usePdfPagination'
 import { usePdfResponsiveSpread } from '../composables/usePdfResponsiveSpread'
 import { usePdfSidebarLayout, type PdfSidebarTab } from '../composables/usePdfSidebarLayout'
@@ -52,7 +52,7 @@ const { provides: scrollCapability } = useScrollCapability()
 const { state: zoomState, provides: zoom } = useZoom(() => props.documentId)
 const { provides: spread } = useSpread(() => props.documentId)
 const { rotation, provides: rotate } = useRotate(() => props.documentId)
-const { isPanning, provides: pan } = usePan(() => props.documentId)
+const { isPanning, togglePan, activateTextSelection } = usePdfInteractionMode(() => props.documentId)
 const { provides: selectionCapability } = useSelectionCapability()
 const { provides: annotationCapability } = useAnnotationCapability()
 const { isFullscreen, isFullscreenSupported, toggleFullscreen } = useFullscreen()
@@ -91,10 +91,12 @@ const {
   handleWheel: handleViewportWheel,
   handleTouchStart,
   handleTouchEnd,
+  handleTouchCancel,
 } = usePdfPagination({
   mode: currentScrollMode,
   scrollState,
   scroll,
+  touchPageTurningEnabled: isPanning,
   onActivity: revealHeader,
 })
 const { apply: applyResponsiveSpread } = usePdfResponsiveSpread(viewerSurface, currentSpreadPreference, spread)
@@ -135,11 +137,11 @@ function handleSidebarWidth(width: number) {
 }
 
 function handleTogglePan() {
-  pan.value?.togglePan()
+  togglePan()
 }
 
 function handleSelectTool() {
-  pan.value?.disablePan()
+  activateTextSelection()
 }
 
 function handleSettingsOpen(open: boolean) {
@@ -475,6 +477,7 @@ onUnmounted(() => {
         @wheel="handleViewportWheel"
         @touchstart="handleTouchStart"
         @touchend="handleTouchEnd"
+        @touchcancel="handleTouchCancel"
       >
         <DocumentContent :document-id="props.documentId">
           <template #default="{ documentState, isLoading, isError, isLoaded }">

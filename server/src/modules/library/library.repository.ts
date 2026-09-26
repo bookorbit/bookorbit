@@ -1,15 +1,37 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, gt, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { AccessLevel, ContentFilterRules, LibraryStats } from '@bookorbit/types';
+import { APP_FEATURES, type AccessLevel, type ContentFilterRules, type LibraryStats } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
+import { MIN_VALID_FILE_TIME_MS } from '../../common/utils/file-time.utils';
 import * as schema from '../../db/schema';
-import { bookFiles, books, libraryFolders, libraries } from '../../db/schema';
+import {
+  bookFiles,
+  books,
+  libraries,
+  libraryFolders,
+  podcastEpisodeMedia,
+  podcastEpisodes,
+  podcastJobs,
+  podcastLibrarySettings,
+  podcasts,
+} from '../../db/schema';
 import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
 
 type Db = NodePgDatabase<typeof schema>;
+
+const visibleLibraryCondition = APP_FEATURES.podcasts ? undefined : eq(libraries.type, 'books');
+
+/**
+ * Podcast libraries hold shows rather than books, so the row count that fills their badge comes from
+ * a different table. The subquery only runs for podcast libraries, and it excludes archived shows so
+ * the count matches the show list the library view opens on.
+ */
+const podcastShowCount = sql<number | null>`case when ${libraries.type} = 'podcasts' then (
+  select count(*)::int from ${podcasts} where ${podcasts.libraryId} = ${libraries.id} and ${podcasts.archivedAt} is null
+) end`;
 
 @Injectable()
 export class LibraryRepository {
@@ -19,10 +41,13 @@ export class LibraryRepository {
     return this.db
       .select({
         ...getTableColumns(libraries),
+        accessLevel: sql<AccessLevel | null>`null`,
         bookCount: sql<number>`count(${books.id})::int`,
+        podcastCount: podcastShowCount,
       })
       .from(libraries)
       .leftJoin(books, and(eq(books.libraryId, libraries.id), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
+      .where(visibleLibraryCondition)
       .groupBy(libraries.id)
       .orderBy(libraries.displayOrder, libraries.name);
   }
@@ -34,6 +59,8 @@ export class LibraryRepository {
     return this.db
       .select({
         id: libraries.id,
+        type: libraries.type,
+        accessLevel: schema.userLibraryAccess.accessLevel,
         name: libraries.name,
         icon: libraries.icon,
         displayOrder: libraries.displayOrder,
@@ -43,16 +70,18 @@ export class LibraryRepository {
         createdAt: libraries.createdAt,
         updatedAt: libraries.updatedAt,
         bookCount: sql<number>`count(${books.id})::int`,
+        podcastCount: podcastShowCount,
       })
       .from(libraries)
       .innerJoin(schema.userLibraryAccess, and(eq(schema.userLibraryAccess.libraryId, libraries.id), eq(schema.userLibraryAccess.userId, userId)))
       .leftJoin(books, bookJoinOn)
-      .groupBy(libraries.id)
+      .where(visibleLibraryCondition)
+      .groupBy(libraries.id, schema.userLibraryAccess.accessLevel)
       .orderBy(libraries.displayOrder, libraries.name);
   }
 
   findAllIds() {
-    return this.db.select({ id: libraries.id }).from(libraries).orderBy(libraries.displayOrder, libraries.name);
+    return this.db.select({ id: libraries.id }).from(libraries).where(visibleLibraryCondition).orderBy(libraries.displayOrder, libraries.name);
   }
 
   findAutoScanSchedules() {
@@ -68,11 +97,24 @@ export class LibraryRepository {
       .select({ id: libraries.id })
       .from(libraries)
       .innerJoin(schema.userLibraryAccess, and(eq(schema.userLibraryAccess.libraryId, libraries.id), eq(schema.userLibraryAccess.userId, userId)))
+      .where(visibleLibraryCondition)
       .orderBy(libraries.displayOrder, libraries.name);
   }
 
   findById(id: number) {
-    return this.db.select().from(libraries).where(eq(libraries.id, id)).limit(1);
+    return this.db
+      .select()
+      .from(libraries)
+      .where(and(eq(libraries.id, id), visibleLibraryCondition))
+      .limit(1);
+  }
+
+  findByIds(ids: number[]) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.db
+      .select({ id: libraries.id })
+      .from(libraries)
+      .where(and(inArray(libraries.id, ids), visibleLibraryCondition));
   }
 
   findByName(name: string, excludeId?: number) {
@@ -88,23 +130,28 @@ export class LibraryRepository {
   }
 
   findFoldersByLibrary(libraryId: number) {
-    return this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
+    return this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId)).orderBy(libraryFolders.createdAt, libraryFolders.id);
   }
 
   findAllFolders() {
-    return this.db.select().from(libraryFolders);
+    return this.db.select().from(libraryFolders).orderBy(libraryFolders.libraryId, libraryFolders.createdAt, libraryFolders.id);
   }
 
   findFoldersByLibraryIds(libraryIds: number[]) {
     if (libraryIds.length === 0) return Promise.resolve([]);
-    return this.db.select().from(libraryFolders).where(inArray(libraryFolders.libraryId, libraryIds));
+    return this.db
+      .select()
+      .from(libraryFolders)
+      .where(inArray(libraryFolders.libraryId, libraryIds))
+      .orderBy(libraryFolders.libraryId, libraryFolders.createdAt, libraryFolders.id);
   }
 
   findAllFolderPaths() {
     return this.db
       .select({ libraryId: libraryFolders.libraryId, path: libraryFolders.path, libraryName: libraries.name })
       .from(libraryFolders)
-      .innerJoin(libraries, eq(libraries.id, libraryFolders.libraryId));
+      .innerJoin(libraries, eq(libraries.id, libraryFolders.libraryId))
+      .orderBy(libraries.displayOrder, libraries.name, libraryFolders.createdAt, libraryFolders.id);
   }
 
   insert(data: typeof libraries.$inferInsert) {
@@ -119,8 +166,108 @@ export class LibraryRepository {
       .returning();
   }
 
-  insertFolder(data: typeof libraryFolders.$inferInsert) {
+  insertFolders(data: (typeof libraryFolders.$inferInsert)[]) {
     return this.db.insert(libraryFolders).values(data).returning();
+  }
+
+  insertPodcastSettings(libraryId: number) {
+    return this.db.insert(podcastLibrarySettings).values({ libraryId }).onConflictDoNothing();
+  }
+
+  /**
+   * Files BookOrbit downloaded and may therefore delete. Local-origin media is excluded: those rows
+   * point at files the user brought, which BookOrbit adopted where they lay and never owns.
+   */
+  findPodcastMediaFiles(libraryId: number, afterEpisodeId: number, limit: number) {
+    return this.db
+      .select({ episodeId: podcastEpisodes.id, localPath: podcastEpisodeMedia.localPath })
+      .from(podcastEpisodeMedia)
+      .innerJoin(podcastEpisodes, eq(podcastEpisodes.id, podcastEpisodeMedia.episodeId))
+      .innerJoin(podcasts, eq(podcasts.id, podcastEpisodes.podcastId))
+      .where(
+        and(
+          eq(podcasts.libraryId, libraryId),
+          eq(podcastEpisodes.origin, 'feed'),
+          gt(podcastEpisodes.id, afterEpisodeId),
+          isNotNull(podcastEpisodeMedia.localPath),
+        ),
+      )
+      .orderBy(asc(podcastEpisodes.id))
+      .limit(limit);
+  }
+
+  findPodcastIds(libraryId: number, afterPodcastId: number, limit: number) {
+    return this.db
+      .select({ id: podcasts.id })
+      .from(podcasts)
+      .where(and(eq(podcasts.libraryId, libraryId), gt(podcasts.id, afterPodcastId)))
+      .orderBy(asc(podcasts.id))
+      .limit(limit);
+  }
+
+  findPodcastCleanupJobs(libraryId: number, afterJobId: number, limit: number) {
+    return this.db
+      .select({ id: podcastJobs.id, payload: podcastJobs.payload })
+      .from(podcastJobs)
+      .where(
+        and(
+          eq(podcastJobs.libraryId, libraryId),
+          eq(podcastJobs.type, 'file_cleanup'),
+          gt(podcastJobs.id, afterJobId),
+          sql`${podcastJobs.status} in ('queued', 'failed', 'cancelled')`,
+        ),
+      )
+      .orderBy(asc(podcastJobs.id))
+      .limit(limit);
+  }
+
+  /** Whether anything lives in the downloads root, which is what makes repointing it unsafe. */
+  async hasPodcastMediaFiles(libraryId: number): Promise<boolean> {
+    const [row] = await this.db
+      .select({ episodeId: podcastEpisodes.id })
+      .from(podcastEpisodeMedia)
+      .innerJoin(podcastEpisodes, eq(podcastEpisodes.id, podcastEpisodeMedia.episodeId))
+      .innerJoin(podcasts, eq(podcasts.id, podcastEpisodes.podcastId))
+      .where(and(eq(podcasts.libraryId, libraryId), eq(podcastEpisodes.origin, 'feed'), isNotNull(podcastEpisodeMedia.localPath)))
+      .limit(1);
+    return row !== undefined;
+  }
+
+  async hasBlockingPodcastStorageJobs(libraryId: number): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: podcastJobs.id })
+      .from(podcastJobs)
+      .where(
+        and(
+          eq(podcastJobs.libraryId, libraryId),
+          inArray(podcastJobs.type, ['download', 'retention', 'purge', 'merge', 'file_cleanup']),
+          sql`(${podcastJobs.status} = 'processing' or (${podcastJobs.type} = 'file_cleanup' and ${podcastJobs.status} in ('queued', 'failed', 'cancelled')))`,
+        ),
+      )
+      .limit(1);
+    return row !== undefined;
+  }
+
+  async cancelPodcastJobs(libraryId: number): Promise<number> {
+    const rows = await this.db
+      .update(podcastJobs)
+      .set({
+        cancelRequested: true,
+        status: sql`case when ${podcastJobs.status} = 'queued' then 'cancelled' else ${podcastJobs.status} end`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(podcastJobs.libraryId, libraryId), sql`${podcastJobs.status} in ('queued', 'processing')`))
+      .returning({ status: podcastJobs.status, type: podcastJobs.type, episodeId: podcastJobs.episodeId });
+    const cancelledEpisodeIds = rows.flatMap((row) =>
+      row.status === 'cancelled' && row.type === 'download' && row.episodeId !== null ? [row.episodeId] : [],
+    );
+    if (cancelledEpisodeIds.length > 0) {
+      await this.db
+        .update(podcastEpisodeMedia)
+        .set({ status: 'remote', lastError: null, updatedAt: new Date() })
+        .where(and(inArray(podcastEpisodeMedia.episodeId, cancelledEpisodeIds), eq(podcastEpisodeMedia.status, 'queued')));
+    }
+    return rows.filter((row) => row.status === 'processing').length;
   }
 
   findBookIdsByLibrary(libraryId: number) {
@@ -245,11 +392,87 @@ export class LibraryRepository {
       .where(and(inArray(schema.users.id, userIds), or(eq(schema.users.isSuperuser, true), isNotNull(schema.userLibraryAccess.userId))));
   }
 
+  async getAddedAtRecomputeBounds(libraryId: number) {
+    const [row] = await this.db
+      .select({
+        total: sql<number>`count(*)::int`,
+        maxId: sql<number>`coalesce(max(${books.id}), 0)::int`,
+      })
+      .from(books)
+      .where(eq(books.libraryId, libraryId));
+    return row ?? { total: 0, maxId: 0 };
+  }
+
+  findAddedAtBookBatch(libraryId: number, afterId: number, maxId: number, limit: number) {
+    return this.db
+      .select({ id: books.id, addedAt: books.addedAt, previousAddedAt: sql<string>`${books.addedAt}::text` })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), gt(books.id, afterId), lte(books.id, maxId)))
+      .orderBy(books.id)
+      .limit(limit);
+  }
+
+  findAddedAtMtimes(libraryId: number, bookIds: number[]) {
+    return this.db
+      .select({ bookId: bookFiles.bookId, mtime: sql<Date>`min(${bookFiles.mtime})`.mapWith(bookFiles.mtime) })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(
+        and(
+          eq(books.libraryId, libraryId),
+          inArray(books.id, bookIds),
+          eq(bookFiles.role, 'content'),
+          gt(bookFiles.mtime, new Date(MIN_VALID_FILE_TIME_MS)),
+        ),
+      )
+      .groupBy(bookFiles.bookId);
+  }
+
+  findAddedAtFileBatch(libraryId: number, bookIds: number[], afterId: number, limit: number) {
+    return this.db
+      .select({
+        id: bookFiles.id,
+        bookId: bookFiles.bookId,
+        absolutePath: bookFiles.absolutePath,
+        mtime: bookFiles.mtime,
+        rootPath: libraryFolders.path,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, books.libraryFolderId))
+      .where(and(eq(books.libraryId, libraryId), inArray(books.id, bookIds), eq(bookFiles.role, 'content'), gt(bookFiles.id, afterId)))
+      .orderBy(bookFiles.id)
+      .limit(limit);
+  }
+
+  async updateAddedAtBatch(libraryId: number, values: { id: number; addedAt: Date; previousAddedAt: string }[]): Promise<number[]> {
+    if (values.length === 0) return [];
+    const rows = sql.join(
+      values.map(({ id, addedAt, previousAddedAt }) => sql`(${id}::int, ${addedAt.toISOString()}::timestamptz, ${previousAddedAt}::timestamptz)`),
+      sql`, `,
+    );
+    const result = await this.db
+      .update(books)
+      .set({ addedAt: sql`dates.added_at`, updatedAt: new Date() })
+      .from(sql`(values ${rows}) as dates(id, added_at, previous_added_at)`)
+      .where(and(eq(books.libraryId, libraryId), sql`${books.id} = dates.id`, sql`${books.addedAt} = dates.previous_added_at`))
+      .returning({ id: books.id });
+    return result.map(({ id }) => id);
+  }
+
   async hasUserAccess(userId: number, libraryId: number): Promise<boolean> {
     const row = await this.db.query.userLibraryAccess.findFirst({
       where: and(eq(schema.userLibraryAccess.userId, userId), eq(schema.userLibraryAccess.libraryId, libraryId)),
     });
     return row !== undefined;
+  }
+
+  async findUserAccessLevel(userId: number, libraryId: number): Promise<AccessLevel | null> {
+    const row = await this.db.query.userLibraryAccess.findFirst({
+      columns: { accessLevel: true },
+      where: and(eq(schema.userLibraryAccess.userId, userId), eq(schema.userLibraryAccess.libraryId, libraryId)),
+    });
+    return row?.accessLevel ?? null;
   }
 
   getAccess(libraryId: number) {

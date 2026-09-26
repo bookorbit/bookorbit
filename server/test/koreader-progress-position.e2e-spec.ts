@@ -259,6 +259,64 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
     expect(remaining.map((row) => row.sessionId).sort()).toEqual([measuredSessionId, webSessionId].sort());
   });
 
+  it('uses a user-scoped link when the same book has two files with the same document hash', async () => {
+    const [sourceFile] = await ctx.db
+      .select({
+        bookId: schema.bookFiles.bookId,
+        libraryFolderId: schema.bookFiles.libraryFolderId,
+        absolutePath: schema.bookFiles.absolutePath,
+        relPath: schema.bookFiles.relPath,
+        ino: schema.bookFiles.ino,
+        sizeBytes: schema.bookFiles.sizeBytes,
+        mtime: schema.bookFiles.mtime,
+        format: schema.bookFiles.format,
+      })
+      .from(schema.bookFiles)
+      .where(eq(schema.bookFiles.id, epub.bookFileId));
+    const [koreaderUser] = await ctx.db
+      .select({ userId: schema.koreaderUsers.userId })
+      .from(schema.koreaderUsers)
+      .where(eq(schema.koreaderUsers.username, KOREADER_USERNAME));
+    expect(sourceFile).toBeDefined();
+    expect(koreaderUser).toBeDefined();
+
+    const suffix = randomUUID();
+    const [linkedFile] = await ctx.db
+      .insert(schema.bookFiles)
+      .values({
+        ...sourceFile!,
+        absolutePath: `${sourceFile!.absolutePath}.same-hash-${suffix}`,
+        relPath: sourceFile!.relPath ? `${sourceFile!.relPath}.same-hash-${suffix}` : null,
+        fileHash: epubHash,
+        role: 'content',
+      })
+      .returning({ id: schema.bookFiles.id });
+
+    try {
+      await ctx.db.insert(schema.koreaderBookHashLinks).values({
+        userId: koreaderUser!.userId,
+        hash: epubHash,
+        bookFileId: linkedFile!.id,
+      });
+
+      await syncFromDevice(epubHash, 0.61, XPOINTER);
+
+      const [deviceProgress] = await ctx.db
+        .select({ bookFileId: schema.koreaderDeviceProgress.bookFileId, percentage: schema.koreaderDeviceProgress.percentage })
+        .from(schema.koreaderDeviceProgress)
+        .where(
+          and(
+            eq(schema.koreaderDeviceProgress.bookFileId, linkedFile!.id),
+            eq(schema.koreaderDeviceProgress.userId, koreaderUser!.userId),
+            eq(schema.koreaderDeviceProgress.deviceId, DEVICE_ID),
+          ),
+        );
+      expect(deviceProgress).toEqual({ bookFileId: linkedFile!.id, percentage: 0.61 });
+    } finally {
+      await ctx.db.delete(schema.bookFiles).where(eq(schema.bookFiles.id, linkedFile!.id));
+    }
+  });
+
   it('does not route progress when the document hash matches different books', async () => {
     const comicProgressBefore = await storedProgress(comic.bookFileId);
     const epubProgressBefore = await storedProgress(epub.bookFileId);

@@ -6,7 +6,7 @@ import type { IndexerColor, ReleaseUnitChoice } from "./indexer";
  * deliberately absent: it has no address, no credentials and nothing to choose, so making it a
  * configurable client type would only ask an operator to create a record of nothing.
  */
-export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge"] as const;
+export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "nzbget", "sabnzbd"] as const;
 export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
 
 /**
@@ -14,12 +14,25 @@ export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
  * join a swarm, so this is what decides which configured client a given grab goes to rather than
  * simply taking the highest-priority enabled row.
  */
-export type DownloadDelivery = "torrent" | "file";
+export type DownloadDelivery = "torrent" | "file" | "usenet";
 
 export const DOWNLOAD_CLIENT_DELIVERY: Record<DownloadClientType, DownloadDelivery> = {
   qbittorrent: "torrent",
   transmission: "torrent",
   deluge: "torrent",
+  nzbget: "usenet",
+  sabnzbd: "usenet",
+};
+
+export type DownloadClientCredentialKind = "usernamePassword" | "apiKey";
+
+/** Shapes the settings form without making one daemon's authentication model universal. */
+export const DOWNLOAD_CLIENT_CREDENTIAL_KIND: Record<DownloadClientType, DownloadClientCredentialKind> = {
+  qbittorrent: "usernamePassword",
+  transmission: "usernamePassword",
+  deluge: "usernamePassword",
+  nzbget: "usernamePassword",
+  sabnzbd: "apiKey",
 };
 
 export interface DownloadClientPathMapping {
@@ -45,6 +58,7 @@ export const DOWNLOAD_CLIENT_ERROR_CODES = [
   "DOWNLOAD_CLIENT_URL_PRIVATE",
   "DOWNLOAD_CLIENT_PATH_NOT_ABSOLUTE",
   "DOWNLOAD_CLIENT_MAPPING_REQUIRED",
+  "DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED",
   /** The test ran and the client refused or could not be reached. Carries the adapter's reason. */
   "DOWNLOAD_CLIENT_TEST_FAILED",
   "DOWNLOAD_CLIENT_RECONCILIATION_UNSUPPORTED",
@@ -86,6 +100,7 @@ export interface DownloadClientSummary {
   id: number;
   name: string;
   color: IndexerColor | null;
+  delivery: DownloadDelivery;
 }
 
 /**
@@ -105,7 +120,7 @@ export interface DownloadClientReconciliationAttempt {
 }
 
 export interface DownloadClientReconciliationItem {
-  infoHash: string;
+  clientKey: string;
   name: string;
   state: "queued" | "downloading" | "completed" | "failed" | "unknown";
   progressPercent: number;
@@ -145,7 +160,7 @@ export interface CreateDownloadClientPayload {
   pathMappings?: DownloadClientPathMappingInput[];
 }
 
-export type UpdateDownloadClientPayload = Partial<CreateDownloadClientPayload>;
+export type UpdateDownloadClientPayload = Partial<Omit<CreateDownloadClientPayload, "adapterType">>;
 
 export interface DownloadClientTestResult {
   success: boolean;
@@ -208,7 +223,7 @@ export const UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES: readonly BookRequestDownl
   "needs_review",
 ];
 
-export const BOOK_REQUEST_DOWNLOAD_SOURCES = ["magnet", "torrent_file", "direct_url"] as const;
+export const BOOK_REQUEST_DOWNLOAD_SOURCES = ["magnet", "torrent_file", "direct_url", "nzb_file"] as const;
 export type BookRequestDownloadSource = (typeof BOOK_REQUEST_DOWNLOAD_SOURCES)[number];
 
 /** Which kind of client can carry out a grab of each source. */
@@ -216,6 +231,7 @@ export const DELIVERY_BY_DOWNLOAD_SOURCE: Record<BookRequestDownloadSource, Down
   magnet: "torrent",
   torrent_file: "torrent",
   direct_url: "file",
+  nzb_file: "usenet",
 };
 
 export interface BookRequestDownloadItem {
@@ -234,7 +250,7 @@ export interface BookRequestDownloadItem {
   releaseTitle: string;
   releaseSizeBytes: number | null;
   /** Null for an attempt a source refused before there was anything to download. */
-  clientHash: string | null;
+  clientKey: string | null;
   status: BookRequestDownloadStatus;
   progressPercent: number;
   downloadedBytes: number;
@@ -264,7 +280,7 @@ export interface BookRequestSeedStatus {
   downloadId: number;
   downloadClientId: number;
   downloadClientName: string | null;
-  clientHash: string;
+  clientKey: string;
   /** False once the client has stopped the torrent, whether by goal, by pause or by error. */
   seeding: boolean;
   ratio: number | null;
@@ -333,6 +349,8 @@ export const SOURCE_WIDE_GRAB_FAILURE_CODES: readonly GrabFailureCode[] = ["GRAB
 export interface GrabRefusal {
   /** Null for a hand-pasted magnet or .torrent, which came from no source in the list. */
   indexerId: number | null;
+  /** The delivery that failed. Client-wide refusals only apply to another release using this delivery. */
+  delivery: DownloadDelivery;
   code: GrabFailureCode;
 }
 
@@ -342,16 +360,18 @@ export interface GrabRefusal {
  *
  * Shared because the failover and the picker have to agree about the same list on the same
  * screen: the automation stops trying what this rules out, and the picker stops offering it.
- * `seedsBack` is what makes a release depend on a download client, which is why a client refusing
- * one torrent says nothing about a source BookOrbit downloads from itself.
+ * A client refusal is scoped to its delivery. A torrent client being unavailable says nothing
+ * about an NZBGet release or a source BookOrbit downloads itself.
  */
 export function findGrabRefusal(
-  release: { indexerId: number; vipOnly: boolean; seedsBack: boolean },
+  release: { indexerId: number; vipOnly: boolean; delivery: DownloadDelivery },
   refusals: readonly GrabRefusal[],
 ): GrabRefusal | null {
   return (
     refusals.find((refusal) => {
-      if (refusal.code === "GRAB_CLIENT_REFUSED" || refusal.code === "GRAB_CLIENT_UNAVAILABLE") return release.seedsBack;
+      if (refusal.code === "GRAB_CLIENT_REFUSED" || refusal.code === "GRAB_CLIENT_UNAVAILABLE") {
+        return release.delivery !== "file" && refusal.delivery === release.delivery;
+      }
       if (refusal.indexerId !== release.indexerId) return false;
       if (refusal.code === "GRAB_VIP_REQUIRED") return release.vipOnly;
       return SOURCE_WIDE_GRAB_FAILURE_CODES.includes(refusal.code);

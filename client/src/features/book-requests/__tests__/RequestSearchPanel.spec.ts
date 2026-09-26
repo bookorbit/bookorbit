@@ -36,6 +36,7 @@ const state = vi.hoisted(
       routeQuery: Record<string, string>
       toastError: ReturnType<typeof vi.fn>
       lastFailure: Ref<{ code: string | null; meta: Record<string, unknown> | null; message: string | null } | null>
+      coverOrder: Ref<readonly string[]> | null
     },
 )
 
@@ -72,7 +73,8 @@ vi.mock('@/features/book/composables/useMetadataSearch', async () => {
   return {
     useMetadataSearch: () => ({
       filteredResults: ref([]),
-      coverProviderOrder: ref([]),
+      coverProviderOrder: ref(['amazon', 'itunes']),
+      audioCoverProviderOrder: ref(['audible', 'itunes']),
       resultProviderOrder: ref([]),
       interruptedProviders: ref([]),
       isStreaming: ref(false),
@@ -108,7 +110,12 @@ vi.mock('../composables/useRequestSubmission', async (importOriginal) => {
 vi.mock('../composables/useCandidateGroups', async () => {
   const { ref } = await import('vue')
   state.groups = ref([])
-  return { useCandidateGroups: () => ({ groups: state.groups }) }
+  return {
+    useCandidateGroups: (_results: unknown, _mediaKind: unknown, _availability: unknown, coverOrder: Ref<readonly string[]>) => {
+      state.coverOrder = coverOrder
+      return { groups: state.groups }
+    },
+  }
 })
 
 vi.mock('../composables/useRequestDestinationDefault', async (importOriginal) => {
@@ -347,6 +354,24 @@ describe('RequestSearchPanel provider sources', () => {
     expect(document.body.textContent).toContain('Recommended')
   })
 
+  it('makes the selected media kind visually distinct', async () => {
+    const wrapper = await render()
+    const ebook = wrapper.findAll('button').find((button) => button.text() === 'E-book')!
+    const audiobook = wrapper.findAll('button').find((button) => button.text() === 'Audiobook')!
+
+    expect(ebook.attributes('aria-pressed')).toBe('true')
+    expect(ebook.classes()).toEqual(expect.arrayContaining(['bg-primary', 'text-primary-foreground']))
+    expect(audiobook.attributes('aria-pressed')).toBe('false')
+    expect(audiobook.classes()).toEqual(expect.arrayContaining(['text-foreground', 'hover:bg-accent']))
+
+    await audiobook.trigger('click')
+
+    expect(ebook.attributes('aria-pressed')).toBe('false')
+    expect(ebook.classes()).toEqual(expect.arrayContaining(['text-foreground', 'hover:bg-accent']))
+    expect(audiobook.attributes('aria-pressed')).toBe('true')
+    expect(audiobook.classes()).toEqual(expect.arrayContaining(['bg-primary', 'text-primary-foreground']))
+  })
+
   it('defaults a user with both fulfillment permissions to automation', async () => {
     state.hasPermission.mockImplementation(
       (permission: string) => permission === Permission.BookRequestAutoApprove || permission === Permission.BookRequestSelfFulfill,
@@ -358,7 +383,9 @@ describe('RequestSearchPanel provider sources', () => {
     const automatic = wrapper.findAll('button').find((button) => button.text() === 'Automatic')!
     const choose = wrapper.findAll('button').find((button) => button.text() === 'Choose a release')!
     expect(automatic.attributes('aria-pressed')).toBe('true')
+    expect(automatic.classes()).toEqual(expect.arrayContaining(['bg-primary', 'text-primary-foreground']))
     expect(choose.attributes('aria-pressed')).toBe('false')
+    expect(choose.classes()).toEqual(expect.arrayContaining(['text-foreground', 'hover:bg-accent']))
     expect(wrapper.find('button[aria-label="How BookOrbit chooses the recommended ISBN"]').exists()).toBe(false)
 
     await wrapper
@@ -385,12 +412,12 @@ describe('RequestSearchPanel provider sources', () => {
       .find((button) => button.text() === 'Choose a release')!
       .trigger('click')
 
-    expect(
-      wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Choose a release')!
-        .attributes('aria-pressed'),
-    ).toBe('true')
+    const automatic = wrapper.findAll('button').find((button) => button.text() === 'Automatic')!
+    const choose = wrapper.findAll('button').find((button) => button.text() === 'Choose a release')!
+    expect(automatic.attributes('aria-pressed')).toBe('false')
+    expect(automatic.classes()).toEqual(expect.arrayContaining(['text-foreground', 'hover:bg-accent']))
+    expect(choose.attributes('aria-pressed')).toBe('true')
+    expect(choose.classes()).toEqual(expect.arrayContaining(['bg-primary', 'text-primary-foreground']))
     expect(wrapper.find('button[aria-label="How BookOrbit chooses the recommended ISBN"]').exists()).toBe(true)
 
     await wrapper
@@ -774,5 +801,13 @@ describe('RequestSearchPanel free-text fallback', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(state.push).not.toHaveBeenCalled()
+  })
+
+  it('orders an audiobook request’s cover art by the Audiobook cover rule', async () => {
+    await render()
+
+    expect(state.coverOrder?.value).toEqual(['amazon', 'itunes'])
+    state.mediaKind.value = 'audiobook'
+    expect(state.coverOrder?.value).toEqual(['audible', 'itunes'])
   })
 })

@@ -10,6 +10,7 @@ vi.mock('fs/promises', () => ({
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { access, lstat, readdir, readFile, stat, unlink } from 'fs/promises';
+import { DatabaseError } from 'pg';
 
 import {
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
@@ -76,6 +77,7 @@ function makeService() {
   const processor = {
     createUnitBookRecords: vi.fn().mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] }),
     deleteUnitBookRecords: vi.fn().mockResolvedValue(undefined),
+    reconcileCoversAsync: vi.fn(),
   };
   const events = {
     on: vi.fn(),
@@ -94,6 +96,9 @@ function makeService() {
   const notificationService = {
     notify: vi.fn().mockResolvedValue(undefined),
   };
+  const fileWriteService = {
+    scheduleWrite: vi.fn(),
+  };
 
   const service = new BookDockFinalizeService(
     db as never,
@@ -110,6 +115,7 @@ function makeService() {
     gateway as never,
     notificationService as never,
     processingState as never,
+    fileWriteService as never,
     undefined as never,
     seriesMemberships as never,
   );
@@ -131,6 +137,7 @@ function makeService() {
     processingState,
     seriesMemberships,
     notificationService,
+    fileWriteService,
   };
 }
 
@@ -142,6 +149,7 @@ function makeRow(overrides?: Partial<Record<string, unknown>>) {
     fileSize: 100,
     format: 'epub',
     status: 'ready',
+    uploadedBy: 7,
     embeddedMetadata: { title: 'Embedded Title', genres: ['Embedded Genre'] } as BookDockMetadata,
     selectedMetadata: null as BookDockMetadata | null,
     fetchedMetadata: null as BookDockMetadata | null,
@@ -1442,7 +1450,7 @@ describe('BookDockFinalizeService', () => {
       }),
     );
 
-    expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith('https://covers.example/1.jpg', 20);
+    expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith([{ url: 'https://covers.example/1.jpg' }], 20, 'ebook', { userChosen: true });
     expect(metadataService.saveExtractedCoverBytes).not.toHaveBeenCalled();
     expect(mockReadFile).not.toHaveBeenCalled();
   });
@@ -1606,6 +1614,27 @@ describe('BookDockFinalizeService', () => {
     expect(updateChain.set).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: 1000 }));
   });
 
+  it('applyMetadata writes the staged cover of an audiobook into the audio slot, and never into a sibling book', async () => {
+    const { service, db, metadataService } = makeService();
+    const updateChain = { set: vi.fn(), where: vi.fn().mockResolvedValue(undefined) };
+    updateChain.set.mockReturnValue(updateChain);
+    db.update.mockReturnValue(updateChain);
+    mockReadFile.mockResolvedValue(Buffer.from('square-art'));
+
+    await (service as any).applyMetadata(
+      31,
+      makeRow({ coverPath: '/tmp/cover.jpg', format: 'm4b', selectedMetadata: { title: 'T' } as BookDockMetadata }),
+    );
+    await (service as any).applyMetadata(
+      32,
+      makeRow({ coverPath: '/tmp/cover.jpg', format: 'm4b', selectedMetadata: { title: 'T' } as BookDockMetadata }),
+      false,
+    );
+
+    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledOnce();
+    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledWith(31, Buffer.from('square-art'), 'audio');
+  });
+
   it('applyMetadata falls back to extracted cover bytes when cover download is unavailable', async () => {
     const { service, db, metadataService } = makeService();
     metadataService.downloadAndSaveCover.mockResolvedValueOnce(false);
@@ -1625,7 +1654,7 @@ describe('BookDockFinalizeService', () => {
       }),
     );
 
-    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledWith(21, Buffer.from('cover-bytes'));
+    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledWith(21, Buffer.from('cover-bytes'), 'ebook');
   });
 
   describe('multi-file units', () => {
@@ -1680,7 +1709,13 @@ describe('BookDockFinalizeService', () => {
 
     function arrange(
       harness: ReturnType<typeof makeService>,
-      options: { organizationMode?: string; formatPriority?: string[]; destPath?: string; importFormats?: string } = {},
+      options: {
+        organizationMode?: string;
+        formatPriority?: string[];
+        destPath?: string;
+        importFormats?: string;
+        fileWriteEnabled?: boolean;
+      } = {},
     ) {
       const { service } = harness;
       harness.appSettings.getBookRequestImportFormats.mockResolvedValue(options.importFormats ?? 'all');
@@ -1691,6 +1726,7 @@ describe('BookDockFinalizeService', () => {
         fileNamingPattern: null,
         formatPriority: options.formatPriority ?? [],
         organizationMode: options.organizationMode ?? 'book_per_folder',
+        fileWriteEnabled: options.fileWriteEnabled ?? false,
       } as never);
       vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
       vi.spyOn(service as never, 'resolveDestination').mockResolvedValue((options.destPath ?? '/library/Neuromancer/track-01.mp3') as never);
@@ -1708,13 +1744,13 @@ describe('BookDockFinalizeService', () => {
      * Every file into one folder, and one book out of it, in a single write: the primary goes first
      * because the book row that carries `primaryFileId` is the one created for it.
      */
-    it('places every file of a unit into one folder and builds a single book from them', async () => {
+    it.each([UNIT_DIR, null])('places every file into one book with directory ownership %s', async (unitDirectory) => {
       const harness = makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness);
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [77], createdBookIds: [77], attachedFileIds: [] });
 
-      const result = await finalize(harness, unitRow());
+      const result = await finalize(harness, unitRow({ unitDirectory }));
 
       expect(result).toMatchObject({ success: true, bookId: 77 });
       expect(harness.storage.moveToPath).toHaveBeenCalledTimes(3);
@@ -1769,7 +1805,7 @@ describe('BookDockFinalizeService', () => {
      * A disc-foldered unit holds two files called `track01.mp3`. Filing them both by basename put
      * the second on top of the first, and filed the book under `CD 1` rather than under the book.
      */
-    it('keeps the disc folders of a unit rather than flattening them onto each other', async () => {
+    it.each([UNIT_DIR, null])('preserves distinct disc paths with directory ownership %s', async (unitDirectory) => {
       const harness = makeService();
       harness.repo.findUnitFiles.mockResolvedValue([
         {
@@ -1796,7 +1832,7 @@ describe('BookDockFinalizeService', () => {
       arrange(harness);
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [80], createdBookIds: [80], attachedFileIds: [] });
 
-      const result = await finalize(harness, unitRow({ absolutePath: `${UNIT_DIR}/CD 1/track01.mp3` }));
+      const result = await finalize(harness, unitRow({ absolutePath: `${UNIT_DIR}/CD 1/track01.mp3`, unitDirectory }));
 
       expect(result.success).toBe(true);
       expect(harness.storage.moveToPath.mock.calls.map((call: string[]) => call[1])).toEqual([
@@ -1825,16 +1861,23 @@ describe('BookDockFinalizeService', () => {
     });
 
     /** A folder in a book_per_file library is split apart by the next scan: data loss, not taste. */
-    it('holds a multipart audiobook rather than placing a folder into a book_per_file library', async () => {
+    it.each([UNIT_DIR, null])('holds multipart audio for a book_per_file library with directory ownership %s', async (unitDirectory) => {
       const harness = makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness, { organizationMode: 'book_per_file' });
 
-      const result = await finalize(harness, unitRow());
+      const result = await finalize(harness, unitRow({ unitDirectory }));
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('one book per file');
       expect(harness.storage.moveToPath).not.toHaveBeenCalled();
+    });
+
+    it('discards every recorded file of a shared-folder unit without removing its directory', async () => {
+      const { service, repo } = makeService();
+      repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
+      await (service as any).cleanupDiscardedBookDockFile(unitRow({ unitDirectory: null }));
+      expect(new Set(mockUnlink.mock.calls.map(([path]) => path))).toEqual(new Set(AUDIO_UNIT_FILES.map((file) => file.absolutePath)));
     });
 
     const MULTI_FORMAT_FILES = [
@@ -1922,6 +1965,67 @@ describe('BookDockFinalizeService', () => {
       const [, , looseFiles] = harness.processor.createUnitBookRecords.mock.calls[0];
       expect(looseFiles.map((file: { folderPath: string }) => file.folderPath)).toEqual(['/library/Dune.epub', '/library/Dune.pdf']);
       expect(applyMetadata.mock.calls.map((call: unknown[]) => call[0])).toEqual([81, 82]);
+      // The staged cover came from the primary file, so only its book gets it; reconcile fills the rest.
+      expect(applyMetadata.mock.calls.map((call: unknown[]) => call[2])).toEqual([true, false]);
+      expect(harness.processor.reconcileCoversAsync).toHaveBeenCalledWith([81, 82]);
+    });
+
+    describe('metadata write-back', () => {
+      it('schedules a write for every book the unit produced, attributed to the uploader', async () => {
+        const harness = makeService();
+        harness.repo.findUnitFiles.mockResolvedValue(MULTI_FORMAT_FILES);
+        arrange(harness, { organizationMode: 'book_per_file', destPath: '/library/Dune.epub', fileWriteEnabled: true });
+        harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101, 102], createdBookIds: [101, 102], attachedFileIds: [] });
+
+        const result = await finalize(harness, multiFormatRow());
+
+        expect(result.success).toBe(true);
+        expect(harness.fileWriteService.scheduleWrite.mock.calls).toEqual([
+          [101, 'auto', 7],
+          [102, 'auto', 7],
+        ]);
+      });
+
+      it('does not schedule a write when the library does not write metadata to files', async () => {
+        const harness = makeService();
+        harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
+        arrange(harness, { fileWriteEnabled: false });
+        harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] });
+
+        const result = await finalize(harness, unitRow());
+
+        expect(result.success).toBe(true);
+        expect(harness.fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      });
+
+      it('does not schedule a write for any book when a later book of the unit fails', async () => {
+        const harness = makeService();
+        harness.repo.findUnitFiles.mockResolvedValue(MULTI_FORMAT_FILES);
+        arrange(harness, { organizationMode: 'book_per_file', destPath: '/library/Dune.epub', fileWriteEnabled: true });
+        harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101, 102], createdBookIds: [102], attachedFileIds: [9] });
+        vi.spyOn(harness.service as never, 'applyMetadata')
+          .mockResolvedValueOnce(undefined as never)
+          .mockRejectedValueOnce(new Error('metadata exploded') as never);
+
+        const result = await finalize(harness, multiFormatRow());
+
+        expect(result.success).toBe(false);
+        expect(harness.processor.deleteUnitBookRecords).toHaveBeenCalled();
+        expect(harness.fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      });
+
+      it('does not schedule a write when dock record cleanup fails', async () => {
+        const harness = makeService();
+        harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
+        arrange(harness, { fileWriteEnabled: true });
+        harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] });
+        vi.spyOn(harness.service as never, 'cleanupBookDockRecord').mockRejectedValue(new Error('cleanup failed') as never);
+
+        const result = await finalize(harness, unitRow());
+
+        expect(result.success).toBe(false);
+        expect(harness.fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      });
     });
 
     /**
@@ -1950,10 +2054,12 @@ describe('BookDockFinalizeService', () => {
   it('does not put a database error into the message a requester reads', async () => {
     const harness = makeService();
     const row = makeRow({ targetLibraryId: 5, targetFolderId: 9, unitDirectory: '/dock/request-7-Dune' });
+    const databaseError = Object.assign(new DatabaseError('syntax error at or near "asc"', 0, 'error'), { code: '42601' });
     const failure = Object.assign(new Error('Failed query: select "id" from "book_dock_unit_files" where ...'), {
-      cause: Object.assign(new Error('syntax error at or near "asc"'), { code: '42601' }),
+      cause: databaseError,
     });
     harness.repo.findUnitFiles.mockRejectedValue(failure);
+    const warn = vi.spyOn((harness.service as any).logger, 'warn').mockImplementation(() => {});
     vi.spyOn(harness.service as never, 'findLibraryOrFail').mockResolvedValue({
       id: 5,
       name: 'Books',
@@ -1970,6 +2076,51 @@ describe('BookDockFinalizeService', () => {
     expect(result.message).toBe('Filing this book failed inside BookOrbit. Check the server log for the cause.');
     expect(result.message).not.toContain('select');
     expect(result.message).not.toContain('book_dock_unit_files');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('errorClass=DatabaseError errorCode=42601'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('error="syntax error at or near \\"asc\\""'));
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('book_dock_unit_files'));
+  });
+
+  it.each(['EXDEV', 'EPERM', 'EACCES', 'ENOENT'])('logs %s from a failed file move without exposing paths to the requester', async (code) => {
+    const harness = makeService();
+    const row = makeRow({ absolutePath: '/dock/book.epub' });
+    const prepared = {
+      fileId: row.id,
+      fileName: row.fileName,
+      row,
+      status: 'ready',
+      destPath: '/library/book.epub',
+      library: { id: 5 },
+      folder: { id: 9, path: '/library' },
+      format: 'epub',
+      placement: [
+        {
+          sourcePath: '/dock/book.epub',
+          destPath: '/library/book.epub',
+          format: 'epub',
+          role: 'content',
+          sortOrder: 0,
+        },
+      ],
+    };
+    const failure = Object.assign(new Error(`${code}: move '/dock/book.epub' -> '/library/book.epub'`), { code });
+    harness.storage.moveToPath.mockRejectedValueOnce(failure);
+    vi.spyOn(harness.service as never, 'classifyDestination').mockResolvedValue(prepared as never);
+    const warn = vi.spyOn((harness.service as any).logger, 'warn').mockImplementation(() => {});
+
+    const result = await (harness.service as any).finalizePreparedCandidate(prepared, new Map());
+
+    expect(result).toEqual({
+      fileId: 1,
+      fileName: 'book.epub',
+      success: false,
+      message: 'Filing this book failed inside BookOrbit. Check the server log for the cause.',
+    });
+    expect(result.message).not.toContain('/dock');
+    expect(result.message).not.toContain('/library');
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      `[book_dock.finalize] [fail] fileId=1 stage=filing errorClass=Error errorCode=${code} error="${code}" - Book Dock file finalization failed`,
+    );
   });
 
   it('cleanupBookDockRecord deletes cover files and bucket row id', async () => {
@@ -2044,6 +2195,7 @@ describe('BookDockFinalizeService', () => {
 
   it('reports non-ENOENT destination access failures without moving the file', async () => {
     const { service, storage } = makeService();
+    const warn = vi.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
     const analysis = {
       fileId: 1,
       fileName: 'book.epub',
@@ -2058,7 +2210,13 @@ describe('BookDockFinalizeService', () => {
 
     const classified = await (service as any).classifyDestination(analysis, new Map());
 
-    expect(classified).toMatchObject({ status: 'error', message: 'permission denied' });
+    expect(classified).toMatchObject({
+      status: 'error',
+      message: 'Filing this book failed inside BookOrbit. Check the server log for the cause.',
+    });
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      '[book_dock.finalize] [fail] fileId=1 stage=destination_check errorClass=Error errorCode=EACCES error="EACCES" - Book Dock file finalization failed',
+    );
     expect(storage.moveToPath).not.toHaveBeenCalled();
   });
 

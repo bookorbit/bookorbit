@@ -7,8 +7,11 @@ import SidebarEntitySection from '../SidebarEntitySection.vue'
 const sections = reactive<Record<SidebarSectionId, { open: boolean; cap?: SidebarCap }>>({
   browse: { open: true },
   libraries: { open: true, cap: 8 },
+  podcasts: { open: true, cap: 8 },
   smartScopes: { open: true, cap: 8 },
   collections: { open: true, cap: 8 },
+  podcastScopes: { open: true, cap: 8 },
+  podcastCollections: { open: true, cap: 8 },
 })
 
 vi.mock('@/composables/useSidebarPrefs', () => ({
@@ -118,6 +121,24 @@ describe('SidebarEntitySection', () => {
       await nextTick()
 
       expect(wrapper.findAll('li')).toHaveLength(20)
+    })
+  })
+
+  describe('count badge', () => {
+    function mountRow(item: Record<string, unknown>) {
+      return mountSection(0, { items: [{ id: 1, displayOrder: 0, name: 'Library', icon: null, ...item }] })
+    }
+
+    it('counts books for a book library', () => {
+      expect(rowNames(mountRow({ type: 'books', bookCount: 7 }))).toEqual(['Library7'])
+    })
+
+    it('counts shows for a podcast library, which holds no books', () => {
+      expect(rowNames(mountRow({ type: 'podcasts', bookCount: 0, podcastCount: 2 }))).toEqual(['Library2'])
+    })
+
+    it('renders no badge when the entity carries no count', () => {
+      expect(rowNames(mountRow({ type: 'podcasts', bookCount: 0, podcastCount: null }))).toEqual(['Library'])
     })
   })
 

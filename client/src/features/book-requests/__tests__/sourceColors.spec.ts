@@ -26,11 +26,12 @@ describe('sourceColors', () => {
     expect(sourceChipClass('chartreuse' as never)).toBe(sourceChipClass(null))
   })
 
-  it('keeps the two protocol hues out of the palette an operator can assign', () => {
+  it('keeps protocol hues out of the palette an operator can assign', () => {
     const assignable = INDEXER_COLORS.map((color) => sourceChipClass(color)).join(' ')
 
     expect(assignable).not.toContain('--pill-torrent')
+    expect(assignable).not.toContain('--pill-usenet')
     expect(assignable).not.toContain('--pill-direct')
-    expect(protocolChipClass(true)).not.toBe(protocolChipClass(false))
+    expect(new Set(['torrent', 'usenet', 'file'].map((delivery) => protocolChipClass(delivery as never))).size).toBe(3)
   })
 })

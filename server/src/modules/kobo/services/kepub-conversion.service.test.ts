@@ -60,6 +60,20 @@ describe('KepubConversionService', () => {
     );
   });
 
+  it('gives a stripped source its own cache entry so it cannot be served as the full archive', async () => {
+    const { service } = makeService();
+    statMock.mockRejectedValueOnce(new Error('cache miss'));
+    execFileMock.mockImplementation((_path, _args, _options, cb) => {
+      cb?.(null, '', '');
+      return {} as never;
+    });
+
+    // Same book and same file hash as the full archive; only the audioless flag separates them.
+    await expect(
+      service.getKepubPath({ sourcePath: '/tmp/kobo-epub/book.epub', fileHash: 'abc', bookId: 44, hyphenate: true, audioless: true }),
+    ).resolves.toBe('/app-data/.kepub-cache/44/abc-noaudio-v1-hyph.kepub.epub');
+  });
+
   it('uses a stable nohash cache key when file hash is unavailable', async () => {
     const { service } = makeService();
     statMock.mockRejectedValueOnce(new Error('cache miss'));

@@ -38,6 +38,12 @@ local function applyRow(entry, id, title, authors, last_open)
     if title == "" then title = nil end
     if authors == "" then authors = nil end
     table.insert(entry.ids, id)
+    table.insert(entry.rows, {
+        id = id,
+        title = title,
+        authors = authors,
+        last_open = last_open,
+    })
     if not entry._variant_seen[metadataKey(title, authors)] then
         entry._variant_seen[metadataKey(title, authors)] = true
         entry._variant_count = entry._variant_count + 1
@@ -53,6 +59,7 @@ end
 
 local function finalizeEntry(entry)
     entry.metadata_ambiguous = (entry._variant_count or 0) > 1
+    entry.stats_ambiguous = #entry.ids > 1
     entry._variant_seen = nil
     entry._variant_count = nil
     return entry
@@ -163,7 +170,7 @@ function Session:book(md5)
     if type(md5) ~= "string" or not md5:match("^%x+$") then return nil end
     local res = self:select(BOOK_BY_MD5_SQL, { md5 })
     if not res then return nil end
-    local book = { ids = {}, last_open = 0, _variant_seen = {}, _variant_count = 0 }
+    local book = { ids = {}, rows = {}, last_open = 0, _variant_seen = {}, _variant_count = 0 }
     for i = 1, #res[1] do
         applyRow(book, tonumber(res[1][i]), res[2][i], res[3][i], tonumber(res[4][i]) or 0)
     end
@@ -318,7 +325,7 @@ end
 function BookOrbitStatsReader.collectBookRow(collector, row)
     local entry = collector.by_md5[row.md5]
     if not entry then
-        entry = { md5 = row.md5, ids = {}, last_open = 0, _variant_seen = {}, _variant_count = 0 }
+        entry = { md5 = row.md5, ids = {}, rows = {}, last_open = 0, _variant_seen = {}, _variant_count = 0 }
         collector.by_md5[row.md5] = entry
         table.insert(collector.list, entry)
     end
@@ -334,7 +341,7 @@ function BookOrbitStatsReader.finalizeBookEntry(entry)
     return finalizeEntry(entry)
 end
 
--- Returns { ids, last_open, title, authors, metadata_ambiguous } for one md5.
+-- Returns { ids, rows, last_open, title, authors, metadata_ambiguous, stats_ambiguous } for one md5.
 -- Used by live single-book sync before match-check.
 function BookOrbitStatsReader.getBook(md5)
     return withSession(function(session)

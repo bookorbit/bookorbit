@@ -18,6 +18,9 @@ const { handleLibraryCreated } = useLibraryCreationRedirect()
 const createOpen = ref(false)
 const canManageLibraries = computed(() => hasPermission('manage_libraries'))
 
+/** Podcast libraries have their own index; listing them here would route them to the book view. */
+const bookLibraries = computed(() => libraries.value.filter((library) => library.type !== 'podcasts'))
+
 function openCreate() {
   createOpen.value = true
 }
@@ -38,12 +41,12 @@ onMounted(() => {
 
 <template>
   <div class="h-full">
-    <LibraryCreatorModal v-if="createOpen" @close="closeCreate" @saved="onLibrarySaved" />
+    <LibraryCreatorModal v-if="createOpen" initial-type="books" @close="closeCreate" @saved="onLibrarySaved" />
     <EntityIndexView
       :title="t('titles.libraries')"
       title-icon="BookCopy"
       fallback-icon="BookCopy"
-      :items="libraries"
+      :items="bookLibraries"
       route-name="library"
       :loading="loading"
       :search-placeholder="t('components.sidebar.filterLibrariesPlaceholder')"

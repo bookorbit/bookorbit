@@ -88,7 +88,7 @@ export function mapBookRequestDownload({
     automated: download.automated,
     releaseTitle: download.releaseTitle,
     releaseSizeBytes: download.releaseSizeBytes,
-    clientHash: download.clientHash,
+    clientKey: download.clientKey,
     status: download.status as BookRequestDownloadStatus,
     progressPercent: download.progressPercent,
     downloadedBytes: download.downloadedBytes,

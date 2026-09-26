@@ -21,11 +21,12 @@ export class EmailSendLogRepository {
     return this.db.select().from(emailSendLog).where(eq(emailSendLog.id, id)).limit(1);
   }
 
-  findForUser(userId: number, limit: number, offset: number) {
+  findForUser(userId: number, limit: number, offset: number, bookId?: number) {
+    const ownedByUser = eq(emailSendLog.userId, userId);
     return this.db
       .select()
       .from(emailSendLog)
-      .where(eq(emailSendLog.userId, userId))
+      .where(bookId === undefined ? ownedByUser : and(ownedByUser, eq(emailSendLog.bookId, bookId)))
       .orderBy(sql`${emailSendLog.createdAt} desc`)
       .limit(limit)
       .offset(offset);

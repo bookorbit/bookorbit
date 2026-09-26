@@ -9,5 +9,6 @@ import { EpubService } from './epub.service';
   imports: [BookModule, LibraryModule],
   controllers: [EpubController],
   providers: [EpubService],
+  exports: [EpubService],
 })
 export class EpubModule {}

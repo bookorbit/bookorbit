@@ -2,7 +2,7 @@ import { BookDockGateway } from './book-dock.gateway';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
-  const authService = { validateUser: vi.fn() };
+  const authService = { validateSessionUser: vi.fn() };
   const gateway = new BookDockGateway(jwtService as any, authService as any);
   return { gateway, jwtService, authService };
 }
@@ -26,7 +26,7 @@ describe('BookDockGateway', () => {
   it('disconnects sockets when user cannot be validated', async () => {
     const { gateway, jwtService, authService } = makeGateway();
     jwtService.verify.mockReturnValue({ sub: 8, ver: 3 });
-    authService.validateUser.mockResolvedValue(null);
+    authService.validateSessionUser.mockResolvedValue(null);
     const client = {
       id: 'socket-2',
       handshake: { auth: { token: 'jwt' } },
@@ -37,7 +37,7 @@ describe('BookDockGateway', () => {
 
     await gateway.handleConnection(client);
 
-    expect(authService.validateUser).toHaveBeenCalledWith(8, 3, 'legacy');
+    expect(authService.validateSessionUser).toHaveBeenCalledWith(8, 3, 'legacy', undefined);
     expect(client.disconnect).toHaveBeenCalledTimes(1);
   });
 
@@ -45,7 +45,7 @@ describe('BookDockGateway', () => {
     const { gateway, jwtService, authService } = makeGateway();
     const user = { id: 9, isSuperuser: false, permissions: [] };
     jwtService.verify.mockReturnValue({ sub: 9, ver: 4 });
-    authService.validateUser.mockResolvedValue(user);
+    authService.validateSessionUser.mockResolvedValue(user);
     const client = {
       id: 'socket-3',
       handshake: { auth: { token: 'jwt' } },

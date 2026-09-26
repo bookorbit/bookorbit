@@ -70,6 +70,17 @@ describe('EmailSendLogRepository', () => {
     expect(selectBuilder.limit).toHaveBeenCalledWith(20);
     expect(selectBuilder.offset).toHaveBeenCalledWith(40);
 
+    // The book filter is additive: ownership still constrains the query, so one user cannot read
+    // another's sends by naming a book id.
+    void repo.findForUser(9, 20, 0, 965);
+    expect(selectBuilder.where).toHaveBeenLastCalledWith({
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: emailSendLog.userId, right: 9 },
+        { op: 'eq', left: emailSendLog.bookId, right: 965 },
+      ],
+    });
+
     void repo.findAll(10, 0);
     expect(selectBuilder.offset).toHaveBeenLastCalledWith(0);
     expect(sql).toHaveBeenCalledWith(expect.any(Array), emailSendLog.createdAt);

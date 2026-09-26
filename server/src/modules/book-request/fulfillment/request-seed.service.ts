@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { WORKER_WRITABLE_BOOK_REQUEST_STATUSES } from '@bookorbit/types';
+import { DELIVERY_BY_DOWNLOAD_SOURCE, WORKER_WRITABLE_BOOK_REQUEST_STATUSES } from '@bookorbit/types';
 import type { BookRequestItem, BookRequestSeedStatus } from '@bookorbit/types';
 
 import type { RequestUser } from '../../../common/types/request-user';
@@ -40,21 +40,21 @@ export class RequestSeedService {
     }
 
     const { download, downloadClientName } = latest;
-    if (download.source === 'direct_url' || download.downloadClientId === null) return null;
+    if (DELIVERY_BY_DOWNLOAD_SOURCE[download.source] !== 'torrent' || download.downloadClientId === null) return null;
     // A refused attempt never reached a client, so there is no torrent to report a seed for.
-    const clientHash = download.clientHash;
-    if (clientHash === null) return null;
+    const clientKey = download.clientKey;
+    if (clientKey === null) return null;
 
     const config = await this.clients.resolveConfig(download.downloadClientId);
     const adapter = this.registry.require(config.adapterType);
-    const [status] = await adapter.status([clientHash], config);
+    const [status] = await adapter.status([clientKey], config);
     if (!status) return null;
 
     return {
       downloadId: download.id,
       downloadClientId: download.downloadClientId,
       downloadClientName,
-      clientHash,
+      clientKey,
       seeding: status.seed?.seeding ?? false,
       ratio: status.seed?.ratio ?? null,
       ratioGoal: status.seed?.ratioGoal ?? null,

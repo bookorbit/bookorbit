@@ -124,6 +124,51 @@ const NAV_EDGE_XHTML = `
 </html>
 `;
 
+const OPF_MEDIA_OVERLAY_XML = `
+<package version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Narrated EPUB</dc:title>
+  </metadata>
+  <manifest>
+    <item id="chap1" href="text/ch1.xhtml" media-type="application/xhtml+xml" media-overlay="mo1" />
+    <item id="mo1" href="smil/ch1.smil" media-type="application/smil+xml" />
+    <item id="audio1" href="audio/ch1.mp3" media-type="audio/mpeg" />
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
+  </manifest>
+  <spine>
+    <itemref idref="chap1" />
+  </spine>
+</package>
+`;
+
+const SMIL_XML = `
+<smil>
+  <body>
+    <seq>
+      <par>
+        <text src="../text/ch1.xhtml#s1" />
+        <audio src="../audio/ch1.mp3" clipBegin="0:00:01.500" clipEnd="0:00:03.000" />
+      </par>
+      <par>
+        <text src="../text/ch1.xhtml#s2" />
+        <audio src="../audio/ch1.mp3" clipBegin="3s" clipEnd="4500ms" />
+      </par>
+    </seq>
+  </body>
+</smil>
+`;
+
+function makeMediaOverlayArchive(smil = SMIL_XML) {
+  return makeArchive([
+    { path: 'META-INF/container.xml', content: CONTAINER_XML },
+    { path: 'OPS/content.opf', content: OPF_MEDIA_OVERLAY_XML },
+    { path: 'OPS/nav.xhtml', content: NAV_XHTML },
+    { path: 'OPS/text/ch1.xhtml', content: '<h1>ch1</h1>' },
+    { path: 'OPS/smil/ch1.smil', content: smil },
+    { path: 'OPS/audio/ch1.mp3', content: Buffer.from('0123456789') },
+  ]);
+}
+
 function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?: boolean; lowerCasePaths?: boolean }) {
   const lower = options?.lowerCasePaths === true;
   const ops = lower ? 'ops' : 'OPS';
@@ -245,6 +290,83 @@ describe('EpubService', () => {
       { label: '7', href: 'OPS/text/ch1.xhtml', children: undefined },
     ]);
     expect(info.manifest.some((item) => item.href === 'OPS/styles/%E0%A4%A.css')).toBe(true);
+  });
+
+  it('preserves OPF media-overlay manifest attributes', async () => {
+    mockOpenFile.mockResolvedValueOnce(makeMediaOverlayArchive() as any);
+
+    const info = await service.getBookInfo(99, undefined, user);
+
+    expect(info.manifest.find((item) => item.id === 'chap1')).toEqual(expect.objectContaining({ mediaOverlay: 'mo1' }));
+  });
+
+  it('builds a normalized media-overlay playlist from SMIL clips', async () => {
+    mockOpenFile.mockResolvedValueOnce(makeMediaOverlayArchive() as any).mockResolvedValueOnce(makeMediaOverlayArchive() as any);
+
+    const playlist = await service.getMediaOverlayPlaylist(99, undefined, user);
+
+    expect(playlist.durationSeconds).toBe(3);
+    expect(playlist.sections).toEqual([
+      expect.objectContaining({ index: 0, href: 'OPS/text/ch1.xhtml', smilHref: 'OPS/smil/ch1.smil', durationSeconds: 3 }),
+    ]);
+    expect(playlist.resources).toEqual([{ href: 'OPS/audio/ch1.mp3', mediaType: 'audio/mpeg', size: 10 }]);
+    expect(playlist.items).toEqual([
+      expect.objectContaining({
+        index: 0,
+        sectionIndex: 0,
+        textHref: 'OPS/text/ch1.xhtml',
+        textFragment: 's1',
+        audioHref: 'OPS/audio/ch1.mp3',
+        clipBeginSeconds: 1.5,
+        clipEndSeconds: 3,
+        durationSeconds: 1.5,
+      }),
+      expect.objectContaining({
+        index: 1,
+        textFragment: 's2',
+        clipBeginSeconds: 3,
+        clipEndSeconds: 4.5,
+        durationSeconds: 1.5,
+      }),
+    ]);
+  });
+
+  it('preserves a zero-length SMIL clip as a known zero-width playlist item', async () => {
+    const smil = SMIL_XML.replace('clipBegin="3s" clipEnd="4500ms"', 'clipBegin="3s" clipEnd="3s"');
+    mockOpenFile.mockResolvedValueOnce(makeMediaOverlayArchive(smil) as any).mockResolvedValueOnce(makeMediaOverlayArchive(smil) as any);
+
+    const playlist = await service.getMediaOverlayPlaylist(99, undefined, user);
+
+    expect(playlist.durationSeconds).toBe(1.5);
+    expect(playlist.sections).toEqual([expect.objectContaining({ durationSeconds: 1.5 })]);
+    expect(playlist.items[1]).toEqual(
+      expect.objectContaining({
+        textFragment: 's2',
+        clipBeginSeconds: 3,
+        clipEndSeconds: 3,
+        durationSeconds: 0,
+      }),
+    );
+  });
+
+  it('streams only playlist audio resources and supports byte ranges', async () => {
+    mockOpenFile
+      .mockResolvedValueOnce(makeMediaOverlayArchive() as any)
+      .mockResolvedValueOnce(makeMediaOverlayArchive() as any)
+      .mockResolvedValueOnce(makeMediaOverlayArchive() as any);
+
+    const result = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=2-5', user);
+
+    expect(result.status).toBe(206);
+    expect(result.contentRange).toBe('bytes 2-5/10');
+    expect(result.contentType).toBe('audio/mpeg');
+    expect(result.data).toEqual(Buffer.from('2345'));
+  });
+
+  it('rejects media-overlay file requests for non-playlist resources', async () => {
+    mockOpenFile.mockResolvedValueOnce(makeMediaOverlayArchive() as any).mockResolvedValueOnce(makeMediaOverlayArchive() as any);
+
+    await expect(service.streamMediaOverlayFile(99, 'OPS/text/ch1.xhtml', undefined, undefined, user)).rejects.toThrow(NotFoundException);
   });
 
   it('rejects stream requests with invalid paths', async () => {

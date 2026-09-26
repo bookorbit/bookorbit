@@ -16,7 +16,15 @@
     "yes": "Yes",
     "no": "No",
     "show": "Show",
-    "hide": "Hide"
+    "hide": "Hide",
+    "undo": "Undo",
+    "pagination": {
+      "label": "Pagination",
+      "pageOf": "Page {page} of {totalPages}",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "goToPage": "Go to page {page}"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -734,6 +742,7 @@
         "connected": "Connected - {issuer}",
         "connectionFailed": "Connection failed",
         "privateIssuerAddress": "The issuer URL resolves to a private or local network address, so the server refused to connect. Set OIDC_ALLOW_LOCAL_ISSUERS=true on the BookOrbit server to allow it.",
+        "tlsCertificateUntrusted": "BookOrbit could not verify the OIDC provider's TLS certificate. If the provider uses a private certificate authority, mount its PEM CA bundle, set NODE_EXTRA_CA_CERTS to the bundle's in-container path, and restart BookOrbit.",
         "hide": "Hide",
         "details": "Details",
         "supported": "supported",
@@ -1355,7 +1364,101 @@
         "account-activity": "Account Activity",
         "magic-links": "Magic Links",
         "oidc": "OIDC / SSO",
+        "tts": "Text-to-Speech",
         "server-fonts": "Server Fonts"
+      },
+      "tts": {
+        "title": "Providers",
+        "subtitle": "Speech engines available to readers. Voices are curated per provider.",
+        "summary": "{providers, plural, one {# provider} other {# providers}} · {enabled} enabled · {voices, plural, one {# voice curated} other {# voices curated}}",
+        "addProvider": "Add provider",
+        "loadFailed": "Failed to load text-to-speech configuration",
+        "empty": "No speech providers configured.",
+        "reorderHint": "Drag to reorder. Readers see providers in this order.",
+        "dragHandle": "Reorder {name}",
+        "moveUp": "Move {name} up",
+        "moveDown": "Move {name} down",
+        "reorderFailed": "Failed to save the provider order",
+        "expand": "Show details for {name}",
+        "collapse": "Hide details for {name}",
+        "toggleEnabled": "Enable {name}",
+        "enableFailed": "Failed to update {name}",
+        "statusConnected": "Connected",
+        "statusUnreachable": "Unreachable",
+        "statusUnchecked": "Not checked",
+        "voiceCount": "{count, plural, one {# voice} other {# voices}}",
+        "configuration": "Configuration",
+        "fieldType": "Type",
+        "fieldTypeOpenAi": "OpenAI-compatible",
+        "fieldApiKey": "API key",
+        "apiKeySet": "Set",
+        "apiKeyNotSet": "Not set",
+        "fieldModel": "Default model",
+        "fieldModelNone": "Provider default",
+        "fieldDiscovery": "Voice discovery",
+        "discoverySupported": "Supported",
+        "discoveryUnsupported": "Not supported",
+        "voices": "Voices",
+        "voicesCurated": "{count} curated",
+        "voicesTapToPreview": "Tap a voice to preview it",
+        "voicesNone": "No voices configured yet",
+        "manageVoices": "Manage voices",
+        "previewVoice": "Preview {name}",
+        "previewStop": "Stop preview",
+        "previewFailed": "Could not play a preview for {name}",
+        "previewNeedsEnabled": "Enable this provider to preview its voices",
+        "editConfiguration": "Edit configuration",
+        "testConnection": "Test connection",
+        "testPassed": "Connected · {count, plural, one {# voice found} other {# voices found}}",
+        "testFailed": "Connection failed",
+        "delete": "Delete",
+        "deleteConfirm": "Delete the provider \"{name}\"? Readers using its voices fall back to another provider.",
+        "deleteFailed": "Failed to delete {name}",
+        "deleted": "Provider deleted",
+        "saveFailed": "Failed to save {name}",
+        "saved": "Provider saved",
+        "formAddTitle": "New provider",
+        "formEditTitle": "Edit provider",
+        "formName": "Name",
+        "formNamePlaceholder": "Kokoro",
+        "formBaseUrl": "Base URL",
+        "formBaseUrlPlaceholder": "http://localhost:8880/v1",
+        "formApiKey": "API key",
+        "formApiKeyOptional": "Optional",
+        "formApiKeyPlaceholder": "sk-...",
+        "formApiKeyKeep": "Leave blank to keep the current key",
+        "formModel": "Default model",
+        "formModelPlaceholder": "tts-1",
+        "formDiscovery": "This provider can list its own voices",
+        "formRequired": "Name and base URL are required",
+        "curation": {
+          "title": "Manage Voices - {provider}",
+          "summary": "{count, plural, one {# voice configured} other {# voices configured}}",
+          "summaryUnsaved": "{count, plural, one {# voice configured} other {# voices configured}} - Unsaved changes",
+          "importFromProvider": "Import from provider",
+          "loadPreset": "Load {preset} preset",
+          "importUnsupported": "This provider does not support voice discovery.",
+          "importUnsupportedWithPreset": "This provider does not support voice discovery. Use the “Load {preset} preset” button instead.",
+          "discoveryUnsupported": "This provider does not expose a voice list endpoint.",
+          "discoverFailed": "Failed to discover voices",
+          "emptyImportOrPreset": "No voices configured. Import from provider or load a preset.",
+          "emptyImport": "No voices configured. Import from provider.",
+          "emptyPreset": "No voices configured. Load a preset to get started.",
+          "emptyManual": "No voices configured. Add voices manually.",
+          "columnId": "ID",
+          "columnName": "Name",
+          "columnLocale": "Locale",
+          "columnGender": "Gender",
+          "genderMale": "Male",
+          "genderFemale": "Female",
+          "genderUnknown": "Unknown",
+          "cancelEdit": "Cancel edit",
+          "editVoice": "Edit {name}",
+          "deleteVoice": "Delete {name}",
+          "previewVoice": "Preview {name}",
+          "stopPreview": "Stop preview for {name}",
+          "saveVoices": "{count, plural, one {Save # voice} other {Save # voices}}"
+        }
       },
       "serverFonts": {
         "title": "Server Fonts",
@@ -1376,11 +1479,13 @@
         "opds": "OPDS",
         "kobo": "Kobo",
         "koreader": "KOReader",
+        "tts": "Text-to-Speech",
         "integrations": "Integrations",
         "hardcover": "Hardcover",
         "admin": "Admin",
         "system": "System",
-        "account": "Account"
+        "account": "Account",
+        "podcasts": "Podcasts"
       }
     },
     "integrations": {
@@ -1406,6 +1511,7 @@
         "subtitle": "Subtitle",
         "description": "Description",
         "cover": "Cover",
+        "audioCover": "Audiobook cover",
         "authors": "Authors",
         "publisher": "Publisher",
         "publishedYear": "Published year",
@@ -1591,6 +1697,7 @@
         "clearAllProviders": "Clear All Providers",
         "clearAll": "Clear All",
         "resetToDefault": "Reset to Default",
+        "bookCover": "Book cover",
         "reset": "Reset",
         "dragProvidersHint": "Drag providers from here onto any field to add them",
         "dragProviderHere": "drag a provider here",
@@ -1729,6 +1836,7 @@
           "makeFirst": "Make first everywhere",
           "makeLast": "Make last everywhere",
           "removeEverywhere": "Remove from all fields",
+          "audioCoverOrderKept": "Reordering skips the Audiobook cover rule, which keeps audiobook sources first.",
           "allFields": "All fields",
           "overridesOnly": "Overrides only",
           "clearFilters": "Clear filters"
@@ -2835,8 +2943,8 @@
         "deleteClient": "Delete {name}",
         "clientsEmpty": {
           "title": "No download client yet",
-          "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch what a tracker offers as a torrent too.",
-          "note": "qBittorrent, Transmission and Deluge are supported."
+          "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch releases delivered by torrent or Usenet too.",
+          "note": "qBittorrent, Transmission, Deluge, NZBGet and SABnzbd are supported."
         },
         "summary": "{type} - category {category}, priority {priority}",
         "disabled": "Disabled",
@@ -2851,7 +2959,9 @@
         "clientTypes": {
           "qbittorrent": "qBittorrent",
           "transmission": "Transmission",
-          "deluge": "Deluge"
+          "deluge": "Deluge",
+          "nzbget": "NZBGet",
+          "sabnzbd": "SABnzbd"
         },
         "color": {
           "label": "Color",
@@ -2864,19 +2974,23 @@
           "baseUrl": "Base URL",
           "username": "Username",
           "password": "Password",
+          "apiKey": "API key",
           "passwordKeep": "Leave blank to keep the stored password",
+          "apiKeyKeep": "Leave blank to keep the stored API key",
           "passwordClear": "Clear",
           "passwordKeepAction": "Keep",
           "passwordWillClear": "The stored password is removed when you save",
+          "apiKeyWillClear": "The stored API key is removed when you save",
           "category": "Category",
-          "categoryHint": "Tags the torrents BookOrbit adds, so it only ever acts on its own.",
+          "categoryHint": "Tags the downloads BookOrbit adds, so it only ever acts on its own.",
           "priority": "Priority",
           "enabled": "Enabled",
           "useHardlinks": "Use hardlinks",
           "allowPrivateAddress": "Allow private addresses",
           "allowPrivateAddressHint": "Needed when the client runs on your local network or the same machine.",
           "passwordBrief": "Stored encrypted.",
-          "useHardlinksBrief": "Seeds without using the disk twice. Falls back to a copy across filesystems."
+          "apiKeyBrief": "Found in SABnzbd under Config > General. Stored encrypted.",
+          "useHardlinksBrief": "Imports without using the disk twice. Falls back to a copy across filesystems."
         },
         "mappings": {
           "title": "Path mappings",
@@ -2924,33 +3038,39 @@
           "nameTaken": "A download client with that name already exists",
           "urlUnsafe": "That base URL could not be reached. Check the address and that it uses http or https.",
           "urlPrivate": "That address is on a private or local network. Turn on \"Allow private addresses\" if the client runs there.",
-          "encryptionKeyMissing": "Set BOOK_REQUEST_ENCRYPTION_KEY before saving a password. Generate one with: openssl rand -hex 32",
-          "encryptionKeyChanged": "The stored password could not be read. BOOK_REQUEST_ENCRYPTION_KEY may have changed since it was saved.",
+          "encryptionKeyMissing": "Set BOOK_REQUEST_ENCRYPTION_KEY before saving a client credential. Generate one with: openssl rand -hex 32",
+          "encryptionKeyChanged": "The stored client credential could not be read. BOOK_REQUEST_ENCRYPTION_KEY may have changed since it was saved.",
           "pathNotAbsolute": "Path mappings must use absolute paths on both sides",
           "nameRequired": "Give this client a name.",
           "urlRequired": "Enter the address BookOrbit should reach this client at.",
-          "mappingRequired": "Add at least one path mapping, so BookOrbit knows which directory it may import from."
+          "mappingRequired": "Add at least one path mapping, so BookOrbit knows which directory it may import from.",
+          "apiKeyRequired": "Enter the SABnzbd API key from Config > General."
         },
-        "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY is not set, so a client password cannot be saved. Generate one with: openssl rand -hex 32",
+        "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY is not set, so a client credential cannot be saved. Generate one with: openssl rand -hex 32",
         "confirmDelete": {
           "title": "Remove this download client?",
-          "description": "{name}'s address and stored password are deleted, and requests downloading there stop updating. Turn it off instead to keep the details.",
+          "description": "{name}'s address and stored credential are deleted, and requests downloading there stop updating. Turn it off instead to keep the details.",
           "confirm": "Remove client"
         },
         "indexers": {
-          "title": "Torrent indexers",
-          "hint": "Your own Prowlarr, Jackett or NZBHydra, over Torznab. Add one per Torznab feed you want searched.",
+          "title": "Direct feeds",
+          "hint": "Connect an individual Torznab feed for torrents or Newznab feed for Usenet releases.",
           "allDisabled": "Every source below is switched off, so no request search will find anything. Switch at least one back on.",
           "loading": "Loading indexers...",
           "empty": {
             "title": "No sources yet",
-            "body": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one. There are two ways in.",
+            "body": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one. Choose the setup that fits your indexers.",
             "bodyOneWay": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one.",
             "responsibility": "What a source you add indexes is your responsibility.",
+            "prowlarrTitle": "Connect Prowlarr",
+            "prowlarrBody": "Manage several torrent and Usenet indexers through one connection.",
+            "recommended": "Recommended",
             "pluginTitle": "Install a plugin",
             "pluginBody": "One file that teaches BookOrbit to search a specific site. You supply it, then fill in its settings.",
             "torznabTitle": "Add a Torznab indexer",
-            "torznabBody": "Point at a Prowlarr, Jackett or NZBHydra feed you already run. One per feed."
+            "torznabBody": "Point at a Prowlarr, Jackett or NZBHydra feed you already run. One per feed.",
+            "builtInTitle": "Add an indexer",
+            "builtInBody": "Point at a Torznab or Newznab feed you already use. One configuration per feed."
           },
           "add": "Add indexer",
           "edit": "Edit indexer",
@@ -2969,6 +3089,18 @@
           "deleted": "Source deleted",
           "unavailable": "This install has no \"{type}\" indexer type. Change the type or delete its plugin and saved configuration.",
           "pluginFailed": "The plugin in \"{directory}\" did not load: {reason}",
+          "sources": {
+            "title": "Sources",
+            "hint": "Everything BookOrbit can search, grouped by connection.",
+            "add": "Add source",
+            "prowlarr": "Connect Prowlarr",
+            "prowlarrHint": "Manage several torrent and Usenet indexers together.",
+            "direct": "Add Torznab or Newznab",
+            "directHint": "Connect one compatible feed directly.",
+            "plugin": "Install a plugin",
+            "pluginHint": "Add a specialized source implementation.",
+            "activeSummary": "{count, plural, one {# active source} other {# active sources}}: {torrent} torrent, {usenet} Usenet, {direct} direct"
+          },
           "network": {
             "title": "Advanced network",
             "hint": "Only needed when the default path to this source does not work. What is allowed does not change: whatever address is reached is still checked the same way.",
@@ -2980,14 +3112,16 @@
             "proxyBrief": "An http or https proxy for this source. SOCKS is not supported."
           },
           "types": {
-            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)"
+            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)",
+            "newznab": "Newznab"
           },
           "fields": {
             "name": "Name",
             "type": "Indexer type",
             "baseUrl": "Base URL",
             "baseUrlHint": {
-              "torznab": "The torznab feed URL, without the query string. Jackett shows it on each indexer as \"Torznab Feed\"."
+              "torznab": "The Torznab feed URL, without the query string. Jackett shows it on each indexer as \"Torznab Feed\".",
+              "newznab": "The Newznab site URL or API endpoint, without a search query."
             },
             "credential": {
               "apiKey": "API key",
@@ -3000,13 +3134,13 @@
             "enabled": "Enabled",
             "allowPrivateAddress": "Allow private addresses",
             "credentialBrief": "Stored encrypted.",
-            "allowPrivateAddressBrief": "Off by default. Only needed for a proxy such as Jackett on your local network.",
+            "allowPrivateAddressBrief": "Off by default. Only needed when the source is on your local network.",
             "searchByIsbn": "Search by ISBN",
             "searchByIsbnBrief": "On by default. Turn it off if this source returns the wrong book for an exact ISBN, and it will be searched by title and author instead."
           },
           "color": {
             "label": "Color",
-            "hint": "Marks this source on every release it returns, so you can tell where a result came from before reading its name. Torrent and direct download keep their own two colors, which is why neither is offered here.",
+            "hint": "Marks this source on every release it returns, so you can tell where a result came from before reading its name. Delivery protocols keep their own colors, which is why those colors are not offered here.",
             "none": "No color",
             "options": {
               "blue": "Blue",
@@ -3032,6 +3166,29 @@
           },
           "settings": {
             "restoreDefault": "Restore defaults"
+          },
+          "seeding": {
+            "applyTracker": "Apply tracker seed goals",
+            "applyTrackerBrief": "When a manual value is blank, use a valid goal reported by the tracker. When this is off, blank values use the download client's defaults. Manual values still apply.",
+            "ratio": "Seed ratio",
+            "ratioBrief": "A positive decimal. Blank inherits from the tracker or client.",
+            "time": "Seed time (minutes)",
+            "timeBrief": "A positive whole number. Blank inherits from the tracker or client.",
+            "clientSupport": "qBittorrent accepts ratio and total seed time. Deluge and Transmission accept ratio only. Client global rules and whichever limit is reached first can stop seeding, so these values do not guarantee that every tracker minimum is met.",
+            "futureGrabs": "Changes apply to future grabs. Existing or adopted torrents can retain client-specific limits. Turning tracker fallback off leaves client defaults active; it does not mean unlimited seeding.",
+            "reset": "Reset seeding settings",
+            "summary": {
+              "title": "Policy summary",
+              "ratio": "Ratio",
+              "time": "Seed time",
+              "manual": "Manual: {value}",
+              "tracker": "Tracker fallback",
+              "client": "Client default"
+            },
+            "errors": {
+              "ratio": "Enter a finite number greater than zero, or leave this blank.",
+              "minutes": "Enter a whole number from 1 through 2,147,483,647, or leave this blank."
+            }
           },
           "confirmDelete": {
             "title": "Delete this source?",
@@ -3059,13 +3216,14 @@
           "builtIn": "Built in",
           "plugin": "Plugin",
           "typeDescriptions": {
-            "torznab": "Your own Jackett, Prowlarr or NZBHydra. Uses categories and seed goals."
+            "torznab": "Your own Jackett, Prowlarr or NZBHydra. Uses categories and seed goals.",
+            "newznab": "A Newznab-compatible Usenet indexer. Uses categories and requires an API key."
           },
           "plugins": {
             "title": "Plugins",
-            "hint": "A site BookOrbit can search, added as a single plugin file. Install one, then fill in its settings.",
+            "hint": "A site BookOrbit can search, added as a single plugin file.",
             "directoryLink": "Browse open library plugins",
-            "none": "No plugin installed. Install one to search a site Torznab does not cover.",
+            "none": "No plugin installed. Install one to search a site the built-in protocols do not cover.",
             "install": "Install plugin",
             "installed": "Installed {label}.",
             "installFailed": "That plugin could not be installed.",
@@ -3087,6 +3245,25 @@
             "usedBy": "{count, plural, one {used by # source} other {used by # sources}}",
             "unused": "no source uses it yet",
             "update": "Update plugin",
+            "checkUpdates": "Check for updates",
+            "updateCheckComplete": "Plugin update check complete.",
+            "updateCheckFailed": "Could not check for plugin updates.",
+            "updateInspectFailed": "The published plugin update could not be verified.",
+            "reviewUpdate": "Review update",
+            "updated": "Updated {label} to {version}.",
+            "autoUpdate": "Install signed updates automatically",
+            "autoUpdateFailed": "Could not change automatic updates for this plugin.",
+            "installedVersion": "Installed version",
+            "updateChannel": "Signed update channel",
+            "signatureVerified": "The downloaded source matches the publisher's Ed25519 signature.",
+            "updateStates": {
+              "unsupported": "Manual updates",
+              "unchecked": "Not checked yet",
+              "current": "Up to date",
+              "available": "Version {version} available",
+              "custom": "Custom build",
+              "failed": "Update check failed"
+            },
             "wrongType": "That file is the {found} plugin, not {expected}.",
             "replaceTitle": "Replace this plugin?",
             "replace": "Replace plugin",
@@ -3108,6 +3285,61 @@
             "removeUnusedWarning": "The plugin will be permanently deleted from the server."
           },
           "posture": "BookOrbit does not provide or endorse indexer sources. Every source here is one you configured, and you are responsible for what you search and download through it."
+        },
+        "managers": {
+          "add": "Add Prowlarr",
+          "loading": "Loading Prowlarr connections...",
+          "managedSources": "{count, plural, one {# managed indexer} other {# managed indexers}}",
+          "protocol": {
+            "torrent": "Torrent",
+            "usenet": "Usenet"
+          },
+          "saved": "Prowlarr settings saved",
+          "deleted": "Prowlarr removed",
+          "synced": "Prowlarr sources synchronized",
+          "test": "Test connection",
+          "sync": "Synchronize",
+          "testOk": "Connected to Prowlarr {version}. Found {count, plural, one {# source} other {# sources}}.",
+          "unavailable": "Unavailable",
+          "priority": "Prowlarr priority {priority}",
+          "toggleSource": "Search with {name}",
+          "changeColor": "Change color for {name}",
+          "sourceColor": "Source color",
+          "sourceColorHint": "Marks releases returned by {name} throughout BookOrbit.",
+          "noSources": "No compatible torrent or Usenet indexers were discovered. Synchronize after adding one in Prowlarr.",
+          "unknown": "Unknown",
+          "editorDescription": "Connection and source synchronization settings for Prowlarr.",
+          "confirmDelete": "Remove this Prowlarr connection?",
+          "deleteConsequence": "The connection, encrypted API key, and all synchronized sources are deleted. Downloads already in progress are not removed.",
+          "fields": {
+            "name": "Name",
+            "color": "Connection color",
+            "colorHint": "Marks this Prowlarr connection here. Each managed indexer has its own release color.",
+            "baseUrl": "Base URL",
+            "apiKey": "API key",
+            "apiKeyHint": "Found in Prowlarr under Settings > General > Security. Stored encrypted.",
+            "syncNew": "Enable newly discovered sources",
+            "syncNewHint": "New Prowlarr indexers are searchable immediately. Sources you switch off here stay off after later synchronizations.",
+            "autoExpand": "Retry without category filters",
+            "autoExpandHint": "When an indexer answers successfully with no results, retry once without BookOrbit's book category filter.",
+            "inheritSeedLimits": "Use Prowlarr seed limits",
+            "inheritSeedLimitsHint": "Apply each torrent indexer's configured seed ratio and seed time to future downloads when no BookOrbit override exists.",
+            "perIndexerTimeout": "Indexer timeout (seconds)",
+            "perIndexerTimeoutHint": "How long one synchronized source may take. Slow FlareSolverr-backed indexers may need more time.",
+            "overallBudget": "Prowlarr budget (seconds)",
+            "overallBudgetHint": "Maximum wall-clock time shared by all sources from this Prowlarr connection during one search."
+          },
+          "errors": {
+            "load": "Could not load indexer managers",
+            "nameTaken": "A Prowlarr connection with that name already exists",
+            "urlPrivate": "That address is on a private or local network. Turn on \"Allow private addresses\" if Prowlarr runs there.",
+            "required": "Enter a name, base URL, and API key.",
+            "save": "Could not save the Prowlarr connection",
+            "delete": "Could not remove the Prowlarr connection",
+            "test": "Could not reach Prowlarr",
+            "sync": "Could not synchronize Prowlarr sources",
+            "source": "Could not change that source"
+          }
         },
         "automation": {
           "title": "Automation",
@@ -3135,8 +3367,9 @@
           "autoGrabHint": "When a request is approved, its highest-scoring release goes straight to the download client and nobody has to open the release picker. Off by default, because matching a book to the right release is hard and a person is usually the better judge.",
           "autoGrabEnabled": "Automatic downloads are on",
           "autoGrabDisabled": "Automatic downloads are off",
-          "minScore": "Minimum release score",
+          "minScore": "Minimum score for automatic download",
           "minScoreHint": "A release scoring below this is never downloaded automatically. Scores run to 100, and how well the title and author match makes up most of one, with format, file size, seeders and source priority behind it. If nothing scores high enough, the request waits for someone to pick a release by hand and says why it stopped.",
+          "minScoreHintV2": "A release scoring below this is never downloaded automatically. Scores run to 100. Title and author relevance contributes most, followed by format and plausible file size, with swarm health and freeleech used when a source provides them. If nothing scores high enough, the request waits for someone to pick a release by hand and says why it stopped.",
           "autoRetry": "Try the next release after a failure",
           "autoRetryHint": "When an automatic download fails, the next-best release is tried instead of giving up. This covers a source refusing to hand the file over and a download that dies partway through. It only applies to releases BookOrbit chose itself: one an approver picked by hand stays failed and waits for them.",
           "maxAttempts": "Attempts per request",
@@ -3181,7 +3414,10 @@
         },
         "profiles": {
           "title": "Release profiles",
-          "hint": "The edition you want, best first. A release is matched against these top to bottom and takes the first tier it fits. This is what unattended downloading chooses from: a release that matches no tier is never downloaded automatically, though it still appears in the picker for you to send by hand. Leave a medium empty and nothing is filtered or refused, and releases rank by score alone.",
+          "effectiveRule": "Auto-download rule: first matching tier, then highest score (minimum {score}).",
+          "summary": "Releases outside the profile remain available for manual selection. With no tiers, releases rank by score alone.",
+          "howProfiles": "How release profiles work",
+          "hint": "A release is matched against tiers from top to bottom and takes the first tier it fits. Automatic downloads consider only tiered releases when a profile exists. Manual selection still includes untiered releases after the tiered results.",
           "bitrateNote": "A bitrate floor turns away a release that states a lower one. Most sources measure very few of their releases, and an unmeasured release is not turned away, so this narrows less than it looks.",
           "empty": "No profile. Releases for this medium are ranked by score alone.",
           "addTier": "Add tier",
@@ -3195,6 +3431,10 @@
           "anyLayout": "Any",
           "minBitrate": "Min kbps",
           "minSeeders": "Min seeders",
+          "torrentConditions": "Torrent conditions",
+          "nonTorrentConditions": "Seeder, freeleech and VIP conditions do not apply to the selected sources.",
+          "incompatibleTorrentConditions": "This non-torrent tier still has saved torrent conditions. They may be ignored or prevent the tier from matching.",
+          "removeTorrentConditions": "Remove torrent conditions",
           "channels": "Channels",
           "anyChannels": "Any",
           "mono": "Mono",
@@ -3220,6 +3460,7 @@
           "connection": "Connection",
           "search": "What to search",
           "access": "Access",
+          "seeding": "Seeding",
           "availability": "Availability",
           "behaviour": "Behaviour"
         },
@@ -3227,11 +3468,13 @@
         "external": "External",
         "editorDescription": "Settings for this download client.",
         "chooseClientType": "Choose a client type",
-        "chooseClientTypeHint": "Pick which program BookOrbit hands torrents to.",
+        "chooseClientTypeHint": "Pick which program BookOrbit hands downloads to.",
         "clientTypeDescriptions": {
           "qbittorrent": "Your own qBittorrent. Needs an address and an account.",
           "transmission": "Your own Transmission. It has no categories, so the category becomes a subfolder of its download directory.",
-          "deluge": "Your own Deluge. Sign in with the Web UI password; the category needs the Label plugin switched on."
+          "deluge": "Your own Deluge. Sign in with the Web UI password; the category needs the Label plugin switched on.",
+          "nzbget": "Your own NZBGet. BookOrbit sends NZB files over its JSON-RPC API.",
+          "sabnzbd": "Your own SABnzbd. BookOrbit sends NZB files using its API key."
         },
         "searchHealth": {
           "failingOnce": "Last search failed",
@@ -3246,7 +3489,7 @@
       "searchPlaceholder": "Search settings",
       "clearSearch": "Clear search",
       "noResults": "No settings match {query}.",
-      "shortcutHint": "Press Cmd K to jump to any setting",
+      "shortcutHint": "Press {shortcut} to jump to any setting",
       "status": {
         "scanning": "Scanning"
       },
@@ -3409,8 +3652,12 @@
       "trend": "Daily reading trend",
       "emptyTitle": "No reading activity in this period",
       "noData": "No recorded reading data for this period.",
+      "sessionCount": "{count, plural, one {# session} other {# sessions}}",
       "sourceNames": {
         "web": "Web reader",
+        "ios": "iOS app",
+        "watchos": "Apple Watch",
+        "android": "Android app",
         "koreader": "KOReader",
         "manual": "Manual",
         "kobo": "Kobo",
@@ -3488,6 +3735,7 @@
       "presetClearAll": "Clear All",
       "permissionGroups": {
         "content": "Content",
+        "podcasts": "Podcasts",
         "devicesAccess": "Devices & Access",
         "email": "Email",
         "administration": "Administration",
@@ -4068,6 +4316,8 @@
       "User": "User",
       "Library": "Library",
       "Book": "Book",
+      "Podcast": "Podcast",
+      "PodcastEpisode": "Podcast episode",
       "Collection": "Collection",
       "SmartScope": "Smart scope",
       "BookDockFile": "Book Dock file",
@@ -4131,6 +4381,18 @@
       "LibraryAccessRevoke": "Revoke library access",
       "LibraryWriteMetadataToFiles": "Write metadata to files",
       "LibraryBulkRename": "Rename library files",
+      "LibraryRecomputeAddedAt": "Recompute date added",
+      "PodcastCreate": "Create podcast",
+      "PodcastUpdate": "Update podcast",
+      "PodcastArchive": "Archive podcast",
+      "PodcastRestore": "Restore podcast",
+      "PodcastPurge": "Purge podcast",
+      "PodcastMerge": "Merge podcasts",
+      "PodcastDownload": "Download podcast episode",
+      "PodcastDownloadRemove": "Remove podcast download",
+      "PodcastRetentionUpdate": "Update podcast retention",
+      "PodcastOpmlImport": "Import podcast OPML",
+      "PodcastOpmlExport": "Export podcast OPML",
       "BookUpload": "Upload book",
       "BookMetadataUpdate": "Update book metadata",
       "BookMetadataLocksUpdate": "Update metadata locks",
@@ -4535,9 +4797,33 @@
       "primary": "Primary",
       "audiobook": "Audiobook"
     },
+    "formats": {
+      "epub": "EPUB e-book",
+      "kepub": "KEPUB e-book",
+      "pdf": "PDF document",
+      "cbz": "CBZ comic",
+      "cbr": "CBR comic",
+      "cb7": "CB7 comic",
+      "mobi": "MOBI e-book",
+      "azw3": "AZW3 e-book",
+      "azw": "AZW e-book",
+      "fb2": "FictionBook",
+      "m4b": "M4B audiobook",
+      "mp3": "MP3 audio",
+      "m4a": "M4A audio",
+      "opus": "Opus audio",
+      "ogg": "OGG audio",
+      "flac": "FLAC audio",
+      "readAlong": "Read-along EPUB",
+      "primary": "Primary format"
+    },
     "actions": {
       "read": "Read",
       "listen": "Listen",
+      "startReading": "Start reading",
+      "continueReading": "Continue reading",
+      "startListening": "Start listening",
+      "continueListening": "Continue listening",
       "peek": "Peek",
       "quickView": "Quick View",
       "details": "Details",
@@ -4551,7 +4837,14 @@
       "setStatus": "Set Status",
       "sendViaEmail": "Send via Email",
       "rate": "Rate {star}",
-      "openAs": "Open as {format}"
+      "openAs": "Open as {format}",
+      "openReadAlong": "Open read-along EPUB"
+    },
+    "coverRegeneration": {
+      "failed": "Could not regenerate the cover",
+      "bulkInProgress": "Re-extracting covers",
+      "bulkFailed": "Could not re-extract covers",
+      "bulkCompleted": "Re-extracted {updated} of {processed, plural, one {# cover} other {# covers}}"
     },
     "readStatus": {
       "unread": "Unread",
@@ -4573,7 +4866,10 @@
       "progressPercent": "Downloading {percent} of {total}",
       "progressBytes": "Downloading {transferred}",
       "failed": "Download failed",
-      "exportFailed": "Export failed"
+      "exportFailed": "Export failed",
+      "audiolessEpub": "KOReader EPUB",
+      "audiolessEpubHint": "Download EPUB for KOReader with audio files removed",
+      "noAudio": "no audio"
     },
     "sort": {
       "moveUp": "Move up",
@@ -4581,6 +4877,7 @@
       "ascending": "Ascending",
       "descending": "Descending",
       "fields": {
+        "relevance": "Relevance",
         "author": "Author",
         "title": "Title",
         "series": "Series",
@@ -4644,6 +4941,7 @@
         "isbn": "ISBN",
         "metadataScore": "Metadata Score",
         "cover": "Cover",
+        "audioCover": "Audiobook Cover",
         "lockStatus": "Lock Status",
         "seriesStatus": "Series Status"
       },
@@ -4947,7 +5245,32 @@
         "saving": "Saving...",
         "saveCover": "Save cover",
         "revertToOriginal": "Revert to original",
-        "regenerateCover": "Regenerate Cover"
+        "regenerateCover": "Regenerate Cover",
+        "slotsLabel": "Cover to edit",
+        "slotEbook": "Book",
+        "slotAudio": "Audiobook",
+        "slotEbookName": "Book cover",
+        "slotAudioName": "Audiobook cover",
+        "editingEbook": "Editing the book cover",
+        "editingAudio": "Editing the audiobook cover",
+        "lockEbookCover": "Lock book cover",
+        "unlockEbookCover": "Unlock book cover",
+        "lockAudioCover": "Lock audiobook cover",
+        "unlockAudioCover": "Unlock audiobook cover",
+        "viewLarger": "View larger",
+        "viewLargerEbook": "View larger book cover",
+        "viewLargerAudio": "View larger audiobook cover",
+        "sourceMode": "Image source",
+        "urlLabel": "Image URL",
+        "saveFailed": "Could not save the cover",
+        "revertFailed": "Could not revert the cover"
+      },
+      "coverLightbox": {
+        "title": "Cover preview",
+        "description": "The full-size cover. Press Escape to close.",
+        "switchLabel": "Cover to show",
+        "ebook": "Book",
+        "audio": "Audiobook"
       },
       "coverSearch": {
         "title": "Online Search",
@@ -4988,14 +5311,38 @@
           "cancelEditAria": "Cancel personal review edit"
         },
         "editCover": "Edit cover",
+        "viewCover": "View larger cover",
         "finished": "Finished",
         "resetFileProgress": "Reset file progress",
+        "resetEditionProgress": "Reset progress for {format}",
         "resetting": "Resetting...",
         "resetProgressConfirm": "Reset stored reading progress for {label}?",
         "moreCount": "+{count} more",
         "untitled": "Untitled",
         "metadataScore": "Metadata Score",
         "primaryFormat": "Primary format",
+        "readAloudSync": {
+          "title": "Read-aloud progress sync",
+          "state": {
+            "enabled": "Enabled",
+            "disabled": "Disabled",
+            "unavailable": "Unavailable",
+            "epubCopiesOnly": "EPUB copies only"
+          },
+          "enabledDescription": "Audiobook, web reader, Kobo, and KOReader positions stay in sync.",
+          "disabledDescription": "Each format keeps its own reading position.",
+          "epubCopiesDescription": "Web reader, Kobo, and KOReader positions stay in sync across the EPUB copies. Add matching audiobook files to sync the audiobook too.",
+          "reason": {
+            "no_media_overlay_epub": "A read-along EPUB with media overlays is required.",
+            "no_audio_files": "Matching standalone audiobook files are required.",
+            "missing_duration": "Audio duration metadata is incomplete.",
+            "durationMismatch": "Durations do not match closely enough: audiobook {audio}, read-along EPUB {overlay}."
+          },
+          "enable": "Enable",
+          "disable": "Disable",
+          "saving": "Saving...",
+          "saveFailed": "Could not update read-aloud progress sync."
+        },
         "openIn": "Open in {provider}",
         "showLess": "Show less",
         "showMore": "Show more",
@@ -5105,6 +5452,7 @@
         "loadFromFileTooltip": "Load metadata from the primary book file",
         "writeToFile": "Write to file",
         "autoFill": "Auto-fill",
+        "autoFillFailed": "Auto-fill failed",
         "fetchingMetadata": "Fetching metadata...",
         "noExistingProviderIds": "No metadata fetched: none of the active Field Rule providers has an ID stored on this book.",
         "allFieldsLocked": "All fields are locked",
@@ -5174,9 +5522,19 @@
           "hideUnchanged": "Hide unchanged",
           "showUnchanged": "Show unchanged",
           "current": "Current",
+          "new": "New",
           "noMetadata": "No metadata available from this source.",
           "noChangedFields": "No changed or missing fields. Use Show unchanged to inspect everything.",
-          "applyToForm": "Apply to form"
+          "applyToForm": "Apply to form",
+          "secondCover": {
+            "audioResults": "Audiobook cover results",
+            "bookResults": "Book cover results",
+            "showCover": "Show the {provider} cover, {index} of {total}",
+            "searchingAudio": "Searching audiobook editions...",
+            "searchingBook": "Searching book editions...",
+            "noAudio": "No audiobook covers found.",
+            "noBook": "No book covers found."
+          }
         },
         "diff": {
           "locked": "Locked",
@@ -5185,8 +5543,14 @@
           "newCoverAlt": "New cover",
           "pickCoverFromProvider": "Pick cover from another provider",
           "pickCoverSource": "Pick cover source",
+          "coverShapeHint": {
+            "portraitForAudio": "Portrait image. Audiobook covers are square.",
+            "squareForBook": "Square image. Book covers are portrait."
+          },
           "pickFromProvider": "Pick from another provider",
           "pickSource": "Pick source",
+          "useNew": "Use the new {field}",
+          "keepCurrent": "Keep the current {field}",
           "genreWriteMode": {
             "label": "How to apply genres",
             "merge": "Merge",
@@ -5195,7 +5559,60 @@
           "empty": "empty",
           "showLess": "Show less",
           "showMore": "Show more",
-          "coverPreviewAlt": "Cover preview"
+          "coverPreviewAlt": "Cover preview",
+          "fields": {
+            "coverUrl": "Cover",
+            "bookCover": "Book cover",
+            "audioCover": "Audiobook cover",
+            "title": "Title",
+            "subtitle": "Subtitle",
+            "authors": "Authors",
+            "description": "Description",
+            "publisher": "Publisher",
+            "publishedDate": "Published",
+            "language": "Language",
+            "pageCount": "Page count",
+            "communityRating": "Community rating",
+            "seriesName": "Series",
+            "seriesIndex": "Series index",
+            "isbn13": "ISBN-13",
+            "isbn10": "ISBN-10",
+            "genres": "Genres",
+            "narrators": "Narrators",
+            "durationSeconds": "Duration (seconds)",
+            "abridged": "Abridged",
+            "hardcoverEditionId": "Hardcover edition ID",
+            "mangabakaId": "MangaBaka ID",
+            "mangabakaSeriesId": "MangaBaka Series ID",
+            "comicIssueNumber": "Issue number",
+            "comicVolumeName": "Volume",
+            "comicPencillers": "Pencillers",
+            "comicInkers": "Inkers",
+            "comicColorists": "Colorists",
+            "comicLetterers": "Letterers",
+            "comicCoverArtists": "Cover artists",
+            "comicCharacters": "Characters",
+            "comicTeams": "Teams",
+            "comicLocations": "Locations",
+            "comicStoryArcs": "Story arcs",
+            "sourceUrl": "Source URL"
+          },
+          "providerIds": {
+            "google": "Google Books ID",
+            "goodreads": "Goodreads ID",
+            "amazon": "Amazon ID",
+            "hardcover": "Hardcover ID",
+            "openLibrary": "Open Library ID",
+            "itunes": "iTunes ID",
+            "audible": "Audible ID",
+            "librofm": "Libro.fm ISBN",
+            "comicvine": "ComicVine ID",
+            "ranobedb": "RanobeDB ID",
+            "kobo": "Kobo ID",
+            "lubimyczytac": "LubimyCzytac ID",
+            "aladin": "Aladin ID",
+            "mangabaka": "MangaBaka ID"
+          }
         },
         "searchDrawer": {
           "searchTitle": "Search Metadata",
@@ -5805,6 +6222,8 @@
         "table": {
           "title": "Sessions",
           "sourceWeb": "Web",
+          "sourceIos": "iOS app",
+          "sourceWatchos": "Apple Watch",
           "sourceManual": "Manual",
           "colDate": "Date",
           "colDateMobile": "Date",
@@ -5887,6 +6306,15 @@
       "chips": {
         "addPlaceholder": "Add..."
       },
+      "quickFilter": {
+        "presentFiles": "Filter to present files",
+        "missingFiles": "Filter to missing files",
+        "withCovers": "Filter to books with covers",
+        "missingCovers": "Filter to books missing covers",
+        "missingAudioCovers": "Filter to books missing audiobook covers",
+        "withValues": "Filter to rows with values",
+        "emptyRows": "Filter to empty rows"
+      },
       "cover": {
         "previewDescription": "Book cover preview",
         "editDescription": "Edit book cover",
@@ -5933,6 +6361,8 @@
       "read": {
         "play": "Play",
         "read": "Read",
+        "readFormat": "Read {format}",
+        "playFormat": "Play {format}",
         "primary": "Primary",
         "peekFormat": "Peek {format}",
         "chooseFormat": "Choose format to read or play",
@@ -5942,6 +6372,7 @@
         "unread": "Unread"
       },
       "series": {
+        "seriesRow": "Series row",
         "bookCount": "{count, plural, =0 {(no books)} one {(# book)} other {(# books)}}",
         "readOfCount": "{read} of {total} read"
       },
@@ -6668,7 +7099,10 @@
       "grab": "Download release",
       "viewFiles": "View files",
       "hideFiles": "Hide files",
+      "viewDetails": "About contents",
+      "hideDetails": "Hide details",
       "inspectingFiles": "Reading the release file list...",
+      "inspectingNzb": "Fetching and validating the NZB...",
       "inspectingShort": "Checking files...",
       "inspectionFailed": "This release's file list could not be read.",
       "manifest": {
@@ -6678,6 +7112,7 @@
         "multipleBooks": "This release contains {count} separate books. After it downloads you will be asked which one to import.",
         "multiPartBook": "{count, plural, one {This release is one book made of # file.} other {This release is one book made of # files, imported together as a single book.}}",
         "metadataUnavailable": "This is a magnet link. Its file list is unavailable until a torrent client fetches the metadata from the swarm.",
+        "usenetMetadataUnavailable": "This is a Usenet release. Its final file list is unavailable until NZBGet downloads and post-processes it.",
         "bookFile": "Book file",
         "extraFile": "Extra",
         "truncated": "Showing {shown} of {total} files.",
@@ -6692,6 +7127,7 @@
         }
       },
       "manual": "Paste a link instead",
+      "manualTorrent": "Use magnet or .torrent instead",
       "indexer": "Indexer",
       "size": "Size",
       "seeders": "Seeders",
@@ -6701,8 +7137,8 @@
       "format": "Format",
       "files": "Files",
       "fileLayout": {
-        "single": "One book file",
-        "multi": "Several files"
+        "single": "One listed file",
+        "multi": "Multiple listed files"
       },
       "fileCount": "{count, plural, one {# file} other {# files}}",
       "audio": "Audio",
@@ -6718,6 +7154,27 @@
       "vipOnly": "VIP only",
       "hideVipOnly": "Hide VIP only",
       "noneMatchedProfile": "No release here matches your profile for this medium, so none of them will be downloaded automatically. You can still send one by hand. To widen it, add a tier with fewer conditions below the ones you have.",
+      "profileMismatch": {
+        "summary": "{count, plural, one {# release was found, but automatic download will skip it because it does not match any {medium} profile tier.} other {# releases were found, but automatic download will skip them because none matches a {medium} profile tier.}} Match score and profile rules are separate checks. You can still click Send.",
+        "review": "Review {medium} profile",
+        "row": "Automatic download will skip this. Closest tier: {tier}. {reasons}",
+        "failures": {
+          "formatUnknown": "{source} did not state a format; this tier requires {expected}.",
+          "format": "Format is {actual}; this tier requires {expected}.",
+          "fileLayoutUnknown": "{source} did not state a file count; this tier requires {expected}.",
+          "fileLayout": "File layout is {actual}; this tier requires {expected}.",
+          "bitrate": "Bitrate is {actual} kbps; this tier requires at least {expected} kbps.",
+          "channels": "Audio is {actual}; this tier requires {expected}.",
+          "languageUnknown": "{source} did not state a language; this tier requires {expected}.",
+          "language": "Language is {actual}; this tier requires {expected}.",
+          "source": "This source is not included in the tier.",
+          "seeders": "This release has {actual} seeders; this tier requires at least {expected}.",
+          "sizeUnknown": "{source} did not state a size; this tier allows up to {expected}.",
+          "size": "Size is {actual}; this tier allows up to {expected}.",
+          "freeleech": "This tier requires freeleech.",
+          "vipOnly": "This tier excludes VIP-only releases."
+        }
+      },
       "alreadyGrabbed": "Already snatched",
       "freeleechLabel": "Freeleech",
       "published": "Published",
@@ -6754,10 +7211,11 @@
       "score": "Score",
       "release": "Release",
       "send": "Send",
-      "tableCaption": "Every other release, ranked",
+      "tableCaption": "Releases, ranked",
       "onlyBestMatch": "That is the only release that matched.",
       "tiedWithBest": "{count, plural, one {# other release scored the same} other {# other releases scored the same}}",
       "inspectionFailedHint": "It was not sent to a download client. Try again, or use Paste a link instead.",
+      "inspectionFailedHintGeneric": "It was not sent to a download client. Try again, or choose another release.",
       "mediumUncovered": "No source carries this kind of book.",
       "mediumUncoveredHint": "None of your enabled indexers cover it. Add one that does, or paste a link yourself.",
       "noSourcesConfigured": "No search sources are set up yet.",
@@ -6769,6 +7227,7 @@
       "reviewSources": "Review sources",
       "protocol": {
         "torrent": "Torrent",
+        "usenet": "Usenet",
         "direct": "Direct download",
         "directPill": "Direct"
       }
@@ -6848,7 +7307,7 @@
     },
     "confirm": {
       "cancelDownloadTitle": "Cancel this download?",
-      "cancelDownloadDescription": "The active transfer stops and the request stays open so another release can be chosen. Torrent data is kept; partial direct-download staging is deleted.",
+      "cancelDownloadDescription": "The active transfer stops and the request stays open so another release can be chosen. Client-managed data is kept; partial direct-download staging is deleted.",
       "cancelTitle": "Stop this request?",
       "cancelDescription": "It moves to cancelled. Nobody waiting on it will get the book.",
       "cancelDescriptionWithDownload": "The active transfer is stopped. Data in the download client is kept; partial direct-download staging is deleted.",
@@ -7002,6 +7461,7 @@
     },
     "createDialog": {
       "title": "New Collection",
+      "podcastTitle": "New Podcast Collection",
       "namePlaceholder": "e.g. Favorites"
     },
     "editDialog": {
@@ -7106,6 +7566,10 @@
       },
       "support": "Support BookOrbit",
       "supportAria": "Support BookOrbit on Ko-fi",
+      "appLinks": {
+        "ios": "Get the iOS app",
+        "android": "Android app coming soon"
+      },
       "sectionHeader": {
         "add": "Add",
         "showAll": "Show all",
@@ -7127,6 +7591,30 @@
       "seeAllLibraries": "See all libraries ({count})",
       "seeAllSmartScopes": "See all smart scopes ({count})",
       "seeAllCollections": "See all collections ({count})",
+      "podcasts": "Podcasts",
+      "newPodcastLibrary": "New Podcast Library",
+      "noPodcastLibraries": "No podcast libraries yet",
+      "filterPodcastLibraries": "Filter podcast libraries",
+      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
+      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
+      "podcastScopes": "Podcast Scopes",
+      "newPodcastScope": "New Podcast Scope",
+      "noPodcastScopes": "No podcast scopes yet",
+      "filterPodcastScopes": "Filter podcast scopes",
+      "filterPodcastScopesPlaceholder": "Filter podcast scopes...",
+      "seeAllPodcastScopes": "See all podcast scopes ({count})",
+      "podcastCollections": "Podcast Collections",
+      "newPodcastCollection": "New Podcast Collection",
+      "noPodcastCollections": "No podcast collections yet",
+      "filterPodcastCollections": "Filter podcast collections",
+      "filterPodcastCollectionsPlaceholder": "Filter podcast collections...",
+      "seeAllPodcastCollections": "See all podcast collections ({count})",
+      "queue": "Queue",
+      "mode": {
+        "books": "Books",
+        "podcasts": "Podcasts",
+        "switcherAria": "Switch between books and podcasts"
+      },
       "updateAvailable": "Update {version}",
       "updateTooltip": "{version} update available",
       "openUpdateRelease": "Open the {version} release on GitHub",
@@ -7140,7 +7628,15 @@
         "dropped": "{name} dropped at position {position} of {total}",
         "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
         "filteredHint": "Clear the filter to reorder"
-      }
+      },
+      "podcastImportProgress": "{processed} / {total} files",
+      "podcastImportCounting": "Counting files…",
+      "playlists": "Smart Playlists",
+      "newPlaylist": "New Smart Playlist",
+      "noPlaylists": "No smart playlists yet",
+      "filterPlaylists": "Filter smart playlists",
+      "filterPlaylistsPlaceholder": "Filter smart playlists...",
+      "seeAllPlaylists": "See all smart playlists ({count})"
     },
     "selectionActionBar": {
       "setReadingStatus": "Set reading status",
@@ -7181,6 +7677,8 @@
       "columnVisibilityHint": "Use the column visibility panel in the table header to show or hide columns.",
       "columnVisibilityMobileHint": "Column visibility can be managed from the table header.",
       "searchPlaceholder": "Search title, author, series, narrator...",
+      "clearSearch": "Clear search",
+      "closeSearch": "Close search",
       "mobileSearch": {
         "description": "Search items by title, author, series, or narrator.",
         "done": "Done"
@@ -7195,6 +7693,7 @@
         "display": "Display",
         "coverSize": "Cover size",
         "gridGap": "Grid gap",
+        "pixelValue": "{value} pixels",
         "showJumpRails": "Show jump rails",
         "columnsHint": "Use the column visibility panel in the table header to show or hide columns.",
         "coverShape": "Cover shape",
@@ -7230,6 +7729,11 @@
       "description": "This {entity} doesn't exist or has been deleted.",
       "goBack": "Go back"
     },
+    "media": {
+      "volume": "Volume",
+      "mute": "Mute",
+      "unmute": "Unmute"
+    },
     "themePicker": {
       "light": "Light",
       "dark": "Dark",
@@ -7256,7 +7760,11 @@
       "sidebar": {
         "title": "Sidebar",
         "mobileDescription": "Displays the mobile sidebar.",
-        "toggle": "Toggle Sidebar"
+        "toggle": "Toggle Sidebar",
+        "collapse": "Collapse sidebar",
+        "expand": "Expand sidebar",
+        "open": "Open sidebar",
+        "close": "Close sidebar"
       },
       "chipInput": {
         "typeAndEnter": "Type and press Enter to add",
@@ -7274,7 +7782,8 @@
       "sort": {
         "custom": "Custom order",
         "name": "Name",
-        "bookCount": "Book count"
+        "bookCount": "Book count",
+        "showCount": "Show count"
       },
       "ascending": "Ascending",
       "descending": "Descending",
@@ -7283,9 +7792,33 @@
       "noMatches": "No matches",
       "noMatchesHint": "Try a different search term.",
       "bookCount": "Books: {count}",
+      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Create a library to start adding books.",
+      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
       "collectionsEmptyHint": "Collections group books you pick by hand."
+    },
+    "legalNotices": {
+      "about": "About BookOrbit",
+      "trigger": "Legal notices",
+      "title": "About BookOrbit",
+      "description": "BookOrbit attribution, licensing, and source code.",
+      "poweredBy": "Powered by BookOrbit",
+      "originalDevelopment": "This software contains material originally developed as BookOrbit.",
+      "copyright": "Copyright (C) 2025-2026 neon.",
+      "contributors": "Additional copyright is held by the respective BookOrbit contributors.",
+      "licenseSummary": "Licensed under the GNU Affero General Public License, version 3 only, with additional terms. This software is provided without warranty. You may redistribute and modify it under those terms.",
+      "sourceCode": "Source code",
+      "license": "AGPLv3 license",
+      "additionalTerms": "Additional terms"
+    },
+    "confirmDialog": {
+      "typeToConfirm": "Type “{phrase}” to confirm"
+    },
+    "formSheet": {
+      "discardTitle": "Discard changes?",
+      "discardDescription": "Your unsaved changes will be lost.",
+      "discardConfirm": "Discard"
     }
   },
   "customIcons": {
@@ -7333,6 +7866,7 @@
       "empty": {
         "continueReading": "No books in progress yet. Start reading one to see it here.",
         "continueListening": "No audiobooks in progress yet. Start listening to one to see it here.",
+        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "No books marked want to read yet.",
         "upNextInSeries": "No next-in-series picks yet. Finish a volume to surface the next one.",
         "recentlyAdded": "No books in your library yet.",
@@ -7364,6 +7898,7 @@
         "recentlyAdded": "Recently Added",
         "continueReading": "Continue Reading",
         "continueListening": "Continue Listening",
+        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Want to Read",
         "upNextInSeries": "Up Next in Series",
         "random": "Discover Something New",
@@ -7693,6 +8228,17 @@
       "failed": "Failed to send"
     }
   },
+  "errors": {
+    "network": "Could not reach BookOrbit. Check your connection, then try again.",
+    "codes": {
+      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
+      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
+      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
+      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
+      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
+      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
+    }
+  },
   "hardcover": {
     "settings": {
       "subtitle": "Sync your reading progress, status, and ratings to Hardcover."
@@ -7948,7 +8494,8 @@
           "title": "Cover style",
           "portrait": "Portrait",
           "square": "Square",
-          "hint": "Portrait for ebook or mixed libraries. Square for audiobook-only libraries."
+          "hint": "Portrait for ebook or mixed libraries. Square for audiobook-only libraries.",
+          "hintSlots": "Portrait for ebook or mixed libraries, square for audiobook-only libraries. A book with both an ebook and an audiobook shows its book cover in a portrait library and its audiobook cover in a square one."
         },
         "icon": {
           "label": "Icon",
@@ -7979,7 +8526,16 @@
         "noneAdded": "No folders added yet",
         "runPrescanHint": "Run a prescan to validate paths before saving.",
         "scanning": "Scanning…",
-        "prescan": "Prescan"
+        "prescan": "Prescan",
+        "local": {
+          "title": "Existing podcast folders",
+          "optional": "Optional",
+          "description": "Folders you already keep podcasts in. BookOrbit reads them where they are, and never renames, moves, or deletes anything inside.",
+          "addTitle": "Add an existing podcast folder",
+          "addDescription": "Every folder directly inside becomes a show.",
+          "add": "Add another folder",
+          "remove": "Remove {folder}"
+        }
       },
       "scanner": {
         "scanMode": {
@@ -7994,6 +8550,49 @@
           "fileAsBook": {
             "title": "File as Book",
             "hint": "Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple files."
+          }
+        },
+        "addedAt": {
+          "title": "Date added",
+          "hint": "Choose what a book's \"date added\" reflects. This applies to books imported from now on.",
+          "options": {
+            "imported": {
+              "title": "When imported",
+              "hint": "The date BookOrbit first imported the book. This is the default."
+            },
+            "file_modified": {
+              "title": "File modified time",
+              "hint": "The file's last-modified time (mtime), often preserved when files are copied."
+            },
+            "file_created": {
+              "title": "File creation time",
+              "hint": "When the file first landed on disk (birthtime). Falls back to modified time on filesystems that don't record creation time."
+            }
+          },
+          "recompute": "Recompute now",
+          "recomputing": "Recomputing...",
+          "recomputeHint": "Update the date added for existing books using this setting.",
+          "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
+          "backgroundConfirm": "Recompute dates for existing books? This runs in the background, and you can close this editor. Books with unreadable files keep their current date.",
+          "progressSummary": "Processed {processed} of {total}: {updated} updated, {unchanged} unchanged, {skipped} skipped, {failed} failed.",
+          "failedBooksHint": "Failed books kept their dates. Check file access, then run recompute again to retry.",
+          "jobStatus": {
+            "running": "Recomputing dates in the background.",
+            "completed": "Date recompute finished.",
+            "failed": "Recompute stopped before finishing. Completed changes were kept; you can safely run it again."
+          },
+          "errors": {
+            "sourceImported": "Save a file timestamp source before recomputing dates.",
+            "alreadyRunning": "A recompute is already running for this library.",
+            "busy": "Other recomputes are running. Try again shortly.",
+            "requestFailed": "Could not reach the recompute service. Close and reopen this editor to check its status.",
+            "interrupted": "The job status is no longer available. It may have been interrupted by a server restart. You can safely run recompute again."
+          },
+          "failureSample": "Book {bookId}: {reason}",
+          "failureReasons": {
+            "file_unavailable": "A content file could not be read.",
+            "unsafe_path": "A content file is outside its permitted library folder.",
+            "database_error": "The database update failed."
           }
         },
         "allowedFormats": {
@@ -8019,7 +8618,9 @@
         "formatPriority": {
           "title": "Format priority",
           "hint": "When a book has multiple formats, the format highest in the list is preferred."
-        }
+        },
+        "moveUp": "Move {item} up",
+        "moveDown": "Move {item} down"
       },
       "fileWrite": {
         "maxFileSizeMb": "Max file size (MB)",
@@ -8717,6 +9318,12 @@
       "keyboardShortcutsHint": "Keyboard shortcuts (?)",
       "enterFullscreen": "Enter fullscreen",
       "exitFullscreen": "Exit fullscreen",
+      "narrationPlaying": "Narration playing",
+      "ttsPlaying": "TTS playing",
+      "listenWithNarrationShort": "Listen (narration)",
+      "listen": "Listen",
+      "listenWithNarration": "Listen with narration",
+      "listenWithTts": "Listen with TTS",
       "footerMode": {
         "pageProgress": "Footer info: page + progress",
         "sessionTimeLeft": "Footer info: reading session + time left",
@@ -8995,6 +9602,19 @@
     "sheet": {
       "expand": "Expand panel",
       "collapse": "Collapse panel"
+    },
+    "narration": {
+      "fallbackTitle": "Narration",
+      "meta": "Audio narration - {speed}x",
+      "openControls": "Open narration controls",
+      "previousSentence": "Previous sentence",
+      "nextSentence": "Next sentence",
+      "play": "Play narration",
+      "pause": "Pause narration",
+      "showControls": "Show controls",
+      "hideControls": "Hide controls",
+      "stop": "Stop narration",
+      "error": "Narration playback error"
     }
   },
   "scanner": {
@@ -9167,6 +9787,7 @@
     },
     "createDialog": {
       "title": "New Smart Scope",
+      "podcastTitle": "New Smart Playlist",
       "createFailed": "Failed to create Smart Scope"
     },
     "saveAsDialog": {
@@ -9194,6 +9815,14 @@
         "noGenres": "No Genres",
         "epubOnly": "EPUB Only"
       }
+    },
+    "errors": {
+      "load": "Failed to load your smart scopes",
+      "loadEpisodes": "Failed to load episodes for this smart playlist",
+      "save": "Failed to save the smart scope",
+      "delete": "Failed to delete the smart scope",
+      "reorder": "Failed to reorder smart scopes",
+      "koboSync": "Failed to update Kobo sync for this smart scope"
     }
   },
   "statistics": {
@@ -9372,7 +10001,9 @@
       "sourceDistribution": {
         "title": "Where You Read",
         "emptyTitle": "No reading activity yet",
-        "emptyDescription": "Read on the web, KOReader, or Kobo to see your source split."
+        "emptyDescription": "Read on the web, KOReader, or Kobo to see your source split.",
+        "emptyDescriptionWithAppleClients": "Read on the web, iOS app, Apple Watch, KOReader, or Kobo to see your source split.",
+        "emptyDescriptionWithNativeClients": "Read on the web, iOS app, Android app, Apple Watch, KOReader, or Kobo to see your source split."
       }
     }
   },
@@ -9524,12 +10155,10 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Scan settings",
       "title": "Duplicate Books",
-      "description": "Scan files and metadata for potential duplicate records. Nothing is deleted during a scan.",
       "scope": "Library scope",
       "allLibraries": "All accessible libraries",
-      "similarity": "Similar-title threshold",
+      "similarity": "Similar titles",
       "explainSimilarity": "Explain the similar-title threshold",
       "similarityHelp": "Only for Similar title and author matches. At least one author and the book type must also match. Lower finds more possible duplicates; higher requires closer titles. Identical files, ISBN, and exact metadata are checked separately.",
       "runScan": "Run scan",
@@ -9538,8 +10167,7 @@
         "queued": "Scan queued",
         "running": "Scanning books"
       },
-      "groupsFound": "{count, plural, =0 {No duplicate groups} one {One duplicate group} other {# duplicate groups}}",
-      "filter": "Match type",
+      "filter": "Filter by match type",
       "allReasons": "All match types",
       "reasons": {
         "file_hash": "Identical file set",
@@ -9547,35 +10175,28 @@
         "exact_metadata": "Exact title and authors",
         "fuzzy_metadata": "Similar title and author"
       },
-      "similarityValue": "{percent}% title similarity",
       "notDuplicates": "Not duplicates",
-      "keepThis": "Keep this book",
-      "discardThis": "Discard this book",
-      "selectKeeperFirst": "Select a keeper first",
-      "noDirectMatch": "No direct match with keeper",
-      "moreFiles": "+{count} more",
-      "showDetails": "Show details",
-      "hideDetails": "Hide details",
-      "deleteSelected": "Delete {count} selected",
-      "openBook": "Open details for {title}",
       "unknownAuthor": "Unknown author",
       "unknown": "Unknown",
       "none": "None",
       "accessDenied": "You do not have permission to use the duplicate book tool.",
-      "pairDetails": "Match details",
+      "pairDetails": "Why these matched",
       "pairLabel": "{first} and {second}",
       "fields": {
         "library": "Library",
         "isbn": "ISBN",
         "formats": "Formats",
-        "fileLocation": "File",
-        "files": "Files",
-        "readingStatus": "Reading status",
-        "progress": "Progress",
-        "path": "Library path",
         "collections": "Collections",
         "added": "Added",
-        "updated": "Updated"
+        "size": "Size",
+        "metadata": "Metadata",
+        "reading": "Reading",
+        "folder": "Folder",
+        "noIsbn": "Not set",
+        "notStarted": "Not started",
+        "outOfHundred": "/100",
+        "percentRead": "{percent} read",
+        "fileCount": "{count, plural, one {# file} other {# files}}"
       },
       "initial": {
         "title": "Find duplicate books",
@@ -9586,8 +10207,6 @@
         "description": "No books matched the current scope, similarity level, and match filter."
       },
       "deleteDialog": {
-        "title": "Permanently delete duplicate books?",
-        "description": "{count, plural, =0 {This will permanently delete # selected book and its files.} one {This will permanently delete # selected book and its files.} other {This will permanently delete # selected books and their files.}}",
         "warning": "Metadata, collections, reading data, and device state are not transferred to the kept book. Associated data for other users is also removed.",
         "confirm": "{count, plural, =0 {Delete # book} one {Delete # book} other {Delete # books}}",
         "success": "{count, plural, =0 {No books deleted} one {One duplicate book deleted} other {# duplicate books deleted}}"
@@ -9597,11 +10216,101 @@
         "status": "Could not load scan progress.",
         "scan": "The duplicate scan failed. Try running it again.",
         "results": "Could not load duplicate groups.",
-        "delete": "Could not delete the selected duplicate books."
+        "delete": "Could not delete the selected duplicate books.",
+        "dismiss": "Could not dismiss that group.",
+        "restore": "Could not restore that pair."
       },
       "pagination": {
         "label": "Duplicate groups pages",
         "page": "Page {page} of {total}"
+      },
+      "similarityOption": "{percent} and up",
+      "scannedBooks": "{count} books · checked {when}",
+      "scanProgress": "{processed} of {total} books",
+      "recommended": "Recommended",
+      "keeping": "Keeping",
+      "willDelete": "Delete",
+      "keepCopy": "Keep {name}",
+      "selectGroup": "Select {title}",
+      "selectAll": "Select every group on this page",
+      "compareCopies": "Compare the copies of {title}",
+      "compareCaption": "Field by field comparison of {count} copies",
+      "fieldColumn": "Field",
+      "filesEach": "{count, plural, one {# file each} other {# files each}}",
+      "moreFilesCount": "{count, plural, one {and # more file} other {and # more files}}",
+      "identicalAcross": "{count, plural, one {Identical in both copies:} other {Identical in all # copies:}}",
+      "deleteGroup": "{count, plural, one {Delete # copy, free {size}} other {Delete # copies, free {size}}}",
+      "confidence": {
+        "file_hash": "Identical",
+        "isbn": "Same ISBN",
+        "exact_metadata": "Exact match",
+        "fuzzy_metadata": "Similar",
+        "withSimilarity": "{label} {percent}"
+      },
+      "summary": {
+        "groups": "{count, plural, one {group} other {groups}}",
+        "extraCopies": "{count, plural, one {extra copy} other {extra copies}}",
+        "reclaimable": "reclaimable"
+      },
+      "columns": {
+        "match": "Match",
+        "book": "Book",
+        "copies": "Copies",
+        "libraries": "Libraries",
+        "frees": "Frees",
+        "keeping": "Keeping"
+      },
+      "keepRule": {
+        "label": "Keep",
+        "metadata": "Best metadata",
+        "size": "Largest files",
+        "formats": "Most formats",
+        "oldest": "Oldest copy",
+        "newest": "Newest copy",
+        "hint": "Picks a keeper in every group. You can override any row."
+      },
+      "sort": {
+        "label": "Sort",
+        "reclaimable": "Most space freed",
+        "copies": "Most copies",
+        "confidence": "Strongest match",
+        "title": "Title A to Z"
+      },
+      "keeper": {
+        "yourChoice": "Your choice",
+        "reading": "you are {percent} through it",
+        "collection": "it is in {name}",
+        "metadata": "metadata {score}",
+        "largest": "largest at {size}",
+        "formats": "{count} formats",
+        "isbn": "has an ISBN",
+        "added": "added {date}",
+        "riskReading": "deletes a copy you are {percent} through",
+        "riskCollection": "deletes a copy in {name}"
+      },
+      "selection": {
+        "summary": "{groups} groups selected, {copies} copies to delete, frees {size}",
+        "clear": "Clear",
+        "review": "{count, plural, one {Review # copy} other {Review # copies}}",
+        "hint": "Tick the groups you trust, or open one to compare the copies."
+      },
+      "keys": {
+        "move": "move",
+        "expand": "expand",
+        "keep": "keep",
+        "select": "select"
+      },
+      "review": {
+        "title": "{count, plural, one {Delete # copy} other {Delete # copies}}",
+        "description": "Across {groups} groups, freeing {size}. Nothing is deleted until you confirm.",
+        "riskWarning": "{count, plural, one {# group deletes a copy carrying your reading data.} other {# groups delete a copy carrying your reading data.}}",
+        "footer": "Frees {size}"
+      },
+      "dismissed": {
+        "show": "{count, plural, one {Show # dismissed pair} other {Show # dismissed pairs}}",
+        "hide": "Hide dismissed pairs",
+        "restore": "Restore this pair",
+        "restored": "Pair restored. It can match again on the next scan."
       }
     },
     "entityManager": {
@@ -9792,10 +10501,21 @@
         "extracted": "Extracted",
         "custom": "Custom"
       },
+      "brokenSlot": {
+        "ebookExtracted": "Book cover, extracted",
+        "ebookCustom": "Book cover, custom",
+        "audioExtracted": "Audiobook cover, extracted",
+        "audioCustom": "Audiobook cover, custom"
+      },
       "table": {
         "selectPage": "Select everything on this page",
         "coverFolder": "Cover folder for book #{bookId}",
-        "fileCount": "{count, plural, one {# file} other {# files}}"
+        "fileCount": "{count, plural, one {# file} other {# files}}",
+        "orphanMedia": {
+          "ebook": "Book cover",
+          "audio": "Audiobook cover",
+          "both": "Book and audiobook covers"
+        }
       },
       "confirm": {
         "title": "Clean missing resources?",
@@ -9982,6 +10702,35 @@
         "noMatchHint": "Try adjusting the filter rules.",
         "edit": "Edit SmartScope"
       }
+    },
+    "podcastScope": {
+      "title": "Smart playlist",
+      "entity": "smart playlist",
+      "loadFailed": "Could not load episodes for this playlist.",
+      "loadMoreFailed": "Could not load more episodes.",
+      "retry": "Retry",
+      "editRules": "Edit rules",
+      "saveFailed": "Could not save the playlist rules.",
+      "deleteFailed": "Could not delete this playlist.",
+      "empty": {
+        "title": "No matching episodes",
+        "hint": "Adjust the rules to match more episodes."
+      }
+    },
+    "podcastCollection": {
+      "title": "Podcast collection",
+      "entity": "podcast collection",
+      "loadFailed": "Could not load shows in this collection.",
+      "remove": "Remove",
+      "removeAria": "Remove {name} from this collection",
+      "removed": "Removed {name}",
+      "removeFailed": "Could not remove that show.",
+      "empty": {
+        "title": "No shows yet",
+        "hint": "Add shows to this collection from a podcast library."
+      },
+      "loadMoreFailed": "Could not load more shows.",
+      "retry": "Retry"
     }
   },
   "whatsNew": {
@@ -10014,9 +10763,825 @@
     "previousImage": "Previous image",
     "nextImage": "Next image"
   },
+  "podcast": {
+    "actions": {
+      "add": "Add",
+      "cancel": "Cancel",
+      "save": "Save",
+      "play": "Play",
+      "pause": "Pause",
+      "playEpisode": "Play episode",
+      "listen": "Listen",
+      "remove": "Remove",
+      "episodeActions": "Episode actions",
+      "removeFromQueue": "Remove from queue",
+      "addToQueue": "Add to queue",
+      "playNext": "Play next",
+      "retryDownload": "Retry download",
+      "download": "Download",
+      "removeDownload": "Remove download",
+      "markUnplayed": "Mark unplayed",
+      "markPlayed": "Mark played",
+      "follow": "Follow",
+      "unfollow": "Unfollow",
+      "followPodcast": "Follow podcast",
+      "unfollowPodcast": "Unfollow podcast",
+      "resume": "Resume",
+      "playLatest": "Play latest",
+      "moveToTop": "Move to top",
+      "playFromHere": "Play from here",
+      "moveDown": "Move down",
+      "clearQueue": "Clear queue",
+      "clearAll": "Clear all",
+      "search": "Search",
+      "clearPlayed": "Clear played",
+      "downloadSelected": "Download selected",
+      "removeSelectedDownloads": "Remove selected downloads",
+      "markSelectedPlayed": "Mark selected played",
+      "removeSelectedFromQueue": "Remove selected from queue",
+      "selectEpisode": "Select {title}",
+      "playNamedEpisode": "Play {title}",
+      "listenToEpisode": "Listen to {title}",
+      "resumeEpisode": "Resume {title}",
+      "playLatestEpisode": "Play latest episode {title}",
+      "episodeDetails": "Episode details",
+      "episodeDetailsNamed": "Episode details for {title}",
+      "editEpisodeMetadata": "Edit metadata",
+      "openFullPlayer": "Open full player",
+      "reorderEpisode": "Reorder {title}",
+      "playAll": "Play all",
+      "resumeNamed": "Resume {title}",
+      "queueAll": "Queue all",
+      "markAllPlayed": "Mark all played",
+      "latestCount": "Latest {count}",
+      "downloadLatest": "Download latest",
+      "removeAllDownloads": "Remove all downloads",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "pinEpisode": "Pin episode",
+      "unpinEpisode": "Unpin episode"
+    },
+    "status": {
+      "nowPlaying": "Now playing",
+      "paused": "Paused",
+      "downloaded": "Downloaded",
+      "downloadQueued": "Download queued",
+      "downloading": "Downloading",
+      "downloadFailed": "Download failed",
+      "unavailable": "Unavailable",
+      "played": "Played",
+      "following": "Following",
+      "playbackProgress": "Playback progress",
+      "downloadProgress": "Download progress",
+      "removedFromFeed": "No longer in feed",
+      "inQueue": "In queue",
+      "feedFailing": "Feed failing",
+      "archived": "Archived",
+      "localShow": "Local",
+      "localShowDescription": "This show has no feed. Its episodes are the files in its folder.",
+      "missing": "Missing",
+      "missingDescription": "This show's folder is no longer on disk. It is kept here in case the folder comes back; delete the show to remove it for good."
+    },
+    "selection": {
+      "select": "Select",
+      "selectAll": "Select all",
+      "count": "{count} selected",
+      "toggleShow": "Select {title}"
+    },
+    "bulkDelete": {
+      "title": "Delete selected shows",
+      "action": "Delete",
+      "confirmPhrase": "DELETE",
+      "description": "This permanently deletes {count} shows and everything BookOrbit knows about them, including your listening history. This cannot be undone.",
+      "descriptionWithFiles": "This permanently deletes {count} shows, everything BookOrbit knows about them, and {size} of downloaded files. Your own folders are never touched. This cannot be undone.",
+      "queued": "Deleting {count} shows",
+      "queuedWithFailures": "Deleting {count} shows, {failed} could not be started",
+      "errors": {
+        "prepare": "Could not work out what deleting these shows would remove",
+        "delete": "Could not delete the selected shows"
+      }
+    },
+    "views": {
+      "queue": "Queue"
+    },
+    "labels": {
+      "episodeCount": "{count} episodes",
+      "unknownPublisher": "Unknown publisher",
+      "durationHoursMinutes": "{hours}h {minutes}m",
+      "durationMinutes": "{minutes}m",
+      "durationSeconds": "{seconds}s",
+      "durationUnavailable": "Duration unavailable",
+      "unknownDate": "Unknown date",
+      "seasonEpisode": "S{season} E{episode}",
+      "season": "S{season}",
+      "episode": "E{episode}",
+      "episodeTypeTrailer": "Trailer",
+      "episodeTypeBonus": "Bonus",
+      "pinnedHint": "Pinned episodes are protected from storage retention removal.",
+      "explicit": "Explicit",
+      "lastListened": "Listened {time}",
+      "timeLeft": "{time} left",
+      "remainingClock": "-{time}",
+      "pinnedEpisode": "Pinned episode",
+      "newEpisodeCount": "{count} new",
+      "unplayedShort": "{count} unplayed"
+    },
+    "acquisition": {
+      "title": "Automatic downloads",
+      "never": "Never",
+      "newEpisodes": "New episodes",
+      "recentEpisodes": "Recent episodes",
+      "maximumNewest": "Maximum newest episodes",
+      "publishedWithinDays": "Published within the last (days)",
+      "remoteDescription": "Stream episodes by default. You can still download individual episodes for offline listening.",
+      "newestDescription": "Automatically download the selected number of newest episodes that are not already stored or queued. Saving this rule also checks episodes already in the feed.",
+      "windowDescription": "Download existing and newly discovered episodes published in this period. Episodes without a publication date are skipped. Changing this rule does not remove older downloads, but storage retention can remove unpinned downloads when space is needed."
+    },
+    "cleanup": {
+      "title": "Delete after listening",
+      "keep": "Keep downloads",
+      "afterFinished": "Delete after finished",
+      "delayHours": "Delete this many hours after the last listener finishes",
+      "keepDescription": "Downloaded episodes stay on disk until storage retention needs the space.",
+      "afterFinishedDescription": "Delete a downloaded episode once every listener who started it has finished it and the delay has passed. Marking it unplayed, pinning it, or putting it back in a queue during that window cancels the deletion."
+    },
+    "player": {
+      "miniPlayer": "Podcast mini player",
+      "openFullPlayer": "Open full player",
+      "expandMiniPlayer": "Expand mini player",
+      "collapseMiniPlayer": "Collapse to compact player",
+      "stopAndClose": "Stop and close player",
+      "sleepActive": "Sleep timer active: {value}",
+      "previousEpisode": "Previous episode",
+      "nextEpisode": "Next episode",
+      "backSeconds": "Back {count} seconds",
+      "forwardSeconds": "Forward {count} seconds",
+      "episodePosition": "Episode position",
+      "toggleTimeDisplay": "Toggle remaining and total time",
+      "positionValue": "{elapsed} elapsed of {duration}",
+      "playingAnnouncement": "Playing {title} from {podcast}",
+      "pausedAnnouncement": "Paused {title} from {podcast}",
+      "volume": "Volume",
+      "positionValueWithChapter": "{elapsed} elapsed of {duration}, chapter {chapter}"
+    },
+    "bookmarks": {
+      "title": "Bookmarks",
+      "empty": "No bookmarks",
+      "closeForm": "Close bookmark form",
+      "saveAt": "Save at {time}",
+      "titlePlaceholder": "Bookmark title",
+      "notePlaceholder": "Optional note",
+      "save": "Save bookmark",
+      "edit": "Edit bookmark",
+      "delete": "Delete bookmark",
+      "titleLabel": "Bookmark title",
+      "noteLabel": "Bookmark note",
+      "editTitleLabel": "Edit bookmark title",
+      "editNoteLabel": "Edit bookmark note",
+      "defaultTitle": "Bookmark at {time}"
+    },
+    "library": {
+      "episodes": "Episodes",
+      "shows": "Shows",
+      "latest": "Latest",
+      "inProgress": "In progress",
+      "unplayed": "Unplayed",
+      "finished": "Finished",
+      "health": "Health",
+      "search": "Search podcasts",
+      "clearSearch": "Clear podcast search",
+      "import": "Import",
+      "importOpml": "Import OPML",
+      "importDescription": "Import an OPML subscription list",
+      "addFeed": "Add feed",
+      "settings": "Podcast settings",
+      "views": "Podcast views",
+      "loading": "Loading podcasts...",
+      "noMatchingShows": "No matching shows",
+      "ready": "Your podcast library is ready",
+      "tryDifferentSearch": "Try a different title or publisher.",
+      "readyDescription": "Add an RSS feed or import an OPML file to start building your listening library.",
+      "loadMoreShows": "Load more shows",
+      "upNext": "Up next",
+      "emptyQueue": "Your queue is empty",
+      "emptyQueueDescription": "Add an episode from a show to keep your next listen within easy reach.",
+      "loadMore": "Load more",
+      "lastSuccess": "Last success",
+      "failureCount": "{count} failures: {error}",
+      "unknownError": "Unknown error",
+      "healthy": "Healthy",
+      "noFeeds": "No feeds to monitor",
+      "noFeedsDescription": "Add a podcast feed to see its refresh status here.",
+      "noMatchingEpisodes": "No matching episodes",
+      "noEpisodesLatest": "No episodes yet",
+      "noEpisodesDownloaded": "No downloaded episodes",
+      "noEpisodesInProgress": "No episodes in progress",
+      "noEpisodesUnplayed": "No unplayed episodes",
+      "noEpisodesFinished": "No finished episodes",
+      "noEpisodesPinned": "No pinned episodes",
+      "pinned": "Pinned",
+      "continueListening": "Continue listening",
+      "viewAllContinue": "View all",
+      "noEpisodesDescription": "New episodes from your shows will appear here.",
+      "loadMoreEpisodes": "Load more episodes",
+      "addPodcastFeed": "Add podcast feed",
+      "rssUrl": "RSS feed URL",
+      "preview": "Preview",
+      "addPodcast": "Add podcast",
+      "storage": "Podcast storage",
+      "currentlyUsing": "Currently using {size}",
+      "libraryQuotaGb": "Library quota (GB)",
+      "freeSpaceReserveGb": "Free-space reserve (GB)",
+      "defaultRefreshMinutes": "Default refresh (minutes)",
+      "finishRemainingSeconds": "Finish with seconds remaining",
+      "exportOpml": "Export OPML",
+      "exportDescription": "Export this library as an OPML subscription list",
+      "importOpmlDescription": "Choose an OPML file and the download policy to apply to every feed in it.",
+      "opmlFile": "OPML file",
+      "chooseOpmlFile": "Choose file",
+      "noOpmlFileChosen": "No file chosen",
+      "importPolicyHint": "This applies to every imported feed. You can change it per show afterwards.",
+      "searchShows": "Search shows",
+      "searchEpisodes": "Search episodes",
+      "searchHealth": "Search feed health",
+      "manageFeeds": "Manage feeds",
+      "feedHealth": "Feed health",
+      "feedsNeedAttention": "Feeds need attention",
+      "episodeFilters": "Episode filters",
+      "previewing": "Previewing...",
+      "addingPodcast": "Adding...",
+      "openShow": "Open {title}",
+      "retryFeed": "Refresh {title}",
+      "reparseFeed": "Reparse the stored feed for {title}",
+      "confirmClearQueue": "Remove every queued episode?",
+      "importProgress": "Import progress",
+      "jobsQueued": "{count} queued",
+      "jobsProcessing": "{count} processing",
+      "jobsFailed": "{count} failed",
+      "retryUnhealthy": "Retry unhealthy feeds",
+      "followedOnly": "Following only",
+      "queueDuration": "{duration} total",
+      "confirmClearPlayed": "Remove every played episode from the queue?",
+      "searchQueue": "Search your queue",
+      "noMatchingQueueEpisodes": "No matching queued episodes",
+      "showAllEpisodes": "Show all episodes",
+      "browseShows": "Browse shows",
+      "browseEpisodes": "Browse episodes",
+      "allLoaded": "All {total} loaded",
+      "addFeedDescription": "Search the podcast directory or paste an RSS feed URL, preview the show, then choose how its episodes are acquired.",
+      "searchDirectory": "Search the podcast directory",
+      "searchDirectoryPlaceholder": "Show or publisher name",
+      "searchDirectoryEmpty": "No shows in the directory match that search.",
+      "searchDirectoryHint": "Choose a result to preview it, or paste a feed URL below.",
+      "inLibrary": "In library",
+      "openExistingShow": "Open {title}, already in your library",
+      "pasteFeedUrl": "Or paste a feed URL",
+      "selectAllLoaded": "Select every loaded episode",
+      "reorderLoadedHint": "Reordering applies to the episodes loaded so far.",
+      "retryUnhealthyLoaded": "Retry loaded failing feeds",
+      "manageFeedsUnhealthy": "Manage feeds: failing feeds need attention",
+      "localImportTitle": "Importing podcasts from your folders",
+      "localImportDoneTitle": "Import finished",
+      "localImportCounting": "Looking through your folders…",
+      "localImportProgress": "{processed} of {total} files",
+      "localImportDone": "{processed} files imported",
+      "importingTitle": "Importing your podcasts",
+      "importingHint": "Shows appear here as their files are read."
+    },
+    "import": {
+      "title": "Import local files",
+      "description": "Match audio already in this library's folder to episodes from the feeds you follow.",
+      "placementHint": "Put the files inside this library's folder first. BookOrbit adopts them where they are: nothing is copied, renamed, or moved.",
+      "scan": "Scan for files",
+      "running": "Scanning...",
+      "progress": "{current} of {total} files scanned",
+      "apply": "Import matched files",
+      "applyWithChoices": "Import matched files and your choices",
+      "applied": "Adopted {count} files.",
+      "quota": "{adopt} to adopt, {headroom} of the quota still free",
+      "truncated": "Some lists are shortened. The counts above are complete.",
+      "chooseEpisode": "Choose the episode",
+      "leaveUnresolved": "Leave for later",
+      "noDate": "No date",
+      "fileCount": "{count} files",
+      "subscribe": "Subscribe",
+      "subscribed": "Subscribed",
+      "suggestedFeedsHint": "These folders name a feed you do not follow yet. Subscribe, then scan again to match their files.",
+      "rescanHint": "Scan again to match the files in the folders you just subscribed to.",
+      "duplicateDiffers": "A different file is already attached to this episode",
+      "duplicateSame": "This episode already has this file",
+      "unreadableFolders": "{count} folders could not be read.",
+      "groups": {
+        "matched": "Matched",
+        "ambiguous": "Needs a decision",
+        "unmatched": "No match",
+        "duplicates": "Already attached",
+        "skipped": "Skipped",
+        "suggestedFeeds": "Feeds to subscribe to",
+        "unclaimedFolders": "Folders with no feed"
+      },
+      "signals": {
+        "episode_guid": "Episode ID in the file's tags",
+        "episode_id_suffix": "BookOrbit ID in the file name",
+        "enclosure_file_name": "File name matches the feed's",
+        "title_and_date": "Title and date",
+        "title_and_duration": "Title and length",
+        "manual": "Your choice"
+      },
+      "scopes": {
+        "request": "Show you selected",
+        "folder_suffix": "Show folder name",
+        "feed_url_tag": "Feed address in the file's tags",
+        "feed_sidecar": "Saved feed in the folder",
+        "title_similarity": "Similar show title",
+        "library": "No show identified"
+      },
+      "reasons": {
+        "show_unresolved": "No show could be identified for this file",
+        "no_episode_candidate": "The show matched, but no episode did",
+        "single_fuzzy_signal": "Only one signal pointed at an episode",
+        "multiple_candidates": "Several episodes fit equally well",
+        "empty_file": "The file is empty",
+        "unsupported_format": "Not a supported audio file",
+        "symlink": "Symbolic links are not imported",
+        "unreadable": "The file could not be read",
+        "outside_library_root": "The file resolves outside the library folder",
+        "attach_conflict": "The episode gained a file while the scan was running",
+        "quota_exceeded": "Importing these files would exceed this library's storage quota. Raise the quota or import fewer files."
+      },
+      "sources": {
+        "feed_sidecar": "Saved feed file",
+        "metadata_json": "metadata.json",
+        "feed_url_tag": "File tags"
+      },
+      "errors": {
+        "status": "Failed to read the import status",
+        "start": "Failed to start the import",
+        "subscribe": "Failed to subscribe to this feed",
+        "createLocalShow": "Failed to create a local show from this folder"
+      },
+      "messages": {
+        "subscribed": "Podcast added. Scan again to match its files.",
+        "localShowCreated": "Local show created. Its episodes are being imported.",
+        "localShowUpdated": "Importing the new files in this folder."
+      },
+      "createLocalShow": "Create local show",
+      "addLocalEpisodes": "Add new episodes",
+      "localShowCreated": "Created",
+      "unclaimedFoldersHint": "These folders name no feed. Turn one into a local show and every audio file in it becomes an episode.",
+      "localRescanHint": "Scan again to pick up anything else that changed in the folders you just imported."
+    },
+    "messages": {
+      "podcastAdded": "Podcast added",
+      "feedsQueued": "Queued {count} podcast feeds",
+      "settingsSaved": "Podcast settings saved",
+      "downloadQueued": "Episode download queued",
+      "downloadRemoved": "Episode download removed",
+      "refreshQueued": "Podcast refresh queued",
+      "reparseQueued": "Podcast reparse queued",
+      "mergeQueued": "Podcast merge queued",
+      "showDeleted": "{title} deleted",
+      "queueCleared": "Podcast queue cleared",
+      "playerClosed": "Player closed",
+      "feedsRefreshQueued": "Queued refresh for {count} feeds",
+      "finishedQueueCleared": "Played episodes removed from the queue",
+      "bulkQueueActionCompleted": "Updated {count} selected episodes",
+      "bulkQueueActionFailed": "Updated {completed} episodes, {failed} failed",
+      "bulkQueued": "Queued {completed} episodes; {skipped} were already queued or exceeded the queue limit",
+      "bulkMarkedPlayed": "Marked {count} episodes played",
+      "bulkDownloadsQueued": "Queued {count} episode downloads",
+      "bulkDownloadsRemoved": "Removed {count} episode downloads",
+      "bulkDownloadsRemovedWithFailures": "Removed {completed} downloads; {failed} failed",
+      "queueRestored": "Restored {count} episodes to the queue",
+      "playlistSaved": "Playlist saved",
+      "playlistDeleted": "Playlist deleted",
+      "playlistQueued": "Queued {completed} episodes, skipped {skipped}",
+      "playlistQueueEmpty": "No episodes matched this playlist",
+      "detailsSaved": "Show details saved",
+      "episodeDetailsSaved": "Episode details saved",
+      "artworkUpdated": "Artwork updated",
+      "artworkRemoved": "Custom artwork removed",
+      "localFileDeleted": "Episode file deleted",
+      "opmlOmittedLocalShows": "Left {count} local shows out of the export: OPML can only describe feeds."
+    },
+    "fullPlayer": {
+      "queueNowPlaying": "Now playing #{position} · {count} remaining",
+      "queuedCount": "{count} queued",
+      "mediaUnavailable": "Media unavailable",
+      "streaming": "Streaming",
+      "backToPodcast": "Back to podcast",
+      "loading": "Loading episode...",
+      "tryAgain": "Try again",
+      "nowListening": "Now listening",
+      "retry": "Retry",
+      "restart": "Restart",
+      "durationUnavailable": "Duration unavailable",
+      "previousQueued": "Previous queued episode",
+      "nextQueued": "Next queued episode",
+      "startingPlayback": "Starting playback",
+      "speed": "Speed",
+      "playbackSpeed": "Playback speed",
+      "sleep": "Sleep",
+      "off": "Off",
+      "endOfChapter": "End of chapter",
+      "endOfEpisode": "End of episode",
+      "minutesLeft": "{count}m left",
+      "aboutEpisode": "About this episode",
+      "showLess": "Show less",
+      "showMore": "Show more",
+      "chapters": "Chapters",
+      "previousChapter": "Previous chapter",
+      "nextChapter": "Next chapter",
+      "removeNamedFromQueue": "Remove {title} from queue",
+      "queueClear": "Your queue is clear.",
+      "transcripts": "Transcripts",
+      "transcript": "Transcript",
+      "sleepMinutes": "{count} min",
+      "speedValue": "{rate}x",
+      "cyclePlaybackSpeed": "Cycle playback speed",
+      "choosePlaybackSpeed": "Choose playback speed",
+      "moreSpeeds": "More",
+      "showSpeedOverride": "This speed is remembered for this show.",
+      "clearSpeedOverride": "Use default speed for this show",
+      "extendSleepLabel": "Add {count} more minutes to the sleep timer",
+      "sleepTimer": "Sleep timer",
+      "sleepRemaining": "{count}m",
+      "fineTuneSpeed": "Fine adjustment",
+      "decreaseSpeed": "Decrease playback speed",
+      "increaseSpeed": "Increase playback speed",
+      "extendSleep": "Add {count} min",
+      "bookmarkTooltip": "Bookmark: {title}",
+      "openQueue": "Open queue",
+      "openChapterLink": "Open chapter link for {title}"
+    },
+    "show": {
+      "loading": "Loading podcast...",
+      "noAlerts": "No alerts",
+      "immediate": "Immediate",
+      "dailyDigest": "Daily digest",
+      "weeklyDigest": "Weekly digest",
+      "refreshFeed": "Refresh feed",
+      "refreshInterval": "Refresh interval in minutes",
+      "restore": "Restore",
+      "archive": "Archive",
+      "deletePermanently": "Delete permanently",
+      "mergeSource": "Merge another podcast ID into this show",
+      "queueMerge": "Queue merge",
+      "confirmMerge": "Merge podcast {id} into this podcast? The source podcast will be permanently removed.",
+      "confirmDelete": "Permanently delete {title}, its {episodes} episodes, and all listening state? This cannot be undone.",
+      "confirmDeleteWithDownloads": "Permanently delete {title}, its {episodes} episodes, {files} downloaded files ({size}), and all listening state? This cannot be undone.",
+      "back": "Back",
+      "notificationMode": "Notification frequency",
+      "readMore": "Read more",
+      "searchEpisodes": "Search this show's episodes",
+      "clearEpisodeSearch": "Clear episode search",
+      "episodeFilter": "Episode filter",
+      "episodeSort": "Episode sort order",
+      "newestFirst": "Newest first",
+      "oldestFirst": "Oldest first",
+      "noEpisodes": "No matching episodes",
+      "noEpisodesDescription": "Try another search, filter, or sort order.",
+      "dangerZone": "Danger zone",
+      "dangerZoneActions": "Archive, delete, or merge this feed. Deleting cannot be undone.",
+      "mergeTitle": "Merge duplicate show",
+      "mergeDescription": "Find the source show to merge into this one. The source will be permanently removed.",
+      "searchMergeSource": "Search for a duplicate show",
+      "mergeSelected": "Merge “{title}” into this show",
+      "fromDate": "From",
+      "toDate": "To",
+      "feedFailingTitle": "Feed needs attention",
+      "feedFailingDetail": "{count} consecutive refresh failures. Last successful refresh: {lastSuccess}",
+      "archivedTitle": "This show is archived",
+      "archivedDescription": "Archived shows stop refreshing and do not download new episodes.",
+      "downloadLatestCount": "Number of latest episodes to download",
+      "confirmRemoveAllDownloads": "Remove every downloaded episode for this show? Streamed episodes and listening progress are kept.",
+      "refreshCompleted": "Updated, {count} new episodes",
+      "refreshFailed": "Refresh failed: {error}",
+      "manageTitle": "Manage show",
+      "manageActionsDescription": "Archiving, deleting, and merging are handled separately so routine settings stay safe to change.",
+      "openManageActions": "Archive, delete, or merge",
+      "archiveOrDelete": "Archiving is reversible and keeps every episode. Deleting removes the show, its episodes, and any downloaded files for good.",
+      "deleteRequiresOwner": "Archiving hides this show and stops its refreshes. Only a library owner with permission to delete podcasts can remove it permanently.",
+      "settingsDescription": "Choose how episodes are acquired and how often the feed is checked.",
+      "updatedAgo": "Updated {time}",
+      "checksEvery": "Checks every {time}",
+      "visitWebsite": "Visit website",
+      "backToLibrary": "Back to {library}",
+      "categoryOverflow": "+{count}",
+      "moreCategories": "Show {count} more categories",
+      "allCategories": "All categories",
+      "serial": "Serial",
+      "daysShort": "{count} d",
+      "hoursShort": "{count} h",
+      "minutesShort": "{count} min",
+      "moreActions": "More show actions",
+      "dates": "Dates",
+      "anyDate": "Any",
+      "dateRange": "{from} - {to}",
+      "dateFilter": "Episode publication dates",
+      "clearDates": "Clear dates",
+      "seasonHeader": "Season {season}",
+      "localSettingsHint": "This show has no feed, so it has no refresh or download settings."
+    },
+    "edit": {
+      "title": "Edit details",
+      "description": "Anything you change here is locked so the next feed refresh cannot overwrite it.",
+      "titleLabel": "Show title",
+      "authorLabel": "Publisher",
+      "authorPlaceholder": "Who publishes this show",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What this show is about",
+      "descriptionHint": "Formatting from the feed is replaced by the plain text you enter here.",
+      "siteUrlLabel": "Website",
+      "siteUrlPlaceholder": "https://example.com/show",
+      "languageLabel": "Language",
+      "languagePlaceholder": "en-us",
+      "categoriesLabel": "Categories",
+      "categoriesPlaceholder": "Add a category and press Enter",
+      "removeCategory": "Remove category {category}",
+      "categoryLimit": "You can keep up to {count} categories.",
+      "explicitLabel": "Explicit",
+      "explicitHint": "Marks this show as containing explicit content.",
+      "artworkTitle": "Artwork",
+      "artworkHint": "PNG, JPEG, WebP, GIF, or AVIF up to 10 MB. Custom artwork replaces the feed image everywhere.",
+      "artworkUrlLabel": "Image address",
+      "artworkUrlPlaceholder": "https://example.com/artwork.png",
+      "chooseImage": "Choose image",
+      "useImage": "Use this image",
+      "removeCustomArtwork": "Remove custom artwork",
+      "lockField": "Lock {field} against feed refreshes",
+      "unlockField": "Unlock {field} so the feed can update it",
+      "willLockField": "{field} will be locked when you save",
+      "willLockHint": "This field will be locked when you save.",
+      "localDescription": "This show has no feed, so your edits are permanent and nothing can overwrite them."
+    },
+    "episodeEdit": {
+      "title": "Edit episode",
+      "description": "Anything you change here is locked so the next feed refresh cannot overwrite it.",
+      "lockHint": "Edited fields are protected from feed updates.",
+      "titleLabel": "Episode title",
+      "subtitleLabel": "Subtitle",
+      "subtitlePlaceholder": "A short line under the title",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What this episode covers",
+      "descriptionHint": "Formatting from the feed is replaced by the plain text you enter here.",
+      "publishedAtLabel": "Published",
+      "seasonLabel": "Season",
+      "seasonPlaceholder": "2",
+      "episodeLabel": "Episode number",
+      "episodePlaceholder": "14",
+      "episodeTypeLabel": "Episode type",
+      "episodeTypeNone": "Not set",
+      "episodeTypeFull": "Full episode",
+      "episodeTypeTrailer": "Trailer",
+      "episodeTypeBonus": "Bonus",
+      "episodeTypeFromFeed": "{value} (from the feed)",
+      "durationLabel": "Duration",
+      "durationPlaceholder": "Minutes",
+      "durationHint": "In minutes. Leave it empty to remove the duration.",
+      "durationInvalid": "Enter a duration in minutes greater than zero.",
+      "explicitLabel": "Explicit",
+      "explicitHint": "Marks this episode as containing explicit content.",
+      "localHint": "This episode came from a file rather than a feed, so your edits are permanent and nothing can overwrite them."
+    },
+    "errors": {
+      "createBookmark": "Failed to create bookmark",
+      "updateBookmark": "Failed to update bookmark",
+      "deleteBookmark": "Failed to delete bookmark",
+      "feedPreview": "Feed preview failed",
+      "directorySearch": "Directory search is unavailable right now. Paste the feed URL instead.",
+      "invalidEpisodeLimit": "Enter a valid maximum number of episodes",
+      "invalidEpisodeWindow": "Enter a valid recent episode window",
+      "invalidCleanupDelay": "Cleanup delay must be from 0 to 8,760 hours",
+      "addPodcast": "Failed to add podcast",
+      "opmlTooLarge": "OPML files cannot exceed 5 MB",
+      "opmlImport": "OPML import failed",
+      "opmlExport": "OPML export failed",
+      "loadSettings": "Failed to load podcast settings",
+      "invalidStorage": "Storage values must be nonnegative numbers",
+      "invalidRefresh": "Default refresh must be from 5 to 10,080 minutes",
+      "invalidCompletion": "Completion threshold must be from 0 to 3,600 seconds",
+      "saveSettings": "Failed to save podcast settings",
+      "markPlayed": "Failed to mark episode played",
+      "restartEpisode": "Failed to restart episode",
+      "queueDownload": "Failed to queue episode download",
+      "removeDownload": "Failed to remove episode download",
+      "addToQueue": "Failed to add episode to queue",
+      "removeFromQueue": "Failed to remove episode from queue",
+      "loadPodcast": "Failed to load podcast",
+      "loadEpisodes": "Failed to load podcast episodes",
+      "queueNext": "Failed to queue episode next",
+      "follow": "Failed to follow podcast",
+      "unfollow": "Failed to unfollow podcast",
+      "updateEpisode": "Failed to update episode",
+      "refresh": "Failed to queue podcast refresh",
+      "reparse": "Failed to queue podcast reparse",
+      "reparseNoSnapshot": "BookOrbit has no stored copy of this feed yet. Refresh it first.",
+      "updatePodcast": "Failed to update podcast",
+      "archive": "Failed to archive podcast",
+      "prepareDelete": "Failed to prepare the show deletion",
+      "deleteShow": "Failed to delete the show",
+      "restore": "Failed to restore podcast",
+      "merge": "Failed to queue podcast merge",
+      "libraryAccess": "Failed to load library access",
+      "reorderQueue": "Failed to reorder podcast queue",
+      "clearQueue": "Failed to clear podcast queue",
+      "podcastNotFound": "Podcast not found",
+      "loadPodcasts": "Failed to load podcasts",
+      "loadQueue": "Failed to load podcast queue",
+      "loadHealth": "Failed to load feed health",
+      "loadPlaybackSettings": "Failed to load podcast playback settings",
+      "invalidPlaybackRate": "Playback rate must be from 0.5 to 3",
+      "invalidSkipBackward": "Skip backward must be from 5 to 120 seconds",
+      "invalidSkipForward": "Skip forward must be from 5 to 120 seconds",
+      "invalidDateRange": "The start date must be before the end date",
+      "episodeNotFound": "Podcast episode not found",
+      "loadEpisode": "Failed to load podcast episode",
+      "refreshPlaybackContext": "Failed to refresh playback context",
+      "streamUnavailable": "Unable to load this podcast episode",
+      "bulkAction": "Failed to update podcast episodes",
+      "invalidVolume": "Volume must be from 0 to 100 percent",
+      "restoreQueue": "Failed to restore podcast queue",
+      "loadPlaylists": "Failed to load your playlists",
+      "savePlaylist": "Failed to save the playlist",
+      "deletePlaylist": "Failed to delete the playlist",
+      "queuePlaylist": "Failed to queue the playlist",
+      "playlistNameRequired": "Name the playlist before saving it",
+      "playlistLimitReached": "You have reached the saved playlist limit",
+      "playlistDurationRange": "The shortest duration must be below the longest",
+      "updatePinned": "Failed to update pinned state",
+      "titleRequired": "Show title cannot be empty",
+      "episodeTitleRequired": "Episode title cannot be empty",
+      "updateArtwork": "Failed to update artwork",
+      "removeArtwork": "Failed to remove custom artwork"
+    },
+    "settingsPage": {
+      "title": "Podcast settings",
+      "subtitle": "Manage your playback defaults and storage behavior for each podcast library.",
+      "loading": "Loading podcast settings...",
+      "saving": "Saving...",
+      "playbackTitle": "Playback defaults",
+      "playbackDescription": "These preferences follow your account across devices. Playback speeds remembered for individual shows are preserved.",
+      "defaultPlaybackRate": "Default playback speed",
+      "skipBackwardSeconds": "Skip backward (seconds)",
+      "skipForwardSeconds": "Skip forward (seconds)",
+      "playbackSaved": "Podcast playback settings saved",
+      "playbackSaveFailed": "Failed to save podcast playback settings",
+      "libraryTitle": "Library defaults and storage",
+      "libraryDescription": "Choose a podcast library to view its storage limits and default refresh behavior.",
+      "library": "Podcast library",
+      "noLibraries": "You do not have access to a podcast library yet.",
+      "loadingLibrary": "Loading library settings...",
+      "readOnlyLibrary": "Only library owners with podcast retention permission can change these settings.",
+      "showSettingsHint": "Automatic download rules and refresh overrides remain in each show's settings.",
+      "defaultVolume": "Default volume",
+      "gigabytesUnit": "GB"
+    },
+    "queueReorder": {
+      "lifted": "{title} lifted at position {position} of {total}",
+      "moved": "{title} moved to position {position} of {total}",
+      "dropped": "{title} dropped at position {position} of {total}",
+      "cancelled": "Reordering {title} cancelled"
+    },
+    "sort": {
+      "label": "Sort",
+      "showLabel": "Sort shows",
+      "episodeLabel": "Sort episodes",
+      "showTitle": "Title A to Z",
+      "showRecent": "Recently updated",
+      "showUnplayed": "Most unplayed",
+      "shortest": "Shortest first",
+      "longest": "Longest first",
+      "recentlyListened": "Recently listened"
+    },
+    "announce": {
+      "queued": "{title} added to the queue",
+      "queuedNext": "{title} will play next",
+      "unqueued": "{title} removed from the queue",
+      "downloadReady": "{title} finished downloading",
+      "downloadFailed": "{title} failed to download",
+      "evictedSpace": "{title} download removed to free storage",
+      "evictedPlayed": "{title} download removed after listening",
+      "sleepExpired": "Sleep timer ended, playback paused",
+      "sleepExtended": "Sleep timer extended by {count} minutes",
+      "sleepChapterUnavailable": "Sleep timer cancelled, this episode has no chapters"
+    },
+    "shortcuts": {
+      "title": "Podcast keyboard shortcuts",
+      "description": "These work while an episode is loaded. Space and the arrow keys act on the player page or the mini player, and bookmarks can only be added from the player page.",
+      "open": "Keyboard shortcuts",
+      "togglePlayback": "Play or pause",
+      "skipBackward": "Skip backward",
+      "skipForward": "Skip forward",
+      "next": "Next episode",
+      "previous": "Previous episode",
+      "speedDown": "Decrease playback speed",
+      "speedUp": "Increase playback speed",
+      "mute": "Mute or unmute",
+      "volumeUp": "Increase volume",
+      "volumeDown": "Decrease volume",
+      "bookmark": "Add bookmark",
+      "help": "Show this list",
+      "spaceKey": "Space",
+      "groups": {
+        "playback": "Playback",
+        "navigation": "Navigation",
+        "tools": "Tools"
+      }
+    },
+    "playlists": {
+      "title": "Playlists",
+      "builtInLabel": "Built in",
+      "savedLabel": "Saved",
+      "choose": "Choose a playlist",
+      "search": "Search playlist episodes",
+      "summary": "{count} episodes, {duration}",
+      "summaryShortest": "Shortest",
+      "summaryLongest": "Longest",
+      "summaryPublishedWithin": "Published within",
+      "create": "New playlist",
+      "createTitle": "New smart playlist",
+      "editTitle": "Edit smart playlist",
+      "editorDescription": "Choose which episodes this smart playlist collects. The rules are re-evaluated every time you open it, so new episodes appear automatically.",
+      "edit": "Edit rules",
+      "adjustRules": "Adjust rules",
+      "saveAs": "Save as playlist",
+      "save": "Save playlist",
+      "delete": "Delete playlist",
+      "deleteConfirmTitle": "Delete this playlist?",
+      "deleteConfirmDescription": "\"{name}\" and its rules will be removed. The episodes it collects are not affected.",
+      "nameLabel": "Playlist name",
+      "namePlaceholder": "Morning commute",
+      "filterLabel": "Episodes",
+      "sortLabel": "Order",
+      "minDuration": "Shortest (minutes)",
+      "maxDuration": "Longest (minutes)",
+      "publishedWithin": "Published within (days)",
+      "showsLabel": "Shows",
+      "showsDescription": "Leave this empty to include every show in the library.",
+      "searchShows": "Search shows to add",
+      "removeShow": "Remove {title}",
+      "showLimit": "A playlist can target up to {count} shows.",
+      "copyOf": "{name} copy",
+      "empty": "Nothing matches this playlist yet",
+      "emptyDescription": "Adjust the rules, or come back once new episodes arrive.",
+      "builtIn": {
+        "quick": "Quick listens",
+        "continue": "Continue listening",
+        "downloaded": "Downloaded",
+        "fresh": "Fresh this week"
+      },
+      "nameRequired": "Name the playlist before saving it"
+    },
+    "downloadWidget": {
+      "title": "Downloads",
+      "progress": "{completed} of {total} downloaded",
+      "progressWithFailures": "{completed} of {total} downloaded; {failed} failed",
+      "progressWithCancelled": "{completed} of {total} downloaded; {cancelled} cancelled",
+      "complete": "Downloads complete: {count}",
+      "expand": "Expand download progress",
+      "collapse": "Collapse download progress",
+      "overallProgress": "Overall download progress",
+      "unknownPodcast": "Podcast",
+      "unknownEpisode": "Episode",
+      "batchProgress": "{completed} of {total} complete",
+      "dismiss": "Dismiss download progress",
+      "bytes": "{received} of {total}",
+      "episodeProgress": "Download progress for {title}",
+      "status": {
+        "queued": "Queued",
+        "downloading": "Downloading",
+        "completed": "Downloaded",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      }
+    },
+    "collections": {
+      "addAction": "Add to collection",
+      "addTitle": "Add to collection",
+      "addDescription": "Choose a podcast collection for {title}.",
+      "added": "Added to {name}",
+      "addFailed": "Could not add the show to that collection.",
+      "createFailed": "Could not create the collection.",
+      "alreadyIn": "Already in this collection",
+      "none": "No podcast collections yet. Create one below.",
+      "newPlaceholder": "Sci-fi podcasts",
+      "newLabel": "New collection name",
+      "create": "Create",
+      "newCollection": "New collection",
+      "existing": "Collections",
+      "inCollection": "In this collection",
+      "showCount": "{count} shows",
+      "removed": "Removed from {name}",
+      "removeFailed": "Could not remove the show from that collection."
+    }
+  },
   "titles": {
     "dashboard": "Dashboard",
     "libraries": "Libraries",
+    "podcastLibraries": "Podcast Libraries",
+    "podcastScope": "Smart Playlist",
+    "podcastCollection": "Podcast Collection",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader Sync",
@@ -10045,6 +11610,9 @@
     "collection": "Collection",
     "author": "Author",
     "book": "Book",
+    "podcasts": "Podcasts",
+    "podcast": "Podcast",
+    "podcastEpisode": "Episode",
     "seriesItem": "Series",
     "appearance": {
       "theme": "Display",
@@ -10084,7 +11652,8 @@
       "account-activity": "Account Activity",
       "magic-links": "Magic Links",
       "oidc": "OIDC / SSO",
-      "server-fonts": "Server Fonts"
+      "server-fonts": "Server Fonts",
+      "tts": "Text-to-Speech"
     },
     "system": {
       "file-naming": "File Naming",
@@ -10104,6 +11673,88 @@
     "missingResources": "Missing Resources",
     "bookRequests": "Requests",
     "bookRequestDetail": "Request",
-    "bookRequestReleases": "Pick a release"
+    "bookRequestReleases": "Pick a release",
+    "tts": "Text-to-Speech"
+  },
+  "tts": {
+    "readerControls": {
+      "listen": "Listen",
+      "playing": "Playing"
+    },
+    "player": {
+      "fallbackTitle": "TTS Playback",
+      "play": "Play TTS",
+      "pause": "Pause TTS",
+      "openMiniPlayer": "Open mini player",
+      "shrinkPlayer": "Shrink player",
+      "expandPlayer": "Expand player",
+      "collapsePlayer": "Collapse player",
+      "openDetails": "Open player details",
+      "previousSentence": "Previous sentence",
+      "nextSentence": "Next sentence",
+      "meta": "Ch {chapter} - Sent {sentence} - {voice} - {speed}x",
+      "metaWithoutVoice": "Ch {chapter} - Sent {sentence} - {speed}x",
+      "position": "Chapter {chapter} - Sentence {sentence}",
+      "playbackError": "Playback error - tap play to retry",
+      "voice": "Voice",
+      "sleep": "Sleep",
+      "sleepRemaining": "{count}m",
+      "currentVoice": "Current Voice",
+      "chooseVoice": "Choose voice",
+      "saveForBook": "Save for this book",
+      "setAsDefault": "Set as global default",
+      "bookVoiceSaved": "Voice saved for this book",
+      "bookVoiceSaveFailed": "Failed to save book voice",
+      "defaultVoiceSaved": "Default TTS voice updated",
+      "defaultVoiceSaveFailed": "Failed to update default voice",
+      "stop": "Stop"
+    },
+    "speed": {
+      "label": "Playback speed",
+      "value": "{speed}x"
+    },
+    "sleepTimer": {
+      "title": "Sleep Timer",
+      "preset": "{count}m",
+      "presetLabel": "Stop playback after {count} minutes",
+      "cancel": "Cancel",
+      "cancelLabel": "Cancel sleep timer",
+      "remaining": "Stops in {minutes}m {seconds}s"
+    },
+    "resume": {
+      "title": "Resume TTS?",
+      "description": "You have a saved TTS position",
+      "descriptionWithChapter": "You have a saved TTS position (Chapter {chapter})",
+      "resume": "Resume",
+      "startHere": "Start this page",
+      "dismiss": "Dismiss",
+      "clearing": "Clearing...",
+      "confirmClear": "Confirm clear",
+      "clearSavedPosition": "Clear saved position"
+    },
+    "voicePicker": {
+      "search": "Search voices...",
+      "allProviders": "All",
+      "allLanguages": "All languages",
+      "allCountries": "All countries",
+      "filterByLanguage": "Filter by language",
+      "filterByCountry": "Filter by country",
+      "empty": "No voices found",
+      "select": "Select {name}",
+      "preview": "Preview {name}",
+      "voiceWithLocale": "{voice} - {locale}"
+    },
+    "settings": {
+      "description": "Configure your default TTS voice and playback settings.",
+      "defaultVoice": "Default Voice",
+      "selectVoice": "Select a voice...",
+      "change": "Change",
+      "defaultSpeed": "Default Speed",
+      "saved": "TTS preferences saved",
+      "saveFailed": "Failed to save TTS preferences"
+    },
+    "errors": {
+      "generic": "TTS error"
+    }
   }
 }

@@ -339,9 +339,12 @@ export async function findCoverFilePath(
   prefix: string = COVER_EXTRACTED_FILE_PREFIX,
 ): Promise<string | null> {
   const dir = coverDirPath(ctx.fixture.booksPath, bookId);
-  const entries = await readdir(dir).catch(() => [] as string[]);
-  const fileName = entries.find((entry) => entry.startsWith(prefix));
-  return fileName ? join(dir, fileName) : null;
+  for (const candidate of [dir, join(dir, 'ebook'), join(dir, 'audio')]) {
+    const entries = await readdir(candidate).catch(() => [] as string[]);
+    const fileName = entries.find((entry) => entry.startsWith(prefix));
+    if (fileName) return join(candidate, fileName);
+  }
+  return null;
 }
 
 export async function uploadBookCover(

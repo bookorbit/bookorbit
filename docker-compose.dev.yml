@@ -22,5 +22,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # Opt-in: `pnpm tts:up`, or `docker compose -f docker-compose.dev.yml --profile tts up -d`.
+  # Left out of the default set so `pnpm setup` and `pnpm db:up` stay quick for anyone who is not
+  # working on text-to-speech; the image carries the model and is a large first pull.
+  kokoro:
+    container_name: bookorbit-dev-kokoro
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.8.0
+    profiles: ["tts"]
+    restart: unless-stopped
+    ports:
+      - "${DEV_KOKORO_PORT:-8880}:8880"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request;urllib.request.urlopen(''http://127.0.0.1:8880/v1/audio/voices'')"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
 volumes:
   postgres_data:

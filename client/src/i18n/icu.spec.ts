@@ -216,7 +216,6 @@ describe('ICU message compilation', () => {
     expect(polish.settings.metadata.autoFetch.runNow).toBe('Uruchom teraz')
     expect(italian.settings.admin.migration.host).toBe('Host')
     expect(italian.settings.admin.migration.port).toBe('Porta')
-    expect(polish.tools.bookDuplicates.selectKeeperFirst).toBe('Najpierw wybierz książkę do zachowania')
   })
 
   it('preserves spacing around collection names in reviewed Italian messages', () => {
@@ -227,32 +226,45 @@ describe('ICU message compilation', () => {
   })
 
   it.each([
-    ['en', en, [0, 1, 2], ['No duplicate groups', 'One duplicate group', '2 duplicate groups']],
-    ['de', de, [0, 1, 2], ['Keine duplizierten Gruppen', 'Eine duplizierte Gruppe', '2 duplizierte Gruppen']],
-    ['es', spanish, [0, 1, 1_000_000], ['No hay grupos duplicados', 'Un grupo duplicado', '1.000.000 grupos duplicados']],
-    ['fr', french, [0, 1, 1_000_000], ['Pas de groupes en double', 'Un groupe en double', '1 000 000 groupes en double']],
-    ['it', italian, [0, 1, 1_000_000], ['Nessun gruppo duplicato', 'Un gruppo duplicato', '1.000.000 gruppi duplicati']],
-    ['nl', nl, [0, 1, 2], ['No duplicate groups', 'One duplicate group', '2 duplicate groups']],
+    ['en', en, [0, 1, 2], ['No books deleted', 'One duplicate book deleted', '2 duplicate books deleted']],
+    ['de', de, [0, 1, 2], ['Keine Bücher gelöscht', 'Ein doppeltes Buch gelöscht', '2 doppelte Bücher gelöscht']],
+    ['es', spanish, [0, 1, 1_000_000], ['No se eliminaron libros', 'Se ha eliminado un libro duplicado.', '1.000.000 libros duplicados eliminados']],
+    ['fr', french, [0, 1, 1_000_000], ['Aucun livre supprimé', 'Un livre en double supprimé', '1 000 000 livres en double supprimés']],
+    ['it', italian, [0, 1, 1_000_000], ['Nessun libro eliminato', 'Un libro duplicato eliminato', '1.000.000 libri duplicati eliminati']],
+    ['nl', nl, [0, 1, 2], ['No books deleted', 'One duplicate book deleted', '2 duplicate books deleted']],
     [
       'pl',
       polish,
       [0, 1, 2, 5, 1_000_000],
-      ['Brak zduplikowanych grup', 'Jedna zduplikowana grupa', '2 zduplikowane grupy', '5 zduplikowanych grup', '1 000 000 zduplikowanych grup'],
+      [
+        'Żadne książki nie zostały usunięte',
+        'Usunięto jedną zduplikowaną książkę',
+        'Usunięto 2 zduplikowane książki',
+        'Usunięto 5 zduplikowanych książek',
+        'Usunięto 1 000 000 zduplikowanych książek',
+      ],
     ],
-    ['pt', pt, [0, 1, 1_000_000], ['Sem grupos duplicados', 'Um grupo duplicado', '1.000.000 grupos duplicados']],
-    ['sl', sl, [0, 1, 2, 3, 5], ['No duplicate groups', 'One duplicate group', '2 duplicate groups', '3 duplicate groups', '5 duplicate groups']],
-  ] as const)('renders migrated Book Duplicates messages for %s', (locale, catalog, counts, expectedGroups) => {
+    ['pt', pt, [0, 1, 1_000_000], ['No books deleted', 'One duplicate book deleted', '1.000.000 duplicate books deleted']],
+    [
+      'sl',
+      sl,
+      [0, 1, 2, 3, 5],
+      ['No books deleted', 'One duplicate book deleted', '2 duplicate books deleted', '3 duplicate books deleted', '5 duplicate books deleted'],
+    ],
+  ] as const)('renders migrated Book Duplicates messages for %s', (locale, catalog, counts, expectedDeletions) => {
     const testI18n = createCatalogI18n(locale, catalog)
 
-    expect(counts.map((count) => testI18n.global.t('tools.bookDuplicates.groupsFound', { count }))).toEqual(expectedGroups)
+    expect(counts.map((count) => testI18n.global.t('tools.bookDuplicates.deleteDialog.success', { count }, count))).toEqual(expectedDeletions)
 
     for (const key of [
-      'tools.bookDuplicates.deleteDialog.description',
       'tools.bookDuplicates.deleteDialog.confirm',
-      'tools.bookDuplicates.deleteDialog.success',
+      'tools.bookDuplicates.review.title',
+      'tools.bookDuplicates.selection.review',
+      'tools.bookDuplicates.summary.groups',
+      'tools.bookDuplicates.summary.extraCopies',
     ]) {
       for (const count of counts) {
-        const result = testI18n.global.t(key, { count })
+        const result = testI18n.global.t(key, { count }, count)
         expect(result).not.toContain('{count')
         expect(result).not.toContain('plural')
       }

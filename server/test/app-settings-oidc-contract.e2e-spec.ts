@@ -579,7 +579,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
       const callbackPayload = {
         code: 'authorization-code-provisioned',
         codeVerifier: 'verifier-provisioned',
-        redirectUri: 'http://localhost:5173/oauth2-callback',
+        redirectUri: 'http://localhost:6263/oauth2-callback',
         nonce: 'nonce-provisioned',
         state,
       };
@@ -691,7 +691,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         payload: {
           code: 'authorization-code-linked',
           codeVerifier: 'verifier-linked',
-          redirectUri: 'http://localhost:5173/oauth2-callback',
+          redirectUri: 'http://localhost:6263/oauth2-callback',
           nonce: 'nonce-linked',
           state,
         },
@@ -800,7 +800,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         payload: {
           code: 'authorization-code-invalid-state',
           codeVerifier: 'verifier-invalid-state',
-          redirectUri: 'http://localhost:5173/oauth2-callback',
+          redirectUri: 'http://localhost:6263/oauth2-callback',
           nonce: 'nonce-invalid-state',
           state: `invalid-${randomUUID()}`,
         },
@@ -822,7 +822,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         payload: {
           code: 'authorization-code-missing-subject',
           codeVerifier: 'verifier-missing-subject',
-          redirectUri: 'http://localhost:5173/oauth2-callback',
+          redirectUri: 'http://localhost:6263/oauth2-callback',
           nonce: 'nonce-missing-subject',
           state,
         },
@@ -864,7 +864,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         payload: {
           code: 'authorization-code-disabled',
           codeVerifier: 'verifier-disabled',
-          redirectUri: 'http://localhost:5173/oauth2-callback',
+          redirectUri: 'http://localhost:6263/oauth2-callback',
           nonce: 'nonce-disabled',
           state: disabledState,
         },
@@ -903,7 +903,7 @@ describe('App settings OIDC contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, (
         payload: {
           code: 'authorization-code-inactive',
           codeVerifier: 'verifier-inactive',
-          redirectUri: 'http://localhost:5173/oauth2-callback',
+          redirectUri: 'http://localhost:6263/oauth2-callback',
           nonce: 'nonce-inactive',
           state: inactiveState,
         },

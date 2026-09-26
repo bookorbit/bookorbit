@@ -1,64 +1,39 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
 
-type Db = NodePgDatabase<typeof schema>;
-
 @Injectable()
 export class OidcSessionRepository {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(@Inject(DB) private readonly db: NodePgDatabase<typeof schema>) {}
 
-  async create(data: typeof schema.oidcSessions.$inferInsert) {
-    const [session] = await this.db.insert(schema.oidcSessions).values(data).returning();
-    return session;
-  }
-
-  async findActiveBySid(sid: string) {
-    return this.db.query.oidcSessions.findFirst({
-      where: and(eq(schema.oidcSessions.oidcSessionId, sid), eq(schema.oidcSessions.revoked, false), gt(schema.oidcSessions.expiresAt, new Date())),
+  async revokeProviderSessions(issuer: string, selector: { sid: string } | { subject: string }) {
+    const now = new Date();
+    return this.db.transaction(async (tx) => {
+      const matching = tx
+        .select({ id: schema.oidcSessions.sessionId })
+        .from(schema.oidcSessions)
+        .where(
+          and(
+            eq(schema.oidcSessions.oidcIssuer, issuer),
+            eq(schema.oidcSessions.revoked, false),
+            gt(schema.oidcSessions.expiresAt, now),
+            'sid' in selector ? eq(schema.oidcSessions.oidcSessionId, selector.sid) : eq(schema.oidcSessions.oidcSubject, selector.subject),
+          ),
+        );
+      // Lock application sessions before their OIDC rows, matching refresh and local logout.
+      const result = await tx.update(schema.authSessions).set({ revokedAt: now }).where(inArray(schema.authSessions.id, matching));
+      const revoked = tx
+        .select({ id: schema.authSessions.id })
+        .from(schema.authSessions)
+        .where(and(inArray(schema.authSessions.id, matching), eq(schema.authSessions.revokedAt, now)));
+      await tx
+        .update(schema.refreshTokens)
+        .set({ revokedAt: now })
+        .where(and(inArray(schema.refreshTokens.sessionId, revoked), isNull(schema.refreshTokens.revokedAt)));
+      await tx.update(schema.oidcSessions).set({ revoked: true }).where(inArray(schema.oidcSessions.sessionId, revoked));
+      return result.rowCount ?? 0;
     });
-  }
-
-  async findActiveBySubjectAndIssuer(subject: string, issuer: string) {
-    return this.db.query.oidcSessions.findMany({
-      where: and(
-        eq(schema.oidcSessions.oidcSubject, subject),
-        eq(schema.oidcSessions.oidcIssuer, issuer),
-        eq(schema.oidcSessions.revoked, false),
-        gt(schema.oidcSessions.expiresAt, new Date()),
-      ),
-    });
-  }
-
-  async revokeBySid(sid: string) {
-    await this.db.update(schema.oidcSessions).set({ revoked: true }).where(eq(schema.oidcSessions.oidcSessionId, sid));
-  }
-
-  async revokeBySubjectAndIssuer(subject: string, issuer: string) {
-    await this.db
-      .update(schema.oidcSessions)
-      .set({ revoked: true })
-      .where(and(eq(schema.oidcSessions.oidcSubject, subject), eq(schema.oidcSessions.oidcIssuer, issuer)));
-  }
-
-  async findActiveByUserId(userId: number) {
-    return this.db.query.oidcSessions.findFirst({
-      where: and(eq(schema.oidcSessions.userId, userId), eq(schema.oidcSessions.revoked, false), gt(schema.oidcSessions.expiresAt, new Date())),
-      orderBy: (t, { desc }) => [desc(t.createdAt)],
-    });
-  }
-
-  async touchActiveByUserId(userId: number, expiresAt: Date) {
-    await this.db
-      .update(schema.oidcSessions)
-      .set({ expiresAt })
-      .where(and(eq(schema.oidcSessions.userId, userId), eq(schema.oidcSessions.revoked, false), gt(schema.oidcSessions.expiresAt, new Date())));
-  }
-
-  async revokeByUserId(userId: number) {
-    await this.db.update(schema.oidcSessions).set({ revoked: true }).where(eq(schema.oidcSessions.userId, userId));
   }
 }

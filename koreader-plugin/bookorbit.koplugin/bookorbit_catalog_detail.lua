@@ -299,8 +299,16 @@ function CatalogDetail.detailSeriesLine(detail)
     return text .. "  \u{203A}"
 end
 
-local function fileInfoLabel(file)
+local function fileFormatLabel(file)
     local label = string.upper(file.format or "file")
+    if file.downloadVariant == "audioless_epub" then
+        label = label .. " - " .. _("Read Along (audio removed)")
+    end
+    return label
+end
+
+local function fileInfoLabel(file)
+    local label = fileFormatLabel(file)
     local extras = {}
     local size = formatBytes(file.sizeBytes)
     if size ~= "" then table.insert(extras, size) end
@@ -865,17 +873,18 @@ function CatalogDetail:downloadButtonLabel(supported_files)
     local file = self:nextDownloadFile(supported_files)
     local format = cleanInlineText(file and file.format)
     if not format then return _("Download") end
+    local format_label = fileFormatLabel(file)
     -- Size is what decides whether a download is worth starting over a slow
     -- connection, so it rides the button when the server knows it.
     local size = formatBytes(file and file.sizeBytes)
     if size ~= "" then
-        return T(_("Download %1 - %2"), string.upper(format), size)
+        return T(_("Download %1 - %2"), format_label, size)
     end
-    return T(_("Download (%1)"), string.upper(format))
+    return T(_("Download (%1)"), format_label)
 end
 
 function CatalogDetail:fileLabel(file, show_support)
-    local label = string.upper(file.format or "file")
+    local label = fileFormatLabel(file)
     local extras = {}
     local size = formatBytes(file.sizeBytes)
     if size ~= "" then table.insert(extras, size) end

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { extractAudioCover } from './extractors/audio.extractor';
 import { AudioFormatExtractor } from './extractors/audio-format.extractor';
 import { ComicFormatExtractor } from './extractors/comic-format.extractor';
 import { EpubFormatExtractor } from './extractors/epub-format.extractor';
@@ -73,6 +74,13 @@ export class MetadataExtractionService {
 
     const cover = await extractCover(absolutePath, format);
     return { metadata: null, cover };
+  }
+
+  /** Reads only a file's embedded cover. KEPUB is an EPUB container, and audio art comes from ffmpeg. */
+  async extractEmbeddedCover(absolutePath: string, format: string): Promise<Buffer | null> {
+    const normalized = format.toLowerCase();
+    if ((METADATA_AUDIO_FORMATS as readonly string[]).includes(normalized)) return extractAudioCover(absolutePath);
+    return extractCover(absolutePath, normalized === 'kepub' ? 'epub' : normalized);
   }
 
   private logPdfParseWarning(warning: PdfParseWarning): void {

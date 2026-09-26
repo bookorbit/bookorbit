@@ -1,4 +1,9 @@
 import type { Rule, StaticRuleField, TableViewType } from '@bookorbit/types'
+import { i18n } from '@/i18n'
+
+// Resolved through the global composer because this runs outside a component setup; the template
+// that calls it still re-renders on a language change.
+const t = i18n.global.t
 
 type QuickFilterField = Exclude<StaticRuleField, 'communityRating' | 'communityRatingCount'>
 
@@ -29,15 +34,16 @@ export function useTableQuickFilters(viewType: TableViewType) {
 
     if (colId === 'format') {
       return [
-        { key: 'present', label: 'Filter to present files' },
-        { key: 'missing', label: 'Filter to missing files' },
+        { key: 'present', label: t('book.table.quickFilter.presentFiles') },
+        { key: 'missing', label: t('book.table.quickFilter.missingFiles') },
       ]
     }
 
     if (colId === 'cover') {
       return [
-        { key: 'present', label: 'Filter to books with covers' },
-        { key: 'missing', label: 'Filter to books missing covers' },
+        { key: 'present', label: t('book.table.quickFilter.withCovers') },
+        { key: 'missing', label: t('book.table.quickFilter.missingCovers') },
+        { key: 'missingAudio', label: t('book.table.quickFilter.missingAudioCovers') },
       ]
     }
 
@@ -61,8 +67,8 @@ export function useTableQuickFilters(viewType: TableViewType) {
       ].includes(colId)
     ) {
       return [
-        { key: 'present', label: 'Filter to rows with values' },
-        { key: 'missing', label: 'Filter to empty rows' },
+        { key: 'present', label: t('book.table.quickFilter.withValues') },
+        { key: 'missing', label: t('book.table.quickFilter.emptyRows') },
       ]
     }
 
@@ -71,6 +77,7 @@ export function useTableQuickFilters(viewType: TableViewType) {
 
   function buildQuickFilterRule(colId: string, key: string): Rule | null {
     if (colId === 'format') return { type: 'rule', field: 'fileAvailability', operator: key === 'missing' ? 'isMissing' : 'isPresent' }
+    if (colId === 'cover' && key === 'missingAudio') return { type: 'rule', field: 'audioCover', operator: 'isMissing' }
     if (colId === 'cover') return { type: 'rule', field: 'cover', operator: key === 'missing' ? 'isMissing' : 'isPresent' }
 
     const textField = TEXT_FIELD_MAP[colId]

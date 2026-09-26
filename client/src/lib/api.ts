@@ -1,4 +1,5 @@
 import type { RefreshResponse } from '@bookorbit/types'
+import { i18n } from '@/i18n'
 
 /**
  * Refresh this far ahead of `exp`. A token that survives the check still has to travel, reach a
@@ -8,6 +9,9 @@ const EXPIRY_SKEW_MS = 30_000
 
 /** After a failed proactive refresh, stop trying for this long. Reactive 401 refreshes ignore it. */
 const REFRESH_COOLDOWN_MS = 5_000
+
+const AUTH_PROXY_RELOAD_KEY = 'bookorbit:auth-proxy-reload-at'
+const AUTH_PROXY_RELOAD_WINDOW_MS = 15_000
 
 let _accessToken: string | null = null
 let _accessTokenExpiresAt: number | null = null
@@ -92,10 +96,72 @@ export function setOnAuthFailure(fn: () => void): void {
   _onAuthFailure = fn
 }
 
-function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+/**
+ * A request that never reached the server: offline, connection refused, DNS failure, blocked origin.
+ * `fetch` rejects these with a `TypeError` whose message is the browser's own untranslated English,
+ * "Failed to fetch", and plenty of call sites render `reason.message` straight into a toast. The
+ * rejection is retagged here, at the one place every request passes through, so no caller can leak it.
+ */
+export class NetworkError extends Error {
+  /** The browser's own wording. Useful in a log line, never in the interface. */
+  readonly browserMessage: string
+
+  constructor(browserMessage: string) {
+    super(i18n.global.t('errors.network'))
+    this.name = 'NetworkError'
+    this.browserMessage = browserMessage
+  }
+}
+
+/**
+ * True when a same-origin request came back redirected elsewhere. With `redirect: 'manual'` this is
+ * how an edge auth proxy (Cloudflare Access, an OAuth2 gateway) shows up once its session cookie has
+ * expired: it can't be told apart from a logged-out app any other way, since `fetch` either follows the
+ * redirect into a CORS failure or throws before the caller ever sees a status code.
+ */
+export function isAuthProxyRedirect(res: Response): boolean {
+  return res.type === 'opaqueredirect'
+}
+
+/**
+ * A fetch can't complete a proxy's redirect to its login page itself. A full navigation can, so that's
+ * the only way through. Normally returns a promise that never settles: the reload is about to tear down this
+ * page, and letting the caller's `.then`/`.catch` run first (e.g. routing to the app's own login screen)
+ * would just flash the wrong UI for a moment.
+ */
+export function reloadForAuthProxy(): Promise<never> {
+  // If the reload is answered from the service worker cache again (e.g. the network failed), a second
+  // reload would loop forever. Give up and let the caller surface an error instead. Without storage
+  // the loop can't be detected, so don't risk the reload at all.
+  const now = Date.now()
+  let lastReload: number
+  try {
+    lastReload = Number(sessionStorage.getItem(AUTH_PROXY_RELOAD_KEY)) || 0
+    sessionStorage.setItem(AUTH_PROXY_RELOAD_KEY, String(now))
+  } catch {
+    return Promise.reject(new NetworkError('auth proxy redirect'))
+  }
+  if (now - lastReload < AUTH_PROXY_RELOAD_WINDOW_MS) {
+    return Promise.reject(new NetworkError('auth proxy redirect'))
+  }
+  window.location.reload()
+  return new Promise<never>(() => {})
+}
+
+export async function fetchWithAuthProxyRecovery(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, { ...init, redirect: 'manual' })
+  return isAuthProxyRedirect(res) ? reloadForAuthProxy() : res
+}
+
+async function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers)
   if (_accessToken) headers.set('Authorization', `Bearer ${_accessToken}`)
-  return fetch(input, { ...init, headers, credentials: 'include' })
+  try {
+    return await fetchWithAuthProxyRecovery(input, { ...init, headers, credentials: 'include' })
+  } catch (reason) {
+    if (reason instanceof TypeError) throw new NetworkError(reason.message)
+    throw reason
+  }
 }
 
 async function attemptRefresh(): Promise<string> {

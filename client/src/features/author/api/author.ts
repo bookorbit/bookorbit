@@ -1,10 +1,10 @@
 import { api } from '@/lib/api'
 import type {
   AuthorsPage,
+  AuthorBooksPage,
   AuthorDetail,
   AuthorMetadataCandidate,
   AuthorMetadataProviderKey,
-  BooksPage,
   JumpBucketsResponse,
   MergeAuthorsResult,
 } from '@bookorbit/types'
@@ -34,6 +34,7 @@ type ListAuthorBooksParams = {
   sort: AuthorBookSort
   order: SortDirection
   libraryId?: number | null
+  collapseSeries?: boolean
 }
 
 export type UpdateAuthorPayload = {
@@ -141,13 +142,14 @@ export async function fetchAuthor(id: number): Promise<AuthorDetail | null> {
   return res.json()
 }
 
-export async function fetchAuthorBooks(authorId: number, params: ListAuthorBooksParams): Promise<BooksPage> {
+export async function fetchAuthorBooks(authorId: number, params: ListAuthorBooksParams): Promise<AuthorBooksPage> {
   const query = toQuery({
     page: params.page,
     size: params.size,
     sort: params.sort,
     order: params.order,
     libraryId: params.libraryId ?? undefined,
+    collapseSeries: params.collapseSeries ? 'true' : undefined,
   })
 
   const res = await api(`/api/v1/authors/${authorId}/books${query}`)

@@ -30,15 +30,25 @@ const pluginType = (slug: string) => slug as IndexerAdapterType;
 function indexer(overrides: Partial<ResolvedIndexerConfig> = {}): ResolvedIndexerConfig {
   return {
     id: 1,
+    managerId: null,
+    managerPriority: null,
     name: 'jackett',
+    color: null,
     adapterType: 'torznab',
     baseUrl: 'http://127.0.0.1:9117',
     credential: null,
     allowPrivateAddress: true,
+    applyTrackerSeedGoals: true,
+    seedRatioGoal: null,
+    seedTimeMinutes: null,
     categories: { ebook: [7020], audiobook: [3030], comic: [7030] },
     disabledMediaKinds: [],
     isbnSearchDisabled: false,
     settings: null,
+    networkProfile: null,
+    perIndexerTimeoutSeconds: 20,
+    overallSearchBudgetSeconds: null,
+    autoExpandCategories: false,
     credentialError: null,
     ...overrides,
   };
@@ -63,13 +73,25 @@ function release(overrides: Partial<ReleaseCandidate> = {}): ReleaseCandidate {
  */
 function makeService(
   configs: ResolvedIndexerConfig[],
-  adapters: Record<string, { search: ReturnType<typeof vi.fn>; mediaKinds?: readonly string[]; seedsBack?: boolean; supportsIsbnSearch?: boolean }>,
+  adapters: Record<
+    string,
+    {
+      search: ReturnType<typeof vi.fn>;
+      mediaKinds?: readonly string[];
+      seedsBack?: boolean;
+      supportsIsbnSearch?: boolean;
+      delivery?: 'torrent' | 'usenet' | 'file';
+    }
+  >,
 ) {
   // The rows that exist, of which `configs` is the enabled subset. Every case here builds its
   // sources enabled, so the two counts match unless a case says otherwise.
   const indexers = {
     resolveEnabledConfigs: vi.fn().mockResolvedValue(configs),
     resolveConfig: vi.fn((id: number) => Promise.resolve(configs.find((config) => config.id === id))),
+    findColorsByIds: vi.fn((ids: number[]) =>
+      Promise.resolve(configs.filter((config) => ids.includes(config.id)).map((config) => ({ id: config.id, color: config.color }))),
+    ),
     countSources: vi.fn().mockResolvedValue({ configured: configs.length, enabled: configs.length }),
     recordSearchOutcomes: vi.fn().mockResolvedValue(undefined),
   };
@@ -79,6 +101,7 @@ function makeService(
       return adapter ? { mediaKinds: ['ebook', 'audiobook', 'comic'], supportsIsbnSearch: false, ...adapter } : undefined;
     }),
     seedsBack: vi.fn((type: string) => adapters[type]?.seedsBack ?? true),
+    delivery: vi.fn((type: string) => adapters[type]?.delivery ?? (adapters[type]?.seedsBack === false ? 'file' : 'torrent')),
   };
   // No profile, which is the shipped default and keeps these cases about search and scoring.
   const automationSettings = { get: vi.fn(() => Promise.resolve({ profiles: emptyReleaseProfiles() })) };
@@ -207,7 +230,7 @@ describe('IndexerSearchService', () => {
   });
 
   it('searches only the recommended ISBN while retaining every distinct provider ISBN as an alternative', async () => {
-    const libgen = { search: vi.fn().mockResolvedValue([]), supportsIsbnSearch: true };
+    const libgen = { search: vi.fn().mockResolvedValueOnce([release()]), supportsIsbnSearch: true };
     const { service } = makeService([indexer({ adapterType: pluginType('libgen') })], { libgen });
 
     const result = await service.search(
@@ -226,6 +249,51 @@ describe('IndexerSearchService', () => {
     );
     expect(result.criteria).toMatchObject({ activeIsbn: '9780441013593', isbns: ['9780441013593', '9781250301697'] });
     expect(result.indexers[0]?.query).toEqual({ kind: 'isbn', value: '9780441013593' });
+  });
+
+  it('falls back from an empty ISBN search to title and author without identifiers', async () => {
+    const libgen = {
+      search: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([release()]),
+      supportsIsbnSearch: true,
+    };
+    const { service } = makeService([indexer({ adapterType: pluginType('libgen') })], { libgen });
+
+    const result = await service.search(request({ isbn13: '9780441172719' }));
+
+    expect(libgen.search).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ isbn13: '9780441172719', isbn13s: ['9780441172719'] }),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(libgen.search).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ title: 'Dune', author: 'Frank Herbert', isbn13: null, isbn13s: [] }),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(result.releases).toHaveLength(1);
+    expect(result.indexers[0]?.query).toEqual({ kind: 'titleAuthor', value: 'Dune Frank Herbert' });
+  });
+
+  it('uses the existing title-only fallback after ISBN and title-author searches are empty', async () => {
+    const libgen = {
+      search: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([release()]),
+      supportsIsbnSearch: true,
+    };
+    const { service } = makeService([indexer({ adapterType: pluginType('libgen') })], { libgen });
+
+    const result = await service.search(request({ isbn13: '9780441172719' }));
+
+    expect(libgen.search).toHaveBeenCalledTimes(3);
+    expect(libgen.search).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ title: 'Dune', author: null, isbn13: null, isbn13s: [] }),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(result.releases).toHaveLength(1);
+    expect(result.indexers[0]?.query).toEqual({ kind: 'titleAuthor', value: 'Dune Frank Herbert' });
   });
 
   it('uses explicit picker overrides instead of silently retaining request search fields', async () => {
@@ -306,7 +374,7 @@ describe('IndexerSearchService', () => {
 
   it('limits fallback passes to ISBN-capable indexers', async () => {
     const torznab = { search: vi.fn().mockResolvedValue([]) };
-    const libgen = { search: vi.fn().mockResolvedValue([]), supportsIsbnSearch: true };
+    const libgen = { search: vi.fn().mockResolvedValue([release({ indexerId: 2 })]), supportsIsbnSearch: true };
     const { service } = makeService([indexer(), indexer({ id: 2, name: 'libgen', adapterType: pluginType('libgen') })], {
       torznab,
       libgen,
@@ -354,6 +422,7 @@ describe('IndexerSearchService', () => {
       {
         indexerId: 1,
         indexerName: 'jackett',
+        color: null,
         ok: false,
         count: 0,
         filtered: 0,
@@ -361,15 +430,18 @@ describe('IndexerSearchService', () => {
         failure: 'unauthorized',
         error: 'bad key',
         seedsBack: true,
+        delivery: 'torrent',
       },
       {
         indexerId: 2,
         indexerName: 'archive',
+        color: null,
         ok: true,
         count: 1,
         filtered: 0,
         query: { kind: 'titleAuthor', value: 'Dune Frank Herbert' },
         seedsBack: true,
+        delivery: 'torrent',
       },
     ]);
   });
@@ -436,6 +508,20 @@ describe('IndexerSearchService', () => {
     expect(torznab.search).toHaveBeenCalledTimes(2);
   });
 
+  it('refreshes source colors when serving a cached search', async () => {
+    const config = indexer({ color: 'blue' });
+    const torznab = { search: vi.fn().mockResolvedValue([release()]) };
+    const { service } = makeService([config], { torznab });
+
+    await service.search(request());
+    config.color = 'orange';
+
+    const cached = await service.search(request());
+    expect(cached.cached).toBe(true);
+    expect(cached.indexers[0]?.color).toBe('orange');
+    expect(torznab.search).toHaveBeenCalledOnce();
+  });
+
   it('keeps manual and default search caches separate while retaining both pickable result sets', async () => {
     const torznab = {
       search: vi.fn((query: { title: string }) =>
@@ -455,7 +541,7 @@ describe('IndexerSearchService', () => {
   });
 
   it('keeps all-indexer and ISBN-capable search caches separate', async () => {
-    const libgen = { search: vi.fn().mockResolvedValue([]), supportsIsbnSearch: true };
+    const libgen = { search: vi.fn().mockResolvedValue([release()]), supportsIsbnSearch: true };
     const { service } = makeService([indexer({ adapterType: pluginType('libgen') })], { libgen });
     const book = request({ isbn13: '9780441172719' });
 
@@ -694,5 +780,86 @@ describe('IndexerSearchService', () => {
       expect.objectContaining({ indexerId: 2, ok: true, count: 1 }),
     ]);
     expect(result.releases).toHaveLength(1);
+  });
+
+  it('uses Prowlarr priority only after tier, score, and seeders are tied', async () => {
+    const torznab = {
+      search: vi
+        .fn()
+        .mockResolvedValueOnce([release({ indexerId: 1, guid: 'lower-priority' })])
+        .mockResolvedValueOnce([release({ indexerId: 2, guid: 'higher-priority' })]),
+    };
+    const { service } = makeService(
+      [
+        indexer({ id: 1, managerId: 3, managerPriority: 20, overallSearchBudgetSeconds: 60 }),
+        indexer({ id: 2, managerId: 3, managerPriority: 5, overallSearchBudgetSeconds: 60 }),
+      ],
+      { torznab },
+    );
+
+    const result = await service.search(request());
+
+    expect(result.releases.map((item) => item.guid)).toEqual(['higher-priority', 'lower-priority']);
+  });
+
+  it('expands categories only after a successful empty response', async () => {
+    const torznab = { search: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([release()]) };
+    const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
+
+    await service.search(request({ authors: [] }));
+
+    expect(torznab.search).toHaveBeenCalledTimes(2);
+    expect(torznab.search.mock.calls[0]?.[1].categories.ebook).toEqual([7020]);
+    expect(torznab.search.mock.calls[1]?.[1].categories.ebook).toEqual([]);
+  });
+
+  it('keeps the title-only query when it expands categories after an author retry', async () => {
+    const torznab = { search: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([release()]) };
+    const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
+
+    await service.search(request());
+
+    expect(torznab.search).toHaveBeenCalledTimes(3);
+    expect(torznab.search.mock.calls[0]?.[0].author).toBe('Frank Herbert');
+    expect(torznab.search.mock.calls[1]?.[0].author).toBeNull();
+    expect(torznab.search.mock.calls[2]?.[0].author).toBeNull();
+    expect(torznab.search.mock.calls[2]?.[1].categories.ebook).toEqual([]);
+  });
+
+  it('does not expand categories after a failed search', async () => {
+    const torznab = { search: vi.fn().mockRejectedValue(new IndexerSearchException('unreachable', 'offline')) };
+    const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
+
+    const result = await service.search(request({ authors: [] }));
+
+    expect(torznab.search).toHaveBeenCalledTimes(1);
+    expect(result.indexers[0]).toMatchObject({ ok: false, failure: 'unreachable' });
+  });
+
+  it('keeps a picked candidate actionable after the visible result cache expires', async () => {
+    vi.useFakeTimers();
+    try {
+      const torznab = { search: vi.fn().mockResolvedValue([release()]) };
+      const { service } = makeService([indexer()], { torznab });
+      await service.search(request());
+
+      vi.advanceTimersByTime(4 * 60 * 1000);
+
+      expect(service.find(7, 1, 'g1')).toMatchObject({ guid: 'g1' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refreshes a stale managed URL only when the release identity still matches', async () => {
+    const stale = release({ infoHash: 'ABC', downloadUrl: 'https://prowlarr.test/old' });
+    const exact = release({ infoHash: 'abc', downloadUrl: 'https://prowlarr.test/fresh' });
+    const lookalike = release({ guid: 'other', infoHash: 'def', downloadUrl: 'https://prowlarr.test/wrong' });
+    const torznab = { search: vi.fn().mockResolvedValueOnce([stale]).mockResolvedValueOnce([lookalike, exact]) };
+    const managed = indexer({ managerId: 3, managerPriority: 10, overallSearchBudgetSeconds: 60 });
+    const { service } = makeService([managed], { torznab });
+    await service.search(request());
+
+    await expect(service.refreshCandidate(7, 1, stale)).resolves.toMatchObject({ downloadUrl: 'https://prowlarr.test/fresh' });
   });
 });

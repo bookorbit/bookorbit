@@ -103,6 +103,7 @@ local plugin = {
         doc_settings = { readSetting = function() return {} end },
         statistics = {
             settings = { is_enabled = true },
+            id_curr_book = 42,
             insertDB = function() flushes = flushes + 1 end,
         },
     },
@@ -122,6 +123,8 @@ assertEqual(sqlite.opens, 1, "capture opens no database when identity is primed"
 assertEqual(flushes, 1, "the pending page-stat flush still runs live at capture")
 assertEqual(#snap.stats_ids, 1, "the snapshot carries the statistics row ids")
 assertEqual(snap.stats_ids[1], 42, "the row id comes from the primed identity")
+assertEqual(snap.stats_row.id, 42, "the exact live statistics row is carried with its metadata")
+assertEqual(snap.stats_row_ambiguous, false, "a single statistics row needs no explicit collision routing")
 assertEqual(snap.title, "Statistics Title", "stable identity fields come from the cache")
 assertEqual(snap.percentage, 0.5, "progress is read live, never cached")
 assert(type(snap.ann_signature) == "string" and snap.ann_signature ~= "",
@@ -144,15 +147,37 @@ local warm = BookSync.capture(plugin)
 assertEqual(sqlite.opens, 1, "the fallback primes the cache for the next handler")
 assertEqual(warm.stats_ids[1], 42, "the warmed capture carries the same row ids")
 
--- A book with no statistics row yet is a cached miss, not a cache bypass; the
--- drain resolves it through getBookIds() instead.
+-- A genuine partial-MD5 collision still has an exact live KOReader row while
+-- the book is open. Capture must preserve that row rather than the whole hash
+-- group so the drain can bind and replay it safely.
+book_rows = {
+    { "42", "Collision One", "Author A", "1700000000" },
+    { "43", "Collision Two", "Author B", "1700000100" },
+}
+plugin.ui.statistics.id_curr_book = 43
+BookOrbitStatsReader.forgetIdentity()
+local collision = BookSync.capture(plugin)
+assertEqual(collision.stats_row_ambiguous, true, "the exact row records that its digest collides")
+assertEqual(collision.stats_row.id, 43, "capture selects the live collision row")
+assertEqual(collision.stats_row.title, "Collision Two", "the selected row keeps its identity guard")
+assertEqual(#collision.stats_ids, 1, "only the live collision row is eligible for this book sync")
+assertEqual(collision.stats_ids[1], 43, "the other book's statistics row is never included")
+
+-- A repaired digest can be a cached miss while KOReader still has historical
+-- events attached to the current row's old digest. The live row id is exact,
+-- so capture carries it under the recomputed file hash without a second query.
 book_rows = {}
+plugin.ui.statistics.id_curr_book = 115
+plugin.bookorbit_document_digest = { file = "/books/a.epub", digest = "abc123", repaired = true }
 BookOrbitStatsReader.forgetIdentity()
 sqlite.opens = 0
 BookOrbitStatsReader.primeIdentity("abc123")
 local missing = BookSync.capture(plugin)
 assertEqual(sqlite.opens, 1, "a cached miss is not re-queried by the handler")
-assertEqual(#missing.stats_ids, 0, "a missing statistics row captures no ids")
+assertEqual(#missing.stats_ids, 1, "a repaired digest retains the live statistics row")
+assertEqual(missing.stats_ids[1], 115, "historical events follow the exact current-book row")
+assertEqual(missing.stats_metadata_ambiguous, false, "the exact current row is not ambiguous")
+assertEqual(missing.stats_identity_repaired, true, "the snapshot requests an unwatermarked history replay")
 local entry, was_cached = BookOrbitStatsReader.cachedIdentity("abc123")
 assertEqual(entry, nil, "the cached miss stores no row")
 assertEqual(was_cached, true, "a miss is still cached, so the handler stops looking")

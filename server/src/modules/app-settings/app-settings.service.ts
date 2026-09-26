@@ -27,6 +27,7 @@ import {
   type OidcFullConfig,
 } from '../../common/constants/app-settings.constants';
 import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
+import { DEFAULT_MAX_UPLOAD_SIZE_MB, HARD_MAX_UPLOAD_SIZE_MB } from '../../common/constants/upload.constants';
 import { AppSettingsRepository } from './app-settings.repository';
 
 const OIDC_TEST_TIMEOUT_MS = 10_000;
@@ -85,8 +86,8 @@ export class AppSettingsService {
     }
     if (key === APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB) {
       const parsed = parseInt(value, 10);
-      if (isNaN(parsed) || parsed <= 0) {
-        throw new BadRequestException('Upload size limit must be an integer greater than 0');
+      if (isNaN(parsed) || parsed <= 0 || parsed > HARD_MAX_UPLOAD_SIZE_MB) {
+        throw new BadRequestException(`Upload size limit must be an integer between 1 and ${HARD_MAX_UPLOAD_SIZE_MB}`);
       }
     }
     const setting = await this.repo.updateByKey(key, value);
@@ -367,8 +368,8 @@ export class AppSettingsService {
 
   async getMaxUploadSizeMb(): Promise<number> {
     const row = await this.repo.findByKey(APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB);
-    const size = row?.value ? parseInt(row.value, 10) : 500;
-    return isNaN(size) || size <= 0 ? 500 : size;
+    const size = row?.value ? parseInt(row.value, 10) : DEFAULT_MAX_UPLOAD_SIZE_MB;
+    return isNaN(size) || size <= 0 ? DEFAULT_MAX_UPLOAD_SIZE_MB : Math.min(size, HARD_MAX_UPLOAD_SIZE_MB);
   }
 }
 

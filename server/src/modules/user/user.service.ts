@@ -1,5 +1,5 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Permission } from '@bookorbit/types';
@@ -22,6 +22,7 @@ import { UserRepository, type UserListQuery } from './user.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UserStatisticsService } from '../user-statistics/user-statistics.service';
 import { AuthenticationPolicyService } from '../../common/services/authentication-policy.service';
+import { appConfig } from '../../config/config';
 
 /** The band is a to-do list, not a second roster. */
 const ATTENTION_BAND_LIMIT = 8;
@@ -33,7 +34,7 @@ export class UserService {
 
   constructor(
     private readonly userRepo: UserRepository,
-    private readonly config: ConfigService,
+    @Inject(appConfig.KEY) private readonly appConfiguration: ConfigType<typeof appConfig>,
     private readonly contentFilterRepo: ContentFilterRepository,
     private readonly appSettingsService: AppSettingsService,
     private readonly userStatistics: UserStatisticsService,
@@ -158,7 +159,7 @@ export class UserService {
       await this.userRepo.assignViewerLibraries(user.id, libraryIds);
     }
 
-    const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
+    const appUrl = this.appConfiguration.appUrl;
     const rawToken = await this.userRepo.generateResetToken(user.id);
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
 
@@ -439,7 +440,7 @@ export class UserService {
     if (target.provisioningMethod === 'shared') {
       throw new BadRequestException('Shared accounts do not have passwords');
     }
-    const appUrl = this.config.get<string>('app.appUrl') ?? 'http://localhost:5173';
+    const appUrl = this.appConfiguration.appUrl;
     const rawToken = await this.userRepo.generateResetToken(targetUserId);
     return { resetUrl: `${appUrl}/reset-password?token=${rawToken}` };
   }
@@ -504,6 +505,7 @@ export class UserService {
       libraries: { ...currentPrefs.libraries, ...(dto.libraries ?? {}) },
       collections: { ...currentPrefs.collections, ...(dto.collections ?? {}) },
       smartScopes: { ...(currentPrefs.smartScopes ?? {}), ...(dto.smartScopes ?? {}) },
+      authorPages: dto.authorPages !== undefined ? dto.authorPages : (currentPrefs.authorPages ?? false),
     };
 
     // Remove entries set to null (deletion of overrides)
@@ -521,20 +523,20 @@ export class UserService {
   }
 
   async getContentFilters(targetUserId: number, requestingUser: RequestUser) {
-    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
-    if (!target) throw new NotFoundException('User not found');
-    if (targetUserId !== requestingUser.id && !requestingUser.isSuperuser) {
+    if (targetUserId !== requestingUser.id && !this.canManageUsers(requestingUser)) {
       throw new ForbiddenException('Cannot view another user content filters');
     }
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
     return this.contentFilterRepo.findByUserIdWithNames(targetUserId);
   }
 
   async setContentFilters(targetUserId: number, dto: SetContentFiltersDto, requestingUser: RequestUser) {
+    if (!this.canManageUsers(requestingUser)) {
+      throw new ForbiddenException(`Missing permission: ${Permission.ManageUsers}`);
+    }
     const target = await this.userRepo.findByIdWithPermissions(targetUserId);
     if (!target) throw new NotFoundException('User not found');
-    if (!requestingUser.isSuperuser) {
-      throw new ForbiddenException('Only administrators can set content filters');
-    }
     if (target.isSuperuser) {
       throw new BadRequestException('Content filters cannot be applied to administrators');
     }
@@ -549,5 +551,9 @@ export class UserService {
     if (dto.seeOwnRequestedBooks !== undefined) {
       await this.userRepo.update(targetUserId, { seeOwnRequestedBooks: dto.seeOwnRequestedBooks });
     }
+  }
+
+  private canManageUsers(user: RequestUser): boolean {
+    return user.isSuperuser || user.permissions.includes(Permission.ManageUsers);
   }
 }

@@ -5,12 +5,14 @@ vi.mock('drizzle-orm', () => {
     chunks,
     separator,
   }));
+  (sqlFn as typeof sqlFn & { identifier: ReturnType<typeof vi.fn> }).identifier = vi.fn((value: string) => ({ op: 'sql.identifier', value }));
 
   return {
     and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
     asc: vi.fn((value: unknown) => ({ op: 'asc', value })),
     count: vi.fn(() => ({ op: 'count' })),
     eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
+    getTableName: vi.fn(() => 'table'),
     inArray: vi.fn((left: unknown, values: unknown[]) => ({ op: 'inArray', left, values })),
     isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
     max: vi.fn((value: unknown) => ({ op: 'max', value })),
@@ -22,7 +24,7 @@ vi.mock('drizzle-orm', () => {
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { BookMetadataFetchConfig } from '@bookorbit/types';
 
-import { bookMetadata, bookMetadataFetchQueue, bookNarrators, books } from '../../db/schema';
+import { bookCovers, bookFiles, bookMetadata, bookMetadataFetchQueue, bookNarrators, books } from '../../db/schema';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 
 describe('BookMetadataFetchQueueRepository', () => {
@@ -137,6 +139,21 @@ describe('BookMetadataFetchQueueRepository', () => {
     expect(hasNarratorsClause).toBe(true);
     expect(hasDurationClause).toBe(true);
     expect(hasAbridgedClause).toBe(true);
+  });
+
+  it('fetchEligibleBookIds finds books whose cover media include audio and whose audio slot is empty', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ bookId: 9 }]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+    const config = baseConfig();
+    config.conditions.missingFields.enabled = true;
+    config.conditions.missingFields.fields = ['audioCover'];
+
+    await expect(repo.fetchEligibleBookIds(config)).resolves.toEqual([9]);
+
+    const sqlCalls = vi.mocked(sql).mock.calls;
+    expect(sqlCalls.some((call) => call.slice(1).includes(bookCovers) && call.slice(1).includes('audio'))).toBe(true);
+    expect(sqlCalls.some((call) => call.slice(1).includes(bookFiles.mediaOverlayAvailable))).toBe(true);
   });
 
   it('returns empty results without touching the database when no conditions are enabled', async () => {

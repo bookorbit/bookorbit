@@ -1,11 +1,11 @@
 import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 import type { Mocked } from 'vitest';
-import { firstValueFrom, toArray } from 'rxjs';
+import { filter, firstValueFrom, map, pipe, toArray } from 'rxjs';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { MetadataFetchRepository } from './metadata-fetch.repository';
-import { MetadataFetchService } from './metadata-fetch.service';
+import { MetadataFetchService, MetadataSearchEvent } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleError } from './provider-throttle.error';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
@@ -42,6 +42,23 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
     resolve = r;
   });
   return { promise, resolve };
+}
+
+type CandidateEvent = Extract<MetadataSearchEvent, { kind: 'candidate' }>;
+
+function isCandidateEvent(event: MetadataSearchEvent): event is CandidateEvent {
+  return event.kind === 'candidate';
+}
+
+function candidatesOnly() {
+  return pipe(
+    filter(isCandidateEvent),
+    map((event: CandidateEvent) => event.candidate),
+  );
+}
+
+function statusesOf(events: MetadataSearchEvent[]) {
+  return events.filter((event) => event.kind === 'status').map((event) => event.status);
 }
 
 describe('MetadataFetchService', () => {
@@ -96,7 +113,7 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([google, openLibrary]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(candidatesOnly(), toArray()));
 
     expect(results).toHaveLength(3);
     expect(results).toEqual(
@@ -108,6 +125,35 @@ describe('MetadataFetchService', () => {
     );
     expect(google.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }));
     expect(openLibrary.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }));
+  });
+
+  it('states every cover shape, from the provider when the candidate does not say', async () => {
+    const withCover = (id: string, data: Partial<MetadataCandidate> = {}) => ({
+      ...candidate(MetadataProviderKey.GOOGLE, id, 'Dune'),
+      coverUrl: `https://img/${id}.jpg`,
+      ...data,
+    });
+    const fixed: MetadataProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: false,
+      coverShape: 'portrait',
+      search: vi
+        .fn()
+        .mockResolvedValue([withCover('a'), withCover('b', { coverShape: 'square' }), candidate(MetadataProviderKey.GOOGLE, 'c', 'Dune')]),
+    };
+    const unknown: MetadataProvider = {
+      key: MetadataProviderKey.OPEN_LIBRARY,
+      label: 'OpenLibrary',
+      identifiable: false,
+      search: vi.fn().mockResolvedValue([{ ...withCover('d'), provider: MetadataProviderKey.OPEN_LIBRARY }]),
+    };
+    registry.select.mockReturnValue([fixed, unknown]);
+
+    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(candidatesOnly(), toArray()));
+    const shapes = Object.fromEntries(results.map((result) => [result.providerId, result.coverShape]));
+
+    expect(shapes).toEqual({ a: 'portrait', b: 'square', c: undefined, d: 'unknown' });
   });
 
   it('starts selected providers concurrently within one search', async () => {
@@ -141,7 +187,7 @@ describe('MetadataFetchService', () => {
     const openLibrary = makeBlockedProvider(MetadataProviderKey.OPEN_LIBRARY);
     registry.select.mockReturnValue([google, openLibrary]);
 
-    const search = firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const search = firstValueFrom(service.search({ title: 'Dune' }).pipe(candidatesOnly(), toArray()));
 
     await Promise.all([google.started, openLibrary.started]);
 
@@ -168,7 +214,9 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([google]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune', author: 'Frank Herbert', isbn: '9780441013593' }).pipe(toArray()));
+    const results = await firstValueFrom(
+      service.search({ title: 'Dune', author: 'Frank Herbert', isbn: '9780441013593' }).pipe(candidatesOnly(), toArray()),
+    );
 
     expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-fallback', 'Dune')]);
     expect(google.search).toHaveBeenCalledTimes(2);
@@ -199,7 +247,7 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([google]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune', isbn: '9780441013593' }).pipe(toArray()));
+    const results = await firstValueFrom(service.search({ title: 'Dune', isbn: '9780441013593' }).pipe(candidatesOnly(), toArray()));
 
     expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'g-isbn', 'Dune')]);
     expect(google.search).toHaveBeenCalledTimes(1);
@@ -215,7 +263,7 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([google]);
 
-    const results = await firstValueFrom(service.search({ isbn: '9780441013593' }).pipe(toArray()));
+    const results = await firstValueFrom(service.search({ isbn: '9780441013593' }).pipe(candidatesOnly(), toArray()));
 
     expect(results).toEqual([]);
     expect(google.search).toHaveBeenCalledTimes(1);
@@ -236,7 +284,7 @@ describe('MetadataFetchService', () => {
     registry.select.mockReturnValue([audible]);
 
     const results = await firstValueFrom(
-      service.search({ title: 'Confessor', author: 'Terry Goodkin', isbn: '9781662539374', isAudiobook: true }).pipe(toArray()),
+      service.search({ title: 'Confessor', author: 'Terry Goodkin', isbn: '9781662539374', isAudiobook: true }).pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([candidate(MetadataProviderKey.AUDIBLE, 'B002V1NSN2', 'Confessor')]);
@@ -267,7 +315,7 @@ describe('MetadataFetchService', () => {
           isAudiobook: true,
           maxCandidatesPerProvider: 1,
         })
-        .pipe(toArray()),
+        .pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([]);
@@ -285,7 +333,7 @@ describe('MetadataFetchService', () => {
     registry.select.mockReturnValue([google]);
 
     const results = await firstValueFrom(
-      service.search({ title: 'Dune', existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' } }).pipe(toArray()),
+      service.search({ title: 'Dune', existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' } }).pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'stored-id', 'Dune')]);
@@ -311,7 +359,7 @@ describe('MetadataFetchService', () => {
     registry.select.mockReturnValue([google]);
 
     const results = await firstValueFrom(
-      service.search({ title: 'Dune', existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'missing' } }).pipe(toArray()),
+      service.search({ title: 'Dune', existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'missing' } }).pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'search-id', 'Dune')]);
@@ -345,7 +393,7 @@ describe('MetadataFetchService', () => {
           isbn: '9789523331587',
           existingProviderIds: { [MetadataProviderKey.HARDCOVER]: 'comet-in-moominland' },
         })
-        .pipe(toArray()),
+        .pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([candidate(MetadataProviderKey.HARDCOVER, 'comet-in-moominland', 'Kometen kommer')]);
@@ -385,7 +433,7 @@ describe('MetadataFetchService', () => {
           author: 'Frank Herbert',
           existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' },
         })
-        .pipe(toArray()),
+        .pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'search-id', 'Dune')]);
@@ -419,7 +467,7 @@ describe('MetadataFetchService', () => {
           existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' },
           existingProviderIdsOnly: true,
         })
-        .pipe(toArray()),
+        .pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([]);
@@ -445,7 +493,7 @@ describe('MetadataFetchService', () => {
           existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' },
           existingProviderIdsOnly: true,
         })
-        .pipe(toArray()),
+        .pipe(candidatesOnly(), toArray()),
     );
 
     expect(results).toEqual([]);
@@ -462,7 +510,9 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([google]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune', existingProviderIds: {}, existingProviderIdsOnly: true }).pipe(toArray()));
+    const results = await firstValueFrom(
+      service.search({ title: 'Dune', existingProviderIds: {}, existingProviderIdsOnly: true }).pipe(candidatesOnly(), toArray()),
+    );
 
     expect(results).toEqual([]);
     expect(google.lookupById).not.toHaveBeenCalled();
@@ -483,7 +533,7 @@ describe('MetadataFetchService', () => {
       existingProviderIds: { [MetadataProviderKey.AUDIBLE]: 'B0EXISTING' },
       existingProviderIdsOnly: true,
     };
-    const results = await firstValueFrom(service.search(params).pipe(toArray()));
+    const results = await firstValueFrom(service.search(params).pipe(candidatesOnly(), toArray()));
 
     expect(results).toEqual([candidate(MetadataProviderKey.AUDNEXUS, 'B0EXISTING', 'Dune')]);
     expect(audnexus.search).toHaveBeenCalledOnce();
@@ -505,7 +555,7 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([failing, healthy]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(candidatesOnly(), toArray()));
 
     expect(results).toEqual([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', 'Dune')]);
   });
@@ -521,7 +571,7 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([stalled]);
 
-    const searchPromise = firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const searchPromise = firstValueFrom(service.search({ title: 'Dune' }).pipe(candidatesOnly(), toArray()));
     let settled = false;
     void searchPromise.then(() => {
       settled = true;
@@ -534,7 +584,7 @@ describe('MetadataFetchService', () => {
     await expect(searchPromise).resolves.toEqual([]);
   });
 
-  it('does not emit candidates for a stalled provider (result is empty)', async () => {
+  it('reports a stalled provider as a timeout rather than letting it read as empty', async () => {
     vi.useFakeTimers();
 
     const stalled: MetadataProvider = {
@@ -545,14 +595,13 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([stalled]);
 
-    const resultsPromise = firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const events = firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
     await vi.advanceTimersByTimeAsync(15_000);
-    const results = await resultsPromise;
 
-    expect(results).toEqual([]);
+    expect(statusesOf(await events)).toEqual([{ provider: MetadataProviderKey.COMICVINE, outcome: 'timeout' }]);
   });
 
-  it('does not emit candidates for a throttled provider (result is empty)', async () => {
+  it('reports a throttled provider as throttled', async () => {
     const throttled: MetadataProvider = {
       key: MetadataProviderKey.COMICVINE,
       label: 'ComicVine',
@@ -561,12 +610,45 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([throttled]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const events = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
 
-    expect(results).toEqual([]);
+    expect(statusesOf(events)).toEqual([{ provider: MetadataProviderKey.COMICVINE, outcome: 'throttled' }]);
   });
 
-  it('continues processing other providers when one provider errors', async () => {
+  it('keeps the candidates a throttled provider had already assembled, and still records the cooldown', async () => {
+    const scraped = candidate(MetadataProviderKey.GOODREADS, '222794853', 'Dune');
+    const throttled: MetadataProvider = {
+      key: MetadataProviderKey.GOODREADS,
+      label: 'Goodreads',
+      identifiable: false,
+      search: vi.fn().mockRejectedValue(new ProviderThrottleError(undefined, 'bot challenge', [scraped])),
+    };
+    registry.select.mockReturnValue([throttled]);
+
+    const events = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+
+    expect(events.filter(isCandidateEvent).map((event) => event.candidate)).toEqual([scraped]);
+    expect(statusesOf(events)).toEqual([{ provider: MetadataProviderKey.GOODREADS, outcome: 'throttled' }]);
+    expect(throttleTracker.record).toHaveBeenCalledWith(MetadataProviderKey.GOODREADS, undefined);
+  });
+
+  it('holds salvaged candidates to the same relevance bar as candidates from a provider that finished', async () => {
+    const unrelated = candidate(MetadataProviderKey.GOODREADS, '247090873', 'A Wholly Different Book');
+    const throttled: MetadataProvider = {
+      key: MetadataProviderKey.GOODREADS,
+      label: 'Goodreads',
+      identifiable: false,
+      search: vi.fn().mockRejectedValue(new ProviderThrottleError(undefined, 'bot challenge', [unrelated])),
+    };
+    registry.select.mockReturnValue([throttled]);
+
+    const events = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+
+    expect(events.filter(isCandidateEvent)).toEqual([]);
+    expect(statusesOf(events)).toEqual([{ provider: MetadataProviderKey.GOODREADS, outcome: 'throttled' }]);
+  });
+
+  it('reports a provider that errored, alongside the candidates the others found', async () => {
     const failing: MetadataProvider = {
       key: MetadataProviderKey.GOODREADS,
       label: 'Goodreads',
@@ -581,12 +663,13 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([failing, healthy]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const events = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
 
-    expect(results).toEqual([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', 'Dune')]);
+    expect(statusesOf(events)).toEqual([{ provider: MetadataProviderKey.GOODREADS, outcome: 'failed' }]);
+    expect(events.filter((event) => event.kind === 'candidate')).toHaveLength(1);
   });
 
-  it('returns empty array when provider finishes with no candidates', async () => {
+  it('stays silent about providers that finish, including those that simply found nothing', async () => {
     const empty: MetadataProvider = {
       key: MetadataProviderKey.OPEN_LIBRARY,
       label: 'OpenLibrary',
@@ -595,9 +678,9 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([empty]);
 
-    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const events = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
 
-    expect(results).toEqual([]);
+    expect(statusesOf(events)).toEqual([]);
   });
 
   it('keeps provider status out of the candidate-only view the automatic pipeline consumes', async () => {
@@ -615,7 +698,7 @@ describe('MetadataFetchService', () => {
     };
     registry.select.mockReturnValue([failing, healthy]);
 
-    const candidates = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+    const candidates = await firstValueFrom(service.searchCandidates({ title: 'Dune' }).pipe(toArray()));
 
     expect(candidates).toEqual([candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', 'Dune')]);
   });

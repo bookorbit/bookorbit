@@ -108,6 +108,9 @@ describe('useReaderProgress', () => {
         koboLocationValue: 'kobo.1.1',
         koboContentSourceProgressPercent: 0.42,
         koreaderProgress: '/body/DocFragment[1]/body/p[1]',
+        positionSeconds: 123.5,
+        mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+        mediaOverlaySectionIndex: 2,
       }
       mockApi.mockResolvedValue(makeOkResponse(data))
       const elapsedMinutes = ref(0)
@@ -121,6 +124,10 @@ describe('useReaderProgress', () => {
         koboLocationValue,
         koboContentSourceProgressPercent,
         koreaderProgress,
+        positionSeconds,
+        mediaOverlayFragment,
+        mediaOverlaySectionIndex,
+        hasMediaOverlayProgress,
       } = useReaderProgress(1, 42, elapsedMinutes)
 
       await load()
@@ -133,6 +140,20 @@ describe('useReaderProgress', () => {
       expect(koboLocationValue.value).toBe(data.koboLocationValue)
       expect(koboContentSourceProgressPercent.value).toBe(data.koboContentSourceProgressPercent)
       expect(koreaderProgress.value).toBe(data.koreaderProgress)
+      expect(positionSeconds.value).toBe(data.positionSeconds)
+      expect(mediaOverlayFragment.value).toBe(data.mediaOverlayFragment)
+      expect(mediaOverlaySectionIndex.value).toBe(data.mediaOverlaySectionIndex)
+      expect(hasMediaOverlayProgress.value).toBe(true)
+    })
+
+    it('treats position-only EPUB3 narration rows as media-overlay progress', async () => {
+      mockApi.mockResolvedValue(makeOkResponse({ positionSeconds: 900, mediaOverlayFragment: null, mediaOverlaySectionIndex: null }))
+      const elapsedMinutes = ref(0)
+      const { load, hasMediaOverlayProgress } = useReaderProgress(1, 42, elapsedMinutes)
+
+      await load()
+
+      expect(hasMediaOverlayProgress.value).toBe(true)
     })
 
     it('leaves state unchanged on non-ok response', async () => {
@@ -560,6 +581,39 @@ describe('useReaderProgress', () => {
       expect(body.percentage).toBe(55)
       expect(Number.isFinite(body.percentage)).toBe(true)
       expect(percentage.value).toBe(55)
+    })
+
+    it('sends media overlay progress fields in body', async () => {
+      mockApi.mockResolvedValue(makeOkResponse({}))
+      const elapsedMinutes = ref(0)
+      const { setMediaOverlayProgress, save } = useReaderProgress(1, 42, elapsedMinutes)
+
+      setMediaOverlayProgress('OPS/ch1.xhtml#s12', 2)
+      vi.clearAllTimers()
+      await save()
+
+      const body = postedProgressBody()
+      expect(body.positionSeconds).toBeNull()
+      expect(body.mediaOverlayFragment).toBe('OPS/ch1.xhtml#s12')
+      expect(body.mediaOverlaySectionIndex).toBe(2)
+    })
+
+    // The two positions share one record, so the server has to be told which one moved: a
+    // read-along resuming behind the page must not drag the page back to it.
+    it('marks media overlay saves as narration and page moves as text', async () => {
+      mockApi.mockResolvedValue(makeOkResponse({}))
+      const elapsedMinutes = ref(0)
+      const { setMediaOverlayProgress, onRelocate, save } = useReaderProgress(1, 42, elapsedMinutes)
+
+      setMediaOverlayProgress('OPS/ch1.xhtml#s12', 2, 44.3)
+      vi.clearAllTimers()
+      await save()
+      expect(postedProgressBody().source).toBe('narration')
+
+      onRelocate({ fraction: 0.32, cfi: 'epubcfi(/6/40)' } as never)
+      vi.clearAllTimers()
+      await save()
+      expect(postedProgressBody(1).source).toBe('text')
     })
   })
 

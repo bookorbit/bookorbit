@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { CronExpression } from '@nestjs/schedule';
 import {
   AUTO_SEARCH_BACKOFF_WEEK_MS,
   compareByTier,
@@ -20,6 +20,7 @@ import type {
   ReleaseCandidateItem,
 } from '@bookorbit/types';
 
+import { SystemCron } from '../../../common/decorators/system-cron.decorator';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { BookRequestRow } from '../../../db/schema';
 import { BOOK_REQUEST_DOWNLOAD_FAILED, BookRequestEventsService } from '../book-request-events.service';
@@ -133,7 +134,7 @@ export class RequestAutomationService implements OnModuleInit {
    * conditionally and is safe to re-enter, so a request an approver acts on mid-sweep is left
    * alone by the pass that reaches it.
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  @SystemCron(CronExpression.EVERY_HOUR)
   async sweepUnfulfilled(): Promise<void> {
     if (this.sweeping) return;
     const startedAt = Date.now();
@@ -593,22 +594,24 @@ interface AutomationSearchVariant {
  */
 class BlockedSources {
   private readonly refusals: GrabRefusal[] = [];
-  /** Whether a grab from each source joins a swarm, which is the same thing as needing a client. */
-  private readonly seedsBack: Map<number, boolean>;
+  private readonly deliveries: Map<number, IndexerSearchStatus['delivery']>;
 
   constructor(indexers: IndexerSearchStatus[]) {
-    this.seedsBack = new Map(indexers.map((indexer) => [indexer.indexerId, indexer.seedsBack]));
+    this.deliveries = new Map(indexers.map((indexer) => [indexer.indexerId, indexer.delivery]));
   }
 
   blocks(release: ReleaseCandidateItem): boolean {
-    // A source the search never reported on cannot be shown to be a direct download, and a
-    // torrent is the safer thing to assume: it is the shape that needs a client.
-    const seedsBack = this.seedsBack.get(release.indexerId) ?? true;
-    return findGrabRefusal({ indexerId: release.indexerId, vipOnly: release.vipOnly, seedsBack }, this.refusals) !== null;
+    return findGrabRefusal({ indexerId: release.indexerId, vipOnly: release.vipOnly, delivery: this.deliveryFor(release) }, this.refusals) !== null;
   }
 
   record(release: ReleaseCandidateItem, code: GrabFailureCode): void {
-    this.refusals.push({ indexerId: release.indexerId, code });
+    this.refusals.push({ indexerId: release.indexerId, delivery: this.deliveryFor(release), code });
+  }
+
+  private deliveryFor(release: ReleaseCandidateItem): IndexerSearchStatus['delivery'] {
+    // A source omitted from search status cannot be proven to be client-free. Torrent preserves
+    // the established conservative fallback for older or malformed search responses.
+    return this.deliveries.get(release.indexerId) ?? 'torrent';
   }
 }
 

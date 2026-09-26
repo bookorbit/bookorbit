@@ -11,10 +11,12 @@ interface RectLike {
 }
 
 function makeRange(text: string, rect: RectLike): Range {
-  return {
+  const r = {
     toString: () => text,
     getBoundingClientRect: () => rect as DOMRect,
+    cloneRange: () => r,
   } as unknown as Range
+  return r
 }
 
 function makeDoc(options: { selection: Selection | null; iframeRect?: RectLike }): Document {
@@ -67,6 +69,7 @@ describe('useFoliateSelection', () => {
     expect(onSelected).toHaveBeenCalledWith({
       text: 'picked text',
       cfi: 'epubcfi(/6/2)',
+      range: expect.objectContaining({ toString: expect.any(Function) }),
       popupPosition: {
         x: 100,
         y: 130,
@@ -141,6 +144,96 @@ describe('useFoliateSelection', () => {
     if (originalMaxTouchPoints) {
       Object.defineProperty(navigator, 'maxTouchPoints', originalMaxTouchPoints)
     }
+
+    vi.useRealTimers()
+  })
+
+  it('waits for an active touch interaction to finish before publishing the selection', () => {
+    vi.useFakeTimers()
+
+    const range = makeRange('Adjusted selection', {
+      left: 120,
+      top: 220,
+      bottom: 260,
+      width: 80,
+      height: 40,
+    })
+    const selection = {
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => range,
+    } as unknown as Selection
+    const foliateSelection = useFoliateSelection(() => ({
+      renderer: { getContents: () => [{ index: 2 }] },
+      getCFI: () => 'epubcfi(/6/10)',
+    }))
+    const onSelected = vi.fn<(detail: unknown) => void>()
+    const onInteractionStart = vi.fn<() => void>()
+    foliateSelection.setHandler(onSelected)
+    foliateSelection.setInteractionStartHandler(onInteractionStart)
+
+    const doc = makeDoc({ selection })
+    foliateSelection.handleInteractionStart(doc)
+    foliateSelection.handleSelectionChange(doc)
+    vi.advanceTimersByTime(1_000)
+
+    expect(onInteractionStart).toHaveBeenCalledTimes(1)
+    expect(onSelected).not.toHaveBeenCalled()
+
+    foliateSelection.handleInteractionEnd(doc)
+    vi.advanceTimersByTime(49)
+    expect(onSelected).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
+    expect(onSelected).toHaveBeenCalledTimes(1)
+
+    vi.useRealTimers()
+  })
+
+  it('publishes a selection created during a touch interaction only after touch end', () => {
+    vi.useFakeTimers()
+
+    let currentSelection = {
+      isCollapsed: true,
+      rangeCount: 0,
+    } as Selection
+    const range = makeRange('New selection', {
+      left: 120,
+      top: 220,
+      bottom: 260,
+      width: 80,
+      height: 40,
+    })
+    const doc = {
+      defaultView: {
+        getSelection: () => currentSelection,
+        frameElement: null,
+      },
+    } as unknown as Document
+    const foliateSelection = useFoliateSelection(() => ({
+      renderer: { getContents: () => [{ index: 2 }] },
+      getCFI: () => 'epubcfi(/6/10)',
+    }))
+    const onSelected = vi.fn<(detail: unknown) => void>()
+    const onInteractionStart = vi.fn<() => void>()
+    foliateSelection.setHandler(onSelected)
+    foliateSelection.setInteractionStartHandler(onInteractionStart)
+
+    foliateSelection.handleInteractionStart(doc)
+    currentSelection = {
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => range,
+    } as unknown as Selection
+    foliateSelection.handleSelectionChange(doc)
+    vi.advanceTimersByTime(1_000)
+
+    expect(onInteractionStart).not.toHaveBeenCalled()
+    expect(onSelected).not.toHaveBeenCalled()
+
+    foliateSelection.handleInteractionEnd(doc)
+    vi.advanceTimersByTime(50)
+    expect(onSelected).toHaveBeenCalledTimes(1)
 
     vi.useRealTimers()
   })

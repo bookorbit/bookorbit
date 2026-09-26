@@ -73,6 +73,17 @@ export function useBookDownload() {
     }
   }
 
+  async function downloadAudiolessEpub(fileId: number): Promise<void> {
+    isDownloading.value = true
+    try {
+      await downloadFromUrl(`/api/v1/books/files/${fileId}/audioless-epub/download`, 'book.epub')
+    } catch {
+      toast.error(t('book.download.failed'))
+    } finally {
+      isDownloading.value = false
+    }
+  }
+
   async function exportBooks(bookIds: number[], allFormats: boolean, scopeOverride?: ExportScope): Promise<void> {
     if (bookIds.length === 0) return
     const progress = createDownloadToast(t('book.download.preparingExport', { count: bookIds.length }), true)
@@ -92,5 +103,5 @@ export function useBookDownload() {
     }
   }
 
-  return { isDownloading, downloadFile, exportBooks }
+  return { isDownloading, downloadFile, downloadAudiolessEpub, exportBooks }
 }

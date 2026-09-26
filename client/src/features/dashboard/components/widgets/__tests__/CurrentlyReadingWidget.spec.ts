@@ -25,7 +25,19 @@ const CoverArtworkStub = {
 }
 
 function book(fileFormat: string | null) {
-  return { bookId: 1, title: 'Saga', authors: ['Brian K. Vaughan'], progress: 40, hasCover: true, fileId: 9, fileFormat }
+  return {
+    bookId: 1,
+    title: 'Saga',
+    authors: ['Brian K. Vaughan'],
+    progress: 40,
+    hasCover: true,
+    fileId: 9,
+    fileFormat,
+    readFileId: 9,
+    readFileFormat: fileFormat,
+    readAlongFileId: null,
+    hasAudio: false,
+  }
 }
 
 function mountWidget(fileFormat: string | null) {

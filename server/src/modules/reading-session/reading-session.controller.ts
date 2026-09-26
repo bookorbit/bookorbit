@@ -12,6 +12,6 @@ export class ReadingSessionController {
   @Post(':fileId/sessions')
   @HttpCode(204)
   async saveSession(@Param('fileId', ParseIntPipe) fileId: number, @Body() dto: SaveReadingSessionDto, @CurrentUser() user: RequestUser) {
-    await this.service.save(fileId, dto, user);
+    await this.service.save(fileId, dto, user, dto.source ?? 'web');
   }
 }

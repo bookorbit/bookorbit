@@ -2,7 +2,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { createPinia } from 'pinia'
 import { RouterLinkStub } from '@vue/test-utils'
-import type { BookReadingSession, BookReadingSessionStats, ReadingAttempt } from '@bookorbit/types'
+import type { BookDetail, BookReadingSession, BookReadingSessionStats, ReadingAttempt } from '@bookorbit/types'
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(),
@@ -31,7 +31,7 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 import ReadingLogTab from '../ReadingLogTab.vue'
 import ResetReadingStateDialog from '@/features/book/components/ResetReadingStateDialog.vue'
 
-function makeBook(overrides = {}) {
+function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
     id: 10,
     libraryId: 1,
@@ -57,6 +57,9 @@ function makeBook(overrides = {}) {
     personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: null,
+    coverMedia: [],
+    covers: { ebook: null, audio: null },
+    coverVersion: 'legacy:2024-01-01T00:00:00.000Z',
     hardcoverEditionId: null,
     mangabakaSeriesId: null,
     providerIds: {},
@@ -68,11 +71,36 @@ function makeBook(overrides = {}) {
     metadataScore: null,
     readStatus: null,
     audioMetadata: null,
+    readAloudSync: {
+      mode: 'auto',
+      state: 'unavailable',
+      unavailableReason: 'no_media_overlay_epub',
+      overlayFileId: null,
+      audioDurationSeconds: null,
+      overlayDurationSeconds: null,
+      durationDifferenceSeconds: null,
+      durationDifferenceRatio: null,
+      koreaderDownloadAvailable: false,
+    },
     formatPriority: [],
     comicMetadata: null,
     customMetadata: [],
     lockedFields: [],
     collections: [],
+    ...overrides,
+  }
+}
+
+function makeBookFile(overrides: Partial<BookDetail['files'][number]> = {}): BookDetail['files'][number] {
+  return {
+    id: 1,
+    format: 'epub',
+    role: 'primary',
+    sizeBytes: 1,
+    absolutePath: '/book.epub',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    filename: 'book.epub',
+    durationSeconds: null,
     ...overrides,
   }
 }
@@ -109,6 +137,24 @@ function makeStats(items: BookReadingSession[]): BookReadingSessionStats {
     longestSessionSeconds: 0,
     longestSessionAt: null,
     backtrackCount: 0,
+  }
+}
+
+function makeAttempt(overrides: Partial<ReadingAttempt> = {}): ReadingAttempt {
+  return {
+    id: 1,
+    bookId: 10,
+    startedOn: '2026-09-07',
+    endedOn: null,
+    outcome: null,
+    origin: 'koreader',
+    externalProvider: null,
+    externalId: null,
+    totalSessions: 0,
+    totalSeconds: 0,
+    createdAt: '2026-09-07T00:00:00.000Z',
+    updatedAt: '2026-09-07T00:00:00.000Z',
+    ...overrides,
   }
 }
 
@@ -181,6 +227,33 @@ describe('ReadingLogTab', () => {
     expect(text).toContain('This year')
   })
 
+  it('shows a projected UTC-midnight lifecycle date on its canonical day west of UTC', async () => {
+    const originalTimeZone = process.env.TZ
+    process.env.TZ = 'America/Sao_Paulo'
+    try {
+      mocks.api.mockImplementation(routeApi({ attempts: [makeAttempt()] }))
+      const wrapper = mountTab(
+        makeBook({
+          readStatus: {
+            status: 'reading',
+            source: 'auto',
+            startedAt: '2026-09-07T00:00:00.000Z',
+            finishedAt: null,
+            updatedAt: '2026-09-07T00:00:00.000Z',
+          },
+        }),
+      )
+      await flushPromises()
+
+      const startedDate = wrapper.get('button[aria-label="Edit the date you started this book"]')
+      expect(new Date('2026-09-07T00:00:00.000Z').getDate()).toBe(6)
+      expect(startedDate.text()).toContain('Sep 7, 2026')
+      expect(startedDate.text()).not.toContain('Sep 6, 2026')
+    } finally {
+      process.env.TZ = originalTimeZone
+    }
+  })
+
   it('narrows the session request when a quick filter is chosen', async () => {
     mocks.api.mockImplementation(routeApi({ sessions: [makeSession()] }))
     const wrapper = mountTab()
@@ -218,17 +291,15 @@ describe('ReadingLogTab', () => {
 
   it('offers a format filter only when the book has more than one format', async () => {
     mocks.api.mockImplementation(routeApi({ sessions: [makeSession()] }))
-    const single = mountTab(
-      makeBook({ files: [{ id: 1, format: 'epub', bookId: 10, filePath: '/a.epub', fileName: 'a.epub', fileSize: 1, lastModified: null }] }),
-    )
+    const single = mountTab(makeBook({ files: [makeBookFile({ id: 1, format: 'epub', filename: 'a.epub', absolutePath: '/a.epub' })] }))
     await flushPromises()
     expect(single.find('select').exists()).toBe(false)
 
     const multiple = mountTab(
       makeBook({
         files: [
-          { id: 1, format: 'epub', bookId: 10, filePath: '/a.epub', fileName: 'a.epub', fileSize: 1, lastModified: null },
-          { id: 2, format: 'pdf', bookId: 10, filePath: '/a.pdf', fileName: 'a.pdf', fileSize: 1, lastModified: null },
+          makeBookFile({ id: 1, format: 'epub', filename: 'a.epub', absolutePath: '/a.epub' }),
+          makeBookFile({ id: 2, format: 'pdf', filename: 'a.pdf', absolutePath: '/a.pdf' }),
         ],
       }),
     )

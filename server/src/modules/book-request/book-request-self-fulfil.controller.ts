@@ -48,7 +48,7 @@ export class BookRequestSelfFulfilController {
   /** Names and ids only, so the grab dialog can offer a choice it is allowed to act on. */
   @Get('download-clients')
   listDownloadClients() {
-    return this.downloadClients.findEnabledSummaries('torrent');
+    return this.downloadClients.findEnabledSummaries();
   }
 
   @Get(':id/releases')

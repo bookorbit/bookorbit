@@ -54,6 +54,7 @@ function groupDateKeysByMaxSpan(days: Iterable<string>): string[][] {
 
 export type SaveReadingSessionResult =
   | { kind: 'saved' }
+  | { kind: 'superseded'; addedSeconds: number }
   | {
       kind: 'skipped';
       reason: 'duration_below_minimum' | 'book_file_not_found' | 'duplicate_session_id';
@@ -118,6 +119,7 @@ export class ReadingSessionRepository {
     source: ReadingSessionSource = 'web',
     timeZone = 'UTC',
     sync?: ReadingSessionSyncOptions,
+    sessionType: 'read' | 'tts' | 'listen' = 'read',
   ): Promise<SaveReadingSessionResult> {
     if (durationSeconds < MIN_READING_SESSION_SECONDS) {
       return { kind: 'skipped', reason: 'duration_below_minimum' };
@@ -149,6 +151,7 @@ export class ReadingSessionRepository {
           sessionId,
           source,
           sourceDeviceKey: sync?.sourceDeviceKey ?? null,
+          sessionType,
           startedAt,
           endedAt,
           durationSeconds,
@@ -158,11 +161,58 @@ export class ReadingSessionRepository {
         .onConflictDoNothing({ target: [readingSessions.userId, readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
 
-      const result: SaveReadingSessionResult = inserted.length === 0 ? { kind: 'skipped', reason: 'duplicate_session_id' } : { kind: 'saved' };
+      let result: SaveReadingSessionResult;
 
-      if (result.kind === 'saved') {
+      if (inserted.length === 0) {
+        // A row already exists for this sessionId, and that is usually deliberate rather than a
+        // replay. Clients checkpoint a session mid-flight - the iOS player writes one when the app
+        // is backgrounded, because `willTerminate` is not delivered if it is then killed - and the
+        // later close carries the *same* id specifically to supersede that partial row.
+        //
+        // Dropping the second write capped every backgrounded session at whatever the checkpoint
+        // had captured. Measured on iOS: a 50s listen containing one backgrounding recorded 17s,
+        // and the client had correctly sent 56.
+        //
+        // Superseding only upward keeps this idempotent for the sync queue, which may retry the
+        // identical write: an equal or smaller duration is still a no-op, so a stale retry can
+        // never shrink a session.
+        const [existing] = await tx
+          .select({
+            id: readingSessions.id,
+            durationSeconds: readingSessions.durationSeconds,
+            progressDelta: readingSessions.progressDelta,
+          })
+          .from(readingSessions)
+          .where(and(eq(readingSessions.userId, userId), eq(readingSessions.sessionId, sessionId)))
+          .limit(1);
+
+        if (!existing || durationSeconds <= existing.durationSeconds) {
+          result = { kind: 'skipped', reason: 'duplicate_session_id' };
+        } else {
+          const addedSeconds = durationSeconds - existing.durationSeconds;
+          const addedProgress = progressDelta === null ? null : progressDelta - (existing.progressDelta ?? 0);
+
+          await tx.update(readingSessions).set({ endedAt, durationSeconds, progressDelta, endProgress }).where(eq(readingSessions.id, existing.id));
+
+          // Daily stats accumulate, so only add the portion beyond the checkpoint.
+          await this.upsertDailyStats(tx, {
+            userId,
+            libraryId,
+            startedAt,
+            endedAt,
+            durationSeconds: addedSeconds,
+            progressDelta: addedProgress,
+            timeZone,
+          });
+
+          result = { kind: 'superseded', addedSeconds };
+        }
+      } else {
+        result = { kind: 'saved' };
         await this.upsertDailyStats(tx, { userId, libraryId, startedAt, endedAt, durationSeconds, progressDelta, timeZone });
-      } else if (sync) {
+      }
+
+      if (result.kind !== 'saved' && sync) {
         await tx
           .update(readingSessions)
           .set({ sourceDeviceKey: sync.sourceDeviceKey })

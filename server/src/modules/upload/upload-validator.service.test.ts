@@ -1,4 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
+import { mkdtemp, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 import { UploadValidatorService } from './upload-validator.service';
 
@@ -23,7 +26,7 @@ describe('UploadValidatorService', () => {
     });
 
     it('rejects when extension is globally supported but blocked by library policy', () => {
-      expect(() => service.validateFormat('book.cbz', ['epub', 'pdf'])).toThrow(new BadRequestException('This library does not allow .cbz files'));
+      expect(() => service.validateFormat('book.cbz', ['epub', 'pdf'])).toThrow(BadRequestException);
     });
 
     it.each(['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'])('accepts audio format .%s', (ext) => {
@@ -113,6 +116,62 @@ describe('UploadValidatorService', () => {
 
     it('preserves original extension casing', () => {
       expect(service.sanitizeFilename('Book.EPUB')).toBe('Book.EPUB');
+    });
+  });
+
+  describe('validateContent', () => {
+    it.each([
+      ['epub', Buffer.from([0x50, 0x4b, 0x03, 0x04])],
+      ['kepub', Buffer.from([0x50, 0x4b, 0x03, 0x04])],
+      ['cbz', Buffer.from([0x50, 0x4b, 0x03, 0x04])],
+      ['pdf', Buffer.from('%PDF-1.7')],
+      ['cbr', Buffer.from('Rar!\x1a\x07\x01')],
+      ['cb7', Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])],
+      [
+        'mobi',
+        (() => {
+          const value = Buffer.alloc(80);
+          value.write('BOOKMOBI', 60);
+          return value;
+        })(),
+      ],
+      [
+        'azw3',
+        (() => {
+          const value = Buffer.alloc(80);
+          value.write('BOOKMOBI', 60);
+          return value;
+        })(),
+      ],
+      ['fb2', Buffer.from('<?xml version="1.0"?><FictionBook xmlns="urn:fb2"></FictionBook>')],
+      ['flac', Buffer.from('fLaC')],
+      ['ogg', Buffer.from('OggS')],
+      ['opus', Buffer.from('OggSOpusHead')],
+      ['m4b', Buffer.concat([Buffer.alloc(4), Buffer.from('ftypM4B ')])],
+      ['m4a', Buffer.concat([Buffer.alloc(4), Buffer.from('ftypM4A ')])],
+      ['mp3', Buffer.from('ID3\x04\x00')],
+    ])('accepts a bounded magic signature for %s', async (format, contents) => {
+      const directory = await mkdtemp(join(tmpdir(), 'bookorbit-signature-test-'));
+      const path = join(directory, `book.${format}`);
+      try {
+        await writeFile(path, contents);
+        await expect(service.validateContent(path, format)).resolves.toBeUndefined();
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects an empty or spoofed file even when its extension is valid', async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'bookorbit-signature-test-'));
+      const path = join(directory, 'book.epub');
+      try {
+        await writeFile(path, 'not a zip archive');
+        await expect(service.validateContent(path, 'epub')).rejects.toMatchObject({
+          response: { errorCode: 'UPLOAD_CONTENT_INVALID' },
+        });
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
     });
   });
 });

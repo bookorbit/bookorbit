@@ -82,16 +82,23 @@ describe('DevicesEvaluator', () => {
     });
   });
 
-  describe('reading-session gating', () => {
-    it('short-circuits a web session when the user has no external device', async () => {
+  describe('first-party reading sessions', () => {
+    it('evaluates multi-source achievements without an external device', async () => {
       repo.hasAnyExternalDevice.mockResolvedValue(false);
+      repo.countDistinctSources.mockResolvedValue(3);
+      repo.maxSourcesOnSingleBook.mockResolvedValue(2);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: { userId: 1 } as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: { userId: 1, source: 'watchos' } as never,
+        },
         new Set(),
       );
-      expect(awards).toHaveLength(0);
-      expect(repo.countDistinctSources).not.toHaveBeenCalled();
-      expect(repo.maxSourcesOnSingleBook).not.toHaveBeenCalled();
+      expect(awards.map((award) => award.key)).toEqual(expect.arrayContaining(['full_orbit', 'two_worlds']));
+      expect(awards.find((award) => award.key === 'synced_up')).toBeUndefined();
     });
   });
 

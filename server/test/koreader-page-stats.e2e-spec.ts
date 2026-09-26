@@ -53,7 +53,7 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     return { 'x-auth-user': KOREADER_USERNAME, 'x-auth-key': KOREADER_PASSWORD };
   }
 
-  async function uploadPageStats(events: KoreaderPageEvent[]) {
+  async function uploadPageStats(events: KoreaderPageEvent[], bookFileId?: number) {
     const response = await ctx.app.inject({
       method: 'POST',
       url: '/api/v1/koreader/plugin/page-stats',
@@ -62,7 +62,7 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
         deviceId: DEVICE_ID,
         deviceModel: 'E2E',
         pluginVersion: '0.4.0',
-        books: [{ hash: fileHash, events }],
+        books: [{ hash: fileHash, bookFileId, events }],
       },
     });
     expect(response.statusCode).toBe(201);
@@ -265,10 +265,10 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     expect(await waitForAchievement(session!.userId, 'power_hour')).toBe(true);
   });
 
-  // A file hash is not unique: identical bytes in two places are two book file rows. The resolver
-  // has to land on the same one every time, or a device's statistics split across both and the
-  // plugin sees its sync target move, which discards its local upload cursor.
-  it('resolves a hash shared by two book files to the same row on every upload', async () => {
+  // A file hash is not unique: identical bytes in two places are two book file rows. The server
+  // must refuse to guess, then honor an accessible file identity previously verified by the
+  // plugin so every later upload has one stable target.
+  it('requires and persists an explicit identity for a hash shared by two book files', async () => {
     const duplicatePath = join(library.folderPath, 'page-stats-book-copy.epub');
     await copyFile(epubPath, duplicatePath);
     await triggerAndWaitForLibraryScan(ctx, library.libraryId);
@@ -282,13 +282,50 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     expect(sharing[0]!.id).toBe(epub.bookFileId);
 
     const firstStart = BASE_EPOCH + 20_000_000;
+    const ambiguous = await uploadPageStats([{ page: 1, startTime: firstStart, durationSeconds: 55, totalPages: TOTAL_PAGES }]);
+    expect(ambiguous.results).toEqual([]);
+    expect(ambiguous.unmatched).toEqual([fileHash]);
+
+    const beforeLink = await ctx.db
+      .select({ id: schema.koreaderPageStats.id })
+      .from(schema.koreaderPageStats)
+      .where(and(eq(schema.koreaderPageStats.deviceId, DEVICE_ID), gte(schema.koreaderPageStats.startTime, firstStart)));
+    expect(beforeLink).toEqual([]);
+
+    const matchResponse = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/match-check',
+      headers: deviceHeaders(),
+      payload: {
+        deviceId: DEVICE_ID,
+        deviceModel: 'E2E',
+        pluginVersion: '1.5.3',
+        hashes: [fileHash],
+        books: [{ hash: fileHash, source: 'current_file', bookFileId: epub.bookFileId }],
+      },
+    });
+    expect(matchResponse.statusCode).toBe(201);
+    expect(matchResponse.json().matches).toEqual([{ hash: fileHash, bookId: epub.bookId, bookFileId: epub.bookFileId }]);
+
     await uploadPageStats([{ page: 1, startTime: firstStart, durationSeconds: 55, totalPages: TOTAL_PAGES }]);
     await uploadPageStats([{ page: 2, startTime: firstStart + 60, durationSeconds: 55, totalPages: TOTAL_PAGES }]);
+
+    const explicitStart = firstStart + 120;
+    const explicit = await uploadPageStats([{ page: 3, startTime: explicitStart, durationSeconds: 55, totalPages: TOTAL_PAGES }], sharing[1]!.id);
+    expect(explicit.results).toEqual([{ hash: fileHash, accepted: 1, duplicates: 0, watermark: explicitStart }]);
+
+    const [explicitRow] = await ctx.db
+      .select({ bookFileId: schema.koreaderPageStats.bookFileId })
+      .from(schema.koreaderPageStats)
+      .where(and(eq(schema.koreaderPageStats.deviceId, DEVICE_ID), eq(schema.koreaderPageStats.startTime, explicitStart)));
+    expect(explicitRow?.bookFileId).toBe(sharing[1]!.id);
 
     const targets = await ctx.db
       .selectDistinct({ bookFileId: schema.koreaderPageStats.bookFileId })
       .from(schema.koreaderPageStats)
       .where(and(eq(schema.koreaderPageStats.deviceId, DEVICE_ID), gte(schema.koreaderPageStats.startTime, firstStart)));
-    expect(targets.map((row) => row.bookFileId)).toEqual([epub.bookFileId]);
+    expect(targets.map((row) => row.bookFileId).sort((left, right) => left - right)).toEqual(
+      [epub.bookFileId, sharing[1]!.id].sort((left, right) => left - right),
+    );
   });
 });

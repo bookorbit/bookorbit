@@ -7,6 +7,7 @@ export function useReaderSelection() {
   const showBelow = ref(false)
   const text = ref('')
   const cfi = ref<string | null>(null)
+  const selectionRange = ref<Range | null>(null)
   const overlappingAnnotationId = ref<number | null>(null)
   const showNoteDialog = ref(false)
   const noteText = ref('')
@@ -14,6 +15,7 @@ export function useReaderSelection() {
   function show(detail: SelectionDetail, overlappingId: number | null = null) {
     text.value = detail.text
     cfi.value = detail.cfi ?? null
+    selectionRange.value = detail.range ?? null
     position.value = { x: detail.popupPosition.x, y: detail.popupPosition.y }
     showBelow.value = detail.popupPosition.showBelow
     overlappingAnnotationId.value = overlappingId
@@ -30,5 +32,5 @@ export function useReaderSelection() {
     dismiss()
   }
 
-  return { visible, position, showBelow, text, cfi, overlappingAnnotationId, showNoteDialog, noteText, show, dismiss, openNoteDialog }
+  return { visible, position, showBelow, text, cfi, selectionRange, overlappingAnnotationId, showNoteDialog, noteText, show, dismiss, openNoteDialog }
 }

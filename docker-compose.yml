@@ -20,6 +20,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?required}
       POSTGRES_DB: ${POSTGRES_DB?required}
       JWT_SECRET: ${JWT_SECRET?required}
+      PODCAST_ENCRYPTION_KEY: ${PODCAST_ENCRYPTION_KEY:-}
       SETUP_BOOTSTRAP_TOKEN: ${SETUP_BOOTSTRAP_TOKEN?required}
       APP_URL: ${APP_URL?required}
       CLIENT_URL: ${CLIENT_URL:-${APP_URL?required}}
@@ -50,6 +51,30 @@ services:
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 30s
+
+  # Opt-in: add `--profile tts` to your compose commands. BookOrbit reaches it inside the compose
+  # network at http://kokoro:8880/v1, so no port is published to the host.
+  kokoro:
+    container_name: bookorbit-kokoro
+    image: ${KOKORO_IMAGE:-ghcr.io/remsky/kokoro-fastapi-cpu:v0.8.0}
+    profiles: ["tts"]
+    restart: unless-stopped
+    init: true
+    expose:
+      - "8880"
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request;urllib.request.urlopen(''http://127.0.0.1:8880/v1/audio/voices'')"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   postgres:
     container_name: bookorbit-db

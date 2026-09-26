@@ -17,7 +17,8 @@ import {
   Users,
   X,
 } from '@lucide/vue'
-import type { CoverAspectRatio, Library, OrganizationMode } from '@bookorbit/types'
+import { APP_FEATURES, type CoverAspectRatio, type Library, type LibraryType, type OrganizationMode } from '@bookorbit/types'
+import { useLibraryAddedAt } from '../composables/useLibraryAddedAt'
 import { useModal } from '@/composables/useModal'
 import { api } from '@/lib/api'
 import { useLibraryCreator, type LibraryCreatorSectionId } from '../composables/useLibraryCreator'
@@ -34,6 +35,8 @@ const { t } = useI18n()
 
 const props = defineProps<{
   library?: Library | null
+  /** Create mode only: pre-selects the library type (e.g. from the podcast sidebar section). */
+  initialType?: LibraryType
 }>()
 
 const emit = defineEmits<{
@@ -62,7 +65,7 @@ const ALL_SECTIONS: CreatorSection[] = [
   {
     id: 'folders',
     label: 'Folders',
-    description: 'Choose the server folders that contain your books.',
+    description: 'Choose the server folders used by this library.',
     icon: FolderOpen,
     component: LibraryCreatorFolders,
     required: true,
@@ -120,10 +123,25 @@ const initializing = ref(true)
 const initializationWarning = ref<string | null>(null)
 const initialFormSnapshot = ref('')
 const nestedModalOpen = ref(false)
+const addedAtRecompute = useLibraryAddedAt(editingLibraryId)
 const attemptedSections = ref(new Set<LibraryCreatorSectionId>())
 
-const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.filter((section) => section.id !== 'access') : ALL_SECTIONS))
-const activeSection = computed(() => sections.value[stepIndex.value] ?? sections.value[0]!)
+const sections = computed(() => {
+  if (form.type === 'podcasts') {
+    return ALL_SECTIONS.filter(
+      (section) =>
+        section.id === 'details' || section.id === 'folders' || section.id === 'schedule' || (mode.value === 'edit' && section.id === 'access'),
+    )
+  }
+  return mode.value === 'create' ? ALL_SECTIONS.filter((section) => section.id !== 'access') : ALL_SECTIONS
+})
+const activeSection = computed(() => {
+  const section = sections.value[stepIndex.value] ?? sections.value[0]!
+  if (form.type === 'podcasts' && section.id === 'schedule') {
+    return { ...section, description: t('library.creator.schedule.watchFolders.hint') }
+  }
+  return section
+})
 const ActiveComponent = computed(() => activeSection.value.component)
 const activeId = computed(() => activeSection.value.id)
 const isFirstStep = computed(() => stepIndex.value === 0)
@@ -143,12 +161,24 @@ watch(
 )
 
 const sectionProps = computed(() => ({
-  details: { name: form.name, icon: form.icon, coverAspectRatio: form.coverAspectRatio },
-  folders: { folders: form.folders, prescanResult: prescanResult.value, prescanLoading: prescanLoading.value },
+  details: { name: form.name, icon: form.icon, coverAspectRatio: form.coverAspectRatio, type: form.type, typeLocked: mode.value === 'edit' },
+  folders: {
+    folders: form.folders,
+    localFolders: form.localFolders,
+    prescanResult: prescanResult.value,
+    prescanLoading: prescanLoading.value,
+    libraryType: form.type,
+  },
   scanner: {
     organizationMode: form.organizationMode,
     organizationModeLocked: mode.value === 'edit',
     allowedFormats: form.allowedFormats,
+    addedAtSource: form.addedAtSource,
+    canRecomputeAddedAt: mode.value === 'edit',
+    storedAddedAtSource: creator.storedAddedAtSource.value,
+    recomputingAddedAt: addedAtRecompute.running.value,
+    recomputeJob: addedAtRecompute.job.value,
+    recomputeErrorKey: addedAtRecompute.errorKey.value,
     excludePatterns: form.excludePatterns,
   },
   metadata: { metadataPrecedence: form.metadataPrecedence, formatPriority: form.formatPriority },
@@ -156,7 +186,11 @@ const sectionProps = computed(() => ({
     readingThreshold: form.readingThreshold,
     markAsFinishedPercentComplete: form.markAsFinishedPercentComplete,
   },
-  schedule: { watch: form.watch, autoScanCronExpression: form.autoScanCronExpression },
+  schedule: {
+    watch: form.type === 'podcasts' ? form.watchLocalFolders : form.watch,
+    autoScanCronExpression: form.autoScanCronExpression,
+    showAutoScanSchedule: form.type === 'books',
+  },
   fileWrite: {
     fileRenameEnabled: form.fileRenameEnabled,
     fileWriteEnabled: form.fileWriteEnabled,
@@ -243,6 +277,19 @@ function handleIconUpdate(value: string | null) {
   form.icon = value
 }
 
+function handleTypeUpdate(value: LibraryType) {
+  const availableType = APP_FEATURES.podcasts ? value : 'books'
+  form.type = availableType
+  if (availableType === 'podcasts') {
+    form.coverAspectRatio = '1/1'
+    form.watchLocalFolders = true
+    if (!form.name.trim()) form.name = 'Podcasts'
+    if (!form.icon) form.icon = 'Podcast'
+  }
+  stepIndex.value = 0
+  visitedUpTo.value = 0
+}
+
 function handleCoverAspectRatioUpdate(value: CoverAspectRatio) {
   form.coverAspectRatio = value
 }
@@ -252,8 +299,20 @@ function handleFoldersUpdate(value: string[]) {
   prescanResult.value = null
 }
 
+function handleLocalFoldersUpdate(value: string[]) {
+  form.localFolders = value
+}
+
 function handleOrganizationModeUpdate(value: OrganizationMode) {
   form.organizationMode = value
+}
+
+function handleAddedAtSourceUpdate(value: Library['addedAtSource']) {
+  form.addedAtSource = value
+}
+
+function handleRecomputeAddedAt() {
+  if (!addedAtRecompute.running.value) void addedAtRecompute.start()
 }
 
 function handleNestedModalChange(value: boolean) {
@@ -262,17 +321,24 @@ function handleNestedModalChange(value: boolean) {
 
 const sectionListeners = {
   'update:name': handleNameUpdate,
+  'update:type': handleTypeUpdate,
   'update:icon': handleIconUpdate,
   'update:coverAspectRatio': handleCoverAspectRatioUpdate,
   'update:folders': handleFoldersUpdate,
+  'update:localFolders': handleLocalFoldersUpdate,
   'update:organizationMode': handleOrganizationModeUpdate,
+  'update:addedAtSource': handleAddedAtSourceUpdate,
+  recompute: handleRecomputeAddedAt,
   'update:metadataPrecedence': (value: string[]) => (form.metadataPrecedence = value),
   'update:formatPriority': (value: string[]) => (form.formatPriority = value),
   'update:allowedFormats': (value: string[]) => (form.allowedFormats = value),
   'update:excludePatterns': (value: string[]) => (form.excludePatterns = value),
   'update:readingThreshold': (value: number) => (form.readingThreshold = value),
   'update:markAsFinishedPercentComplete': (value: number) => (form.markAsFinishedPercentComplete = value),
-  'update:watch': (value: boolean) => (form.watch = value),
+  'update:watch': (value: boolean) => {
+    if (form.type === 'podcasts') form.watchLocalFolders = value
+    else form.watch = value
+  },
   'update:autoScanCronExpression': (value: string | null) => (form.autoScanCronExpression = value),
   'update:fileRenameEnabled': (value: boolean) => (form.fileRenameEnabled = value),
   'update:fileWriteEnabled': (value: boolean) => (form.fileWriteEnabled = value),
@@ -311,6 +377,7 @@ onMounted(async () => {
       visitedUpTo.value = ALL_SECTIONS.length - 1
     } else {
       creator.initCreate()
+      if (props.initialType && props.initialType !== form.type) handleTypeUpdate(props.initialType)
       visitedUpTo.value = 0
     }
   } catch {
@@ -320,6 +387,7 @@ onMounted(async () => {
       initializationWarning.value = 'The latest library settings could not be loaded. You can still edit the cached settings shown here.'
     } else {
       creator.initCreate()
+      if (props.initialType && props.initialType !== form.type) handleTypeUpdate(props.initialType)
     }
   } finally {
     stepIndex.value = 0

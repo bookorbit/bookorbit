@@ -3,16 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { watch, type FSWatcher } from 'chokidar';
 import { Dirent } from 'fs';
 import { mkdir, readdir, realpath, stat, unlink } from 'fs/promises';
-import { join, sep } from 'path';
+import { join, resolve, sep } from 'path';
 
+import { waitForStability } from '../../common/utils/fs-stability.utils';
+import { normalizeWatchEvent, waitForWatcherReady, type WatchEventType as EventType } from '../../common/utils/fs-watch.utils';
 import { isPrimaryFormat } from '../scanner/lib/classify';
-import { waitForDirectoryStability, waitForStability } from '../scanner/lib/stability';
 import { BookDockIngestService } from './book-dock-ingest.service';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockGateway } from './book-dock.gateway';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
-
-type EventType = 'delete' | 'create';
 
 const DEBOUNCE_MS = 500;
 const COVERS_DIR = 'covers';
@@ -22,6 +21,9 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
   private readonly logger = new Logger(BookDockWatcherService.name);
   private bookDockPath: string;
   private subscription: FSWatcher | null = null;
+  private scanPromise: Promise<void> | null = null;
+  private stopping = false;
+  private readonly pendingScans = new Set<string>();
   private readonly pendingTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; type: EventType }>();
 
   constructor(
@@ -41,11 +43,18 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
     for (const entry of this.pendingTimers.values()) clearTimeout(entry.timer);
     this.pendingTimers.clear();
+    this.pendingScans.clear();
     if (this.subscription) {
       await this.subscription.close();
       this.subscription = null;
+    }
+    try {
+      await this.scanPromise;
+    } finally {
+      this.stopping = false;
     }
   }
 
@@ -54,7 +63,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
       this.emitChange();
       return;
     }
-    await this.walkAndIngest(this.bookDockPath);
+    await this.scan(this.bookDockPath);
     this.emitChange();
   }
 
@@ -63,7 +72,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
       await mkdir(this.bookDockPath, { recursive: true });
       this.bookDockPath = await realpath(this.bookDockPath);
 
-      this.subscription = watch(this.bookDockPath, { ignoreInitial: true });
+      this.subscription = watch(this.bookDockPath, { ignoreInitial: true, followSymlinks: false });
       this.subscription.on('all', (eventName, eventPath) => {
         const type = normalizeWatchEvent(eventName);
         if (!type || this.isInCoversDir(eventPath)) return;
@@ -101,6 +110,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
    * fires once, after the last one.
    */
   private schedule(type: EventType, path: string): void {
+    if (this.stopping) return;
     const key = (type === 'create' ? this.unitDirectoryFor(path) : null) ?? path;
     const existing = this.pendingTimers.get(key);
     if (existing) clearTimeout(existing.timer);
@@ -115,15 +125,13 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
     if (type === 'create') {
       if (await this.processingState.isPaused()) return;
 
-      // A directory below the dock root is a unit, and a unit is ingested whole rather than as a
-      // stream of loose files. `schedule` has already collapsed a file event onto its unit
-      // directory, so what arrives here for a dropped folder is the folder itself.
       const unitDirectory = this.unitDirectoryFor(path) ?? ((await this.isUnitDirectory(path)) ? path : null);
       if (unitDirectory !== null) {
-        await this.ingestUnitDirectory(unitDirectory);
+        await this.scan(unitDirectory);
         return;
       }
 
+      if (!(await this.isSafePath(path))) return;
       if (!isPrimaryFormat(path)) return;
       await waitForStability(path);
       if (await this.processingState.isPaused()) return;
@@ -142,13 +150,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
     }
   }
 
-  /**
-   * The directory one level below the dock root that owns this path, or null when the path is a
-   * loose file sitting at the root.
-   *
-   * Units are always exactly one level down, which is what keeps this an equality lookup on a
-   * unique column rather than an ancestor walk over an unbounded path.
-   */
+  /** Coalesce events from a dropped tree, including all tracks of a multipart book. */
   private unitDirectoryFor(path: string): string | null {
     if (!path.startsWith(this.bookDockPath + sep)) return null;
     const [first, ...rest] = path.substring(this.bookDockPath.length + 1).split(sep);
@@ -157,29 +159,40 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
     return join(this.bookDockPath, first);
   }
 
-  /**
-   * Ingests a dropped folder as one or more units. Before this, `walkAndIngest` created an
-   * independent row per file, so a 31-track audiobook became 31 books whose destinations were each
-   * resolved from their own chapter-named ID3 tags. No error, just quietly wrong.
-   */
-  private async ingestUnitDirectory(unitDirectory: string): Promise<void> {
-    // Claimed means the importer created the row before the directory existed, precisely so this
-    // check cannot lose the race to chokidar's first event.
-    if (await this.repo.findByUnitDirectory(unitDirectory)) return;
-    if (await this.processingState.isPaused()) return;
+  private scan(dir: string): Promise<void> {
+    if (this.stopping) return Promise.resolve();
+    // A rescan and a watcher event may discover the same files. Serialize discovery and retain
+    // arrivals during an active scan for one more pass, rather than racing their inserts.
+    if (![...this.pendingScans].some((pending) => dir === pending || dir.startsWith(pending + sep))) {
+      for (const pending of this.pendingScans) {
+        if (pending.startsWith(dir + sep)) this.pendingScans.delete(pending);
+      }
+      this.pendingScans.add(dir);
+    }
+    if (!this.scanPromise) {
+      this.scanPromise = this.drainScans().finally(() => {
+        this.scanPromise = null;
+      });
+    }
+    return this.scanPromise;
+  }
 
-    // A folder still being copied is a folder that is not yet a book. Interpreting it now reads a
-    // partial snapshot, and the row it creates then claims the directory so the tracks that arrive
-    // afterwards are never looked at again.
-    await waitForDirectoryStability(unitDirectory);
+  private async drainScans(): Promise<void> {
+    while (!this.stopping && this.pendingScans.size > 0) {
+      const dir = this.pendingScans.values().next().value!;
+      this.pendingScans.delete(dir);
+      await this.walkAndIngest(dir);
+    }
+  }
 
-    // Re-checked because the wait is long enough for the importer to have claimed the directory,
-    // or for an operator to have paused processing, in the meantime.
-    if (await this.repo.findByUnitDirectory(unitDirectory)) return;
-    if (await this.processingState.isPaused()) return;
-
-    const created = await this.ingestService.ingestUnitDirectory(unitDirectory);
-    if (created > 0) this.emitChange();
+  private async isSafePath(path: string): Promise<boolean> {
+    const normalized = resolve(path);
+    if (normalized !== this.bookDockPath && !normalized.startsWith(this.bookDockPath + sep)) return false;
+    // The root is canonicalized at startup. Reject symlinks in any descendant component.
+    return realpath(path).then(
+      (canonical) => canonical === normalized,
+      () => false,
+    );
   }
 
   /** A path one level below the dock root that is a directory, i.e. an `addDir` for a unit. */
@@ -193,8 +206,9 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
     );
   }
 
-  private async walkAndIngest(dir: string): Promise<void> {
-    if (await this.processingState.isPaused()) return;
+  private async walkAndIngest(dir: string, skipIngest = false): Promise<void> {
+    if (this.stopping || (await this.processingState.isPaused())) return;
+    if (!(await this.isSafePath(dir))) return;
 
     let entries: Dirent[];
     try {
@@ -203,13 +217,26 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
       return;
     }
 
+    let consumedDirectories = new Set<string>();
+    if (dir !== this.bookDockPath) {
+      // Request imports claim their destination before copying files. Watched book rows only
+      // own their recorded files and must not hide later siblings or nested books.
+      if ((await this.repo.findByUnitDirectory(dir))?.autoFinalizeSuppressed) return;
+      if (!skipIngest) {
+        const result = await this.ingestService.ingestUnitDirectory(dir);
+        consumedDirectories = result.consumedDirectories;
+        if (result.created > 0) this.emitChange();
+      }
+      if ((await this.repo.findByUnitDirectory(dir))?.autoFinalizeSuppressed) return;
+    }
+
     for (const entry of entries) {
-      if (await this.processingState.isPaused()) return;
+      if (this.stopping || (await this.processingState.isPaused())) return;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (entry.name === COVERS_DIR && dir === this.bookDockPath) continue;
-        await this.ingestUnitDirectory(full);
-      } else if (entry.isFile() && isPrimaryFormat(full)) {
+        await this.walkAndIngest(full, consumedDirectories.has(full));
+      } else if (dir === this.bookDockPath && entry.isFile() && isPrimaryFormat(full)) {
         await this.ingestService.ingestFromWatchedFolder(full);
       }
     }
@@ -226,26 +253,4 @@ async function safeUnlink(path: string): Promise<void> {
   } catch {
     // file may already be deleted
   }
-}
-
-function normalizeWatchEvent(eventName: string): EventType | null {
-  if (eventName === 'unlink' || eventName === 'unlinkDir') return 'delete';
-  if (eventName === 'add' || eventName === 'addDir' || eventName === 'change') return 'create';
-  return null;
-}
-
-function waitForWatcherReady(watcher: FSWatcher): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const handleReady = () => {
-      watcher.off('error', handleError);
-      resolve();
-    };
-    const handleError = (error: unknown) => {
-      watcher.off('ready', handleReady);
-      reject(error instanceof Error ? error : new Error(String(error)));
-    };
-
-    watcher.once('ready', handleReady);
-    watcher.once('error', handleError);
-  });
 }

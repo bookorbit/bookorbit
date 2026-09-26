@@ -5,6 +5,12 @@ import { CBX_READER_DEFAULTS, READER_GROUP_DEFAULTS, type PdfReaderSettings } fr
 const apiMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<unknown>>())
 vi.mock('@/lib/api', () => ({ api: apiMock }))
 
+/** The JSON body of a recorded `api()` call, so an assertion can read what was actually sent. */
+function sentBody(call = 0): Record<string, unknown> {
+  const init = apiMock.mock.calls[call]?.[1] as RequestInit | undefined
+  return JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+}
+
 const toastMock = vi.hoisted(() => ({
   success: vi.fn<(...args: unknown[]) => unknown>(),
 }))
@@ -341,16 +347,31 @@ describe('useReaderSettings - updateBookSettings', () => {
     expect(apiMock).not.toHaveBeenCalled()
   })
 
-  it('calls api() with PUT when sync is enabled', () => {
+  it('patches only the changed field when sync is enabled', () => {
+    useAuthMock.mockReturnValue({
+      user: ref({ settings: { syncReaderPreferences: true } }),
+    })
+    apiMock.mockResolvedValue({ ok: true })
+    // A field another client pinned on this same book, already in the local delta.
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ themeName: 'sepia' }))
+
+    const s = useReaderSettings(BOOK_FILE_ID, 'epub')
+    s.updateBookSettings({ fontSize: 22 } as never)
+
+    expect(apiMock).toHaveBeenCalledWith(`/api/v1/reader/preferences/${BOOK_FILE_ID}`, expect.objectContaining({ method: 'PATCH' }))
+    expect(sentBody()).toEqual({ set: { fontSize: 22 } })
+  })
+
+  it('sends nothing when the patch is empty, because the server rejects an empty body', () => {
     useAuthMock.mockReturnValue({
       user: ref({ settings: { syncReaderPreferences: true } }),
     })
     apiMock.mockResolvedValue({ ok: true })
 
     const s = useReaderSettings(BOOK_FILE_ID, 'epub')
-    s.updateBookSettings({ fontSize: 22 } as never)
+    s.updateBookSettings({} as never)
 
-    expect(apiMock).toHaveBeenCalledWith(`/api/v1/reader/preferences/${BOOK_FILE_ID}`, expect.objectContaining({ method: 'PUT' }))
+    expect(apiMock).not.toHaveBeenCalled()
   })
 })
 
@@ -408,7 +429,7 @@ describe('useReaderSettings - updateDefaultSettings', () => {
     expect(stored).toMatchObject({ fontSize: 18, isDark: true })
   })
 
-  it('calls api() with PUT when sync is enabled', () => {
+  it('patches only the changed field rather than sending a full snapshot', () => {
     useAuthMock.mockReturnValue({
       user: ref({ settings: { syncReaderPreferences: true } }),
     })
@@ -417,7 +438,11 @@ describe('useReaderSettings - updateDefaultSettings', () => {
     const s = useReaderSettings(BOOK_FILE_ID, 'epub')
     s.updateDefaultSettings({ fontSize: 18 } as never)
 
-    expect(apiMock).toHaveBeenCalledWith('/api/v1/reader/defaults/epub', expect.objectContaining({ method: 'PUT' }))
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/reader/defaults/epub', expect.objectContaining({ method: 'PATCH' }))
+    const body = sentBody()
+    expect(body).toEqual({ set: { fontSize: 18 } })
+    // The whole point: nothing another client owns rides along and overwrites it.
+    expect(body.settings).toBeUndefined()
   })
 
   it('does not call api() when sync is disabled', () => {
@@ -632,7 +657,7 @@ describe('useReaderDefaultSettings - update', () => {
     expect(stored).toMatchObject({ fontSize: 22 })
   })
 
-  it('calls api() with PUT when sync is enabled', () => {
+  it('patches only the changed field rather than sending a full snapshot', () => {
     useAuthMock.mockReturnValue({
       user: ref({ settings: { syncReaderPreferences: true } }),
     })
@@ -641,7 +666,20 @@ describe('useReaderDefaultSettings - update', () => {
     const s = useReaderDefaultSettings('epub')
     s.update({ fontSize: 22 } as never)
 
-    expect(apiMock).toHaveBeenCalledWith('/api/v1/reader/defaults/epub', expect.objectContaining({ method: 'PUT' }))
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/reader/defaults/epub', expect.objectContaining({ method: 'PATCH' }))
+    expect(sentBody()).toEqual({ set: { fontSize: 22 } })
+  })
+
+  it('sends nothing when the patch is empty', () => {
+    useAuthMock.mockReturnValue({
+      user: ref({ settings: { syncReaderPreferences: true } }),
+    })
+    apiMock.mockResolvedValue({ ok: true })
+
+    const s = useReaderDefaultSettings('epub')
+    s.update({} as never)
+
+    expect(apiMock).not.toHaveBeenCalled()
   })
 })
 

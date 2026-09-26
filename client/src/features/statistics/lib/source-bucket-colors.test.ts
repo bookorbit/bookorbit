@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
       (
         ({
           '--pill-web': 'oklch(0.72 0.14 245)',
+          '--pill-ios': 'oklch(0.75 0.14 150)',
+          '--pill-watchos': 'oklch(0.76 0.15 35)',
+          '--pill-android': 'oklch(0.75 0.14 95)',
           '--pill-koreader': 'oklch(0.72 0.17 295)',
           '--pill-kobo': 'oklch(0.74 0.1 195)',
         }) as Record<string, string>
@@ -26,6 +29,9 @@ describe('source-bucket-colors', () => {
   it('maps each bucket to its pill token (bookorbit reuses the web hue)', () => {
     expect(SOURCE_BUCKET_COLOR_TOKENS).toEqual({
       bookorbit: '--pill-web',
+      ios: '--pill-ios',
+      watchos: '--pill-watchos',
+      android: '--pill-android',
       koreader: '--pill-koreader',
       kobo: '--pill-kobo',
     })
@@ -34,11 +40,14 @@ describe('source-bucket-colors', () => {
   it('converts oklch tokens to a zrender-parseable hex so bars do not vanish on hover', () => {
     const colors = resolveSourceBucketColors('dark:violet')
 
-    expect(colors).toEqual({ bookorbit: '#abcdef', koreader: '#abcdef', kobo: '#abcdef' })
+    expect(colors).toEqual({ bookorbit: '#abcdef', ios: '#abcdef', watchos: '#abcdef', android: '#abcdef', koreader: '#abcdef', kobo: '#abcdef' })
     expect(mocks.readCssColor).toHaveBeenCalledWith('--pill-web')
+    expect(mocks.readCssColor).toHaveBeenCalledWith('--pill-ios')
+    expect(mocks.readCssColor).toHaveBeenCalledWith('--pill-watchos')
+    expect(mocks.readCssColor).toHaveBeenCalledWith('--pill-android')
     expect(mocks.readCssColor).toHaveBeenCalledWith('--pill-koreader')
     expect(mocks.readCssColor).toHaveBeenCalledWith('--pill-kobo')
-    expect(mocks.oklchToHex).toHaveBeenCalledTimes(3)
+    expect(mocks.oklchToHex).toHaveBeenCalledTimes(6)
   })
 
   it('passes through values that are already rgb/hex', () => {

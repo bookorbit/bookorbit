@@ -155,6 +155,31 @@ describe('ReaderFooter', () => {
     expect(wrapper.emitted('seek')?.[0]).toEqual([100 / 200])
   })
 
+  it('blocks navigation controls when navigation is locked', async () => {
+    const wrapper = mount(ReaderFooter, {
+      props: {
+        ...defaultProps,
+        navigationLocked: true,
+      },
+      global: globalStubs,
+    })
+
+    expect(wrapper.get('button[aria-label="Previous section"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[aria-label="Next section"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[aria-label="Jump to location"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('input[type="range"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.get('button[aria-label="Previous section"]').trigger('click')
+    await wrapper.get('button[aria-label="Next section"]').trigger('click')
+    await wrapper.get('input[type="range"]').setValue('0.55')
+    await wrapper.get('button[aria-label="Jump to location"]').trigger('click')
+
+    expect(wrapper.emitted('prevSection')).toBeUndefined()
+    expect(wrapper.emitted('nextSection')).toBeUndefined()
+    expect(wrapper.emitted('seek')).toBeUndefined()
+    expect(wrapper.find('input[type="text"]').exists()).toBe(false)
+  })
+
   it('closes go-to input on Escape', async () => {
     const wrapper = mount(ReaderFooter, {
       props: defaultProps,

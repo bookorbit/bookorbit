@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RequestUser } from '../../common/types/request-user';
+import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 import { ReadingAttemptController } from './reading-attempt.controller';
 
 const user = { id: 7 } as RequestUser;
@@ -45,5 +46,22 @@ describe('ReadingAttemptController', () => {
     const { controller, attempts } = makeController();
     await controller.delete(10, 4, user);
     expect(attempts.delete).toHaveBeenCalledWith(7, 10, 4);
+  });
+
+  // Every route here is scoped by user.id, so none takes a permission. Gating only start-reread and
+  // delete left the controller contradicting itself: an attempt could be created and edited without
+  // library_edit_metadata, but neither started nor removed.
+  it('requires no permission on any route, since all of them touch only the caller data', () => {
+    const routes = [
+      ReadingAttemptController.prototype.list,
+      ReadingAttemptController.prototype.create,
+      ReadingAttemptController.prototype.startReread,
+      ReadingAttemptController.prototype.update,
+      ReadingAttemptController.prototype.delete,
+    ];
+
+    for (const route of routes) {
+      expect(Reflect.getMetadata(PERMISSION_KEY, route)).toBeUndefined();
+    }
   });
 });

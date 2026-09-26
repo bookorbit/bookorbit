@@ -1,7 +1,15 @@
 import { computed, onScopeDispose, ref, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import type { IndexerAdapterDescriptor, IndexerItem, IndexerPluginFailure, PluginInspection, PluginInstallResult } from '@bookorbit/types'
+import type {
+  IndexerAdapterDescriptor,
+  IndexerItem,
+  IndexerPluginFailure,
+  PluginInspection,
+  PluginInstallResult,
+  PluginUpdateReview,
+  PluginUpdateStatus,
+} from '@bookorbit/types'
 
 import { isBuiltInAdapter } from './useIndexerDraft'
 
@@ -15,10 +23,15 @@ export interface IndexerPluginsOptions {
   indexers: Ref<IndexerItem[]>
   adapters: Ref<IndexerAdapterDescriptor[]>
   pluginFailures: Ref<IndexerPluginFailure[]>
+  pluginUpdates: Ref<PluginUpdateStatus[]>
   adapterFor: (type: string) => IndexerAdapterDescriptor | undefined
   inspectPlugin: (file: File) => Promise<{ inspection: PluginInspection | null; error?: string | null }>
   installPlugin: (file: File) => Promise<{ inspection: PluginInstallResult | null; error?: string | null }>
   removePlugin: (type: string) => Promise<boolean>
+  fetchPluginUpdates: (refresh?: boolean) => Promise<boolean>
+  inspectPluginUpdate: (type: string) => Promise<{ inspection: PluginUpdateReview | null; error: string | null }>
+  installPluginUpdate: (type: string, sha256: string) => Promise<{ status: PluginUpdateStatus | null; error: string | null }>
+  setPluginAutomaticUpdate: (type: string, enabled: boolean) => Promise<{ status: PluginUpdateStatus | null; error: string | null }>
   fetchIndexers: (options?: { silent?: boolean; withAdapters?: boolean }) => Promise<void>
   /** The type currently open in the editor, so removing its plugin closes the form behind it. */
   editingType: Ref<string | null>
@@ -37,12 +50,27 @@ export interface IndexerPluginsOptions {
  */
 export function useIndexerPlugins(options: IndexerPluginsOptions) {
   const { t } = useI18n()
-  const { indexers, adapters, pluginFailures, adapterFor, inspectPlugin, installPlugin, removePlugin, fetchIndexers } = options
+  const {
+    indexers,
+    adapters,
+    pluginFailures,
+    pluginUpdates,
+    adapterFor,
+    inspectPlugin,
+    installPlugin,
+    removePlugin,
+    fetchIndexers,
+    fetchPluginUpdates,
+    inspectPluginUpdate,
+    installPluginUpdate,
+    setPluginAutomaticUpdate,
+  } = options
   const { editingType, cancelEdit, startCreateFor } = options
 
   const pluginInput = ref<HTMLInputElement | null>(null)
   const pluginFile = ref<File | null>(null)
-  const pluginReview = ref<PluginInspection | null>(null)
+  const pluginReview = ref<PluginInspection | PluginUpdateReview | null>(null)
+  const remoteReview = ref<PluginUpdateReview | null>(null)
   const pluginError = ref<string | null>(null)
   const pluginBusy = ref(false)
   /**
@@ -54,6 +82,7 @@ export function useIndexerPlugins(options: IndexerPluginsOptions) {
   /** Which plugin that was, so the notice can be retired once the restart has actually loaded it. */
   let restartPendingType: string | null = null
   const removingPlugin = ref<string | null>(null)
+  const checkingPluginUpdates = ref(false)
   /** The plugin whose Update entry opened the picker, so the file can be held to that type. */
   const updatingPlugin = ref<string | null>(null)
   /**
@@ -80,8 +109,8 @@ export function useIndexerPlugins(options: IndexerPluginsOptions) {
    * the wrong list. So an installed plugin nothing uses appears in this list as the row it is on the
    * way to becoming, and finishing it is a step on that row rather than a different section.
    *
-   * Only a plugin does this. Torznab is compiled in and always offerable, so an unconfigured torznab
-   * is not an object anyone owns and would be a permanent row for a thing that does not exist.
+   * Only a plugin does this. Built-ins are always offerable, so an unconfigured adapter is not an
+   * object anyone owns and would be a permanent row for a thing that does not exist.
    */
   const pluginRows = computed<PluginRow[]>(() => {
     const configured = new Set<string>()
@@ -104,22 +133,14 @@ export function useIndexerPlugins(options: IndexerPluginsOptions) {
     return rows
   })
 
-  /** Torznab is the only built-in, so this group is exactly the Prowlarr and Jackett endpoints. */
-  const torznabRows = computed(() => indexers.value.filter((indexer) => isBuiltInAdapter(indexer.adapterType)))
+  const builtInRows = computed(() => indexers.value.filter((indexer) => isBuiltInAdapter(indexer.adapterType)))
 
   /**
    * Nothing at all, which is what a fresh install looks like and the only state that gets its own
    * panel. A plugin that failed to load counts as something: it is the one row somebody has to act
    * on, and burying it under "no sources yet" would say the opposite.
    */
-  const nothingConfigured = computed(() => pluginRows.value.length === 0 && torznabRows.value.length === 0)
-
-  /**
-   * Rows exist and not one of them is on, which searches exactly as far as having none: the rows
-   * are all still on screen looking configured, so this is the one misconfiguration the list
-   * cannot show by itself.
-   */
-  const allSourcesDisabled = computed(() => indexers.value.length > 0 && indexers.value.every((indexer) => !indexer.enabled))
+  const nothingConfigured = computed(() => pluginRows.value.length === 0 && builtInRows.value.length === 0)
 
   /** Every non-built-in source belongs to a plugin, including one whose plugin file is already gone. */
   const editingPluginType = computed(() => {
@@ -143,6 +164,12 @@ export function useIndexerPlugins(options: IndexerPluginsOptions) {
   )
 
   const pendingRemovalUsage = computed(() => indexerCountByType.value.get(pluginPendingRemoval.value?.type ?? '') ?? 0)
+
+  const updateStatusByType = computed(() => new Map(pluginUpdates.value.map((status) => [status.type, status])))
+
+  function updateStatusFor(type: string): PluginUpdateStatus | undefined {
+    return updateStatusByType.value.get(type)
+  }
 
   function askRemovePlugin(plugin: IndexerAdapterDescriptor) {
     pluginPendingRemoval.value = { type: plugin.type, label: plugin.label }
@@ -174,6 +201,49 @@ export function useIndexerPlugins(options: IndexerPluginsOptions) {
     const source = indexers.value.find((indexer) => indexer.adapterType === type)
     if (adapter) askRemovePlugin(adapter)
     else askRemovePluginType(type, source?.name ?? type)
+  }
+
+  async function checkPluginUpdates() {
+    checkingPluginUpdates.value = true
+    try {
+      const ok = await fetchPluginUpdates(true)
+      if (!ok) toast.error(t('settings.system.requests.indexers.plugins.updateCheckFailed'))
+      else toast.success(t('settings.system.requests.indexers.plugins.updateCheckComplete'))
+    } finally {
+      checkingPluginUpdates.value = false
+    }
+  }
+
+  async function reviewPublishedUpdate(type: string) {
+    pluginBusy.value = true
+    try {
+      const { inspection, error } = await inspectPluginUpdate(type)
+      if (!inspection) {
+        toast.error(error ?? t('settings.system.requests.indexers.plugins.updateInspectFailed'))
+        return
+      }
+      remoteReview.value = inspection
+      pluginReview.value = inspection
+    } finally {
+      pluginBusy.value = false
+    }
+  }
+
+  async function setAutomaticUpdate(type: string, enabled: boolean) {
+    pluginBusy.value = true
+    try {
+      const { status, error } = await setPluginAutomaticUpdate(type, enabled)
+      if (!status) {
+        toast.error(error ?? t('settings.system.requests.indexers.plugins.autoUpdateFailed'))
+        return
+      }
+      const index = pluginUpdates.value.findIndex((entry) => entry.type === type)
+      if (index === -1) pluginUpdates.value.push(status)
+      else pluginUpdates.value[index] = status
+      if (enabled && status.state === 'current') await fetchIndexers({ silent: true, withAdapters: true })
+    } finally {
+      pluginBusy.value = false
+    }
   }
 
   function startPluginInstall() {
@@ -228,9 +298,28 @@ export function useIndexerPlugins(options: IndexerPluginsOptions) {
     pluginFile.value = null
     pluginError.value = null
     updatingPlugin.value = null
+    remoteReview.value = null
   }
 
   async function confirmPluginInstall() {
+    const published = remoteReview.value
+    if (published) {
+      pluginBusy.value = true
+      try {
+        const { status, error } = await installPluginUpdate(published.type, published.sha256)
+        if (!status) {
+          toast.error(error ?? t('settings.system.requests.indexers.plugins.installFailed'))
+          return
+        }
+        toast.success(t('settings.system.requests.indexers.plugins.updated', { label: published.label, version: published.version }))
+        cancelPluginInstall()
+        await Promise.all([fetchIndexers({ silent: true, withAdapters: true }), fetchPluginUpdates(false)])
+      } finally {
+        pluginBusy.value = false
+      }
+      return
+    }
+
     const file = pluginFile.value
     if (!file) return
 
@@ -301,23 +390,27 @@ export function useIndexerPlugins(options: IndexerPluginsOptions) {
     pluginError,
     pluginBusy,
     pluginRestartPending,
+    checkingPluginUpdates,
     removingPlugin,
     pluginPendingRemoval,
     pluginRows,
-    torznabRows,
+    builtInRows,
     nothingConfigured,
-    allSourcesDisabled,
     editingPluginType,
     editingPlugin,
     pluginUseCount,
     pluginUsage,
     pendingRemovalUsage,
+    updateStatusFor,
     askRemovePlugin,
     askRemovePluginType,
     cancelRemovePlugin,
     confirmRemovePlugin,
     handleRowPluginUpdate,
     handleRowPluginRemove,
+    checkPluginUpdates,
+    reviewPublishedUpdate,
+    setAutomaticUpdate,
     startPluginInstall,
     startPluginUpdate,
     handlePluginChosen,

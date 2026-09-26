@@ -1,1 +1,185 @@
-{}
+{
+  "common": {
+    "resetSortAria": "Kembalikan urutan ke pengaturan awal",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "delete": "Hapus",
+    "edit": "Sunting",
+    "close": "Tutup",
+    "confirm": "Konfirmasi",
+    "loading": "Memuat...",
+    "search": "Cari",
+    "back": "Kembali",
+    "next": "Berikutnya",
+    "previous": "Sebelumnya",
+    "retry": "Coba Lagi",
+    "yes": "Ya",
+    "no": "Tidak",
+    "show": "Tampilkan",
+    "hide": "Sembunyikan"
+  },
+  "settings": {
+    "privacySharing": {
+      "title": "Privasi & Berbagi",
+      "subtitle": "Atur apakah administrator dapat melihat ringkasan aktivitas membaca Anda yang memuat informasi identitas.",
+      "levelLegend": "Tingkat berbagi wawasan bacaan",
+      "current": "Pengaturan saat ini",
+      "levels": {
+        "private": {
+          "title": "Pribadi",
+          "description": "Hanya Anda yang dapat melihat statistik membaca Anda."
+        },
+        "summary": {
+          "title": "Bagikan ringkasan",
+          "description": "Bagikan data kebiasaan secara agregat tanpa menyertakan judul buku, penulis, seri, atau narator."
+        },
+        "detailed": {
+          "title": "Bagikan wawasan terperinci",
+          "description": "Bagikan juga buku, penulis, seri, genre, dan narator terbaru dan terpilih."
+        }
+      },
+      "fields": {
+        "frequency": "Frekuensi membaca dan hari aktif",
+        "completion": "Total buku yang mulai dibaca dan diselesaikan",
+        "formats": "Distribusi format",
+        "genres": "Distribusi genre umum",
+        "trend": "Trend bacaan agregat",
+        "books": "Judul-judul buku yang sedang dibaca, terbaru, dan paling banyak dibaca",
+        "authors": "Penulis terpilih",
+        "series": "Seri terpilih",
+        "narrators": "Narator terpilih"
+      },
+      "confirm": {
+        "shareTitle": "Aktifkan {level}?",
+        "shareDescription": "Administrator yang memiliki ijin akan dapat melihat informasi berikut.",
+        "stopTitle": "Berhenti membagikan wawasan bacaan?",
+        "stopDescription": "Akses administrator akan segera diblokir. Catatan akses yang sudah ada tetap ada dalam riwayat Anda.",
+        "recordedNotice": "Setiap tampilan profil administrator dicatat dan muncul dalam riwayat akses Anda."
+      },
+      "preview": {
+        "title": "Pratinjau profil yang Anda bagikan",
+        "description": "Lihat informasi yang saat ini tersedia bagi administrator yang berwenang.",
+        "action": "Muat pratinjau",
+        "readingTime": "Waktu baca",
+        "activeDays": "Hari aktif",
+        "started": "Buku yang mulai dibaca",
+        "completed": "Buku yang selesai dibaca",
+        "topBooks": "Buku pilihan"
+      },
+      "history": {
+        "title": "Riwayat akses profil",
+        "description": "Riwayat tampilan profil bacaan bersama Anda oleh administrator baru-baru ini.",
+        "empty": "Belum ada administrator yang melihat profil bacaan bersama Anda.",
+        "paginationLabel": "Halaman riwayat akses profil"
+      },
+      "durationMinutes": "{count, plural, one {# menit} other {# menit}}",
+      "durationHours": "{count, plural, one {# jam} other {# jam}}",
+      "unknownTitle": "Buku tanpa judul",
+      "errors": {
+        "load": "Gagal memuat pengaturan berbagi.",
+        "save": "Gagal memperbarui pengaturan berbagi.",
+        "preview": "Gagal memuat pratinjau profil bersama."
+      }
+    },
+    "appearance": {
+      "language": {
+        "title": "Bahasa",
+        "description": "Pilih bahasa yang akan digunakan di seluruh antarmuka.",
+        "label": "Bahasa",
+        "loadError": "Gagal memuat bahasa yang dipilih",
+        "saveError": "Gagal menyimpan preferensi bahasa"
+      },
+      "pageTitle": "Tampilan",
+      "pageSubtitle": "Atur tema, sampul, tata letak, dan cara perpustakaan Anda ditampilkan.",
+      "mobileSummary": "Tema: {theme} • Aksen: {accent} • Latar Belakang: {background}",
+      "themeMode": {
+        "light": "Cerah",
+        "dark": "Gelap",
+        "system": "Sistem"
+      },
+      "theme": {
+        "title": "Tema",
+        "colorScheme": {
+          "label": "Skema warna",
+          "hint": "Antarmuka cerah atau gelap"
+        },
+        "accents": {
+          "grey": "Abu-abu",
+          "scarlet": "Kirmizi",
+          "vermilion": "Merah terang",
+          "rose": "Merah muda",
+          "copper": "Tembaga",
+          "orange": "Jingga",
+          "chartreuse": "Hijau kekuningan",
+          "marigold": "Marigold",
+          "wasabi": "Wasabi",
+          "amber": "Amber",
+          "malachite": "Malachite",
+          "yellow": "Kuning",
+          "viridian": "Viridian",
+          "turquoise": "Turquoise",
+          "lime": "Lime",
+          "green": "Hijau",
+          "acid-green": "Acid Green",
+          "emerald": "Emerald",
+          "teal": "Teal",
+          "electric-blue": "Electric Blue",
+          "cyan": "Cyan",
+          "jade": "Jade",
+          "ultramarine": "Ultramarine",
+          "iris": "Iris",
+          "purple": "Ungu",
+          "blue": "Biru",
+          "indigo": "Indigo",
+          "violet": "Violet",
+          "amethyst": "Amethyst",
+          "fuchsia": "Amethyst",
+          "raspberry": "Raspberry",
+          "pink": "Pink",
+          "white": "White",
+          "rosewater": "Rosewater",
+          "salmon": "Salmon",
+          "coral": "Coral",
+          "sand": "Sand",
+          "peach": "Peach",
+          "pear": "Pear",
+          "flax": "Flax",
+          "sprout": "Sprout",
+          "butter": "Butter",
+          "aloe": "Aloe",
+          "lemon": "Lemon",
+          "foam": "Foam",
+          "aqua": "Aqua",
+          "celadon": "Celadon",
+          "sage": "Sage",
+          "mint": "Mint",
+          "seafoam": "Seafoam",
+          "baby-blue": "Baby Blue",
+          "powder": "Powder",
+          "sea-glass": "Sea Glass",
+          "bluebell": "Bluebell",
+          "cornflower": "Cornflower",
+          "thistle": "Thistle",
+          "periwinkle": "Periwinkle",
+          "wisteria": "Wisteria",
+          "lavender": "Lavender",
+          "mauve": "Mauve",
+          "orchid": "Orchid",
+          "rose-quartz": "Rose Quartz",
+          "blush": "Blush"
+        },
+        "accentColor": {
+          "label": "Accent color"
+        },
+        "cornerRadius": {
+          "label": "Corner radius",
+          "hint": "Roundness of cards and UI elements"
+        },
+        "surfaceBrightness": {
+          "label": "Surface brightness",
+          "hint": "Lighten dark mode surfaces"
+        }
+      }
+    }
+  }
+}

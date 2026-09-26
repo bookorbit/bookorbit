@@ -5,7 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
 import { ReaderPreferencesRepository } from './reader-preferences.repository';
 import { ReaderPreferencesService } from './reader-preferences.service';
-import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { CBX_READER_DEFAULTS, EMPTY_CONTENT_FILTER_RULES, EPUB_READER_DEFAULTS } from '@bookorbit/types';
 
 function makeUser(overrides?: Partial<RequestUser>): RequestUser {
   return {
@@ -54,6 +54,8 @@ const mockRepo = {
   findAllDefaults: vi.fn<(...args: [number]) => Promise<Array<{ formatGroup: string; settings: Record<string, unknown> }>>>(),
   upsertDefault: vi.fn<(...args: [number, string, Record<string, unknown>]) => Promise<void>>(),
   deleteDefault: vi.fn<(...args: [number, string]) => Promise<void>>(),
+  patchPreference: vi.fn<(...args: [number, number, Record<string, unknown>, string[]]) => Promise<void>>(),
+  patchDefault: vi.fn<(...args: [number, string, Record<string, unknown>, Record<string, unknown>]) => Promise<void>>(),
 };
 
 const mockBookService = {
@@ -72,6 +74,8 @@ describe('ReaderPreferencesService', () => {
     mockRepo.findAllDefaults.mockResolvedValue([]);
     mockRepo.upsertDefault.mockResolvedValue(undefined);
     mockRepo.deleteDefault.mockResolvedValue(undefined);
+    mockRepo.patchPreference.mockResolvedValue(undefined);
+    mockRepo.patchDefault.mockResolvedValue(undefined);
     service = new ReaderPreferencesService(mockRepo as unknown as ReaderPreferencesRepository, mockBookService as unknown as BookService);
   });
 
@@ -512,6 +516,145 @@ describe('ReaderPreferencesService', () => {
       delete (withoutSpread as Record<string, unknown>).fixedLayoutSpread;
 
       await expect(service.upsertDefault(1, 'epub', withoutSpread)).rejects.toThrow(BadRequestException);
+    });
+  });
+  describe('patch routes', () => {
+    describe('patchDefault', () => {
+      it('writes only the keys the caller sent, with the built-in defaults underneath', async () => {
+        await service.patchDefault(9, 'epub', { themeName: 'sepia', isDark: true });
+
+        expect(mockRepo.patchDefault).toHaveBeenCalledWith(9, 'epub', EPUB_READER_DEFAULTS, { themeName: 'sepia', isDark: true });
+      });
+
+      it('leaves every untouched key out of the patch, so the stored row keeps its own value', async () => {
+        await service.patchDefault(9, 'epub', { lineHeight: 1.8 });
+
+        const [, , , set] = mockRepo.patchDefault.mock.calls[0]!;
+        expect(Object.keys(set)).toEqual(['lineHeight']);
+        expect(set).not.toHaveProperty('fontSize');
+        expect(set).not.toHaveProperty('maxInlineSize');
+      });
+
+      it('does not inject spreadGap into a cbx patch that never mentioned it', async () => {
+        await service.patchDefault(9, 'cbx', { bgColor: 'white' });
+
+        expect(mockRepo.patchDefault).toHaveBeenCalledWith(9, 'cbx', CBX_READER_DEFAULTS, { bgColor: 'white' });
+      });
+
+      it('rejects an unknown key', async () => {
+        await expect(service.patchDefault(9, 'epub', { nope: true })).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchDefault).not.toHaveBeenCalled();
+      });
+
+      it('rejects an out-of-range value', async () => {
+        await expect(service.patchDefault(9, 'epub', { fontSize: 99 })).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchDefault).not.toHaveBeenCalled();
+      });
+
+      it('rejects an unknown format group', async () => {
+        await expect(service.patchDefault(9, 'comics', { bgColor: 'white' })).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchDefault).not.toHaveBeenCalled();
+      });
+
+      it.each([[undefined], [{}]])('rejects an empty body (%s)', async (set) => {
+        await expect(service.patchDefault(9, 'epub', set as Record<string, unknown> | undefined)).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchDefault).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('patchPreference', () => {
+      beforeEach(() => {
+        mockBookService.verifyFileAccess.mockResolvedValue({ format: 'epub' });
+      });
+
+      it('resolves the format group from the file and writes the sent keys', async () => {
+        const user = makeUser({ id: 31 });
+
+        await service.patchPreference(user, 77, { themeName: 'sepia' }, undefined);
+
+        expect(mockBookService.verifyFileAccess).toHaveBeenCalledWith(77, user);
+        expect(mockRepo.patchPreference).toHaveBeenCalledWith(31, 77, { themeName: 'sepia' }, []);
+      });
+
+      it('keeps a pin whose value equals the built-in default', async () => {
+        await service.patchPreference(makeUser(), 77, { lineHeight: 1.5 }, undefined);
+
+        expect(mockRepo.patchPreference).toHaveBeenCalledWith(7, 77, { lineHeight: 1.5 }, []);
+      });
+
+      it('keeps an explicit null apart from an absent key', async () => {
+        await service.patchPreference(makeUser(), 77, { fontFamily: null }, undefined);
+
+        expect(mockRepo.patchPreference).toHaveBeenCalledWith(7, 77, { fontFamily: null }, []);
+      });
+
+      it('accepts an unset-only body', async () => {
+        await service.patchPreference(makeUser(), 77, undefined, ['themeName', 'isDark']);
+
+        expect(mockRepo.patchPreference).toHaveBeenCalledWith(7, 77, {}, ['themeName', 'isDark']);
+      });
+
+      it('collapses duplicate unset keys', async () => {
+        await service.patchPreference(makeUser(), 77, undefined, ['isDark', 'isDark']);
+
+        expect(mockRepo.patchPreference).toHaveBeenCalledWith(7, 77, {}, ['isDark']);
+      });
+
+      it('rejects an unset key that is not part of the group schema', async () => {
+        await expect(service.patchPreference(makeUser(), 77, undefined, ['bgColor'])).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchPreference).not.toHaveBeenCalled();
+      });
+
+      it('rejects a key that appears in both set and unset', async () => {
+        await expect(service.patchPreference(makeUser(), 77, { isDark: true }, ['isDark'])).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchPreference).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        [undefined, undefined],
+        [{}, []],
+        [{}, undefined],
+      ])('rejects an empty body (%s, %s)', async (set, unset) => {
+        await expect(
+          service.patchPreference(makeUser(), 77, set as Record<string, unknown> | undefined, unset as string[] | undefined),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchPreference).not.toHaveBeenCalled();
+      });
+
+      it('rejects an unknown key', async () => {
+        await expect(service.patchPreference(makeUser(), 77, { nope: 1 }, undefined)).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchPreference).not.toHaveBeenCalled();
+      });
+
+      it('rejects an out-of-range value', async () => {
+        await expect(service.patchPreference(makeUser(), 77, { fontSize: 2 }, undefined)).rejects.toThrow(BadRequestException);
+        expect(mockRepo.patchPreference).not.toHaveBeenCalled();
+      });
+
+      it('does not inject spreadGap into a cbx per-book patch', async () => {
+        mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'cbz' });
+
+        await service.patchPreference(makeUser(), 77, { direction: 'rtl' }, undefined);
+
+        expect(mockRepo.patchPreference).toHaveBeenCalledWith(7, 77, { direction: 'rtl' }, []);
+      });
+
+      it('writes nothing when file access fails', async () => {
+        mockBookService.verifyFileAccess.mockRejectedValueOnce(new ForbiddenException());
+
+        await expect(service.patchPreference(makeUser(), 77, { isDark: true }, undefined)).rejects.toThrow(ForbiddenException);
+        expect(mockRepo.patchPreference).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('upsertPreference key picking', () => {
+      it('does not inject spreadGap into a cbx per-book PUT', async () => {
+        mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'cbz' });
+
+        await service.upsertPreference(makeUser(), 41, { direction: 'rtl' });
+
+        expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 41, { direction: 'rtl' });
+      });
     });
   });
 });

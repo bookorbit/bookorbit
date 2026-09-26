@@ -1,0 +1,1 @@
+CREATE INDEX "bm_subtitle_unaccent_trgm_idx" ON "book_metadata" USING gin (public.bookorbit_unaccent("subtitle") gin_trgm_ops);

@@ -40,12 +40,17 @@ describe('EmailSendLogController', () => {
 
   it('uses default pagination values when query is empty', async () => {
     await controller.findForUser({} as QuerySendLogDto, user);
-    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, undefined);
   });
 
   it('forwards explicit pagination values', async () => {
     await controller.findForUser({ page: 4, size: 5 }, user);
-    expect(logService.findForUser).toHaveBeenCalledWith(user, 4, 5);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 4, 5, undefined);
+  });
+
+  it('forwards the book filter', async () => {
+    await controller.findForUser({ bookId: 965 }, user);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, 965);
   });
 
   it('delegates remove', async () => {

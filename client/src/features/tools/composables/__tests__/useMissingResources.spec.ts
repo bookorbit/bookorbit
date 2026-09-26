@@ -167,7 +167,7 @@ describe('useMissingResources', () => {
   it('never exposes rows from the previous category while the next page is loading', async () => {
     vi.mocked(api.getMissingResourcesSummary).mockResolvedValue(summary({ sweep: completedSweep }))
     vi.mocked(api.getOrphanedCoverDirs).mockResolvedValue({
-      items: [{ bookId: 1028, fileCount: 3, sizeBytes: 1024 }],
+      items: [{ bookId: 1028, fileCount: 3, sizeBytes: 1024, media: ['audio'] }],
       total: 283,
       page: 1,
       pageSize: 50,

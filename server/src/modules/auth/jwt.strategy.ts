@@ -19,8 +19,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: number; ver: number; amr?: AuthenticationMethod }) {
-    const user = await this.authService.validateUser(payload.sub, payload.ver, payload.amr ?? 'legacy');
+  async validate(payload: { sub: number; ver: number; sid?: number; amr?: AuthenticationMethod }) {
+    const user = await this.authService.validateSessionUser(payload.sub, payload.ver, payload.amr ?? 'legacy', payload.sid);
     if (!user) throw new UnauthorizedException();
     return user;
   }

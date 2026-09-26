@@ -18,7 +18,7 @@ function download(overrides: Partial<BookRequestDownloadItem> = {}): BookRequest
     automated: false,
     releaseTitle: 'Pride and Prejudice',
     releaseSizeBytes: null,
-    clientHash: 'a'.repeat(40),
+    clientKey: 'a'.repeat(40),
     status: 'queued',
     progressPercent: 0,
     downloadedBytes: 0,
@@ -121,6 +121,16 @@ describe('RequestDownloadProgress', () => {
     expect(pills[0]?.classes().join(' ')).toContain('--pill-source-orange')
     expect(pills[1]?.classes().join(' ')).toContain('--pill-torrent')
     expect(pills[2]?.classes().join(' ')).toContain('--pill-source-green')
+  })
+
+  it('renders an NZB attempt as Usenet', () => {
+    const wrapper = mount(RequestDownloadProgress, {
+      props: { download: download({ source: 'nzb_file', downloadClientName: 'NZBGet' }), live: null },
+    })
+
+    expect(wrapper.text()).toContain('Usenet')
+    expect(wrapper.text()).toContain('NZBGet')
+    expect(wrapper.findAll('.rounded-full.border')[1]?.classes().join(' ')).toContain('--pill-usenet')
   })
 
   it('says a hand-pasted magnet came from no source rather than leaving a gap', () => {

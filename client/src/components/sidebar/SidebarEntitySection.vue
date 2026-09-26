@@ -10,6 +10,7 @@ import SidebarSectionHeader from '@/components/sidebar/SidebarSectionHeader.vue'
 import SidebarSectionBody from '@/components/sidebar/SidebarSectionBody.vue'
 import SidebarBadge from '@/components/sidebar/SidebarBadge.vue'
 import { formatCompactNumber, formatNumber } from '@/i18n/formatters'
+import { entityCount } from '@/lib/entity-count'
 import { useDraggableOrder } from '@/composables/useDraggableOrder'
 import { useSidebarPrefs } from '@/composables/useSidebarPrefs'
 
@@ -19,6 +20,11 @@ export interface SidebarEntity {
   name: string
   icon?: string | null
   bookCount?: number | null
+  podcastCount?: number | null
+  episodeCount?: number | null
+  /** Libraries discriminate on `type`; scopes and collections on `mediaType`. */
+  type?: string
+  mediaType?: 'books' | 'podcasts'
 }
 
 const props = withDefaults(
@@ -27,7 +33,8 @@ const props = withDefaults(
     label: string
     items: SidebarEntity[]
     routeName: string
-    indexRouteName: string
+    /** Omit when the section has no index page; the see-all link is then suppressed. */
+    indexRouteName?: string
     activeId: number | null
     fallbackIcon: string
     emptyText: string
@@ -42,7 +49,15 @@ const props = withDefaults(
     /** Rail popovers render the body regardless of the stored open state. */
     alwaysOpen?: boolean
   }>(),
-  { canAdd: false, canReorder: false, addLabel: undefined, persistOrder: undefined, tourId: undefined, alwaysOpen: false },
+  {
+    indexRouteName: undefined,
+    canAdd: false,
+    canReorder: false,
+    addLabel: undefined,
+    persistOrder: undefined,
+    tourId: undefined,
+    alwaysOpen: false,
+  },
 )
 
 const emit = defineEmits<{ add: []; navigate: [] }>()
@@ -88,7 +103,7 @@ const matchedItems = computed(() => {
 
 const visibleItems = computed(() => (Number.isFinite(capValue.value) ? matchedItems.value.slice(0, capValue.value) : matchedItems.value))
 
-const showSeeAll = computed(() => total.value > capValue.value)
+const showSeeAll = computed(() => Boolean(props.indexRouteName) && total.value > capValue.value)
 
 /** Reordering is an explicit mode entered from the section menu. Grips are a rare action,
  *  so they stay out of the way until the user asks for them. */
@@ -145,12 +160,8 @@ function handleFilterKeydown(event: KeyboardEvent) {
   }
 }
 
-function itemRoute(id: number) {
-  return { name: props.routeName, params: { id } }
-}
-
-function itemCount(item: SidebarEntity): number | null {
-  return typeof item.bookCount === 'number' ? item.bookCount : null
+function itemRoute(item: SidebarEntity) {
+  return { name: props.routeName, params: { id: item.id } }
 }
 
 function gripLabel(item: SidebarEntity): string {
@@ -228,7 +239,7 @@ function onGripBlur(id: number) {
               :key="item.id"
               :is-active="activeId === item.id"
               :tooltip="item.name"
-              :to="itemRoute(item.id)"
+              :to="itemRoute(item)"
               :icon="item.icon || fallbackIcon"
               :fallback-icon="fallbackIcon"
               :label="item.name"
@@ -236,7 +247,7 @@ function onGripBlur(id: number) {
             >
               <template #badge>
                 <slot name="itemBadge" :item="item">
-                  <SidebarBadge v-if="itemCount(item) !== null">{{ formatCompactNumber(itemCount(item) ?? 0) }}</SidebarBadge>
+                  <SidebarBadge v-if="entityCount(item) !== null">{{ formatCompactNumber(entityCount(item) ?? 0) }}</SidebarBadge>
                 </slot>
               </template>
               <template v-if="dragEnabled" #trailing>
@@ -265,7 +276,7 @@ function onGripBlur(id: number) {
 
         <RouterLink
           v-if="showSeeAll && !isFiltering"
-          :to="{ name: indexRouteName }"
+          :to="{ name: indexRouteName as string }"
           class="mt-0.5 flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-normal text-muted-foreground outline-hidden transition-colors duration-150 hover:bg-(--shell-accent-wash) hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           @click="handleNavigate"
         >

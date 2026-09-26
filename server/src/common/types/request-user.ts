@@ -11,6 +11,7 @@ export interface RequestUser {
   isSuperuser: boolean;
   isDefaultPassword: boolean;
   tokenVersion: number;
+  sessionId?: number;
   settings: Record<string, unknown>;
   avatarUrl: string | null;
   avatarSource?: 'none' | 'external' | 'uploaded' | null;

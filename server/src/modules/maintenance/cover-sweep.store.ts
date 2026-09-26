@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CoverSweepStatus } from '@bookorbit/types';
+import type { CoverMedium, CoverSweepStatus } from '@bookorbit/types';
 
 /**
  * Sweep results are held in memory rather than a table: a sweep is cheap to repeat, its
@@ -14,6 +14,7 @@ export interface OrphanedCoverDir {
   bookId: number;
   fileCount: number;
   sizeBytes: number;
+  media: CoverMedium[];
 }
 
 export interface SweepRecord {

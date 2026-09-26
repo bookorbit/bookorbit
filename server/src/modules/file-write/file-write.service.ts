@@ -1,13 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { readdir, readFile, stat } from 'fs/promises';
-import { basename, extname, join } from 'path';
+import { readFile, stat } from 'fs/promises';
+import { basename, extname } from 'path';
 
-import type { BookFileWriteDisabledReason, BookFileWriteField, BookFileWriteStatus, BookFormat, WriteResult } from '@bookorbit/types';
+import type { BookFileWriteDisabledReason, BookFileWriteField, BookFileWriteStatus, BookFormat, CoverMedium, WriteResult } from '@bookorbit/types';
 import { BOOK_FORMATS, getBookFileWriteFormatFields, isAudioFormat, NotificationType } from '@bookorbit/types';
-import { bookCoverDirPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { NotificationService } from '../notification/notification.service';
 import { computeFileHash } from '../scanner/lib/hash';
 import {
@@ -54,7 +54,6 @@ type FileWriteCapabilityLibraryConfig = Partial<LibraryFileWriteConfig> | null |
 @Injectable()
 export class FileWriteService implements OnModuleDestroy {
   private readonly logger = new Logger(FileWriteService.name);
-  private readonly appDataPath: string;
   private readonly debounceMs: number;
   private readonly maxConcurrentWrites: number;
   private readonly debounceMap = new Map<number, NodeJS.Timeout>();
@@ -69,8 +68,8 @@ export class FileWriteService implements OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly notificationService: NotificationService,
     private readonly selfWriteRegistry: SelfWriteRegistry,
+    private readonly coverStore: BookCoverStore,
   ) {
-    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_WRITE_DEBOUNCE_MS);
     this.maxConcurrentWrites = resolvePositiveInteger(this.config.get('fileWrite.maxConcurrentWrites'), DEFAULT_MAX_CONCURRENT_WRITES);
   }
@@ -214,7 +213,7 @@ export class FileWriteService implements OnModuleDestroy {
       const payload: BookWritePayload = { ...rawPayload };
 
       if (libConfig.fileWriteWriteCover && !dryRun) {
-        payload.coverBytes = await this.loadCoverBytes(bookId);
+        payload.coverBytes = await this.loadCoverBytes(bookId, this.coverMediumForTargets(targets));
       }
 
       const audioWriteContexts = this.resolveAudioWriteContexts(targets);
@@ -502,14 +501,21 @@ export class FileWriteService implements OnModuleDestroy {
     return this.fileWriteRepo.findLibraryWriteSettingsForBook(bookId);
   }
 
-  private async loadCoverBytes(bookId: number): Promise<Buffer | null> {
+  /** Targets are the ebook primary alone, or every audio track, so they share one medium. */
+  private coverMediumForTargets(targets: readonly FileWriteTarget[]): CoverMedium {
+    const format = normalizeFormat(targets[0]?.format);
+    return format && isAudioFormat(format) ? 'audio' : 'ebook';
+  }
+
+  /**
+   * Only the target medium's own slot is ever embedded. A square audiobook cover baked into an
+   * EPUB would come back as the ebook cover on the next scan.
+   */
+  private async loadCoverBytes(bookId: number, medium: CoverMedium): Promise<Buffer | null> {
     const startedAt = Date.now();
-    const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
-      const files = await readdir(dir);
-      const cover = findPreferredBookCoverFileName(files);
-      if (!cover) return null;
-      return readFile(join(dir, cover));
+      const path = await this.coverStore.resolve(bookId, { medium, variant: 'cover', strict: true });
+      return path ? await readFile(path) : null;
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
       const errorMessage = sanitizeErrorMessage(error instanceof Error ? error.message : String(error));

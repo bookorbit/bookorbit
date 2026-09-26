@@ -1,6 +1,9 @@
-import { bigserial, index, boolean, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { bigserial, check, index, boolean, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import type { MediaType } from '@bookorbit/types';
 
 import { books } from './books';
+import { podcasts } from './podcasts';
 import { users } from './auth';
 
 export const collections = pgTable(
@@ -10,6 +13,8 @@ export const collections = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    /** A collection holds one medium: books go in collection_books, shows in collection_podcasts. */
+    mediaType: varchar('media_type', { length: 20 }).$type<MediaType>().notNull().default('books'),
     name: text('name').notNull(),
     icon: text('icon'),
     description: text('description'),
@@ -23,9 +28,12 @@ export const collections = pgTable(
       .$onUpdateFn(() => new Date()),
   },
   (t) => [
-    uniqueIndex('collections_user_name_uidx').on(t.userId, t.name),
+    uniqueIndex('collections_user_media_type_name_uidx').on(t.userId, t.mediaType, t.name),
     index('collections_user_display_name_idx').on(t.userId, t.displayOrder, t.name),
     index('collections_public_display_name_idx').on(t.isPublic, t.displayOrder, t.name),
+    check('collections_media_type_chk', sql`${t.mediaType} in ('books', 'podcasts')`),
+    /** Kobo takes books only, so a podcast collection must never carry the sync flag. */
+    check('collections_kobo_books_only_chk', sql`${t.syncToKobo} = false or ${t.mediaType} = 'books'`),
   ],
 );
 
@@ -48,6 +56,21 @@ export const collectionBooks = pgTable(
     index('collection_books_book_id_idx').on(table.bookId),
     index('collection_books_collection_position_idx').on(table.collectionId, table.position),
   ],
+);
+
+/** Podcast collections group shows. Episodes stay the queue's and the scopes' concern. */
+export const collectionPodcasts = pgTable(
+  'collection_podcasts',
+  {
+    collectionId: integer('collection_id')
+      .notNull()
+      .references(() => collections.id, { onDelete: 'cascade' }),
+    podcastId: integer('podcast_id')
+      .notNull()
+      .references(() => podcasts.id, { onDelete: 'cascade' }),
+    addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.collectionId, table.podcastId] }), index('collection_podcasts_podcast_id_idx').on(table.podcastId)],
 );
 
 export type Collection = typeof collections.$inferSelect;

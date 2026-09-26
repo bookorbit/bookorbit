@@ -876,9 +876,11 @@ export class Paginator extends HTMLElement {
     this.#touchScrolled = true
     this.scrollBy(dx, dy)
   }
-  #onTouchEnd() {
+  #onTouchEnd(e) {
     this.#touchScrolled = false
     if (this.scrolled) return
+    const doc = e.currentTarget?.getSelection ? e.currentTarget : this.#view?.document
+    if (hasActiveTextSelection(doc)) return
 
     // XXX: Firefox seems to report scale as 1... sometimes...?
     // at this point I'm basically throwing `requestAnimationFrame` at
