@@ -1,6 +1,12 @@
 import { Logger } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { BookService } from '../book/book.service';
+import { HardcoverBookMatchService } from './hardcover-book-match.service';
+import { HardcoverClientService } from './hardcover-client.service';
+import { HardcoverRepository } from './hardcover.repository';
+import { HardcoverSettingsService } from './hardcover-settings.service';
 import { HardcoverSyncService } from './hardcover-sync.service';
 
 const mockRepo = {
@@ -39,6 +45,20 @@ const mockBookService = {
 
 function makeService() {
   return new HardcoverSyncService(mockRepo as any, mockClient as any, mockMatchService as any, mockSettingsService as any, mockBookService as any);
+}
+
+async function makeTestingService() {
+  const module = await Test.createTestingModule({
+    providers: [
+      HardcoverSyncService,
+      { provide: HardcoverRepository, useValue: mockRepo },
+      { provide: HardcoverClientService, useValue: mockClient },
+      { provide: HardcoverBookMatchService, useValue: mockMatchService },
+      { provide: HardcoverSettingsService, useValue: mockSettingsService },
+      { provide: BookService, useValue: mockBookService },
+    ],
+  }).compile();
+  return module.get(HardcoverSyncService);
 }
 
 const defaultSettings = {
@@ -898,6 +918,69 @@ describe('HardcoverSyncService', () => {
   });
 
   describe('setEdition', () => {
+    it.each(['single book', 'sync all'])('keeps a new manual edition after an older %s sync finishes', async (source) => {
+      let state = { userId: 1, bookId: 1, hardcoverBookId: 10, hardcoverEditionId: 20, matchError: null, lastSyncedAt: null as Date | null };
+      let releaseFirstMatch!: () => void;
+      let signalFirstMatch!: () => void;
+      const firstMatchStarted = new Promise<void>((resolve) => {
+        signalFirstMatch = resolve;
+      });
+      const firstMatchBlocked = new Promise<void>((resolve) => {
+        releaseFirstMatch = resolve;
+      });
+
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue({ ...readingBook, startedAt: null, progress: null });
+      mockRepo.findSyncableBooks.mockResolvedValue([{ ...readingBook, startedAt: null, progress: null }]);
+      mockRepo.findBookState.mockImplementation(() => Promise.resolve(state));
+      mockRepo.upsertBookState.mockImplementation((data) => {
+        state = { ...state, ...data };
+        return Promise.resolve(state);
+      });
+      mockMatchService.findEditionForBook.mockResolvedValue({ id: 30, format: 'Physical Book' });
+      mockMatchService.matchBook.mockImplementationOnce(async () => {
+        signalFirstMatch();
+        await firstMatchBlocked;
+        return { hardcoverBookId: 10, hardcoverEditionId: 20, editionPages: 300, matchMethod: 'cached' };
+      });
+      mockMatchService.matchBook.mockImplementationOnce(() =>
+        Promise.resolve({
+          hardcoverBookId: 10,
+          hardcoverEditionId: state.hardcoverEditionId,
+          editionPages: 300,
+          matchMethod: 'cached',
+        }),
+      );
+      mockClient.query.mockResolvedValue({ insert_user_book: { user_book: { id: 55 } }, update_user_book: { error: null } });
+
+      const service = await makeTestingService();
+      if (source === 'single book') {
+        const earlierSync = service.syncBook(1, 1);
+        await firstMatchStarted;
+        const choice = service.setEdition(1, 1, 30);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(mockMatchService.findEditionForBook).not.toHaveBeenCalled();
+        releaseFirstMatch();
+        await expect(earlierSync).resolves.toBe('synced');
+        await expect(choice).resolves.toEqual({ success: true });
+      } else {
+        await service.syncAll(1);
+        await firstMatchStarted;
+        const choice = service.setEdition(1, 1, 30);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(mockMatchService.findEditionForBook).not.toHaveBeenCalled();
+        releaseFirstMatch();
+        await expect(choice).resolves.toEqual({ success: true });
+      }
+
+      expect(state.hardcoverEditionId).toBe(30);
+      expect(mockMatchService.matchBook).toHaveBeenCalledTimes(2);
+      const syncedEditions = mockClient.query.mock.calls
+        .filter((call) => (call[2] as string).includes('mutation UpdateUserBook'))
+        .map((call) => call[3].object.edition_id);
+      expect(syncedEditions).toEqual([20, 30]);
+    });
+
     it('throws when the book has no matched hardcoverBookId', async () => {
       mockSettingsService.getTokenForUser.mockResolvedValue('tok');
       mockRepo.findBookState.mockResolvedValue(null);
