@@ -83,6 +83,7 @@ const progress = useAudioProgress(props.bookId, { trackingEnabled, manifestRevis
 
 let queue: ReturnType<typeof useAudioQueue> | null = null
 let stopQueuePlayingWatch: WatchStopHandle | null = null
+let stopQueueErrorWatch: WatchStopHandle | null = null
 const isPlaying = ref(false)
 const currentPosition = ref(0)
 const currentFileIndex = ref(0)
@@ -121,6 +122,14 @@ function initQueue(startAssetId: string, startPosition: number) {
       if (isPlaying.value !== playing) {
         isPlaying.value = playing
       }
+    },
+    { immediate: true },
+  )
+  stopQueueErrorWatch?.()
+  stopQueueErrorWatch = watch(
+    queue.loadError,
+    (message) => {
+      if (message && !error.value) error.value = message
     },
     { immediate: true },
   )
@@ -231,6 +240,8 @@ onUnmounted(() => {
   releaseMediaSessionArtwork()
   stopQueuePlayingWatch?.()
   stopQueuePlayingWatch = null
+  stopQueueErrorWatch?.()
+  stopQueueErrorWatch = null
   queue?.destroy()
   stopTicker()
   progress.flush()

@@ -1,11 +1,14 @@
 import { ref } from 'vue'
 import { Howl } from 'howler'
+import { refreshAccessToken } from '@/lib/api'
 
 export interface AudioFile {
   assetId: string
   format: string
   durationMs: number | null
 }
+
+const RECOVERY_COOLDOWN_MS = 5_000
 
 function serveUrl(bookId: number, assetId: string): string {
   return `/api/v1/audiobooks/${bookId}/assets/${assetId}/content`
@@ -24,19 +27,33 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
   // Pending seek to apply when the current Howl finishes loading.
   // Using a single variable prevents stacking multiple once('load') seek handlers.
   let pendingSeek: number | null = null
+  let playRequested = false
+  let recoveryPending = false
+  let destroyed = false
+  let activationEpoch = 0
+  let playbackRate = 1
+  let playbackVolume = 1
+  let lastRecoveryAt: number | null = null
 
-  function buildHowl(index: number): Howl {
+  function buildHowl(index: number, allowRecovery = true): Howl {
     const file = files[index]!
     const fmt = file.format?.toLowerCase() ?? 'm4b'
+    let recovering = false
     const howl = new Howl({
       src: [serveUrl(bookId, file.assetId)],
       format: [fmt],
       html5: true,
       preload: false,
+      rate: playbackRate,
+      volume: playbackVolume,
       onend() {
+        if (recoveryPending || destroyed || howls.get(file.assetId) !== howl) return
+        playRequested = false
         onFileEnd(file.assetId)
       },
       onplay() {
+        if (recoveryPending || destroyed || howls.get(file.assetId) !== howl) return
+        playRequested = true
         isPlaying.value = true
       },
       onpause() {
@@ -46,14 +63,51 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
         isPlaying.value = false
       },
       onload() {
+        allowRecovery = true
         if (index === currentIndex.value) {
           duration.value = howl.duration()
         }
       },
       onloaderror(_id: number, err: unknown) {
-        if (index === currentIndex.value) {
-          loadError.value = typeof err === 'string' ? err : 'Failed to load audio file'
+        if (index !== currentIndex.value || howls.get(file.assetId) !== howl || destroyed || recovering) return
+        isPlaying.value = false
+        const message = typeof err === 'string' ? err : 'Failed to load audio file'
+        if (!allowRecovery || (lastRecoveryAt !== null && Date.now() - lastRecoveryAt < RECOVERY_COOLDOWN_MS)) {
+          recoveryPending = false
+          playRequested = false
+          loadError.value = message
+          return
         }
+        allowRecovery = false
+        lastRecoveryAt = Date.now()
+        recovering = true
+        recoveryPending = true
+        const epoch = activationEpoch
+        void refreshAccessToken()
+          .then(() => {
+            if (destroyed || epoch !== activationEpoch || index !== currentIndex.value || howls.get(file.assetId) !== howl) return
+            howl.unload()
+            howls.delete(file.assetId)
+            const retry = buildHowl(index, false)
+            howls.set(file.assetId, retry)
+            retry.once('load', () => {
+              if (destroyed || index !== currentIndex.value || howls.get(file.assetId) !== retry) return
+              const position = currentPosition.value
+              retry.seek(position)
+              recoveryPending = false
+              if (playRequested) retry.play()
+            })
+            retry.load()
+          })
+          .catch(() => {
+            if (destroyed || epoch !== activationEpoch || index !== currentIndex.value || howls.get(file.assetId) !== howl) return
+            recoveryPending = false
+            playRequested = false
+            loadError.value = message
+          })
+          .finally(() => {
+            recovering = false
+          })
       },
     })
     return howl
@@ -85,6 +139,8 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
       prev?.stop()
       currentIndex.value = clamped
       pendingSeek = null
+      activationEpoch++
+      recoveryPending = false
     }
 
     const howl = getOrCreate(clamped)
@@ -94,6 +150,7 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
 
     loadError.value = null
     duration.value = (files[clamped]!.durationMs ?? 0) / 1000
+    currentPosition.value = positionSeconds
 
     if (howl.state() === 'loaded') {
       duration.value = howl.duration()
@@ -120,6 +177,8 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
   function play() {
     const h = currentHowl()
     if (!h) return
+    playRequested = true
+    if (recoveryPending) return
     if (h.state() === 'unloaded') {
       h.once('load', () => h.play())
       h.load()
@@ -129,6 +188,7 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
   }
 
   function pause() {
+    playRequested = false
     currentHowl()?.pause()
   }
 
@@ -149,17 +209,21 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
   }
 
   function position(): number {
+    if (loadError.value || recoveryPending) return currentPosition.value
     const h = currentHowl()
     if (!h) return currentPosition.value
     const p = h.seek()
-    return typeof p === 'number' ? p : currentPosition.value
+    if (typeof p === 'number' && Number.isFinite(p)) currentPosition.value = p
+    return currentPosition.value
   }
 
   function setSpeed(rate: number) {
+    playbackRate = rate
     for (const h of howls.values()) h.rate(rate)
   }
 
   function setVolume(vol: number) {
+    playbackVolume = vol
     for (const h of howls.values()) h.volume(vol)
   }
 
@@ -178,6 +242,9 @@ export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (as
   }
 
   function destroy() {
+    destroyed = true
+    playRequested = false
+    recoveryPending = false
     for (const h of howls.values()) {
       h.stop()
       h.unload()
