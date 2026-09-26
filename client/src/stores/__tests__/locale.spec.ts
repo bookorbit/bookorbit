@@ -29,6 +29,7 @@ describe('locale store', () => {
   it('matches exact locales before falling back to a supported base language', async () => {
     const { matchSupportedLocale } = await import('../locale')
 
+    expect(matchSupportedLocale(['en', 'en-GB', 'en-US'])).toBe('en')
     expect(matchSupportedLocale(['nl-NL', 'en-US'])).toBe('nl')
     expect(matchSupportedLocale(['de-DE', 'en-GB'])).toBe('de')
     expect(matchSupportedLocale(['el-GR', 'en-GB'])).toBe('el')

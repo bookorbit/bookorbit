@@ -1,7 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isFiveFieldCronExpression } from '@bookorbit/types'
 
 import { parseCronToHuman } from '../cron'
+
+function mockBrowserClock(locale: string, hour12: boolean): void {
+  const NativeDateTimeFormat = Intl.DateTimeFormat
+  vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function dateTimeFormat(requestedLocale, options) {
+    const formatter = new NativeDateTimeFormat(requestedLocale, options)
+    if (requestedLocale === undefined) {
+      vi.spyOn(formatter, 'resolvedOptions').mockReturnValue({ ...formatter.resolvedOptions(), locale, hour12 })
+    }
+    return formatter
+  })
+}
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('isFiveFieldCronExpression', () => {
   it.each(['0 4 * * *', '*/30 * * * *', '0 0 * * 1', '0 4 * * MON', '0  4 * * *', '1-5/2 * * * *', '0 4 * jan-mar *'])(
@@ -21,6 +34,30 @@ describe('isFiveFieldCronExpression', () => {
 })
 
 describe('parseCronToHuman', () => {
+  it('uses the browser clock for an English regional preference', () => {
+    mockBrowserClock('en-GB', false)
+
+    expect(parseCronToHuman('31 12,0 * * *', 'en')).toBe('At 00:31 and 12:31')
+  })
+
+  it('preserves a 12-hour English browser preference', () => {
+    mockBrowserClock('en-US', true)
+
+    expect(parseCronToHuman('31 12,0 * * *', 'en')).toBe('At 12:31 AM and 12:31 PM')
+  })
+
+  it('uses the selected language convention when it differs from the browser language', () => {
+    mockBrowserClock('en-US', true)
+
+    expect(parseCronToHuman('31 12,0 * * *', 'nl')).toBe('At 00:31 and 12:31')
+  })
+
+  it('preserves the English convention with a Dutch browser language', () => {
+    mockBrowserClock('nl-BE', false)
+
+    expect(parseCronToHuman('31 12,0 * * *', 'en')).toBe('At 12:31 AM and 12:31 PM')
+  })
+
   it('returns null for null input', () => {
     expect(parseCronToHuman(null, 'en')).toBeNull()
   })
