@@ -289,6 +289,25 @@ describe('api wrapper', () => {
       expect(fetchMock.mock.calls[0]![1]?.redirect).toBe('manual')
     })
 
+    it('keeps redirects manual even when a caller asks to follow them', async () => {
+      const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(new Response('{}', { status: 200 })))
+      globalThis.fetch = fetchMock as never
+
+      await api('/api/v1/books/1', { redirect: 'follow' })
+
+      expect(fetchMock.mock.calls[0]![1]?.redirect).toBe('manual')
+    })
+
+    it('does not reload when storage is unavailable, since a loop could not be detected', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(() => Promise.resolve(opaqueRedirect())) as never
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('SecurityError')
+      })
+
+      await expect(api('/api/v1/books/1')).rejects.toBeInstanceOf(NetworkError)
+      expect(reload).not.toHaveBeenCalled()
+    })
+
     it('reloads the page instead of treating a proxy redirect as a logged-out session', async () => {
       globalThis.fetch = vi.fn<typeof fetch>(() => Promise.resolve(opaqueRedirect())) as never
       const onAuthFailure = vi.fn<() => void>()

@@ -103,7 +103,11 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'app-shell',
-              networkTimeoutSeconds: 10,
+              // No networkTimeoutSeconds: a slow proxy redirect must win over the cached page.
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7,
+              },
               precacheFallback: {
                 fallbackURL: 'index.html',
               },

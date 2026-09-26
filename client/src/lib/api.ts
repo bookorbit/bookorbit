@@ -130,15 +130,16 @@ export function isAuthProxyRedirect(res: Response): boolean {
  * would just flash the wrong UI for a moment.
  */
 export function reloadForAuthProxy(): Promise<never> {
-  // If the reload is answered from the service worker cache again (e.g. the network-first route timed
-  // out), a second reload would loop forever. Give up and let the caller surface an error instead.
+  // If the reload is answered from the service worker cache again (e.g. the network failed), a second
+  // reload would loop forever. Give up and let the caller surface an error instead. Without storage
+  // the loop can't be detected, so don't risk the reload at all.
   const now = Date.now()
-  let lastReload = 0
+  let lastReload: number
   try {
     lastReload = Number(sessionStorage.getItem(AUTH_PROXY_RELOAD_KEY)) || 0
     sessionStorage.setItem(AUTH_PROXY_RELOAD_KEY, String(now))
   } catch {
-    // Storage unavailable: fall through and reload once.
+    return Promise.reject(new NetworkError('auth proxy redirect'))
   }
   if (now - lastReload < AUTH_PROXY_RELOAD_WINDOW_MS) {
     return Promise.reject(new NetworkError('auth proxy redirect'))
@@ -152,7 +153,7 @@ async function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
   if (_accessToken) headers.set('Authorization', `Bearer ${_accessToken}`)
   let res: Response
   try {
-    res = await fetch(input, { redirect: 'manual', ...init, headers, credentials: 'include' })
+    res = await fetch(input, { ...init, headers, credentials: 'include', redirect: 'manual' })
   } catch (reason) {
     if (reason instanceof TypeError) throw new NetworkError(reason.message)
     throw reason
