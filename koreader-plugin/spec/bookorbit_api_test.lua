@@ -352,25 +352,38 @@ assertEqual(request_ran_in_subprocess, false, "unwrapped fallback runs in curren
 assertEqual(client:getProxy(), nil, "default client has no proxy")
 
 local explicit_proxy_client = BookOrbitApi.new{
-    server_url = "https://bookorbit.example.com/api/v1",
+    server_url = "http://bookorbit.example.com/api/v1",
     username = "reader",
     userkey = "secret",
     proxy = "http://127.0.0.1:8080",
 }
 assertEqual(explicit_proxy_client:getProxy(), "http://127.0.0.1:8080",
-    "explicit proxy is returned")
+    "explicit proxy is returned for HTTP server")
 
 mock_http_body = "{\"ok\":true}"
 mock_http_code = 200
 explicit_proxy_client:auth()
 assertEqual(last_request_proxy, "http://127.0.0.1:8080",
-    "explicit proxy is passed to request table")
+    "explicit proxy is passed to request table for HTTP server")
+
+local https_explicit_proxy_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    proxy = "http://127.0.0.1:8080",
+}
+assertEqual(https_explicit_proxy_client:getProxy(), nil,
+    "proxy is skipped for HTTPS server to prevent cleartext credential leakage without CONNECT")
 
 local tailscale_ip_client = BookOrbitApi.new{
     server_url = "http://100.85.60.88:3005/api/v1",
 }
 assertEqual(tailscale_ip_client:getProxy(), "http://127.0.0.1:1056",
-    "tailscale 100.x.y.z server URL routes to userspace proxy")
+    "tailscale 100.64.0.0/10 server URL routes to userspace proxy")
+
+local non_tailscale_ip_client = BookOrbitApi.new{
+    server_url = "http://100.1.2.3:3005/api/v1",
+}
+assertEqual(non_tailscale_ip_client:getProxy(), nil,
+    "IPs outside Tailscale CGNAT range do not route to userspace proxy")
 
 local tailscale_magicdns_client = BookOrbitApi.new{
     server_url = "http://my-server.tailnet.ts.net:3005/api/v1",
@@ -378,7 +391,19 @@ local tailscale_magicdns_client = BookOrbitApi.new{
 assertEqual(tailscale_magicdns_client:getProxy(), "http://127.0.0.1:1056",
     "tailscale ts.net server URL routes to userspace proxy")
 
+local non_tailscale_path_client = BookOrbitApi.new{
+    server_url = "http://example.com/docs/tailnet.ts.net/api/v1",
+}
+assertEqual(non_tailscale_path_client:getProxy(), nil,
+    "url path containing .ts.net does not trigger userspace proxy")
+
 -- KOReader global settings proxy test
+local http_client = BookOrbitApi.new{
+    server_url = "http://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+}
+
 local mock_settings = {
     http_proxy_enabled = true,
     http_proxy = "http://192.168.1.1:3128",
@@ -388,15 +413,15 @@ G_reader_settings = {
     readSetting = function(self, key) return mock_settings[key] end,
 }
 
-assertEqual(client:getProxy(), "http://192.168.1.1:3128",
-    "G_reader_settings proxy is used when enabled")
+assertEqual(http_client:getProxy(), "http://192.168.1.1:3128",
+    "G_reader_settings proxy is used when enabled for HTTP server")
 
-client:auth()
+http_client:auth()
 assertEqual(last_request_proxy, "http://192.168.1.1:3128",
     "G_reader_settings proxy is passed to request table")
 
 mock_settings.http_proxy_enabled = false
-assertEqual(client:getProxy(), nil,
+assertEqual(http_client:getProxy(), nil,
     "G_reader_settings proxy is ignored when disabled")
 
 G_reader_settings = nil

@@ -175,7 +175,25 @@ function BookOrbitApi.normalizeServerUrl(input)
     return url
 end
 
+-- Matches Tailscale hostnames (*.ts.net) and CGNAT IPv4 addresses (100.64.0.0/10).
+local function isTailnetHost(host)
+    if not host or type(host) ~= "string" then return false end
+    if host:match("%.ts%.net$") or host == "ts.net" then
+        return true
+    end
+    local o1, o2, o3, o4 = host:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
+    if o1 and o2 and o3 and o4 then
+        o1, o2, o3, o4 = tonumber(o1), tonumber(o2), tonumber(o3), tonumber(o4)
+        if o1 == 100 and o2 >= 64 and o2 <= 127 and o3 >= 0 and o3 <= 255 and o4 >= 0 and o4 <= 255 then
+            return true
+        end
+    end
+    return false
+end
+
+-- Creates a new BookOrbitApi instance with the provided options.
 function BookOrbitApi.new(opts)
+    opts = opts or {}
     return setmetatable({
         server_url = forkSafeServerUrl(opts.server_url),
         username = opts.username,
@@ -188,20 +206,32 @@ function BookOrbitApi.new(opts)
     }, BookOrbitApi)
 end
 
+-- Resolves the HTTP proxy for a target URL.
+-- Prefers an explicit proxy option, then KOReader's enabled global HTTP proxy,
+-- and falls back to Tailscale userspace proxy (127.0.0.1:1056) for Tailnet HTTP targets.
+-- Skips proxying for HTTPS targets since LuaSocket lacks CONNECT tunneling.
 function BookOrbitApi:getProxy(target_url)
+    local url = (target_url and tostring(target_url):match("^https?://")) and tostring(target_url) or self.server_url
+    local parsed = parseHttpUrl(url)
+    if not parsed or parsed.scheme == "https" then
+        return nil
+    end
+
     if self.proxy and self.proxy ~= "" then
         return self.proxy
     end
+
     if G_reader_settings and G_reader_settings:isTrue("http_proxy_enabled") then
         local p = G_reader_settings:readSetting("http_proxy")
         if p and p ~= "" then
             return p
         end
     end
-    local url_str = tostring(target_url or self.server_url or ""):lower()
-    if url_str:find("://100%.") or url_str:find("%.ts%.net") then
+
+    if isTailnetHost(parsed.host) then
         return "http://127.0.0.1:1056"
     end
+
     return nil
 end
 
