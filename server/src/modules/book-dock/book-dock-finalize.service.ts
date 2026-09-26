@@ -410,13 +410,6 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         // Several ids only in a loose-file library, where each format is its own book. They are the
         // same work, so they get the same metadata rather than one of them getting all of it.
         for (const created of written.bookIds) await this.applyMetadata(created, row, created === bookId);
-
-        // Schedule a write-back once we know every book has its metadata and file write is enabled.
-        if (library.fileWriteEnabled) {
-          for (const created of written.bookIds) {
-            this.fileWriteService.scheduleWrite(created, 'auto', row.uploadedBy ?? undefined);
-          }
-        }
       } catch (err) {
         // The books committed before the failure, and metadata runs against services that cannot
         // join that transaction, so the compensation is explicit: take back exactly what this unit
@@ -428,6 +421,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       this.processor.reconcileCoversAsync(written.bookIds);
       await this.cleanupBookDockRecord(row);
+      if (library.fileWriteEnabled) {
+        for (const created of written.bookIds) {
+          this.fileWriteService.scheduleWrite(created, 'auto', row.uploadedBy ?? undefined);
+        }
+      }
       existingDestinations.set(this.destinationKey(library.id, destPath), bookId);
       existingDestinations.set(this.destinationKey(library.id, persistedDestPath), bookId);
 

@@ -568,14 +568,14 @@ describe('Book Dock ingest + finalize (e2e)', () => {
       const parsed = await parseFb2File(bookFile!.absolutePath);
       expect(parsed?.title).toBe('Dock Edited Title');
       expect(parsed?.authors.map((author) => author.name)).toEqual(['Dock Edited Author']);
-    });
 
-    const [writeLog] = await context.db
-      .select({ status: schema.fileWriteLog.status, triggeredBy: schema.fileWriteLog.triggeredBy, userId: schema.fileWriteLog.userId })
-      .from(schema.fileWriteLog)
-      .where(eq(schema.fileWriteLog.bookId, finalizedBookId))
-      .limit(1);
-    expect(writeLog).toMatchObject({ status: 'success', triggeredBy: 'auto', userId: uploader.userId });
+      const [writeLog] = await context.db
+        .select({ status: schema.fileWriteLog.status, triggeredBy: schema.fileWriteLog.triggeredBy, userId: schema.fileWriteLog.userId })
+        .from(schema.fileWriteLog)
+        .where(eq(schema.fileWriteLog.bookId, finalizedBookId))
+        .limit(1);
+      expect(writeLog).toMatchObject({ status: 'success', triggeredBy: 'auto', userId: uploader.userId });
+    });
   });
 
   it('finalize returns partial success with duplicate and destination conflicts', async () => {

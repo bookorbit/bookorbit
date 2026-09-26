@@ -2009,6 +2009,19 @@ describe('BookDockFinalizeService', () => {
         expect(harness.processor.deleteUnitBookRecords).toHaveBeenCalled();
         expect(harness.fileWriteService.scheduleWrite).not.toHaveBeenCalled();
       });
+
+      it('does not schedule a write when dock record cleanup fails', async () => {
+        const harness = makeService();
+        harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
+        arrange(harness, { fileWriteEnabled: true });
+        harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] });
+        vi.spyOn(harness.service as never, 'cleanupBookDockRecord').mockRejectedValue(new Error('cleanup failed') as never);
+
+        const result = await finalize(harness, unitRow());
+
+        expect(result.success).toBe(false);
+        expect(harness.fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      });
     });
 
     /**
