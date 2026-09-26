@@ -53,6 +53,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, libraries, libraryFolders } from '../../db/schema';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
@@ -234,6 +235,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     private readonly gateway: BookDockGateway,
     private readonly notificationService: NotificationService,
     private readonly processingState: BookDockProcessingStateService,
+    private readonly fileWriteService: FileWriteService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {
@@ -419,6 +421,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       this.processor.reconcileCoversAsync(written.bookIds);
       await this.cleanupBookDockRecord(row);
+      if (library.fileWriteEnabled) {
+        for (const created of written.bookIds) {
+          this.fileWriteService.scheduleWrite(created, 'auto', row.uploadedBy ?? undefined);
+        }
+      }
       existingDestinations.set(this.destinationKey(library.id, destPath), bookId);
       existingDestinations.set(this.destinationKey(library.id, persistedDestPath), bookId);
 
