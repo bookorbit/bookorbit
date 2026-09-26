@@ -71,6 +71,7 @@ package.loaded["ltn12"] = {
 
 local last_request_url
 local last_request_headers
+local last_request_proxy
 local request_count = 0
 package.loaded["socket.http"] = {
     request = function(request)
@@ -78,6 +79,7 @@ package.loaded["socket.http"] = {
         request_ran_in_subprocess = in_subprocess
         last_request_url = request.url
         last_request_headers = request.headers
+        last_request_proxy = request.proxy
         if mock_http_body then
             request.sink(mock_http_body)
         end
@@ -345,5 +347,58 @@ body, err = background_client:auth()
 assertEqual(body.ok, true, "unwrapped request falls back safely")
 assertEqual(subprocess_calls, 4, "unwrapped request does not start subprocess")
 assertEqual(request_ran_in_subprocess, false, "unwrapped fallback runs in current process")
+
+-- Proxy resolution tests
+assertEqual(client:getProxy(), nil, "default client has no proxy")
+
+local explicit_proxy_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    proxy = "http://127.0.0.1:8080",
+}
+assertEqual(explicit_proxy_client:getProxy(), "http://127.0.0.1:8080",
+    "explicit proxy is returned")
+
+mock_http_body = "{\"ok\":true}"
+mock_http_code = 200
+explicit_proxy_client:auth()
+assertEqual(last_request_proxy, "http://127.0.0.1:8080",
+    "explicit proxy is passed to request table")
+
+local tailscale_ip_client = BookOrbitApi.new{
+    server_url = "http://100.85.60.88:3005/api/v1",
+}
+assertEqual(tailscale_ip_client:getProxy(), "http://127.0.0.1:1056",
+    "tailscale 100.x.y.z server URL routes to userspace proxy")
+
+local tailscale_magicdns_client = BookOrbitApi.new{
+    server_url = "http://my-server.tailnet.ts.net:3005/api/v1",
+}
+assertEqual(tailscale_magicdns_client:getProxy(), "http://127.0.0.1:1056",
+    "tailscale ts.net server URL routes to userspace proxy")
+
+-- KOReader global settings proxy test
+local mock_settings = {
+    http_proxy_enabled = true,
+    http_proxy = "http://192.168.1.1:3128",
+}
+G_reader_settings = {
+    isTrue = function(self, key) return mock_settings[key] == true end,
+    readSetting = function(self, key) return mock_settings[key] end,
+}
+
+assertEqual(client:getProxy(), "http://192.168.1.1:3128",
+    "G_reader_settings proxy is used when enabled")
+
+client:auth()
+assertEqual(last_request_proxy, "http://192.168.1.1:3128",
+    "G_reader_settings proxy is passed to request table")
+
+mock_settings.http_proxy_enabled = false
+assertEqual(client:getProxy(), nil,
+    "G_reader_settings proxy is ignored when disabled")
+
+G_reader_settings = nil
 
 print("bookorbit_api_test.lua: ok")

@@ -184,7 +184,25 @@ function BookOrbitApi.new(opts)
         device_model = opts.device_model,
         plugin_version = opts.plugin_version,
         background_requests = opts.background_requests == true,
+        proxy = opts.proxy,
     }, BookOrbitApi)
+end
+
+function BookOrbitApi:getProxy(target_url)
+    if self.proxy and self.proxy ~= "" then
+        return self.proxy
+    end
+    if G_reader_settings and G_reader_settings:isTrue("http_proxy_enabled") then
+        local p = G_reader_settings:readSetting("http_proxy")
+        if p and p ~= "" then
+            return p
+        end
+    end
+    local url_str = tostring(target_url or self.server_url or ""):lower()
+    if url_str:find("://100%.") or url_str:find("%.ts%.net") then
+        return "http://127.0.0.1:1056"
+    end
+    return nil
 end
 
 function BookOrbitApi:isConfigured()
@@ -208,6 +226,11 @@ function BookOrbitApi:requestBlocking(method, path, body, extra_headers)
 
     for name, value in pairs(extra_headers or {}) do
         request.headers[name] = value
+    end
+
+    local proxy = self:getProxy(request.url)
+    if proxy then
+        request.proxy = proxy
     end
 
     if body then
@@ -400,6 +423,11 @@ function BookOrbitApi:downloadBlocking(path, local_path, opts)
                 ["x-auth-key"] = self.userkey,
             },
         }
+
+        local proxy = self:getProxy(current_url)
+        if proxy then
+            request.proxy = proxy
+        end
 
         socketutil:set_timeout(
             opts.block_timeout or socketutil.FILE_BLOCK_TIMEOUT,
