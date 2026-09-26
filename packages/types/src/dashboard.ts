@@ -191,6 +191,9 @@ export interface HighlightOfTheDayWidgetData {
   createdAt: string;
 }
 
+/** Bounded Home shelf returned by GET /dashboard/widgets/highlights. */
+export type HighlightsWidgetData = HighlightOfTheDayWidgetData[];
+
 export type ChallengeType = "short-read" | "genre-explorer" | "finish-oldest" | "streak-builder" | "new-author" | "page-milestone";
 
 export interface MonthlyChallengeWidgetData {

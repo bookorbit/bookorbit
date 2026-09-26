@@ -256,6 +256,7 @@ export class DashboardWidgetRepository {
       .select({ count: sql<number>`count(*)::int` })
       .from(annotations)
       .innerJoin(books, eq(books.id, annotations.bookId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .where(and(eq(annotations.userId, userId), isNull(annotations.deletedAt), inArray(books.libraryId, accessibleLibraryIds), ...cfClauses));
 
     return row?.count ?? 0;
@@ -300,6 +301,52 @@ export class DashboardWidgetRepository {
       chapterTitle: row.chapterTitle,
       createdAt: row.createdAt.toISOString(),
     };
+  }
+
+  async getHighlightsFromOtherBooks(
+    userId: number,
+    accessibleLibraryIds: number[],
+    excludedBookId: number,
+    limit: number,
+    contentFilters?: ContentFilterRules,
+  ): Promise<HighlightOfTheDayWidgetData[]> {
+    if (accessibleLibraryIds.length === 0 || limit <= 0) return [];
+
+    const cfClauses = this.getContentFilterClauses(contentFilters);
+    const rows = await this.db
+      .selectDistinctOn([annotations.bookId], {
+        text: annotations.text,
+        note: annotations.note,
+        bookTitle: bookMetadata.title,
+        bookId: annotations.bookId,
+        coverSource: bookMetadata.coverSource,
+        chapterTitle: annotations.chapterTitle,
+        createdAt: annotations.createdAt,
+      })
+      .from(annotations)
+      .innerJoin(books, eq(books.id, annotations.bookId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(
+        and(
+          eq(annotations.userId, userId),
+          isNull(annotations.deletedAt),
+          inArray(books.libraryId, accessibleLibraryIds),
+          notInArray(annotations.bookId, [excludedBookId]),
+          ...cfClauses,
+        ),
+      )
+      .orderBy(annotations.bookId, desc(annotations.id))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      text: row.text,
+      note: row.note,
+      bookTitle: row.bookTitle,
+      bookId: row.bookId,
+      hasCover: row.coverSource != null,
+      chapterTitle: row.chapterTitle,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 
   // ── Monthly Challenge (raw data) ────────────────────────────────

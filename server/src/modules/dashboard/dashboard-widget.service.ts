@@ -6,6 +6,7 @@ import type {
   DashboardWidgetBatchResult,
   DiversityScoreWidgetData,
   HighlightOfTheDayWidgetData,
+  HighlightsWidgetData,
   LibraryOverviewWidgetData,
   LongWaitWidgetData,
   MonthlyChallengeWidgetData,
@@ -121,6 +122,32 @@ export class DashboardWidgetService {
       const dateStr = formatDay(new Date());
       const offset = pickAnnotationIndex(user.id, dateStr, total);
       return this.widgetRepo.getAnnotationByOffset(user.id, accessibleLibraryIds, offset, contentFilters);
+    });
+  }
+
+  async getHighlights(user: RequestUser): Promise<HighlightsWidgetData> {
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.liveCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'highlights', async () => {
+      const contentFilters = this.getContentFilters(user);
+      const total = await this.widgetRepo.getAnnotationCount(user.id, accessibleLibraryIds, contentFilters);
+      if (total === 0) return [];
+      const start = pickAnnotationIndex(user.id, formatDay(new Date()), total);
+      const first = await this.widgetRepo.getAnnotationByOffset(user.id, accessibleLibraryIds, start, contentFilters);
+      if (!first) return [];
+      const others = await this.widgetRepo.getHighlightsFromOtherBooks(user.id, accessibleLibraryIds, first.bookId, 2, contentFilters);
+      const highlights = [first, ...others];
+      // An account with highlights in one or two books can still fill its remaining cards with
+      // other annotations. The offset scan never repeats the first row and skips selected rows.
+      for (let step = 1; highlights.length < Math.min(total, 3) && step < total; step++) {
+        const candidate = await this.widgetRepo.getAnnotationByOffset(user.id, accessibleLibraryIds, (start + step) % total, contentFilters);
+        if (
+          candidate &&
+          !highlights.some((item) => item.bookId === candidate.bookId && item.createdAt === candidate.createdAt && item.text === candidate.text)
+        ) {
+          highlights.push(candidate);
+        }
+      }
+      return highlights;
     });
   }
 

@@ -32,6 +32,7 @@ function makeService() {
     getLibraryOverview: vi.fn(),
     getAnnotationCount: vi.fn(),
     getAnnotationByOffset: vi.fn(),
+    getHighlightsFromOtherBooks: vi.fn().mockResolvedValue([]),
     getChallengePatternData: vi.fn(),
     getYearProjectionData: vi.fn(),
     getNeglectedGems: vi.fn(),
@@ -246,6 +247,57 @@ describe('DashboardWidgetService', () => {
       expect(result).not.toBeNull();
       expect(result!.text).toBe('A great quote');
       expect(widgetRepo.getAnnotationByOffset).toHaveBeenCalled();
+    });
+  });
+
+  describe('getHighlights', () => {
+    it('prefers highlights from other books after the daily highlight', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([7]);
+      widgetRepo.getAnnotationCount.mockResolvedValue(10);
+      const highlight = (bookId: number) => ({
+        text: `Passage ${bookId}`,
+        note: null,
+        bookTitle: `Book ${bookId}`,
+        bookId,
+        hasCover: true,
+        chapterTitle: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+      widgetRepo.getAnnotationByOffset.mockResolvedValue(highlight(5));
+      widgetRepo.getHighlightsFromOtherBooks.mockResolvedValue([highlight(6), highlight(7)]);
+
+      const result = await service.getHighlights(makeUser());
+      expect(result.map((item) => item.bookId)).toEqual([5, 6, 7]);
+      expect(widgetRepo.getHighlightsFromOtherBooks).toHaveBeenCalledWith(42, [7], 5, 2, EMPTY_CONTENT_FILTER_RULES);
+      expect(widgetRepo.getAnnotationByOffset).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns up to three real, distinct annotation rows from the scoped pool', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([7]);
+      widgetRepo.getAnnotationCount.mockResolvedValue(2);
+      widgetRepo.getAnnotationByOffset.mockImplementation((_userId: number, _libraries: number[], offset: number) =>
+        Promise.resolve({
+          text: `Highlight ${offset}`,
+          note: null,
+          bookTitle: 'Book',
+          bookId: offset + 1,
+          hasCover: false,
+          chapterTitle: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        }),
+      );
+
+      const result = await service.getHighlights(makeUser({ id: 42 }));
+      expect(result).toHaveLength(2);
+      expect(new Set(result.map((item) => item.text)).size).toBe(2);
+      expect(widgetRepo.getAnnotationByOffset).toHaveBeenCalledTimes(2);
+      for (const call of widgetRepo.getAnnotationByOffset.mock.calls) {
+        expect(call[0]).toBe(42);
+        expect(call[1]).toEqual([7]);
+        expect(call[3]).toEqual(EMPTY_CONTENT_FILTER_RULES);
+      }
     });
   });
 
