@@ -142,6 +142,7 @@ For the full installation guide including reverse proxy setup, file permissions 
 Prefer a hosted instance without managing Docker or servers? [Zenith offers BookOrbit hosting](https://zenith.hosting/host/bookorbit) with a web file browser for uploads, access controls, and resource usage insights.
 
 [![Deploy with Zenith](https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg)](https://zenith.hosting/host/bookorbit)
+<a href="https://repocloud.io/details/BookOrbit/"><img src="https://d16t0pc4846x52.cloudfront.net/deploylobe.svg" alt="Deploy on RepoCloud" height="49"></a>
 
 ## How I Actually Use BookOrbit
 
