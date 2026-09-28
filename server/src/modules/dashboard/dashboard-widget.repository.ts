@@ -539,7 +539,7 @@ export class DashboardWidgetRepository {
             ...cfClauses,
           ),
         ),
-      // Any book finished this month — approximates whether the oldest in-progress book was cleared
+      // Any book finished this month - approximates whether the oldest in-progress book was cleared
       this.db
         .select({ count: sql<number>`count(*)::int` })
         .from(userBookStatus)
