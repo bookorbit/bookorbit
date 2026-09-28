@@ -9,10 +9,33 @@ import type {
   YearProjectionWidgetData,
 } from '@bookorbit/types';
 
+import { addDateKeyDays } from '../../common/utils/reading-daily-stats.utils';
+import { resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
+
 // ── Date Helpers ─────────────────────────────────────────────────────
 
-export function formatDay(date: Date): string {
-  return date.toISOString().slice(0, 10);
+/**
+ * The reader's own calendar: which day, month and year it is where they are.
+ *
+ * Daily reading stats and attempt dates are stored as the reader's local days, so a widget that
+ * asks "today" or "this year" of the server's UTC clock reads tomorrow's empty row every evening
+ * west of Greenwich. Falls back to UTC, as the rest of the server does, when no zone is set.
+ */
+export interface ReaderClock {
+  timeZone: string;
+  today: string;
+  year: number;
+  month: number;
+}
+
+export function resolveReaderClock(timeZoneSetting: unknown, now: Date = new Date()): ReaderClock {
+  const timeZone = resolveTimeZone(timeZoneSetting, 'UTC');
+  const today = toDateKeyInTimeZone(now, timeZone);
+  return { timeZone, today, year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) };
+}
+
+export function daysBetweenDateKeys(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 export function computeLongestStreak(readDays: Set<string>): number {
@@ -38,14 +61,11 @@ export function computeLongestStreak(readDays: Set<string>): number {
   return longest;
 }
 
-export function computeStreakData(readDays: Set<string>, today: Date): ReadingStreakWidgetData {
-  const todayStr = formatDay(today);
-
+/** `today` is the reader's local date key, the same calendar the daily stats rows are keyed by. */
+export function computeStreakData(readDays: Set<string>, today: string): ReadingStreakWidgetData {
   const lastSevenDays: boolean[] = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    lastSevenDays.push(readDays.has(formatDay(d)));
+    lastSevenDays.push(readDays.has(addDateKeyDays(today, -i)));
   }
 
   if (readDays.size === 0) {
@@ -53,18 +73,17 @@ export function computeStreakData(readDays: Set<string>, today: Date): ReadingSt
   }
 
   let currentStreak = 0;
-  const startDate = new Date(today);
-  if (!readDays.has(todayStr)) {
-    startDate.setUTCDate(startDate.getUTCDate() - 1);
-    if (!readDays.has(formatDay(startDate))) {
+  let cursor = today;
+  if (!readDays.has(cursor)) {
+    cursor = addDateKeyDays(cursor, -1);
+    if (!readDays.has(cursor)) {
       return { currentStreak: 0, longestStreak: computeLongestStreak(readDays), lastSevenDays };
     }
   }
 
-  const cursor = new Date(startDate);
-  while (readDays.has(formatDay(cursor))) {
+  while (readDays.has(cursor)) {
     currentStreak++;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    cursor = addDateKeyDays(cursor, -1);
   }
 
   return { currentStreak, longestStreak: computeLongestStreak(readDays), lastSevenDays };
@@ -394,18 +413,17 @@ export function computeDiversityScore(
 
 // ── Reading Rhythm Pulse ────────────────────────────────────────────
 
+/** `today` is the reader's local date key; the series ends on it. */
 export function buildDaysSeries(
   dailyData: { day: string; readingSeconds: number }[],
-  today: Date,
+  today: string,
   windowDays: number,
 ): { date: string; readingSeconds: number }[] {
   const lookup = new Map(dailyData.map((d) => [d.day, d.readingSeconds]));
   const result: { date: string; readingSeconds: number }[] = [];
 
   for (let i = windowDays - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = addDateKeyDays(today, -i);
     result.push({ date: dateStr, readingSeconds: lookup.get(dateStr) ?? 0 });
   }
 

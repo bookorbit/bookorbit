@@ -1,6 +1,7 @@
 import type { CurrentlyReadingWidgetData, LibraryOverviewWidgetData, NeglectedGemsWidgetData, ReadingStreakWidgetData } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { pickAnnotationIndex } from './dashboard-widget.calculations';
 import { DashboardWidgetService } from './dashboard-widget.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
@@ -26,7 +27,7 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
 
 function makeService() {
   const widgetRepo = {
-    getCompletedBooksThisYear: vi.fn(),
+    countCompletedBooks: vi.fn(),
     getCurrentlyReadingBooks: vi.fn(),
     getReadingStreak: vi.fn(),
     getLibraryOverview: vi.fn(),
@@ -61,23 +62,24 @@ describe('DashboardWidgetService', () => {
         settings: { dashboardConfig: { readingGoal: 24, widgets: [] } },
       });
       libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);
-      widgetRepo.getCompletedBooksThisYear.mockResolvedValue(7);
+      widgetRepo.countCompletedBooks.mockResolvedValue(7);
 
       const result = await service.getReadingGoal(user);
 
+      const year = new Date().getUTCFullYear();
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
-      expect(widgetRepo.getCompletedBooksThisYear).toHaveBeenCalledWith(42, [1, 2], EMPTY_CONTENT_FILTER_RULES);
+      expect(widgetRepo.countCompletedBooks).toHaveBeenCalledWith(42, [1, 2], `${year}-01-01`, `${year + 1}-01-01`, EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual({
         goalBooks: 24,
         completedBooks: 7,
-        year: new Date().getUTCFullYear(),
+        year,
       });
     });
 
     it('returns null goalBooks when user has no reading goal set', async () => {
       const { service, widgetRepo, libraryService } = makeService();
       libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
-      widgetRepo.getCompletedBooksThisYear.mockResolvedValue(0);
+      widgetRepo.countCompletedBooks.mockResolvedValue(0);
 
       const result = await service.getReadingGoal(makeUser());
 
@@ -89,7 +91,7 @@ describe('DashboardWidgetService', () => {
       const { service, widgetRepo, libraryService } = makeService();
       const user = makeUser({ settings: { dashboardConfig: { widgets: [] } } });
       libraryService.findAccessibleLibraryIds.mockResolvedValue([]);
-      widgetRepo.getCompletedBooksThisYear.mockResolvedValue(0);
+      widgetRepo.countCompletedBooks.mockResolvedValue(0);
 
       const result = await service.getReadingGoal(user);
 
@@ -191,7 +193,7 @@ describe('DashboardWidgetService', () => {
       const result = await service.getReadingStreak(user);
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
-      expect(widgetRepo.getReadingStreak).toHaveBeenCalledWith(99, [1, 2], EMPTY_CONTENT_FILTER_RULES);
+      expect(widgetRepo.getReadingStreak).toHaveBeenCalledWith(99, [1, 2], expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual(mockData);
     });
   });
@@ -213,7 +215,7 @@ describe('DashboardWidgetService', () => {
       const result = await service.getLibraryOverview(user);
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
-      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledWith([10], EMPTY_CONTENT_FILTER_RULES);
+      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledWith([10], expect.any(Date), EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual(mockData);
     });
   });
@@ -526,7 +528,7 @@ describe('DashboardWidgetService', () => {
     it('getReadingGoal returns fresh goalBooks from user settings but reuses cached completedBooks', async () => {
       const { service, widgetRepo, libraryService } = makeService();
       libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
-      widgetRepo.getCompletedBooksThisYear.mockResolvedValue(5);
+      widgetRepo.countCompletedBooks.mockResolvedValue(5);
 
       const userWithOldGoal = makeUser({ settings: { dashboardConfig: { readingGoal: 12, widgets: [] } } });
       const userWithNewGoal = makeUser({ settings: { dashboardConfig: { readingGoal: 24, widgets: [] } } });
@@ -534,7 +536,7 @@ describe('DashboardWidgetService', () => {
       const first = await service.getReadingGoal(userWithOldGoal);
       const second = await service.getReadingGoal(userWithNewGoal);
 
-      expect(widgetRepo.getCompletedBooksThisYear).toHaveBeenCalledTimes(1);
+      expect(widgetRepo.countCompletedBooks).toHaveBeenCalledTimes(1);
       expect(first.goalBooks).toBe(12);
       expect(second.goalBooks).toBe(24);
       expect(second.completedBooks).toBe(5);
@@ -581,11 +583,226 @@ describe('DashboardWidgetService', () => {
     });
   });
 
+  describe("the reader's time zone", () => {
+    const denver = () => makeUser({ id: 42, settings: { timezone: 'America/Denver' } });
+    const highlight = {
+      text: 'A line',
+      note: null,
+      bookTitle: 'Book',
+      bookId: 5,
+      hasCover: false,
+      chapterTitle: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      // 7:58 PM on Sep 27 in Denver, already 01:58 on Sep 28 in UTC.
+      vi.setSystemTime(new Date('2026-09-28T01:58:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('ends the reading rhythm on the local day, not the UTC one', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingRhythmData.mockResolvedValue([
+        { day: '2026-09-27', readingSeconds: 900 },
+        { day: '2026-09-28', readingSeconds: 60 },
+      ]);
+
+      const result = await service.getReadingRhythm(denver());
+
+      expect(widgetRepo.getReadingRhythmData).toHaveBeenCalledWith(42, [1], '2026-09-14', EMPTY_CONTENT_FILTER_RULES);
+      expect(result.days).toHaveLength(14);
+      expect(result.days[0]?.date).toBe('2026-09-14');
+      expect(result.days.at(-1)).toEqual({ date: '2026-09-27', readingSeconds: 900 });
+      expect(result.activeDays).toBe(1);
+    });
+
+    it('keeps UTC days for a reader with no time zone set', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingRhythmData.mockResolvedValue([]);
+
+      const result = await service.getReadingRhythm(makeUser());
+
+      expect(result.days.at(-1)?.date).toBe('2026-09-28');
+    });
+
+    it('asks for the streak as of the local day', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingStreak.mockResolvedValue({ currentStreak: 3, longestStreak: 3, lastSevenDays: [] });
+
+      await service.getReadingStreak(denver());
+
+      expect(widgetRepo.getReadingStreak).toHaveBeenCalledWith(42, [1], '2026-09-27', EMPTY_CONTENT_FILTER_RULES);
+    });
+
+    it('does not serve the previous local day from the live cache after local midnight', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingRhythmData.mockResolvedValue([]);
+      widgetRepo.getReadingStreak.mockResolvedValue({ currentStreak: 1, longestStreak: 1, lastSevenDays: [] });
+
+      vi.setSystemTime(new Date('2026-09-28T05:59:00Z'));
+      const beforeMidnight = await service.getReadingRhythm(denver());
+      await service.getReadingStreak(denver());
+      vi.setSystemTime(new Date('2026-09-28T06:01:00Z'));
+      const afterMidnight = await service.getReadingRhythm(denver());
+      await service.getReadingStreak(denver());
+
+      expect(beforeMidnight.days.at(-1)?.date).toBe('2026-09-27');
+      expect(afterMidnight.days.at(-1)?.date).toBe('2026-09-28');
+      expect(widgetRepo.getReadingRhythmData).toHaveBeenCalledTimes(2);
+      expect(widgetRepo.getReadingStreak).toHaveBeenNthCalledWith(2, 42, [1], '2026-09-28', EMPTY_CONTENT_FILTER_RULES);
+    });
+
+    it('does not answer a changed time zone from the old zone cache entry', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingRhythmData.mockResolvedValue([]);
+
+      await service.getReadingRhythm(makeUser({ id: 42 }));
+      const afterChange = await service.getReadingRhythm(denver());
+
+      expect(afterChange.days.at(-1)?.date).toBe('2026-09-27');
+      expect(widgetRepo.getReadingRhythmData).toHaveBeenCalledTimes(2);
+    });
+
+    it("counts the reading goal for the reader's year on New Year's Eve", async () => {
+      vi.setSystemTime(new Date('2027-01-01T03:00:00Z'));
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.countCompletedBooks.mockResolvedValue(44);
+
+      const result = await service.getReadingGoal(denver());
+
+      expect(result.year).toBe(2026);
+      expect(widgetRepo.countCompletedBooks).toHaveBeenCalledWith(42, [1], '2026-01-01', '2027-01-01', EMPTY_CONTENT_FILTER_RULES);
+    });
+
+    it('projects the year from local windows', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getYearProjectionData.mockResolvedValue({
+        booksCompletedYtd: 44,
+        pagesReadLast30Days: 3_000,
+        hoursReadLast30Days: 22.5,
+        booksCompletedLast30Days: 2,
+      });
+
+      const result = await service.getYearProjection(denver());
+
+      expect(widgetRepo.getYearProjectionData).toHaveBeenCalledWith(
+        42,
+        [1],
+        {
+          yearStartDay: '2026-01-01',
+          nextYearStartDay: '2027-01-01',
+          recentStartDay: '2026-08-29',
+          recentEndDay: '2026-09-28',
+          // Midnight on Aug 29 in Denver, which is on daylight time.
+          recentStart: new Date('2026-08-29T06:00:00Z'),
+        },
+        EMPTY_CONTENT_FILTER_RULES,
+      );
+      // Sep 27 is day 270 of 2026.
+      expect(result.daysRemaining).toBe(95);
+      expect(result.booksCompletedYtd).toBe(44);
+      expect(result.projectedPages).toBe(36_500);
+    });
+
+    it('scopes the monthly challenge to the local month', async () => {
+      vi.setSystemTime(new Date('2026-10-01T03:00:00Z'));
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getChallengePatternData.mockResolvedValue({
+        avgPageCount: 300,
+        uniqueGenresLast6Months: 3,
+        staleInProgressCount: 0,
+        currentStreak: 2,
+        maxStreakThisMonth: 3,
+        topAuthorBookCount: 1,
+        totalBooksRead: 20,
+        pagesThisMonth: 200,
+        shortBooksCompleted: 0,
+        newGenresRead: 0,
+        oldestInProgressFinished: false,
+        newAuthorsRead: 0,
+        pagesReadThisMonth: 200,
+      });
+
+      const result = await service.getMonthlyChallenge(denver());
+
+      expect(result).toMatchObject({ month: 9, year: 2026 });
+      expect(widgetRepo.getChallengePatternData).toHaveBeenCalledWith(
+        42,
+        [1],
+        { start: new Date('2026-09-01T06:00:00Z'), startDay: '2026-09-01', today: '2026-09-30' },
+        expect.any(Date),
+        EMPTY_CONTENT_FILTER_RULES,
+      );
+    });
+
+    it('seeds the highlight of the day with the local date', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getAnnotationCount.mockResolvedValue(97);
+      widgetRepo.getAnnotationByOffset.mockResolvedValue(highlight);
+
+      await service.getHighlightOfTheDay(denver());
+      await service.getHighlights(denver());
+
+      const expectedOffset = pickAnnotationIndex(42, '2026-09-27', 97);
+      expect(expectedOffset).not.toBe(pickAnnotationIndex(42, '2026-09-28', 97));
+      expect(widgetRepo.getAnnotationByOffset).toHaveBeenNthCalledWith(1, 42, [1], expectedOffset, EMPTY_CONTENT_FILTER_RULES);
+      expect(widgetRepo.getAnnotationByOffset).toHaveBeenNthCalledWith(2, 42, [1], expectedOffset, EMPTY_CONTENT_FILTER_RULES);
+    });
+
+    it("counts books added since the start of the reader's year", async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getLibraryOverview.mockResolvedValue({
+        totalBooks: 1,
+        totalAuthors: 1,
+        totalSeries: 0,
+        totalStorageBytes: 1,
+        booksAddedThisYear: 1,
+      });
+
+      await service.getLibraryOverview(denver());
+
+      // Midnight on Jan 1 in Denver, which is on standard time.
+      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledWith([1], new Date('2026-01-01T07:00:00Z'), EMPTY_CONTENT_FILTER_RULES);
+    });
+
+    it('reads the reading DNA peak hour in the local zone', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingDnaData.mockResolvedValue({
+        avgPageCount: 300,
+        uniqueGenres: 4,
+        totalBooks: 10,
+        readingDaysRatio: 0.5,
+        peakHour: 20,
+        avgPagesPerHour: null,
+      });
+
+      await service.getReadingDna(denver());
+
+      expect(widgetRepo.getReadingDnaData).toHaveBeenCalledWith(42, [1], expect.any(Date), 'America/Denver', EMPTY_CONTENT_FILTER_RULES);
+    });
+  });
+
   describe('getWidgets', () => {
     it('resolves several widgets in one call', async () => {
       const { service, widgetRepo, libraryService } = makeService();
       libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
-      widgetRepo.getCompletedBooksThisYear.mockResolvedValue(4);
+      widgetRepo.countCompletedBooks.mockResolvedValue(4);
       widgetRepo.getLibraryOverview.mockResolvedValue({ totalBooks: 100, formats: [] });
 
       const response = await service.getWidgets(['reading-goal', 'library-overview'], makeUser());
@@ -599,7 +816,7 @@ describe('DashboardWidgetService', () => {
     it('isolates a failing widget so the rest of the dashboard still loads', async () => {
       const { service, widgetRepo, libraryService } = makeService();
       libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
-      widgetRepo.getCompletedBooksThisYear.mockRejectedValue(new Error('statement timeout'));
+      widgetRepo.countCompletedBooks.mockRejectedValue(new Error('statement timeout'));
       widgetRepo.getLibraryOverview.mockResolvedValue({ totalBooks: 100, formats: [] });
 
       const response = await service.getWidgets(['reading-goal', 'library-overview'], makeUser());
