@@ -16,7 +16,7 @@
   <rect width="458" height="736" x="1" y="1" class="card" />
 
   <text x="20" y="35" class="title">Translation Progress</text>
-  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 53% average</text>
+  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 54% average</text>
 
   <line x1="20" y1="51" x2="440" y2="51" class="grid" />
 
@@ -38,16 +38,16 @@
   <text x="440" y="153" text-anchor="end" class="pct-label">98%</text>
   <text x="20" y="178" class="lang-label">🇪🇸  Spanish</text>
   <rect x="142" y="170" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="170" width="214" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="178" text-anchor="end" class="pct-label">87%</text>
-  <text x="20" y="203" class="lang-label">🇰🇷  Korean</text>
+  <rect x="142" y="170" width="219" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="178" text-anchor="end" class="pct-label">89%</text>
+  <text x="20" y="203" class="lang-label">🇭🇺  Hungarian</text>
   <rect x="142" y="195" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="195" width="167" height="6" rx="3" class="bar-low" />
-  <text x="440" y="203" text-anchor="end" class="pct-label">68%</text>
-  <text x="20" y="228" class="lang-label">🇭🇺  Hungarian</text>
+  <rect x="142" y="195" width="204" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="203" text-anchor="end" class="pct-label">83%</text>
+  <text x="20" y="228" class="lang-label">🇰🇷  Korean</text>
   <rect x="142" y="220" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="220" width="165" height="6" rx="3" class="bar-low" />
-  <text x="440" y="228" text-anchor="end" class="pct-label">67%</text>
+  <rect x="142" y="220" width="167" height="6" rx="3" class="bar-low" />
+  <text x="440" y="228" text-anchor="end" class="pct-label">68%</text>
   <text x="20" y="253" class="lang-label">🇮🇹  Italian</text>
   <rect x="142" y="245" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="245" width="162" height="6" rx="3" class="bar-low" />
