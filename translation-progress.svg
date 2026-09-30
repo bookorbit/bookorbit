@@ -36,14 +36,14 @@
   <rect x="142" y="145" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="145" width="231" height="6" rx="3" class="bar-progress" />
   <text x="440" y="153" text-anchor="end" class="pct-label">94%</text>
-  <text x="20" y="178" class="lang-label">🇪🇸  Spanish</text>
+  <text x="20" y="178" class="lang-label">🇭🇺  Hungarian</text>
   <rect x="142" y="170" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="170" width="214" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="178" text-anchor="end" class="pct-label">87%</text>
-  <text x="20" y="203" class="lang-label">🇭🇺  Hungarian</text>
+  <rect x="142" y="170" width="219" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="178" text-anchor="end" class="pct-label">89%</text>
+  <text x="20" y="203" class="lang-label">🇪🇸  Spanish</text>
   <rect x="142" y="195" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="195" width="207" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="203" text-anchor="end" class="pct-label">84%</text>
+  <rect x="142" y="195" width="214" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="203" text-anchor="end" class="pct-label">87%</text>
   <text x="20" y="228" class="lang-label">🇰🇷  Korean</text>
   <rect x="142" y="220" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="220" width="162" height="6" rx="3" class="bar-low" />
