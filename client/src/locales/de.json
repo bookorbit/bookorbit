@@ -17,7 +17,11 @@
     "no": "Nein",
     "show": "Anzeigen",
     "hide": "Ausblenden",
-    "undo": "Rückgängig"
+    "undo": "Rückgängig",
+    "pagination": {
+      "pageOf": "Seite {page} von {totalPages}",
+      "goToPage": "Gehe zur Seite {page}"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -1359,6 +1363,8 @@
         "server-fonts": "Server-Schriftarten"
       },
       "tts": {
+        "addProvider": "Anbieter hinzufügen",
+        "manageVoices": "Stimmen verwalten",
         "deleted": "Anbieter gelöscht",
         "saveFailed": "{name} konnte nicht kopiert werden"
       },
@@ -5678,6 +5684,7 @@
     }
   },
   "bookRequests": {
+    "title": "Anfragen (Beta)",
     "detail": {
       "series": "Reihe",
       "dockFileIdLabel": "Bücherablage Datei-ID",

@@ -17,7 +17,10 @@
     "no": "No",
     "show": "Mostra",
     "hide": "Nascondi",
-    "undo": "Annulla"
+    "undo": "Annulla",
+    "pagination": {
+      "pageOf": "Pagina {page} di {totalPages}"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -421,6 +424,9 @@
         "collapseSeries": {
           "label": "Comprimi le serie per impostazione predefinita",
           "hint": "Raggruppa i libri della stessa serie in un'unica scheda nelle visualizzazioni della biblioteca e della raccolta"
+        },
+        "bookRequests": {
+          "label": "Mostra le richieste di libri"
         }
       },
       "icons": {
@@ -3338,14 +3344,22 @@
           "autoRetryShort": "A failed download falls through to the runner-up.",
           "maxAttemptsShort": "Il primo tentativo e tutti i successivi tentativi vengono conteggiati ai fini di questo limite.",
           "noSourcesConfigured": "Nessuna fonte di ricerca è impostata, quindi non verrà cercato nulla e ogni richiesta approvata tornerà indietro. Aggiungine una sotto Fonti.",
+          "maxAttempts": "Tentativi per richiesta",
+          "maxAttemptsHint": "Ogni versione che BookOrbit invia ad un client di download per questa richiesta conta verso questo limite: il primo tentativo automatico, qualsiasi cosa provata dopo che una fonte ha rifiutato, e qualsiasi cosa provata dopo che un download non è riuscito. Impostare a 1 per rinunciare dopo il primo tentativo.",
+          "autoSearchIntervalShort": "Contato dall'ultima ricerca, e allungato con l'invecchiare della richiesta.",
           "autoSearchMaxAgeUnit": "giorni",
           "verify": "Controllare le importazioni in relazione alla domanda",
+          "verifyOnHint": "Ogni file scaricato viene confrontato con il libro che è stato richiesto prima di essere archiviato. Tutto ciò che non ha una corrispondenza sufficiente attende nel Book Dock che qualcuno lo controlli.",
           "verificationEnabled": "Il controllo dell'importazione è attivo",
           "destinationUnset": "Nessun predefinito",
           "destinationHiddenLibrary": "Una libreria che non puoi vedere",
           "destinationHiddenFolder": "Una cartella che non puoi vedere",
           "selectFolder": "Scegli una cartella",
+          "destinationLibraryFor": "Libreria predefinita per richieste di {medium}",
           "importFormats": "Formato di importazione"
+        },
+        "profiles": {
+          "howProfiles": "Come funzionano i profili di rilascio"
         }
       }
     },
