@@ -30,6 +30,7 @@ import { BookQueryBuilder } from './book-query-builder.service';
 import { letterJumpBucketExpr } from './jump-bucket-expr';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { BookMergeRepository } from './book-merge.repository';
 import {
   authors,
   bookAuthors,
@@ -65,7 +66,7 @@ import {
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
-type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
+export type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 type MetadataUpdateExecutor = Pick<Db, 'delete' | 'insert' | 'select' | 'update'>;
 type MetadataReadExecutor = Pick<Db, 'select'>;
 type JsonObj = Record<string, unknown>;
@@ -535,6 +536,7 @@ function temporalBucketsQuery(opts: {
 export class BookRepository {
   constructor(
     @Inject(DB) private readonly db: Db,
+    private readonly bookMergeRepository: BookMergeRepository,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {}
@@ -545,6 +547,11 @@ export class BookRepository {
 
   async withTransaction<T>(callback: (tx: DbTransaction) => Promise<T>): Promise<T> {
     return this.db.transaction((tx) => callback(tx));
+  }
+
+  async findBooksByIds(bookIds: number[]) {
+    if (bookIds.length === 0) return [];
+    return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));
   }
 
   async findCards(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number; userId: number }) {
@@ -2877,6 +2884,19 @@ export class BookRepository {
     }
 
     await this.db.transaction(async (tx) => {
+      const mergeBookIds = [...uniqueSourceIds, targetBookId];
+      const mergeBooks = await tx.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, mergeBookIds));
+
+      if (mergeBooks.length !== mergeBookIds.length) {
+        throw new BadRequestException('One or more books could not be found');
+      }
+
+      if (new Set(mergeBooks.map((book) => book.libraryId)).size > 1) {
+        throw new BadRequestException('book.merge.errors.differentLibraries');
+      }
+
+      await this.bookMergeRepository.reconcileBookDependents(tx, uniqueSourceIds, targetBookId);
+
       await tx
         .update(bookFiles)
         .set({

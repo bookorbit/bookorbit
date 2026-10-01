@@ -1,4 +1,4 @@
-import { ArrayNotEmpty, IsArray, IsInt } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsInt, IsPositive } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class MergeBooksDto {
@@ -6,9 +6,11 @@ export class MergeBooksDto {
   @ArrayNotEmpty()
   @Type(() => Number)
   @IsInt({ each: true })
+  @ArrayMaxSize(100)
   sourceBookIds!: number[];
 
   @Type(() => Number)
   @IsInt()
+  @IsPositive()
   targetBookId!: number;
 }

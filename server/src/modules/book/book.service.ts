@@ -3788,8 +3788,20 @@ export class BookService {
 
     const uniqueSourceIds = [...new Set(sourceBookIds)];
 
-    await this.verifyBookAccess(targetBookId, user);
-    await Promise.all(uniqueSourceIds.map((bookId) => this.verifyBookAccess(bookId, user)));
+    const mergeBookIds = [...new Set([...sourceBookIds, targetBookId])];
+    const mergeBooks = await this.verifyLibraryAccessForBookIds(mergeBookIds, user);
+
+    if (new Set(mergeBooks.map((book) => book.libraryId)).size > 1) {
+      throw new BadRequestException('Books from different libraries cannot be merged');
+    }
+
+    const libraryIds = new Set(mergeBooks.map((book) => book.libraryId));
+    if (mergeBooks.length !== mergeBookIds.length) {
+      throw new NotFoundException('One or more books could not be found');
+    }
+    if (libraryIds.size > 1) {
+      throw new BadRequestException('Books from different libraries cannot be merged');
+    }
 
     const merged = await this.bookRepo.mergeBooks(uniqueSourceIds, targetBookId);
 

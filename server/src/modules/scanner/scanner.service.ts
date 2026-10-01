@@ -1572,7 +1572,10 @@ export class ScannerService implements OnApplicationBootstrap {
       ]);
 
       const isFirstScan = knownBooks.length === 0 && knownFiles.length === 0;
-      const maps = ScannerService.buildLookupMaps(knownBooks, knownFiles);
+      const referencedBookIds = [...new Set(knownFiles.map((file) => file.bookId))];
+      const referencedBooks = await this.scannerRepo.findBooksByIds(referencedBookIds, libraryId);
+      const knownBooksById = new Map([...knownBooks, ...referencedBooks].map((book) => [book.id, book]));
+      const maps = ScannerService.buildLookupMaps([...knownBooksById.values()], knownFiles);
 
       const seenBookIds = new Set<number>();
       const allRetainedFileIds = new Set<number>();
@@ -2133,6 +2136,23 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     if (!existing) {
+      if (candidateOwnedBookIds.size === 1) {
+        const referencedBook = this.findBookEntryById(bookByFolderPath, [...candidateOwnedBookIds][0]);
+        if (referencedBook) {
+          if (referencedBook.status === 'missing') {
+            await this.scannerRepo.updateBookStatus(referencedBook.id, 'present');
+            counts.updatedCount++;
+            this.scanGateway.emitBookRestored({ libraryId, bookIds: [referencedBook.id] });
+            this.bufferBooksRestoredNotification(libraryId, [referencedBook.id]);
+          }
+
+          this.logger.log(
+            `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${referencedBook.id} folder="${sanitizeLogValue(candidate.folderPath)}" action=reuse_referenced_book - reused book referenced by candidate file`,
+          );
+          return { ...referencedBook, created: false };
+        }
+      }
+
       // Detect series-to-single-book merge: files were renamed so all stems match,
       // turning what was a virtual multi-book folder into one real-directory book.
       // Find any known books whose folderPaths are virtual children of this directory

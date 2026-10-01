@@ -30,6 +30,10 @@ async function handleMerge(): Promise<void> {
     toast.error(t('book.merge.errors.not2books'))
     return
   }
+  if (hasDifferentLibraries.value) {
+    toast.error(t('book.merge.errors.differentLibraries'))
+    return
+  }
   if (targetBookId.value == null) {
     toast.error(t('book.merge.errors.notarget'))
     return
@@ -40,15 +44,18 @@ async function handleMerge(): Promise<void> {
     toast.success(
       t('book.merge.toast.success', {
         count: result?.merged ?? selectedBookIds.value.length,
-        target: result?.targetTitle ?? targetBookId.value,
+        target: targetBookId.value,
       }),
     )
     emit('merged')
     emit('update:open', false)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : t('book.merge.errors.common')
-    toast.error(t(message))
+  } catch {
+    toast.error(t('book.merge.errors.common'))
   }
+}
+
+function handleOpenChange(value: boolean): void {
+  emit('update:open', value)
 }
 
 function handleClose(): void {
@@ -58,16 +65,24 @@ function handleClose(): void {
 const targetBookId = ref<number | null>(null)
 
 const selectedBookIds = computed(() => {
+  if ('query' in props.selectionPayload && props.selectionPayload.query) {
+    return []
+  }
   if ('bookIds' in props.selectionPayload && props.selectionPayload.bookIds) {
     return props.selectionPayload.bookIds
   }
   return []
 })
 
+const isQuerySelectionActive = computed(() => {
+  return 'query' in props.selectionPayload && !!props.selectionPayload.query
+})
+
 type BookMeta = {
   id: number
   title: string
   formats: string[]
+  libraryId: number
 }
 
 const bookArray = ref<BookMeta[]>([])
@@ -79,26 +94,41 @@ async function loadBookMeta(bookId: number): Promise<BookMeta> {
   const formats = [...new Set((bookState.detail.value?.files ?? []).map((file) => file.format).filter((format): format is string => Boolean(format)))]
   return {
     id: bookId,
-    title: bookState.detail.value?.title ?? 'Untitled',
+    title: bookState.detail.value?.title ?? t('book.merge.untitled'),
     formats,
+    libraryId: bookState.detail.value?.libraryId ?? -1,
   }
 }
 
+const hasDifferentLibraries = computed(() => {
+  const libraryIds = new Set(bookArray.value.map((book) => book.libraryId).filter((libraryId) => libraryId > 0))
+  return libraryIds.size > 1
+})
+
+const canMerge = computed(() => {
+  if (isQuerySelectionActive.value) return false
+
+  return selectedBookIds.value.length >= 2 && bookArray.value.length === selectedBookIds.value.length && !hasDifferentLibraries.value
+})
+
 watch(
-  selectedBookIds,
-  async (ids) => {
-    if (!ids.length) {
+  [() => props.open, selectedBookIds],
+  async ([isOpen, ids]) => {
+    if (isOpen) {
+      targetBookId.value = null
+    }
+    if (!isOpen || !ids.length) {
       bookArray.value = []
       return
     }
     bookArray.value = await Promise.all(ids.map(loadBookMeta))
   },
-  { immediate: true },
+  { immediate: false },
 )
 </script>
 
 <template>
-  <Sheet :open="open" @update:open="emit('update:open', $event)">
+  <Sheet :open="open" @update:open="handleOpenChange">
     <SheetContent
       side="bottom"
       class="max-h-[85vh] overflow-y-auto sm:inset-x-auto sm:right-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg sm:rounded-t-lg"
@@ -132,9 +162,16 @@ watch(
             </li>
           </ul>
         </div>
+        <p v-if="hasDifferentLibraries" class="text-sm text-destructive">
+          {{ t('book.merge.errors.differentLibraries') }}
+        </p>
+        <p v-if="isQuerySelectionActive" class="text-sm text-yellow-600/90 mt-2">
+          {{ t('book.merge.info.query') }}
+          <!-- Assuming a translation key like 'book.merge.info.query' exists or we use static text -->
+        </p>
         <div class="flex items-center justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" @click="handleClose">{{ t('common.cancel') }}</Button>
-          <Button @click="handleMerge">
+          <Button :disabled="!canMerge" @click="handleMerge">
             {{ t('book.merge.mergeBtn') }}
           </Button>
         </div>

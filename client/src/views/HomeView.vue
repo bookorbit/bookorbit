@@ -34,7 +34,6 @@ import AddToCollectionSheet from '@/features/collection/components/AddToCollecti
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import { useMoveToLibraryTarget } from '@/features/book/composables/useMoveToLibraryTarget'
 import MergeBooksSheet from '@/features/book/components/MergeBooksSheet.vue'
-import { useMergeBooksTarget } from '@/features/book/composables/useMergeBooksTarget'
 import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
@@ -446,16 +445,15 @@ const {
   selectedCount: computed(() => (querySelection.value ? querySelection.value.total : selectedCount.value)),
 })
 
-const {
-  open: mergeBooksOpen,
-  payload: mergePayload,
-  count: mergeCount,
-  openForSelection: openMergeForSelection,
-  setOpen: setMergeOpen,
-} = useMergeBooksTarget({
-  getSelectionPayload: () => getSelectionPayload(),
-  selectedCount: computed(() => (querySelection.value ? querySelection.value.total : selectedCount.value)),
-})
+const mergeBooksOpen = ref(false)
+const mergePayload = computed(() => getSelectionPayload())
+const mergeCount = computed(() => (querySelection.value ? querySelection.value.total : selectedCount.value))
+function openMergeForSelection() {
+  mergeBooksOpen.value = true
+}
+function setMergeOpen(next: boolean) {
+  mergeBooksOpen.value = next
+}
 
 const { onBookMissing, onBookRestored, onBookMoved, onBookTransferred } = useBookEvents()
 const TRANSFER_REFRESH_DEBOUNCE_MS = 300
@@ -563,6 +561,7 @@ function handleBooksMoved() {
 
 function handleBooksMerged() {
   exitSelectionMode()
+  resetBooks()
 }
 
 function handleEditSelected() {

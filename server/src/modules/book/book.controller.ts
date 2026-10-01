@@ -829,7 +829,7 @@ export class BookController {
   }
 
   @Post('merge')
-  @RequirePermission(Permission.LibraryEditMetadata)
+  @RequirePermission(Permission.LibraryDeleteBooks)
   @Auditable({
     action: AuditAction.BookMerge,
     resource: AuditResource.Book,

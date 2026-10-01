@@ -6929,17 +6929,19 @@
     "merge": {
       "action": "Merge books",
       "title": "{count, plural, one {Merge # book} other {Merge # books}}",
-      "description": "This will not change book locations! But merge them only in the database.",
-      "subtitle": "Select the book in which the others should be merged.",
+      "description": "Files stay where they are. Only the database records are combined.",
+      "subtitle": "Select the target book in which the others should be merged.",
       "mergeBtn": "Merge Books",
+      "untitled": "Untitled",
       "errors": {
         "failed": "Failed to merge books",
         "notarget": "No target book selected",
         "not2books": "Select at least 2 books to merge",
-        "common": " An Error occurred while merging books. Please try again."
+        "differentLibraries": "Books from different libraries cannot be merged",
+        "common": "An Error occurred while merging books. Please try again."
       },
       "toast": {
-        "success": "Merged {count} {count, plural, one {Merge # book} other {Merge # books}} into book ID:{target}"
+        "success": "{count, plural, one {Merged # book} other {Merged # books}} into book ID:{target}"
       }
     }
   },

@@ -32,7 +32,6 @@ import AddToCollectionSheet from '@/features/collection/components/AddToCollecti
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import { useMoveToLibraryTarget } from '@/features/book/composables/useMoveToLibraryTarget'
 import MergeBooksSheet from '@/features/book/components/MergeBooksSheet.vue'
-import { useMergeBooksTarget } from '@/features/book/composables/useMergeBooksTarget'
 import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
@@ -272,19 +271,19 @@ function handleBooksMoved() {
   exitSelectionMode()
 }
 
-const {
-  open: mergeBooksOpen,
-  payload: mergePayload,
-  count: mergeCount,
-  openForSelection: openMergeForSelection,
-  setOpen: setMergeOpen,
-} = useMergeBooksTarget({
-  getSelectionPayload: () => ({ bookIds: [...selectedIds.value] }),
-  selectedCount,
-})
+const mergeBooksOpen = ref(false)
+const mergePayload = computed(() => ({ bookIds: [...selectedIds.value] }))
+const mergeCount = computed(() => selectedCount.value)
+function openMergeForSelection() {
+  mergeBooksOpen.value = true
+}
+function setMergeOpen(next: boolean) {
+  mergeBooksOpen.value = next
+}
 
 function handleBooksMerged() {
   exitSelectionMode()
+  resetBooks()
 }
 
 const metadataExportOpen = ref(false)
