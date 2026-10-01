@@ -1,8 +1,8 @@
 {
   "common": {
-    "resetSortAria": "Visszaállítás alap állapotra",
+    "resetSortAria": "Rendezés alaphelyzetbe állítása",
     "save": "Mentés",
-    "cancel": "Mégsem",
+    "cancel": "Mégse",
     "delete": "Törlés",
     "edit": "Szerkesztés",
     "close": "Bezárás",
@@ -39,11 +39,11 @@
         },
         "summary": {
           "title": "Összefoglaló megosztása",
-          "description": "Ossz meg összesített szokásokat könyvcímek, szerzők, sorozatok vagy narrátorok nélkül."
+          "description": "Ossz meg összesített szokásokat könyvcímek, szerzők, sorozatok vagy felolvasók nélkül."
         },
         "detailed": {
           "title": "Részletes elemzések megosztása",
-          "description": "Ossz meg legújabb és legnépszerűbb könyveket, szerzőket, sorozatokat, műfajokat és narrátorokat is."
+          "description": "Ossz meg legújabb és legnépszerűbb könyveket, szerzőket, sorozatokat, műfajokat és felolvasókat is."
         }
       },
       "fields": {
@@ -55,7 +55,7 @@
         "books": "Jelenlegi, legújabb és legolvasottabb könyvcímek",
         "authors": "Legjobb szerzők",
         "series": "Legjobb sorozatok",
-        "narrators": "Legjobb narrátorok"
+        "narrators": "Legjobb felolvasók"
       },
       "confirm": {
         "shareTitle": "{level} engedélyezése?",
@@ -334,7 +334,7 @@
         },
         "coverSizeBehavior": {
           "label": "Borítóméret viselkedése",
-          "hint": "Szabályozhatod, hogy az álló/négyzet alakú méretek és a rácstávolság minden nézetben meg legyen-e osztva, vagy nézetenként megmaradjon",
+          "hint": "Szabályozhatod, hogy az álló/négyzetes alakú méretek és a rácstávolság minden nézetben meg legyen-e osztva, vagy nézetenként megmaradjon",
           "perViewHint": "Nézetenkénti mód: a borító méretét és a térközt az egyes nézetek megjelenítés paneljén állíthatod be.",
           "syncAll": "Összes nézet szinkronizálása",
           "perView": "Nézetenkénti méretek"
@@ -344,16 +344,16 @@
           "hint": "Álló könyvtárakhoz és nézetekhez használatos"
         },
         "squareCoverSize": {
-          "label": "Négyzet alakú borító mérete",
-          "hint": "Négyzet alakú könyvtárakhoz és nézetekhez használatos"
+          "label": "Négyzetes alakú borító mérete",
+          "hint": "Négyzetes alakú könyvtárakhoz és nézetekhez használatos"
         },
         "portraitGridSpacing": {
           "label": "Álló rács térköz",
-          "hint": "Portréborítók közötti rés"
+          "hint": "Álló borítók közötti rés"
         },
         "squareGridSpacing": {
-          "label": "Négyzet alakú rácstávolság",
-          "hint": "Négyzet alakú fedelek közötti rés"
+          "label": "Négyzetes alakú rácstávolság",
+          "hint": "Négyzetes alakú fedelek közötti rés"
         },
         "cardInfoMode": {
           "label": "Kártyainformációs mód",
@@ -400,7 +400,7 @@
             "hint": "A szerzői borítók alakja a rácsban"
           },
           "circle": "Kör",
-          "square": "Négyzet"
+          "square": "Négyzetes"
         },
         "listTableViews": {
           "title": "Lista- és táblázatnézetek"
@@ -445,7 +445,7 @@
         },
         "selectedCount": "{count, plural, one {# kiválasztva} other {# kiválasztva}}",
         "clear": "Törlés",
-        "deleteSelected": "Kijelöltek törlése",
+        "deleteSelected": "Kiválasztottak törlése",
         "loading": "Ikonok betöltése...",
         "emptySearch": "Egyetlen ikon sem felel meg a keresésnek.",
         "emptyNoIcons": "Még nincsenek feltöltve egyéni ikonok.",
@@ -558,7 +558,7 @@
         "removeConfirm": {
           "title": "Profilkép törlése?",
           "description": "Az avatárod eltávolításra kerül, és a helyére monogram kerül.",
-          "confirm": "Eltávolít"
+          "confirm": "Eltávolítás"
         }
       },
       "connectedAccounts": {
@@ -995,7 +995,7 @@
         "noPrefixesFound": "Nem találhatók előtagok - először ellenőrizd a forrást",
         "selectSourcePrefix": "Forrás előtag kiválasztása...",
         "selectTargetFolder": "Célmappa kiválasztása...",
-        "remove": "Eltávolít",
+        "remove": "Eltávolítás",
         "pathValidation": "Útvonal-érvényesítés",
         "pathValidationMapped": "{total} forráskönyvből {mapped} rendelkezik leképezett útvonallal",
         "pathValidationUnmatched": "{count} leképezett elérési út nem található a lemezen - ezek a könyvek ISBN / cím egyeztetésre fognak visszaállni",
@@ -1051,7 +1051,7 @@
         "booksCard": "Könyvek",
         "metadataOverlaysApplied": "Metaadat-átfedések alkalmazva",
         "authorMappingsReplaced": "Szerzői leképezések cserélve",
-        "narratorMappingsReplaced": "Narrátor leképezések cserélve",
+        "narratorMappingsReplaced": "Felolvasó leképezések cserélve",
         "genreMappingsReplaced": "Műfaj leképezések cserélve",
         "tagMappingsReplaced": "Címke leképezések cserélve",
         "coversImported": "Borítók importálva",
@@ -1138,7 +1138,7 @@
         "scanFailedAt": "Sikertelen {time}",
         "scanningPercent": "Beolvasás {pct}%",
         "scanCounting": "Fájlok számlálása",
-        "scanCounts": "{processed} a {total}-ból",
+        "scanCounts": "{processed}/{total}",
         "scanAdded": "{count, plural, one {+# hozzáadva} other {+# hozzáadva}}",
         "scanUpdated": "{count, plural,one {# frissítve} other {# frissítve}}",
         "scanMissing": "{count, plural, one {+# hiányzik} other {+# hiányzik}}",
@@ -1209,8 +1209,8 @@
           "added": "Hozzáadva",
           "coverShape": "Borító alakja",
           "coverShapeValue": {
-            "portrait": "2:3 portré",
-            "square": "1:1 négyzet"
+            "portrait": "2:3 álló",
+            "square": "1:1 négyzetes"
           },
           "none": "Egyik sem",
           "allSupported": "Minden támogatott",
@@ -1231,7 +1231,7 @@
         "enableTitle": "Automatikus szerzőbővítés engedélyezése",
         "enableHint": "Szerzői életrajzok és profilfotók automatikus lekérése könyvek hozzáadásakor vagy frissítésekor.",
         "triggerOnImportTitle": "Importáláskor aktiválódó",
-        "triggerOnImportHint": "A szerzők sorba állítása a bővítéshez, amikor a könyvek először kerülnek fel a könyvtárba.",
+        "triggerOnImportHint": "A szerzők várólistára tétele a bővítéshez, amikor a könyvek először kerülnek fel a könyvtárba.",
         "eligibilityTitle": "Jogosultsági feltételek",
         "eligibilityHint": "Egy szerző akkor jogosult, ha megfelel bármelyik engedélyezett feltételnek.",
         "neverEnrichedTitle": "Még nem volt bővítés",
@@ -1247,7 +1247,7 @@
         "saveFailed": "Szerzőbővítési beállítások mentése sikertelen",
         "noEligibleAuthors": "Nem találhatók megfelelő szerzők",
         "noAuthorsToEnrich": "Nincsenek bővíthető szerzők",
-        "queueFailed": "Nem sikerült a szerző feltöltését sorba állítani",
+        "queueFailed": "Nem sikerült a szerző feltöltését várólistára tenni",
         "fields": {
           "description": "Életrajz",
           "photo": "Fotó",
@@ -1337,7 +1337,7 @@
           },
           "median": "Medián",
           "belowFifty": "50 alatt",
-          "ninetyPlus": "90 és felette",
+          "ninetyPlus": "Legalább 90",
           "noBooks": "Még nincsenek pontozott könyvek. Futtass újrapontozást, miután a könyvtár importálása befejeződött.",
           "scopeNote": "A könyvtárakban elérhető {count, plural, one {# könyv} other {# könyv}} között, az aktuálisan mentett súlyokkal pontozva."
         },
@@ -1523,7 +1523,7 @@
         "seriesName": "Sorozat neve",
         "seriesIndex": "Sorozatindex",
         "genres": "Műfajok",
-        "narrators": "Narrátorok",
+        "narrators": "Felolvasók",
         "duration": "Időtartam",
         "abridged": "Rövidített",
         "tags": "Címkék",
@@ -1573,15 +1573,15 @@
         },
         "triggerOnImport": {
           "label": "Importáláskor aktiválódó",
-          "hint": "A megfelelő könyvek várakozási sorba tétele, amikor először a könyvtárhoz adják őket."
+          "hint": "A megfelelő könyvek várólistára tétele, amikor először a könyvtárhoz adják őket."
         },
         "status": {
-          "inQueuePaused": "{count} a sorban - szüneteltetve",
+          "inQueuePaused": "{count} a várólistán - szüneteltetve",
           "remaining": "{count} van hátra",
           "eligible": "~{count} megfelelő"
         },
         "trigger": {
-          "queued": "{count, plural, one {# könyv sorba állítva} other {# könyv sorba állítva}}",
+          "queued": "{count, plural, one {# könyv várólistára téve} other {# könyv várólistára téve}}",
           "noneFound": "Nem találhatók megfelelő könyvek"
         },
         "lastRun": {
@@ -1591,7 +1591,7 @@
           "yesterday": "tegnap",
           "daysAgo": "{count, plural, one {# napja} other {# napja}}",
           "label": "Utolsó futtatás: {when}",
-          "labelQueued": "Utolsó futtatás: {when} - {count} könyv sorba állítva",
+          "labelQueued": "Utolsó futtatás: {when} - {count} könyv a várólistán",
           "labelNoneEligible": "Utolsó futtatás: {when} - nincsenek megfelelő könyvek"
         },
         "conditions": {
@@ -1636,7 +1636,7 @@
         "hardcoverEnableHint": "Futtass tesztet az aktuális tokennel az engedélyező kapcsoló feloldásához.",
         "searchPlaceholder": "Források szűrése",
         "sourcesEnabled": "{enabled} a {total} forrásból engedélyezve",
-        "groupEnabled": "{enabled} a {total}-ból itt:",
+        "groupEnabled": "{enabled}/{total} itt",
         "unsavedChanges": "{count, plural, one {# változás nincs mentve} other {# változás nincs mentve}}",
         "noMatches": "Egyetlen forrás sem felel meg ennek a szűrőnek.",
         "clearFilters": "Szűrők törlése",
@@ -1941,7 +1941,7 @@
         "sampleValue": "Mintaérték",
         "enabledLibraries": "Engedélyezett könyvtárak",
         "countOf": "{selected}/{total}",
-        "selectAll": "Összes kijelölése",
+        "selectAll": "Összes kiválasztása",
         "clear": "Törlés",
         "noLibraries": "Még nincsenek elérhető könyvtárak.",
         "allLibraries": "Összes könyvtár"
@@ -2311,7 +2311,7 @@
         "tokenTitle": "Könyv címe",
         "tokenSubtitle": "Könyv alcíme",
         "tokenAuthors": "Szerző(k), vesszővel elválasztva",
-        "tokenNarrators": "Narrátor(ok), vesszővel elválasztva",
+        "tokenNarrators": "Felolvasó(k), vesszővel elválasztva",
         "tokenYear": "Kiadás éve",
         "tokenSeries": "Sorozat neve",
         "tokenSeriesIndex": "Sorozatindex (nullával feltöltve)",
@@ -2321,6 +2321,7 @@
         "tokenLibrary": "Könyvtár neve",
         "tokenOriginalFilename": "Eredeti fájlnév (kiterjesztés nélkül)",
         "tokenExtension": "Fájlkiterjesztés (pont nélkül)",
+        "tokenReadaloud": "Hangos felolvasás szinkronizált hangot tartalmazó EPUB esetén",
         "patternHelpIntro": "A minták olyan tokeneket használnak, mint a {titleToken} és az {authorsToken}, valamint módosítókat és opcionális szegmenseket.",
         "browseTokensAndExamples": "Tokenek és példák böngészése",
         "subtitleShort": "Mappa- és fájlnév-minták a tárolt fájlokhoz.",
@@ -2333,7 +2334,7 @@
           "title": "Mi szerint kerül kiválasztásra az elérési út.",
           "summary": "Egy saját mintával rendelkező könyvtár nyer. Minden más könyvtár a globális alapértelmezett rendezési módot követi. A minta megváltoztatása nem helyezi át a lemezen már meglévő könyveket; az új feltöltések a következő feltöltéstől kezdve követik azt."
         },
-        "filterRules": "Szűrő szabályok",
+        "filterRules": "Szűrési szabályok",
         "librariesGroup": "Könyvtárak",
         "customCount": "{custom}/{total} egyedi",
         "noRuleMatches": "Nincs egyező szabály a(z) „{query}” keresésre.",
@@ -2383,6 +2384,9 @@
         "resultCopyFailed": "A generált eredmény másolása sikertelen",
         "sampleBookNote": "Az összes előnézethez használt mintakönyv",
         "missingMetadata": "Ha hiányoznak a metaadatok",
+        "readaloudComparison": "Hangos felolvasás összehasonlítása",
+        "readaloudEpub": "Hangos felolvasást támogató EPUB",
+        "plainEpub": "Normál EPUB",
         "caseNoSeriesLabel": "Nincs sorozat",
         "caseNoYearLabel": "Nincs év",
         "caseNoAuthorLabel": "Nincs szerző",
@@ -2835,7 +2839,7 @@
           "saving": "Mentés...",
           "confirmLink": "Kapcsolat megerősítése"
         },
-        "remove": "Eltávolít",
+        "remove": "Eltávolítás",
         "removing": "Eltávolítás...",
         "unmatchedBooks": "Párosítatlan könyvek",
         "deviceRemoved": "Eszköz eltávolítva",
@@ -3685,7 +3689,7 @@
         "authors": "Legjobb szerzők",
         "genres": "Legjobb műfajok",
         "series": "Legjobb sorozatok",
-        "narrators": "Legjobb narrátorok"
+        "narrators": "Legjobb felolvasók"
       },
       "errors": {
         "READING_INSIGHTS_PRIVATE": "Ez a felhasználó nem oszt meg olvasási statisztikákat.",
@@ -3834,7 +3838,7 @@
       "usernameFixedHint": "A felhasználó név nem változtatható meg.",
       "emailHint": "Jelszó-visszaállításokhoz és értesítésekhez használatos.",
       "libraryAccessHint": "Az ezeken a könyvtárakon kívüli könyvek láthatatlanok a felhasználó számára.",
-      "selectAll": "Összes kijelölése",
+      "selectAll": "Összes kiválasztása",
       "clearAll": "Törlés",
       "permissionsHint": "Amit ez a fiók tehet. {granted}/{total} engedélyezett.",
       "groupLegend": "{group}: {granted}/{total} engedélyezett",
@@ -3844,7 +3848,7 @@
         "standard": "Általános",
         "custom": "Egyéni",
         "admin": "Adminisztrátor",
-        "customHint": "Ez a kijelölés nem egyezik egyetlen előbeállítással sem."
+        "customHint": "Ez a kiválasztás nem egyezik egyetlen előbeállítással sem."
       },
       "filterPermissions": "Jogosultságok szűrése",
       "grantedOnly": "Csak engedélyezett",
@@ -4329,7 +4333,7 @@
       "EmailTemplate": "Email sablon",
       "EmailRecipient": "Email címzettje",
       "EmailRecipientGroup": "Email címzettcsoport",
-      "Narrator": "Narrátor",
+      "Narrator": "Felolvasó",
       "Publisher": "Kiadó",
       "Language": "Nyelv",
       "Series": "Sorozat",
@@ -4677,9 +4681,9 @@
         "selectVisible": "Láthatók kiválasztása",
         "refreshMetadata": "Metaadatok frissítése",
         "refreshingMetadata": "Metaadatok frissítése...",
-        "deleteSelected": "Kijelöltek törlése",
+        "deleteSelected": "Kiválasztottak törlése",
         "deleting": "Törlés...",
-        "exitSelection": "Kilépés a kijelölésből",
+        "exitSelection": "Kilépés a kiválasztásból",
         "confirmDeleteCount": "{count, plural, =0 {Törölsz # szerzőt?} one {Törölsz # szerzőt?} other {Törölsz # szerzőt?}}"
       },
       "toast": {
@@ -5030,7 +5034,7 @@
     "export": {
       "title": "Metaadatok exportálása",
       "scope": "Hatókör",
-      "selectedRows": "Kijelölt sorok",
+      "selectedRows": "Kiválasztott sorok",
       "currentlySelected": "{count} jelenleg kiválasztva",
       "allMatchingRows": "Az összes egyező sor",
       "rowsInResult": "{count} sor a jelenlegi találatok között",
@@ -5087,8 +5091,8 @@
       "title": "Gyorsbillentyűk",
       "navigation": {
         "title": "Navigáció",
-        "moveFocusVertical": "Kijelölés mozgatása fel/le",
-        "moveFocusHorizontal": "Kijelölés mozgatása balra/jobbra",
+        "moveFocusVertical": "Kiválasztás mozgatása fel/le",
+        "moveFocusHorizontal": "Kiválasztás mozgatása balra/jobbra",
         "jumpFirstColumn": "Ugrás az első oszlopra",
         "jumpLastColumn": "Ugrás az utolsó oszlopra",
         "jumpFirstRow": "Ugrás az első sorra",
@@ -5096,11 +5100,11 @@
       },
       "actions": {
         "title": "Műveletek",
-        "editCell": "Kijelölt cella szerkesztése",
+        "editCell": "Kiválasztott cella szerkesztése",
         "cancelEditing": "Szerkesztés megszakítása / Panel bezárása",
-        "toggleRowSelection": "Sor kijelölésének átváltása",
+        "toggleRowSelection": "Sor kiválasztásának átváltása",
         "copyCell": "Cella értékének másolása",
-        "copyRow": "Kijelölt sor másolása"
+        "copyRow": "Kiválasztott sor másolása"
       },
       "general": {
         "title": "Általános",
@@ -5276,7 +5280,7 @@
         "sourceField": "Forrás",
         "allSources": "Minden forrás",
         "audiobookCovers": "Hangoskönyv-borítók",
-        "squareHint": "(négyzet)",
+        "squareHint": "(négyzetes)",
         "searching": "Keresés...",
         "findCovers": "Borítók keresése",
         "selectCover": "Borító kiválasztása",
@@ -5288,7 +5292,7 @@
       },
       "details": {
         "by": "tőle",
-        "narratedBy": "narrátor",
+        "narratedBy": "felolvasó",
         "ratingLocked": "Értékelés zárolva",
         "rateStar": "{star} csillagos értékelés",
         "listen": "Hallgatás",
@@ -5379,7 +5383,7 @@
         "koboRemovedByDevice": "Eszköz által törölve",
         "koboRemovedByDeviceTooltip": "A Kobo jelentése szerint ez a könyv törölve lett.",
         "koboNotSynced": "Nincs szinkronizálva",
-        "koboNotSyncedTooltip": "Sorba állítva a következő Kobo-szinkronizáláshoz.",
+        "koboNotSyncedTooltip": "Várólistára téve a következő Kobo-szinkronizáláshoz.",
         "filesNotFound": "A fájlok nem találhatók",
         "filesNotFoundDescription": "A könyvhöz tartozó fájl(ok) már nem találhatók a lemezen. A metaadatok továbbra is elérhetők. A megerősítéshez futtass egy könyvtárellenőrzést, vagy távolítsd el a bejegyzést.",
         "resetHoldNotice": "A(z) {device} még a régi pozíciót ({percent}) tárolja",
@@ -5468,7 +5472,7 @@
         "titleLabel": "Cím",
         "subtitleLabel": "Alcím",
         "authorsLabel": "Szerzők",
-        "narratorsLabel": "Narrátorok",
+        "narratorsLabel": "Felolvasók",
         "genresLabel": "Műfajok",
         "tagsLabel": "Címkék",
         "ratingLabel": "Értékelés",
@@ -5511,7 +5515,7 @@
           "selectedOf": "{selected}/{total} kiválasztva",
           "yearUnknown": "Év ismeretlen",
           "indexOf": "{index}/{total}",
-          "switchedResult": "Találatváltás történt. A szolgáltatóhoz kapcsolódó korábbi kijelölések törlődtek.",
+          "switchedResult": "Találatváltás történt. A szolgáltatóhoz kapcsolódó korábbi kiválasztások törlődtek.",
           "selectFieldsToApply": "Válaszd ki az alkalmazandó mezőket",
           "copyMissing": "Hiányzó másolása",
           "copyAll": "Összes másolása",
@@ -5540,8 +5544,8 @@
           "pickCoverFromProvider": "Borító választása másik szolgáltatótól",
           "pickCoverSource": "Borító forrásának kiválasztása",
           "coverShapeHint": {
-            "portraitForAudio": "Álló tájolású kép. A hangoskönyv-borítók négyzet alakúak.",
-            "squareForBook": "Négyzet alakú kép. A könyvborítók álló tájolásúak."
+            "portraitForAudio": "Álló tájolású kép. A hangoskönyv-borítók négyzetes alakúak.",
+            "squareForBook": "Négyzetes alakú kép. A könyvborítók álló tájolásúak."
           },
           "pickFromProvider": "Választás másik szolgáltatótól",
           "pickSource": "Forrás kiválasztása",
@@ -5574,7 +5578,7 @@
             "isbn13": "ISBN-13",
             "isbn10": "ISBN-10",
             "genres": "Műfajok",
-            "narrators": "Narrátorok",
+            "narrators": "Felolvasók",
             "durationSeconds": "Időtartam (másodperc)",
             "abridged": "Rövidített",
             "hardcoverEditionId": "Hardcover-kiadásazonosító",
@@ -5638,9 +5642,191 @@
           "searchInterruptedHint": "Próbáld újra, vagy szűkítsd a keresési kört.",
           "searchPrompt": "Keress fent, majd kattints egy találatra a metaadatok összehasonlításához."
         },
+        "match": {
+          "sheetDescription": "Keress a metaadat-szolgáltatók között, és válaszd ki, mit szeretnél átmásolni ebbe a könyvbe.",
+          "mediumAudiobook": "Hangoskönyv",
+          "mediumEbook": "E-könyv",
+          "query": {
+            "label": "Metaadatok keresése",
+            "title": "Cím",
+            "author": "Szerző",
+            "isbn": "ISBN",
+            "edited": "Keresőszó módosítva",
+            "useBookDetails": "Könyv részleteinek használata"
+          },
+          "sources": {
+            "heading": "Források",
+            "allEnabledHint": "{count, plural, one {# forrás. Manuális kereséshez a legalkalmasabb.} other {# forrás. Manuális kereséshez a legalkalmasabb.}}",
+            "fieldRulesHint": "{count, plural, one {# forrás, amelyet az automatikus lekérés használ.} other {# forrás, amelyet az automatikus lekérés használ.}}",
+            "outsideRules": "{providers} {count, plural, one {engedélyezve van, de nem szerepel a mezőszabályokban, így az automatikus lekérés átugorja.} other {engedélyezve van, de nem szerepel a mezőszabályokban, így az automatikus lekérés átugorja.}}",
+            "manualOnly": "{providers}: kizárólag manuális keresés, az automatikus lekérés nem használja.",
+            "count": "{provider}: {count, plural, =0 {nincs eredmény} one {# eredmény} other {# eredmény}}",
+            "searching": "{provider}: keresés",
+            "stopped": "{provider}: leállt a befejezés előtt"
+          },
+          "results": {
+            "label": "Egyezések",
+            "best": "Legjobb egyezések",
+            "otherEditions": "További kiadások",
+            "otherBooks": "Valószínűleg különböző könyvek",
+            "stillSearching": "Keresés folyamatban",
+            "linked": "Összekapcsolva",
+            "linkedHint": "Ez a bejegyzés már össze van kapcsolva a könyvvel",
+            "isbn": "ISBN egyezés",
+            "fills": "+{count} üres",
+            "fillsHint": "{count, plural, one {# üres mező kitöltése} other {# üres mező kitöltése}}",
+            "differ": "{count} eltérés",
+            "differHint": "{count, plural, one {# mező eltér a könyvtől} other {# mező eltér a könyvtől}}",
+            "inSync": "Szinkronizálva",
+            "inSyncHint": "Az itt szereplő adatok egyike sem módosítaná a könyvet",
+            "differentAuthor": "Eltérő szerző",
+            "titleDiffers": "Eltérő cím",
+            "sparse": "Hiányos",
+            "sparseHint": "{count, plural, one {Csak # mező lett kitöltve} other {Csak # mező lett kitöltve}}",
+            "staged": "{count, plural, one {# módosítás előkészítve ebből a találatból} other {# módosítás előkészítve ebből a találatból}}",
+            "noMatches": "Nincs találat erre a lekérdezésre",
+            "noMatchesHint": "{count, plural, one {A forrás nem adott vissza találatot.} other {# forrás nem adott vissza találatot.}} Próbálkozz tágabb kereséssel.",
+            "searchTitleOnly": "Keresés kizárólag a címben",
+            "prompt": "Adj meg egy címet vagy ISBN-számot a kereséshez.",
+            "mayBeMissing": "Az ebből származó találatok hiányozhatnak.",
+            "retry": "{provider} újra",
+            "pages": "{count, plural, one {# oldal} other {# oldal}}",
+            "fetched": "Lekérve"
+          },
+          "tier": {
+            "strong": "Erős egyezés",
+            "possible": "Valószínű egyezés",
+            "weak": "Valószínűtlen egyezés"
+          },
+          "compare": {
+            "label": "Összehasonlítás",
+            "backToMatches": "Vissza az egyezésekhez",
+            "previous": "Előző eredmény",
+            "next": "Következő eredmény",
+            "position": "{index}/{total}",
+            "viewOn": "Megtekintés itt: {provider}",
+            "linkedToBook": "Összekapcsolva ezzel a könyvvel",
+            "sameTitleAuthor": "Azonos cím és szerző",
+            "streaming": "Az eddigi legjobb találat megjelenítése. Várakozás: {providers}.",
+            "rows": "Sorok",
+            "differences": "Eltérések",
+            "allFields": "Minden mező",
+            "fillEmpty": "{count, plural, =0 {Nincs üres mező} one {# üres kitöltése} other {# üres kitöltése}}",
+            "takeAll": "{count, plural, =0 {Nincs használható} one {# használata} other {Mind al # használata}}",
+            "more": "További műveletek",
+            "clearAll": "Minden kiválasztás törlése",
+            "clearAllHint": "Vissza a könyv jelenlegi értékeihez.",
+            "field": "Mező",
+            "pickTitle": "Válassz ki egy találatot az összehasonlításhoz",
+            "pickHint": "Válassz ki egy találatot. A mezői felsorakoznak a könyv adatai mellett, így egyenként megtarthatod vagy lecserélheted őket.",
+            "noneTitle": "Még nincs mit összehasonlítani",
+            "noneHint": "Ha a keresés találatokat hoz, a legjobb itt nyílik meg, a(z) {title} jelenlegi adatai mellett.",
+            "allMatch": "Minden mező megegyezik a könyv adataival. A megtekintésükhöz válts az Összes mező lehetőségre.",
+            "toReview": "{count, plural, =0 {Nincs mit áttekinteni} one {# áttekintendő} other {# áttekintendő}}",
+            "stagedInSection": "{count} előkészítve"
+          },
+          "sections": {
+            "identity": "Személyazonosság",
+            "description": "Leírás",
+            "publication": "Kiadvány",
+            "series": "Sorozat",
+            "genres": "Műfajok",
+            "comics": "Képregény-készítők",
+            "identifiers": "Azonosítók",
+            "ratings": "Közösségi értékelés"
+          },
+          "kind": {
+            "fill": "Üresek kitöltése",
+            "change": "Eltérő",
+            "same": "Ugyanaz",
+            "missing": "Nem ismert"
+          },
+          "minor": {
+            "reordered": "Átrendezve",
+            "formatting": "Csak formázás",
+            "punctuation": "Írásjelek",
+            "capitalization": "Írásmód",
+            "yearOnly": "Csak év",
+            "addsDay": "Nap hozzáadása",
+            "languageCode": "Egyező nyelv",
+            "ratingCount": "Csak darabszám"
+          },
+          "decision": {
+            "keep": "Megtartás",
+            "use": "Használ",
+            "merge": "Egyesítés",
+            "replace": "Csere",
+            "alreadyMatches": "Már megegyezik",
+            "nothingToApply": "Nincs mit alkalmazni",
+            "lockedHint": "A módosításához oldd fel a szerkesztőben.",
+            "usingFrom": "Érték átvétele innen:",
+            "switchTo": "Váltás erre: {provider}"
+          },
+          "value": {
+            "empty": "Üres",
+            "notProvided": "Nem ismert",
+            "showAll": "Mind a(z) {count} szó megjelenítése",
+            "otherValues": "{count, plural, one {# egyéb érték} other {# egyéb érték}}",
+            "otherValuesHeading": "{field} a többi találatból",
+            "otherValuesHint": "Az egyik kiválasztása előkészíti ezt a mezőt",
+            "sameAsCurrent": "Megegyezik a jelenlegivel",
+            "useThis": "Használd ezt",
+            "using": "Használatban"
+          },
+          "providerRating": "{provider}-értékelés",
+          "cover": {
+            "slotAudio": "Hangoskönyv-kártyahely, négyzetes",
+            "slotBook": "Könyvkártyahely, álló tájolású",
+            "current": "Jelenlegi",
+            "staged": "Előkészítve",
+            "size": "{width} × {height}",
+            "fits": "Illeszkedik a kártyahelyre",
+            "portraitInSquare": "Álló tájolás: alul-felül fekete sávval",
+            "squareInPortrait": "Négyzetes: kétoldalt fekete sávval",
+            "broken": "Sérültnek tűnik",
+            "unknown": "Ismeretlen alakzat",
+            "fitShort": "Illeszkedik",
+            "portraitShort": "Álló",
+            "squareShort": "Négyzetes",
+            "brokenShort": "Sérült",
+            "noCover": "Ez a találat nem tartalmaz borítót",
+            "noCurrent": "Még nincs borító",
+            "strip": "Borítók az egyező találatokból",
+            "stripMeta": "{count, plural, one {# borító} other {# borító}}, illeszkedők előre",
+            "choose": "Válassz egy borítót",
+            "preview": "A borítók megtekintése teljes képernyős előnézetben",
+            "previewTitle": "Borítók egymás mellett",
+            "previewDescription": "A jelenlegi borító az őt felváltó új borító mellett.",
+            "choice": "{provider} borító",
+            "choiceSized": "{provider} borító, {width} x {height}",
+            "using": "Használatban"
+          },
+          "footer": {
+            "changes": "{count, plural, one {# változás} other {# változás}}",
+            "from": "ettől",
+            "nothingStaged": "Semmi sincs előkészítve. Válassz a mezők melletti Használ lehetőségre kattintva, vagy jelölj ki egy borítót.",
+            "nothingStagedShort": "Semmi sincs előkészítve",
+            "formHint": "Kitölti a szerkesztési űrlapot. A megtartásához ott mentsd el.",
+            "fileHint": "Mentés ezen fájl metaadataiba.",
+            "apply": "{count, plural, =0 {Alkalmaz} one {# változás alkalmazása} other {# változás alkalmazása}}",
+            "stagedHeading": "Előkészítve az űrlaphoz",
+            "clearAll": "Összes törlése",
+            "undo": "{field} visszavonása",
+            "merged": "egyesítve",
+            "live": "{count, plural, =0 {Nincs előkészített változás} one {# változás előkészítve} other {# változás előkészítve}}"
+          },
+          "keyboard": {
+            "title": "Gyorsbillentyűk",
+            "results": "Előző vagy következő találat",
+            "fields": "Navigáció a mezők között",
+            "toggle": "Mező megtartása vagy használata",
+            "search": "Keresés szerkesztése",
+            "close": "Menük bezárása"
+          }
+        },
         "writeAndRename": "Fájlba írás és átnevezés",
         "writeAndRenameShort": "Írás és átnevezés",
-        "identityCard": "Azonosítók",
+        "identityCard": "Személyazonosság",
         "catalogCard": "Katalógus",
         "sourceCard": "Forrás",
         "score": "Pontszám",
@@ -5876,7 +6062,7 @@
           "exportCount": "{count} exportálása"
         },
         "row": {
-          "select": "Kiemelés kijelölése",
+          "select": "Kiemelés kiválasztása",
           "showMore": "Több megjelenítése",
           "showLess": "Kevesebb megjelenítése",
           "note": "Megjegyzés",
@@ -5899,10 +6085,10 @@
         },
         "bulk": {
           "selected": "{count} kiválasztva",
-          "selectAll": "Mind a(z) {count} kijelölése",
-          "recolour": "Kijelölés átszínezése",
+          "selectAll": "Mind a(z) {count} kiválasztása",
+          "recolour": "Kiválasztás átszínezése",
           "recolourTo": "Átszínezés ilyenre: {colour}",
-          "clear": "Kijelölés törlése"
+          "clear": "Kiválasztás törlése"
         },
         "index": {
           "title": "Mutató",
@@ -6193,7 +6379,7 @@
           "last30": "Utolsó 30 nap",
           "last90": "Utolsó 90 nap",
           "thisYear": "Idén",
-          "allFormats": "Minden formátum"
+          "allFormats": "Összes formátum"
         },
         "table": {
           "title": "Munkamenetek",
@@ -6314,7 +6500,7 @@
         "unpinColumn": "Oszlop rögzítésének feloldása",
         "autoFitWidth": "Szélesség automatikus igazítása",
         "autoFitAllColumns": "Minden oszlop automatikus igazítása",
-        "selectAllBooks": "Minden könyv kijelölése",
+        "selectAllBooks": "Minden könyv kiválasztása",
         "shiftClickSecondarySort": "Shift+kattintás másodlagos rendezés hozzáadásához",
         "clickToSort": "Kattints a rendezéshez"
       },
@@ -6428,7 +6614,7 @@
       "title": "Szerző bővítése"
     },
     "stats": {
-      "queued": "Sorba állítva",
+      "queued": "Várólistára téve",
       "processing": "Feldolgozás alatt",
       "rateLimited": "Kérés korlátozva",
       "failed": "Sikertelen"
@@ -6436,7 +6622,7 @@
     "actions": {
       "pause": "Szünet",
       "resume": "Folytatás",
-      "cancelQueued": "Sorban állók megszakítása",
+      "cancelQueued": "Várólistán lévők megszakítása",
       "dismissBookStatus": "Metaadat-lekérési állapot elvetése",
       "dismissAuthorStatus": "Szerző bővítési állapot elvetése"
     },
@@ -6490,7 +6676,7 @@
     "apply": "Alkalmaz",
     "done": "Kész",
     "discard": "Elvetés",
-    "deselect": "Kijelölés törlése",
+    "deselect": "Kiválasztás törlése",
     "finalize": "Véglegesítés",
     "rescan": "Újrakeresés",
     "uploadAction": "Feltöltés",
@@ -6501,10 +6687,10 @@
     "applyFetched": "Lekérések alkalmazása",
     "retryErrors": "Hibásak újra",
     "discardDialog": {
-      "title": "{count, plural, =0 {Nem vetsz el egyetlen fájlt sem?} one {Elveted a kijelölt fájlt?} other {Elveted a # kijelölt fájlt?}}",
-      "description": "{count, plural, =0 {Nincs fájl kiválasztva.} one {Ez véglegesen törli a kijelölt fájlt a lemezről. Ez a művelet nem vonható vissza.} other {Ez véglegesen törli a kijelölt # fájlt a lemezről. Ez a művelet nem vonható vissza.}}",
+      "title": "{count, plural, =0 {Nem vetsz el egyetlen fájlt sem?} one {Elveted a kiválasztott fájlt?} other {Elveted a # kiválasztott fájlt?}}",
+      "description": "{count, plural, =0 {Nincs fájl kiválasztva.} one {Ez véglegesen törli a kiválasztott fájlt a lemezről. Ez a művelet nem vonható vissza.} other {Ez véglegesen törli a kiválasztott # fájlt a lemezről. Ez a művelet nem vonható vissza.}}",
       "confirm": "{count, plural,one {Fájl törlése} other {# fájl törlése}}",
-      "failed": "A kijelölt fájlokat nem sikerült törölni. Próbáld újra."
+      "failed": "A kiválasztott fájlokat nem sikerült törölni. Próbáld újra."
     },
     "commaSeparated": "vesszővel elválasztva",
     "destinationLibrary": "Célkönyvtár",
@@ -6594,8 +6780,8 @@
     "finalizeDialog": {
       "title": "{count, plural, =0 {Nincs véglegesítendő fájl} one {# véglegesítendő fájl} other {# véglegesítendő fájl}}",
       "resultTitle": "Eredmények véglegesítése",
-      "needDestination": "{count, plural, =0 {A(z) # kijelölt fájl közül {without}-nak nincs célhelye} one {A(z) # kijelölt fájl közül {without}-nak nincs célhelye} other {A(z) # kijelölt fájl közül {without}-nak nincs célhelye}}",
-      "allHaveDestination": "Minden kijelölt fájlhoz meg van adva a célhely",
+      "needDestination": "{count, plural, =0 {A(z) # kiválasztott fájl közül {without}-nak nincs célhelye} one {A(z) # kiválasztott fájl közül {without}-nak nincs célhelye} other {A(z) # kiválasztott fájl közül {without}-nak nincs célhelye}}",
+      "allHaveDestination": "Minden kiválasztott fájlhoz meg van adva a célhely",
       "defaultDestinationLibrary": "Alapértelmezett célkönyvtár",
       "defaultDestinationFolder": "Alapértelmezett célmappa",
       "renamePreview": "Átnevezés előnézete",
@@ -6661,11 +6847,11 @@
         "nothingReadyToFile": "Nincsenek besorolásra kész fájlok.",
         "dropHint": "Vagy húzd a fájlokat a lap bármely részére."
       },
-      "selectAllOnPage": "Minden fájl kijelölése ezen az oldalon",
+      "selectAllOnPage": "Minden fájl kiválasztása ezen az oldalon",
       "showingOf": "{shown}/{total}",
-      "keyboardHint": "J / K: mozgatás · Szóköz: kijelölés · Enter: kibontás",
+      "keyboardHint": "J / K: mozgatás · Szóköz: kiválasztás · Enter: kibontás",
       "allOnPageSelected": "Az oldalon található mind a(z) {count} elem ki van jelölve.",
-      "selectAllMatching": "Mind a(z) {count} egyező elem kijelölése",
+      "selectAllMatching": "Mind a(z) {count} egyező elem kiválasztása",
       "allMatchingSelected": "Mind a(z) {count} egyező fájl ki van jelölve",
       "sort": {
         "label": "Rendezés módja",
@@ -6715,7 +6901,7 @@
       "rejected": "Elutasítva",
       "cancelled": "Visszavonva",
       "searching": "Keresés",
-      "grabbed": "Begyűjtve",
+      "grabbed": "Lekérve",
       "downloading": "Letöltés",
       "importing": "Importálás",
       "needs_review": "Felülvizsgálat szükséges",
@@ -6938,12 +7124,12 @@
       "fulfilFailed": "Nem sikerült lezárni a kérést",
       "grabFailed": "Nem sikerült elindítani a letöltést",
       "removeDownloadFailed": "Nem sikerült eltávolítani a torrentet a letöltőkliensből",
-      "bulkApproveFailed": "Nem sikerült jóváhagyni a kijelölt kéréseket",
-      "bulkDismissFailed": "Nem sikerült elrejteni a kijelölt kéréseket",
+      "bulkApproveFailed": "Nem sikerült jóváhagyni a kiválasztott kéréseket",
+      "bulkDismissFailed": "Nem sikerült elrejteni a kiválasztott kéréseket",
       "selectUnitFailed": "A könyv nem importálható.",
       "languageChangeFailed": "Nem sikerült megváltoztatni a kérés nyelvét",
       "leaveFailed": "Ebből a kérésből nem lehet kilépni",
-      "bulkRejectFailed": "A kijelölt elemeket nem sikerült elutasítani",
+      "bulkRejectFailed": "A kiválasztott elemeket nem sikerült elutasítani",
       "discardImportFailed": "Az importálást nem sikerült elvetni"
     },
     "grab": {
@@ -6970,7 +7156,7 @@
     },
     "download": {
       "source": {
-        "automatic": "Automatikusan begyűjtve",
+        "automatic": "Automatikusan lekérve",
         "manual": "Jóváhagyó által kiválasztva",
         "pasted": "Kézzel beillesztve"
       },
@@ -7272,7 +7458,7 @@
       "state": "Állapot",
       "outcome": "Eredmény",
       "actions": "Műveletek",
-      "selectAll": "Minden jóváhagyásra váró kérés kijelölése",
+      "selectAll": "Minden jóváhagyásra váró kérés kiválasztása",
       "selectRow": "{title} kiválasztása",
       "toggleDetail": "Mutassa, mi történt ezzel: {title}",
       "release": "Kiadás",
@@ -7631,11 +7817,11 @@
       "lockAll": "Összes zárolása",
       "unlockAll": "Összes feloldása",
       "exportMetadata": "Metaadatok exportálása",
-      "deleteSelected": "Kijelöltek törlése",
-      "exitSelection": "Kilépés a kijelölésből",
+      "deleteSelected": "Kiválasztottak törlése",
+      "exitSelection": "Kilépés a kiválasztásból",
       "downloadFilesZipLabel": "Fájlok letöltése ZIP-ként:",
       "primaryOnly": "Csak elsődleges",
-      "allFormats": "Minden formátum",
+      "allFormats": "Összes formátum",
       "audioOnly": "Csak hang",
       "setRatingLabel": "Értékelés beállítása:",
       "clear": "Törlés",
@@ -7663,7 +7849,7 @@
         "grid": "Rács",
         "list": "Lista",
         "select": "Kiválaszt",
-        "exitSelect": "Kilépés a kijelölésből"
+        "exitSelect": "Kilépés a kiválasztásból"
       },
       "displayControls": {
         "display": "Megjelenés",
@@ -7674,7 +7860,7 @@
         "columnsHint": "Használd a táblázat fejlécében található oszlopláthatósági panelt az oszlopok megjelenítéséhez vagy elrejtéséhez.",
         "coverShape": "Borító alakja",
         "circle": "Kör",
-        "square": "Négyzet",
+        "square": "Négyzetes",
         "rowDensity": "Sormagasság",
         "densityCompact": "Kompakt",
         "densityComfortable": "Kényelmes",
@@ -7846,7 +8032,7 @@
         "wantToRead": "Még nincsenek elolvasandó könyvek.",
         "upNextInSeries": "Még nincsenek következő kötetajánlatok. Fejezz be egy kötetet, hogy megjelenjen a következő.",
         "recentlyAdded": "Még nincsenek könyvek a könyvtáradban.",
-        "smartScope": "Egyetlen könyv sem egyezik ezzel az okosgyűjteménnyel.",
+        "smartScope": "Egyetlen könyv sem felel meg ennek az OkosGyűjteménynek.",
         "default": "Nem találhatók könyvek."
       }
     },
@@ -7963,8 +8149,8 @@
         "empty": "Az összes legjobb értékelésű könyvedet elolvastad!",
         "rating": "{rating}/5",
         "daysWaiting": "{count} napja várakozik",
-        "queued": "Sorba állítva",
-        "addToQueue": "Sorba tesz",
+        "queued": "Várólistára téve",
+        "addToQueue": "Várólistára tesz",
         "shuffle": "Keverés"
       },
       "readingDna": {
@@ -8181,7 +8367,7 @@
       "resendFailed": "Újraküldés sikertelen",
       "statusSent": "Elküldve",
       "statusFailed": "Sikertelen",
-      "statusQueued": "Sorba állítva",
+      "statusQueued": "Várólistára téve",
       "statusPending": "Függőben"
     },
     "send": {
@@ -8200,7 +8386,7 @@
       "default": "Alapértelmezett",
       "send": "Küldés",
       "sending": "Küldés...",
-      "queued": "{count, plural, =0 {nincs email a sorban} one {egy email a sorban} other {# email a sorban}}",
+      "queued": "{count, plural, =0 {nincs email a várólistán} one {egy email a várólistán} other {# email a várólistán}}",
       "failed": "Küldés sikertelen"
     }
   },
@@ -8245,7 +8431,7 @@
           "description": "Mindent szinkronizál, kivéve ha kizársz egy könyvet."
         },
         "selectedOnly": {
-          "label": "Kizárólag a kijelölt könyvek",
+          "label": "Kizárólag a kiválasztott könyvek",
           "description": "Kizárólag azokat a könyveket szinkronizálja, amelyeket kifejezetten beveszel a hatókörbe."
         }
       },
@@ -8316,7 +8502,7 @@
       "description": "A Hardcover-találatok előnézetének megtekintése az üres BookOrbit-állapotok kitöltése előtt.",
       "clear": "Törlés",
       "preview": "Előnézet",
-      "importProgress": "Haladások importálása",
+      "importProgress": "Haladás importálása",
       "reviewMatches": "Találatok ellenőrzése",
       "importReady": "Importálás kész",
       "exactMatches": "{count, plural, =0 {nincs ellenőrzés nélkül importálható pontos találat} one {# pontos találat importálható ellenőrzés nélkül} other {# pontos találat importálható ellenőrzés nélkül}}",
@@ -8360,7 +8546,7 @@
       "selectPage": "Oldal kiválasztása",
       "clearPage": "Oldal törlése",
       "clearSelection": "Kiválasztás törlése",
-      "importSelected": "Kijelöltek importálása",
+      "importSelected": "Kiválasztottak importálása",
       "previousPage": "Előző oldal",
       "nextPage": "Következő oldal",
       "pageRange": "{start}-{end}/{total}",
@@ -8469,14 +8655,33 @@
         "coverStyle": {
           "title": "Borító stílusa",
           "portrait": "Álló",
-          "square": "Négyzet",
+          "square": "Négyzetes",
           "hint": "Álló tájolás az e-könyveket tartalmazó vagy vegyes könyvtárakhoz. Négyzetes a kizárólag hangoskönyveket tartalmazó könyvtárakhoz.",
           "hintSlots": "Álló tájolás az e-könyveket tartalmazó vagy vegyes könyvtárakhoz, négyzetes a kizárólag hangoskönyveket tartalmazó könyvtárakhoz. Az e-könyv és hangoskönyv formátummal egyaránt rendelkező könyvek esetében álló könyvtárban a könyvborító, négyzetes könyvtárban pedig a hangoskönyv-borító jelenik meg."
         },
         "icon": {
           "label": "Ikon",
           "placeholder": "Válassz egy ikont...",
-          "selected": "Kiválasztva"
+          "selected": "Kiválasztva",
+          "more": "Több ikon"
+        },
+        "identity": "Személyazonosság",
+        "podcastName": "Podcast-könyvtár neve",
+        "podcastPlaceholder": "Podcastjaim",
+        "podcastDefaultName": "Podcastok",
+        "type": {
+          "title": "Könyvtár típusa",
+          "books": "Könyvek",
+          "booksHint": "E-könyvek, képregények és hangoskönyvek",
+          "podcasts": "Podcastok",
+          "podcastsHint": "RSS-csatornák és felügyelt epizódtárhely"
+        },
+        "cover": {
+          "portraitTitle": "2:3 álló",
+          "portraitHint": "E-könyvek és vegyes könyvtárak",
+          "squareTitle": "Négyzetes 1:1",
+          "squareHint": "Csak hangoskönyv-könyvtárak",
+          "slotsHint": "Az e-könyvként és hangoskönyvként egyaránt elérhető műveknél az alakzatnak megfelelő borító jelenik meg."
         }
       },
       "folders": {
@@ -8511,6 +8716,32 @@
           "addDescription": "Minden közvetlenül benne található mappa külön műsorrá válik.",
           "add": "Másik mappa hozzáadása",
           "remove": "{folder} törlése"
+        },
+        "listTitle": "Mappák",
+        "storageTitle": "Tárolómappa",
+        "matchingFiles": "{count, plural, one {# egyező fájl} other {# egyező fájl}}",
+        "bookCount": "{count, plural, one {# könyv} other {# könyv}}",
+        "checkAll": "Mappák újbóli ellenőrzése",
+        "checkAgain": "{folder} újbóli ellenőrzése",
+        "checkHint": "A rendszer minden mappát azonnal ellenőriz, amint hozzáadod. Az olyan mappákat, amelyeket egy másik könyvtár már beolvas, megjelöljük, mivel mindkét könyvtár ugyanazokat a fájlokat importálná.",
+        "emptyHint": "Illessz be egy szerveroldali elérési utat alább, vagy tallózz egyet.",
+        "emptyPodcastHint": "Válaszd ki, hol szeretnéd tárolni a letöltött podcast-epizódokat.",
+        "pastePlaceholder": "Illessz be egy szerverútvonalat, pl. /books/Sci-Fi",
+        "pastePodcastPlaceholder": "Illessz be egy szerverútvonalat, pl. /podcasts",
+        "browse": "Tallózás...",
+        "status": {
+          "checking": "Ellenőrzés",
+          "failed": "Ellenőrzés sikertelen",
+          "notAccessible": "Nem érhető el",
+          "overlap": "Már szerepel itt is: {library}",
+          "overlapTitle": "A(z) „{library}” könyvtár már beolvassa ezt a mappát.",
+          "files": "{count, plural, one {# fájl} other {# fájl}}"
+        },
+        "errors": {
+          "empty": "Adj meg egy szerveroldali mappa-elérési utat.",
+          "notAbsolute": "Adj meg egy ezzel kezdődő abszolút szerverútvonalat: /.",
+          "duplicate": "Ez a mappa már hozzá van adva.",
+          "covered": "Ez a mappa már a(z) {path} útvonal hatókörébe tartozik."
         }
       },
       "scanner": {
@@ -8574,8 +8805,8 @@
         "allowedFormats": {
           "title": "Engedélyezett formátumok",
           "allowAll": "Összes engedélyezése",
-          "allAllowed": "Minden formátum engedélyezett.",
-          "onlySelected": "Kizárólag a kijelölt formátumok kerülnek importálásra.",
+          "allAllowed": "Összes formátum engedélyezett.",
+          "onlySelected": "Kizárólag a kiválasztott formátumok kerülnek importálásra.",
           "warning": "A könyvtárban már meglévő, más formátumú könyvek a következő beolvasáskor hiányzóként lesznek megjelölve."
         },
         "excludePatterns": {
@@ -8584,6 +8815,36 @@
           "hintAfter": ").",
           "add": "Hozzáad",
           "empty": "Nincsenek minták hozzáadva."
+        },
+        "mode": {
+          "title": "Hogyan lesz a fájlokból könyv",
+          "locked": "Létrehozáskor meghatározva",
+          "cannotChange": "Ez az egyetlen beállítás, amelyet később nem módosíthatsz.",
+          "folderHint": "Minden mappa egy könyvnek felel meg. Ideális megoldás, ha egy cím több formátumot fog össze, vagy ha egy hangoskönyv sok különálló fájlból áll.",
+          "fileHint": "Minden fájl egy önálló könyvnek felel meg. Ideális megoldás az egyrétegű mappákhoz, ahol címenként egy formátum található.",
+          "folderResult": "Egy könyv két formátummal",
+          "fileResult": "Három könyv, fájlonként egy"
+        },
+        "import": {
+          "title": "Importálás",
+          "all": "Összes formátum",
+          "some": "Csak ezek",
+          "groups": {
+            "ebook": "E-könyvek",
+            "kindle": "Kindle",
+            "document": "Dokumentumok",
+            "comic": "Képregények",
+            "audio": "Hang"
+          }
+        },
+        "skip": {
+          "title": "Egyező fájlok kihagyása",
+          "count": "{count, plural,one {# minta} other {# minta}}",
+          "hint": "Glob-minták, amelyek a könyvtármappákon belüli útvonalakra illeszkednek.",
+          "inputLabel": "Kihagyandó minta",
+          "placeholder": "Írj be egy mintát (pl. **/samples/**), majd nyomd meg az Entert",
+          "placeholderMore": "Másik minta hozzáadása",
+          "remove": "Minta törlése: {pattern}"
         }
       },
       "metadata": {
@@ -8596,7 +8857,28 @@
           "hint": "Ha egy könyv több formátummal is rendelkezik, a listában legfelül szereplő formátum élvez elsőbbséget."
         },
         "moveUp": "{item} mozgatása felfelé",
-        "moveDown": "{item} mozgatása lefelé"
+        "moveDown": "{item} mozgatása lefelé",
+        "primary": {
+          "title": "Elsődleges fájl",
+          "hint": "Ha egy könyv több fájlból áll, az ebben a sorrendben legelső formátum lesz az elsődleges fájlja: az, amelyik először nyílik meg, és amelyik a könyv részletes adatait biztosítja. Átrendezéshez húzz el egy sort, vagy használd a nyilakat.",
+          "reset": "Sorrend visszaállítása",
+          "first": "Első választás",
+          "notImported": "Nincs importálva",
+          "notHeld": "{count, plural, one {# formátum, amellyel ez a könyvtár nem rendelkezik, ezek után megtartja az alapértelmezett helyét.} other {# formátum, amellyel ez a könyvtár nem rendelkezik, ezek után megtartja az alapértelmezett helyét.}}",
+          "moreBelow": "{count, plural, one {# további formátum következik ebben a sorrendben.} other {# további formátum következik ebben a sorrendben.}}",
+          "showingAll": "Minden formátum mutatása.",
+          "showAll": "Mind a(z) {count} megjelenítése",
+          "showFewer": "Kevesebb megjelenítése"
+        },
+        "source": {
+          "title": "A könyv részletes adatainak forrása",
+          "embeddedTitle": "A könyvfájlban lévő címkék",
+          "embeddedHint": "Beolvasás az elsődleges fájlból",
+          "opfTitle": "metadata.opf fájl",
+          "opfHint": "A Calibre által a könyv mellé mentve",
+          "swap": "Sorrend megcserélése",
+          "hint": "A BookOrbit a könyvhöz tartozó legelsőt használja, a többit pedig mellőzi. A Calibre-könyvtáraknál általában a metadata.opf fájlt érdemes az első helyre tenni."
+        }
       },
       "fileWrite": {
         "maxFileSizeMb": "Maximális fájlméret (MB)",
@@ -8610,7 +8892,7 @@
           "hint": "Ha engedélyezve van, a metaadatok mentésekor a változások a lemezen található fizikai fájlba is visszaírásra kerülnek."
         },
         "cover": {
-          "title": "Borítókép mellékelése",
+          "title": "Borítókép beágyazása",
           "hint": "A tárolt borítót visszaírja a támogatott fájlformátumokba."
         },
         "epub": {
@@ -8642,7 +8924,17 @@
           "title": "Hang",
           "hint": "Beágyazza a tárolt borítót az M4B-, M4A-, MP3- és FLAC-fájlokba.",
           "toggleAria": "Hangfájl-borítóképek beírása"
-        }
+        },
+        "coverAudioHint": "A mentett borítót a fájlba is beágyazza. A hangfájlok csak borítóképet fogadhatnak be.",
+        "audioNeedsCover": "Ehhez a „Borítókép beágyazása” lehetőség bekapcsolása szükséges.",
+        "table": {
+          "format": "Formátum",
+          "inLibrary": "Itt",
+          "sizeLimit": "Méretkorlát"
+        },
+        "sizeLimitAria": "{format} méretkorlátja MB-ban",
+        "mb": "MB",
+        "summary": "{count, plural, =0 {Nem történt fájltípus-írás.} one {# fájltípus írása történik meg. A méretkorlátot meghaladó fájlok ki lesznek hagyva.} other {# fájltípus írása történik meg. A méretkorlátot meghaladó fájlok ki lesznek hagyva.}}"
       },
       "reading": {
         "readingStart": {
@@ -8653,7 +8945,16 @@
           "title": "Megjelölés befejezettként",
           "hint": "A könyv automatikusan „olvasott” megjelölést kap, amint a haladás eléri ezt a százalékos értéket.",
           "invalidThreshold": "A befejezési haladás értékének 90% és 100% között kell lennie."
-        }
+        },
+        "statusTitle": "Olvasási állapot",
+        "zones": {
+          "notStarted": "Nincs elkezdve",
+          "reading": "Olvasás",
+          "read": "Elolvasva"
+        },
+        "range": "{min} és {max} között.",
+        "startSlider": "Húzd el a csúszkát annak beállításához, hogy mikortól számítson elkezdettnek egy könyv",
+        "finishSlider": "Húzd el a csúszkát annak beállításához, hogy mikortól számítson befejezettnek egy könyv"
       },
       "schedule": {
         "fileWatching": "Fájlfigyelés",
@@ -8708,8 +9009,101 @@
         "errors": {
           "grant": "A hozzáférés engedélyezése sikertelen",
           "updateLevel": "A hozzáférési szint frissítése sikertelen",
-          "revoke": "Nem sikerült visszavonni a hozzáférést"
+          "revoke": "Nem sikerült visszavonni a hozzáférést",
+          "load": "Nem sikerült betölteni a könyvtár hozzáférési beállításait."
+        },
+        "peopleTitle": "Hozzáféréssel rendelkezők",
+        "peopleCount": "{count, plural, one {# személy} other {# személy}}",
+        "add": "Hozzáad",
+        "emptyCreate": "Még nincs más felhasználó hozzáadva. Az itt megadott személyek azonnal hozzáférést kapnak, amint a könyvtár létrejön.",
+        "superusers": "A szuperfelhasználók mindig teljes hozzáféréssel rendelkeznek.",
+        "levelFor": "{name} hozzáférési szintje",
+        "revokeFor": "{name} hozzáférésének eltávolítása",
+        "revokeQuestion": "Hozzáférés eltávolítása?",
+        "revoke": "Eltávolítás",
+        "keep": "Megtartás",
+        "failed": {
+          "title": "{count, plural, one {# személy hozzáadása sikertelen} other {# személy hozzáadása sikertelen}}",
+          "body": "A könyvtár létrejött. Próbáld meg újra hozzáadni a(z) {names} felhasználókat, vagy add hozzá őket később ebből a szakaszból."
         }
+      },
+      "optional": "Opcionális",
+      "nav": {
+        "details": "Könyvtár",
+        "folders": "Mappák",
+        "scanner": "Beolvasás",
+        "metadata": "Metaadatok",
+        "reading": "Olvasás",
+        "schedule": "Automatizálás",
+        "fileWrite": "Fájlfrissítések",
+        "access": "Hozzáférés",
+        "descriptions": {
+          "details": "A könyvtár elnevezése és a borítók megjelenési formája.",
+          "folders": "Azok a szerveroldali mappák, amelyekből ez a könyvtár beolvas.",
+          "scanner": "A fájlok könyvekbe történő csoportosításának módja, valamint a kihagyott fájlok köre.",
+          "metadata": "Melyik fájl legyen az elsődleges, ha egy könyv több fájlból áll, és honnan származzanak a részletes adatai.",
+          "reading": "Amikor egy könyv státusza az olvasatlanból az olvasás alatt állón át a befejezettbe vált.",
+          "schedule": "A könyvtár naprakészen tartása a Beolvasás gomb megnyomása nélkül.",
+          "fileWrite": "Opcionális módosítások, amelyeket a BookOrbit hajthat végre a lemezen lévő fájlokon.",
+          "access": "Ki láthatja még ezt a könyvtárat, és ki dolgozhat vele."
+        }
+      },
+      "sheet": {
+        "createTitle": "Új könyvtár",
+        "createHint": "Nevezd el, és irányítsd egy mappára. Minden egyéb beállítás ésszerű alapértelmezett értékkel indul.",
+        "editFallbackTitle": "Könyvtár beállítások",
+        "editSubtitle": "{books, plural, one {# könyv} other {# könyv}} · {folders, plural, one {# mappa} other {# mappa}} · {mode}",
+        "editSubtitleNoBooks": "{folders, plural, one {# mappa} other {# mappa}} · {mode}",
+        "readyHint": "Készen áll a létrehozásra. A többi ráér.",
+        "needsHint": "Név, ikon és mappa megadása szükséges.",
+        "discardQuestion": "Nem mentett módosítások elvetése?",
+        "discard": "Elvetés",
+        "keepEditing": "Szerkesztés folytatása",
+        "done": "Kész",
+        "loading": "Beállítások betöltése...",
+        "staleWarning": "A legújabb könyvtárbeállításokat nem sikerült betölteni. Az itt látható gyorsítótárazott beállításokat ettől függetlenül szerkesztheted.",
+        "scanNow": "Keresés most"
+      },
+      "summary": {
+        "needsName": "Név megadása szükséges",
+        "needsIcon": "Ikon megadása szükséges",
+        "needsFolder": "Mappa megadása szükséges",
+        "detailsPortrait": "{name} · Álló borítók",
+        "detailsSquare": "{name} · Négyzetes borítók",
+        "folders": "{folders, plural, one {# mappa} other {# mappa}}",
+        "foldersFiles": "{folders, plural, one {# mappa} other {# mappa}} · {files, plural, one {# fájl} other {# fájl}}",
+        "foldersBooks": "{folders, plural, one {# mappa} other {# mappa}} · {books, plural, one {# könyv} other {# könyv}}",
+        "scannerAll": "{mode} · Összes formátum",
+        "scannerSome": "{mode} · {count, plural, one {# formátum} other {# formátum}}",
+        "metadataFile": "{format} az elsődleges · Elsőként a könyvfájl",
+        "metadataOpf": "{format} az elsődleges · Elsőként a metadata.opf",
+        "reading": "Elkezdve {start} · Befejezve {finish}",
+        "watching": "Mappák figyelése",
+        "notWatching": "Nincs figyelés",
+        "watchingScheduled": "Figyelés · {schedule}",
+        "watchingOnly": "Figyelés · Nincs ütemezés",
+        "scheduledOnly": "Nincs figyelés · {schedule}",
+        "manualOnly": "Kizárólag manuális beolvasás",
+        "customSchedule": "Egyéni ütemezés",
+        "writesAndRenames": "{count, plural, =0 {Nem történik írás} one {# típus írása történik meg} other {# típus írása történik meg}} · Átnevezések",
+        "writes": "{count, plural, =0 {Nem történik írás} one {# fájltípus írása történik meg} other {# fájltípus írása történik meg}}",
+        "renames": "Fájlok átnevezése",
+        "untouched": "Változatlanul hagyott fájlok",
+        "onlySuperusers": "Csak szuperfelhasználók",
+        "accessQueued": "{count, plural, one {# személy hozzáadása} other {# személy hozzáadása}}",
+        "accessPeople": "{count, plural, =0 {Csak szuperfelhasználók} one {# személy} other {# személy}}"
+      },
+      "errors": {
+        "nameRequired": "Adj meg egy könyvtárnevet.",
+        "iconRequired": "Válassz egy ikont.",
+        "folderRequired": "Adj hozzá legalább egy mappát.",
+        "podcastStorageFolder": "Válassz ki pontosan egy tárolási mappát a podcastok számára.",
+        "podcastFolderOverlap": "A meglévő podcast-mappáknak a tárolási mappán kívül kell elhelyezkedniük.",
+        "cronInvalid": "Adj meg egy érvényes, 5 mezőből álló cron-kifejezést.",
+        "readingStartRange": "Az olvasás kezdetének 0,05% és 5% között kell lennie.",
+        "fileSizeRange": "A fájlméret-korlátoknak 1 és 10 000 MB közötti egész számoknak kell lenniük.",
+        "saveFailed": "Könyvtár mentése sikertelen.",
+        "connection": "Nem sikerült csatlakozni a szerverhez. Ellenőrizd a kapcsolatot, majd próbáld meg újra."
       }
     },
     "folderPicker": {
@@ -8999,7 +9393,7 @@
       "booksSection": "Könyvek",
       "metadataOverlays": "Metaadat-átfedések alkalmazva",
       "authorMappings": "Szerzői leképezések cserélve",
-      "narratorMappings": "Narrátor leképezések cserélve",
+      "narratorMappings": "Felolvasó leképezések cserélve",
       "genreMappings": "Műfaj leképezések cserélve",
       "tagMappings": "Címke leképezések cserélve",
       "coversImported": "Borítók importálva",
@@ -9270,7 +9664,7 @@
         "selectText": "Szöveg kijelölése",
         "pinHeader": "Olvasófejléc rögzítése",
         "unpinHeader": "Olvasófejléc rögzítésének feloldása",
-        "pinHeaderShort": "Fejléc kitűzése",
+        "pinHeaderShort": "Fejléc rögzítése",
         "unpinHeaderShort": "Fejléc rögzítésének feloldása",
         "moreTools": "További PDF-eszközök",
         "settings": "PDF-beállítások"
@@ -9716,7 +10110,7 @@
       "columnSeries": "Sorozat",
       "columnVolumes": "Kötetek",
       "columnRead": "Elolvasva",
-      "columnNext": "Következő",
+      "columnNext": "Következik",
       "columnAdded": "Hozzáadva",
       "percent": "{value}%",
       "captionReading": "{base} · {count, plural, one {# folyamatban} other {# folyamatban}}",
@@ -9768,16 +10162,16 @@
       "createFailed": "Nem sikerült létrehozni az okosgyűjteményt"
     },
     "saveAsDialog": {
-      "title": "Mentés okosgyűjteményként",
-      "save": "Okosgyűjtemény mentése",
+      "title": "Mentés OkosGyűjteményként",
+      "save": "OkosGyűjtemény mentése",
       "saveFailed": "Nem sikerült menteni az okosgyűjteményt"
     },
     "editorPanel": {
-      "untitled": "Névtelen okosgyűjtemény",
+      "untitled": "Névtelen OkosGyűjtemény",
       "subtitle": "Okosgyűjtemény-beállítások konfigurálása",
       "counting": "számolás...",
       "bookCount": "{count, plural, =0 {nincs könyv} one {egy könyv} other {# könyv}}",
-      "identity": "Azonosítók",
+      "identity": "Személyazonosság",
       "filters": "Szűrők",
       "noFilters": "Nincsenek beállítva szűrők. Minden elérhető könyv bekerül ebbe az okosgyűjteménybe.",
       "buildFromScratch": "Létrehozás alapoktól",
@@ -9995,7 +10389,7 @@
       "authors": "Szerzők",
       "genres": "Műfajok",
       "tags": "Címkék",
-      "narrators": "Narrátorok",
+      "narrators": "Felolvasók",
       "publishers": "Kiadók",
       "languages": "Nyelvek",
       "series": "Sorozat"
@@ -10056,8 +10450,8 @@
       },
       "select": {
         "ofSelected": "a {total}-ból kiválasztva",
-        "toggleAll": "Összes átnevezés kijelölése vagy törlése",
-        "toggleGroup": "Összes {kind}-átnevezés kijelölése vagy törlése",
+        "toggleAll": "Összes átnevezés kiválasztása vagy törlése",
+        "toggleGroup": "Összes {kind}-átnevezés kiválasztása vagy törlése",
         "toggleBook": "{title} átnevezése"
       },
       "review": {
@@ -10125,6 +10519,8 @@
         "dismiss": "Elvetés"
       },
       "executionError": {
+        "http": "A szerver elutasította a kérést (HTTP {status}).",
+        "noBody": "A szerver nem küldött választörzset.",
         "incomplete": "A kapcsolat megszakadt az átnevezés befejeződése előtt. Előfordulhat, hogy néhány fájl nem lett átnevezve.",
         "unknown": "Az átnevezést nem sikerült befejezni."
       }
@@ -10139,7 +10535,7 @@
       "runScan": "Keresés futtatása",
       "rescan": "Újrakeresés",
       "status": {
-        "queued": "Keresés a várakozási sorban",
+        "queued": "Keresés a várólistán",
         "running": "Könyvek beolvasása"
       },
       "filter": "Szűrés az egyezés típusa szerint",
@@ -10191,12 +10587,72 @@
         "status": "Nem sikerült betölteni a beolvasás haladási állapotát.",
         "scan": "A duplikátumkeresés sikertelen. Próbáld meg újra futtatni.",
         "results": "Nem sikerült betölteni a duplikált csoportokat.",
-        "delete": "Nem sikerült törölni a kijelölt duplikált könyveket."
+        "delete": "Nem sikerült törölni a kiválasztott duplikált könyveket.",
+        "dismiss": "Nem sikerült elvetni a csoportot.",
+        "restore": "Nem sikerült visszaállítani a párt."
       },
       "pagination": {
+        "label": "Duplikált csoportok oldalai",
         "page": "{page}/{total} oldal"
       },
+      "similarityOption": "Legalább {percent}",
+      "scannedBooks": "{count} könyv · ellenőrizve {when}",
+      "scanProgress": "{processed}/{total} könyv",
+      "recommended": "Ajánlott",
+      "keeping": "Megtartás",
+      "willDelete": "Törlés",
+      "keepCopy": "{name} megtartása",
+      "selectGroup": "{title} kiválasztása",
+      "selectAll": "Az összes csoport kiválasztása ezen az oldalon",
+      "compareCopies": "A(z) {title} példányainak összehasonlítása",
+      "compareCaption": "{count} példány mezőnkénti összehasonlítása",
+      "fieldColumn": "Mező",
+      "filesEach": "{count, plural, one {# fájl egyenként} other {# fájl egyenként}}",
+      "moreFilesCount": "{count, plural, one {és további # fájl} other {és további # fájl}}",
+      "identicalAcross": "{count, plural, one {Mindkét példányban megegyezik:} other {Mind a(z) # példányban megegyezik:}}",
+      "deleteGroup": "{count, plural, one {# példány törlése, felszabadul {size}} other {# példány törlése, felszabadul {size}}}",
+      "confidence": {
+        "file_hash": "Azonos",
+        "isbn": "Azonos ISBN-szám",
+        "exact_metadata": "Pontos egyezés",
+        "fuzzy_metadata": "Hasonló",
+        "withSimilarity": "{label} {percent}"
+      },
+      "summary": {
+        "groups": "{count, plural, one {csoport} other {csoport}}",
+        "extraCopies": "{count, plural, one {felesleges példány} other {felesleges példány}}",
+        "reclaimable": "felszabadítható"
+      },
+      "columns": {
+        "match": "Egyezés",
+        "book": "Könyv",
+        "copies": "Példányok",
+        "libraries": "Könyvtárak",
+        "frees": "Felszabadít",
+        "keeping": "Megtartás"
+      },
+      "keepRule": {
+        "label": "Megtartás",
+        "metadata": "Legjobb metaadatok",
+        "size": "Legnagyobb fájlok",
+        "formats": "Legtöbb formátum",
+        "oldest": "Legrégebbi példány",
+        "newest": "Legújabb példány",
+        "hint": "Minden csoportban kijelöl egy megőrzendő példányt. Bármelyik sort felülbírálhatod."
+      },
+      "sort": {
+        "label": "Rendezés",
+        "reclaimable": "Legtöbb felszabaduló hely",
+        "copies": "Legtöbb példány",
+        "confidence": "Legerősebb egyezés",
+        "title": "Cím A-Z"
+      },
       "keeper": {
+        "yourChoice": "Kézi választás",
+        "reading": "{percent} olvasva ebből",
+        "collection": "helye {name}",
+        "metadata": "metaadat-pontszám {score}",
+        "largest": "legnagyobb {size}",
         "formats": "{count} formátum",
         "isbn": "van ISBN-száma",
         "added": "hozzáadva {date}",
@@ -10232,7 +10688,7 @@
       "unknown": "Ismeretlen",
       "bookCount": "{count, plural, =0 {nincs könyv} one {# könyv} other {# könyv}}",
       "sortPrefix": "· rendezés: {sortName}",
-      "selectTargetToKeep": "A megtartandó példány kijelölése",
+      "selectTargetToKeep": "A megtartandó példány kiválasztása",
       "writeToFiles": "Írás fájlokba",
       "writeChangesToFiles": "Módosítások mentése a fájlokba",
       "mergeIntoTarget": "{count} példány beolvasztása a célpontba",
@@ -10255,55 +10711,768 @@
         "noneComputed": "Még nincsenek jelöltek kiszámítva.",
         "computeNow": "Kiszámítás most",
         "emptyTitle": "Duplikált entitások keresése",
-        "emptyDescription": "Állítsd be a hasonlósági küszöbértéket, majd kattints a Beolvasás gombra a lehetséges duplikátumok felkutatásához."
+        "emptyDescription": "Állítsd be a hasonlósági küszöbértéket, majd kattints a Beolvasás gombra a lehetséges duplikátumok felkutatásához.",
+        "noneFoundTitle": "Nem találhatók duplikátumok",
+        "noneFoundDescription": "A jelenlegi beállításokkal a rendszer nem észlelt lehetséges duplikátumokat.",
+        "clustersFound": "{count, plural, =0 {nem található csoportosulás} one {# talált csoportosulás} other {# talált csoportosulás}}",
+        "plusOthers": "{count, plural, =0 {+ # további} one {+ # további} other {+ # további}}",
+        "percentSimilar": "{percent}% hasonlóság",
+        "pairDetails": "Pár részletei",
+        "dismissEntityTitle": "Az ehhez az entitáshoz tartozó összes pár elvetése",
+        "dismissPairTitle": "Pár elvetése",
+        "groupsLabel": "Lehetséges duplikált csoportok",
+        "keepThisOne": "Tartsa meg ezt",
+        "mergeAway": "Egyesítés és tisztítás",
+        "notAMatch": "Nem egyezik",
+        "notAMatchTitle": "A csoportban található összes pár elvetése",
+        "selectPromptTitle": "Válassz ki egy csoportot az ellenőrzéshez",
+        "selectPromptDescription": "Válassz ki egy csoportot a listából az entitásai egymás melletti összehasonlításához.",
+        "backToList": "Vissza a csoportokhoz",
+        "noBookTitles": "Nincsenek könyvek ehhez a rekordhoz társítva",
+        "thresholdLabel": "Minimális hasonlóság",
+        "thresholdValue": "{percent}%+",
+        "willBeMerged": "{count, plural, one {# entitás egyesítése és eltávolítása} other {# entitás egyesítése és eltávolítása}}",
+        "chooseTargetHint": "Válaszd ki a megőrzendő entitást. A csoportban lévő minden egyéb elem ebbe vonódik össze."
+      },
+      "dismissed": {
+        "loading": "Mellőzött párok betöltése...",
+        "empty": "Nincsenek mellőzött párok",
+        "restore": "Visszaállít",
+        "restoreTitle": "Pár visszaállítása",
+        "hidePairs": "Mellőzött párok elrejtése",
+        "showPairs": "Mellőzött párok megjelenítése"
       },
       "browse": {
+        "searchPlaceholder": "Keresés...",
+        "emptyOnly": "Csak üres",
+        "clear": "Törlés",
+        "noEntities": "Nem találhatóak entitások",
+        "mergeCount": "Egyesítés ({count})",
+        "deleteCount": "Törlés ({count})",
+        "totalCount": "{count} összesen",
+        "sortLabel": "rendezés: {sortName}",
+        "sort": {
+          "nameAsc": "Név A-Z",
+          "nameDesc": "Név Z-A",
+          "fewestBooks": "Legkevesebb könyv",
+          "mostBooks": "Legtöbb könyv"
+        },
+        "sortByLabel": "Rendezés módja",
+        "entityTypeLabel": "Entitás típusa",
+        "resultCount": "{count, plural, =0 {nincs entitás} one {# entitás} other {# entitás}}",
+        "selectedCount": "{count, plural, one {# kiválasztva} other {# kiválasztva}}",
+        "columns": {
+          "name": "Név",
+          "sortName": "Rendezési név",
+          "books": "Könyvek",
+          "status": "Állapot",
+          "actions": "Műveletek"
+        },
+        "selectAllOnPage": "Minden entitás kiválasztása ezen az oldalon",
+        "selectEntity": "{name} kiválasztása",
+        "actionsFor": "Műveletek ehhez: {name}",
+        "status": {
+          "noBooks": "Nincsenek könyvek"
+        },
+        "filters": {
+          "all": "Összes",
+          "noBooks": "Nincsenek könyvek"
+        },
         "density": {
+          "label": "Sormagasság",
+          "comfortable": "Kényelmes",
           "compact": "Kompakt"
         },
+        "rowsPerPage": "Sorok oldalanként",
         "range": "Megjelenítve {from}-{to} ennyiből: {total}",
+        "pagination": "Oldalszámozás",
+        "previousPage": "Előző oldal",
+        "nextPage": "Következő oldal",
         "goToPage": "Ugrás erre az oldalra: {page}",
+        "morePages": "Több oldal",
+        "noEntitiesDescription": "Ehhez az entitástípushoz még semmi sincs hozzáadva.",
+        "noMatchesTitle": "Nincs találat",
+        "noMatchesDescription": "Egyetlen entitás sem felel meg az aktuális keresésnek és szűrőknek.",
         "clearFilters": "Szűrők törlése"
       },
+      "deleteMode": {
+        "label": "Törlési mód",
+        "softTitle": "Logikai törlés",
+        "softDescription": "Leválasztás az összes könyvről, de az entitásrekord megtartása",
+        "softDescriptionPlural": "Leválasztás az összes könyvről, de az entitásrekordok megtartása",
+        "hardTitle": "Fizikai törlés",
+        "hardDescription": "Az entitás és az összes hozzárendelés végleges törlése",
+        "hardDescriptionPlural": "Az entitások és az összes hozzárendelés végleges törlése"
+      },
+      "renameModal": {
+        "title": "Entitás átnevezése",
+        "currentName": "Jelenlegi név",
+        "newName": "Új név"
+      },
       "deleteModal": {
+        "title": "Entitás törlése",
         "confirm": "Biztosan törölni szeretnéd a következőt: {name}?"
+      },
+      "splitModal": {
+        "title": "Entitás szétválasztása",
+        "splitting": "Szétválasztás",
+        "newNames": "Új nevek (minimum 2)",
+        "namePlaceholder": "Név megadása...",
+        "addAnother": "Újabb hozzáadása"
+      },
+      "bulkDeleteModal": {
+        "title": "Csoportos törlés",
+        "confirm": "{count, plural, =0 {Biztosan törölni szeretnél # kiválaszott entitást?} one {Biztosan törölni szeretnél # kiválaszott entitást?} other {Biztosan törölni szeretnél # kiválaszott entitást?}}",
+        "deleteButton": "{count} törlése"
+      },
+      "mergeModal": {
+        "title": "Entitások egyesítése",
+        "description": "Válaszd ki a megőrzendő entitást. A többi elem ebbe vonódik össze, majd eltávolításra kerül."
       }
     },
     "missingResources": {
+      "title": "Hiányzó erőforrások",
+      "accessDenied": "Nincs jogosultságod a hiányzó erőforrások tisztítására.",
+      "categoriesLabel": "Tisztítási kategória",
       "untitled": "Névtelen",
+      "clearSelection": "Kiválasztás törlése",
+      "cleanSelected": "{count} kiválasztott elem tisztítása",
+      "selectAllMatching": "Mind a(z) {count} egyező bejegyzés kiválasztása",
+      "allSelected": "Mind a(z) {count} egyező bejegyzés ki van jelölve.",
+      "sweep": {
+        "title": "Borítóellenőrzés",
+        "description": "Minden olyan könyvet ellenőriz a lemezen lévő fájlok alapján, amelyhez borító tartozik, és keresi a törölt könyvek után visszamaradt borítómappákat. Az ellenőrzés során semmi sem kerül eltávolításra.",
+        "run": "Ellenőrzés futtatás",
+        "running": "Ellenőrzés",
+        "progress": "{processed}/{total} könyv ellenőrizve",
+        "lastRun": "Utoljára ellenőrizve {at}",
+        "truncated": "Kizárólag az első találatok jelennek meg. Tisztítsd meg ezeket, majd futtasd le újra az ellenőrzést a többi megtekintéséhez."
+      },
+      "categories": {
+        "missing_books": "Hiányzó könyvek",
+        "broken_covers": "Sérült borítók",
+        "orphaned_cover_dirs": "Árva borítómappák"
+      },
+      "found": {
+        "missing_books": "{count, plural, =0 {Nincs hiányzó fájllal rendelkező könyv} one {Egy hiányzó fájllal rendelkező könyv} other {# hiányzó fájllal rendelkező könyv}}",
+        "broken_covers": "{count, plural, =0 {Nincs sérült borítóhivatkozás} one {Egy sérült borítóhivatkozás} other {# sérült borítóhivatkozás}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {Nincs árva borítómappa} one {Egy árva borítómappa} other {# árva borítómappa}}"
+      },
+      "empty": {
+        "missing_books": "Nincsenek hiányzó könyvek",
+        "broken_covers": "Nincsenek sérült borítóhivatkozások",
+        "orphaned_cover_dirs": "Nincsenek árva borítómappák",
+        "description": "Ebben a kategóriában minden tétel hiánytalan."
+      },
+      "needsSweep": {
+        "title": "Először futtasd le a borítóellenőrzést",
+        "description": "A borítóeredmények egy lemezellenőrzésből származnak. Futtasd le a sérült hivatkozások és az árva mappák megtekintéséhez."
+      },
+      "coverSource": {
+        "extracted": "Kicsomagolva",
+        "custom": "Egyéni"
+      },
+      "brokenSlot": {
+        "ebookExtracted": "Könyvborító, kicsomagolva",
+        "ebookCustom": "Könyvborító, egyéni",
+        "audioExtracted": "Hangoskönyv-borító, kicsomagolva",
+        "audioCustom": "Hangoskönyv-borító, egyéni"
+      },
+      "table": {
+        "selectPage": "Az oldalon található összes elem kiválasztása",
+        "coverFolder": "#{bookId} könyv borítómappája",
+        "fileCount": "{count, plural, one {# fájl} other {# fájl}}",
+        "orphanMedia": {
+          "ebook": "Könyvborító",
+          "audio": "Hangoskönyv-borító",
+          "both": "Könyv- és hangoskönyv-borítók"
+        }
+      },
+      "confirm": {
+        "title": "Hiányzó erőforrások tisztitása?",
+        "action": "Tisztítás",
+        "missing_books": "{count, plural, one {Törli annak a könyvnek az adatbázis-rekordját, amelynek a fájljai eltűntek. A könyv, a metaadatai, az olvasási haladása és a borítója eltávolításra kerülnek. Ez a művelet nem vonható vissza.} other {Törli # olyan könyv adatbázis-rekordját, amelyeknek a fájljai eltűntek. A könyvek, a metaadataik, az olvasási haladásuk és a borítóik eltávolításra kerülnek. Ez a művelet nem vonható vissza.}}",
+        "broken_covers": "{count, plural, one {Törli egy könyv borítóhivatkozását, így az borító nélkül jelenik meg. A metaadatok egyébként nem változnak.} other {Törli # könyv borítóhivatkozását, így azok borító nélkül jelennek meg. A metaadatok egyébként nem változnak.}}",
+        "orphaned_cover_dirs": "{count, plural, one {Töröl egy borítómappát a lemezről, amelynek a könyve már nem szerepel az adatbázisban. Ez a művelet nem vonható vissza.} other {Töröl # olyan borítómappát a lemezről, amelyeknek a könyve már nem szerepel az adatbázisban. Ez a művelet nem vonható vissza.}}"
+      },
+      "cleaned": {
+        "missing_books": "{count, plural, =0 {Nincs mit tisztítani} one {Egy hiányzó könyv eltávolítva} other {# hiányzó könyv eltávolítva}}",
+        "broken_covers": "{count, plural, =0 {Nincs mit tisztítani} one {Egy sérült borítóhivatkozás törölve} other {# sérült borítóhivatkozás törölve}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {Nincs mit tisztítani} one {Egy árva borítómappa törölve} other {# árva borítómappa törölve}}"
+      },
       "pagination": {
+        "label": "Hiányzó erőforrásoldalak",
         "page": "{page}/{total} oldal"
+      },
+      "errors": {
+        "summary": "Nem sikerült betölteni a hiányzó erőforrások összegzését.",
+        "sweepStart": "Nem sikerült elindítani a borítóellenőrzést.",
+        "sweep": "A borítóellenőrzés sikertelen.",
+        "list": "Nem sikerült betölteni ezeket a bejegyzéseket.",
+        "clean": "A tisztítás sikertelen."
       }
     }
   },
   "views": {
+    "entity": {
+      "book": "Könyv",
+      "collection": "Gyűjtemény",
+      "library": "Könyvtár",
+      "smartScope": "OkosGyűjtemény"
+    },
+    "common": {
+      "retry": "Újra"
+    },
     "bookView": {
-      "clearAllFilters": "Összes szűrő törlése"
+      "sort": "Rendezés",
+      "sortOn": "Be",
+      "resetSort": "Rendezés alaphelyzetbe állítása",
+      "shuffle": "Keverés",
+      "shuffleAria": "A könyvek sorrendjének összekeverése",
+      "shuffleHint": "Új véletlenszerű sorrend",
+      "filters": "Szűrők",
+      "clear": "Törlés",
+      "clearAllFilters": "Összes szűrő törlése",
+      "expandSeries": "Sorozatok kibontása",
+      "collapseSeries": "Sorozatok összecsukása",
+      "collapseLockedWhileSelecting": "A sorozatok kibontva maradnak a kiválasztás során",
+      "expanded": "Kibontva",
+      "exportMetadata": "Metaadatok exportálása",
+      "showControlsAria": "Könyvtárvezérlők megjelenítése",
+      "export": "Exportálás",
+      "searchPlaceholder": "Keresés cím, szerző, sorozat, felolvasó alapján...",
+      "allBooksLoaded": "Mind a(z) {count} könyv betöltve"
     },
     "notFound": {
-      "title": "Az oldal nem található"
+      "title": "Az oldal nem található",
+      "description": "A keresett oldal nem létezik.",
+      "goHome": "Ugrás a kezdőlapra"
+    },
+    "dashboard": {
+      "customize": "Irányítópult testreszabása",
+      "allShelvesHidden": "Minden polc rejtett.",
+      "greeting": {
+        "night": "Jó éjszakát,",
+        "morning": "Jó reggelt,",
+        "afternoon": "Jó napot,",
+        "evening": "Jó estét,",
+        "fallbackName": "olvasó"
+      }
+    },
+    "bookDetail": {
+      "title": "Könyv",
+      "titleWithId": "Könyv #{id}",
+      "pageTitle": {
+        "book": "Könyv · {base}",
+        "editMetadata": "Metaadatok szerkesztése · {base}",
+        "edit": "Szerkesztés · {base}",
+        "files": "Fájlok · {base}",
+        "readingLog": "Olvasási napló · {base}",
+        "highlights": "Kiemelések · {base}"
+      }
+    },
+    "bookDock": {
+      "title": "Könyvdokk",
+      "newFilesDetected": "Új fájlok észlelve",
+      "reconnecting": "Újracsatlakozás",
+      "rescanFailed": "Újraellenőrzés sikertelen",
+      "totalInDock": "{size} a Könyvdokkban",
+      "dropFiles": "Dobj fájlokat a Könyvdokkba",
+      "supportedFormats": "Támogatott: {formats}",
+      "empty": {
+        "noSearchMatch": "Egyetlen fájl sem egyezik ezzel: „{query}”",
+        "noStatusFiles": "Nincsenek {status} fájlok",
+        "uploadPrompt": "Fájlok feltöltése, vagy behúzása a könyvdokk mappájába"
+      },
+      "retry": {
+        "noneToRetry": "Nincsenek újrapróbálható hibás fájlok",
+        "retrying": "{count, plural, =0 {Egy fájl újrapróbálása} one {Egy fájl újrapróbálása} other {# fájl újrapróbálása}}"
+      },
+      "applyFetched": {
+        "applied": "{count, plural, =0 {Nincs fájlra alkalmazva} one {Egy fájlra alkalmazva} other {# fájlra alkalmazva}}",
+        "skippedEdited": "{count, plural, =0 {egy fájl kihagyva, mivel kézi módosításokat tartalmaz} one {egy fájl kihagyva, mivel kézi módosításokat tartalmaz} other {# fájl kihagyva, mivel kézi módosításokat tartalmaz}}",
+        "skippedNoMetadata": "{count, plural, =0 {egy fájl kihagyva, mivel nem rendelkezik lekért metaadatokkal} one {egy fájl kihagyva, mivel nem rendelkezik lekért metaadatokkal} other {# fájl kihagyva, mivel nem rendelkezik lekért metaadatokkal}}",
+        "noneApplied": "Egyetlen fájl sem lett módosítva; {reasons}",
+        "noneSelected": "Nincsenek kiválasztott fájlok"
+      }
+    },
+    "collection": {
+      "title": "Gyűjtemény",
+      "pageTitle": "Gyűjtemény · {name}",
+      "pageTitleWithId": "Gyűjtemény #{id}",
+      "editCollection": "Gyűjtemény szerkesztése",
+      "showControlsAria": "Gyűjteményvezérlők megjelenítése",
+      "loadError": "Nem sikerült betölteni a gyűjteményt",
+      "toast": {
+        "removed": "{count, plural, =0 {Egyetlen könyv se lett eltávolítva a gyűjteményből} one {Egy könyv eltávolítva a gyűjteményből} other {# könyv eltávolítva a gyűjteményből}}",
+        "removeFailed": "Nem sikerült eltávolítani a könyveket a gyűjteményből"
+      },
+      "empty": {
+        "noSearchMatch": "Egyetlen könyv sem felel meg a keresésnek",
+        "noSearchMatchHint": "Próbálkozz egy másik keresőszóval, vagy töröld a keresést.",
+        "noBooks": "Nincsenek könyvek ebben a gyűjteményben",
+        "noBooksHint": "Válassz ki könyveket a könyvtáradból, és add hozzá őket itt."
+      }
     },
     "library": {
+      "title": "Könyvtár",
+      "pageTitle": "Könyvtár · {name}",
+      "pageTitleWithId": "Könyvtár #{id}",
+      "filterRules": "Szűrési szabályok",
+      "saveAsSmartScope": "Mentés okosgyűjteményként",
+      "saveScope": "Gyűjtemény mentése",
+      "saveAsSmartScopeTooltip": "Szűrő mentés nevesített okosgyűjteményként",
+      "saved": "Mentve",
+      "saveFilter": "Szűrő mentése",
+      "filterSaved": "Szűrő mentve",
+      "saveFilterTooltip": "Szűrő mentése ehhez a könyvtárhoz",
+      "removeSavedFilter": "Mentett szűrő eltávolítása",
       "empty": {
-        "clearFilters": "Szűrők törlése"
+        "noFilterMatch": "Egyetlen könyv sem felel meg a szűrőknek",
+        "noFilterMatchHint": "Próbáld meg módosítani vagy törölni a szűrőket több könyv megjelenítéséhez.",
+        "clearFilters": "Szűrők törlése",
+        "scanning": "A könyvtárad ellenőrzése folyamatban...",
+        "scanningHint": "A könyvek a felkutatásuk ütemében fognak itt megjelenni.",
+        "emptyLibrary": "A könyvtárad üres",
+        "emptyLibraryHint": "Amint hozzáadsz könyveket ehhez a könyvtárhoz, azok meg fognak itt jelenni."
+      },
+      "querySelection": {
+        "loadedSelected": "{selected}/{total} betöltött könyv kiválasztva.",
+        "selectAllMatching": "Mind a(z) {total} egyező könyv kiválasztása"
       }
     },
     "smartScope": {
+      "title": "OkosGyűjtemény",
+      "pageTitle": "OkosGyűjtemény · {name}",
+      "pageTitleWithId": "OkosGyűjtemény #{id}",
+      "defaultName": "Okosgyűjtemény",
+      "filter": "Szűrő",
+      "edit": "Okosgyűjtemény szerkesztése",
+      "koboSync": {
+        "label": "Szinkronizálás a Kobommal",
+        "enabledHint": "Az ebben a megosztott okosgyűjteményben lévő könyvek szinkronizálódnak a Kobo eszközöddel. Kapcsold ki a szinkronizálás leállításához.",
+        "disabledHint": "Kapcsold be az ebben a megosztott okosgyűjteményben lévő könyvek Kobo eszközödre való szinkronizálásához."
+      },
+      "showControlsAria": "Okosgyűjtemény vezérlőinek megjelenítése",
+      "hideFilter": "Szűrő elrejtése",
+      "showFilter": "Szűrő megjelenítése",
+      "confirmDelete": "Megerősítés?",
+      "loadError": "Nem sikerült betölteni ezt az OkosGyűjteményt",
       "toast": {
         "deleted": "\"{name}\" törölve",
-        "deleteFailed": "\"{name}\" törlése sikertelen"
+        "deleteFailed": "\"{name}\" törlése sikertelen",
+        "koboSyncEnabled": "A(z) „{name}” mostantól szinkronizálódik a Kobo-val",
+        "koboSyncDisabled": "A(z) „{name}” szinkronizálása a Kobo-val leállt",
+        "koboSyncFailed": "Nem sikerült frissíteni a(z) „{name}” Kobo-szinkronizációját"
+      },
+      "empty": {
+        "noRules": "Nincsenek beállított szabályok",
+        "noRulesHint": "Nyisd meg a szerkesztőt annak meghatározásához, hogy mely könyvek jelenjenek meg ebben az OkosGyűjteményben a szűrési és rendezési szabályok segítségével.",
+        "configure": "OkosGyűjtemény beállítása",
+        "noMatch": "Egyetlen könyv sem felel meg ennek az OkosGyűjteménynek",
+        "noMatchHint": "Próbáld meg módosítani a szűrési szabályokat.",
+        "edit": "OkosGyűjtemény szerkesztése"
       }
+    },
+    "podcastScope": {
+      "title": "Okos lejátszólista",
+      "entity": "okos lejátszólista",
+      "loadFailed": "Nem sikerült betölteni a lejátszólista epizódjait.",
+      "loadMoreFailed": "Nem sikerült több epizódot betölteni.",
+      "retry": "Újra",
+      "editRules": "Szabályok szerkesztése",
+      "saveFailed": "Nem sikerült elmenteni a lejátszólista szabályait.",
+      "deleteFailed": "Nem sikerült törölni a lejátszólistát.",
+      "empty": {
+        "title": "Nincsenek megfelelő epizódok",
+        "hint": "Módosítsd a szabályokat több epizód megjelenítéséhez."
+      }
+    },
+    "podcastCollection": {
+      "title": "Podcast-gyűjtemény",
+      "entity": "podcast-gyűjtemény",
+      "loadFailed": "Nem sikerült betölteni a gyűjteményben lévő műsorokat.",
+      "remove": "Eltávolítás",
+      "removeAria": "{name} eltávolítása ebből a gyűjteményből",
+      "removed": "{name} eltávolítva",
+      "removeFailed": "Nem sikerült eltávolítani a műsort.",
+      "empty": {
+        "title": "Még nincsenek műsorok",
+        "hint": "Adj hozzá műsorokat ehhez a gyűjteményhez egy podcast-könyvtárból."
+      },
+      "loadMoreFailed": "Nem sikerült több műsort betölteni.",
+      "retry": "Újra"
     }
   },
+  "whatsNew": {
+    "title": "Újdonságok",
+    "subtitle": "Minden úton lévő, a legújabbak elől.",
+    "versionPrefix": "{version} verzió",
+    "newUpdates": "{count, plural, =0 {nincs új frissítés} one {egy új frissítés} other {# új frissítés}}",
+    "remindLater": "Emlékeztessen később",
+    "gotIt": "Értem",
+    "latest": "Legújabb",
+    "fullChangelog": "Teljes változásnapló",
+    "seeAllReleases": "Minden kiadás megtekintése",
+    "versions": "Verziók",
+    "currentVersion": "Jelenlegi verzió",
+    "youreHere": "Itt vagy",
+    "searchPlaceholder": "Kiadások keresése...",
+    "noReleasesFound": "Nincsenek kiadások.",
+    "noHighlights": "Ehhez a kiadáshoz nincsenek kiemelt újdonságok.",
+    "showChangelog": "A teljes változásnapló megjelenítése",
+    "hideChangelog": "A teljes változásnapló elrejtése",
+    "openOnGitHub": "Megnyitás a GitHubon",
+    "loadMore": "Több betöltése",
+    "loadingMore": "Betöltés…",
+    "loadFailed": "Nem sikerült betölteni a kiadásokat",
+    "loadMoreFailed": "Nem sikerült több kiadást betölteni. Kérjük, próbáld meg újra.",
+    "loadErrorHint": "Nem sikerült betölteni a kiadásokat. Ellenőrizd a kapcsolatot, majd próbáld meg újra.",
+    "retry": "Újra",
+    "imageViewer": "Képmegjelenítő",
+    "closeImage": "Kép bezárása",
+    "previousImage": "Előző kép",
+    "nextImage": "Következő kép"
+  },
   "podcast": {
+    "actions": {
+      "add": "Hozzáad",
+      "cancel": "Mégse",
+      "save": "Mentés",
+      "play": "Lejátszás",
+      "pause": "Szünet",
+      "playEpisode": "Epizód lejátszása",
+      "listen": "Hallgatás",
+      "remove": "Eltávolítás",
+      "episodeActions": "Epizódműveletek",
+      "removeFromQueue": "Eltávolítás a várólistáról",
+      "addToQueue": "Várólistára tesz",
+      "playNext": "Következő lejátszása",
+      "retryDownload": "Letöltés újrapróbálása",
+      "download": "Letöltés",
+      "removeDownload": "Letöltés eltávolítása",
+      "markUnplayed": "Megjelölés lejátszatlanként",
+      "markPlayed": "Megjelölés lejátszottként",
+      "follow": "Követés",
+      "unfollow": "Kikövetés",
+      "followPodcast": "Podcast követése",
+      "unfollowPodcast": "Podcast kikövetése",
+      "resume": "Folytatás",
+      "playLatest": "Legutolsó lejátszása",
+      "moveToTop": "Mozgatás felülre",
+      "playFromHere": "Lejátszás innen",
+      "moveDown": "Mozgás le",
+      "clearQueue": "Lejátszási sor törlése",
+      "clearAll": "Összes törlése",
+      "search": "Keresés",
+      "clearPlayed": "Lejátszottak törlése",
+      "downloadSelected": "Kiválasztottak letöltése",
+      "removeSelectedDownloads": "Kiválasztott letöltések eltávolítása",
+      "markSelectedPlayed": "Kiválasztottak megjelölése lejátszottként",
+      "removeSelectedFromQueue": "Kiválasztottak eltávolítása a sorból",
+      "selectEpisode": "{title} Kiválasztása",
+      "playNamedEpisode": "{title} lejátszása",
+      "listenToEpisode": "{title} hallgatása",
+      "resumeEpisode": "{title} folytatása",
+      "playLatestEpisode": "{title} utolsó epizódjának lejátszása",
+      "episodeDetails": "Epizód részletei",
+      "episodeDetailsNamed": "{title} epizódjának részletei",
+      "editEpisodeMetadata": "Metaadatok szerkesztése",
+      "openFullPlayer": "Teljes lejátszó megnyitása",
+      "reorderEpisode": "{title} átrendezése",
+      "playAll": "Összes lejátszása",
+      "resumeNamed": "{title} folytatása",
+      "queueAll": "Mind a várólistára",
+      "markAllPlayed": "Összes megjelölése lejátszottként",
+      "latestCount": "Legutóbbi {count}",
+      "downloadLatest": "Legújabb letöltése",
+      "removeAllDownloads": "Összes letöltés törlése",
+      "pin": "Rögzítés",
+      "unpin": "Rögzítés feloldása",
+      "pinEpisode": "Epizód rögzítése",
+      "unpinEpisode": "Epizód rögzítésének feloldása"
+    },
+    "status": {
+      "nowPlaying": "Most játszott",
+      "paused": "Szüneteltetve",
+      "downloaded": "Letöltve",
+      "downloadQueued": "Letöltés sorba állítva",
+      "downloading": "Letöltés",
+      "downloadFailed": "Letöltés sikertelen",
+      "unavailable": "Nem elérhető",
+      "played": "Lejátszva",
+      "following": "Követve",
+      "playbackProgress": "Lejátszási folyamat",
+      "downloadProgress": "Letöltési folyamat",
+      "removedFromFeed": "Már nem szerepel a csatornában",
+      "inQueue": "Várólistán",
+      "feedFailing": "A csatorna hibás",
+      "archived": "Archiválva",
+      "localShow": "Helyi",
+      "localShowDescription": "Ez a műsor nem rendelkezik csatornával. Az epizódjait a mappájában található fájlok alkotják.",
+      "missing": "Hiányzik",
+      "missingDescription": "Ez a műsor nem található meg a lemezen. A rendszer megőrzi a bejegyzést arra az esetre, ha a mappa visszakerülne; a végleges eltávolításhoz töröld a műsort."
+    },
+    "selection": {
+      "select": "Kiválaszt",
+      "selectAll": "Összes kiválasztása",
+      "count": "{count} kiválasztva",
+      "toggleShow": "{title} kiválasztása"
+    },
+    "bulkDelete": {
+      "title": "Kiválasztott műsorok törlése",
+      "action": "Törlés",
+      "confirmPhrase": "DELETE",
+      "description": "Ez véglegesen töröl {count} műsort és minden hozzájuk kapcsolódó adatot a BookOrbitból, beleértve a hallgatási előzményeidet is. Ez a művelet nem vonható vissza.",
+      "descriptionWithFiles": "Ez véglegesen töröl {count} műsort, minden hozzájuk kapcsolódó adatot a BookOrbitból, valamint {size} letöltött fájlt. A saját mappáidat nem érinti a művelet. Ez a művelet nem vonható vissza.",
+      "queued": "{count} másor törlése",
+      "queuedWithFailures": "{count} műsor törlése, {failed} nem indítható el",
+      "errors": {
+        "prepare": "Nem sikerült meghatározni, hogy a műsorok törlése milyen adatokat távolítana el",
+        "delete": "Nem sikerült törölni a kiválasztott műsorokat"
+      }
+    },
+    "views": {
+      "queue": "Várólista"
+    },
     "labels": {
+      "episodeCount": "{count} epizód",
+      "unknownPublisher": "Ismeretlen kiadó",
       "durationHoursMinutes": "{hours}ó {minutes}p",
       "durationMinutes": "{minutes}p",
-      "durationSeconds": "{seconds}mp"
+      "durationSeconds": "{seconds}mp",
+      "durationUnavailable": "Az időtartam nem érhető el",
+      "unknownDate": "Ismeretlen dátum",
+      "seasonEpisode": "S{season} E{episode}",
+      "season": "S{season}",
+      "episode": "E{episode}",
+      "episodeTypeTrailer": "Bemutató",
+      "episodeTypeBonus": "Bónusz",
+      "pinnedHint": "A kitűzött epizódok védettek a tárhely-karbantartási törléssel szemben.",
+      "explicit": "Szókimondó",
+      "lastListened": "Hallgatva {time}",
+      "timeLeft": "{time} van vissza",
+      "remainingClock": "-{time}",
+      "pinnedEpisode": "Kitűzött epizód",
+      "newEpisodeCount": "{count} új",
+      "unplayedShort": "{count} lejátszatlan"
+    },
+    "acquisition": {
+      "title": "Automatikus letöltések",
+      "never": "Soha",
+      "newEpisodes": "Új epizódok",
+      "recentEpisodes": "Legutóbbi epizódok",
+      "maximumNewest": "Legfrissebb epizódok maximális száma",
+      "publishedWithinDays": "Nemrég megjelent (nap)",
+      "remoteDescription": "Alapértelmezés szerint online streameléssel játssza le az epizódokat. Az egyes epizódokat ettől függetlenül letöltheted offline hallgatáshoz.",
+      "newestDescription": "Automatikusan letölti a kiválasztott számú legfrissebb epizódot, amely még nem tárolt vagy nem szerepel a várólistán. A szabály mentése a csatornán már meglévő epizódokat is ellenőrzi.",
+      "windowDescription": "Letölti az ebben az időszakban megjelent meglévő és újonnan észlelt epizódokat. A közzétételi dátummal nem rendelkező epizódok kihagyásra kerülnek. Ezen szabály módosítása nem távolítja el a korábbi letöltéseket, de a tárhely-karbantartás törölheti a nem kitűzött letöltéseket, ha helyre van szükség."
+    },
+    "cleanup": {
+      "title": "Törlés meghallgatás után",
+      "keep": "Letöltések megőrzése",
+      "afterFinished": "Törlés befejezés után",
+      "delayHours": "Törlés ennyi órával azután, hogy az utolsó hallgató is befejezi",
+      "keepDescription": "A letöltött epizódok mindaddig a lemezen maradnak, amíg a tárhely-karbantartásnak nincs szüksége a helyre.",
+      "afterFinishedDescription": "Törli a letöltött epizódot, amint minden olyan hallgató befejezte, aki elindította, és a várakozási idő letelt. Ha ezen az időablakon belül lejátszatlannak jelölöd, kitűzöd vagy visszahelyezed a várólistára, a törlés megszakad."
+    },
+    "player": {
+      "miniPlayer": "Podcast mini-lejátszó",
+      "openFullPlayer": "Teljes lejátszó megnyitása",
+      "expandMiniPlayer": "Mini-lejátszó kibontása",
+      "collapseMiniPlayer": "Mini-lejátszó összecsukása",
+      "stopAndClose": "Lejátszó leállítása és bezárása",
+      "sleepActive": "Elalváskapcsoló aktív: {value}",
+      "previousEpisode": "Előző epizód",
+      "nextEpisode": "Következő epizód",
+      "backSeconds": "Vissza {count} másodpercet",
+      "forwardSeconds": "Előre {count} másodpercet",
+      "episodePosition": "Epizódpozíció",
+      "toggleTimeDisplay": "Váltás a hátralévő és a teljes idő között",
+      "positionValue": "{elapsed}/{duration} eltelt",
+      "playingAnnouncement": "A(z) {title} lejátszása innen: {podcast}",
+      "pausedAnnouncement": "A(z) {title} megállítva innen: {podcast}",
+      "volume": "Hangerő",
+      "positionValueWithChapter": "{elapsed}/{duration} eltelt, fejezet {chapter}"
+    },
+    "bookmarks": {
+      "title": "Könyvjelzők",
+      "empty": "Nincsenek könyvjelzők",
+      "closeForm": "Könyvjelző-űrlap bezárása",
+      "saveAt": "Mentés ennél az időpontnál: {time}",
+      "titlePlaceholder": "Könyvjelző címe",
+      "notePlaceholder": "Opcionális megjegyzés",
+      "save": "Könyvjelző mentése",
+      "edit": "Könyvjelző szerkesztése",
+      "delete": "Könyvjelző törlése",
+      "titleLabel": "Könyvjelző címe",
+      "noteLabel": "Könyvjelző megjegyzés",
+      "editTitleLabel": "Könyvjelző címének szerkesztése",
+      "editNoteLabel": "Könyvjelző megjegyzésének szerkesztése",
+      "defaultTitle": "Könyvjelző ennél az időpontnál: {time}"
+    },
+    "library": {
+      "episodes": "Epizódok",
+      "shows": "Műsorok",
+      "latest": "Legújabb",
+      "inProgress": "Folyamatban",
+      "unplayed": "Lejátszatlan",
+      "finished": "Befejezve",
+      "health": "Állapot",
+      "search": "Podcastek keresése",
+      "clearSearch": "Podcastkeresés törlése",
+      "import": "Importálás",
+      "importOpml": "OPML importálása",
+      "importDescription": "OPML-feliratkozásilista importálása",
+      "addFeed": "Csatorna hozzáadása",
+      "settings": "Podcast beállítások",
+      "views": "Podcast-nézetek",
+      "loading": "Podcastek betöltése...",
+      "noMatchingShows": "Nincsenek megfelelő műsorok",
+      "ready": "A podcast-könyvtárad elkészült",
+      "tryDifferentSearch": "Próbálj meg egy másik címet vagy kiadót.",
+      "readyDescription": "Adj hozzá egy RSS-csatornát, vagy importálj egy OPML-fájlt a hallgatási könyvtárad felépítésének megkezdéséhez.",
+      "loadMoreShows": "Több műsor betöltése",
+      "upNext": "Következik",
+      "emptyQueue": "A várólistád üres",
+      "emptyQueueDescription": "Adj hozzá egy epizódot egy műsorból, hogy a következő hallgatnivalód mindig könnyen elérhető legyen.",
+      "loadMore": "Több betöltése",
+      "lastSuccess": "Utoljára sikerült",
+      "failureCount": "{count} hiba: {error}",
+      "unknownError": "Ismeretlen hiba",
+      "healthy": "Egészséges",
+      "noFeeds": "Nincsenek figyelhető csatornák",
+      "noFeedsDescription": "Adj hozzá egy podcast-csatornát, hogy itt láthasd a frissítési állapotát.",
+      "noMatchingEpisodes": "Nincsenek megfelelő epizódok",
+      "noEpisodesLatest": "Még nincsenek epizódok",
+      "noEpisodesDownloaded": "Nincsenek letöltött epizódok",
+      "noEpisodesInProgress": "Nincsenek folyamatban lévő epizódok",
+      "noEpisodesUnplayed": "Nincsenek lejátszatlan epizódok",
+      "noEpisodesFinished": "Nincsenek befejezett epizódok",
+      "noEpisodesPinned": "Nincsenek kitűzött epizódok",
+      "pinned": "Kitűzve",
+      "continueListening": "Hallgatás folytatása",
+      "viewAllContinue": "Összes megtekintése",
+      "noEpisodesDescription": "A műsoraid új epizódjai itt fognak megjelenni.",
+      "loadMoreEpisodes": "Több epizód betöltése",
+      "addPodcastFeed": "Podcast-csatorna hozzáadása",
+      "rssUrl": "RSS-csatorna URL-címe",
+      "preview": "Előnézet",
+      "addPodcast": "Podcast hozzáadása",
+      "storage": "Podcast-tárhely",
+      "currentlyUsing": "Jelenleg használatban: {size}",
+      "libraryQuotaGb": "Könyvtárkvóta (GB)",
+      "freeSpaceReserveGb": "Szabad tárhely tartaléka (GB)",
+      "defaultRefreshMinutes": "Alapértelmezett frissítés (perc)",
+      "finishRemainingSeconds": "Befejezés ennyi másodperccel a vége előtt",
+      "exportOpml": "OPML exportálása",
+      "exportDescription": "Ezen könyvtár exportálása OPML-feliratkozásilistaként",
+      "importOpmlDescription": "Válassz ki egy OPML-fájlt és a letöltési szabályzatot, amelyet a benne lévő összes csatornára alkalmazni szeretnél.",
+      "opmlFile": "OPML fájl",
+      "chooseOpmlFile": "Fájl kiválasztása",
+      "noOpmlFileChosen": "Nincs fájl kiválasztva",
+      "importPolicyHint": "Ez minden importált csatornára érvényes. Később műsoronként egyedileg módosíthatod.",
+      "searchShows": "Műsorok keresése",
+      "searchEpisodes": "Epizódok keresése",
+      "searchHealth": "Csatornaállapot keresése",
+      "manageFeeds": "Csatornák kezelése",
+      "feedHealth": "Csatorna állapota",
+      "feedsNeedAttention": "Vannak figyelmet igénylő csatornák",
+      "episodeFilters": "Epizód szűrők",
+      "previewing": "Előnézet...",
+      "addingPodcast": "Hozzáadás...",
+      "openShow": "{title} megnyitása",
+      "retryFeed": "{title} frissítése",
+      "reparseFeed": "A(z) „{title}” tárolt csatornájának újraértelmezése",
+      "confirmClearQueue": "Eltávolítod az összes várólistán lévő epizódot?",
+      "importProgress": "Haladás importálása",
+      "jobsQueued": "{count} a várólistán",
+      "jobsProcessing": "{count} feldolgozás alatt",
+      "jobsFailed": "{count} sikertelen",
+      "retryUnhealthy": "Hibás csatornák újrapróbálása",
+      "followedOnly": "Csak követettek",
+      "queueDuration": "{duration} összesen",
+      "confirmClearPlayed": "Eltávolítod az összes lejátszott epizódot a várólistáról?",
+      "searchQueue": "Keresés a várólistán",
+      "noMatchingQueueEpisodes": "Nincsenek megfelelő várolistán lévő epizódok",
+      "showAllEpisodes": "Összes epizód megjelenítése",
+      "browseShows": "Műsorok böngészése",
+      "browseEpisodes": "Epizódok böngészése",
+      "allLoaded": "Mind a(z) {total} betöltve",
+      "addFeedDescription": "Keress a podcast-könyvtárban, vagy illeszd be egy RSS-csatorna URL-címét, tekintsd meg a műsor előnézetét, majd válaszd ki, hogyan történjen az epizódok beszerzése.",
+      "searchDirectory": "Keresés a podcast-könyvtárban",
+      "searchDirectoryPlaceholder": "Műsor vagy kiadó neve",
+      "searchDirectoryEmpty": "Egyetlen műsor sem felel meg a keresésnek a könyvtárban.",
+      "searchDirectoryHint": "Válassz ki egy találatot az előnézet megtekintéséhez, vagy illeszd be a csatorna URL-címét alább.",
+      "inLibrary": "A könyvtárban",
+      "openExistingShow": "{title} megnyitása, már szerepel a könyvtáradban",
+      "pasteFeedUrl": "Vagy illeszd be egy csatorna URL-címét",
+      "selectAllLoaded": "Az összes betöltött epizód kiválasztása",
+      "reorderLoadedHint": "Az átrendezés az eddig betöltött epizódokra vonatkozik.",
+      "retryUnhealthyLoaded": "A betöltött hibás csatornák újrapróbálása",
+      "manageFeedsUnhealthy": "Csatornák kezelése: a hibás csatornák figyelmet igényelnek",
+      "localImportTitle": "Podcastok importálása a mappáidból",
+      "localImportDoneTitle": "Importálás befejezve",
+      "localImportCounting": "A mappáid átvizsgálása…",
+      "localImportProgress": "{processed}/{total} fájl",
+      "localImportDone": "{processed} fájl importálva",
+      "importingTitle": "A podcastjaid importálása",
+      "importingHint": "A műsorok a fájljaik beolvasásának ütemében fognak itt megjelenni."
+    },
+    "import": {
+      "title": "Helyi fájlok importálása",
+      "description": "Párosítsd a könyvtár mappájában lévő hangfájlokat a követett csatornák epizódjaival.",
+      "placementHint": "Először helyezd a fájlokat ezen könyvtár mappájába. A BookOrbit a jelenlegi helyükön veszi használatba őket: semmi sem kerül másolásra, átnevezésre vagy áthelyezésre.",
+      "scan": "Fájlok beolvasása",
+      "running": "Beolvasás...",
+      "progress": "{current}/{total} fájl beolvasva",
+      "apply": "A megfeleltetett fájlok importálása",
+      "applyWithChoices": "A megfeleltetett fájlok és a beállítások importálása",
+      "applied": "{count} fájl használatba véve.",
+      "quota": "{adopt} vár használatba vételre, a kvótából még {headroom} szabad hely maradt",
+      "truncated": "Néhány lista rövidítve jelenik meg. A fenti darabszámok a teljes mennyiséget mutatják.",
+      "chooseEpisode": "Válassz epizódot",
+      "leaveUnresolved": "Halasztás későbbre",
+      "noDate": "Nincs dátum",
+      "fileCount": "{count} fájl",
+      "subscribe": "Feliratkozás",
+      "subscribed": "Feliratkozva",
+      "suggestedFeedsHint": "Ezek a mappák olyan csatornára hivatkoznak, amelyet még nem követsz. Iratkozz fel, majd indítsd újra a beolvasást a fájljaik megfeleltetéséhez.",
+      "rescanHint": "Indítsd újra a beolvasást a frissen követett csatornák mappáiban lévő fájlok megfeleltetéséhez.",
+      "duplicateDiffers": "Ehhez az epizódhoz már egy másik fájl van csatolva",
+      "duplicateSame": "Ez az epizód már rendelkezik ezzel a fájllal",
+      "unreadableFolders": "{count} mappát nem sikerült beolvasni.",
+      "groups": {
+        "matched": "Egyező",
+        "ambiguous": "Döntést igényel",
+        "unmatched": "Nincs találat",
+        "duplicates": "Már csatolva",
+        "skipped": "Átugorva",
+        "suggestedFeeds": "Feliratkozásra váró csatornák",
+        "unclaimedFolders": "Csatorna nélküli mappák"
+      },
+      "signals": {
+        "episode_guid": "Epizódazonosító a fájl címkéiben",
+        "episode_id_suffix": "BookOrbit-azonosító a fájlnévben",
+        "enclosure_file_name": "A fájlnév megegyezik a csatornáéval",
+        "title_and_date": "Cím és dátum",
+        "title_and_duration": "Cím és hossz",
+        "manual": "Kézi választás"
+      },
+      "scopes": {
+        "request": "A kiválasztott műsor",
+        "folder_suffix": "Mappanév megjelenítése",
+        "feed_url_tag": "Csatornacím a fájl címkéiben",
+        "feed_sidecar": "Mentett csatorna a mappában",
+        "title_similarity": "Hasonló műsorcím"
+      }
     },
     "fullPlayer": {
       "startingPlayback": "Lejátszás indítása"
     }
+  },
+  "titles": {
+    "smartScope": "OkosGyűjtemény"
   },
   "tts": {
     "sleepTimer": {

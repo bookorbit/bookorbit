@@ -5642,6 +5642,20 @@
           "searchInterruptedHint": "请重试，或缩小搜索范围。",
           "searchPrompt": "在上方搜索，然后点击结果开始比较元数据。"
         },
+        "match": {
+          "mediumAudiobook": "有声书",
+          "mediumEbook": "电子书",
+          "query": {
+            "label": "元数据搜索",
+            "title": "标题",
+            "author": "作者",
+            "isbn": "ISBN",
+            "edited": "已编辑查询"
+          },
+          "sources": {
+            "heading": "来源"
+          }
+        },
         "writeAndRename": "写入文件并重命名",
         "writeAndRenameShort": "写入并重命名",
         "identityCard": "身份信息",

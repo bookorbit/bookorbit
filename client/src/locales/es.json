@@ -2324,6 +2324,7 @@
         "tokenLibrary": "Nombre de la biblioteca",
         "tokenOriginalFilename": "Nombre de archivo original (sin extensión)",
         "tokenExtension": "Extensión de archivo (sin punto)",
+        "tokenReadaloud": "La palabra en voz alta para un EPUB con superposiciones multimedia",
         "patternHelpIntro": "Los patrones usan tokens como {titleToken} y {authorsToken}, además de modificadores y segmentos opcionales.",
         "browseTokensAndExamples": "Explorar tokens y ejemplos",
         "subtitleShort": "Patrones de carpetas y nombres de archivo para los archivos almacenados.",
@@ -2386,6 +2387,9 @@
         "resultCopyFailed": "Error al copiar el resultado resuelto",
         "sampleBookNote": "Libro de ejemplo usado para cada vista previa",
         "missingMetadata": "Si faltan metadatos",
+        "readaloudComparison": "Comparación en voz alta",
+        "readaloudEpub": "EPUB en voz alta",
+        "plainEpub": "EPUB simple",
         "caseNoSeriesLabel": "Ninguna serie",
         "caseNoYearLabel": "Sin año",
         "caseNoAuthorLabel": "Sin autor",
@@ -5641,6 +5645,163 @@
           "searchInterruptedHint": "Inténtelo de nuevo, o limite el ámbito de búsqueda.",
           "searchPrompt": "Busque arriba y luego haga clic en un resultado para comenzar a comparar metadatos."
         },
+        "match": {
+          "sheetDescription": "Buscar proveedores de metadatos y elegir qué copiar en este libro.",
+          "mediumAudiobook": "Audiolibro",
+          "mediumEbook": "E-book",
+          "query": {
+            "label": "Búsqueda de metadatos",
+            "title": "Título",
+            "author": "Autor",
+            "isbn": "ISBN",
+            "edited": "Consulta editada",
+            "useBookDetails": "Usar detalles del libro"
+          },
+          "sources": {
+            "heading": "Fuentes",
+            "allEnabledHint": "{count, plural, one {# fuente. Mejor para una búsqueda manual.} other {# fuentes. Mejor para una búsqueda manual.}}",
+            "fieldRulesHint": "{count, plural, one {# fuente, el único uso de la búsqueda automática.} other {# fuentes, los usos de la búsqueda automática.}}",
+            "outsideRules": "{providers} {count, plural, one {está habilitado, pero no está incluido en las reglas de campos, por lo que la obtención automática lo omite.} other {están habilitados, pero no están incluidos en las reglas de campos, por lo que la obtención automática los omite.}}",
+            "manualOnly": "{providers}: búsqueda manual solamente, no utilizada por la búsqueda automática.",
+            "count": "{provider}: {count, plural, =0 {sin resultados} one {# resultado} other {# resultados}}",
+            "searching": "{provider}: buscando",
+            "stopped": "{provider}: detenido antes de terminar"
+          },
+          "results": {
+            "label": "Coincidencias",
+            "best": "Mejores coincidencias",
+            "otherEditions": "Otras ediciones",
+            "otherBooks": "Probablemente diferentes libros",
+            "stillSearching": "Aún buscando",
+            "linked": "Vinculado",
+            "linkedHint": "Este registro ya está vinculado al libro",
+            "isbn": "Coincidencia ISBN",
+            "fills": "+{count} vacío",
+            "fillsHint": "{count, plural, one {campo vacío} other {campos vacíos}}",
+            "differ": "{count} difieren",
+            "differHint": "{count, plural, one {# campo difiere del libro} other {# campos diferentes del libro}}",
+            "inSync": "En sincronización",
+            "inSyncHint": "Nada de esto cambiaría el libro",
+            "differentAuthor": "Autor diferente",
+            "titleDiffers": "Difiere el título",
+            "sparse": "Disperso",
+            "sparseHint": "{count, plural, one {Solo # campo rellenado} other {Sólo # campos rellenados}}",
+            "staged": "{count, plural, one {# cambios realizados a partir de este resultado} other {# cambios realizados a partir de este resultado}}",
+            "noMatches": "No hay coincidencias para esta consulta",
+            "noMatchesHint": "{count, plural, one {La fuente respondió sin nada.} other {# fuentes respondidas sin nada.}} Mida la búsqueda e inténtalo de nuevo.",
+            "searchTitleOnly": "Buscar solamente títulos",
+            "prompt": "Introduzca un título o ISBN para buscar.",
+            "mayBeMissing": "Puede que falten los resultados.",
+            "retry": "Reintentar {provider}",
+            "pages": "{count, plural, one {# página} many {# de páginas} other {# páginas}}",
+            "fetched": "Obtenido"
+          },
+          "tier": {
+            "strong": "Coincidencia alta",
+            "possible": "Posible coincidencia",
+            "weak": "Coincidencia improbable"
+          },
+          "compare": {
+            "label": "Comparar",
+            "backToMatches": "Regresar a coincidencias",
+            "previous": "Resultado anterior",
+            "next": "Resultado siguiente",
+            "position": "{index} de {total}",
+            "linkedToBook": "Enlazado a este libro",
+            "sameTitleAuthor": "Mismo título y autor",
+            "streaming": "Mostrando la mejor coincidencia hasta ahora. Esperando en {providers}.",
+            "rows": "Filas",
+            "differences": "Diferencias",
+            "allFields": "Todos los campos",
+            "fillEmpty": "{count, plural, =0 {No hay campos vacíos} one {Rellena # vacío} other {Rellena # vacío}}",
+            "takeAll": "{count, plural, =0 {Nada que usar} one {Usa #} other {Usa todo #}}",
+            "more": "Más acciones",
+            "clearAll": "Limpiar todas las selecciones",
+            "clearAllHint": "Volver a los valores actuales del libro.",
+            "field": "Campo",
+            "pickTitle": "Selecciona una coincidencia para comparar",
+            "pickHint": "Elija un resultado. Sus campos se alinean con el libro para que pueda mantener o reemplazar cada uno.",
+            "noneTitle": "Aún no hay nada que comparar",
+            "noneHint": "Cuando una búsqueda encuentra coincidencias, la mejor se abre aquí junto a lo que {title} tiene actualmente.",
+            "allMatch": "Cada campo coincide con el libro. Cambie a todos los campos para verlos.",
+            "toReview": "{count, plural, =0 {nada para renombrar} one {# para renombrar} other {# para renombrar}}",
+            "stagedInSection": "{count} preparados"
+          },
+          "sections": {
+            "identity": "Identidad",
+            "description": "Descripción",
+            "publication": "Publicación",
+            "series": "Serie",
+            "genres": "Géneros",
+            "comics": "Créditos de cómics",
+            "identifiers": "Identificadores",
+            "ratings": "Calificación de la comunidad"
+          },
+          "kind": {
+            "fill": "Rellenar vacío",
+            "change": "Diferentes",
+            "same": "Iguales",
+            "missing": "No proporcionado"
+          },
+          "minor": {
+            "reordered": "Reordenado",
+            "formatting": "Solo formato",
+            "punctuation": "Puntuación",
+            "capitalization": "Primera letra en mayúsculas",
+            "yearOnly": "Solo año",
+            "addsDay": "Añade el día",
+            "languageCode": "Mismo idioma",
+            "ratingCount": "Contar solo"
+          },
+          "decision": {
+            "keep": "Mantener",
+            "use": "Uso",
+            "merge": "Combinar",
+            "replace": "Reemplazar",
+            "alreadyMatches": "Ya coincide",
+            "nothingToApply": "Nada que aplicar",
+            "lockedHint": "Desbloquéalo en el editor para cambiarlo.",
+            "usingFrom": "Usando el valor de",
+            "switchTo": "Cambiar a {provider}"
+          },
+          "value": {
+            "empty": "Vacío",
+            "notProvided": "No proporcionado",
+            "showAll": "Mostrar todas las palabras {count}",
+            "otherValues": "{count, plural, one {# otro valor} other {# otros valores}}",
+            "otherValuesHeading": "{field} de otros resultados",
+            "otherValuesHint": "Al elegir uno, se prepara para este campo",
+            "sameAsCurrent": "Igual que actual",
+            "useThis": "Usar este",
+            "using": "En uso"
+          },
+          "providerRating": "Valoración de {provider}",
+          "cover": {
+            "slotAudio": "Ranura de audiolibro, cuadrado",
+            "slotBook": "Ranura del libro, retrato",
+            "current": "Actual",
+            "staged": "Escalonado",
+            "size": "{width} × {height}",
+            "fits": "Ajustar a la ranura",
+            "portraitInSquare": "Retrato: buzón de letras",
+            "squareInPortrait": "Cuadrado: buzón de letras",
+            "broken": "Apariencia rota",
+            "unknown": "Forma desconocida",
+            "fitShort": "Ajustado",
+            "portraitShort": "Retrato",
+            "squareShort": "Cuadrado",
+            "brokenShort": "Roto",
+            "noCover": "No hay portada en este resultado",
+            "noCurrent": "Todavía no hay portada.",
+            "strip": "Portadas de los resultados coincidentes",
+            "stripMeta": "{count, plural, one {# cubre} other {# cubre}}, encajando primero",
+            "choose": "Elige una portada",
+            "preview": "Vista previa de las portadas a pantalla completa",
+            "previewTitle": "Portadas una al lado de la otra",
+            "previewDescription": "La portada actual junto a la que la sustituiría.",
+            "choice": "Portada de {provider}"
+          }
+        },
         "writeAndRename": "Escribir en archivo y cambiar nombre",
         "writeAndRenameShort": "Escribir y cambiar nombre",
         "identityCard": "Identidad",
@@ -8583,6 +8744,33 @@
           "hintAfter": ").",
           "add": "Añadir",
           "empty": "No se agregaron patrones."
+        },
+        "mode": {
+          "folderHint": "Cada carpeta es un libro. Lo mejor cuando un título mantiene varios formatos juntos, o un audiolibro abarca muchos archivos.",
+          "fileHint": "Cada archivo es su propio libro. Mejor para carpetas planas con un formato por título.",
+          "folderResult": "Un libro con dos formatos",
+          "fileResult": "Tres libros, uno por archivo"
+        },
+        "import": {
+          "title": "Importar",
+          "all": "Todos los formatos",
+          "some": "Solo estos",
+          "groups": {
+            "ebook": "Ebooks",
+            "kindle": "Kindle",
+            "document": "Documentos",
+            "comic": "Cómics",
+            "audio": "Audio"
+          }
+        },
+        "skip": {
+          "title": "Omitir la coincidencia de archivos",
+          "count": "{count, plural, one {# patrón} other {# patrones}}",
+          "hint": "Patrones de cuadros, combinados con caminos dentro de las carpetas de la biblioteca.",
+          "inputLabel": "Patrón a omitir",
+          "placeholder": "Escribe un patrón como **/samples/** y presiona Enter",
+          "placeholderMore": "Añadir otro patrón",
+          "remove": "Eliminar patrón {pattern}"
         }
       },
       "metadata": {
@@ -8595,7 +8783,27 @@
           "hint": "Cuando un libro tiene varios formatos, se prefiere el formato más alto de la lista."
         },
         "moveUp": "Mover {item} arriba",
-        "moveDown": "Mover {item} abajo"
+        "moveDown": "Mover {item} abajo",
+        "primary": {
+          "title": "Archivo principal",
+          "hint": "Cuando un libro tiene varios archivos, el primer formato en este pedido se convierte en su archivo principal: el que abre primero y proporciona los detalles del libro. Arrastra una fila, o usa las flechas.",
+          "reset": "Restablecer orden",
+          "first": "Primera elección",
+          "notImported": "No importado",
+          "notHeld": "{count, plural, one {# formato que esta librería no mantiene su lugar predeterminado después de estos.} other {# formatos de esta biblioteca no mantienen su orden predeterminado después de estos.}}",
+          "moreBelow": "{count, plural, one {# más formato sigue en este pedido.} other {# más formatos siguen en este orden.}}",
+          "showingAll": "Mostrar todos los formatos.",
+          "showFewer": "Mostrar menos"
+        },
+        "source": {
+          "title": "Los detalles del libro provienen de",
+          "embeddedTitle": "Etiquetas en el archivo del libro",
+          "embeddedHint": "Leer desde el archivo principal",
+          "opfTitle": "archivo metadata.opf",
+          "opfHint": "Guardado junto al libro por Calibre",
+          "swap": "Intercambiar el orden",
+          "hint": "BookOrbit utiliza el primero que tiene un libro e ignora el otro. Las librerías Calibre normalmente quieren metadata.opf primero."
+        }
       },
       "fileWrite": {
         "maxFileSizeMb": "Tamaño máximo de archivo (MB)",
@@ -8641,7 +8849,17 @@
           "title": "Audio",
           "hint": "Incrusta la portada almacenada en archivos M4B, M4A, MP3 y FLAC.",
           "toggleAria": "Escribir portadas de audio"
-        }
+        },
+        "coverAudioHint": "Escribe también la portada almacenada en el archivo. Los archivos de audio sólo pueden tener una portada.",
+        "audioNeedsCover": "Necesita activar “Incluye imagen de portada”.",
+        "table": {
+          "format": "Formato",
+          "inLibrary": "Aquí",
+          "sizeLimit": "Límite de tamaño"
+        },
+        "sizeLimitAria": "Límite de tamaño {format} en MB",
+        "mb": "MB",
+        "summary": "{count, plural, =0 {No se ha escrito ningún tipo de archivo.} one {# tipo de archivo se ha escrito. Se omitirán los archivos por encima de su límite de tamaño.} other {Se han escrito # tipos de archivos. Se omiten los archivos que superan su límite de tamaño.}}"
       },
       "reading": {
         "readingStart": {
@@ -8652,7 +8870,15 @@
           "title": "Marcar como terminado",
           "hint": "Un libro se marca automáticamente como \"leído\" cuando se alcanza este porcentaje de progreso.",
           "invalidThreshold": "El progreso final debe estar entre 90 y 100%."
-        }
+        },
+        "statusTitle": "Estado de lectura",
+        "zones": {
+          "notStarted": "No comenzado",
+          "reading": "Leyendo",
+          "read": "Leer"
+        },
+        "range": "Entre {min} y {max}",
+        "startSlider": "Arrastre para establecer cuando un libro cuenta como iniciado"
       },
       "schedule": {
         "fileWatching": "Observación de archivos",
