@@ -39,7 +39,7 @@ function handleCancel(): void {
 <template>
   <DialogRoot :open="props.open" @update:open="handleOpenChange">
     <DialogPortal>
-      <DialogOverlay class="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-[2px]" />
+      <DialogOverlay class="fixed inset-0 z-50 bg-scrim" />
       <DialogContent
         class="fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-popover p-5 shadow-2xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >

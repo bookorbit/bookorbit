@@ -4,7 +4,7 @@ import { api } from '@/lib/api'
 
 interface LibraryDetail {
   history: LibraryScanHistoryEntry[]
-  accessCount: number
+  access: LibraryAccessEntry[]
 }
 
 /**
@@ -38,7 +38,7 @@ export function useLibraryDetail() {
         if (requestGeneration !== generation) return
         details.value = new Map(details.value).set(libraryId, {
           history: Array.isArray(history) ? history : [],
-          accessCount: Array.isArray(access) ? access.length : 0,
+          access: Array.isArray(access) ? access : [],
         })
         const nextFailed = new Set(failed.value)
         nextFailed.delete(libraryId)

@@ -45,7 +45,7 @@ useModal({
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-[75] flex items-end justify-center bg-black/50 motion-safe:animate-in motion-safe:fade-in sm:items-center sm:px-4"
+      class="fixed inset-0 z-[75] flex items-end justify-center bg-scrim motion-safe:animate-in motion-safe:fade-in sm:items-center sm:px-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="whats-new-title"

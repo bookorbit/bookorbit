@@ -37,29 +37,40 @@ describe('useCoverShapes', () => {
     vi.unstubAllGlobals()
   })
 
-  it('measures only covers whose provider states no shape, once per image', async () => {
+  it('measures each cover once, and trusts a shape the provider states', async () => {
     const unsized = candidate('unsized')
     const stated = candidate('stated', { coverShape: 'square' })
     const list = ref<MetadataCandidate[]>([unsized, stated])
     const { shapeOf } = useCoverShapes(list)
 
-    expect(FakeImage.loads.map((image) => image.src)).toEqual(['/covers/unsized.jpg'])
+    expect(FakeImage.loads.map((image) => image.src)).toEqual(['/covers/unsized.jpg', '/covers/stated.jpg'])
     expect(shapeOf(unsized)).toBe('unknown')
 
     FakeImage.loads[0]!.finish(336, 500)
+    FakeImage.loads[1]!.finish(300, 500)
     expect(shapeOf(unsized)).toBe('portrait')
     expect(shapeOf(stated)).toBe('square')
 
     list.value = [...list.value, candidate('unsized')]
     await nextTick()
-    expect(FakeImage.loads).toHaveLength(1)
+    expect(FakeImage.loads).toHaveLength(2)
+  })
+
+  it('reports the measured size over a stated one, which can describe a thumbnail', () => {
+    const thumb = candidate('thumb', { coverWidth: 355, coverHeight: 522 })
+    const { sizeOf } = useCoverShapes([thumb])
+
+    expect(sizeOf(thumb)).toEqual({ width: 355, height: 522 })
+    FakeImage.loads[0]!.finish(1740, 2560)
+    expect(sizeOf(thumb)).toEqual({ width: 1740, height: 2560 })
   })
 
   it('leaves a cover that fails to load as unknown', () => {
     const broken = candidate('broken')
-    const { shapeOf } = useCoverShapes([broken])
+    const { shapeOf, sizeOf } = useCoverShapes([broken])
 
     FakeImage.loads[0]!.onerror?.()
     expect(shapeOf(broken)).toBe('unknown')
+    expect(sizeOf(broken)).toBeNull()
   })
 })

@@ -72,6 +72,16 @@ export function registerAuthGuard(router: Router): void {
       return { name: 'settings-account-profile' }
     }
 
+    if (
+      user.value.settings.showBookRequests === false &&
+      (to.name === 'book-requests' ||
+        to.name === 'book-request-detail' ||
+        to.name === 'book-request-releases' ||
+        to.name === 'settings-admin-requests')
+    ) {
+      return { name: 'settings-appearance-behavior' }
+    }
+
     return true
   })
 }

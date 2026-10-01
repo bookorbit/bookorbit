@@ -136,7 +136,7 @@ function onCoverLoad(event: Event) {
 
   <DialogRoot :open="!!lightbox" @update:open="onLightboxOpenChange">
     <DialogPortal>
-      <DialogOverlay class="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      <DialogOverlay class="fixed inset-0 z-50 bg-scrim-media data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <DialogContent
         class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 outline-none data-[state=open]:animate-in data-[state=open]:zoom-in-95"
       >

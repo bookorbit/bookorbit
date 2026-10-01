@@ -25,6 +25,10 @@ function installBrowserGlobals() {
       addEventListener: vi.fn<() => void>(),
       removeEventListener: vi.fn<() => void>(),
     }) as unknown as MediaQueryList
+  Object.defineProperty(globalThis, 'visualViewport', {
+    configurable: true,
+    value: { scale: 1 },
+  })
 }
 
 describe('Foliate navigation', () => {
@@ -267,11 +271,6 @@ describe('Foliate navigation', () => {
   it('still snaps ordinary paginated touch gestures', () => {
     const paginator = new Paginator() as InstanceType<typeof Paginator> & EventTarget
     const snap = vi.spyOn(paginator, 'snap').mockImplementation(() => {})
-    const originalVisualViewport = Object.getOwnPropertyDescriptor(globalThis, 'visualViewport')
-    Object.defineProperty(globalThis, 'visualViewport', {
-      configurable: true,
-      value: { scale: 1 },
-    })
     const animationFrame = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
       callback(0)
       return 0
@@ -300,8 +299,6 @@ describe('Foliate navigation', () => {
     expect(snap).toHaveBeenCalledWith(0, undefined)
 
     animationFrame.mockRestore()
-    if (originalVisualViewport) Object.defineProperty(globalThis, 'visualViewport', originalVisualViewport)
-    else Reflect.deleteProperty(globalThis, 'visualViewport')
   })
 
   it('maps physical left and right navigation using OPF RTL page progression', async () => {

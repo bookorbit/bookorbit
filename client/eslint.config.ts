@@ -31,7 +31,12 @@ export default defineConfigWithVueTs(
   // podcast feature was swept clean of them. The rest of the app still carries several hundred, so
   // widening this is its own task rather than a side effect of one feature's refactor.
   {
-    files: ['src/features/podcast/**/*.vue', 'src/components/FormSheet.vue', 'src/features/collection/components/CollectionMembershipList.vue'],
+    files: [
+      'src/features/podcast/**/*.vue',
+      'src/components/FormSheet.vue',
+      'src/features/collection/components/CollectionMembershipList.vue',
+      'src/features/book/components/metadata-match/*.vue',
+    ],
     rules: { 'vue/v-on-handler-style': ['error', ['method', 'inline']] },
   },
 

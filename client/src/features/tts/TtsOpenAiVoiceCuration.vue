@@ -200,7 +200,7 @@ function handleClose() {
 </script>
 
 <template>
-  <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="fixed inset-0 bg-scrim z-50 flex items-center justify-center p-4">
     <div class="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl">
       <!-- Header -->
       <div class="flex items-center justify-between p-5 border-b border-border flex-shrink-0">

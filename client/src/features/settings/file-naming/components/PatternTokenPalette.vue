@@ -24,6 +24,7 @@ const TOKEN_DESCRIPTION_KEYS: Record<PatternToken, string> = {
   library: 'settings.reader.fileNaming.tokenLibrary',
   originalFilename: 'settings.reader.fileNaming.tokenOriginalFilename',
   extension: 'settings.reader.fileNaming.tokenExtension',
+  readaloud: 'settings.reader.fileNaming.tokenReadaloud',
 }
 
 const MODIFIER_DESCRIPTION_KEYS: Record<PatternModifier, string> = {

@@ -34,6 +34,7 @@ function makeController() {
     getReadingStreak: vi.fn(),
     getLibraryOverview: vi.fn(),
     getHighlightOfTheDay: vi.fn(),
+    getHighlights: vi.fn(),
     getMonthlyChallenge: vi.fn(),
     getYearProjection: vi.fn(),
     getNeglectedGems: vi.fn(),
@@ -172,6 +173,7 @@ describe('DashboardController', () => {
 
     it.each([
       ['getHighlightOfTheDay', { text: 'quote', bookId: 1 }],
+      ['getHighlights', [{ text: 'quote', bookId: 1 }]],
       ['getMonthlyChallenge', { challengeType: 'page-milestone', progress: 0, target: 500 }],
       ['getYearProjection', { projectedBooks: 30, daysRemaining: 200 }],
       ['getNeglectedGems', { gems: [] }],

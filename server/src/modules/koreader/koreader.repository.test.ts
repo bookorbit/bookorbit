@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { createCapturingDb } from '../../common/test-utils/capture-sql-db';
 import { sqlChunkText } from '../../common/test-utils/sql-chunk-text';
 import { KoreaderRepository } from './koreader.repository';
@@ -848,7 +850,7 @@ describe('KoreaderRepository', () => {
       await expect(repo.getTotalSyncedBooks(42)).resolves.toBe(0);
     });
 
-    it('removeDevice deletes progress/sweep/page-stat/unmatched-device-link rows and cleans up orphaned unmatched books, summing everything', async () => {
+    it('removeDevice deletes annotation sync state with the device data and sums every removed row', async () => {
       const returning = vi
         .fn()
         .mockResolvedValueOnce([{ id: 1 }, { id: 2 }]) // device progress
@@ -856,20 +858,28 @@ describe('KoreaderRepository', () => {
         .mockResolvedValueOnce([{ id: 5 }]) // page stats
         .mockResolvedValueOnce([{ hash: 'a'.repeat(32) }]) // unmatched-book device links
         .mockResolvedValueOnce([]) // device settings
+        .mockResolvedValueOnce([{ id: 8 }, { id: 9 }]) // annotation sync state
         .mockResolvedValueOnce([{ hash: 'a'.repeat(32) }]); // orphaned unmatched books cleanup
       const txDeleteBuilder = { where: vi.fn().mockReturnValue({ returning }) };
       const txSelectBuilder = { from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue('SUBQUERY') }) };
       const tx = { delete: vi.fn().mockReturnValue(txDeleteBuilder), select: vi.fn().mockReturnValue(txSelectBuilder) };
       db.transaction.mockImplementation(async (handler: (client: typeof tx) => Promise<number>) => handler(tx));
 
-      await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(6);
+      await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(8);
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
-      // Six data deletes plus the retirement marker, which is cleared without being counted.
-      expect(tx.delete).toHaveBeenCalledTimes(7);
-      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(7);
-      expect(returning).toHaveBeenCalledTimes(6);
+      // Seven returning deletes plus the retirement marker, which is cleared without being counted.
+      expect(tx.delete).toHaveBeenCalledTimes(8);
+      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(8);
+      expect(returning).toHaveBeenCalledTimes(7);
       expect(tx.select).toHaveBeenCalledTimes(1);
+
+      const annotationStateFilter = txDeleteBuilder.where.mock.calls[5]![0] as SQL;
+      const annotationStateQuery = new PgDialect().sqlToQuery(annotationStateFilter);
+      expect(annotationStateQuery.sql).toContain('"annotation_sync_state"."user_id" = $1');
+      expect(annotationStateQuery.sql).toContain('"annotation_sync_state"."source" = $2');
+      expect(annotationStateQuery.sql).toContain('"annotation_sync_state"."device_id" = $3');
+      expect(annotationStateQuery.params).toEqual([42, 'koreader', 'device-1']);
     });
 
     it('removeDevice skips the orphaned unmatched-book cleanup when the device had no unmatched-book links', async () => {
@@ -879,14 +889,15 @@ describe('KoreaderRepository', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]) // no unmatched-book device links removed
-        .mockResolvedValueOnce([]); // no device settings removed
+        .mockResolvedValueOnce([]) // no device settings removed
+        .mockResolvedValueOnce([]); // no annotation sync state removed
       const txDeleteBuilder = { where: vi.fn().mockReturnValue({ returning }) };
       const tx = { delete: vi.fn().mockReturnValue(txDeleteBuilder), select: vi.fn() };
       db.transaction.mockImplementation(async (handler: (client: typeof tx) => Promise<number>) => handler(tx));
 
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(1);
 
-      expect(tx.delete).toHaveBeenCalledTimes(6);
+      expect(tx.delete).toHaveBeenCalledTimes(7);
       expect(tx.select).not.toHaveBeenCalled();
     });
 

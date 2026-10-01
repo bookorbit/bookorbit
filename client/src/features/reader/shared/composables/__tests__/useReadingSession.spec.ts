@@ -108,3 +108,39 @@ describe('useReadingSession - elapsedMinutes', () => {
     expect(apiMock).not.toHaveBeenCalled()
   })
 })
+
+describe('useReadingSession - sessionType', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    apiMock.mockResolvedValue({ ok: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  async function savedBody(options?: Parameters<typeof useReadingSession>[2]): Promise<Record<string, unknown>> {
+    const { onActivity, endSession } = useReadingSession(7, () => ({ percentage: 10 }), options)
+    onActivity()
+    await vi.advanceTimersByTimeAsync(20 * 1000)
+    endSession()
+    expect(apiMock).toHaveBeenCalledTimes(1)
+    const [url, init] = apiMock.mock.calls[0] as [string, { body: string }]
+    expect(url).toBe('/api/v1/books/files/7/sessions')
+    return JSON.parse(init.body) as Record<string, unknown>
+  }
+
+  it('omits sessionType by default so the server records a read session', async () => {
+    const body = await savedBody()
+    expect(body).not.toHaveProperty('sessionType')
+    expect(body).not.toHaveProperty('source')
+  })
+
+  it('sends the configured sessionType', async () => {
+    const body = await savedBody({ sessionType: 'listen' })
+    expect(body.sessionType).toBe('listen')
+    expect(body).not.toHaveProperty('source')
+  })
+})

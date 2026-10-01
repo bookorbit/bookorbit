@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ChevronRight, Search, X } from '@lucide/vue'
 import { useModifierKey } from '@/composables/useModifierKey'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
 import { useSettingsNavStatus } from '../composables/useSettingsNavStatus'
 import { visibleSettingsNav, type SettingsNavGroup, type SettingsNavItem } from '../lib/settings-nav'
 interface SearchHit {
@@ -18,6 +19,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { isSuperuser, userPermissions, isDemoRestrictedAccount } = usePermissions()
+const { showBookRequests } = useBookRequestVisibility()
 const { isMac, modifierKey } = useModifierKey()
 
 /** Apple writes the combo as one glyph pair, everyone else separates the two keys. */
@@ -31,6 +33,7 @@ const groups = computed(() =>
     isSuperuser: isSuperuser.value,
     permissions: userPermissions.value,
     isDemoRestricted: isDemoRestrictedAccount.value,
+    showBookRequests: showBookRequests.value,
   }),
 )
 

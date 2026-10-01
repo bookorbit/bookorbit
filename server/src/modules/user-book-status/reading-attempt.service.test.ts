@@ -261,6 +261,25 @@ describe('ReadingAttemptService', () => {
     expect(fake.rows[0]).toMatchObject({ outcome: 'completed', endedOn: '2026-07-12' });
   });
 
+  it.each([
+    { progress: 99.94, expectedStatus: 'reading', expectedOutcome: null },
+    { progress: Math.fround(99.95), expectedStatus: 'read', expectedOutcome: 'completed' },
+  ])('uses a fractional finish threshold at $progress% progress', async ({ progress, expectedStatus, expectedOutcome }) => {
+    const result = await service.recordActivity({
+      userId: 1,
+      bookId: 10,
+      occurredOn: '2026-07-12',
+      origin: 'bookorbit',
+      progress,
+      finishThreshold: 99.95,
+      strongRereadEvidence: false,
+      meaningfulActivity: true,
+    });
+
+    expect(result?.status).toBe(expectedStatus);
+    expect(fake.rows[0]?.outcome).toBe(expectedOutcome);
+  });
+
   it('keeps repeated manual read operations idempotent', async () => {
     const first = await service.applyManualStatus(1, 10, 'read', '2026-01-01', '2026-01-10', '2026-07-12');
     const second = await service.applyManualStatus(1, 10, 'read', undefined, undefined, '2026-07-12');

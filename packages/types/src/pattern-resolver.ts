@@ -19,6 +19,7 @@ export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   library: "Books",
   originalFilename: "neuromancer",
   extension: "epub",
+  readaloud: "readaloud",
 };
 
 export const PATTERN_TOKENS = [
@@ -35,6 +36,7 @@ export const PATTERN_TOKENS = [
   { token: "library", description: "Library name" },
   { token: "originalFilename", description: "Original filename (without extension)" },
   { token: "extension", description: "File extension (without dot)" },
+  { token: "readaloud", description: "The word readaloud for an EPUB with media overlays" },
 ] as const;
 
 export type PatternToken = (typeof PATTERN_TOKENS)[number]["token"];

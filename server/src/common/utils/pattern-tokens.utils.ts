@@ -24,6 +24,14 @@ export interface PatternTokenInput {
   originalStem: string;
   format: string;
   libraryName?: string | null;
+  mediaOverlayAvailable?: boolean | null;
+}
+
+export function patternReferencesToken(pattern: string, token: string): boolean {
+  for (const match of pattern.matchAll(/\{([^}:]+)(?::[^}]+)?}/g)) {
+    if (match[1] === token) return true;
+  }
+  return false;
 }
 
 /**
@@ -36,7 +44,7 @@ export interface PatternTokenInput {
  * treats the two identically, and omitting them keeps the map readable in logs.
  */
 export function buildPatternTokens(input: PatternTokenInput): Record<string, string> {
-  const { metadata, authors = [], narrators = [], originalStem, format, libraryName } = input;
+  const { metadata, authors = [], narrators = [], originalStem, format, libraryName, mediaOverlayAvailable } = input;
   const tokens: Record<string, string> = { originalFilename: originalStem, extension: format };
 
   if (libraryName) tokens['library'] = libraryName;
@@ -52,6 +60,7 @@ export function buildPatternTokens(input: PatternTokenInput): Record<string, str
   if (seriesIndex) tokens['seriesIndex'] = seriesIndex;
   if (authors.length > 0) tokens['authors'] = authors.join(', ');
   if (narrators.length > 0) tokens['narrators'] = narrators.join(', ');
+  if (format.toLowerCase() === 'epub' && mediaOverlayAvailable === true) tokens['readaloud'] = 'readaloud';
 
   return tokens;
 }

@@ -147,6 +147,18 @@ describe('FileNamingSettings', () => {
     }
   })
 
+  it('offers the readaloud token and previews read-aloud and plain EPUB outcomes', async () => {
+    const wrapper = await mountPage()
+
+    expect(buttonWith(wrapper, '{readaloud}')).toBeDefined()
+    await patternField(wrapper).setValue('{title}< ({readaloud})>')
+
+    expect(wrapper.text()).toContain('Read-aloud comparison')
+    expect(wrapper.text()).toContain('Read-aloud EPUB')
+    expect(wrapper.text()).toContain('Plain EPUB')
+    expect(wrapper.text()).toContain('Neuromancer (readaloud)')
+  })
+
   it('saves the cross-platform toggle immediately without a separate save button', async () => {
     const wrapper = await mountPage()
 

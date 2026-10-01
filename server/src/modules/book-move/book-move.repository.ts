@@ -32,6 +32,7 @@ export interface MoveBookFile {
   format: string | null;
   fileHash: string | null;
   sortOrder: number | null;
+  mediaOverlayAvailable: boolean;
 }
 
 export interface MoveBookData {
@@ -161,6 +162,7 @@ export class BookMoveRepository {
           format: bookFiles.format,
           fileHash: bookFiles.fileHash,
           sortOrder: bookFiles.sortOrder,
+          mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
         })
         .from(bookFiles)
         .where(inArray(bookFiles.bookId, batchIds))
@@ -192,6 +194,7 @@ export class BookMoveRepository {
           format: file.format,
           fileHash: file.fileHash,
           sortOrder: file.sortOrder,
+          mediaOverlayAvailable: file.mediaOverlayAvailable,
         };
         if (list) list.push(entry);
         else filesByBook.set(file.bookId, [entry]);

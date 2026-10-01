@@ -14,7 +14,7 @@ import { mkdtemp, rm, stat, rename } from 'fs/promises';
 import { inArray, type SQL } from 'drizzle-orm';
 
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
-import { coverFetchInputs, resolveIsAudiobook } from '../../common/utils/book-media.utils';
+import { compareAudioTracks, coverFetchInputs, resolveIsAudiobook } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
@@ -182,6 +182,7 @@ type ExportCandidateFile = {
   format: string | null;
   sizeBytes: number | null;
   sortOrder?: number;
+  mediaOverlayAvailable: boolean;
 };
 
 export type ExportPlan = {
@@ -1380,7 +1381,7 @@ export class BookService {
     const fallback = this.sanitizeFilenameSegment(`${originalStem}.zip`, 'book.zip');
     const meta = metadataByBookId.get(firstFile.bookId);
     const tokens = {
-      ...this.buildDownloadPatternTokens(firstFile.absolutePath, firstFile.format, meta),
+      ...this.buildDownloadPatternTokens(firstFile.absolutePath, firstFile.format, false, meta),
       originalFilename: meta?.title?.trim() || originalStem,
       extension: 'zip',
     };
@@ -1398,6 +1399,7 @@ export class BookService {
   private buildDownloadPatternTokens(
     absolutePath: string,
     format: string | null,
+    mediaOverlayAvailable: boolean,
     meta?: Awaited<ReturnType<BookRepository['findPatternMetadataByBookIds']>>[number],
   ): Record<string, string> {
     const pathExtension = extname(absolutePath).toLowerCase().slice(1);
@@ -1411,17 +1413,23 @@ export class BookService {
       originalStem: stem,
       format: extension,
       libraryName: meta?.libraryName,
+      mediaOverlayAvailable,
     });
   }
 
-  private async resolveDownloadFilenameForFile(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {
+  private async resolveDownloadFilenameForFile(file: {
+    bookId: number;
+    absolutePath: string;
+    format: string | null;
+    mediaOverlayAvailable: boolean;
+  }): Promise<string> {
     const originalFilename = basename(file.absolutePath);
     try {
       const [pattern, metaRows] = await Promise.all([
         this.appSettings.getDownloadPattern(),
         this.bookRepo.findPatternMetadataByBookIds([file.bookId]),
       ]);
-      const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metaRows[0]);
+      const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, file.mediaOverlayAvailable, metaRows[0]);
       const resolvedPath = resolveUploadPath(pattern || DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
       const resolvedName = resolvedPath?.split('/').filter(Boolean).pop() ?? null;
       return this.sanitizeFilenameSegment(resolvedName ?? originalFilename, originalFilename);
@@ -1439,7 +1447,7 @@ export class BookService {
   async getFileInfo(
     fileId: number,
     user: RequestUser,
-  ): Promise<{ path: string; size: number; format: string; bookId: number; originalFilename: string }> {
+  ): Promise<{ path: string; size: number; format: string; bookId: number; originalFilename: string; mediaOverlayAvailable: boolean }> {
     const file = await this.verifyFileAccess(fileId, user);
     let size: number;
     try {
@@ -1451,10 +1459,22 @@ export class BookService {
       throw err;
     }
     const originalFilename = basename(file.absolutePath);
-    return { path: file.absolutePath, size, format: file.format ?? 'unknown', bookId: file.bookId, originalFilename };
+    return {
+      path: file.absolutePath,
+      size,
+      format: file.format ?? 'unknown',
+      bookId: file.bookId,
+      originalFilename,
+      mediaOverlayAvailable: file.mediaOverlayAvailable,
+    };
   }
 
-  async resolveDownloadFilename(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {
+  async resolveDownloadFilename(file: {
+    bookId: number;
+    absolutePath: string;
+    format: string | null;
+    mediaOverlayAvailable: boolean;
+  }): Promise<string> {
     return this.resolveDownloadFilenameForFile(file);
   }
 
@@ -3191,7 +3211,7 @@ export class BookService {
           throw new BadRequestException(`Export exceeds projected size limit of ${EXPORT_LIMITS.MAX_PROJECTED_BYTES} bytes.`);
         }
 
-        const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, metadataByBookId.get(file.bookId));
+        const tokens = this.buildDownloadPatternTokens(file.absolutePath, file.format, file.mediaOverlayAvailable, metadataByBookId.get(file.bookId));
         const resolvedPath = resolveUploadPath(pattern || DEFAULT_DOWNLOAD_PATTERN, tokens, tokens.extension);
         const fallbackFilename = basename(file.absolutePath);
         const rawZipPath = resolvedPath ?? fallbackFilename;
@@ -3681,12 +3701,14 @@ export class BookService {
 
   private resolveChapters(
     stored: AudiobookChapter[] | null | undefined,
-    fileRows: { absolutePath: string; format: string | null; durationSeconds: number | null }[],
+    fileRows: { absolutePath: string; format: string | null; durationSeconds: number | null; sortOrder?: number | null }[],
   ): AudiobookChapter[] | null {
     if (stored && stored.length > 0) return stored;
 
-    const audioFiles = fileRows.filter((f) => f.format && isAudioFormat(f.format));
+    const audioFiles = fileRows.filter((f) => f.format && isAudioFormat(f.format)).sort(compareAudioTracks);
     if (audioFiles.length < 2) return stored ?? null;
+    // Offsets past a track of unknown length would be wrong; clients fall back to one entry per track.
+    if (audioFiles.some((f) => f.durationSeconds === null || f.durationSeconds <= 0)) return stored ?? null;
 
     const chapters: AudiobookChapter[] = [];
     let offsetMs = 0;

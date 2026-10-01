@@ -486,6 +486,31 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
   });
 
   describe('create library and manage access', () => {
+    it('persists fractional finished thresholds through create and update', async () => {
+      const { body: createdLibrary } = await createLibraryViaApi(ctx, manager.accessToken, {
+        markAsFinishedPercentComplete: 99.95,
+      });
+      expect(createdLibrary.markAsFinishedPercentComplete).toBe(99.95);
+
+      await grantLibraryAccess(ctx, manager.userId, createdLibrary.id, 'owner');
+      const update = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${createdLibrary.id}`,
+        headers: authHeader(manager.accessToken),
+        payload: { markAsFinishedPercentComplete: 98.05 },
+      });
+      expect(update.statusCode, update.body).toBe(200);
+      expect(update.json().markAsFinishedPercentComplete).toBe(98.05);
+
+      const read = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/libraries/${createdLibrary.id}`,
+        headers: authHeader(manager.accessToken),
+      });
+      expect(read.statusCode, read.body).toBe(200);
+      expect(read.json().markAsFinishedPercentComplete).toBe(98.05);
+    });
+
     it('creates a library with the requested settings, requires explicit access rows, and reflects grant/update/revoke changes', async () => {
       const { body: createdLibrary } = await createLibraryViaApi(ctx, manager.accessToken, {
         name: `library-contract-${randomUUID()}`,

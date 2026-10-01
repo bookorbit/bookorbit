@@ -60,16 +60,16 @@
     "pnpm": ">=11"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.2",
-    "@commitlint/config-conventional": "^21.2.2",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/github": "^12.0.9",
+    "@semantic-release/github": "^12.0.10",
     "@semantic-release/release-notes-generator": "^14.1.1",
     "concurrently": "^10.0.5",
-    "conventional-changelog-conventionalcommits": "^10.3.0",
+    "conventional-changelog-conventionalcommits": "^10.4.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.3.0",
-    "prettier": "^3.9.6",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.9",
     "semantic-release": "^25.0.9"
   },
   "lint-staged": {

@@ -439,9 +439,14 @@ export class BookController {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - download file started`);
     try {
-      const { path, size, format, bookId } = await this.bookService.getFileInfo(fileId, user);
+      const { path, size, format, bookId, mediaOverlayAvailable } = await this.bookService.getFileInfo(fileId, user);
       const mimeType = resolveBookMimeType(format);
-      const filename = await this.bookService.resolveDownloadFilename({ bookId, absolutePath: path, format: format === 'unknown' ? null : format });
+      const filename = await this.bookService.resolveDownloadFilename({
+        bookId,
+        absolutePath: path,
+        format: format === 'unknown' ? null : format,
+        mediaOverlayAvailable,
+      });
 
       reply.header('Accept-Ranges', 'bytes');
       reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));

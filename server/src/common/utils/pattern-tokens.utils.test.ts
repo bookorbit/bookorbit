@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildPatternTokens } from './pattern-tokens.utils';
+import { buildPatternTokens, patternReferencesToken } from './pattern-tokens.utils';
 
 describe('pattern-tokens.utils', () => {
   describe('buildPatternTokens', () => {
@@ -107,6 +107,26 @@ describe('pattern-tokens.utils', () => {
 
       expect(legacy['seriesIndex']).toBe('03');
       expect(malformed['seriesIndex']).toBeUndefined();
+    });
+
+    it('emits readaloud only for an EPUB with media overlays', () => {
+      expect(buildPatternTokens({ metadata, originalStem: 'book', format: 'epub', mediaOverlayAvailable: true })['readaloud']).toBe('readaloud');
+      expect(buildPatternTokens({ metadata, originalStem: 'book', format: 'EPUB', mediaOverlayAvailable: true })['readaloud']).toBe('readaloud');
+      expect(buildPatternTokens({ metadata, originalStem: 'book', format: 'epub', mediaOverlayAvailable: false })['readaloud']).toBeUndefined();
+      expect(buildPatternTokens({ metadata, originalStem: 'book', format: 'm4b', mediaOverlayAvailable: true })['readaloud']).toBeUndefined();
+    });
+  });
+
+  describe('patternReferencesToken', () => {
+    it('matches a token with or without a modifier', () => {
+      expect(patternReferencesToken('{title}< ({readaloud})>', 'readaloud')).toBe(true);
+      expect(patternReferencesToken('{readaloud:upper}', 'readaloud')).toBe(true);
+    });
+
+    it('does not match a prefix, literal text, or another token', () => {
+      expect(patternReferencesToken('{readaloudEdition}', 'readaloud')).toBe(false);
+      expect(patternReferencesToken('readaloud {title}', 'readaloud')).toBe(false);
+      expect(patternReferencesToken('{title}', 'readaloud')).toBe(false);
     });
   });
 });

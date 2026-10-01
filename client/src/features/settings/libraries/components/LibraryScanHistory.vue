@@ -71,14 +71,15 @@ function resultParts(entry: LibraryScanHistoryEntry): { added: number; updated: 
           </template>
         </td>
         <td class="py-1.5 text-end">
+          <!-- Only the exceptions get a chip, so a failure stands out in a column of completed scans. -->
+          <span v-if="entry.status === 'completed'" class="text-[11px] text-muted-foreground">
+            {{ t('settings.admin.libraries.history.statusValue.completed') }}
+          </span>
           <span
+            v-else
             class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] font-semibold"
             :class="
-              entry.status === 'failed'
-                ? 'border-destructive/35 bg-destructive/12 text-destructive'
-                : entry.status === 'running'
-                  ? 'border-primary/40 bg-primary/15 text-primary'
-                  : 'border-[var(--pill-success)]/35 bg-[var(--pill-success)]/12 text-[var(--pill-success)]'
+              entry.status === 'failed' ? 'border-destructive/35 bg-destructive/12 text-destructive' : 'border-primary/40 bg-primary/15 text-primary'
             "
           >
             {{ t(`settings.admin.libraries.history.statusValue.${entry.status}`) }}

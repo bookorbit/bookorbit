@@ -11,6 +11,7 @@ import type {
 
 import { ReadingAttemptRepository } from './reading-attempt.repository';
 import { READING_DATE_ERROR_CODES } from './user-book-status.constants';
+import { hasReachedProgressThreshold } from '../../common/utils/progress-threshold.utils';
 
 function dateToUtcDate(value: string | null): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
@@ -259,7 +260,7 @@ export class ReadingAttemptService {
       let active: Awaited<ReturnType<ReadingAttemptRepository['findActive']>> | null = await this.repo.findActive(tx, input.userId, input.bookId);
       let latest = active ?? (await this.repo.findLatest(tx, input.userId, input.bookId));
       const hasCompleted = await this.repo.hasCompleted(tx, input.userId, input.bookId);
-      const isFinished = input.progress >= input.finishThreshold;
+      const isFinished = hasReachedProgressThreshold(input.progress, input.finishThreshold);
 
       if (!active && hasCompleted && !input.strongRereadEvidence && !input.meaningfulActivity) return null;
       if (!active && isFinished && !hasCompleted) {

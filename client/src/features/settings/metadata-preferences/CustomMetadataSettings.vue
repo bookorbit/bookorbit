@@ -434,7 +434,7 @@ onMounted(() => {
   </div>
 
   <Teleport to="body">
-    <div v-if="deleteConfirmField" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="cancelDeleteConfirm">
+    <div v-if="deleteConfirmField" class="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" @click.self="cancelDeleteConfirm">
       <div class="w-full max-w-md rounded-xl border border-border bg-card shadow-xl">
         <div class="p-5 border-b border-border flex items-start gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">

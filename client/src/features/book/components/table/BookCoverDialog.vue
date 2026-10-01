@@ -84,7 +84,7 @@ async function handleToggleCoverLock(field: 'cover' | 'audioCover') {
 <template>
   <DialogRoot :open="book !== null" @update:open="handleOpenChange">
     <DialogPortal>
-      <DialogOverlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+      <DialogOverlay class="fixed inset-0 z-50 bg-scrim" />
       <DialogContent
         class="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card shadow-xl outline-none"
         @escape-key-down="handleOpenChange(false)"

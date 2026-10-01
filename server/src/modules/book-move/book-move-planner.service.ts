@@ -220,6 +220,7 @@ export class BookMovePlannerService {
       originalStem,
       format,
       libraryName: input.target.libraryName,
+      mediaOverlayAvailable: file.mediaOverlayAvailable,
     });
     return resolveUploadPath(input.pattern!, tokens, format, { sanitizeForCrossPlatform: input.sanitizeForCrossPlatform });
   }

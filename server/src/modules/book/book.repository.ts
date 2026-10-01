@@ -22,6 +22,7 @@ import { advanceIsoTimestamp } from '../../common/utils/iso-timestamp.utils';
 import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
 import { scanStateInvalidationPaths } from '../../common/utils/scan-state-paths.utils';
 import { seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
+import { hasReachedProgressThreshold } from '../../common/utils/progress-threshold.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -1457,6 +1458,7 @@ export class BookRepository {
           absolutePath: bookFiles.absolutePath,
           createdAt: bookFiles.createdAt,
           durationSeconds: bookFiles.durationSeconds,
+          sortOrder: bookFiles.sortOrder,
           mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
           mediaOverlayDurationSeconds: bookFiles.mediaOverlayDurationSeconds,
           mediaOverlayCheckedAt: bookFiles.mediaOverlayCheckedAt,
@@ -2053,10 +2055,16 @@ export class BookRepository {
 
   async findPrimaryFilesByBookIds(
     bookIds: number[],
-  ): Promise<{ bookId: number; absolutePath: string; format: string | null; sizeBytes: number | null }[]> {
+  ): Promise<{ bookId: number; absolutePath: string; format: string | null; sizeBytes: number | null; mediaOverlayAvailable: boolean }[]> {
     if (bookIds.length === 0) return [];
     return this.db
-      .select({ bookId: books.id, absolutePath: bookFiles.absolutePath, format: bookFiles.format, sizeBytes: bookFiles.sizeBytes })
+      .select({
+        bookId: books.id,
+        absolutePath: bookFiles.absolutePath,
+        format: bookFiles.format,
+        sizeBytes: bookFiles.sizeBytes,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+      })
       .from(books)
       .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(inArray(books.id, bookIds))
@@ -2082,9 +2090,16 @@ export class BookRepository {
       .orderBy(asc(books.id));
   }
 
-  async findAllFilesByBookIds(
-    bookIds: number[],
-  ): Promise<{ bookId: number; absolutePath: string; format: string | null; sizeBytes: number | null; sortOrder: number }[]> {
+  async findAllFilesByBookIds(bookIds: number[]): Promise<
+    {
+      bookId: number;
+      absolutePath: string;
+      format: string | null;
+      sizeBytes: number | null;
+      sortOrder: number;
+      mediaOverlayAvailable: boolean;
+    }[]
+  > {
     if (bookIds.length === 0) return [];
     return this.db
       .select({
@@ -2093,6 +2108,7 @@ export class BookRepository {
         format: bookFiles.format,
         sizeBytes: bookFiles.sizeBytes,
         sortOrder: bookFiles.sortOrder,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
       })
       .from(bookFiles)
       .where(inArray(bookFiles.bookId, bookIds))
@@ -2806,7 +2822,7 @@ export class BookRepository {
    */
   private deriveKoboStatus(percentage: number, markAsFinishedPercentComplete: number): string {
     const threshold = Number.isFinite(markAsFinishedPercentComplete) ? Math.min(100, Math.max(1, markAsFinishedPercentComplete)) : 100;
-    if (percentage >= threshold) return 'Finished';
+    if (hasReachedProgressThreshold(percentage, threshold)) return 'Finished';
     return percentage > 0 ? 'Reading' : 'ReadyToRead';
   }
 

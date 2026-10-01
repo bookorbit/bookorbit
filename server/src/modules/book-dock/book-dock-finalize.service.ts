@@ -48,7 +48,7 @@ import { SeriesMembershipService } from '../../common/services/series-membership
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
-import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
+import { buildPatternTokens, patternReferencesToken } from '../../common/utils/pattern-tokens.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, libraries, libraryFolders } from '../../db/schema';
@@ -60,6 +60,7 @@ import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { UploadProcessorService, type UnitBookFileInput, type UnitBookRecords } from '../upload/upload-processor.service';
 import { UploadStorageService } from '../upload/upload-storage.service';
 import { UploadValidatorService } from '../upload/upload-validator.service';
+import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
@@ -1058,15 +1059,17 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       ? new Map((await this.db.select().from(libraries).where(inArray(libraries.id, libraryIds))).map((lib) => [lib.id, lib]))
       : new Map<number, typeof libraries.$inferSelect>();
 
-    return rows.map((row) => {
-      const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
-      const effectiveLibraryId = row.targetLibraryId ?? defaultLibraryId ?? null;
-      const lib = effectiveLibraryId !== null ? libraryMap.get(effectiveLibraryId) : undefined;
-      const pattern = lib?.fileNamingPattern ?? (lib?.organizationMode === 'book_per_folder' ? appPatternFolder : appPatternFile);
-      const newName = this.resolveRelativeDestination(lib, row, format, pattern, sanitizeForCrossPlatform);
+    return Promise.all(
+      rows.map(async (row) => {
+        const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
+        const effectiveLibraryId = row.targetLibraryId ?? defaultLibraryId ?? null;
+        const lib = effectiveLibraryId !== null ? libraryMap.get(effectiveLibraryId) : undefined;
+        const pattern = lib?.fileNamingPattern ?? (lib?.organizationMode === 'book_per_folder' ? appPatternFolder : appPatternFile);
+        const newName = await this.resolveRelativeDestination(lib, row, format, pattern, sanitizeForCrossPlatform);
 
-      return { fileId: row.id, fileName: row.fileName, newName };
-    });
+        return { fileId: row.id, fileName: row.fileName, newName };
+      }),
+    );
   }
 
   private async resolveDestination(library: NamingLibrary, folderPath: string, row: BookDockFileRow, format: string): Promise<string> {
@@ -1077,7 +1080,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         : await this.appSettings.getUploadPattern());
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
 
-    return join(folderPath, this.resolveRelativeDestination(library, row, format, pattern, sanitizeForCrossPlatform));
+    return join(folderPath, await this.resolveRelativeDestination(library, row, format, pattern, sanitizeForCrossPlatform));
   }
 
   /**
@@ -1088,16 +1091,19 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
    * services; `book_per_file` differs only in that the file itself is the book, so without a
    * pattern it stays where it is instead of gaining a folder of its own.
    */
-  private resolveRelativeDestination(
+  private async resolveRelativeDestination(
     library: NamingLibrary | undefined,
     row: BookDockFileRow,
     format: string,
     pattern: string | null,
     sanitizeForCrossPlatform: boolean,
-  ): string {
+  ): Promise<string> {
     if (pattern) {
       const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
-      const tokens = this.buildFilePatternTokens(meta, row.fileName, format, library?.name);
+      const mediaOverlayAvailable = patternReferencesToken(pattern, 'readaloud')
+        ? await this.inspectMediaOverlayAvailable(row.absolutePath, format)
+        : false;
+      const tokens = this.buildFilePatternTokens(meta, row.fileName, format, library?.name, mediaOverlayAvailable);
       const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
       if (resolved) return resolved;
     }
@@ -1109,7 +1115,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     return row.fileName;
   }
 
-  private buildFilePatternTokens(meta: BookDockMetadata, fileName: string, format: string, libraryName?: string | null): Record<string, string> {
+  private buildFilePatternTokens(
+    meta: BookDockMetadata,
+    fileName: string,
+    format: string,
+    libraryName?: string | null,
+    mediaOverlayAvailable = false,
+  ): Record<string, string> {
     return buildPatternTokens({
       metadata: meta,
       authors: meta.authors,
@@ -1117,7 +1129,19 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       originalStem: basename(fileName, extname(fileName)),
       format,
       libraryName,
+      mediaOverlayAvailable,
     });
+  }
+
+  private async inspectMediaOverlayAvailable(absolutePath: string, format: string): Promise<boolean> {
+    const startedAt = Date.now();
+    const fields = await inspectEpubMediaOverlayFields(absolutePath, format, (err) => {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[book_dock.media_overlay_capability] [fail] path="${sanitizeLogValue(absolutePath)}" durationMs=${Date.now() - startedAt} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - EPUB media-overlay inspection failed`,
+      );
+    });
+    return fields.mediaOverlayAvailable;
   }
 
   /**

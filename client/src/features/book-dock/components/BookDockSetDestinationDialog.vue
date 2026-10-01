@@ -99,7 +99,7 @@ function handleClose() {
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="handleClose" />
+      <div class="absolute inset-0 bg-scrim" @click="handleClose" />
       <div class="relative z-10 w-full max-w-xl mx-4 bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">

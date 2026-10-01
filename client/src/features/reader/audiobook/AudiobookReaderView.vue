@@ -77,7 +77,23 @@ const audioFiles = computed<AudiobookManifestAsset[]>(() => manifest.value?.asse
 // ── Progress ──────────────────────────────────────────────────────────────────
 
 const manifestRevision = computed(() => manifest.value?.revision ?? '')
-const progress = useAudioProgress(props.bookId, { trackingEnabled, manifestRevision })
+const progress = useAudioProgress(props.bookId, { trackingEnabled, manifestRevision, assets: audioFiles, onManifestStale: reloadStaleManifest })
+
+async function reloadStaleManifest() {
+  try {
+    const res = await api(`/api/v1/audiobooks/${props.bookId}/manifest`)
+    if (!res.ok || !mounted) return
+    const next = (await res.json()) as AudiobookManifest
+    const current = audioFiles.value
+    // The queue was built from the old track list, so only a manifest with the same tracks can replace it in place.
+    const sameTracks = next.assets.length === current.length && next.assets.every((asset, index) => asset.assetId === current[index]?.assetId)
+    if (!sameTracks) return
+    manifest.value = next
+    progress.flush()
+  } catch {
+    // Progress stays on hold until the manifest can be reloaded.
+  }
+}
 
 // ── Queue (created lazily after files load) ───────────────────────────────────
 
@@ -161,7 +177,7 @@ const audioBookmarks = useAudioBookmarks(props.bookId)
 
 // ── Reading session ───────────────────────────────────────────────────────────
 
-const session = useReadingSession(props.fileId, () => ({ percentage: progressPct.value }), { trackingEnabled })
+const session = useReadingSession(props.fileId, () => ({ percentage: progressPct.value }), { trackingEnabled, sessionType: 'listen' })
 
 // ── Ticker (updates position every 500ms while playing) ──────────────────────
 
@@ -1174,7 +1190,7 @@ onMounted(async () => {
 
       <!-- Chapter sheet backdrop -->
       <Transition name="fade">
-        <div v-if="showChapters" class="absolute inset-0 z-20 bg-black/40" @click="showChapters = false" />
+        <div v-if="showChapters" class="absolute inset-0 z-20 bg-scrim" @click="showChapters = false" />
       </Transition>
 
       <!-- Chapter / Bookmarks sheet (slide up) -->
@@ -1256,7 +1272,7 @@ onMounted(async () => {
 
       <!-- Settings sheet backdrop -->
       <Transition name="fade">
-        <div v-if="showSettings" class="absolute inset-0 z-20 bg-black/40" @click="showSettings = false" />
+        <div v-if="showSettings" class="absolute inset-0 z-20 bg-scrim" @click="showSettings = false" />
       </Transition>
 
       <!-- Settings sheet (slide up) -->

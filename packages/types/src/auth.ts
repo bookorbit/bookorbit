@@ -33,6 +33,7 @@ export const ProvisioningMethod = {
 export type ProvisioningMethod = (typeof ProvisioningMethod)[keyof typeof ProvisioningMethod];
 
 export interface UserSettings {
+  showBookRequests?: boolean;
   syncReaderPreferences?: boolean;
   syncThemePreferences?: boolean;
   statisticsConfig?: import("./statistics").StatisticsSettings;

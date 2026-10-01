@@ -1,5 +1,6 @@
 import { onUnmounted, ref, unref, type MaybeRef } from 'vue'
 import { api } from '@/lib/api'
+import { createUuid } from '@/lib/uuid'
 
 export interface ProgressSnapshot {
   percentage: number
@@ -11,18 +12,15 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000
 const MIN_SESSION_MS = 10 * 1000
 const ELAPSED_UPDATE_INTERVAL_MS = 30 * 1000
 
+export type ReadingSessionType = 'read' | 'tts' | 'listen'
+
 export interface ReadingSessionOptions {
   trackingEnabled?: MaybeRef<boolean>
-}
-
-function generateSessionId(): string {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}` // codeql[js/insecure-randomness] - session IDs are non-security deduplication keys
+  sessionType?: ReadingSessionType
 }
 
 export function useReadingSession(bookFileId: number, getProgress: () => ProgressSnapshot, options: ReadingSessionOptions = {}) {
-  let sessionId = generateSessionId()
+  let sessionId = createUuid()
   let startedAt: Date | null = null
   let activeMs = 0
   let activeStart: number | null = null
@@ -104,7 +102,7 @@ export function useReadingSession(bookFileId: number, getProgress: () => Progres
     if (!canTrack()) return
     // No active session or previous session ended (e.g. after idle timeout) - start fresh.
     if (!startedAt || ended) {
-      sessionId = generateSessionId()
+      sessionId = createUuid()
       startSession()
       return
     }
@@ -150,6 +148,7 @@ export function useReadingSession(bookFileId: number, getProgress: () => Progres
       durationSeconds,
       progressDelta,
       endProgress,
+      ...(options.sessionType ? { sessionType: options.sessionType } : {}),
     })
 
     const url = `/api/v1/books/files/${bookFileId}/sessions`

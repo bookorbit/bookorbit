@@ -1548,6 +1548,9 @@ describe('BookRepository', () => {
       { percentage: 100, threshold: 98, expected: 'Finished' },
       { percentage: 95, threshold: 95, expected: 'Finished' },
       { percentage: 99, threshold: 100, expected: 'Reading' },
+      { percentage: 99.94, threshold: 99.95, expected: 'Reading' },
+      { percentage: Math.fround(99.95), threshold: 99.95, expected: 'Finished' },
+      { percentage: 99.999995, threshold: 100, expected: 'Reading' },
     ])('reports $expected at $percentage% with a $threshold% threshold', async ({ percentage, threshold, expected }) => {
       await expect(syncStatusFor(percentage, threshold)).resolves.toBe(expected);
     });

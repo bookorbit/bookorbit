@@ -6,10 +6,11 @@ overrides:
   "@xhmikosr/decompress": ^11.1.4
   "@esbuild-kit/core-utils>esbuild": ^0.25.12
   "@nestjs/swagger>js-yaml": ^5.3.0
-  "@typescript-eslint/eslint-plugin": ^8.67.0
-  "@typescript-eslint/parser": ^8.67.0
-  "@typescript-eslint/utils": ^8.67.0
-  "brace-expansion@>=5.0.0 <5.0.9": ^5.0.9
+  "@typescript-eslint/eslint-plugin": ^8.71.0
+  "@typescript-eslint/parser": ^8.71.0
+  "@typescript-eslint/utils": ^8.71.0
+  "brace-expansion@>=2.0.0 <2.1.6": ^2.1.6
+  "brace-expansion@>=5.0.0 <5.0.11": ^5.0.11
   engine.io: ^6.6.7
   esbuild: ^0.28.2
   fastify: ^5.10.0
@@ -19,12 +20,15 @@ overrides:
   form-data: ^4.0.6
   piscina: ^4.9.3
   qs: ^6.15.2
-  typescript-eslint: ^8.67.0
+  typescript-eslint: ^8.71.0
   ws: ^8.21.3
 packageExtensions:
-  "@embedpdf/utils@2.15.0":
+  "@embedpdf/utils@2.15.1":
     dependencies:
-      "@embedpdf/models": 2.15.0
+      "@embedpdf/models": 2.15.1
+peerDependencyRules:
+  allowedVersions:
+    "vite-plugin-pwa>@vite-pwa/assets-generator": "^2.0.0"
 allowBuilds:
   "@ffmpeg-installer/darwin-arm64": true
   "@ffmpeg-installer/darwin-x64": true
@@ -51,10 +55,10 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: false
 patchedDependencies:
-  "@embedpdf/core@2.15.0": patches/@embedpdf__core@2.15.0.patch
-  "@embedpdf/engines@2.15.0": patches/@embedpdf__engines@2.15.0.patch
-  "@embedpdf/plugin-scroll@2.15.0": patches/@embedpdf__plugin-scroll@2.15.0.patch
-  "@embedpdf/plugin-zoom@2.15.0": patches/@embedpdf__plugin-zoom@2.15.0.patch
+  "@embedpdf/core@2.15.1": patches/@embedpdf__core@2.15.1.patch
+  "@embedpdf/engines@2.15.1": patches/@embedpdf__engines@2.15.1.patch
+  "@embedpdf/plugin-scroll@2.15.1": patches/@embedpdf__plugin-scroll@2.15.1.patch
+  "@embedpdf/plugin-zoom@2.15.1": patches/@embedpdf__plugin-zoom@2.15.1.patch
 minimumReleaseAgeExclude:
   - "@tsconfig/node24@24.0.5"
   - "@vue/language-core@3.3.10"

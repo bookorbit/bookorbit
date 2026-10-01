@@ -1,0 +1,2 @@
+DROP INDEX "bookmarks_user_book_pos_uidx";--> statement-breakpoint
+CREATE UNIQUE INDEX "bookmarks_user_book_pos_uidx" ON "bookmarks" USING btree ("user_id","book_id","position_seconds") WHERE "bookmarks"."position_seconds" is not null and "bookmarks"."cfi" is null and "bookmarks"."deleted_at" is null;

@@ -57,6 +57,13 @@ describe('visibleSettingsNav', () => {
     expect(visibleSettingsNav(SUPERUSER).map((group) => group.id)).toEqual(['you', 'library', 'devices', 'accounts', 'server'])
   })
 
+  it('hides only request administration when Requests are hidden', () => {
+    const normal = visibleSettingsNav(SUPERUSER).flatMap((group) => group.items.map((item) => item.id))
+    const hidden = visibleSettingsNav({ ...SUPERUSER, showBookRequests: false }).flatMap((group) => group.items.map((item) => item.id))
+    expect(normal).toContain('requests')
+    expect(hidden).toEqual(normal.filter((id) => id !== 'requests'))
+  })
+
   it('hides notifications without notification access', () => {
     const you = visibleSettingsNav(NOBODY)[0]
     expect(you?.items.map((item) => item.id)).not.toContain('notifications')

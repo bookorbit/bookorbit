@@ -299,6 +299,7 @@ export class OpdsController {
         bookId,
         absolutePath,
         format: format === 'unknown' ? null : format,
+        mediaOverlayAvailable: false,
       });
 
       reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));

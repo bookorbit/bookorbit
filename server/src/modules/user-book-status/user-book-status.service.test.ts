@@ -384,6 +384,9 @@ describe('autoUpdate with custom thresholds', () => {
     { percentage: 0.5, readingThreshold: 1, finishThreshold: 90, existingStatus: 'reading', expectedStatus: 'unread' },
     { percentage: 1, readingThreshold: 1, finishThreshold: 90, existingStatus: 'unread', expectedStatus: 'reading' },
     { percentage: 90, readingThreshold: 1, finishThreshold: 90, existingStatus: 'reading', expectedStatus: 'read' },
+    { percentage: 99.94, readingThreshold: 1, finishThreshold: 99.95, existingStatus: 'unread', expectedStatus: 'reading' },
+    { percentage: Math.fround(99.95), readingThreshold: 1, finishThreshold: 99.95, existingStatus: 'reading', expectedStatus: 'read' },
+    { percentage: 99.999995, readingThreshold: 1, finishThreshold: 100, existingStatus: 'unread', expectedStatus: 'reading' },
   ])(
     'derives expected status for percentage=$percentage',
     async ({ percentage, readingThreshold, finishThreshold, existingStatus, expectedStatus }) => {

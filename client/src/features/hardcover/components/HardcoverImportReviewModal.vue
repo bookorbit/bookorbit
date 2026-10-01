@@ -267,7 +267,7 @@ function normalizeSearch(value: string): string {
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-[70] flex items-end justify-center bg-foreground/35 px-2 py-3 md:items-center md:px-6" @click.self="handleClose">
+    <div class="fixed inset-0 z-[70] flex items-end justify-center bg-scrim px-2 py-3 md:items-center md:px-6" @click.self="handleClose">
       <section
         ref="dialogRef"
         class="flex max-h-[92vh] w-full max-w-6xl flex-col rounded-lg border border-border bg-background shadow-xl outline-none"

@@ -329,7 +329,7 @@ async function confirmDelete() {
 
     <!-- Rename -->
     <div v-if="renameTarget" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeRenameModal">
-      <button class="absolute inset-0 bg-black/45" :aria-label="t('common.cancel')" @click="closeRenameModal" />
+      <button class="absolute inset-0 bg-scrim" :aria-label="t('common.cancel')" @click="closeRenameModal" />
       <div
         class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5"
         role="dialog"
@@ -365,7 +365,7 @@ async function confirmDelete() {
 
     <!-- Delete -->
     <div v-if="deleteTarget" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeDeleteModal">
-      <button class="absolute inset-0 bg-black/45" :aria-label="t('common.cancel')" @click="closeDeleteModal" />
+      <button class="absolute inset-0 bg-scrim" :aria-label="t('common.cancel')" @click="closeDeleteModal" />
       <div
         class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5"
         role="dialog"

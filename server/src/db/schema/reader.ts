@@ -447,7 +447,7 @@ export const bookmarks = pgTable(
       .where(sql`${t.cfi} is not null`),
     uniqueIndex('bookmarks_user_book_pos_uidx')
       .on(t.userId, t.bookId, t.positionSeconds)
-      .where(sql`${t.positionSeconds} is not null and ${t.cfi} is null`),
+      .where(sql`${t.positionSeconds} is not null and ${t.cfi} is null and ${t.deletedAt} is null`),
     check('bookmarks_origin_chk', sql`${t.origin} in ('web', 'koreader')`),
   ],
 );

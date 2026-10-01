@@ -80,7 +80,7 @@ function handleSubmit() {
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="handleClose" />
+      <div class="absolute inset-0 bg-scrim" @click="handleClose" />
       <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-base font-semibold text-foreground">{{ t('book.detail.addSession.title') }}</h2>

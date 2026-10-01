@@ -7,6 +7,7 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from 
 import { KoboStatusProjectionRepository } from './kobo-status-projection.repository';
 import { ReadingAttemptService } from './reading-attempt.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { hasReachedProgressThreshold } from '../../common/utils/progress-threshold.utils';
 import { toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 
 const DEFAULT_FINISH_THRESHOLD = 98;
@@ -250,8 +251,11 @@ export class UserBookStatusService {
 
     const normalizedPercentage = this.normalizePercentage(percentage);
     const { readThreshold, finishThreshold: normalizedFinishThreshold } = this.normalizeThresholds(readingThreshold, finishThreshold);
-    const derived: ReadStatus =
-      normalizedPercentage >= normalizedFinishThreshold ? 'read' : normalizedPercentage >= readThreshold ? 'reading' : 'unread';
+    const derived: ReadStatus = hasReachedProgressThreshold(normalizedPercentage, normalizedFinishThreshold)
+      ? 'read'
+      : normalizedPercentage >= readThreshold
+        ? 'reading'
+        : 'unread';
 
     if (this.attempts) {
       const timeZone = activity.timeZone ?? (await this.repo.findUserTimeZone(userId));

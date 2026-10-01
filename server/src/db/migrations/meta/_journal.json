@@ -698,8 +698,22 @@
     {
       "idx": 99,
       "version": "7",
-      "when": 1790450071640,
-      "tag": "0099_add_mangabaka_columns",
+      "when": 1790446233976,
+      "tag": "0099_fractional_finished_threshold",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1790634252132,
+      "tag": "0100_audio_bookmark_position_ignores_tombstones",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1790893535455,
+      "tag": "0101_add_mangabaka_columns",
       "breakpoints": true
     }
   ]

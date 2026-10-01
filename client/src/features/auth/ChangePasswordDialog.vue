@@ -52,7 +52,7 @@ async function handleSubmit() {
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-scrim px-4">
       <div class="w-full max-w-sm rounded-lg border border-border bg-card shadow-xl p-6">
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-base font-semibold text-foreground">{{ t('auth.changePassword.title') }}</h2>

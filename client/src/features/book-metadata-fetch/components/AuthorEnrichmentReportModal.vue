@@ -49,7 +49,7 @@ onMounted(() => loadPage(1))
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="emit('close')">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-scrim" @click.self="emit('close')">
     <div class="bg-background border border-border rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
       <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <h2 class="text-sm font-semibold">{{ t('bookMetadataFetch.report.authorTitle') }}</h2>

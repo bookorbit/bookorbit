@@ -213,6 +213,62 @@ describe('UploadService', () => {
     expect(processor.processNewBookImportAsync).toHaveBeenCalledWith(99, 1, '/library/Frank Herbert/Dune.epub', 'epub');
   });
 
+  it('inspects and marks a read-aloud EPUB when the upload pattern references the token', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{title}< ({readaloud})>' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'Dune',
+      subtitle: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      isbn13: null,
+      authors: [{ name: 'Frank Herbert' }],
+      tags: [],
+      description: null,
+      isbn10: null,
+    });
+    const inspect = vi.spyOn(service as any, 'inspectMediaOverlayFields').mockResolvedValue({
+      mediaOverlayAvailable: true,
+      mediaOverlayDurationSeconds: 3600,
+      mediaOverlayCheckedAt: new Date(),
+    });
+
+    const result = await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(result.filename).toBe('Dune (readaloud).epub');
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Dune (readaloud).epub');
+    expect(inspect).toHaveBeenCalledOnce();
+  });
+
+  it('does not inspect media overlays for naming when the upload pattern omits the token', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{title}' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'Dune',
+      subtitle: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      isbn13: null,
+      authors: [{ name: 'Frank Herbert' }],
+      tags: [],
+      description: null,
+      isbn10: null,
+    });
+    const inspect = vi.spyOn(service as any, 'inspectMediaOverlayFields');
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(inspect).not.toHaveBeenCalled();
+  });
+
   it('stores the directory-entry spelling when an upload targets a case-insensitive parent path', async () => {
     db.select
       .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{authors:first}/{title}.{extension}' }]))

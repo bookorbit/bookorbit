@@ -6,7 +6,7 @@ import { Readable } from 'stream';
 import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
+import { buildPatternTokens, patternReferencesToken } from '../../common/utils/pattern-tokens.utils';
 import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
 
 import { DB } from '../../db';
@@ -417,7 +417,10 @@ export class UploadService {
 
     if (pattern) {
       const stem = basename(filename, extname(filename));
-      const tokens = await this.buildUploadPatternTokens(tempPath, format, stem, library.name);
+      const mediaOverlayAvailable = patternReferencesToken(pattern, 'readaloud')
+        ? (await this.inspectMediaOverlayFields(tempPath, format)).mediaOverlayAvailable
+        : false;
+      const tokens = await this.buildUploadPatternTokens(tempPath, format, stem, library.name, mediaOverlayAvailable);
       const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
       if (resolved) {
@@ -441,8 +444,9 @@ export class UploadService {
     format: string,
     stem: string,
     libraryName?: string | null,
+    mediaOverlayAvailable = false,
   ): Promise<Record<string, string>> {
-    const fallback = buildPatternTokens({ metadata: {}, originalStem: stem, format, libraryName });
+    const fallback = buildPatternTokens({ metadata: {}, originalStem: stem, format, libraryName, mediaOverlayAvailable });
     const event = 'upload.pattern_tokens';
     const startedAt = Date.now();
 
@@ -506,6 +510,7 @@ export class UploadService {
         originalStem: stem,
         format,
         libraryName,
+        mediaOverlayAvailable,
       });
     } catch (err) {
       const { errorClass, errorMessage } = this.parseError(err);

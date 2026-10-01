@@ -88,6 +88,21 @@ describe('NotificationService', () => {
   // ---------- notify() ----------
 
   describe('notify()', () => {
+    it('does not dispatch request notifications to users who hide Requests', async () => {
+      repo.findUserSettings.mockResolvedValue(
+        new Map([
+          [1, { showBookRequests: false }],
+          [2, {}],
+        ]),
+      );
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(2, { type: NotificationType.BookRequestSubmitted })]);
+
+      await service.notify(makePayload({ kind: 'users', userIds: [1, 2] }, { type: NotificationType.BookRequestSubmitted }));
+
+      expect(repo.insertOrCollapse).toHaveBeenCalledWith([expect.objectContaining({ userId: 2 })]);
+      expect(gateway.emitNew).toHaveBeenCalledTimes(1);
+    });
+
     it.each([NotificationType.PodcastEpisodePublished, NotificationType.PodcastFeedUnhealthy, NotificationType.PodcastDownloadFailed])(
       'ignores disabled podcast notification type %s',
       async (type) => {

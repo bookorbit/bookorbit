@@ -1,4 +1,3 @@
-import { SCHEDULE_CRON_OPTIONS } from '@nestjs/schedule/dist/schedule.constants';
 import { describe, expect, it } from 'vitest';
 
 import { SYSTEM_TIME_ZONE } from '../utils/timezone.utils';
@@ -11,9 +10,8 @@ describe('SystemCron', () => {
       run(): void {}
     }
 
-    expect(Reflect.getMetadata(SCHEDULE_CRON_OPTIONS, TestJob.prototype.run)).toEqual({
-      cronTime: '0 3 * * *',
-      timeZone: SYSTEM_TIME_ZONE,
-    });
+    const metadata = Reflect.getMetadataKeys(TestJob.prototype.run).map((key) => Reflect.getMetadata(key, TestJob.prototype.run));
+
+    expect(metadata).toContainEqual({ cronTime: '0 3 * * *', timeZone: SYSTEM_TIME_ZONE });
   });
 });

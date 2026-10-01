@@ -8,6 +8,8 @@ export const AUDIOBOOK_MANIFEST_VERSION = 2 as const;
 
 export interface AudiobookManifestAsset {
   assetId: string;
+  /** The book file id, matching `BookDetail.files[].id`, so clients can pair an asset with its file. */
+  fileId: number;
   sequence: number;
   format: string;
   durationMs: number | null;

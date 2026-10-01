@@ -125,7 +125,7 @@ function formatPillClass(filename: string): string {
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4">
-      <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" @click="handleClose" />
+      <div class="absolute inset-0 bg-scrim" @click="handleClose" />
 
       <div
         class="relative flex flex-col w-full max-w-2xl bg-background rounded-lg shadow-2xl border border-border overflow-hidden"

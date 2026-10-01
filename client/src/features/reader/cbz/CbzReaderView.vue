@@ -920,11 +920,11 @@ onUnmounted(() => {
       <div class="flex min-h-full min-w-full items-center justify-center" :style="paginatedStageStyle">
         <div
           data-testid="cbz-paginated-pages"
-          class="flex shrink-0 items-center justify-center px-1 origin-center"
+          class="flex shrink-0 items-center-safe justify-center-safe px-1 origin-center"
           :style="[paginatedContentStyle, renderSpread ? spreadContainerStyle : undefined]"
         >
           <template v-if="renderSpread">
-            <div data-spread-side="left" class="flex h-full min-w-0 flex-1 items-center justify-end">
+            <div data-spread-side="left" class="flex h-full min-w-0 flex-1 items-center-safe justify-end">
               <img
                 v-if="renderLeftPage !== null"
                 :src="pageUrl(renderLeftPage)"
@@ -936,7 +936,7 @@ onUnmounted(() => {
               />
               <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
             </div>
-            <div data-spread-side="right" class="flex h-full min-w-0 flex-1 items-center justify-start">
+            <div data-spread-side="right" class="flex h-full min-w-0 flex-1 items-center-safe justify-start">
               <img
                 v-if="renderRightPage !== null"
                 :src="pageUrl(renderRightPage)"

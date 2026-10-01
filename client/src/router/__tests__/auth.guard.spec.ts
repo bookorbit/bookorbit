@@ -51,6 +51,10 @@ function makeRouter() {
       { path: '/setup', name: 'setup', component: blank, meta: { public: true } },
       { path: '/forgot-password', name: 'forgot-password', component: blank, meta: { public: true } },
       { path: '/reset-password', name: 'reset-password', component: blank, meta: { public: true } },
+      { path: '/requests', name: 'book-requests', component: blank },
+      { path: '/requests/:id', name: 'book-request-detail', component: blank },
+      { path: '/settings/admin/requests', name: 'settings-admin-requests', component: blank },
+      { path: '/settings/appearance/behavior', name: 'settings-appearance-behavior', component: blank },
     ],
   })
   registerAuthGuard(router)
@@ -63,6 +67,22 @@ beforeEach(() => {
   statusState.needsSetup = false
   statusState.allowRegistration = false
   statusState.passwordLoginEnabled = true
+})
+
+describe('auth guard: hidden book requests', () => {
+  it.each(['/requests', '/requests/42', '/settings/admin/requests'])('redirects %s to the visibility setting', async (path) => {
+    authState.user = { id: 1, isDefaultPassword: false, permissions: [], settings: { showBookRequests: false } }
+    const router = makeRouter()
+    await router.push(path)
+    expect(router.currentRoute.value.name).toBe('settings-appearance-behavior')
+  })
+
+  it('preserves existing request links when the preference is absent', async () => {
+    authState.user = { id: 1, isDefaultPassword: false, permissions: [], settings: {} }
+    const router = makeRouter()
+    await router.push('/requests')
+    expect(router.currentRoute.value.name).toBe('book-requests')
+  })
 })
 
 describe('auth guard: /register', () => {

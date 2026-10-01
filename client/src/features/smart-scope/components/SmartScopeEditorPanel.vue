@@ -161,7 +161,7 @@ async function save() {
 <template>
   <Teleport to="body">
     <Transition name="smartScope-fade">
-      <div v-if="open" class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" @click="emit('close')" />
+      <div v-if="open" class="fixed inset-0 z-40 bg-scrim" @click="emit('close')" />
     </Transition>
 
     <Transition name="smartScope-slide">

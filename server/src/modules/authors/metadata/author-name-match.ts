@@ -66,7 +66,7 @@ function normalizeName(value: string): string {
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -95,6 +95,7 @@ function overlapRatio(queryTokens: string[], candidateTokens: string[]): number 
 }
 
 function haveEqualTokenMultiset(a: string[], b: string[]): boolean {
+  if (a.length === 0 || b.length === 0) return false;
   if (a.length !== b.length) return false;
   const aSorted = [...a].sort();
   const bSorted = [...b].sort();

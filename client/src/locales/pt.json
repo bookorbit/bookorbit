@@ -17,7 +17,14 @@
     "no": "Não",
     "show": "Mostrar",
     "hide": "Ocultar",
-    "undo": "Desfazer"
+    "undo": "Desfazer",
+    "pagination": {
+      "label": "Paginação",
+      "pageOf": "Página {page} de {totalPages}",
+      "previousPage": "Página anterior",
+      "nextPage": "Próxima página",
+      "goToPage": "Ir para a página {page}"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -421,6 +428,11 @@
         "collapseSeries": {
           "label": "Recolher séries por padrão",
           "hint": "Agrupar livros da mesma série em um único cartão nas visualizações de biblioteca e coleção"
+        },
+        "bookRequests": {
+          "label": "Mostrar solicitações de livros",
+          "hint": "Mostrar páginas, avisos e configurações desta conta. Requisições existentes continuam sendo executadas quando ocultas.",
+          "saveFailed": "Não foi possível atualizar a visibilidade de solicitações de livros"
         }
       },
       "icons": {
@@ -1504,6 +1516,7 @@
         "subtitle": "Subtítulo",
         "description": "Descrição",
         "cover": "Capa",
+        "audioCover": "Capas de audiolivros",
         "authors": "Autores",
         "publisher": "Editora",
         "publishedYear": "Ano de publicação",
@@ -1689,6 +1702,7 @@
         "clearAllProviders": "Limpar Todos os Provedores",
         "clearAll": "Limpar Tudo",
         "resetToDefault": "Restaurar Padrão",
+        "bookCover": "Capa do livro",
         "reset": "Restaurar",
         "dragProvidersHint": "Arraste os provedores daqui para qualquer campo para adicioná-los",
         "dragProviderHere": "arraste um provedor para cá",
@@ -1827,6 +1841,7 @@
           "makeFirst": "Tornar-se primeiro em todos os lugares",
           "makeLast": "Tornar durável em todos os lugares",
           "removeEverywhere": "Remover de todos os campos",
+          "audioCoverOrderKept": "Reordenar ignora a regra do Audiobook que mantém as fontes do audiolivro primeiro.",
           "allFields": "Todos os campos",
           "overridesOnly": "Substituir apenas",
           "clearFilters": "Limpar filtros"
@@ -4786,6 +4801,26 @@
       "primary": "Primário",
       "audiobook": "Audiolivro"
     },
+    "formats": {
+      "epub": "EPUB e-book",
+      "kepub": "KEPUB e-book",
+      "pdf": "Documento em PDF",
+      "cbz": "Quadrinhos CBZ",
+      "cbr": "CBR quadrinhos",
+      "cb7": "CBR quadrinhos",
+      "mobi": "MOBI e-book",
+      "azw3": "AZW3 e-book",
+      "azw": "AZW e-book",
+      "fb2": "FictionBook",
+      "m4b": "Áudio M4B",
+      "mp3": "Áudio MP3",
+      "m4a": "Áudio M4A",
+      "opus": "Áudio Opus",
+      "ogg": "Áudio OGG",
+      "flac": "Áudio FLAC",
+      "readAlong": "Leitura de EPUB",
+      "primary": "Formato principal"
+    },
     "actions": {
       "read": "Ler",
       "listen": "Ouvir",
@@ -4809,6 +4844,12 @@
       "openAs": "Abrir como {format}",
       "openReadAlong": "Abrir leitura ao longo do EPUB"
     },
+    "coverRegeneration": {
+      "failed": "Não foi possível regerar a capa",
+      "bulkInProgress": "Reextração de capas",
+      "bulkFailed": "Não foi possível re-extrair as capas",
+      "bulkCompleted": "Reextraído {updated} de {processed, plural, one {# capa} other {# capas}}"
+    },
     "readStatus": {
       "unread": "Não Lido",
       "wantToRead": "Quero Ler",
@@ -4829,7 +4870,10 @@
       "progressPercent": "Baixando {percent} do {total}",
       "progressBytes": "Baixando {transferred}",
       "failed": "Falha no download",
-      "exportFailed": "Falha na exportação"
+      "exportFailed": "Falha na exportação",
+      "audiolessEpub": "EPUB do KOReader",
+      "audiolessEpubHint": "Baixar EPUB para o KOReader com arquivos de áudio removidos",
+      "noAudio": "sem áudio"
     },
     "sort": {
       "moveUp": "Mover para cima",
@@ -4901,6 +4945,7 @@
         "isbn": "ISBN",
         "metadataScore": "Pontuação de Metadados",
         "cover": "Capa",
+        "audioCover": "Capa de Audiobook",
         "lockStatus": "Status de bloqueio",
         "seriesStatus": "Status da Série"
       },
@@ -5204,7 +5249,32 @@
         "saving": "Salvando...",
         "saveCover": "Salvar capa",
         "revertToOriginal": "Reverter para o original",
-        "regenerateCover": "Gerar Capa Novamente"
+        "regenerateCover": "Gerar Capa Novamente",
+        "slotsLabel": "Capa a editar",
+        "slotEbook": "Livro",
+        "slotAudio": "Audiobook",
+        "slotEbookName": "Capa do Livro",
+        "slotAudioName": "Capa de Audiobook",
+        "editingEbook": "Editando a capa do livro",
+        "editingAudio": "Editando a capa de audiolivro",
+        "lockEbookCover": "Travar capa do livro",
+        "unlockEbookCover": "Desbloquear capa do livro",
+        "lockAudioCover": "Travar capa do audiobook",
+        "unlockAudioCover": "Desbloquear capa do audiobook",
+        "viewLarger": "Ver maior",
+        "viewLargerEbook": "Ver capa de livro maior",
+        "viewLargerAudio": "Ver capa do audiobook maior",
+        "sourceMode": "Origem da imagem",
+        "urlLabel": "URL da Imagem",
+        "saveFailed": "Não foi possível salvar a capa",
+        "revertFailed": "Não foi possível reverter a capa"
+      },
+      "coverLightbox": {
+        "title": "Pré-visualização da capa",
+        "description": "Capa completa. Pressione Escape para fechar.",
+        "switchLabel": "Capa a ser exibida",
+        "ebook": "Livro",
+        "audio": "Audiobook"
       },
       "coverSearch": {
         "title": "Busca Online",
@@ -5245,8 +5315,10 @@
           "cancelEditAria": "Cancelar edição da revisão pessoal"
         },
         "editCover": "Editar capa",
+        "viewCover": "Ver capa maior",
         "finished": "Concluído",
         "resetFileProgress": "Redefinir progresso do arquivo",
+        "resetEditionProgress": "Redefinir progresso para {format}",
         "resetting": "Redefinindo...",
         "resetProgressConfirm": "Redefinir progresso de leitura armazenado para {label}?",
         "moreCount": "+{count} mais",
@@ -5384,6 +5456,7 @@
         "loadFromFileTooltip": "Carregar metadados do arquivo primário do livro",
         "writeToFile": "Gravar no arquivo",
         "autoFill": "Preenchimento automático",
+        "autoFillFailed": "Auto-preenchimento falhou",
         "fetchingMetadata": "Buscando metadados...",
         "noExistingProviderIds": "Nenhum metadados buscado: nenhum dos provedores da regra de campo ativo tem um ID armazenado neste livro.",
         "allFieldsLocked": "Todos os campos estão bloqueados",
@@ -5453,9 +5526,19 @@
           "hideUnchanged": "Ocultar inalterados",
           "showUnchanged": "Mostrar inalterados",
           "current": "Atual",
+          "new": "Novo",
           "noMetadata": "Nenhum metadado disponível desta fonte.",
           "noChangedFields": "Nenhum campo alterado ou ausente. Use Mostrar inalterados para inspecionar tudo.",
-          "applyToForm": "Aplicar ao formulário"
+          "applyToForm": "Aplicar ao formulário",
+          "secondCover": {
+            "audioResults": "Os resultados da capa do Audiobook",
+            "bookResults": "Os resultados da capa do livro",
+            "showCover": "Exibir a capa {provider}, {index} de {total}",
+            "searchingAudio": "Pesquisando edições de audioobook...",
+            "searchingBook": "Procurando edições de livros...",
+            "noAudio": "Nenhuma capa de audiobook foi encontrada.",
+            "noBook": "Nenhuma capa de livro encontrada."
+          }
         },
         "diff": {
           "locked": "Bloqueado",
@@ -5464,8 +5547,14 @@
           "newCoverAlt": "Nova capa",
           "pickCoverFromProvider": "Escolher capa de outro provedor",
           "pickCoverSource": "Escolher fonte da capa",
+          "coverShapeHint": {
+            "portraitForAudio": "Imagem em retrato. Capas de audiobooks são quadradas.",
+            "squareForBook": "Imagem quadrada. Capas de livro são em formato retrato."
+          },
           "pickFromProvider": "Escolher de outro provedor",
           "pickSource": "Escolher fonte",
+          "useNew": "Use o novo {field}",
+          "keepCurrent": "Manter a atual {field}",
           "genreWriteMode": {
             "label": "Como aplicar gêneros",
             "merge": "Mesclar",
@@ -5474,7 +5563,57 @@
           "empty": "vazio",
           "showLess": "Mostrar menos",
           "showMore": "Mostrar mais",
-          "coverPreviewAlt": "Pré-visualização da capa"
+          "coverPreviewAlt": "Pré-visualização da capa",
+          "fields": {
+            "coverUrl": "Capa",
+            "bookCover": "Capa do Livro",
+            "audioCover": "Capa de Audiobook",
+            "title": "Título",
+            "subtitle": "Subtítulo",
+            "authors": "Autores",
+            "description": "Descrição",
+            "publisher": "Editora",
+            "publishedDate": "Publicado",
+            "language": "Idioma",
+            "pageCount": "Número de páginas",
+            "communityRating": "Avaliação da comunidade",
+            "seriesName": "Séries",
+            "seriesIndex": "Índice da série",
+            "isbn13": "ISBN-13",
+            "isbn10": "ISBN-10",
+            "genres": "Gêneros",
+            "narrators": "Narradores",
+            "durationSeconds": "Duração (segundos)",
+            "abridged": "Resumido",
+            "hardcoverEditionId": "ID da edição Hardcover",
+            "comicIssueNumber": "Número de emissão",
+            "comicVolumeName": "Volume",
+            "comicPencillers": "Desenhistas",
+            "comicInkers": "Colaboradores",
+            "comicColorists": "Coloristas",
+            "comicLetterers": "Letristas",
+            "comicCoverArtists": "Artistas da capa",
+            "comicCharacters": "Personagens",
+            "comicTeams": "Equipes",
+            "comicLocations": "Localizações",
+            "comicStoryArcs": "Arcos de História",
+            "sourceUrl": "URL de origem"
+          },
+          "providerIds": {
+            "google": "ID Google Books",
+            "goodreads": "ID Goodreads",
+            "amazon": "ID da Amazon",
+            "hardcover": "ID do Hardcover",
+            "openLibrary": "ID do Open Library",
+            "itunes": "ID do iTunes",
+            "audible": "ID do Audible",
+            "librofm": "Libro.fm ISBN",
+            "comicvine": "ID da ComicVine",
+            "ranobedb": "ID do RanobeDB",
+            "kobo": "ID do KOBO",
+            "lubimyczytac": "ID do LubimyCzytac",
+            "aladin": "ID do Aladin"
+          }
         },
         "searchDrawer": {
           "searchTitle": "Buscar Metadados",
@@ -6168,6 +6307,15 @@
       "chips": {
         "addPlaceholder": "Adicionar..."
       },
+      "quickFilter": {
+        "presentFiles": "Filtrar para apresentar arquivos",
+        "missingFiles": "Filtrar para arquivos ausentes",
+        "withCovers": "Filtrar para livros com capas",
+        "missingCovers": "Filtrar por livros sem capas",
+        "missingAudioCovers": "Filtrar para livros com capas de audiolivro faltando",
+        "withValues": "Filtro para linhas com valores",
+        "emptyRows": "Filtro para linhas vazias"
+      },
       "cover": {
         "previewDescription": "Pré-visualização da capa do livro",
         "editDescription": "Editar capa do livro",
@@ -6214,6 +6362,8 @@
       "read": {
         "play": "Ouvir",
         "read": "Ler",
+        "readFormat": "Ler {format}",
+        "playFormat": "Reproduzir {format}",
         "primary": "Primário",
         "peekFormat": "Espiar {format}",
         "chooseFormat": "Escolha o formato para ler ou ouvir",
@@ -8345,7 +8495,8 @@
           "title": "Estilo da capa",
           "portrait": "Retrato",
           "square": "Quadrado",
-          "hint": "Retrato para e-books ou bibliotecas mistas. Quadrado para bibliotecas exclusivas de audiolivros."
+          "hint": "Retrato para e-books ou bibliotecas mistas. Quadrado para bibliotecas exclusivas de audiolivros.",
+          "hintSlots": "Retrato para livros ebook ou bibliotecas mistas, quadrado para bibliotecas somente de audiolivro. Um livro com um ebook e um audiobook mostra sua capa de livro em uma biblioteca como retrato e sua capa de audiolivro em um quadrado."
         },
         "icon": {
           "label": "Ícone",
@@ -8468,7 +8619,9 @@
         "formatPriority": {
           "title": "Prioridade de formato",
           "hint": "Quando um livro possui vários formatos, o formato mais alto na lista é o preferido."
-        }
+        },
+        "moveUp": "Mover {item} para cima",
+        "moveDown": "Mover {item} para baixo"
       },
       "fileWrite": {
         "maxFileSizeMb": "Tamanho máx. do arquivo (MB)",
@@ -8523,7 +8676,8 @@
         },
         "markAsFinished": {
           "title": "Marcar como concluído",
-          "hint": "Um livro é automaticamente marcado como \"lido\" quando atingir esta porcentagem de progresso."
+          "hint": "Um livro é automaticamente marcado como \"lido\" quando atingir esta porcentagem de progresso.",
+          "invalidThreshold": "O progresso concluído deve situar-se entre 90% e 100%."
         }
       },
       "schedule": {
@@ -10347,10 +10501,21 @@
         "extracted": "Extraído",
         "custom": "Personalizado"
       },
+      "brokenSlot": {
+        "ebookExtracted": "Capa de livros, extraída",
+        "ebookCustom": "Capa de livro, personalizada",
+        "audioExtracted": "Capa de audioobook extraída",
+        "audioCustom": "Capa personalizada de audioobook"
+      },
       "table": {
         "selectPage": "Selecionar tudo nesta página",
         "coverFolder": "Pasta de capa do livro #{bookId}",
-        "fileCount": "{count, plural, one {# arquivo} other {# arquivos}}"
+        "fileCount": "{count, plural, one {# arquivo} other {# arquivos}}",
+        "orphanMedia": {
+          "ebook": "Capa do Livro",
+          "audio": "Capa de Audiobook",
+          "both": "Capas de livro e audiobooks"
+        }
       },
       "confirm": {
         "title": "Limpar recursos que faltam?",

@@ -106,6 +106,7 @@ export class BulkRenameRepository {
           format: bookFiles.format,
           role: bookFiles.role,
           sortOrder: bookFiles.sortOrder,
+          mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
         })
         .from(bookFiles)
         .where(inArray(bookFiles.bookId, libraryBookIds))
@@ -120,6 +121,7 @@ export class BulkRenameRepository {
         format: row.format,
         role: row.role,
         sortOrder: row.sortOrder,
+        mediaOverlayAvailable: row.mediaOverlayAvailable,
       };
       const existing = filesByBook.get(row.bookId);
       if (existing) existing.push(entry);

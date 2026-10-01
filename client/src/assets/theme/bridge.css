@@ -65,6 +65,8 @@
 
   --color-diff-del: var(--diff-del);
   --color-diff-ins: var(--diff-ins);
+  --color-scrim: var(--scrim);
+  --color-scrim-media: var(--scrim-media);
   --color-path-dim: var(--path-dim);
   --color-path-fold: var(--path-fold);
 

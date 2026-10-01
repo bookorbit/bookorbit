@@ -14,10 +14,14 @@ const routeState = { name: 'settings-appearance-theme' }
 
 const push = vi.fn<(to: { name: string }) => void>()
 
-vi.mock('vue-router', () => ({
-  useRoute: () => ({ name: routeState.name }),
-  useRouter: () => ({ push }),
-}))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...actual,
+    useRoute: () => ({ name: routeState.name }),
+    useRouter: () => ({ push }),
+  }
+})
 
 const navStatus = vi.hoisted(() => ({ scanning: false }))
 

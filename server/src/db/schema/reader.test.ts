@@ -1,4 +1,4 @@
-import { getTableConfig } from 'drizzle-orm/pg-core';
+import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core';
 
 import {
   annotations,
@@ -103,6 +103,16 @@ describe('reader schema', () => {
     expect(annotationFks.get('book_id')?.onDelete).toBe('cascade');
     expect(annotations.color.default).toBe('yellow');
     expect(annotations.style.default).toBe('highlight');
+  });
+
+  it('frees a deleted audio bookmark position but keeps CFI tombstones unique for KOReader revival', () => {
+    const dialect = new PgDialect();
+    const predicates = new Map(getTableConfig(bookmarks).indexes.map((idx) => [idx.config.name, idx.config.where]));
+    const positionPredicate = dialect.sqlToQuery(predicates.get('bookmarks_user_book_pos_uidx')!).sql;
+    const cfiPredicate = dialect.sqlToQuery(predicates.get('bookmarks_user_book_cfi_uidx')!).sql;
+
+    expect(positionPredicate).toContain('"deleted_at" is null');
+    expect(cfiPredicate).not.toContain('deleted_at');
   });
 
   it('keeps reader preference uniqueness scoped to user and format/file', () => {

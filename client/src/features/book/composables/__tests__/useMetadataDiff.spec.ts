@@ -1,7 +1,15 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { ref } from 'vue'
-import type { MetadataCandidate, MetadataProviderKey, MetadataSource } from '@bookorbit/types'
-import { useMetadataDiff } from '../useMetadataDiff'
+import { ref, type Ref } from 'vue'
+import type {
+  BookMetadataLockField,
+  MetadataCandidate,
+  MetadataProviderInfo,
+  MetadataProviderKey,
+  MetadataSource,
+  ProviderIds,
+} from '@bookorbit/types'
+import { useMetadataDiff, type MetadataDiffInput } from '../useMetadataDiff'
 
 describe('useMetadataDiff', () => {
   const mockCurrent: MetadataSource = {
@@ -26,7 +34,7 @@ describe('useMetadataDiff', () => {
     communityRatings: [],
   }
 
-  const mockCandidate1: MetadataCandidate = {
+  const google: MetadataCandidate = {
     provider: 'google',
     providerId: 'g1',
     title: 'Google Title',
@@ -35,7 +43,7 @@ describe('useMetadataDiff', () => {
     coverUrl: 'http://google.com/cover.jpg',
   }
 
-  const mockCandidate2: MetadataCandidate = {
+  const goodreads: MetadataCandidate = {
     provider: 'goodreads',
     providerId: 'gr1',
     title: 'Goodreads Title',
@@ -43,246 +51,247 @@ describe('useMetadataDiff', () => {
     genres: ['Genre 2'],
   }
 
-  const providers = [
-    { key: 'google' as MetadataProviderKey, label: 'Google Books', identifiable: true },
-    { key: 'goodreads' as MetadataProviderKey, label: 'Goodreads', identifiable: true },
+  const providers: MetadataProviderInfo[] = [
+    { key: 'google', label: 'Google Books', identifiable: true },
+    { key: 'goodreads', label: 'Goodreads', identifiable: true },
+    { key: 'hardcover', label: 'Hardcover', identifiable: true },
+    { key: 'amazon', label: 'Amazon', identifiable: true },
+    { key: 'audible', label: 'Audible', identifiable: true },
   ]
 
-  const communityRatingProviders = [
-    { key: 'hardcover' as MetadataProviderKey, label: 'Hardcover', identifiable: true },
-    { key: 'amazon' as MetadataProviderKey, label: 'Amazon', identifiable: true },
-  ]
-  const hardcoverProviders = [communityRatingProviders[0]]
+  function setup(
+    active: MetadataCandidate | Ref<MetadataCandidate | null>,
+    options: Partial<Omit<MetadataDiffInput, 'active'>> & { lockedFields?: readonly BookMetadataLockField[]; providerIds?: ProviderIds } = {},
+  ) {
+    const activeRef = 'value' in active ? active : ref<MetadataCandidate | null>(active)
+    return useMetadataDiff({
+      current: mockCurrent,
+      alternatives: [],
+      providers,
+      ...options,
+      active: activeRef,
+    })
+  }
 
-  it('initializes with fields from active provider', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+  const field = (diff: ReturnType<typeof setup>, key: string) => diff.fields.value.find((f) => f.key === key)
 
-    const titleField = fields.value.find((f) => f.key === 'title')
-    expect(titleField).toBeDefined()
-    expect(titleField?.candidateDisplay).toBe('Google Title')
-    expect(titleField?.bookValue).toBe('Original Title')
+  it('lines up the active result against the book', () => {
+    const diff = setup(google)
+
+    expect(field(diff, 'title')).toMatchObject({ candidateDisplay: 'Google Title', bookValue: 'Original Title', kind: 'change' })
   })
 
-  it('switches fields when active provider changes', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+  it('follows the active result when it changes', () => {
+    const active = ref<MetadataCandidate | null>(google)
+    const diff = setup(active)
 
-    activeProvider.value = 'goodreads'
-    const titleField = fields.value.find((f) => f.key === 'title')
-    expect(titleField?.candidateDisplay).toBe('Goodreads Title')
+    active.value = goodreads
+    expect(field(diff, 'title')?.candidateDisplay).toBe('Goodreads Title')
   })
 
-  it('toggles a field for picking', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields, toggleField } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
-
-    toggleField('title')
-    const titleField = fields.value.find((f) => f.key === 'title')
-    expect(titleField?.isPicked).toBe(true)
-    expect(titleField?.pickedProvider).toBe('google')
+  it('has no rows without an active result', () => {
+    expect(setup(ref(null)).fields.value).toEqual([])
   })
 
-  it('picks a field from a specific provider', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields, pickFieldFromProvider } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+  it('names how each field differs, and marks a reordered list as minor', () => {
+    const diff = setup({
+      provider: 'goodreads',
+      providerId: 'gr1',
+      title: 'original title',
+      genres: ['Genre 1'],
+      authors: ['Original Author'],
+      publisher: 'Other House',
+      language: 'English',
+      isbn13: '978-1234567890',
+    })
 
-    pickFieldFromProvider('authors', 'goodreads')
-    const authorsField = fields.value.find((f) => f.key === 'authors')
-    expect(authorsField?.isPicked).toBe(true)
-    expect(authorsField?.pickedProvider).toBe('goodreads')
-    expect(authorsField?.pickedDisplay).toBe('Goodreads Author')
+    expect(field(diff, 'title')).toMatchObject({ kind: 'minor', minorReason: 'capitalization' })
+    expect(field(diff, 'authors')?.kind).toBe('same')
+    expect(field(diff, 'publisher')?.kind).toBe('change')
+    expect(field(diff, 'language')).toMatchObject({ kind: 'minor', minorReason: 'languageCode' })
+    expect(field(diff, 'goodreadsId')?.kind).toBe('fill')
   })
 
-  it('builds a patch with picked fields', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { toggleField, pickFieldFromProvider, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+  it('shows a description as plain text and compares it without markup', () => {
+    const current = { ...mockCurrent, description: '<p>A <b>bold</b> start.</p>' }
+    const diff = setup({ ...goodreads, description: 'A bold start.' }, { current })
 
-    toggleField('title') // google
-    pickFieldFromProvider('authors', 'goodreads')
+    expect(field(diff, 'description')).toMatchObject({ bookValue: 'A bold start.', kind: 'minor', minorReason: 'formatting' })
+  })
 
-    const { formPatch } = buildPatch()
+  it('stages a field from the active result', () => {
+    const diff = setup(google)
+
+    diff.toggleField('title')
+    expect(field(diff, 'title')).toMatchObject({ isPicked: true, pickedFromActive: true, pickedProvider: 'google' })
+    expect(diff.decisionOf(field(diff, 'title')!)).toBe('use')
+  })
+
+  it('keeps a pick when another result becomes active, and says where it came from', () => {
+    const active = ref<MetadataCandidate | null>(google)
+    const diff = setup(active)
+
+    diff.setField('authors', 'use')
+    active.value = goodreads
+
+    expect(field(diff, 'authors')).toMatchObject({ isPicked: true, pickedFromActive: false, pickedProvider: 'google' })
+    expect(diff.decisionOf(field(diff, 'authors')!)).toBe('keep')
+    expect(diff.buildPatch().formPatch.authors).toEqual(['Google Author'])
+  })
+
+  it('keeps picks from two results of the same provider apart', () => {
+    const second: MetadataCandidate = { provider: 'google', providerId: 'g2', title: 'Second Edition', pageCount: 412 }
+    const active = ref<MetadataCandidate | null>(google)
+    const diff = setup(active)
+
+    diff.setField('title', 'use')
+    active.value = second
+    diff.setField('pageCount', 'use')
+
+    expect(diff.buildPatch().formPatch).toMatchObject({ title: 'Google Title', pageCount: 412 })
+    expect(diff.stagedByCandidate.value.get('google:g1')).toBe(1)
+    expect(diff.stagedByCandidate.value.get('google:g2')).toBe(1)
+  })
+
+  it('stages a field from another result', () => {
+    const diff = setup(google, { alternatives: [google, goodreads] })
+
+    diff.setField('authors', 'use', goodreads)
+    expect(field(diff, 'authors')).toMatchObject({ isPicked: true, pickedFromActive: false, pickedProvider: 'goodreads' })
+  })
+
+  it('builds a patch reading each field from its own result, and links every provider that contributed', () => {
+    const diff = setup(google)
+
+    diff.toggleField('title')
+    diff.setField('authors', 'use', goodreads)
+
+    const { formPatch } = diff.buildPatch()
     expect(formPatch.title).toBe('Google Title')
     expect(formPatch.authors).toEqual(['Goodreads Author'])
-    // Should auto-include provider IDs
     expect(formPatch.googleBooksId).toBe('g1')
     expect(formPatch.goodreadsId).toBe('gr1')
   })
 
+  it('groups the values other results offer, once per value', () => {
+    const agreeing: MetadataCandidate = { provider: 'amazon', providerId: 'a1', title: 'Goodreads Title' }
+    const same: MetadataCandidate = { provider: 'hardcover', providerId: 'h1', title: 'Original Title' }
+    const diff = setup(google, { alternatives: [google, goodreads, agreeing, same] })
+
+    const others = field(diff, 'title')?.otherValues ?? []
+    expect(others.map((entry) => [entry.display, entry.candidates.map((c) => c.provider), entry.matchesCurrent])).toEqual([
+      ['Goodreads Title', ['goodreads', 'amazon'], false],
+      ['Original Title', ['hardcover'], true],
+    ])
+
+    diff.setField('title', 'use', agreeing)
+    expect(field(diff, 'title')?.otherValues[0]?.isPicked).toBe(true)
+  })
+
   it('merges provider genres into the current list by default', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'goodreads',
-      providerId: 'gr1',
-      title: 'Goodreads Title',
-      genres: [' genre 1 ', 'Genre 2', 'GENRE 2', ''],
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('goodreads')
-    const { fields, toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+    const diff = setup({ provider: 'goodreads', providerId: 'gr1', title: 'Goodreads Title', genres: [' genre 1 ', 'Genre 2', 'GENRE 2', ''] })
 
-    toggleField('genres')
+    expect(field(diff, 'genres')?.mergeable).toBe(true)
+    diff.toggleField('genres')
 
-    expect(fields.value.find((field) => field.key === 'genres')?.currentDisplay).toBe('Genre 1, Genre 2')
-    expect(buildPatch().formPatch.genres).toEqual(['Genre 1', 'Genre 2'])
+    expect(diff.decisionOf(field(diff, 'genres')!)).toBe('merge')
+    expect(diff.buildPatch().formPatch.genres).toEqual(['Genre 1', 'Genre 2'])
+    expect(diff.staged.value[0]).toMatchObject({ after: 'Genre 1, Genre 2', merged: true })
   })
 
   it('can replace current genres explicitly', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'goodreads',
-      providerId: 'gr1',
-      title: 'Goodreads Title',
-      genres: ['Genre 2', 'genre 2', 'Genre 3'],
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('goodreads')
-    const { toggleField, buildPatch, setGenreWriteMode } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+    const diff = setup({ provider: 'goodreads', providerId: 'gr1', title: 'Goodreads Title', genres: ['Genre 2', 'genre 2', 'Genre 3'] })
 
-    toggleField('genres')
-    setGenreWriteMode('replace')
+    diff.setField('genres', 'replace')
 
-    expect(buildPatch().formPatch.genres).toEqual(['Genre 2', 'Genre 3'])
+    expect(diff.decisionOf(field(diff, 'genres')!)).toBe('replace')
+    expect(diff.buildPatch().formPatch.genres).toEqual(['Genre 2', 'Genre 3'])
   })
 
   it('shows and applies the Libro.fm ISBN as a provider ID', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'librofm',
-      providerId: '9781234567890',
-      title: 'Libro.fm Title',
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('librofm')
-    const { fields, toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, [
-      { key: 'librofm', label: 'Libro.fm', identifiable: true },
-    ])
+    const diff = setup(
+      { provider: 'librofm', providerId: '9781234567890', title: 'Libro.fm Title' },
+      { providers: [{ key: 'librofm', label: 'Libro.fm', identifiable: true }] },
+    )
 
-    expect(fields.value.find((field) => field.key === 'librofmId')).toMatchObject({
+    expect(field(diff, 'librofmId')).toMatchObject({
       labelKey: 'book.detail.editMetadata.diff.providerIds.librofm',
       candidateDisplay: '9781234567890',
     })
 
-    toggleField('title')
-    expect(buildPatch().formPatch.librofmId).toBe('9781234567890')
+    diff.toggleField('title')
+    expect(diff.buildPatch().formPatch.librofmId).toBe('9781234567890')
   })
 
   it('shows and applies an AudNexus ASIN as the Audible ID', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'audnexus',
-      providerId: 'B0TEST12345',
-      audibleId: 'B0TEST12345',
-      title: 'AudNexus Title',
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('audnexus')
-    const providerIds = ref({ audible: 'B0OLD12345' })
-    const { fields, toggleField, buildPatch } = useMetadataDiff(
-      mockCurrent,
-      candidates,
-      activeProvider,
-      [{ key: 'audnexus', label: 'AudNexus', identifiable: false }],
-      undefined,
-      providerIds,
+    const diff = setup(
+      { provider: 'audnexus', providerId: 'B0TEST12345', audibleId: 'B0TEST12345', title: 'AudNexus Title' },
+      { providers: [{ key: 'audnexus', label: 'AudNexus', identifiable: false }], providerIds: { audible: 'B0OLD12345' } },
     )
 
-    expect(fields.value.find((field) => field.key === 'audibleId')).toMatchObject({
+    expect(field(diff, 'audibleId')).toMatchObject({
       labelKey: 'book.detail.editMetadata.diff.providerIds.audible',
       bookValue: 'B0OLD12345',
       candidateDisplay: 'B0TEST12345',
+      kind: 'change',
     })
 
-    toggleField('title')
-    expect(buildPatch().formPatch.audibleId).toBe('B0TEST12345')
+    diff.toggleField('title')
+    expect(diff.buildPatch().formPatch.audibleId).toBe('B0TEST12345')
   })
 
   it('builds a date and derived year patch when published date is picked', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'google',
-      providerId: 'g1',
-      title: 'Google Title',
-      publishedDate: '1965-08-01',
-      publishedYear: 1965,
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+    const diff = setup({ provider: 'google', providerId: 'g1', title: 'Google Title', publishedDate: '1965-08-01', publishedYear: 1965 })
 
-    toggleField('publishedDate')
+    diff.toggleField('publishedDate')
 
-    expect(buildPatch().formPatch).toMatchObject({
-      publishedDate: '1965-08-01',
-      publishedYear: 1965,
-    })
+    expect(diff.buildPatch().formPatch).toMatchObject({ publishedDate: '1965-08-01', publishedYear: 1965 })
   })
 
   it('uses the publishedYear lock for publishedDate picks', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'google',
-      providerId: 'g1',
-      title: 'Google Title',
-      publishedDate: '1965-08-01',
-      publishedYear: 1965,
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields, toggleField, buildPatch } = useMetadataDiff(
-      mockCurrent,
-      candidates,
-      activeProvider,
-      providers,
-      undefined,
-      undefined,
-      ref(['publishedYear']),
+    const diff = setup(
+      { provider: 'google', providerId: 'g1', title: 'Google Title', publishedDate: '1965-08-01', publishedYear: 1965 },
+      { lockedFields: ['publishedYear'] },
     )
 
-    const field = fields.value.find((f) => f.key === 'publishedDate')
-    expect(field?.isLocked).toBe(true)
+    expect(field(diff, 'publishedDate')?.isLocked).toBe(true)
+    diff.toggleField('publishedDate')
 
-    toggleField('publishedDate')
-
-    expect(buildPatch().formPatch.publishedDate).toBeUndefined()
-    expect(buildPatch().formPatch.publishedYear).toBeUndefined()
+    expect(diff.buildPatch().formPatch.publishedDate).toBeUndefined()
+    expect(diff.buildPatch().formPatch.publishedYear).toBeUndefined()
   })
 
   it('builds a provider-specific community ratings patch', () => {
-    const hardcoverCandidate: MetadataCandidate = {
+    const hardcover: MetadataCandidate = {
       provider: 'hardcover',
       providerId: 'hardcover-book',
       title: 'Hardcover Title',
       communityRating: 4.25,
       communityRatingCount: 12345,
     }
-    const amazonCandidate: MetadataCandidate = {
+    const amazon: MetadataCandidate = {
       provider: 'amazon',
       providerId: 'B00X47ZVXM',
       title: 'Amazon Title',
       communityRating: 4.8,
       communityRatingCount: 104451,
     }
-    const candidates = ref([hardcoverCandidate, amazonCandidate])
-    const activeProvider = ref<MetadataProviderKey>('hardcover')
-    const { fields, toggleField, pickFieldFromProvider, buildPatch } = useMetadataDiff(
-      mockCurrent,
-      candidates,
-      activeProvider,
-      communityRatingProviders,
-    )
+    const active = ref<MetadataCandidate | null>(hardcover)
+    const diff = setup(active)
 
-    const ratingField = fields.value.find((f) => f.key === 'communityRating')
-    expect(ratingField).toEqual(
-      expect.objectContaining({
-        bookValue: '',
-        candidateDisplay: '4.3 / 5 (12,345 ratings)',
-      }),
-    )
+    expect(field(diff, 'communityRating')).toMatchObject({
+      labelKey: 'book.detail.editMetadata.match.providerRating',
+      labelParams: { provider: 'Hardcover' },
+      bookValue: '',
+      candidateDisplay: '4.3 / 5 (12,345 ratings)',
+      kind: 'fill',
+    })
 
-    toggleField('communityRating')
-    pickFieldFromProvider('communityRating', 'amazon')
+    diff.toggleField('communityRating')
+    active.value = amazon
+    diff.toggleField('communityRating')
 
-    expect(buildPatch().formPatch).toMatchObject({
+    expect(diff.buildPatch().formPatch).toMatchObject({
       communityRatings: [
         { provider: 'hardcover', rating: 4.25, ratingCount: 12345 },
         { provider: 'amazon', rating: 4.8, ratingCount: 104451 },
@@ -292,330 +301,234 @@ describe('useMetadataDiff', () => {
     })
   })
 
-  it('shows and applies Hardcover edition IDs as lockable metadata fields', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'hardcover',
-      providerId: 'the-name-of-the-wind',
-      hardcoverEditionId: '1001',
-      title: 'Hardcover Title',
+  it('treats a refreshed rating count as a minor difference', () => {
+    const current = {
+      ...mockCurrent,
+      communityRatings: [{ provider: 'amazon' as MetadataProviderKey, rating: 4.4, ratingCount: 9846, updatedAt: null }],
     }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('hardcover')
-    const { fields, toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, hardcoverProviders)
+    const diff = setup({ provider: 'amazon', providerId: 'a1', title: 'Amazon Title', communityRating: 4.4, communityRatingCount: 9771 }, { current })
 
-    const editionField = fields.value.find((f) => f.key === 'hardcoverEditionId')
-    expect(editionField).toEqual(
-      expect.objectContaining({
-        bookValue: '',
-        candidateDisplay: '1001',
-        isLocked: false,
-      }),
-    )
+    expect(field(diff, 'communityRating')).toMatchObject({ kind: 'minor', minorReason: 'ratingCount' })
+  })
 
-    toggleField('hardcoverEditionId')
-    expect(buildPatch().formPatch).toEqual({
-      hardcoverEditionId: '1001',
-      hardcoverId: 'the-name-of-the-wind',
-    })
+  it('shows and applies Hardcover edition IDs as lockable metadata fields', () => {
+    const diff = setup({ provider: 'hardcover', providerId: 'the-name-of-the-wind', hardcoverEditionId: '1001', title: 'Hardcover Title' })
+
+    expect(field(diff, 'hardcoverEditionId')).toMatchObject({ bookValue: '', candidateDisplay: '1001', isLocked: false })
+
+    diff.toggleField('hardcoverEditionId')
+    expect(diff.buildPatch().formPatch).toEqual({ hardcoverEditionId: '1001', hardcoverId: 'the-name-of-the-wind' })
   })
 
   it('auto-includes unlocked Hardcover edition IDs when applying other Hardcover fields', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'hardcover',
-      providerId: 'the-name-of-the-wind',
-      hardcoverEditionId: '1001',
-      title: 'Hardcover Title',
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('hardcover')
-    const { toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, hardcoverProviders)
+    const diff = setup({ provider: 'hardcover', providerId: 'the-name-of-the-wind', hardcoverEditionId: '1001', title: 'Hardcover Title' })
 
-    toggleField('title')
+    diff.toggleField('title')
 
-    expect(buildPatch().formPatch).toMatchObject({
-      title: 'Hardcover Title',
-      hardcoverId: 'the-name-of-the-wind',
-      hardcoverEditionId: '1001',
-    })
+    expect(diff.buildPatch().formPatch).toMatchObject({ title: 'Hardcover Title', hardcoverId: 'the-name-of-the-wind', hardcoverEditionId: '1001' })
   })
 
   it('does not auto-include locked Hardcover edition IDs', () => {
-    const candidate: MetadataCandidate = {
-      provider: 'hardcover',
-      providerId: 'the-name-of-the-wind',
-      hardcoverEditionId: '1001',
-      title: 'Hardcover Title',
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('hardcover')
-    const { toggleField, buildPatch } = useMetadataDiff(
-      mockCurrent,
-      candidates,
-      activeProvider,
-      hardcoverProviders,
-      undefined,
-      undefined,
-      ref(['hardcoverEditionId'] as const),
+    const diff = setup(
+      { provider: 'hardcover', providerId: 'the-name-of-the-wind', hardcoverEditionId: '1001', title: 'Hardcover Title' },
+      { lockedFields: ['hardcoverEditionId'] },
     )
 
-    toggleField('title')
+    diff.toggleField('title')
 
-    expect(buildPatch().formPatch).toMatchObject({
-      title: 'Hardcover Title',
-      hardcoverId: 'the-name-of-the-wind',
-    })
-    expect(buildPatch().formPatch.hardcoverEditionId).toBeUndefined()
+    expect(diff.buildPatch().formPatch).toMatchObject({ title: 'Hardcover Title', hardcoverId: 'the-name-of-the-wind' })
+    expect(diff.buildPatch().formPatch.hardcoverEditionId).toBeUndefined()
   })
 
-  it('builds series memberships when series name and index are picked from the same provider', () => {
-    const audibleCandidate: MetadataCandidate = {
-      provider: 'audible',
-      providerId: 'B002V1NSN2',
-      title: 'Confessor',
-      seriesName: 'Sword of Truth',
-      seriesIndex: '11',
-      seriesMemberships: [
-        { seriesName: 'Sword of Truth', seriesIndex: '11', expectedBookCount: 12 },
-        { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
-      ],
-    }
-    const candidates = ref([audibleCandidate])
-    const activeProvider = ref<MetadataProviderKey>('audible')
-    const { toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, [
-      { key: 'audible' as MetadataProviderKey, label: 'Audible', identifiable: true },
-    ])
+  const audible: MetadataCandidate = {
+    provider: 'audible',
+    providerId: 'B002V1NSN2',
+    title: 'Confessor',
+    seriesName: 'Sword of Truth',
+    seriesIndex: '11',
+    seriesMemberships: [
+      { seriesName: 'Sword of Truth', seriesIndex: '11' },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
+    ],
+  }
 
-    toggleField('seriesName')
-    toggleField('seriesIndex')
+  it('builds series memberships when series name and index are picked from the same result', () => {
+    const diff = setup(audible)
 
-    expect(buildPatch().formPatch.seriesMemberships).toEqual([
-      { seriesName: 'Sword of Truth', seriesIndex: '11', expectedBookCount: 12 },
-      { seriesName: 'Chainfire Trilogy', seriesIndex: '3', expectedBookCount: null },
+    diff.toggleField('seriesName')
+    diff.toggleField('seriesIndex')
+
+    expect(diff.buildPatch().formPatch.seriesMemberships).toEqual([
+      { seriesName: 'Sword of Truth', seriesIndex: '11' },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
     ])
   })
 
   it('does not replace series memberships when only the series name is picked', () => {
-    const audibleCandidate: MetadataCandidate = {
-      provider: 'audible',
-      providerId: 'B002V1NSN2',
-      title: 'Confessor',
-      seriesName: 'Sword of Truth',
-      seriesIndex: '11',
-      seriesMemberships: [
-        { seriesName: 'Sword of Truth', seriesIndex: '11' },
-        { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
-      ],
-    }
-    const candidates = ref([audibleCandidate])
-    const activeProvider = ref<MetadataProviderKey>('audible')
-    const { toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, [
-      { key: 'audible' as MetadataProviderKey, label: 'Audible', identifiable: true },
+    const diff = setup(audible)
+
+    diff.toggleField('seriesName')
+
+    expect(diff.buildPatch().formPatch.seriesMemberships).toBeUndefined()
+  })
+
+  it('does not build memberships from a name and an index of different results', () => {
+    const other: MetadataCandidate = { ...audible, providerId: 'B00OTHER', seriesIndex: '12' }
+    const diff = setup(audible)
+
+    diff.setField('seriesName', 'use')
+    diff.setField('seriesIndex', 'use', other)
+
+    expect(diff.buildPatch().formPatch.seriesMemberships).toBeUndefined()
+  })
+
+  it('takes every difference from the active result', () => {
+    const diff = setup(google)
+
+    expect(diff.takeAllCount.value).toBe(diff.fields.value.filter((f) => f.hasDiff).length + 1)
+    diff.takeAll()
+
+    expect(diff.fields.value.every((f) => !f.hasDiff || f.isPicked)).toBe(true)
+    expect(field(diff, 'title')?.pickedProvider).toBe('google')
+    expect(diff.buildPatch().coverUrl).toBe('http://google.com/cover.jpg')
+  })
+
+  it('fills only the fields that are empty on the book', () => {
+    const diff = setup(google, { current: { ...mockCurrent, description: '' } })
+
+    diff.fillEmpty()
+
+    expect(field(diff, 'title')?.isPicked).toBe(false)
+    expect(field(diff, 'description')?.isPicked).toBe(true)
+  })
+
+  it('lists staged changes with what they replace, and unstages one', () => {
+    const diff = setup(google)
+
+    diff.toggleField('title')
+    diff.toggleField('description')
+
+    expect(diff.staged.value.map((change) => [change.key, change.before, change.after])).toEqual([
+      ['title', 'Original Title', 'Google Title'],
+      ['description', 'Original Description', 'Google Description'],
     ])
+    diff.unstage('title')
+    expect(diff.staged.value.map((change) => change.key)).toEqual(['description'])
 
-    toggleField('seriesName')
-
-    expect(buildPatch().formPatch.seriesMemberships).toBeUndefined()
-  })
-
-  it('copyAll picks everything from active provider', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields, copyAll } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
-
-    copyAll()
-    expect(fields.value.every((f) => !f.isCopyable || f.isPicked)).toBe(true)
-    expect(fields.value.find((f) => f.key === 'title')?.pickedProvider).toBe('google')
-  })
-
-  it('clearPicksForProvider clears only that provider', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { toggleField, pickFieldFromProvider, clearPicksForProvider, fields } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
-
-    toggleField('title') // google
-    pickFieldFromProvider('authors', 'goodreads')
-
-    clearPicksForProvider('google')
-    expect(fields.value.find((f) => f.key === 'title')?.isPicked).toBe(false)
-    expect(fields.value.find((f) => f.key === 'authors')?.isPicked).toBe(true)
-  })
-
-  it('copyMissing picks only fields that are empty on the book', () => {
-    const currentWithEmpty = { ...mockCurrent, description: '' }
-    const candidates = ref([mockCandidate1])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields, copyMissing } = useMetadataDiff(currentWithEmpty, candidates, activeProvider, providers)
-
-    copyMissing()
-
-    expect(fields.value.find((f) => f.key === 'title')?.isPicked).toBe(false)
-    expect(fields.value.find((f) => f.key === 'description')?.isPicked).toBe(true)
+    diff.clearAll()
+    expect(diff.hasCopied.value).toBe(false)
   })
 
   it('handles comic metadata fields', () => {
-    const mockComic: MetadataCandidate = {
-      provider: 'google',
-      providerId: 'c1',
-      title: 'Comic',
-      comicMetadata: {
-        issueNumber: '42',
-        volumeName: 'Volume 1',
-      },
-    }
-    const candidates = ref([mockComic])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+    const diff = setup({ provider: 'google', providerId: 'c1', title: 'Comic', comicMetadata: { issueNumber: '42', volumeName: 'Volume 1' } })
 
-    const issueField = fields.value.find((f) => f.key === 'comicIssueNumber')
-    expect(issueField).toBeDefined()
-    expect(issueField?.candidateDisplay).toBe('42')
-  })
-
-  it('provides multiple values from different providers for a single field', () => {
-    const candidates = ref([mockCandidate1, mockCandidate2])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
-
-    const authorsField = fields.value.find((f) => f.key === 'authors')
-    expect(authorsField?.providerValues).toHaveLength(2)
-    expect(authorsField?.providerValues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ provider: 'google', display: 'Google Author' }),
-        expect.objectContaining({ provider: 'goodreads', display: 'Goodreads Author' }),
-      ]),
-    )
+    expect(field(diff, 'comicIssueNumber')).toMatchObject({ candidateDisplay: '42', kind: 'fill' })
   })
 
   it('marks locked fields and prevents them from being picked', () => {
-    const candidates = ref([mockCandidate1])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const lockedFields = ref(['title'] as const)
-    const { fields, toggleField, buildPatch } = useMetadataDiff(
-      mockCurrent,
-      candidates,
-      activeProvider,
-      providers,
-      undefined,
-      undefined,
-      lockedFields,
-    )
+    const diff = setup(google, { lockedFields: ['title'] })
 
-    toggleField('title')
+    diff.toggleField('title')
+    diff.takeAll()
 
-    expect(fields.value.find((f) => f.key === 'title')?.isLocked).toBe(true)
-    expect(fields.value.find((f) => f.key === 'title')?.isPicked).toBe(false)
-    expect(buildPatch().formPatch.title).toBeUndefined()
+    expect(field(diff, 'title')).toMatchObject({ isLocked: true, isPicked: false })
+    expect(diff.buildPatch().formPatch.title).toBeUndefined()
   })
 
-  it('proxies external cover URLs for display and preserves raw cover URL in patch', () => {
+  it('proxies external cover URLs for display and preserves the raw cover URL in the patch', () => {
     const externalCover = 'https://m.media-amazon.com/images/I/41ZaIFRkWyL.jpg'
-    const candidate: MetadataCandidate = {
-      ...mockCandidate1,
-      coverUrl: externalCover,
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields, toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+    const diff = setup({ ...google, coverUrl: externalCover })
 
-    const coverField = fields.value.find((f) => f.key === 'coverUrl')
-    expect(coverField?.candidateDisplay).toContain('/api/v1/books/cover/proxy?url=')
+    expect(diff.cover.value.active?.url).toContain('/api/v1/books/cover/proxy?url=')
+    diff.pickCover(diff.cover.value.active!.candidate)
 
-    toggleField('coverUrl')
-    const { coverUrl } = buildPatch()
-    expect(coverUrl).toBe(externalCover)
+    expect(diff.buildPatch().coverUrl).toBe(externalCover)
   })
 
   it('does not proxy same-origin cover URLs for display', () => {
-    const sameOriginCover = '/api/v1/books/1/cover'
-    const candidate: MetadataCandidate = {
-      ...mockCandidate1,
-      coverUrl: sameOriginCover,
-    }
-    const candidates = ref([candidate])
-    const activeProvider = ref<MetadataProviderKey>('google')
-    const { fields } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+    const diff = setup({ ...google, coverUrl: '/api/v1/books/1/cover' })
 
-    const coverField = fields.value.find((f) => f.key === 'coverUrl')
-    expect(coverField?.candidateDisplay).toBe(sameOriginCover)
+    expect(diff.cover.value.active?.url).toBe('/api/v1/books/1/cover')
   })
 
-  it('gives the cover row the lock, label and frame of the slot it fills, and reads the current cover live', () => {
-    const candidates = ref([mockCandidate1])
-    const activeProvider = ref<MetadataProviderKey>('google')
+  it('gives the cover the lock and slot it fills, and reads the current cover live', () => {
     const currentCover = ref('')
-    const { fields, toggleField, buildPatch } = useMetadataDiff(
-      mockCurrent,
-      candidates,
-      activeProvider,
-      providers,
-      () => currentCover.value,
-      undefined,
-      ['audioCover'],
-      { coverMedium: 'audio', coverLabelKey: 'book.detail.editMetadata.diff.fields.audioCover' },
-    )
+    const diff = setup(google, { currentCoverUrl: () => currentCover.value, lockedFields: ['audioCover'], coverMedium: 'audio' })
 
-    expect(fields.value.find((f) => f.key === 'coverUrl')).toMatchObject({
-      labelKey: 'book.detail.editMetadata.diff.fields.audioCover',
-      coverMedium: 'audio',
-      isLocked: true,
-      bookValue: '',
-    })
-    toggleField('coverUrl')
-    expect(buildPatch().coverUrl).toBeUndefined()
+    expect(diff.cover.value).toMatchObject({ medium: 'audio', locked: true, currentUrl: '' })
+    diff.pickCover(google)
+    expect(diff.buildPatch().coverUrl).toBeUndefined()
 
     currentCover.value = '/api/v1/books/1/cover?medium=audio'
-    expect(fields.value.find((f) => f.key === 'coverUrl')?.bookValue).toBe('/api/v1/books/1/cover?medium=audio')
+    expect(diff.cover.value.currentUrl).toBe('/api/v1/books/1/cover?medium=audio')
   })
 
   describe('cover shape', () => {
     const hardcover: MetadataCandidate = { provider: 'hardcover', providerId: 'h1', title: 'The Silver Chair', coverUrl: '/covers/hardcover.jpg' }
-    const audible: MetadataCandidate = {
+    const square: MetadataCandidate = {
       provider: 'audible',
       providerId: 'a1',
       title: 'The Silver Chair',
       coverUrl: '/covers/audible.jpg',
       coverShape: 'square',
     }
-    const google: MetadataCandidate = {
+    const portrait: MetadataCandidate = {
       provider: 'google',
       providerId: 'g1',
       title: 'The Silver Chair',
       coverUrl: '/covers/google.jpg',
       coverShape: 'portrait',
     }
-    const measuredPortrait = (candidate: MetadataCandidate) => (candidate === hardcover ? 'portrait' : (candidate.coverShape ?? 'unknown'))
+    const strip: MetadataCandidate = {
+      provider: 'amazon',
+      providerId: 'am1',
+      title: 'The Silver Chair',
+      coverUrl: '/covers/strip.jpg',
+      coverShape: 'square',
+    }
+    // Keyed by id, as the real lookups go by URL: the active result arrives as a reactive proxy.
+    const measuredPortrait = (candidate: MetadataCandidate) => (candidate.providerId === 'h1' ? 'portrait' : (candidate.coverShape ?? 'unknown'))
+    const sizes = (candidate: MetadataCandidate) => (candidate.providerId === 'am1' ? { width: 575, height: 92 } : null)
 
     function audioDiff(currentCover: string) {
-      return useMetadataDiff(mockCurrent, [hardcover, google, audible], 'hardcover', communityRatingProviders, () => currentCover, undefined, [], {
+      return setup(hardcover, {
+        alternatives: [hardcover, strip, portrait, square],
+        currentCoverUrl: () => currentCover,
         coverMedium: 'audio',
+        coverPriority: ['google', 'hardcover'],
         coverShapeOf: measuredPortrait,
+        coverSizeOf: sizes,
       })
     }
 
-    it('names the fit of the offered cover and lists square alternatives first for the audio slot', () => {
-      const { fields } = audioDiff('/api/v1/books/1/cover?medium=audio')
-      const cover = fields.value.find((f) => f.key === 'coverUrl')
+    it('names the fit of the offered cover and lists fitting art first, broken images last', () => {
+      const { cover } = audioDiff('/api/v1/books/1/cover?medium=audio')
 
-      expect(cover?.candidateCoverFit).toBe('mismatch')
-      expect(cover?.providerValues.map((value) => value.provider)).toEqual(['audible', 'hardcover', 'google'])
+      expect(cover.value.active?.fit).toBe('mismatch')
+      expect(cover.value.choices.map((choice) => [choice.candidate.provider, choice.fit, choice.broken])).toEqual([
+        ['audible', 'match', false],
+        ['google', 'mismatch', false],
+        ['hardcover', 'mismatch', false],
+        ['amazon', 'match', true],
+      ])
     })
 
-    it('keeps Copy All from swapping a cover for art of the other shape, but the arrow still can', () => {
-      const { copyAll, buildPatch, toggleField } = audioDiff('/api/v1/books/1/cover?medium=audio')
+    it('keeps Use all from swapping a cover for art of the other shape, but the cover control still can', () => {
+      const diff = audioDiff('/api/v1/books/1/cover?medium=audio')
 
-      copyAll()
-      expect(buildPatch().coverUrl).toBeUndefined()
-      expect(buildPatch().formPatch.title).toBe('The Silver Chair')
+      diff.takeAll()
+      expect(diff.buildPatch().coverUrl).toBeUndefined()
+      expect(diff.buildPatch().formPatch.title).toBe('The Silver Chair')
 
-      toggleField('coverUrl')
-      expect(buildPatch().coverUrl).toBe('/covers/hardcover.jpg')
+      diff.pickCover(hardcover)
+      expect(diff.buildPatch().coverUrl).toBe('/covers/hardcover.jpg')
     })
 
-    it('lets Copy All fill an empty slot with art of the other shape', () => {
-      const { copyAll, buildPatch } = audioDiff('')
+    it('lets Use all fill an empty slot with art of the other shape', () => {
+      const diff = audioDiff('')
 
-      copyAll()
-      expect(buildPatch().coverUrl).toBe('/covers/hardcover.jpg')
+      diff.takeAll()
+      expect(diff.buildPatch().coverUrl).toBe('/covers/hardcover.jpg')
     })
   })
 })

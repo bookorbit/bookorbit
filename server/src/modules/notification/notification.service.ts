@@ -228,6 +228,7 @@ export class NotificationService {
   private isEnabled(settings: Record<string, unknown> | undefined, type: NotificationType): boolean {
     const meta = NOTIFICATION_TYPE_META[type];
     if (!meta) return true;
+    if (meta.category === 'bookRequests' && settings?.showBookRequests === false) return false;
     const prefs = settings?.notificationPreferences as NotificationPreferences | undefined;
     const level = resolveNotificationLevel(prefs?.[meta.category]);
     return isNotificationAllowed(level, meta.severity);

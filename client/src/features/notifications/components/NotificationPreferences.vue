@@ -12,12 +12,14 @@ import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import NotificationLevelSegmented from './NotificationLevelSegmented.vue'
 import { NOTIFICATION_CATEGORY_GROUPS, NOTIFICATION_CATEGORY_ICONS } from '../lib/notification-category-groups'
+import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const { t } = useI18n()
 
 const { user, me } = useAuth()
+const { showBookRequests } = useBookRequestVisibility()
 const { popupEnabled, setPopupEnabled, loadPrefs } = useWhatsNew()
 
 const saving = ref(false)
@@ -54,8 +56,15 @@ const hasChanges = computed(() => {
   return NOTIFICATION_CATEGORY_IDS.some((key) => preferences.value[key] !== resolveNotificationLevel(userPrefs?.[key]))
 })
 
-const enabledCount = computed(() => NOTIFICATION_CATEGORY_IDS.filter((key) => preferences.value[key] !== NotificationLevel.Off).length)
-const totalCount = computed(() => NOTIFICATION_CATEGORY_IDS.length)
+const visibleGroups = computed(() =>
+  NOTIFICATION_CATEGORY_GROUPS.map((group) => ({
+    ...group,
+    categories: group.categories.filter((category) => category !== 'bookRequests' || showBookRequests.value),
+  })).filter((group) => group.categories.length > 0),
+)
+const visibleCategoryIds = computed(() => visibleGroups.value.flatMap((group) => group.categories))
+const enabledCount = computed(() => visibleCategoryIds.value.filter((key) => preferences.value[key] !== NotificationLevel.Off).length)
+const totalCount = computed(() => visibleCategoryIds.value.length)
 
 function categoryLabel(category: NotificationCategory): string {
   return t(`notifications.preferences.categories.${category}.label`)
@@ -126,7 +135,7 @@ async function handleSave() {
   </div>
 
   <div class="space-y-4" :class="{ 'mt-5 md:mt-0': !props.embedded }">
-    <section v-for="group in NOTIFICATION_CATEGORY_GROUPS" :key="group.id" :aria-labelledby="`notification-group-${group.id}`" class="space-y-2">
+    <section v-for="group in visibleGroups" :key="group.id" :aria-labelledby="`notification-group-${group.id}`" class="space-y-2">
       <div class="flex items-baseline justify-between gap-3">
         <h2 :id="`notification-group-${group.id}`" class="settings-group-label mb-0">
           {{ t(`notifications.preferences.groups.${group.id}`) }}

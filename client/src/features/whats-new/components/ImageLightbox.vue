@@ -50,7 +50,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <div
       ref="panel"
-      class="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 motion-safe:animate-in motion-safe:fade-in"
+      class="fixed inset-0 z-[90] flex items-center justify-center bg-scrim-media p-4 motion-safe:animate-in motion-safe:fade-in"
       role="dialog"
       aria-modal="true"
       :aria-label="t('whatsNew.imageViewer')"

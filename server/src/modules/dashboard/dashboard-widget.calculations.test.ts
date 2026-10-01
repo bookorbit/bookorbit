@@ -15,10 +15,46 @@ import {
   computeSpeedScore,
   computeTimeScore,
   computeVarietyScore,
+  daysBetweenDateKeys,
   findEligibleChallenges,
   pickAnnotationIndex,
+  resolveReaderClock,
   selectChallenge,
 } from './dashboard-widget.calculations';
+
+describe('resolveReaderClock', () => {
+  it("reads today, the month and the year off the reader's own clock", () => {
+    // 7:58 PM on Sep 27 in Denver is already Sep 28 in UTC.
+    expect(resolveReaderClock('America/Denver', new Date('2026-09-28T01:58:00Z'))).toEqual({
+      timeZone: 'America/Denver',
+      today: '2026-09-27',
+      year: 2026,
+      month: 9,
+    });
+  });
+
+  it("keeps New Year's Eve in the old year west of UTC", () => {
+    expect(resolveReaderClock('America/Denver', new Date('2027-01-01T03:00:00Z'))).toMatchObject({ today: '2026-12-31', year: 2026, month: 12 });
+  });
+
+  it('moves to the next day east of UTC before UTC does', () => {
+    expect(resolveReaderClock('Asia/Tokyo', new Date('2026-09-27T20:00:00Z'))).toMatchObject({ today: '2026-09-28' });
+  });
+
+  it('falls back to UTC when no zone is set or the zone is invalid', () => {
+    const now = new Date('2026-09-28T01:58:00Z');
+    expect(resolveReaderClock(undefined, now)).toMatchObject({ timeZone: 'UTC', today: '2026-09-28' });
+    expect(resolveReaderClock('Not/AZone', now)).toMatchObject({ timeZone: 'UTC', today: '2026-09-28' });
+  });
+});
+
+describe('daysBetweenDateKeys', () => {
+  it('counts calendar days, including across a leap day', () => {
+    expect(daysBetweenDateKeys('2026-01-01', '2026-09-27')).toBe(269);
+    expect(daysBetweenDateKeys('2026-01-01', '2027-01-01')).toBe(365);
+    expect(daysBetweenDateKeys('2028-01-01', '2029-01-01')).toBe(366);
+  });
+});
 
 describe('computeDailySeed', () => {
   it('returns a non-negative integer', () => {
@@ -480,16 +516,14 @@ describe('Diversity Score calculations', () => {
 describe('Reading Rhythm calculations', () => {
   describe('buildDaysSeries', () => {
     it('fills missing days with zeroes', () => {
-      const today = new Date('2026-04-28T12:00:00Z');
-      const result = buildDaysSeries([], today, 7);
+      const result = buildDaysSeries([], '2026-04-28', 7);
       expect(result).toHaveLength(7);
       expect(result.every((d) => d.readingSeconds === 0)).toBe(true);
     });
 
     it('maps existing data to correct dates', () => {
-      const today = new Date('2026-04-28T12:00:00Z');
       const data = [{ day: '2026-04-28', readingSeconds: 600 }];
-      const result = buildDaysSeries(data, today, 3);
+      const result = buildDaysSeries(data, '2026-04-28', 3);
 
       expect(result).toHaveLength(3);
       expect(result[2]!.date).toBe('2026-04-28');
@@ -498,10 +532,25 @@ describe('Reading Rhythm calculations', () => {
     });
 
     it('orders oldest to newest', () => {
-      const today = new Date('2026-04-28T12:00:00Z');
-      const result = buildDaysSeries([], today, 3);
+      const result = buildDaysSeries([], '2026-04-28', 3);
       expect(result[0]!.date).toBe('2026-04-26');
       expect(result[2]!.date).toBe('2026-04-28');
+    });
+
+    it('ends on the given local day and ignores rows after it', () => {
+      const data = [
+        { day: '2026-09-27', readingSeconds: 900 },
+        { day: '2026-09-28', readingSeconds: 60 },
+      ];
+      const result = buildDaysSeries(data, '2026-09-27', 2);
+      expect(result).toEqual([
+        { date: '2026-09-26', readingSeconds: 0 },
+        { date: '2026-09-27', readingSeconds: 900 },
+      ]);
+    });
+
+    it('steps across month and year boundaries', () => {
+      expect(buildDaysSeries([], '2027-01-01', 3).map((d) => d.date)).toEqual(['2026-12-30', '2026-12-31', '2027-01-01']);
     });
   });
 

@@ -4,6 +4,7 @@ import type { Library, LibraryOverviewEntry } from '@bookorbit/types'
 
 import { formatFamily, toFormatSegments } from '../lib/library-formats'
 import { shortenPath } from '../lib/library-paths'
+import { libraryProblem } from '../lib/library-problems'
 import { isLibrarySortField, matchesLibraryQuery, sortLibraries } from '../lib/library-sort'
 
 function library(overrides: Partial<Library> & Pick<Library, 'id' | 'name'>): Library {
@@ -182,5 +183,38 @@ describe('isLibrarySortField', () => {
   it('accepts known fields and rejects anything else', () => {
     expect(isLibrarySortField('lastScan')).toBe(true)
     expect(isLibrarySortField('nonsense')).toBe(false)
+  })
+})
+
+describe('libraryProblem', () => {
+  const scan = (overrides: Partial<NonNullable<LibraryOverviewEntry['lastScan']>> = {}) => ({
+    status: 'completed' as const,
+    triggeredBy: 'schedule' as const,
+    startedAt: '2026-09-28T06:00:00.000Z',
+    completedAt: '2026-09-28T06:00:01.000Z',
+    addedCount: 0,
+    updatedCount: 0,
+    missingCount: 0,
+    errorMessage: null,
+    ...overrides,
+  })
+
+  it('flags a library that has never been scanned', () => {
+    expect(libraryProblem(null, false)).toEqual({ kind: 'never' })
+  })
+
+  it('flags a failed scan with the scan it came from', () => {
+    const failed = scan({ status: 'failed', errorMessage: 'Server restarted during scan' })
+    expect(libraryProblem(failed, false)).toEqual({ kind: 'failed', scan: failed })
+  })
+
+  it('has nothing to say about a completed scan, missing books included', () => {
+    expect(libraryProblem(scan(), false)).toBeNull()
+    expect(libraryProblem(scan({ missingCount: 11 }), false)).toBeNull()
+  })
+
+  it('stays quiet while a scan is running, since it is about to replace the last one', () => {
+    expect(libraryProblem(null, true)).toBeNull()
+    expect(libraryProblem(scan({ status: 'failed' }), true)).toBeNull()
   })
 })

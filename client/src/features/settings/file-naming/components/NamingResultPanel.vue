@@ -36,6 +36,8 @@ function resolve(metadata: Record<string, string>): string {
 }
 
 const resolved = computed(() => resolve(EXAMPLE_PATTERN_METADATA))
+const usesReadaloudToken = computed(() => props.pattern.includes('{readaloud'))
+const plainEpubResult = computed(() => resolve({ ...EXAMPLE_PATTERN_METADATA, readaloud: '' }))
 
 const fallbackCases = computed(() =>
   MISSING_METADATA_CASES.map((previewCase) => ({
@@ -109,6 +111,22 @@ function handleSanitize(value: boolean) {
           <dd class="mt-0.5 break-words font-mono text-[11px] text-foreground">
             {{ item.path || t('settings.reader.fileNaming.previewEmptyShort') }}
           </dd>
+        </div>
+      </dl>
+    </div>
+
+    <div v-if="usesReadaloudToken" class="border-t border-border px-3.5 py-3">
+      <h4 class="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {{ t('settings.reader.fileNaming.readaloudComparison') }}
+      </h4>
+      <dl class="divide-y divide-dashed divide-border">
+        <div class="py-1.5">
+          <dt class="text-[11px] font-semibold text-muted-foreground">{{ t('settings.reader.fileNaming.readaloudEpub') }}</dt>
+          <dd class="mt-0.5 break-words font-mono text-[11px] text-foreground">{{ resolved }}</dd>
+        </div>
+        <div class="py-1.5">
+          <dt class="text-[11px] font-semibold text-muted-foreground">{{ t('settings.reader.fileNaming.plainEpub') }}</dt>
+          <dd class="mt-0.5 break-words font-mono text-[11px] text-foreground">{{ plainEpubResult }}</dd>
         </div>
       </dl>
     </div>

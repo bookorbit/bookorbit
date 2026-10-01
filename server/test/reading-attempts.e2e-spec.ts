@@ -384,8 +384,9 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     const book = await createBook();
     const attempts = ctx.app.get(ReadingAttemptService);
     const dashboard = ctx.app.get(DashboardWidgetRepository);
-    const completedBefore = await dashboard.getCompletedBooksThisYear(adminUserId, [libraryId]);
     const year = new Date().getUTCFullYear();
+    const countThisYear = () => dashboard.countCompletedBooks(adminUserId, [libraryId], `${year}-01-01`, `${year + 1}-01-01`);
+    const completedBefore = await countThisYear();
     await attempts.createHistorical(adminUserId, book.bookId, {
       startedOn: `${year}-01-01`,
       endedOn: `${year}-01-10`,
@@ -402,7 +403,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       outcome: 'skimmed',
     });
     await attempts.createHistorical(adminUserId, book.bookId, { startedOn: null, endedOn: null, outcome: 'completed' });
-    await expect(dashboard.getCompletedBooksThisYear(adminUserId, [libraryId])).resolves.toBe(completedBefore + 2);
+    await expect(countThisYear()).resolves.toBe(completedBefore + 2);
   });
 
   it('16. isolates attempt history between users sharing a library', async () => {
@@ -805,7 +806,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(latencyResponse.json()).toMatchObject({ totalCompletions: 3, medianDays: 2 });
   });
 
-  it('32. reports the same completed-book count on the reading-goal widget and the activity overview', async () => {
+  it('32. reports the same completed-book count on the reading-goal and year-projection widgets and the activity overview', async () => {
     const username = `activity-goal-${randomUUID()}`;
     const password = 'ActivityGoal123!';
     const [user] = await ctx.db
@@ -916,6 +917,17 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(login.statusCode).toBe(200);
     const token = (login.json() as { accessToken: string }).accessToken;
 
+    // The twice-read book is now on its third read. Its status row holds no finish while that
+    // runs, which once dropped both of this year's finishes from the year projection.
+    const reread = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${reRead.bookId}/reading-attempts/start-reread`,
+      headers: auth(token),
+      payload: { resetProgress: false },
+    });
+    expect(reread.statusCode).toBe(201);
+    expect(reread.json()).toMatchObject({ status: 'rereading' });
+
     const widgetResponse = await ctx.app.inject({
       method: 'GET',
       url: '/api/v1/dashboard/widgets/reading-goal',
@@ -923,6 +935,14 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     });
     expect(widgetResponse.statusCode).toBe(200);
     const widget = widgetResponse.json() as { completedBooks: number; year: number };
+
+    const projectionResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/widgets/year-projection',
+      headers: auth(token),
+    });
+    expect(projectionResponse.statusCode).toBe(200);
+    const projection = projectionResponse.json() as { booksCompletedYtd: number };
 
     const overviewResponse = await ctx.app.inject({
       method: 'GET',
@@ -936,9 +956,10 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       completion: { months: Array<{ year: number; month: number; count: number }> };
     };
 
-    // Four books finished this year, one of them twice: the two surfaces have to say the same
+    // Four books finished this year, one of them twice: every surface has to say the same
     // thing, and say 5, rather than the 2 a session-derived count would have reported.
     expect(widget.completedBooks).toBe(5);
+    expect(projection.booksCompletedYtd).toBe(widget.completedBooks);
     expect(overview.goal.completedBooks).toBe(widget.completedBooks);
     expect(overview.snapshot.completedBooksYtd).toBe(widget.completedBooks);
     expect(overview.goal.points.at(-1)?.actualCumulative).toBe(5);

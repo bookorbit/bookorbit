@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { FolderOpen, Plus, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { Library as LibraryType } from '@bookorbit/types'
+import type { Library as LibraryType, ScanProgressEvent } from '@bookorbit/types'
 
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
@@ -14,14 +14,17 @@ import { api } from '@/lib/api'
 import { jsonBody } from '@/lib/api-json'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
+import type { LibraryCreatorSectionId } from '@/features/library/composables/useLibraryCreator'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import { useLibraryFileSync } from '@/features/library/composables/useLibraryFileSync'
-import { getSocket, useScanProgress } from '@/features/scanner/composables/useScanProgress'
+import { claimScanCompletionToasts, getSocket, useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import LibrariesToolbar from './libraries/components/LibrariesToolbar.vue'
 import LibraryLedgerCards from './libraries/components/LibraryLedgerCards.vue'
 import LibraryLedgerList from './libraries/components/LibraryLedgerList.vue'
 import { useLibraryDetail } from './libraries/composables/useLibraryDetail'
+import { formatSchedule } from './libraries/lib/library-schedule'
+import type { AutomationToggle } from './libraries/components/LibraryAutomationList.vue'
 import { useLibraryOverview } from './libraries/composables/useLibraryOverview'
 import { matchesLibraryQuery, sortLibraries, type LibrarySortField } from './libraries/lib/library-sort'
 
@@ -49,6 +52,10 @@ const sortBy = ref<LibrarySortField>('default')
 const scanningAll = ref(false)
 const creatorOpen = ref(false)
 const editingLibrary = ref<LibraryType | null>(null)
+const editingSection = ref<LibraryCreatorSectionId | undefined>(undefined)
+const templateLibrary = ref<LibraryType | null>(null)
+const savingAutomation = ref<Set<number>>(new Set())
+const justFinished = ref<Set<number>>(new Set())
 const deletingLibrary = ref<LibraryType | null>(null)
 const deleteConfirmName = ref('')
 const deleting = ref(false)
@@ -80,6 +87,9 @@ function subscribeAll() {
   }
 }
 
+/** This page announces finished scans with their outcome, so the generic "books added" toast stands down. */
+const releaseScanToasts = claimScanCompletionToasts()
+
 onMounted(async () => {
   headerSlotAvailable.value = document.getElementById(HEADER_ACTIONS_TARGET.slice(1)) !== null
   getSocket()
@@ -90,6 +100,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   overview.dispose()
+  releaseScanToasts()
+  for (const timer of finishTimers.values()) clearTimeout(timer)
 })
 
 /**
@@ -98,6 +110,44 @@ onUnmounted(() => {
  * leave the map, which keeps the set bounded to the scans currently in flight.
  */
 const handledScanJobs = new Set<number>()
+const finishTimers = new Map<number, ReturnType<typeof setTimeout>>()
+const FINISH_HIGHLIGHT_MS = 2200
+
+function scanOutcomeText(event: ScanProgressEvent): string {
+  const parts: string[] = []
+  if (event.added > 0) parts.push(t('settings.admin.libraries.scanAdded', { count: event.added }))
+  if (event.updated > 0) parts.push(t('settings.admin.libraries.scanUpdated', { count: event.updated }))
+  if (event.missing > 0) parts.push(t('settings.admin.libraries.scanMissing', { count: event.missing }))
+  return parts.length > 0 ? parts.join(t('settings.admin.libraries.outcomeSeparator')) : t('settings.admin.libraries.scanNoChange')
+}
+
+/** Tints the row once so the library that just changed is findable, then lets it go. */
+function highlightFinished(libraryId: number) {
+  justFinished.value = new Set(justFinished.value).add(libraryId)
+  clearTimeout(finishTimers.get(libraryId))
+  finishTimers.set(
+    libraryId,
+    setTimeout(() => {
+      const next = new Set(justFinished.value)
+      next.delete(libraryId)
+      justFinished.value = next
+      finishTimers.delete(libraryId)
+    }, FINISH_HIGHLIGHT_MS),
+  )
+}
+
+function announceFinished(event: ScanProgressEvent) {
+  const lib = libraries.value.find((library) => library.id === event.libraryId)
+  if (!lib) return
+  if (event.status === 'failed') {
+    toast.error(t('settings.admin.libraries.scanFinishedFailed', { name: lib.name }), { description: event.errorMessage })
+    return
+  }
+  highlightFinished(lib.id)
+  toast.success(t('settings.admin.libraries.scanFinished', { name: lib.name, outcome: scanOutcomeText(event) }), {
+    action: { label: t('settings.admin.libraries.viewChanges'), onClick: () => openDetail(lib) },
+  })
+}
 
 watch(progressMap, (map) => {
   const liveJobIds = new Set<number>()
@@ -107,6 +157,7 @@ watch(progressMap, (map) => {
     if (event.status === 'running' || handledScanJobs.has(event.jobId)) continue
     handledScanJobs.add(event.jobId)
     finished = true
+    announceFinished(event)
   }
   for (const jobId of handledScanJobs) {
     if (!liveJobIds.has(jobId)) handledScanJobs.delete(jobId)
@@ -133,12 +184,75 @@ function toggleDetail(lib: LibraryType) {
   void detail.load(lib.id)
 }
 
+/** Opens a row's details without closing it if it is already open, for "View changes". */
+function openDetail(lib: LibraryType) {
+  expandedId.value = lib.id
+  void detail.load(lib.id)
+}
+
 function historyFor(libraryId: number) {
   return detail.get(libraryId)?.history ?? null
 }
 
-function accessCountFor(libraryId: number): number | null {
-  return detail.get(libraryId)?.accessCount ?? null
+function accessFor(libraryId: number) {
+  return detail.get(libraryId)?.access ?? null
+}
+
+function isSavingAutomation(libraryId: number): boolean {
+  return savingAutomation.value.has(libraryId)
+}
+
+function isJustFinished(libraryId: number): boolean {
+  return justFinished.value.has(libraryId)
+}
+
+type AutomationPatch = { watch: boolean } | { fileWriteEnabled: boolean } | { fileRenameEnabled: boolean } | { autoScanCronExpression: string | null }
+
+/**
+ * Saves one automation setting straight from the row. Both fields are optional on PATCH, so nothing else
+ * about the library is sent or changed. The toast's Undo sends the previous value back the same way.
+ */
+async function saveAutomation(lib: LibraryType, patch: AutomationPatch, undo: AutomationPatch | null, message: string): Promise<boolean> {
+  savingAutomation.value = new Set(savingAutomation.value).add(lib.id)
+  try {
+    const res = await api(`/api/v1/libraries/${lib.id}`, jsonBody('PATCH', patch))
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    await refreshLibraries()
+    if (undo) {
+      toast.success(message, { action: { label: t('common.undo'), onClick: () => void saveAutomation(lib, undo, null, message) } })
+    }
+    return true
+  } catch {
+    toast.error(t('settings.admin.libraries.quick.saveFailed', { name: lib.name }))
+    return false
+  } finally {
+    const next = new Set(savingAutomation.value)
+    next.delete(lib.id)
+    savingAutomation.value = next
+  }
+}
+
+const TOGGLE_MESSAGES: Record<AutomationToggle, { on: string; off: string }> = {
+  watch: { on: 'settings.admin.libraries.quick.watchOn', off: 'settings.admin.libraries.quick.watchOff' },
+  fileWriteEnabled: { on: 'settings.admin.libraries.quick.fileWriteOn', off: 'settings.admin.libraries.quick.fileWriteOff' },
+  fileRenameEnabled: { on: 'settings.admin.libraries.quick.renameOn', off: 'settings.admin.libraries.quick.renameOff' },
+}
+
+function toggleSetting(lib: LibraryType, setting: AutomationToggle) {
+  const next = !lib[setting]
+  const message = t(next ? TOGGLE_MESSAGES[setting].on : TOGGLE_MESSAGES[setting].off, { name: lib.name })
+  const patch = { [setting]: next } as AutomationPatch
+  const undo = { [setting]: lib[setting] } as AutomationPatch
+  void saveAutomation(lib, patch, undo, message)
+}
+
+function setSchedule(lib: LibraryType, cron: string | null) {
+  const previous = lib.autoScanCronExpression ?? null
+  const label = cron ? (formatSchedule(cron, t, locale.value)?.label ?? cron) : ''
+  const message = cron
+    ? t('settings.admin.libraries.quick.scheduleSet', { name: lib.name, value: label })
+    : t('settings.admin.libraries.quick.scheduleOff', { name: lib.name })
+  void saveAutomation(lib, { autoScanCronExpression: cron }, { autoScanCronExpression: previous }, message)
 }
 
 function isDetailLoading(libraryId: number): boolean {
@@ -239,23 +353,36 @@ async function confirmSyncFiles() {
 
 function openCreate() {
   editingLibrary.value = null
+  editingSection.value = undefined
+  templateLibrary.value = null
   creatorOpen.value = true
 }
 
-function openEdit(lib: LibraryType) {
+function openEdit(lib: LibraryType, section?: LibraryCreatorSectionId) {
   editingLibrary.value = lib
+  editingSection.value = section
+  templateLibrary.value = null
+  creatorOpen.value = true
+}
+
+/** A new library seeded from this one's settings; its folders and access are left for the new one. */
+function openDuplicate(lib: LibraryType) {
+  editingLibrary.value = null
+  editingSection.value = undefined
+  templateLibrary.value = lib
   creatorOpen.value = true
 }
 
 function closeCreator() {
   creatorOpen.value = false
   editingLibrary.value = null
+  editingSection.value = undefined
+  templateLibrary.value = null
 }
 
 async function onSaved(library: LibraryType) {
   const isNew = !editingLibrary.value
-  creatorOpen.value = false
-  editingLibrary.value = null
+  closeCreator()
   subscribeLibrary(library.id)
   if (isNew) {
     toast.success(t('settings.admin.libraries.libraryCreated', { name: library.name }))
@@ -267,6 +394,17 @@ async function onSaved(library: LibraryType) {
   detail.invalidate()
   if (expandedId.value !== null) void detail.load(expandedId.value)
   void overview.load()
+}
+
+/** Both open their own confirmation, which cannot sit on top of the editor, so the editor closes first. */
+function syncFilesFromEditor(lib: LibraryType) {
+  closeCreator()
+  promptSyncFiles(lib)
+}
+
+function removeFromEditor(lib: LibraryType) {
+  closeCreator()
+  openDelete(lib)
 }
 
 function openDelete(lib: LibraryType) {
@@ -309,7 +447,8 @@ async function confirmDelete() {
 
 <template>
   <TooltipProvider>
-    <div class="space-y-4">
+    <!-- A container, so the ledger swaps to cards by the width it actually has, sidebar open or collapsed. -->
+    <div class="@container space-y-4">
       <Teleport :to="HEADER_ACTIONS_TARGET" defer :disabled="!headerSlotAvailable">
         <Button
           variant="outline"
@@ -349,7 +488,7 @@ async function confirmDelete() {
         </p>
 
         <div v-if="showSkeleton" class="space-y-2.5" aria-hidden="true">
-          <Skeleton v-for="index in libraries.length" :key="index" class="h-44 w-full rounded-xl md:h-[7.6875rem]" />
+          <Skeleton v-for="index in libraries.length" :key="index" class="h-44 w-full rounded-xl @min-[75rem]:h-[7.6875rem]" />
         </div>
 
         <template v-else-if="visibleLibraries.length > 0">
@@ -362,8 +501,10 @@ async function confirmDelete() {
             :is-scanning="isScanning"
             :is-refreshing-covers="isRefreshingCovers"
             :is-syncing-files="isSyncingFiles"
+            :is-saving-automation="isSavingAutomation"
+            :is-just-finished="isJustFinished"
             :history-for="historyFor"
-            :access-count-for="accessCountFor"
+            :access-for="accessFor"
             :is-detail-loading="isDetailLoading"
             :is-detail-failed="isDetailFailed"
             @toggle="toggleDetail"
@@ -372,6 +513,9 @@ async function confirmDelete() {
             @refresh-covers="refreshCovers"
             @sync-files="promptSyncFiles"
             @remove="openDelete"
+            @duplicate="openDuplicate"
+            @toggle-setting="toggleSetting"
+            @set-schedule="setSchedule"
           />
           <LibraryLedgerCards
             :libraries="visibleLibraries"
@@ -386,6 +530,7 @@ async function confirmDelete() {
             @refresh-covers="refreshCovers"
             @sync-files="promptSyncFiles"
             @remove="openDelete"
+            @duplicate="openDuplicate"
           />
         </template>
 
@@ -411,7 +556,18 @@ async function confirmDelete() {
       </div>
     </div>
 
-    <LibraryCreatorModal v-if="creatorOpen" :library="editingLibrary" @close="closeCreator" @saved="onSaved" />
+    <LibraryCreatorModal
+      v-if="creatorOpen"
+      :library="editingLibrary"
+      :initial-section="editingSection"
+      :template="templateLibrary"
+      @close="closeCreator"
+      @saved="onSaved"
+      @scan="scan"
+      @refresh-covers="refreshCovers"
+      @sync-files="syncFilesFromEditor"
+      @remove="removeFromEditor"
+    />
 
     <ConfirmDialog
       v-if="deletingLibrary"

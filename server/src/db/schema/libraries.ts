@@ -49,7 +49,7 @@ export const libraries = pgTable(
 
     // Reading progress thresholds
     readingThreshold: doublePrecision('reading_threshold').notNull().default(0.25),
-    markAsFinishedPercentComplete: integer('mark_as_finished_percent_complete').notNull().default(98),
+    markAsFinishedPercentComplete: doublePrecision('mark_as_finished_percent_complete').notNull().default(98),
 
     // File write-back settings
     fileWriteEnabled: boolean('file_write_enabled').notNull().default(false),

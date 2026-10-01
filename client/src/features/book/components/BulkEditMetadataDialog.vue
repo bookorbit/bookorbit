@@ -204,7 +204,7 @@ watch(
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="handleClose" />
+      <div class="absolute inset-0 bg-scrim" @click="handleClose" />
       <div class="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] bg-card border border-border rounded-lg shadow-2xl flex flex-col">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">

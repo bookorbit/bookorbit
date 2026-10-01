@@ -53,7 +53,7 @@ function handleCopy() {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4" @click.self="handleClose">
+  <div class="fixed inset-0 z-[60] flex items-center justify-center bg-scrim px-4" @click.self="handleClose">
     <div class="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl">
       <div class="flex items-start justify-between mb-4">
         <h2 class="text-base font-semibold text-foreground">{{ t('adminFeature.resetLink.title') }}</h2>

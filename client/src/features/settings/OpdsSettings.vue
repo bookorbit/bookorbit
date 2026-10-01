@@ -401,7 +401,7 @@ function cancelDelete() {
       class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
       @click.self="deleteConfirmUser = null"
     >
-      <button class="absolute inset-0 bg-black/45" @click="cancelDelete" />
+      <button class="absolute inset-0 bg-scrim" @click="cancelDelete" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">
           {{ t('settings.reader.opds.deleteConfirmTitle') }}

@@ -49,6 +49,7 @@ export interface SettingsNavContext {
   isSuperuser: boolean
   permissions: readonly string[]
   isDemoRestricted: boolean
+  showBookRequests?: boolean
 }
 
 /** Live signals the rail renders beside a row. Resolved by the nav, not stored in this file. */
@@ -496,7 +497,7 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         descriptionKey: 'settings.nav.descriptions.requests',
         icon: DownloadCloud,
         keywords: 'request download client qbittorrent torrent magnet path mapping hardlink',
-        isVisible: anyPermission(Permission.ManageAppSettings),
+        isVisible: (context) => context.showBookRequests !== false && anyPermission(Permission.ManageAppSettings)(context),
       },
       {
         id: 'admin-tts',

@@ -32,6 +32,19 @@ const TUNED_TEXT_TOKENS = [
 // (`hover:`, `placeholder:`, `group-data-[active=true]/item:` and so on).
 const FADED_TEXT_PATTERN = new RegExp(String.raw`(?:[\w[\]=.\-/]+:)*text-(?:${TUNED_TEXT_TOKENS.join('|')})\/\d+`, 'g')
 const LEGACY_SETTINGS_BUTTON_PATTERN = /\bsettings-btn-(?:primary|outline|secondary|danger)\b/g
+
+/**
+ * Modal backdrops take their veil from `bg-scrim`, or `bg-scrim-media` behind image viewers, so
+ * every dialog and sheet dims the page the same way in both themes. A backdrop tinted with a theme
+ * colour inverts in dark mode: `--foreground` is near-white there, so the veil washes the page grey
+ * instead of dimming it. A full-screen layer counts as a backdrop when it is fixed or dismisses on
+ * click; tinted overlays that only decorate a cover or card are left alone.
+ */
+const ELEMENT_OPENING_TAG_PATTERN = /<[A-Za-z][\w-]*\b[^<>]*>/g
+const DIALOG_OVERLAY_TAG_PATTERN = /^<(?:Dialog|AlertDialog)Overlay\b/
+const SCRIM_CLASS_PATTERN = /\bbg-scrim(?:-media)?\b/
+const TINTED_BACKDROP_PATTERN = /\bbg-(?:black|white|foreground|background)\/\d+/
+const BACKDROP_ROLE_PATTERN = /\bfixed\b|@click/
 const BUTTON_OPENING_TAG_PATTERN = /<Button\b[\s\S]*?>/g
 const DESTRUCTIVE_BUTTON_VARIANT_PATTERN = /\bvariant=["']destructive(?:-outline|-ghost)?["']/
 const DESTRUCTIVE_BUTTON_COLOR_OVERRIDE_PATTERN =
@@ -74,6 +87,17 @@ for (const file of await sourceFiles(sourceDirectory)) {
     errors.push(`${relativePath}:${line}: destructive Button color override - keep destructive styling centralized in the shared Button variants.`)
   }
 
+  for (const match of source.matchAll(ELEMENT_OPENING_TAG_PATTERN)) {
+    const tag = match[0]
+    const isDialogOverlay = DIALOG_OVERLAY_TAG_PATTERN.test(tag)
+    const isTintedBackdrop = /\binset-0\b/.test(tag) && BACKDROP_ROLE_PATTERN.test(tag) && TINTED_BACKDROP_PATTERN.test(tag)
+    if ((!isDialogOverlay || SCRIM_CLASS_PATTERN.test(tag)) && !isTintedBackdrop) continue
+    const line = source.slice(0, match.index).split('\n').length
+    errors.push(
+      `${relativePath}:${line}: modal backdrop - use bg-scrim, or bg-scrim-media behind an image viewer, so it dims the page in both themes.`,
+    )
+  }
+
   for (const [index, line] of lines.entries()) {
     for (const match of line.matchAll(LEGACY_SETTINGS_BUTTON_PATTERN)) {
       errors.push(`${relativePath}:${index + 1}: ${match[0]} - use the shared Button component and its variants.`)
@@ -99,4 +123,4 @@ if (errors.length > 0) {
   throw new Error(`Style validation failed:\n${errors.join('\n')}`)
 }
 
-console.log('Validated style tokens and shared settings buttons')
+console.log('Validated style tokens, modal backdrops and shared settings buttons')

@@ -63,7 +63,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeyDown, true))
 </script>
 
 <template>
-  <div data-backdrop class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm" @click="handleBackdropClick">
+  <div data-backdrop class="fixed inset-0 z-[60] flex items-center justify-center bg-scrim px-4" @click="handleBackdropClick">
     <div class="w-full max-w-md rounded-xl border border-border/80 bg-card shadow-2xl">
       <div class="flex items-center justify-between border-b border-border/80 bg-gradient-to-br from-muted/75 via-card to-muted/40 px-4 py-3">
         <div class="inline-flex items-center gap-2">

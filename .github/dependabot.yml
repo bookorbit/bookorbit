@@ -21,6 +21,9 @@ updates:
       # @nestjs/testing must stay on the same major as @nestjs/common and @nestjs/core
       - dependency-name: "@nestjs/testing"
         update-types: ["version-update:semver-major"]
+      # jsdom 30.1 hides the Blob impl symbol that vitest's URL.createObjectURL shim reads (still true in vitest 5.0)
+      - dependency-name: "jsdom"
+        update-types: ["version-update:semver-minor"]
     groups:
       production-dependencies:
         dependency-type: "production"

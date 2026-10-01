@@ -123,6 +123,7 @@ export class FileRenameService implements OnModuleDestroy {
       originalStem,
       format,
       libraryName: data.libraryName,
+      mediaOverlayAvailable: data.file.mediaOverlayAvailable,
     });
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
     const resolvedRelPath = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });

@@ -10,6 +10,7 @@ export interface TargetBookFile {
   format: string | null;
   role: string | null;
   sortOrder: number | null;
+  mediaOverlayAvailable?: boolean | null;
 }
 
 export interface BookFileTargetsInput {
@@ -141,6 +142,7 @@ function resolveRelPathFor(file: TargetBookFile, input: BookFileTargetsInput): s
     originalStem: basename(file.absolutePath, extension),
     format,
     libraryName: input.libraryName,
+    mediaOverlayAvailable: file.mediaOverlayAvailable,
   });
   return resolveUploadPath(input.pattern, tokens, format, { sanitizeForCrossPlatform: input.sanitizeForCrossPlatform });
 }

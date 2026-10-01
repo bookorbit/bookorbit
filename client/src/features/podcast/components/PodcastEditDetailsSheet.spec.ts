@@ -170,6 +170,7 @@ describe('PodcastEditDetailsSheet', () => {
 
   it('uploads a chosen artwork file and emits the new versioned url', async () => {
     apiMock.mockResolvedValue(jsonResponse({ id: 12, imageUrl: '/api/v1/podcasts/12/artwork?v=99', artworkUpdatedAt: '2026-07-31T00:00:00.000Z' }))
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:podcast-artwork')
     const wrapper = await mountSheet()
     const input = wrapper.get('input[type="file"]')
     const file = new File(['bytes'], 'artwork.png', { type: 'image/png' })
@@ -183,7 +184,10 @@ describe('PodcastEditDetailsSheet', () => {
     expect(url).toBe('/api/v1/podcasts/12/artwork')
     expect(init?.method).toBe('POST')
     expect(init?.body).toBeInstanceOf(FormData)
+    expect(createObjectURL).toHaveBeenCalledWith(file)
     expect(wrapper.emitted('artwork-changed')?.[0]?.[0]).toMatchObject({ artworkUpdatedAt: '2026-07-31T00:00:00.000Z' })
+
+    createObjectURL.mockRestore()
   })
 
   it('uploads artwork from a url without touching the metadata endpoint', async () => {

@@ -1,7 +1,27 @@
+import { EventEmitter } from 'node:events';
+
 import { Logger } from '@nestjs/common';
-import { Pool, type PoolClient } from 'pg';
+import { Pool, type ClientBase, type PoolClient } from 'pg';
 
 import { InstrumentedPgPool } from './instrumented-pg-pool';
+
+class FakePoolClient extends EventEmitter {
+  release!: (error?: Error) => void;
+  ended = false;
+  _ending = false;
+  _queryable = true;
+
+  connect(callback: (error?: Error) => void): void {
+    callback();
+  }
+
+  end(callback?: () => void): void {
+    this.ended = true;
+    callback?.();
+  }
+}
+
+const fakeClientConstructor = FakePoolClient as unknown as new () => ClientBase;
 
 describe('InstrumentedPgPool', () => {
   afterEach(() => {
@@ -57,5 +77,68 @@ describe('InstrumentedPgPool', () => {
     await expect(pool.connect()).rejects.toThrow(error);
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[db.pool_acquire] [fail] acquisitionKind=idle'));
+  });
+
+  it('handles an idle client disconnect without throwing and removes the failed client', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const pool = new InstrumentedPgPool({ max: 1, Client: fakeClientConstructor });
+    const client = await pool.connect();
+    client.release();
+
+    expect(pool.idleCount).toBe(1);
+    expect(() => client.emit('error', new Error('idle connection lost'))).not.toThrow();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\[db\.connection\] \[fail\] clientState=idle durationMs=\d+ totalCount=0 idleCount=0 waitingCount=0 errorClass=Error error="idle connection lost" - database connection lost$/,
+      ),
+    );
+    expect(pool.totalCount).toBe(0);
+    expect((client as unknown as FakePoolClient).ended).toBe(true);
+
+    const replacement = await pool.connect();
+    expect(replacement).not.toBe(client);
+    replacement.release();
+    await pool.end();
+  });
+
+  it('handles a checked-out client disconnect without throwing or double logging', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const pool = new InstrumentedPgPool({ max: 1, Client: fakeClientConstructor });
+    const client = await pool.connect();
+    const error = new Error('checked-out connection lost');
+
+    expect(pool.idleCount).toBe(0);
+    expect(() => client.emit('error', error)).not.toThrow();
+    expect(() => client.emit('error', new Error('follow-up socket error'))).not.toThrow();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\[db\.connection\] \[fail\] clientState=checked-out durationMs=\d+ totalCount=1 idleCount=0 waitingCount=0 errorClass=Error error="checked-out connection lost" - database connection lost$/,
+      ),
+    );
+
+    client.release(error);
+    expect(pool.totalCount).toBe(0);
+
+    const replacement = await pool.connect();
+    expect(replacement).not.toBe(client);
+    replacement.release();
+    await pool.end();
+  });
+
+  it('sanitizes connection errors before logging them', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const pool = new InstrumentedPgPool({ max: 1, Client: fakeClientConstructor });
+    const client = await pool.connect();
+
+    client.emit('error', new Error('socket closed\nfor "maintenance"'));
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('error="socket closed for \\"maintenance\\""'));
+
+    client.release(new Error('connection failed'));
+    await pool.end();
   });
 });

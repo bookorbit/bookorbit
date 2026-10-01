@@ -80,11 +80,7 @@ useModal({
 
 <template>
   <Teleport to="body">
-    <div
-      class="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/30 sm:items-center sm:p-4"
-      role="presentation"
-      @click.self="requestClose"
-    >
+    <div class="fixed inset-0 z-[80] flex items-end justify-center bg-scrim sm:items-center sm:p-4" role="presentation" @click.self="requestClose">
       <div
         ref="panel"
         class="flex h-dvh w-full flex-col overflow-hidden bg-background shadow-2xl outline-none sm:h-[min(82dvh,700px)] sm:max-w-xl sm:rounded-lg sm:border sm:border-border"

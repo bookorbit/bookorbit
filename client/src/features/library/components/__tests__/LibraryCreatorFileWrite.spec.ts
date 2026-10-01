@@ -27,18 +27,6 @@ describe('LibraryCreatorFileWrite', () => {
     })
   }
 
-  it('emits rename toggle updates and hides file-write detail controls when disabled', async () => {
-    const wrapper = mountComponent()
-
-    expect(wrapper.text()).toContain('Rename files after metadata changes')
-    expect(wrapper.text()).not.toContain('Include cover image')
-
-    const renameSwitch = wrapper.findAll('[role="switch"]')[0]
-    expect(renameSwitch).toBeDefined()
-    await renameSwitch!.trigger('click')
-    expect(wrapper.emitted('update:fileRenameEnabled')).toEqual([[true]])
-  })
-
   const ALL_ENABLED = {
     fileRenameEnabled: true,
     fileWriteEnabled: true,
@@ -57,26 +45,36 @@ describe('LibraryCreatorFileWrite', () => {
     fileWriteAudioMaxFileSizeMb: 40,
   }
 
-  function toggleByLabel(wrapper: ReturnType<typeof mountComponent>, label: string) {
-    const control = wrapper.findAll('[role="switch"]').find((node) => node.attributes('aria-label') === label)
-    if (!control) throw new Error(`no switch labelled "${label}"`)
-    return control.trigger('click')
+  function checkbox(wrapper: ReturnType<typeof mountComponent>, label: string) {
+    const control = wrapper.findAll('input[type="checkbox"]').find((node) => node.attributes('aria-label') === label)
+    if (!control) throw new Error(`no checkbox labelled "${label}"`)
+    return control
   }
 
-  it('emits an update for every format toggle', async () => {
+  it('emits the two switches and hides the per-format table while writing is off', async () => {
+    const wrapper = mountComponent()
+
+    expect(wrapper.text()).toContain('Rename files after metadata changes')
+    expect(wrapper.text()).not.toContain('Include cover image')
+    const switches = wrapper.findAll('[role="switch"]')
+    expect(switches).toHaveLength(2)
+
+    await switches[0]!.trigger('click')
+    await switches[1]!.trigger('click')
+    expect(wrapper.emitted('update:fileRenameEnabled')).toEqual([[true]])
+    expect(wrapper.emitted('update:fileWriteEnabled')).toEqual([[true]])
+  })
+
+  it('emits an update for every format checkbox', async () => {
     const wrapper = mountComponent(ALL_ENABLED)
 
-    expect(wrapper.findAll('[role="switch"]')).toHaveLength(9)
+    await checkbox(wrapper, 'Write EPUB metadata').setValue(false)
+    await checkbox(wrapper, 'Write FB2 metadata').setValue(false)
+    await checkbox(wrapper, 'Write PDF metadata').setValue(false)
+    await checkbox(wrapper, 'Write comic archive metadata').setValue(false)
+    await checkbox(wrapper, 'Write Kindle metadata').setValue(false)
+    await checkbox(wrapper, 'Write audio covers').setValue(false)
 
-    await toggleByLabel(wrapper, 'Write metadata to files')
-    await toggleByLabel(wrapper, 'Write EPUB metadata')
-    await toggleByLabel(wrapper, 'Write FB2 metadata')
-    await toggleByLabel(wrapper, 'Write PDF metadata')
-    await toggleByLabel(wrapper, 'Write comic archive metadata')
-    await toggleByLabel(wrapper, 'Write Kindle metadata')
-    await toggleByLabel(wrapper, 'Write audio covers')
-
-    expect(wrapper.emitted('update:fileWriteEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteEpubEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteFb2Enabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWritePdfEnabled')).toEqual([[false]])
@@ -88,8 +86,7 @@ describe('LibraryCreatorFileWrite', () => {
   it('emits max-size updates for every format', async () => {
     const wrapper = mountComponent(ALL_ENABLED)
 
-    const inputs = wrapper.findAll('input[type="number"]')
-    expect(inputs).toHaveLength(6)
+    expect(wrapper.findAll('input[type="number"]')).toHaveLength(6)
 
     await wrapper.find('#epub-max-size').setValue('15')
     await wrapper.find('#fb2-max-size').setValue('65')
@@ -106,71 +103,36 @@ describe('LibraryCreatorFileWrite', () => {
     expect(wrapper.emitted('update:fileWriteAudioMaxFileSizeMb')).toEqual([[45]])
   })
 
-  it('hides the FB2 size input until the FB2 toggle is on', () => {
-    const off = mountComponent({ fileWriteEnabled: true, fileWriteFb2Enabled: false })
-    expect(off.text()).toContain('FictionBook (FB2)')
-    expect(off.find('#fb2-max-size').exists()).toBe(false)
-
-    const on = mountComponent({ fileWriteEnabled: true, fileWriteFb2Enabled: true })
-    expect(on.find('#fb2-max-size').exists()).toBe(true)
-    expect(on.find('#fb2-max-size').attributes('value')).toBe('100')
-  })
-
-  it('shows FB2 controls independently of the cover-writing toggle', () => {
-    const wrapper = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: false, fileWriteFb2Enabled: true })
+  it('keeps a size limit visible but disabled while its format is off', () => {
+    const wrapper = mountComponent({ fileWriteEnabled: true, fileWriteFb2Enabled: false })
 
     expect(wrapper.text()).toContain('FictionBook (FB2)')
-    expect(wrapper.find('#fb2-max-size').exists()).toBe(true)
+    expect(wrapper.get('#fb2-max-size').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('#fb2-max-size').attributes('aria-label')).toBe('FictionBook (FB2) size limit in MB')
   })
 
-  it('hides the FB2 card until file writing is enabled', () => {
-    expect(mountComponent({ fileWriteEnabled: false, fileWriteFb2Enabled: true }).text()).not.toContain('FictionBook (FB2)')
-  })
+  it('explains why audio is unavailable without the cover image', () => {
+    const wrapper = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: false, fileWriteAudioEnabled: true })
 
-  it('hides the Kindle size input until the Kindle toggle is on', () => {
-    const off = mountComponent({ fileWriteEnabled: true, fileWriteKindleEnabled: false })
-    expect(off.text()).toContain('Kindle (MOBI, AZW3)')
-    expect(off.find('#kindle-max-size').exists()).toBe(false)
-
-    const on = mountComponent({ fileWriteEnabled: true, fileWriteKindleEnabled: true })
-    expect(on.find('#kindle-max-size').exists()).toBe(true)
-  })
-
-  it('shows Kindle controls independently of the cover-writing toggle', () => {
-    const wrapper = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: false, fileWriteKindleEnabled: true })
-
-    expect(wrapper.text()).toContain('Kindle (MOBI, AZW3)')
-    expect(wrapper.text()).not.toContain('Audio')
-  })
-
-  it('gives the Kindle toggle an accessible label', () => {
-    const wrapper = mountComponent({ fileWriteEnabled: true })
-
-    expect(wrapper.findAll('[role="switch"]').some((node) => node.attributes('aria-label') === 'Write Kindle metadata')).toBe(true)
-  })
-
-  it('renders audio controls only when file write details and cover writing are enabled', () => {
-    const hidden = mountComponent({ fileWriteEnabled: false, fileWriteAudioEnabled: true })
-    expect(hidden.text()).not.toContain('Audio')
-
-    const coverDisabled = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: false, fileWriteAudioEnabled: true })
-    expect(coverDisabled.text()).not.toContain('Audio')
-
-    const visible = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: true, fileWriteAudioEnabled: true })
-    expect(visible.text()).toContain('Audio')
-    expect(visible.text()).toContain('M4B, M4A, MP3, and FLAC')
+    const audio = checkbox(wrapper, 'Write audio covers')
+    expect(audio.attributes('disabled')).toBeDefined()
+    expect((audio.element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.text()).toContain('Needs “Include cover image” turned on.')
   })
 
   it('disables audio embedding when cover writing is turned off', async () => {
-    const wrapper = mountComponent({
-      fileWriteEnabled: true,
-      fileWriteWriteCover: true,
-      fileWriteAudioEnabled: true,
-    })
+    const wrapper = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: true, fileWriteAudioEnabled: true })
 
-    await wrapper.findAll('[role="switch"]')[2]!.trigger('click')
+    await wrapper.findAll('input[type="checkbox"]')[0]!.setValue(false)
 
     expect(wrapper.emitted('update:fileWriteWriteCover')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteAudioEnabled')).toEqual([[false]])
+  })
+
+  it('counts the books each writer would touch when counts are known', () => {
+    const wrapper = mountComponent({ fileWriteEnabled: true, formatCounts: { mobi: 24, azw3: 35, epub: 378 } })
+
+    const kindle = wrapper.findAll('li').find((row) => row.text().includes('Kindle'))!
+    expect(kindle.text()).toContain('59')
   })
 })

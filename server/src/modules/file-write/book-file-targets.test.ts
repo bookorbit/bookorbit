@@ -63,6 +63,66 @@ describe('resolveBookFileTargets', () => {
     });
   });
 
+  describe('read-aloud EPUBs', () => {
+    it('separates a plain EPUB, read-aloud EPUB, and audiobook using the file-specific token', () => {
+      const files: TargetBookFile[] = [
+        {
+          id: 1,
+          absolutePath: '/library/old/plain.epub',
+          format: 'epub',
+          role: 'content',
+          sortOrder: null,
+          mediaOverlayAvailable: false,
+        },
+        {
+          id: 2,
+          absolutePath: '/library/old/read-aloud.epub',
+          format: 'epub',
+          role: 'content',
+          sortOrder: null,
+          mediaOverlayAvailable: true,
+        },
+        {
+          id: 3,
+          absolutePath: '/library/old/audio.m4b',
+          format: 'm4b',
+          role: 'content',
+          sortOrder: null,
+          mediaOverlayAvailable: false,
+        },
+      ];
+
+      const targets = resolveBookFileTargets(
+        input({
+          files,
+          bookFolderPath: '/library/old',
+          organizationMode: 'book_per_folder',
+          pattern: '{title}/{title}< ({readaloud})>',
+        }),
+      );
+
+      expect(targets.get(1)).toBe('/library/Book/Book.epub');
+      expect(targets.get(2)).toBe('/library/Book/Book (readaloud).epub');
+      expect(targets.get(3)).toBe('/library/Book/Book.m4b');
+      expect(new Set(targets.values()).size).toBe(3);
+    });
+
+    it('does not trust the overlay flag on a non-EPUB file', () => {
+      const files: TargetBookFile[] = [
+        {
+          id: 1,
+          absolutePath: '/library/old/book.m4b',
+          format: 'm4b',
+          role: 'content',
+          sortOrder: null,
+          mediaOverlayAvailable: true,
+        },
+      ];
+
+      expect(resolvePrimaryFileTarget(input({ files, pattern: '{title}< ({readaloud})>' }))).toBe('/library/Book.m4b');
+    });
+  });
+
   /**
    * The bug this module exists for. Every part of an audiobook shares its metadata, so the pattern
    * resolves all of them onto one filename and the track suffix has to come back. A preview that

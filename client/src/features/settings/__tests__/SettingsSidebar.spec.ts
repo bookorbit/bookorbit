@@ -10,10 +10,14 @@ const permState = {
   demoRestricted: false,
 }
 
-vi.mock('vue-router', () => ({
-  useRoute: () => ({ name: 'settings-appearance-theme' }),
-  useRouter: () => ({ push: vi.fn<(to: { name: string }) => void>() }),
-}))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...actual,
+    useRoute: () => ({ name: 'settings-appearance-theme' }),
+    useRouter: () => ({ push: vi.fn<(to: { name: string }) => void>() }),
+  }
+})
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({

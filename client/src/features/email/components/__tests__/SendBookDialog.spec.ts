@@ -231,7 +231,7 @@ describe('SendBookDialog', () => {
 
   it('emits close when the backdrop is clicked', async () => {
     const wrapper = mountDialog()
-    await wrapper.find('.absolute.inset-0.bg-black\\/50').trigger('click')
+    await wrapper.find('.absolute.inset-0.bg-scrim').trigger('click')
     expect(wrapper.emitted('update:open')).toEqual([[false]])
   })
 

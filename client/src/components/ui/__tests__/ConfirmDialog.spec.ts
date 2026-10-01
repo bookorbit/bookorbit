@@ -96,7 +96,7 @@ describe('ConfirmDialog', () => {
     // Simulate an underlying drawer/sheet overlay rendered at z-50
     const sheetOverlay = document.createElement('div')
     sheetOverlay.setAttribute('data-slot', 'sheet-overlay')
-    sheetOverlay.className = 'fixed inset-0 z-50 bg-black/15'
+    sheetOverlay.className = 'fixed inset-0 z-50 bg-scrim'
     document.body.appendChild(sheetOverlay)
 
     const wrapper = mountDialog()

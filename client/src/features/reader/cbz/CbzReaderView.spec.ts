@@ -202,7 +202,29 @@ describe('CbzReaderView', () => {
     expect(wrapper.get('[data-testid="cbz-paginated-pages"]').attributes('style')).toContain(`column-gap: ${spreadGap}px`)
     expect(wrapper.get('[data-spread-side="left"]').classes()).toContain('justify-end')
     expect(wrapper.get('[data-spread-side="right"]').classes()).toContain('justify-start')
+    expect(wrapper.get('[data-spread-side="left"]').classes()).toContain('items-center-safe')
+    expect(wrapper.get('[data-spread-side="right"]').classes()).toContain('items-center-safe')
     expect(wrapper.findAll('[data-spread-side] img')).toHaveLength(2)
+
+    wrapper.unmount()
+  })
+
+  it('safely centers a paginated page without putting oversized content before the scroll origin', async () => {
+    mocks.savedMode = 'paginated'
+    mocks.savedViewMode = 'single'
+    mocks.pageCount = 6
+    mocks.savedPageNumber = 2
+
+    const wrapper = shallowMount(CbzReaderView, {
+      props: { bookId: 11, fileId: 22 },
+    })
+
+    await flushPromises()
+    await nextTick()
+
+    const pages = wrapper.get('[data-testid="cbz-paginated-pages"]')
+    expect(pages.classes()).toContain('items-center-safe')
+    expect(pages.classes()).toContain('justify-center-safe')
 
     wrapper.unmount()
   })

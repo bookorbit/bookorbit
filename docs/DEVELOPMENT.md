@@ -29,7 +29,7 @@ graph LR
 | Layer        | Tech                            | Location          |
 | ------------ | ------------------------------- | ----------------- |
 | Frontend     | Vue 3, Tailwind CSS v4, Vite    | `client/`         |
-| Backend      | NestJS 11, Fastify, Drizzle ORM | `server/`         |
+| Backend      | NestJS 12, Fastify, Drizzle ORM | `server/`         |
 | Database     | PostgreSQL 18, pgvector         | Docker container  |
 | Shared types | TypeScript                      | `packages/types/` |
 | Real-time    | Socket.IO                       | Server + Client   |

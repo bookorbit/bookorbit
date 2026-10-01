@@ -62,7 +62,48 @@ describe('DashboardWidgetRepository highlight queries', () => {
 
     await expect(repository.getAnnotationCount(42, [])).resolves.toBe(0);
     await expect(repository.getAnnotationByOffset(42, [], 0)).resolves.toBeNull();
+    await expect(repository.getHighlightsFromOtherBooks(42, [], 1, 2)).resolves.toEqual([]);
     expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('selects one active highlight per other book in the same scoped pool', async () => {
+    const createdAt = new Date('2026-07-01T12:00:00.000Z');
+    const query = {
+      from: vi.fn(),
+      innerJoin: vi.fn(),
+      where: vi.fn(),
+      orderBy: vi.fn(),
+      limit: vi.fn(),
+    };
+    query.from.mockReturnValue(query);
+    query.innerJoin.mockReturnValue(query);
+    query.where.mockReturnValue(query);
+    query.orderBy.mockReturnValue(query);
+    query.limit.mockResolvedValue([
+      { text: 'Other book', note: null, bookTitle: 'Other', bookId: 9, coverSource: null, chapterTitle: null, createdAt },
+    ]);
+    const db = { selectDistinctOn: vi.fn().mockReturnValue(query) };
+    const repository = new DashboardWidgetRepository(db as never);
+
+    await expect(repository.getHighlightsFromOtherBooks(42, [7, 8], 5, 2)).resolves.toEqual([
+      {
+        text: 'Other book',
+        note: null,
+        bookTitle: 'Other',
+        bookId: 9,
+        hasCover: false,
+        chapterTitle: null,
+        createdAt: createdAt.toISOString(),
+      },
+    ]);
+    expect(db.selectDistinctOn).toHaveBeenCalledWith([annotations.bookId], expect.any(Object));
+    const rendered = dialect.sqlToQuery(query.where.mock.calls[0]?.[0] as SQL);
+    expect(rendered.sql).toContain('"annotations"."user_id" = $1');
+    expect(rendered.sql).toContain('"annotations"."deleted_at" is null');
+    expect(rendered.sql).toContain('"books"."library_id" in ($2, $3)');
+    expect(rendered.sql).toContain('"annotations"."book_id" not in ($4)');
+    expect(rendered.params).toEqual([42, 7, 8, 5]);
+    expect(query.limit).toHaveBeenCalledWith(2);
   });
 
   it('counts only active annotations in the user and library scoped pool', async () => {

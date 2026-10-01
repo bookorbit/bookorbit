@@ -68,6 +68,11 @@ export class DashboardController {
     return this.widgetService.getHighlightOfTheDay(user);
   }
 
+  @Get('widgets/highlights')
+  getHighlights(@CurrentUser() user: RequestUser) {
+    return this.widgetService.getHighlights(user);
+  }
+
   @Get('widgets/monthly-challenge')
   getMonthlyChallenge(@CurrentUser() user: RequestUser) {
     return this.widgetService.getMonthlyChallenge(user);

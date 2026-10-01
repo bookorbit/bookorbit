@@ -1438,7 +1438,7 @@ async function handleDownloadPlugin() {
         class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
         @click.self="handleCloseDeleteConfirm"
       >
-        <button class="absolute inset-0 bg-black/45" @click="handleCloseDeleteConfirm" />
+        <button class="absolute inset-0 bg-scrim" @click="handleCloseDeleteConfirm" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
             {{ t('settings.reader.koreader.deleteConfirmTitle') }}
@@ -1462,7 +1462,7 @@ async function handleDownloadPlugin() {
         class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
         @click.self="handleCloseUnlink"
       >
-        <button class="absolute inset-0 bg-black/45" @click="handleCloseUnlink" />
+        <button class="absolute inset-0 bg-scrim" @click="handleCloseUnlink" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
             {{ t('settings.reader.koreader.hashLinks.unlinkConfirmTitle') }}
@@ -1502,7 +1502,7 @@ async function handleDownloadPlugin() {
         class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
         @click.self="handleCloseRemoveDevice"
       >
-        <button class="absolute inset-0 bg-black/45" @click="handleCloseRemoveDevice" />
+        <button class="absolute inset-0 bg-scrim" @click="handleCloseRemoveDevice" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
             {{
@@ -1534,7 +1534,7 @@ async function handleDownloadPlugin() {
         class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
         @click.self="handleCloseDismiss"
       >
-        <button class="absolute inset-0 bg-black/45" @click="handleCloseDismiss" />
+        <button class="absolute inset-0 bg-scrim" @click="handleCloseDismiss" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
             {{
@@ -1571,7 +1571,7 @@ async function handleDownloadPlugin() {
         class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
         @click.self="handleCloseDismissAll"
       >
-        <button class="absolute inset-0 bg-black/45" @click="handleCloseDismissAll" />
+        <button class="absolute inset-0 bg-scrim" @click="handleCloseDismissAll" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
             {{
@@ -1603,7 +1603,7 @@ async function handleDownloadPlugin() {
         @click.self="handleCloseLink"
         @keydown.esc="handleCloseLink"
       >
-        <button class="absolute inset-0 bg-black/45" @click="handleCloseLink" />
+        <button class="absolute inset-0 bg-scrim" @click="handleCloseLink" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-2xl md:rounded-lg md:p-5">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">

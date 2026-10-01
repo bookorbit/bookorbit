@@ -125,7 +125,7 @@ JWT_SECRET=                # signs login tokens          - openssl rand -hex 32
 SETUP_BOOTSTRAP_TOKEN=     # one-time setup wizard token - openssl rand -hex 16
 ```
 
-On a NAS, or any host where your book folder is owned by a user other than UID 1000, also set `PUID` and `PGID` to match that owner. Getting these wrong is the most common cause of permission errors on first scan.
+If your local book folder is owned by a user other than UID 1000, also set `PUID` and `PGID` to match that owner. Getting these wrong is the most common cause of permission errors on first scan.
 
 Then start:
 
@@ -135,7 +135,7 @@ docker compose up -d
 
 Open `http://your-server-ip:3000` and complete setup using your `SETUP_BOOTSTRAP_TOKEN`.
 
-For the full installation guide including reverse proxy setup, file permissions on NAS, secrets from mounted files, external databases, OIDC hardening, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation)**.
+For the full installation guide including reverse proxy setup, host file permissions, secrets from mounted files, external databases, OIDC hardening, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation)**.
 
 ## Managed Hosting
 
@@ -170,6 +170,15 @@ Full documentation is at **[bookorbit.app](https://bookorbit.app/what-is-bookorb
 For setting up book requests, see the [book requests guide](docs/BOOK_REQUESTS.md): indexers,
 download clients, path mappings, automation, and the encryption key they all need.
 For local development, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). To contribute, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow: branch naming, test expectations, PR checklist, and commit format.
+
+## Unsupported Storage Configurations
+
+> [!WARNING]
+> **NAS and network storage configurations are not supported.** BookOrbit requires a local filesystem with dependable semantics for every writable path, including book libraries, import folders, application data, and PostgreSQL data. Do not place these paths on SMB/CIFS, NFS, FUSE or cloud mounts, distributed filesystems, or similar storage, even when the storage is mounted as an ordinary directory.
+>
+> BookOrbit scans, moves, renames, and writes files while coordinating with its database and background jobs. Network and nonstandard filesystems can behave differently around atomic renames, locking, file notifications, permissions, caching, consistency, and durability. A configuration may appear to work and later cause intermittent failures, incomplete moves, stale library state, data loss, or corruption.
+>
+> Such configurations may work in a particular environment, but using them is entirely at your own risk. No support is provided for them. Please do not open GitHub issues for problems encountered with these configurations unless the problem can be reproduced using supported local storage.
 
 ## Repository Activity
 

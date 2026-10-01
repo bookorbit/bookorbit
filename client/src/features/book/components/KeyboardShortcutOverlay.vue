@@ -47,12 +47,7 @@ const sections = computed(() => [
 <template>
   <Teleport to="body">
     <Transition name="shortcut-overlay">
-      <div
-        v-if="open"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-        @click.self="handleClose"
-        @keydown.escape="handleClose"
-      >
+      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-scrim" @click.self="handleClose" @keydown.escape="handleClose">
         <div class="relative w-full max-w-md rounded-xl border border-border bg-card shadow-xl" role="dialog" :aria-label="t('book.shortcuts.title')">
           <div class="flex items-center justify-between border-b border-border px-5 py-3">
             <h2 class="text-sm font-semibold text-foreground">{{ t('book.shortcuts.title') }}</h2>

@@ -196,7 +196,7 @@ function audiobookManifest(): AudiobookManifest {
     schemaVersion: 2,
     revision: 'manifest-rev-1',
     book: { id: BOOK_ID, title: 'The Long Orbit', authors: ['Ada Vance'], narrators: ['Sam Reed'], hasCover: true },
-    assets: [{ assetId: 'asset-1', sequence: 0, format: 'm4b', durationMs: 3_600_000, sizeBytes: 4096, etag: 'etag-1' }],
+    assets: [{ assetId: 'asset-1', fileId: FILE_ID, sequence: 0, format: 'm4b', durationMs: 3_600_000, sizeBytes: 4096, etag: 'etag-1' }],
     chapters: [{ id: 'chapter-1', title: 'Launch', assetId: 'asset-1', sequence: 0, startMs: 0, endMs: 3_600_000, assetOffsetMs: 0 }],
     totalDurationMs: 3_600_000,
   }

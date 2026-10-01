@@ -120,7 +120,7 @@ export class UpdateLibraryDto {
   readingThreshold?: number;
 
   @IsOptional()
-  @IsInt()
+  @IsNumber()
   @Min(LIBRARY_MARK_AS_FINISHED_MIN)
   @Max(LIBRARY_MARK_AS_FINISHED_MAX)
   markAsFinishedPercentComplete?: number;

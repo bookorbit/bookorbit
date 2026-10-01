@@ -6,6 +6,8 @@ import { createAuthenticatedSocket } from '@/lib/socket'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
 let socket: Socket | null = null
+/** While a page announces finished scans itself (the Libraries settings page), the generic toast stays quiet. */
+let completionToastClaims = 0
 const progressMap = ref<Map<number, ScanProgressEvent>>(new Map())
 const coverRefreshMap = ref<Map<number, CoverRefreshProgressEvent>>(new Map())
 const subscribedLibraries = new Set<number>()
@@ -18,7 +20,7 @@ function getSocket(): Socket {
       progressMap.value.set(event.libraryId, event)
       progressMap.value = new Map(progressMap.value)
       if (event.status !== 'running') {
-        if (event.status === 'completed' && event.added > 0) {
+        if (event.status === 'completed' && event.added > 0 && completionToastClaims === 0) {
           toast.success(`${event.added} new ${event.added === 1 ? 'book' : 'books'} added`)
         }
         // Keep the final event for a short time so UI can show completion, then clear.
@@ -60,6 +62,17 @@ function getSocket(): Socket {
 }
 
 export { getSocket }
+
+/** Takes over the "books added" toast until the returned release is called. */
+export function claimScanCompletionToasts(): () => void {
+  completionToastClaims += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    completionToastClaims -= 1
+  }
+}
 
 export function useScanProgress() {
   function subscribeLibrary(libraryId: number): void {

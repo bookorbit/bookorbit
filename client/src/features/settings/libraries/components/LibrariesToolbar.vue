@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, X } from '@lucide/vue'
+import { formatNumber } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import { isLibrarySortField, LIBRARY_SORT_FIELDS, type LibrarySortField } from '../lib/library-sort'
 
@@ -19,7 +20,13 @@ const emit = defineEmits<{ 'update:query': [value: string]; 'update:sortBy': [va
 
 const { t } = useI18n()
 
-const sortOptions = computed(() => LIBRARY_SORT_FIELDS.map((value) => ({ value, label: t(`settings.admin.libraries.sort.${value}`) })))
+/** The default order is the sidebar's display order, and the label says so. */
+const sortOptions = computed(() =>
+  LIBRARY_SORT_FIELDS.map((value) => ({
+    value,
+    label: t(value === 'default' ? 'settings.admin.libraries.sort.sidebar' : `settings.admin.libraries.sort.${value}`),
+  })),
+)
 
 function handleQueryInput(event: Event) {
   emit('update:query', (event.target as HTMLInputElement).value)
@@ -65,15 +72,32 @@ function handleSortChange(event: Event) {
       </select>
     </label>
 
-    <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground lg:ms-auto lg:justify-end">
-      <span>{{ t('settings.admin.libraries.totalLibraries', { count: libraryCount }) }}</span>
+    <!-- The figures carry the weight; the units stay quiet beside them. -->
+    <p
+      data-testid="libraries-totals"
+      class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[13px] text-muted-foreground lg:ms-auto lg:justify-end"
+    >
+      <span
+        ><span class="font-semibold tabular-nums text-foreground">{{ formatNumber(libraryCount) }}</span>
+        {{ t('settings.admin.libraries.librariesUnit', { count: libraryCount }) }}</span
+      >
       <span class="opacity-50" aria-hidden="true">&middot;</span>
-      <span>{{ t('settings.admin.libraries.folderCount', { count: folderCount }) }}</span>
+      <span
+        ><span class="font-semibold tabular-nums text-foreground">{{ formatNumber(folderCount) }}</span>
+        {{ t('settings.admin.libraries.foldersUnit', { count: folderCount }) }}</span
+      >
       <template v-if="!statsPending">
         <span class="opacity-50" aria-hidden="true">&middot;</span>
-        <span>{{ t('settings.admin.libraries.bookCount', { count: totalBooks }) }}</span>
+        <span
+          ><span class="font-semibold tabular-nums text-foreground">{{ formatNumber(totalBooks) }}</span>
+          {{ t('settings.admin.libraries.booksUnit', { count: totalBooks }) }}</span
+        >
         <span class="opacity-50" aria-hidden="true">&middot;</span>
-        <span>{{ t('settings.admin.libraries.onDiskUnit', { size: formatBytes(totalSizeBytes) }) }}</span>
+        <i18n-t keypath="settings.admin.libraries.onDiskUnit" tag="span" scope="global">
+          <template #size
+            ><span class="font-semibold tabular-nums text-foreground">{{ formatBytes(totalSizeBytes) }}</span></template
+          >
+        </i18n-t>
       </template>
     </p>
   </div>

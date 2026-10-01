@@ -1,11 +1,22 @@
 import { onUnmounted, ref, unref, type MaybeRef } from 'vue'
+import type { AudiobookManifestAsset, AudiobookPlaybackState } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { createUuid } from '@/lib/uuid'
 
 const SAVE_THROTTLE_MS = 5_000
 
 export interface AudioProgressOptions {
   trackingEnabled?: MaybeRef<boolean>
   manifestRevision: MaybeRef<string>
+  assets?: MaybeRef<Pick<AudiobookManifestAsset, 'assetId' | 'durationMs'>[]>
+  onManifestStale?: () => void
+}
+
+interface PendingWrite {
+  assetId: string
+  positionMs: number
+  capturedAt: string
+  operationId: string
 }
 
 export function useAudioProgress(bookId: number, options: AudioProgressOptions) {
@@ -14,85 +25,102 @@ export function useAudioProgress(bookId: number, options: AudioProgressOptions) 
   const revision = ref(0)
   const loaded = ref(false)
   const trackingEnabled = options.trackingEnabled ?? true
+  const url = `/api/v1/audiobooks/${bookId}/playback-state`
 
-  let pendingAssetId: string | null = null
-  let pendingPosition = 0
+  let pending: PendingWrite | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
-  let dirty = false
   let saving = false
+  let staleManifestRevision: string | null = null
+
+  function applyState(state: AudiobookPlaybackState | null) {
+    revision.value = state?.revision ?? 0
+    resumeAssetId.value = state?.assetId ?? null
+    resumePosition.value = (state?.positionMs ?? 0) / 1000
+  }
 
   async function load() {
     if (!unref(trackingEnabled)) {
       loaded.value = true
       return
     }
-    const res = await api(`/api/v1/audiobooks/${bookId}/playback-state`)
+    const res = await api(url)
     // Mark loaded regardless of response so callers can distinguish
     // "load attempted" from "load not yet called".
     loaded.value = true
     if (!res.ok) return
-    const data = await res.json()
-    if (data) {
-      resumeAssetId.value = data.assetId ?? null
-      resumePosition.value = (data.positionMs ?? 0) / 1000
-      revision.value = data.revision ?? 0
-    }
+    applyState(await res.json())
+  }
+
+  function scheduleFlush() {
+    if (saveTimer) return
+    saveTimer = setTimeout(() => {
+      saveTimer = null
+      void flushIfDirty()
+    }, SAVE_THROTTLE_MS)
   }
 
   function update(assetId: string, positionSeconds: number) {
     if (!unref(trackingEnabled)) return
-    pendingAssetId = assetId
-    pendingPosition = positionSeconds
-    dirty = true
-
-    if (!saveTimer) {
-      saveTimer = setTimeout(() => {
-        saveTimer = null
-        flushIfDirty()
-      }, SAVE_THROTTLE_MS)
+    pending = {
+      assetId,
+      positionMs: Math.max(0, Math.round(positionSeconds * 1000)),
+      capturedAt: new Date().toISOString(),
+      operationId: createUuid(),
     }
+    scheduleFlush()
+  }
+
+  function settle(write: PendingWrite) {
+    if (pending === write) pending = null
+  }
+
+  function clampToAsset(write: PendingWrite): number {
+    const durationMs = unref(options.assets)?.find((asset) => asset.assetId === write.assetId)?.durationMs
+    return typeof durationMs === 'number' ? Math.min(write.positionMs, durationMs) : write.positionMs
   }
 
   async function flushIfDirty() {
     if (!unref(trackingEnabled)) return
-    if (!dirty || pendingAssetId === null || saving) return
-    const assetId = pendingAssetId
-    const positionMs = Math.max(0, Math.round(pendingPosition * 1000))
+    const write = pending
+    if (write === null || saving) return
+    const manifestRevision = unref(options.manifestRevision)
+    // A 412 means this manifest is gone; hold the write until the view loads the new one.
+    if (manifestRevision === staleManifestRevision) return
     const body = JSON.stringify({
-      assetId,
-      positionMs,
-      capturedAt: new Date().toISOString(),
-      operationId: crypto.randomUUID(),
+      assetId: write.assetId,
+      positionMs: clampToAsset(write),
+      capturedAt: write.capturedAt,
+      operationId: write.operationId,
       baseRevision: revision.value,
-      manifestRevision: unref(options.manifestRevision),
+      manifestRevision,
     })
-    dirty = false
     saving = true
     try {
-      const res = await api(`/api/v1/audiobooks/${bookId}/playback-state`, {
+      const res = await api(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body,
       })
-      if (!res.ok) {
-        dirty = true
-        if (res.status === 409) await load()
-        return
+      if (res.ok) {
+        applyState(await res.json())
+        settle(write)
+      } else if (res.status === 409) {
+        const current = await api(url)
+        if (!current.ok) return
+        const server = (await current.json()) as AudiobookPlaybackState | null
+        applyState(server)
+        if (server && Date.parse(server.capturedAt) >= Date.parse(write.capturedAt)) settle(write)
+      } else if (res.status === 412) {
+        staleManifestRevision = manifestRevision
+        options.onManifestStale?.()
+      } else if (res.status < 500 && res.status !== 429) {
+        settle(write)
       }
-      const state = await res.json()
-      revision.value = state.revision
-      resumeAssetId.value = state.assetId
-      resumePosition.value = state.positionMs / 1000
     } catch {
-      dirty = true
+      // Network failure: keep the write and retry it with the same operationId.
     } finally {
       saving = false
-      if (dirty && !saveTimer) {
-        saveTimer = setTimeout(() => {
-          saveTimer = null
-          void flushIfDirty()
-        }, SAVE_THROTTLE_MS)
-      }
+      if (pending !== null && unref(options.manifestRevision) !== staleManifestRevision) scheduleFlush()
     }
   }
 

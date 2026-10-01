@@ -182,7 +182,7 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
 <template>
   <DialogRoot :open="open" @update:open="handleOpenChange">
     <DialogPortal>
-      <DialogOverlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+      <DialogOverlay class="fixed inset-0 z-50 bg-scrim" />
       <DialogContent
         class="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl outline-none"
         @escape-key-down="closeDialog"

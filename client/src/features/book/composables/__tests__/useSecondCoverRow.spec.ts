@@ -32,21 +32,20 @@ describe('useSecondCoverRow', () => {
     expect(active.value).toBe(audible)
   })
 
-  it('ranks art measured as the other shape last, and names its fit', () => {
+  it('ranks art measured as the other shape last', () => {
     const hardcover = candidate('hardcover', 'hardcover-1')
     const goodreads = candidate('goodreads', 'goodreads-1')
     const measured = (entry: MetadataCandidate) => (entry === hardcover ? 'portrait' : (entry.coverShape ?? 'unknown'))
-    const { choices, active, row, select } = useSecondCoverRow(
+    const { choices, active, select } = useSecondCoverRow(
       source({ priority: ['hardcover', 'goodreads'], candidates: [hardcover, goodreads] }),
       measured,
     )
 
     expect(choices.value).toEqual([goodreads, hardcover])
     expect(active.value).toBe(goodreads)
-    expect(row.value?.candidateCoverFit).toBe('unknown')
 
     select(hardcover)
-    expect(row.value?.candidateCoverFit).toBe('mismatch')
+    expect(active.value).toBe(hardcover)
   })
 
   it('keeps its pick apart from the selection, and a locked slot cannot be picked', () => {
@@ -61,15 +60,7 @@ describe('useSecondCoverRow', () => {
     row.select(itunes)
 
     expect(row.pickedCoverUrl.value).toBe('/covers/audible-1.jpg')
-    expect(row.row.value).toMatchObject({
-      key: 'secondCoverUrl',
-      labelKey: 'book.detail.editMetadata.diff.fields.audioCover',
-      coverMedium: 'audio',
-      isPicked: true,
-      pickedFromActive: false,
-      pickedProvider: 'audible',
-      bookValue: '/api/v1/books/1/cover?medium=audio',
-    })
+    expect(row.active.value).toBe(itunes)
 
     row.togglePick()
     expect(row.picked.value).toBe(itunes)
@@ -77,13 +68,27 @@ describe('useSecondCoverRow', () => {
     locked.value = true
     row.togglePick()
     expect(row.picked.value).toBe(itunes)
-    expect(row.row.value?.isLocked).toBe(true)
+    row.pick(audible)
+    expect(row.picked.value).toBe(itunes)
   })
 
-  it('has no row without a second medium', () => {
-    const { row, choices } = useSecondCoverRow(null)
+  it('stages a cover straight from the strip, and a second pick of the same cover unstages it', () => {
+    const audible = candidate('audible', 'audible-1', { coverShape: 'square' })
+    const itunes = candidate('itunes', 'itunes-1', { coverShape: 'square' })
+    const row = useSecondCoverRow(source({ candidates: [audible, itunes] }))
 
-    expect(row.value).toBeNull()
+    row.pick(itunes)
+    expect(row.picked.value).toBe(itunes)
+    expect(row.active.value).toBe(itunes)
+
+    row.pick(itunes)
+    expect(row.picked.value).toBeNull()
+  })
+
+  it('offers nothing without a second medium', () => {
+    const { active, choices } = useSecondCoverRow(null)
+
+    expect(active.value).toBeNull()
     expect(choices.value).toEqual([])
   })
 })

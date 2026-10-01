@@ -528,6 +528,7 @@ export class KoreaderCatalogService {
       bookId: file.bookId,
       absolutePath: file.absolutePath,
       format: file.format,
+      mediaOverlayAvailable: false,
     });
 
     try {

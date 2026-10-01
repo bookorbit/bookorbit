@@ -1197,6 +1197,26 @@ describe('BookDockFinalizeService', () => {
     expect(result[0].newName).toBe('Dune.epub');
   });
 
+  it('previewNames marks a read-aloud EPUB and uses the same destination for finalization', async () => {
+    const { service, repo, db } = makeService();
+    const row = makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: { title: 'Dune' } as BookDockMetadata });
+    const library = { id: 10, name: 'Books', fileNamingPattern: '{title}< ({readaloud})>', organizationMode: 'book_per_file' };
+    repo.findByIds.mockResolvedValue([row]);
+    db.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([library]),
+      }),
+    });
+    const inspect = vi.spyOn(service as any, 'inspectMediaOverlayAvailable').mockResolvedValue(true);
+
+    const [preview] = await service.previewNames([1], false, [], undefined, 1, true);
+    const destination = await (service as any).resolveDestination(library, '/library', row, 'epub');
+
+    expect(preview.newName).toBe('Dune (readaloud).epub');
+    expect(destination).toBe('/library/Dune (readaloud).epub');
+    expect(inspect).toHaveBeenCalledTimes(2);
+  });
+
   it('previewNames sanitizes generated names when cross-platform mode is enabled', async () => {
     const { service, repo, appSettings, db } = makeService();
     appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(true);

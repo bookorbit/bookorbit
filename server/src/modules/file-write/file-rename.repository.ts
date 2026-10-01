@@ -15,6 +15,7 @@ export interface BookRenameData {
     relPath: string | null;
     format: string | null;
     role: string;
+    mediaOverlayAvailable: boolean;
   };
   libraryId: number;
   libraryName: string;
@@ -56,6 +57,7 @@ export class FileRenameRepository {
         relPath: bookFiles.relPath,
         format: bookFiles.format,
         role: bookFiles.role,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
         libraryFolderId: bookFiles.libraryFolderId,
         libraryFolderPath: libraryFolders.path,
         libraryId: books.libraryId,
@@ -104,6 +106,7 @@ export class FileRenameRepository {
         relPath: row.relPath,
         format: row.format,
         role: row.role,
+        mediaOverlayAvailable: row.mediaOverlayAvailable,
       },
       libraryId: row.libraryId,
       libraryName: row.libraryName,
@@ -137,6 +140,7 @@ export class FileRenameRepository {
         role: bookFiles.role,
         format: bookFiles.format,
         sortOrder: bookFiles.sortOrder,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
       })
       .from(bookFiles)
       .where(eq(bookFiles.bookId, bookId))

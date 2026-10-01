@@ -13,17 +13,22 @@ const { t } = useI18n()
 
 const isFileMode = computed(() => props.library.organizationMode === 'book_per_file')
 const modeIcon = computed(() => (isFileMode.value ? FileText : Folder))
-const modeLabel = computed(() => (isFileMode.value ? t('settings.admin.libraries.fileMode') : t('settings.admin.libraries.folderMode')))
+/** The editor's own name for the setting, so the list and the editor never call it two things. */
+const modeLabel = computed(() =>
+  isFileMode.value ? t('library.creator.scanner.scanMode.fileAsBook.title') : t('library.creator.scanner.scanMode.folderAsBook.title'),
+)
 
 const firstFolder = computed(() => props.library.folders[0]?.path ?? null)
 const extraFolders = computed(() => Math.max(0, props.library.folders.length - 1))
 const allPaths = computed(() => props.library.folders.map((folder) => folder.path).join('\n'))
 
-/** The ledger row has room for the whole path; the mobile card keeps the identifying tail. */
-const displayPath = computed(() => {
-  if (!firstFolder.value) return ''
-  return props.prominent ? firstFolder.value : shortenPath(firstFolder.value)
+/** Split so the last segment, the one that names the library's folder, can be set apart. */
+const pathHead = computed(() => {
+  const path = firstFolder.value ?? ''
+  const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return cut >= 0 ? path.slice(0, cut + 1) : ''
 })
+const pathLeaf = computed(() => (firstFolder.value ?? '').slice(pathHead.value.length))
 </script>
 
 <template>
@@ -47,6 +52,7 @@ const displayPath = computed(() => {
 
       <p class="flex min-w-0 items-center gap-2 text-muted-foreground" :class="prominent ? 'mt-1.5 text-[12.5px]' : 'mt-0.5 text-xs'">
         <span
+          data-testid="library-mode"
           class="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-[11px] font-medium"
           :class="
             isFileMode
@@ -57,14 +63,17 @@ const displayPath = computed(() => {
           <component :is="modeIcon" :size="11" class="shrink-0" aria-hidden="true" />
           {{ modeLabel }}
         </span>
+        <!-- One folder is already stated by the path line underneath. -->
         <template v-if="prominent">
-          <span class="shrink-0">{{ t('settings.admin.libraries.folderCount', { count: library.folders.length }) }}</span>
+          <span v-if="library.folders.length > 1" class="shrink-0">{{
+            t('settings.admin.libraries.folderCount', { count: library.folders.length })
+          }}</span>
         </template>
         <template v-else-if="firstFolder">
           <span class="shrink-0 opacity-50" aria-hidden="true">&middot;</span>
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="min-w-0 truncate font-mono" dir="ltr" :title="allPaths">{{ displayPath }}</span>
+              <span class="min-w-0 truncate font-mono" dir="ltr" :title="allPaths">{{ shortenPath(firstFolder) }}</span>
             </TooltipTrigger>
             <TooltipContent class="max-w-sm">
               <p v-for="folder in library.folders" :key="folder.id" dir="ltr" class="break-all font-mono text-xs">{{ folder.path }}</p>
@@ -78,7 +87,13 @@ const displayPath = computed(() => {
         <Folder :size="12" class="shrink-0 opacity-60" aria-hidden="true" />
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="min-w-0 truncate font-mono" dir="ltr" :title="allPaths">{{ displayPath }}</span>
+            <!-- Cut from the start, so the folder that names the library is what stays visible: the right-to-left box
+                 overflows on its left, and the bdi keeps the path itself left-to-right in either locale direction. -->
+            <span data-testid="library-path" class="library-path min-w-0 font-mono" :title="allPaths">
+              <bdi dir="ltr"
+                >{{ pathHead }}<span class="font-semibold text-foreground">{{ pathLeaf }}</span></bdi
+              >
+            </span>
           </TooltipTrigger>
           <TooltipContent class="max-w-sm">
             <p v-for="folder in library.folders" :key="folder.id" dir="ltr" class="break-all font-mono text-xs">{{ folder.path }}</p>
@@ -91,3 +106,18 @@ const displayPath = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.library-path {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+[dir='rtl'] .library-path {
+  text-align: right;
+}
+</style>

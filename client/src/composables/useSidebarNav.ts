@@ -8,12 +8,14 @@ import { useBookDockSummary } from '@/features/book-dock/composables/useBookDock
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useBrowseCounts } from '@/composables/useBrowseCounts'
 import { useMediaMode } from '@/composables/useMediaMode'
+import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
 
 export const SIDEBAR_ZONE_IDS = ['primary', 'browse'] as const
 export type SidebarZoneId = (typeof SIDEBAR_ZONE_IDS)[number]
 
 interface NavContext {
   hasPermission: (name: string) => boolean
+  showBookRequests?: boolean
   bookDockTotal: number
   outstandingRequestTotal: number
   outstandingRequestLabel: string
@@ -115,6 +117,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     // The drawer routes are children of this one, so the row has to stay lit while one is open.
     isActive: (route) => routeNameStartsWith(route, 'book-request'),
     permission: 'book_request_access',
+    visible: (context) => context.showBookRequests !== false,
     badge: (context) =>
       context.outstandingRequestTotal > 0 ? { value: context.outstandingRequestTotal, label: context.outstandingRequestLabel, tone: 'accent' } : null,
   },
@@ -203,6 +206,7 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
   const { counts: browseCounts } = useBrowseCounts()
   const { libraries } = useLibraries()
   const { mode } = useMediaMode()
+  const { showBookRequests } = useBookRequestVisibility()
 
   const context = computed<NavContext>(() => {
     const outstandingRequestTotal = getOutstandingRequestTotal()
@@ -212,6 +216,7 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
 
     return {
       hasPermission,
+      showBookRequests: showBookRequests.value,
       bookDockTotal: bookDockSummary.value.total,
       outstandingRequestTotal,
       outstandingRequestLabel: t(outstandingRequestLabelKey, { count: outstandingRequestTotal }),

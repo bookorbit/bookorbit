@@ -2,7 +2,6 @@ import { computed, shallowRef, toValue, type MaybeRefOrGetter } from 'vue'
 import type { CoverMedium, MetadataCandidate, MetadataCoverShape, MetadataProviderKey } from '@bookorbit/types'
 import { toDisplayCoverUrl } from '../lib/metadata-fetch'
 import { COVER_FIT_RANK, coverFit, statedCoverShape } from '../lib/cover-slots'
-import type { DiffField } from './useMetadataDiff'
 
 /** What the diff panel is given for the other medium's cover row. */
 export interface SecondCoverInput {
@@ -61,32 +60,6 @@ export function useSecondCoverRow(
     return choices.value[0] ?? null
   })
 
-  const row = computed<DiffField | null>(() => {
-    const current = toValue(source)
-    if (!current) return null
-    const candidateDisplay = toDisplayCoverUrl(active.value?.coverUrl)
-    const pickedDisplay = toDisplayCoverUrl(picked.value?.coverUrl)
-    const isPicked = picked.value !== null
-    return {
-      key: 'secondCoverUrl',
-      labelKey: `book.detail.editMetadata.diff.fields.${current.medium === 'audio' ? 'audioCover' : 'bookCover'}`,
-      bookValue: current.currentUrl,
-      currentDisplay: isPicked ? pickedDisplay : current.currentUrl,
-      candidateDisplay,
-      hasDiff: current.currentUrl !== candidateDisplay,
-      isPicked,
-      pickedFromActive: isPicked && picked.value === active.value,
-      pickedProvider: picked.value?.provider ?? null,
-      pickedDisplay,
-      isCover: true,
-      coverMedium: current.medium,
-      ...(active.value && candidateDisplay ? { candidateCoverFit: coverFit(shapeOf(active.value), current.medium) } : {}),
-      isLocked: current.locked,
-      isCopyable: true,
-      providerValues: [],
-    }
-  })
-
   function select(candidate: MetadataCandidate) {
     chosen.value = candidate
   }
@@ -96,7 +69,14 @@ export function useSecondCoverRow(
     picked.value = picked.value === active.value ? null : active.value
   }
 
+  /** Stages a cover straight from the strip, and shows it; picking the staged one again unstages it. */
+  function pick(candidate: MetadataCandidate | null) {
+    if (toValue(source)?.locked) return
+    if (candidate) chosen.value = candidate
+    picked.value = candidate && picked.value !== candidate ? candidate : null
+  }
+
   const pickedCoverUrl = computed(() => picked.value?.coverUrl)
 
-  return { choices, active, row, picked, pickedCoverUrl, select, togglePick }
+  return { choices, active, picked, pickedCoverUrl, select, togglePick, pick }
 }

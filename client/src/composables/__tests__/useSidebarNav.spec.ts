@@ -31,6 +31,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 function makeContext(
   overrides: Partial<{
     permissions: string[]
+    showBookRequests: boolean
     bookDockTotal: number
     outstandingRequestTotal: number
     outstandingRequestLabel: string
@@ -41,6 +42,7 @@ function makeContext(
   const permissions = overrides.permissions ?? []
   return {
     hasPermission: (name: string) => permissions.includes(name),
+    showBookRequests: overrides.showBookRequests,
     bookDockTotal: overrides.bookDockTotal ?? 0,
     outstandingRequestTotal: overrides.outstandingRequestTotal ?? 0,
     outstandingRequestLabel: overrides.outstandingRequestLabel ?? '',
@@ -95,6 +97,12 @@ describe('sidebar nav registry', () => {
 
   it('hides Requests from a user without book_request_access', () => {
     expect(allowedIds(makeContext())).not.toContain('book-requests')
+  })
+
+  it('hides Requests without changing permission when the user turns visibility off', () => {
+    const context = makeContext({ permissions: ['book_request_access'], showBookRequests: false })
+    expect(allowedIds(context)).not.toContain('book-requests')
+    expect(context.hasPermission('book_request_access')).toBe(true)
   })
 
   it.each(['book-requests', 'book-request-detail', 'book-request-releases'])('keeps Requests active on %s', (routeName) => {

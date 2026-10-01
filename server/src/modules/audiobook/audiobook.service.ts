@@ -14,7 +14,7 @@ import {
 } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { naturalCompare } from '../../common/utils/natural-sort.utils';
+import { compareAudioTracks } from '../../common/utils/book-media.utils';
 import type { BookmarkRow } from '../../db/schema';
 import { BookService } from '../book/book.service';
 import type { CreateAudiobookBookmarkDto } from './dto/create-audiobook-bookmark.dto';
@@ -23,6 +23,10 @@ import type { UpdateAudiobookBookmarkDto } from './dto/update-audiobook-bookmark
 import { AudiobookRepository } from './audiobook.repository';
 
 type AudioFileRow = Awaited<ReturnType<AudiobookRepository['findAudioFiles']>>[number];
+
+// Durations are stored as whole seconds, so a real position can sit up to half a second past the
+// rounded duration. Accept a little beyond it and clamp, rather than refusing the tail of a track.
+const DURATION_SLACK_MS = 1_000;
 
 interface ManifestContext {
   manifest: AudiobookManifest;
@@ -94,18 +98,19 @@ export class AudiobookService {
     }
 
     const asset = context.manifest.assets[fileIndex]!;
-    if (asset.durationMs !== null && dto.positionMs > asset.durationMs) {
+    if (asset.durationMs !== null && dto.positionMs > asset.durationMs + DURATION_SLACK_MS) {
       throw new BadRequestException('positionMs exceeds the asset duration');
     }
+    const positionMs = asset.durationMs === null ? dto.positionMs : Math.min(dto.positionMs, asset.durationMs);
     const elapsedBefore = context.manifest.assets.slice(0, fileIndex).reduce((sum, item) => sum + (item.durationMs ?? 0), 0);
-    const absolutePositionMs = elapsedBefore + dto.positionMs;
+    const absolutePositionMs = elapsedBefore + positionMs;
     const percentage =
       context.hasCompleteDurations && context.manifest.totalDurationMs > 0
         ? Math.max(0, Math.min(100, (absolutePositionMs / context.manifest.totalDurationMs) * 100))
         : (previous?.percentage ?? 0);
     const values = {
       currentFileId: context.files[fileIndex]!.id,
-      positionSeconds: dto.positionMs / 1000,
+      positionSeconds: positionMs / 1000,
       percentage,
       capturedAt: new Date(dto.capturedAt),
       operationId: dto.operationId,
@@ -134,7 +139,7 @@ export class AudiobookService {
     );
     return {
       assetId: dto.assetId,
-      positionMs: dto.positionMs,
+      positionMs,
       percentage,
       completed: percentage >= 100,
       capturedAt: saved.capturedAt.toISOString(),
@@ -156,7 +161,8 @@ export class AudiobookService {
 
   async createBookmark(bookId: number, dto: CreateAudiobookBookmarkDto, user: RequestUser): Promise<AudiobookBookmark> {
     const context = await this.loadManifestContext(bookId, user);
-    if (context.manifest.totalDurationMs > 0 && dto.positionMs > context.manifest.totalDurationMs) {
+    const totalDurationMs = context.manifest.totalDurationMs;
+    if (totalDurationMs > 0 && dto.positionMs > totalDurationMs + DURATION_SLACK_MS) {
       throw new BadRequestException('positionMs exceeds the audiobook duration');
     }
     if (dto.chapterId && !context.manifest.chapters.some((chapter) => chapter.id === dto.chapterId)) {
@@ -164,7 +170,7 @@ export class AudiobookService {
     }
     const row = await this.repo.createAudioBookmark(user.id, bookId, {
       clientId: dto.clientId,
-      positionSeconds: dto.positionMs / 1000,
+      positionSeconds: (totalDurationMs > 0 ? Math.min(dto.positionMs, totalDurationMs) : dto.positionMs) / 1000,
       chapterId: dto.chapterId ?? null,
       title: dto.title,
       note: dto.note ?? null,
@@ -193,15 +199,7 @@ export class AudiobookService {
   private async loadManifestContext(bookId: number, user: RequestUser): Promise<ManifestContext> {
     await this.bookService.verifyBookAccess(bookId, user);
     const [detail, rows] = await Promise.all([this.bookService.getDetail(bookId, user), this.repo.findAudioFiles(bookId)]);
-    const files = rows
-      .filter((row) => row.format !== null && isAudioFormat(row.format))
-      .sort((left, right) => {
-        if (left.sortOrder !== null || right.sortOrder !== null) {
-          const byOrder = (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER);
-          if (byOrder !== 0) return byOrder;
-        }
-        return naturalCompare(basename(left.absolutePath), basename(right.absolutePath));
-      });
+    const files = rows.filter((row) => row.format !== null && isAudioFormat(row.format)).sort(compareAudioTracks);
     if (files.length === 0) throw new NotFoundException('Book has no audiobook assets');
 
     const revision = createHash('sha256')
@@ -214,6 +212,7 @@ export class AudiobookService {
       .digest('hex');
     const assets = files.map<AudiobookManifestAsset>((file, sequence) => ({
       assetId: this.assetId(file.publicId),
+      fileId: file.id,
       sequence,
       format: file.format!,
       durationMs: file.durationSeconds === null ? null : Math.round(file.durationSeconds * 1000),

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { FileEdit, Images, MoreHorizontal, Pencil, RefreshCw, Trash2 } from '@lucide/vue'
+import { Copy, FileEdit, History, Images, MoreHorizontal, Pencil, RefreshCw, Trash2 } from '@lucide/vue'
 import type { Library } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
-const props = defineProps<{ library: Library; scanning: boolean; refreshingCovers: boolean; syncingFiles: boolean }>()
+const props = withDefaults(
+  defineProps<{ library: Library; scanning: boolean; refreshingCovers: boolean; syncingFiles: boolean; canShowHistory?: boolean }>(),
+  { canShowHistory: false },
+)
 
 const emit = defineEmits<{
   scan: [library: Library]
@@ -13,6 +16,8 @@ const emit = defineEmits<{
   refreshCovers: [library: Library]
   syncFiles: [library: Library]
   remove: [library: Library]
+  duplicate: [library: Library]
+  history: [library: Library]
 }>()
 
 const { t } = useI18n()
@@ -31,6 +36,12 @@ function requestSyncFiles() {
 }
 function requestRemove() {
   emit('remove', props.library)
+}
+function requestDuplicate() {
+  emit('duplicate', props.library)
+}
+function requestHistory() {
+  emit('history', props.library)
 }
 </script>
 
@@ -51,6 +62,15 @@ function requestRemove() {
           <Pencil />
           {{ t('settings.admin.libraries.editLibrary') }}
         </DropdownMenuItem>
+        <DropdownMenuItem v-if="library.type !== 'podcasts'" @click="requestDuplicate">
+          <Copy />
+          {{ t('settings.admin.libraries.duplicateSettings') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem v-if="canShowHistory" @click="requestHistory">
+          <History />
+          {{ t('settings.admin.libraries.detail.historyTitle') }}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem :disabled="refreshingCovers" @click="requestRefreshCovers">
           <Images :class="refreshingCovers ? 'animate-pulse motion-reduce:animate-none' : ''" />
           {{ t('settings.admin.libraries.refreshCovers') }}

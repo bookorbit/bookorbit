@@ -123,7 +123,9 @@ describe('Library DTO validation', () => {
     const base = { name: 'x', icon: 'BookOpen', folders: ['/a'] };
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 89 }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 101 }))).toBe(true);
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 90.5 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 90.05 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 99.95 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 100.05 }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 90 }))).toBe(false);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, markAsFinishedPercentComplete: 100 }))).toBe(false);
   });
@@ -133,6 +135,7 @@ describe('Library DTO validation', () => {
     expect(await hasErrors(plainToInstance(UpdateLibraryDto, { readingThreshold: 2.5 }))).toBe(false);
     expect(await hasErrors(plainToInstance(UpdateLibraryDto, { markAsFinishedPercentComplete: 89 }))).toBe(true);
     expect(await hasErrors(plainToInstance(UpdateLibraryDto, { markAsFinishedPercentComplete: 95 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { markAsFinishedPercentComplete: 99.95 }))).toBe(false);
   });
 
   describe('file write settings validation', () => {

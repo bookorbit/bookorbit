@@ -1,6 +1,6 @@
 # BookOrbit - Server
 
-NestJS 11 backend running on Fastify.
+NestJS 12 backend running on Fastify.
 
 ## Running
 

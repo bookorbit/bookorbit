@@ -38,66 +38,90 @@ describe('useLibraryCreator', () => {
     expect(apiMock).not.toHaveBeenCalled()
   })
 
-  it('does not run prescan without folders', async () => {
+  it('does not check folders when there are none', async () => {
     const { useLibraryCreator } = await import('../useLibraryCreator')
     const creator = useLibraryCreator()
 
-    await creator.runPrescan()
+    await creator.checkFolders()
 
     expect(apiMock).not.toHaveBeenCalled()
-    expect(creator.prescanLoading.value).toBe(false)
-    expect(creator.prescanResult.value).toBeNull()
+    expect(creator.folderChecks.value).toEqual({})
   })
 
-  it('stores successful prescan results', async () => {
+  it('checks only the folders asked about and keys results by the requested path', async () => {
     const { useLibraryCreator } = await import('../useLibraryCreator')
     const creator = useLibraryCreator()
-    const result: PrescanResult = { paths: [{ path: '/books', accessible: true, fileCount: 2 }], totalFiles: 2 }
+    const result: PrescanResult = {
+      paths: [{ path: '/mnt/resolved/new', accessible: true, fileCount: 2, overlapLibrary: 'Comics' }],
+      totalFiles: 2,
+    }
     apiMock.mockResolvedValue(jsonResponse(result))
+    creator.form.folders = ['/books', '/books-new']
 
-    creator.form.folders = ['/books']
-
-    await creator.runPrescan()
+    await creator.checkFolders(['/books-new'])
 
     expect(apiMock).toHaveBeenCalledWith(
       '/api/v1/libraries/prescan',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ paths: ['/books'] }),
-      }),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ paths: ['/books-new'] }) }),
     )
-    expect(creator.prescanLoading.value).toBe(false)
-    expect(creator.prescanResult.value).toEqual(result)
+    expect(creator.folderChecks.value).toEqual({
+      '/books-new': { state: 'checked', accessible: true, fileCount: 2, overlapLibrary: 'Comics' },
+    })
   })
 
-  it('includes the current library ID when prescanning an edit', async () => {
+  it('includes the current library ID when checking folders during an edit', async () => {
     const { useLibraryCreator } = await import('../useLibraryCreator')
     const creator = useLibraryCreator()
     const result: PrescanResult = { paths: [{ path: '/books', accessible: true, fileCount: 2 }], totalFiles: 2 }
     apiMock.mockResolvedValue(jsonResponse(result))
     creator.initEdit(makeLibrary({ id: 12 }))
 
-    await creator.runPrescan()
+    await creator.checkFolders()
 
     expect(apiMock).toHaveBeenCalledWith(
       '/api/v1/libraries/prescan',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ paths: ['/books'], libraryId: 12 }),
-      }),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ paths: ['/books'], libraryId: 12 }) }),
     )
   })
 
-  it('surfaces prescan connection failures', async () => {
+  it('marks folders as failed when the check cannot reach the server', async () => {
     const { useLibraryCreator } = await import('../useLibraryCreator')
     const creator = useLibraryCreator()
     apiMock.mockRejectedValue(new TypeError('network error'))
-
     creator.form.folders = ['/books']
-    await creator.runPrescan()
 
-    expect(creator.error.value).toBe('Could not connect to the server to scan folders.')
-    expect(creator.prescanLoading.value).toBe(false)
+    await creator.checkFolders()
+
+    expect(creator.folderChecks.value).toEqual({ '/books': { state: 'failed' } })
+    expect(creator.error.value).toBeNull()
+  })
+
+  it('ignores a slower, older check of the same folder', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    let resolveFirst: (value: Response) => void = () => undefined
+    apiMock
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (resolveFirst = resolve)))
+      .mockResolvedValueOnce(jsonResponse({ paths: [{ path: '/books', accessible: true, fileCount: 9 }], totalFiles: 9 }))
+
+    const first = creator.checkFolders(['/books'])
+    await creator.checkFolders(['/books'])
+    resolveFirst(jsonResponse({ paths: [{ path: '/books', accessible: false, fileCount: 0 }], totalFiles: 0 }))
+    await first
+
+    expect(creator.folderChecks.value['/books']).toEqual({ state: 'checked', accessible: true, fileCount: 9, overlapLibrary: undefined })
+  })
+
+  it('loads counts for a book library being edited', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    apiMock.mockResolvedValue(jsonResponse({ totalBooks: 455, totalSizeBytes: 10, formatCounts: { epub: 400, pdf: 55 } }))
+    creator.initEdit(makeLibrary({ id: 12 }))
+
+    await creator.loadStats()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/libraries/12/stats')
+    expect(creator.stats.value?.formatCounts).toEqual({ epub: 400, pdf: 55 })
   })
 
   it('validates cron expressions and file size limits before saving', async () => {
@@ -123,6 +147,23 @@ describe('useLibraryCreator', () => {
 
     expect(creator.form.fileWriteAudioEnabled).toBe(true)
     expect(creator.form.fileWriteAudioMaxFileSizeMb).toBe(500)
+  })
+
+  it('accepts and sends a fractional finished threshold', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    apiMock.mockResolvedValue(jsonResponse(makeLibrary({ markAsFinishedPercentComplete: 99.95 }), 201))
+    creator.form.name = 'Main Library'
+    creator.form.icon = 'BookOpen'
+    creator.form.folders = ['/books']
+    creator.form.markAsFinishedPercentComplete = 99.95
+
+    expect(creator.validationErrors.value.reading).toBeUndefined()
+    await creator.save()
+    expect(JSON.parse(apiMock.mock.calls[0]?.[1]?.body as string).markAsFinishedPercentComplete).toBe(99.95)
+
+    creator.form.markAsFinishedPercentComplete = 100.05
+    expect(creator.validationErrors.value.reading).toBe('Finished progress must be between 90% and 100%.')
   })
 
   it('hydrates file rename and audio write settings when editing a library', async () => {

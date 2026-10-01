@@ -121,7 +121,7 @@ function close() {
   <Teleport to="body">
     <Transition name="dialog-fade">
       <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]" @click="close" />
+        <div class="absolute inset-0 bg-scrim" @click="close" />
 
         <div class="relative w-full max-w-md bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
           <!-- Header -->

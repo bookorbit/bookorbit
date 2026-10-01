@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import type { AudiobookBookmark } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { createUuid } from '@/lib/uuid'
 
 export type AudioBookmark = AudiobookBookmark
 
@@ -18,7 +19,7 @@ export function useAudioBookmarks(bookId: number) {
     const res = await api(`/api/v1/audiobooks/${bookId}/bookmarks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: crypto.randomUUID(), positionMs: Math.round(positionSeconds * 1000), title, chapterId }),
+      body: JSON.stringify({ clientId: createUuid(), positionMs: Math.round(positionSeconds * 1000), title, chapterId }),
     })
     if (!res.ok) return null
     const created: AudioBookmark = await res.json()

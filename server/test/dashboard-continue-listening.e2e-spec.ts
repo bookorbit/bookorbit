@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import { and, eq } from 'drizzle-orm';
-import type { AudiobookManifest, AudiobookPlaybackState } from '@bookorbit/types';
+import type { AudiobookManifest, AudiobookPlaybackState, DashboardScrollerResponse } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import {
@@ -48,7 +48,7 @@ describe('Dashboard continue-listening scroller (e2e)', { timeout: SCENARIO_TIME
       headers: authHeader(reader.accessToken),
     });
     expect(response.statusCode).toBe(200);
-    return (response.json() as Array<{ id: number }>).map((book) => book.id);
+    return response.json<DashboardScrollerResponse>().books.map((book) => book.id);
   }
 
   async function getReadStatus(): Promise<string | null> {

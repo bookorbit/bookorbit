@@ -57,4 +57,42 @@ describe('author-name-match', () => {
     ]);
     expect(best).toBeNull();
   });
+
+  it('rejects an unrelated candidate when both names have no ASCII letters', () => {
+    const match = scoreAuthorNameMatch('Агата Кристи', candidate('Андрея Илиев'));
+    expect(match.tokenSetEqual).toBe(false);
+    expect(match.accept).toBe(false);
+  });
+
+  it('returns null when every non-ASCII candidate is unrelated', () => {
+    const best = pickBestAuthorNameMatch('Агата Кристи', [candidate('Андрея Илиев'), candidate('Борис Акунин')]);
+    expect(best).toBeNull();
+  });
+
+  it('rejects same-last-name false positives in a non-Latin script', () => {
+    const match = scoreAuthorNameMatch('Агата Кристи', candidate('Иван Кристи'));
+    expect(match.lastTokenExact).toBe(true);
+    expect(match.accept).toBe(false);
+  });
+
+  it('accepts matching names in a non-Latin script', () => {
+    const exact = scoreAuthorNameMatch('Агата Кристи', candidate('Агата Кристи'));
+    const swapped = scoreAuthorNameMatch('Кристи Агата', candidate('Агата Кристи'));
+    expect(exact.accept).toBe(true);
+    expect(exact.score).toBe(1);
+    expect(swapped.accept).toBe(true);
+    expect(swapped.tokenSetEqual).toBe(true);
+  });
+
+  it('never treats two names without letters or digits as a token-set match', () => {
+    const match = scoreAuthorNameMatch('...', candidate('?!'));
+    expect(match.tokenSetEqual).toBe(false);
+    expect(match.accept).toBe(false);
+  });
+
+  it('keeps script-specific combining marks, so names that differ only by one stay distinct', () => {
+    const match = scoreAuthorNameMatch('कमल', candidate('कमला'));
+    expect(match.exactNormalized).toBe(false);
+    expect(match.accept).toBe(false);
+  });
 });

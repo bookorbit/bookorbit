@@ -332,7 +332,8 @@ function handleGrab(request: BookRequestItem) {
             />
           </td>
 
-          <td class="px-3" :class="isCompact ? 'py-1.5' : 'py-2.5'">
+          <!-- Auto table layout uses the nowrap title's intrinsic width unless the cell itself is bounded. -->
+          <td class="max-w-0 px-3" :class="isCompact ? 'py-1.5' : 'py-2.5'">
             <div class="flex min-w-0 items-center gap-2.5">
               <RequestCover
                 :src="request.coverUrl"
