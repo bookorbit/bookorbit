@@ -107,8 +107,6 @@ export class BookMergeRepository {
       ['kobo_snapshot_books', 'snapshot_id'],
       ['kobo_device_snapshot_books', 'snapshot_id'],
     ] as const) {
-      // Remove duplicate relations between source books.
-      // Keep the row with the smallest id.
       await tx.execute(
         sql.raw(
           `DELETE FROM ${table}
@@ -139,36 +137,6 @@ export class BookMergeRepository {
           WHERE book_id IN (${ids})`,
         ),
       );
-      /*await tx.execute(
-        sql.raw(
-          `DELETE FROM ${table} source
-          USING ${table} duplicate
-          WHERE source.book_id IN (${ids})
-            AND duplicate.book_id IN (${ids})
-            AND source.${key} = duplicate.${key}
-            AND source.id > duplicate.id`,
-        ),
-      );
-
-      // Remove source relations that already exist on the target book.
-      await tx.execute(
-        sql.raw(
-          `DELETE FROM ${table} source
-          USING ${table} target
-          WHERE source.book_id IN (${ids})
-            AND target.book_id = ${targetBookId}
-            AND source.${key} = target.${key}`,
-        ),
-      );
-
-      // Move all remaining source relations to the target book.
-      await tx.execute(
-        sql.raw(
-          `UPDATE ${table}
-          SET book_id = ${targetBookId}
-          WHERE book_id IN (${ids})`,
-        ),
-      );*/
     }
   }
 
@@ -212,7 +180,6 @@ export class BookMergeRepository {
       }
     }
 
-    // Reading sessions von den zu löschenden Attempts auf den Survivor umbiegen
     for (const [deleteId, survivorId] of attemptSurvivors) {
       await tx.execute(
         sql.raw(
@@ -223,7 +190,6 @@ export class BookMergeRepository {
       );
     }
 
-    // Delete all attempts that are not going to survive.
     if (deleteIds.length > 0) {
       await tx.execute(
         sql.raw(
@@ -233,7 +199,6 @@ export class BookMergeRepository {
       );
     }
 
-    // Move the surviving attempts to the target book.
     if (survivorIds.length > 0) {
       await tx.execute(
         sql.raw(
@@ -405,25 +370,7 @@ export class BookMergeRepository {
         )`,
       ),
     );
-    /*await tx.execute(
-      sql.raw(
-        `DELETE FROM reading_session_sync_cursors source
-        WHERE source.book_id IN (${ids})
-          AND EXISTS (
-            SELECT 1
-            FROM reading_session_sync_cursors other
-            WHERE other.book_id IN (${ids}, ${targetBookId})
-              AND other.user_id = source.user_id
-              AND other.source = source.source
-              AND other.source_device_key = source.source_device_key
-              AND (
-                other.book_id = ${targetBookId}
-                OR other.id < source.id
-              )
-          )`,
-      ),
-    );
-*/
+
     await tx.execute(
       sql.raw(
         `UPDATE reading_session_sync_cursors
@@ -435,7 +382,6 @@ export class BookMergeRepository {
 
   //Update Only
   private async mergeUpdateOnly(tx: DbTransaction, ids: string, targetBookId: number): Promise<void> {
-    //for all that directly update to the target book.
     for (const table of ['audiobook_progress', 'annotations', 'bookmarks', 'email_send_log', 'file_write_log']) {
       await tx.execute(
         sql.raw(
@@ -446,7 +392,6 @@ export class BookMergeRepository {
       );
     }
 
-    //update requests to point to the target book.
     await tx.execute(
       sql.raw(
         `UPDATE book_requests
@@ -458,7 +403,6 @@ export class BookMergeRepository {
 
   //Delete Source, Keep Target
   private async mergeDeleteSource(tx: DbTransaction, ids: string): Promise<void> {
-    //delete book_duplicate_pairs source keep target.
     for (const table of ['book_duplicate_pairs']) {
       await tx.execute(
         sql.raw(
@@ -469,7 +413,6 @@ export class BookMergeRepository {
       );
     }
 
-    //delete source keep target.
     for (const table of ['book_metadata_fetch_queue', 'book_duplicate_scan_keys']) {
       await tx.execute(
         sql.raw(
