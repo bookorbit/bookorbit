@@ -6938,7 +6938,8 @@
         "notarget": "No target book selected",
         "not2books": "Select at least 2 books to merge",
         "differentLibraries": "Books from different libraries cannot be merged",
-        "common": "An Error occurred while merging books. Please try again."
+        "common": "An Error occurred while merging books. Please try again.",
+        "querySelection": "Unable to merge query selection. Please select books manually."
       },
       "toast": {
         "success": "{count, plural, one {Merged # book} other {Merged # books}} into book ID:{target}"

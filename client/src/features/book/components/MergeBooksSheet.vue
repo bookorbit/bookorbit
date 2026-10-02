@@ -166,8 +166,7 @@ watch(
           {{ t('book.merge.errors.differentLibraries') }}
         </p>
         <p v-if="isQuerySelectionActive" class="text-sm text-yellow-600/90 mt-2">
-          {{ t('book.merge.info.query') }}
-          <!-- Assuming a translation key like 'book.merge.info.query' exists or we use static text -->
+          {{ t('book.merge.errors.querySelection') }}
         </p>
         <div class="flex items-center justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" @click="handleClose">{{ t('common.cancel') }}</Button>
