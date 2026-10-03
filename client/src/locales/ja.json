@@ -2262,6 +2262,7 @@
       "searchPlaceholder": "検索設定",
       "clearSearch": "検索をクリア",
       "noResults": "{query} に一致する設定がありません。",
+      "shortcutHint": "{shortcut} を押して任意の設定にジャンプします",
       "groups": {
         "you": "あなたです",
         "library": "ライブラリ",
@@ -6557,6 +6558,10 @@
         "title": "開始するライブラリを選択",
         "description": "上記のライブラリを選択すると、変更の名前をプレビューし、ステータスごとにフィルタを適用し、一括変更を実行できます。",
         "chooseLibrary": "ライブラリを選択"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, other {ディスク上の # 個のファイルの名前を変更しますか？}}",
+        "body": "{library} 内の実際のファイルを移動します。BookOrbit は各移動を記録しますが、元に戻すには再度名前を変更する必要があります。"
       }
     },
     "bookDuplicates": {

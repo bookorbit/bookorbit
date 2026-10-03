@@ -1220,10 +1220,38 @@
           "patternCount": "{count, plural, one {# pattern} other {# patterns}}",
           "peopleCount": "{count, plural, =0 {Não há nenhum explícito} one {# pessoa} other {# pessoas}}",
           "historyEmpty": "Esta biblioteca nunca foi escaneada.",
-          "historyFailed": "Não foi possível carregar o histórico de digitalizações para esta biblioteca."
+          "historyFailed": "Não foi possível carregar o histórico de digitalizações para esta biblioteca.",
+          "manageAccess": "Gerenciar",
+          "peopleMore": "{count, plural, one {+# mais} other {+# mais}}"
         },
         "scannedAt": "Escaneado {time}",
-        "detailRegion": "Detalhes para {name}"
+        "detailRegion": "Detalhes para {name}",
+        "scanTrigger": {
+          "manual": "Manual",
+          "watcher": "Observador",
+          "schedule": "Agendado"
+        },
+        "schedule": {
+          "at": "{preset} · {time}",
+          "weeklyAt": "{preset} · {day} {time}"
+        },
+        "librariesUnit": "{count, plural, one {biblioteca} other {bibliotecas}}",
+        "foldersUnit": "{count, plural, one {pasta} other {pastas}}",
+        "copyPath": "Caminho de cópia",
+        "pathCopied": "Caminho copiado",
+        "pathCopyFailed": "Não foi possível copiar o caminho",
+        "problem": {
+          "neverTitle": "Nunca verificado.",
+          "neverBody": "{count, plural, one {Ainda não há nada em sua pasta.} other {Ainda não há nada em # suas pastas.}}",
+          "failedTitle": "A última verificação falhou em {time}.",
+          "scanNow": "Verificar agora",
+          "retry": "Tentar novamente"
+        },
+        "quick": {
+          "watchAria": "Monitorar pastas para {name}",
+          "scheduleAria": "Agendado verificação para {name}: {value}",
+          "customSchedule": "Agendamento personalizado..."
+        }
       },
       "authorEnrichment": {
         "configuration": "Configuração",
@@ -2386,6 +2414,7 @@
         "resultCopyFailed": "Falha ao copiar o resultado resolvido",
         "sampleBookNote": "Exemplo de livro usado para cada pré-visualização",
         "missingMetadata": "Se faltarem metadados",
+        "plainEpub": "EPUB Simples",
         "caseNoSeriesLabel": "Sem série",
         "caseNoYearLabel": "Sem ano",
         "caseNoAuthorLabel": "Sem autor",
@@ -3489,6 +3518,7 @@
       "searchPlaceholder": "Procurar nas configurações",
       "clearSearch": "Limpar busca",
       "noResults": "Nenhuma configuração corresponde a {query}.",
+      "shortcutHint": "Pressione {shortcut} para pular para qualquer configuração",
       "status": {
         "scanning": "Analisando"
       },
@@ -5640,6 +5670,25 @@
           "providerFailed": "{provider} não pôde ser alcançado.",
           "searchInterruptedHint": "Tente novamente, ou restrinja o escopo de pesquisa.",
           "searchPrompt": "Busque acima, então clique em um resultado para começar a comparar os metadados."
+        },
+        "match": {
+          "query": {
+            "title": "Título",
+            "author": "Autor"
+          },
+          "results": {
+            "inSync": "Em sincronia",
+            "inSyncHint": "Nada aqui mudaria o livro",
+            "differentAuthor": "Autor diferente",
+            "titleDiffers": "Título diferente",
+            "sparse": "Esparso",
+            "searchTitleOnly": "Pesquisar somente títulos",
+            "prompt": "Informe um título ou ISBN para pesquisar.",
+            "fetched": "Obtido"
+          },
+          "tier": {
+            "strong": "Correspondência forte"
+          }
         },
         "writeAndRename": "Gravar no Arquivo & Renomear",
         "writeAndRenameShort": "Gravar & Renomear",
@@ -8712,7 +8761,20 @@
           "grant": "Falha ao conceder acesso",
           "updateLevel": "Falha ao atualizar nível de acesso",
           "revoke": "Falha ao revogar acesso"
-        }
+        },
+        "revoke": "Remover",
+        "keep": "Manter"
+      },
+      "optional": "Opcional",
+      "nav": {
+        "details": "Biblioteca",
+        "folders": "Pastas",
+        "scanner": "Analisando",
+        "metadata": "Metadados",
+        "reading": "Leitura",
+        "schedule": "Automação",
+        "fileWrite": "Arquivo atualizado",
+        "access": "Acesso"
       }
     },
     "folderPicker": {
@@ -10107,6 +10169,8 @@
         "noMatch": "Nenhum livro corresponde a esta pesquisa."
       },
       "confirmDialog": {
+        "title": "{count, plural, many {Renomear # arquivos no disco?} one {Renomear # arquivo no disco?} other {Renomear # arquivos no disco?}}",
+        "body": "Isso move arquivos reais dentro de {library}. O BookOrbit registra cada movimentação, mas desfazer significa renomear de volta.",
         "willRename": "Será renomeado",
         "skippedByYou": "Ignorado por você",
         "heldBack": "Reteve como conflitos",

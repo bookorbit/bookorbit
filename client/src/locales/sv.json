@@ -6369,6 +6369,10 @@
         "title": "Välj ett bibliotek för att starta",
         "description": "Välj ett bibliotek ovan för att förhandsgranska byta namn på ändringar, filtrera efter status, och tillämpa bulk byta namn kör.",
         "chooseLibrary": "Välj bibliotek"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, one {Byta namn på # fil på disken?} other {Byta namn på # filer på disken?}}",
+        "body": "Detta flyttar riktiga filer i {library}. BookOrbit loggar varje flytt, men att ångra innebär att byta tillbaka namnen."
       }
     },
     "bookDuplicates": {

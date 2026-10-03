@@ -6387,6 +6387,10 @@
         "title": "Vælg et bibliotek for at starte",
         "description": "Vælg et bibliotek ovenfor for at forhåndsvise omdøbning ændringer, filter efter status, og anvend bulk omdøbe kørsel.",
         "chooseLibrary": "Vælg Bibliotek"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, one {Omdøb # fil på disken?} other {Omdøb # filer på disken?}}",
+        "body": "Dette flytter rigtige filer inde i {library}. BookOrbit registrerer hver flytning, men fortrydelse betyder at omdøbe dem igen."
       }
     },
     "bookDuplicates": {

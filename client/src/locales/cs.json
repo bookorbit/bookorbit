@@ -6397,6 +6397,10 @@
         "title": "Vyberte knihovnu pro spuštění",
         "description": "Vyberte knihovnu výše pro zobrazení změn v náhledu, filtr podle stavu a použijte hromadný běh přejmenování.",
         "chooseLibrary": "Vybrat knihovnu"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, few {Přejmenovat # soubory na disku?} many {Přejmenovat # souboru na disku?} one {Přejmenovat # soubor na disku?} other {Přejmenovat # souborů na disku?}}",
+        "body": "Tímto přesunete skutečné soubory uvnitř {library}. BookOrbit si každý přesun zaznamená, ale vrácení zpět znamená je přejmenovat zpět."
       }
     },
     "bookDuplicates": {

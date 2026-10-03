@@ -1186,6 +1186,7 @@
           "historyEmpty": "Ta biblioteka nigdy nie została zeskanowana.",
           "historyFailed": "Nie udało się załadować historii skanowania dla tej biblioteki."
         },
+        "scannedAt": "Zeskanowano {time}",
         "detailRegion": "Szczegóły dotyczące {name}"
       },
       "authorEnrichment": {
@@ -6654,6 +6655,10 @@
         "title": "Wybierz bibliotekę, aby rozpocząć",
         "description": "Wybierz bibliotekę powyżej, aby wyświetlić podgląd zmian zmiany nazwy, filtrować według stanu i zastosować zbiorczą zmianę nazwy.",
         "chooseLibrary": "Wybierz Bibliotekę"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, few {Zmienić nazwę # pliki na dysku?} many {Zmienić nazwę # pliku na dysku?} one {Zmienić nazwę # pliku na dysku?} other {Zmienić nazwę # plików na dysku?}}",
+        "body": "Ta operacja przenosi rzeczywiste pliki wewnątrz {library}. BookOrbit rejestruje każde przeniesienie, ale cofnięcie oznacza ponowne zmienienie nazw."
       }
     },
     "bookDuplicates": {
