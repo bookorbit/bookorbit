@@ -475,6 +475,10 @@ jobs:
         shell: bash
         run: mkdir -p "$GITHUB_WORKSPACE/test-results/${{ matrix.package }}"
 
+      - name: Verify production PDFium precache
+        if: steps.has-changes.outputs.run == 'true' && matrix.package == 'client'
+        run: pnpm run test:pwa
+
       - name: Run tests
         if: steps.has-changes.outputs.run == 'true'
         shell: bash

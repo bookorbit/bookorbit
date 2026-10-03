@@ -93,7 +93,8 @@
     "vue-i18n": "^11.4.12",
     "vue-router": "^5.3.1",
     "vue-sonner": "^2.0.9",
-    "vue-virtual-scroller": "^3.0.5"
+    "vue-virtual-scroller": "^3.0.5",
+    "workbox-window": "^7.4.1"
   },
   "devDependencies": {
     "@intlify/message-compiler": "^11.4.12",
