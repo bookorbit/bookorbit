@@ -35,6 +35,13 @@ function toReadingSessionType(value: string | null | undefined): ReadingSessionT
 }
 const ESTIMATE_CLEANUP_PAGE_SIZE = 500;
 const CLEANUP_DAILY_STATS_MAX_SPAN_DAYS = 31;
+// Cumulative device counters tick in whole minutes, so less than one tick left is rounding, not reading.
+const SYNC_COUNTER_RESOLUTION_SECONDS = 60;
+
+function scaleProgressDelta(progressDelta: number | null, keptSeconds: number, totalSeconds: number): number | null {
+  if (progressDelta === null || keptSeconds === totalSeconds) return progressDelta;
+  return Math.round(((progressDelta * keptSeconds) / totalSeconds) * 100) / 100;
+}
 
 function groupDateKeysByMaxSpan(days: Iterable<string>): string[][] {
   const sorted = [...new Set(days)].sort();
@@ -69,7 +76,7 @@ export type SaveReadingSessionResult =
 
 export type RecordCumulativeReadingSessionResult =
   | { kind: 'baseline' | 'unchanged' | 'reset' | 'stale' }
-  | { kind: 'saved'; durationSeconds: number; sessionId: string }
+  | { kind: 'saved'; durationSeconds: number; progressDelta: number | null; sessionId: string }
   | {
       kind: 'skipped';
       reason: 'book_file_not_found' | 'duplicate_session_id' | 'measured_session_present';
@@ -235,7 +242,7 @@ export class ReadingSessionRepository {
       }
 
       if (sync?.estimateSessionIdPrefix) {
-        await this.deleteOverlappingSyncEstimates(tx, {
+        await this.reconcileSyncEstimates(tx, {
           userId,
           bookId,
           libraryId,
@@ -245,6 +252,7 @@ export class ReadingSessionRepository {
           startedAt,
           endedAt,
           timeZone,
+          newlyMeasuredSeconds: result.kind === 'saved' ? durationSeconds : result.kind === 'superseded' ? result.addedSeconds : 0,
         });
       }
 
@@ -299,11 +307,14 @@ export class ReadingSessionRepository {
         return { kind: 'reset' };
       }
 
-      const durationSeconds = (params.counter - cursor.counter) * 60;
-      const startedAt = new Date(params.endedAt.getTime() - durationSeconds * 1000);
+      // The counter covers everything read since the previous push, however long ago that reading
+      // was: a device that read offline only pushes with its next sync. Sessions the device also
+      // measured in that interval are subtracted rather than taken as proof the whole delta is
+      // covered, so reading it did not measure is kept.
+      const counterSeconds = (params.counter - cursor.counter) * 60;
 
       const [measured] = await tx
-        .select({ id: readingSessions.id })
+        .select({ seconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int` })
         .from(readingSessions)
         .where(
           and(
@@ -312,16 +323,19 @@ export class ReadingSessionRepository {
             eq(readingSessions.source, params.source),
             eq(readingSessions.sourceDeviceKey, params.sourceDeviceKey),
             notLike(readingSessions.sessionId, `${params.sessionIdPrefix}%`),
+            gte(readingSessions.startedAt, cursor.lastModified),
             lt(readingSessions.startedAt, params.endedAt),
-            gt(readingSessions.endedAt, startedAt),
           ),
-        )
-        .limit(1);
+        );
 
-      if (measured) {
+      const durationSeconds = counterSeconds - (measured?.seconds ?? 0);
+      if (durationSeconds < SYNC_COUNTER_RESOLUTION_SECONDS) {
         await this.updateSyncCursor(tx, params, cursor.generation);
         return { kind: 'skipped', reason: 'measured_session_present' };
       }
+
+      const startedAt = new Date(params.endedAt.getTime() - durationSeconds * 1000);
+      const progressDelta = scaleProgressDelta(params.progressDelta, durationSeconds, counterSeconds);
 
       if (params.bookFileId === null) return { kind: 'skipped', reason: 'book_file_not_found' };
 
@@ -348,8 +362,9 @@ export class ReadingSessionRepository {
           startedAt,
           endedAt: params.endedAt,
           durationSeconds,
-          progressDelta: params.progressDelta,
+          progressDelta,
           endProgress: params.endProgress,
+          syncIntervalStartedAt: cursor.lastModified,
         })
         .onConflictDoNothing({ target: [readingSessions.userId, readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
@@ -363,11 +378,11 @@ export class ReadingSessionRepository {
         startedAt,
         endedAt: params.endedAt,
         durationSeconds,
-        progressDelta: params.progressDelta,
+        progressDelta,
         timeZone: params.timeZone,
       });
 
-      return { kind: 'saved', durationSeconds, sessionId };
+      return { kind: 'saved', durationSeconds, progressDelta, sessionId };
     });
   }
 
@@ -810,7 +825,20 @@ export class ReadingSessionRepository {
     await tx.execute(sql`select pg_advisory_xact_lock(${userId}::int, hashtext(${`${sourceDeviceKey}:${bookId}`})::int)`);
   }
 
-  private async deleteOverlappingSyncEstimates(
+  /**
+   * Reconciles the counter-derived estimates of a device with a session it also measured.
+   *
+   * An estimate stands for whatever was read between two counter pushes, and it is dated on the
+   * minutes leading up to the push. That is only when the reading happened if the device pushed
+   * right after it; after offline reading the push comes with the next sync. So the measured
+   * session is matched to the estimate whose counter interval contains its start, and its seconds
+   * are taken off that estimate once, when they are first stored: a replay takes nothing, and one
+   * session never reaches a second estimate. What is left stays as reading the device did not
+   * measure, unless it is below the counter resolution.
+   *
+   * Estimates written before the interval was recorded keep the overlap rule they were created under.
+   */
+  private async reconcileSyncEstimates(
     tx: Tx,
     params: {
       userId: number;
@@ -822,28 +850,37 @@ export class ReadingSessionRepository {
       startedAt: Date;
       endedAt: Date;
       timeZone: string;
+      newlyMeasuredSeconds: number;
     },
   ): Promise<void> {
     const affectedDays = new Set<string>();
+    const estimateColumns = {
+      id: readingSessions.id,
+      startedAt: readingSessions.startedAt,
+      endedAt: readingSessions.endedAt,
+      durationSeconds: readingSessions.durationSeconds,
+      progressDelta: readingSessions.progressDelta,
+    };
+    const sameDeviceEstimate = and(
+      eq(readingSessions.userId, params.userId),
+      eq(readingSessions.bookId, params.bookId),
+      eq(readingSessions.source, params.source),
+      eq(readingSessions.sourceDeviceKey, params.sourceDeviceKey),
+      like(readingSessions.sessionId, `${params.estimateSessionIdPrefix}%`),
+    );
+    const collectAffectedDays = (row: { startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null }) => {
+      for (const day of getReadingSessionDayKeys(row, params.timeZone)) affectedDays.add(day);
+    };
     let cursor = 0;
 
     for (;;) {
       const rows = await tx
-        .select({
-          id: readingSessions.id,
-          startedAt: readingSessions.startedAt,
-          endedAt: readingSessions.endedAt,
-          durationSeconds: readingSessions.durationSeconds,
-          progressDelta: readingSessions.progressDelta,
-        })
+        .select(estimateColumns)
         .from(readingSessions)
         .where(
           and(
-            eq(readingSessions.userId, params.userId),
-            eq(readingSessions.bookId, params.bookId),
-            eq(readingSessions.source, params.source),
-            eq(readingSessions.sourceDeviceKey, params.sourceDeviceKey),
-            like(readingSessions.sessionId, `${params.estimateSessionIdPrefix}%`),
+            sameDeviceEstimate,
+            isNull(readingSessions.syncIntervalStartedAt),
             lt(readingSessions.startedAt, params.endedAt),
             gt(readingSessions.endedAt, params.startedAt),
             gt(readingSessions.id, cursor),
@@ -855,19 +892,7 @@ export class ReadingSessionRepository {
       if (rows.length === 0) break;
       cursor = rows[rows.length - 1]!.id;
 
-      for (const row of rows) {
-        for (const day of getReadingSessionDayKeys(
-          {
-            startedAt: row.startedAt,
-            endedAt: row.endedAt,
-            durationSeconds: row.durationSeconds,
-            progressDelta: row.progressDelta ?? null,
-          },
-          params.timeZone,
-        )) {
-          affectedDays.add(day);
-        }
-      }
+      for (const row of rows) collectAffectedDays(row);
 
       await tx.delete(readingSessions).where(
         and(
@@ -880,6 +905,37 @@ export class ReadingSessionRepository {
       );
 
       if (rows.length < ESTIMATE_CLEANUP_PAGE_SIZE) break;
+    }
+
+    if (params.newlyMeasuredSeconds > 0) {
+      const [estimate] = await tx
+        .select(estimateColumns)
+        .from(readingSessions)
+        .where(and(sameDeviceEstimate, lte(readingSessions.syncIntervalStartedAt, params.startedAt), gt(readingSessions.endedAt, params.startedAt)))
+        .orderBy(asc(readingSessions.endedAt), asc(readingSessions.id))
+        .limit(1);
+
+      if (estimate) {
+        const ownEstimate = and(eq(readingSessions.userId, params.userId), eq(readingSessions.id, estimate.id));
+        const remainingSeconds = estimate.durationSeconds - params.newlyMeasuredSeconds;
+        collectAffectedDays(estimate);
+
+        if (remainingSeconds < SYNC_COUNTER_RESOLUTION_SECONDS) {
+          await tx.delete(readingSessions).where(ownEstimate);
+        } else {
+          const shortened = {
+            startedAt: new Date(estimate.endedAt.getTime() - remainingSeconds * 1000),
+            endedAt: estimate.endedAt,
+            durationSeconds: remainingSeconds,
+            progressDelta: scaleProgressDelta(estimate.progressDelta, remainingSeconds, estimate.durationSeconds),
+          };
+          await tx
+            .update(readingSessions)
+            .set({ startedAt: shortened.startedAt, durationSeconds: shortened.durationSeconds, progressDelta: shortened.progressDelta })
+            .where(ownEstimate);
+          collectAffectedDays(shortened);
+        }
+      }
     }
 
     if (affectedDays.size > 0) {

@@ -308,6 +308,8 @@ export const readingSessions = pgTable(
     // Nullable: CBX with no percentage tracking may omit these.
     progressDelta: real('progress_delta'),
     endProgress: real('end_progress'),
+    // Counter-derived sync estimates only: the previous counter push, where the interval the estimate stands for begins.
+    syncIntervalStartedAt: timestamp('sync_interval_started_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('rs_user_session_id_uidx').on(t.userId, t.sessionId),

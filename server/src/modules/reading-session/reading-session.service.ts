@@ -127,7 +127,7 @@ export class ReadingSessionService {
         durationSeconds: result.durationSeconds,
         startedAt,
         endedAt: params.endedAt,
-        progressDelta: params.progressDelta,
+        progressDelta: result.progressDelta,
         endProgress: params.endProgress,
         timezone: params.timeZone,
       });

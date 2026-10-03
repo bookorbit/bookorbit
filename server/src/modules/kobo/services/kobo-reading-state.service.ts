@@ -312,16 +312,19 @@ export class KoboReadingStateService {
   /**
    * Turns the reading time a device reports alongside its bookmark into a reading session.
    *
-   * Current Kobo firmware no longer emits the `LeaveContent` analytics events the reading log
-   * was built on, so `POST /v1/analytics/event` never arrives and every Kobo statistic reads
-   * zero however much the device is read. What the device does still send, on every state push,
-   * is its own `SpentReadingMinutes` - the counter it keeps as `content.TimeSpentReading` on
-   * device, and the only reading time these devices offer at all.
+   * Some Kobo devices no longer emit the `LeaveContent` analytics events the reading log was
+   * built on, so `POST /v1/analytics/event` never arrives and every Kobo statistic reads zero
+   * however much the device is read. What every device does still send, on every state push, is
+   * its own `SpentReadingMinutes` - the counter it keeps as `content.TimeSpentReading` on device,
+   * and the only reading time those devices offer at all. Others still send both: a Libra Colour
+   * on firmware 4.45.23792 does, and after offline reading it pushes the counter and the events
+   * together with its next sync, long after the reading.
    *
    * Each device has an independent durable cursor. Session insertion, daily aggregation, and
    * cursor advancement share one transaction so a failed write is retried from the same counter.
    * Measured analytics sessions and counter-derived sessions are serialized by the same lock and
-   * reconciled by overlap, regardless of which endpoint arrives first.
+   * reconciled on the counter interval each estimate stands for, regardless of which endpoint
+   * arrives first.
    *
    * Failures are swallowed. A device retries the entire push when the response is not a clean
    * acknowledgement, so a session that cannot be stored must not take the bookmark down with it.
