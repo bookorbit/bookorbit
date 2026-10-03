@@ -1,3 +1,4 @@
+import { MetadataModule } from '../metadata/metadata.module';
 import { Module, forwardRef } from '@nestjs/common';
 
 import { AchievementModule } from '../achievement/achievement.module';
@@ -17,6 +18,7 @@ import { LibraryAddedAtService } from './library-added-at.service';
 @Module({
   imports: [
     ScannerModule,
+    MetadataModule,
     AchievementModule,
     forwardRef(() => BookModule),
     FileWriteModule,

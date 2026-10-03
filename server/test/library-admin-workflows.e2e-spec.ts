@@ -210,6 +210,63 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
     await closeAuthorizationMatrixE2EContext(ctx);
   });
 
+  it('protects regex preview and validates its nested request contract', async () => {
+    const payload = { config: { rules: [{ pattern: '^(?<title>.+)$', flags: '' }] }, relativePath: 'Book.epub' };
+    for (const [token, status] of [
+      [manager.accessToken, 201],
+      [noPermissionUser.accessToken, 403],
+    ] as const) {
+      const response = await ctx.app.inject({ method: 'POST', url: '/api/v1/libraries/regex-metadata/preview', headers: authHeader(token), payload });
+      expect(response.statusCode).toBe(status);
+      if (status === 201) expect(response.json()).toMatchObject({ inputPath: 'Book', metadata: { title: 'Book' } });
+    }
+    for (const bad of [
+      { ...payload, relativePath: '/private/Book.epub' },
+      { ...payload, relativePath: '../Book.epub' },
+      { ...payload, config: { rules: [{ ...payload.config.rules[0], template: '{title}' }] } },
+    ]) {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/libraries/regex-metadata/preview',
+        headers: authHeader(manager.accessToken),
+        payload: bad,
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    const library = await createLibraryWithFolder(ctx);
+    const forbidden = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/libraries/regex-metadata/preview',
+      headers: authHeader(manager.accessToken),
+      payload: { ...payload, libraryId: library.libraryId },
+    });
+    expect(forbidden.statusCode).toBe(403);
+    const update = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/libraries/${library.libraryId}`,
+      headers: authHeader(manager.accessToken),
+      payload: { regexMetadata: payload.config },
+    });
+    expect(update.statusCode).toBe(403);
+  });
+
+  it('validates regex rules without a path and enforces access and DTO boundaries', async () => {
+    const config = { rules: [{ pattern: '(?<title>.+)', flags: '' }] };
+    const request = (payload: object, token = manager.accessToken) =>
+      ctx.app.inject({ method: 'POST', url: '/api/v1/libraries/regex-metadata/validate', headers: authHeader(token), payload });
+    const valid = await request({ config });
+    expect(valid.statusCode).toBe(201);
+    expect(valid.json()).toEqual({ valid: true, diagnostics: [] });
+    const invalid = await request({ config: { rules: [{ pattern: '[', flags: '' }] } });
+    expect(invalid.statusCode).toBe(201);
+    expect(invalid.json()).toEqual({ valid: false, diagnostics: [{ code: 'invalid_pattern', ruleIndex: 0 }] });
+    expect((await request({ config }, noPermissionUser.accessToken)).statusCode).toBe(403);
+    expect((await request({ config, relativePath: 'unexpected.epub' })).statusCode).toBe(400);
+    expect((await request({ config: { rules: [{ pattern: '(?<title>.+)', flags: 'g' }] } })).statusCode).toBe(400);
+    const library = await createLibraryWithFolder(ctx);
+    expect((await request({ config, libraryId: library.libraryId })).statusCode).toBe(403);
+  });
+
   it.each([
     { organizationMode: 'book_per_file', autoScanCronExpression: '0 2 * * *', watch: true, fileWriteEnabled: true },
     { organizationMode: 'book_per_folder', autoScanCronExpression: null, watch: false, fileWriteEnabled: false },
@@ -301,6 +358,31 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
     const [storedLibrary] = await ctx.db.select().from(schema.libraries).where(eq(schema.libraries.id, library.libraryId));
     expect(storedLibrary).toMatchObject(savedSettings);
   });
+
+  it.each([null, { rules: [{ pattern: '(?<title>.+)', flags: '' }] }])(
+    'lets managers save unrelated settings without a grant when regex is unchanged: %j',
+    async (regexMetadata) => {
+      const library = await createLibraryWithFolder(ctx);
+      await ctx.db.update(schema.libraries).set({ regexMetadata }).where(eq(schema.libraries.id, library.libraryId));
+      const response = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(manager.accessToken),
+        payload: { name: `Renamed library ${library.libraryId}`, icon: 'BookOpen', regexMetadata },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json()).toMatchObject({ name: `Renamed library ${library.libraryId}`, regexMetadata });
+      const denied = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(manager.accessToken),
+        payload: { regexMetadata: regexMetadata === null ? { rules: [{ pattern: '(?<title>.+)', flags: '' }] } : null },
+      });
+      expect(denied.statusCode).toBe(403);
+      const [stored] = await ctx.db.select().from(schema.libraries).where(eq(schema.libraries.id, library.libraryId));
+      expect(stored.regexMetadata).toEqual(regexMetadata);
+    },
+  );
 
   describe('date added recompute', () => {
     async function finishRecompute(libraryId: number): Promise<AddedAtRecomputeJob> {

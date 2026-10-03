@@ -1,3 +1,5 @@
+import { RegexMetadataService } from '../metadata/regex/regex-metadata.service';
+import type { RegexMetadataConfig, RegexMetadataPreview } from '@bookorbit/types';
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
@@ -87,7 +89,13 @@ interface ScanLookupMaps {
   fileIdsByBookId: Map<number, Set<number>>;
 }
 
+interface RegexScanContext {
+  config: RegexMetadataConfig | null;
+  disabled: boolean;
+}
+
 interface LibraryScanSettings {
+  regexContext: RegexScanContext;
   allowedFormats: string[];
   formatPriority: string[];
   metadataPrecedence: string[];
@@ -248,6 +256,7 @@ export class ScannerService implements OnApplicationBootstrap {
     private readonly notificationService: NotificationService,
     private readonly selfWriteRegistry: SelfWriteRegistry,
     private readonly coverStore: BookCoverStore,
+    private readonly regexMetadata: RegexMetadataService,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
     @Optional() private readonly achievementEvents?: AchievementEventsService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
@@ -701,6 +710,7 @@ export class ScannerService implements OnApplicationBootstrap {
       const allowedFormats = settings?.allowedFormats ?? [];
       const formatPriority = settings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY;
       const metadataPrecedence = settings?.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT];
+      const regexContext: RegexScanContext = { config: settings?.regexMetadata ?? null, disabled: false };
       const excludePatterns = settings?.excludePatterns ?? [];
       const organizationMode = normalizeOrganizationMode(settings?.organizationMode);
       const addedAtSource = normalizeAddedAtSource(settings?.addedAtSource);
@@ -734,6 +744,7 @@ export class ScannerService implements OnApplicationBootstrap {
         organizationMode,
         addedAtSource,
         forceFullScan,
+        regexContext,
       ).catch((err) => {
         const errorClass = err instanceof Error ? err.name : 'Error';
         const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -949,6 +960,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     const rawSettings = await this.scannerRepo.findLibrarySettings(libraryId);
     const settings: LibraryScanSettings = {
+      regexContext: { config: rawSettings?.regexMetadata ?? null, disabled: false },
       allowedFormats: rawSettings?.allowedFormats ?? [],
       formatPriority: rawSettings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY,
       metadataPrecedence: rawSettings?.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT],
@@ -992,6 +1004,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     const rawSettings = await this.scannerRepo.findLibrarySettings(libraryId);
     const settings: LibraryScanSettings = {
+      regexContext: { config: rawSettings?.regexMetadata ?? null, disabled: false },
       allowedFormats: rawSettings?.allowedFormats ?? [],
       formatPriority: rawSettings?.formatPriority ?? DEFAULT_FORMAT_PRIORITY,
       metadataPrecedence: rawSettings?.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT],
@@ -1075,6 +1088,7 @@ export class ScannerService implements OnApplicationBootstrap {
         settings.addedAtSource,
         false,
         candidateFolderPaths,
+        settings.regexContext,
       );
       this.emitTargetedScanResult(libraryId, result);
       seenBookIds.add(result.bookId);
@@ -1196,6 +1210,7 @@ export class ScannerService implements OnApplicationBootstrap {
       settings.addedAtSource,
       false,
       new Set([candidate.folderPath]),
+      settings.regexContext,
     );
     const pruned = await this.pruneMissingBookFiles(result.bookId, result.retainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, {
       added: 0,
@@ -1268,6 +1283,7 @@ export class ScannerService implements OnApplicationBootstrap {
       settings.addedAtSource,
       false,
       new Set([candidate.folderPath]),
+      settings.regexContext,
     );
     const pruned = await this.pruneMissingBookFiles(result.bookId, result.retainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, {
       added: 0,
@@ -1359,6 +1375,7 @@ export class ScannerService implements OnApplicationBootstrap {
       settings.addedAtSource,
       false,
       new Set([candidate.folderPath]),
+      settings.regexContext,
     );
     const pruned = await this.pruneMissingBookFiles(result.bookId, result.retainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, {
       added: 0,
@@ -1383,6 +1400,7 @@ export class ScannerService implements OnApplicationBootstrap {
     organizationMode: OrganizationMode,
     addedAtSource: AddedAtSource,
     forceFullScan = false,
+    regexContext?: RegexScanContext,
   ): Promise<void> {
     const event = 'scanner.run_scan';
     const startedAt = Date.now();
@@ -1468,6 +1486,7 @@ export class ScannerService implements OnApplicationBootstrap {
           addedAtSource,
           skippedDirs,
           unchangedDirs,
+          regexContext,
         );
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
@@ -1555,6 +1574,7 @@ export class ScannerService implements OnApplicationBootstrap {
     addedAtSource: AddedAtSource,
     skippedDirs: Set<string> = new Set(),
     unchangedDirs: Set<string> = new Set(),
+    regexContext?: RegexScanContext,
   ): Promise<ScanCounts> {
     const event = 'scanner.scan_folder_candidates';
     const startedAt = Date.now();
@@ -1588,6 +1608,7 @@ export class ScannerService implements OnApplicationBootstrap {
           addedAtSource,
           isFirstScan,
           candidateFolderPaths,
+          regexContext,
         );
         seenBookIds.add(result.bookId);
         if (result.created) importedBookIds.push(result.bookId);
@@ -1761,6 +1782,7 @@ export class ScannerService implements OnApplicationBootstrap {
     addedAtSource: AddedAtSource,
     isFirstScan: boolean,
     candidateFolderPaths: Set<string>,
+    regexContext?: RegexScanContext,
   ): Promise<ProcessCandidateResult> {
     const { bookByFolderPath, booksByParentDir, fileByPath, fileByIno } = maps;
     const counts = { added: 0, updated: 0 };
@@ -1873,7 +1895,9 @@ export class ScannerService implements OnApplicationBootstrap {
 
     const metadataSources = this.buildMetadataExtractionSources(registeredFiles, winner, metadataPrecedence);
     const shouldExtractMetadata =
-      metadataSources.some((source) => hasMetadataSourceChanged(source.file)) || (book.primaryFileId === null && winner !== null);
+      metadataSources.some((source) => hasMetadataSourceChanged(source.file)) ||
+      (regexContext?.config != null && winner !== null && hasMetadataSourceChanged(winner)) ||
+      (book.primaryFileId === null && winner !== null);
     const audioContentFiles = contentFiles.filter((f) => f.format !== null && isAudioFormat(f.format!));
     const changedAudioFiles = audioContentFiles.filter(hasMetadataSourceChanged);
     const audioFilesNeedingDuration = audioContentFiles.filter(
@@ -1910,7 +1934,9 @@ export class ScannerService implements OnApplicationBootstrap {
 
     // 3b: Extract shared metadata from the first available configured source.
     if (shouldExtractMetadata && !selfWriteInProgress) {
-      await this.extractFirstAvailableMetadataSource(book.id, metadataSources);
+      const relativePath = winner ? candidate.files.find((file) => file.absolutePath === winner.absolutePath)?.relPath : undefined;
+      const regexApplied = await this.extractRegexMetadata(book.id, libraryId, relativePath, metadataSources, metadataPrecedence, regexContext);
+      if (!regexApplied) await this.extractFirstAvailableMetadataSource(book.id, metadataSources);
     }
 
     // 3c: Write per-file duration for new, changed, or historically unprobed audio files.
@@ -1961,6 +1987,43 @@ export class ScannerService implements OnApplicationBootstrap {
     const fileSetChanged = mediaOverlayChanged || registeredFiles.some(hasMetadataSourceChanged);
     const coverBookIds = [...(fileSetChanged ? [book.id] : []), ...formerOwnerBookIds];
     return { bookId: book.id, ...counts, retainedFileIds, becameVisible, created: book.created, coverBookIds };
+  }
+
+  private async extractRegexMetadata(
+    bookId: number,
+    libraryId: number,
+    relativePath: string | undefined,
+    sources: MetadataExtractionSource[],
+    precedence: string[],
+    context?: RegexScanContext,
+  ): Promise<boolean> {
+    if (!context?.config || context.disabled || !relativePath) return false;
+    const startedAt = Date.now();
+    let result: RegexMetadataPreview;
+    try {
+      result = await this.regexMetadata.preview(context.config, relativePath);
+      if (result.diagnostics.some((entry) => entry.code !== 'invalid_value')) {
+        context.disabled = true;
+        this.logger.warn(
+          `[scanner.regex_metadata] [fail] libraryId=${libraryId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=RegexEvaluationError error="${sanitizeLogValue(result.diagnostics[0].code)}" - regex disabled for this scan`,
+        );
+        return false;
+      }
+      if (!result.matched) return false;
+    } catch (error) {
+      this.logger.warn(
+        `[scanner.regex_metadata] [fail] libraryId=${libraryId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - regex evaluation failed`,
+      );
+      return false;
+    }
+    // Persistence may already have written metadata before failing; never retry with different precedence.
+    await this.metadataService.extractAndSaveWithRegex(
+      bookId,
+      sources.map((source) => ({ key: source.key, absolutePath: source.file.absolutePath, format: source.format })),
+      result.metadata,
+      precedence,
+    );
+    return true;
   }
 
   private buildMetadataExtractionSources(

@@ -1,3 +1,6 @@
+import { isDeepStrictEqual } from 'node:util';
+import { RegexMetadataService } from '../metadata/regex/regex-metadata.service';
+import { RegexMetadataPreviewDto, RegexMetadataValidationDto } from './dto/regex-metadata.dto';
 import {
   BadRequestException,
   ConflictException,
@@ -12,7 +15,14 @@ import { readdir, realpath, rm, stat } from 'fs/promises';
 import { dirname, isAbsolute, join, relative } from 'path';
 
 import { APP_FEATURES, DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
-import type { AccessLevel, LibraryFileSyncProgressEvent, LibraryOverviewEntry, OrganizationMode, WriteResult } from '@bookorbit/types';
+import type {
+  AccessLevel,
+  LibraryFileSyncProgressEvent,
+  LibraryOverviewEntry,
+  OrganizationMode,
+  RegexMetadataConfig,
+  WriteResult,
+} from '@bookorbit/types';
 import { podcastArtworkDirPath } from '../../common/podcast-artwork-storage';
 import { podcastFeedSnapshotPath } from '../../common/podcast-feed-snapshot-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -57,6 +67,7 @@ const BOOK_ONLY_LIBRARY_FIELDS = [
   'watch',
   'autoScanCronExpression',
   'metadataPrecedence',
+  'regexMetadata',
   'formatPriority',
   'allowedFormats',
   'organizationMode',
@@ -97,6 +108,7 @@ export class LibraryService {
     private readonly achievementEvents: AchievementEventsService,
     private readonly pathPolicy: PathPolicyService,
     private readonly scanScheduler: LibraryScanSchedulerService,
+    private readonly regexMetadata: RegexMetadataService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -160,6 +172,24 @@ export class LibraryService {
     return { ...normalizeLibraryOrganizationMode(library), folders };
   }
 
+  private async verifyRegexMetadataAccess(dto: RegexMetadataValidationDto, user: RequestUser) {
+    if (dto.libraryId !== undefined) {
+      await this.verifyUserAccess(user.id, dto.libraryId, user.isSuperuser);
+      const library = await this.findOne(dto.libraryId);
+      if (library.type !== 'books') throw new BadRequestException('Regex metadata is only available for book libraries');
+    }
+  }
+
+  async validateRegexMetadata(dto: RegexMetadataValidationDto, user: RequestUser) {
+    await this.verifyRegexMetadataAccess(dto, user);
+    return this.regexMetadata.check(dto.config);
+  }
+
+  async previewRegexMetadata(dto: RegexMetadataPreviewDto, user: RequestUser) {
+    await this.verifyRegexMetadataAccess(dto, user);
+    return this.regexMetadata.preview(dto.config, dto.relativePath);
+  }
+
   async create(dto: CreateLibraryDto) {
     const libraryType = dto.type ?? 'books';
     if (libraryType === 'podcasts' && !APP_FEATURES.podcasts) {
@@ -167,6 +197,7 @@ export class LibraryService {
     }
     if (libraryType === 'podcasts') this.assertNoBookOnlyFields(dto);
     else this.assertNoPodcastOnlyFields(dto);
+    await this.regexMetadata.validate(dto.regexMetadata);
     await this.assertNameAvailable(dto.name);
     const folderInputs = resolveLibraryFolderRoles(
       libraryType,
@@ -186,6 +217,7 @@ export class LibraryService {
       watch: libraryType === 'books' ? (dto.watch ?? false) : false,
       watchLocalFolders: libraryType === 'podcasts' ? (dto.watchLocalFolders ?? true) : false,
       autoScanCronExpression: libraryType === 'books' ? (dto.autoScanCronExpression ?? null) : null,
+      regexMetadata: dto.regexMetadata ?? null,
       metadataPrecedence: libraryType === 'books' ? (dto.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT]) : [],
       formatPriority: libraryType === 'books' ? (dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY]) : [],
       allowedFormats: libraryType === 'books' ? (dto.allowedFormats ?? []) : [],
@@ -230,11 +262,20 @@ export class LibraryService {
     return { ...normalizeLibraryOrganizationMode(library), folders };
   }
 
-  async update(id: number, dto: UpdateLibraryDto) {
+  async update(id: number, dto: UpdateLibraryDto, user?: RequestUser) {
     const [existing] = await this.libraryRepo.findById(id);
     if (!existing) throw new NotFoundException('Library not found');
     if (existing.type === 'podcasts') this.assertNoBookOnlyFields(dto);
     else this.assertNoPodcastOnlyFields(dto);
+
+    const regexRules = (config: RegexMetadataConfig | null | undefined) => config?.rules.map(({ pattern, flags }) => [pattern, flags]) ?? null;
+    const regexMetadataChanged =
+      dto.regexMetadata !== undefined && !isDeepStrictEqual(regexRules(dto.regexMetadata), regexRules(existing.regexMetadata));
+    if (regexMetadataChanged) {
+      if (!user) throw new ForbiddenException('User context is required to update regex metadata');
+      await this.verifyUserAccess(user.id, id, user.isSuperuser);
+      await this.regexMetadata.validate(dto.regexMetadata);
+    }
 
     const existingOrganizationMode = normalizeOrganizationMode(existing.organizationMode);
     if (dto.organizationMode !== undefined && dto.organizationMode !== existingOrganizationMode) {
@@ -248,6 +289,7 @@ export class LibraryService {
     }
 
     const { folders: rawFolderPaths, localFolders: rawLocalFolderPaths, ...fields } = dto;
+    if (!regexMetadataChanged) delete fields.regexMetadata;
     let existingFolders: Awaited<ReturnType<LibraryRepository['findFoldersByLibrary']>> | undefined;
     let folderInputs: LibraryFolderInput[] | undefined;
     if (rawFolderPaths !== undefined || rawLocalFolderPaths !== undefined) {

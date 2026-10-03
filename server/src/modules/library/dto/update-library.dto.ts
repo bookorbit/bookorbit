@@ -1,3 +1,6 @@
+import { RegexMetadataConfigDto } from './regex-metadata.dto';
+import { Type } from 'class-transformer';
+import { IsObject, ValidateNested } from 'class-validator';
 import {
   ArrayMinSize,
   IsArray,
@@ -89,6 +92,12 @@ export class UpdateLibraryDto {
   @IsArray()
   @IsString({ each: true })
   metadataPrecedence?: string[];
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RegexMetadataConfigDto)
+  regexMetadata?: RegexMetadataConfigDto | null;
 
   @IsOptional()
   @IsArray()

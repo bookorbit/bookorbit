@@ -79,20 +79,20 @@ describe('LibraryCreatorMetadata', () => {
     expect(wrapper.findAll('ol[aria-labelledby="primary-file-title"] > li')[1]!.text()).toContain('Not imported')
   })
 
-  it('swaps which source is read first', async () => {
+  it('moves a source earlier in the precedence list', async () => {
     const wrapper = mountMetadata({ formatPriority: ['epub'] })
 
-    await wrapper.get('button[aria-label="Swap the order"]').trigger('click')
+    await wrapper.get('button[aria-label="Move metadata.opf file up"]').trigger('click')
 
-    expect(wrapper.emitted('update:metadataPrecedence')).toEqual([[['opfFile', 'embedded']]])
+    expect(wrapper.emitted('update:metadataPrecedence')).toEqual([[['opfFile', 'embedded', 'regex']]])
   })
 
-  it('fills in a source missing from an older saved list before swapping', async () => {
+  it('fills in a source missing from an older saved list before reordering', async () => {
     const wrapper = mountMetadata({ formatPriority: ['epub'], metadataPrecedence: ['embedded'] })
 
     expect(wrapper.text()).toContain('metadata.opf file')
-    await wrapper.get('button[aria-label="Swap the order"]').trigger('click')
+    await wrapper.get('button[aria-label="Move metadata.opf file up"]').trigger('click')
 
-    expect(wrapper.emitted('update:metadataPrecedence')).toEqual([[['opfFile', 'embedded']]])
+    expect(wrapper.emitted('update:metadataPrecedence')).toEqual([[['opfFile', 'embedded', 'regex']]])
   })
 })

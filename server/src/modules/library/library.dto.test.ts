@@ -247,3 +247,23 @@ describe('Library DTO validation', () => {
     });
   });
 });
+
+describe('regex metadata DTO validation', () => {
+  it('accepts a nullable config and validates nested rules with the global whitelist', async () => {
+    for (const regexMetadata of [null, { rules: [{ pattern: '(?<title>.+)', flags: 'iu' }] }]) {
+      const dto = plainToInstance(UpdateLibraryDto, { regexMetadata });
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toEqual([]);
+    }
+  });
+  it.each([
+    { rules: [] },
+    { rules: [{ pattern: '(?<title>.+)', flags: 'g' }] },
+    { rules: [{ pattern: '(?<title>.+)', flags: '', template: '{title}' }] },
+    { rules: [null] },
+    { rules: 'invalid' },
+    [],
+  ])('rejects invalid nested configuration %j', async (regexMetadata) => {
+    const dto = plainToInstance(UpdateLibraryDto, { regexMetadata });
+    expect((await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).length).toBeGreaterThan(0);
+  });
+});

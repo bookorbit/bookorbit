@@ -1,3 +1,6 @@
+import 'reflect-metadata';
+import { plainToInstance } from 'class-transformer';
+import { UpdateLibraryDto } from './dto/update-library.dto';
 vi.mock('fs/promises', () => ({
   readdir: vi.fn(),
   realpath: vi.fn(),
@@ -95,6 +98,7 @@ describe('LibraryService', () => {
     removeSchedule: vi.fn(),
   };
 
+  const regexMetadata = { validate: vi.fn() };
   let service: LibraryService;
 
   beforeEach(() => {
@@ -109,6 +113,7 @@ describe('LibraryService', () => {
       achievementEvents as any,
       pathPolicy as any,
       scanScheduler as any,
+      regexMetadata as any,
     );
 
     libraryRepo.findPodcastIds.mockResolvedValue([]);
@@ -181,6 +186,67 @@ describe('LibraryService', () => {
   it('findOne throws when library is missing', async () => {
     libraryRepo.findById.mockResolvedValue([]);
     await expect(service.findOne(111)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects regex validation for podcast libraries even for superusers', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'podcasts' }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
+    await expect(
+      service.validateRegexMetadata({ config: { rules: [{ pattern: '(?<title>.+)', flags: '' }] }, libraryId: 2 }, {
+        id: 1,
+        isSuperuser: true,
+      } as any),
+    ).rejects.toThrow('Regex metadata is only available for book libraries');
+  });
+
+  describe('regex configuration updates', () => {
+    const first = { pattern: '(?<title>.+)', flags: 'i' };
+    const second = { pattern: '(?<series>.+)', flags: '' };
+    const config = { rules: [first, second] };
+    beforeEach(() => {
+      libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: config }]);
+      libraryRepo.update.mockResolvedValue([{ id: 2 }]);
+      libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
+    });
+
+    it.each([null, { rules: [{ flags: 'i', pattern: first.pattern }, second] }])(
+      'does not require a grant or rewrite unchanged rules: %j',
+      async (unchanged) => {
+        libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: unchanged === null ? null : config }]);
+        await service.update(2, plainToInstance(UpdateLibraryDto, { coverAspectRatio: '1/1', regexMetadata: unchanged }), {
+          id: 3,
+          isSuperuser: false,
+        } as any);
+        expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
+        expect(regexMetadata.validate).not.toHaveBeenCalled();
+        expect(libraryRepo.update).toHaveBeenCalledWith(2, { coverAspectRatio: '1/1' });
+      },
+    );
+
+    it.each([
+      null,
+      { rules: [second, first] },
+      { rules: [{ ...first, flags: 'u' }, second] },
+      { rules: [{ ...first, pattern: '(?<title>.*)' }, second] },
+    ])('requires a grant for actual changes: %j', async (changed) => {
+      libraryRepo.hasUserAccess.mockResolvedValue(false);
+      await expect(service.update(2, { regexMetadata: changed }, { id: 3, isSuperuser: false } as any)).rejects.toThrow(ForbiddenException);
+      expect(libraryRepo.update).not.toHaveBeenCalled();
+      expect(regexMetadata.validate).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])('validates and persists an authorized change (superuser=%s)', async (isSuperuser) => {
+      libraryRepo.hasUserAccess.mockResolvedValue(true);
+      await service.update(2, { regexMetadata: null }, { id: 3, isSuperuser } as any);
+      expect(regexMetadata.validate).toHaveBeenCalledWith(null);
+      expect(libraryRepo.update).toHaveBeenCalledWith(2, { regexMetadata: null });
+      if (isSuperuser) expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
+    });
+
+    it('rejects changed configuration without caller context', async () => {
+      await expect(service.update(2, { regexMetadata: null })).rejects.toThrow(ForbiddenException);
+      expect(libraryRepo.update).not.toHaveBeenCalled();
+    });
   });
 
   it('verifyUserAccess bypasses lookup for superusers', async () => {
