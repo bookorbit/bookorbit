@@ -1,0 +1,2 @@
+ALTER TABLE "libraries" ADD COLUMN "derive_series_from_folder" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "libraries" ADD CONSTRAINT "libraries_derive_series_from_folder_mode_chk" CHECK ("libraries"."derive_series_from_folder" = false or "libraries"."organization_mode" = 'book_per_file');

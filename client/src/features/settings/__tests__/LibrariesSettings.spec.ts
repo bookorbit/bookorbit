@@ -85,6 +85,7 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     formatPriority: [],
     allowedFormats: [],
     organizationMode: 'book_per_file',
+    deriveSeriesFromFolder: false,
     addedAtSource: 'imported',
     excludePatterns: [],
     readingThreshold: 10,

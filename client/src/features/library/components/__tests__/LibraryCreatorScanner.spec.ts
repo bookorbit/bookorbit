@@ -9,6 +9,7 @@ function mountScanner(overrides: Partial<InstanceType<typeof LibraryCreatorScann
     props: {
       organizationMode: 'book_per_folder',
       organizationModeLocked: false,
+      deriveSeriesFromFolder: false,
       allowedFormats: [],
       addedAtSource: 'imported',
       excludePatterns: [],
@@ -34,6 +35,36 @@ describe('LibraryCreatorScanner', () => {
     expect(wrapper.text()).toContain('File as Book')
     expect(wrapper.text()).toContain('Set at creation')
     expect(wrapper.text()).toContain('Organization mode is fixed after library creation')
+  })
+
+  it('hides series from folders unless each file is its own book', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_folder' })
+
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+  })
+
+  it('offers series from folders in file mode with a one-line reason', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file' })
+
+    const checkbox = wrapper.get('input[type="checkbox"]')
+    expect((checkbox.element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.get('#series-from-folders-hint').text()).toBe('Recommended for Komga and Kavita layouts: one folder per series.')
+  })
+
+  it('emits series from folders when toggled', async () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file' })
+
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+
+    expect(wrapper.emitted('update:deriveSeriesFromFolder')).toEqual([[true]])
+  })
+
+  it('keeps series from folders adjustable once the organization mode is locked', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', organizationModeLocked: true, deriveSeriesFromFolder: true })
+
+    const checkbox = wrapper.get('input[type="checkbox"]')
+    expect(checkbox.attributes('disabled')).toBeUndefined()
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
   })
 
   it('starts restricting imports from every format, then drops the ones unticked', async () => {

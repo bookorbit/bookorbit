@@ -1017,3 +1017,53 @@ describe('earliestContentTime', () => {
     expect(earliestContentTime(files, 'file_created')).toBeUndefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// findLooseFileCandidates: series from folders (#1167)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('findLooseFileCandidates: series from folders', () => {
+  const seriesOf = (candidates: BookCandidate[], relPath: string) => candidates.find((c) => c.folderPath === join(root, relPath))?.derivedSeries;
+
+  it('attaches no series unless the option is set', async () => {
+    await file('Largo Winch/Largo Winch T01.cbz');
+    const { candidates } = await findLooseFileCandidates(root);
+    expect(candidates[0].derivedSeries).toBeUndefined();
+  });
+
+  it('names each file after its folder and numbers it from its name', async () => {
+    await file('Blake et Mortimer/Blake et Mortimer T01.cbz');
+    await file('Blake et Mortimer/Blake et Mortimer T02.cbz');
+    await file('Blake et Mortimer/cover.jpg');
+
+    const { candidates } = await findLooseFileCandidates(root, [], undefined, undefined, { deriveSeriesFromFolder: { libraryRoot: root } });
+
+    expect(candidates).toHaveLength(2);
+    expect(seriesOf(candidates, 'Blake et Mortimer/Blake et Mortimer T01.cbz')).toEqual({ name: 'Blake et Mortimer', index: '1' });
+    expect(seriesOf(candidates, 'Blake et Mortimer/Blake et Mortimer T02.cbz')).toEqual({ name: 'Blake et Mortimer', index: '2' });
+  });
+
+  it('decides chapter numbering for the whole folder', async () => {
+    await file('Solo Leveling/Solo Leveling v01.cbz');
+    await file('Solo Leveling/Solo Leveling c010.cbz');
+
+    const { candidates } = await findLooseFileCandidates(root, [], undefined, undefined, { deriveSeriesFromFolder: { libraryRoot: root } });
+
+    expect(seriesOf(candidates, 'Solo Leveling/Solo Leveling c010.cbz')).toEqual({ name: 'Solo Leveling', index: '10' });
+    expect(seriesOf(candidates, 'Solo Leveling/Solo Leveling v01.cbz')).toEqual({ name: 'Solo Leveling', index: null });
+  });
+
+  it('leaves files at the library root without a series', async () => {
+    await file('loose.cbz');
+    const { candidates } = await findLooseFileCandidates(root, [], undefined, undefined, { deriveSeriesFromFolder: { libraryRoot: root } });
+    expect(candidates[0].derivedSeries).toBeUndefined();
+  });
+
+  it('uses the library root, not the walk start, to decide what has no series', async () => {
+    await file('Largo Winch/Largo Winch T03.cbz');
+    const { candidates } = await findLooseFileCandidates(join(root, 'Largo Winch'), [], undefined, undefined, {
+      deriveSeriesFromFolder: { libraryRoot: root },
+    });
+    expect(candidates[0].derivedSeries).toEqual({ name: 'Largo Winch', index: '3' });
+  });
+});

@@ -44,6 +44,7 @@ function blankForm() {
     formatPriority: withReadAlongFormatPriority(DEFAULT_FORMAT_PRIORITY),
     allowedFormats: [] as string[],
     organizationMode: 'book_per_folder' as OrganizationMode,
+    deriveSeriesFromFolder: false,
     addedAtSource: 'imported' as AddedAtSource,
     excludePatterns: [] as string[],
     readingThreshold: 0.25,
@@ -161,6 +162,7 @@ export function useLibraryCreator() {
     form.formatPriority = withReadAlongFormatPriority([...library.formatPriority, ...missing])
     form.allowedFormats = [...library.allowedFormats]
     form.organizationMode = library.organizationMode
+    form.deriveSeriesFromFolder = library.deriveSeriesFromFolder ?? false
     form.addedAtSource = library.addedAtSource
     storedAddedAtSource.value = library.addedAtSource
     form.excludePatterns = [...library.excludePatterns]

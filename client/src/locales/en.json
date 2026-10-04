@@ -8866,7 +8866,12 @@
           "fileAsBook": {
             "title": "File as Book",
             "hint": "Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple files."
-          }
+          },
+          "fileAsBookSeries": "File as Book, series from folders"
+        },
+        "seriesFromFolders": {
+          "title": "Group files into series by folder",
+          "hint": "Recommended for Komga and Kavita layouts: one folder per series."
         },
         "addedAt": {
           "title": "Date added",

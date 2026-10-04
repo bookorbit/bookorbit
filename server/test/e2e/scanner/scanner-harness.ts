@@ -16,8 +16,8 @@ import { FileWatcherService } from '../../../src/modules/scanner/file-watcher.se
 import { createE2EContext, type E2EContext } from '../app-harness';
 
 /** Scans write covers, so every scanner suite gets its own data folder. */
-export function createScannerE2EContext(): Promise<E2EContext> {
-  return createE2EContext({ isolateAppData: true });
+export function createScannerE2EContext(options: { realMetadata?: boolean } = {}): Promise<E2EContext> {
+  return createE2EContext({ isolateAppData: true, ...options });
 }
 
 export async function startLibraryWatcher(ctx: E2EContext, libraryId: number, paths: string[]): Promise<void> {

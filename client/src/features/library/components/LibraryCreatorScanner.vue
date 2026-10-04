@@ -14,6 +14,7 @@ const { t } = useI18n()
 const props = defineProps<{
   organizationMode: OrganizationMode
   organizationModeLocked?: boolean
+  deriveSeriesFromFolder: boolean
   allowedFormats: string[]
   addedAtSource: AddedAtSource
   canRecomputeAddedAt?: boolean
@@ -26,6 +27,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:organizationMode': [value: OrganizationMode]
+  'update:deriveSeriesFromFolder': [value: boolean]
   'update:allowedFormats': [value: string[]]
   'update:addedAtSource': [value: AddedAtSource]
   'update:excludePatterns': [value: string[]]
@@ -119,6 +121,10 @@ function onPatternKeydown(event: KeyboardEvent) {
 function selectMode(event: Event) {
   if (props.organizationModeLocked) return
   emit('update:organizationMode', (event.target as HTMLInputElement).value as OrganizationMode)
+}
+
+function toggleSeriesFromFolders(event: Event) {
+  emit('update:deriveSeriesFromFolder', (event.target as HTMLInputElement).checked)
 }
 
 // ── Date added ────────────────────────────────────────────────────────────────
@@ -225,6 +231,20 @@ async function confirmRecompute() {
           {{ t('library.creator.scanner.mode.cannotChange') }}
         </p>
       </template>
+
+      <label v-if="organizationMode === 'book_per_file'" class="mt-3 flex cursor-pointer items-start gap-2.5 border-t border-border pt-3">
+        <input
+          type="checkbox"
+          class="mt-0.5 size-4 shrink-0 accent-primary"
+          :checked="deriveSeriesFromFolder"
+          aria-describedby="series-from-folders-hint"
+          @change="toggleSeriesFromFolders"
+        />
+        <span class="flex min-w-0 flex-col">
+          <span class="text-sm font-semibold text-foreground">{{ t('library.creator.scanner.seriesFromFolders.title') }}</span>
+          <span id="series-from-folders-hint" class="text-xs text-muted-foreground">{{ t('library.creator.scanner.seriesFromFolders.hint') }}</span>
+        </span>
+      </label>
     </LibraryCreatorCard>
 
     <LibraryCreatorCard :label="t('library.creator.scanner.import.title')" label-id="import-formats-title">
