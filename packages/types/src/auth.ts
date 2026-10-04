@@ -43,6 +43,8 @@ export interface UserSettings {
   notificationPreferences?: import("./notification").NotificationPreferences;
   seriesCollapsePreferences?: import("./series-collapse").SeriesCollapsePreferences;
   dashboardConfig?: import("./dashboard").DashboardConfig;
+  /** Separate from dashboardConfig so legacy clients replacing it preserve shelf preferences. */
+  dashboardShelfConfig?: import("./dashboard").DashboardShelfConfig;
   sidebarConfig?: import("./sidebar").SidebarConfig;
   achievementPreferences?: {
     enabled?: boolean;

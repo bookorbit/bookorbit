@@ -128,7 +128,15 @@ const WATCHER_NOTIFY_DEBOUNCE_MS = 30_000;
 const TARGETED_BOOK_SCAN_MAX_CONCURRENCY = 8;
 const MISSING_FILE_STAT_BATCH_SIZE = 50;
 const AUDIO_DURATION_PROBE_CONCURRENCY = 4;
+const MEDIA_OVERLAY_REPAIR_CONCURRENCY = 4;
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
+
+function isUnderAnyDir(absolutePath: string, dirs: Set<string>): boolean {
+  for (const dir of dirs) {
+    if (absolutePath === dir || absolutePath.startsWith(dir + sep)) return true;
+  }
+  return false;
+}
 
 interface ScanCounts {
   addedCount: number;
@@ -1600,6 +1608,7 @@ export class ScannerService implements OnApplicationBootstrap {
       }
 
       await this.repairMissingAudioDurations(knownFiles, unchangedDirs, seenBookIds);
+      await this.repairUncheckedMediaOverlays(knownFiles, unchangedDirs, seenBookIds);
 
       // Deferred prune: delete book files not retained by any candidate.
       // Must happen after ALL batches so cross-book file moves are visible.
@@ -1668,19 +1677,13 @@ export class ScannerService implements OnApplicationBootstrap {
   ): Promise<void> {
     if (unchangedDirs.size === 0) return;
 
-    const isUnderUnchangedDir = (absolutePath: string) => {
-      for (const dir of unchangedDirs) {
-        if (absolutePath === dir || absolutePath.startsWith(dir + sep)) return true;
-      }
-      return false;
-    };
     const filesToRepair = knownFiles.filter(
       (file) =>
         !processedBookIds.has(file.bookId) &&
         file.format !== null &&
         isAudioFormat(file.format) &&
         (file.durationSeconds === null || file.durationSeconds <= 0) &&
-        isUnderUnchangedDir(file.absolutePath) &&
+        isUnderAnyDir(file.absolutePath, unchangedDirs) &&
         !this.selfWriteRegistry.isSuppressed(file.absolutePath),
     );
     const repairedBookIds = new Set<number>();
@@ -1702,6 +1705,47 @@ export class ScannerService implements OnApplicationBootstrap {
       } catch (err) {
         this.logger.warn(
           `[scanner.aggregate_audio_duration] [fail] bookId=${bookId} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - repaired audio duration aggregation failed`,
+        );
+      }
+    });
+  }
+
+  /**
+   * Measures read-along EPUBs whose media-overlay check was cleared so a fixed parser reads them
+   * again. An incremental scan never opens a file in an unchanged folder, so they are inspected
+   * here. A failed read does not demote the file; the next scan or its detail page tries again.
+   */
+  private async repairUncheckedMediaOverlays(
+    knownFiles: Array<{
+      id: number;
+      bookId: number;
+      absolutePath: string;
+      format: string | null;
+      mediaOverlayAvailable: boolean;
+      mediaOverlayCheckedAt: Date | null;
+    }>,
+    unchangedDirs: Set<string>,
+    processedBookIds: Set<number>,
+  ): Promise<void> {
+    if (unchangedDirs.size === 0) return;
+
+    const filesToRepair = knownFiles.filter(
+      (file) =>
+        !processedBookIds.has(file.bookId) &&
+        file.format?.toLowerCase() === 'epub' &&
+        file.mediaOverlayAvailable &&
+        file.mediaOverlayCheckedAt == null &&
+        isUnderAnyDir(file.absolutePath, unchangedDirs) &&
+        !this.selfWriteRegistry.isSuppressed(file.absolutePath),
+    );
+
+    await mapWithConcurrency(filesToRepair, MEDIA_OVERLAY_REPAIR_CONCURRENCY, async (file) => {
+      try {
+        const fields = await this.inspectMediaOverlayFields(file.absolutePath, file.format);
+        if (fields.mediaOverlayAvailable) await this.scannerRepo.updateBookFile(file.id, fields);
+      } catch (err) {
+        this.logger.warn(
+          `[scanner.media_overlay_repair] [fail] fileId=${file.id} path="${sanitizeLogValue(file.absolutePath)}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - unchecked media overlay repair failed`,
         );
       }
     });

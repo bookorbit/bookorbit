@@ -2359,6 +2359,7 @@
       "searchPlaceholder": "Setări căutare",
       "clearSearch": "Ștergeți căutarea",
       "noResults": "Nicio setare nu corespunde cu {query}.",
+      "shortcutHint": "Apăsați {shortcut} pentru a sări la orice setare",
       "groups": {
         "you": "Tu",
         "library": "Bibliotecă",
@@ -6854,6 +6855,10 @@
         "title": "Alege o bibliotecă pentru a începe",
         "description": "Selectați o bibliotecă de mai sus pentru a previzualiza modificările, a filtra după stare și a aplica redarea în masă rulată.",
         "chooseLibrary": "Alege biblioteca"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, few {Redenumiți # fișiere pe disc?} one {Redenumiți # fișier pe disc?} other {Redenumiți # fișiere pe disc?}}",
+        "body": "Aceasta mută fișiere reale din {library}. BookOrbit înregistrează fiecare mutare, dar anularea înseamnă redenumirea înapoi."
       }
     },
     "bookDuplicates": {

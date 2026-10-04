@@ -91,7 +91,7 @@ export class UserController {
 
   @Patch('me/settings')
   updateMySettings(@CurrentUser() user: RequestUser, @Body() dto: UpdateMeSettingsDto) {
-    return this.userService.updateMySettings(user.id, dto);
+    return this.userService.updateMySettings(user, dto);
   }
 
   @Patch('me/reader-storage-mode')

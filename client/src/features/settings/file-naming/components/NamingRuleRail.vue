@@ -1,29 +1,32 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Globe, Library, Search } from '@lucide/vue'
+import { ChevronRight } from '@lucide/vue'
 import AppIcon from '@/components/AppIcon.vue'
 import type { NamingRuleId } from '../lib/naming-rules'
 
 export interface RailItem {
   id: NamingRuleId
   name: string
-  detail: string
   icon: string
   custom: boolean
   dirty: boolean
 }
 
-const props = defineProps<{
-  globals: RailItem[]
+/** A global default and the libraries that sit under it: inheritance is drawn, not described. */
+export interface RailGroup {
+  rule: RailItem
   libraries: RailItem[]
-  librariesTotal: number
-  customCount: number
+  /** Drawn apart from the groups above it, for a rule that governs something other than uploads. */
+  separate?: boolean
+}
+
+const props = defineProps<{
+  groups: RailGroup[]
   selectedId: NamingRuleId
-  query: string
   editorId: string
 }>()
 
-const emit = defineEmits<{ select: [id: NamingRuleId]; 'update:query': [value: string] }>()
+const emit = defineEmits<{ select: [id: NamingRuleId] }>()
 
 const { t } = useI18n()
 
@@ -31,107 +34,87 @@ function handleSelect(id: NamingRuleId) {
   emit('select', id)
 }
 
-function handleQuery(event: Event) {
-  emit('update:query', (event.target as HTMLInputElement).value)
+function isCurrent(id: NamingRuleId): boolean {
+  return id === props.selectedId
 }
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col border-border bg-muted/25 md:border-r">
-    <div class="p-2.5">
-      <label class="sr-only" for="file-naming-rule-filter">{{ t('settings.reader.fileNaming.filterRules') }}</label>
-      <div
-        class="flex items-center gap-2 rounded-md border border-input bg-background px-2 py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/45"
-      >
-        <Search :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-        <input
-          id="file-naming-rule-filter"
-          type="search"
-          :value="query"
-          :placeholder="t('settings.reader.fileNaming.filterRules')"
-          class="w-full min-w-0 border-0 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
-          @input="handleQuery"
-        />
-      </div>
-    </div>
+  <nav class="flex min-w-0 flex-col gap-1 border-border bg-muted/25 p-2 md:border-e" :aria-label="t('settings.reader.fileNaming.rulesNav')">
+    <ul class="flex list-none flex-col gap-0.5 p-0">
+      <li v-for="group in groups" :key="group.rule.id" :class="group.separate ? 'mt-1.5 border-t border-border pt-2' : ''">
+        <button
+          type="button"
+          :aria-current="isCurrent(group.rule.id) ? 'true' : undefined"
+          :aria-controls="editorId"
+          class="relative flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-start @2xl/naming:min-h-9 transition-colors hover:bg-primary/8 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+          :class="isCurrent(group.rule.id) ? 'bg-primary/12 shadow-[inset_2px_0_0_var(--primary)]' : ''"
+          @click="handleSelect(group.rule.id)"
+        >
+          <span
+            class="grid size-6 shrink-0 place-items-center rounded-[5px]"
+            :class="isCurrent(group.rule.id) ? 'bg-primary/20 text-primary' : 'bg-surface-3 text-muted-foreground'"
+          >
+            <AppIcon :icon="group.rule.icon" fallback="File" :size="13" aria-hidden="true" />
+          </span>
+          <span
+            class="min-w-0 flex-1 truncate text-sm font-medium @2xl/naming:text-[13px]"
+            :class="isCurrent(group.rule.id) ? 'font-semibold text-primary' : 'text-foreground'"
+          >
+            {{ group.rule.name }}
+          </span>
+          <span
+            v-if="group.rule.dirty"
+            class="size-1.5 shrink-0 rounded-full bg-warning"
+            role="img"
+            :aria-label="t('settings.reader.fileNaming.unsavedMarker')"
+          />
+          <ChevronRight :size="16" class="shrink-0 text-muted-foreground @2xl/naming:hidden" aria-hidden="true" />
+        </button>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2.5">
-      <template v-if="props.globals.length">
-        <p class="flex items-center gap-1.5 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          <Globe :size="11" class="shrink-0" aria-hidden="true" />
-          {{ t('settings.reader.fileNaming.globalDefaults') }}
-        </p>
-        <ul class="list-none space-y-px p-0">
-          <li v-for="item in props.globals" :key="item.id">
+        <ul v-if="group.libraries.length" class="mb-1.5 ms-5 mt-px flex list-none flex-col gap-px border-s border-border p-0">
+          <li v-for="item in group.libraries" :key="item.id">
             <button
               type="button"
-              :aria-current="item.id === selectedId ? 'true' : undefined"
+              :aria-current="isCurrent(item.id) ? 'true' : undefined"
               :aria-controls="editorId"
-              class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-primary/8 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
-              :class="item.id === selectedId ? 'bg-primary/12 shadow-[inset_2px_0_0_var(--primary)]' : ''"
+              class="relative flex min-h-10 w-full items-center gap-2 rounded-e-md ps-4 pe-2 text-start @2xl/naming:min-h-7.5 transition-colors before:absolute before:start-0 before:top-1/2 before:h-px before:w-2.5 before:bg-border hover:bg-primary/8 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+              :class="isCurrent(item.id) ? 'bg-primary/12 shadow-[inset_2px_0_0_var(--primary)]' : ''"
               @click="handleSelect(item.id)"
             >
+              <AppIcon
+                :icon="item.icon"
+                fallback="FolderOpen"
+                :size="14"
+                class="shrink-0"
+                :class="item.custom || isCurrent(item.id) ? 'text-primary' : 'text-muted-foreground'"
+                aria-hidden="true"
+              />
               <span
-                class="grid size-6 shrink-0 place-items-center rounded-[5px]"
-                :class="item.id === selectedId ? 'bg-primary/20 text-primary' : 'bg-surface-3 text-muted-foreground'"
+                class="min-w-0 flex-1 truncate text-sm @2xl/naming:text-[13px]"
+                :class="isCurrent(item.id) ? 'font-semibold text-primary' : 'text-foreground'"
               >
-                <AppIcon :icon="item.icon" fallback="File" :size="13" aria-hidden="true" />
+                {{ item.name }}
               </span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-[13px]" :class="item.id === selectedId ? 'font-semibold text-primary' : 'text-foreground'">{{
-                  item.name
-                }}</span>
-                <span class="block truncate text-[11px] text-muted-foreground">{{ item.detail }}</span>
-              </span>
-              <span v-if="item.dirty" class="size-1.5 shrink-0 rounded-full bg-warning" :aria-label="t('settings.reader.fileNaming.unsavedMarker')" />
-            </button>
-          </li>
-        </ul>
-      </template>
-
-      <template v-if="props.libraries.length">
-        <p class="flex items-center gap-1.5 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          <Library :size="11" class="shrink-0" aria-hidden="true" />
-          {{ t('settings.reader.fileNaming.librariesGroup') }}
-          <span class="ml-auto tabular-nums">{{ t('settings.reader.fileNaming.customCount', { custom: customCount, total: librariesTotal }) }}</span>
-        </p>
-        <ul class="list-none space-y-px p-0">
-          <li v-for="item in props.libraries" :key="item.id">
-            <button
-              type="button"
-              :aria-current="item.id === selectedId ? 'true' : undefined"
-              :aria-controls="editorId"
-              class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-primary/8 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
-              :class="item.id === selectedId ? 'bg-primary/12 shadow-[inset_2px_0_0_var(--primary)]' : ''"
-              @click="handleSelect(item.id)"
-            >
               <span
-                class="grid size-6 shrink-0 place-items-center rounded-[5px]"
-                :class="item.id === selectedId ? 'bg-primary/20 text-primary' : 'bg-surface-3 text-muted-foreground'"
-              >
-                <AppIcon :icon="item.icon" fallback="FolderOpen" :size="13" aria-hidden="true" />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-[13px]" :class="item.id === selectedId ? 'font-semibold text-primary' : 'text-foreground'">{{
-                  item.name
-                }}</span>
-                <span class="block truncate text-[11px] text-muted-foreground">{{ item.detail }}</span>
-              </span>
-              <span v-if="item.dirty" class="size-1.5 shrink-0 rounded-full bg-warning" :aria-label="t('settings.reader.fileNaming.unsavedMarker')" />
+                v-if="item.dirty"
+                class="size-1.5 shrink-0 rounded-full bg-warning"
+                role="img"
+                :aria-label="t('settings.reader.fileNaming.unsavedMarker')"
+              />
               <span
                 v-else-if="item.custom"
-                class="shrink-0 rounded bg-primary/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-primary"
+                class="shrink-0 rounded bg-primary/15 px-1 py-px text-[9.5px] font-bold uppercase tracking-wide text-primary"
               >
                 {{ t('settings.reader.fileNaming.badgeCustom') }}
               </span>
+              <ChevronRight :size="16" class="shrink-0 text-muted-foreground @2xl/naming:hidden" aria-hidden="true" />
             </button>
           </li>
         </ul>
-      </template>
+      </li>
+    </ul>
 
-      <p v-if="!props.globals.length && !props.libraries.length" class="px-2 py-8 text-center text-xs text-muted-foreground">
-        {{ t('settings.reader.fileNaming.noRuleMatches', { query }) }}
-      </p>
-    </div>
-  </div>
+    <p class="mt-auto px-2 pb-1 pt-3 text-[11.5px] leading-normal text-muted-foreground">{{ t('settings.reader.fileNaming.railFoot') }}</p>
+  </nav>
 </template>

@@ -11,7 +11,6 @@ updates:
     open-pull-requests-limit: 1
     labels:
       - "dependencies"
-      - "npm"
     commit-message:
       prefix: "chore(deps)"
     ignore:

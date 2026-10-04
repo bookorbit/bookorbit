@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { setI18nLocale } from '@/i18n'
 import { formatBytes } from '@/lib/formatting'
-import { formatCompactNumber, formatDate, formatLanguageName, formatNumber } from './formatters'
+import { formatCompactNumber, formatDate, formatLanguageName, formatListParts, formatNumber } from './formatters'
 
 describe('locale formatters', () => {
   afterEach(async () => {
@@ -53,5 +53,23 @@ describe('locale formatters', () => {
 
     await setI18nLocale('nl')
     expect(formatBytes(1536)).toBe('1,5 kB')
+  })
+
+  it('splits a sentence list into items and the locale joining words', async () => {
+    await setI18nLocale('en')
+    expect(formatListParts(['Comics', 'Novels', 'PDFs'])).toEqual([
+      { type: 'element', value: 'Comics' },
+      { type: 'literal', value: ', ' },
+      { type: 'element', value: 'Novels' },
+      { type: 'literal', value: ', and ' },
+      { type: 'element', value: 'PDFs' },
+    ])
+
+    await setI18nLocale('nl')
+    expect(
+      formatListParts(['Comics', 'Novels'])
+        .map((part) => part.value)
+        .join(''),
+    ).toBe('Comics en Novels')
   })
 })

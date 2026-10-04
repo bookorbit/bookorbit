@@ -69,7 +69,7 @@ const greetingName = computed(() => {
 })
 
 watch(
-  [smartScopesLoaded, smartScopes],
+  [smartScopesLoaded, smartScopes, scrollers],
   ([isLoaded, allSmartScopes]) => {
     if (!isLoaded) return
     pruneDeletedSmartScopeScrollers(allSmartScopes.map((smartScope) => smartScope.id))

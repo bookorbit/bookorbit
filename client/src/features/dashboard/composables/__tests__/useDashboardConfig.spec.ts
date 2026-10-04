@@ -1,5 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ScrollerConfig } from '@bookorbit/types'
+import { Permission, type AuthUser, type ScrollerConfig } from '@bookorbit/types'
+import { effectScope, ref } from 'vue'
+import type { api } from '@/lib/api'
+
+const mocks = vi.hoisted(() => ({ api: vi.fn<typeof api>() }))
+const user = ref<AuthUser | null>(null)
+
+vi.mock('@/lib/api', () => ({ api: mocks.api }))
+vi.mock('@/features/auth/composables/useAuth', () => ({ useAuth: () => ({ user }) }))
+
+function signedIn(settings: AuthUser['settings'] = {}, id = 1) {
+  user.value = { id, settings } as AuthUser
+}
 
 const STORAGE_KEY = 'bookorbit:dashboard:config'
 
@@ -11,6 +23,131 @@ describe('useDashboardConfig', () => {
   beforeEach(() => {
     vi.resetModules()
     localStorage.clear()
+    user.value = null
+    mocks.api.mockReset()
+    mocks.api.mockResolvedValue(new Response(null, { status: 200 }))
+  })
+
+  it('keeps shelves browser-local by default without a settings request', async () => {
+    signedIn()
+    const { useDashboardConfig, SHELF_LAYOUT } = await import('../useDashboardConfig')
+    const config = useDashboardConfig()
+
+    await config.saveShelfSettings([...config.scrollers.value].reverse(), SHELF_LAYOUT.TWO_COLUMNS)
+
+    expect(config.syncAcrossSessions.value).toBe(false)
+    expect(storedConfig().shelfLayout).toBe('two-columns')
+    expect(mocks.api).not.toHaveBeenCalled()
+  })
+
+  it('ignores account shelf sync and forced opt-in for a demo-restricted account', async () => {
+    signedIn({ dashboardShelfConfig: { syncAcrossSessions: true, shelfLayout: 'two-columns' } })
+    user.value!.permissions = [Permission.DemoRestricted]
+    const { useDashboardConfig, SHELF_LAYOUT } = await import('../useDashboardConfig')
+    const config = useDashboardConfig()
+
+    expect(config.syncAcrossSessions.value).toBe(false)
+    expect(config.shelfLayout.value).toBe('wide')
+    await config.saveShelfSettings(config.scrollers.value, SHELF_LAYOUT.TWO_COLUMNS, true)
+
+    expect(mocks.api).not.toHaveBeenCalled()
+    expect(storedConfig().shelfLayout).toBe('two-columns')
+  })
+
+  it('uploads the current layout on opt-in and restores it in a fresh session', async () => {
+    signedIn({ dashboardConfig: { readingGoal: 12 } })
+    const { useDashboardConfig, SHELF_LAYOUT } = await import('../useDashboardConfig')
+    const config = useDashboardConfig()
+    const shelves = [...config.scrollers.value].reverse().map((scroller) => ({ ...scroller, rows: 2, enabled: false }))
+
+    await config.saveShelfSettings(shelves, SHELF_LAYOUT.TWO_COLUMNS, true)
+
+    const body = JSON.parse(String(mocks.api.mock.calls[0]![1]?.body))
+    expect(mocks.api.mock.calls[0]![0]).toBe('/api/v1/users/me/settings')
+    expect(body.settings.dashboardShelfConfig.syncAcrossSessions).toBe(true)
+    expect(body.settings.dashboardConfig).toBeUndefined()
+    expect(user.value?.settings.dashboardConfig).toEqual({ readingGoal: 12 })
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+
+    localStorage.clear()
+    vi.resetModules()
+    const fresh = (await import('../useDashboardConfig')).useDashboardConfig()
+    expect(fresh.syncAcrossSessions.value).toBe(true)
+    expect(fresh.shelfLayout.value).toBe('two-columns')
+    expect(fresh.scrollers.value).toEqual(body.settings.dashboardShelfConfig.scrollers)
+  })
+
+  it('keeps the current layout locally after disabling sync', async () => {
+    signedIn({ dashboardShelfConfig: { syncAcrossSessions: true, shelfLayout: 'two-columns' } })
+    const config = (await import('../useDashboardConfig')).useDashboardConfig()
+
+    await config.saveShelfSettings(config.scrollers.value, config.shelfLayout.value, false)
+
+    expect(config.syncAcrossSessions.value).toBe(false)
+    expect(storedConfig().shelfLayout).toBe('two-columns')
+    expect(JSON.parse(String(mocks.api.mock.calls[0]![1]?.body)).settings.dashboardShelfConfig.syncAcrossSessions).toBe(false)
+  })
+
+  it('preserves local settings and leaves sync off when opt-in fails', async () => {
+    signedIn()
+    const { useDashboardConfig, SHELF_LAYOUT } = await import('../useDashboardConfig')
+    const config = useDashboardConfig()
+    config.saveScrollers(config.scrollers.value)
+    const original = localStorage.getItem(STORAGE_KEY)
+    mocks.api.mockResolvedValue(new Response(null, { status: 500 }))
+
+    await expect(config.saveShelfSettings([...config.scrollers.value].reverse(), SHELF_LAYOUT.TWO_COLUMNS, true)).rejects.toThrow(
+      'Failed to save dashboard shelves: 500',
+    )
+
+    expect(config.syncAcrossSessions.value).toBe(false)
+    expect(config.shelfLayout.value).toBe('wide')
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(original)
+  })
+
+  it('does not carry synced shelves into another account or overwrite the browser layout', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ shelfLayout: 'wide' }))
+    signedIn({ dashboardShelfConfig: { syncAcrossSessions: true, shelfLayout: 'two-columns' } })
+    const config = (await import('../useDashboardConfig')).useDashboardConfig()
+    expect(config.shelfLayout.value).toBe('two-columns')
+
+    signedIn({}, 2)
+
+    expect(config.syncAcrossSessions.value).toBe(false)
+    expect(config.shelfLayout.value).toBe('wide')
+    expect(storedConfig().shelfLayout).toBe('wide')
+  })
+
+  it('ignores a completed save after the signed-in account changes', async () => {
+    signedIn()
+    const { useDashboardConfig, SHELF_LAYOUT } = await import('../useDashboardConfig')
+    const config = useDashboardConfig()
+    let resolve!: (response: Response) => void
+    mocks.api.mockReturnValue(
+      new Promise<Response>((done) => {
+        resolve = done
+      }),
+    )
+    const pending = config.saveShelfSettings(config.scrollers.value, SHELF_LAYOUT.TWO_COLUMNS, true)
+    signedIn({}, 2)
+    resolve(new Response(null, { status: 200 }))
+    await pending
+
+    expect(user.value?.id).toBe(2)
+    expect(config.syncAcrossSessions.value).toBe(false)
+    expect(config.shelfLayout.value).toBe('wide')
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+  })
+
+  it('restores browser settings when an account changes while the dashboard is unmounted', async () => {
+    signedIn({ dashboardShelfConfig: { syncAcrossSessions: true, shelfLayout: 'two-columns' } })
+    const { useDashboardConfig } = await import('../useDashboardConfig')
+    const scope = effectScope()
+    scope.run(() => useDashboardConfig())
+    scope.stop()
+    signedIn({}, 2)
+
+    expect(useDashboardConfig().shelfLayout.value).toBe('wide')
   })
 
   it('normalizes legacy object storage into a scroller array', async () => {

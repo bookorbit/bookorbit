@@ -280,23 +280,40 @@ describe('UserService', () => {
     const updated = { id: 2, settings: { dashboardConfig: { readingGoal: 12 } } };
     userRepo.update.mockResolvedValue(updated);
 
-    const result = await service.updateMySettings(2, { settings: { dashboardConfig: { readingGoal: 12 } } });
+    const result = await service.updateMySettings(reqUser({ id: 2 }), { settings: { dashboardConfig: { readingGoal: 12 } } });
 
     expect(userRepo.update).toHaveBeenCalledWith(2, { settings: { dashboardConfig: { readingGoal: 12 } } });
     expect(result).toEqual(updated);
   });
 
+  it.each([false, true])('rejects shelf sync settings from demo-restricted accounts with isSuperuser=%s', async (isSuperuser) => {
+    const user = reqUser({ isSuperuser, permissions: [Permission.DemoRestricted] });
+    for (const dashboardShelfConfig of [{ syncAcrossSessions: true }, { syncAcrossSessions: false }, null]) {
+      await expect(service.updateMySettings(user, { settings: { dashboardShelfConfig } })).rejects.toBeInstanceOf(ForbiddenException);
+    }
+    expect(userRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('allows demo-restricted accounts to save existing dashboard widget settings', async () => {
+    const user = reqUser({ permissions: [Permission.DemoRestricted] });
+    const settings = { dashboardConfig: { readingGoal: 12 } };
+    userRepo.update.mockResolvedValue({ id: user.id, settings });
+
+    await expect(service.updateMySettings(user, { settings })).resolves.toEqual({ id: user.id, settings });
+    expect(userRepo.update).toHaveBeenCalledWith(user.id, { settings });
+  });
+
   it('updateMySettings throws NotFoundException when user does not exist', async () => {
     userRepo.update.mockResolvedValue(null);
 
-    await expect(service.updateMySettings(99, { settings: { theme: 'dark' } })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.updateMySettings(reqUser({ id: 99 }), { settings: { theme: 'dark' } })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('updateMySettings passes arbitrary nested settings without modification', async () => {
     const settings = { nested: { deeply: { value: true } }, arr: [1, 2, 3] };
     userRepo.update.mockResolvedValue({ id: 5, settings });
 
-    await service.updateMySettings(5, { settings });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings });
 
     expect(userRepo.update).toHaveBeenCalledWith(5, { settings });
   });
@@ -306,7 +323,7 @@ describe('UserService', () => {
     userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax' } });
     userStatistics.rebuildDailyStatsForUser.mockResolvedValue({ deleted: 12, inserted: 9, libraries: 1 });
 
-    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'America/Halifax' } });
 
     expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'America/Halifax');
   });
@@ -317,7 +334,7 @@ describe('UserService', () => {
     userRepo.findSettingsById.mockResolvedValue({ timezone: 'America/Halifax' });
     userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax' } });
 
-    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'America/Halifax' } });
 
     expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'America/Halifax');
   });
@@ -327,12 +344,12 @@ describe('UserService', () => {
     userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax' } });
     userStatistics.rebuildDailyStatsForUser.mockRejectedValueOnce(new Error('deadlock detected'));
 
-    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'America/Halifax' } });
 
     userStatistics.rebuildDailyStatsForUser.mockResolvedValue({ deleted: 4, inserted: 3, libraries: 1 });
     userRepo.findSettingsById.mockResolvedValue({ timezone: 'America/Halifax' });
 
-    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'America/Halifax' } });
 
     expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledTimes(2);
   });
@@ -350,7 +367,7 @@ describe('UserService', () => {
       }),
     );
 
-    await expect(service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } })).resolves.toEqual({
+    await expect(service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'America/Halifax' } })).resolves.toEqual({
       id: 5,
       settings: { timezone: 'America/Halifax' },
     });
@@ -362,7 +379,7 @@ describe('UserService', () => {
   it('leaves stats alone for a settings write that does not touch the timezone', async () => {
     userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax', theme: 'dark' } });
 
-    await service.updateMySettings(5, { settings: { theme: 'dark' } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { theme: 'dark' } });
 
     // Reading the stored settings is only worth a query when this write can replace the zone.
     expect(userRepo.findSettingsById).not.toHaveBeenCalled();
@@ -374,7 +391,7 @@ describe('UserService', () => {
     userRepo.findSettingsById.mockResolvedValue({});
     userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'Europe/Berlin' } });
 
-    await service.updateMySettings(5, { settings: { timezone: 'Europe/Berlin' } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'Europe/Berlin' } });
     expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'Europe/Berlin');
 
     userStatistics.rebuildDailyStatsForUser.mockClear();
@@ -382,7 +399,7 @@ describe('UserService', () => {
     userRepo.findSettingsById.mockResolvedValue({ timezone: 'Europe/Berlin' });
     userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'Not/AZone' } });
 
-    await service.updateMySettings(5, { settings: { timezone: 'Not/AZone' } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'Not/AZone' } });
     expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'UTC');
   });
 
@@ -392,13 +409,13 @@ describe('UserService', () => {
     userRepo.update.mockResolvedValue(updated);
     userStatistics.rebuildDailyStatsForUser.mockRejectedValue(new Error('deadlock detected'));
 
-    await expect(service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } })).resolves.toEqual(updated);
+    await expect(service.updateMySettings(reqUser({ id: 5 }), { settings: { timezone: 'America/Halifax' } })).resolves.toEqual(updated);
   });
 
   it('caches an explicit achievement preference when settings are updated', async () => {
     userRepo.update.mockResolvedValue({ id: 5, settings: { achievementPreferences: { enabled: false } } });
 
-    await service.updateMySettings(5, { settings: { achievementPreferences: { enabled: false } } });
+    await service.updateMySettings(reqUser({ id: 5 }), { settings: { achievementPreferences: { enabled: false } } });
 
     await expect(service.isAchievementEnabled(5)).resolves.toBe(false);
     expect(userRepo.findSettingsById).not.toHaveBeenCalled();

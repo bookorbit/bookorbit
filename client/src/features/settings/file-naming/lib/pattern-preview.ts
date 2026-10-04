@@ -15,6 +15,8 @@ export type PreviewCaseId = 'complete' | 'noSeries' | 'noYear' | 'noAuthor'
 
 export interface PreviewCase {
   id: PreviewCaseId
+  /** The fields this case blanks, so it can be applied to any preview book. */
+  omit: readonly string[]
   metadata: Record<string, string>
 }
 
@@ -26,10 +28,10 @@ export const metadataWithout = (...fields: string[]): Record<string, string> => 
 }
 
 export const PREVIEW_CASES: PreviewCase[] = [
-  { id: 'complete', metadata: { ...EXAMPLE_PATTERN_METADATA } },
-  { id: 'noSeries', metadata: metadataWithout('series', 'seriesIndex') },
-  { id: 'noYear', metadata: metadataWithout('year') },
-  { id: 'noAuthor', metadata: metadataWithout('authors') },
+  { id: 'complete', omit: [], metadata: { ...EXAMPLE_PATTERN_METADATA } },
+  { id: 'noSeries', omit: ['series', 'seriesIndex'], metadata: metadataWithout('series', 'seriesIndex') },
+  { id: 'noYear', omit: ['year'], metadata: metadataWithout('year') },
+  { id: 'noAuthor', omit: ['authors'], metadata: metadataWithout('authors') },
 ]
 
 /** Cases other than the complete one, which the panels render as the headline result. */

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 
 import { plainToInstance } from 'class-transformer';
+import { ValidationPipe } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { Permission } from '@bookorbit/types';
 
@@ -17,6 +18,17 @@ async function hasErrors(dto: object): Promise<boolean> {
 }
 
 describe('User DTO validation', () => {
+  it('accepts optional shelf sync settings through the global validation contract', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    for (const settings of [
+      { dashboardConfig: { readingGoal: 12 } },
+      { dashboardShelfConfig: { syncAcrossSessions: true, shelfLayout: 'two-columns', scrollers: [] } },
+      { dashboardShelfConfig: { syncAcrossSessions: false } },
+    ]) {
+      const result = await pipe.transform({ settings }, { type: 'body', metatype: UpdateMeSettingsDto });
+      expect(result.settings).toEqual(settings);
+    }
+  });
   it('CreateUserDto requires email, enforces username minimum length, and validates permission enums', async () => {
     const bad = plainToInstance(CreateUserDto, { username: 'ab', name: 'n', permissionNames: [1, 2] });
     expect(await hasErrors(bad)).toBe(true);

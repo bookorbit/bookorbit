@@ -2514,6 +2514,7 @@
       "searchPlaceholder": "Nastavitve iskanja",
       "clearSearch": "Počisti iskanje",
       "noResults": "Nobena nastavitev ne ustreza {query}.",
+      "shortcutHint": "Pritisnite {shortcut} za skok na katero koli nastavitev",
       "groups": {
         "you": "Vi",
         "library": "Knjižnica",
@@ -7147,6 +7148,10 @@
         "title": "Izberite knjižnico za začetek",
         "description": "Zgoraj izberite knjižnico za predogled sprememb preimenovanja, filtriranje po stanju in izvedbo množičnega preimenovanja.",
         "chooseLibrary": "Izberi knjižnico"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, few {Preimenovati # datoteke na disku?} one {Preimenovati # datoteko na disku?} two {Preimenovati # datoteki na disku?} other {Preimenovati # datotek na disku?}}",
+        "body": "To premakne prave datoteke znotraj {library}. BookOrbit beleži vsak premik, razveljavitev pa pomeni ponovno preimenovanje."
       }
     },
     "bookDuplicates": {

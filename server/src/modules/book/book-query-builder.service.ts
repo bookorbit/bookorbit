@@ -1166,6 +1166,9 @@ export class BookQueryBuilder {
         case 'pageCount':
           parts.push(`page_count ${D} NULLS LAST`);
           break;
+        case 'metadataScore':
+          parts.push(`metadata_score ${D} NULLS LAST`);
+          break;
         case 'updatedAt':
           parts.push(`updated_at ${D} NULLS LAST`);
           break;

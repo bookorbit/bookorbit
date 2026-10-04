@@ -3,6 +3,7 @@ packages:
   - "server"
   - "packages/*"
 overrides:
+  "@fastify/busboy": ^3.2.1
   "@xhmikosr/decompress": ^11.1.4
   "@esbuild-kit/core-utils>esbuild": ^0.25.12
   "@nestjs/swagger>js-yaml": ^5.3.0

@@ -396,6 +396,22 @@ describe('Jump buckets invariant (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
     }
   }
 
+  it('applies a secondary metadataScore tier to collapsed buckets without breaking the anchors', async () => {
+    const sort: SortSpec[] = [
+      { field: 'title', dir: 'asc' },
+      { field: 'metadataScore', dir: 'desc' },
+    ];
+    const [bucketsResponse, listing] = await Promise.all([fetchBuckets(sort, true), fetchListing(sort, true)]);
+
+    expect(bucketsResponse.total).toBe(listing.total);
+    expect(bucketsResponse.buckets.length).toBeGreaterThan(1);
+    for (const bucket of bucketsResponse.buckets) {
+      const seeded = seededById.get((listing.items[bucket.index] as BookCard).id);
+      expect(seeded).toBeDefined();
+      expect(expectedBucketKey(seeded!, 'title', true, bucketsResponse.granularity)).toBe(bucket.key);
+    }
+  });
+
   it('preserves every populated year when sparse years fit the bounded capacity', async () => {
     const response = await fetchBuckets([{ field: 'publishedYear', dir: 'asc' }], false);
     const expectedYears = [...new Set([...seededById.values()].flatMap((book) => (book.publishedYear === null ? [] : [String(book.publishedYear)])))];

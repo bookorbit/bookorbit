@@ -1275,6 +1275,7 @@ export class BookRepository {
           book_metadata.published_year,
           book_metadata.publisher,
           book_metadata.page_count,
+          book_metadata.metadata_score,
           NULLIF(lower(btrim(book_metadata.series_name)), '') AS norm_series
           ${source.baseExtraSelect}
         FROM books
@@ -1301,6 +1302,7 @@ export class BookRepository {
           base.published_year,
           base.publisher,
           base.page_count,
+          base.metadata_score,
           ubr.rating,
           base.primary_author_sort_name AS author_sort_name,
           COALESCE(base.norm_series, lower(base.title)) AS sort_title,

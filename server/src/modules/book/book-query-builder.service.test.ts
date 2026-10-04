@@ -41,6 +41,7 @@ import {
   CUSTOM_FIELD_TYPE_OPERATORS,
   EMPTY_CONTENT_FILTER_RULES,
   FIELD_OPERATORS,
+  SORT_FIELDS,
   customRuleField,
   type CustomMetadataFieldType,
   type RuleField,
@@ -1985,6 +1986,15 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
 
   it('generates updatedAt sort', () => {
     expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'updatedAt', dir: 'asc' }], 1)).toBe('updated_at ASC NULLS LAST, r.id ASC');
+  });
+
+  it('generates metadataScore sort against the representative row', () => {
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'metadataScore', dir: 'asc' }], 1)).toBe('metadata_score ASC NULLS LAST, r.id ASC');
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'metadataScore', dir: 'desc' }], 1)).toBe('metadata_score DESC NULLS LAST, r.id ASC');
+  });
+
+  it.each(SORT_FIELDS.filter((field) => field !== 'relevance'))('honours the %s browse sort instead of falling back to title', (field) => {
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field, dir: 'desc' }], 1)).not.toBe('sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('generates fileSize sort using the primary file', () => {

@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { hash } from 'bcryptjs';
+import { Permission } from '@bookorbit/types';
 
 import { AppModule } from '../src/app.module';
 import { DB } from '../src/db';
@@ -293,6 +294,96 @@ describe('Auth session security (e2e)', () => {
       expect(invalidLoginResponse.statusCode).toBe(401);
       expect(getSetCookieLines(invalidLoginResponse.headers)).toHaveLength(0);
     });
+  });
+
+  describe('dashboard shelf settings', () => {
+    it.each([false, true])(
+      'rejects shelf sync writes for demo-restricted accounts with isSuperuser=%s',
+      async (isSuperuser) => {
+        const demo = await createLocalUser(context.db);
+        await context.db.update(schema.users).set({ isSuperuser }).where(eq(schema.users.id, demo.userId));
+        await context.db.insert(schema.userPermissions).values({ userId: demo.userId, permissionName: Permission.DemoRestricted });
+        const session = await login(context.app, demo.username, demo.password);
+        const headers = { authorization: `Bearer ${session.accessToken}` };
+
+        for (const dashboardShelfConfig of [{ syncAcrossSessions: true }, { syncAcrossSessions: false }, null]) {
+          const response = await context.app.inject({
+            method: 'PATCH',
+            url: '/api/v1/users/me/settings',
+            headers,
+            payload: { settings: { dashboardShelfConfig } },
+          });
+          expect(response.statusCode).toBe(403);
+        }
+
+        const legacySave = await context.app.inject({
+          method: 'PATCH',
+          url: '/api/v1/users/me/settings',
+          headers,
+          payload: { settings: { dashboardConfig: { readingGoal: 24 } } },
+        });
+        expect(legacySave.statusCode).toBe(200);
+        expect(legacySave.json().settings.dashboardConfig.readingGoal).toBe(24);
+        expect(legacySave.json().settings.dashboardShelfConfig).toBeUndefined();
+      },
+      15_000,
+    );
+
+    it('persists opt-in shelves across sessions, preserves them through legacy saves, and isolates accounts', async () => {
+      const owner = await createLocalUser(context.db);
+      const session = await login(context.app, owner.username, owner.password);
+      const shelfConfig = {
+        syncAcrossSessions: true,
+        shelfLayout: 'two-columns',
+        scrollers: [{ id: '1', type: 'random', label: 'Discover Something New', enabled: true, order: 1, limit: 20, rows: 2 }],
+      };
+      const save = await context.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/users/me/settings',
+        headers: { authorization: `Bearer ${session.accessToken}` },
+        payload: { settings: { dashboardShelfConfig: shelfConfig } },
+      });
+      expect(save.statusCode).toBe(200);
+
+      const legacySave = await context.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/users/me/settings',
+        headers: { authorization: `Bearer ${session.accessToken}` },
+        payload: { settings: { dashboardConfig: { readingGoal: 24, widgets: [], libraryIds: [1] } } },
+      });
+      expect(legacySave.statusCode).toBe(200);
+      expect(legacySave.json().settings.dashboardShelfConfig).toEqual(shelfConfig);
+
+      const fresh = await login(context.app, owner.username, owner.password);
+      const me = await context.app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/me',
+        headers: { authorization: `Bearer ${fresh.accessToken}` },
+      });
+      expect(me.statusCode).toBe(200);
+      expect(me.json().settings.dashboardShelfConfig).toEqual(shelfConfig);
+      expect(me.json().settings.dashboardConfig.readingGoal).toBe(24);
+
+      const other = await createLocalUser(context.db);
+      const otherSession = await login(context.app, other.username, other.password);
+      const otherMe = await context.app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/me',
+        headers: { authorization: `Bearer ${otherSession.accessToken}` },
+      });
+      expect(otherMe.statusCode).toBe(200);
+      expect(otherMe.json().settings.dashboardShelfConfig).toBeUndefined();
+
+      const optOut = await context.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/users/me/settings',
+        headers: { authorization: `Bearer ${fresh.accessToken}` },
+        payload: { settings: { dashboardShelfConfig: { ...shelfConfig, syncAcrossSessions: false } } },
+      });
+      expect(optOut.statusCode).toBe(200);
+      expect(optOut.json().settings.dashboardShelfConfig.syncAcrossSessions).toBe(false);
+      expect(optOut.json().settings.dashboardConfig.readingGoal).toBe(24);
+    }, 15_000);
   });
 
   describe('login lockout', () => {

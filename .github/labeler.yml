@@ -19,6 +19,9 @@ ci:
   - changed-files:
       - any-glob-to-any-file: ".github/**"
       - any-glob-to-any-file: "scripts/**"
+
+docker:
+  - changed-files:
       - any-glob-to-any-file: "docker/**"
       - any-glob-to-any-file: "Dockerfile"
       - any-glob-to-any-file: "docker-compose*.yml"

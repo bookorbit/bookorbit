@@ -49,16 +49,32 @@ export function formatCompactNumber(value: number): string {
 }
 
 /** Joins values into a locale-aware list: "Audiobooks, Comics, Novels" in English. */
-export function formatList(values: string[]): string {
+function listFormatter(options: Intl.ListFormatOptions): Intl.ListFormat {
   const locale = activeLocale()
-  const options: Intl.ListFormatOptions = { style: 'short', type: 'unit' }
   const key = formatterKey(locale, options)
   let formatter = listFormatters.get(key)
   if (!formatter) {
     formatter = new Intl.ListFormat(locale, options)
     listFormatters.set(key, formatter)
   }
-  return formatter.format(values)
+  return formatter
+}
+
+export function formatList(values: string[]): string {
+  return listFormatter({ style: 'short', type: 'unit' }).format(values)
+}
+
+export interface ListPart {
+  type: 'element' | 'literal'
+  value: string
+}
+
+/**
+ * A sentence-style list ("A, B and C") split into its items and the locale's joining words,
+ * so a template can render each item as a control without hardcoding English separators.
+ */
+export function formatListParts(values: string[]): ListPart[] {
+  return listFormatter({ style: 'long', type: 'conjunction' }).formatToParts(values)
 }
 
 export function formatDate(value: Date | number, options: Intl.DateTimeFormatOptions = {}): string {

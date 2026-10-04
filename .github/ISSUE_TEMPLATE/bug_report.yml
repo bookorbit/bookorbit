@@ -1,7 +1,7 @@
 name: Bug Report
 description: Report a bug in BookOrbit
 title: "[Bug] "
-labels: ["bug"]
+labels: ["bug", "needs-triage"]
 body:
   - type: textarea
     id: description

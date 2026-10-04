@@ -228,7 +228,14 @@ export class UserService {
     return user;
   }
 
-  async updateMySettings(userId: number, dto: UpdateMeSettingsDto) {
+  async updateMySettings(requestingUser: RequestUser, dto: UpdateMeSettingsDto) {
+    if (
+      requestingUser.permissions.includes(Permission.DemoRestricted) &&
+      Object.prototype.hasOwnProperty.call(dto.settings, 'dashboardShelfConfig')
+    ) {
+      throw new ForbiddenException('Demo-restricted account cannot change dashboard shelf sync settings');
+    }
+    const userId = requestingUser.id;
     // Settings are merged server-side, so the stored row is the only place the outgoing
     // timezone still exists. Read only when this write is the one that can replace it.
     const touchesTimeZone = Object.prototype.hasOwnProperty.call(dto.settings, 'timezone');

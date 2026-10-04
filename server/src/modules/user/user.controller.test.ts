@@ -67,9 +67,10 @@ describe('UserController', () => {
     const settings = { dashboardConfig: { readingGoal: 12 } };
     userService.updateMySettings.mockResolvedValue({ id: 7, settings });
 
-    const result = await controller.updateMySettings({ id: 7 } as any, { settings } as any);
+    const user = { id: 7, permissions: [] } as any;
+    const result = await controller.updateMySettings(user, { settings } as any);
 
-    expect(userService.updateMySettings).toHaveBeenCalledWith(7, { settings });
+    expect(userService.updateMySettings).toHaveBeenCalledWith(user, { settings });
     expect(result).toEqual({ id: 7, settings });
   });
 

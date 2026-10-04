@@ -2479,7 +2479,58 @@
           "noLanguage": "No language",
           "noPublisher": "No publisher"
         },
-        "unknownModifier": "Unknown modifier \"{modifier}\". It will be ignored, leaving the value unchanged."
+        "unknownModifier": "Unknown modifier \"{modifier}\". It will be ignored, leaving the value unchanged.",
+        "rulesNav": "Naming rules",
+        "railFoot": "A library without a pattern of its own follows the default it sits under.",
+        "usedBy": "Used by {libraries}",
+        "followsBase": "Follows the {base}.",
+        "copyPattern": "Copy pattern",
+        "recipes": "Recipes",
+        "recipesTitle": "Start from a recipe",
+        "recipesReplace": "Replaces the whole pattern",
+        "recipeInUse": "In use",
+        "insert": "Insert",
+        "insertToolbar": "Insert into the pattern",
+        "insertOptional": "Optional",
+        "insertFallback": "Fallback",
+        "insertFolder": "Folder",
+        "lineHint": "Press {enter} to start a new folder or type {brace} to pick a token. Click a folder icon to skip that folder when its value is missing.",
+        "downloadLineHint": "Downloads have no folders, so only the last part of the pattern is used.",
+        "tokenSuggestions": "Matching tokens",
+        "noTokenMatch": "No token matches \"{query}\".",
+        "uploadedNameKept": "Uploaded filename kept",
+        "level": {
+          "folder": "Folder {n}",
+          "bookFolder": "Book folder",
+          "file": "File name",
+          "skipWhenEmpty": "Skip {level} when its value is missing",
+          "skippedWhenEmpty": "Skipped when its value is missing. Click to always create this folder.",
+          "alwaysCreated": "Always created. Click to skip this folder when its value is missing."
+        },
+        "result": "Result",
+        "previewWith": "Preview with",
+        "previewWithAria": "Preview with {title}",
+        "previewBook": {
+          "sample": "Sample book",
+          "longTitle": "Long title and series",
+          "longSubtitle": "Long subtitle",
+          "manyAuthors": "Five authors",
+          "audiobook": "Audiobook",
+          "standalone": "No series"
+        },
+        "previewingCase": "Previewing: {case}",
+        "showComplete": "Show complete",
+        "previewStale": "The preview catches up once the pattern is fixed.",
+        "noChange": "No change",
+        "tagSkipped": "skipped",
+        "tagFallback": "fallback",
+        "tagBookFolder": "book folder",
+        "tagUploadedName": "uploaded name",
+        "tagShortened": "shortened to 255 bytes",
+        "tagEmptyName": "empty name",
+        "levelSkipped": "Skipped because {token} is empty",
+        "levelEmptyName": "Empty folder name. Give this folder a fallback so it always has one.",
+        "renameNote": "Books already on disk keep their paths. Libraries that rename files apply this pattern the next time a book's details are saved: {libraries}."
       },
       "kobo": {
         "title": "Kobo Sync",
@@ -8115,6 +8166,7 @@
     },
     "settings": {
       "title": "Customize Dashboard",
+      "preferencesTitle": "Dashboard preferences",
       "tabs": {
         "widgets": "Widgets",
         "shelves": "Shelves"
@@ -8151,6 +8203,11 @@
         "twoColumns": "Two columns",
         "twoColumnsDescription": "Show two shelves per row."
       },
+      "shelfSync": {
+        "label": "Sync shelves across sessions",
+        "description": "Save shelf order, visibility, row counts, and layout to your account. When off, shelf settings stay in this browser."
+      },
+      "saveFailed": "Could not save dashboard settings. Check your connection and try again.",
       "libraryScope": {
         "title": "Dashboard libraries",
         "description": "Choose which libraries contribute books and reading data to this dashboard.",

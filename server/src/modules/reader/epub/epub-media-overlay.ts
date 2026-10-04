@@ -110,6 +110,33 @@ function attr(node: unknown, name: string): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+/**
+ * The total narration length every EPUB 3 Media Overlay package must declare, in a
+ * `media:duration` meta that refines nothing. It stands in when a clip cannot be measured:
+ * Storyteller 2.x ends the last clip of each audio track at the track's real length, which can
+ * fall before the clip's start, and one such clip voids the whole clip sum.
+ */
+async function readPackageMediaDurationSeconds(zip: unzipper.CentralDirectory, opfPath: string): Promise<number | null> {
+  const entry = opfPath ? findEpubZipEntry(zip.files, opfPath) : undefined;
+  if (!entry) return null;
+  let doc: Record<string, unknown>;
+  try {
+    doc = smilParser.parse(await entry.buffer()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const pkg = (doc['package'] ?? doc) as Record<string, unknown>;
+  const metadata = pkg['metadata'] as Record<string, unknown> | undefined;
+  for (const meta of toArray(metadata?.meta)) {
+    if (attr(meta, 'property') !== 'media:duration' || attr(meta, 'refines') != null) continue;
+    // fast-xml-parser turns a bare timecount such as "21103.35" into a number.
+    const value = (meta as Record<string, unknown>)['#text'];
+    const seconds = typeof value === 'number' ? value : parseClock(value);
+    if (seconds != null && Number.isFinite(seconds) && seconds > 0) return seconds;
+  }
+  return null;
+}
+
 function splitHrefFragment(href: string): { href: string; fragment: string | null } {
   const [path, fragment] = href.split('#');
   return { href: normalizeEpubZipPath(path), fragment: fragment || null };
@@ -313,7 +340,7 @@ export async function buildEpubMediaOverlayPlaylist(
   return {
     bookId,
     fileId,
-    durationSeconds: hasUnknownDuration ? null : totalKnownDuration,
+    durationSeconds: hasUnknownDuration ? await readPackageMediaDurationSeconds(zip, info.containerPath) : totalKnownDuration,
     items,
     sections,
     resources,

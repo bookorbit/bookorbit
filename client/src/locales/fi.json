@@ -6270,6 +6270,10 @@
         "title": "Valitse kirjasto aloittaaksesi",
         "description": "Valitse yllä oleva kirjasto, jos haluat esikatsella uudelleennimeä muutoksia, suodattaa statuksen mukaan ja käyttää suoritettua massaa.",
         "chooseLibrary": "Valitse Kirjasto"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, one {Nimetäänkö # tiedosto uudelleen levyllä?} other {Nimetäänkö # tiedostoa uudelleen levyllä?}}",
+        "body": "Tämä siirtää todellisia tiedostoja kohteen {library} sisällä. BookOrbit kirjaa jokaisen siirron, mutta kumoaminen tarkoittaa nimien palauttamista."
       }
     },
     "bookDuplicates": {

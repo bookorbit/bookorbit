@@ -1,7 +1,7 @@
 name: Feature Request
 description: Suggest a new feature or improvement for BookOrbit
 title: "[Feature] "
-labels: ["feature"]
+labels: ["feature", "needs-triage"]
 body:
   - type: textarea
     id: description

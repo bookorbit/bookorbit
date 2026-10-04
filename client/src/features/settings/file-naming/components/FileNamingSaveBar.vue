@@ -9,6 +9,8 @@ const props = defineProps<{
   saving: boolean
   /** Set while a dirty rule has a validation error, so Save cannot send a bad pattern. */
   blocked: boolean
+  /** Blocked only by a token still being typed: Save stays off, but nothing is wrong yet. */
+  quiet?: boolean
 }>()
 
 const emit = defineEmits<{ save: []; discard: [] }>()
@@ -31,7 +33,7 @@ function handleDiscard() {
   <div
     class="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border bg-card/90 px-3.5 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-card/75 md:px-5"
   >
-    <p v-if="blocked && dirty" class="flex items-center gap-2 text-sm text-destructive" role="status">
+    <p v-if="blocked && dirty && !quiet" class="flex items-center gap-2 text-sm text-destructive" role="status">
       <span aria-hidden="true" class="size-2 shrink-0 rounded-full bg-destructive" />
       {{ t('settings.reader.fileNaming.save.blocked') }}
     </p>

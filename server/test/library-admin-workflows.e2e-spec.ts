@@ -210,6 +210,98 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
     await closeAuthorizationMatrixE2EContext(ctx);
   });
 
+  it.each([
+    { organizationMode: 'book_per_file', autoScanCronExpression: '0 2 * * *', watch: true, fileWriteEnabled: true },
+    { organizationMode: 'book_per_folder', autoScanCronExpression: null, watch: false, fileWriteEnabled: false },
+  ])('returns saved library summary settings to non-superusers: $organizationMode', async (savedSettings) => {
+    const library = await createLibraryWithFolder(ctx);
+    const hiddenLibrary = await createLibraryWithFolder(ctx);
+    await ctx.db.update(schema.libraries).set(savedSettings).where(eq(schema.libraries.id, library.libraryId));
+    await grantLibraryAccess(ctx, manager.userId, library.libraryId, 'viewer');
+
+    const detailResponse = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/libraries/${library.libraryId}`,
+      headers: authHeader(manager.accessToken),
+    });
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json()).toMatchObject(savedSettings);
+
+    const superuserResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/libraries',
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(superuserResponse.statusCode).toBe(200);
+    const superuserLibraries = superuserResponse.json() as Array<{ id: number }>;
+    expect(superuserLibraries.find(({ id }) => id === library.libraryId)).toMatchObject(savedSettings);
+
+    const scopedResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/libraries',
+      headers: authHeader(manager.accessToken),
+    });
+    expect(scopedResponse.statusCode).toBe(200);
+    const scopedLibraries = scopedResponse.json() as Array<{ id: number }>;
+    expect(scopedLibraries.map(({ id }) => id)).not.toContain(hiddenLibrary.libraryId);
+    expect(scopedLibraries.find(({ id }) => id === library.libraryId)).toMatchObject({
+      ...savedSettings,
+      accessLevel: 'viewer',
+    });
+  });
+
+  it('does not grant management or file-write actions to viewers who can read automation settings', async () => {
+    const library = await createLibraryWithFolder(ctx);
+    const savedSettings = { watch: true, autoScanCronExpression: '0 2 * * *', fileWriteEnabled: true };
+    await ctx.db.update(schema.libraries).set(savedSettings).where(eq(schema.libraries.id, library.libraryId));
+    await grantLibraryAccess(ctx, scopedUser.userId, library.libraryId, 'viewer');
+
+    const listResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/libraries',
+      headers: authHeader(scopedUser.accessToken),
+    });
+    expect(listResponse.statusCode).toBe(200);
+    const visibleLibraries = listResponse.json() as Array<{ id: number }>;
+    expect(visibleLibraries.find(({ id }) => id === library.libraryId)).toMatchObject(savedSettings);
+
+    for (const payload of [{ watch: false }, { autoScanCronExpression: null }, { fileWriteEnabled: false }]) {
+      const response = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(scopedUser.accessToken),
+        payload,
+      });
+      expectError(response, 403, 'Missing permission: manage_libraries');
+    }
+
+    for (const action of ['scan', 'refresh-covers']) {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/scanner/libraries/${library.libraryId}/${action}`,
+        headers: authHeader(scopedUser.accessToken),
+      });
+      expectError(response, 403, 'Missing permission: manage_libraries');
+    }
+
+    const writeUrl = `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`;
+    expectError(
+      await ctx.app.inject({ method: 'POST', url: writeUrl, headers: authHeader(scopedUser.accessToken) }),
+      403,
+      'Missing permission: library_edit_metadata',
+    );
+    const metadataEditor = await createUserAndLogin(ctx, { permissions: [Permission.LibraryEditMetadata] });
+    await grantLibraryAccess(ctx, metadataEditor.userId, library.libraryId, 'viewer');
+    expectError(
+      await ctx.app.inject({ method: 'POST', url: writeUrl, headers: authHeader(metadataEditor.accessToken) }),
+      403,
+      'Insufficient library access level',
+    );
+
+    const [storedLibrary] = await ctx.db.select().from(schema.libraries).where(eq(schema.libraries.id, library.libraryId));
+    expect(storedLibrary).toMatchObject(savedSettings);
+  });
+
   describe('date added recompute', () => {
     async function finishRecompute(libraryId: number): Promise<AddedAtRecomputeJob> {
       let result: AddedAtRecomputeJob;

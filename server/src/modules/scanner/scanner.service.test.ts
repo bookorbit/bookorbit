@@ -2,6 +2,10 @@ vi.mock('./lib/walk');
 vi.mock('./lib/hash');
 vi.mock('../../common/utils/fs-stability.utils', () => ({ waitForStability: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../common/utils/path-identity.utils', () => ({ pathsReferToSameEntry: vi.fn() }));
+vi.mock('../reader/epub/epub-media-overlay-capability', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../reader/epub/epub-media-overlay-capability')>();
+  return { ...actual, inspectEpubMediaOverlayFields: vi.fn(actual.inspectEpubMediaOverlayFields) };
+});
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>();
   return {
@@ -26,6 +30,7 @@ import type { BookCandidate, FileStat } from './lib/walk';
 import { findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate } from './lib/walk';
 import { computeFileHash } from './lib/hash';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
+import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
 import * as assembleBookCardsModule from '../book/utils/assemble-book-cards';
 
 const mockFindCandidates = findBookCandidates as MockedFunction<typeof findBookCandidates>;
@@ -33,6 +38,7 @@ const mockFindLooseCandidates = findLooseFileCandidates as MockedFunction<typeof
 const mockBuildSingleCandidate = buildSingleBookCandidate as MockedFunction<typeof buildSingleBookCandidate>;
 const mockFingerprint = computeFileHash as MockedFunction<typeof computeFileHash>;
 const mockPathsReferToSameEntry = pathsReferToSameEntry as MockedFunction<typeof pathsReferToSameEntry>;
+const mockInspectMediaOverlayFields = vi.mocked(inspectEpubMediaOverlayFields);
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockStat = stat as MockedFunction<typeof stat>;
 
@@ -2276,6 +2282,100 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
     }
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledOnce();
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('unchecked read-along EPUBs in unchanged folders', () => {
+  const READ_ALONG = '/library/Author/Book/readaloud.epub';
+  const MEASURED = {
+    mediaOverlayAvailable: true,
+    mediaOverlayDurationSeconds: 21103.35,
+    mediaOverlayCheckedAt: new Date('2026-10-01T00:00:00.000Z'),
+  };
+
+  async function scanUnchangedFolder(files: ReturnType<typeof makeBookFile>[], repoOverrides: Record<string, unknown> = {}) {
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue(files),
+      ...repoOverrides,
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(['/library/Author/Book']),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+    return repo;
+  }
+
+  function readAlongFile(overrides: Record<string, unknown> = {}) {
+    return makeBookFile({
+      id: 7,
+      absolutePath: READ_ALONG,
+      relPath: 'Author/Book/readaloud.epub',
+      durationSeconds: null,
+      mediaOverlayAvailable: true,
+      mediaOverlayDurationSeconds: null,
+      mediaOverlayCheckedAt: null,
+      ...overrides,
+    });
+  }
+
+  it('measures a read-along EPUB whose check was cleared, even though the incremental scan skips its folder', async () => {
+    mockInspectMediaOverlayFields.mockResolvedValueOnce(MEASURED);
+
+    const repo = await scanUnchangedFolder([readAlongFile()]);
+
+    expect(mockInspectMediaOverlayFields).toHaveBeenCalledOnce();
+    expect(mockInspectMediaOverlayFields).toHaveBeenCalledWith(READ_ALONG, 'epub', expect.any(Function));
+    expect(repo.updateBookFile).toHaveBeenCalledWith(7, MEASURED);
+    expect(repo.completeScanJob).toHaveBeenCalled();
+  });
+
+  it('leaves checked read-along EPUBs, never-checked plain EPUBs and other formats unopened', async () => {
+    await scanUnchangedFolder([
+      readAlongFile({ mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') }),
+      makeBookFile({ id: 8, absolutePath: '/library/Author/Book/plain.epub', mediaOverlayAvailable: false, mediaOverlayCheckedAt: null }),
+      makeBookFile({ id: 9, absolutePath: '/library/Author/Book/book.m4b', format: 'm4b', mediaOverlayAvailable: true, mediaOverlayCheckedAt: null }),
+    ]);
+
+    expect(mockInspectMediaOverlayFields).not.toHaveBeenCalled();
+  });
+
+  it('leaves a read-along EPUB outside the unchanged folders to the regular scan', async () => {
+    await scanUnchangedFolder([readAlongFile({ bookId: 2, absolutePath: '/library/Other/Book/readaloud.epub' })]);
+
+    expect(mockInspectMediaOverlayFields).not.toHaveBeenCalled();
+  });
+
+  it('does not demote a read-along EPUB the repair cannot read', async () => {
+    mockInspectMediaOverlayFields.mockResolvedValueOnce({
+      mediaOverlayAvailable: false,
+      mediaOverlayDurationSeconds: null,
+      mediaOverlayCheckedAt: new Date('2026-10-01T00:00:00.000Z'),
+    });
+
+    const repo = await scanUnchangedFolder([readAlongFile()]);
+
+    expect(mockInspectMediaOverlayFields).toHaveBeenCalledOnce();
+    expect(repo.updateBookFile).not.toHaveBeenCalled();
+  });
+
+  it('finishes the scan when storing a repaired capability fails', async () => {
+    mockInspectMediaOverlayFields.mockResolvedValueOnce(MEASURED);
+
+    const repo = await scanUnchangedFolder([readAlongFile()], { updateBookFile: vi.fn().mockRejectedValue(new Error('connection reset')) });
+
+    expect(repo.completeScanJob).toHaveBeenCalled();
+    expect(repo.failScanJob).not.toHaveBeenCalled();
+    expect(Logger.prototype.warn).toHaveBeenCalledWith(expect.stringContaining('[scanner.media_overlay_repair] [fail] fileId=7'));
   });
 });
 

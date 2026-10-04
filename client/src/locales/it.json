@@ -6243,7 +6243,7 @@
         }
       },
       "readingLog": {
-        "resetReadingState": "Reimposta stato di lettura",
+        "resetReadingState": "Resetta stato di lettura",
         "vitals": {
           "aria": "Riepilogo lettura",
           "notSet": "Non impostato",

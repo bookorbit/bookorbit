@@ -315,23 +315,6 @@ describe('saving', () => {
   })
 })
 
-describe('filtering', () => {
-  it('narrows the rule list to names matching the query', async () => {
-    libraries.value = [makeLibrary(), makeLibrary({ id: 2, name: 'Comics' })]
-    const rules = await loaded()
-    rules.query.value = 'comic'
-
-    expect(rules.visibleRules.value.map((rule) => rule.id)).toEqual(['library:2'])
-  })
-
-  it('matches global rules by their translated name', async () => {
-    const rules = await loaded()
-    rules.query.value = 'download'
-
-    expect(rules.visibleRules.value.map((rule) => rule.id)).toEqual(['global:download'])
-  })
-})
-
 describe('cross-platform sanitization', () => {
   it('reads the stored value on load', async () => {
     apiMock.mockImplementation((input, init) => {

@@ -8,6 +8,7 @@ import { formatList } from '@/i18n/formatters'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { DEFAULT_SCROLLERS, SCROLLER_LABELS, SHELF_LAYOUT, useDashboardConfig, type DashboardShelfLayout } from '../composables/useDashboardConfig'
 import { SHELF_ROW_OPTIONS } from '../lib/shelf-rows'
 import { useDashboardLabels } from '../composables/useDashboardLabels'
@@ -18,8 +19,9 @@ const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [] }>()
 
 const { t } = useI18n()
+const { isDemoRestrictedAccount } = usePermissions()
 
-const { scrollers, shelfLayout, saveShelfSettings, MAX_SCROLLERS } = useDashboardConfig()
+const { scrollers, shelfLayout, syncAcrossSessions, saveShelfSettings, MAX_SCROLLERS } = useDashboardConfig()
 const { widgets, libraryIds, saveWidgets, saveLibraryScope, DEFAULT_WIDGETS } = useDashboardWidgets()
 const { smartScopes, fetchSmartScopes } = useSmartScopes()
 const { libraries, fetchLibraries } = useLibraries()
@@ -28,10 +30,12 @@ const { widgetName, shelfTypeName } = useDashboardLabels()
 const activeTab = ref<'widgets' | 'shelves'>('shelves')
 const draft = ref<ScrollerConfig[]>([])
 const shelfLayoutDraft = ref<DashboardShelfLayout>(SHELF_LAYOUT.WIDE)
+const syncShelvesDraft = ref(false)
 const widgetDraft = ref<WidgetConfig[]>([])
 const libraryIdsDraft = ref<number[] | null>(null)
 const libraryScopeOpen = ref(false)
 const saving = ref(false)
+const saveError = ref(false)
 const bookLibraries = computed(() => libraries.value)
 const accessibleLibraryIds = computed(() => new Set(bookLibraries.value.map((library) => library.id)))
 const selectedAccessibleLibraryIds = computed<number[] | null>(() =>
@@ -55,6 +59,8 @@ watch(
     if (isOpen) {
       draft.value = (Array.isArray(scrollers.value) ? scrollers.value : DEFAULT_SCROLLERS).map((s) => ({ ...s }))
       shelfLayoutDraft.value = shelfLayout.value
+      syncShelvesDraft.value = syncAcrossSessions.value
+      saveError.value = false
       widgetDraft.value = widgets.value.map((w) => ({ ...w }))
       libraryIdsDraft.value = libraryIds.value ? [...libraryIds.value] : null
       libraryScopeOpen.value = false
@@ -107,6 +113,14 @@ function setShelfRows(scroller: ScrollerConfig, rows: number) {
   scroller.rows = rows
 }
 
+function toggleShelf(scroller: ScrollerConfig) {
+  scroller.enabled = !scroller.enabled
+}
+
+function toggleWidget(widget: WidgetConfig) {
+  widget.enabled = !widget.enabled
+}
+
 function removeScroller(index: number) {
   if (draft.value.length <= 1) return
   draft.value.splice(index, 1)
@@ -147,8 +161,8 @@ function handleLibraryChange(libraryId: number, event: Event) {
 
 // ── Save / Reset / Close ─────────────────────────────────────
 async function saveShelves() {
-  saveShelfSettings(draft.value, shelfLayoutDraft.value)
   await saveLibraryScope(selectedAccessibleLibraryIds.value)
+  await saveShelfSettings(draft.value, shelfLayoutDraft.value, syncShelvesDraft.value)
 }
 
 function selectWideShelfLayout() {
@@ -161,6 +175,9 @@ function selectTwoColumnShelfLayout() {
 
 async function saveWidgetSettings() {
   await saveWidgets(widgetDraft.value, selectedAccessibleLibraryIds.value)
+  if (syncShelvesDraft.value !== syncAcrossSessions.value) {
+    await saveShelfSettings(scrollers.value, shelfLayout.value, syncShelvesDraft.value)
+  }
 }
 
 async function handleSave() {
@@ -169,11 +186,14 @@ async function handleSave() {
     return
   }
   saving.value = true
+  saveError.value = false
   try {
     if (activeTab.value === 'widgets') await saveWidgetSettings()
     else await saveShelves()
     emit('saved')
     emit('update:open', false)
+  } catch {
+    saveError.value = true
   } finally {
     saving.value = false
   }
@@ -187,10 +207,26 @@ function resetToDefault() {
     shelfLayoutDraft.value = SHELF_LAYOUT.WIDE
   }
 }
+
+function selectShelvesTab() {
+  activeTab.value = 'shelves'
+}
+
+function selectWidgetsTab() {
+  activeTab.value = 'widgets'
+}
+
+function handleOpenChange(open: boolean) {
+  emit('update:open', open)
+}
+
+function handleCancel() {
+  emit('update:open', false)
+}
 </script>
 
 <template>
-  <Sheet :open="open" @update:open="emit('update:open', $event)">
+  <Sheet :open="open" @update:open="handleOpenChange">
     <!-- SheetContent defaults to sm:max-w-sm; the override has to match that variant to win in tailwind-merge. -->
     <SheetContent side="right" class="flex w-[90vw] flex-col gap-0 p-0 sm:max-w-[480px]">
       <!-- Header -->
@@ -206,7 +242,7 @@ function resetToDefault() {
               'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
               activeTab === 'shelves' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
             ]"
-            @click="activeTab = 'shelves'"
+            @click="selectShelvesTab"
           >
             {{ t('dashboard.settings.tabs.shelves') }}
           </button>
@@ -215,7 +251,7 @@ function resetToDefault() {
               'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
               activeTab === 'widgets' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
             ]"
-            @click="activeTab = 'widgets'"
+            @click="selectWidgetsTab"
           >
             {{ t('dashboard.settings.tabs.widgets') }}
           </button>
@@ -233,7 +269,7 @@ function resetToDefault() {
             @click="toggleLibraryScope"
           >
             <span class="min-w-0 grow">
-              <span class="block text-sm font-medium text-foreground">{{ t('dashboard.settings.libraryScope.title') }}</span>
+              <span class="block text-sm font-medium text-foreground">{{ t('dashboard.settings.preferencesTitle') }}</span>
               <span class="mt-0.5 block truncate text-xs text-muted-foreground">{{ librarySelectionSummary }}</span>
             </span>
             <ChevronDown
@@ -272,6 +308,20 @@ function resetToDefault() {
                 </label>
               </div>
             </div>
+            <label v-if="!isDemoRestrictedAccount" class="mt-3 flex cursor-pointer items-start gap-3 border-t border-border px-2 pt-3">
+              <input
+                v-model="syncShelvesDraft"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-describedby="dashboard-shelf-sync-description"
+              />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-foreground">{{ t('dashboard.settings.shelfSync.label') }}</span>
+                <span id="dashboard-shelf-sync-description" class="mt-1 block text-xs text-muted-foreground">{{
+                  t('dashboard.settings.shelfSync.description')
+                }}</span>
+              </span>
+            </label>
           </fieldset>
           <p v-if="!hasValidLibrarySelection" role="alert" class="border-t border-border px-3 py-2 text-xs text-destructive">
             {{ t('dashboard.settings.libraryScope.required') }}
@@ -366,7 +416,7 @@ function resetToDefault() {
                 <button
                   class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
                   :class="scroller.enabled ? 'bg-primary' : 'bg-muted'"
-                  @click="scroller.enabled = !scroller.enabled"
+                  @click="toggleShelf(scroller)"
                 >
                   <span
                     class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200"
@@ -491,7 +541,7 @@ function resetToDefault() {
                 <button
                   class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
                   :class="widget.enabled ? 'bg-primary' : 'bg-muted'"
-                  @click="widget.enabled = !widget.enabled"
+                  @click="toggleWidget(widget)"
                 >
                   <span
                     class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200"
@@ -507,6 +557,7 @@ function resetToDefault() {
       </div>
 
       <!-- Footer -->
+      <p v-if="saveError" role="alert" class="border-t border-border px-5 py-3 text-sm text-destructive">{{ t('dashboard.settings.saveFailed') }}</p>
       <div class="flex items-center justify-between border-t border-border px-5 py-4">
         <button class="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground" @click="resetToDefault">
           <RotateCcw :size="13" />
@@ -515,7 +566,7 @@ function resetToDefault() {
         <div class="flex items-center gap-2">
           <button
             class="h-8 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            @click="emit('update:open', false)"
+            @click="handleCancel"
           >
             {{ t('common.cancel') }}
           </button>

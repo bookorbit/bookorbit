@@ -74,7 +74,7 @@ describe('LibraryRepository', () => {
     expect(where).toHaveBeenCalledWith({ op: 'eq', left: libraries.type, right: 'books' });
   });
 
-  it('findAllForUser includes file rename eligibility and counts only present books', async () => {
+  it('findAllForUser includes organization and automation settings and counts only present books', async () => {
     const orderBy = vi.fn().mockResolvedValue([]);
     const groupBy = vi.fn().mockReturnValue({ orderBy });
     const where = vi.fn().mockReturnValue({ groupBy });
@@ -87,6 +87,10 @@ describe('LibraryRepository', () => {
 
     expect(db.select).toHaveBeenCalledWith(
       expect.objectContaining({
+        organizationMode: libraries.organizationMode,
+        autoScanCronExpression: libraries.autoScanCronExpression,
+        watch: libraries.watch,
+        fileWriteEnabled: libraries.fileWriteEnabled,
         fileRenameEnabled: libraries.fileRenameEnabled,
       }),
     );

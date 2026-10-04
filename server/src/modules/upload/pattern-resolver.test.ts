@@ -7,6 +7,7 @@ import {
   MAX_PATH_SEGMENT_BYTES,
   replacePlaceholders,
   resolveDownloadFilename,
+  resolvePlaceholders,
   resolveUploadPath,
   sanitizePathSegment,
   validatePattern,
@@ -340,6 +341,34 @@ describe('replacePlaceholders', () => {
     it('decimal series index is preserved', () => {
       expect(replacePlaceholders('<{seriesIndex}. >{title}', DECIMAL_INDEX)).toBe('01.5. Neuromancer');
     });
+  });
+});
+
+describe('resolvePlaceholders', () => {
+  it('resolves to the same text as replacePlaceholders', () => {
+    for (const pattern of [DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE, DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER, '{title}< - {subtitle}>']) {
+      expect(resolvePlaceholders(pattern, PARTIAL).text).toBe(replacePlaceholders(pattern, PARTIAL));
+    }
+  });
+
+  it('reports neither branch when every group fills its primary side', () => {
+    expect(resolvePlaceholders('<{authors}|Unknown>/<{series}/>{title}', FULL)).toEqual({
+      text: 'William Gibson/Sprawl/Neuromancer',
+      usedFallback: false,
+      droppedOptional: false,
+    });
+  });
+
+  it('reports a group that fell back', () => {
+    const result = resolvePlaceholders('<{publisher}|Unknown Publisher>/{title}', PARTIAL);
+
+    expect(result).toEqual({ text: 'Unknown Publisher/Project Hail Mary', usedFallback: true, droppedOptional: false });
+  });
+
+  it('reports a group without a fallback that dropped out', () => {
+    const result = resolvePlaceholders('<{series}/>{title}', PARTIAL);
+
+    expect(result).toEqual({ text: 'Project Hail Mary', usedFallback: false, droppedOptional: true });
   });
 });
 

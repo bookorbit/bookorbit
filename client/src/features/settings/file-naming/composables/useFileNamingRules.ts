@@ -51,7 +51,6 @@ export function useFileNamingRules() {
   const savingCrossPlatformSanitization = ref(false)
 
   const selectedRuleId = ref<NamingRuleId>('global:fileAsBook')
-  const query = ref('')
 
   const globalRules = computed<NamingRule[]>(() => GLOBAL_RULE_KEYS.map(globalRule))
   const libraryRules = computed<NamingRule[]>(() => libraries.value.map(libraryRule))
@@ -110,12 +109,6 @@ export function useFileNamingRules() {
   const dirtyRules = computed(() => rules.value.filter(isDirty))
   const hasUnsavedChanges = computed(() => dirtyRules.value.length > 0)
   const blockedByError = computed(() => dirtyRules.value.some((rule) => errorFor(rule) !== ''))
-
-  const visibleRules = computed(() => {
-    const needle = query.value.trim().toLowerCase()
-    if (!needle) return rules.value
-    return rules.value.filter((rule) => ruleName(rule).toLowerCase().includes(needle))
-  })
 
   function ruleName(rule: NamingRule): string {
     return rule.kind === 'global' ? t(`settings.reader.fileNaming.rule.${rule.globalKey}`) : (rule.library?.name ?? '')
@@ -272,10 +265,8 @@ export function useFileNamingRules() {
     rules,
     globalRules,
     libraryRules,
-    visibleRules,
     selectedRuleId,
     selectedRule,
-    query,
     loading,
     saving,
     crossPlatformSanitizationEnabled,

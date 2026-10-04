@@ -1,27 +1,38 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Info, Loader2 } from '@lucide/vue'
+import { Loader2 } from '@lucide/vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import NamingRuleRail, { type RailItem } from './file-naming/components/NamingRuleRail.vue'
-import NamingRuleEditor from './file-naming/components/NamingRuleEditor.vue'
-import NamingResultPanel from './file-naming/components/NamingResultPanel.vue'
+import NamingRuleRail, { type RailGroup, type RailItem } from './file-naming/components/NamingRuleRail.vue'
+import NamingRuleEditor, { type RuleLink } from './file-naming/components/NamingRuleEditor.vue'
 import FileNamingSaveBar from './file-naming/components/FileNamingSaveBar.vue'
 import PatternExamplesSheet from './file-naming/components/PatternExamplesSheet.vue'
 import { useDebouncedPatternPreview } from './composables/useDebouncedPatternPreview'
 import { useFileNamingRules } from './file-naming/composables/useFileNamingRules'
-import { GLOBAL_RULE_ICONS, globalKeyForMode, librariesGovernedBy, type NamingRule, type NamingRuleId } from './file-naming/lib/naming-rules'
+import {
+  GLOBAL_RULE_ICONS,
+  globalKeyForMode,
+  globalRule,
+  librariesGovernedBy,
+  type NamingRule,
+  type NamingRuleId,
+} from './file-naming/lib/naming-rules'
+import type { PreviewBookId } from './file-naming/lib/preview-books'
+import type { PreviewCaseId } from './file-naming/lib/pattern-preview'
+import { findUnbalancedDelimiter } from './file-naming/lib/pattern-highlight'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const { t } = useI18n()
+const { hasPermission } = usePermissions()
 
 const {
   libraries,
-  visibleRules,
+  rules,
   selectedRuleId,
   selectedRule,
-  query,
   loading,
   saving,
   crossPlatformSanitizationEnabled,
@@ -45,8 +56,11 @@ const {
 } = useFileNamingRules()
 
 const helpOpen = ref(false)
-/** Below md the rail and the editor are separate screens, so one of them is showing. */
+/** Below the two-column width the rail and the editor are separate screens, so one of them is showing. */
 const mobileView = ref<'rail' | 'editor'>('rail')
+/** Kept across rules, so a long title chosen to test one pattern can test the next one too. */
+const previewBookId = ref<PreviewBookId>('sample')
+const caseId = ref<PreviewCaseId>('complete')
 
 const EDITOR_ID = 'file-naming-editor'
 
@@ -54,13 +68,9 @@ onMounted(() => {
   void load()
 })
 
-// A filter that hides the selected rule would leave the editor showing something the
-// rail no longer lists, so follow the filter down to the first surviving rule.
-watch(visibleRules, (rules) => {
-  if (rules.length === 0) return
-  if (rules.some((rule) => rule.id === selectedRuleId.value)) return
-  const first = rules[0]
-  if (first) selectedRuleId.value = first.id
+// A missing-metadata case belongs to the rule it was opened on.
+watch(selectedRuleId, () => {
+  caseId.value = 'complete'
 })
 
 function ruleIcon(rule: NamingRule): string {
@@ -68,74 +78,93 @@ function ruleIcon(rule: NamingRule): string {
   return rule.library?.icon || 'FolderOpen'
 }
 
-// A library's organization mode decides which global default it falls back to, which is
-// the fact that matters on this page; a book count would not tell the reader anything here.
-function railDetail(rule: NamingRule): string {
-  if (rule.kind === 'library') {
-    return rule.organizationMode === 'book_per_folder'
-      ? t('settings.reader.fileNaming.orgFolderAsBook')
-      : t('settings.reader.fileNaming.orgFileAsBook')
-  }
-  if (rule.globalKey === 'download') return t('settings.reader.fileNaming.downloadScope')
-  const governed = librariesGovernedBy(rule, libraries.value, overriddenLibraryIds.value).length
-  return t('settings.reader.fileNaming.appliesToLibraries', { count: governed })
-}
-
 function toRailItem(rule: NamingRule): RailItem {
   return {
     id: rule.id,
     name: ruleName(rule),
-    detail: railDetail(rule),
     icon: ruleIcon(rule),
     custom: rule.kind === 'library' && !isInherited(rule),
     dirty: isDirty(rule),
   }
 }
 
-const railGlobals = computed(() => visibleRules.value.filter((rule) => rule.kind === 'global').map(toRailItem))
-const railLibraries = computed(() => visibleRules.value.filter((rule) => rule.kind === 'library').map(toRailItem))
+/** Each library sits under the default for its organization mode, whether or not it overrides it. */
+const railGroups = computed<RailGroup[]>(() =>
+  rules.value
+    .filter((rule) => rule.kind === 'global')
+    .map((rule) => ({
+      rule: toRailItem(rule),
+      libraries: rules.value
+        .filter((entry) => entry.kind === 'library' && rule.target === 'upload' && entry.organizationMode === rule.organizationMode)
+        .map(toRailItem),
+      separate: rule.target === 'download',
+    })),
+)
 
 const activePattern = computed(() => (selectedRule.value ? effectivePattern(selectedRule.value) : ''))
 const activeName = computed(() => (selectedRule.value ? ruleName(selectedRule.value) : ''))
 const activeInherited = computed(() => (selectedRule.value ? isInherited(selectedRule.value) : false))
-const activeError = computed(() => (selectedRule.value ? errorFor(selectedRule.value) : ''))
+/** Set while the field is completing a token, whose open brace is unfinished rather than wrong. */
+const completingToken = ref(false)
+const completingOnly = computed(() => completingToken.value && findUnbalancedDelimiter(activePattern.value) === '{')
+const activeError = computed(() => (selectedRule.value && !completingOnly.value ? errorFor(selectedRule.value) : ''))
+/** The save bar stays calm only when the token being typed is the sole thing blocking Save. */
+const quietSaveBar = computed(
+  () => completingOnly.value && !dirtyRules.value.some((rule) => rule.id !== selectedRuleId.value && errorFor(rule) !== ''),
+)
 
-// The result panel resolves the pattern four times over. Phones cannot do that per
+// The result panel resolves the pattern several times over. Phones cannot do that per
 // keystroke without the on-screen keyboard stuttering, so the preview trails the field
 // there and stays in lockstep on desktop.
 const previewPattern = useDebouncedPatternPreview(activePattern)
 
-/** The global rule a library falls back to, named so the copy can point at it. */
-const inheritedFromName = computed(() => {
+const usedBy = computed<RuleLink[]>(() => {
   const rule = selectedRule.value
-  if (!rule || rule.kind !== 'library') return ''
-  return t(
-    `settings.reader.fileNaming.rule.${globalKeyForMode(rule.organizationMode ?? 'book_per_file')}` as 'settings.reader.fileNaming.rule.fileAsBook',
-  )
+  if (!rule || rule.kind !== 'global') return []
+  return librariesGovernedBy(rule, libraries.value, overriddenLibraryIds.value).map((library) => ({
+    id: `library:${library.id}` as const,
+    name: library.name,
+  }))
 })
 
-/** One line under the field saying exactly what this pattern governs today. */
-const scopeSummary = computed(() => {
+const base = computed<RuleLink | null>(() => {
   const rule = selectedRule.value
-  if (!rule) return ''
-  if (rule.kind === 'library') return t('settings.reader.fileNaming.scopeLibrary', { name: rule.library?.name ?? '' })
-  if (rule.globalKey === 'download') return t('settings.reader.fileNaming.scopeDownload')
-  const governed = librariesGovernedBy(rule, libraries.value, overriddenLibraryIds.value).length
-  if (governed === 0) return t('settings.reader.fileNaming.scopeGlobalNone')
-  return t('settings.reader.fileNaming.scopeGlobal', { count: governed })
+  if (!rule || rule.kind !== 'library') return null
+  const key = globalKeyForMode(rule.organizationMode ?? 'book_per_file')
+  return { id: `global:${key}`, name: ruleName(globalRule(key)) }
 })
+
+/** Libraries whose files this pattern renames on the next save of a book's details. */
+const renamingLibraries = computed<string[]>(() => {
+  const rule = selectedRule.value
+  if (!rule || rule.target !== 'upload') return []
+  if (rule.kind === 'library') return rule.library?.fileRenameEnabled ? [rule.library.name] : []
+  return librariesGovernedBy(rule, libraries.value, overriddenLibraryIds.value)
+    .filter((library) => library.fileRenameEnabled)
+    .map((library) => library.name)
+})
+
+const canBulkRename = computed(() => hasPermission('manage_libraries'))
+
+function handleCompleting(value: boolean) {
+  completingToken.value = value
+}
 
 function handleSelect(id: NamingRuleId) {
   selectedRuleId.value = id
   mobileView.value = 'editor'
 }
 
-function handleQuery(value: string) {
-  query.value = value
-}
-
 function handlePattern(value: string) {
   if (selectedRule.value) setDraft(selectedRule.value, value)
+}
+
+function handlePreviewBook(value: PreviewBookId) {
+  previewBookId.value = value
+}
+
+function handleCase(value: PreviewCaseId) {
+  caseId.value = value
 }
 
 function handleAddOverride() {
@@ -176,7 +205,7 @@ function handleSanitize(value: boolean) {
 </script>
 
 <template>
-  <div class="space-y-4 pb-16">
+  <div class="@container/naming space-y-4 pb-16">
     <SettingsPageHeader
       v-if="!props.embedded"
       class="hidden md:flex"
@@ -194,71 +223,71 @@ function handleSanitize(value: boolean) {
     </div>
 
     <template v-else>
-      <div class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
-        <div class="md:grid md:grid-cols-[17.5rem_minmax(0,1fr)] md:items-stretch">
+      <div class="rounded-lg border border-border bg-card shadow-xs">
+        <div class="overflow-clip rounded-lg @2xl/naming:grid @2xl/naming:grid-cols-[15.5rem_minmax(0,1fr)] @2xl/naming:items-stretch">
           <NamingRuleRail
-            :class="mobileView === 'editor' ? 'hidden md:flex' : 'flex'"
-            :globals="railGlobals"
-            :libraries="railLibraries"
-            :libraries-total="libraries.length"
-            :custom-count="overriddenLibraryIds.size"
+            :class="mobileView === 'editor' ? 'hidden @2xl/naming:flex' : 'flex'"
+            :groups="railGroups"
             :selected-id="selectedRuleId"
-            :query="query"
             :editor-id="EDITOR_ID"
             @select="handleSelect"
-            @update:query="handleQuery"
           />
 
-          <div :id="EDITOR_ID" :class="mobileView === 'rail' ? 'hidden md:block' : 'block'">
-            <div v-if="selectedRule" class="xl:grid xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-start">
-              <NamingRuleEditor
-                :rule="selectedRule"
-                :name="activeName"
-                :icon="ruleIcon(selectedRule)"
-                :pattern="activePattern"
-                :inherited="activeInherited"
-                :dirty="isDirty(selectedRule)"
-                :error="activeError"
-                :scope-summary="scopeSummary"
-                :inherited-from-name="inheritedFromName"
-                :sanitize="crossPlatformSanitizationEnabled"
-                @update:pattern="handlePattern"
-                @add-override="handleAddOverride"
-                @remove-override="handleRemoveOverride"
-                @reset-to-shipped="handleResetToShipped"
-                @open-help="openHelp"
-                @back="handleBack"
-              />
-
-              <div class="px-3.5 pb-4 md:px-5 xl:sticky xl:top-4 xl:self-start xl:border-l xl:border-border xl:px-4 xl:pt-4">
-                <NamingResultPanel
-                  :pattern="previewPattern"
-                  :target="selectedRule.target"
-                  :rule-name="activeName"
-                  :sanitize="crossPlatformSanitizationEnabled"
-                  :sanitize-busy="savingCrossPlatformSanitization"
-                  @update:sanitize="handleSanitize"
-                />
-              </div>
-            </div>
+          <div :id="EDITOR_ID" :class="mobileView === 'rail' ? 'hidden @2xl/naming:block' : 'block'">
+            <NamingRuleEditor
+              v-if="selectedRule"
+              :rule="selectedRule"
+              :name="activeName"
+              :icon="ruleIcon(selectedRule)"
+              :pattern="activePattern"
+              :preview-pattern="previewPattern"
+              :inherited="activeInherited"
+              :dirty="isDirty(selectedRule)"
+              :error="activeError"
+              :sanitize="crossPlatformSanitizationEnabled"
+              :preview-book-id="previewBookId"
+              :case-id="caseId"
+              :used-by="usedBy"
+              :base="base"
+              :renaming-libraries="renamingLibraries"
+              :can-bulk-rename="canBulkRename"
+              @update:pattern="handlePattern"
+              @update:preview-book-id="handlePreviewBook"
+              @update:case-id="handleCase"
+              @add-override="handleAddOverride"
+              @remove-override="handleRemoveOverride"
+              @reset-to-shipped="handleResetToShipped"
+              @open-examples="openHelp"
+              @select="handleSelect"
+              @back="handleBack"
+              @completing="handleCompleting"
+            />
           </div>
         </div>
 
         <FileNamingSaveBar
+          v-if="dirtyRules.length > 0"
+          class="rounded-b-lg"
           :unsaved-count="dirtyRules.length"
           :saving="saving"
           :blocked="blockedByError"
+          :quiet="quietSaveBar"
           @save="handleSave"
           @discard="handleDiscard"
         />
       </div>
 
-      <div class="flex items-start gap-3 rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 shadow-xs">
-        <Info :size="16" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-        <p class="text-xs leading-relaxed text-muted-foreground">
-          <span class="font-medium text-foreground">{{ t('settings.reader.fileNaming.howItWorks.title') }}</span>
-          {{ ' ' }}{{ t('settings.reader.fileNaming.howItWorks.summary') }}
-        </p>
+      <div class="flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs md:px-5">
+        <div class="min-w-0 flex-1">
+          <p class="settings-label">{{ t('settings.reader.fileNaming.crossPlatform') }}</p>
+          <p class="settings-hint">{{ t('settings.reader.fileNaming.crossPlatformHint') }}</p>
+        </div>
+        <ToggleSwitch
+          :model-value="crossPlatformSanitizationEnabled"
+          :disabled="savingCrossPlatformSanitization"
+          :aria-label="t('settings.reader.fileNaming.crossPlatform')"
+          @update:model-value="handleSanitize"
+        />
       </div>
     </template>
 

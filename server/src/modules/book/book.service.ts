@@ -3366,15 +3366,14 @@ export class BookService {
       absolutePath: string;
       mediaOverlayAvailable?: boolean | null;
       mediaOverlayDurationSeconds?: number | null;
-      mediaOverlayCheckedAt?: Date | null;
+      mediaOverlayCheckedAt: Date | null;
     }>,
   ): Promise<Map<number, EpubMediaOverlayCapability | null>> {
     const entries = await Promise.all(
       fileRows.map(async (file) => {
         if (file.format?.toLowerCase() !== 'epub') return [file.id, null] as const;
 
-        const stored = mediaOverlayCapabilityFromFields(file);
-        if (stored) return [file.id, stored] as const;
+        if (file.mediaOverlayCheckedAt) return [file.id, mediaOverlayCapabilityFromFields(file)] as const;
 
         const fields = await inspectEpubMediaOverlayFields(file.absolutePath, file.format, (err) => {
           const error = err instanceof Error ? err : new Error(String(err));
