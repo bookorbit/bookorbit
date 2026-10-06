@@ -134,6 +134,13 @@ export interface PluginReleaseFile {
   fileName: string;
   sizeBytes: number | null;
   format: string;
+  /**
+   * Headers the download client should send with the file request. A plugin that holds a session
+   * cookie or a specific User-Agent can pass them here so the file host admits the download the
+   * same way it admitted the search. They are sent as defaults: the download client's own
+   * transfer headers (`Range`, `If-Range`) always win, while `User-Agent` and `Cookie` may be set.
+   */
+  headers?: Record<string, string>;
 }
 
 export interface PluginTestResult {

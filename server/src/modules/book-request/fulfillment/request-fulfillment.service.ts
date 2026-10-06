@@ -288,6 +288,7 @@ export class RequestFulfillmentService {
           fileUrl: directUrl as string,
           fileName: directFileName as string,
           clientKey: grab.clientKey,
+          headers: grab.fileHeaders,
         });
       } else {
         const config = await this.clients.resolveConfig(client.id);
@@ -676,6 +677,7 @@ export class RequestFulfillmentService {
         ...snapshot,
         source: 'direct_url',
         fileUrl: file.url,
+        fileHeaders: file.headers,
         fileName,
         // A digest of the URL, because there is no infohash and the poll loop still needs a key.
         clientKey: createHash('sha1').update(file.url).digest('hex'),
@@ -940,6 +942,8 @@ interface ParsedGrab {
   nzbFile?: Buffer;
   nzbFileName?: string;
   fileUrl?: string;
+  /** What the source asked to be sent with `fileUrl`, held in memory only and never persisted. */
+  fileHeaders?: Record<string, string>;
   fileName?: string;
   releaseTitle: string;
   /** The size of what the release carries, which a magnet does not state. */

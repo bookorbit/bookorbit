@@ -160,6 +160,8 @@ export interface ReleaseFile {
   /** Known here even where the search could not state one, since a single file has a real size. */
   sizeBytes: number | null;
   format: string;
+  /** Sent with the file request, so a session the source cleared on search carries over to the download. */
+  headers?: Record<string, string>;
 }
 
 /** What a credentialed torrent download endpoint resolves to after redirects are followed. */

@@ -119,6 +119,12 @@ export interface DirectDownloadRequest {
    * derives a stable digest of the URL, which keeps the duplicate-grab index meaningful.
    */
   clientKey: string;
+  /**
+   * What the source asked to be sent with the file request, such as a session cookie and the
+   * User-Agent that earned it. Not persisted: a restarted transfer resumes without them, which
+   * costs a re-challenge on a host that needs them but keeps session cookies out of the database.
+   */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -164,7 +170,7 @@ export class DirectDownloadService {
     const target = safeJoin(directory, stagedDirectFileName(release.fileName, release.format));
 
     await mkdir(directory, { recursive: true });
-    this.start(release.downloadId, release.clientKey, url, target, directory, 0, null, null);
+    this.start(release.downloadId, release.clientKey, url, target, directory, 0, null, null, release.headers);
 
     return { clientKey: release.clientKey };
   }
@@ -208,6 +214,7 @@ export class DirectDownloadService {
     offset: number,
     validator: string | null,
     expectedBytes: number | null,
+    sourceHeaders: Record<string, string> = {},
   ): void {
     this.progress.set(clientKey, {
       state: 'downloading',
@@ -220,7 +227,7 @@ export class DirectDownloadService {
 
     // Deliberately not awaited: `add` hands the work over the way a torrent client does, and the
     // poll loop is what reports on it from here.
-    const task = this.run(downloadId, clientKey, url, target, controller.signal, offset, validator, expectedBytes)
+    const task = this.run(downloadId, clientKey, url, target, controller.signal, offset, validator, expectedBytes, sourceHeaders)
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
@@ -349,8 +356,9 @@ export class DirectDownloadService {
     offset: number,
     validator: string | null,
     expectedBytes: number | null,
+    sourceHeaders: Record<string, string>,
   ): Promise<void> {
-    const response = await this.open(url, signal, offset > 0 ? { Range: `bytes=${offset}-`, 'If-Range': validator as string } : {});
+    const response = await this.open(url, signal, sourceHeaders, offset > 0 ? { Range: `bytes=${offset}-`, 'If-Range': validator as string } : {});
     const responseMeta = validateDownloadResponse(response, offset, expectedBytes, validator);
     const totalBytes = responseMeta.totalBytes;
     if (totalBytes !== null && totalBytes > MAX_FILE_BYTES) {
@@ -473,16 +481,25 @@ export class DirectDownloadService {
    * socket open until the agent times it out: five hops through a chain of mirrors would otherwise
    * leave five sockets and five buffers behind per grab.
    */
-  private async open(url: URL, signal: AbortSignal, headers: Record<string, string> = {}): Promise<Response> {
+  private async open(
+    url: URL,
+    signal: AbortSignal,
+    sourceHeaders: Record<string, string> = {},
+    headers: Record<string, string> = {},
+  ): Promise<Response> {
     let current = url;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const response = await this.openHop(current, signal, headers);
+      const response = await this.openHop(current, signal, sourceHeaders, headers);
 
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
         await response.body?.cancel().catch(() => {});
         if (!location) throw new Error(`That URL answered ${response.status} without saying where to go`);
-        current = await ensureSafeUrl(new URL(location, current).href, { allowPrivate: ALLOW_PRIVATE });
+        const next = await ensureSafeUrl(new URL(location, current).href, { allowPrivate: ALLOW_PRIVATE });
+        // A session the source handed over is for its own host. A mirror elsewhere gets the
+        // User-Agent but not the cookie, as a browser would have done.
+        if (next.origin !== current.origin) sourceHeaders = withoutCredentialHeaders(sourceHeaders);
+        current = next;
 
         continue;
       }
@@ -508,7 +525,7 @@ export class DirectDownloadService {
    *
    * The body is not left unbounded: `run` holds it to an idle timeout and a total ceiling.
    */
-  private async openHop(url: URL, signal: AbortSignal, headers: Record<string, string>): Promise<Response> {
+  private async openHop(url: URL, signal: AbortSignal, sourceHeaders: Record<string, string>, headers: Record<string, string>): Promise<Response> {
     const connect = new AbortController();
     const deadline = setTimeout(() => connect.abort(new Error(`That URL did not answer within ${CONNECT_TIMEOUT_MS}ms`)), CONNECT_TIMEOUT_MS);
     try {
@@ -517,7 +534,9 @@ export class DirectDownloadService {
         {
           redirect: 'manual',
           signal: AbortSignal.any([signal, connect.signal]),
-          headers: { Accept: '*/*', 'User-Agent': USER_AGENT, ...headers },
+          // The source's headers sit between the defaults and the transfer's own: a plugin may
+          // replace User-Agent or add Cookie, but Range and If-Range are set last and always win.
+          headers: { Accept: '*/*', 'User-Agent': USER_AGENT, ...sourceHeaders, ...headers },
         },
         // Pinned, because the URL came from an indexer or a plugin rather than from an operator:
         // this is exactly the caller the resolve-twice window in `safeFetch` is not acceptable
@@ -610,4 +629,10 @@ function safeJoin(directory: string, fileName: string): string {
     throw new Error('That release names a file that would land outside the download directory');
   }
   return target;
+}
+
+const CREDENTIAL_HEADERS = new Set(['authorization', 'cookie', 'cookie2', 'proxy-authorization']);
+
+function withoutCredentialHeaders(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(headers).filter(([name]) => !CREDENTIAL_HEADERS.has(name.toLowerCase())));
 }

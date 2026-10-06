@@ -410,6 +410,67 @@ describe('DirectDownloadService', () => {
     expect((init.headers as Record<string, string>)['User-Agent']).toBe('BookOrbit');
   });
 
+  it('sends the headers the source asked for, letting it replace the User-Agent', async () => {
+    fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
+
+    await service.add({
+      fileUrl: 'https://archive.org/download/x/book.epub',
+      fileName: 'book.epub',
+      clientKey: HASH,
+      headers: { Cookie: 'cf_clearance=abc', 'User-Agent': 'Mozilla/5.0' },
+    });
+    expect((await settle()).state).toBe('completed');
+
+    const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(init.headers).toMatchObject({ Accept: '*/*', Cookie: 'cf_clearance=abc', 'User-Agent': 'Mozilla/5.0' });
+  });
+
+  /** Resume validators are what make appending safe, so nothing a source sends may replace them. */
+  it('keeps its own Range and If-Range over anything the source sent', async () => {
+    const directory = join(appDataPath, 'request-downloads', HASH);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'partial');
+    fetchMock.mockResolvedValue(
+      new Response(' tail', {
+        status: 206,
+        headers: { 'content-type': 'application/epub+zip', 'content-range': 'bytes 7-11/12', etag: '"edition-1"' },
+      }),
+    );
+
+    // Resume never carries source headers, so the merge is exercised through the private path a
+    // fresh add with a partial offset would take.
+    const run = (service as unknown as { start: (...args: unknown[]) => void }).start.bind(service);
+    run(46, HASH, new URL('https://archive.org/download/x/book.epub'), join(directory, 'book.epub'), directory, 7, '"edition-1"', 12, {
+      Range: 'bytes=0-',
+      'If-Range': '"forged"',
+      Cookie: 'cf_clearance=abc',
+    });
+    expect((await settle()).state).toBe('completed');
+
+    const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(init.headers).toMatchObject({ Range: 'bytes=7-', 'If-Range': '"edition-1"', Cookie: 'cf_clearance=abc' });
+  });
+
+  it('keeps a source cookie off a redirect to another host', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 302, headers: { location: 'https://www.gutenberg.org/x/book.epub' } }))
+      .mockResolvedValueOnce(fileResponse('a real epub would go here'));
+
+    await service.add({
+      fileUrl: 'https://archive.org/download/x/book.epub',
+      fileName: 'book.epub',
+      clientKey: HASH,
+      headers: { Cookie: 'cf_clearance=abc', 'User-Agent': 'Mozilla/5.0' },
+    });
+    expect((await settle()).state).toBe('completed');
+
+    const first = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    const second = fetchMock.mock.calls[1][1]?.headers as Record<string, string>;
+    expect(first.Cookie).toBe('cf_clearance=abc');
+    expect(second.Cookie).toBeUndefined();
+    expect(second['User-Agent']).toBe('Mozilla/5.0');
+  });
+
   it('fails a file that declares itself past the size cap', async () => {
     fetchMock.mockResolvedValue(fileResponse('x', { 'content-length': String(64 * 1024 * 1024 * 1024) }));
 

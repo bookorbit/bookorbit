@@ -231,6 +231,51 @@ describe('PluginIndexerAdapter', () => {
     expect(direct.adapter.fetchTorrentFile).toBeUndefined();
   });
 
+  /** A session the plugin cleared on search has to reach the download client, or the host answers 403. */
+  it('carries the headers a plugin asks to be sent with its file', async () => {
+    const { adapter } = makeAdapter({
+      fetchTorrentFile: undefined,
+      resolveFile: () =>
+        Promise.resolve({
+          url: 'https://archive.org/download/x/y.epub',
+          fileName: 'y.epub',
+          sizeBytes: 1,
+          format: 'epub',
+          headers: { Cookie: 'cf_clearance=abc', 'User-Agent': 'Mozilla/5.0' },
+        }),
+    });
+
+    const file = await adapter.resolveFile!(
+      { indexerId: 4, guid: 'g', title: 't', sizeBytes: null, seeders: null, leechers: null },
+      config(),
+      AbortSignal.timeout(5000),
+    );
+
+    expect(file.headers).toEqual({ Cookie: 'cf_clearance=abc', 'User-Agent': 'Mozilla/5.0' });
+  });
+
+  it('drops file headers the download client manages itself or fetch would reject', async () => {
+    const { adapter } = makeAdapter({
+      fetchTorrentFile: undefined,
+      resolveFile: () =>
+        Promise.resolve({
+          url: 'https://archive.org/download/x/y.epub',
+          fileName: 'y.epub',
+          sizeBytes: 1,
+          format: 'epub',
+          headers: { Range: 'bytes=0-10', host: 'elsewhere', 'X-Split': 'a\r\nInjected: 1', 'bad name': 'x', Num: 1 as never },
+        }),
+    });
+
+    const file = await adapter.resolveFile!(
+      { indexerId: 4, guid: 'g', title: 't', sizeBytes: null, seeders: null, leechers: null },
+      config(),
+      AbortSignal.timeout(5000),
+    );
+
+    expect(file.headers).toBeUndefined();
+  });
+
   describe('containment', () => {
     /**
      * The reason the host lends a `fetch` rather than letting a plugin use the global one: this is

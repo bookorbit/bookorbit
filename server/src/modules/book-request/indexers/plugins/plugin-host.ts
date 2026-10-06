@@ -139,7 +139,8 @@ export class PluginIndexerAdapter implements IndexerAdapter {
         }
         throw error;
       }
-      return file;
+      const headers = sanitizeFileHeaders(file.headers);
+      return { url: file.url, fileName: file.fileName, sizeBytes: file.sizeBytes, format: file.format, ...(headers ? { headers } : {}) };
     };
   }
 
@@ -260,6 +261,33 @@ const CREDENTIAL_HEADERS = new Set(['authorization', 'cookie', 'cookie2', 'proxy
 
 function withoutCredentialHeaders(headers: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(headers).filter(([name]) => !CREDENTIAL_HEADERS.has(name.toLowerCase())));
+}
+
+/**
+ * Headers the download client manages itself, so a plugin naming them would only break the
+ * transfer: a `Range` on a fresh download asks for part of a file the client means to take whole.
+ */
+const TRANSFER_HEADERS = new Set(['range', 'if-range', 'host', 'content-length', 'transfer-encoding', 'connection']);
+const MAX_FILE_HEADERS = 32;
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
+/**
+ * What a plugin asked to be sent with its file, kept to plain strings with valid names. A value
+ * fetch would reject is dropped here rather than failing the download later with a TypeError.
+ */
+function sanitizeFileHeaders(raw: unknown): Record<string, string> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const kept = Object.entries(raw as Record<string, unknown>)
+    .filter(
+      (entry): entry is [string, string] =>
+        HEADER_NAME.test(entry[0]) &&
+        !TRANSFER_HEADERS.has(entry[0].toLowerCase()) &&
+        typeof entry[1] === 'string' &&
+        entry[1].length <= MAX_PLUGIN_URL_LENGTH &&
+        !/[\r\n\0]/.test(entry[1]),
+    )
+    .slice(0, MAX_FILE_HEADERS);
+  return kept.length > 0 ? Object.fromEntries(kept) : undefined;
 }
 
 /**
