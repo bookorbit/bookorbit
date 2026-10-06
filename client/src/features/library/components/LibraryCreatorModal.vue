@@ -274,6 +274,7 @@ const sectionProps = computed(() => ({
   scanner: {
     organizationMode: form.organizationMode,
     organizationModeLocked: !creating.value,
+    deriveSeriesFromFolder: form.deriveSeriesFromFolder,
     allowedFormats: form.allowedFormats,
     addedAtSource: form.addedAtSource,
     canRecomputeAddedAt: !creating.value,
@@ -481,6 +482,12 @@ function handleWriteCoverUpdate(value: boolean) {
   form.fileWriteWriteCover = value
 }
 
+function handleOrganizationModeUpdate(value: OrganizationMode) {
+  form.organizationMode = value
+  // The server rejects the flag outside book_per_file.
+  if (value !== 'book_per_file') form.deriveSeriesFromFolder = false
+}
+
 const sectionListeners = {
   'update:name': (value: string) => (form.name = value),
   'update:type': handleTypeUpdate,
@@ -488,7 +495,8 @@ const sectionListeners = {
   'update:coverAspectRatio': (value: CoverAspectRatio) => (form.coverAspectRatio = value),
   'update:folders': handleFoldersUpdate,
   'update:localFolders': (value: string[]) => (form.localFolders = value),
-  'update:organizationMode': (value: OrganizationMode) => (form.organizationMode = value),
+  'update:organizationMode': handleOrganizationModeUpdate,
+  'update:deriveSeriesFromFolder': (value: boolean) => (form.deriveSeriesFromFolder = value),
   'update:addedAtSource': (value: Library['addedAtSource']) => (form.addedAtSource = value),
   recompute: handleRecomputeAddedAt,
   check: handleCheckFolders,

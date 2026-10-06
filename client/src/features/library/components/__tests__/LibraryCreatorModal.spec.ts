@@ -151,6 +151,22 @@ describe('LibraryCreatorModal', () => {
     wrapper.unmount()
   })
 
+  it('clears series from folders when leaving file-as-book mode', async () => {
+    const library = makeLibrary({ organizationMode: 'book_per_file', deriveSeriesFromFolder: true })
+    apiMock.mockImplementation(async (url) => jsonResponse(String(url).endsWith('/libraries/9') ? library : null))
+    const wrapper = await mountCreator({ library })
+    await navButton(wrapper, 'Scanning').trigger('click')
+    const scanner = () => wrapper.getComponent(LibraryCreatorScanner)
+    expect(scanner().props('deriveSeriesFromFolder')).toBe(true)
+
+    scanner().vm.$emit('update:organizationMode', 'book_per_folder')
+    await flushPromises()
+
+    expect(scanner().props('organizationMode')).toBe('book_per_folder')
+    expect(scanner().props('deriveSeriesFromFolder')).toBe(false)
+    wrapper.unmount()
+  })
+
   it('opens on the section it was asked for', async () => {
     const library = makeLibrary()
     apiMock.mockImplementation(async (url) => jsonResponse(String(url).endsWith('/libraries/9') ? library : null))

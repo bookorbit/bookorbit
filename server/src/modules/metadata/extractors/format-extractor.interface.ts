@@ -45,6 +45,8 @@ export interface ParsedBookData {
    */
   isFixedLayout?: boolean | null;
   comicMetadata?: ParsedCbzComicMetadata | null;
+  /** False when every text field was derived from the filename, so a sidecar OPF may take precedence. */
+  hasEmbeddedMetadata?: boolean;
 }
 
 export interface FormatExtractor {
