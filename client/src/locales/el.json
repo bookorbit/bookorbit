@@ -3859,6 +3859,23 @@
           "noResultsHint": "Δοκιμάστε να προσαρμόσετε τον τίτλο ή τον συγγραφέα",
           "searchPrompt": "Αναζήτηση παραπάνω, στη συνέχεια, κάντε κλικ σε ένα αποτέλεσμα για να ξεκινήσετε τη σύγκριση μεταδεδομένων."
         },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        },
         "writeAndRename": "Εγγραφή σε αρχείο & Μετονομασία",
         "writeAndRenameShort": "Εγγραφή & Μετονομασία"
       },

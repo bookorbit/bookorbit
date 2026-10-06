@@ -76,7 +76,10 @@ describe('AchievementRepository', () => {
         insert: vi.fn().mockReturnValue(insertChain),
         update: vi.fn().mockReturnValue(updateChain),
       };
-      const db = { transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)) };
+      const db = {
+        execute: vi.fn().mockResolvedValue({ rows: [{ exists: true }] }),
+        transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)),
+      };
       const repo = makeRepo(db);
 
       await expect(repo.backfillExistingCelebrations()).resolves.toBe(2);
@@ -87,11 +90,26 @@ describe('AchievementRepository', () => {
     it('does not repeat the backfill when the marker already exists', async () => {
       const insertChain = makeInsertChain([]);
       const tx = { insert: vi.fn().mockReturnValue(insertChain), update: vi.fn() };
-      const db = { transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)) };
+      const db = {
+        execute: vi.fn().mockResolvedValue({ rows: [{ exists: true }] }),
+        transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)),
+      };
       const repo = makeRepo(db);
 
       await expect(repo.backfillExistingCelebrations()).resolves.toBe(0);
       expect(tx.update).not.toHaveBeenCalled();
+    });
+
+    it('skips the backfill without a marker when the celebrated_at column is missing', async () => {
+      const tx = { insert: vi.fn(), update: vi.fn() };
+      const db = {
+        execute: vi.fn().mockResolvedValue({ rows: [{ exists: false }] }),
+        transaction: vi.fn().mockImplementation((callback: (value: typeof tx) => unknown) => callback(tx)),
+      };
+      const repo = makeRepo(db);
+
+      await expect(repo.backfillExistingCelebrations()).resolves.toBe(0);
+      expect(db.transaction).not.toHaveBeenCalled();
     });
 
     it('claims one pending award with a skip-locked row lock', async () => {

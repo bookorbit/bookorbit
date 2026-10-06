@@ -19,6 +19,9 @@ const mockConfig: ProviderConfigurations = {
   ranobedb: { enabled: false },
   kobo: { enabled: false, country: 'us', language: 'en' },
   lubimyczytac: { enabled: false },
+  mangabaka: { enabled: false },
+  librofm: { enabled: false },
+  aladin: { enabled: false, ttbKey: '' },
 };
 
 const mockDocument: HardcoverSearchDocument = {

@@ -1735,7 +1735,8 @@
           "comicvine": "Comic-Metadaten von ComicVine. Ein kostenloser API-Schlüssel von comicvine.gamespot.com ist erforderlich.",
           "ranobedb": "Metadaten japanischer Light Novels von RanobeDB. Keine Einrichtung erforderlich.",
           "lubimyczytac": "Polnischer Buchkatalog (lubimyczytac.pl). Ruft Daten von öffentlichen Buchseiten ab. Keine Einrichtung erforderlich.",
-          "aladin": "Koreanische Buch-Metadaten von Aladin (알라딘). Ein TTB-Schlüssel von aladin.co.kr ist erforderlich."
+          "aladin": "Koreanische Buch-Metadaten von Aladin (알라딘). Ein TTB-Schlüssel von aladin.co.kr ist erforderlich.",
+          "mangabaka": "Manga- und Light-Novel-Metadaten von MangaBaka. Keine Einrichtung erforderlich."
         },
         "blocked": {
           "google": "Google Books erfordert einen API-Schlüssel, bevor es aktiviert werden kann",
@@ -1794,6 +1795,10 @@
           "storeProviderIds": {
             "label": "Anbieter-IDs bei Büchern speichern",
             "hint": "Beim Abrufen von Metadaten die zurückgegebenen Anbieter-IDs (ISBN, ASIN, Goodreads-ID usw.) im Buchdatensatz speichern, für genauere zukünftige Suchen."
+          },
+          "richTitleFormat": {
+            "label": "Umfangreiches Titelformat für Manga-Bände",
+            "hint": "Bandtitel als \"Reihe, Bd. NN: Untertitel, Kap. NNNN\" anstelle des einfacheren \"Reihe, Bd. NN - Kap. NNN\" formatieren. Gilt nur für MangaBaka."
           },
           "existingProviderIdsOnly": {
             "label": "Nur vorhandene Provider-IDs verwenden",
@@ -5693,6 +5698,23 @@
           "providerFailed": "{provider} konnte nicht erreicht werden.",
           "searchInterruptedHint": "Versuchen Sie es erneut oder schränken Sie den Suchbereich ein.",
           "searchPrompt": "Suchen Sie oben, klicken Sie dann auf ein Ergebnis, um den Metadatenvergleich zu starten."
+        },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
         },
         "match": {
           "sheetDescription": "Suchen Sie nach Metadatenanbietern und wählen Sie aus, was in dieses Buch kopiert werden soll.",

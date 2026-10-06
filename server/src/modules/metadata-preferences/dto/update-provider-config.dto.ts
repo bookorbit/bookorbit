@@ -63,4 +63,5 @@ export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => KoboProviderConfigDto) kobo?: KoboProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) lubimyczytac?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => AladinProviderConfigDto) aladin?: AladinProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) mangabaka?: SimpleProviderConfigDto;
 }

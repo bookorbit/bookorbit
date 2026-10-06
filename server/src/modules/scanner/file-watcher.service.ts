@@ -52,10 +52,10 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] - watcher bootstrap started`);
     try {
-      const watchedLibraries = await this.db.select().from(libraries).where(eq(libraries.watch, true));
+      const watchedLibraries = await this.db.select({ id: libraries.id }).from(libraries).where(eq(libraries.watch, true));
       let failedWatcherCount = 0;
       for (const lib of watchedLibraries) {
-        const folders = await this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, lib.id));
+        const folders = await this.db.select({ path: libraryFolders.path }).from(libraryFolders).where(eq(libraryFolders.libraryId, lib.id));
         try {
           await this.startWatcher(
             lib.id,

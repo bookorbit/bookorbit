@@ -350,6 +350,8 @@ export class BookService {
     ranobedbId?: string | null;
     lubimyczytacId?: string | null;
     aladinId?: string | null;
+    mangabakaId?: string | null;
+    mangabakaSeriesId?: string | null;
   }): Partial<Record<MetadataProviderKey, string>> {
     const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
     if (meta.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
@@ -365,6 +367,7 @@ export class BookService {
     if (meta.ranobedbId) providerIds[MetadataProviderKey.RANOBEDB] = meta.ranobedbId;
     if (meta.lubimyczytacId) providerIds[MetadataProviderKey.LUBIMYCZYTAC] = meta.lubimyczytacId;
     if (meta.aladinId) providerIds[MetadataProviderKey.ALADIN] = meta.aladinId;
+    if (meta.mangabakaId) providerIds[MetadataProviderKey.MANGABAKA] = meta.mangabakaId;
     return providerIds;
   }
 
@@ -385,6 +388,8 @@ export class BookService {
       | 'ranobedbId'
       | 'lubimyczytacId'
       | 'aladinId'
+      | 'mangabakaId'
+      | 'mangabakaSeriesId'
     >,
     providerIds: Partial<Record<MetadataProviderKey, string>>,
   ): void {
@@ -401,6 +406,9 @@ export class BookService {
     if (providerIds[MetadataProviderKey.RANOBEDB]) dto.ranobedbId = providerIds[MetadataProviderKey.RANOBEDB];
     if (providerIds[MetadataProviderKey.LUBIMYCZYTAC]) dto.lubimyczytacId = providerIds[MetadataProviderKey.LUBIMYCZYTAC];
     if (providerIds[MetadataProviderKey.ALADIN]) dto.aladinId = providerIds[MetadataProviderKey.ALADIN];
+    if (providerIds[MetadataProviderKey.MANGABAKA]) dto.mangabakaId = providerIds[MetadataProviderKey.MANGABAKA];
+    // mangabakaSeriesId is handled as a special field like hardcoverEditionId,
+    // not as a standard provider ID lookup key.
   }
 
   private buildMetadataRefreshPreview(
@@ -427,6 +435,7 @@ export class BookService {
     if (r.coverUrl !== undefined) preview.coverUrl = r.coverUrl as string;
     if (r.audioCoverUrl !== undefined) preview.audioCoverUrl = r.audioCoverUrl as string;
     if (r.hardcoverEditionId !== undefined) preview.hardcoverEditionId = r.hardcoverEditionId as string | null;
+    if (r.mangabakaSeriesId !== undefined) preview.mangabakaSeriesId = r.mangabakaSeriesId as string | null;
     if (r.comicMetadata !== undefined) preview.comicMetadata = r.comicMetadata as BookMetadataRefreshPreviewFields['comicMetadata'];
 
     if (r.narrators !== undefined || r.duration !== undefined || r.abridged !== undefined || r.chapters !== undefined) {
@@ -1808,6 +1817,8 @@ export class BookService {
     if (dto.ranobedbId !== undefined) scalarFields.ranobedbId = dto.ranobedbId ?? null;
     if (dto.lubimyczytacId !== undefined) scalarFields.lubimyczytacId = dto.lubimyczytacId ?? null;
     if (dto.aladinId !== undefined) scalarFields.aladinId = dto.aladinId ?? null;
+    if (dto.mangabakaId !== undefined) scalarFields.mangabakaId = dto.mangabakaId ?? null;
+    if (dto.mangabakaSeriesId !== undefined) scalarFields.mangabakaSeriesId = dto.mangabakaSeriesId ?? null;
     if (dto.rating !== undefined) scalarFields.rating = dto.rating ?? null;
     if (dto.audioMetadata) {
       if (dto.audioMetadata.durationSeconds !== undefined) scalarFields.durationSeconds = dto.audioMetadata.durationSeconds ?? null;
@@ -2932,6 +2943,7 @@ export class BookService {
       if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as string | null;
       if (r.seriesMemberships !== undefined) dto.seriesMemberships = r.seriesMemberships as UpdateBookMetadataDto['seriesMemberships'];
       if (r.hardcoverEditionId !== undefined) dto.hardcoverEditionId = r.hardcoverEditionId as string | null;
+      if (r.mangabakaSeriesId !== undefined) dto.mangabakaSeriesId = r.mangabakaSeriesId as string | null;
       if (r.narrators !== undefined || r.duration !== undefined || r.abridged !== undefined || r.chapters !== undefined) {
         dto.audioMetadata = {};
         if (r.narrators !== undefined) dto.audioMetadata.narrators = r.narrators as string[];
@@ -3315,7 +3327,9 @@ export class BookService {
         [MetadataProviderKey.RANOBEDB]: meta?.ranobedbId ?? null,
         [MetadataProviderKey.LUBIMYCZYTAC]: meta?.lubimyczytacId ?? null,
         [MetadataProviderKey.ALADIN]: meta?.aladinId ?? null,
+        [MetadataProviderKey.MANGABAKA]: meta?.mangabakaId ?? null,
       },
+      mangabakaSeriesId: meta?.mangabakaSeriesId ?? null,
       authors: authorRows,
       genres: genreRows.map((g) => g.name),
       tags: tagRows.map((t) => t.name),

@@ -32,6 +32,7 @@ import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { MetadataSearchParams } from './providers/metadata-search-params';
+import { extractChapterNumber } from './providers/mangabaka/mangabaka-title-utils';
 
 /**
  * One fetched cover a slot may take, in the order the apply step tries them. `fit` compares the
@@ -56,6 +57,7 @@ export type ResolvedMetadataFields = Partial<Record<MetadataField, string | stri
   chapters?: AudiobookChapter[];
   comicMetadata?: ComicMetadataFields;
   communityRatings?: BookCommunityRating[];
+  mangabakaSeriesId?: string | null;
 };
 
 /** `cover` is the ebook slot and `audioCover` the audio slot; each is present when its slot is filled. */
@@ -193,6 +195,14 @@ export class MetadataFetchPipeline {
     const searchParams = providerSelection.activeProviders.some((provider) => this.registry.servesOnlyAudiobooks(provider))
       ? { ...providerSearchParams, includeAudiobookProviders: true }
       : providerSearchParams;
+    // Thread rich title format preference and chapter inclusion flag for MangaBaka.
+    if (preferences.options?.richTitleFormat !== undefined) {
+      (searchParams as MetadataSearchParams).richTitleFormat = preferences.options.richTitleFormat;
+    }
+    // Include chapter in MangaBaka title when the query contains a chapter marker.
+    if (params.title && extractChapterNumber(params.title) !== undefined) {
+      (searchParams as MetadataSearchParams).includeChapter = true;
+    }
     const candidates = await this.searchCandidates(searchParams, providerSelection.activeProviders);
 
     // The service already swallows its own failures; this guards the invariant at the boundary so
@@ -752,6 +762,13 @@ export class MetadataFetchPipeline {
         ) {
           result.hardcoverEditionId = candidate.hardcoverEditionId;
         }
+        if (
+          candidate.provider === MetadataProviderKey.MANGABAKA &&
+          candidate.mangabakaSeriesId &&
+          (!options?.preserveExisting || this.isMissing((existing as Record<string, unknown>).mangabakaSeriesId))
+        ) {
+          (result as Record<string, unknown>).mangabakaSeriesId = candidate.mangabakaSeriesId;
+        }
       }
     }
 
@@ -863,7 +880,7 @@ export class MetadataFetchPipeline {
 
       const seriesIndex = parseSeriesIndex(membership.seriesIndex);
       seen.add(key);
-      normalized.push({ seriesName, seriesIndex });
+      normalized.push({ seriesName, seriesIndex, expectedBookCount: membership.expectedBookCount ?? undefined });
     }
 
     return normalized;

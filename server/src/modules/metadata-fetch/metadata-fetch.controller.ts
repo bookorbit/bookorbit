@@ -1,6 +1,7 @@
-import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
+import { Controller, Get, MessageEvent, Param, ParseIntPipe, Query, Sse } from '@nestjs/common';
 import {
   CoverMedia,
+  MangabakaCollectionSummary,
   METADATA_PROVIDER_STATUS_EVENT,
   MetadataCandidate,
   MetadataProviderInfo,
@@ -125,6 +126,20 @@ export class MetadataFetchController {
             : { type: METADATA_PROVIDER_STATUS_EVENT, data: event.status },
         ),
       );
+  }
+
+  @Get('mangabaka/series/:seriesId/collections')
+  async getMangabakaCollections(@Param('seriesId', ParseIntPipe) seriesId: number): Promise<MangabakaCollectionSummary[]> {
+    return this.metadataFetchService.getMangabakaCollections(seriesId);
+  }
+
+  @Get('mangabaka/collections/:collectionId/works')
+  async getMangabakaWorks(
+    @Param('collectionId') collectionId: string,
+    @Query('seriesId', ParseIntPipe) seriesId: number,
+    @Query('preferredLanguage') preferredLanguage?: string,
+  ): Promise<MetadataCandidate[]> {
+    return this.metadataFetchService.getMangabakaWorks(collectionId, seriesId, preferredLanguage);
   }
 
   @Get('lookup')
