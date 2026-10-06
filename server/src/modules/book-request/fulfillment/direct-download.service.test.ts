@@ -105,7 +105,9 @@ describe('DirectDownloadService', () => {
     expect(resumed).toBe(true);
     expect((await settle()).state).toBe('completed');
     await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('partial tail');
-    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ Range: 'bytes=7-', 'If-Range': '"edition-1"' });
+    const sent = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(sent.get('range')).toBe('bytes=7-');
+    expect(sent.get('if-range')).toBe('"edition-1"');
     expect(downloads.update).toHaveBeenCalledWith(44, expect.objectContaining({ directEtag: '"edition-1"', totalBytes: 12 }));
   });
 
@@ -407,22 +409,69 @@ describe('DirectDownloadService', () => {
     await settle();
 
     const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect((init.headers as Record<string, string>)['User-Agent']).toBe('BookOrbit');
+    expect(new Headers(init.headers).get('user-agent')).toBe('BookOrbit');
   });
 
-  it('sends the headers the source asked for, letting it replace the User-Agent', async () => {
+  it('sends the headers the source asked for, letting it replace the User-Agent whatever its case', async () => {
     fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
 
     await service.add({
       fileUrl: 'https://archive.org/download/x/book.epub',
       fileName: 'book.epub',
       clientKey: HASH,
-      headers: { Cookie: 'cf_clearance=abc', 'User-Agent': 'Mozilla/5.0' },
+      headers: { Cookie: 'cf_clearance=abc', 'user-agent': 'Mozilla/5.0' },
     });
     expect((await settle()).state).toBe('completed');
 
     const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect(init.headers).toMatchObject({ Accept: '*/*', Cookie: 'cf_clearance=abc', 'User-Agent': 'Mozilla/5.0' });
+    const sent = new Headers(init.headers);
+    expect(sent.get('accept')).toBe('*/*');
+    expect(sent.get('cookie')).toBe('cf_clearance=abc');
+    expect(sent.get('user-agent')).toBe('Mozilla/5.0');
+  });
+
+  it('refuses to send a source cookie over plain HTTP', async () => {
+    await service.add({
+      fileUrl: 'http://archive.org/download/x/book.epub',
+      fileName: 'book.epub',
+      clientKey: HASH,
+      headers: { Cookie: 'cf_clearance=abc' },
+    });
+    const status = await settle();
+
+    expect(status.state).toBe('failed');
+    expect(status.errorMessage).toMatch(/plain HTTP/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  /** A change of scheme is a change of origin, so the cookie is gone before the HTTP hop is made. */
+  it('drops a source cookie on a redirect down to plain HTTP', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 302, headers: { location: 'http://archive.org/download/x/book.epub' } }))
+      .mockResolvedValueOnce(fileResponse('a real epub would go here'));
+
+    await service.add({
+      fileUrl: 'https://archive.org/download/x/book.epub',
+      fileName: 'book.epub',
+      clientKey: HASH,
+      headers: { Cookie: 'cf_clearance=abc' },
+    });
+    expect((await settle()).state).toBe('completed');
+
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get('cookie')).toBeNull();
+  });
+
+  it('still fetches over plain HTTP when the source sent no credentials', async () => {
+    fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
+
+    await service.add({
+      fileUrl: 'http://archive.org/download/x/book.epub',
+      fileName: 'book.epub',
+      clientKey: HASH,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+
+    expect((await settle()).state).toBe('completed');
   });
 
   /** Resume validators are what make appending safe, so nothing a source sends may replace them. */
@@ -448,7 +497,10 @@ describe('DirectDownloadService', () => {
     expect((await settle()).state).toBe('completed');
 
     const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect(init.headers).toMatchObject({ Range: 'bytes=7-', 'If-Range': '"edition-1"', Cookie: 'cf_clearance=abc' });
+    const sent = new Headers(init.headers);
+    expect(sent.get('range')).toBe('bytes=7-');
+    expect(sent.get('if-range')).toBe('"edition-1"');
+    expect(sent.get('cookie')).toBe('cf_clearance=abc');
   });
 
   it('keeps a source cookie off a redirect to another host', async () => {
@@ -464,11 +516,11 @@ describe('DirectDownloadService', () => {
     });
     expect((await settle()).state).toBe('completed');
 
-    const first = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
-    const second = fetchMock.mock.calls[1][1]?.headers as Record<string, string>;
-    expect(first.Cookie).toBe('cf_clearance=abc');
-    expect(second.Cookie).toBeUndefined();
-    expect(second['User-Agent']).toBe('Mozilla/5.0');
+    const first = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    const second = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(first.get('cookie')).toBe('cf_clearance=abc');
+    expect(second.get('cookie')).toBeNull();
+    expect(second.get('user-agent')).toBe('Mozilla/5.0');
   });
 
   it('fails a file that declares itself past the size cap', async () => {

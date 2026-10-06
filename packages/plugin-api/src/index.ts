@@ -139,6 +139,9 @@ export interface PluginReleaseFile {
    * cookie or a specific User-Agent can pass them here so the file host admits the download the
    * same way it admitted the search. They are sent as defaults: the download client's own
    * transfer headers (`Range`, `If-Range`) always win, while `User-Agent` and `Cookie` may be set.
+   * As in a browser, only `Authorization`, `Cookie`, `Cookie2` and `Proxy-Authorization` are
+   * dropped on a redirect to another origin, and none of them is sent over plain HTTP: put a
+   * secret in one of those, never in a custom header, or it will follow the file to a mirror.
    */
   headers?: Record<string, string>;
 }

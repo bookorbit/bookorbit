@@ -526,6 +526,16 @@ export class DirectDownloadService {
    * The body is not left unbounded: `run` holds it to an idle timeout and a total ceiling.
    */
   private async openHop(url: URL, signal: AbortSignal, sourceHeaders: Record<string, string>, headers: Record<string, string>): Promise<Response> {
+    if (url.protocol === 'http:' && Object.keys(sourceHeaders).some((name) => CREDENTIAL_HEADERS.has(name.toLowerCase()))) {
+      throw new Error('That URL would send the source credentials over plain HTTP');
+    }
+    // The source's headers sit between the defaults and the transfer's own: a plugin may replace
+    // User-Agent or add Cookie, but Range and If-Range are set last and always win. Set through
+    // `Headers` because a spread keeps `user-agent` beside `User-Agent` and fetch joins the two.
+    const requestHeaders = new Headers({ Accept: '*/*', 'User-Agent': USER_AGENT });
+    for (const [name, value] of Object.entries(sourceHeaders)) requestHeaders.set(name, value);
+    for (const [name, value] of Object.entries(headers)) requestHeaders.set(name, value);
+
     const connect = new AbortController();
     const deadline = setTimeout(() => connect.abort(new Error(`That URL did not answer within ${CONNECT_TIMEOUT_MS}ms`)), CONNECT_TIMEOUT_MS);
     try {
@@ -534,9 +544,7 @@ export class DirectDownloadService {
         {
           redirect: 'manual',
           signal: AbortSignal.any([signal, connect.signal]),
-          // The source's headers sit between the defaults and the transfer's own: a plugin may
-          // replace User-Agent or add Cookie, but Range and If-Range are set last and always win.
-          headers: { Accept: '*/*', 'User-Agent': USER_AGENT, ...sourceHeaders, ...headers },
+          headers: requestHeaders,
         },
         // Pinned, because the URL came from an indexer or a plugin rather than from an operator:
         // this is exactly the caller the resolve-twice window in `safeFetch` is not acceptable
