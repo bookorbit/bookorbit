@@ -39,158 +39,13 @@ export const getKoboSpanValue = (range) => {
   return null
 }
 
-const getXPathStep = (node) => {
-  if (!node) return null
-  if (node.nodeType === 3) return 'text()'
-  if (node.nodeType === 1 && node.localName) return node.localName
-  return null
-}
-
-const getXPathIndex = (node) => {
-  const step = getXPathStep(node)
-  if (!step) return 1
-
-  const siblings = getEffectiveChildren(getEffectiveParent(node)).filter((item) => item.type === 'element' && getXPathStep(item.node) === step)
-  const index = siblings.findIndex((item) => item.node === node)
-  return index >= 0 ? index + 1 : 1
-}
-
-const getXPathStepCount = (node) => {
-  const step = getXPathStep(node)
-  if (!step) return 1
-  return getEffectiveChildren(getEffectiveParent(node)).filter((item) => item.type === 'element' && getXPathStep(item.node) === step).length || 1
-}
-
-const getXPathSegment = (node) => {
-  const step = getXPathStep(node)
-  if (!step) return null
-  return getXPathStepCount(node) > 1 ? `${step}[${getXPathIndex(node)}]` : step
-}
-
-const isFoliateLayoutWrapper = (node) => node?.nodeType === 1 && (node.id === 'book-columns' || node.id === 'book-inner')
-
-const isKoboSpanWrapper = (node) => node?.nodeType === 1 && node.classList?.contains('koboSpan') && /^kobo\./.test(node.id ?? '')
-
-const isTransparentXPathWrapper = (node) => isFoliateLayoutWrapper(node) || isKoboSpanWrapper(node)
-
-const getEffectiveParent = (node) => {
-  let parent = node?.parentNode ?? null
-  while (isTransparentXPathWrapper(parent)) parent = parent.parentNode
-  return parent
-}
-
-const appendEffectiveChild = (items, node) => {
-  if (!node) return
-
-  if (isTransparentXPathWrapper(node)) {
-    for (const child of node.childNodes) appendEffectiveChild(items, child)
-    return
-  }
-
-  if (node.nodeType === 3) {
-    const last = items.at(-1)
-    if (last?.type === 'text') {
-      last.nodes.push(node)
-      return
-    }
-    items.push({ type: 'text', nodes: [node] })
-    return
-  }
-
-  if (node.nodeType === 1) items.push({ type: 'element', node })
-}
-
-const getEffectiveChildren = (parent) => {
-  const items = []
-  for (const child of parent?.childNodes ?? []) appendEffectiveChild(items, child)
-  return items
-}
-
-const getBodyXPath = (node) => {
-  if (!node) return null
-
-  const doc = node.ownerDocument ?? (node.nodeType === 9 ? node : null)
-  const body = doc?.body
-  if (!body) return null
-
-  const parts = []
-  let current = node
-  while (current) {
-    if (current === body) {
-      parts.unshift('body')
-      return `/${parts.join('/')}`
-    }
-
-    if (!isTransparentXPathWrapper(current)) {
-      const segment = getXPathSegment(current)
-      if (!segment) return null
-      parts.unshift(segment)
-    }
-    current = getEffectiveParent(current)
-  }
-
-  return null
-}
-
-const getKoreaderTextTarget = (point) => {
-  if (point?.node?.nodeType !== 3) return null
-
-  const parent = getEffectiveParent(point.node)
-  if (!parent) return null
-
-  const textItems = getEffectiveChildren(parent).filter((item) => item.type === 'text')
-  for (const [itemIndex, item] of textItems.entries()) {
-    let offset = 0
-    for (const node of item.nodes) {
-      if (node === point.node) {
-        return {
-          parent,
-          index: itemIndex + 1,
-          count: textItems.length,
-          offset: offset + (Number.isFinite(point.offset) ? point.offset : 0),
-        }
-      }
-      offset += node.nodeValue?.length ?? 0
-    }
-  }
-
-  return null
-}
-
-const getSectionPathBasename = (section) => {
-  if (typeof section?.id !== 'string') return null
-  const path = section.id.split(/[?#]/)[0]
-  return path.split('/').pop() ?? null
-}
-
-const isKepubifySyntheticSection = (section) => getSectionPathBasename(section) === 'kepubify-titlepage-dummy.xhtml'
-
-export const getKoreaderDocFragmentIndex = (sections, index) => {
-  if (!Array.isArray(sections) || typeof index !== 'number') return null
-  const section = sections[index]
-  if (!section || isKepubifySyntheticSection(section)) return null
-
-  let docFragmentIndex = 0
-  for (let i = 0; i <= index && i < sections.length; i += 1) {
-    if (!isKepubifySyntheticSection(sections[i])) docFragmentIndex += 1
-  }
-  return docFragmentIndex || null
-}
-
-export const getKoreaderProgress = (docFragmentIndex, range) => {
-  if (!range || typeof docFragmentIndex !== 'number') return null
-
+export const getReadingProgressRange = (range) => {
   const point = getRangePoint(range)
   if (!point) return null
-
-  const target = getKoreaderTextTarget(point)
-  if (!target) return null
-
-  const xpath = getBodyXPath(target.parent)
-  if (!xpath) return null
-
-  const textStep = target.count > 1 ? `text()[${target.index}]` : 'text()'
-  return `/body/DocFragment[${docFragmentIndex}]${xpath}/${textStep}.${target.offset}`
+  const progressRange = range.cloneRange()
+  progressRange.setStart(point.node, point.offset)
+  progressRange.collapse(true)
+  return progressRange
 }
 
 const isZip = async (file) => {
@@ -583,13 +438,13 @@ export class View extends HTMLElement {
     const progress = this.#sectionProgress?.getProgress(index, fraction, size) ?? {}
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)
-    const cfi = this.getCFI(index, range)
+    const cfi = this.getCFI(index, getReadingProgressRange(range))
     const source = this.book.sections[index]?.id ?? null
     const contentSourceProgressPercent = toPercent(fraction)
     const koboLocationValue = getKoboSpanValue(range)
     const koboLocationType = koboLocationValue ? 'KoboSpan' : null
-    const koreaderDocFragmentIndex = getKoreaderDocFragmentIndex(this.book.sections, index)
-    const koreaderProgress = getKoreaderProgress(koreaderDocFragmentIndex, range)
+    // Convert the source CFI on the server, where the original XHTML is available.
+    const koreaderProgress = null
     this.lastLocation = {
       ...progress,
       tocItem,

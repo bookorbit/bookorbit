@@ -1,12 +1,8 @@
 /**
- * Collapsed-text index over a chapter DOM, approximating how crengine builds its
- * text nodes (whitespace runs collapse to single spaces, leading whitespace after
- * block boundaries drops). Every collapsed CODE POINT maps back to its raw text
- * node + UTF-16 offset, so positions can be translated between:
- * - crengine xpointer offsets (code points in the collapsed view of a text run)
- * - browser/CFI offsets (UTF-16 code units in the raw text nodes)
- * Synthetic separators are inserted between blocks for search quality; they map to
- * no raw position and are skipped when resolving range endpoints.
+ * Chapter text index with separate search and CREngine offset mappings. Search
+ * collapses Unicode whitespace and inserts block separators; engine offsets keep
+ * Unicode spaces, leading ASCII space, and source-parser text node boundaries.
+ * Both map Unicode code points back to raw DOM nodes and UTF-16 CFI offsets.
  */
 
 import { CfiNode, getDocumentElement, isElementNode, isTextNode } from './cfi.utils';
@@ -61,6 +57,8 @@ export interface TextRun {
   runCount: number;
   collapsedStart: number;
   collapsedLength: number;
+  engineRawOffsets: Int32Array;
+  engineRawEnd: number;
 }
 
 export interface RawPoint {
@@ -95,10 +93,14 @@ export class ChapterTextIndex {
   private readonly runByPoint: Int32Array;
   private readonly rawOffsetByPoint: Int32Array;
   private readonly cpByUtf16: Int32Array;
+  private readonly engineRunsByRun = new Map<TextRun, TextRun[]>();
   private readonly runsByParent = new Map<CfiNode, TextRun[]>();
   private readonly runInfoByNode = new Map<CfiNode, { run: TextRun; rawStart: number }>();
 
-  constructor(root: CfiNode) {
+  constructor(
+    root: CfiNode,
+    private readonly engineBoundaries = new Map<CfiNode, number[]>(),
+  ) {
     const state: BuildState = {
       collapsedPoints: [],
       runByPoint: [],
@@ -131,8 +133,31 @@ export class ChapterTextIndex {
     this.cpByUtf16[this.collapsed.length] = state.collapsedPoints.length;
 
     for (const run of runs) {
+      if (!run.engineRawOffsets.length) continue;
       const list = this.runsByParent.get(run.parent) ?? [];
-      list.push(run);
+      const splitOffsets = [0];
+      let partStart = 0;
+      let supported = true;
+      for (const part of run.parts) {
+        const boundaries = this.engineBoundaries.get(part.node);
+        if (boundaries?.length === 0) supported = false;
+        for (const offset of boundaries?.slice(1, -1) ?? []) splitOffsets.push(partStart + offset);
+        partStart += part.rawLength;
+      }
+      splitOffsets.push(partStart);
+      const engineRuns: TextRun[] = [];
+      if (supported) {
+        let nextOffset = 0;
+        for (let i = 0; i < splitOffsets.length - 1; i += 1) {
+          const firstOffset = nextOffset;
+          while (nextOffset < run.engineRawOffsets.length && run.engineRawOffsets[nextOffset] < splitOffsets[i + 1]) nextOffset += 1;
+          const offsets = run.engineRawOffsets.subarray(firstOffset, nextOffset);
+          if (!offsets.length) continue;
+          engineRuns.push(splitOffsets.length === 2 ? run : { ...run, engineRawOffsets: offsets, engineRawEnd: splitOffsets[i + 1] });
+        }
+      }
+      this.engineRunsByRun.set(run, engineRuns);
+      list.push(...engineRuns);
       this.runsByParent.set(run.parent, list);
     }
     for (const [, list] of this.runsByParent) {
@@ -181,15 +206,28 @@ export class ChapterTextIndex {
       runCount: 0,
       collapsedStart: state.collapsedPoints.length,
       collapsedLength: 0,
+      engineRawOffsets: new Int32Array(),
+      engineRawEnd: 0,
     };
     const runIdx = runs.length;
     let emittedAny = false;
     let rawConcatOffset = 0;
+    // Search drops block indentation; CREngine keeps one leading ASCII space and
+    // preserves Unicode spaces. Keep its offsets independent of the search index.
+    const engineRawOffsets: number[] = [];
+    let engineLastWasSpace = false;
+    const whitespaceOnly = run.parts.every((part) => /^[ \t\r\n]*$/.test(part.node.data ?? ''));
 
     for (const part of run.parts) {
       this.runInfoByNode.set(part.node, { run, rawStart: rawConcatOffset });
       const raw = part.node.data ?? '';
+      const boundaries = new Set(this.engineBoundaries.get(part.node) ?? []);
+      const partStart = rawConcatOffset;
       for (const cp of raw) {
+        if (boundaries.has(rawConcatOffset - partStart)) engineLastWasSpace = false;
+        const engineSpace = /^[ \t\r\n]$/.test(cp);
+        if (!whitespaceOnly && (!engineSpace || !engineLastWasSpace)) engineRawOffsets.push(rawConcatOffset);
+        engineLastWasSpace = engineSpace;
         if (WHITESPACE_RE.test(cp)) {
           if (!state.atBoundary && !state.lastWasSpace) {
             state.collapsedPoints.push(' ');
@@ -223,6 +261,8 @@ export class ChapterTextIndex {
     }
 
     run.collapsedLength = emittedAny ? state.collapsedPoints.length - run.collapsedStart : 0;
+    run.engineRawOffsets = Int32Array.from(engineRawOffsets);
+    run.engineRawEnd = rawConcatOffset;
     runs.push(run);
   }
 
@@ -247,7 +287,50 @@ export class ChapterTextIndex {
   }
 
   collapsedForRunOffset(run: TextRun, cpOffset: number): number {
-    return run.collapsedStart + Math.max(0, Math.min(cpOffset, run.collapsedLength));
+    const point = this.rawPointForEngineOffset(run, cpOffset);
+    return point ? (this.collapsedFromNodePoint(point.node, point.offset) ?? run.collapsedStart) : run.collapsedStart;
+  }
+
+  enginePointOfRawPoint(node: CfiNode, offset: number): { run: TextRun; offset: number } | null {
+    const info = this.runInfoByNode.get(node);
+    if (!info) return null;
+    const target = info.rawStart + offset;
+    const runs = this.engineRunsByRun.get(info.run) ?? [];
+    const run = runs.find((candidate) => target < candidate.engineRawEnd) ?? runs.at(-1);
+    if (!run) return null;
+    let lo = 0;
+    let hi = run.engineRawOffsets.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (run.engineRawOffsets[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return { run, offset: lo };
+  }
+
+  engineOffsetOfRawPoint(node: CfiNode, offset: number): number | null {
+    const info = this.runInfoByNode.get(node);
+    if (!info || !info.run.engineRawOffsets.length) return null;
+    const target = info.rawStart + offset;
+    const offsets = info.run.engineRawOffsets;
+    let lo = 0;
+    let hi = offsets.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (offsets[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  rawPointForEngineOffset(run: TextRun, offset: number): RawPoint | null {
+    if (!run.engineRawOffsets.length || offset < 0 || offset > run.engineRawOffsets.length) return null;
+    let rawOffset = run.engineRawOffsets[offset] ?? run.engineRawEnd;
+    for (const part of run.parts) {
+      if (rawOffset < part.rawLength || part === run.parts[run.parts.length - 1]) return { node: part.node, offset: rawOffset };
+      rawOffset -= part.rawLength;
+    }
+    return null;
   }
 
   /** Inclusive start point: resolves the collapsed cp index to (raw text node, UTF-16 offset). */
@@ -319,7 +402,9 @@ export class ChapterTextIndex {
 
   /** Run-relative crengine offset (code points) for a collapsed cp index. */
   runOffsetOfCollapsed(cpIndex: number, run: TextRun): number {
-    return Math.max(0, Math.min(cpIndex, run.collapsedStart + run.collapsedLength) - run.collapsedStart);
+    const index = Math.max(run.collapsedStart, Math.min(cpIndex, run.collapsedStart + run.collapsedLength));
+    const point = index < run.collapsedStart + run.collapsedLength ? this.rawPointAt(index) : this.endPointFromCollapsed(index);
+    return point ? (this.engineOffsetOfRawPoint(point.node, point.offset) ?? 0) : 0;
   }
 
   runAtCollapsed(cpIndex: number, direction: 'forward' | 'backward' = 'forward'): TextRun | null {

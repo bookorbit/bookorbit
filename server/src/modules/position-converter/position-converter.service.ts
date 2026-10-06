@@ -8,10 +8,12 @@ import {
   ConversionResult,
   CONVERTER_VERSION,
   cfiPointToCollapsedCp,
+  cfiPointToXPointer,
   cfiRangeToXPointer,
   collapsedPointToCfi,
   collapsedPointToXPointer,
   xpointerPointToCollapsed,
+  xpointerPointToCfi,
   xpointerRangeToCfi,
 } from './position-converter.core';
 import { parseXPointer } from './xpointer.utils';
@@ -89,10 +91,8 @@ export class PositionConverterService {
     const doc = await this.epubDom.getChapter(params.bookFileId, chapterIndex);
     if (!doc) return { status: 'failed', reason: 'chapter_unavailable', chapterIndex };
 
-    const cp = xpointerPointToCollapsed(doc, params.pos);
-    if (cp == null) return { status: 'failed', reason: 'unresolvable_structure', chapterIndex };
-    const cfi = collapsedPointToCfi(doc, chapterIndex, cp);
-    if (!cfi) return { status: 'failed', reason: 'cfi_generation_failed', chapterIndex };
+    const cfi = xpointerPointToCfi(doc, chapterIndex, params.pos);
+    if (!cfi) return { status: 'failed', reason: 'unresolvable_structure', chapterIndex };
     return { status: 'exact', cfi, chapterIndex };
   }
 
@@ -109,10 +109,8 @@ export class PositionConverterService {
     const doc = await this.epubDom.getChapter(params.bookFileId, chapterIndex);
     if (!doc) return { status: 'failed', reason: 'chapter_unavailable', chapterIndex };
 
-    const cp = cfiPointToCollapsedCp(doc, params.cfi);
-    if (cp == null) return { status: 'failed', reason: 'unresolvable_structure', chapterIndex };
-    const pos = collapsedPointToXPointer(doc, chapterIndex, cp);
-    if (!pos) return { status: 'failed', reason: 'xpointer_generation_failed', chapterIndex };
+    const pos = cfiPointToXPointer(doc, chapterIndex, params.cfi);
+    if (!pos) return { status: 'failed', reason: 'unresolvable_structure', chapterIndex };
     return { status: 'exact', pos0: pos, chapterIndex };
   }
 

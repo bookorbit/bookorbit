@@ -2474,7 +2474,58 @@
           "noLanguage": "Aucune langue",
           "noPublisher": "Aucun éditeur"
         },
-        "unknownModifier": "Modificateur « {modifier} » inconnu. Il sera ignoré et la valeur restera inchangée."
+        "unknownModifier": "Modificateur « {modifier} » inconnu. Il sera ignoré et la valeur restera inchangée.",
+        "rulesNav": "Règles de nommage",
+        "railFoot": "Une bibliothèque sans modèle propre suit la valeur par défaut dont elle relève.",
+        "usedBy": "Utilisée par {libraries}",
+        "followsBase": "Hérite de : {base}.",
+        "copyPattern": "Copier le modèle",
+        "recipes": "Recettes",
+        "recipesTitle": "Partir d'une recette",
+        "recipesReplace": "Remplace tout le modèle",
+        "recipeInUse": "Utilisée",
+        "insert": "Insérer",
+        "insertToolbar": "Insérer dans le modèle",
+        "insertOptional": "Facultatif",
+        "insertFallback": "Valeur de repli",
+        "insertFolder": "Dossier",
+        "lineHint": "Appuyez sur {enter} pour commencer un nouveau dossier ou tapez {brace} pour choisir un jeton. Cliquez sur l'icône d'un dossier pour l'omettre lorsque sa valeur manque.",
+        "downloadLineHint": "Les téléchargements n'ont pas de dossiers : seule la dernière partie du modèle est utilisée.",
+        "tokenSuggestions": "Jetons correspondants",
+        "noTokenMatch": "Aucun jeton ne correspond à « {query} ».",
+        "uploadedNameKept": "Nom de fichier envoyé conservé",
+        "level": {
+          "folder": "Dossier {n}",
+          "bookFolder": "Dossier du livre",
+          "file": "Nom de fichier",
+          "skipWhenEmpty": "{level} : omettre si la valeur manque",
+          "skippedWhenEmpty": "Omis lorsque sa valeur manque. Cliquez pour toujours créer ce dossier.",
+          "alwaysCreated": "Toujours créé. Cliquez pour omettre ce dossier lorsque sa valeur manque."
+        },
+        "result": "Résultat",
+        "previewWith": "Aperçu avec",
+        "previewWithAria": "Aperçu avec {title}",
+        "previewBook": {
+          "sample": "Livre exemple",
+          "longTitle": "Titre et série longs",
+          "longSubtitle": "Sous-titre long",
+          "manyAuthors": "Cinq auteurs",
+          "audiobook": "Livre audio",
+          "standalone": "Sans série"
+        },
+        "previewingCase": "Aperçu : {case}",
+        "showComplete": "Afficher le cas complet",
+        "previewStale": "L'aperçu se mettra à jour une fois le modèle corrigé.",
+        "noChange": "Aucun changement",
+        "tagSkipped": "omis",
+        "tagFallback": "repli",
+        "tagBookFolder": "dossier du livre",
+        "tagUploadedName": "nom envoyé",
+        "tagShortened": "raccourci à 255 octets",
+        "tagEmptyName": "nom vide",
+        "levelSkipped": "Omis car {token} est vide",
+        "levelEmptyName": "Nom de dossier vide. Donnez une valeur de repli à ce dossier pour qu'il ait toujours un nom.",
+        "renameNote": "Les livres déjà sur le disque conservent leur chemin. Les bibliothèques qui renomment les fichiers appliquent ce modèle au prochain enregistrement des détails d'un livre : {libraries}."
       },
       "kobo": {
         "title": "Synchronisation Kobo",
@@ -8090,6 +8141,7 @@
     },
     "settings": {
       "title": "Personnaliser le tableau de bord",
+      "preferencesTitle": "Préférences du tableau de bord",
       "tabs": {
         "widgets": "Widgets",
         "shelves": "Étagères"
@@ -8126,6 +8178,11 @@
         "twoColumns": "Deux colonnes",
         "twoColumnsDescription": "Afficher deux étagères par ligne."
       },
+      "shelfSync": {
+        "label": "Synchroniser les étagères entre les sessions",
+        "description": "Enregistrer l'ordre, la visibilité, le nombre de rangées et la disposition des étagères dans votre compte. Option désactivée, les réglages des étagères restent dans ce navigateur."
+      },
+      "saveFailed": "Impossible d'enregistrer les paramètres du tableau de bord. Vérifiez votre connexion et réessayez.",
       "libraryScope": {
         "title": "Bibliothèques du tableau de bord",
         "description": "Choisissez les bibliothèques qui alimentent ce tableau de bord en livres et en données de lecture.",

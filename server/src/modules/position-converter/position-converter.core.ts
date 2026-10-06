@@ -20,9 +20,11 @@ import {
   spineCfiForChapterIndex,
 } from './cfi.utils';
 import { decodeNamedEntities } from './xhtml-entities';
-import { buildXPointer, parseXPointer, resolveXPointerElement } from './xpointer.utils';
+import { buildXPointer, buildXPointerPath, parseXPointer, resolveXPointerElement } from './xpointer.utils';
 
-export const CONVERTER_VERSION = 1;
+export const CONVERTER_VERSION = 2;
+
+const ENGINE_TEXT_SPLIT_SIZE = 8192;
 
 /** KOReader sidecar text is truncated at 10000 chars; treat near-limit text as a prefix. */
 const TRUNCATED_TEXT_THRESHOLD = 9990;
@@ -49,7 +51,42 @@ export type ConversionResult = ConversionSuccess | ConversionFailure;
 export function parseChapterDocument(xhtml: string): ChapterDocument {
   const $ = cheerio.load(decodeNamedEntities(xhtml), { xml: true });
   const root = $.root()[0] as unknown as CfiNode;
-  return { root, index: new ChapterTextIndex(root) };
+  if (xhtml.length < ENGINE_TEXT_SPLIT_SIZE) return { root, index: new ChapterTextIndex(root) };
+  // CREngine splits source before entity decoding; decoded text lengths cannot determine its node indexes.
+  const rawRoot = cheerio.load(xhtml, { xml: { decodeEntities: false } }).root()[0] as unknown as CfiNode;
+  const boundaries = new Map<CfiNode, number[]>();
+  const visit = (node: CfiNode, raw: CfiNode) => {
+    if (isTextNode(node) && Array.from(raw.data ?? '').length >= ENGINE_TEXT_SPLIT_SIZE) {
+      const chars = Array.from(raw.data ?? '');
+      const offsets = [0];
+      let consumed = 0;
+      let decoded = '';
+      while (consumed < chars.length) {
+        let end = Math.min(consumed + ENGINE_TEXT_SPLIT_SIZE, chars.length);
+        if (end - consumed === ENGINE_TEXT_SPLIT_SIZE) {
+          for (let i = end - 1; i >= consumed; i -= 1) {
+            if (chars[i] === ' ' || chars[i] === '\n' || chars[i] === '\r') {
+              end = i + 1;
+              break;
+            }
+          }
+        }
+        const chunk = chars.slice(consumed, end).join('');
+        decoded += cheerio
+          .load(`<p>${decodeNamedEntities(chunk)}</p>`, { xml: true })('p')
+          .text();
+        offsets.push(decoded.length);
+        consumed = end;
+      }
+      boundaries.set(node, decoded === node.data ? offsets : []);
+    }
+    for (let i = 0; i < (node.children?.length ?? 0); i += 1) {
+      const rawChild = raw.children?.[i];
+      if (rawChild) visit(node.children![i], rawChild);
+    }
+  };
+  visit(root, rawRoot);
+  return { root, index: new ChapterTextIndex(root, boundaries) };
 }
 
 interface StructuralAnchor {
@@ -70,7 +107,7 @@ function xpointerAnchor(doc: ChapterDocument, pos: string, exclusiveEnd: boolean
   if (parsed.offset == null) {
     return { cp: exclusiveEnd ? run.collapsedStart + run.collapsedLength : run.collapsedStart, resolved: false };
   }
-  const withinRange = parsed.offset <= run.collapsedLength;
+  const withinRange = parsed.offset <= run.engineRawOffsets.length;
   return { cp: doc.index.collapsedForRunOffset(run, parsed.offset), resolved: withinRange };
 }
 
@@ -159,7 +196,36 @@ export function collapsedPointToCfi(doc: ChapterDocument, chapterIndex: number, 
 export function collapsedPointToXPointer(doc: ChapterDocument, chapterIndex: number, cp: number): string | null {
   const run = doc.index.runAtCollapsed(cp, 'forward') ?? doc.index.runAtCollapsed(cp, 'backward');
   if (!run) return null;
-  return buildXPointer(run.parent, chapterIndex + 1, run.runIndex, run.runCount, doc.index.runOffsetOfCollapsed(cp, run));
+  const point = doc.index.startPointFromCollapsed(cp);
+  const engine = point ? doc.index.enginePointOfRawPoint(point.node, point.offset) : null;
+  return engine ? buildXPointer(engine.run.parent, chapterIndex + 1, engine.run.runIndex, engine.run.runCount, engine.offset) : null;
+}
+
+export function cfiPointToXPointer(doc: ChapterDocument, chapterIndex: number, cfi: string): string | null {
+  const parsed = parseCfi(cfi);
+  const point = parsed ? resolveCfiParts(doc.root, parsed.start) : null;
+  if (!point?.node) return null;
+  if (!isTextNode(point.node)) return buildXPointerPath(point.node, chapterIndex + 1);
+  const engine = doc.index.enginePointOfRawPoint(point.node, point.offset ?? 0);
+  return engine ? buildXPointer(engine.run.parent, chapterIndex + 1, engine.run.runIndex, engine.run.runCount, engine.offset) : null;
+}
+
+export function xpointerPointToCfi(doc: ChapterDocument, chapterIndex: number, pos: string): string | null {
+  const parsed = parseXPointer(pos);
+  if (!parsed || parsed.docFragmentIndex !== chapterIndex + 1) return null;
+  const element = resolveXPointerElement(doc.root, parsed.steps);
+  if (!element) return null;
+  if (!/\/text\(\)/.test(pos)) {
+    if (parsed.offset != null && parsed.offset !== 0) return null;
+    return joinCfiIndirection(spineCfiForChapterIndex(chapterIndex), cfiFromPoint({ node: element, offset: 0 }));
+  }
+  if (parsed.textIndex == null || parsed.offset == null) {
+    const cp = xpointerPointToCollapsed(doc, pos);
+    return cp == null ? null : collapsedPointToCfi(doc, chapterIndex, cp);
+  }
+  const run = doc.index.runsOfParent(element)[parsed.textIndex - 1];
+  const point = run ? doc.index.rawPointForEngineOffset(run, parsed.offset) : null;
+  return point ? joinCfiIndirection(spineCfiForChapterIndex(chapterIndex), cfiFromPoint(point)) : null;
 }
 
 /** Resolves a point xpointer to its collapsed cp index (null when structure is unresolvable). */
@@ -235,15 +301,14 @@ export function collapsedRangeToXPointerPair(
   const endRun = doc.index.runAtCollapsed(endCp - 1, 'backward');
   if (!startRun || !endRun) return null;
 
+  const start = doc.index.startPointFromCollapsed(startCp);
+  const end = doc.index.endPointFromCollapsed(endCp);
+  const engineStart = start ? doc.index.enginePointOfRawPoint(start.node, start.offset) : null;
+  const engineEnd = end ? doc.index.enginePointOfRawPoint(end.node, end.offset) : null;
+  if (!engineStart || !engineEnd) return null;
   const docFragmentIndex = chapterIndex + 1;
-  const pos0 = buildXPointer(
-    startRun.parent,
-    docFragmentIndex,
-    startRun.runIndex,
-    startRun.runCount,
-    doc.index.runOffsetOfCollapsed(startCp, startRun),
-  );
-  const pos1 = buildXPointer(endRun.parent, docFragmentIndex, endRun.runIndex, endRun.runCount, doc.index.runOffsetOfCollapsed(endCp, endRun));
+  const pos0 = buildXPointer(engineStart.run.parent, docFragmentIndex, engineStart.run.runIndex, engineStart.run.runCount, engineStart.offset);
+  const pos1 = buildXPointer(engineEnd.run.parent, docFragmentIndex, engineEnd.run.runIndex, engineEnd.run.runCount, engineEnd.offset);
   if (!pos0 || !pos1) return null;
   return { pos0, pos1 };
 }

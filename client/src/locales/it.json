@@ -2474,7 +2474,42 @@
           "noLanguage": "Senza lingua",
           "noPublisher": "Senza editore"
         },
-        "unknownModifier": "Modificatore sconosciuto \"{modifier}\". Sarà ignorato, lasciando invariato il valore."
+        "unknownModifier": "Modificatore sconosciuto \"{modifier}\". Sarà ignorato, lasciando invariato il valore.",
+        "rulesNav": "Regole di denominazione",
+        "railFoot": "Una libreria senza un proprio modello segue il valore predefinito sottostante.",
+        "usedBy": "Usato da {libraries}",
+        "followsBase": "Segue la {base}.",
+        "copyPattern": "Copia modello",
+        "recipeInUse": "In uso",
+        "insert": "Inserisci",
+        "insertToolbar": "Inserisci nel modello",
+        "insertOptional": "Facoltativo",
+        "insertFallback": "Alternativa",
+        "insertFolder": "Cartella",
+        "lineHint": "Premi {enter} per avviare una nuova cartella o digita {brace} per scegliere un token. Fare clic sull'icona di una cartella per saltare quella cartella quando il suo valore è mancante.",
+        "downloadLineHint": "I download non hanno cartelle, quindi viene utilizzata solo l'ultima parte del modello.",
+        "tokenSuggestions": "Token corrispondenti",
+        "noTokenMatch": "Nessun token corrisponde \"{query}\".",
+        "uploadedNameKept": "Nome file caricato mantenuto",
+        "level": {
+          "folder": "Cartella {n}",
+          "bookFolder": "Cartella del libro",
+          "file": "Nome file",
+          "skipWhenEmpty": "Salta {level} quando il suo valore è mancante",
+          "skippedWhenEmpty": "Saltato quando il suo valore è mancante. Fare clic per creare sempre questa cartella."
+        },
+        "result": "Risultato",
+        "previewWith": "Anteprima con",
+        "previewWithAria": "Anteprima con {title}",
+        "previewBook": {
+          "sample": "Libro campione",
+          "longTitle": "Titolo lungo e serie",
+          "longSubtitle": "Sottotitolo lungo",
+          "manyAuthors": "Cinque autori",
+          "audiobook": "Audiolibro",
+          "standalone": "Nessuna serie"
+        },
+        "previewingCase": "Anteprima {case}"
       },
       "kobo": {
         "title": "Kobo Sincronizza",

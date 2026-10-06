@@ -516,10 +516,16 @@ export class KoreaderService {
 
     if (readingProg) {
       let xpointer = readingProg.koreaderProgress ?? null;
-      if (!xpointer && readingProg.cfi) {
-        const chapterIndex = this.chapterService.parseChapterIndexFromCfi(readingProg.cfi);
-        if (chapterIndex !== null && chapterIndex >= 0) {
-          xpointer = `/body/DocFragment[${chapterIndex + 1}]/body`;
+      if (!xpointer && readingProg.cfi && !isPagedReadingFormat(bookFile.format)) {
+        const startedAt = Date.now();
+        try {
+          const outcome = await this.positionConverter.cfiPointToXpointer({ bookFileId: bookFile.id, cfi: readingProg.cfi });
+          // A chapter start would override the percentage fallback and discard the text offset.
+          if (outcome.status !== 'failed' && outcome.pos0) xpointer = outcome.pos0;
+        } catch (error) {
+          this.logger.warn(
+            `[${SYNC_EVENT}] [fail] userId=${userId} bookFileId=${bookFile.id} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? sanitizeLogValue(error.name) : 'unknown'} - position conversion failed; serving percentage fallback`,
+          );
         }
       }
 

@@ -21,7 +21,7 @@ export interface ParsedXPointer {
   offset: number | null;
 }
 
-const XPOINTER_RE = /^\/body\/DocFragment(?:\[(\d+)\])?(.*)$/;
+const XPOINTER_RE = /^\/body(?:\[1\])?\/DocFragment(?:\[(\d+)\])?(.*)$/;
 const STEP_RE = /^([A-Za-z][\w:-]*)(?:\[(\d+)\])?$/;
 const TEXT_STEP_RE = /^text\(\)(?:\[(\d+)\])?$/;
 
