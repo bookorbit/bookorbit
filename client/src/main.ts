@@ -3,6 +3,7 @@ import './lib/echarts'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { registerSW } from 'virtual:pwa-register'
 
 import App from './App.vue'
 import router from './router'
@@ -62,6 +63,8 @@ if (needsSetup.value !== true) {
 
 app.use(router)
 app.mount('#app')
+
+registerSW({ immediate: true })
 
 function prefetchPdfReader() {
   void Promise.all([import('./features/reader/pdf-v4/PdfV4ReaderView.vue'), import('@embedpdf/pdfium/pdfium.wasm?url')]).then(([, wasm]) => {

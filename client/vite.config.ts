@@ -89,7 +89,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,wasm}'],
+        // PDFium exceeds Workbox's default 2 MiB precache limit.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         globIgnores: ['**/assets/foliate/**'],
         // Keep the offline shell at a separate path. Workbox maps '/' and its query variants to
         // precached index.html before the NetworkFirst route can contact the auth proxy.
