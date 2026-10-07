@@ -109,7 +109,7 @@ export class BookMergeRepository {
       )
       UPDATE book_series_memberships b
       SET
-          book_id = 61,
+          book_id = ${targetBookId},
           display_order = o.new_display_order
       FROM ordered o
       WHERE b.ctid = o.ctid;`,
