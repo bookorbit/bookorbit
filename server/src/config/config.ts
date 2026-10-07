@@ -2,6 +2,7 @@ import { registerAs } from '@nestjs/config';
 import { join, resolve } from 'path';
 
 import { DEV_CLIENT_ORIGIN } from './dev-client-origin';
+
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   host: process.env.HOST?.trim() || '0.0.0.0',
@@ -14,6 +15,10 @@ export const appConfig = registerAs('app', () => ({
   githubReleasesRepo: process.env.GITHUB_RELEASES_REPO?.trim() || 'bookorbit/bookorbit',
   githubReleasesToken: process.env.GITHUB_RELEASES_TOKEN?.trim() || undefined,
   oidcAllowLocalIssuers: parseBooleanFlag(process.env.OIDC_ALLOW_LOCAL_ISSUERS, false),
+  // Additional redirect URIs accepted alongside the web callback and nativeRedirectUri above -
+  // e.g. other hostnames a multi-origin deployment is reachable on. Empty by default (purely
+  // additive); see isAllowedRedirectUri in modules/auth/oidc/redirect-uri.ts.
+  oidcExtraRedirectUris: parseStringList(process.env.OIDC_EXTRA_REDIRECT_URIS, []),
   swaggerEnabled: parseBooleanFlag(process.env.SWAGGER_ENABLED, false),
   koboCloudscraperPython: process.env.KOBO_CLOUDSCRAPER_PYTHON?.trim() || undefined,
   koreaderPluginSourcePath: process.env.KOREADER_PLUGIN_PATH?.trim() || undefined,
@@ -94,6 +99,15 @@ export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({
   clockToleranceSecs: parsePositiveInteger(process.env.OIDC_CLOCK_TOLERANCE_SECS, 30),
   tokenExchangeTimeoutMs: parsePositiveInteger(process.env.OIDC_TOKEN_EXCHANGE_TIMEOUT_MS, 10_000),
 }));
+
+function parseStringList(value: string | undefined, fallback: string[]): string[] {
+  if (!value?.trim()) return fallback;
+  const parsed = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? parsed : fallback;
+}
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value);

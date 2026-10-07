@@ -85,6 +85,7 @@ const envSchema = z.object({
   AUDIOLESS_EPUB_MAX_OUTPUT_BYTES: z.coerce.number().int().positive().optional(),
   CLIENT_URL: z.string().url().optional(),
   APP_URL: z.string().url().default(DEV_CLIENT_ORIGIN),
+  OIDC_EXTRA_REDIRECT_URIS: z.string().optional(),
   TRUST_PROXY: trustProxyEnv(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   MIGRATION_ENCRYPTION_KEY: z.string().optional(),
