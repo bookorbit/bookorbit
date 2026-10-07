@@ -129,6 +129,7 @@ const TARGETED_BOOK_SCAN_MAX_CONCURRENCY = 8;
 const MISSING_FILE_STAT_BATCH_SIZE = 50;
 const AUDIO_DURATION_PROBE_CONCURRENCY = 4;
 const MEDIA_OVERLAY_REPAIR_CONCURRENCY = 4;
+const BOOK_FINALIZE_BATCH_SIZE = 200;
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
 
 function isUnderAnyDir(absolutePath: string, dirs: Set<string>): boolean {
@@ -142,6 +143,10 @@ interface ScanCounts {
   addedCount: number;
   updatedCount: number;
   missingCount: number;
+}
+
+interface ScanFolderCandidatesResult extends ScanCounts {
+  booksToFinalize: Map<number, boolean>;
 }
 
 type ScannerMetadataSource = (typeof SCANNER_METADATA_SOURCES)[number];
@@ -187,6 +192,7 @@ interface ProcessCandidateResult {
   retainedFileIds: Set<number>;
   becameVisible: boolean;
   created: boolean;
+  audioFilesChanged: boolean;
   /** Books whose file set changed here: this one, and any book a file was taken from. */
   coverBookIds: number[];
 }
@@ -1061,6 +1067,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const totals = { added: 0, updated: 0 };
     const allRetainedFileIds = new Set<number>();
     const seenBookIds = new Set<number>();
+    const booksToFinalize = new Map<number, boolean>();
     const coverBookIds = new Set<number>();
     const importedBookIds: number[] = [];
     const candidateFolderPaths = new Set(candidates.map((candidate) => candidate.folderPath));
@@ -1079,6 +1086,9 @@ export class ScannerService implements OnApplicationBootstrap {
       this.emitTargetedScanResult(libraryId, result);
       seenBookIds.add(result.bookId);
       if (result.created) importedBookIds.push(result.bookId);
+      for (const bookId of [result.bookId, ...result.coverBookIds]) {
+        booksToFinalize.set(bookId, (booksToFinalize.get(bookId) ?? false) || result.audioFilesChanged);
+      }
       for (const fid of result.retainedFileIds) allRetainedFileIds.add(fid);
       for (const coverBookId of result.coverBookIds) coverBookIds.add(coverBookId);
       totals.added += result.added;
@@ -1087,11 +1097,14 @@ export class ScannerService implements OnApplicationBootstrap {
 
     const pruneCounts = { added: 0, updated: 0 };
     for (const bookId of seenBookIds) {
-      if (await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts)) {
+      const pruned = await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts);
+      if (pruned) {
         coverBookIds.add(bookId);
+        booksToFinalize.set(bookId, true);
       }
     }
     totals.updated += pruneCounts.updated;
+    await this.finalizeScannedBooks(booksToFinalize, settings.formatPriority);
     await this.reconcileCoverSlots(coverBookIds);
     await this.scheduleImportedBookMetadataFetch(libraryId, importedBookIds);
 
@@ -1201,6 +1214,12 @@ export class ScannerService implements OnApplicationBootstrap {
       added: 0,
       updated: 0,
     });
+    const booksToFinalize = new Map<number, boolean>();
+    for (const bookId of [result.bookId, ...result.coverBookIds]) {
+      booksToFinalize.set(bookId, result.audioFilesChanged);
+    }
+    if (pruned) booksToFinalize.set(result.bookId, true);
+    await this.finalizeScannedBooks(booksToFinalize, settings.formatPriority);
     await this.reconcileCoverSlots([...result.coverBookIds, ...(pruned ? [result.bookId] : [])]);
     this.emitTargetedScanResult(libraryId, result);
     await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
@@ -1273,6 +1292,12 @@ export class ScannerService implements OnApplicationBootstrap {
       added: 0,
       updated: 0,
     });
+    const booksToFinalize = new Map<number, boolean>();
+    for (const bookId of [result.bookId, ...result.coverBookIds]) {
+      booksToFinalize.set(bookId, result.audioFilesChanged);
+    }
+    if (pruned) booksToFinalize.set(result.bookId, true);
+    await this.finalizeScannedBooks(booksToFinalize, settings.formatPriority);
     await this.reconcileCoverSlots([...result.coverBookIds, ...(pruned ? [result.bookId] : [])]);
     this.emitTargetedScanResult(libraryId, result);
     await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
@@ -1364,6 +1389,12 @@ export class ScannerService implements OnApplicationBootstrap {
       added: 0,
       updated: 0,
     });
+    const booksToFinalize = new Map<number, boolean>();
+    for (const bookId of [result.bookId, ...result.coverBookIds]) {
+      booksToFinalize.set(bookId, result.audioFilesChanged);
+    }
+    if (pruned) booksToFinalize.set(result.bookId, true);
+    await this.finalizeScannedBooks(booksToFinalize, settings.formatPriority);
     await this.reconcileCoverSlots([...result.coverBookIds, ...(pruned ? [result.bookId] : [])]);
     this.emitTargetedScanResult(libraryId, result);
     await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
@@ -1395,6 +1426,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const allowed = allowedFormats.length > 0 ? new Set(allowedFormats) : null;
 
     const totals: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
+    const booksToFinalize = new Map<number, boolean>();
 
     try {
       this.scanJobStore.setTotal(libraryId, 0);
@@ -1472,6 +1504,9 @@ export class ScannerService implements OnApplicationBootstrap {
         totals.addedCount += counts.addedCount;
         totals.updatedCount += counts.updatedCount;
         totals.missingCount += counts.missingCount;
+        for (const [bookId, audioFilesChanged] of counts.booksToFinalize) {
+          booksToFinalize.set(bookId, (booksToFinalize.get(bookId) ?? false) || audioFilesChanged);
+        }
 
         // Persist dir scan state after successful folder processing
         if (dirMtimes.size > 0 && scanStateVersion !== undefined) {
@@ -1486,6 +1521,7 @@ export class ScannerService implements OnApplicationBootstrap {
         }
       }
 
+      await this.finalizeScannedBooks(booksToFinalize, formatPriority);
       await this.pruneExpiredDormantCovers(libraryId, jobId);
       await this.scannerRepo.completeScanJob(jobId, totals);
       this.logger.log(
@@ -1555,7 +1591,7 @@ export class ScannerService implements OnApplicationBootstrap {
     addedAtSource: AddedAtSource,
     skippedDirs: Set<string> = new Set(),
     unchangedDirs: Set<string> = new Set(),
-  ): Promise<ScanCounts> {
+  ): Promise<ScanFolderCandidatesResult> {
     const event = 'scanner.scan_folder_candidates';
     const startedAt = Date.now();
     this.logger.log(
@@ -1563,13 +1599,17 @@ export class ScannerService implements OnApplicationBootstrap {
     );
     try {
       const counts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
+      const booksToFinalize = new Map<number, boolean>();
       const [knownBooks, knownFiles] = await Promise.all([
         this.scannerRepo.findBooksByLibraryFolder(libraryFolderId),
         this.scannerRepo.findBookFilesByLibraryFolder(libraryFolderId),
       ]);
 
       const isFirstScan = knownBooks.length === 0 && knownFiles.length === 0;
-      const maps = ScannerService.buildLookupMaps(knownBooks, knownFiles);
+      const referencedBookIds = [...new Set(knownFiles.map((file) => file.bookId))];
+      const referencedBooks = await this.scannerRepo.findBooksByIds(referencedBookIds, libraryId);
+      const knownBooksById = new Map([...knownBooks, ...referencedBooks].map((book) => [book.id, book]));
+      const maps = ScannerService.buildLookupMaps([...knownBooksById.values()], knownFiles);
 
       const seenBookIds = new Set<number>();
       const allRetainedFileIds = new Set<number>();
@@ -1591,6 +1631,9 @@ export class ScannerService implements OnApplicationBootstrap {
         );
         seenBookIds.add(result.bookId);
         if (result.created) importedBookIds.push(result.bookId);
+        for (const bookId of [result.bookId, ...result.coverBookIds]) {
+          booksToFinalize.set(bookId, (booksToFinalize.get(bookId) ?? false) || result.audioFilesChanged);
+        }
         for (const fid of result.retainedFileIds) allRetainedFileIds.add(fid);
         for (const coverBookId of result.coverBookIds) coverBookIds.add(coverBookId);
         counts.addedCount += result.added;
@@ -1614,8 +1657,17 @@ export class ScannerService implements OnApplicationBootstrap {
       // Must happen after ALL batches so cross-book file moves are visible.
       const pruneCounts = { added: 0, updated: 0 };
       for (const bookId of seenBookIds) {
-        if (await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts)) {
+        const pruned = await this.pruneMissingBookFiles(
+          bookId,
+          allRetainedFileIds,
+          maps.fileIdsByBookId,
+          maps.fileByPath,
+          maps.fileByIno,
+          pruneCounts,
+        );
+        if (pruned) {
           coverBookIds.add(bookId);
+          booksToFinalize.set(bookId, true);
         }
       }
       counts.updatedCount += pruneCounts.updated;
@@ -1654,7 +1706,7 @@ export class ScannerService implements OnApplicationBootstrap {
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} durationMs=${Date.now() - startedAt} addedCount=${counts.addedCount} updatedCount=${counts.updatedCount} missingCount=${counts.missingCount} - folder candidate scan completed`,
       );
-      return counts;
+      return { ...counts, booksToFinalize };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -1749,6 +1801,48 @@ export class ScannerService implements OnApplicationBootstrap {
         );
       }
     });
+  }
+
+  private async finalizeScannedBooks(booksToFinalize: Map<number, boolean>, formatPriority: string[]): Promise<void> {
+    const entries = [...booksToFinalize];
+    for (let offset = 0; offset < entries.length; offset += BOOK_FINALIZE_BATCH_SIZE) {
+      const batch = entries.slice(offset, offset + BOOK_FINALIZE_BATCH_SIZE);
+      const files = await this.scannerRepo.findBookFilesByBookIds(batch.map(([bookId]) => bookId));
+      const filesByBookId = new Map<number, BookFile[]>();
+      for (const file of files) {
+        let bookFiles = filesByBookId.get(file.bookId);
+        if (!bookFiles) {
+          bookFiles = [];
+          filesByBookId.set(file.bookId, bookFiles);
+        }
+        bookFiles.push(file);
+      }
+
+      for (const [bookId, audioFilesChanged] of batch) {
+        await this.finalizeScannedBook(bookId, filesByBookId.get(bookId) ?? [], formatPriority, audioFilesChanged);
+      }
+    }
+  }
+
+  private async finalizeScannedBook(bookId: number, files: BookFile[], formatPriority: string[], audioFilesChanged: boolean): Promise<void> {
+    const contentFiles = files.filter((file) => file.role === 'content');
+    const winner = selectPrimaryFile(contentFiles, formatPriority);
+    await this.scannerRepo.updateBookPrimaryFile(bookId, winner?.id ?? null);
+
+    const audioPaths = contentFiles
+      .filter((file) => file.format !== null && isAudioFormat(file.format))
+      .sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)))
+      .map((file) => file.absolutePath);
+
+    if (audioPaths.length > 1) {
+      try {
+        await this.metadataService.extractMergedAudioChapters(bookId, audioPaths, { filesChanged: audioFilesChanged });
+      } catch (err) {
+        this.logger.warn(
+          `[scanner.merge_audio_chapters] [fail] bookId=${bookId} files=${audioPaths.length} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - audio chapter merge failed`,
+        );
+      }
+    }
   }
 
   private async processCandidate(
@@ -1848,15 +1942,13 @@ export class ScannerService implements OnApplicationBootstrap {
       }
     }
 
-    // Phase 2: Pick winner (primary file) from all registered content files.
+    // Phase 2: Pick the candidate winner for metadata source selection.
     const contentFiles = registeredFiles.filter((f) => f.role === 'content');
 
     const winner = selectPrimaryFile(
       contentFiles.map((file) => ({ ...file, id: file.fileId })),
       formatPriority,
     );
-
-    await this.scannerRepo.updateBookPrimaryFile(book.id, winner?.fileId ?? null);
 
     // Phase 3: Metadata extraction, source-precedence driven, triggered by new/reassigned/changed metadata sources.
     //
@@ -1876,6 +1968,7 @@ export class ScannerService implements OnApplicationBootstrap {
       metadataSources.some((source) => hasMetadataSourceChanged(source.file)) || (book.primaryFileId === null && winner !== null);
     const audioContentFiles = contentFiles.filter((f) => f.format !== null && isAudioFormat(f.format!));
     const changedAudioFiles = audioContentFiles.filter(hasMetadataSourceChanged);
+    const audioFilesChanged = shouldExtractMetadata || changedAudioFiles.length > 0;
     const audioFilesNeedingDuration = audioContentFiles.filter(
       (file) => hasMetadataSourceChanged(file) || file.durationSeconds === null || file.durationSeconds <= 0,
     );
@@ -1938,29 +2031,10 @@ export class ScannerService implements OnApplicationBootstrap {
       }
     }
 
-    // 3e: Rebuild chapters across every audio file. Steps 3a and 3b read chapters from one file, and
-    //     each file of a multi-file audiobook embeds only its own chapters starting at zero, so on
-    //     its own that leaves the later files with no chapters at all and the last chapter of the
-    //     first file stretched over the rest of the book. Runs for unchanged books too, which is
-    //     what repairs the ones scanned before chapters were merged; it settles after one pass.
-    if (audioContentFiles.length > 1) {
-      const orderedAudioPaths = [...audioContentFiles]
-        .sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)))
-        .map((file) => file.absolutePath);
-      const filesChanged = shouldExtractMetadata || changedAudioFiles.length > 0;
-      try {
-        await this.metadataService.extractMergedAudioChapters(book.id, orderedAudioPaths, { filesChanged });
-      } catch (err) {
-        this.logger.warn(
-          `[scanner.merge_audio_chapters] [fail] bookId=${book.id} files=${orderedAudioPaths.length} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - audio chapter merge failed`,
-        );
-      }
-    }
-
     const becameVisible = await this.scannerRepo.promoteProcessingBookToPresent(book.id);
     const fileSetChanged = mediaOverlayChanged || registeredFiles.some(hasMetadataSourceChanged);
     const coverBookIds = [...(fileSetChanged ? [book.id] : []), ...formerOwnerBookIds];
-    return { bookId: book.id, ...counts, retainedFileIds, becameVisible, created: book.created, coverBookIds };
+    return { bookId: book.id, ...counts, retainedFileIds, becameVisible, created: book.created, audioFilesChanged, coverBookIds };
   }
 
   private buildMetadataExtractionSources(
@@ -2052,6 +2126,29 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     if (!existing) {
+      if (candidateOwnedBookIds.size === 1) {
+        const referencedBook = this.findBookEntryById(bookByFolderPath, [...candidateOwnedBookIds][0]);
+        const referencedFolderStillPresent =
+          referencedBook !== null &&
+          referencedBook.folderPath !== candidate.folderPath &&
+          (candidateFolderPaths.has(referencedBook.folderPath) ||
+            (await this.pathExistsAsDistinctEntry(referencedBook.folderPath, candidate.folderPath)));
+
+        if (referencedBook && referencedFolderStillPresent) {
+          if (referencedBook.status === 'missing') {
+            await this.scannerRepo.updateBookStatus(referencedBook.id, 'present');
+            counts.updatedCount++;
+            this.scanGateway.emitBookRestored({ libraryId, bookIds: [referencedBook.id] });
+            this.bufferBooksRestoredNotification(libraryId, [referencedBook.id]);
+          }
+
+          this.logger.log(
+            `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${referencedBook.id} folder="${sanitizeLogValue(candidate.folderPath)}" action=reuse_referenced_book - reused book referenced by candidate file`,
+          );
+          return { ...referencedBook, created: false };
+        }
+      }
+
       // Detect series-to-single-book merge: files were renamed so all stems match,
       // turning what was a virtual multi-book folder into one real-directory book.
       // Find any known books whose folderPaths are virtual children of this directory

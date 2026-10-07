@@ -569,16 +569,18 @@ export class ScannerRepository {
     return row ?? null;
   }
 
-  async findBooksByIds(bookIds: number[]) {
+  async findBooksByIds(bookIds: number[], libraryId?: number) {
     if (bookIds.length === 0) return [];
     return this.db
       .select({
         id: books.id,
         libraryId: books.libraryId,
         status: books.status,
+        folderPath: books.folderPath,
+        primaryFileId: books.primaryFileId,
       })
       .from(books)
-      .where(inArray(books.id, bookIds));
+      .where(libraryId == null ? inArray(books.id, bookIds) : and(inArray(books.id, bookIds), eq(books.libraryId, libraryId)));
   }
 
   async findBookCardData(bookIds: number[]) {

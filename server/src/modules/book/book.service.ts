@@ -3705,4 +3705,34 @@ export class BookService {
     }
     return chapters;
   }
+
+  async mergeBooks(sourceBookIds: number[], targetBookId: number, user: RequestUser): Promise<{ merged: number; targetBookId: number }> {
+    if (!sourceBookIds.length) {
+      throw new BadRequestException('sourceBookIds must not be empty');
+    }
+
+    const uniqueSourceIds = [...new Set(sourceBookIds)];
+
+    const mergeBookIds = [...new Set([...sourceBookIds, targetBookId])];
+    const mergeBooks = await this.verifyLibraryAccessForBookIds(mergeBookIds, user);
+
+    if (new Set(mergeBooks.map((book) => book.libraryId)).size > 1) {
+      throw new BadRequestException('Books from different libraries cannot be merged');
+    }
+
+    const libraryIds = new Set(mergeBooks.map((book) => book.libraryId));
+    if (mergeBooks.length !== mergeBookIds.length) {
+      throw new NotFoundException('One or more books could not be found');
+    }
+    if (libraryIds.size > 1) {
+      throw new BadRequestException('Books from different libraries cannot be merged');
+    }
+
+    const merged = await this.bookRepo.mergeBooks(uniqueSourceIds, targetBookId);
+
+    return {
+      merged,
+      targetBookId,
+    };
+  }
 }

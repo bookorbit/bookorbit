@@ -4510,6 +4510,7 @@
       "BookBulkSetMetadataLock": "Set metadata locks",
       "BookBulkEditMetadata": "Edit book metadata",
       "BookBulkMoveLibrary": "Move books to another library",
+      "BookMerge": "Merge books",
       "BookReadingStateReset": "Reset reading state",
       "BookWriteAndRename": "Write metadata and rename file",
       "CollectionCreate": "Create collection",
@@ -6706,6 +6707,25 @@
       "toast": {
         "success": "Moved {count} books to {library}",
         "partial": "Moved {moved} books, {failed} failed"
+      }
+    },
+    "merge": {
+      "action": "Merge books",
+      "title": "{count, plural, one {Merge # book} other {Merge # books}}",
+      "description": "Files stay where they are. Only the database records are combined.",
+      "subtitle": "Select the target book in which the others should be merged.",
+      "mergeBtn": "Merge books",
+      "untitled": "Untitled",
+      "errors": {
+        "failed": "Failed to merge books",
+        "notarget": "No target book selected",
+        "not2books": "Select at least 2 books to merge",
+        "differentLibraries": "Books from different libraries cannot be merged",
+        "common": "An error occurred while merging books. Please try again.",
+        "querySelection": "Unable to merge query selection. Please select books manually."
+      },
+      "toast": {
+        "success": "{count, plural, one {Merged # book} other {Merged # books}} into book #{target}"
       }
     }
   },

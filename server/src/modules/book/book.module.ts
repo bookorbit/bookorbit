@@ -25,6 +25,7 @@ import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
 import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfill.service';
 import { ReadingAttemptController } from './reading-attempt.controller';
+import { BookMergeRepository } from './book-merge.repository';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { ReadingAttemptController } from './reading-attempt.controller';
     BookAuthorSortKeyBackfillService,
     AudiobookEbookProgressSyncService,
     AudiolessEpubService,
+    BookMergeRepository,
   ],
   exports: [BookService, BookReadService, BookQueryBuilder, AudiolessEpubService],
 })

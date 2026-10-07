@@ -34,6 +34,7 @@ import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import { useMoveToLibraryTarget } from '@/features/book/composables/useMoveToLibraryTarget'
+import MergeBooksSheet from '@/features/book/components/MergeBooksSheet.vue'
 import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
@@ -276,6 +277,21 @@ function handleBooksMoved() {
   exitSelectionMode()
 }
 
+const mergeBooksOpen = ref(false)
+const mergePayload = computed(() => ({ bookIds: [...selectedIds.value] }))
+const mergeCount = computed(() => selectedCount.value)
+function openMergeForSelection() {
+  mergeBooksOpen.value = true
+}
+function setMergeOpen(next: boolean) {
+  mergeBooksOpen.value = next
+}
+
+function handleBooksMerged() {
+  exitSelectionMode()
+  resetBooks()
+}
+
 const metadataExportOpen = ref(false)
 const visibleExportColumns = computed(() => {
   if (!tableRef.value) return []
@@ -492,6 +508,7 @@ defineOptions({ name: 'SmartScopeView' })
       @lock-metadata="handleBulkSetMetadataLock"
       @delete="handleDeleteSelected"
       @move-to-library="openMoveForSelection"
+      @merge-books="openMergeForSelection"
       @exit="exitSelectionMode"
     />
 
@@ -521,6 +538,14 @@ defineOptions({ name: 'SmartScopeView' })
       :selected-count="moveCount"
       @update:open="setMoveOpen"
       @moved="handleBooksMoved"
+    />
+
+    <MergeBooksSheet
+      :open="mergeBooksOpen"
+      :selection-payload="mergePayload"
+      :selected-count="mergeCount"
+      @update:open="setMergeOpen"
+      @merged="handleBooksMerged"
     />
     <BulkEditMetadataDialog
       :open="bulkEditOpen"
