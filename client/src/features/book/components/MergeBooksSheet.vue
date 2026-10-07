@@ -24,8 +24,10 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const merge = useMergeBooks()
+const merging = ref(false)
 
 async function handleMerge(): Promise<void> {
+  if (merging.value) return
   if (!selectedBookIds.value.length) {
     toast.error(t('book.merge.errors.not2books'))
     return
@@ -39,6 +41,7 @@ async function handleMerge(): Promise<void> {
     return
   }
 
+  merging.value = true
   try {
     const result = await merge.mergeBooks(selectedBookIds.value, targetBookId.value)
     toast.success(
@@ -51,6 +54,8 @@ async function handleMerge(): Promise<void> {
     emit('update:open', false)
   } catch {
     toast.error(t('book.merge.errors.common'))
+  } finally {
+    merging.value = false
   }
 }
 
@@ -170,7 +175,7 @@ watch(
         </p>
         <div class="flex items-center justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" @click="handleClose">{{ t('common.cancel') }}</Button>
-          <Button :disabled="!canMerge" @click="handleMerge">
+          <Button :disabled="!canMerge || merging.value" @click="handleMerge">
             {{ t('book.merge.mergeBtn') }}
           </Button>
         </div>
