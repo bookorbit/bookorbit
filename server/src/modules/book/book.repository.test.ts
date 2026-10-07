@@ -163,6 +163,7 @@ describe('BookRepository', () => {
     const stateDeleteWhere = vi.fn().mockResolvedValue(undefined);
     const bookDeleteWhere = vi.fn().mockResolvedValue(undefined);
     const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
       update: vi.fn().mockReturnValue({ set: updateSet }),
       delete: vi.fn().mockReturnValueOnce({ where: stateDeleteWhere }).mockReturnValueOnce({ where: bookDeleteWhere }),
@@ -174,7 +175,8 @@ describe('BookRepository', () => {
 
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(tx.update).toHaveBeenCalledTimes(1);
-    expect(tx.delete).toHaveBeenCalledTimes(2);
+    expect(tx.delete).toHaveBeenCalledTimes(1);
+    expect(tx.execute).toHaveBeenCalledTimes(1);
     const invalidationQuery = new PgDialect().sqlToQuery(stateDeleteWhere.mock.calls[0]![0]);
     expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."library_folder_id" = $1');
     expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."dir_path" in');
@@ -188,6 +190,7 @@ describe('BookRepository', () => {
     const updateWhere = vi.fn().mockResolvedValue(undefined);
     const stateDeleteWhere = vi.fn().mockRejectedValue(new Error('invalidation failed'));
     const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
       update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: updateWhere }) }),
       delete: vi.fn().mockReturnValue({ where: stateDeleteWhere }),
@@ -209,6 +212,7 @@ describe('BookRepository', () => {
     const bookSelect = makeSelectChain('for', bookRows);
     const folderSelect = makeSelectChain('for', [{ id: 7 }]);
     const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
       update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
       delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
@@ -218,7 +222,8 @@ describe('BookRepository', () => {
 
     await repo.deleteByIdsAndInvalidateScanState(bookRows.map((row) => row.id));
 
-    expect(tx.delete).toHaveBeenCalledTimes(3);
+    expect(tx.delete).toHaveBeenCalledTimes(2);
+    expect(tx.execute).toHaveBeenCalledTimes(1);
   });
 
   it('findCards loads card rows and related collections for the current user', async () => {
@@ -943,6 +948,7 @@ describe('BookRepository', () => {
     const updateWhere = vi.fn().mockResolvedValue(undefined);
     const updateBuilder = { set: vi.fn().mockReturnValue({ where: updateWhere }) };
     const db = {
+      execute: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockReturnValue(deleteBuilder),
       update: vi.fn().mockReturnValue(updateBuilder),
     };
@@ -950,8 +956,8 @@ describe('BookRepository', () => {
 
     await repo.deleteByIds([10, 11]);
     await repo.updateMetadataFields(10, { title: 'Updated' });
-    expect(db.delete).toHaveBeenCalledTimes(1);
-    expect(deleteWhere).toHaveBeenCalledTimes(1);
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]).sql).toContain('delete from "books"');
     expect(db.update).toHaveBeenCalledTimes(2);
     expect(updateBuilder.set).toHaveBeenNthCalledWith(1, { title: 'Updated' });
     expect(updateBuilder.set).toHaveBeenNthCalledWith(2, expect.objectContaining({ updatedAt: expect.any(Date) }));
@@ -1262,12 +1268,12 @@ describe('BookRepository', () => {
     );
   });
 
-  it('syncs primary EPUB progress into Kobo reading state and marks snapshot row pending', async () => {
+  it.each(['epub', 'kepub'])('syncs primary %s progress into Kobo reading state and marks snapshot row pending', async (format) => {
     const insertChain = makeInsertChain();
     const db = {
       select: vi
         .fn()
-        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format, markAsFinishedPercentComplete: 98 }]))
         .mockReturnValueOnce(
           makeSelectChain('limit', [
             {

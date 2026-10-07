@@ -7,6 +7,7 @@ import { UserModule } from '../user/user.module';
 import { CommonModule } from '../../common/common.module';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import { OpdsBookService } from './opds-book.service';
+import { OpdsCollectionRepository } from './opds-collection.repository';
 import { OpdsController } from './opds.controller';
 import { OpdsEnabledGuard } from './opds-enabled.guard';
 import { OpdsService } from './opds.service';
@@ -16,7 +17,7 @@ import { OpdsUserService } from './opds-user.service';
 @Module({
   imports: [AppSettingsModule, BookModule, BookCoverStoreModule, UserModule, CommonModule],
   controllers: [OpdsController, OpdsUserController],
-  providers: [OpdsService, OpdsBookService, OpdsUserService, OpdsAuthGuard, OpdsEnabledGuard],
+  providers: [OpdsService, OpdsBookService, OpdsCollectionRepository, OpdsUserService, OpdsAuthGuard, OpdsEnabledGuard],
   exports: [OpdsBookService],
 })
 export class OpdsModule {}

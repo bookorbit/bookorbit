@@ -81,7 +81,49 @@ describe('FileWriteRepository', () => {
 
     await expect(repo.findLibraryFileWriteConfig(10)).resolves.toEqual(settings);
     expect(db.select).toHaveBeenCalledWith(
-      expect.objectContaining({ fileWriteAudioEnabled: expect.anything(), fileWriteAudioMaxFileSizeMb: expect.anything() }),
+      expect.objectContaining({
+        fileWriteAudioEnabled: expect.anything(),
+        fileWriteAudioMaxFileSizeMb: expect.anything(),
+        fileWriteAllFiles: expect.anything(),
+        fileWriteReadAlongEnabled: expect.anything(),
+        fileWriteReadAlongMaxFileSizeMb: expect.anything(),
+      }),
+    );
+  });
+
+  it('findPrimaryFileForBook carries the library write scope', async () => {
+    const c = chain([]);
+    const db = { select: vi.fn().mockReturnValue(c) };
+
+    await new FileWriteRepository(db as never).findPrimaryFileForBook(1);
+
+    expect(db.select).toHaveBeenCalledWith(expect.objectContaining({ libraryId: expect.anything(), fileWriteAllFiles: expect.anything() }));
+    expect(c.innerJoin).toHaveBeenCalledTimes(2);
+  });
+
+  it('findFileWriteScopeForBook returns the library scope of a book with or without a primary file', async () => {
+    const scope = { libraryId: 10, fileWriteAllFiles: true };
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(chain([scope]))
+        .mockReturnValueOnce(chain([])),
+    };
+    const repo = new FileWriteRepository(db as never);
+
+    await expect(repo.findFileWriteScopeForBook(1)).resolves.toEqual(scope);
+    await expect(repo.findFileWriteScopeForBook(2)).resolves.toBeNull();
+    expect(db.select).toHaveBeenCalledWith({ libraryId: expect.anything(), fileWriteAllFiles: expect.anything() });
+  });
+
+  it('findFilesForBook selects the role and order the target selector needs', async () => {
+    const c = chain([]);
+    const db = { select: vi.fn().mockReturnValue(c) };
+
+    await new FileWriteRepository(db as never).findFilesForBook(1);
+
+    expect(db.select).toHaveBeenCalledWith(
+      expect.objectContaining({ role: expect.anything(), sortOrder: expect.anything(), mediaOverlayAvailable: expect.anything() }),
     );
   });
 

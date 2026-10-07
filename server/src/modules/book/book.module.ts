@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 
 import { AchievementModule } from '../achievement/achievement.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
@@ -36,6 +37,7 @@ import { ReadingAttemptController } from './reading-attempt.controller';
     EmbeddingModule,
     MetadataFetchModule,
     FileWriteModule,
+    SelfWriteRegistryModule,
     AppSettingsModule,
     MetadataScoreModule,
     NarratorModule,

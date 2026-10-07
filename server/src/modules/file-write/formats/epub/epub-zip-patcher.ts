@@ -1,3 +1,6 @@
+import { randomUUID } from 'crypto';
+import { unlink } from 'fs/promises';
+import { dirname, join } from 'path';
 import * as unzipper from 'unzipper';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
 import { writeZipArchive, type ZipRewriteEntry } from '../shared/zip-rewrite';
@@ -17,10 +20,17 @@ export async function listEntryPaths(filePath: string): Promise<string[]> {
 }
 
 export async function patch(filePath: string, patches: Map<string, Buffer>): Promise<void> {
-  const tmpPath = filePath + '.tmp';
+  // A hidden, random name like every other writer: appending ".tmp" overflowed long file names and
+  // would have overwritten a user's own file of that name.
+  const tmpPath = join(dirname(filePath), `.epub-write-${randomUUID()}`);
   const zip = await unzipper.Open.file(filePath);
 
-  await writeZipArchive(tmpPath, rewriteEntries(zip.files, patches));
+  try {
+    await writeZipArchive(tmpPath, rewriteEntries(zip.files, patches));
+  } catch (error) {
+    await unlink(tmpPath).catch(() => {});
+    throw error;
+  }
 
   await replaceFileAtomically(tmpPath, filePath);
 }

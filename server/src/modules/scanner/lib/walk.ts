@@ -2,7 +2,7 @@ import { usableFileTime } from '../../../common/utils/file-time.utils';
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
-import { naturalCompare } from '../../../common/utils/natural-sort.utils';
+import { compareBookFilePaths } from '../../../common/utils/audio-track-order.utils';
 import { buildNameExcludeMatcher, walkDirectoryTree, WALK_MAX_PATH_LENGTH } from '../../../common/fs-walk.utils';
 import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
 
@@ -269,13 +269,14 @@ export async function findBookCandidates(
     }
 
     // If any primary file is an audio format, treat the entire folder as one audiobook.
-    // Files are natural-sorted by basename so playback order is deterministic.
+    // Files are natural-sorted by path so playback order is deterministic and flattened disc
+    // folders play disc by disc.
     const hasAudio = primaryFiles.some((f) => {
       return f.format !== null && f.format !== undefined && isAudioFormat(f.format);
     });
 
     if (hasAudio) {
-      const sorted = [...files].sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)));
+      const sorted = [...files].sort((a, b) => compareBookFilePaths(a.absolutePath, b.absolutePath));
       candidates.push({ folderPath: dir, files: sorted });
       continue;
     }
@@ -416,6 +417,6 @@ export async function buildSingleBookCandidate(
 
   return {
     folderPath,
-    files: allFiles.sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath))),
+    files: allFiles.sort((a, b) => compareBookFilePaths(a.absolutePath, b.absolutePath)),
   };
 }

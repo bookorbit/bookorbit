@@ -404,7 +404,7 @@ export class KoboReadingStateService {
       .select({ fileId: schema.bookFiles.id })
       .from(schema.books)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-      .where(and(eq(schema.books.id, bookId), eq(schema.bookFiles.format, 'epub')))
+      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, ['epub', 'kepub'])))
       .limit(1);
     if (!primaryFile) return null;
 

@@ -1,5 +1,8 @@
 import {
   ACCENT_IDS,
+  ANNOTATION_COLOR_NAME_MAX_ENTRIES,
+  ANNOTATION_COLOR_NAME_MAX_LENGTH,
+  ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS,
   AUTHOR_COVER_SHAPES,
   PODCAST_PLAYLIST_MAX_SAVED,
   PODCAST_PLAYLIST_MAX_SHOWS,
@@ -28,6 +31,7 @@ import {
   SURFACE_OPACITY_MIN,
   TABLE_DENSITIES,
   THEME_IDS,
+  type AnnotationColorNamePreferences,
   type BookRequestPreferences,
   type DisplayPreferences,
   type CoverSearchPreferences,
@@ -177,6 +181,36 @@ const SERVER_FONT_PREFERENCES_SCHEMA = z
   })
   .strict();
 
+const ANNOTATION_COLOR_KEY = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * Keys normalise to uppercase so `#facc15` and `#FACC15` name one colour, and a blank label drops
+ * its entry, which is how a client clears a name. The cap applies to what is actually stored.
+ */
+const ANNOTATION_COLOR_NAME_PREFERENCES_SCHEMA = z
+  .object({
+    names: z
+      .record(z.string().regex(ANNOTATION_COLOR_KEY, 'must be a #RRGGBB colour'), z.string().trim().max(ANNOTATION_COLOR_NAME_MAX_LENGTH))
+      .transform((names, ctx) => {
+        const normalized: Record<string, string> = {};
+        for (const [key, label] of Object.entries(names)) {
+          if (label === '') continue;
+          const color = key.toUpperCase();
+          if (Object.hasOwn(normalized, color)) {
+            ctx.addIssue({ code: 'custom', path: [key], message: 'names the same colour as another key' });
+            return z.NEVER;
+          }
+          normalized[color] = label;
+        }
+        if (Object.keys(normalized).length > ANNOTATION_COLOR_NAME_MAX_ENTRIES) {
+          ctx.addIssue({ code: 'custom', message: `must name at most ${ANNOTATION_COLOR_NAME_MAX_ENTRIES} colours` });
+          return z.NEVER;
+        }
+        return normalized;
+      }),
+  })
+  .strict() satisfies z.ZodType<AnnotationColorNamePreferences>;
+
 const PODCAST_PLAYLIST_RULES_SCHEMA = z
   .object({
     filter: z.enum(['latest', 'downloaded', 'in_progress', 'unplayed', 'finished']),
@@ -310,6 +344,42 @@ export class UserPreferencesService {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.error(
         `[user_preferences.upsert_server_fonts] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert server font preferences failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getAnnotationColorNamePreferences(userId: number): Promise<AnnotationColorNamePreferences> {
+    const row = await this.repo.findByCategory(userId, 'annotation-colors');
+    if (!row) return { names: { ...ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS.names } };
+    const stored = ANNOTATION_COLOR_NAME_PREFERENCES_SCHEMA.safeParse(row.data);
+    return stored.success ? stored.data : { names: { ...ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS.names } };
+  }
+
+  async upsertAnnotationColorNamePreferences(userId: number, data: Record<string, unknown>): Promise<void> {
+    const start = Date.now();
+    this.logger.log(`[user_preferences.upsert_annotation_colors] [start] userId=${userId} - upsert annotation colour names started`);
+
+    const result = ANNOTATION_COLOR_NAME_PREFERENCES_SCHEMA.safeParse(data);
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : 'settings';
+      const issueMessage = firstIssue?.message ?? 'Invalid settings payload';
+      throw new BadRequestException(`Invalid annotation colour preferences at "${issuePath}": ${issueMessage}`);
+    }
+
+    try {
+      await this.repo.upsert(userId, 'annotation-colors', { names: result.data.names });
+      const durationMs = Date.now() - start;
+      this.logger.log(
+        `[user_preferences.upsert_annotation_colors] [end] userId=${userId} durationMs=${durationMs} namedCount=${Object.keys(result.data.names).length} - upsert annotation colour names completed`,
+      );
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[user_preferences.upsert_annotation_colors] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert annotation colour names failed`,
       );
       throw err;
     }

@@ -33,6 +33,7 @@ function makeBook(overrides: Partial<MoveBookData> = {}): MoveBookData {
       subtitle: null,
       publisher: null,
       language: null,
+      isbn10: null,
       isbn13: null,
       publishedYear: null,
       seriesName: null,
@@ -144,6 +145,16 @@ describe('eligibility', () => {
     )[0];
 
     expect(expectReady(outcome).targetPath).toBe('/libB/Frank Herbert/Dune.epub');
+  });
+
+  it('uses ISBN-10 when the destination naming pattern needs an ISBN', () => {
+    const book = makeBook();
+    book.metadata.isbn10 = '0306406152';
+    const outcome = planner.plan(
+      makeInput({ books: [book], target: makeTarget({ organizationMode: 'book_per_file', fileNamingPattern: '{isbn}' }), pattern: '{isbn}' }),
+    )[0];
+
+    expect(expectReady(outcome).targetPath).toBe('/libB/0306406152.epub');
   });
 
   it('refuses when no naming pattern is configured', () => {

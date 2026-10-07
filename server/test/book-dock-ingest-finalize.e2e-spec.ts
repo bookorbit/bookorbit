@@ -13,6 +13,7 @@ import {
 
 import * as schema from '../src/db/schema';
 import { parseFb2File } from '../src/modules/metadata/lib/fb2-parser';
+import { ScannerService } from '../src/modules/scanner/scanner.service';
 import { waitForCondition } from './e2e/app-harness';
 import { buildFb2Fixture } from './e2e/book-dock/book-dock-fixture-builder';
 import { createPdfFixture } from './e2e/metadata-write/metadata-write-fixture-builder';
@@ -809,51 +810,107 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(await getBookDockRow(context, candidateRow.id)).toBeUndefined();
   });
 
-  it('finalize stores a folder path even when the naming pattern is flat', async () => {
-    const destination = await createLibraryWithFolder(context);
-    await context.db.update(schema.libraries).set({ fileNamingPattern: '{title}' }).where(eq(schema.libraries.id, destination.libraryId));
+  it.each([
+    { mode: 'book_per_folder' as const, fileWriteEnabled: false },
+    { mode: 'book_per_folder' as const, fileWriteEnabled: true },
+    { mode: 'book_per_file' as const, fileWriteEnabled: false },
+    { mode: 'book_per_file' as const, fileWriteEnabled: true },
+  ])('preserves separate root books and metadata through repeated scans: $mode, writeBack=$fileWriteEnabled', async ({ mode, fileWriteEnabled }) => {
+    const destination = await createLibraryWithFolder(context, { mode, fileWriteEnabled, fileWriteFb2Enabled: fileWriteEnabled });
+    const reader = await createUserAndLogin(context);
+    await context.db
+      .update(schema.libraries)
+      .set({ fileNamingPattern: '<{title}|{originalFilename}> - <{authors:first}> - <{year}>' })
+      .where(eq(schema.libraries.id, destination.libraryId));
 
-    const bookDockRow = await createBookDockRow(context, {
-      fileName: 'flat-pattern.fb2',
-      selectedMetadata: {
-        title: 'Flat Pattern Title',
-        authors: ['Flat Pattern Author'],
-      },
-      targetLibraryId: destination.libraryId,
-      targetFolderId: destination.libraryFolderId,
-    });
+    const bookIds: number[] = [];
+    const paths: string[] = [];
+    for (const label of ['First', 'Second']) {
+      const selectedMetadata = { title: `${label} Edited Title`, authors: [`${label} Edited Author`], publishedYear: 2024 };
+      const row = await createBookDockRow(context, {
+        fileName: `${label.toLowerCase()}-root.fb2`,
+        content: buildFb2Fixture({ title: `${label} Embedded Title`, authors: [`${label} Embedded Author`] }),
+        selectedMetadata,
+        targetLibraryId: destination.libraryId,
+        targetFolderId: destination.libraryFolderId,
+      });
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/book-dock/finalize',
+        headers: authHeader(context.adminToken),
+        payload: { fileIds: [row.id] },
+      });
+      expect(response.statusCode).toBe(201);
+      const result = response.json() as BookDockFinalizeResult;
+      expect(result).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+      const bookId = result.results[0]!.bookId!;
+      expect(bookIds).not.toContain(bookId);
+      bookIds.push(bookId);
+      const path = join(destination.folderPath, `${selectedMetadata.title} - ${selectedMetadata.authors[0]} - 2024.fb2`);
+      paths.push(path);
+      expect(await fileExists(path)).toBe(true);
+      expect(await getBookDockRow(context, row.id)).toBeUndefined();
 
-    const response = await context.app.inject({
-      method: 'POST',
-      url: '/api/v1/book-dock/finalize',
-      headers: authHeader(context.adminToken),
-      payload: {
-        fileIds: [bookDockRow.id],
-      },
-    });
+      if (fileWriteEnabled) {
+        await waitForCondition(async () => {
+          expect((await parseFb2File(path))?.title).toBe(selectedMetadata.title);
+          const [log] = await context.db
+            .select({ status: schema.fileWriteLog.status })
+            .from(schema.fileWriteLog)
+            .where(eq(schema.fileWriteLog.bookId, bookId))
+            .limit(1);
+          expect(log?.status).toBe('success');
+        });
+      } else {
+        expect((await parseFb2File(path))?.title).toBe(`${label} Embedded Title`);
+      }
 
-    expect(response.statusCode).toBe(201);
-    const body = response.json() as BookDockFinalizeResult;
-    expect(body).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+      if (label === 'First') {
+        await context.db.insert(schema.userBookStatus).values({ userId: reader.userId, bookId, status: 'reading', source: 'manual' });
+      }
+    }
 
-    const finalizedBookId = body.results[0]!.bookId!;
-    const [book] = await context.db
-      .select({
-        folderPath: schema.books.folderPath,
-      })
-      .from(schema.books)
-      .where(eq(schema.books.id, finalizedBookId))
-      .limit(1);
-    const [bookFile] = await context.db
-      .select({
-        absolutePath: schema.bookFiles.absolutePath,
-      })
-      .from(schema.bookFiles)
-      .where(eq(schema.bookFiles.bookId, finalizedBookId))
-      .limit(1);
+    const readBooks = () =>
+      context.db
+        .select({
+          id: schema.books.id,
+          status: schema.books.status,
+          folderPath: schema.books.folderPath,
+          title: schema.bookMetadata.title,
+          primaryFileId: schema.books.primaryFileId,
+        })
+        .from(schema.books)
+        .innerJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.books.id))
+        .where(eq(schema.books.libraryId, destination.libraryId))
+        .orderBy(schema.books.id);
+    const beforeScan = await readBooks();
+    expect(beforeScan).toHaveLength(2);
+    expect(beforeScan.map((book) => book.id)).toEqual(bookIds);
+    expect(beforeScan.map((book) => book.title)).toEqual(['First Edited Title', 'Second Edited Title']);
+    expect(beforeScan.map((book) => book.folderPath)).toEqual(paths);
+    const readFiles = () =>
+      context.db
+        .select({ bookId: schema.bookFiles.bookId, publicId: schema.bookFiles.publicId, path: schema.bookFiles.absolutePath })
+        .from(schema.bookFiles)
+        .where(inArray(schema.bookFiles.bookId, bookIds))
+        .orderBy(schema.bookFiles.bookId);
+    const beforeFiles = await readFiles();
+    expect(beforeFiles.map(({ bookId, path }) => ({ bookId, path }))).toEqual(bookIds.map((bookId, index) => ({ bookId, path: paths[index] })));
 
-    expect(book?.folderPath).toBe(destination.folderPath);
-    expect(book?.folderPath).toBe(dirname(bookFile!.absolutePath));
+    for (let scan = 0; scan < 2; scan++) {
+      const { jobId } = await context.app.get(ScannerService).startScan(destination.libraryId, 'manual', true);
+      await waitForCondition(async () => {
+        const [job] = await context.db.select().from(schema.scanJobs).where(eq(schema.scanJobs.id, jobId)).limit(1);
+        expect(job).toMatchObject({ status: 'completed', addedCount: 0, missingCount: 0 });
+      });
+      expect(await readBooks()).toEqual(beforeScan);
+      expect(await readFiles()).toEqual(beforeFiles);
+      const statuses = await context.db
+        .select({ bookId: schema.userBookStatus.bookId, status: schema.userBookStatus.status, source: schema.userBookStatus.source })
+        .from(schema.userBookStatus)
+        .where(inArray(schema.userBookStatus.bookId, bookIds));
+      expect(statuses).toEqual([{ bookId: bookIds[0], status: 'reading', source: 'manual' }]);
+    }
   });
 
   it('finalize files a book_per_file library under the shipped default pattern folders', async () => {

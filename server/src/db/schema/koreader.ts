@@ -150,7 +150,7 @@ export const bookFileHashHistory = pgTable(
   (t) => [
     uniqueIndex('book_file_hash_history_book_file_id_file_hash_idx').on(t.bookFileId, t.fileHash),
     index('book_file_hash_history_file_hash_idx').on(t.fileHash),
-    check('book_file_hash_history_reason_chk', sql`${t.reason} in ('file_write', 'external_change', 'rescan')`),
+    check('book_file_hash_history_reason_chk', sql`${t.reason} in ('file_write', 'external_change', 'rescan', 'kobo_download')`),
   ],
 );
 
@@ -200,6 +200,7 @@ export const koreaderUnmatchedBooks = pgTable(
     lastOpen: bigint('last_open', { mode: 'number' }),
     source: varchar('source', { length: 20 }).notNull().default('statistics'),
     metadataAmbiguous: boolean('metadata_ambiguous').notNull().default(false),
+    manualLinkRequested: boolean('manual_link_requested').notNull().default(false),
     firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
   },

@@ -379,6 +379,21 @@ describe('disc folder flattening', () => {
     expect(candidates[0].files).toHaveLength(3);
   });
 
+  it('orders tracks disc by disc when the discs reuse file names', async () => {
+    await file('Book/CD 2/01.mp3');
+    await file('Book/CD 1/02.mp3');
+    await file('Book/CD 10/01.mp3');
+    await file('Book/CD 1/01.mp3');
+    await file('Book/CD 2/02.mp3');
+
+    const { candidates } = await findBookCandidates(root);
+    const expected = ['CD 1/01.mp3', 'CD 1/02.mp3', 'CD 2/01.mp3', 'CD 2/02.mp3', 'CD 10/01.mp3'].map((name) => join(root, 'Book', name));
+    expect(candidates[0].files.map((f) => f.absolutePath)).toEqual(expected);
+
+    const single = await buildSingleBookCandidate(join(root, 'Book'), root);
+    expect(single?.files.map((f) => f.absolutePath)).toEqual(expected);
+  });
+
   it('flattens Disc, Disk, Part, Pt, Side patterns', async () => {
     await file('MultiDisc/Disc 1/track-01.mp3');
     await file('MultiDisc/Disk 2/track-02.mp3');

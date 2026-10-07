@@ -46,6 +46,7 @@ describe('UploadProcessorService', () => {
   const deleteWhere = vi.fn();
 
   const tx = {
+    execute: vi.fn().mockResolvedValue(undefined),
     select: vi.fn(() => ({ from: selectFrom })),
     insert: vi.fn((table: unknown) => {
       if (table === books) {
@@ -633,9 +634,9 @@ describe('UploadProcessorService', () => {
     it('clears the file rows before the books that own them', async () => {
       await service.deleteUnitBookRecords({ bookIds: [42], createdBookIds: [42], attachedFileIds: [777], replacedPrimaries: [] });
 
-      expect(tx.delete).toHaveBeenNthCalledWith(1, bookFiles);
-      expect(tx.delete).toHaveBeenNthCalledWith(2, bookFiles);
-      expect(tx.delete).toHaveBeenNthCalledWith(3, books);
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[0]![0]).sql).toContain('delete from "book_files"');
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[1]![0]).sql).toContain('delete from "book_files"');
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[2]![0]).sql).toContain('delete from "books"');
     });
 
     const dialect = new PgDialect();
@@ -649,9 +650,9 @@ describe('UploadProcessorService', () => {
         replacedPrimaries: [{ bookId: 99, previousPrimaryFileId: 500, primaryFileId: 777 }],
       });
 
-      expect(tx.delete).toHaveBeenCalledWith(bookFiles);
+      expect(tx.execute).toHaveBeenCalledTimes(1);
       expect(updateBooksSet).toHaveBeenCalledWith({ primaryFileId: 500, updatedAt: expect.any(Date) });
-      expect(deleteWhere.mock.invocationCallOrder[0]).toBeLessThan(updateBooksSet.mock.invocationCallOrder[0]!);
+      expect(tx.execute.mock.invocationCallOrder[0]).toBeLessThan(updateBooksSet.mock.invocationCallOrder[0]!);
 
       // Only a primary that was cleared, or is still the one the unit chose, is undone, and only
       // onto a file that is still this book's.

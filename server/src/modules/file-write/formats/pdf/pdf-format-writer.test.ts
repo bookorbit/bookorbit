@@ -16,6 +16,8 @@ vi.mock('fs/promises', async () => {
     writeFile: vi.fn(),
     rename: vi.fn(),
     unlink: vi.fn(),
+    chmod: vi.fn().mockResolvedValue(undefined),
+    chown: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -197,6 +199,20 @@ describe('PdfFormatWriter', () => {
       'permission denied',
     );
 
+    expect(mockUnlink).toHaveBeenCalledWith('/books/.tmp-abc-uuid.pdf');
+  });
+
+  it('deletes temp file when writing it fails', async () => {
+    mockPdfLoad.mockResolvedValue(makePdfDoc() as never);
+    mockWriteFile.mockRejectedValue(Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }));
+
+    const writer = new PdfFormatWriter();
+
+    await expect(writer.write('/books/dune.pdf', { title: 'Dune' }, { fieldMask: new Set(['title']), dryRun: false })).rejects.toThrow(
+      'no space left on device',
+    );
+
+    expect(mockRename).not.toHaveBeenCalled();
     expect(mockUnlink).toHaveBeenCalledWith('/books/.tmp-abc-uuid.pdf');
   });
 

@@ -434,7 +434,9 @@ defineExpose({ focusQuery: () => rail.value?.focusQuery() })
           @select-field-rules="handleSelectFieldRules"
           @retry-provider="handleRetry"
           @select="select"
-        />
+        >
+          <template #search-options><slot name="search-options" /></template>
+        </MetadataMatchRail>
       </div>
       <div class="min-h-0 flex-col @5xl/match:flex" :class="screen === 'matches' && !fixedCandidate ? 'hidden' : 'flex'">
         <MetadataMatchCompare

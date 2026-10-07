@@ -148,6 +148,8 @@ export class BookMetadataLockService {
     this.copyResolvedField(filteredResolved, resolved, 'publishedYear', 'publishedYear', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'language', 'language', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'pageCount', 'pageCount', lockedSet, skippedFields);
+    this.copyResolvedField(filteredResolved, resolved, 'isbn10', 'isbn10', lockedSet, skippedFields);
+    this.copyResolvedField(filteredResolved, resolved, 'isbn13', 'isbn13', lockedSet, skippedFields);
     if (resolved.seriesMemberships !== undefined || resolved.seriesName !== undefined || resolved.seriesIndex !== undefined) {
       if (lockedSet.has('seriesName') || lockedSet.has('seriesIndex')) {
         if (lockedSet.has('seriesName')) skippedFields.add('seriesName');

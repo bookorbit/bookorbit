@@ -76,7 +76,7 @@ function makeService() {
     buildOrderBy: vi.fn(),
   };
   const libraryService = {
-    findAccessibleLibraryIds: vi.fn(),
+    findAccessibleLibraryIds: vi.fn().mockResolvedValue([]),
   };
   const bookService = {
     executeBooksQuery: vi.fn(),
@@ -270,6 +270,28 @@ describe('SmartScopeService', () => {
       ).resolves.toBeTruthy();
 
       expect(smartScopeRepo.insert).toHaveBeenCalled();
+    });
+
+    it.each(['create', 'update'] as const)('%s returns the saved playlist episode count', async (operation) => {
+      const { service, smartScopeRepo, libraryService, podcastEpisodeRepo, bookReadService } = makeService();
+      const scope = podcastScope();
+      smartScopeRepo.insert.mockResolvedValue([scope]);
+      smartScopeRepo.findById.mockResolvedValue([scope]);
+      smartScopeRepo.update.mockResolvedValue([scope]);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([4]);
+      podcastEpisodeRepo.countEpisodes.mockResolvedValue(6);
+
+      const result =
+        operation === 'create'
+          ? await service.create(
+              { name: scope.name, icon: 'Podcast', mediaType: 'podcasts', libraryId: 4, filter: RULES, defaultSort: [] },
+              makeUser(),
+            )
+          : await service.update(scope.id, { filter: RULES }, makeUser());
+
+      expect(result).toEqual(expect.objectContaining({ episodeCount: 6 }));
+      expect(podcastEpisodeRepo.countEpisodes).toHaveBeenCalledExactlyOnceWith(4, 12, expect.objectContaining({ filter: 'unplayed' }));
+      expect(bookReadService.countWhere).not.toHaveBeenCalled();
     });
 
     it('leaves book scopes uncapped, which has always been their contract', async () => {
@@ -580,7 +602,53 @@ describe('SmartScopeService', () => {
       isPublic: false,
       syncToKobo: false,
     });
-    expect(result).toEqual({ ...created, isOwner: true, koboSyncEnabled: false });
+    expect(result).toEqual({ ...created, isOwner: true, koboSyncEnabled: false, bookCount: 0 });
+  });
+
+  it('create returns the matching book count using the requesting user visibility and timezone', async () => {
+    const { service, smartScopeRepo, libraryService, queryBuilder, bookReadService } = makeService();
+    const created = makeSmartScope({
+      filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'space' }] },
+    });
+    smartScopeRepo.insert.mockResolvedValue([created]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([2, 3]);
+    queryBuilder.buildWhere.mockReturnValue('visible-matches');
+    bookReadService.countWhere.mockResolvedValue(7);
+    const user = makeUser({ settings: { timezone: 'America/Denver' } });
+
+    const result = await service.create({ name: created.name, icon: 'Aperture', filter: created.filter, defaultSort: [] }, user);
+
+    expect(result).toEqual({ ...created, isOwner: true, koboSyncEnabled: false, bookCount: 7 });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(created.filter, {
+      accessibleLibraryIds: [2, 3],
+      userId: user.id,
+      timeZone: 'America/Denver',
+      contentFilters: user.contentFilters,
+    });
+    expect(bookReadService.countWhere).toHaveBeenCalledExactlyOnceWith('visible-matches');
+    expect(smartScopeRepo.findAllForUser).not.toHaveBeenCalled();
+  });
+
+  it('update counts the saved filter instead of the previous filter', async () => {
+    const { service, smartScopeRepo, libraryService, queryBuilder, bookReadService } = makeService();
+    const existing = makeSmartScope({
+      filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'old' }] },
+    });
+    const updated = makeSmartScope({
+      filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'new' }] },
+    });
+    smartScopeRepo.findById.mockResolvedValue([existing]);
+    smartScopeRepo.update.mockResolvedValue([updated]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([2]);
+    queryBuilder.buildWhere.mockReturnValue('updated-matches');
+    bookReadService.countWhere.mockResolvedValue(3);
+
+    const result = await service.update(existing.id, { filter: updated.filter }, makeUser());
+
+    expect(result).toEqual({ ...updated, isOwner: true, koboSyncEnabled: false, bookCount: 3 });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(updated.filter, expect.objectContaining({ accessibleLibraryIds: [2], userId: 12 }));
+    expect(bookReadService.countWhere).toHaveBeenCalledExactlyOnceWith('updated-matches');
+    expect(smartScopeRepo.findAllForUser).not.toHaveBeenCalled();
   });
 
   it('create rejects missing icons', async () => {
@@ -613,7 +681,7 @@ describe('SmartScopeService', () => {
       defaultSort: undefined,
       isPublic: undefined,
     });
-    expect(result).toEqual({ ...updated, isOwner: false, koboSyncEnabled: false });
+    expect(result).toEqual({ ...updated, isOwner: false, koboSyncEnabled: false, bookCount: 0 });
   });
 
   describe('sharing an existing smartScope (issue #805)', () => {
@@ -627,7 +695,7 @@ describe('SmartScopeService', () => {
       const result = await service.update(3, { isPublic: true }, makeUser({ id: 12 }));
 
       expect(smartScopeRepo.update).toHaveBeenCalledWith(3, 12, expect.objectContaining({ isPublic: true }));
-      expect(result).toEqual({ ...shared, isOwner: true, koboSyncEnabled: false });
+      expect(result).toEqual({ ...shared, isOwner: true, koboSyncEnabled: false, bookCount: 0 });
     });
 
     it('update unshares a public smartScope', async () => {
@@ -722,7 +790,9 @@ describe('SmartScopeService', () => {
     smartScopeRepo.findById.mockResolvedValue([existing]);
     smartScopeRepo.update.mockResolvedValue([{ ...existing, filter: null }]);
 
-    await service.update(3, { filter: null }, makeUser({ id: 12 }));
+    const result = await service.update(3, { filter: null }, makeUser({ id: 12 }));
+
+    expect(result).toEqual(expect.objectContaining({ filter: null, bookCount: 0 }));
 
     expect(smartScopeRepo.update).toHaveBeenCalledWith(
       3,

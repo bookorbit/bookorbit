@@ -438,3 +438,53 @@ describe('StatsCache', () => {
     });
   });
 });
+
+describe('StatsCache invalidation races', () => {
+  it('does not repopulate globally cleared caches from an older in-flight load', async () => {
+    const cache = new StatsCache({ ttlMs: 1000, maxEntries: 10 });
+    let finish!: (value: string) => void;
+    const old = cache.get(
+      '1',
+      'goal',
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    cache.clear();
+    finish('old');
+    expect(await old).toBe('old');
+    const fresh = vi.fn().mockResolvedValue('new');
+    expect(await cache.get('1', 'goal', fresh)).toBe('new');
+    expect(fresh).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a newer in-flight load deduplicated when the invalidated load finishes', async () => {
+    const cache = new StatsCache({ ttlMs: 1000, maxEntries: 10 });
+    let finishOld!: (value: string) => void;
+    let finishNew!: (value: string) => void;
+    const old = cache.get(
+      '1',
+      'goal',
+      () =>
+        new Promise<string>((resolve) => {
+          finishOld = resolve;
+        }),
+    );
+    cache.clearForScope('1');
+    const fresh = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          finishNew = resolve;
+        }),
+    );
+    const next = cache.get('1', 'goal', fresh);
+    finishOld('old');
+    await old;
+    const shared = cache.get('1', 'goal', fresh);
+    expect(fresh).toHaveBeenCalledOnce();
+    finishNew('new');
+    expect(await next).toBe('new');
+    expect(await shared).toBe('new');
+  });
+});

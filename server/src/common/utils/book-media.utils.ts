@@ -1,8 +1,6 @@
-import { basename } from 'node:path';
-
 import { getBookMediaProfile, type CoverMedia, type CoverMedium } from '@bookorbit/types';
 
-import { naturalCompare } from './natural-sort.utils';
+import { compareBookFilePaths } from './audio-track-order.utils';
 
 type BookMediaFileRow = { format: string | null; role: string };
 
@@ -42,9 +40,9 @@ export function coverFetchInputs(state: CoverFetchState): {
 
 type AudioTrackOrderRow = { sortOrder?: number | null; absolutePath: string };
 
-/** Playback order of an audiobook's tracks: explicit sort order first, unset last, then natural file name. */
+/** Playback order of an audiobook's tracks: explicit sort order first, unset last, then natural path. */
 export function compareAudioTracks(left: AudioTrackOrderRow, right: AudioTrackOrderRow): number {
   const byOrder = (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER);
   if (byOrder !== 0) return byOrder;
-  return naturalCompare(basename(left.absolutePath), basename(right.absolutePath));
+  return compareBookFilePaths(left.absolutePath, right.absolutePath);
 }

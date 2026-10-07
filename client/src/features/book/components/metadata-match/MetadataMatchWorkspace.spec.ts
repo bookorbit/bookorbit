@@ -51,9 +51,10 @@ const goodreads: MetadataCandidate = {
 }
 const collection: MetadataCandidate = { provider: 'google', providerId: 'set', title: 'Artemis Fowl: Books 1-4', authors: ['Eoin Colfer'] }
 
-function mountWorkspace(props: Partial<InstanceType<typeof MetadataMatchWorkspace>['$props']> = {}) {
+function mountWorkspace(props: Partial<InstanceType<typeof MetadataMatchWorkspace>['$props']> = {}, slots: Record<string, string> = {}) {
   return mount(MetadataMatchWorkspace, {
     attachTo: document.body,
+    slots,
     props: {
       current,
       providerIds: { amazon: 'B002KP6DXQ' },
@@ -87,6 +88,14 @@ async function choose(wrapper: VueWrapper, key: string, option: string) {
 }
 
 describe('MetadataMatchWorkspace', () => {
+  it('places search options beside the submit button inside the search form', () => {
+    const wrapper = mountWorkspace({}, { 'search-options': '<button type="button" aria-label="Search options">Options</button>' })
+    const options = wrapper.get('form[role="search"] [aria-label="Search options"]')
+    expect(options.element.previousElementSibling).toHaveProperty('type', 'submit')
+    expect(wrapper.find('header [aria-label="Search options"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('groups results by how likely they are this book and opens the linked record', () => {
     const wrapper = mountWorkspace()
 

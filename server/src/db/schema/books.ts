@@ -102,6 +102,7 @@ export const bookFiles = pgTable(
     uniqueIndex('book_files_public_id_uidx').on(t.publicId),
     uniqueIndex('book_files_absolute_path_uidx').on(t.absolutePath),
     index('book_files_book_id_idx').on(t.bookId),
+    index('book_files_change_timestamp_idx').on(sql`greatest(${t.createdAt}, ${t.updatedAt}) desc`),
     index('book_files_library_folder_id_idx').on(t.libraryFolderId),
     index('book_files_file_hash_idx').on(t.fileHash),
     index('book_files_ino_idx').on(t.ino),

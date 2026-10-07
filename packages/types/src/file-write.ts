@@ -187,11 +187,20 @@ export function getBookFileWriteFormatFields(format: string | null | undefined):
   return BOOK_FILE_WRITE_FORMAT_FIELDS[key as keyof typeof BOOK_FILE_WRITE_FORMAT_FIELDS] ?? [];
 }
 
+export type WriteResultFileCounts = {
+  processed: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+};
+
 export type WriteResult = {
   status: "success" | "skipped" | "failed";
   fieldsWritten: string[];
   durationMs: number;
   reason?: string;
+  /** Per-file outcome counts, present when a book wrote to more than one file. `status` stays the aggregate. */
+  fileCounts?: WriteResultFileCounts;
 };
 
 export type LibraryFileSyncProgressEvent =

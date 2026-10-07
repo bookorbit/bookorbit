@@ -8,6 +8,7 @@ export type MetadataField =
   | "audioCover"
   | "authors"
   | "publisher"
+  | "isbn"
   | "publishedYear"
   | "language"
   | "pageCount"
@@ -27,6 +28,7 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
   "audioCover",
   "authors",
   "publisher",
+  "isbn",
   "publishedYear",
   "language",
   "pageCount",

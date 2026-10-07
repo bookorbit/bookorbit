@@ -27,6 +27,7 @@ import { SeriesExpectedCountService } from '../../common/services/series-expecte
 import { applyGenreFetchOptions, createGenreBlocklistTokenSet, mergeExistingGenres } from '../../common/utils/genre-fetch-options.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { canonicalIsbn13, isValidIsbn10, isValidIsbn13, normalizeMetadataIsbn } from '../../common/text-match/isbn-normalize';
 import { acceptAgainstAnchor, resolveCandidateAgreement } from './candidate-agreement';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
@@ -44,6 +45,8 @@ export interface ResolvedCoverChoice {
 }
 
 export type ResolvedMetadataFields = Partial<Record<MetadataField, string | string[] | number | null>> & {
+  isbn10?: string;
+  isbn13?: string;
   /** The ebook slot's first choice. */
   coverUrl?: string;
   coverChoices?: ResolvedCoverChoice[];
@@ -60,6 +63,9 @@ export type ResolvedMetadataFields = Partial<Record<MetadataField, string | stri
 
 /** `cover` is the ebook slot and `audioCover` the audio slot; each is present when its slot is filled. */
 export interface ExistingMetadataFields extends Partial<Record<MetadataField, unknown>> {
+  isbn10?: string | null;
+  isbn13?: string | null;
+  lockedFields?: readonly string[];
   chapters?: unknown;
   comicMetadata?: Partial<Record<keyof ComicMetadataFields, unknown>> | null;
   hardcoverEditionId?: unknown;
@@ -662,6 +668,15 @@ export class MetadataFetchPipeline {
       if (field === 'cover' || field === 'audioCover') continue;
       const mergeStrategy = options?.preserveExisting ? 'fillMissing' : fieldPreference.mergeStrategy;
 
+      if (field === 'isbn') {
+        const isbn = this.resolveIsbns(fieldPreference.providers, identifying, existing, mergeStrategy);
+        if (isbn) {
+          Object.assign(result, isbn.values);
+          for (const key of Object.keys(isbn.values)) sources[key] = isbn.provider;
+        }
+        continue;
+      }
+
       if (field === 'genres' && preferences.options?.genres.mode === 'merge') {
         const { genres, sourceProvider } = this.mergeGenres(
           fieldPreference.providers as MetadataProviderKey[],
@@ -772,6 +787,42 @@ export class MetadataFetchPipeline {
     if (filteredComicMetadata) result.comicMetadata = filteredComicMetadata;
 
     return { resolved: result, sources, providerIds };
+  }
+
+  private resolveIsbns(
+    providers: readonly string[],
+    candidates: CandidatesByProvider,
+    existing: ExistingMetadataFields,
+    strategy: MetadataMergeStrategy,
+  ): { values: Pick<ResolvedMetadataFields, 'isbn10' | 'isbn13'>; provider: string } | undefined {
+    const fillMissing = strategy === 'fillMissing';
+    const locked = new Set(existing.lockedFields);
+    const missing10 = !existing.isbn10?.trim();
+    const missing13 = !existing.isbn13?.trim();
+    if (fillMissing && !missing10 && !missing13) return undefined;
+
+    for (const provider of providers) {
+      const candidate = candidates.get(provider);
+      if (!candidate) continue;
+      const normalized10 = normalizeMetadataIsbn(candidate.isbn10);
+      const normalized13 = normalizeMetadataIsbn(candidate.isbn13);
+      const isbn10 = isValidIsbn10(normalized10) ? normalized10 : undefined;
+      const isbn13 = isValidIsbn13(normalized13) ? normalized13 : undefined;
+      const canonical = canonicalIsbn13(isbn13 ?? isbn10);
+      if (!canonical || (isbn10 && isbn13 && canonicalIsbn13(isbn10) !== isbn13)) continue;
+
+      // Keep the pair on one edition, including when only one side can be filled.
+      const retained = [
+        ...((fillMissing || !isbn10 || locked.has('isbn10')) && !missing10 ? [existing.isbn10] : []),
+        ...((fillMissing || !isbn13 || locked.has('isbn13')) && !missing13 ? [existing.isbn13] : []),
+      ];
+      if (retained.some((value) => canonicalIsbn13(value) !== canonical)) continue;
+      const values: Pick<ResolvedMetadataFields, 'isbn10' | 'isbn13'> = {};
+      if (isbn10 && (!fillMissing || missing10)) values.isbn10 = isbn10;
+      if (isbn13 && (!fillMissing || missing13)) values.isbn13 = isbn13;
+      if (Object.keys(values).length > 0) return { values, provider };
+    }
+    return undefined;
   }
 
   private extractField(candidate: MetadataCandidate, field: MetadataField): unknown {

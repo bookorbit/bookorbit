@@ -314,6 +314,9 @@ const sectionProps = computed(() => ({
     fileWriteKindleMaxFileSizeMb: form.fileWriteKindleMaxFileSizeMb,
     fileWriteAudioEnabled: form.fileWriteAudioEnabled,
     fileWriteAudioMaxFileSizeMb: form.fileWriteAudioMaxFileSizeMb,
+    fileWriteAllFiles: form.fileWriteAllFiles,
+    fileWriteReadAlongEnabled: form.fileWriteReadAlongEnabled,
+    fileWriteReadAlongMaxFileSizeMb: form.fileWriteReadAlongMaxFileSizeMb,
     formatCounts: stats.value?.formatCounts ?? null,
   },
   access: { libraryId: editingLibraryId.value },
@@ -515,6 +518,9 @@ const sectionListeners = {
   'update:fileWriteKindleMaxFileSizeMb': (value: number) => (form.fileWriteKindleMaxFileSizeMb = value),
   'update:fileWriteAudioEnabled': (value: boolean) => (form.fileWriteAudioEnabled = value),
   'update:fileWriteAudioMaxFileSizeMb': (value: number) => (form.fileWriteAudioMaxFileSizeMb = value),
+  'update:fileWriteAllFiles': (value: boolean) => (form.fileWriteAllFiles = value),
+  'update:fileWriteReadAlongEnabled': (value: boolean) => (form.fileWriteReadAlongEnabled = value),
+  'update:fileWriteReadAlongMaxFileSizeMb': (value: number) => (form.fileWriteReadAlongMaxFileSizeMb = value),
   'update:pickerOpen': handleNestedModalChange,
 }
 

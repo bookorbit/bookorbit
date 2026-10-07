@@ -94,6 +94,8 @@ export interface BookMutationState {
     publishedYear: number | null;
     language: string | null;
     pageCount: number | null;
+    isbn10: string | null;
+    isbn13: string | null;
     coverSource: string | null;
     goodreadsId: string | null;
     openLibraryId: string | null;
@@ -277,6 +279,8 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
         publishedYear: bookMetadata.publishedYear,
         language: bookMetadata.language,
         pageCount: bookMetadata.pageCount,
+        isbn10: bookMetadata.isbn10,
+        isbn13: bookMetadata.isbn13,
         coverSource: bookMetadata.coverSource,
         goodreadsId: bookMetadata.goodreadsId,
         openLibraryId: bookMetadata.openLibraryId,
@@ -311,6 +315,8 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
           publishedYear: meta.publishedYear,
           language: meta.language,
           pageCount: meta.pageCount,
+          isbn10: meta.isbn10,
+          isbn13: meta.isbn13,
           coverSource: meta.coverSource,
           goodreadsId: meta.goodreadsId,
           openLibraryId: meta.openLibraryId,

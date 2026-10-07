@@ -329,7 +329,7 @@ describe('KoreaderSettings', () => {
       'Setup',
       'Devices',
       'Plugin Activity',
-      'Unmatched KOReader Books',
+      'KOReader Books to Review',
       'Manual KOReader Links',
       'Setup Guide',
       'Danger Zone',
@@ -346,7 +346,8 @@ describe('KoreaderSettings', () => {
     expect(wrapper.text()).toContain('Update available')
     expect(wrapper.text()).toContain('latest plugin v1.6.0')
     expect(wrapper.text()).toContain('Matched books')
-    expect(wrapper.text()).toContain('No unmatched KOReader books.')
+    expect(wrapper.text()).toContain('No KOReader books to review.')
+    expect(wrapper.text()).toContain('Unlinked books can still sync through an automatic match.')
     expect(wrapper.text()).toContain('No manual KOReader links.')
     expect(wrapper.text()).toContain('2 deleted highlights awaiting KOReader plugin acknowledgement.')
     expect(wrapper.text()).toContain('3 highlight positions need attention.')
@@ -677,8 +678,8 @@ describe('KoreaderSettings', () => {
 
     await buttonByText(wrapper, 'Dismiss all')!.trigger('click')
 
-    expect(wrapper.text()).toContain('Dismiss all 2 unmatched books?')
-    expect(wrapper.text()).toContain('clears your entire unmatched books list')
+    expect(wrapper.text()).toContain('Dismiss all 2 books to review?')
+    expect(wrapper.text()).toContain('clears your entire books to review list')
 
     const dismissAllButtons = wrapper.findAll('button').filter((button) => button.text() === 'Dismiss all')
     await dismissAllButtons[dismissAllButtons.length - 1]!.trigger('click')
@@ -700,7 +701,7 @@ describe('KoreaderSettings', () => {
     await buttonByText(wrapper, 'Cancel')!.trigger('click')
 
     expect(koreaderMock.dismissAllUnmatchedBooks).not.toHaveBeenCalled()
-    expect(wrapper.text()).not.toContain('clears your entire unmatched books list')
+    expect(wrapper.text()).not.toContain('clears your entire books to review list')
   })
 
   it('keeps the confirm dialog open and reports an error when dismissing all unmatched books fails', async () => {
@@ -719,7 +720,7 @@ describe('KoreaderSettings', () => {
     await flushPromises()
 
     expect(koreaderMock.dismissAllUnmatchedBooks).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('clears your entire unmatched books list')
+    expect(wrapper.text()).toContain('clears your entire books to review list')
   })
 
   it('loads more BookOrbit search results from the link dialog', async () => {
@@ -778,6 +779,7 @@ describe('KoreaderSettings', () => {
     await buttonByText(wrapper, 'Unlink')!.trigger('click')
 
     expect(wrapper.text()).toContain('Unlink KOReader book?')
+    expect(wrapper.text()).toContain('Future syncs will use an automatic match if one exists.')
     expect(wrapper.text()).toContain('Already synced stats will stay on their current BookOrbit book.')
 
     const unlinkButtons = wrapper.findAll('button').filter((button) => button.text() === 'Unlink')

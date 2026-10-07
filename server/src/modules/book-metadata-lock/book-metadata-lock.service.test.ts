@@ -18,6 +18,13 @@ function makeService(lockedFields: string[] = []) {
 }
 
 describe('BookMetadataLockService', () => {
+  it('keeps ISBN locks independent during automated refreshes', async () => {
+    const { service } = makeService(['isbn13']);
+    const result = await service.filterResolvedMetadata(12, { isbn10: '0306406152', isbn13: '9780306406157' }, {});
+    expect(result.resolved).toEqual({ isbn10: '0306406152' });
+    expect(result.skippedFields).toEqual(['isbn13']);
+  });
+
   it('normalizes, deduplicates, and orders locked fields', () => {
     const { service } = makeService();
 

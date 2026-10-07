@@ -100,15 +100,18 @@ defineExpose({ focusTitle })
           autocomplete="off"
         />
       </label>
-      <button
-        type="submit"
-        class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold whitespace-nowrap text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
-        :disabled="!canSearch"
-      >
-        <Loader2 v-if="busy" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-        <Search v-else class="size-4" aria-hidden="true" />
-        {{ t('common.search') }}
-      </button>
+      <div class="flex items-center gap-1.5">
+        <button
+          type="submit"
+          class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold whitespace-nowrap text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
+          :disabled="!canSearch"
+        >
+          <Loader2 v-if="busy" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <Search v-else class="size-4" aria-hidden="true" />
+          {{ t('common.search') }}
+        </button>
+        <slot name="search-options" />
+      </div>
     </div>
     <div v-if="edited" class="flex items-center justify-between gap-2">
       <span class="text-[11.5px] text-muted-foreground">{{ t('book.detail.editMetadata.match.query.edited') }}</span>

@@ -75,6 +75,7 @@ const READER_ROUTES: Record<ReaderTab, string> = {
 }
 
 const METADATA_ROUTES: Record<MetadataTab, string> = {
+  reminders: 'settings-metadata-reminders',
   providers: 'settings-metadata-providers',
   'field-rules': 'settings-metadata-field-rules',
   'custom-fields': 'settings-metadata-custom-fields',
@@ -345,6 +346,12 @@ export const routes: RouteRecordRaw[] = [
             path: 'metadata',
             name: 'settings-metadata',
             redirect: tabRedirect(normalizeMetadataTab, METADATA_ROUTES),
+          },
+          {
+            path: 'metadata/reminders',
+            name: 'settings-metadata-reminders',
+            component: () => import('@/features/settings/MetadataRemindersSettings.vue'),
+            meta: { maxWidth: 'max-w-3xl', title: () => t('metadataReminders.title') },
           },
           {
             path: 'metadata/providers',

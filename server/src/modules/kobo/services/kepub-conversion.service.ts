@@ -1,10 +1,12 @@
 import { execFile } from 'child_process';
-import { mkdir, stat } from 'fs/promises';
+import { mkdir, mkdtemp, rename, rm, stat } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
+
+import { storageConfig } from '../../../config/config';
 
 import { KepubifyBinaryService } from './kepubify-binary.service';
 
@@ -27,12 +29,13 @@ interface KepubConversionInput {
 @Injectable()
 export class KepubConversionService {
   private readonly kepubCachePath: string;
+  private readonly conversions = new Map<string, Promise<string>>();
 
   constructor(
-    private readonly config: ConfigService,
+    @Inject(storageConfig.KEY) storage: ConfigType<typeof storageConfig>,
     private readonly kepubifyBinaryService: KepubifyBinaryService,
   ) {
-    this.kepubCachePath = join(this.config.get<string>('storage.appDataPath')!, '.kepub-cache');
+    this.kepubCachePath = join(storage.appDataPath, '.kepub-cache');
   }
 
   async getKepubPath(input: KepubConversionInput): Promise<string> {
@@ -41,6 +44,8 @@ export class KepubConversionService {
     // Keep the original two key shapes byte for byte so existing cache entries still hit.
     const cacheKey = `${fileHash}${input.audioless ? `-noaudio-v${AUDIOLESS_EPUB_CACHE_VERSION}` : ''}${input.hyphenate ? '-hyph' : ''}`;
     const cachedPath = join(cacheDir, `${cacheKey}.kepub.epub`);
+    const pending = this.conversions.get(cachedPath);
+    if (pending) return pending;
 
     try {
       await stat(cachedPath);
@@ -49,10 +54,30 @@ export class KepubConversionService {
       // Cache miss.
     }
 
+    const concurrent = this.conversions.get(cachedPath);
+    if (concurrent) return concurrent;
+    const conversion = this.convertToCache(input, cacheDir, cachedPath);
+    this.conversions.set(cachedPath, conversion);
+    try {
+      return await conversion;
+    } finally {
+      this.conversions.delete(cachedPath);
+    }
+  }
+
+  private async convertToCache(input: KepubConversionInput, cacheDir: string, cachedPath: string): Promise<string> {
     const binaryPath = await this.kepubifyBinaryService.getBinaryPath();
     await mkdir(cacheDir, { recursive: true });
-    const args = input.hyphenate ? ['--hyphenate', '--output', cachedPath, input.sourcePath] : ['--output', cachedPath, input.sourcePath];
-    await execFileAsync(binaryPath, args, { timeout: KEPUBIFY_TIMEOUT_MS });
-    return cachedPath;
+    const tempDir = await mkdtemp(join(cacheDir, '.conversion-'));
+    const outputPath = join(tempDir, 'book.kepub.epub');
+    try {
+      const args = input.hyphenate ? ['--hyphenate', '--output', outputPath, input.sourcePath] : ['--output', outputPath, input.sourcePath];
+      await execFileAsync(binaryPath, args, { timeout: KEPUBIFY_TIMEOUT_MS });
+      // Readers and the cache recovery pass must never see a partially written conversion.
+      await rename(outputPath, cachedPath);
+      return cachedPath;
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   }
 }

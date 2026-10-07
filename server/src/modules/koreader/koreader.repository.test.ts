@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Test } from '@nestjs/testing';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { createCapturingDb } from '../../common/test-utils/capture-sql-db';
 import { sqlChunkText } from '../../common/test-utils/sql-chunk-text';
 import { KoreaderRepository } from './koreader.repository';
+import { DB } from '../../db';
+
+async function makeRepository(db: unknown) {
+  const module = await Test.createTestingModule({ providers: [KoreaderRepository, { provide: DB, useValue: db }] }).compile();
+  return module.get(KoreaderRepository);
+}
 
 function makeQueryChain(result: unknown) {
   const chain: Record<string, unknown> = {
@@ -44,9 +51,9 @@ describe('KoreaderRepository', () => {
   let db: ReturnType<typeof makeDb>;
   let repo: KoreaderRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     db = makeDb();
-    repo = new KoreaderRepository(db as never);
+    repo = await makeRepository(db);
   });
 
   describe('progress resets', () => {
@@ -93,6 +100,62 @@ describe('KoreaderRepository', () => {
   });
 
   describe('resolveBookFileByHash', () => {
+    beforeEach(() => db.select.mockReturnValue(makeQueryChain([])));
+
+    it.each(['current', 'history'])('honors an explicit user link even when a unique %s identity exists', async (source) => {
+      const intrinsic = { id: 10, bookId: 20, libraryId: 1, format: 'epub' };
+      const linked = { id: 11, bookId: 21, libraryId: 1, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain(source === 'current' ? [intrinsic] : []))
+        .mockReturnValueOnce(makeQueryChain(source === 'history' ? [intrinsic] : []))
+        .mockReturnValueOnce(makeQueryChain([linked]));
+      await expect(repo.resolveBookFileByHash('explicit', [1], 7)).resolves.toEqual(linked);
+    });
+
+    it.each([undefined, 7])('rejects a current/history collision across books for user %s', async (userId) => {
+      db.select
+        .mockReturnValueOnce(makeQueryChain([{ id: 10, bookId: 20, libraryId: 1, format: 'epub' }]))
+        .mockReturnValueOnce(makeQueryChain([{ id: 11, bookId: 21, libraryId: 1, format: 'epub' }]));
+      await expect(repo.resolveBookFileByHash('collision', [1], userId)).resolves.toBeNull();
+    });
+
+    it('allows an explicit user link to disambiguate a current/history collision', async () => {
+      const linked = { id: 11, bookId: 21, libraryId: 1, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain([{ id: 10, bookId: 20, libraryId: 1, format: 'epub' }]))
+        .mockReturnValueOnce(makeQueryChain([{ ...linked }]))
+        .mockReturnValueOnce(makeQueryChain([linked]));
+      await expect(repo.resolveBookFileByHash('collision', [1], 7)).resolves.toEqual(linked);
+    });
+
+    it.each([undefined, 7])('deduplicates a file present in current and delivered history for user %s', async (userId) => {
+      const file = { id: 10, bookId: 20, libraryId: 1, format: 'pdf' };
+      db.select.mockReturnValueOnce(makeQueryChain([file])).mockReturnValueOnce(makeQueryChain([{ ...file }]));
+      await expect(repo.resolveBookFileByHash('unchanged', [1], userId)).resolves.toEqual({ id: 10, bookId: 20, libraryId: 1, format: 'pdf' });
+      expect(db.select).toHaveBeenCalledTimes(userId === undefined ? 2 : 3);
+    });
+
+    it('preserves manual selection for different files of one book across current and history', async () => {
+      const linked = { id: 11, bookId: 20, libraryId: 1, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain([{ id: 10, bookId: 20, libraryId: 1, format: 'epub' }]))
+        .mockReturnValueOnce(makeQueryChain([{ ...linked }]))
+        .mockReturnValueOnce(makeQueryChain([linked]));
+      await expect(repo.resolveBookFileByHash('same-book', [1], 7)).resolves.toEqual(linked);
+    });
+
+    it('checks both intrinsic sources with library filters and bounded ambiguity queries', async () => {
+      const captured = createCapturingDb();
+      const repository = await makeRepository(captured.db);
+      await repository.resolveBookFileByHash('collision', [31, 32]);
+      expect(captured.queries).toHaveLength(2);
+      for (const query of captured.queries) {
+        expect(query.sql).toContain('"books"."library_id" in');
+        expect(query.sql).toContain('limit');
+        expect(query.params).toEqual(expect.arrayContaining(['collision', 31, 32, 2]));
+      }
+    });
+
     it('short-circuits when accessible libraries are empty', async () => {
       await expect(repo.resolveBookFileByHash('hash', [])).resolves.toBeNull();
       expect(db.select).not.toHaveBeenCalled();
@@ -100,7 +163,7 @@ describe('KoreaderRepository', () => {
 
     it('returns null when accessible libraries is null and no file found', async () => {
       const emptyChain = makeQueryChain([]);
-      db.select.mockReturnValue(emptyChain);
+      db.select.mockReturnValueOnce(emptyChain);
 
       const result = await repo.resolveBookFileByHash('hash', null);
 
@@ -110,25 +173,25 @@ describe('KoreaderRepository', () => {
 
     it('returns the book file when found by current hash', async () => {
       const file = { id: 10, bookId: 20, libraryId: 1, format: 'epub' };
-      db.select.mockReturnValue(makeQueryChain([file]));
+      db.select.mockReturnValueOnce(makeQueryChain([file]));
 
       const result = await repo.resolveBookFileByHash('abc123', null);
 
       expect(result).toEqual(file);
-      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(db.select).toHaveBeenCalledTimes(2);
     });
 
     it('returns the oldest file when current hash matches stay within one book', async () => {
       const firstFile = { id: 10, bookId: 20, libraryId: 1, format: 'epub' };
       const secondFile = { id: 11, bookId: 20, libraryId: 1, format: 'epub' };
-      db.select.mockReturnValue(makeQueryChain([firstFile, secondFile]));
+      db.select.mockReturnValueOnce(makeQueryChain([firstFile, secondFile]));
 
       await expect(repo.resolveBookFileByHash('abc123', null)).resolves.toEqual(firstFile);
-      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(db.select).toHaveBeenCalledTimes(2);
     });
 
     it('returns null when a current hash matches different books', async () => {
-      db.select.mockReturnValue(
+      db.select.mockReturnValueOnce(
         makeQueryChain([
           { id: 10, bookId: 20, libraryId: 1, format: 'epub' },
           { id: 11, bookId: 21, libraryId: 1, format: 'epub' },
@@ -136,7 +199,7 @@ describe('KoreaderRepository', () => {
       );
 
       await expect(repo.resolveBookFileByHash('abc123', null)).resolves.toBeNull();
-      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(db.select).toHaveBeenCalledTimes(2);
     });
 
     it('uses a user-scoped manual link when a current hash matches different books', async () => {
@@ -148,28 +211,33 @@ describe('KoreaderRepository', () => {
             { id: 11, bookId: 21, libraryId: 1, format: 'epub' },
           ]),
         )
+        .mockReturnValueOnce(makeQueryChain([]))
         .mockReturnValueOnce(makeQueryChain([manualFile]));
 
       await expect(repo.resolveBookFileByHash('abc123', null, 7)).resolves.toEqual(manualFile);
-      expect(db.select).toHaveBeenCalledTimes(2);
+      expect(db.select).toHaveBeenCalledTimes(3);
     });
 
     it('prefers a user-scoped link when a current hash matches multiple files in one book', async () => {
       const linkedFile = { id: 11, bookId: 20, libraryId: 1, format: 'epub' };
       db.select
-        .mockReturnValueOnce(makeQueryChain([{ id: 10, bookId: 20, libraryId: 1, format: 'epub', matchingFileCount: 2 }]))
+        .mockReturnValueOnce(makeQueryChain([{ id: 10, bookId: 20, libraryId: 1, format: 'epub' }]))
+        .mockReturnValueOnce(makeQueryChain([]))
         .mockReturnValueOnce(makeQueryChain([linkedFile]));
 
       await expect(repo.resolveBookFileByHash('abc123', null, 7)).resolves.toEqual(linkedFile);
-      expect(db.select).toHaveBeenCalledTimes(2);
+      expect(db.select).toHaveBeenCalledTimes(3);
     });
 
     it('keeps the deterministic first file when a same-book duplicate has no user-scoped link', async () => {
-      const firstFile = { id: 10, bookId: 20, libraryId: 1, format: 'epub', matchingFileCount: 2 };
-      db.select.mockReturnValueOnce(makeQueryChain([firstFile])).mockReturnValueOnce(makeQueryChain([]));
+      const firstFile = { id: 10, bookId: 20, libraryId: 1, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain([firstFile]))
+        .mockReturnValueOnce(makeQueryChain([]))
+        .mockReturnValueOnce(makeQueryChain([]));
 
       await expect(repo.resolveBookFileByHash('abc123', null, 7)).resolves.toEqual({ id: 10, bookId: 20, libraryId: 1, format: 'epub' });
-      expect(db.select).toHaveBeenCalledTimes(2);
+      expect(db.select).toHaveBeenCalledTimes(3);
     });
 
     it('falls back to hash history when current hash lookup returns nothing', async () => {
@@ -229,6 +297,72 @@ describe('KoreaderRepository', () => {
   });
 
   describe('resolveBookFilesByHashes', () => {
+    beforeEach(() => db.select.mockReturnValue(makeQueryChain([])));
+
+    it.each(['current', 'history'])('honors an explicit user link over a unique %s identity in a batch', async (source) => {
+      const intrinsic = { hash: 'explicit', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' };
+      const linked = { hash: 'explicit', bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain(source === 'current' ? [intrinsic] : []))
+        .mockReturnValueOnce(makeQueryChain(source === 'history' ? [intrinsic] : []))
+        .mockReturnValueOnce(makeQueryChain([linked]));
+      const result = await repo.resolveBookFilesByHashes(['explicit'], [31], 7);
+      expect(result.get('explicit')).toEqual({ bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' });
+    });
+
+    it.each([undefined, 7])('omits current/history collisions without losing other batch matches for user %s', async (userId) => {
+      db.select
+        .mockReturnValueOnce(
+          makeQueryChain([
+            { hash: 'collision', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' },
+            { hash: 'safe', bookFileId: 13, bookId: 23, libraryId: 31, format: 'pdf' },
+          ]),
+        )
+        .mockReturnValueOnce(makeQueryChain([{ hash: 'collision', bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' }]));
+      const result = await repo.resolveBookFilesByHashes(['collision', 'safe'], [31], userId);
+      expect(result.has('collision')).toBe(false);
+      expect(result.get('safe')).toEqual({ bookFileId: 13, bookId: 23, libraryId: 31, format: 'pdf' });
+    });
+
+    it('uses a user link to resolve a current/history collision in a batch', async () => {
+      const linked = { hash: 'collision', bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain([{ hash: 'collision', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' }]))
+        .mockReturnValueOnce(makeQueryChain([linked]))
+        .mockReturnValueOnce(makeQueryChain([linked]));
+      const result = await repo.resolveBookFilesByHashes(['collision'], [31], 7);
+      expect(result.get('collision')).toEqual({ bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' });
+    });
+
+    it('deduplicates current/history rows of an unchanged delivered file while checking manual links', async () => {
+      const file = { hash: 'unchanged', bookFileId: 11, bookId: 21, libraryId: 31, format: 'pdf' };
+      db.select.mockReturnValueOnce(makeQueryChain([file])).mockReturnValueOnce(makeQueryChain([{ ...file }]));
+      const result = await repo.resolveBookFilesByHashes(['unchanged'], [31], 7);
+      expect(result.get('unchanged')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'pdf' });
+      expect(db.select).toHaveBeenCalledTimes(3);
+    });
+
+    it('preserves manual selection of same-book files split across current and history in a batch', async () => {
+      const linked = { hash: 'same-book', bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' };
+      db.select
+        .mockReturnValueOnce(makeQueryChain([{ hash: 'same-book', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' }]))
+        .mockReturnValueOnce(makeQueryChain([linked]))
+        .mockReturnValueOnce(makeQueryChain([linked]));
+      const result = await repo.resolveBookFilesByHashes(['same-book'], [31], 7);
+      expect(result.get('same-book')).toEqual({ bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' });
+    });
+
+    it('queries every requested hash in both library-scoped intrinsic sources', async () => {
+      const captured = createCapturingDb();
+      const repository = await makeRepository(captured.db);
+      await repository.resolveBookFilesByHashes(['current', 'delivered'], [31, 32]);
+      expect(captured.queries).toHaveLength(2);
+      for (const query of captured.queries) {
+        expect(query.sql).toContain('"books"."library_id" in');
+        expect(query.params).toEqual(expect.arrayContaining(['current', 'delivered', 31, 32]));
+      }
+    });
+
     it('returns an empty map when no hashes are provided', async () => {
       const result = await repo.resolveBookFilesByHashes([], null);
 
@@ -243,7 +377,7 @@ describe('KoreaderRepository', () => {
       expect(db.select).not.toHaveBeenCalled();
     });
 
-    it('resolves direct hashes first and falls back to hash history for missing hashes', async () => {
+    it('resolves current and historical identities in the same batch', async () => {
       db.select
         .mockReturnValueOnce(
           makeQueryChain([
@@ -261,13 +395,13 @@ describe('KoreaderRepository', () => {
       expect(db.select).toHaveBeenCalledTimes(2);
     });
 
-    it('skips hash history lookup when all hashes resolve directly', async () => {
+    it('checks history even when all hashes resolve directly', async () => {
       db.select.mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31, format: 'pdf' }]));
 
       const result = await repo.resolveBookFilesByHashes(['current'], null);
 
       expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'pdf' });
-      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(db.select).toHaveBeenCalledTimes(2);
     });
 
     it('resolves duplicate current hash rows when they belong to one book', async () => {
@@ -281,7 +415,7 @@ describe('KoreaderRepository', () => {
       const result = await repo.resolveBookFilesByHashes(['current'], null);
 
       expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' });
-      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(db.select).toHaveBeenCalledTimes(2);
     });
 
     it('omits a current hash that matches different books', async () => {
@@ -295,7 +429,7 @@ describe('KoreaderRepository', () => {
       const result = await repo.resolveBookFilesByHashes(['current'], null);
 
       expect(result.has('current')).toBe(false);
-      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(db.select).toHaveBeenCalledTimes(2);
     });
 
     it('uses a user-scoped manual link for an ambiguous current hash', async () => {
@@ -306,12 +440,13 @@ describe('KoreaderRepository', () => {
             { hash: 'current', bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' },
           ]),
         )
+        .mockReturnValueOnce(makeQueryChain([]))
         .mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' }]));
 
       const result = await repo.resolveBookFilesByHashes(['current'], null, 7);
 
       expect(result.get('current')).toEqual({ bookFileId: 12, bookId: 22, libraryId: 31, format: 'epub' });
-      expect(db.select).toHaveBeenCalledTimes(2);
+      expect(db.select).toHaveBeenCalledTimes(3);
     });
 
     it('prefers a user-scoped link for duplicate current hashes within one book', async () => {
@@ -322,12 +457,13 @@ describe('KoreaderRepository', () => {
             { hash: 'current', bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' },
           ]),
         )
+        .mockReturnValueOnce(makeQueryChain([]))
         .mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' }]));
 
       const result = await repo.resolveBookFilesByHashes(['current'], null, 7);
 
       expect(result.get('current')).toEqual({ bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' });
-      expect(db.select).toHaveBeenCalledTimes(2);
+      expect(db.select).toHaveBeenCalledTimes(3);
     });
 
     it('keeps the deterministic first file when a same-book duplicate has no user-scoped bulk link', async () => {
@@ -338,12 +474,13 @@ describe('KoreaderRepository', () => {
             { hash: 'current', bookFileId: 12, bookId: 21, libraryId: 31, format: 'epub' },
           ]),
         )
+        .mockReturnValueOnce(makeQueryChain([]))
         .mockReturnValueOnce(makeQueryChain([]));
 
       const result = await repo.resolveBookFilesByHashes(['current'], null, 7);
 
       expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' });
-      expect(db.select).toHaveBeenCalledTimes(2);
+      expect(db.select).toHaveBeenCalledTimes(3);
     });
 
     it('omits a historical hash that matches different books', async () => {
@@ -570,6 +707,19 @@ describe('KoreaderRepository', () => {
       );
     });
 
+    it('creates automatic candidate links without replacing manual links or reviving pending corrections', async () => {
+      const { db: capturedDb, queries } = createCapturingDb();
+      const repository = await makeRepository(capturedDb);
+      await repository.createBookHashLinkIfAbsent(7, 'a'.repeat(32), 44, { title: '  Title  ', authors: '  Author  ', lastOpen: 100 });
+      expect(queries).toHaveLength(1);
+      const query = queries[0]!;
+      expect(query.sql).toContain('on conflict (user_id, hash) do nothing');
+      expect(query.sql).toContain('where not exists');
+      expect(query.sql).toContain('manual_link_requested = true');
+      expect(query.sql).not.toContain('do update');
+      expect(query.params).toEqual([7, 'a'.repeat(32), 44, 'Title', 'Author', 100, 7, 'a'.repeat(32)]);
+    });
+
     it('upserts a manual hash link with null metadata when none is provided', async () => {
       const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
       const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
@@ -600,11 +750,35 @@ describe('KoreaderRepository', () => {
 
     it('deletes and returns a user-scoped manual hash link', async () => {
       const row = { hash: 'a'.repeat(32), bookFileId: 44, koreaderTitle: 'Title', koreaderAuthors: 'Author', koreaderLastOpen: 100 };
-      const chain = makeQueryChain([row]);
-      db.delete.mockReturnValue(chain);
+      db.execute.mockResolvedValue({ rows: [row] });
+      await expect(repo.unlinkBookHashLink(7, 'a'.repeat(32))).resolves.toEqual(row);
+      const query = sqlChunkText(db.execute.mock.calls[0]![0]);
+      expect(query).toContain('with deleted as');
+      expect(query).toContain('manual_link_requested');
+    });
+  });
 
-      await expect(repo.deleteBookHashLink(7, 'a'.repeat(32))).resolves.toEqual(row);
-      expect(chain.returning).toHaveBeenCalledTimes(1);
+  describe('pending manual override protection', () => {
+    it.each([false, true])('only clears pending manual requests when explicitly requested (%s)', async (includeManual) => {
+      const captured = createCapturingDb();
+      const module = await Test.createTestingModule({ providers: [KoreaderRepository, { provide: DB, useValue: captured.db }] }).compile();
+      await module.get(KoreaderRepository).clearUnmatchedBooks(7, ['a'.repeat(32)], includeManual);
+      const query = captured.queries[0]!;
+      expect(query.sql).toContain('"user_id" =');
+      expect(query.sql.includes('"manual_link_requested" =')).toBe(!includeManual);
+    });
+
+    it('restores a relinkable request atomically with user-scoped link deletion', async () => {
+      const captured = createCapturingDb();
+      const module = await Test.createTestingModule({ providers: [KoreaderRepository, { provide: DB, useValue: captured.db }] }).compile();
+      await expect(module.get(KoreaderRepository).unlinkBookHashLink(7, 'a'.repeat(32))).resolves.toBeNull();
+      expect(captured.queries).toHaveLength(1);
+      const query = captured.queries[0]!;
+      expect(query.sql).toContain('with deleted as');
+      expect(query.sql).toContain('where user_id = $1 and hash = $2');
+      expect(query.sql).toContain('insert into "koreader_unmatched_books"');
+      expect(query.sql).toContain('manual_link_requested = true');
+      expect(query.params).toEqual([7, 'a'.repeat(32)]);
     });
   });
 

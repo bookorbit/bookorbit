@@ -646,6 +646,30 @@ describe('KoreaderCatalogService', () => {
     );
   });
 
+  it('uses viewer-scoped aggregate collection counts without recounting each collection', async () => {
+    const { service, opdsBookService } = makeService();
+    const user = makeUser({ id: 7 });
+    opdsBookService.getUserCollections.mockResolvedValue([
+      { id: 2, name: 'Favorites', bookCount: 3 },
+      { id: 9, name: 'Public empty', bookCount: 0 },
+    ]);
+
+    const section = await service.getSectionEntries(user, 'collections');
+
+    expect(opdsBookService.getUserCollections).toHaveBeenCalledWith(7, false, user.contentFilters);
+    expect(opdsBookService.countBooks).not.toHaveBeenCalled();
+    expect(section.items).toEqual([
+      { id: '2', title: 'Favorites', section: 'collections', count: 3, booksHref: '/api/v1/koreader/plugin/catalog/books?sort=title&collectionId=2' },
+      {
+        id: '9',
+        title: 'Public empty',
+        section: 'collections',
+        count: 0,
+        booksHref: '/api/v1/koreader/plugin/catalog/books?sort=title&collectionId=9',
+      },
+    ]);
+  });
+
   it('rejects unknown section names', async () => {
     const { service } = makeService();
     await expect(service.getSectionEntries(makeUser(), 'bogus')).rejects.toThrow(BadRequestException);

@@ -1,6 +1,6 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
-import { candidateHasNormalizedIsbn, normalizeMetadataIsbn } from './isbn-match';
+import { candidateHasNormalizedIsbn, candidatesShareIsbn, normalizeMetadataIsbn } from './isbn-match';
 
 function candidate(data: Partial<MetadataCandidate> = {}): MetadataCandidate {
   return {
@@ -12,6 +12,13 @@ function candidate(data: Partial<MetadataCandidate> = {}): MetadataCandidate {
 }
 
 describe('isbn-match', () => {
+  it('matches equivalent ISBN-10 and ISBN-13 across providers', () => {
+    expect(candidateHasNormalizedIsbn(candidate({ isbn10: '0306406152' }), '9780306406157')).toBe(true);
+    expect(candidateHasNormalizedIsbn(candidate({ isbn13: '9780306406157' }), '0306406152')).toBe(true);
+    expect(candidatesShareIsbn(candidate({ isbn10: '0306406152' }), candidate({ isbn13: '9780306406157' }))).toBe(true);
+    expect(candidatesShareIsbn(candidate({ isbn10: '0306406152' }), candidate({ isbn13: '9781635766264' }))).toBe(false);
+  });
+
   it('normalizes formatted ISBN values for comparison', () => {
     const normalized = normalizeMetadataIsbn('978-952-333-158-7');
 

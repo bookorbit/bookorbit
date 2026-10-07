@@ -5,6 +5,7 @@ import * as unzipper from 'unzipper';
 import { ZipArchive } from 'archiver';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { collapsedPointToCfi } from './position-converter.core';
 import { EpubDomService, loadChapterFromZip, readEpubSpine } from './epub-dom.service';
 import { PositionConverterService } from './position-converter.service';
 
@@ -31,7 +32,10 @@ const CH2 = `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>2</title></head>
 <body><p>Second chapter text.</p></body></html>`;
 
-async function buildEpub(path: string, containerXml = CONTAINER_XML, contentOpf = CONTENT_OPF): Promise<void> {
+async function buildEpub(
+  path: string,
+  { chapter = CH1, containerXml = CONTAINER_XML, contentOpf = CONTENT_OPF }: { chapter?: string; containerXml?: string; contentOpf?: string } = {},
+): Promise<void> {
   const archive = new ZipArchive({ zlib: { level: 0 } });
   const chunks: Buffer[] = [];
   archive.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -42,7 +46,7 @@ async function buildEpub(path: string, containerXml = CONTAINER_XML, contentOpf 
   archive.append('application/epub+zip', { name: 'mimetype', store: true });
   archive.append(containerXml, { name: 'META-INF/container.xml' });
   archive.append(contentOpf, { name: 'OEBPS/content.opf' });
-  archive.append(CH1, { name: 'OEBPS/text/ch1.xhtml' });
+  archive.append(chapter, { name: 'OEBPS/text/ch1.xhtml' });
   archive.append(CH2, { name: 'OEBPS/text/ch2.xhtml' });
   await archive.finalize();
   await done;
@@ -88,7 +92,7 @@ describe('EpubDomService', () => {
     const prefixedPath = join(dir, 'prefixed.epub');
     const container = CONTAINER_XML.replace(/(<\/?)(container|rootfiles|rootfile)(?=[\s>])/g, '$1ocf:$2').replace('xmlns=', 'xmlns:ocf=');
     const opf = CONTENT_OPF.replace(/(<\/?)(package|metadata|manifest|item|spine|itemref)(?=[\s/>])/g, '$1opf:$2').replace('xmlns=', 'xmlns:opf=');
-    await buildEpub(prefixedPath, container, opf);
+    await buildEpub(prefixedPath, { containerXml: container, contentOpf: opf });
     const service = new EpubDomService(makeDb(prefixedPath) as never);
 
     expect(await service.getSpineHrefs(1)).toEqual(['OEBPS/text/ch1.xhtml', 'OEBPS/text/ch2.xhtml']);
@@ -110,6 +114,20 @@ describe('EpubDomService', () => {
     const again = await service.getChapter(1, 0);
     expect(again).toBe(first);
     expect(await service.getChapter(1, 9)).toBeNull();
+  });
+
+  it('canonicalizes native KEPUB wrappers and accumulates offsets across spans', async () => {
+    const nativePath = join(dir, 'native.kepub');
+    await buildEpub(nativePath, {
+      chapter:
+        '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title></head><body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">Alpha sentence. </span><span class="koboSpan" id="kobo.1.2">Second sentence.</span></p></div></div></body></html>',
+    });
+    const service = new EpubDomService(makeDb(nativePath, 'kepub') as never);
+    const doc = (await service.getChapter(2, 0))!;
+    expect(doc.index.collapsed).toBe('Alpha sentence. Second sentence.');
+    expect(collapsedPointToCfi(doc, 0, 22)).toBe('epubcfi(/6/2!/4/2/1:22)');
+    const raw = await loadChapterFromZip(await unzipper.Open.file(nativePath), 'OEBPS/text/ch1.xhtml');
+    expect(collapsedPointToCfi(raw!, 0, 22)).toContain('[kobo.1.2]');
   });
 
   it('returns null for non-epub files', async () => {

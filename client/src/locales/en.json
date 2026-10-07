@@ -1570,6 +1570,7 @@
         "publishedYear": "Published year",
         "language": "Language",
         "pageCount": "Page count",
+        "isbn": "ISBNs",
         "communityRating": "Community rating",
         "seriesName": "Series name",
         "seriesIndex": "Series index",
@@ -2886,7 +2887,13 @@
             "unmatchedDismissed": "Unmatched book dismissed",
             "dismissFailed": "Failed to dismiss unmatched book",
             "allDismissed": "{count, plural, =0 {Dismissed no unmatched books} one {Dismissed # unmatched book} other {Dismissed # unmatched books}}",
-            "dismissAllFailed": "Failed to dismiss all unmatched books"
+            "dismissAllFailed": "Failed to dismiss all unmatched books",
+            "reviewRefreshed": "Books to review refreshed",
+            "reviewRefreshFailed": "Failed to refresh books to review",
+            "reviewDismissed": "Book dismissed from review",
+            "reviewDismissFailed": "Failed to dismiss book from review",
+            "reviewAllDismissed": "{count, plural, =0 {Dismissed no books from review} one {Dismissed # book from review} other {Dismissed # books from review}}",
+            "reviewDismissAllFailed": "Failed to dismiss all books from review"
           },
           "modal": {
             "linkTitle": "Link KOReader book",
@@ -2939,7 +2946,15 @@
           "syncedStatsNote": "Already synced stats will stay on their current BookOrbit book.",
           "chooseDifferent": "Choose different",
           "saving": "Saving...",
-          "confirmLink": "Confirm link"
+          "confirmLink": "Confirm link",
+          "reviewTitle": "KOReader Books to Review",
+          "reviewHint": "Books without an automatic match and books you unlinked appear here. Unlinked books can still sync through an automatic match. Link a book to override that match, or dismiss it to remove it from this list.",
+          "loadingReview": "Loading books to review...",
+          "noReview": "No KOReader books to review.",
+          "manualUnlinkConfirmBody": "Remove the manual link to {title} and return this book to the review list. Future syncs will use an automatic match if one exists. Already synced stats will stay on their current BookOrbit book.",
+          "reviewDismissConfirmBody": "This removes it from your books to review. Automatic matching and existing sync data are kept. If a device reports the hash again without a match, it can reappear.",
+          "reviewDismissAllConfirmTitle": "{count, plural, =0 {No books to review} one {Dismiss all # book to review?} other {Dismiss all # books to review?}}",
+          "reviewDismissAllConfirmBody": "This clears your entire books to review list, including entries on other pages. Automatic matching and existing sync data are kept. If a device reports a hash again without a match, it can reappear."
         },
         "remove": "Remove",
         "removing": "Removing...",
@@ -5716,6 +5731,9 @@
         },
         "searchDrawer": {
           "searchTitle": "Search Metadata",
+          "autoSearchOnOpen": "Search automatically when opened",
+          "autoSearchOnOpenHint": "Uses the book's details next time this panel opens. Remembered for your account in this browser.",
+          "searchOptions": "Search options",
           "compareTitle": "Compare Metadata",
           "searchSubtitle": "Find the best provider match for this book.",
           "compareSubtitle": "Review differences and apply only what you want."
@@ -5935,6 +5953,8 @@
         "score": "Score",
         "scoreTooltip": "Metadata score {score} out of 100",
         "emptyFields": "{count, plural, one {empty field} other {empty fields}}",
+        "emptyFieldsCount": "{count, plural, one {# empty field} other {# empty fields}}",
+        "emptyFieldsHeading": "Empty metadata fields",
         "emptyFieldsTooltip": "Not filled in yet: {fields}. Search online to look them up.",
         "libraryRow": "Library",
         "primaryRow": "Primary",
@@ -6036,6 +6056,12 @@
         "resume": "Resume",
         "audiobook": "Audiobook",
         "writeTarget": "Write target",
+        "notWritten": {
+          "formatNotSupported": "Not written: unsupported format",
+          "formatDisabled": "Not written: format turned off",
+          "fileExceedsSizeLimit": "Not written: over size limit",
+          "notContentFile": "Not written: not book content"
+        },
         "enabled": "Enabled",
         "disabled": "Off",
         "notSet": "not set",
@@ -9002,12 +9028,22 @@
         },
         "cover": {
           "title": "Include cover image",
-          "hint": "Writes the stored cover back into supported file formats."
+          "hint": "Writes the stored cover back into supported file formats.",
+          "mediumHint": "Writes the stored cover into the file too. Ebook files get the Book cover and audio files get the Audiobook cover; a file whose cover is missing keeps its own."
+        },
+        "allFiles": {
+          "title": "Write into every file of a book",
+          "hint": "Also writes into the book's other book files, such as an audiobook kept beside its ebook or a PDF in the same folder. Every book format there is written, so give a companion file such as a workbook its own folder to keep it out. Format toggles and size limits below still apply. Turning this off stops future writes; it does not undo files already written."
         },
         "epub": {
           "title": "EPUB",
           "hint": "Writes metadata into the OPF file inside the EPUB archive.",
           "toggleAria": "Write EPUB metadata"
+        },
+        "readAlong": {
+          "title": "Read-along EPUB",
+          "hint": "EPUBs with synced narration, such as Storyteller read-alongs. They carry their audio, so they are large and need more memory to rewrite.",
+          "toggleAria": "Write read-along EPUB metadata"
         },
         "fb2": {
           "title": "FictionBook (FB2)",
@@ -9032,7 +9068,9 @@
         "audio": {
           "title": "Audio",
           "hint": "Embeds the stored cover into M4B, M4A, MP3, and FLAC files.",
-          "toggleAria": "Write audio covers"
+          "toggleAria": "Write audio covers",
+          "tagsHint": "Writes tags such as title, authors, narrators, and series into M4B, M4A, MP3, and FLAC files.",
+          "tagsToggleAria": "Write audio metadata"
         },
         "coverAudioHint": "Writes the stored cover into the file too. Audio files can only take a cover.",
         "audioNeedsCover": "Needs “Include cover image” turned on.",
@@ -9245,6 +9283,13 @@
         "createFolder": "Could not create folder"
       }
     },
+    "destination": {
+      "loadFailed": "Could not load destination libraries. Close and reopen to try again.",
+      "noLibraries": "No book libraries are available. Create a library or ask an administrator for access.",
+      "noFolders": "This library has no destination folders. Add a folder in Library settings.",
+      "unavailable": "The selected library is no longer available.",
+      "selectFolder": "Select a folder..."
+    },
     "upload": {
       "library": "Library",
       "selectLibrary": "Select a library...",
@@ -9269,6 +9314,59 @@
       "dropzone": {
         "title": "Drop files here or click to browse",
         "hint": "{formats} - up to {size} MB each"
+      }
+    }
+  },
+  "metadataReminders": {
+    "title": "Missing-field reminders",
+    "navDescription": "Choose which missing metadata fields you want to see",
+    "personal": "Your preferences",
+    "description": "Choose which missing fields appear in book reminders. These preferences apply across your library and do not change metadata scores.",
+    "sheetDescription": "Choose the fields you care about without leaving this book.",
+    "fieldsHeading": "Fields to check",
+    "autoSave": "Changes save automatically to your account.",
+    "saving": "Saving preferences...",
+    "saved": "Preferences saved.",
+    "reset": "Reset to defaults",
+    "disabled": "No fields selected. Missing-field reminders are hidden.",
+    "saveFailed": "Could not save your preferences. Your previous preferences have been restored.",
+    "customize": "Customize reminders...",
+    "missingHeading": "Missing metadata",
+    "missingDescription": "Missing fields you have chosen to track.",
+    "missingCount": "{count, plural, one {# missing field} other {# missing fields}}",
+    "missingFields": "{count, plural, one {missing field} other {missing fields}}",
+    "fields": {
+      "publisher": {
+        "label": "Publisher",
+        "hint": "The publisher is filled in."
+      },
+      "language": {
+        "label": "Language",
+        "hint": "The language is filled in."
+      },
+      "publication": {
+        "label": "Publication year",
+        "hint": "A publication year or full date is enough."
+      },
+      "pageCount": {
+        "label": "Page count",
+        "hint": "The page count is filled in. Audio-only books are skipped."
+      },
+      "isbn": {
+        "label": "ISBN",
+        "hint": "Either ISBN-10 or ISBN-13 is enough."
+      },
+      "genres": {
+        "label": "Genres",
+        "hint": "At least one genre is filled in."
+      },
+      "tags": {
+        "label": "Tags",
+        "hint": "At least one tag is filled in."
+      },
+      "description": {
+        "label": "Description",
+        "hint": "The description is filled in."
       }
     }
   },

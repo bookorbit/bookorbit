@@ -222,7 +222,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       const searchParams: MetadataSearchParams = {
         title: meta?.title ?? undefined,
         author: authorRows[0]?.name ?? undefined,
-        isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+        isbn: meta?.isbn13?.trim() || meta?.isbn10?.trim() || undefined,
         seriesName: meta?.seriesName ?? undefined,
         seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: this.collectProviderIds(meta ?? {}),
@@ -240,6 +240,8 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         publishedYear: meta?.publishedYear,
         language: meta?.language,
         pageCount: meta?.pageCount,
+        isbn10: meta?.isbn10,
+        isbn13: meta?.isbn13,
         communityRating: communityRatingRows,
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
@@ -250,6 +252,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         chapters: meta?.chapters,
         hardcoverEditionId: meta?.hardcoverEditionId,
       };
+      if (meta?.lockedFields?.length) existingFields.lockedFields = meta.lockedFields;
       const coverInputs = coverFetchInputs(coverState);
       Object.assign(existingFields, coverInputs.existing);
 
@@ -329,6 +332,10 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (language !== undefined) scalarFields.language = language;
     const pageCount = this.asNullableNumber(filteredResolved.pageCount);
     if (pageCount !== undefined) scalarFields.pageCount = pageCount;
+    const isbn10 = this.asNullableString(filteredResolved.isbn10);
+    if (isbn10 !== undefined) scalarFields.isbn10 = isbn10;
+    const isbn13 = this.asNullableString(filteredResolved.isbn13);
+    if (isbn13 !== undefined) scalarFields.isbn13 = isbn13;
     const seriesName = this.asNullableString(filteredResolved.seriesName);
     if (seriesName !== undefined) scalarFields.seriesName = seriesName;
     const seriesIndex = filteredResolved.seriesIndex === null ? null : (parseSeriesIndex(filteredResolved.seriesIndex) ?? undefined);
@@ -442,6 +449,8 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       publishedYear: meta?.publishedYear ?? null,
       language: meta?.language ?? null,
       pageCount: meta?.pageCount ?? null,
+      isbn10: meta?.isbn10 ?? null,
+      isbn13: meta?.isbn13 ?? null,
       communityRating: communityRatingRows,
       seriesName: meta?.seriesName ?? null,
       seriesIndex: meta?.seriesIndex ?? null,

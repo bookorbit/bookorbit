@@ -229,7 +229,8 @@ export class KoreaderBookmarkExchangeService {
       const known = linkByKey.get(key);
       if (known) {
         const bookmark = working.byId.get(known.bookmarkId);
-        // Only the device can rename a dogear, so a differing title is always its edit.
+        // A differing title is treated as the device's edit. Renames made through the API are
+        // never pushed down, so the device's title wins the next time it uploads this dogear.
         if (bookmark && !bookmark.deletedAt && bookmark.title !== title) {
           await this.bookmarkSync.applyDeviceEdit(userId, known.bookmarkId, { title, pageno: change.pageno ?? null });
           mutated = true;

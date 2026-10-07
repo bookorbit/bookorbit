@@ -17,6 +17,7 @@ type KoreaderUnmatchedCandidate = {
   lastOpen?: number | null;
   source?: KoreaderUnmatchedSource;
   metadataAmbiguous?: boolean;
+  manualLinkRequested?: boolean;
 };
 type KoreaderHashLinkMetadata = {
   title?: string | null;
@@ -25,7 +26,6 @@ type KoreaderHashLinkMetadata = {
 };
 
 type HashedResolvedBookFile = ResolvedBookFileByHashes & { hash: string | null };
-type CountedResolvedBookFile = ResolvedBookFileByHash & { matchingFileCount: number };
 
 function resolveUniqueBook<T extends { bookId: number }>(rows: T[]): T | null {
   const first = rows[0];
@@ -33,15 +33,7 @@ function resolveUniqueBook<T extends { bookId: number }>(rows: T[]): T | null {
   return rows.every((row) => row.bookId === first.bookId) ? first : null;
 }
 
-function hasDuplicateFileMatches(rows: CountedResolvedBookFile[]): boolean {
-  return rows.length > 1 || rows.some((row) => Number(row.matchingFileCount) > 1);
-}
-
-function withoutMatchCount(row: CountedResolvedBookFile): ResolvedBookFileByHash {
-  return { id: row.id, bookId: row.bookId, libraryId: row.libraryId, format: row.format };
-}
-
-function addUnambiguousHashMatches(rows: HashedResolvedBookFile[], result: Map<string, ResolvedBookFileByHashes>): Set<string> {
+function addUnambiguousHashMatches(rows: HashedResolvedBookFile[], result: Map<string, ResolvedBookFileByHashes>): void {
   const rowsByHash = new Map<string, HashedResolvedBookFile[]>();
 
   for (const row of rows) {
@@ -62,8 +54,6 @@ function addUnambiguousHashMatches(rows: HashedResolvedBookFile[], result: Map<s
       });
     }
   }
-
-  return new Set(rowsByHash.keys());
 }
 
 export interface ReadingProgressUpsert {
@@ -133,7 +123,6 @@ export class KoreaderRepository {
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
         format: schema.bookFiles.format,
-        matchingFileCount: sql<number>`count(*) over (partition by ${schema.bookFiles.fileHash})`,
       })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
@@ -141,20 +130,12 @@ export class KoreaderRepository {
       .orderBy(asc(schema.bookFiles.bookId), asc(schema.bookFiles.id))
       .limit(2);
 
-    if (byFileHash.length > 0) {
-      const resolved = resolveUniqueBook(byFileHash);
-      if (resolved && (!hasDuplicateFileMatches(byFileHash) || userId === undefined)) return withoutMatchCount(resolved);
-      if (userId === undefined) return null;
-      return (await this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId)) ?? (resolved ? withoutMatchCount(resolved) : null);
-    }
-
     const byFileHashHistory = await this.db
       .selectDistinctOn([schema.bookFiles.bookId], {
         id: schema.bookFiles.id,
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
         format: schema.bookFiles.format,
-        matchingFileCount: sql<number>`count(*) over (partition by ${schema.bookFileHashHistory.fileHash})`,
       })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
@@ -163,14 +144,18 @@ export class KoreaderRepository {
       .orderBy(asc(schema.bookFiles.bookId), asc(schema.bookFiles.id))
       .limit(2);
 
-    if (byFileHashHistory.length > 0) {
-      const resolved = resolveUniqueBook(byFileHashHistory);
-      if (resolved && (!hasDuplicateFileMatches(byFileHashHistory) || userId === undefined)) return withoutMatchCount(resolved);
-      if (userId === undefined) return null;
-      return (await this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId)) ?? (resolved ? withoutMatchCount(resolved) : null);
+    // A delivered variant can collide with another book's current hash. Both sources must
+    // agree before a device's progress can be assigned, even when a current hash exists.
+    const candidates = [...byFileHash];
+    for (const row of byFileHashHistory) {
+      if (!candidates.some((candidate) => candidate.id === row.id)) candidates.push(row);
     }
-
-    return userId === undefined ? null : this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId);
+    if (userId !== undefined) {
+      const manual = await this.resolveManualBookFileByHash(hash, accessibleLibraryIds, userId);
+      if (manual) return manual;
+    }
+    const resolved = resolveUniqueBook(candidates);
+    return resolved;
   }
 
   async resolveBookFilesByHashes(
@@ -197,46 +182,28 @@ export class KoreaderRepository {
       .where(and(inArray(schema.bookFiles.fileHash, hashes), libraryFilter))
       .orderBy(asc(schema.bookFiles.id));
 
-    const directHashes = addUnambiguousHashMatches(direct, result);
-    const duplicateHashes = new Set<string>();
-    const directCounts = new Map<string, number>();
-    for (const row of direct) {
-      if (!row.hash) continue;
-      directCounts.set(row.hash, (directCounts.get(row.hash) ?? 0) + 1);
-    }
-    for (const [hash, count] of directCounts) {
-      if (count > 1) duplicateHashes.add(hash);
-    }
+    const history = await this.db
+      .select({
+        hash: schema.bookFileHashHistory.fileHash,
+        bookFileId: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        format: schema.bookFiles.format,
+      })
+      .from(schema.bookFileHashHistory)
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .where(and(inArray(schema.bookFileHashHistory.fileHash, hashes), libraryFilter))
+      .orderBy(asc(schema.bookFiles.id));
 
-    const missing = hashes.filter((hash) => !directHashes.has(hash));
-    if (missing.length > 0) {
-      const history = await this.db
-        .select({
-          hash: schema.bookFileHashHistory.fileHash,
-          bookFileId: schema.bookFiles.id,
-          bookId: schema.bookFiles.bookId,
-          libraryId: schema.books.libraryId,
-          format: schema.bookFiles.format,
-        })
-        .from(schema.bookFileHashHistory)
-        .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
-        .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
-        .where(and(inArray(schema.bookFileHashHistory.fileHash, missing), libraryFilter))
-        .orderBy(asc(schema.bookFiles.id));
-
-      addUnambiguousHashMatches(history, result);
-      const historyCounts = new Map<string, number>();
-      for (const row of history) {
-        if (!row.hash) continue;
-        historyCounts.set(row.hash, (historyCounts.get(row.hash) ?? 0) + 1);
-      }
-      for (const [hash, count] of historyCounts) {
-        if (count > 1) duplicateHashes.add(hash);
-      }
+    const uniqueFiles = new Map<string, HashedResolvedBookFile>();
+    for (const row of [...direct, ...history]) {
+      const key = `${row.hash}:${row.bookFileId}`;
+      if (!uniqueFiles.has(key)) uniqueFiles.set(key, row);
     }
-
-    const linkCandidates = hashes.filter((hash) => !result.has(hash) || duplicateHashes.has(hash));
-    if (linkCandidates.length === 0 || userId === undefined) return result;
+    const candidates = [...uniqueFiles.values()];
+    addUnambiguousHashMatches(candidates, result);
+    if (userId === undefined) return result;
 
     const manualLinks = await this.db
       .select({
@@ -249,7 +216,7 @@ export class KoreaderRepository {
       .from(schema.koreaderBookHashLinks)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.koreaderBookHashLinks.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
-      .where(and(eq(schema.koreaderBookHashLinks.userId, userId), inArray(schema.koreaderBookHashLinks.hash, linkCandidates), libraryFilter));
+      .where(and(eq(schema.koreaderBookHashLinks.userId, userId), inArray(schema.koreaderBookHashLinks.hash, hashes), libraryFilter));
 
     for (const row of manualLinks) {
       result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, format: row.format });
@@ -294,6 +261,7 @@ export class KoreaderRepository {
             lastOpen: candidate.lastOpen ?? null,
             source: candidate.source ?? 'statistics',
             metadataAmbiguous: candidate.metadataAmbiguous ?? false,
+            manualLinkRequested: candidate.manualLinkRequested ?? false,
             lastSeenAt: now,
           })),
         )
@@ -321,16 +289,19 @@ export class KoreaderRepository {
             `,
             source: sql`
               case
+                when ${schema.koreaderUnmatchedBooks.manualLinkRequested} then 'file'
                 when ${incomingSourceRank} >= ${storedSourceRank} then excluded.source
                 else ${schema.koreaderUnmatchedBooks.source}
               end
             `,
             metadataAmbiguous: sql`
               case
+                when ${schema.koreaderUnmatchedBooks.manualLinkRequested} then false
                 when ${incomingSourceRank} >= ${storedSourceRank} then excluded.metadata_ambiguous
                 else ${schema.koreaderUnmatchedBooks.metadataAmbiguous}
               end
             `,
+            manualLinkRequested: sql`${schema.koreaderUnmatchedBooks.manualLinkRequested} or excluded.manual_link_requested`,
             lastSeenAt: now,
           },
         });
@@ -351,11 +322,17 @@ export class KoreaderRepository {
     });
   }
 
-  async clearUnmatchedBooks(userId: number, hashes: string[]): Promise<void> {
+  async clearUnmatchedBooks(userId: number, hashes: string[], includeManualRequests = false): Promise<void> {
     if (hashes.length === 0) return;
     await this.db
       .delete(schema.koreaderUnmatchedBooks)
-      .where(and(eq(schema.koreaderUnmatchedBooks.userId, userId), inArray(schema.koreaderUnmatchedBooks.hash, hashes)));
+      .where(
+        and(
+          eq(schema.koreaderUnmatchedBooks.userId, userId),
+          inArray(schema.koreaderUnmatchedBooks.hash, hashes),
+          includeManualRequests ? undefined : eq(schema.koreaderUnmatchedBooks.manualLinkRequested, false),
+        ),
+      );
   }
 
   async dismissUnmatchedBook(userId: number, hash: string) {
@@ -485,6 +462,20 @@ export class KoreaderRepository {
       });
   }
 
+  async createBookHashLinkIfAbsent(userId: number, hash: string, bookFileId: number, metadata: KoreaderHashLinkMetadata = {}): Promise<void> {
+    await this.db.execute(sql`
+      insert into ${schema.koreaderBookHashLinks}
+        (user_id, hash, book_file_id, koreader_title, koreader_authors, koreader_last_open)
+      select ${userId}, ${hash}, ${bookFileId}, ${metadata.title?.trim() || null},
+        ${metadata.authors?.trim() || null}, ${metadata.lastOpen ?? null}
+      where not exists (
+        select 1 from ${schema.koreaderUnmatchedBooks}
+        where user_id = ${userId} and hash = ${hash} and manual_link_requested = true
+      )
+      on conflict (user_id, hash) do nothing
+    `);
+  }
+
   async getBookHashLink(userId: number, hash: string): Promise<{ bookFileId: number } | null> {
     const [row] = await this.db
       .select({ bookFileId: schema.koreaderBookHashLinks.bookFileId })
@@ -494,18 +485,25 @@ export class KoreaderRepository {
     return row ?? null;
   }
 
-  async deleteBookHashLink(userId: number, hash: string) {
-    const [row] = await this.db
-      .delete(schema.koreaderBookHashLinks)
-      .where(and(eq(schema.koreaderBookHashLinks.userId, userId), eq(schema.koreaderBookHashLinks.hash, hash)))
-      .returning({
-        hash: schema.koreaderBookHashLinks.hash,
-        bookFileId: schema.koreaderBookHashLinks.bookFileId,
-        koreaderTitle: schema.koreaderBookHashLinks.koreaderTitle,
-        koreaderAuthors: schema.koreaderBookHashLinks.koreaderAuthors,
-        koreaderLastOpen: schema.koreaderBookHashLinks.koreaderLastOpen,
-      });
-    return row ?? null;
+  async unlinkBookHashLink(userId: number, hash: string) {
+    const result = await this.db.execute<Pick<typeof schema.koreaderUnmatchedBooks.$inferSelect, 'hash'>>(sql`
+      with deleted as (
+        delete from ${schema.koreaderBookHashLinks}
+        where user_id = ${userId} and hash = ${hash}
+        returning *
+      )
+      insert into ${schema.koreaderUnmatchedBooks}
+        (user_id, hash, title, authors, last_open, source, metadata_ambiguous, manual_link_requested)
+      select user_id, hash, koreader_title, koreader_authors, koreader_last_open, 'file', false, true
+      from deleted
+      on conflict (user_id, hash) do update set
+        title = coalesce(excluded.title, koreader_unmatched_books.title),
+        authors = coalesce(excluded.authors, koreader_unmatched_books.authors),
+        last_open = coalesce(excluded.last_open, koreader_unmatched_books.last_open),
+        source = 'file', metadata_ambiguous = false, manual_link_requested = true, last_seen_at = now()
+      returning hash
+    `);
+    return result.rows[0] ?? null;
   }
 
   async getAccessibleLibraryIds(userId: number): Promise<number[] | null> {

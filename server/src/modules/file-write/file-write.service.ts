@@ -1,42 +1,51 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFile, stat } from 'fs/promises';
-import { basename, extname } from 'path';
 
-import type { BookFileWriteDisabledReason, BookFileWriteField, BookFileWriteStatus, BookFormat, CoverMedium, WriteResult } from '@bookorbit/types';
-import { BOOK_FORMATS, getBookFileWriteFormatFields, isAudioFormat, NotificationType } from '@bookorbit/types';
+import type { BookFileWriteStatus, CoverMedium, WriteResult, WriteResultFileCounts } from '@bookorbit/types';
+import { NotificationType } from '@bookorbit/types';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { NotificationService } from '../notification/notification.service';
 import { computeFileHash } from '../scanner/lib/hash';
 import {
-  AUDIO_WRITE_FORMATS,
-  FORMAT_AZW,
-  FORMAT_AZW3,
-  FORMAT_CB7,
-  FORMAT_CBZ,
-  FORMAT_EPUB,
-  FORMAT_FB2,
-  FORMAT_MOBI,
-  FORMAT_PDF,
-  createBookWriteFieldMask,
-} from './file-write.constants';
+  resolveBookFileWriteStatus,
+  writeTargetModeFor,
+  type FileWriteCapabilityFile,
+  type FileWriteCapabilityLibraryConfig,
+} from './file-write-capability';
+import { createBookWriteFieldMask } from './file-write.constants';
 import { FileLockService, bookOperationLockKey } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FormatWriterRegistry } from './format-writer.registry';
+import { inspectCoverImage } from './formats/shared/cover-image';
 import type { BookWritePayload } from './interfaces/book-write-payload.interface';
-import type { FormatWriteOptions } from './interfaces/format-write-options.interface';
+import { describeWriteFailure } from './write-failure-reason';
+import {
+  coverMediumForFormat,
+  isWriterSupported,
+  needsBookFileList,
+  normalizeWriteFormat,
+  resolveAudioTrackContexts,
+  resolveWriteTargetSkip,
+  selectWriteTargets,
+  WRITE_TARGET_SKIP_REASON,
+  type AudioTrackContext,
+  type WriteTargetMode,
+  type WriteTargetSkipReason,
+  type WriterSupport,
+} from './write-target-selector';
 
 const FILE_WRITE_EVENT = 'file_write.write';
 const FILE_WRITE_SCHEDULE_EVENT = 'file_write.schedule';
 const FILE_WRITE_COVER_EVENT = 'file_write.cover_load';
+const FILE_WRITE_SKIP_LOG_EVENT = 'file_write.skip_log';
 const UNKNOWN_FORMAT = 'unknown';
 const DEFAULT_WRITE_DEBOUNCE_MS = 3_000;
 const DEFAULT_MAX_CONCURRENT_WRITES = 2;
 const FILE_STATE_REFRESH_ATTEMPTS = 3;
 const FILE_STATE_REFRESH_RETRY_MS = 50;
-const BOOK_FORMAT_SET = new Set<string>(BOOK_FORMATS);
 
 type FileWriteTarget = {
   id: number;
@@ -45,11 +54,15 @@ type FileWriteTarget = {
   sizeBytes: number | null;
   fileHash?: string | null;
   libraryId: number;
+  role?: string | null;
+  sortOrder?: number | null;
+  mediaOverlayAvailable?: boolean | null;
 };
 
-type AudioWriteContextByFileId = Map<number, Pick<FormatWriteOptions, 'trackNumber' | 'trackTotal' | 'trackTitle' | 'isMultiTrackAudio'>>;
-type FileWriteCapabilityFile = Pick<FileWriteTarget, 'id' | 'format' | 'sizeBytes'>;
-type FileWriteCapabilityLibraryConfig = Partial<LibraryFileWriteConfig> | null | undefined;
+type PrimaryFileWriteTarget = FileWriteTarget & { fileWriteAllFiles?: boolean | null };
+
+/** A file the run considered, with the result it was skipped with, or null when it is to be written. */
+type PlannedTarget = { file: FileWriteTarget; skip: WriteResult | null };
 
 @Injectable()
 export class FileWriteService implements OnModuleDestroy {
@@ -60,6 +73,7 @@ export class FileWriteService implements OnModuleDestroy {
   private readonly scheduledWriteRuns = new Set<Promise<unknown>>();
   private readonly writeQueue: Array<() => void> = [];
   private activeWrites = 0;
+  private readonly supports: WriterSupport = (format) => this.registry.supports(format);
 
   constructor(
     private readonly fileWriteRepo: FileWriteRepository,
@@ -158,75 +172,84 @@ export class FileWriteService implements OnModuleDestroy {
     );
 
     try {
-      const primaryFile = await this.fileWriteRepo.findPrimaryFileForBook(bookId);
-      if (!primaryFile) {
+      const primaryFile: PrimaryFileWriteTarget | null = await this.fileWriteRepo.findPrimaryFileForBook(bookId);
+      const primaryFormat = normalizeWriteFormat(primaryFile?.format) || UNKNOWN_FORMAT;
+      const scope = await this.resolveWriteScope(bookId, primaryFile);
+      if (!scope) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'no primary file' };
         this.logWriteEnd(bookId, UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
         return result;
       }
 
-      const primaryFormat = normalizeFormat(primaryFile.format);
-      const targets = await this.resolveWriteTargets(bookId, primaryFile);
-      if (!targets.some((target) => this.registry.supports(normalizeFormat(target.format)))) {
-        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format not supported' };
-        await Promise.all(targets.map((target) => this.insertTargetLogIfSync(bookId, target, result, triggeredBy, userId)));
-        this.logWriteEnd(bookId, primaryFormat || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+      const files = needsBookFileList(primaryFile, scope.mode) ? await this.fileWriteRepo.findFilesForBook(bookId) : [primaryFile!];
+      const { targets, excluded } = selectWriteTargets<FileWriteTarget>({ files, primaryFile, mode: scope.mode, supports: this.supports });
+      const exclusions: PlannedTarget[] = excluded.map((file) => ({ file, skip: skipResult(WRITE_TARGET_SKIP_REASON.notContentFile) }));
+
+      if (targets.length === 0) {
+        await this.insertSkipLogsIfSync(bookId, exclusions, triggeredBy, userId);
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'no primary file' };
+        this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
         return result;
       }
 
-      const libConfig = await this.fileWriteRepo.findLibraryFileWriteConfig(primaryFile.libraryId);
+      if (!targets.some((target) => isWriterSupported(normalizeWriteFormat(target.format), this.supports))) {
+        const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: WRITE_TARGET_SKIP_REASON.formatNotSupported };
+        await this.insertSkipLogsIfSync(bookId, [...targets.map((file) => ({ file, skip: result })), ...exclusions], triggeredBy, userId);
+        this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
+        return result;
+      }
+
+      const libConfig = await this.fileWriteRepo.findLibraryFileWriteConfig(scope.libraryId);
       if (!libConfig) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'library not found' };
-        this.logWriteEnd(bookId, primaryFormat || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
         return result;
       }
 
       if (!libConfig.fileWriteEnabled && !dryRun && !force) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' };
-        this.logWriteEnd(bookId, primaryFormat || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
         return result;
       }
 
-      const targetSkips = targets.map((target) => ({
-        target,
-        result: this.resolveTargetSkip(target, libConfig),
-      }));
-      if (targetSkips.every(({ result }) => result !== null)) {
-        const results = await Promise.all(
-          targetSkips.map(async ({ target, result }) => {
-            await this.insertTargetLogIfSync(bookId, target, result!, triggeredBy, userId);
-            return result!;
-          }),
+      const sizedTargets = await this.withSizesOnDisk(targets);
+      const plan: PlannedTarget[] = [
+        ...sizedTargets.map((file) => ({ file, skip: skipResultOrNull(resolveWriteTargetSkip(file, libConfig, this.supports)) })),
+        ...exclusions,
+      ];
+      const skipped = plan.filter((entry) => entry.skip !== null);
+      const writable = plan.filter((entry) => entry.skip === null).map((entry) => entry.file);
+
+      if (writable.length === 0) {
+        await this.insertSkipLogsIfSync(bookId, skipped, triggeredBy, userId);
+        const result = aggregateWriteResults(
+          skipped.map((entry) => entry.skip!),
+          Date.now() - startedAt,
         );
-        const result = aggregateWriteResults(results, Date.now() - startedAt);
-        this.logWriteEnd(bookId, primaryFormat || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
         return result;
       }
 
       const rawPayload = await this.fileWriteRepo.loadPayload(bookId);
       if (!rawPayload) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'no metadata' };
-        this.logWriteEnd(bookId, primaryFormat || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+        this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
         return result;
       }
 
-      const payload: BookWritePayload = { ...rawPayload };
+      const payloadForFile = await this.buildPayloadResolver(bookId, { ...rawPayload }, writable, libConfig.fileWriteWriteCover && !dryRun);
+      const audioTrackContexts = resolveAudioTrackContexts(sizedTargets, primaryFile);
 
-      if (libConfig.fileWriteWriteCover && !dryRun) {
-        payload.coverBytes = await this.loadCoverBytes(bookId, this.coverMediumForTargets(targets));
-      }
-
-      const audioWriteContexts = this.resolveAudioWriteContexts(targets);
-      const targetResults: WriteResult[] = [];
-      const suppressPaths = dryRun ? [] : targets.map((target) => target.absolutePath);
+      await this.insertSkipLogsIfSync(bookId, skipped, triggeredBy, userId);
+      const targetResults: WriteResult[] = skipped.map((entry) => entry.skip!);
+      const suppressPaths = dryRun ? [] : sizedTargets.map((target) => target.absolutePath);
       this.selfWriteRegistry.begin(suppressPaths);
       try {
-        for (const target of targets) {
+        for (const target of writable) {
           const result = await this.writeTarget(
             bookId,
             target,
-            payload,
-            libConfig,
+            payloadForFile(target),
             {
               triggeredBy,
               userId,
@@ -234,7 +257,7 @@ export class FileWriteService implements OnModuleDestroy {
               suppressNotification,
               startedAt,
             },
-            audioWriteContexts.get(target.id),
+            audioTrackContexts.get(target.id),
           );
           targetResults.push(result);
         }
@@ -258,7 +281,7 @@ export class FileWriteService implements OnModuleDestroy {
             .catch(() => {});
         }
       }
-      this.logWriteEnd(bookId, primaryFormat || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
+      this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
       return result;
     } finally {
       this.releaseWriteSlot();
@@ -271,62 +294,66 @@ export class FileWriteService implements OnModuleDestroy {
 
   resolveBookFileWriteStatus(
     libraryConfig: FileWriteCapabilityLibraryConfig,
-    files: FileWriteCapabilityFile[],
+    files: readonly FileWriteCapabilityFile[],
     primaryFileId: number | null,
   ): BookFileWriteStatus {
-    if (!isCompleteLibraryFileWriteConfig(libraryConfig) || !libraryConfig.fileWriteEnabled) {
-      return disabledBookFileWriteStatus('library_disabled');
-    }
-
-    const primaryFile = primaryFileId == null ? null : files.find((file) => file.id === primaryFileId);
-    if (!primaryFile) return disabledBookFileWriteStatus('no_primary_file');
-
-    const targets = resolveCapabilityWriteTargets(files, primaryFile);
-    if (targets.length === 0) return disabledBookFileWriteStatus('no_primary_file');
-
-    const targetStatuses = targets.map((target) => {
-      const format = normalizeFormat(target.format);
-      const skip = this.resolveTargetSkip(target, libraryConfig);
-      return skip ? { enabled: false, reason: mapFileWriteSkipReason(skip.reason), format } : { enabled: true, format };
-    });
-
-    const writableTargetStatuses = targetStatuses.filter(
-      (status): status is { enabled: true; format: BookFormat } => status.enabled && isBookFormat(status.format),
-    );
-    const writableFormats = uniqueBookFormats(writableTargetStatuses.map((status) => status.format));
-    if (writableFormats.length > 0) {
-      const writableFields = uniqueBookFileWriteFields(
-        writableTargetStatuses.flatMap((status) => resolveWritableFieldsForFormat(status.format, libraryConfig)),
-      );
-      return { enabled: true, reason: null, writableFormats, writableFields };
-    }
-
-    const reasons = targetStatuses
-      .filter((status): status is { enabled: false; reason: BookFileWriteDisabledReason; format: string } => !status.enabled)
-      .map((status) => status.reason);
-    return disabledBookFileWriteStatus(resolveBookFileWriteDisabledReason(reasons));
+    return resolveBookFileWriteStatus(libraryConfig, files, primaryFileId, this.supports);
   }
 
-  private async resolveWriteTargets(bookId: number, primaryFile: FileWriteTarget): Promise<FileWriteTarget[]> {
-    const primaryFormat = normalizeFormat(primaryFile.format);
-    if (!primaryFormat || !isAudioFormat(primaryFormat)) {
-      return [primaryFile];
+  /**
+   * The library a write runs against and which selection mode it uses. A book without a primary
+   * file has nothing to write in `primary` mode; only the all-files mode can still reach its files.
+   */
+  private async resolveWriteScope(
+    bookId: number,
+    primaryFile: PrimaryFileWriteTarget | null,
+  ): Promise<{ libraryId: number; mode: WriteTargetMode } | null> {
+    if (primaryFile) return { libraryId: primaryFile.libraryId, mode: writeTargetModeFor(primaryFile) };
+
+    const scope = await this.fileWriteRepo.findFileWriteScopeForBook(bookId);
+    if (!scope || writeTargetModeFor(scope) !== 'all_files') return null;
+    return { libraryId: scope.libraryId, mode: 'all_files' };
+  }
+
+  /**
+   * The size limit applies to what is on disk now. The stored size is unknown for some rows and lags
+   * any change made outside BookOrbit, so it is only the fallback for a file that cannot be read.
+   */
+  private async withSizesOnDisk(targets: readonly FileWriteTarget[]): Promise<FileWriteTarget[]> {
+    const sized: FileWriteTarget[] = [];
+    for (const target of targets) {
+      const sizeBytes = await stat(target.absolutePath, { bigint: true }).then(
+        (stats) => Number(stats.size),
+        () => target.sizeBytes,
+      );
+      sized.push(sizeBytes === target.sizeBytes ? target : { ...target, sizeBytes });
     }
+    return sized;
+  }
 
-    const files = await this.fileWriteRepo.findFilesForBook(bookId);
-    const audioFiles = files.filter((file) => {
-      const format = normalizeFormat(file.format);
-      return Boolean(format && isAudioFormat(format));
-    });
+  /**
+   * Each file gets the artwork of its own medium. Every medium is resolved once per run, and the
+   * payload for it is built once, so a long track list shares one snapshot instead of re-reading it.
+   */
+  private async buildPayloadResolver(
+    bookId: number,
+    payload: BookWritePayload,
+    writable: readonly FileWriteTarget[],
+    writeCover: boolean,
+  ): Promise<(file: FileWriteTarget) => BookWritePayload> {
+    if (!writeCover) return () => payload;
 
-    return audioFiles.length > 0 ? audioFiles : [primaryFile];
+    const payloadByMedium = new Map<CoverMedium, BookWritePayload>();
+    for (const medium of new Set(writable.map((file) => coverMediumForFormat(file.format)))) {
+      payloadByMedium.set(medium, { ...payload, coverBytes: await this.loadCoverBytes(bookId, medium) });
+    }
+    return (file) => payloadByMedium.get(coverMediumForFormat(file.format)) ?? { ...payload, coverBytes: null };
   }
 
   private async writeTarget(
     bookId: number,
     file: FileWriteTarget,
     payload: BookWritePayload,
-    libConfig: LibraryFileWriteConfig,
     options: {
       triggeredBy: 'auto' | 'sync';
       userId: number | undefined;
@@ -334,17 +361,10 @@ export class FileWriteService implements OnModuleDestroy {
       suppressNotification: boolean;
       startedAt: number;
     },
-    audioWriteContext?: Pick<FormatWriteOptions, 'trackNumber' | 'trackTotal' | 'trackTitle' | 'isMultiTrackAudio'>,
+    audioTrackContext?: AudioTrackContext,
   ): Promise<WriteResult> {
     const { triggeredBy, userId, dryRun, suppressNotification, startedAt } = options;
-    const format = normalizeFormat(file.format);
-
-    const targetSkip = this.resolveTargetSkip(file, libConfig);
-    if (targetSkip) {
-      await this.insertTargetLogIfSync(bookId, file, targetSkip, triggeredBy, userId);
-      return targetSkip;
-    }
-
+    const format = normalizeWriteFormat(file.format);
     const writer = this.registry.get(format)!;
 
     if (!dryRun && file.fileHash) {
@@ -354,15 +374,19 @@ export class FileWriteService implements OnModuleDestroy {
     let result: WriteResult;
     try {
       result = await this.lockService.withLock(file.absolutePath, () =>
-        writer.write(file.absolutePath, payload, { fieldMask: createBookWriteFieldMask(), dryRun, ...audioWriteContext }),
+        writer.write(file.absolutePath, payload, { fieldMask: createBookWriteFieldMask(), dryRun, ...audioTrackContext }),
       );
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = describeWriteFailure(error, file.absolutePath);
       result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason };
-      this.logWriteFail(bookId, format, triggeredBy, userId, dryRun, startedAt, error);
+      this.logWriteFail(bookId, format, triggeredBy, userId, dryRun, startedAt, error, reason);
       await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
       this.notifyTargetWriteFailure(bookId, reason, triggeredBy, userId, suppressNotification);
       return result;
+    }
+
+    if (result.status === 'failed' && result.reason) {
+      result = { ...result, reason: describeWriteFailure(result.reason, file.absolutePath) };
     }
 
     if (result.status === 'success') {
@@ -402,62 +426,36 @@ export class FileWriteService implements OnModuleDestroy {
       .catch(() => {});
   }
 
-  private resolveAudioWriteContexts(targets: FileWriteTarget[]): AudioWriteContextByFileId {
-    const audioTargets = targets.filter((target) => {
-      const format = normalizeFormat(target.format);
-      return Boolean(format && isAudioFormat(format) && this.registry.supports(format));
-    });
-
-    const isMultiTrackAudio = audioTargets.length > 1;
-    return new Map(
-      audioTargets.map((target, index) => {
-        const trackNumber = index + 1;
-        return [
-          target.id,
-          {
-            trackNumber,
-            trackTotal: audioTargets.length,
-            trackTitle: resolveTrackTitle(target.absolutePath, trackNumber),
-            isMultiTrackAudio,
-          },
-        ];
-      }),
-    );
-  }
-
-  private resolveTargetSkip(file: Pick<FileWriteTarget, 'format' | 'sizeBytes'>, libConfig: LibraryFileWriteConfig): WriteResult | null {
-    const format = normalizeFormat(file.format);
-
-    if (!format || !this.registry.supports(format)) {
-      return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format not supported' };
-    }
-
-    const formatSettings = resolveFormatSettings(libConfig, format);
-    if (!formatSettings.enabled) {
-      return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format disabled' };
-    }
-
-    const sizeBytes = file.sizeBytes ?? 0;
-    if (sizeBytes > formatSettings.maxFileSizeBytes) {
-      return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'file exceeds size limit' };
-    }
-
-    return null;
-  }
-
-  private async insertTargetLogIfSync(
+  private async insertSkipLogsIfSync(
     bookId: number,
-    file: FileWriteTarget,
-    result: WriteResult,
+    entries: readonly PlannedTarget[],
     triggeredBy: 'auto' | 'sync',
     userId: number | undefined,
   ): Promise<void> {
-    if (triggeredBy !== 'sync') {
-      return;
+    if (triggeredBy !== 'sync' || entries.length === 0) return;
+
+    const startedAt = Date.now();
+    let failed = 0;
+    let lastError: unknown;
+    // One insert at a time: a concurrent insert per skipped file would grow with the file count.
+    // A failed insert is counted rather than abandoning the rest, since the skip itself stands.
+    for (const { file, skip } of entries) {
+      const format = normalizeWriteFormat(file.format) || UNKNOWN_FORMAT;
+      try {
+        await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result: skip!, triggeredBy });
+      } catch (error) {
+        failed++;
+        lastError = error;
+      }
     }
 
-    const format = normalizeFormat(file.format) || UNKNOWN_FORMAT;
-    await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
+    if (failed > 0) {
+      const errorClass = lastError instanceof Error ? lastError.name : 'Error';
+      const errorMessage = sanitizeErrorMessage(lastError instanceof Error ? lastError.message : String(lastError));
+      this.logger.warn(
+        `[${FILE_WRITE_SKIP_LOG_EVENT}] [fail] bookId=${bookId} attempted=${entries.length} inserted=${entries.length - failed} failed=${failed} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - skip log inserts failed`,
+      );
+    }
   }
 
   private async updateTargetFileState(bookId: number, file: FileWriteTarget): Promise<boolean> {
@@ -501,26 +499,27 @@ export class FileWriteService implements OnModuleDestroy {
     return this.fileWriteRepo.findLibraryWriteSettingsForBook(bookId);
   }
 
-  /** Targets are the ebook primary alone, or every audio track, so they share one medium. */
-  private coverMediumForTargets(targets: readonly FileWriteTarget[]): CoverMedium {
-    const format = normalizeFormat(targets[0]?.format);
-    return format && isAudioFormat(format) ? 'audio' : 'ebook';
-  }
-
   /**
-   * Only the target medium's own slot is ever embedded. A square audiobook cover baked into an
-   * EPUB would come back as the ebook cover on the next scan.
+   * Only the target medium's own slot is ever embedded, never the other medium as a fallback. A
+   * square audiobook cover baked into an EPUB would come back as the ebook cover on the next scan.
+   * A missing, empty, unreadable, or undecodable slot yields null, which leaves the file's own
+   * artwork in place and still writes its metadata. Decoding once here keeps one bad cover from
+   * failing every file of the book.
    */
   private async loadCoverBytes(bookId: number, medium: CoverMedium): Promise<Buffer | null> {
     const startedAt = Date.now();
     try {
       const path = await this.coverStore.resolve(bookId, { medium, variant: 'cover', strict: true });
-      return path ? await readFile(path) : null;
+      if (!path) return null;
+      const bytes = await readFile(path);
+      if (bytes.length === 0) return null;
+      await inspectCoverImage(bytes);
+      return bytes;
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
       const errorMessage = sanitizeErrorMessage(error instanceof Error ? error.message : String(error));
-      this.logger.debug(
-        `[${FILE_WRITE_COVER_EVENT}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - cover bytes unavailable`,
+      this.logger.warn(
+        `[${FILE_WRITE_COVER_EVENT}] [fail] bookId=${bookId} medium=${medium} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - cover unusable, writing metadata only`,
       );
       return null;
     }
@@ -536,7 +535,11 @@ export class FileWriteService implements OnModuleDestroy {
     result: WriteResult,
   ): void {
     const reasonPart = result.reason ? ` reason="${sanitizeErrorMessage(result.reason)}"` : '';
-    const message = `[${FILE_WRITE_EVENT}] [end] bookId=${bookId} format=${format || UNKNOWN_FORMAT} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} durationMs=${Date.now() - startedAt} status=${result.status} fieldsWritten=${result.fieldsWritten.length}${reasonPart} - file write completed`;
+    const counts = result.fileCounts;
+    const countsPart = counts
+      ? ` files=${counts.processed} succeededFiles=${counts.succeeded} failedFiles=${counts.failed} skippedFiles=${counts.skipped}`
+      : '';
+    const message = `[${FILE_WRITE_EVENT}] [end] bookId=${bookId} format=${format || UNKNOWN_FORMAT} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} durationMs=${Date.now() - startedAt} status=${result.status} fieldsWritten=${result.fieldsWritten.length}${countsPart}${reasonPart} - file write completed`;
     if (triggeredBy === 'auto' && result.status === 'skipped') {
       this.logger.debug(message);
       return;
@@ -552,9 +555,10 @@ export class FileWriteService implements OnModuleDestroy {
     dryRun: boolean,
     startedAt: number,
     error: unknown,
+    reason: string,
   ): void {
     const errorClass = error instanceof Error ? error.name : 'Error';
-    const errorMessage = sanitizeErrorMessage(error instanceof Error ? error.message : String(error));
+    const errorMessage = sanitizeErrorMessage(reason);
     this.logger.warn(
       `[${FILE_WRITE_EVENT}] [fail] bookId=${bookId} format=${format || UNKNOWN_FORMAT} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - file write failed`,
     );
@@ -581,141 +585,59 @@ export class FileWriteService implements OnModuleDestroy {
   }
 }
 
-type LibraryFileWriteConfig = {
-  fileWriteEnabled: boolean;
-  fileWriteWriteCover: boolean;
-  fileWriteEpubEnabled: boolean;
-  fileWriteEpubMaxFileSizeMb: number;
-  fileWriteFb2Enabled: boolean;
-  fileWriteFb2MaxFileSizeMb: number;
-  fileWritePdfEnabled: boolean;
-  fileWritePdfMaxFileSizeMb: number;
-  fileWriteCbxEnabled: boolean;
-  fileWriteCbxMaxFileSizeMb: number;
-  fileWriteKindleEnabled: boolean;
-  fileWriteKindleMaxFileSizeMb: number;
-  fileWriteAudioEnabled: boolean;
-  fileWriteAudioMaxFileSizeMb: number;
-};
-
-function resolveFormatSettings(config: LibraryFileWriteConfig, format: string): { enabled: boolean; maxFileSizeBytes: number } {
-  switch (format) {
-    case FORMAT_EPUB:
-      return { enabled: config.fileWriteEpubEnabled, maxFileSizeBytes: config.fileWriteEpubMaxFileSizeMb * 1024 * 1024 };
-    case FORMAT_FB2:
-      return { enabled: config.fileWriteFb2Enabled, maxFileSizeBytes: config.fileWriteFb2MaxFileSizeMb * 1024 * 1024 };
-    case FORMAT_PDF:
-      return { enabled: config.fileWritePdfEnabled, maxFileSizeBytes: config.fileWritePdfMaxFileSizeMb * 1024 * 1024 };
-    case FORMAT_CBZ:
-    case FORMAT_CB7:
-      return { enabled: config.fileWriteCbxEnabled, maxFileSizeBytes: config.fileWriteCbxMaxFileSizeMb * 1024 * 1024 };
-    case FORMAT_MOBI:
-    case FORMAT_AZW3:
-    case FORMAT_AZW:
-      return { enabled: config.fileWriteKindleEnabled, maxFileSizeBytes: config.fileWriteKindleMaxFileSizeMb * 1024 * 1024 };
-    default:
-      if (AUDIO_WRITE_FORMATS.includes(format as (typeof AUDIO_WRITE_FORMATS)[number])) {
-        return { enabled: config.fileWriteAudioEnabled, maxFileSizeBytes: config.fileWriteAudioMaxFileSizeMb * 1024 * 1024 };
-      }
-      return { enabled: false, maxFileSizeBytes: 0 };
-  }
+function skipResult(reason: WriteTargetSkipReason): WriteResult {
+  return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason };
 }
 
+function skipResultOrNull(reason: WriteTargetSkipReason | null): WriteResult | null {
+  return reason === null ? null : skipResult(reason);
+}
+
+/**
+ * A single target's result is returned intact. Several are combined: any failure fails the book,
+ * otherwise any success succeeds it, and the per-file counts beside `status` say how it got there.
+ * Fields are kept even when every target skipped, because a dry run reports each target as skipped
+ * with the fields it would write.
+ */
 function aggregateWriteResults(results: WriteResult[], durationMs: number): WriteResult {
   if (results.length === 1) {
     return results[0]!;
   }
 
   const fieldsWritten = [...new Set(results.flatMap((result) => result.fieldsWritten))];
-  const failed = results.filter((result) => result.status === 'failed');
-  if (failed.length > 0) {
+  const fileCounts = countFileOutcomes(results);
+  if (fileCounts.failed > 0) {
     return {
       status: 'failed',
       fieldsWritten,
       durationMs,
-      reason: `${failed.length} of ${results.length} file writes failed`,
+      reason: `${fileCounts.failed} of ${results.length} file writes failed`,
+      fileCounts,
     };
   }
 
-  const succeeded = results.filter((result) => result.status === 'success');
-  if (succeeded.length > 0) {
-    return { status: 'success', fieldsWritten, durationMs };
+  if (fileCounts.succeeded > 0) {
+    return { status: 'success', fieldsWritten, durationMs, fileCounts };
   }
 
   const reasons = [...new Set(results.map((result) => result.reason).filter((reason): reason is string => Boolean(reason)))];
   return {
     status: 'skipped',
-    fieldsWritten: [],
+    fieldsWritten,
     durationMs,
     reason: reasons.length > 0 ? reasons.join('; ') : 'all targets skipped',
+    fileCounts,
   };
 }
 
-function resolveCapabilityWriteTargets(files: FileWriteCapabilityFile[], primaryFile: FileWriteCapabilityFile): FileWriteCapabilityFile[] {
-  const primaryFormat = normalizeFormat(primaryFile.format);
-  if (!primaryFormat || !isAudioFormat(primaryFormat)) return [primaryFile];
-
-  const audioFiles = files.filter((file) => {
-    const format = normalizeFormat(file.format);
-    return Boolean(format && isAudioFormat(format));
-  });
-  return audioFiles.length > 0 ? audioFiles : [primaryFile];
-}
-
-function isCompleteLibraryFileWriteConfig(config: FileWriteCapabilityLibraryConfig): config is LibraryFileWriteConfig {
-  if (!config) return false;
-  return (
-    typeof config.fileWriteEnabled === 'boolean' &&
-    typeof config.fileWriteWriteCover === 'boolean' &&
-    typeof config.fileWriteEpubEnabled === 'boolean' &&
-    typeof config.fileWriteEpubMaxFileSizeMb === 'number' &&
-    typeof config.fileWriteFb2Enabled === 'boolean' &&
-    typeof config.fileWriteFb2MaxFileSizeMb === 'number' &&
-    typeof config.fileWritePdfEnabled === 'boolean' &&
-    typeof config.fileWritePdfMaxFileSizeMb === 'number' &&
-    typeof config.fileWriteCbxEnabled === 'boolean' &&
-    typeof config.fileWriteCbxMaxFileSizeMb === 'number' &&
-    typeof config.fileWriteKindleEnabled === 'boolean' &&
-    typeof config.fileWriteKindleMaxFileSizeMb === 'number' &&
-    typeof config.fileWriteAudioEnabled === 'boolean' &&
-    typeof config.fileWriteAudioMaxFileSizeMb === 'number'
-  );
-}
-
-function mapFileWriteSkipReason(reason: string | undefined): BookFileWriteDisabledReason {
-  if (reason === 'file exceeds size limit') return 'file_exceeds_size_limit';
-  if (reason === 'format disabled') return 'format_disabled';
-  return 'format_not_supported';
-}
-
-function resolveBookFileWriteDisabledReason(reasons: BookFileWriteDisabledReason[]): BookFileWriteDisabledReason {
-  if (reasons.includes('file_exceeds_size_limit')) return 'file_exceeds_size_limit';
-  if (reasons.includes('format_disabled')) return 'format_disabled';
-  return reasons[0] ?? 'format_not_supported';
-}
-
-function disabledBookFileWriteStatus(reason: BookFileWriteDisabledReason): BookFileWriteStatus {
-  return { enabled: false, reason, writableFormats: [], writableFields: [] };
-}
-
-function uniqueBookFormats(values: BookFormat[]): BookFormat[] {
-  return [...new Set(values)];
-}
-
-function uniqueBookFileWriteFields(values: BookFileWriteField[]): BookFileWriteField[] {
-  return [...new Set(values)];
-}
-
-function resolveWritableFieldsForFormat(format: string, config: LibraryFileWriteConfig): BookFileWriteField[] {
-  return getBookFileWriteFormatFields(format).filter((field) => field !== 'coverBytes' || config.fileWriteWriteCover);
-}
-
-function normalizeFormat(format: string | null | undefined): string {
-  return (format ?? '').toLowerCase();
-}
-
-function isBookFormat(format: string): format is BookFormat {
-  return BOOK_FORMAT_SET.has(format);
+function countFileOutcomes(results: readonly WriteResult[]): WriteResultFileCounts {
+  const counts: WriteResultFileCounts = { processed: results.length, succeeded: 0, failed: 0, skipped: 0 };
+  for (const result of results) {
+    if (result.status === 'success') counts.succeeded++;
+    else if (result.status === 'failed') counts.failed++;
+    else counts.skipped++;
+  }
+  return counts;
 }
 
 function resolvePositiveInteger(value: unknown, fallback: number): number {
@@ -732,11 +654,4 @@ function formatUserId(userId: number | undefined): string {
 
 function sanitizeErrorMessage(message: string): string {
   return sanitizeLogValue(message);
-}
-
-function resolveTrackTitle(filePath: string, trackNumber: number): string {
-  const fileName = basename(filePath);
-  const extension = extname(fileName);
-  const stem = (extension ? fileName.slice(0, -extension.length) : fileName).trim();
-  return stem || `Part ${String(trackNumber).padStart(2, '0')}`;
 }

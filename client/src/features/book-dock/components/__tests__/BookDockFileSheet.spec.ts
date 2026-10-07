@@ -1,10 +1,11 @@
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { defineComponent, reactive, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookDockFile, Library, MetadataCandidate } from '@bookorbit/types'
+import { i18n } from '@/i18n'
 import BookDockFileSheet from '../BookDockFileSheet.vue'
 
-type LibraryOption = Pick<Library, 'id' | 'name'> & {
+type LibraryOption = Pick<Library, 'id' | 'name' | 'type'> & {
   folders: Array<Pick<Library['folders'][number], 'id' | 'path'>>
 }
 
@@ -18,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   libraries: [] as LibraryOption[],
 }))
 
+const libraryOptions = ref<LibraryOption[]>([])
+
 vi.mock('../../composables/useBookDockDetail', () => ({
   useBookDockDetail: () => ({
     saved: ref(false),
@@ -30,8 +33,11 @@ vi.mock('../../composables/useBookDockDetail', () => ({
 
 vi.mock('@/features/library/composables/useLibraries', () => ({
   useLibraries: () => ({
-    libraries: ref(mocks.libraries),
+    libraries: libraryOptions,
     fetchLibraries: mocks.fetchLibraries,
+    loaded: ref(true),
+    loading: ref(false),
+    error: ref(null),
   }),
 }))
 
@@ -92,16 +98,22 @@ function makeFile(overrides: Partial<BookDockFile> = {}): BookDockFile {
   }
 }
 
+const wrappers: ReturnType<typeof shallowMount>[] = []
+afterEach(() => wrappers.splice(0).forEach((wrapper) => wrapper.unmount()))
+
 function mountSheet(file: BookDockFile) {
-  return shallowMount(BookDockFileSheet, {
+  const wrapper = shallowMount(BookDockFileSheet, {
     props: { file },
     global: {
       stubs: {
         MetadataMatchWorkspace: WorkspaceStub,
         BookDockStatusBadge: true,
+        BookDestinationFields: false,
       },
     },
   })
+  wrappers.push(wrapper)
+  return wrapper
 }
 
 async function openSearchAndReadDefaults(file: BookDockFile): Promise<Record<string, string | undefined>> {
@@ -114,6 +126,7 @@ async function openSearchAndReadDefaults(file: BookDockFile): Promise<Record<str
 
 describe('BookDockFileSheet', () => {
   beforeEach(() => {
+    i18n.global.locale.value = 'en'
     vi.clearAllMocks()
     mocks.fetchLibraries.mockResolvedValue(undefined)
     mocks.loadProviders.mockResolvedValue(undefined)
@@ -121,6 +134,7 @@ describe('BookDockFileSheet', () => {
     mocks.setTarget.mockResolvedValue(null)
     mocks.filteredResults.length = 0
     mocks.libraries.length = 0
+    libraryOptions.value = mocks.libraries
   })
 
   it.each([
@@ -303,16 +317,17 @@ describe('BookDockFileSheet', () => {
   it('persists the visible default destination when finishing metadata edits', async () => {
     mocks.libraries.push({
       id: 7,
+      type: 'books',
       name: 'Novels',
       folders: [{ id: 70, path: '/library/novels' }],
     })
     const updatedFile = makeFile({ targetLibraryId: 7, targetFolderId: 70 })
     mocks.setTarget.mockResolvedValue(updatedFile)
     const wrapper = mountSheet(makeFile())
-    const [librarySelect, folderSelect] = wrapper.findAll<HTMLSelectElement>('select')
-
-    expect(librarySelect!.element.value).toBe('7')
-    expect(folderSelect!.element.value).toBe('70')
+    await flushPromises()
+    expect(wrapper.findAll('select')).toHaveLength(0)
+    expect(wrapper.text()).toContain('Novels')
+    expect(wrapper.text()).toContain('/library/novels')
 
     const doneButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Done')
     await doneButton!.trigger('click')
@@ -326,6 +341,7 @@ describe('BookDockFileSheet', () => {
   it('does not save an unchanged destination again when finishing', async () => {
     mocks.libraries.push({
       id: 7,
+      type: 'books',
       name: 'Novels',
       folders: [{ id: 70, path: '/library/novels' }],
     })
@@ -343,11 +359,13 @@ describe('BookDockFileSheet', () => {
     mocks.libraries.push(
       {
         id: 7,
+        type: 'books',
         name: 'Novels',
         folders: [{ id: 70, path: '/library/novels' }],
       },
       {
         id: 8,
+        type: 'books',
         name: 'Comics',
         folders: [{ id: 80, path: '/library/comics' }],
       },
@@ -375,6 +393,7 @@ describe('BookDockFileSheet', () => {
   it('keeps the sheet open when the visible destination cannot be saved', async () => {
     mocks.libraries.push({
       id: 7,
+      type: 'books',
       name: 'Novels',
       folders: [{ id: 70, path: '/library/novels' }],
     })
@@ -388,5 +407,74 @@ describe('BookDockFileSheet', () => {
     expect(mocks.setTarget).toHaveBeenCalledWith(1, 7, 70)
     expect(wrapper.emitted('updated')).toBeUndefined()
     expect(wrapper.emitted('close')).toBeUndefined()
+  })
+  it('selects a delayed sole library and persists it only when Done is clicked', async () => {
+    mocks.fetchLibraries.mockImplementation(async () => {
+      libraryOptions.value = [{ id: 7, type: 'books', name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] }]
+    })
+    mocks.setTarget.mockResolvedValue(makeFile({ targetLibraryId: 7, targetFolderId: 70 }))
+    const wrapper = mountSheet(makeFile())
+    await flushPromises()
+    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Novels')
+    expect(mocks.setTarget).not.toHaveBeenCalled()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Done')!
+      .trigger('click')
+    await flushPromises()
+    expect(mocks.setTarget).toHaveBeenCalledExactlyOnceWith(1, 7, 70)
+  })
+
+  it('preserves a saved non-first folder and offers the other folders', async () => {
+    mocks.libraries.push({
+      id: 7,
+      type: 'books',
+      name: 'Novels',
+      folders: [
+        { id: 70, path: '/books/first' },
+        { id: 71, path: '/books/second' },
+      ],
+    })
+    const wrapper = mountSheet(makeFile({ targetLibraryId: 7, targetFolderId: 71 }))
+    await flushPromises()
+    expect(wrapper.findAll('select')).toHaveLength(1)
+    expect(wrapper.get<HTMLSelectElement>('select').element.value).toBe('71')
+    await wrapper.get('select').setValue('70')
+    await flushPromises()
+    expect(mocks.setTarget).toHaveBeenCalledWith(1, 7, 70)
+  })
+
+  it('uses the next file destination when switching files in an open sheet', async () => {
+    mocks.libraries.push(
+      { id: 7, type: 'books', name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] },
+      { id: 8, type: 'books', name: 'Comics', folders: [{ id: 80, path: '/books/comics' }] },
+    )
+    const wrapper = mountSheet(makeFile({ targetLibraryId: 7, targetFolderId: 70 }))
+    await wrapper.setProps({ file: makeFile({ id: 2, targetLibraryId: 8, targetFolderId: 80 }) })
+    await flushPromises()
+    expect(wrapper.get<HTMLSelectElement>('select').element.value).toBe('8')
+    expect(wrapper.text()).toContain('/books/comics')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Done')!
+      .trigger('click')
+    await flushPromises()
+    expect(mocks.setTarget).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toEqual([[]])
+  })
+
+  it('does not overwrite an unavailable saved destination with the sole library', async () => {
+    mocks.libraries.push({ id: 7, type: 'books', name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] })
+    const wrapper = mountSheet(makeFile({ targetLibraryId: 99, targetFolderId: 990 }))
+    await flushPromises()
+    expect(wrapper.get<HTMLSelectElement>('select').element.value).toBe('')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Done')!
+      .trigger('click')
+    await flushPromises()
+    expect(mocks.setTarget).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toEqual([[]])
   })
 })

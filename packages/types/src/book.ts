@@ -263,11 +263,27 @@ export type ReadAloudProgressSync = {
 export type BookFileWriteDisabledReason =
   "library_disabled" | "no_primary_file" | "format_not_supported" | "format_disabled" | "file_exceeds_size_limit";
 
+/** Why one file of a book is not written. Per-file only: never reported as the book-level `reason`. */
+export type BookFileWriteTargetSkipReason = "format_not_supported" | "format_disabled" | "file_exceeds_size_limit" | "not_content_file";
+
+/** One file the book's write-back considered, with the fields its own format can hold. */
+export type BookFileWriteTargetStatus = {
+  fileId: number;
+  format: string | null;
+  writable: boolean;
+  reason: BookFileWriteTargetSkipReason | null;
+  writableFields: BookFileWriteField[];
+};
+
 export type BookFileWriteStatus = {
   enabled: boolean;
   reason: BookFileWriteDisabledReason | null;
+  /** Union across writable files. Kept for released clients; prefer `targets` for anything per file. */
   writableFormats: BookFormat[];
+  /** Union across writable files. Kept for released clients; prefer `targets` for anything per file. */
   writableFields: BookFileWriteField[];
+  /** Every file write-back considered, in write order. Absent from servers that predate it. */
+  targets?: BookFileWriteTargetStatus[];
 };
 
 export type BookDetail = {
@@ -333,6 +349,8 @@ export type BookMetadataSaveResult = {
 };
 
 export type BookMetadataRefreshPreviewFields = {
+  isbn10?: string | null;
+  isbn13?: string | null;
   title?: string | null;
   subtitle?: string | null;
   description?: string | null;

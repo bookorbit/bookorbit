@@ -8,7 +8,7 @@ import { mkdir } from 'fs/promises';
 import { asc, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
-import type { BulkRenamePreviewPage, BulkRenameProgressEvent, BulkRenameStatus } from '@bookorbit/types';
+import type { BookWriteAndRenameResult, BulkRenamePreviewPage, BulkRenameProgressEvent, BulkRenameStatus } from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
@@ -246,8 +246,9 @@ export async function setBookMetadata(
     publisher?: string | null;
     publishedYear?: number | null;
     seriesName?: string | null;
-    seriesIndex?: number | null;
+    seriesIndex?: string | null;
     language?: string | null;
+    isbn10?: string | null;
     isbn13?: string | null;
     authors?: string[];
   },
@@ -264,6 +265,7 @@ export async function setBookMetadata(
       ...(metadata.seriesName !== undefined && { seriesName: metadata.seriesName }),
       ...(metadata.seriesIndex !== undefined && { seriesIndex: metadata.seriesIndex }),
       ...(metadata.language !== undefined && { language: metadata.language }),
+      ...(metadata.isbn10 !== undefined && { isbn10: metadata.isbn10 }),
       ...(metadata.isbn13 !== undefined && { isbn13: metadata.isbn13 }),
       ...(metadata.authors !== undefined && { authors: metadata.authors }),
     },
@@ -309,6 +311,20 @@ export async function getBulkRenameStatus(ctx: FileRenameE2EContext, libraryId: 
   }
 
   return response.json() as { running: boolean };
+}
+
+export async function writeAndRename(ctx: FileRenameE2EContext, bookId: number): Promise<BookWriteAndRenameResult> {
+  const response = await ctx.app.inject({
+    method: 'POST',
+    url: `/api/v1/books/${bookId}/write-and-rename`,
+    headers: authHeader(ctx.adminToken),
+  });
+
+  if (response.statusCode !== 201) {
+    throw new Error(`Write and rename returned ${response.statusCode}: ${response.body}`);
+  }
+
+  return response.json() as BookWriteAndRenameResult;
 }
 
 export interface BulkRenameExecuteResult {

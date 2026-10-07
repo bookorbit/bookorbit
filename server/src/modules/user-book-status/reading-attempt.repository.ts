@@ -233,8 +233,8 @@ export class ReadingAttemptRepository {
     return { items, total: totals[0]?.total ?? 0 };
   }
 
-  async findOwned(userId: number, bookId: number, attemptId: number) {
-    const [row] = await this.db
+  async findOwned(userId: number, bookId: number, attemptId: number, tx?: Tx) {
+    const query = (tx ?? this.db)
       .select()
       .from(readingAttempts)
       .where(
@@ -246,6 +246,7 @@ export class ReadingAttemptRepository {
         ),
       )
       .limit(1);
+    const [row] = await (tx ? query.for('update') : query);
     return row ?? null;
   }
 

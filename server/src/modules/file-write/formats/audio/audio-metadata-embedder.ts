@@ -12,6 +12,7 @@ import { replaceFileAtomically } from '../shared/atomic-file-replace';
 const execFile = promisify(execFileCallback);
 const FFMPEG_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 const FFMPEG_TIMEOUT_MS = 60_000;
+const FFPROBE_TIMEOUT_MS = 30_000;
 
 export interface AudioMetadataArg {
   key: string;
@@ -26,6 +27,12 @@ export interface AudioMetadataWriteInput {
 
 @Injectable()
 export class AudioMetadataEmbedder {
+  /**
+   * A run hands every track of a book the same cover buffer, so the JPEG conversion is done once
+   * per buffer rather than once per track. Keyed weakly, the result goes when the run's buffer does.
+   */
+  private readonly normalizedCovers = new WeakMap<Buffer, Promise<Buffer>>();
+
   async embedMetadata(filePath: string, format: string, input: AudioMetadataWriteInput): Promise<void> {
     const dir = dirname(filePath);
     const id = randomUUID();
@@ -34,7 +41,7 @@ export class AudioMetadataEmbedder {
 
     try {
       if (coverPath && input.coverBytes) {
-        await writeFile(coverPath, await normalizeCoverJpeg(input.coverBytes));
+        await writeFile(coverPath, await this.normalizedCover(input.coverBytes));
       }
       const useMp4MetadataTags = await shouldUseMp4MetadataTags(filePath, format, coverPath);
       await execFile(resolveFfmpegPath(), buildFfmpegArgs(filePath, coverPath, tempPath, format, input.metadata, { useMp4MetadataTags }), {
@@ -51,6 +58,16 @@ export class AudioMetadataEmbedder {
       }
     }
   }
+
+  private normalizedCover(coverBytes: Buffer): Promise<Buffer> {
+    const cached = this.normalizedCovers.get(coverBytes);
+    if (cached) return cached;
+
+    const pending = normalizeCoverJpeg(coverBytes);
+    this.normalizedCovers.set(coverBytes, pending);
+    pending.catch(() => this.normalizedCovers.delete(coverBytes));
+    return pending;
+  }
 }
 
 function buildFfmpegArgs(
@@ -66,7 +83,9 @@ function buildFfmpegArgs(
   if (coverPath) {
     args.push('-i', coverPath, '-map', '0:a', '-map', '0:s?', '-map', '1:v:0');
   } else {
-    args.push('-map', '0');
+    // Data streams are never copied: an M4B chapter track cannot be stream-copied into a new MP4, which
+    // failed every tag-only write of an audiobook with chapters. -map_chapters rebuilds that track.
+    args.push('-map', '0:a', '-map', '0:v?', '-map', '0:s?');
   }
 
   args.push('-map_metadata', '0', '-map_chapters', '0', '-c', 'copy');
@@ -106,17 +125,11 @@ async function shouldUseMp4MetadataTags(filePath: string, format: string, coverP
 
 async function hasVideoStream(filePath: string): Promise<boolean> {
   try {
-    const { stdout } = await execFile(resolveFfprobePath(), [
-      '-v',
-      'error',
-      '-select_streams',
-      'v',
-      '-show_entries',
-      'stream=index',
-      '-of',
-      'csv=p=0',
-      filePath,
-    ]);
+    const { stdout } = await execFile(
+      resolveFfprobePath(),
+      ['-v', 'error', '-select_streams', 'v', '-show_entries', 'stream=index', '-of', 'csv=p=0', filePath],
+      { timeout: FFPROBE_TIMEOUT_MS },
+    );
     return String(stdout).trim().length > 0;
   } catch {
     return true;

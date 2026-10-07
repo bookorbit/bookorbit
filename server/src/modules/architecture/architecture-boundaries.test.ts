@@ -48,7 +48,6 @@ describe('Architecture boundaries', () => {
       'src/modules/kobo/services/kobo-book-access.service.ts',
       'src/modules/kobo/services/kobo-book-identity.service.ts',
       'src/modules/kobo/services/kobo-device.service.ts',
-      'src/modules/kobo/services/kobo-download.service.ts',
       'src/modules/kobo/services/kobo-reading-state.service.ts',
       'src/modules/kobo/services/kobo-settings.service.ts',
       'src/modules/kobo/services/kobo-sync-history.service.ts',

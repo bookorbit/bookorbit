@@ -610,6 +610,30 @@ describe('UploadService', () => {
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Stephen King/The Stand.mobi');
   });
 
+  it.each(['9780385121682', '097522980X'])('mobi metadata populates the ISBN naming token: %s', async (isbn) => {
+    validator.validateFormat.mockReturnValue('mobi');
+    validator.sanitizeFilename.mockReturnValue('book.mobi');
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['mobi'], fileNamingPattern: '{authors:first}/{title}-{isbn}.{extension}' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    mockParseMobiFile.mockResolvedValue({
+      title: 'The Stand',
+      authors: ['Stephen King'],
+      publisher: 'Doubleday',
+      isbn,
+      publishedDate: '1978-10-03',
+      language: 'en',
+      description: null,
+      tags: [],
+    });
+    storage.streamToTemp.mockResolvedValue({ tempPath: 'upload.bin', sizeBytes: 456 });
+
+    const result = await service.upload(1, 2, 'raw.mobi', {} as any, user);
+
+    expect(result.filename).toBe(`The Stand-${isbn}.mobi`);
+    expect(storage.moveToPath.mock.lastCall?.[1]).toBe(`/library/Stephen King/The Stand-${isbn}.mobi`);
+  });
+
   it('pdf metadata populates tokens', async () => {
     validator.validateFormat.mockReturnValue('pdf');
     validator.sanitizeFilename.mockReturnValue('doc.pdf');
@@ -852,6 +876,44 @@ describe('UploadService', () => {
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/GlobalBook.epub');
     expect(appSettings.getUploadPattern).toHaveBeenCalled();
     expect(appSettings.getUploadPatternBookPerFolder).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { mode: 'book_per_folder', pattern: '{title}', global: false },
+    { mode: 'book_per_folder', pattern: '<{title}|{originalFilename}> - <{authors:first}> - <{year}>', global: false },
+    { mode: 'book_per_folder', pattern: '{title}', global: true },
+    { mode: 'book_per_file', pattern: '{title}', global: false },
+  ])('keeps sequential root uploads separate with $mode, pattern=$pattern, global=$global', async ({ mode, pattern, global }) => {
+    for (const title of ['First Book', 'Second Book']) {
+      db.select
+        .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: global ? null : pattern, organizationMode: mode }]))
+        .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+      appSettings.getUploadPatternBookPerFolder.mockResolvedValue(pattern);
+      mockExtractEpubMetadata.mockResolvedValue({ title, authors: [{ name: 'Test Author' }], publishedYear: 2024 } as never);
+
+      await service.upload(1, 2, 'raw.epub', {} as any, user);
+    }
+
+    const paths = pattern.includes('authors')
+      ? ['/library/First Book - Test Author - 2024.epub', '/library/Second Book - Test Author - 2024.epub']
+      : ['/library/First Book.epub', '/library/Second Book.epub'];
+    for (const [index, path] of paths.entries()) {
+      expect(storage.moveToPath).toHaveBeenNthCalledWith(index + 1, '/tmp/upload.bin', path);
+      expect(processor.createBookRecord).toHaveBeenNthCalledWith(index + 1, 1, 2, path, path, path.slice('/library/'.length), 'epub', 456);
+    }
+  });
+
+  it('uses the persisted root filename spelling for both file and book identity', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{title}', organizationMode: 'book_per_folder' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    mockExtractEpubMetadata.mockResolvedValue({ title: 'Dune', authors: [] } as never);
+    mockLstat.mockResolvedValue({} as never);
+    mockReaddir.mockResolvedValue(['dune.epub'] as never);
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(processor.createBookRecord).toHaveBeenCalledWith(1, 2, '/library/dune.epub', '/library/dune.epub', 'dune.epub', 'epub', 456);
   });
 
   it('book_per_folder global pattern used when library pattern is null', async () => {

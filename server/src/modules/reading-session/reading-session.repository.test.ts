@@ -447,6 +447,36 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.items[0]?.source).toBe('web');
   });
 
+  it('returns each session type and reads unknown or missing types as reading', async () => {
+    const now = new Date('2026-04-15T10:00:00.000Z');
+    const later = new Date('2026-04-15T10:30:00.000Z');
+    const base = {
+      bookFileId: 42,
+      startedAt: now,
+      endedAt: later,
+      durationSeconds: 1800,
+      progressDelta: 1,
+      endProgress: 50,
+      format: 'epub',
+      source: 'ios',
+    };
+    const { db } = makeListDb({
+      rows: [
+        { ...base, id: 1, sessionType: 'listen' },
+        { ...base, id: 2, sessionType: 'tts' },
+        { ...base, id: 3, sessionType: 'read' },
+        { ...base, id: 4, sessionType: 'hologram' },
+        { ...base, id: 5 },
+      ],
+      count: [{ total: 5 }],
+    });
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
+
+    expect(result.items.map((item) => item.sessionType)).toEqual(['listen', 'tts', 'read', 'read', 'read']);
+  });
+
   it('fires six select queries', async () => {
     const { db, select } = makeListDb({});
     const repo = new ReadingSessionRepository(db as never);

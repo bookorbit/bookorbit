@@ -114,7 +114,7 @@ export class KoreaderPluginService {
     const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
     const hashes = [...new Set(dto.hashes.map((hash) => hash.toLowerCase()))];
     const resolved = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
-    const linked = await this.linkRequestedFileHashes(user, hashes, resolved, this.buildCandidateMap(dto));
+    const linked = await this.linkRequestedFileHashes(user, hashes, resolved, this.buildCandidateMap(dto), accessibleLibraryIds);
     for (const [hash, match] of linked) resolved.set(hash, match);
     const matchedHashes = [...resolved.keys()];
     const unmatchedCandidates = this.buildUnmatchedCandidates(hashes, matchedHashes, dto);
@@ -295,15 +295,17 @@ export class KoreaderPluginService {
   }
 
   private async computeLibraryVersion(userId: number, accessibleLibraryIds: number[] | null): Promise<string> {
-    const [fileMaxTs, linkVersion] = await Promise.all([
-      this.pluginRepo.getLibraryMaxFileTimestamp(accessibleLibraryIds),
+    const [fileMaxTs, linkVersion, historyVersion] = await Promise.all([
+      accessibleLibraryIds?.length === 0 ? null : this.pluginRepo.getGlobalMaxFileTimestamp(),
       this.pluginRepo.getHashLinkVersion(userId),
+      this.pluginRepo.getHashHistoryVersion(accessibleLibraryIds),
     ]);
     const maxTs = maxDate(fileMaxTs, linkVersion.maxTs);
     const libraryKey = accessibleLibraryIds === null ? 'all' : [...accessibleLibraryIds].sort((a, b) => a - b).join(',');
     const linkKey = `${linkVersion.count}:${linkVersion.maxTs ? linkVersion.maxTs.toISOString() : 'none'}`;
+    const historyKey = historyVersion;
     return createHash('md5') // codeql[js/weak-cryptographic-algorithm] - non-security cache token
-      .update(`${libraryKey}|${maxTs ? maxTs.toISOString() : 'none'}|${linkKey}`)
+      .update(`${libraryKey}|${maxTs ? maxTs.toISOString() : 'none'}|${linkKey}|${historyKey}`)
       .digest('hex')
       .slice(0, 16);
   }
@@ -321,8 +323,9 @@ export class KoreaderPluginService {
     hashes: string[],
     resolved: Map<string, ResolvedBookFile>,
     candidates: Map<string, MatchCheckBookCandidate>,
+    accessibleLibraryIds: number[] | null,
   ): Promise<Map<string, ResolvedBookFile>> {
-    const linked = new Map<string, ResolvedBookFile>();
+    const attempted: string[] = [];
     for (const hash of hashes) {
       const candidate = candidates.get(hash);
       if (!candidate?.bookFileId || (candidate.source !== 'file' && candidate.source !== 'current_file')) continue;
@@ -330,15 +333,19 @@ export class KoreaderPluginService {
 
       const file = await this.bookService.verifyFileAccess(candidate.bookFileId, user).catch(() => null);
       if (!file || file.role !== 'content') continue;
+      const existing = resolved.get(hash);
+      if (existing && existing.bookId !== file.bookId) continue;
 
-      await this.koreaderRepo.upsertBookHashLink(user.id, hash, file.id, {
+      // A device's cached file ID cannot overwrite a manual choice made since its last sync.
+      await this.koreaderRepo.createBookHashLinkIfAbsent(user.id, hash, file.id, {
         title: candidate.title ?? null,
         authors: candidate.authors ?? null,
         lastOpen: candidate.lastOpen ?? null,
       });
-      linked.set(hash, { bookFileId: file.id, bookId: file.bookId, libraryId: file.libraryId, format: file.format });
+      attempted.push(hash);
     }
-    return linked;
+    // Resolve committed links again, including a manual link created concurrently with access checks.
+    return attempted.length ? this.koreaderRepo.resolveBookFilesByHashes(attempted, accessibleLibraryIds, user.id) : new Map();
   }
 
   private buildUnmatchedCandidates(hashes: string[], matchedHashes: string[], dto: MatchCheckDto) {

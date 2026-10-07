@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, unlink, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { PDFDocument, PDFName } from 'pdf-lib';
 
@@ -26,11 +26,24 @@ export function resolvePdfFieldsWritten(
   };
 }
 
+export function pdfTempPathFor(filePath: string): string {
+  return join(dirname(filePath), `.tmp-${randomUUID()}.pdf`);
+}
+
+export async function removePdfTempFile(tempPath: string): Promise<void> {
+  try {
+    await unlink(tempPath);
+  } catch {
+    // Absent once the replace succeeded or before the write began.
+  }
+}
+
 export async function writePdfMetadataInProcess(
   filePath: string,
   payload: BookWritePayload,
   pdfFieldMask: Set<BookWritePayloadKey>,
   startedAt = Date.now(),
+  tempPath = pdfTempPathFor(filePath),
 ): Promise<WriteResult> {
   const fieldsWritten = resolveFieldsWritten(payload, pdfFieldMask);
   const originalBytes = await readFile(filePath);
@@ -48,9 +61,13 @@ export async function writePdfMetadataInProcess(
 
   const savedBytes = await pdfDoc.save();
 
-  const tempPath = join(dirname(filePath), `.tmp-${randomUUID()}.pdf`);
-  await writeFile(tempPath, savedBytes);
-  await replaceFileAtomically(tempPath, filePath);
+  try {
+    await writeFile(tempPath, savedBytes);
+    await replaceFileAtomically(tempPath, filePath);
+  } catch (error) {
+    await removePdfTempFile(tempPath);
+    throw error;
+  }
 
   return { status: 'success', fieldsWritten, durationMs: Date.now() - startedAt };
 }

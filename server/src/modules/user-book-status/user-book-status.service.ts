@@ -171,16 +171,21 @@ export class UserBookStatusService {
     };
 
     if (this.attempts) {
-      const batchSize = 50;
-      const timeZone = await this.repo.findUserTimeZone(userId);
-      for (let offset = 0; offset < bookIds.length; offset += batchSize) {
-        const batch = bookIds.slice(offset, offset + batchSize);
-        const results = await Promise.all(batch.map((bookId) => this.applyManualStatus(userId, bookId, { status }, undefined, timeZone)));
-        results.forEach((result, index) => {
-          if (result.statusChanged) recordChange(result.state.status, batch[index]!);
-        });
-      }
-      await this.projectGroupsToKobo(userId, changedByStatus);
+      await this.attempts.coalesceChanges(async () => {
+        const batchSize = 50;
+        const timeZone = await this.repo.findUserTimeZone(userId);
+        for (let offset = 0; offset < bookIds.length; offset += batchSize) {
+          const batch = bookIds.slice(offset, offset + batchSize);
+          const settled = await Promise.allSettled(batch.map((bookId) => this.applyManualStatus(userId, bookId, { status }, undefined, timeZone)));
+          const failure = settled.find((result) => result.status === 'rejected');
+          if (failure?.status === 'rejected') throw failure.reason;
+          const results = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value);
+          results.forEach((result, index) => {
+            if (result.statusChanged) recordChange(result.state.status, batch[index]!);
+          });
+        }
+        await this.projectGroupsToKobo(userId, changedByStatus);
+      });
       return;
     }
 

@@ -3,9 +3,10 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight } from '@lucide/vue'
 import type { BookDetail } from '@bookorbit/types'
-import { formatRelativeFromNow } from '@/i18n/formatters'
+import { formatListParts, formatRelativeFromNow } from '@/i18n/formatters'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 import { resolveWriteBackFields } from '@/features/book/lib/write-back-fields'
+import { writableFieldsByFormat } from '@/features/book/lib/file-write-targets'
 
 /** Enough field names to make the sentence concrete without turning it back into a table. */
 const NAMED_FIELD_LIMIT = 5
@@ -21,7 +22,24 @@ const fields = computed(() => resolveWriteBackFields(props.book, status.value?.w
 const filled = computed(() => fields.value.filter((entry) => entry.value != null))
 const fillFraction = computed(() => (fields.value.length === 0 ? 0 : filled.value.length / fields.value.length))
 
-const targetFormat = computed(() => (writableFormats.value[0] ?? '').toUpperCase())
+const targetFormat = computed(() =>
+  formatListParts(writableFormats.value.map((format) => format.toUpperCase()))
+    .map((part) => part.value)
+    .join(''),
+)
+
+/**
+ * Each format holds different fields, so a mixed book says how much lands in each file rather than
+ * implying every file takes the union.
+ */
+const formatBreakdown = computed(() => {
+  const formats = writableFieldsByFormat(status.value)
+  if (formats.length < 2) return []
+  return formats.map(({ format, fields: formatFields }) => {
+    const entries = resolveWriteBackFields(props.book, formatFields, format)
+    return { format, filled: entries.filter((entry) => entry.value != null).length, total: entries.length }
+  })
+})
 
 /**
  * The old panel printed twenty-eight rows of book metadata on a tab about files. The question it
@@ -84,6 +102,21 @@ function handleEditMetadata() {
       <div class="h-1.5 overflow-hidden rounded-full bg-muted">
         <span class="block h-full rounded-full bg-primary transition-[width]" :style="{ width: `${Math.round(fillFraction * 100)}%` }" />
       </div>
+
+      <ul v-if="formatBreakdown.length > 0" class="flex flex-col gap-1">
+        <li v-for="entry in formatBreakdown" :key="entry.format" class="flex items-center gap-2 text-[12px] text-muted-foreground">
+          <span
+            class="inline-flex h-[18px] items-center rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
+            :style="{
+              color: formatColorVar(entry.format),
+              backgroundColor: `color-mix(in oklch, ${formatColorVar(entry.format)} 16%, transparent)`,
+            }"
+          >
+            {{ entry.format }}
+          </span>
+          <span class="tabular-nums">{{ t('book.detail.files.fieldsSet', { filled: entry.filled, total: entry.total }) }}</span>
+        </li>
+      </ul>
 
       <p class="text-[12.5px] leading-relaxed text-muted-foreground">{{ summary }}</p>
 

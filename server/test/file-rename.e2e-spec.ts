@@ -18,6 +18,7 @@
  *   - Empty-folder cleanup after book_per_folder rename
  *   - Cross-directory move within book_per_file
  *   - Flat-to-folder transition (book_per_folder, book was NOT in own folder)
+ *   - Target folder held by another book (book_per_folder): refused unless the same work
  */
 
 import { mkdtemp, rm, access, readdir } from 'fs/promises';
@@ -39,6 +40,7 @@ import {
   getBulkRenameStatus,
   setBookMetadata,
   triggerAndWaitForScan,
+  writeAndRename,
   type FileRenameE2EContext,
 } from './e2e/file-rename/file-rename-harness';
 import {
@@ -50,6 +52,7 @@ import {
   buildCollisionPair,
   buildSpecialCharBook,
   createEpubFile,
+  createPdfFile,
 } from './e2e/file-rename/file-rename-fixture-builder';
 
 const SUITE_TIMEOUT_MS = 180_000;
@@ -145,6 +148,31 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
         const matched = updatedBooks.find((b) => b.relPath === `${title}.epub`);
         expect(matched).toBeDefined();
       }
+    });
+
+    it.each([
+      { isbn10: '0306406152', isbn13: null, expected: '0306406152' },
+      { isbn10: '0306406152', isbn13: '9780306406157', expected: '9780306406157' },
+    ])('renames using the available ISBN ($expected) without changing its field', async ({ isbn10, isbn13, expected }) => {
+      const lib = await createLibrary(ctx, { mode: 'book_per_file', fileRenameEnabled: true, fileNamingPattern: '{isbn}' });
+      await createEpubFile(join(lib.folderPath, 'isbn-source.epub'));
+      await triggerAndWaitForScan(ctx, lib.libraryId);
+      const [book] = await findAllBooksInLibrary(ctx, lib.libraryId);
+      await setBookMetadata(ctx, book.bookId, { isbn10, isbn13 });
+
+      const preview = await getBulkRenamePreview(ctx, lib.libraryId);
+      expect(preview.items).toHaveLength(1);
+      expect(preview.items[0].status).toBe('will_rename');
+
+      const result = await executeBulkRename(ctx, lib.libraryId);
+      expect(getDoneEvent(result.events)).toMatchObject({ succeeded: 1, failed: 0 });
+      await expect(pathExists(join(lib.folderPath, `${expected}.epub`))).resolves.toBe(true);
+      expect((await findAllBooksInLibrary(ctx, lib.libraryId))[0].relPath).toBe(`${expected}.epub`);
+      const [metadata] = await ctx.db
+        .select({ isbn10: schema.bookMetadata.isbn10, isbn13: schema.bookMetadata.isbn13 })
+        .from(schema.bookMetadata)
+        .where(eq(schema.bookMetadata.bookId, book.bookId));
+      expect(metadata).toEqual({ isbn10, isbn13 });
     });
 
     it('reports unchanged for books already at the correct path', async () => {
@@ -268,9 +296,9 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
       expect(books).toHaveLength(3);
 
       const seriesData = [
-        { title: 'Book One', seriesName: 'My Series', seriesIndex: 1 },
-        { title: 'Book Two', seriesName: 'My Series', seriesIndex: 2 },
-        { title: 'Book Three', seriesName: 'My Series', seriesIndex: 3 },
+        { title: 'Book One', seriesName: 'My Series', seriesIndex: '1' },
+        { title: 'Book Two', seriesName: 'My Series', seriesIndex: '2' },
+        { title: 'Book Three', seriesName: 'My Series', seriesIndex: '3' },
       ];
 
       for (let i = 0; i < books.length; i++) {
@@ -983,7 +1011,85 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
     });
   });
 
-  // ── 20. Non-existent library ──────────────────────────────────────────────
+  // ── 20. book_per_folder — target folder held by another book ──────────────
+
+  describe('book_per_folder — target folder held by another book', { timeout: TEST_TIMEOUT_MS }, () => {
+    const seriesPattern = '{authors}/<{series}/><{seriesIndex}> - <{title}|{originalFilename}>';
+
+    async function scanDuneVolumes(lib: { libraryId: number; folderPath: string }, duneRelPath: string, messiahRelPath: string) {
+      await createEpubFile(join(lib.folderPath, duneRelPath), 'Dune');
+      await createEpubFile(join(lib.folderPath, messiahRelPath), 'Dune Messiah');
+      await triggerAndWaitForScan(ctx, lib.libraryId);
+
+      const books = await findAllBooksInLibrary(ctx, lib.libraryId);
+      const dune = books.find((b) => b.absolutePath === join(lib.folderPath, duneRelPath))!;
+      const messiah = books.find((b) => b.absolutePath === join(lib.folderPath, messiahRelPath))!;
+      await setBookMetadata(ctx, dune.bookId, { title: 'Dune', authors: ['Frank Herbert'], seriesName: 'Dune', seriesIndex: '1' });
+      await setBookMetadata(ctx, messiah.bookId, { title: 'Dune Messiah', authors: ['Frank Herbert'], seriesName: 'Dune', seriesIndex: '2' });
+      return { dune, messiah };
+    }
+
+    it('refuses to move a loose series volume into the folder another book holds', async () => {
+      const lib = await createLibrary(ctx, { mode: 'book_per_folder', fileRenameEnabled: false, fileNamingPattern: seriesPattern });
+      const { dune, messiah } = await scanDuneVolumes(lib, 'dune.epub', 'dune-messiah.epub');
+
+      expect((await writeAndRename(ctx, dune.bookId)).rename.status).toBe('success');
+      const second = await writeAndRename(ctx, messiah.bookId);
+
+      expect(second.rename).toEqual(expect.objectContaining({ status: 'skipped', reason: 'target folder belongs to another book' }));
+      const after = await findAllBooksInLibrary(ctx, lib.libraryId);
+      expect(after.find((b) => b.bookId === dune.bookId)?.folderPath).toBe(join(lib.folderPath, 'Frank Herbert/Dune'));
+      expect(after.find((b) => b.bookId === messiah.bookId)?.absolutePath).toBe(join(lib.folderPath, 'dune-messiah.epub'));
+      await expect(pathExists(join(lib.folderPath, 'dune-messiah.epub'))).resolves.toBe(true);
+    });
+
+    it('refuses to fold a series volume that has its own folder into another book', async () => {
+      const lib = await createLibrary(ctx, { mode: 'book_per_folder', fileRenameEnabled: false, fileNamingPattern: seriesPattern });
+      const { dune, messiah } = await scanDuneVolumes(lib, 'Frank Herbert/Dune/Dune.epub', 'Frank Herbert/Dune Messiah/Dune Messiah.epub');
+
+      expect((await writeAndRename(ctx, dune.bookId)).rename.status).toBe('success');
+      const second = await writeAndRename(ctx, messiah.bookId);
+
+      expect(second.rename).toEqual(expect.objectContaining({ status: 'skipped', reason: 'target folder belongs to another book' }));
+      const after = await findAllBooksInLibrary(ctx, lib.libraryId);
+      expect(new Set(after.map((b) => b.bookId))).toEqual(new Set([dune.bookId, messiah.bookId]));
+      await expect(pathExists(join(lib.folderPath, 'Frank Herbert/Dune Messiah/Dune Messiah.epub'))).resolves.toBe(true);
+    });
+
+    it('still merges another format of the same work into the folder that work holds', async () => {
+      const lib = await createLibrary(ctx, { mode: 'book_per_folder', fileRenameEnabled: false, fileNamingPattern: '{authors}/{title}/{title}' });
+      await createEpubFile(join(lib.folderPath, 'Frank Herbert/Dune/Dune.epub'), 'Dune');
+      await createPdfFile(join(lib.folderPath, 'Incoming/scan.pdf'), 'Dune');
+      await triggerAndWaitForScan(ctx, lib.libraryId);
+
+      const books = await findAllBooksInLibrary(ctx, lib.libraryId);
+      const ebook = books.find((b) => b.absolutePath.endsWith('Dune.epub'))!;
+      const pdf = books.find((b) => b.absolutePath.endsWith('scan.pdf'))!;
+      for (const book of [ebook, pdf]) await setBookMetadata(ctx, book.bookId, { title: 'Dune', authors: ['Frank Herbert'] });
+
+      const result = await writeAndRename(ctx, pdf.bookId);
+
+      expect(result.rename.status).toBe('success');
+      const after = await findAllBooksInLibrary(ctx, lib.libraryId);
+      expect(after.map((b) => b.bookId)).toEqual([ebook.bookId, ebook.bookId]);
+      expect(after.map((b) => b.relPath).sort()).toEqual(['Frank Herbert/Dune/Dune.epub', 'Frank Herbert/Dune/Dune.pdf']);
+    });
+
+    it('bulk preview holds back series volumes that would share one folder, and the run renames none of them', async () => {
+      const lib = await createLibrary(ctx, { mode: 'book_per_folder', fileRenameEnabled: true, fileNamingPattern: seriesPattern });
+      await scanDuneVolumes(lib, 'dune.epub', 'dune-messiah.epub');
+
+      const preview = await getBulkRenamePreview(ctx, lib.libraryId);
+      expect(preview.items.map((item) => item.status)).toEqual(['collision', 'collision']);
+
+      const done = getDoneEvent((await executeBulkRename(ctx, lib.libraryId)).events);
+      expect(done!.processed).toBe(0);
+      await expect(pathExists(join(lib.folderPath, 'dune.epub'))).resolves.toBe(true);
+      await expect(pathExists(join(lib.folderPath, 'dune-messiah.epub'))).resolves.toBe(true);
+    });
+  });
+
+  // ── 21. Non-existent library ──────────────────────────────────────────────
 
   describe('non-existent library', { timeout: TEST_TIMEOUT_MS }, () => {
     it('execute returns 404 for non-existent libraryId', async () => {

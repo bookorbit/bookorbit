@@ -16,6 +16,10 @@ import { KoboAnnotationMaterializerService } from './services/kobo-annotation-ma
 import { KoboBookAccessService } from './services/kobo-book-access.service';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 import { KoboDeviceService } from './services/kobo-device.service';
+import { KoboDownloadRepository } from './kobo-download.repository';
+import { KoboDownloadHashBackfillService } from './services/kobo-download-hash-backfill.service';
+import { AppSettingsModule } from '../app-settings/app-settings.module';
+import { KoboDownloadHashRegistrationService } from './services/kobo-download-hash-registration.service';
 import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboKepubContextService } from './services/kobo-kepub-context.service';
 import { KoboPositionRebuildService } from './services/kobo-position-rebuild.service';
@@ -40,6 +44,7 @@ describe('KoboModule', () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, KoboModule) as unknown[];
 
     expect(imports).toContain(BookModule);
+    expect(imports).toContain(AppSettingsModule);
     expect(imports).toContain(ReadingSessionModule);
     expect(imports).toContain(AnnotationModule);
     expect(imports).toContain(PositionConverterModule);
@@ -62,6 +67,9 @@ describe('KoboModule', () => {
       KoboSyncHistoryService,
       KoboThumbnailService,
       KoboDownloadService,
+      KoboDownloadRepository,
+      KoboDownloadHashBackfillService,
+      KoboDownloadHashRegistrationService,
       KoboProxyService,
       KoboAnalyticsResolverService,
       KoboAnalyticsService,

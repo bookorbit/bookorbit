@@ -1,3 +1,4 @@
+import { deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import { basename } from 'path';
@@ -213,14 +214,14 @@ export class UploadProcessorService {
 
     await this.db.transaction(async (tx) => {
       if (records.attachedFileIds.length > 0) {
-        await tx.delete(bookFiles).where(inArray(bookFiles.id, records.attachedFileIds));
+        await deleteBookFilesWithHashInvalidation(tx, inArray(bookFiles.id, records.attachedFileIds));
       }
       for (const replaced of records.replacedPrimaries) await this.restorePrimaryFile(tx, replaced);
       if (records.createdBookIds.length > 0) {
         // `books.primary_file_id` is `on delete set null`, so clearing the files first leaves
         // nothing pointing at a row that is about to disappear.
-        await tx.delete(bookFiles).where(inArray(bookFiles.bookId, records.createdBookIds));
-        await tx.delete(books).where(inArray(books.id, records.createdBookIds));
+        await deleteBookFilesWithHashInvalidation(tx, inArray(bookFiles.bookId, records.createdBookIds));
+        await deleteBooksWithHashInvalidation(tx, inArray(books.id, records.createdBookIds));
       }
     });
     // Metadata may already have written covers for the books this unit created.

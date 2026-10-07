@@ -665,6 +665,7 @@ describe('kobo status projection', () => {
   describe('with reading attempts enabled', () => {
     const mockAttempts = {
       applyManualStatus: vi.fn(),
+      coalesceChanges: vi.fn((operation: () => Promise<unknown>) => operation()),
     };
     let attemptService: UserBookStatusService;
 
@@ -781,6 +782,7 @@ describe('reading dates are filed on the reader local day', () => {
   const mockAttempts = {
     recordActivity: vi.fn(),
     applyManualStatus: vi.fn(),
+    coalesceChanges: vi.fn((operation: () => Promise<unknown>) => operation()),
   };
   let attemptService: UserBookStatusService;
 

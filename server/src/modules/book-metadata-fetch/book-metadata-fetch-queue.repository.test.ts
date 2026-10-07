@@ -156,6 +156,19 @@ describe('BookMetadataFetchQueueRepository', () => {
     expect(sqlCalls.some((call) => call.slice(1).includes(bookFiles.mediaOverlayAvailable))).toBe(true);
   });
 
+  it('checks both ISBN columns when scheduling books without an ISBN', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ bookId: 7 }]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+    const config = baseConfig();
+    config.conditions.missingFields = { enabled: true, fields: ['isbn'] };
+    await expect(repo.fetchEligibleBookIds(config, 5)).resolves.toEqual([7]);
+    expect(vi.mocked(sql).mock.calls.some((call) => call.slice(1).includes(bookMetadata.isbn10) && call.slice(1).includes(bookMetadata.isbn13))).toBe(
+      true,
+    );
+    expect(eq).toHaveBeenCalledWith(books.libraryId, 5);
+  });
+
   it('returns empty results without touching the database when no conditions are enabled', async () => {
     const { db } = makeDb();
     const repo = new BookMetadataFetchQueueRepository(db as never);

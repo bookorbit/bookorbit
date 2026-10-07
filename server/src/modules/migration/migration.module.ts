@@ -1,3 +1,4 @@
+import { ReadingAttemptEventsModule } from '../user-book-status/reading-attempt-events.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -37,6 +38,7 @@ import { MigrationReportingService } from './reporting/migration-reporting.servi
 
 @Module({
   imports: [
+    ReadingAttemptEventsModule,
     AuthModule,
     forwardRef(() => NotificationModule),
     ScannerModule,

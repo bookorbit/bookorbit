@@ -47,6 +47,7 @@ import { SeriesIdentityService } from '../../common/services/series-identity.ser
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
+import { resolveSingleFileBookPath } from '../../common/utils/book-path.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { buildPatternTokens, patternReferencesToken } from '../../common/utils/pattern-tokens.utils';
 import { DB } from '../../db';
@@ -665,7 +666,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     if (unitFiles.length === 0) {
       return {
         files: [{ sourcePath: row.absolutePath, destPath, format: row.format, role: 'content', sortOrder: 0 }],
-        bookFolderPath: library.organizationMode === 'book_per_file' ? destPath : dirname(destPath),
+        bookFolderPath: resolveSingleFileBookPath(destPath, folderPath, library.organizationMode),
       };
     }
 
@@ -750,7 +751,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     if (placement.length === 0) throw new Error('Finalization placed no files');
 
     const loose = library.organizationMode === 'book_per_file';
-    const sharedFolderPath = bookFolderPath ?? dirname(persistedPrimaryPath);
+    const sharedFolderPath = bookFolderPath === placement[0]!.destPath ? persistedPrimaryPath : (bookFolderPath ?? dirname(persistedPrimaryPath));
     const files: UnitBookFileInput[] = [];
 
     for (const [index, file] of placement.entries()) {

@@ -1,3 +1,4 @@
+import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 vi.mock('fs/promises', () => ({
   readdir: vi.fn(),
   realpath: vi.fn(),
@@ -96,10 +97,12 @@ describe('LibraryService', () => {
   };
 
   let service: LibraryService;
+  let readingEvents: ReadingAttemptEventsService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('/books');
+    readingEvents = new ReadingAttemptEventsService();
     service = new LibraryService(
       libraryRepo as any,
       config as any,
@@ -109,6 +112,7 @@ describe('LibraryService', () => {
       achievementEvents as any,
       pathPolicy as any,
       scanScheduler as any,
+      readingEvents,
     );
 
     libraryRepo.findPodcastIds.mockResolvedValue([]);
@@ -253,9 +257,39 @@ describe('LibraryService', () => {
         fileWriteCbxMaxFileSizeMb: 500,
         fileWriteAudioEnabled: true,
         fileWriteAudioMaxFileSizeMb: 500,
+        fileWriteAllFiles: false,
+        fileWriteReadAlongEnabled: false,
+        fileWriteReadAlongMaxFileSizeMb: 1000,
         fileRenameEnabled: false,
       }),
     );
+  });
+
+  it('create stores the all-files write scope when asked', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Mixed', icon: 'BookOpen' }]);
+    libraryRepo.insertFolders.mockResolvedValue([{ id: 11, path: '/a' }]);
+
+    await service.create({ name: 'Mixed', icon: 'BookOpen', folders: ['/a'], fileWriteAllFiles: true } as any);
+
+    expect(libraryRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ fileWriteAllFiles: true }));
+  });
+
+  it('update leaves the stored all-files write scope alone when the request omits it', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, fileWriteAllFiles: true }]);
+    libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, fileWriteAllFiles: true }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    await service.update(10, { fileWriteEnabled: true } as any);
+
+    expect(libraryRepo.update).toHaveBeenCalledWith(10, { fileWriteEnabled: true });
+  });
+
+  it('update rejects the all-files write scope for podcast libraries', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast' }]);
+
+    await expect(service.update(12, { fileWriteAllFiles: true } as any)).rejects.toThrow('fileWriteAllFiles is only supported for book libraries');
+    expect(libraryRepo.update).not.toHaveBeenCalled();
   });
 
   it('create starts watcher immediately when watch is enabled', async () => {
@@ -623,13 +657,27 @@ describe('LibraryService', () => {
     libraryRepo.findById.mockResolvedValue([{ id: 4, name: 'L' }]);
     libraryRepo.findBookIdsByLibrary.mockResolvedValue([{ id: 101 }, { id: 102 }]);
 
+    const notify = vi.spyOn(readingEvents, 'notifyChanged');
+    libraryRepo.delete.mockImplementation(() => {
+      expect(notify).not.toHaveBeenCalled();
+      return Promise.resolve();
+    });
     await service.remove(4);
+    expect(notify).toHaveBeenCalledExactlyOnceWith(null);
 
     expect(fileWatcherService.stopWatcher).toHaveBeenCalledWith(4);
     expect(libraryRepo.delete).toHaveBeenCalledWith(4);
     expect(scanScheduler.removeSchedule).toHaveBeenCalledWith(4);
     expect(mockRm).toHaveBeenCalledWith('/books/covers/101', { recursive: true, force: true });
     expect(mockRm).toHaveBeenCalledWith('/books/covers/102', { recursive: true, force: true });
+  });
+
+  it('does not invalidate reading caches when deleting the library fails', async () => {
+    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
+    libraryRepo.delete.mockRejectedValueOnce(new Error('Delete failed'));
+    const notify = vi.spyOn(readingEvents, 'notifyChanged');
+    await expect(service.remove(1)).rejects.toThrow('Delete failed');
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('remove deletes downloaded podcast files before deleting the library', async () => {

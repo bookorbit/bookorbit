@@ -1,3 +1,4 @@
+import { ReadingAttemptEventsService } from '../../user-book-status/reading-attempt-events.service';
 import { UserStateImporter } from './user-state.importer';
 
 function makeImporter() {
@@ -33,8 +34,9 @@ function makeImporter() {
     batchInsertCollectionBooks: vi.fn().mockResolvedValue(undefined),
   };
 
-  const importer = new UserStateImporter(repo as never, importRepo as never);
-  return { importer, repo, importRepo };
+  const events = new ReadingAttemptEventsService();
+  const importer = new UserStateImporter(repo as never, importRepo as never, events);
+  return { importer, repo, importRepo, events };
 }
 
 describe('UserStateImporter', () => {
@@ -1024,5 +1026,59 @@ describe('UserStateImporter', () => {
       positionSeconds: number;
     }>;
     expect(audioBatch).toEqual([]);
+  });
+});
+
+describe('UserStateImporter cache invalidation', () => {
+  function plan() {
+    return {
+      execution: {
+        sourceData: {
+          userBookStatuses: [
+            { sourceUserId: 'reader', sourceBookId: 'a', status: 'read' },
+            { sourceUserId: 'reader', sourceBookId: 'b', status: 'read' },
+          ],
+        },
+      },
+    };
+  }
+
+  it('invalidates each affected reader once after the status transaction commits', async () => {
+    const { importer, importRepo, events } = makeImporter();
+    const notify = vi.spyOn(events, 'notifyChanged');
+    importRepo.withTransaction.mockImplementation(async (callback) => {
+      await callback(importRepo);
+      expect(notify).not.toHaveBeenCalled();
+    });
+    await (importer as any).importUserBookStatuses(
+      1,
+      plan(),
+      new Map([['reader', 7]]),
+      new Map([
+        ['a', 10],
+        ['b', 11],
+      ]),
+      async () => {},
+    );
+    expect(notify).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
+  it('keeps caches when the status transaction rolls back', async () => {
+    const { importer, importRepo, events } = makeImporter();
+    const notify = vi.spyOn(events, 'notifyChanged');
+    importRepo.withTransaction.mockRejectedValueOnce(new Error('Rollback'));
+    await expect(
+      (importer as any).importUserBookStatuses(
+        1,
+        plan(),
+        new Map([['reader', 7]]),
+        new Map([
+          ['a', 10],
+          ['b', 11],
+        ]),
+        async () => {},
+      ),
+    ).rejects.toThrow('Rollback');
+    expect(notify).not.toHaveBeenCalled();
   });
 });

@@ -42,6 +42,7 @@ function makeService(rebuilderRegistered = false) {
     findHubBookFacet: vi.fn().mockResolvedValue(null),
     bulkSetDeleted: vi.fn().mockResolvedValue(2),
     bulkRestyle: vi.fn().mockResolvedValue(2),
+    bulkSetStarred: vi.fn().mockResolvedValue(2),
     restore: vi.fn().mockResolvedValue(makeHubRow({ deletedAt: null })),
     findHubById: vi.fn().mockResolvedValue(makeHubRow()),
     purge: vi.fn().mockResolvedValue('purged'),
@@ -88,6 +89,18 @@ describe('AnnotationHubService', () => {
   });
 
   describe('list', () => {
+    it('returns starredAt on hub items as an ISO string or null', async () => {
+      const { service, annotationRepo } = makeService();
+      annotationRepo.findHubPaginated.mockResolvedValueOnce({
+        items: [makeHubRow({ starredAt: new Date('2026-02-02T02:02:02Z') }), makeHubRow({ id: 2, starredAt: null })],
+        total: 2,
+      });
+
+      const result = await service.list(10, {});
+
+      expect(result.items.map((item) => item.starredAt)).toEqual(['2026-02-02T02:02:02.000Z', null]);
+    });
+
     it('maps the date range to Date objects and the notes-only flag into repository filters', async () => {
       const { service, annotationRepo } = makeService();
 
@@ -292,6 +305,18 @@ describe('AnnotationHubService', () => {
       await service.bulk(10, { ids: [1], action: 'restyle', color: '#38BDF8', style: 'underline' });
 
       expect(annotationRepo.bulkRestyle).toHaveBeenCalledWith(10, [1], { color: '#38BDF8', style: 'underline' });
+    });
+
+    it('stars and unstars the given ids without touching deletion or style', async () => {
+      const { service, annotationRepo } = makeService();
+
+      expect(await service.bulk(10, { ids: [1, 2], action: 'star' })).toEqual({ affected: 2 });
+      await service.bulk(10, { ids: [3], action: 'unstar' });
+
+      expect(annotationRepo.bulkSetStarred).toHaveBeenNthCalledWith(1, 10, [1, 2], true);
+      expect(annotationRepo.bulkSetStarred).toHaveBeenNthCalledWith(2, 10, [3], false);
+      expect(annotationRepo.bulkSetDeleted).not.toHaveBeenCalled();
+      expect(annotationRepo.bulkRestyle).not.toHaveBeenCalled();
     });
   });
 

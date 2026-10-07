@@ -4,6 +4,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { pickAnnotationIndex } from './dashboard-widget.calculations';
 import { DashboardWidgetService } from './dashboard-widget.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { READING_ATTEMPT_CHANGED, ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -46,8 +47,9 @@ function makeService() {
     findAccessibleLibraryIds: vi.fn(),
   };
 
-  const service = new DashboardWidgetService(widgetRepo as never, libraryService as never);
-  return { service, widgetRepo, libraryService };
+  const events = new ReadingAttemptEventsService();
+  const service = new DashboardWidgetService(widgetRepo as never, libraryService as never, events);
+  return { service, widgetRepo, libraryService, events };
 }
 
 describe('DashboardWidgetService', () => {
@@ -827,5 +829,25 @@ describe('DashboardWidgetService', () => {
       expect(libraryOverview?.failed).toBe(false);
       expect(libraryOverview?.data).toBeTruthy();
     });
+  });
+});
+
+describe('DashboardWidgetService reading-attempt subscription', () => {
+  it('registers through lifecycle initialization and stops invalidating on destruction', async () => {
+    const { service, widgetRepo, libraryService, events } = makeService();
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+    widgetRepo.countCompletedBooks.mockResolvedValueOnce(0).mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+    service.onModuleInit();
+    const user = makeUser();
+    expect((await service.getReadingGoal(user)).completedBooks).toBe(0);
+    events.notifyChanged(user.id);
+    expect((await service.getReadingGoal(user)).completedBooks).toBe(1);
+    const unrelated = vi.fn();
+    events.on(READING_ATTEMPT_CHANGED, unrelated);
+    service.onModuleDestroy();
+    events.notifyChanged(user.id);
+    expect((await service.getReadingGoal(user)).completedBooks).toBe(1);
+    expect(widgetRepo.countCompletedBooks).toHaveBeenCalledTimes(2);
+    expect(unrelated).toHaveBeenCalledExactlyOnceWith({ userId: user.id });
   });
 });

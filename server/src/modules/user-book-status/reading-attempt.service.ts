@@ -9,7 +9,8 @@ import type {
   UserBookStatus,
 } from '@bookorbit/types';
 
-import { ReadingAttemptRepository } from './reading-attempt.repository';
+import { ReadingAttemptRepository, type AttemptProjection } from './reading-attempt.repository';
+import { ReadingAttemptEventsService } from './reading-attempt-events.service';
 import { READING_DATE_ERROR_CODES } from './user-book-status.constants';
 import { hasReachedProgressThreshold } from '../../common/utils/progress-threshold.utils';
 
@@ -51,7 +52,14 @@ type ManualStatusOptions = {
 
 @Injectable()
 export class ReadingAttemptService {
-  constructor(private readonly repo: ReadingAttemptRepository) {}
+  constructor(
+    private readonly repo: ReadingAttemptRepository,
+    private readonly events: ReadingAttemptEventsService,
+  ) {}
+
+  coalesceChanges<T>(operation: () => T | Promise<T>): Promise<T> {
+    return this.events.coalesceChanges(operation);
+  }
 
   async applyManualStatus(
     userId: number,
@@ -62,7 +70,8 @@ export class ReadingAttemptService {
     today: string,
     options: ManualStatusOptions = {},
   ): Promise<UserBookStatus> {
-    return this.repo.transaction(async (tx) => {
+    let changed = false;
+    const result = await this.repo.transaction<UserBookStatus>(async (tx) => {
       let active: Awaited<ReturnType<ReadingAttemptRepository['findActive']>> | null = await this.repo.findActive(tx, userId, bookId);
       let latest = active ?? (await this.repo.findLatest(tx, userId, bookId));
       const hasStartedOn = startedOn !== undefined;
@@ -75,6 +84,8 @@ export class ReadingAttemptService {
         attemptId: number,
         patch: Parameters<ReadingAttemptRepository['update']>[4],
       ): Promise<NonNullable<Awaited<ReturnType<ReadingAttemptRepository['update']>>>> => {
+        const original = active?.id === attemptId ? active : latest;
+        changed ||= Object.entries(patch).some(([key, value]) => original?.[key as keyof typeof original] !== value);
         const updated = await this.repo.update(tx, userId, bookId, attemptId, patch);
         if (!updated) throw new InternalServerErrorException('Reading attempt disappeared during update');
         return updated;
@@ -86,6 +97,7 @@ export class ReadingAttemptService {
           if (endedOn !== undefined && endedOn !== null) {
             const resolvedStartedOn = startedOn ?? null;
             this.validateDates(resolvedStartedOn, endedOn);
+            changed = true;
             latest = await this.repo.create(tx, {
               userId,
               bookId,
@@ -96,6 +108,7 @@ export class ReadingAttemptService {
             });
             projectedStatus = 'read';
           } else if (startedOn !== undefined && startedOn !== null) {
+            changed = true;
             active = await this.repo.createActive(tx, {
               userId,
               bookId,
@@ -144,6 +157,7 @@ export class ReadingAttemptService {
         }
 
         if (status === 'rereading' && !(await this.repo.hasCompleted(tx, userId, bookId))) {
+          changed = true;
           await this.repo.create(tx, {
             userId,
             bookId,
@@ -156,6 +170,7 @@ export class ReadingAttemptService {
 
         if (isActiveStatus) {
           if (!active) {
+            changed = true;
             active = await this.repo.createActive(tx, {
               userId,
               bookId,
@@ -184,6 +199,7 @@ export class ReadingAttemptService {
               const resolvedStartedOn = startedOn ?? null;
               const resolvedEndedOn = hasEndedOn ? (endedOn ?? null) : notBeforeStart(today, resolvedStartedOn);
               this.validateDates(resolvedStartedOn, resolvedEndedOn);
+              changed = true;
               latest = await this.repo.create(tx, {
                 userId,
                 bookId,
@@ -228,14 +244,17 @@ export class ReadingAttemptService {
         }
       }
 
+      const current = await this.repo.findStatus(tx, userId, bookId);
       const projectionTarget = active ?? latest;
       const projected = projectionDatesFor(projectedStatus, projectionTarget);
-      await this.repo.project(tx, userId, bookId, {
+      const projection: AttemptProjection = {
         status: projectedStatus,
         source: 'manual',
         startedAt: dateToUtcDate(projected.startedOn),
         finishedAt: dateToUtcDate(projected.endedOn),
-      });
+      };
+      changed ||= this.hasProjectionChanged(current, projection);
+      await this.repo.project(tx, userId, bookId, projection);
       return {
         status: projectedStatus,
         source: 'manual',
@@ -244,6 +263,8 @@ export class ReadingAttemptService {
         updatedAt: new Date().toISOString(),
       };
     });
+    if (changed) this.events.notifyChanged(userId);
+    return result;
   }
 
   async recordActivity(input: {
@@ -256,7 +277,8 @@ export class ReadingAttemptService {
     strongRereadEvidence: boolean;
     meaningfulActivity: boolean;
   }): Promise<UserBookStatus | null> {
-    return this.repo.transaction(async (tx) => {
+    let changed = false;
+    const result = await this.repo.transaction<UserBookStatus | null>(async (tx) => {
       let active: Awaited<ReturnType<ReadingAttemptRepository['findActive']>> | null = await this.repo.findActive(tx, input.userId, input.bookId);
       let latest = active ?? (await this.repo.findLatest(tx, input.userId, input.bookId));
       const hasCompleted = await this.repo.hasCompleted(tx, input.userId, input.bookId);
@@ -272,6 +294,7 @@ export class ReadingAttemptService {
           outcome: 'completed',
           origin: input.origin,
         });
+        changed = true;
       }
       if (!active && isFinished && hasCompleted && input.strongRereadEvidence) {
         latest = await this.repo.create(tx, {
@@ -282,6 +305,7 @@ export class ReadingAttemptService {
           outcome: 'completed',
           origin: input.origin,
         });
+        changed = true;
       }
       if (!active && !isFinished && (input.progress > 0 || input.strongRereadEvidence || input.meaningfulActivity)) {
         active = await this.repo.createActive(tx, {
@@ -290,6 +314,7 @@ export class ReadingAttemptService {
           startedOn: input.occurredOn,
           origin: input.origin,
         });
+        changed = true;
       }
 
       let projectionTarget = active ?? latest;
@@ -299,6 +324,7 @@ export class ReadingAttemptService {
           endedOn: notBeforeStart(input.occurredOn, active.startedOn),
           outcome: 'completed',
         });
+        changed = true;
         status = 'read';
       } else if (active) {
         status = hasCompleted ? 'rereading' : 'reading';
@@ -308,12 +334,15 @@ export class ReadingAttemptService {
         return null;
       }
 
-      await this.repo.project(tx, input.userId, input.bookId, {
+      const current = await this.repo.findStatus(tx, input.userId, input.bookId);
+      const projection: AttemptProjection = {
         status,
         source: 'auto',
         startedAt: dateToUtcDate(projectionTarget?.startedOn ?? null),
         finishedAt: projectionTarget?.outcome === 'completed' ? dateToUtcDate(projectionTarget.endedOn) : null,
-      });
+      };
+      changed ||= this.hasProjectionChanged(current, projection);
+      await this.repo.project(tx, input.userId, input.bookId, projection);
       return {
         status,
         source: 'auto',
@@ -322,6 +351,8 @@ export class ReadingAttemptService {
         updatedAt: new Date().toISOString(),
       };
     });
+    if (changed) this.events.notifyChanged(input.userId);
+    return result;
   }
 
   async list(userId: number, bookId: number, page = 1, pageSize = 20): Promise<ReadingAttemptListResponse> {
@@ -360,15 +391,16 @@ export class ReadingAttemptService {
     input: { provider: 'hardcover'; externalId: string; startedOn: string | null; endedOn: string | null },
   ): Promise<void> {
     this.validateDates(input.startedOn, input.endedOn);
-    await this.repo.transaction(async (tx) => {
+    const changed = await this.repo.transaction(async (tx) => {
       const existing = await this.repo.findByExternal(tx, userId, input.provider, input.externalId);
-      if (existing?.deletedAt) return;
+      if (existing?.deletedAt) return false;
       if (existing) {
-        await this.repo.update(tx, userId, bookId, existing.id, {
+        const patch = {
           ...(existing.startedOn === null && input.startedOn !== null ? { startedOn: input.startedOn } : {}),
-          ...(existing.endedOn === null && input.endedOn !== null ? { endedOn: input.endedOn, outcome: 'completed' } : {}),
-        });
-        return;
+          ...(existing.endedOn === null && input.endedOn !== null ? { endedOn: input.endedOn, outcome: 'completed' as const } : {}),
+        };
+        if (Object.keys(patch).length === 0) return false;
+        return (await this.repo.update(tx, userId, bookId, existing.id, patch)) !== null;
       }
       const active = input.endedOn === null ? await this.repo.findActive(tx, userId, bookId) : null;
       if (input.endedOn === null && !active) {
@@ -392,20 +424,26 @@ export class ReadingAttemptService {
           externalId: input.externalId,
         });
       }
+      return true;
     });
+    if (changed) this.events.notifyChanged(userId);
   }
 
   async update(userId: number, bookId: number, attemptId: number, patch: ReadingAttemptPatch): Promise<ReadingAttempt> {
-    const existing = await this.repo.findOwned(userId, bookId, attemptId);
-    if (!existing) throw new NotFoundException('Reading attempt not found');
-    const startedOn = patch.startedOn === undefined ? existing.startedOn : patch.startedOn;
-    const endedOn = patch.endedOn === undefined ? existing.endedOn : patch.endedOn;
-    const outcome = patch.outcome === undefined ? existing.outcome : patch.outcome;
-    this.validateDates(startedOn, endedOn);
-    if (endedOn && outcome === null) throw new BadRequestException('A closed attempt requires an outcome');
-    const row = await this.repo.transaction((tx) => this.repo.update(tx, userId, bookId, attemptId, patch));
-    if (!row) throw new NotFoundException('Reading attempt not found');
-    await this.rebuildProjection(userId, bookId);
+    const { row, changed } = await this.repo.transaction(async (tx) => {
+      const existing = await this.repo.findOwned(userId, bookId, attemptId, tx);
+      if (!existing) throw new NotFoundException('Reading attempt not found');
+      const startedOn = patch.startedOn === undefined ? existing.startedOn : patch.startedOn;
+      const endedOn = patch.endedOn === undefined ? existing.endedOn : patch.endedOn;
+      const outcome = patch.outcome === undefined ? existing.outcome : patch.outcome;
+      this.validateDates(startedOn, endedOn);
+      if (endedOn && outcome === null) throw new BadRequestException('A closed attempt requires an outcome');
+      const changed = Object.entries(patch).some(([key, value]) => existing[key as keyof typeof existing] !== value);
+      const row = await this.repo.update(tx, userId, bookId, attemptId, patch);
+      if (!row) throw new NotFoundException('Reading attempt not found');
+      return { row, changed };
+    });
+    await this.rebuildProjection(userId, bookId, changed);
     return this.toDto({ ...row, totalSessions: 0, totalSeconds: 0 });
   }
 
@@ -414,27 +452,43 @@ export class ReadingAttemptService {
     await this.rebuildProjection(userId, bookId);
   }
 
-  private async rebuildProjection(userId: number, bookId: number): Promise<void> {
-    await this.repo.transaction(async (tx) => {
-      const active = await this.repo.findActive(tx, userId, bookId);
-      const latest = active ?? (await this.repo.findLatest(tx, userId, bookId));
-      const current = await this.repo.findStatus(tx, userId, bookId);
-      const hasCompleted = await this.repo.hasCompleted(tx, userId, bookId);
-      const target = active ?? latest;
-      let status: ReadStatus = 'unread';
-      if (active) status = current?.status === 'on_hold' ? 'on_hold' : hasCompleted ? 'rereading' : 'reading';
-      else if (current?.status === 'want_to_read' || current?.status === 'unread') status = current.status;
-      else if (latest?.outcome === 'completed') status = 'read';
-      else if (latest?.outcome === 'skimmed') status = 'skimmed';
-      else if (latest?.outcome === 'abandoned') status = 'abandoned';
-      const projected = projectionDatesFor(status, target);
-      await this.repo.project(tx, userId, bookId, {
-        status,
-        source: 'manual',
-        startedAt: dateToUtcDate(projected.startedOn),
-        finishedAt: dateToUtcDate(projected.endedOn),
+  private async rebuildProjection(userId: number, bookId: number, changed = true): Promise<void> {
+    try {
+      await this.repo.transaction(async (tx) => {
+        const active = await this.repo.findActive(tx, userId, bookId);
+        const latest = active ?? (await this.repo.findLatest(tx, userId, bookId));
+        const current = await this.repo.findStatus(tx, userId, bookId);
+        const hasCompleted = await this.repo.hasCompleted(tx, userId, bookId);
+        const target = active ?? latest;
+        let status: ReadStatus = 'unread';
+        if (active) status = current?.status === 'on_hold' ? 'on_hold' : hasCompleted ? 'rereading' : 'reading';
+        else if (current?.status === 'want_to_read' || current?.status === 'unread') status = current.status;
+        else if (latest?.outcome === 'completed') status = 'read';
+        else if (latest?.outcome === 'skimmed') status = 'skimmed';
+        else if (latest?.outcome === 'abandoned') status = 'abandoned';
+        const projected = projectionDatesFor(status, target);
+        const projection: AttemptProjection = {
+          status,
+          source: 'manual',
+          startedAt: dateToUtcDate(projected.startedOn),
+          finishedAt: dateToUtcDate(projected.endedOn),
+        };
+        changed ||= this.hasProjectionChanged(current, projection);
+        await this.repo.project(tx, userId, bookId, projection);
       });
-    });
+    } finally {
+      // The history mutation already committed even if rebuilding its projection fails.
+      if (changed) this.events.notifyChanged(userId);
+    }
+  }
+
+  private hasProjectionChanged(current: Awaited<ReturnType<ReadingAttemptRepository['findStatus']>>, projection: AttemptProjection): boolean {
+    return (
+      current?.status !== projection.status ||
+      current?.source !== projection.source ||
+      (current?.startedAt?.toISOString() ?? null) !== (projection.startedAt?.toISOString() ?? null) ||
+      (current?.finishedAt?.toISOString() ?? null) !== (projection.finishedAt?.toISOString() ?? null)
+    );
   }
 
   private validateDates(startedOn: string | null, endedOn: string | null): void {

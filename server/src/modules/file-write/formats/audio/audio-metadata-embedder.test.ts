@@ -112,6 +112,28 @@ describe('AudioMetadataEmbedder', () => {
     expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
   });
 
+  it('converts one shared cover to JPEG once across every track of a run', async () => {
+    const embedder = new AudioMetadataEmbedder();
+    const sharedCover = Buffer.from('png-cover');
+
+    for (const track of ['01', '02', '03']) {
+      await embedder.embedMetadata(`/books/audio/${track}.mp3`, 'mp3', { coverBytes: sharedCover, metadata: [] });
+    }
+
+    expect(sharpMock).toHaveBeenCalledTimes(1);
+    expect(writeFileMock).toHaveBeenCalledTimes(3);
+    expect(writeFileMock).toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg', Buffer.from('jpeg-cover'));
+  });
+
+  it('converts a different cover buffer again rather than reusing an earlier run', async () => {
+    const embedder = new AudioMetadataEmbedder();
+
+    await embedder.embedMetadata('/books/audio/a.mp3', 'mp3', { coverBytes: Buffer.from('first'), metadata: [] });
+    await embedder.embedMetadata('/books/audio/b.mp3', 'mp3', { coverBytes: Buffer.from('second'), metadata: [] });
+
+    expect(sharpMock).toHaveBeenCalledTimes(2);
+  });
+
   it('preserves existing embedded cover streams when no replacement cover is provided', async () => {
     const embedder = new AudioMetadataEmbedder();
 
@@ -119,14 +141,37 @@ describe('AudioMetadataEmbedder', () => {
 
     expect(sharpMock).not.toHaveBeenCalled();
     expect(writeFileMock).not.toHaveBeenCalled();
-    expect(execFileMock).toHaveBeenCalledWith(
-      'ffmpeg',
-      expect.arrayContaining(['-map', '0', '-metadata', 'album=Book', '/books/audio/.bookorbit-write-fixed-id.flac']),
-      expect.any(Object),
-      expect.any(Function),
-    );
+    const args = execFileMock.mock.calls[0]![1] as string[];
+    expect(args).toEqual(expect.arrayContaining(['-metadata', 'album=Book', '/books/audio/.bookorbit-write-fixed-id.flac']));
+    // Audio, existing art, and subtitles only: a copied MP4 chapter data track fails the whole write.
+    expect(mapArgs(args)).toEqual(['0:a', '0:v?', '0:s?']);
     expect(unlinkMock).not.toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
   });
+
+  it('never maps data streams, with or without a replacement cover', () => {
+    expect(mapArgs(testing.buildFfmpegArgs('/a.m4b', null, '/t.m4b', 'm4b', []))).toEqual(['0:a', '0:v?', '0:s?']);
+    expect(mapArgs(testing.buildFfmpegArgs('/a.m4b', '/c.jpg', '/t.m4b', 'm4b', []))).toEqual(['0:a', '0:s?', '1:v:0']);
+  });
+
+  it('bounds the ffprobe stream check and treats a timed-out probe as having art', async () => {
+    vi.stubEnv('FFPROBE_PATH', '/opt/bin/ffprobe');
+    execFileMock.mockImplementation((bin: string, _args: string[], _options: unknown, callback: (error: Error | null, stdout: string) => void) => {
+      if (bin === '/opt/bin/ffprobe') callback(Object.assign(new Error('Command failed'), { killed: true, signal: 'SIGTERM' }), '');
+      else callback(null, '');
+    });
+    const embedder = new AudioMetadataEmbedder();
+
+    await embedder.embedMetadata('/books/audio/book.m4b', 'm4b', { coverBytes: null, metadata: [{ key: 'album', value: 'Book' }] });
+
+    const probeCall = execFileMock.mock.calls.find(([bin]) => bin === '/opt/bin/ffprobe')!;
+    expect(probeCall[2]).toEqual({ timeout: 30_000 });
+    const ffmpegArgs = execFileMock.mock.calls.find(([bin]) => bin !== '/opt/bin/ffprobe')![1] as string[];
+    expect(ffmpegArgs).not.toContain('use_metadata_tags');
+  });
+
+  function mapArgs(args: string[]): string[] {
+    return args.flatMap((arg, index) => (arg === '-map' ? [args[index + 1]!] : []));
+  }
 
   it('ignores temporary-file cleanup failures after a successful write', async () => {
     unlinkMock.mockRejectedValue(new Error('cleanup failed'));

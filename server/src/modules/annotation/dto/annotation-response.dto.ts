@@ -20,6 +20,7 @@ export class AnnotationResponseDto {
   createdAt!: Date;
   pdf!: AnnotationPdfPosition | null;
   updatedAt!: Date | null;
+  starredAt!: Date | null;
 
   static from(row: AnnotationWithCfi): AnnotationResponseDto {
     const dto = new AnnotationResponseDto();
@@ -41,6 +42,7 @@ export class AnnotationResponseDto {
     dto.highlightedAt = row.sourceCreatedAt ?? row.createdAt;
     dto.createdAt = row.createdAt;
     dto.updatedAt = row.updatedAt ?? null;
+    dto.starredAt = row.starredAt ?? null;
     return dto;
   }
 }

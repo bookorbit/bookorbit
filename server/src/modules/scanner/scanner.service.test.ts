@@ -125,6 +125,8 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     findBooksByFolderPath: vi.fn().mockResolvedValue([]),
     findBookFilesByBookId: vi.fn().mockResolvedValue([]),
     findBookFilesByBookIds: vi.fn().mockResolvedValue([]),
+    findBookFileFormats: vi.fn().mockResolvedValue([]),
+    remapAudioPositions: vi.fn().mockResolvedValue({ bookmarks: 0, progress: 0 }),
     findBookById: vi.fn().mockResolvedValue(null),
     findBooksByIds: vi.fn().mockResolvedValue([]),
     findBookCardData: vi.fn().mockResolvedValue({ rows: [], authorRows: [], fileRows: [], genreRows: [] }),
@@ -1801,6 +1803,142 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
     expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(expect.any(Number), ['/library/Book/01.m4b', '/library/Book/02.m4b'], {
       filesChanged: false,
+    });
+  });
+
+  describe('disc folders reordered by a rescan', () => {
+    // Stored under the old file-name order, which interleaved the discs.
+    const tracks = [
+      { id: 20, path: '/library/Book/CD 1/01.mp3', ino: 9101n, oldOrder: 0, duration: 100 },
+      { id: 21, path: '/library/Book/CD 2/01.mp3', ino: 9102n, oldOrder: 1, duration: 200 },
+      { id: 22, path: '/library/Book/CD 1/02.mp3', ino: 9103n, oldOrder: 2, duration: 300 },
+      { id: 23, path: '/library/Book/CD 2/02.mp3', ino: 9104n, oldOrder: 3, duration: 400 },
+    ];
+    const pathOrder = ['/library/Book/CD 1/01.mp3', '/library/Book/CD 1/02.mp3', '/library/Book/CD 2/01.mp3', '/library/Book/CD 2/02.mp3'];
+
+    function stat(track: (typeof tracks)[number]) {
+      return makeFileStat({
+        absolutePath: track.path,
+        relPath: track.path.slice('/library/'.length),
+        ino: track.ino,
+        format: 'mp3',
+        role: 'content',
+      });
+    }
+
+    function reorderRepo(overrides: Record<string, unknown> = {}) {
+      return makeRepo({
+        findBooksByLibraryFolder: vi
+          .fn()
+          .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Book', status: 'present' }]),
+        findBookFilesByLibraryFolder: vi.fn().mockResolvedValue(
+          tracks.map((track) =>
+            makeBookFile({
+              id: track.id,
+              bookId: 1,
+              absolutePath: track.path,
+              relPath: track.path.slice('/library/'.length),
+              ino: track.ino,
+              format: 'mp3',
+              sortOrder: track.oldOrder,
+              durationSeconds: track.duration,
+            }),
+          ),
+        ),
+        findBookFileFormats: vi.fn().mockResolvedValue(tracks.map((track) => ({ id: track.id, format: 'mp3' }))),
+        ...overrides,
+      });
+    }
+
+    async function scan(repo: ReturnType<typeof makeRepo>, files = pathOrder.map((path) => stat(tracks.find((track) => track.path === path)!))) {
+      mockFindCandidates.mockResolvedValue({
+        candidates: [makeCandidate('/library/Book', files)],
+        skippedDirs: new Set(),
+        unchangedDirs: new Set(),
+        dirMtimes: new Map(),
+      });
+      const done = awaitScan(repo);
+      const { service } = makeService(repo);
+      await service.startScan(1, 'manual');
+      await done;
+    }
+
+    it('moves bookmarks to the same moment of the same track and rebuilds chapters in disc order', async () => {
+      const repo = reorderRepo();
+      await scan(repo);
+
+      expect(repo.remapAudioPositions).toHaveBeenCalledTimes(1);
+      const [bookId, remap, percentageAt] = repo.remapAudioPositions.mock.calls[0] as [
+        number,
+        (seconds: number) => number | null,
+        (fileId: number, offset: number) => number | null,
+      ];
+      expect(bookId).toBe(1);
+      // 350 s was 50 s into CD 1/02, which followed CD 1/01 and CD 2/01; it now follows CD 1/01 only.
+      expect(remap(350)).toBe(150);
+      // 120 s was 20 s into CD 2/01, which now follows both CD 1 tracks.
+      expect(remap(120)).toBe(420);
+      expect(percentageAt(21, 20)).toBe(42);
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true });
+    });
+
+    it('leaves positions alone when the order did not change', async () => {
+      const repo = reorderRepo({
+        findBookFilesByLibraryFolder: vi.fn().mockResolvedValue(
+          pathOrder.map((path, index) => {
+            const track = tracks.find((candidate) => candidate.path === path)!;
+            return makeBookFile({
+              id: track.id,
+              bookId: 1,
+              absolutePath: path,
+              relPath: path.slice('/library/'.length),
+              ino: track.ino,
+              format: 'mp3',
+              sortOrder: index,
+            });
+          }),
+        ),
+      });
+      await scan(repo);
+
+      expect(repo.remapAudioPositions).not.toHaveBeenCalled();
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: false });
+    });
+
+    it('leaves positions alone when a track is new, because they cannot be placed', async () => {
+      const repo = reorderRepo();
+      const added = makeFileStat({
+        absolutePath: '/library/Book/CD 1/03.mp3',
+        relPath: 'Book/CD 1/03.mp3',
+        ino: 9105n,
+        format: 'mp3',
+        role: 'content',
+      });
+      await scan(repo, [
+        ...pathOrder.slice(0, 2).map((path) => stat(tracks.find((track) => track.path === path)!)),
+        added,
+        ...pathOrder.slice(2).map((path) => stat(tracks.find((track) => track.path === path)!)),
+      ]);
+
+      expect(repo.findBookFileFormats).not.toHaveBeenCalled();
+      expect(repo.remapAudioPositions).not.toHaveBeenCalled();
+    });
+
+    it('leaves positions alone when a stored track is no longer in the folder, but still rebuilds chapters', async () => {
+      const repo = reorderRepo({
+        findBookFileFormats: vi.fn().mockResolvedValue([...tracks.map((track) => ({ id: track.id, format: 'mp3' })), { id: 29, format: 'mp3' }]),
+      });
+      await scan(repo);
+
+      expect(repo.remapAudioPositions).not.toHaveBeenCalled();
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true });
+    });
+
+    it('still rebuilds chapters when remapping positions fails', async () => {
+      const repo = reorderRepo({ remapAudioPositions: vi.fn().mockRejectedValue(new Error('deadlock detected')) });
+      await scan(repo);
+
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true });
     });
   });
 

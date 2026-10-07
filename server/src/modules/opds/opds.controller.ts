@@ -70,7 +70,7 @@ export class OpdsController {
 
   @Get('collections')
   async collections(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const cols = await this.opdsBookService.getUserCollections(user.userId);
+    const cols = await this.opdsBookService.getUserCollections(user.userId, user.isSuperuser, user.contentFilters);
     const xml = this.opdsService.generateCollectionsNavigation(cols);
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }

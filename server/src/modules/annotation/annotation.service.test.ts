@@ -118,6 +118,18 @@ describe('AnnotationService', () => {
       expect(result[0].bookId).toBe(5);
     });
 
+    it('returns starredAt on the unpaginated list, null when not starred', async () => {
+      const { service, annotationRepo } = await makeService();
+      const starredAt = new Date('2026-03-04T05:06:07Z');
+      annotationRepo.findByBookId.mockResolvedValue([makeAnnotationRow({ starredAt }), makeAnnotationRow({ id: 11, starredAt: null })]);
+
+      const result = await service.getAnnotations(5, makeUser());
+
+      expect(result[0].starredAt).toEqual(starredAt);
+      expect(JSON.parse(JSON.stringify(result[0])).starredAt).toBe('2026-03-04T05:06:07.000Z');
+      expect(result[1].starredAt).toBeNull();
+    });
+
     it('verifies book access before querying', async () => {
       const { service, annotationRepo, bookService } = await makeService();
       annotationRepo.findByBookId.mockResolvedValue([]);
@@ -441,6 +453,25 @@ describe('AnnotationService', () => {
       expect(callArg).not.toHaveProperty('note');
     });
 
+    it('passes a star toggle through to the repository alongside the content patch', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.update.mockResolvedValue(makeAnnotationRow({ starredAt: new Date('2026-03-04T05:06:07Z') }));
+
+      const result = await service.updateAnnotation(5, 10, makeUser(), { starred: true });
+
+      expect(annotationRepo.update).toHaveBeenCalledWith(5, 10, 1, {}, { starred: true });
+      expect(result.starredAt).toEqual(new Date('2026-03-04T05:06:07Z'));
+    });
+
+    it('passes an unstar with a note change as one request', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.update.mockResolvedValue(makeAnnotationRow());
+
+      await service.updateAnnotation(5, 10, makeUser(), { starred: false, note: null });
+
+      expect(annotationRepo.update).toHaveBeenCalledWith(5, 10, 1, { note: null }, { starred: false });
+    });
+
     it('throws NotFoundException when annotation is not found', async () => {
       const { service, annotationRepo } = await makeService();
       annotationRepo.update.mockResolvedValue(null);
@@ -667,6 +698,20 @@ describe('AnnotationService', () => {
       expect(result.pageSize).toBe(25);
       expect(result.stats.totalHighlights).toBe(3);
       expect(result.stats.chapters).toEqual(['Chapter 1', 'Chapter 2']);
+    });
+
+    it('carries starredAt on paginated items as an ISO string or null', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.findPaginated.mockResolvedValue({
+        items: [makeAnnotationRow({ starredAt: new Date('2026-03-04T05:06:07Z') }), makeAnnotationRow({ id: 11 })],
+        total: 2,
+      });
+      annotationRepo.getStats.mockResolvedValue(makeStatsResult());
+      annotationRepo.getDistinctChapters.mockResolvedValue([]);
+
+      const result = await service.getAnnotationsPaginated(5, makeUser(), { page: 1 });
+
+      expect(result.items.map((item) => item.starredAt)).toEqual(['2026-03-04T05:06:07.000Z', null]);
     });
 
     it('verifies book access before querying', async () => {

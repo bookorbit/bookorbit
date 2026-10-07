@@ -116,7 +116,9 @@ defineExpose({ focusQuery })
 <template>
   <aside class="flex min-h-0 flex-col bg-card/50" :aria-label="t('book.detail.editMetadata.match.results.label')">
     <div class="grid gap-3 border-b border-border/60 px-3.5 pt-3.5 pb-3">
-      <MetadataMatchQuery ref="query" :defaults="searchDefaults" :busy="isStreaming" @search="handleSearch" />
+      <MetadataMatchQuery ref="query" :defaults="searchDefaults" :busy="isStreaming" @search="handleSearch">
+        <template #search-options><slot name="search-options" /></template>
+      </MetadataMatchQuery>
       <MetadataMatchSources
         v-if="providers.length"
         :providers="providers"

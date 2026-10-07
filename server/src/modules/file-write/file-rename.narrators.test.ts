@@ -52,7 +52,7 @@ describe('FileRenameService narrator-specific editions', () => {
       }),
       checkPathTakenByOtherBook: vi.fn().mockResolvedValue(false),
       applyFolderRename: vi.fn().mockResolvedValue(undefined),
-      findBookByExactFolderPath: vi.fn().mockResolvedValue(null),
+      findFolderOwners: vi.fn().mockResolvedValue(new Map()),
       applyExistingFolderMerge: vi.fn().mockResolvedValue(undefined),
     };
     const lockService = {

@@ -13,7 +13,6 @@ import {
   bookSeries,
   bookSeriesMemberships,
   books,
-  collections,
   collectionBooks,
   smartScopes,
   libraries,
@@ -25,6 +24,7 @@ import { isAudioFormat, type ContentFilterRules, type GroupRule } from '@bookorb
 import { rankFileRowsByBook, rankFilesByFormatPriority } from '../../common/utils/primary-file-selection.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
+import { OpdsCollectionRepository } from './opds-collection.repository';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -153,6 +153,7 @@ export class OpdsBookService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly queryBuilder: BookQueryBuilder,
+    private readonly collectionRepository: OpdsCollectionRepository,
   ) {}
 
   async getAccessibleLibraryIds(userId: number, isSuperuser = false): Promise<number[]> {
@@ -223,12 +224,8 @@ export class OpdsBookService {
     }
 
     if (filters?.collectionId) {
-      const [collection] = await this.db
-        .select({ userId: collections.userId })
-        .from(collections)
-        .where(eq(collections.id, filters.collectionId))
-        .limit(1);
-      if (!collection || collection.userId !== userId) {
+      const [collection] = await this.collectionRepository.findById(filters.collectionId);
+      if (!collection || collection.mediaType !== 'books' || (collection.userId !== userId && !collection.isPublic)) {
         throw new ForbiddenException('No access to this collection');
       }
     }
@@ -597,29 +594,15 @@ export class OpdsBookService {
     return { items: hasNext ? rows.slice(0, opts.limit) : rows, hasNext };
   }
 
-  async getUserCollections(userId: number) {
-    return this.db
-      .select({
-        id: collections.id,
-        name: collections.name,
-        bookCount: sql<number>`count(${collectionBooks.bookId})::int`,
-      })
-      .from(collections)
-      .leftJoin(collectionBooks, eq(collectionBooks.collectionId, collections.id))
-      .where(and(eq(collections.userId, userId), eq(collections.mediaType, 'books')))
-      .groupBy(collections.id)
-      .orderBy(collections.name);
+  async getUserCollections(userId: number, isSuperuser = false, contentFilters?: ContentFilterRules) {
+    return this.collectionRepository.findVisibleForUser(userId, isSuperuser, contentFilters);
   }
 
   // Badge counts only need the totals, so these skip the per-entity book counts
   // their list siblings compute. Counting collections through getUserCollections
   // would aggregate over collection_books just to read the row count back.
   async countUserCollections(userId: number): Promise<number> {
-    const [row] = await this.db
-      .select({ total: count() })
-      .from(collections)
-      .where(and(eq(collections.userId, userId), eq(collections.mediaType, 'books')));
-    return Number(row?.total ?? 0);
+    return this.collectionRepository.countVisibleForUser(userId);
   }
 
   async countUserSmartScopes(userId: number): Promise<number> {

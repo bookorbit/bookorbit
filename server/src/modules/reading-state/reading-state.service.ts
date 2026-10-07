@@ -5,6 +5,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
+import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 import { ReadingStateRepository } from './reading-state.repository';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class ReadingStateService {
   constructor(
     private readonly bookService: BookService,
     private readonly repo: ReadingStateRepository,
+    private readonly readingAttemptEvents: ReadingAttemptEventsService,
   ) {}
 
   async resetBookReadingState(bookId: number, user: RequestUser): Promise<ResetBookReadingStateResponse> {
@@ -25,6 +27,7 @@ export class ReadingStateService {
       await this.bookService.verifyBookAccess(bookId, user);
       const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
       const result = await this.repo.resetBookReadingState(user.id, bookId, timeZone);
+      this.readingAttemptEvents.notifyChanged(user.id);
       this.logger.log(
         `[${event}] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} sessionsDeleted=${result.sessionsDeleted} progressDeleted=${result.progressDeleted} audioProgressDeleted=${result.audioProgressDeleted} koreaderDeviceProgressDeleted=${result.koreaderDeviceProgressDeleted} koreaderPageStatsDeleted=${result.koreaderPageStatsDeleted} koboStateReset=${result.koboStateReset} - reset reading state completed`,
       );

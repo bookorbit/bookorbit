@@ -1,4 +1,4 @@
-import { normalizeIsbn } from '../../../common/text-match/isbn-normalize';
+import { isValidIsbn10, isValidIsbn13, normalizeIsbn } from '../../../common/text-match/isbn-normalize';
 
 export interface IsbnHit {
   value: string;
@@ -8,28 +8,7 @@ export interface IsbnHit {
 
 const LABEL_LOOKBACK = 25;
 
-export { normalizeIsbn };
-
-export function isValidIsbn10(n: string): boolean {
-  if (!/^[0-9]{9}[0-9X]$/.test(n)) return false;
-  let sum = 0;
-  for (let i = 0; i < 10; i++) {
-    const c = n[i];
-    const v = c === 'X' ? 10 : c.charCodeAt(0) - 48;
-    sum += (i + 1) * v;
-  }
-  return sum % 11 === 0;
-}
-
-export function isValidIsbn13(n: string): boolean {
-  if (!/^97[89][0-9]{10}$/.test(n)) return false;
-  let sum = 0;
-  for (let i = 0; i < 13; i++) {
-    const v = n.charCodeAt(i) - 48;
-    sum += i % 2 === 0 ? v : v * 3;
-  }
-  return sum % 10 === 0;
-}
+export { isValidIsbn10, isValidIsbn13, normalizeIsbn };
 
 /**
  * Find checksum-valid ISBN-10/13 strings inside free text. Each hit records whether

@@ -24,6 +24,7 @@ describe('BookmarkController', () => {
   const service = {
     getBookmarks: vi.fn(),
     createBookmark: vi.fn(),
+    updateBookmark: vi.fn(),
     deleteBookmark: vi.fn(),
   };
 
@@ -48,6 +49,14 @@ describe('BookmarkController', () => {
     await controller.createBookmark(5, dto, user);
 
     expect(service.createBookmark).toHaveBeenCalledWith(5, user, dto);
+  });
+
+  it('delegates updateBookmark with book, bookmark, payload and user', async () => {
+    service.updateBookmark.mockResolvedValue({ id: 15 });
+
+    await controller.updateBookmark(5, 15, { title: 'Renamed', note: null }, user);
+
+    expect(service.updateBookmark).toHaveBeenCalledWith(5, 15, user, { title: 'Renamed', note: null });
   });
 
   it('delegates deleteBookmark with book, bookmark, and user', async () => {

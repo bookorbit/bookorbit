@@ -1,3 +1,4 @@
+import { deleteLibraryFoldersWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, getTableColumns, gt, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -283,11 +284,11 @@ export class LibraryRepository {
   }
 
   deleteFolder(id: number) {
-    return this.db.delete(libraryFolders).where(eq(libraryFolders.id, id));
+    return deleteLibraryFoldersWithHashInvalidation(this.db, eq(libraryFolders.id, id));
   }
 
   deleteFoldersByLibrary(libraryId: number) {
-    return this.db.delete(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
+    return deleteLibraryFoldersWithHashInvalidation(this.db, eq(libraryFolders.libraryId, libraryId));
   }
 
   async updateDisplayOrders(order: { id: number; displayOrder: number }[]) {

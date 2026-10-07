@@ -156,6 +156,54 @@ export const userBookNotes = pgTable(
 export type UserBookNoteRow = typeof userBookNotes.$inferSelect;
 export type NewUserBookNote = typeof userBookNotes.$inferInsert;
 
+export const bookJournalEntries = pgTable(
+  'book_journal_entries',
+  {
+    id: serial('id').primaryKey(),
+    // Client-generated, so an entry written offline can be retried without duplicating it.
+    clientId: uuid('client_id').notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    quote: text('quote'),
+    chapterTitle: varchar('chapter_title', { length: 500 }),
+    positionPercent: real('position_percent'),
+    cfi: varchar('cfi', { length: 2000 }),
+    positionSeconds: real('position_seconds'),
+    // Client-supplied for an entry captured offline, so it gets the decoder that reads any year.
+    createdAt: timestamptz('created_at')
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+    // Trash. Restorable until permanently deleted.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('book_journal_entries_user_client_id_uidx').on(t.userId, t.clientId),
+    index('book_journal_entries_user_book_created_active_idx')
+      .on(t.userId, t.bookId, t.createdAt)
+      .where(sql`${t.deletedAt} is null`),
+    index('book_journal_entries_book_id_idx').on(t.bookId),
+    check('book_journal_entries_body_length_chk', sql`char_length(${t.body}) between 1 and 10000`),
+    check('book_journal_entries_quote_length_chk', sql`${t.quote} is null or char_length(${t.quote}) <= 5000`),
+    check(
+      'book_journal_entries_position_percent_range_chk',
+      sql`${t.positionPercent} is null or (${t.positionPercent} >= 0 and ${t.positionPercent} <= 100)`,
+    ),
+    check('book_journal_entries_position_seconds_nonnegative_chk', sql`${t.positionSeconds} is null or ${t.positionSeconds} >= 0`),
+  ],
+);
+
+export type BookJournalEntryRow = typeof bookJournalEntries.$inferSelect;
+export type NewBookJournalEntry = typeof bookJournalEntries.$inferInsert;
+
 export const readingProgress = pgTable(
   'reading_progress',
   {
@@ -480,6 +528,9 @@ export const annotations = pgTable(
     deviceCreatedAt: varchar('device_created_at', { length: 19 }),
     deviceUpdatedAt: varchar('device_updated_at', { length: 19 }),
     sourceCreatedAt: timestamp('source_created_at', { withTimezone: true }),
+    // Server-only reader metadata. Deliberately outside `version`, which drives device push-down:
+    // no device carries a star, so starring must not re-send the highlight to every device.
+    starredAt: timestamp('starred_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()

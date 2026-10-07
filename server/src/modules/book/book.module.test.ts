@@ -9,6 +9,7 @@ vi.mock('../metadata-fetch/metadata-fetch.module', () => ({ MetadataFetchModule:
 vi.mock('../user-book-note/user-book-note.module', () => ({ UserBookNoteModule: class UserBookNoteModule {} }));
 
 import { MODULE_METADATA } from '@nestjs/common/constants';
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 
 import { LibraryModule } from '../library/library.module';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -24,6 +25,10 @@ import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sy
 import { AudiolessEpubService } from './audioless-epub.service';
 
 describe('BookModule', () => {
+  it('imports the shared registry used by the file watcher', () => {
+    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, BookModule)).toContain(SelfWriteRegistryModule);
+  });
+
   it('registers expected controller/providers/exports', () => {
     expect(Reflect.getMetadata('controllers', BookModule)).toEqual([BookController, ReadingAttemptController]);
     expect(Reflect.getMetadata('providers', BookModule)).toEqual([

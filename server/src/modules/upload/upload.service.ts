@@ -6,6 +6,7 @@ import { Readable } from 'stream';
 import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { splitMetadataIsbn } from '../../common/text-match/isbn-normalize';
 import { buildPatternTokens, patternReferencesToken } from '../../common/utils/pattern-tokens.utils';
 import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
 
@@ -28,6 +29,7 @@ import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
 import { computeFileHash } from '../scanner/lib/hash';
 import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
+import { resolveSingleFileBookPath } from '../../common/utils/book-path.utils';
 import { inspectEpubMediaOverlayFields, mediaOverlayCapabilityFromFields } from '../reader/epub/epub-media-overlay-capability';
 import { PathPolicyService } from '../path/path-policy.service';
 import { FORMATS_WITH_UNBOUNDED_METADATA_READS, MAX_BUFFERED_METADATA_BYTES } from '../../common/constants/upload.constants';
@@ -250,7 +252,7 @@ export class UploadService {
 
       shouldCleanupDestination = true;
       await this.storage.moveToPath(tempPath, destination);
-      // File is on disk. Do not delete it on any subsequent failure — the scanner
+      // File is on disk. Do not delete it on any subsequent failure; the scanner
       // will reconcile any orphan. This also prevents the catch block from deleting
       // a file that a concurrent upload may have written to the same path.
       shouldCleanupDestination = false;
@@ -425,7 +427,7 @@ export class UploadService {
 
       if (resolved) {
         const absolutePath = join(libraryFolderPath, resolved);
-        return { absolutePath, bookFolderPath: isBookPerFile ? absolutePath : dirname(absolutePath) };
+        return { absolutePath, bookFolderPath: resolveSingleFileBookPath(absolutePath, libraryFolderPath, library.organizationMode) };
       }
     }
 
@@ -462,6 +464,7 @@ export class UploadService {
         seriesName?: string | null;
         seriesIndex?: string | null;
         isbn13?: string | null;
+        isbn10?: string | null;
         authors: { name: string }[];
         narrators?: string[];
       } | null = null;
@@ -483,7 +486,7 @@ export class UploadService {
             publisher: mobi.publisher,
             publishedYear: year,
             language: mobi.language,
-            isbn13: mobi.isbn,
+            ...splitMetadataIsbn(mobi.isbn),
             seriesName: null,
             seriesIndex: null,
             authors: mobi.authors.map((name) => ({ name })),

@@ -40,6 +40,7 @@ function makeBook(overrides: Partial<MoveBookData> = {}): MoveBookData {
       subtitle: null,
       publisher: null,
       language: null,
+      isbn10: null,
       isbn13: null,
       publishedYear: null,
       seriesName: null,

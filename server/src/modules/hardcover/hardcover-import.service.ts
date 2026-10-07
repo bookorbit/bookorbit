@@ -173,67 +173,71 @@ export class HardcoverImportService {
       let progressApplied = 0;
       let failed = 0;
 
-      for (const row of preview.rows) {
-        if (!canApplyRow(row, selectedIds) || row.localBookId == null || row.importedStatus == null) continue;
+      const applyRows = async () => {
+        for (const row of preview.rows) {
+          if (!canApplyRow(row, selectedIds) || row.localBookId == null || row.importedStatus == null) continue;
 
-        try {
-          if (this.readingAttempts) {
-            for (const read of [...(row.hardcoverReads ?? [])].sort((left, right) => left.id - right.id)) {
-              await this.readingAttempts.importExternalRead(user.id, row.localBookId, {
-                provider: 'hardcover',
-                externalId: String(read.id),
-                startedOn: read.startedAt?.slice(0, 10) ?? null,
-                endedOn: read.finishedAt?.slice(0, 10) ?? null,
-              });
+          try {
+            if (this.readingAttempts) {
+              for (const read of [...(row.hardcoverReads ?? [])].sort((left, right) => left.id - right.id)) {
+                await this.readingAttempts.importExternalRead(user.id, row.localBookId, {
+                  provider: 'hardcover',
+                  externalId: String(read.id),
+                  startedOn: read.startedAt?.slice(0, 10) ?? null,
+                  endedOn: read.finishedAt?.slice(0, 10) ?? null,
+                });
+              }
             }
+            // want_to_read cannot carry lifecycle dates, and an unfinished status cannot carry a finish
+            // date. The imported reads above already hold the real dates either way.
+            const clearsLifecycle = row.importedStatus === 'want_to_read';
+            const isActiveStatus = row.importedStatus === 'reading' || row.importedStatus === 'on_hold';
+            await this.userBookStatusService.updateManual(user.id, row.localBookId, {
+              status: row.importedStatus,
+              ...(clearsLifecycle
+                ? {}
+                : {
+                    startedAt: toDate(row.importedStartedAt),
+                    finishedAt: isActiveStatus ? null : toDate(row.importedFinishedAt),
+                  }),
+            });
+
+            const progressImported = await this.applyProgressIfRequested(user.id, row, importProgress, startedAt);
+
+            await this.repo.upsertBookState({
+              userId: user.id,
+              bookId: row.localBookId,
+              hardcoverBookId: row.hardcoverBookId,
+              hardcoverEditionId: row.hardcoverEditionId,
+              hardcoverUserBookId: row.hardcoverUserBookId,
+              hardcoverReadId: row.hardcoverReadId,
+              matchMethod: row.matchMethod,
+              matchError: null,
+              syncError: null,
+              lastSyncedAt: new Date(),
+              lastSyncedStatus: row.importedStatus,
+              lastSyncedProgress: progressImported ? row.importedProgressPercent : null,
+              lastSyncedStartedAt: row.importedStartedAt,
+              lastSyncedFinishedAt: row.importedFinishedAt,
+            });
+
+            if (progressImported) {
+              progressApplied++;
+            }
+
+            applied++;
+          } catch (err) {
+            failed++;
+            const errorClass = err instanceof Error ? err.constructor.name : 'Error';
+            const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+            this.logger.warn(
+              `[hardcover.import_status] [fail] userId=${user.id} bookId=${row.localBookId} hardcoverBookId=${row.hardcoverBookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - import row failed`,
+            );
           }
-          // want_to_read cannot carry lifecycle dates, and an unfinished status cannot carry a finish
-          // date. The imported reads above already hold the real dates either way.
-          const clearsLifecycle = row.importedStatus === 'want_to_read';
-          const isActiveStatus = row.importedStatus === 'reading' || row.importedStatus === 'on_hold';
-          await this.userBookStatusService.updateManual(user.id, row.localBookId, {
-            status: row.importedStatus,
-            ...(clearsLifecycle
-              ? {}
-              : {
-                  startedAt: toDate(row.importedStartedAt),
-                  finishedAt: isActiveStatus ? null : toDate(row.importedFinishedAt),
-                }),
-          });
-
-          const progressImported = await this.applyProgressIfRequested(user.id, row, importProgress, startedAt);
-
-          await this.repo.upsertBookState({
-            userId: user.id,
-            bookId: row.localBookId,
-            hardcoverBookId: row.hardcoverBookId,
-            hardcoverEditionId: row.hardcoverEditionId,
-            hardcoverUserBookId: row.hardcoverUserBookId,
-            hardcoverReadId: row.hardcoverReadId,
-            matchMethod: row.matchMethod,
-            matchError: null,
-            syncError: null,
-            lastSyncedAt: new Date(),
-            lastSyncedStatus: row.importedStatus,
-            lastSyncedProgress: progressImported ? row.importedProgressPercent : null,
-            lastSyncedStartedAt: row.importedStartedAt,
-            lastSyncedFinishedAt: row.importedFinishedAt,
-          });
-
-          if (progressImported) {
-            progressApplied++;
-          }
-
-          applied++;
-        } catch (err) {
-          failed++;
-          const errorClass = err instanceof Error ? err.constructor.name : 'Error';
-          const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-          this.logger.warn(
-            `[hardcover.import_status] [fail] userId=${user.id} bookId=${row.localBookId} hardcoverBookId=${row.hardcoverBookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - import row failed`,
-          );
         }
-      }
+      };
+      if (this.readingAttempts) await this.readingAttempts.coalesceChanges(applyRows);
+      else await applyRows();
 
       const result: HardcoverImportApplyResult = {
         ...preview.summary,

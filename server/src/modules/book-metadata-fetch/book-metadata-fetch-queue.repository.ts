@@ -382,6 +382,8 @@ export class BookMetadataFetchQueueRepository {
         return sql`(${bookMetadata.language} IS NULL OR ${bookMetadata.language} = '')`;
       case 'pageCount':
         return sql`${bookMetadata.pageCount} IS NULL`;
+      case 'isbn':
+        return sql`(COALESCE(TRIM(${bookMetadata.isbn10}), '') = '' AND COALESCE(TRIM(${bookMetadata.isbn13}), '') = '')`;
       case 'communityRating':
         return sql`NOT EXISTS (SELECT 1 FROM ${bookCommunityRatings} WHERE ${bookCommunityRatings.bookId} = ${bookMetadata.bookId})`;
       case 'seriesName':

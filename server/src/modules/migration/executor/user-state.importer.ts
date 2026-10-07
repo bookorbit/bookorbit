@@ -1,3 +1,4 @@
+import { ReadingAttemptEventsService } from '../../user-book-status/reading-attempt-events.service';
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -124,6 +125,7 @@ export class UserStateImporter {
   constructor(
     private readonly repo: MigrationRepository,
     private readonly importRepo: MigrationImportRepository,
+    private readonly readingAttemptEvents: ReadingAttemptEventsService,
   ) {}
 
   async import(runId: number, planned: PlannerResult, ensureRunning: RunStateCheck): Promise<void> {
@@ -209,6 +211,7 @@ export class UserStateImporter {
     await this.importRepo.withTransaction(async (importRepo) => {
       await importRepo.batchMergeUserBookStatuses(dedupedBatch);
     });
+    for (const userId of new Set(dedupedBatch.map((item) => item.userId))) this.readingAttemptEvents.notifyChanged(userId);
     await this.repo.setRunMetric(runId, 'user_state', 'user_book_status', counters);
   }
 

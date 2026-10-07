@@ -138,6 +138,8 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
         publisher: expected.goodreads.publisher,
         language: expected.goodreads.language,
         pageCount: expected.goodreads.pageCount,
+        isbn10: expected.goodreads.isbn10,
+        isbn13: expected.goodreads.isbn13,
         goodreadsId: expected.goodreads.providerId,
         openLibraryId: expected.openLibrary.providerId,
         coverUrl: expected.goodreads.coverUrl,
@@ -191,7 +193,7 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
     });
     expect(seed.statusCode).toBe(200);
 
-    const lock = await patchLocks(scanned.bookId, ['subtitle', 'narrators', 'comicIssueNumber', 'cover', 'openLibraryId']);
+    const lock = await patchLocks(scanned.bookId, ['subtitle', 'narrators', 'comicIssueNumber', 'cover', 'openLibraryId', 'isbn13']);
     expect(lock.statusCode).toBe(200);
 
     const refresh = await ctx.app.inject({
@@ -209,6 +211,8 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
       publisher: expected.goodreads.publisher,
       language: expected.goodreads.language,
       pageCount: expected.goodreads.pageCount,
+      isbn10: expected.goodreads.isbn10,
+      isbn13: null,
       goodreadsId: expected.goodreads.providerId,
       openLibraryId: null,
       durationSeconds: expected.goodreads.durationSeconds,

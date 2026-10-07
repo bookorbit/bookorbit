@@ -1,5 +1,6 @@
 import { execFile as execFileCallback } from 'child_process';
-import { copyFile, chmod, mkdtemp, readFile, rm } from 'fs/promises';
+import { createHash } from 'crypto';
+import { copyFile, chmod, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -226,6 +227,79 @@ describe('audio metadata round-trip', () => {
     expect(extractedAfterClear.seriesName).toBeNull();
     expect(extractedAfterClear.seriesIndex).toBeNull();
   });
+
+  it.each([
+    ['m4b', M4bAudioFormatWriter],
+    ['m4a', M4aAudioFormatWriter],
+  ] as const)('writes tags into a %s with chapters without a cover, keeping chapters and existing art', async (format, Writer) => {
+    const filePath = join(tempDir, `chapters.${format}`);
+    const coverPath = join(tempDir, 'cover.jpg');
+    await generateCoverFixture(coverPath);
+    await generateChapteredAudioFixture(filePath, coverPath);
+    const artBefore = await extractArt(filePath);
+
+    const writer = new Writer(new AudioMetadataEmbedder());
+    await expect(
+      writer.write(filePath, { title: 'Chaptered Title', coverBytes: null }, { dryRun: false, fieldMask: createBookWriteFieldMask() }),
+    ).resolves.toEqual(expect.objectContaining({ status: 'success' }));
+
+    expect((await probeFormatTags(filePath)).title).toBe('Chaptered Title');
+    expect(await probeChapterTitles(filePath)).toEqual(['One', 'Two']);
+    expect(await extractArt(filePath)).toEqual(artBefore);
+  });
+
+  async function generateChapteredAudioFixture(filePath: string, coverPath: string): Promise<void> {
+    const chaptersPath = join(tempDir, 'chapters.txt');
+    await writeFile(
+      chaptersPath,
+      ';FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\ntitle=One\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=500\nEND=1000\ntitle=Two\n',
+    );
+    await execFile(ffmpegPath, [
+      '-v',
+      'error',
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=1000:duration=1',
+      '-i',
+      coverPath,
+      '-i',
+      chaptersPath,
+      '-map',
+      '0:a',
+      '-map',
+      '1:v',
+      '-map_metadata',
+      '2',
+      '-map_chapters',
+      '2',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '64k',
+      '-c:v',
+      'mjpeg',
+      '-disposition:v:0',
+      'attached_pic',
+      '-f',
+      'mp4',
+      filePath,
+    ]);
+  }
+
+  async function probeChapterTitles(filePath: string): Promise<string[]> {
+    const { stdout } = await execFile(ffprobePath, ['-v', 'quiet', '-print_format', 'json', '-show_chapters', filePath]);
+    const parsed = JSON.parse(stdout) as { chapters?: Array<{ tags?: { title?: string } }> };
+    return (parsed.chapters ?? []).map((chapter) => chapter.tags?.title ?? '');
+  }
+
+  async function extractArt(filePath: string): Promise<string> {
+    const { stdout } = await execFile(ffmpegPath, ['-v', 'error', '-i', filePath, '-map', '0:v:0', '-c', 'copy', '-f', 'image2pipe', '-'], {
+      encoding: 'buffer',
+    });
+    return createHash('sha256').update(stdout).digest('hex');
+  }
 
   async function generateAudioFixture(filePath: string, codec = 'libmp3lame'): Promise<void> {
     const args = ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:duration=0.2', '-c:a', codec];

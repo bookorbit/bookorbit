@@ -3,8 +3,7 @@ import { formatSeriesIndex } from './series-index-format.utils';
 /**
  * The metadata a naming pattern can draw on. Every consumer reads these same field names
  * off its own row shape, so callers pass the row through rather than mapping it field by
- * field. `isbn13` is the only token whose source differs between callers: the KOReader
- * catalogue falls back to ISBN-10, and resolves that before calling.
+ * field. The ISBN token prefers ISBN-13 and falls back to ISBN-10.
  */
 export interface PatternTokenMetadata {
   title?: string | null;
@@ -12,6 +11,7 @@ export interface PatternTokenMetadata {
   publisher?: string | null;
   language?: string | null;
   isbn13?: string | null;
+  isbn10?: string | null;
   publishedYear?: number | null;
   seriesName?: string | null;
   seriesIndex?: string | null;
@@ -52,7 +52,8 @@ export function buildPatternTokens(input: PatternTokenInput): Record<string, str
   if (metadata.subtitle) tokens['subtitle'] = metadata.subtitle;
   if (metadata.publisher) tokens['publisher'] = metadata.publisher;
   if (metadata.language) tokens['language'] = metadata.language;
-  if (metadata.isbn13) tokens['isbn'] = metadata.isbn13;
+  const isbn = metadata.isbn13?.trim() || metadata.isbn10?.trim();
+  if (isbn) tokens['isbn'] = isbn;
   if (metadata.publishedYear) tokens['year'] = String(metadata.publishedYear);
   if (metadata.seriesName) tokens['series'] = metadata.seriesName;
 

@@ -1,22 +1,20 @@
-import { createReadStream } from 'fs';
-import { mkdtemp, rm, stat } from 'fs/promises';
+import type { ReadStream } from 'fs';
+import { mkdtemp, open, rm, stat } from 'fs/promises';
+import type { FileHandle } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { computeFileHashFromHandle } from '../../../common/utils/file-hash.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
-import { DB } from '../../../db/db.module';
-import * as schema from '../../../db/schema';
 import { AudiolessEpubService } from '../../book/audioless-epub.service';
+import { KoboDownloadHashRegistrationService } from './kobo-download-hash-registration.service';
+import { KoboDownloadRepository } from '../kobo-download.repository';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KepubConversionService } from './kepub-conversion.service';
 import { KoboSettingsService } from './kobo-settings.service';
-
-type Db = NodePgDatabase<typeof schema>;
 
 /** A narration-free rebuild, living in a temp directory for the length of one download. */
 interface AudiolessCopy {
@@ -36,7 +34,8 @@ export class KoboDownloadService {
   private readonly logger = new Logger(KoboDownloadService.name);
 
   constructor(
-    @Inject(DB) private readonly db: Db,
+    private readonly repository: KoboDownloadRepository,
+    private readonly hashRegistration: KoboDownloadHashRegistrationService,
     private readonly kepubConversionService: KepubConversionService,
     private readonly settingsService: KoboSettingsService,
     private readonly bookAccessService: KoboBookAccessService,
@@ -44,14 +43,12 @@ export class KoboDownloadService {
   ) {}
 
   async streamBook(userId: number, bookId: number, reply: FastifyReply) {
-    const book = await this.db.query.books.findFirst({ where: eq(schema.books.id, bookId) });
+    const book = await this.repository.findBook(bookId);
     if (!book) throw new NotFoundException('Book not found');
 
     await this.bookAccessService.assertBookAccessible(userId, bookId);
 
-    const file = await this.db.query.bookFiles.findFirst({
-      where: and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.id, book.primaryFileId ?? -1)),
-    });
+    const file = await this.repository.findPrimaryFile(bookId, book.primaryFileId ?? -1);
 
     if (!file) throw new NotFoundException('No file found for this book');
 
@@ -120,18 +117,45 @@ export class KoboDownloadService {
   }
 
   private async streamFile(absolutePath: string, fileId: number, format: string, reply: FastifyReply, cleanup?: () => Promise<void>) {
+    const startedAt = Date.now();
+    let handle: FileHandle | undefined;
+    let stream: ReadStream | undefined;
+    let cleanupStarted = false;
+    const release = async () => {
+      if (cleanupStarted) return;
+      cleanupStarted = true;
+      await cleanup?.().catch(() => undefined);
+    };
     try {
-      const { size } = await stat(absolutePath);
+      handle = await open(absolutePath, 'r');
+      const [{ size }, hash] = await Promise.all([handle.stat(), computeFileHashFromHandle(handle)]);
+      // Persist the identity of the bytes being sent, including cache hits and fallback EPUBs.
+      // File history preserves ambiguity and never replaces a user's explicit hash link.
+      await this.hashRegistration.record(fileId, hash).catch((error: unknown) => {
+        this.logger.warn(
+          `[kobo.download_hash_registration] [fail] fileId=${fileId} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'UnknownError'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - identity registration failed`,
+        );
+      });
       reply.header('Content-Length', size);
       reply.header('Content-Disposition', `attachment; filename="book-${fileId}.${format}"`);
       reply.type(MIME[format] ?? 'application/octet-stream');
-      const stream = createReadStream(absolutePath);
+      // Hash and stream the same open file even if its cache path is replaced concurrently.
+      stream = handle.createReadStream({ start: 0 });
       // A temp rebuild is only safe to delete once the response has finished reading it.
-      if (cleanup) stream.once('close', () => void cleanup().catch(() => undefined));
+      if (cleanup) stream.once('close', () => void release());
       reply.send(stream);
-    } catch {
-      await cleanup?.().catch(() => undefined);
-      throw new NotFoundException('File not found on disk');
+    } catch (err) {
+      stream?.destroy();
+      await handle?.close().catch(() => undefined);
+      await release();
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT' || (err as NodeJS.ErrnoException).code === 'ENOTDIR') {
+        throw new NotFoundException('File not found on disk');
+      }
+      if (err instanceof HttpException) throw err;
+      this.logger.warn(
+        `[kobo.download] [fail] fileId=${fileId} durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - download preparation failed`,
+      );
+      throw new InternalServerErrorException('Unable to prepare book download');
     }
   }
 

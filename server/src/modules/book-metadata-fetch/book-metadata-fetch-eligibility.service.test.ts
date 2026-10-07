@@ -12,6 +12,8 @@ const baseBook = (): BookEligibilityData => ({
   publishedYear: 2020,
   language: 'en',
   pageCount: 320,
+  isbn10: null,
+  isbn13: null,
   communityRating: [{ provider: 'hardcover', rating: 4.25 }],
   seriesName: 'Series',
   seriesIndex: '1',
@@ -36,6 +38,16 @@ const baseConfig = (): BookMetadataFetchConfig => ({
 });
 
 describe('BookMetadataFetchEligibilityService', () => {
+  it('treats either ISBN as satisfying the ISBN condition', () => {
+    const service = new BookMetadataFetchEligibilityService();
+    const config = baseConfig();
+    config.conditions.missingFields = { enabled: true, fields: ['isbn'] };
+    expect(service.isEligible(baseBook(), config)).toBe(true);
+    expect(service.isEligible({ ...baseBook(), isbn10: '0306406152' }, config)).toBe(false);
+    expect(service.isEligible({ ...baseBook(), isbn13: '9780306406157' }, config)).toBe(false);
+    expect(service.isEligible({ ...baseBook(), isbn10: '  ', isbn13: '' }, config)).toBe(true);
+  });
+
   let service: BookMetadataFetchEligibilityService;
 
   beforeEach(() => {

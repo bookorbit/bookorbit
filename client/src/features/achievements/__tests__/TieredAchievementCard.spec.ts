@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import type { AchievementItem } from '@bookorbit/types'
 import { describe, expect, it, vi } from 'vitest'
+import { i18n } from '@/i18n'
 import TieredAchievementCard from '../components/TieredAchievementCard.vue'
 import type { TieredGroup } from '../types'
 
@@ -189,9 +190,11 @@ describe('TieredAchievementCard', () => {
   })
 
   it('expanded panel shows tier dates for earned tiers', async () => {
+    // Dates follow the app locale, not the machine's, so pin both sides to it.
+    i18n.global.locale.value = 'en'
     const wrapper = mount(TieredAchievementCard, { props: { group: makeGroup() } })
     await wrapper.trigger('click')
-    const expectedDate = new Date('2026-05-15T00:00:00Z').toLocaleDateString(undefined, {
+    const expectedDate = new Date('2026-05-15T00:00:00Z').toLocaleDateString('en', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

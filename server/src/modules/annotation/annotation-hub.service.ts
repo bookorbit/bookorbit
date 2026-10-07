@@ -147,6 +147,8 @@ export class AnnotationHubService {
       affected = await this.annotationRepo.bulkSetDeleted(userId, dto.ids, true);
     } else if (dto.action === 'restore') {
       affected = await this.annotationRepo.bulkSetDeleted(userId, dto.ids, false);
+    } else if (dto.action === 'star' || dto.action === 'unstar') {
+      affected = await this.annotationRepo.bulkSetStarred(userId, dto.ids, dto.action === 'star');
     } else {
       affected = await this.annotationRepo.bulkRestyle(userId, dto.ids, { color: dto.color, style: dto.style });
     }
@@ -275,6 +277,7 @@ export class AnnotationHubService {
       jumpFileId: row.jumpFileId,
       jumpFileFormat: row.jumpFileFormat,
       pageno: row.pageno,
+      starredAt: row.starredAt ? row.starredAt.toISOString() : null,
     };
   }
 

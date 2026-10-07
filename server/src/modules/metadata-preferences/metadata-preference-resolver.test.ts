@@ -13,6 +13,7 @@ describe('MetadataPreferenceResolver', () => {
     const defaults = resolver.getDefaultPreferences();
 
     expect(Object.keys(defaults.fields)).toHaveLength(ALL_METADATA_FIELDS.length);
+    expect(defaults.fields.isbn).toMatchObject({ enabled: true, mergeStrategy: 'fillMissing' });
 
     const fieldsWithItunes: (keyof typeof defaults.fields)[] = ['title', 'subtitle', 'description', 'authors'];
     for (const field of fieldsWithItunes) {

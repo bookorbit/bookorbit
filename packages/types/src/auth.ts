@@ -33,6 +33,7 @@ export const ProvisioningMethod = {
 export type ProvisioningMethod = (typeof ProvisioningMethod)[keyof typeof ProvisioningMethod];
 
 export interface UserSettings {
+  metadataReminderPreferences?: import("./metadata-reminders").MetadataReminderPreferences;
   showBookRequests?: boolean;
   syncReaderPreferences?: boolean;
   syncThemePreferences?: boolean;

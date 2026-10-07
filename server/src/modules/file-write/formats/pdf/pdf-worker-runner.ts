@@ -4,11 +4,19 @@ import { Worker } from 'worker_threads';
 
 import type { WriteResult } from '@bookorbit/types';
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
+import { pdfTempPathFor, removePdfTempFile } from './pdf-write-core';
 
-export interface PdfWriteWorkerData {
+export const PDF_WORKER_TIMEOUT_MS = 5 * 60_000;
+
+export interface PdfWriteRequest {
   filePath: string;
   payload: BookWritePayload;
   fieldMask: BookWritePayloadKey[];
+}
+
+export interface PdfWriteWorkerData extends PdfWriteRequest {
+  /** Owned by the runner so it can remove a partial file from a worker it had to terminate. */
+  tempPath: string;
 }
 
 export type PdfWriteWorkerMessage =
@@ -18,6 +26,7 @@ interface PdfWorkerProcess {
   once(event: 'message', listener: (message: unknown) => void): this;
   once(event: 'error', listener: (error: Error) => void): this;
   once(event: 'exit', listener: (code: number) => void): this;
+  terminate(): Promise<number>;
 }
 
 export type PdfWorkerFactory = (data: PdfWriteWorkerData) => PdfWorkerProcess;
@@ -30,40 +39,63 @@ export function createPdfWriteWorker(data: PdfWriteWorkerData): PdfWorkerProcess
   });
 }
 
-export function writePdfMetadataInWorker(data: PdfWriteWorkerData, createWorker: PdfWorkerFactory = createPdfWriteWorker): Promise<WriteResult> {
+export function writePdfMetadataInWorker(
+  request: PdfWriteRequest,
+  createWorker: PdfWorkerFactory = createPdfWriteWorker,
+  timeoutMs: number = PDF_WORKER_TIMEOUT_MS,
+): Promise<WriteResult> {
+  const tempPath = pdfTempPathFor(request.filePath);
+
   return new Promise((resolve, reject) => {
-    const worker = createWorker(data);
+    const worker = createWorker({ ...request, tempPath });
     let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      void worker
+        .terminate()
+        .catch(() => undefined)
+        .then(() => removePdfTempFile(tempPath))
+        .then(() => reject(timeoutError(timeoutMs)));
+    }, timeoutMs);
+    timer.unref?.();
 
     const settle = (callback: () => void): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       callback();
     };
 
-    worker.once('message', (message) => {
+    const fail = (error: Error): void => {
       settle(() => {
-        if (isWorkerResultMessage(message)) {
-          resolve(message.result);
-          return;
-        }
-        if (isWorkerErrorMessage(message)) {
-          reject(toWorkerError(message));
-          return;
-        }
-        reject(new Error('PDF write worker returned an invalid response'));
+        void removePdfTempFile(tempPath).then(() => reject(error));
       });
+    };
+
+    worker.once('message', (message) => {
+      if (isWorkerResultMessage(message)) {
+        settle(() => resolve(message.result));
+        return;
+      }
+      fail(isWorkerErrorMessage(message) ? toWorkerError(message) : new Error('PDF write worker returned an invalid response'));
     });
 
     worker.once('error', (error) => {
-      settle(() => reject(error));
+      fail(error);
     });
 
     worker.once('exit', (code) => {
-      if (code === 0) return;
-      settle(() => reject(new Error(`PDF write worker exited with code ${code}`)));
+      fail(new Error(code === 0 ? 'PDF write worker exited without a result' : `PDF write worker exited with code ${code}`));
     });
   });
+}
+
+function timeoutError(timeoutMs: number): Error {
+  const error = new Error(`PDF write timed out after ${Math.round(timeoutMs / 1000)}s`);
+  error.name = 'TimeoutError';
+  return error;
 }
 
 function resolvePdfWorkerPath(): string {

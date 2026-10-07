@@ -9,7 +9,7 @@ const noWrites: FileWriteFlags = {
   fileWriteCbxEnabled: false,
   fileWriteKindleEnabled: false,
   fileWriteAudioEnabled: false,
-  fileWriteWriteCover: false,
+  fileWriteReadAlongEnabled: false,
 }
 
 describe('describeSchedule', () => {
@@ -46,8 +46,11 @@ describe('writtenKindCount', () => {
     expect(writtenKindCount({ ...noWrites, fileWriteEpubEnabled: true, fileWritePdfEnabled: true })).toBe(2)
   })
 
-  it('counts audio only when the cover is written into it too', () => {
-    expect(writtenKindCount({ ...noWrites, fileWriteAudioEnabled: true })).toBe(0)
-    expect(writtenKindCount({ ...noWrites, fileWriteAudioEnabled: true, fileWriteWriteCover: true })).toBe(1)
+  it('counts read-along EPUBs as a kind of their own', () => {
+    expect(writtenKindCount({ ...noWrites, fileWriteEpubEnabled: true, fileWriteReadAlongEnabled: true })).toBe(2)
+  })
+
+  it('counts audio on its own toggle, since its tags are written without the cover', () => {
+    expect(writtenKindCount({ ...noWrites, fileWriteAudioEnabled: true })).toBe(1)
   })
 })

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import { eq } from 'drizzle-orm';
@@ -28,11 +28,14 @@ import {
   type MetadataWriteE2EContext,
 } from './e2e/metadata-write/metadata-write-harness';
 import {
+  bundledFfmpegPaths,
   createCb7Fixture,
   createCbzFixture,
   createEpubFixture,
   createFb2Fixture,
+  createM4bFixture,
   createPdfFixture,
+  readAudioTags,
   writeFixtureFile,
 } from './e2e/metadata-write/metadata-write-fixture-builder';
 
@@ -1294,6 +1297,71 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     });
   });
 
+  describe('multi-file write-back', () => {
+    it('writes an audiobook beside its ebook only once the library opts in', async () => {
+      const { ffmpeg, ffprobe } = bundledFfmpegPaths();
+      vi.stubEnv('FFMPEG_PATH', ffmpeg);
+      vi.stubEnv('FFPROBE_PATH', ffprobe);
+      try {
+        const library = await createLibraryWithFolder(context, { mode: 'book_per_folder', fileWriteEnabled: true, fileWriteWriteCover: false });
+        await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteAudioEnabled: true });
+        await createEpubFixture(library.folderPath, 'Mixed Book/book.epub', { title: 'Mixed Original' });
+        await createM4bFixture(library.folderPath, 'Mixed Book/book.m4b', { title: 'Mixed Original' });
+        await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+        const epub = await locateBookFileByRelPath(context, library.libraryId, 'Mixed Book/book.epub');
+        const m4b = await locateBookFileByRelPath(context, library.libraryId, 'Mixed Book/book.m4b');
+        expect(m4b.bookId).toBe(epub.bookId);
+        const [bookRow] = await context.db
+          .select({ primaryFileId: schema.books.primaryFileId })
+          .from(schema.books)
+          .where(eq(schema.books.id, epub.bookId))
+          .limit(1);
+        expect(bookRow?.primaryFileId).toBe(epub.bookFileId);
+
+        const syncWithTitle = async (title: string) => {
+          await context.db.update(schema.bookMetadata).set({ title }).where(eq(schema.bookMetadata.bookId, epub.bookId));
+          const response = await context.app.inject({
+            method: 'POST',
+            url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
+            headers: authHeader(context.adminToken),
+          });
+          expect(response.statusCode).toBe(200);
+          return parseSseEvents(response.body).find((event) => 'done' in event && event.done === true);
+        };
+
+        await expect(syncWithTitle('Primary Only Title')).resolves.toMatchObject({ processed: 1, succeeded: 1, failed: 0 });
+        expect((await extractEpubMetadata(epub.absolutePath))?.title).toBe('Primary Only Title');
+        expect(await readAudioTags(m4b.absolutePath)).toMatchObject({ title: 'Mixed Original', album: 'Mixed Original' });
+
+        await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteAllFiles: true });
+        const detail = await context.app.inject({ method: 'GET', url: `/api/v1/books/${epub.bookId}`, headers: authHeader(context.adminToken) });
+        expect(detail.statusCode).toBe(200);
+        expect(detail.json().fileWriteStatus).toMatchObject({ enabled: true, reason: null });
+        expect(detail.json().fileWriteStatus.writableFormats).toEqual(expect.arrayContaining(['epub', 'm4b']));
+        expect(detail.json().fileWriteStatus.targets).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ fileId: epub.bookFileId, format: 'epub', writable: true }),
+            expect.objectContaining({ fileId: m4b.bookFileId, format: 'm4b', writable: true }),
+          ]),
+        );
+
+        await expect(syncWithTitle('Every File Title')).resolves.toMatchObject({ processed: 1, succeeded: 1, failed: 0 });
+        expect((await extractEpubMetadata(epub.absolutePath))?.title).toBe('Every File Title');
+        // A single audio file is the whole recording, so it takes the book title rather than a file name.
+        expect(await readAudioTags(m4b.absolutePath)).toMatchObject({ title: 'Every File Title', album: 'Every File Title' });
+
+        const logs = await context.db
+          .select({ bookFileId: schema.fileWriteLog.bookFileId, status: schema.fileWriteLog.status, triggeredBy: schema.fileWriteLog.triggeredBy })
+          .from(schema.fileWriteLog)
+          .where(eq(schema.fileWriteLog.bookId, epub.bookId));
+        expect(logs).toEqual(expect.arrayContaining([{ bookFileId: m4b.bookFileId, status: 'success', triggeredBy: 'sync' }]));
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+  });
+
   describe('per-library file write settings', () => {
     it('only auto-writes for the library that has file write enabled', async () => {
       const enabledLibrary = await createLibraryWithFolder(context, { mode: 'book_per_file', fileWriteEnabled: true });
@@ -1435,25 +1503,11 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         fileWriteEpubMaxFileSizeMb: 1,
       });
 
-      await createEpubFixture(library.folderPath, 'per-size/book.epub', { title: 'Large EPUB' });
+      // The limit is checked against the file on disk, so the fixture has to be genuinely over it.
+      const epubPath = await createEpubFixture(library.folderPath, 'per-size/book.epub', { title: 'Large EPUB', paddingBytes: 1.5 * 1024 * 1024 });
+      expect((await stat(epubPath)).size).toBeGreaterThan(1024 * 1024);
       await triggerAndWaitForLibraryScan(context, library.libraryId);
       const book = await locateBookFileByRelPath(context, library.libraryId, 'per-size/book.epub');
-
-      const [fileRow] = await context.db
-        .select({ sizeBytes: schema.bookFiles.sizeBytes })
-        .from(schema.bookFiles)
-        .where(eq(schema.bookFiles.id, book.bookFileId))
-        .limit(1);
-
-      const fileSizeBytes = fileRow?.sizeBytes ?? 0;
-      const limitBytes = 1 * 1024 * 1024;
-
-      if (fileSizeBytes <= limitBytes) {
-        await context.db
-          .update(schema.bookFiles)
-          .set({ sizeBytes: limitBytes + 1 })
-          .where(eq(schema.bookFiles.id, book.bookFileId));
-      }
 
       await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEpubMaxFileSizeMb: 1 });
 
@@ -1573,7 +1627,8 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         headers: authHeader(withPermissionUser.accessToken),
         payload: { title: 'Should Fail Access' },
       });
-      expect(missingAccess.statusCode).toBe(403);
+      // A book in a library the user cannot access is reported as missing, not forbidden.
+      expect(missingAccess.statusCode).toBe(404);
 
       await grantLibraryAccess(context, withPermissionUser.userId, library.libraryId, 'editor');
 

@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { CheckCircle2, FileUp, Loader2, Plus, RotateCcw, Upload, X, XCircle } from '@lucide/vue'
-import type { Library } from '@bookorbit/types'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import { SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT, useBookUpload, type FileUploadStatus } from '../composables/useBookUpload'
 import { emitLibraryUploadCompleted } from '../composables/useLibraryUploadEvents'
-import { useLibraries } from '../composables/useLibraries'
-import { api } from '@/lib/api'
+import { useBookDestination } from '../composables/useBookDestination'
+import BookDestinationFields from './BookDestinationFields.vue'
 import { formatBytes } from '@/lib/formatting'
 const props = defineProps<{
   libraryId?: number
@@ -21,20 +20,17 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const { t } = useI18n()
-const { libraries, fetchLibraries } = useLibraries()
+const destination = useBookDestination({ libraryId: props.libraryId })
+const { libraryId: selectedLibraryId, folderId: selectedFolderId, selectedLibrary, hasDestination, fetchLibraries } = destination
 const { maxUploadSizeMb } = useAppInfo()
 
-const selectedLibraryId = ref<number | undefined>(props.libraryId)
-const folders = ref<Library['folders']>([])
-const selectedFolderId = ref<number | undefined>(undefined)
-const libraryName = ref<string | null>(null)
 const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const { files, pendingCount, isUploading, doneCount, errorCount, uploadedBookIds, addFiles, removeFile, retryFile, reset, startUpload } =
   useBookUpload()
 
-const canUpload = computed(() => pendingCount.value > 0 && !isUploading.value && selectedLibraryId.value !== undefined)
+const canUpload = computed(() => pendingCount.value > 0 && !isUploading.value && hasDestination.value)
 const hasFiles = computed(() => files.value.length > 0)
 const allDone = computed(() => hasFiles.value && files.value.every((f) => f.status === 'done' || f.status === 'error'))
 const allSuccess = computed(() => allDone.value && errorCount.value === 0)
@@ -42,7 +38,7 @@ const allSuccess = computed(() => allDone.value && errorCount.value === 0)
 const headerTitle = computed(() => {
   if (isUploading.value) return t('library.upload.header.uploading')
   if (allDone.value) return t('library.upload.header.complete')
-  if (libraryName.value) return t('library.upload.header.uploadTo', { library: libraryName.value })
+  if (selectedLibrary.value) return t('library.upload.header.uploadTo', { library: selectedLibrary.value.name })
   return t('library.upload.header.uploadBooks')
 })
 
@@ -58,34 +54,12 @@ const fileSummary = computed(() => {
   return { total: files.value.length, totalBytes, formatParts }
 })
 
-async function loadFolders(libraryId: number) {
-  const res = await api(`/api/v1/libraries/${libraryId}`)
-  if (res.ok) {
-    const data: Library = await res.json()
-    folders.value = data.folders ?? []
-    selectedFolderId.value = folders.value[0]?.id
-    libraryName.value = data.name
-  }
-}
-
-watch(selectedLibraryId, (id) => {
-  folders.value = []
-  selectedFolderId.value = undefined
-  libraryName.value = null
-  if (id !== undefined) loadFolders(id)
-})
-
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') handleClose()
 }
 
-onMounted(async () => {
-  if (!props.libraryId) {
-    if (!libraries.value.length) await fetchLibraries()
-    if (selectedLibraryId.value !== undefined) loadFolders(selectedLibraryId.value)
-  } else {
-    loadFolders(props.libraryId)
-  }
+onMounted(() => {
+  void fetchLibraries()
   document.addEventListener('keydown', onKeydown)
 })
 onUnmounted(() => document.removeEventListener('keydown', onKeydown))
@@ -131,8 +105,8 @@ function onFileInputChange(e: Event) {
 
 async function handleUpload() {
   const libraryId = selectedLibraryId.value
-  if (libraryId === undefined) return
-  const folderId = selectedFolderId.value
+  if (!hasDestination.value || libraryId === null) return
+  const folderId = selectedFolderId.value ?? undefined
 
   const pendingAtStart = files.value.filter((f) => f.status === 'pending').length
   if (pendingAtStart === 0) return
@@ -211,28 +185,12 @@ function formatPillClass(filename: string): string {
         </div>
 
         <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
-          <!-- Library selector (only when not pre-scoped to a library) -->
-          <div v-if="!libraryId" class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-muted-foreground">{{ t('library.upload.library') }}</label>
-            <select
-              v-model="selectedLibraryId"
-              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option :value="undefined" disabled>{{ t('library.upload.selectLibrary') }}</option>
-              <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
-            </select>
-          </div>
-
-          <!-- Folder selector (only shown when library has multiple folders) -->
-          <div v-if="folders.length > 1" class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-muted-foreground">{{ t('library.upload.targetFolder') }}</label>
-            <select
-              v-model="selectedFolderId"
-              class="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
-            </select>
-          </div>
+          <BookDestinationFields
+            :destination="destination"
+            :library-label="t('library.upload.library')"
+            :folder-label="t('library.upload.targetFolder')"
+            :scoped="libraryId !== undefined"
+          />
 
           <!-- Shared file input -->
           <input ref="fileInputRef" type="file" multiple :accept="SUPPORTED_FORMATS_ACCEPT" class="sr-only" @change="onFileInputChange" />

@@ -10,7 +10,7 @@ import type {
   ServerFontPreferences,
   ThemePreferences,
 } from '@bookorbit/types';
-import { MAX_SERVER_FONTS, SUPPORTED_LOCALES } from '@bookorbit/types';
+import { ANNOTATION_COLOR_NAME_MAX_ENTRIES, ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS, MAX_SERVER_FONTS, SUPPORTED_LOCALES } from '@bookorbit/types';
 
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { UserPreferencesService } from './user-preferences.service';
@@ -758,6 +758,70 @@ describe('UserPreferencesService', () => {
     it('rejects unknown keys', async () => {
       await expect(service.upsertServerFontPreferences(11, { hiddenFamilies: [], sneaky: true })).rejects.toBeInstanceOf(BadRequestException);
       expect(repo.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('annotation colour name preferences', () => {
+    const hexKey = (i: number) => `#${i.toString(16).padStart(6, '0').toUpperCase()}`;
+
+    it('defaults to no names when the reader has never set any', async () => {
+      repo.findByCategory.mockResolvedValue(undefined);
+
+      const result = await service.getAnnotationColorNamePreferences(11);
+
+      expect(result).toEqual({ names: {} });
+      expect(repo.findByCategory).toHaveBeenCalledWith(11, 'annotation-colors');
+      result.names['#FFFFFF'] = 'mutated';
+      expect(ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS).toEqual({ names: {} });
+    });
+
+    it('returns the stored names', async () => {
+      repo.findByCategory.mockResolvedValue({ data: { names: { '#FACC15': 'Ideas', '#4ADE80': 'Quotes' } } } as never);
+
+      await expect(service.getAnnotationColorNamePreferences(11)).resolves.toEqual({ names: { '#FACC15': 'Ideas', '#4ADE80': 'Quotes' } });
+    });
+
+    it('falls back to the defaults when the stored payload no longer validates', async () => {
+      repo.findByCategory.mockResolvedValue({ data: { names: { yellow: 'Ideas' } } as never });
+
+      await expect(service.getAnnotationColorNamePreferences(11)).resolves.toEqual({ names: {} });
+    });
+
+    it('normalises keys to uppercase, trims labels and drops blank ones', async () => {
+      await service.upsertAnnotationColorNamePreferences(11, { names: { '#facc15': '  Ideas  ', '#4ade80': '   ', '#38BDF8': 'Quotes' } });
+
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'annotation-colors', { names: { '#FACC15': 'Ideas', '#38BDF8': 'Quotes' } });
+    });
+
+    it('stores an empty map, which clears every name', async () => {
+      await service.upsertAnnotationColorNamePreferences(11, { names: {} });
+
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'annotation-colors', { names: {} });
+    });
+
+    it.each([
+      ['a named colour that is not #RRGGBB', { names: { yellow: 'Ideas' } }],
+      ['a three-digit hex colour', { names: { '#FC1': 'Ideas' } }],
+      ['a label longer than the cap', { names: { '#FACC15': 'x'.repeat(41) } }],
+      ['a non-string label', { names: { '#FACC15': 7 } }],
+      ['two keys naming the same colour', { names: { '#facc15': 'One', '#FACC15': 'Two' } }],
+      ['a missing names map', {}],
+      ['an unknown key', { names: {}, extra: true }],
+    ])('rejects %s with 400', async (_label, settings) => {
+      await expect(service.upsertAnnotationColorNamePreferences(11, settings as Record<string, unknown>)).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('accepts a label exactly at the length cap', async () => {
+      await expect(service.upsertAnnotationColorNamePreferences(11, { names: { '#FACC15': 'x'.repeat(40) } })).resolves.toBeUndefined();
+    });
+
+    it('caps the number of named colours, counting only labels that are kept', async () => {
+      const atCap = Object.fromEntries(Array.from({ length: ANNOTATION_COLOR_NAME_MAX_ENTRIES }, (_, i) => [hexKey(i), `Name ${i}`]));
+      await expect(service.upsertAnnotationColorNamePreferences(11, { names: { ...atCap, '#ABCDEF': ' ' } })).resolves.toBeUndefined();
+
+      const overCap = { ...atCap, '#ABCDEF': 'One too many' };
+      await expect(service.upsertAnnotationColorNamePreferences(11, { names: overCap })).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

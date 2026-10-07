@@ -86,7 +86,9 @@ describe('SettingsSidebar', () => {
   })
 
   it('only shows groups the user has access to', () => {
-    expect(mountSidebar({ rail: true }).findAll('[data-testid="rail-group"]')).toHaveLength(1)
+    const personal = mountSidebar({ rail: true })
+    expect(personal.findAll('[data-testid="rail-group"]')).toHaveLength(2)
+    expect(personal.findAll('[data-testid="settings-sidebar-rail-item"]').map((node) => node.text())).toContain('Missing-field reminders')
     expect(mountSidebar({ rail: true, perms: ['manage_libraries'] }).findAll('[data-testid="rail-group"]')).toHaveLength(2)
   })
 

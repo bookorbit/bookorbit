@@ -970,4 +970,93 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     const monthsLastYear = overview.completion.months.filter((month) => month.year === thisYear - 1);
     expect(monthsLastYear.reduce((sum, month) => sum + month.count, 0)).toBe(1);
   });
+
+  it('refreshes cached dashboard and statistics counts immediately after reading history and status date edits', async () => {
+    const book = await createBook();
+    let dashboardBaseline: number | undefined;
+    let statisticsBaseline: number | undefined;
+    async function readingGoal() {
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/dashboard/widgets/reading-goal',
+        headers: auth(ctx.adminToken),
+      });
+      expect(response.statusCode).toBe(200);
+      const goal = response.json() as { completedBooks: number; year: number };
+      const statistics = await ctx.app.inject({ method: 'GET', url: '/api/v1/user-statistics/activity-overview', headers: auth(ctx.adminToken) });
+      expect(statistics.statusCode).toBe(200);
+      const completed = statistics.json().goal.completedBooks as number;
+      dashboardBaseline ??= goal.completedBooks;
+      statisticsBaseline ??= completed;
+      expect(completed - statisticsBaseline).toBe(goal.completedBooks - dashboardBaseline);
+      return goal;
+    }
+    const baseline = await readingGoal();
+    const thisYearEnd = `${baseline.year}-01-15`;
+    const lastYearEnd = `${baseline.year - 1}-12-15`;
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${book.bookId}/reading-attempts`,
+      headers: auth(ctx.adminToken),
+      payload: { endedOn: thisYearEnd, outcome: 'completed' },
+    });
+    expect(created.statusCode).toBe(201);
+    const attempt = created.json() as { id: number };
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+
+    const backdated = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/books/${book.bookId}/reading-attempts/${attempt.id}`,
+      headers: auth(ctx.adminToken),
+      payload: { endedOn: lastYearEnd },
+    });
+    expect(backdated.statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+
+    expect((await patchStatus(book.bookId, { finishedAt: thisYearEnd })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+    expect((await patchStatus(book.bookId, { finishedAt: null })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+    expect((await patchStatus(book.bookId, { finishedAt: thisYearEnd })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+
+    const deleted = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/books/${book.bookId}/reading-attempts/${attempt.id}`,
+      headers: auth(ctx.adminToken),
+    });
+    expect(deleted.statusCode).toBe(204);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+
+    expect((await patchStatus(book.bookId, { status: 'read', finishedAt: thisYearEnd })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+    const reset = await ctx.app.inject({ method: 'POST', url: `/api/v1/books/${book.bookId}/reset-reading-state`, headers: auth(ctx.adminToken) });
+    expect(reset.statusCode).toBe(201);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+  });
+  it('refreshes currently-reading after automatic activity resumes a manually paused book', async () => {
+    const book = await createBook();
+    await ctx.db.insert(schema.bookMetadata).values({ bookId: book.bookId, title: 'Paused book' });
+    expect((await patchStatus(book.bookId, { status: 'on_hold', startedAt: '2026-01-01' })).statusCode).toBe(200);
+    const current = async () => {
+      const response = await ctx.app.inject({ method: 'GET', url: '/api/v1/dashboard/widgets/currently-reading', headers: auth(ctx.adminToken) });
+      expect(response.statusCode).toBe(200);
+      return response.json().books as Array<{ bookId: number }>;
+    };
+    expect((await current()).some((row) => row.bookId === book.bookId)).toBe(false);
+    const before = await listAttempts(book.bookId);
+    await ctx.app.get(ReadingAttemptService).recordActivity({
+      userId: adminUserId,
+      bookId: book.bookId,
+      occurredOn: '2026-01-02',
+      origin: 'kobo',
+      progress: 25,
+      finishThreshold: 98,
+      strongRereadEvidence: false,
+      meaningfulActivity: true,
+    });
+    const after = await listAttempts(book.bookId);
+    expect(after).toEqual(before);
+    expect((await current()).some((row) => row.bookId === book.bookId)).toBe(true);
+  });
 });

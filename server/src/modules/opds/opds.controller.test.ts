@@ -105,7 +105,7 @@ describe('OpdsController', () => {
     await controller.series(user, makeReply());
 
     expect(opdsBookService.getAccessibleLibraries).toHaveBeenCalledWith(8, false);
-    expect(opdsBookService.getUserCollections).toHaveBeenCalledWith(8);
+    expect(opdsBookService.getUserCollections).toHaveBeenCalledWith(8, false, undefined);
     expect(opdsBookService.getUserSmartScopes).toHaveBeenCalledWith(8);
     expect(opdsBookService.getDistinctAuthors).toHaveBeenCalledWith(8, false, undefined);
     expect(opdsBookService.getDistinctSeries).toHaveBeenCalledWith(8, false, undefined);

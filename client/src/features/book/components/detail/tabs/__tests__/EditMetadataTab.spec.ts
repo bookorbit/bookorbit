@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookDetail, CoverMedium } from '@bookorbit/types'
+import type { AuthUser, BookDetail, CoverMedium } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import EditMetadataTab from '../EditMetadataTab.vue'
 
@@ -21,6 +21,9 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: () => true }),
 }))
+
+const reminderUser = ref<AuthUser>({ id: 7, settings: {} } as AuthUser)
+vi.mock('@/features/auth/composables/useAuth', () => ({ useAuth: () => ({ user: reminderUser }) }))
 
 const panel = {
   hasPending: ref(false),
@@ -115,7 +118,7 @@ function mountTab(book: BookDetail) {
         CoverEditorPanel: CoverEditorPanelStub,
         MetadataSearchDrawer: MetadataSearchDrawerStub,
         MetadataSourceCard: true,
-        MetadataFieldLabel: true,
+        MetadataFieldLabel: { props: ['field'], template: '<div :data-field="field"><slot /></div>' },
         RichDescriptionEditor: true,
         SeriesMembershipEditor: true,
         ChipInput: true,
@@ -137,6 +140,7 @@ describe('EditMetadataTab cover tiles', () => {
   let savedBook: BookDetail
 
   beforeEach(() => {
+    reminderUser.value = { id: 7, settings: {} } as AuthUser
     panel.hasPending.value = false
     panel.pendingMedia.value = []
     panel.busy.value = false
@@ -153,6 +157,35 @@ describe('EditMetadataTab cover tiles', () => {
     })
   })
 
+  it('opens a popover listing only empty fields without opening metadata search', async () => {
+    const wrapper = mountTab(makeBook({ publisher: 'Ace', publishedYear: 1965 }))
+    document.body.append(wrapper.element)
+    await flushPromises()
+
+    const badge = wrapper.get('[aria-label="metadataReminders.missingCount"]')
+    await badge.trigger('click')
+    await flushPromises()
+
+    const popover = document.querySelector('[data-slot="popover-content"]')!
+    expect(popover).not.toBeNull()
+    expect(Array.from(popover.querySelectorAll('li'), (item) => item.textContent)).toEqual([
+      'metadataReminders.fields.language.label',
+      'metadataReminders.fields.pageCount.label',
+      'metadataReminders.fields.isbn.label',
+      'metadataReminders.fields.genres.label',
+      'metadataReminders.fields.tags.label',
+      'metadataReminders.fields.description.label',
+    ])
+    expect(badge.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.findComponent(MetadataSearchDrawerStub).exists()).toBe(false)
+    expect(vi.mocked(api).mock.calls.some(([url]) => String(url).includes('/metadata-fetch/stream'))).toBe(false)
+
+    await wrapper.setProps({ book: makeBook({ publisher: 'Ace', publishedYear: 1965, language: 'en' }) })
+    await flushPromises()
+    expect(popover.textContent).not.toContain('metadataReminders.fields.language.label')
+    wrapper.unmount()
+  })
+
   it('enables Save when the only change is an unsaved cover', async () => {
     const wrapper = mountTab(makeBook())
     await flushPromises()
@@ -163,6 +196,109 @@ describe('EditMetadataTab cover tiles', () => {
     await flushPromises()
 
     expect(saveButton(wrapper).attributes('disabled')).toBeUndefined()
+  })
+
+  it('applies preview ISBNs to the editor and saves them only after Save', async () => {
+    vi.mocked(api).mockImplementation(async (url, init) => {
+      if (String(url).includes('/refresh-metadata?preview=true')) {
+        return json({
+          metadata: { isbn10: '0306406152', isbn13: '9780306406157' },
+          diagnostics: { candidateProviders: ['google'], enabledUnreferencedProviders: [] },
+        })
+      }
+      if (init?.method === 'PATCH') return json({ book: savedBook, write: null, libraryAutoWriteEnabled: false })
+      if (String(url).includes('/metadata-fetch/providers')) return json([])
+      return json({})
+    })
+    const wrapper = mountTab(makeBook())
+    await flushPromises()
+    const autoFillButton = wrapper.findAll('button').find((button) => button.text().includes('book.detail.editMetadata.autoFill'))!
+    await autoFillButton.trigger('click')
+    await flushPromises()
+    expect(patchCalls()).toHaveLength(0)
+    expect((wrapper.get('[data-field="isbn10"] input').element as HTMLInputElement).value).toBe('0306406152')
+    expect((wrapper.get('[data-field="isbn13"] input').element as HTMLInputElement).value).toBe('9780306406157')
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+    const body = JSON.parse(patchCalls()[0]![1]!.body as string)
+    expect(body.metadata).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' })
+  })
+
+  it.each(['isbn10', 'isbn13'] as const)('preserves the %s lock when applying preview ISBNs', async (lockedField) => {
+    vi.mocked(api).mockImplementation(async (url) => {
+      if (String(url).includes('/refresh-metadata?preview=true')) {
+        return json({
+          metadata: { isbn10: '0306406152', isbn13: '9780306406157' },
+          diagnostics: { candidateProviders: ['google'], enabledUnreferencedProviders: [] },
+        })
+      }
+      if (String(url).includes('/metadata-fetch/providers')) return json([])
+      return json({})
+    })
+    const wrapper = mountTab(makeBook({ lockedFields: [lockedField] }))
+    await flushPromises()
+    await wrapper.get('[aria-label="book.detail.editMetadata.autoFill"]').trigger('click')
+    await flushPromises()
+    expect((wrapper.get(`[data-field="${lockedField}"] input`).element as HTMLInputElement).value).toBe('')
+    const unlockedField = lockedField === 'isbn10' ? 'isbn13' : 'isbn10'
+    expect((wrapper.get(`[data-field="${unlockedField}"] input`).element as HTMLInputElement).value).toBe(
+      unlockedField === 'isbn10' ? '0306406152' : '9780306406157',
+    )
+  })
+
+  it('opens reminder preferences from the popover without leaving the unsaved book form', async () => {
+    const wrapper = mountTab(makeBook())
+    document.body.append(wrapper.element)
+    await flushPromises()
+    await wrapper.get('[data-field="title"] input').setValue('Unsaved title')
+    await wrapper.get('[aria-label="metadataReminders.missingCount"]').trigger('click')
+    await flushPromises()
+    const customize = document.querySelector<HTMLButtonElement>('[data-slot="popover-content"] button')!
+    customize.click()
+    await flushPromises()
+    const sheet = document.querySelector('[data-slot="sheet-content"]')!
+    expect(sheet).not.toBeNull()
+    expect(sheet.textContent).toContain('metadataReminders.title')
+    expect(patchCalls()).toHaveLength(0)
+    expect((wrapper.get('[data-field="title"] input').element as HTMLInputElement).value).toBe('Unsaved title')
+    wrapper.unmount()
+  })
+
+  it('hides reminders when the only absent identifier is ISBN-10', async () => {
+    const wrapper = mountTab(
+      makeBook({
+        isbn13: '9780593419113',
+        publisher: 'Penguin',
+        publishedDate: '2023-04-25',
+        language: 'en',
+        pageCount: 272,
+        genres: ['Cooking'],
+        tags: ['Food'],
+        description: 'A cookbook',
+      }),
+    )
+    await flushPromises()
+    expect(wrapper.find('[aria-label="metadataReminders.missingCount"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('returns focus to the editor when preferences remove the badge that opened the sheet', async () => {
+    reminderUser.value.settings.metadataReminderPreferences = { fields: ['isbn'] }
+    const wrapper = mountTab(makeBook())
+    document.body.append(wrapper.element)
+    await flushPromises()
+    await wrapper.get('[aria-label="metadataReminders.missingCount"]').trigger('click')
+    await flushPromises()
+    document.querySelector<HTMLButtonElement>('[data-slot="popover-content"] button')!.click()
+    await flushPromises()
+    document.querySelector<HTMLInputElement>('[data-slot="sheet-content"] input[value="isbn"]')!.click()
+    await flushPromises()
+    expect(wrapper.find('[aria-label="metadataReminders.missingCount"]').exists()).toBe(false)
+    document.querySelector<HTMLButtonElement>('[data-slot="sheet-content"] [data-slot="sheet-footer"] button')!.click()
+    await flushPromises()
+    expect(document.activeElement?.getAttribute('tabindex')).toBe('-1')
+    expect(wrapper.element.contains(document.activeElement)).toBe(true)
+    wrapper.unmount()
   })
 
   it('does not save the form when a cover fails to save', async () => {

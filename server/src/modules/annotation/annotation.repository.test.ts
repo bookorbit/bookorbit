@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
-import type { SQL } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { DB } from '../../db';
-import { AnnotationRepository } from './annotation.repository';
+import { AnnotationRepository, cfiStepsSortKey } from './annotation.repository';
 
 function makeRow(overrides?: Record<string, unknown>) {
   return {
@@ -238,6 +238,53 @@ describe('AnnotationRepository', () => {
 
       expect(result).toBeNull();
     });
+
+    it('writes a null note through, which is how a note is cleared', async () => {
+      const db = makeDb([{ id: 1 }], [makeRow()]);
+      const repo = await makeRepository(db);
+
+      await repo.update(5, 1, 10, { note: null });
+
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toHaveProperty('note', null);
+      expect(setCall).toHaveProperty('version');
+      expect(setCall).not.toHaveProperty('starredAt');
+    });
+
+    it('stars without bumping the version devices sync from, keeping an existing star time', async () => {
+      const db = makeDb([{ id: 1 }], [makeRow()]);
+      const repo = await makeRepository(db);
+
+      await repo.update(5, 1, 10, {}, { starred: true });
+
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).not.toHaveProperty('version');
+      expect(setCall).toHaveProperty('updatedAt');
+      expect(compileSql([setCall.starredAt])).toBe('coalesce("annotations"."starred_at", now())');
+    });
+
+    it('unstars by clearing the star time, still without a version bump', async () => {
+      const db = makeDb([{ id: 1 }], [makeRow()]);
+      const repo = await makeRepository(db);
+
+      await repo.update(5, 1, 10, {}, { starred: false });
+
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toHaveProperty('starredAt', null);
+      expect(setCall).not.toHaveProperty('version');
+    });
+
+    it('bumps the version when a star arrives together with a content change', async () => {
+      const db = makeDb([{ id: 1 }], [makeRow()]);
+      const repo = await makeRepository(db);
+
+      await repo.update(5, 1, 10, { color: '#4ADE80' }, { starred: true });
+
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toHaveProperty('color', '#4ADE80');
+      expect(setCall).toHaveProperty('version');
+      expect(setCall).toHaveProperty('starredAt');
+    });
   });
 
   describe('softDelete', () => {
@@ -358,6 +405,19 @@ describe('AnnotationRepository', () => {
       await repo.findPaginated(5, 10, { bookFileId: 42 }, { by: 'position', dir: 'asc' }, 1, 25);
 
       expect(db._queries[0].orderBy.mock.calls[0]).toHaveLength(4);
+    });
+
+    it('orders CFI positions by their numeric steps rather than as strings', async () => {
+      const db = makeDb([], [{ count: 0 }]);
+      const repo = await makeRepository(db);
+
+      await repo.findPaginated(5, 10, {}, { by: 'position', dir: 'desc' }, 1, 25);
+
+      const terms = db._queries[0].orderBy.mock.calls[0].map((fragment: unknown) => compileSql([fragment]));
+      expect(terms[2]).toContain('regexp_matches("annotation_positions"."pos0", \'[/:]([0-9]+)\', \'g\') with ordinality');
+      expect(terms[2]).toMatch(/desc nulls last$/);
+      expect(terms.some((term: string) => /^"annotation_positions"."pos0" (asc|desc)/.test(term))).toBe(false);
+      expect(terms[3]).toBe('"annotations"."id" desc');
     });
   });
 
@@ -595,6 +655,22 @@ describe('AnnotationRepository', () => {
       expect(db.select.mock.calls[0][0]).toHaveProperty('xpointer');
       expect(compileSql(db._queries[0].orderBy.mock.calls[0])).toContain('coalesce("annotations"."source_created_at", "annotations"."created_at")');
     });
+
+    it('orders each book by reading position, not by chapter title', async () => {
+      const db = makeDb([]);
+      const repo = await makeRepository(db);
+
+      await repo.findHubAll(10, { status: 'active' });
+
+      const terms = db._queries[0].orderBy.mock.calls[0].map((fragment: unknown) => compileSql([fragment]));
+      expect(terms[0]).toBe('"book_metadata"."title" asc');
+      expect(terms[1]).toBe('"annotations"."book_id" asc');
+      expect(terms.join(' ')).toContain("ap_pdf.format = 'pdf'");
+      expect(terms.join(' ')).toContain('regexp_matches("annotation_positions"."pos0"');
+      expect(terms.join(' ')).not.toContain('"annotations"."chapter_title"');
+      expect(terms.at(-1)).toBe('"annotations"."id" asc');
+      expect(db._queries[0].limit).toHaveBeenCalledWith(5000);
+    });
   });
 
   describe('findHubById', () => {
@@ -704,6 +780,50 @@ describe('AnnotationRepository', () => {
       expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({
         deletedAt: null,
       });
+    });
+  });
+
+  describe('bulkSetStarred', () => {
+    it('returns 0 for an empty id list without querying', async () => {
+      const db = makeDb();
+      const repo = await makeRepository(db);
+
+      expect(await repo.bulkSetStarred(10, [], true)).toBe(0);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('stars only active, unstarred rows the user owns, without a version bump', async () => {
+      const db = makeDb([{ id: 1 }, { id: 2 }]);
+      const repo = await makeRepository(db);
+
+      expect(await repo.bulkSetStarred(10, [1, 2, 3], true)).toBe(2);
+
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).not.toHaveProperty('version');
+      expect(compileSql([setCall.starredAt])).toBe('coalesce("annotations"."starred_at", now())');
+      const where = compileSql(db._queries[0].where.mock.calls[0]);
+      expect(where).toContain('"annotations"."user_id" = $');
+      expect(where).toContain('"annotations"."deleted_at" is null');
+      expect(where).toContain('"annotations"."starred_at" is null');
+    });
+
+    it('unstars only rows that are starred', async () => {
+      const db = makeDb([{ id: 1 }]);
+      const repo = await makeRepository(db);
+
+      expect(await repo.bulkSetStarred(10, [1], false)).toBe(1);
+
+      expect(db._queries[0].set.mock.calls[0][0]).toHaveProperty('starredAt', null);
+      expect(compileSql(db._queries[0].where.mock.calls[0])).toContain('"annotations"."starred_at" is not null');
+    });
+  });
+
+  describe('cfiStepsSortKey', () => {
+    it('keeps the step pattern intact through the template literal', () => {
+      const compiled = compileSql([cfiStepsSortKey(sql`p.pos0`)]);
+      expect(compiled).toContain("regexp_matches(p.pos0, '[/:]([0-9]+)', 'g') with ordinality as step(m, n)");
+      expect(compiled).toContain('order by step.n');
+      expect(compiled).toContain("'{}'::numeric[]");
     });
   });
 

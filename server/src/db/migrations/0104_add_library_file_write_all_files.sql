@@ -1,0 +1,1 @@
+ALTER TABLE "libraries" ADD COLUMN "file_write_all_files" boolean DEFAULT false NOT NULL;

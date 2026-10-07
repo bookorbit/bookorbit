@@ -2,7 +2,8 @@ import { ConflictException, Injectable, Logger, NotFoundException, OnApplication
 import { createHash } from 'crypto';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { naturalCompare } from '../../common/utils/natural-sort.utils';
+import { audioBookPercentageAt, compareBookFilePaths, remapAudioBookPosition, type AudioTrackSpan } from '../../common/utils/audio-track-order.utils';
+import { compareAudioTracks } from '../../common/utils/book-media.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
@@ -157,6 +158,8 @@ interface RegisteredFile {
   wasReassigned: boolean;
   wasChanged: boolean;
   mediaOverlayAvailable: boolean;
+  /** This book's stored sort order for the file before this scan; null when the file is new to it. */
+  previousSortOrder: number | null;
 }
 
 interface MetadataExtractionSource {
@@ -1751,6 +1754,55 @@ export class ScannerService implements OnApplicationBootstrap {
     });
   }
 
+  /**
+   * Keeps audio bookmarks and progress on the same moment of the same track when a rescan only
+   * reorders a book's existing tracks, such as the disc folders that used to interleave. Positions
+   * are left alone when tracks were also added or removed, because they cannot then be placed.
+   * `audioFiles` is in the new playback order. Returns whether the order changed.
+   */
+  private async remapAudioPositionsIfReordered(bookId: number, audioFiles: RegisteredFile[]): Promise<boolean> {
+    if (audioFiles.length < 2 || audioFiles.some((file) => file.isNew || file.wasReassigned || file.previousSortOrder === null)) {
+      return false;
+    }
+    const previous = [...audioFiles].sort((left, right) =>
+      compareAudioTracks(
+        { sortOrder: left.previousSortOrder, absolutePath: left.absolutePath },
+        { sortOrder: right.previousSortOrder, absolutePath: right.absolutePath },
+      ),
+    );
+    if (previous.every((file, index) => file.fileId === audioFiles[index]!.fileId)) return false;
+
+    const event = 'scanner.remap_audio_positions';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] bookId=${bookId} tracks=${audioFiles.length} - audio track order changed`);
+    try {
+      const storedAudioIds = (await this.scannerRepo.findBookFileFormats(bookId))
+        .filter((file) => file.format !== null && isAudioFormat(file.format))
+        .map((file) => file.id);
+      const currentIds = new Set(audioFiles.map((file) => file.fileId));
+      if (storedAudioIds.length !== currentIds.size || storedAudioIds.some((id) => !currentIds.has(id))) {
+        this.logger.log(`[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} skipped=tracks_changed - positions left unchanged`);
+        return true;
+      }
+      const span = (file: RegisteredFile): AudioTrackSpan => ({ fileId: file.fileId, durationSeconds: file.durationSeconds });
+      const previousSpans = previous.map(span);
+      const nextSpans = audioFiles.map(span);
+      const updated = await this.scannerRepo.remapAudioPositions(
+        bookId,
+        (positionSeconds) => remapAudioBookPosition(positionSeconds, previousSpans, nextSpans),
+        (fileId, offsetSeconds) => audioBookPercentageAt(nextSpans, fileId, offsetSeconds),
+      );
+      this.logger.log(
+        `[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} bookmarks=${updated.bookmarks} progress=${updated.progress} - audio positions remapped`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[${event}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - audio position remap failed`,
+      );
+    }
+    return true;
+  }
+
   private async processCandidate(
     candidate: BookCandidate,
     libraryId: number,
@@ -1804,7 +1856,9 @@ export class ScannerService implements OnApplicationBootstrap {
 
       const fileCount: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
       let processResult: ProcessedFileResult;
-      const knownDurationSeconds = fileByPath.get(fileStat.absolutePath)?.durationSeconds ?? null;
+      const knownEntry = fileByPath.get(fileStat.absolutePath);
+      const knownDurationSeconds = knownEntry?.durationSeconds ?? null;
+      const previousSortOrder = knownEntry?.bookId === book.id ? knownEntry.sortOrder : null;
 
       try {
         processResult = await this.processFile(
@@ -1843,6 +1897,7 @@ export class ScannerService implements OnApplicationBootstrap {
           wasReassigned: processResult.reassigned,
           wasChanged: processResult.changed,
           mediaOverlayAvailable: fileByPath.get(fileStat.absolutePath)?.mediaOverlayAvailable === true,
+          previousSortOrder,
         });
         retainedFileIds.add(processResult.fileId);
       }
@@ -1880,6 +1935,7 @@ export class ScannerService implements OnApplicationBootstrap {
       (file) => hasMetadataSourceChanged(file) || file.durationSeconds === null || file.durationSeconds <= 0,
     );
     const winnerIsAudio = winner !== null && winner.format !== null && isAudioFormat(winner.format);
+    const audioOrderChanged = await this.remapAudioPositionsIfReordered(book.id, audioContentFiles);
 
     // 3a: Extract audio-specific fields (chapters, narrators) from the first audio file if any audio
     //     file is new, reassigned, or changed. Skipped when the audio winner is itself the leading
@@ -1895,9 +1951,7 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     if (!audioWinnerLeadsMetadata && changedAudioFiles.length > 0 && !selfWriteInProgress) {
-      const sortedAudio = [...audioContentFiles].sort((a, b) =>
-        basename(a.absolutePath).localeCompare(basename(b.absolutePath), undefined, { numeric: true }),
-      );
+      const sortedAudio = [...audioContentFiles].sort((a, b) => compareBookFilePaths(a.absolutePath, b.absolutePath));
       const firstAudio = sortedAudio[0];
       try {
         await this.metadataService.extractAudioChaptersAndNarrators(book.id, firstAudio.absolutePath, firstAudio.format!);
@@ -1945,9 +1999,10 @@ export class ScannerService implements OnApplicationBootstrap {
     //     what repairs the ones scanned before chapters were merged; it settles after one pass.
     if (audioContentFiles.length > 1) {
       const orderedAudioPaths = [...audioContentFiles]
-        .sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)))
+        .sort((a, b) => compareBookFilePaths(a.absolutePath, b.absolutePath))
         .map((file) => file.absolutePath);
-      const filesChanged = shouldExtractMetadata || changedAudioFiles.length > 0;
+      // A reorder keeps the total length, so stored chapters still look complete; rebuild them anyway.
+      const filesChanged = shouldExtractMetadata || changedAudioFiles.length > 0 || audioOrderChanged;
       try {
         await this.metadataService.extractMergedAudioChapters(book.id, orderedAudioPaths, { filesChanged });
       } catch (err) {

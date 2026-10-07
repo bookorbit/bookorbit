@@ -11,7 +11,13 @@ async function run(): Promise<void> {
 
   const data = workerData as PdfWriteWorkerData;
   try {
-    const result = await writePdfMetadataInProcess(data.filePath, data.payload, new Set<BookWritePayloadKey>(data.fieldMask));
+    const result = await writePdfMetadataInProcess(
+      data.filePath,
+      data.payload,
+      new Set<BookWritePayloadKey>(data.fieldMask),
+      Date.now(),
+      data.tempPath,
+    );
     postMessage({ type: 'result', result });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));

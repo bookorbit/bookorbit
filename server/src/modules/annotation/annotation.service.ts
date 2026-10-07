@@ -70,6 +70,7 @@ export class AnnotationService {
           highlightedAt: dto.highlightedAt.toISOString(),
           createdAt: dto.createdAt instanceof Date ? dto.createdAt.toISOString() : String(dto.createdAt),
           pdf: dto.pdf,
+          starredAt: dto.starredAt ? dto.starredAt.toISOString() : null,
         };
       }),
       total,
@@ -129,11 +130,15 @@ export class AnnotationService {
 
   async updateAnnotation(bookId: number, annotationId: number, user: RequestUser, dto: UpdateAnnotationDto): Promise<AnnotationResponseDto> {
     await this.bookService.verifyBookAccess(bookId, user);
-    const row = await this.annotationRepo.update(bookId, annotationId, user.id, {
+    const content = {
       ...(dto.note !== undefined && { note: dto.note }),
       ...(dto.color !== undefined && { color: dto.color }),
       ...(dto.style !== undefined && { style: dto.style }),
-    });
+    };
+    const row =
+      dto.starred === undefined
+        ? await this.annotationRepo.update(bookId, annotationId, user.id, content)
+        : await this.annotationRepo.update(bookId, annotationId, user.id, content, { starred: dto.starred });
     if (!row) throw new NotFoundException(this.notFoundMessage(bookId, annotationId));
     return AnnotationResponseDto.from(row);
   }

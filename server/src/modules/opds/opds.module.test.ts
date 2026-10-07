@@ -9,6 +9,7 @@ import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.modul
 import { UserModule } from '../user/user.module';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import { OpdsBookService } from './opds-book.service';
+import { OpdsCollectionRepository } from './opds-collection.repository';
 import { OpdsController } from './opds.controller';
 import { OpdsEnabledGuard } from './opds-enabled.guard';
 import { OpdsModule } from './opds.module';
@@ -29,6 +30,7 @@ describe('OpdsModule', () => {
     expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, OpdsModule)).toEqual([
       OpdsService,
       OpdsBookService,
+      OpdsCollectionRepository,
       OpdsUserService,
       OpdsAuthGuard,
       OpdsEnabledGuard,

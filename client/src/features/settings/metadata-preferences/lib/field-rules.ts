@@ -5,7 +5,7 @@ import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatu
 export const FIELD_GROUPS: { id: string; fields: MetadataField[] }[] = [
   { id: 'core', fields: ['title', 'subtitle', 'description', 'cover', 'audioCover'] },
   { id: 'contributors', fields: ['authors'] },
-  { id: 'publication', fields: ['publisher', 'publishedYear', 'language', 'pageCount', 'communityRating'] },
+  { id: 'publication', fields: ['publisher', 'isbn', 'publishedYear', 'language', 'pageCount', 'communityRating'] },
   { id: 'series', fields: ['seriesName', 'seriesIndex'] },
   { id: 'classification', fields: ['genres'] },
   { id: 'audiobook', fields: ['narrators', 'duration', 'abridged'] },

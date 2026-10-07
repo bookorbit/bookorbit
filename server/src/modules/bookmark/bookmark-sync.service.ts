@@ -45,7 +45,10 @@ export class BookmarkSyncService {
     return existing ? { row: existing, outcome: 'matched' } : null;
   }
 
-  /** Device-side rename. The web has no rename surface, so the device always wins. */
+  /**
+   * Device-side rename. The device wins, including over a rename made through the API: the
+   * exchange never pushes a rename down, so a device re-uploading its own title is all it knows.
+   */
   applyDeviceEdit(userId: number, bookmarkId: number, values: { title?: string; devicePos?: string; pageno?: number | null }) {
     return this.bookmarkRepo.updateFromDevice(userId, bookmarkId, values);
   }

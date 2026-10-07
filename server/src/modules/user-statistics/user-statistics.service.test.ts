@@ -1,3 +1,4 @@
+import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 import { UserStatisticsService } from './user-statistics.service';
 
 describe('UserStatisticsService', () => {
@@ -59,7 +60,7 @@ describe('UserStatisticsService', () => {
       }),
       getProgressFunnelInRange: vi.fn().mockResolvedValue(funnel),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getActivityOverview(
       {
         id: 7,
@@ -115,7 +116,7 @@ describe('UserStatisticsService', () => {
         },
       ]),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getActivityDay({ id: 7, isSuperuser: false, settings: { timezone: 'UTC' } } as any, '2026-04-08', {
       libraryIds: [1],
     });
@@ -132,7 +133,7 @@ describe('UserStatisticsService', () => {
   });
 
   it('rejects future Activity calendar years', async () => {
-    const service = new UserStatisticsService({} as any);
+    const service = new UserStatisticsService({} as any, new ReadingAttemptEventsService());
     await expect(service.getActivityCalendar({ id: 7, settings: { timezone: 'UTC' } } as any, 2027, { libraryIds: [] })).rejects.toThrow(
       'Invalid activity year',
     );
@@ -144,7 +145,7 @@ describe('UserStatisticsService', () => {
       getActivityAvailableYears: vi.fn().mockResolvedValue([2024, 2026]),
       getActivitySessionPage: vi.fn().mockResolvedValue([]),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     await expect(
       service.getActivityCalendar({ id: 7, isSuperuser: false, settings: { timezone: 'UTC' } } as any, 2023, { libraryIds: [2] }),
@@ -168,7 +169,7 @@ describe('UserStatisticsService', () => {
       }),
       getProgressFunnelInRange: vi.fn().mockResolvedValue({ started: 0, reached25: 0, reached50: 0, reached75: 0, completed: 0 }),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     const result = await service.getActivityOverview({ id: 7, isSuperuser: false, settings: { timezone: 'UTC' } } as any, {
       libraryIds: [2, 99],
@@ -187,7 +188,7 @@ describe('UserStatisticsService', () => {
         { id: 4, startedAt: new Date('2026-03-30T18:00:00Z'), endedAt: new Date('2026-03-30T19:30:00Z'), durationSeconds: 5400 },
       ]),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     const result = await service.getActivitySessionPatterns({ id: 7, isSuperuser: false, settings: { timezone: 'America/Denver' } } as any, {
       libraryIds: [3],
@@ -215,7 +216,7 @@ describe('UserStatisticsService', () => {
         { firstStartedAt: new Date('2026-01-01T20:00:00Z'), completedAt: new Date('2026-03-20T20:00:00Z'), format: 'PDF' },
       ]),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     const result = await service.getActivityCompletionSpeed({ id: 7, isSuperuser: false, settings: { timezone: 'UTC' } } as any, {
       libraryIds: [1],
@@ -255,7 +256,7 @@ describe('UserStatisticsService', () => {
         bands: [{ band: '15_to_30', medianProgressDelta: 2.5, sampleCount: 3 }],
       }),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const user = { id: 7, isSuperuser: false, settings: { timezone: 'UTC' } } as any;
 
     const genre = await service.getActivityGenreTime(user, { libraryIds: [1] });
@@ -285,7 +286,7 @@ describe('UserStatisticsService', () => {
       }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     const result = await service.getSummary({ id: 123, isSuperuser: false } as any, { libraryIds: [1, 2] });
 
@@ -310,7 +311,7 @@ describe('UserStatisticsService', () => {
       ]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getReadingHeatmap({ id: 123, isSuperuser: false } as any, { days: 3, libraryIds: [] });
 
     expect(repo.getDailyReadingStats).toHaveBeenCalledWith(123, false, [], 3);
@@ -352,7 +353,7 @@ describe('UserStatisticsService', () => {
       ]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getReadingSourceDistribution({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
 
     expect(repo.getDailyReadingSecondsBySource).toHaveBeenCalledWith(123, false, [], 365);
@@ -370,7 +371,7 @@ describe('UserStatisticsService', () => {
 
   it('returns an empty source distribution and honours the days override', async () => {
     const repo = { getDailyReadingSecondsBySource: vi.fn().mockResolvedValue([]) };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     const result = await service.getReadingSourceDistribution({ id: 7, isSuperuser: true } as any, { days: 30, libraryIds: [1] });
 
@@ -385,7 +386,7 @@ describe('UserStatisticsService', () => {
         .mockResolvedValueOnce([{ day: '2026-04-06', source: 'web', readingSeconds: 60 }])
         .mockResolvedValueOnce([{ day: '2026-04-06', source: 'watchos', readingSeconds: 90 }]),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const user = { id: 7, isSuperuser: false } as any;
 
     const first = await service.getReadingSourceDistribution(user, { libraryIds: [] });
@@ -410,7 +411,7 @@ describe('UserStatisticsService', () => {
       ]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getPeakReadingHours({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
 
     expect(repo.getPeakReadingHours).toHaveBeenCalledWith(123, false, [], 365, 'UTC');
@@ -446,7 +447,7 @@ describe('UserStatisticsService', () => {
       getPeakReadingHours: vi.fn().mockResolvedValue([]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     await service.getPeakReadingHours({ id: 123, isSuperuser: false, settings: { timezone: 'Australia/Brisbane' } } as any, {
       days: 30,
       libraryIds: [2],
@@ -463,7 +464,7 @@ describe('UserStatisticsService', () => {
       ]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getFavoriteReadingDays({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
 
     expect(repo.getFavoriteReadingDays).toHaveBeenCalledWith(123, false, [], 365);
@@ -492,7 +493,7 @@ describe('UserStatisticsService', () => {
       ]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getCompletionTimeline({ id: 123, isSuperuser: false } as any, { days: 120, libraryIds: [] });
 
     expect(repo.getCompletionTimeline).toHaveBeenCalledWith(123, false, [], 120);
@@ -513,7 +514,7 @@ describe('UserStatisticsService', () => {
       ]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getGoalTrajectory({ id: 123, isSuperuser: false } as any, { days: 120, goalBooks: 12, libraryIds: [] });
 
     expect(repo.getMonthlyCompletions).toHaveBeenCalledWith(123, false, [], 120);
@@ -538,7 +539,7 @@ describe('UserStatisticsService', () => {
       }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getProgressFunnel({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
 
     expect(repo.getProgressFunnelInRange).toHaveBeenCalledTimes(1);
@@ -558,7 +559,7 @@ describe('UserStatisticsService', () => {
       }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const user = { id: 7, isSuperuser: false } as any;
     const query = { libraryIds: [2, 1], days: 365 };
 
@@ -574,7 +575,7 @@ describe('UserStatisticsService', () => {
       getCompletionLatencyDays: vi.fn().mockResolvedValue([2, 10, 20, 60, 120, 400]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getCompletionLatency({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
 
     expect(repo.getCompletionLatencyDays).toHaveBeenCalledWith(123, false, [], 1825);
@@ -602,7 +603,7 @@ describe('UserStatisticsService', () => {
       recomputeRecentDailyStats: vi.fn().mockResolvedValue({ deleted: 1, inserted: 2, since: '2026-04-07' }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const user = { id: 9, isSuperuser: false } as any;
     const query = { libraryIds: [1], days: 365 };
 
@@ -624,7 +625,7 @@ describe('UserStatisticsService', () => {
         .mockResolvedValueOnce({ started: 18, reached25: 13, reached50: 9, reached75: 6, completed: 4 }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getProgressFunnel({ id: 123, isSuperuser: false } as any, { libraryIds: [1], days: 365, comparePrevious: true });
 
     expect(repo.getProgressFunnelInRange).toHaveBeenCalledTimes(2);
@@ -651,7 +652,7 @@ describe('UserStatisticsService', () => {
       ]),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.getSessionTimeline({ id: 123, isSuperuser: false } as any, { libraryIds: [1] });
 
     expect(result.year).toBe(2026);
@@ -701,7 +702,7 @@ describe('UserStatisticsService', () => {
       }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const result = await service.updateSessionTimelineSession(
       { id: 123, isSuperuser: false } as any,
       101,
@@ -750,7 +751,7 @@ describe('UserStatisticsService', () => {
       }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     await expect(
       service.updateSessionTimelineSession(
         { id: 123, isSuperuser: false } as any,
@@ -781,7 +782,7 @@ describe('UserStatisticsService', () => {
       moveSessionTimelineSessionAtomic: vi.fn(),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     await expect(
       service.updateSessionTimelineSession(
         { id: 123, isSuperuser: false } as any,
@@ -802,7 +803,7 @@ describe('UserStatisticsService', () => {
       moveSessionTimelineSessionAtomic: vi.fn(),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     await expect(
       service.updateSessionTimelineSession(
         { id: 123, isSuperuser: false } as any,
@@ -859,7 +860,7 @@ describe('UserStatisticsService', () => {
       }),
     };
 
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     await expect(
       service.updateSessionTimelineSession(
         { id: 123, isSuperuser: false } as any,
@@ -878,7 +879,7 @@ describe('UserStatisticsService', () => {
       getDailyReadingStats: vi.fn().mockResolvedValue([{ day: '2026-04-08', readingSeconds: 10, progressDelta: 1.234567, eventsCount: 1 }]),
       getCompletionLatencyDays: vi.fn().mockResolvedValue([]),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     await expect(service.getDailyReading({ id: 11, isSuperuser: false } as any, { days: 1, libraryIds: [] })).resolves.toEqual([
       { day: '2026-04-08', readingSeconds: 10, progressDelta: 1.2346, eventsCount: 1 },
@@ -912,7 +913,7 @@ describe('UserStatisticsService', () => {
         { bookId: 2, title: 'Single Session', startedAt: new Date('2026-04-02T00:00:00.000Z'), endProgress: 90 },
       ]),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
 
     const survival = await service.getReadingSurvival({ id: 11, isSuperuser: false } as any, { days: 365, libraryIds: [] });
     expect(survival.find((point) => point.threshold === 50)).toEqual({
@@ -943,7 +944,7 @@ describe('UserStatisticsService', () => {
       getReadingPacePoints: vi.fn().mockResolvedValue([{ durationSeconds: 240, progressDelta: 1.4, bucket: 'bookorbit', format: 'EPUB' }]),
       getAuthorGenreChord: vi.fn().mockResolvedValue({ nodes: [{ name: 'A' }, { name: 'G' }], links: [{ source: 'A', target: 'G', value: 10 }] }),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const user = { id: 9, isSuperuser: false } as any;
 
     await expect(service.getSessionArchetypes(user, { libraryIds: [1] })).resolves.toEqual([{ hour: 9, durationMinutes: 20, dayOfWeek: 2 }]);
@@ -990,7 +991,7 @@ describe('UserStatisticsService', () => {
       getSessionTimelineSessionById: vi.fn().mockResolvedValue(existing),
       moveSessionTimelineSessionAtomic: vi.fn().mockResolvedValue({ updated, conflict: null }),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const userA = { id: 10, isSuperuser: false } as any;
     const userB = { id: 20, isSuperuser: false } as any;
     const query = { libraryIds: [1] };
@@ -1017,7 +1018,7 @@ describe('UserStatisticsService', () => {
       getSummary: vi.fn().mockResolvedValue({ trackedBooks: 1, startedBooks: 1, inProgressBooks: 1, completedBooks: 0, meanProgressPercent: 10 }),
       rebuildDailyStatsForUser: vi.fn().mockResolvedValue({ deleted: 4, inserted: 2, libraries: 1 }),
     };
-    const service = new UserStatisticsService(repo as any);
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
     const userA = { id: 1, isSuperuser: false } as any;
     const userB = { id: 2, isSuperuser: false } as any;
     const query = { libraryIds: [1] };

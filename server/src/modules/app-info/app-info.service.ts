@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import type { AppInfoResponse } from '@bookorbit/types';
+import { SERVER_FEATURES, type AppInfoResponse } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -49,6 +49,7 @@ export class AppInfoService implements OnApplicationBootstrap {
       updateAvailable: this.updateAvailable,
       latestVersion: this.latestVersion,
       maxUploadSizeMb,
+      features: [...SERVER_FEATURES],
     };
   }
 

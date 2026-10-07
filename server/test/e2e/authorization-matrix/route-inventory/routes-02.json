@@ -674,6 +674,18 @@
   {
     "file": "server/src/modules/bookmark/bookmark.controller.ts",
     "className": "BookmarkController",
+    "methodName": "updateBookmark",
+    "httpMethod": "PATCH",
+    "path": "/books/:bookId/bookmarks/:bookmarkId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/bookmark/bookmark.controller.ts",
+    "className": "BookmarkController",
     "methodName": "deleteBookmark",
     "httpMethod": "DELETE",
     "path": "/books/:bookId/bookmarks/:bookmarkId",

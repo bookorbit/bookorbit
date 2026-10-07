@@ -1,10 +1,13 @@
 import { ZipArchive } from 'archiver';
+import { execFile as execFileCallback } from 'child_process';
 import { randomUUID } from 'crypto';
 import { createWriteStream } from 'fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
+import { createRequire } from 'module';
 import { tmpdir } from 'os';
 import { dirname, isAbsolute, join, normalize } from 'path';
 import { PDFDocument } from 'pdf-lib';
+import { promisify } from 'util';
 
 import { getSevenZip } from '../../../src/common/sevenzip';
 
@@ -24,6 +27,8 @@ interface EpubFixtureInput {
   title?: string;
   language?: string;
   uid?: string;
+  /** Adds a stored entry of this many bytes, for a file genuinely over a size limit on disk. */
+  paddingBytes?: number;
 }
 
 interface Fb2FixtureInput {
@@ -37,6 +42,52 @@ interface ComicFixtureInput {
   author?: string;
   publisher?: string;
   year?: number;
+}
+
+const execFile = promisify(execFileCallback);
+const requireInstaller = createRequire(__filename);
+
+/**
+ * The FFmpeg and FFprobe builds the test suite ships with, so audio scenarios do not depend on
+ * whatever the machine running them has installed.
+ */
+export function bundledFfmpegPaths(): { ffmpeg: string; ffprobe: string } {
+  const ffmpeg = requireInstaller('@ffmpeg-installer/ffmpeg') as { path: string };
+  const ffprobe = requireInstaller('@ffprobe-installer/ffprobe') as { path: string };
+  return { ffmpeg: ffmpeg.path, ffprobe: ffprobe.path };
+}
+
+export async function createM4bFixture(rootPath: string, relativePath: string, input: { title: string }): Promise<string> {
+  assertRelativePath(relativePath);
+  const absolutePath = join(rootPath, relativePath);
+  await mkdir(dirname(absolutePath), { recursive: true });
+  await execFile(bundledFfmpegPaths().ffmpeg, [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'sine=frequency=440:sample_rate=8000:duration=1',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '16k',
+    '-metadata',
+    `title=${input.title}`,
+    '-metadata',
+    `album=${input.title}`,
+    '-f',
+    'ipod',
+    absolutePath,
+  ]);
+  return absolutePath;
+}
+
+export async function readAudioTags(absolutePath: string): Promise<Record<string, string>> {
+  const { stdout } = await execFile(bundledFfmpegPaths().ffprobe, ['-v', 'error', '-show_entries', 'format_tags', '-of', 'json', absolutePath]);
+  const tags = (JSON.parse(String(stdout)) as { format?: { tags?: Record<string, string> } }).format?.tags ?? {};
+  return Object.fromEntries(Object.entries(tags).map(([key, value]) => [key.toLowerCase(), value]));
 }
 
 function assertRelativePath(relativePath: string): void {
@@ -117,6 +168,7 @@ export async function createEpubFixture(rootPath: string, relativePath: string, 
     { path: 'META-INF/container.xml', content: containerXml },
     { path: 'OPS/content.opf', content: opfXml },
     { path: 'OPS/chapter.xhtml', content: chapterXml },
+    ...(input.paddingBytes ? [{ path: 'OPS/padding.bin', content: Buffer.alloc(input.paddingBytes), store: true }] : []),
   ]);
 
   return absolutePath;

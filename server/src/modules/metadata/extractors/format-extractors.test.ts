@@ -502,8 +502,17 @@ describe('metadata format extractors', () => {
       expect.objectContaining({
         publishedYear: 1992,
         cover: null,
+        isbn13: '9780553380958',
       }),
     );
+  });
+
+  it('puts a formatted MOBI ISBN-10 in isbn10', async () => {
+    mockParseMobiFile.mockResolvedValue({ title: 'Book', isbn: '0-9752298-0-x', authors: [], tags: [] } as never);
+    mockExtractMobiCover.mockResolvedValue(null);
+    const result = await new MobiFormatExtractor().extract('/books/book.mobi');
+    expect(result?.isbn10).toBe('097522980X');
+    expect(result?.isbn13).toBeUndefined();
   });
 
   it('pdf extractor returns null for unparseable PDFs', async () => {

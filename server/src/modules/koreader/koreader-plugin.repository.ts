@@ -520,15 +520,14 @@ export class KoreaderPluginRepository {
     };
   }
 
-  async getLibraryMaxFileTimestamp(accessibleLibraryIds: number[] | null): Promise<Date | null> {
-    if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return null;
-    const libraryFilter = accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined;
-
+  async getGlobalMaxFileTimestamp(): Promise<Date | null> {
+    // A global file change may invalidate an unrelated user's token, which is harmless.
+    // The expression index makes this one probe instead of scanning all accessible files.
     const [row] = await this.db
-      .select({ maxTs: sql<Date | string | null>`max(greatest(${schema.bookFiles.createdAt}, ${schema.bookFiles.updatedAt}))` })
+      .select({ maxTs: sql<Date | string | null>`greatest(${schema.bookFiles.createdAt}, ${schema.bookFiles.updatedAt})` })
       .from(schema.bookFiles)
-      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
-      .where(libraryFilter);
+      .orderBy(sql`greatest(${schema.bookFiles.createdAt}, ${schema.bookFiles.updatedAt}) desc`)
+      .limit(1);
 
     return row?.maxTs ? new Date(row.maxTs) : null;
   }
@@ -543,5 +542,15 @@ export class KoreaderPluginRepository {
       .where(eq(schema.koreaderBookHashLinks.userId, userId));
 
     return { count: Number(row?.count ?? 0), maxTs: row?.maxTs ? new Date(row.maxTs) : null };
+  }
+
+  async getHashHistoryVersion(accessibleLibraryIds: number[] | null): Promise<string> {
+    if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return '';
+    const rows = await this.db
+      .select({ id: schema.libraries.id, revision: sql<string>`${schema.libraries.koreaderHashRevision}::text` })
+      .from(schema.libraries)
+      .where(accessibleLibraryIds ? inArray(schema.libraries.id, accessibleLibraryIds) : undefined)
+      .orderBy(schema.libraries.id);
+    return rows.map((row) => `${row.id}:${row.revision}`).join(',');
   }
 }

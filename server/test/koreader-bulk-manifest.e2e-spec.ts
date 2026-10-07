@@ -179,4 +179,33 @@ describe('KOReader bulk manifest at scale (e2e)', { timeout: 600_000 }, () => {
     // have no usable index, which is the regression this fixture exists to catch.
     expect(booksScan!['Node Type']).toMatch(/^Index (Only )?Scan$/);
   });
+  it('keeps version queries bounded with 30,000 files and historical identities', async () => {
+    await ctx.db.execute(sql`
+      insert into book_file_hash_history (book_file_id, file_hash, reason)
+      select f.id, f.file_hash, 'rescan' from book_files f
+      join books b on b.id = f.book_id
+      where b.library_id in (${library.libraryId}, ${decoyLibrary.libraryId})
+      on conflict (book_file_id, file_hash) do nothing
+    `);
+    await ctx.db.execute(sql`analyze book_file_hash_history`);
+    const timestampPlan = await ctx.db.execute(sql`
+      explain (analyze, buffers, format json)
+      select greatest(created_at, updated_at) from book_files
+      order by greatest(created_at, updated_at) desc limit 1
+    `);
+    const scans = collectScanNodes(timestampPlan.rows[0]!['QUERY PLAN']);
+    expect(scans).toHaveLength(1);
+    expect(scans[0]!['Node Type']).toContain('Index');
+    expect(JSON.stringify(timestampPlan.rows)).toContain('book_files_change_timestamp_idx');
+    expect((scans[0] as { 'Actual Rows': number })['Actual Rows']).toBe(1);
+    const revisionPlan = await ctx.db.execute(sql`
+      explain (analyze, buffers, format json)
+      select id, koreader_hash_revision::text from libraries
+      where id = ${library.libraryId} order by id
+    `);
+    const revisionScans = collectScanNodes(revisionPlan.rows[0]!['QUERY PLAN']);
+    expect(revisionScans).toHaveLength(1);
+    expect(revisionScans[0]!['Relation Name']).toBe('libraries');
+    expect((revisionScans[0] as { 'Actual Rows': number })['Actual Rows']).toBe(1);
+  });
 });

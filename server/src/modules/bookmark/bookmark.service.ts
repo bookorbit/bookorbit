@@ -6,6 +6,7 @@ import { BookService } from '../book/book.service';
 import { BookmarkRepository } from './bookmark.repository';
 import { BookmarkResponseDto } from './dto/bookmark-response.dto';
 import { CreateBookmarkDto } from './dto/create-bookmark.dto';
+import { UpdateBookmarkDto } from './dto/update-bookmark.dto';
 
 const BOOKMARK_CONFLICT_MESSAGE = 'Bookmark already exists';
 
@@ -46,6 +47,24 @@ export class BookmarkService {
     const concurrent = await this.bookmarkRepo.findLiveByLocation(user.id, bookId, location);
     if (concurrent) return BookmarkResponseDto.from(concurrent);
     throw new ConflictException(BOOKMARK_CONFLICT_MESSAGE);
+  }
+
+  /**
+   * Renames a bookmark or edits its note. A KOReader device that already holds the dogear does not
+   * receive the change: bookmark exchange pushes only bookmarks a device has never seen.
+   */
+  async updateBookmark(bookId: number, bookmarkId: number, user: RequestUser, dto: UpdateBookmarkDto): Promise<BookmarkResponseDto> {
+    await this.bookService.verifyBookAccess(bookId, user);
+    const patch = {
+      ...(dto.title !== undefined && { title: dto.title }),
+      ...(dto.note !== undefined && { note: dto.note }),
+    };
+    const row =
+      Object.keys(patch).length === 0
+        ? await this.bookmarkRepo.findLive(bookId, bookmarkId, user.id)
+        : await this.bookmarkRepo.update(bookId, bookmarkId, user.id, patch);
+    if (!row) throw new NotFoundException(this.notFoundMessage(bookId, bookmarkId));
+    return BookmarkResponseDto.from(row);
   }
 
   async deleteBookmark(bookId: number, bookmarkId: number, user: RequestUser): Promise<void> {

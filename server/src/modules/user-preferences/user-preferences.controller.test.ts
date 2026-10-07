@@ -92,6 +92,8 @@ describe('UserPreferencesController', () => {
       upsertLocalePreferences: vi.fn(),
       upsertCoverSearchPreferences: vi.fn(),
       upsertBookRequestPreferences: vi.fn(),
+      getAnnotationColorNamePreferences: vi.fn(),
+      upsertAnnotationColorNamePreferences: vi.fn(),
     } as unknown as Mocked<UserPreferencesService>;
 
     controller = new UserPreferencesController(service);
@@ -211,5 +213,21 @@ describe('UserPreferencesController', () => {
     await controller.upsertLocalePreferences({ settings: validLocalePreferences as unknown as Record<string, unknown> }, user);
 
     expect(service.upsertLocalePreferences).toHaveBeenCalledWith(99, validLocalePreferences);
+  });
+
+  it('GET /annotation-colors wraps the named colours in settings', async () => {
+    service.getAnnotationColorNamePreferences.mockResolvedValueOnce({ names: { '#FACC15': 'Ideas' } });
+
+    await expect(controller.getAnnotationColorNamePreferences(makeUser({ id: 11 }))).resolves.toEqual({
+      settings: { names: { '#FACC15': 'Ideas' } },
+    });
+    expect(service.getAnnotationColorNamePreferences).toHaveBeenCalledWith(11);
+  });
+
+  it('PUT /annotation-colors forwards the current user id and settings', async () => {
+    const settings = { names: { '#facc15': 'Ideas' } };
+
+    await expect(controller.upsertAnnotationColorNamePreferences({ settings }, makeUser({ id: 42 }))).resolves.toBeUndefined();
+    expect(service.upsertAnnotationColorNamePreferences).toHaveBeenCalledWith(42, settings);
   });
 });

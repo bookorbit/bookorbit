@@ -763,6 +763,71 @@ describe('BookDockFinalizeService', () => {
       ]);
     });
 
+    it.each(['book_per_folder', 'book_per_file'])('keeps unrelated root imports separate in %s mode', async (organizationMode) => {
+      const { service, processor, storage } = makeService();
+      vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
+        id: 5,
+        allowedFormats: ['epub'],
+        fileNamingPattern: '<{title}|{originalFilename}> - <{authors:first}> - <{year}>',
+        organizationMode,
+      } as never);
+      vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
+      const applyMetadata = vi.spyOn(service as never, 'applyMetadata').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'cleanupBookDockRecord').mockResolvedValue(undefined as never);
+      mockAccess.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+      mockStat.mockResolvedValue({ size: 100 } as never);
+
+      for (const [index, title] of ['First Book', 'Second Book'].entries()) {
+        processor.createUnitBookRecords.mockResolvedValueOnce({ bookIds: [101 + index], createdBookIds: [101 + index], attachedFileIds: [] });
+        const row = makeRow({
+          id: index + 1,
+          targetLibraryId: 5,
+          targetFolderId: 9,
+          selectedMetadata: { title, authors: ['Test Author'], publishedYear: 2024 },
+        });
+        const result = await (service as any).finalizeFile(row, undefined, undefined, new Map(), 1, true);
+
+        expect(result).toMatchObject({ success: true, bookId: 101 + index, newName: `${title} - Test Author - 2024.epub` });
+        const destPath = `/library/${title} - Test Author - 2024.epub`;
+        expect(storage.moveToPath).toHaveBeenNthCalledWith(index + 1, row.absolutePath, destPath);
+        expect(processor.createUnitBookRecords).toHaveBeenNthCalledWith(index + 1, 5, 9, [
+          expect.objectContaining({ folderPath: destPath, absolutePath: destPath }),
+        ]);
+        expect(applyMetadata).toHaveBeenNthCalledWith(index + 1, 101 + index, row, true);
+      }
+    });
+
+    it('uses the persisted filename spelling for a root book identity', async () => {
+      const { service, processor } = makeService();
+      vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
+        id: 5,
+        allowedFormats: ['epub'],
+        fileNamingPattern: '{title}',
+        organizationMode: 'book_per_folder',
+      } as never);
+      vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
+      vi.spyOn(service as never, 'applyMetadata').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'cleanupBookDockRecord').mockResolvedValue(undefined as never);
+      mockAccess.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+      mockStat.mockResolvedValue({ size: 100 } as never);
+      mockLstat.mockResolvedValue({} as never);
+      mockReaddir.mockResolvedValue(['dune.epub'] as never);
+
+      const result = await (service as any).finalizeFile(
+        makeRow({ targetLibraryId: 5, targetFolderId: 9, selectedMetadata: { title: 'Dune' } }),
+        undefined,
+        undefined,
+        new Map(),
+        1,
+        true,
+      );
+
+      expect(result).toMatchObject({ success: true, newName: 'dune.epub' });
+      expect(processor.createUnitBookRecords).toHaveBeenCalledWith(5, 9, [
+        expect.objectContaining({ folderPath: '/library/dune.epub', absolutePath: '/library/dune.epub' }),
+      ]);
+    });
+
     describe('organization modes', () => {
       it('attaches pdf to existing book folder in book_per_folder mode', async () => {
         const { service, processor } = makeService();

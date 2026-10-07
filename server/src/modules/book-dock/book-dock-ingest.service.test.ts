@@ -556,7 +556,7 @@ describe('BookDockIngestService', () => {
           isbn: '9781401284770',
           isAudiobook: false,
         },
-        {},
+        { isbn10: undefined, isbn13: '9781401284770' },
       );
     });
 
@@ -656,6 +656,21 @@ describe('BookDockIngestService', () => {
       const persistedMetadata = repo.update.mock.calls[1]?.[1]?.fetchedMetadata as Record<string, unknown>;
       expect(persistedMetadata).not.toHaveProperty('duration');
       expect(persistedMetadata.communityRatings).toEqual([{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }]);
+    });
+
+    it.each([
+      [{ isbn10: '0-306-40615-2' }, { isbn13: '9780306406157' }, 90],
+      [{ isbn13: '978-0-306-40615-7' }, { isbn13: '9780306406157' }, 95],
+      [{ isbn10: '0306406152' }, { isbn13: '9780525512196' }, 10],
+    ])('compares dock ISBN editions across formats (%j, %j)', async (embedded, fetched, confidence) => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
+      repo.findById.mockResolvedValue({ id: 9, fileName: 'book.epub', status: 'ready', embeddedMetadata: embedded });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({ resolved: fetched, sources: {} });
+
+      await (service as any).autoFetchMetadataAsync(9);
+
+      expect(repo.update).toHaveBeenLastCalledWith(9, expect.objectContaining({ confidence }));
     });
 
     it('falls back to ready status when metadata fetch pipeline throws', async () => {

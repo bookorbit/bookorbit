@@ -1,96 +1,140 @@
-vi.mock('fs/promises', () => ({
-  mkdir: vi.fn(),
-  stat: vi.fn(),
-}));
+vi.mock('fs/promises', () => ({ mkdir: vi.fn(), mkdtemp: vi.fn(), rename: vi.fn(), rm: vi.fn(), stat: vi.fn() }));
+vi.mock('child_process', () => ({ execFile: vi.fn() }));
 
-vi.mock('child_process', () => ({
-  execFile: vi.fn(),
-}));
-
+import { Test } from '@nestjs/testing';
+import { storageConfig } from '../../../config/config';
 import { execFile } from 'child_process';
-import { mkdir, stat } from 'fs/promises';
+import { mkdir, mkdtemp, rename, rm, stat } from 'fs/promises';
 
 import { KepubConversionService } from './kepub-conversion.service';
+import { KepubifyBinaryService } from './kepubify-binary.service';
 
+const execMock = vi.mocked(execFile);
 const statMock = vi.mocked(stat);
-const mkdirMock = vi.mocked(mkdir);
-const execFileMock = vi.mocked(execFile);
+const input = { sourcePath: '/books/source.epub', fileHash: 'abc', bookId: 44, hyphenate: false };
+const cacheDir = '/app-data/.kepub-cache/44';
+const tempDir = `${cacheDir}/.conversion-unit-test`;
+const tempPath = `${tempDir}/book.kepub.epub`;
 
-function makeService() {
-  const config = { get: vi.fn().mockReturnValue('/app-data') };
-  const kepubifyBinaryService = { getBinaryPath: vi.fn().mockResolvedValue('/tools/kepubify') };
-  return { service: new KepubConversionService(config as never, kepubifyBinaryService as never), kepubifyBinaryService };
+function successfulConversion() {
+  execMock.mockImplementation((_path, _args, _options, callback) => {
+    callback?.(null, '', '');
+    return {} as never;
+  });
 }
 
 describe('KepubConversionService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  let service: KepubConversionService;
+  let binary: { getBinaryPath: ReturnType<typeof vi.fn> };
+
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    binary = { getBinaryPath: vi.fn().mockResolvedValue('/tools/kepubify') };
+    statMock.mockRejectedValue(Object.assign(new Error('No cached file'), { code: 'ENOENT' }));
+    vi.mocked(mkdir).mockResolvedValue(undefined);
+    vi.mocked(mkdtemp).mockImplementation((prefix) => Promise.resolve(`${prefix}unit-test`) as never);
+    vi.mocked(rename).mockResolvedValue(undefined);
+    vi.mocked(rm).mockResolvedValue(undefined);
+    successfulConversion();
+    const module = await Test.createTestingModule({
+      providers: [
+        KepubConversionService,
+        { provide: storageConfig.KEY, useValue: { appDataPath: '/app-data' } },
+        { provide: KepubifyBinaryService, useValue: binary },
+      ],
+    }).compile();
+    service = module.get(KepubConversionService);
   });
 
-  it('returns an existing cached kepub path without running kepubify', async () => {
-    const { service, kepubifyBinaryService } = makeService();
-    statMock.mockResolvedValueOnce({} as never);
-
-    await expect(service.getKepubPath({ sourcePath: '/books/source.epub', fileHash: 'abc', bookId: 44, hyphenate: false })).resolves.toBe(
-      '/app-data/.kepub-cache/44/abc.kepub.epub',
-    );
-
-    expect(kepubifyBinaryService.getBinaryPath).not.toHaveBeenCalled();
-    expect(execFileMock).not.toHaveBeenCalled();
+  it('returns existing conversions without invoking the binary or altering the cache', async () => {
+    statMock.mockResolvedValue({} as never);
+    await expect(service.getKepubPath(input)).resolves.toBe(`${cacheDir}/abc.kepub.epub`);
+    expect(binary.getBinaryPath).not.toHaveBeenCalled();
+    expect(execMock).not.toHaveBeenCalled();
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(rename).not.toHaveBeenCalled();
   });
 
-  it('converts and caches a kepub when the cache is missing', async () => {
-    const { service } = makeService();
-    statMock.mockRejectedValueOnce(new Error('cache miss'));
-    execFileMock.mockImplementation((_path, _args, _options, cb) => {
-      cb?.(null, '', '');
-      return {} as never;
-    });
-
-    await expect(service.getKepubPath({ sourcePath: '/books/source.epub', fileHash: 'hash', bookId: 44, hyphenate: true })).resolves.toBe(
-      '/app-data/.kepub-cache/44/hash-hyph.kepub.epub',
-    );
-
-    expect(mkdirMock).toHaveBeenCalledWith('/app-data/.kepub-cache/44', { recursive: true });
-    expect(execFileMock).toHaveBeenCalledWith(
+  it.each([
+    { hash: 'abc', hyphenate: false, audioless: false, key: 'abc' },
+    { hash: 'abc', hyphenate: true, audioless: false, key: 'abc-hyph' },
+    { hash: 'abc', hyphenate: false, audioless: true, key: 'abc-noaudio-v1' },
+    { hash: 'abc', hyphenate: true, audioless: true, key: 'abc-noaudio-v1-hyph' },
+    { hash: null, hyphenate: false, audioless: false, key: 'nohash' },
+    { hash: undefined, hyphenate: false, audioless: false, key: 'nohash' },
+  ])('publishes a complete conversion with the compatible $key cache key', async ({ hash, hyphenate, audioless, key }) => {
+    await expect(service.getKepubPath({ ...input, fileHash: hash, hyphenate, audioless })).resolves.toBe(`${cacheDir}/${key}.kepub.epub`);
+    expect(mkdir).toHaveBeenCalledWith(cacheDir, { recursive: true });
+    expect(mkdtemp).toHaveBeenCalledWith(`${cacheDir}/.conversion-`);
+    expect(execMock).toHaveBeenCalledWith(
       '/tools/kepubify',
-      ['--hyphenate', '--output', '/app-data/.kepub-cache/44/hash-hyph.kepub.epub', '/books/source.epub'],
+      [...(hyphenate ? ['--hyphenate'] : []), '--output', tempPath, input.sourcePath],
       { timeout: 60_000 },
       expect.any(Function),
     );
+    expect(rename).toHaveBeenCalledExactlyOnceWith(tempPath, `${cacheDir}/${key}.kepub.epub`);
+    expect(rm).toHaveBeenCalledExactlyOnceWith(tempDir, { recursive: true, force: true });
+    expect(execMock.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(rename).mock.invocationCallOrder[0]!);
+    expect(vi.mocked(rename).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(rm).mock.invocationCallOrder[0]!);
   });
 
-  it('gives a stripped source its own cache entry so it cannot be served as the full archive', async () => {
-    const { service } = makeService();
-    statMock.mockRejectedValueOnce(new Error('cache miss'));
-    execFileMock.mockImplementation((_path, _args, _options, cb) => {
-      cb?.(null, '', '');
+  it('coalesces simultaneous misses and publishes only after conversion finishes', async () => {
+    let complete!: () => void;
+    execMock.mockImplementation((_path, _args, _options, callback) => {
+      complete = () => callback?.(null, '', '');
       return {} as never;
     });
-
-    // Same book and same file hash as the full archive; only the audioless flag separates them.
-    await expect(
-      service.getKepubPath({ sourcePath: '/tmp/kobo-epub/book.epub', fileHash: 'abc', bookId: 44, hyphenate: true, audioless: true }),
-    ).resolves.toBe('/app-data/.kepub-cache/44/abc-noaudio-v1-hyph.kepub.epub');
+    const first = service.getKepubPath(input);
+    const second = service.getKepubPath(input);
+    await vi.waitFor(() => expect(execMock).toHaveBeenCalledTimes(1));
+    const third = service.getKepubPath(input);
+    expect(rename).not.toHaveBeenCalled();
+    expect(rm).not.toHaveBeenCalled();
+    complete();
+    await expect(Promise.all([first, second, third])).resolves.toEqual(Array(3).fill(`${cacheDir}/abc.kepub.epub`));
+    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(rename).toHaveBeenCalledTimes(1);
   });
 
-  it('uses a stable nohash cache key when file hash is unavailable', async () => {
-    const { service } = makeService();
-    statMock.mockRejectedValueOnce(new Error('cache miss'));
-    execFileMock.mockImplementation((_path, _args, _options, cb) => {
-      cb?.(null, '', '');
+  it('does not coalesce different source hashes, books, or conversion options', async () => {
+    await Promise.all([
+      service.getKepubPath(input),
+      service.getKepubPath({ ...input, fileHash: 'def' }),
+      service.getKepubPath({ ...input, bookId: 45 }),
+      service.getKepubPath({ ...input, hyphenate: true }),
+      service.getKepubPath({ ...input, audioless: true }),
+    ]);
+    expect(execMock).toHaveBeenCalledTimes(5);
+    expect(rename).toHaveBeenCalledTimes(5);
+  });
+
+  it('cleans up a failed conversion without publishing it, and permits a retry', async () => {
+    execMock.mockImplementationOnce((_path, _args, _options, callback) => {
+      callback?.(new Error('Conversion failed'), '', '');
       return {} as never;
     });
+    await expect(service.getKepubPath(input)).rejects.toThrow('Conversion failed');
+    expect(rename).not.toHaveBeenCalled();
+    expect(rm).toHaveBeenCalledWith(tempDir, { recursive: true, force: true });
+    await expect(service.getKepubPath(input)).resolves.toBe(`${cacheDir}/abc.kepub.epub`);
+    expect(execMock).toHaveBeenCalledTimes(2);
+  });
 
-    await expect(service.getKepubPath({ sourcePath: '/books/source.epub', fileHash: null, bookId: 44, hyphenate: false })).resolves.toBe(
-      '/app-data/.kepub-cache/44/nohash.kepub.epub',
-    );
+  it('cleans up when atomic publication fails and allows a retry', async () => {
+    vi.mocked(rename).mockRejectedValueOnce(new Error('Rename failed'));
+    await expect(service.getKepubPath(input)).rejects.toThrow('Rename failed');
+    expect(rm).toHaveBeenCalledWith(tempDir, { recursive: true, force: true });
+    await expect(service.getKepubPath(input)).resolves.toBe(`${cacheDir}/abc.kepub.epub`);
+  });
 
-    expect(execFileMock).toHaveBeenCalledWith(
-      '/tools/kepubify',
-      ['--output', '/app-data/.kepub-cache/44/nohash.kepub.epub', '/books/source.epub'],
-      { timeout: 60_000 },
-      expect.any(Function),
-    );
+  it.each(['binary', 'directory', 'temporary-directory'])('does not publish after %s preparation fails', async (stage) => {
+    const error = new Error('Preparation failed');
+    if (stage === 'binary') binary.getBinaryPath.mockRejectedValue(error);
+    if (stage === 'directory') vi.mocked(mkdir).mockRejectedValue(error);
+    if (stage === 'temporary-directory') vi.mocked(mkdtemp).mockRejectedValue(error);
+    await expect(service.getKepubPath(input)).rejects.toThrow('Preparation failed');
+    expect(execMock).not.toHaveBeenCalled();
+    expect(rename).not.toHaveBeenCalled();
+    expect(rm).not.toHaveBeenCalled();
   });
 });

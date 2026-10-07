@@ -1,7 +1,14 @@
 import { randomUUID } from 'crypto';
+import { execFile } from 'child_process';
+import { rename, rm } from 'fs/promises';
+import { join } from 'path';
+import { promisify } from 'util';
 import { and, eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
+import { KoboKepubContextService } from '../src/modules/kobo/services/kobo-kepub-context.service';
+import { KoboSpanConverterService } from '../src/modules/position-converter/kobo-span-converter.service';
+import { KepubifyBinaryService } from '../src/modules/kobo/services/kepubify-binary.service';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -39,7 +46,7 @@ function flushTick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 150));
 }
 
-describe('Kobo annotation sync (e2e)', { timeout: 180_000 }, () => {
+describe.each(['epub', 'kepub'])('Kobo annotation sync with %s (e2e)', { timeout: 180_000 }, (format) => {
   let ctx!: ReaderStateIsolationE2EContext;
   let library!: CreatedLibrary;
   let epub!: LocatedBookFile;
@@ -95,12 +102,26 @@ describe('Kobo annotation sync (e2e)', { timeout: 180_000 }, () => {
   beforeAll(async () => {
     ctx = await createReaderStateIsolationE2EContext();
     library = await createLibraryWithFolder(ctx, { name: `kobo-annotations-${randomUUID()}` });
-    const epubPath = await createEpubFixture(library.folderPath, 'kobo-sync-book.epub', {
+    let epubPath = await createEpubFixture(library.folderPath, 'kobo-sync-book.epub', {
       title: `Kobo Sync Book ${randomUUID()}`,
       uid: `urn:uuid:${randomUUID()}`,
     });
+    if (format === 'kepub') {
+      const nativePath = join(library.folderPath, 'kobo-sync-book.kepub');
+      const binary = ctx.app.get(KepubifyBinaryService);
+      await promisify(execFile)(await binary.getBinaryPath(), ['--no-add-dummy-titlepage', '--output', `${nativePath}.epub`, epubPath], {
+        timeout: 60_000,
+      });
+      // Keep the paired fixture's spine identical; production conversion remains unchanged.
+      // kepubify copies instead of converting when its output does not end in .epub.
+      await rename(`${nativePath}.epub`, nativePath);
+      await rm(epubPath);
+      epubPath = nativePath;
+    }
     await triggerAndWaitForLibraryScan(ctx, library.libraryId);
     epub = await locateBookByAbsolutePath(ctx, epubPath);
+    const [scanned] = await ctx.db.select({ format: schema.bookFiles.format }).from(schema.bookFiles).where(eq(schema.bookFiles.id, epub.bookFileId));
+    expect(scanned!.format).toBe(format);
 
     const [admin] = await ctx.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.username, 'reader-state-e2e-admin'));
     adminUserId = admin!.id;
@@ -130,6 +151,16 @@ describe('Kobo annotation sync (e2e)', { timeout: 180_000 }, () => {
       payload: { convertToKepub: true },
     });
     expect(settings.statusCode).toBe(200);
+
+    const context = await ctx.app.get(KoboKepubContextService).resolveForBook(adminUserId, epub.bookId);
+    expect(context.ok).toBe(true);
+    if (context.ok) {
+      const point = await ctx.app
+        .get(KoboSpanConverterService)
+        .koboBookmarkToPositions({ bookFileId: context.file.id, ctx: context.ctx, chapterFilename: 'OPS/chapter.xhtml', spanId: 'kobo.1.1' });
+      expect(point.reason).toBeUndefined();
+      expect(point).toMatchObject({ status: 'exact', cfi: 'epubcfi(/6/2!/4/2/1:0)' });
+    }
 
     // Kobo library sync only covers books in collections flagged syncToKobo.
     const collection = await ctx.app.inject({
@@ -161,7 +192,10 @@ describe('Kobo annotation sync (e2e)', { timeout: 180_000 }, () => {
   }, 180_000);
 
   afterAll(async () => {
-    if (ctx) await closeReaderStateIsolationE2EContext(ctx);
+    if (ctx) {
+      if (library) await ctx.db.delete(schema.libraries).where(eq(schema.libraries.id, library.libraryId));
+      await closeReaderStateIsolationE2EContext(ctx);
+    }
   });
 
   it('ingests a device highlight into the hub with exact cfi and xpointer positions', async () => {
@@ -371,7 +405,7 @@ describe('Kobo annotation sync (e2e)', { timeout: 180_000 }, () => {
     expect(progress.koboLocationValue).toBe('kobo.1.1');
   });
 
-  it('serves a recomputed KoboSpan Location after the web reader moves the position', async () => {
+  it('serves a recomputed KoboSpan Location after an API reader moves the position', async () => {
     const save = await ctx.app.inject({
       method: 'POST',
       url: `/api/v1/books/files/${epub.bookFileId}/progress`,

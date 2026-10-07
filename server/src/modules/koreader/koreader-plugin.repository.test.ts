@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sqlChunkText } from '../../common/test-utils/sql-chunk-text';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
+import { Test } from '@nestjs/testing';
+import { DB } from '../../db';
+import { createCapturingDb } from '../../common/test-utils/capture-sql-db';
 
 function makeQueryChain(result: unknown) {
   const chain: Record<string, unknown> = {
@@ -9,7 +12,9 @@ function makeQueryChain(result: unknown) {
     },
   };
   chain.from = vi.fn().mockReturnValue(chain);
+  chain.innerJoin = vi.fn().mockReturnValue(chain);
   chain.where = vi.fn().mockReturnValue(chain);
+  chain.orderBy = vi.fn().mockReturnValue(chain);
   chain.limit = vi.fn().mockReturnValue(chain);
   return chain;
 }
@@ -38,9 +43,10 @@ describe('KoreaderPluginRepository', () => {
   let db: ReturnType<typeof makeDb>;
   let repo: KoreaderPluginRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     db = makeDb();
-    repo = new KoreaderPluginRepository(db as never);
+    const module = await Test.createTestingModule({ providers: [KoreaderPluginRepository, { provide: DB, useValue: db }] }).compile();
+    repo = module.get(KoreaderPluginRepository);
   });
 
   describe('getPluginTotals', () => {
@@ -87,6 +93,47 @@ describe('KoreaderPluginRepository', () => {
         failedPositions: 0,
         unmatchedBooks: 0,
       });
+    });
+  });
+
+  describe('getHashHistoryVersion', () => {
+    it('avoids querying for a user without library access', async () => {
+      await expect(repo.getHashHistoryVersion([])).resolves.toBe('');
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
+    it('preserves full bigint precision in the revision token', async () => {
+      db.select.mockReturnValue(
+        makeQueryChain([
+          { id: 31, revision: '9007199254740993' },
+          { id: 32, revision: '2' },
+        ]),
+      );
+      await expect(repo.getHashHistoryVersion([31, 32])).resolves.toBe('31:9007199254740993,32:2');
+    });
+
+    it.each([null, [31, 32]])('reads library revisions without scanning files or history for access %s', async (libraries) => {
+      const captured = createCapturingDb();
+      const module = await Test.createTestingModule({ providers: [KoreaderPluginRepository, { provide: DB, useValue: captured.db }] }).compile();
+      await module.get(KoreaderPluginRepository).getHashHistoryVersion(libraries);
+      expect(captured.queries).toHaveLength(1);
+      const query = captured.queries[0]!;
+      expect(query.sql).toContain('"koreader_hash_revision"::text');
+      expect(query.sql).toContain('order by "libraries"."id"');
+      expect(query.sql).not.toMatch(/count|join|book_files|book_file_hash_history/);
+      expect(query.params).toEqual(libraries ?? []);
+    });
+  });
+
+  describe('getGlobalMaxFileTimestamp', () => {
+    it('uses an indexed, bounded expression lookup without a library join', async () => {
+      const captured = createCapturingDb();
+      const module = await Test.createTestingModule({ providers: [KoreaderPluginRepository, { provide: DB, useValue: captured.db }] }).compile();
+      await module.get(KoreaderPluginRepository).getGlobalMaxFileTimestamp();
+      expect(captured.queries[0]!.sql).toContain('order by greatest(');
+      expect(captured.queries[0]!.sql).toContain('desc limit');
+      expect(captured.queries[0]!.sql).not.toMatch(/max\(|join|books/);
+      expect(captured.queries[0]!.params).toEqual([1]);
     });
   });
 

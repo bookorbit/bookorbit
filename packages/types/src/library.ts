@@ -80,6 +80,11 @@ export interface Library {
   fileWriteKindleMaxFileSizeMb: number;
   fileWriteAudioEnabled: boolean;
   fileWriteAudioMaxFileSizeMb: number;
+  /** Write metadata into every content file of a book, not just its primary file or audio tracks. */
+  fileWriteAllFiles: boolean;
+  /** EPUBs with synced narration have their own toggle and limit: they embed audio and run large. */
+  fileWriteReadAlongEnabled: boolean;
+  fileWriteReadAlongMaxFileSizeMb: number;
   fileRenameEnabled: boolean;
   folders: LibraryFolder[];
   bookCount?: number;

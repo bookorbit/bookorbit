@@ -557,6 +557,15 @@ describe('KoboReadingStateService', () => {
       return { db, updateChain };
     }
 
+    it('includes native KEPUB in the scoped primary-file lookup for hub bookmark delivery', async () => {
+      const { db } = makeRefreshableDb();
+      const capture = createCapturingDb();
+      db.select = capture.db.select.bind(capture.db) as never;
+      await makeService(db).getRawState(1, 44);
+      expect(capture.queries).toHaveLength(1);
+      expect(capture.queries[0]!.params).toEqual([44, 'epub', 'kepub', 1]);
+    });
+
     it('replaces the device Location with one computed from the hub position', async () => {
       const { db, updateChain } = makeRefreshableDb();
 

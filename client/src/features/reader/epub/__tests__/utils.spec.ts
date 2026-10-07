@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { i18n } from '@/i18n'
 import {
   cfiRangesMatch,
   cfiRangesOverlap,
@@ -18,8 +19,10 @@ describe('epub utils', () => {
   })
 
   it('formats dates using locale short month/day/year format', () => {
+    // Dates follow the app locale, not the machine's, so pin both sides to it.
+    i18n.global.locale.value = 'en'
     const iso = '2026-02-14T12:00:00.000Z'
-    const expected = new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    const expected = new Date(iso).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
 
     expect(formatDate(iso)).toBe(expected)
   })

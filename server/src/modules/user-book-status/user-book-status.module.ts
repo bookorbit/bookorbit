@@ -7,9 +7,10 @@ import { UserBookStatusService } from './user-book-status.service';
 import { ReadingAttemptRepository } from './reading-attempt.repository';
 import { ReadingAttemptService } from './reading-attempt.service';
 import { ReadingAttemptBackfillService } from './reading-attempt-backfill.service';
+import { ReadingAttemptEventsModule } from './reading-attempt-events.module';
 
 @Module({
-  imports: [AchievementModule],
+  imports: [AchievementModule, ReadingAttemptEventsModule],
   providers: [
     UserBookStatusService,
     UserBookStatusRepository,
@@ -18,6 +19,6 @@ import { ReadingAttemptBackfillService } from './reading-attempt-backfill.servic
     ReadingAttemptRepository,
     ReadingAttemptBackfillService,
   ],
-  exports: [UserBookStatusService, ReadingAttemptService],
+  exports: [UserBookStatusService, ReadingAttemptService, ReadingAttemptEventsModule],
 })
 export class UserBookStatusModule {}

@@ -43,6 +43,14 @@ export class KoboKepubContextService {
     if (!file) return { ok: false, reason: 'no_reader_file', settings: null };
 
     const settings = await this.koboSettingsService.getSettings(userId);
+    if (file.format === 'kepub') {
+      return {
+        ok: true,
+        file,
+        settings,
+        ctx: { kepubPath: file.absolutePath, fileHash: file.fileHash, hyphenate: false, kepubifyVersion: 'native-kepub' },
+      };
+    }
     const readiness = this.getKepubReadinessFailure(file, settings);
     if (readiness) return { ok: false, reason: readiness, settings };
 

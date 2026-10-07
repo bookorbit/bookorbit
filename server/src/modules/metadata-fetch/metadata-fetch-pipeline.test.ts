@@ -114,6 +114,105 @@ describe('MetadataFetchPipeline', () => {
     );
   });
 
+  describe('ISBN resolution', () => {
+    function primeIsbns(mergeStrategy: FieldPreference['mergeStrategy'] = 'fillMissing', enabled = true) {
+      const preferences = createPreferences((fields) => {
+        fields.isbn = { enabled, providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY], mergeStrategy };
+      });
+      preferencesService.getGlobal.mockResolvedValue(preferences);
+      resolver.resolve.mockReturnValue(preferences);
+      resolver.withForwardCompatibility.mockReturnValue(preferences);
+      registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    }
+
+    it('fills a normalized pair from one provider in priority order', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0-306-40615-2', isbn13: '978-0-306-40615-7' }),
+          candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { isbn13: '9781635766264' }),
+        ),
+      );
+      const { resolved, sources } = await pipeline.runWithSources({ title: SHARED_CANDIDATE_TITLE }, {});
+      expect(resolved).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' });
+      expect(sources).toMatchObject({ isbn10: 'google', isbn13: 'google' });
+    });
+
+    it.each([
+      { input: { isbn10: '0-9752298-0-x' }, expected: { isbn10: '097522980X' } },
+      { input: { isbn13: '978-0-306-40615-7' }, expected: { isbn13: '9780306406157' } },
+      { input: { isbn13: '9798896602590' }, expected: { isbn13: '9798896602590' } },
+    ])('keeps a single provider identifier in its own field: $expected', async ({ input, expected }) => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', input)));
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: ' ', isbn13: '' });
+      expect({ isbn10: resolved.isbn10, isbn13: resolved.isbn13 }).toEqual(expected);
+      expect(resolved.isbn).toBeUndefined();
+    });
+
+    it('uses a fallback with the same edition to fill a missing counterpart', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn13: '9781635766264' }),
+          candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { isbn10: '0306406152', isbn13: '9780306406157' }),
+        ),
+      );
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: '0-306-40615-2' });
+      expect(resolved.isbn10).toBeUndefined();
+      expect(resolved.isbn13).toBe('9780306406157');
+    });
+
+    it('does not combine different editions or accept malformed provider ISBNs', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0306406152', isbn13: '9781635766264' }),
+          candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { isbn13: '9780306406158' }),
+        ),
+      );
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, {});
+      expect(resolved.isbn10).toBeUndefined();
+      expect(resolved.isbn13).toBeUndefined();
+    });
+
+    it('does not borrow a missing ISBN from another edition', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn13: '9781635766264' })));
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: '0306406152' });
+      expect(resolved.isbn13).toBeUndefined();
+    });
+
+    it('does not change the edition of a locked ISBN when overwrite is configured', async () => {
+      primeIsbns('overwriteIfProvided');
+      fetchService.searchCandidates.mockReturnValue(
+        of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0306406152', isbn13: '9780306406157' })),
+      );
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn13: '9781635766264', lockedFields: ['isbn13'] });
+      expect(resolved.isbn10).toBeUndefined();
+      expect(resolved.isbn13).toBeUndefined();
+    });
+
+    it('keeps existing ISBNs by default and supports disabling the rule', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn13: '9781635766264' })));
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: '0306406152', isbn13: '9780306406157' });
+      expect(resolved.isbn13).toBeUndefined();
+      primeIsbns('fillMissing', false);
+      expect((await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, {})).isbn13).toBeUndefined();
+    });
+
+    it('replaces a complete pair only when configured and respects preserve-existing mode', async () => {
+      primeIsbns('overwriteIfProvided');
+      fetchService.searchCandidates.mockReturnValue(
+        of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0306406152', isbn13: '9780306406157' })),
+      );
+      const existing = { isbn13: '9781635766264' };
+      expect(await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, existing)).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' });
+      expect((await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, existing, undefined, { preserveExisting: true })).isbn10).toBeUndefined();
+    });
+  });
+
   it('derives enabled provider keys from active fields, filters unknown providers, and de-duplicates keys', async () => {
     const global = createPreferences((fields) => {
       fields.title = {

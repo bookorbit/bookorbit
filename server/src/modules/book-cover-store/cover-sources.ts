@@ -1,6 +1,7 @@
 import { isAudioFormat, type CoverMedium } from '@bookorbit/types';
 import { basename } from 'path';
 
+import { compareBookFilePaths } from '../../common/utils/audio-track-order.utils';
 import { naturalCompare } from '../../common/utils/natural-sort.utils';
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 
@@ -32,7 +33,7 @@ export function selectEmbeddedCoverSources<T extends CoverSourceCandidate>(
   const ebooks = content.filter((file) => !isAudioFormat(file.format!.toLowerCase()));
   const audio = content
     .filter((file) => isAudioFormat(file.format!.toLowerCase()))
-    .sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)));
+    .sort((a, b) => compareBookFilePaths(a.absolutePath, b.absolutePath));
   return {
     ebook: selectPrimaryFile(ebooks, formatPriority, { allowZeroByteFallback: true }),
     audio: audio[0] ?? null,

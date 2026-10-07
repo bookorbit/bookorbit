@@ -7,6 +7,7 @@ import { Readable } from 'stream';
 import { isAudioFormat, MetadataProviderKey, resolveBookDockSearchTitle, type BookDockMetadata } from '@bookorbit/types';
 import type { BookDockFileRow } from '../../db/schema';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { canonicalIsbn13, normalizeMetadataIsbn } from '../../common/text-match/isbn-normalize';
 import { waitForDirectoryStability } from '../../common/utils/fs-stability.utils';
 import { SUPPORTED_BOOK_FORMATS, UploadValidatorService } from '../upload/upload-validator.service';
 import { UploadStorageService } from '../upload/upload-storage.service';
@@ -348,7 +349,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     const params = {
       title: resolveBookDockSearchTitle(row.fileName, meta?.title),
       author: meta?.authors?.[0] ?? undefined,
-      isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+      isbn: meta?.isbn13?.trim() || meta?.isbn10?.trim() || undefined,
       isAudiobook: row.format != null && isAudioFormat(row.format),
     };
     if (!params.title && !params.isbn) return;
@@ -356,7 +357,14 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     await this.repo.update(fileId, { status: 'fetching' });
     this.emitChange();
     try {
-      const { resolved, sources, providerIds = {} } = await this.metadataFetchPipeline.runWithSources(params, {});
+      const {
+        resolved,
+        sources,
+        providerIds = {},
+      } = await this.metadataFetchPipeline.runWithSources(params, {
+        isbn10: meta?.isbn10,
+        isbn13: meta?.isbn13,
+      });
       // A dock file has one medium, so its one cover is that medium's slot.
       if (params.isAudiobook) {
         resolved.coverUrl = resolved.audioCoverUrl;
@@ -505,13 +513,20 @@ function authorSimilarity(embAuthors: string[], fetchAuthors: string[]): number 
 }
 
 function computeConfidence(embedded: BookDockMetadata, fetched: BookDockMetadata): number {
+  const embedded13 = normalizeMetadataIsbn(embedded.isbn13);
+  const embedded10 = normalizeMetadataIsbn(embedded.isbn10);
+  const fetched13 = normalizeMetadataIsbn(fetched.isbn13);
+  const fetched10 = normalizeMetadataIsbn(fetched.isbn10);
   // ISBN exact match - definitive
-  if (embedded.isbn13 && fetched.isbn13 && embedded.isbn13 === fetched.isbn13) return 95;
-  if (embedded.isbn10 && fetched.isbn10 && embedded.isbn10 === fetched.isbn10) return 90;
+  if (embedded13 && embedded13 === fetched13) return 95;
+  if (embedded10 && embedded10 === fetched10) return 90;
+
+  const embIsbn = embedded13 || embedded10;
+  const fetchIsbn = fetched13 || fetched10;
+  const canonical = canonicalIsbn13(embIsbn);
+  if (canonical && canonical === canonicalIsbn13(fetchIsbn)) return 90;
 
   // Conflicting ISBNs - almost certainly wrong book
-  const embIsbn = embedded.isbn13 ?? embedded.isbn10;
-  const fetchIsbn = fetched.isbn13 ?? fetched.isbn10;
   if (embIsbn && fetchIsbn && embIsbn !== fetchIsbn) return 10;
 
   let score = 0;

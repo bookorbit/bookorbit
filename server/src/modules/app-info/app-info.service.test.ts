@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SERVER_FEATURES } from '@bookorbit/types';
 
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { GITHUB_RELEASES_API } from './app-info.constants';
@@ -71,6 +72,22 @@ describe('AppInfoService', () => {
         maxUploadSizeMb: 500,
       });
       expect(info).not.toHaveProperty('bookDockPath');
+    });
+
+    it('advertises every server feature so clients can detect support', async () => {
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings());
+      const info = await service.getAppInfo();
+      expect(info.features).toEqual([...SERVER_FEATURES]);
+      expect(info.features).toEqual(
+        expect.arrayContaining(['annotation-stars', 'annotation-color-names', 'annotation-trash', 'book-journal', 'bookmark-edit']),
+      );
+    });
+
+    it('returns a fresh features array per call so a caller cannot mutate the shared list', async () => {
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings());
+      const first = await service.getAppInfo();
+      first.features?.push('book-journal');
+      expect((await service.getAppInfo()).features).toEqual([...SERVER_FEATURES]);
     });
 
     it('fetches from GitHub if checked for the first time', async () => {

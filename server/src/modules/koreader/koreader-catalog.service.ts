@@ -364,7 +364,8 @@ export class KoreaderCatalogService {
               subtitle: row.subtitle,
               publisher: row.publisher,
               language: row.language,
-              isbn13: row.isbn13 ?? row.isbn10,
+              isbn13: row.isbn13,
+              isbn10: row.isbn10,
               publishedYear: row.publishedYear,
               seriesName: row.seriesName,
               seriesIndex: row.seriesIndex,
@@ -559,19 +560,14 @@ export class KoreaderCatalogService {
   }
 
   private async getCollectionEntries(user: RequestUser): Promise<KoreaderCatalogEntry[]> {
-    const rows = await this.opdsBookService.getUserCollections(user.id);
-    return Promise.all(
-      rows.map(async (row) => {
-        const count = await this.countBooks(user, { collectionId: row.id });
-        return {
-          id: String(row.id),
-          title: row.name,
-          section: 'collections',
-          count,
-          booksHref: this.booksHref({ collectionId: row.id, sort: 'title' }),
-        };
-      }),
-    );
+    const rows = await this.opdsBookService.getUserCollections(user.id, user.isSuperuser, user.contentFilters);
+    return rows.map((row) => ({
+      id: String(row.id),
+      title: row.name,
+      section: 'collections',
+      count: row.bookCount,
+      booksHref: this.booksHref({ collectionId: row.id, sort: 'title' }),
+    }));
   }
 
   private async getSmartScopeEntries(user: RequestUser): Promise<KoreaderCatalogEntry[]> {
@@ -743,7 +739,8 @@ export class KoreaderCatalogService {
                 subtitle: detail.subtitle,
                 publisher: detail.publisher,
                 language: detail.language,
-                isbn13: detail.isbn13 ?? detail.isbn10,
+                isbn13: detail.isbn13,
+                isbn10: detail.isbn10,
                 publishedYear: detail.publishedYear,
                 seriesName: detail.seriesName,
                 seriesIndex: detail.seriesIndex,

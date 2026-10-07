@@ -20,7 +20,8 @@ import BookDockStatusBadge from './BookDockStatusBadge.vue'
 import MetadataMatchWorkspace from '@/features/book/components/metadata-match/MetadataMatchWorkspace.vue'
 import type { MetadataQuery } from '@/features/book/components/metadata-match/MetadataMatchQuery.vue'
 import { useBookDockDetail } from '../composables/useBookDockDetail'
-import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useBookDestination } from '@/features/library/composables/useBookDestination'
+import BookDestinationFields from '@/features/library/components/BookDestinationFields.vue'
 import { useMetadataSearch } from '@/features/book/composables/useMetadataSearch'
 import type { MetadataDiffApply } from '@/features/book/composables/useMetadataDiff'
 import { formatBytes } from '@/lib/formatting'
@@ -37,7 +38,8 @@ const emit = defineEmits<{
 }>()
 
 const { saved, saveError, saveMetadata, setTarget, coverUrl } = useBookDockDetail()
-const { libraries, fetchLibraries: fetchLibs } = useLibraries()
+const destination = useBookDestination({ defaultToFirstLibrary: true })
+const { libraryId: targetLibraryId, folderId: targetFolderId, hasDestination, fetchLibraries: fetchLibs } = destination
 
 const meta = computed(() => props.file.selectedMetadata ?? props.file.embeddedMetadata ?? ({} as BookDockMetadata))
 
@@ -47,14 +49,9 @@ const fetchedCandidate = ref<MetadataCandidate | null>(null)
 
 const sheetWidthClass = computed(() => (metaView.value === 'editor' ? 'sm:w-md lg:w-lg' : 'sm:w-[min(100vw-3rem,80rem)] sm:max-w-none'))
 
-const targetLibraryId = ref<number | null>(null)
-const targetFolderId = ref<number | null>(null)
 const persistedTargetLibraryId = ref<number | null>(null)
 const persistedTargetFolderId = ref<number | null>(null)
 const finishing = ref(false)
-
-const selectedLibrary = computed(() => libraries.value.find((l) => l.id === targetLibraryId.value))
-const folders = computed(() => selectedLibrary.value?.folders ?? [])
 
 const form = reactive({
   title: '',
@@ -101,27 +98,11 @@ watch(
     selectedCoverUrl.value = m.coverUrl ?? ''
     metaView.value = 'editor'
 
-    targetLibraryId.value = props.file.targetLibraryId ?? libraries.value[0]?.id ?? null
-    const lib = libraries.value.find((l) => l.id === targetLibraryId.value)
-    targetFolderId.value = props.file.targetFolderId ?? lib?.folders?.[0]?.id ?? null
+    destination.reset(props.file.targetLibraryId, props.file.targetFolderId)
     persistedTargetLibraryId.value = props.file.targetLibraryId
     persistedTargetFolderId.value = props.file.targetFolderId
   },
   { immediate: true },
-)
-
-watch(
-  () => libraries.value,
-  (libs) => {
-    if (!libs.length) return
-    if (targetLibraryId.value === null) {
-      targetLibraryId.value = props.file.targetLibraryId ?? libs[0]?.id ?? null
-    }
-    if (targetFolderId.value === null) {
-      const lib = libs.find((l) => l.id === targetLibraryId.value)
-      targetFolderId.value = props.file.targetFolderId ?? lib?.folders?.[0]?.id ?? null
-    }
-  },
 )
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -182,22 +163,8 @@ function onPublishedYearChange() {
   onFieldChange()
 }
 
-async function onLibraryChange(event: Event) {
-  const raw = Number((event.target as HTMLSelectElement).value)
-  const id = Number.isFinite(raw) && raw > 0 ? raw : null
-  targetLibraryId.value = id
-  const lib = libraries.value.find((l) => l.id === targetLibraryId.value)
-  targetFolderId.value = lib?.folders?.[0]?.id ?? null
-  await persistTarget()
-}
-
-async function onFolderChange(event: Event) {
-  const raw = Number((event.target as HTMLSelectElement).value)
-  targetFolderId.value = Number.isFinite(raw) && raw > 0 ? raw : null
-  await persistTarget()
-}
-
 async function persistTarget(): Promise<BookDockFile | null> {
+  if (!hasDestination.value) return null
   const libraryId = targetLibraryId.value
   const folderId = targetFolderId.value
   const previousSave = pendingTargetSave
@@ -627,28 +594,12 @@ onMounted(() => {
             </label>
           </div>
 
-          <div class="space-y-3 pt-1">
-            <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.destinationLibrary') }}</span>
-              <select
-                class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                :value="targetLibraryId ?? ''"
-                @change="onLibraryChange"
-              >
-                <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
-              </select>
-            </label>
-            <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.destinationFolder') }}</span>
-              <select
-                class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                :value="targetFolderId ?? ''"
-                @change="onFolderChange"
-              >
-                <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
-              </select>
-            </label>
-          </div>
+          <BookDestinationFields
+            :destination="destination"
+            :library-label="t('bookDock.destinationLibrary')"
+            :folder-label="t('bookDock.destinationFolder')"
+            @change="persistTarget"
+          />
 
           <p class="text-xs text-muted-foreground">{{ t('bookDock.sheet.added', { date: formatDate(file.createdAt) }) }}</p>
         </div>

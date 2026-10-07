@@ -124,7 +124,18 @@ describe('epub-zip-patcher', () => {
     expect(chapterEntry.stream).toHaveBeenCalledTimes(1);
     expect(lastArchive.append).toHaveBeenCalledWith(expect.objectContaining({ pipe: expect.any(Function) }), { name: 'OPS/ch1.xhtml' });
     expect(lastArchive.append).toHaveBeenCalledWith(Buffer.from('new-cover'), { name: 'OPS/images/cover.jpg' });
-    expect(mockRename).toHaveBeenCalledWith('/book.epub.tmp', '/book.epub');
+    expect(mockRename).toHaveBeenCalledWith(expect.stringMatching(/^\/\.epub-write-[0-9a-f-]{36}$/), '/book.epub');
+  });
+
+  it('writes beside the book under a hidden random name that never grows with the file name', async () => {
+    mockOpenFile.mockResolvedValue({ files: [] } as never);
+    const longName = `/library/${'L'.repeat(250)}.epub`;
+
+    await patch(longName, new Map());
+
+    const [tempPath, target] = mockRename.mock.calls[0]!;
+    expect(target).toBe(longName);
+    expect(String(tempPath)).toMatch(/^\/library\/\.epub-write-[0-9a-f-]{36}$/);
   });
 
   it('opens each carried-over entry stream only after the previous entry was written', async () => {
@@ -162,6 +173,7 @@ describe('epub-zip-patcher', () => {
 
     expect(missingEntry.stream).toHaveBeenCalledTimes(1);
     expect(mockRename).not.toHaveBeenCalled();
+    expect(mockUnlink).toHaveBeenCalledWith(expect.stringMatching(/^\/\.epub-write-/));
   });
 
   it('deletes temp file when rename fails', async () => {
@@ -169,6 +181,6 @@ describe('epub-zip-patcher', () => {
     mockRename.mockRejectedValue(new Error('rename failed'));
 
     await expect(patch('/book.epub', new Map())).rejects.toThrow('rename failed');
-    expect(mockUnlink).toHaveBeenCalledWith('/book.epub.tmp');
+    expect(mockUnlink).toHaveBeenCalledWith(mockRename.mock.calls[0]![0]);
   });
 });

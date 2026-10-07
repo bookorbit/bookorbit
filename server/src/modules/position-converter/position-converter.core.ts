@@ -48,8 +48,14 @@ export interface ConversionFailure {
 
 export type ConversionResult = ConversionSuccess | ConversionFailure;
 
-export function parseChapterDocument(xhtml: string): ChapterDocument {
+export function parseChapterDocument(xhtml: string, canonicalKepub = false): ChapterDocument {
   const $ = cheerio.load(decodeNamedEntities(xhtml), { xml: true });
+  if (canonicalKepub) {
+    // Match the iOS CFI projection, retaining text order and semantic markup.
+    $('span.koboSpan, div#book-columns, div#book-inner').each((_index, wrapper) => {
+      $(wrapper).replaceWith($(wrapper).contents());
+    });
+  }
   const root = $.root()[0] as unknown as CfiNode;
   if (xhtml.length < ENGINE_TEXT_SPLIT_SIZE) return { root, index: new ChapterTextIndex(root) };
   // CREngine splits source before entity decoding; decoded text lengths cannot determine its node indexes.

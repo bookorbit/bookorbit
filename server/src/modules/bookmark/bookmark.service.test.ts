@@ -46,6 +46,8 @@ function makeService() {
     create: vi.fn(),
     restoreAtLocation: vi.fn().mockResolvedValue(null),
     softDelete: vi.fn(),
+    findLive: vi.fn().mockResolvedValue(null),
+    update: vi.fn().mockResolvedValue(null),
   };
   const bookService = {
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
@@ -150,6 +152,55 @@ describe('BookmarkService', () => {
       await expect(service.createBookmark(5, makeUser(), { title: 'x', cfi: 'epubcfi(/6/2)' })).rejects.toThrow(NotFoundException);
       expect(bookmarkRepo.findLiveByLocation).not.toHaveBeenCalled();
       expect(bookmarkRepo.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateBookmark', () => {
+    it('verifies access, patches only the sent fields and returns the mapped bookmark', async () => {
+      const { service, bookmarkRepo, bookService } = makeService();
+      const user = makeUser();
+      bookmarkRepo.update.mockResolvedValue(makeBookmarkRow({ title: 'Renamed', note: 'Why', updatedAt: new Date('2026-02-01T00:00:00Z') }));
+
+      const result = await service.updateBookmark(5, 10, user, { title: 'Renamed', note: 'Why' });
+
+      expect(bookService.verifyBookAccess).toHaveBeenCalledWith(5, user);
+      expect(bookmarkRepo.update).toHaveBeenCalledWith(5, 10, 1, { title: 'Renamed', note: 'Why' });
+      expect(result).toBeInstanceOf(BookmarkResponseDto);
+      expect(result).toMatchObject({ title: 'Renamed', note: 'Why' });
+    });
+
+    it('clears the note with null and leaves the title alone', async () => {
+      const { service, bookmarkRepo } = makeService();
+      bookmarkRepo.update.mockResolvedValue(makeBookmarkRow({ note: null }));
+
+      await service.updateBookmark(5, 10, makeUser(), { note: null });
+
+      expect(bookmarkRepo.update).toHaveBeenCalledWith(5, 10, 1, { note: null });
+    });
+
+    it('reads the live bookmark instead of writing when nothing was sent', async () => {
+      const { service, bookmarkRepo } = makeService();
+      bookmarkRepo.findLive.mockResolvedValue(makeBookmarkRow());
+
+      await service.updateBookmark(5, 10, makeUser(), {});
+
+      expect(bookmarkRepo.update).not.toHaveBeenCalled();
+      expect(bookmarkRepo.findLive).toHaveBeenCalledWith(5, 10, 1);
+    });
+
+    it('throws NotFoundException for a missing, tombstoned or foreign bookmark', async () => {
+      const { service } = makeService();
+
+      await expect(service.updateBookmark(5, 99, makeUser(), { title: 'x' })).rejects.toThrow('Bookmark 99 not found for book 5');
+      await expect(service.updateBookmark(5, 99, makeUser(), {})).rejects.toThrow(NotFoundException);
+    });
+
+    it('propagates access errors and skips the update', async () => {
+      const { service, bookService, bookmarkRepo } = makeService();
+      bookService.verifyBookAccess.mockRejectedValue(new ForbiddenException());
+
+      await expect(service.updateBookmark(5, 10, makeUser(), { title: 'x' })).rejects.toThrow(ForbiddenException);
+      expect(bookmarkRepo.update).not.toHaveBeenCalled();
     });
   });
 

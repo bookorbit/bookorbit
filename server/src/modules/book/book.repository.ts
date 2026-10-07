@@ -1,3 +1,4 @@
+import { deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { SQL, and, asc, count, eq, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
@@ -1591,7 +1592,7 @@ export class BookRepository {
   }
 
   async deleteBookFile(fileId: number): Promise<void> {
-    await this.db.delete(bookFiles).where(eq(bookFiles.id, fileId));
+    await deleteBookFilesWithHashInvalidation(this.db, eq(bookFiles.id, fileId));
   }
 
   async updateBookFile(
@@ -2149,7 +2150,7 @@ export class BookRepository {
   }
 
   async deleteByIds(bookIds: number[]): Promise<void> {
-    await this.db.delete(books).where(inArray(books.id, bookIds));
+    await deleteBooksWithHashInvalidation(this.db, inArray(books.id, bookIds));
   }
 
   async deleteByIdsAndInvalidateScanState(bookIds: number[]): Promise<void> {
@@ -2203,7 +2204,8 @@ export class BookRepository {
         }
       }
 
-      await tx.delete(books).where(
+      await deleteBooksWithHashInvalidation(
+        tx,
         inArray(
           books.id,
           rows.map((row) => row.id),
@@ -2512,7 +2514,7 @@ export class BookRepository {
       .where(eq(bookFiles.id, fileId))
       .limit(1);
 
-    if (!file || file.primaryFileId !== fileId || file.format !== 'epub') return false;
+    if (!file || file.primaryFileId !== fileId || (file.format !== 'epub' && file.format !== 'kepub')) return false;
 
     const clampedPercentage = this.clampProgressPercentage(percentage);
     const normalizedKoboLocationSource = this.normalizeKoboLocationPart(koboLocationSource);

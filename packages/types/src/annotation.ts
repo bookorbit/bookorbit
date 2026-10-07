@@ -101,6 +101,8 @@ export interface AnnotationItem {
   updatedAt?: string | null;
   /** Present for PDF highlights; null/absent for EPUB and device-synced formats. */
   pdf?: AnnotationPdfPosition | null;
+  /** When the reader starred it; null when not starred. Absent from servers older than stars. */
+  starredAt?: string | null;
 }
 
 /**
@@ -231,6 +233,23 @@ export interface AnnotationHubBookFacet {
   author: string | null;
   count: number;
 }
+
+/** Bulk actions on `POST /annotations/bulk`. `star` and `unstar` touch only active rows. */
+export const ANNOTATION_BULK_ACTIONS = ["trash", "restore", "restyle", "star", "unstar"] as const;
+export type AnnotationBulkAction = (typeof ANNOTATION_BULK_ACTIONS)[number];
+
+export const ANNOTATION_COLOR_NAME_MAX_ENTRIES = 32;
+export const ANNOTATION_COLOR_NAME_MAX_LENGTH = 40;
+
+/**
+ * A reader's own labels for highlight colours, keyed by uppercase `#RRGGBB`. Stored per user
+ * under the `annotation-colors` preference category.
+ */
+export interface AnnotationColorNamePreferences {
+  names: Record<string, string>;
+}
+
+export const ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS: AnnotationColorNamePreferences = { names: {} };
 
 export type AnnotationPositionFormat = "cfi" | "xpointer" | "pdf" | "kobo_span";
 

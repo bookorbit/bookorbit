@@ -59,6 +59,11 @@ function highlightedAt(): SQL<Date> {
   return sql<Date>`coalesce(${annotations.sourceCreatedAt}, ${annotations.createdAt})`;
 }
 
+/** Starring an already starred row keeps its original timestamp. */
+function starredAtValue(starred: boolean): SQL<Date> | null {
+  return starred ? sql<Date>`coalesce(${annotations.starredAt}, now())` : null;
+}
+
 export interface HubFilters {
   bookId?: number;
   colors?: string[];
@@ -363,15 +368,28 @@ export class AnnotationRepository {
     });
   }
 
+  /**
+   * `version` drives device push-down, so it moves for a content change and stays put for a
+   * request that only stars or unstars. A request with no star field keeps the old behaviour of
+   * always bumping, so nothing an older client sends changes meaning.
+   */
   async update(
     bookId: number,
     annotationId: number,
     userId: number,
     data: Partial<Pick<NewAnnotation, 'note' | 'color' | 'style'>>,
+    options: { starred?: boolean } = {},
   ): Promise<AnnotationWithCfi | null> {
+    const contentChanged = data.note !== undefined || data.color !== undefined || data.style !== undefined;
+    const bumpVersion = options.starred === undefined || contentChanged;
     const [row] = await this.db
       .update(annotations)
-      .set({ ...data, version: sql`${annotations.version} + 1`, updatedAt: sql`now()` })
+      .set({
+        ...data,
+        ...(bumpVersion && { version: sql`${annotations.version} + 1` }),
+        ...(options.starred !== undefined && { starredAt: starredAtValue(options.starred) }),
+        updatedAt: sql`now()`,
+      })
       .where(and(eq(annotations.id, annotationId), ...this.baseConditions(bookId, userId)))
       .returning();
     if (!row) return null;
@@ -495,7 +513,9 @@ export class AnnotationRepository {
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
       .leftJoin(books, eq(books.id, annotations.bookId))
       .where(and(...conditions))
-      .orderBy(asc(bookMetadata.title), asc(annotations.chapterTitle), asc(highlightedAt()))
+      // Book by book, then each book in reading order, so chapters come out as they are read
+      // rather than alphabetically. The book id keeps two books sharing a title apart.
+      .orderBy(asc(bookMetadata.title), asc(annotations.bookId), ...readingPositionOrder('asc'), asc(highlightedAt()), asc(annotations.id))
       .limit(limit);
     return rows as HubAnnotationRow[];
   }
@@ -667,6 +687,24 @@ export class AnnotationRepository {
     return result.length;
   }
 
+  /** Active rows only, and only those whose star actually changes; never bumps the version. */
+  async bulkSetStarred(userId: number, ids: number[], starred: boolean): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await this.db
+      .update(annotations)
+      .set({ starredAt: starredAtValue(starred), updatedAt: sql`now()` })
+      .where(
+        and(
+          inArray(annotations.id, ids),
+          eq(annotations.userId, userId),
+          isNull(annotations.deletedAt),
+          starred ? isNull(annotations.starredAt) : isNotNull(annotations.starredAt),
+        ),
+      )
+      .returning({ id: annotations.id });
+    return result.length;
+  }
+
   async bulkRestyle(userId: number, ids: number[], patch: { color?: string; style?: string }): Promise<number> {
     if (ids.length === 0 || (patch.color === undefined && patch.style === undefined)) return 0;
     const result = await this.db
@@ -756,29 +794,53 @@ export class AnnotationRepository {
   private buildOrderBy(sort: AnnotationSort) {
     const direction = sort.dir === 'desc' ? desc : asc;
     if (sort.by === 'position') {
-      const sqlDirection = sql.raw(sort.dir === 'desc' ? 'desc' : 'asc');
-      const pdfPage = sql`(
-        select case
-          when ap_pdf.extras ->> 'pageno' ~ '^[0-9]+$' then (ap_pdf.extras ->> 'pageno')::int
-          else null
-        end
-        from ${annotationPositions} ap_pdf
-        where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
-        limit 1
-      )`;
-      const pdfY = sql`(
-        select ((regexp_match(ap_pdf.pos0, '"y"[[:space:]]*:[[:space:]]*(-?[0-9]+(?:[.][0-9]+)?)'))[1])::numeric
-        from ${annotationPositions} ap_pdf
-        where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
-        limit 1
-      )`;
-      return [
-        sql`${pdfPage} ${sqlDirection} nulls last`,
-        sql`${pdfY} ${sqlDirection} nulls last`,
-        sql`${annotationPositions.pos0} ${sqlDirection} nulls last`,
-        direction(annotations.id),
-      ];
+      return [...readingPositionOrder(sort.dir), direction(annotations.id)];
     }
     return [direction(highlightedAt()), direction(annotations.id)];
   }
+}
+
+/**
+ * The numeric steps of a CFI as an array, which Postgres compares element by element, so `/6/8`
+ * sorts before `/6/10` where the raw string would put it after. Null when the position is missing
+ * or carries no steps, so those rows still fall to the end under `nulls last`. The ordinality
+ * keeps the steps in the order they appear in the CFI, and `numeric` rather than `bigint` means a
+ * malformed CFI with an absurdly long digit run cannot overflow and fail the whole listing.
+ *
+ * Character classes rather than backslash escapes: inside a template literal JavaScript eats `\d`.
+ */
+export function cfiStepsSortKey(pos0: SQL | typeof annotationPositions.pos0): SQL {
+  return sql`nullif(array(
+    select (step.m)[1]::numeric
+    from regexp_matches(${pos0}, '[/:]([0-9]+)', 'g') with ordinality as step(m, n)
+    order by step.n
+  ), '{}'::numeric[])`;
+}
+
+/**
+ * Where a highlight sits in the book: PDF page, then the vertical offset on that page, then the
+ * CFI steps. Requires the canonical `cfi` position joined as `annotation_positions`.
+ */
+export function readingPositionOrder(dir: 'asc' | 'desc'): SQL[] {
+  const sqlDirection = sql.raw(dir === 'desc' ? 'desc' : 'asc');
+  const pdfPage = sql`(
+    select case
+      when ap_pdf.extras ->> 'pageno' ~ '^[0-9]+$' then (ap_pdf.extras ->> 'pageno')::int
+      else null
+    end
+    from ${annotationPositions} ap_pdf
+    where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
+    limit 1
+  )`;
+  const pdfY = sql`(
+    select ((regexp_match(ap_pdf.pos0, '"y"[[:space:]]*:[[:space:]]*(-?[0-9]+(?:[.][0-9]+)?)'))[1])::numeric
+    from ${annotationPositions} ap_pdf
+    where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
+    limit 1
+  )`;
+  return [
+    sql`${pdfPage} ${sqlDirection} nulls last`,
+    sql`${pdfY} ${sqlDirection} nulls last`,
+    sql`${cfiStepsSortKey(annotationPositions.pos0)} ${sqlDirection} nulls last`,
+  ];
 }

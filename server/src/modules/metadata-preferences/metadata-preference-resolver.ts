@@ -49,6 +49,7 @@ const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
 ];
 
 const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> = {
+  isbn: { mergeStrategy: 'fillMissing' },
   title: { mergeStrategy: 'overwriteIfProvided', providers: PROVIDERS_WITH_ITUNES },
   subtitle: { providers: PROVIDERS_WITH_ITUNES },
   description: { providers: PROVIDERS_WITH_ITUNES },

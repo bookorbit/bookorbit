@@ -11,6 +11,8 @@ export interface BookEligibilityData {
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
+  isbn10: string | null;
+  isbn13: string | null;
   communityRating: readonly unknown[];
   seriesName: string | null;
   seriesIndex: string | null;
@@ -80,6 +82,8 @@ export class BookMetadataFetchEligibilityService {
         return book.language === null || book.language === '';
       case 'pageCount':
         return book.pageCount === null;
+      case 'isbn':
+        return !book.isbn10?.trim() && !book.isbn13?.trim();
       case 'communityRating':
         return book.communityRating.length === 0;
       case 'seriesName':

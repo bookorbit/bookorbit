@@ -8,8 +8,9 @@ import type {
   BookReadingSessionStats,
   BookReadingSourceSlice,
   ReadingSessionSource,
+  ReadingSessionType,
 } from '@bookorbit/types';
-import { READING_SESSION_SOURCE_BUCKETS, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
+import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_TYPES, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
 import {
   aggregateReadingSessionDailyStats,
   getDayRangeForDateKeys,
@@ -26,6 +27,12 @@ type Db = NodePgDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const MIN_READING_SESSION_SECONDS = 10;
+
+// The column is a free varchar, so anything unexpected reads as plain reading rather than leaking
+// an unknown value to clients that switch on it.
+function toReadingSessionType(value: string | null | undefined): ReadingSessionType {
+  return (READING_SESSION_TYPES as readonly string[]).includes(value ?? '') ? (value as ReadingSessionType) : 'read';
+}
 const ESTIMATE_CLEANUP_PAGE_SIZE = 500;
 const CLEANUP_DAILY_STATS_MAX_SPAN_DAYS = 31;
 
@@ -483,6 +490,7 @@ export class ReadingSessionRepository {
           format: sql<string | null>`nullif(${bookFiles.format}, '')`,
           source: readingSessions.source,
           attemptId: readingSessions.attemptId,
+          sessionType: readingSessions.sessionType,
         })
         .from(readingSessions)
         .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
@@ -618,6 +626,7 @@ export class ReadingSessionRepository {
       format: r.format ?? null,
       source: r.source ?? null,
       attemptId: r.attemptId ?? null,
+      sessionType: toReadingSessionType(r.sessionType),
     }));
 
     return { items, total, page, pageSize, stats };

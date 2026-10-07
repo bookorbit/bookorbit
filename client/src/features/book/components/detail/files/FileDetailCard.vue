@@ -6,6 +6,8 @@ import { formatBytes } from '@/lib/formatting'
 import { formatDate, formatPercent, formatRelativeFromNow } from '@/i18n/formatters'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 import type { TreeFile } from '@/features/book/composables/useBookFileTree'
+import type { BookFileWriteTargetSkipReason } from '@bookorbit/types'
+import { FILE_WRITE_SKIP_MESSAGE_KEYS } from '@/features/book/lib/file-write-targets'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import FileFormatGlyph from './FileFormatGlyph.vue'
@@ -20,6 +22,8 @@ const props = defineProps<{
   isMultiTrackAudio: boolean
   runtimeSeconds: number | null
   isWriteTarget: boolean
+  /** Set when write-back considered this file and skipped it. */
+  writeSkipReason?: BookFileWriteTargetSkipReason | null
   canDownload: boolean
   canEdit: boolean
   canDelete: boolean
@@ -34,6 +38,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const writeSkipLabel = computed(() => (props.writeSkipReason ? t(FILE_WRITE_SKIP_MESSAGE_KEYS[props.writeSkipReason]) : null))
 
 function formatDuration(seconds: number | null | undefined): string | null {
   if (seconds == null) return null
@@ -122,6 +128,12 @@ function handleCopyPath() {
               class="inline-flex h-[18px] items-center rounded bg-success/15 px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-success"
             >
               {{ t('book.detail.files.writeTarget') }}
+            </span>
+            <span
+              v-else-if="writeSkipLabel"
+              class="inline-flex min-h-[18px] items-center rounded bg-muted px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground"
+            >
+              {{ writeSkipLabel }}
             </span>
             <span
               v-if="isAudioTrack"
