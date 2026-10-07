@@ -100,15 +100,12 @@ export class BookMergeRepository {
 
     await tx.execute(
       sql.raw(
-        //        `UPDATE book_series_memberships
-        //        SET book_id = ${targetBookId}
-        //       WHERE book_id IN (${ids})`,
         `WITH ordered AS (
           SELECT
               ctid,
               ROW_NUMBER() OVER (ORDER BY ctid) - 1 AS new_display_order
           FROM book_series_memberships
-          WHERE book_id IN (74,73,72,71,70,69,68,67,66,65,64,63,62)
+          WHERE book_id IN (${ids})
       )
       UPDATE book_series_memberships b
       SET
@@ -292,7 +289,6 @@ export class BookMergeRepository {
 
   private async mergeMetadata(tx: DbTransaction, ids: string, targetBookId: number): Promise<void> {
     const metadataColumns = [
-      'book_id',
       'title',
       'subtitle',
       'description',

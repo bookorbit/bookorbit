@@ -36,7 +36,7 @@ async function handleMerge(): Promise<void> {
     toast.error(t('book.merge.errors.differentLibraries'))
     return
   }
-  if (targetBookId.value == null) {
+  if (targetBookId.value == null || !selectedBookIds.value.includes(targetBookId.value)) {
     toast.error(t('book.merge.errors.notarget'))
     return
   }
@@ -91,6 +91,7 @@ type BookMeta = {
 }
 
 const bookArray = ref<BookMeta[]>([])
+let bookArrayLoadId = 0
 
 async function loadBookMeta(bookId: number): Promise<BookMeta> {
   const bookState = useBookDetail()
@@ -119,16 +120,17 @@ const canMerge = computed(() => {
 watch(
   [() => props.open, selectedBookIds],
   async ([isOpen, ids]) => {
+    const loadId = ++bookArrayLoadId
+    bookArray.value = []
     if (isOpen) {
       targetBookId.value = null
     }
-    if (!isOpen || !ids.length) {
-      bookArray.value = []
-      return
-    }
-    bookArray.value = await Promise.all(ids.map(loadBookMeta))
+    if (!isOpen || !ids.length) return
+
+    const books = await Promise.all(ids.map(loadBookMeta))
+    if (loadId === bookArrayLoadId) bookArray.value = books
   },
-  { immediate: false },
+  { deep: true, immediate: false },
 )
 </script>
 
