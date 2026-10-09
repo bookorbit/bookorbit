@@ -16,7 +16,7 @@
   <rect width="458" height="736" x="1" y="1" class="card" />
 
   <text x="20" y="35" class="title">Translation Progress</text>
-  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 63% average</text>
+  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 64% average</text>
 
   <line x1="20" y1="51" x2="440" y2="51" class="grid" />
 
@@ -32,31 +32,31 @@
   <rect x="142" y="120" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="120" width="246" height="6" rx="3" class="bar-done" />
   <text x="440" y="128" text-anchor="end" class="pct-label">100%</text>
-  <text x="20" y="153" class="lang-label">🇨🇳  Chinese (S)</text>
+  <text x="20" y="153" class="lang-label">🇪🇸  Spanish</text>
   <rect x="142" y="145" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="145" width="241" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="153" text-anchor="end" class="pct-label">98%</text>
-  <text x="20" y="178" class="lang-label">🇹🇼  Chinese (T)</text>
+  <rect x="142" y="145" width="246" height="6" rx="3" class="bar-done" />
+  <text x="440" y="153" text-anchor="end" class="pct-label">100%</text>
+  <text x="20" y="178" class="lang-label">🇨🇳  Chinese (S)</text>
   <rect x="142" y="170" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="170" width="241" height="6" rx="3" class="bar-progress" />
   <text x="440" y="178" text-anchor="end" class="pct-label">98%</text>
-  <text x="20" y="203" class="lang-label">🇫🇷  French</text>
+  <text x="20" y="203" class="lang-label">🇹🇼  Chinese (T)</text>
   <rect x="142" y="195" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="195" width="241" height="6" rx="3" class="bar-progress" />
   <text x="440" y="203" text-anchor="end" class="pct-label">98%</text>
-  <text x="20" y="228" class="lang-label">🇮🇹  Italian</text>
+  <text x="20" y="228" class="lang-label">🇫🇷  French</text>
   <rect x="142" y="220" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="220" width="241" height="6" rx="3" class="bar-progress" />
   <text x="440" y="228" text-anchor="end" class="pct-label">98%</text>
-  <text x="20" y="253" class="lang-label">🇪🇸  Spanish</text>
+  <text x="20" y="253" class="lang-label">🇩🇪  German</text>
   <rect x="142" y="245" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="245" width="241" height="6" rx="3" class="bar-progress" />
   <text x="440" y="253" text-anchor="end" class="pct-label">98%</text>
-  <text x="20" y="278" class="lang-label">🇳🇱  Dutch</text>
+  <text x="20" y="278" class="lang-label">🇮🇹  Italian</text>
   <rect x="142" y="270" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="270" width="239" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="278" text-anchor="end" class="pct-label">97%</text>
-  <text x="20" y="303" class="lang-label">🇩🇪  German</text>
+  <rect x="142" y="270" width="241" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="278" text-anchor="end" class="pct-label">98%</text>
+  <text x="20" y="303" class="lang-label">🇳🇱  Dutch</text>
   <rect x="142" y="295" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="295" width="239" height="6" rx="3" class="bar-progress" />
   <text x="440" y="303" text-anchor="end" class="pct-label">97%</text>
