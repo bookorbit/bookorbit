@@ -1,0 +1,1 @@
+ALTER TABLE "libraries" ADD COLUMN "regex_metadata" jsonb;

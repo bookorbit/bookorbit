@@ -1,3 +1,4 @@
+import { RegexMetadataPreviewDto, RegexMetadataValidationDto } from './dto/regex-metadata.dto';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
@@ -48,6 +49,18 @@ export class LibraryController {
     return this.libraryService.getOverview(user);
   }
 
+  @Post('regex-metadata/validate')
+  @RequirePermission(Permission.ManageLibraries)
+  validateRegexMetadata(@Body() dto: RegexMetadataValidationDto, @CurrentUser() user: RequestUser) {
+    return this.libraryService.validateRegexMetadata(dto, user);
+  }
+
+  @Post('regex-metadata/preview')
+  @RequirePermission(Permission.ManageLibraries)
+  previewRegexMetadata(@Body() dto: RegexMetadataPreviewDto, @CurrentUser() user: RequestUser) {
+    return this.libraryService.previewRegexMetadata(dto, user);
+  }
+
   @Get(':id')
   @RequireLibraryAccess('viewer')
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -92,8 +105,8 @@ export class LibraryController {
     getResourceId: (req) => parseInt(req.params['id'] as string, 10),
     description: (req) => `Updated library #${req.params['id']}`,
   })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibraryDto) {
-    return this.libraryService.update(id, dto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibraryDto, @CurrentUser() user: RequestUser) {
+    return this.libraryService.update(id, dto, user);
   }
 
   @Delete(':id')

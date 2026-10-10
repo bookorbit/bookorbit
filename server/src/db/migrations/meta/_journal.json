@@ -743,6 +743,13 @@
       "when": 1791388600818,
       "tag": "0105_add_library_file_write_read_along",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1791570865295,
+      "tag": "0106_regex_metadata",
+      "breakpoints": true
     }
   ]
 }

@@ -109,6 +109,7 @@ export class ScannerRepository {
         allowedFormats: libraries.allowedFormats,
         formatPriority: libraries.formatPriority,
         metadataPrecedence: libraries.metadataPrecedence,
+        regexMetadata: libraries.regexMetadata,
         excludePatterns: libraries.excludePatterns,
         organizationMode: libraries.organizationMode,
         addedAtSource: libraries.addedAtSource,
