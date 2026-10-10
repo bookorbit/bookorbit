@@ -1181,6 +1181,7 @@
         },
         "detail": {
           "excludePatterns": "Шаблоны исключений",
+          "allowedFormats": "Разрешенные форматы",
           "countsAsFinished": "Считать законченными",
           "peopleWithAccess": "Пользователи с доступом",
           "none": "Отсутствует",

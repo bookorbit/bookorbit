@@ -1570,6 +1570,7 @@
         "publishedYear": "Año de publicación",
         "language": "Idioma",
         "pageCount": "Recuento de páginas",
+        "isbn": "ISBNs",
         "communityRating": "Calificación de la comunidad",
         "seriesName": "Nombre de la serie",
         "seriesIndex": "Índice de series",
@@ -2886,7 +2887,13 @@
             "unmatchedDismissed": "Libro sin coincidencia descartado",
             "dismissFailed": "No se pudo descartar el libro no coincidente",
             "allDismissed": "{count, plural, =0 {No se descartó ningún libro sin coincidencia} one {Se descartó # libro sin coincidencia} other {Se descartaron # libros sin coincidencia} many {Se descartaron # libros sin coincidencia}}",
-            "dismissAllFailed": "No se pudieron descartar todos los libros no coincidentes"
+            "dismissAllFailed": "No se pudieron descartar todos los libros no coincidentes",
+            "reviewRefreshed": "Libros para revisar actualizados",
+            "reviewRefreshFailed": "Error al actualizar los libros para revisar",
+            "reviewDismissed": "Libro descartado de la revisión",
+            "reviewDismissFailed": "Error al descartar el libro de la revisión",
+            "reviewAllDismissed": "{count, plural, =0 {No se retiró ningún libro de la revisión} one {Se retiró # libro de la revisión} other {Se retiraron # libros de la revisión}}",
+            "reviewDismissAllFailed": "No se pudo descartar todos los libros de la revisión"
           },
           "modal": {
             "linkTitle": "Enlace KOReader libro",
@@ -2939,7 +2946,15 @@
           "syncedStatsNote": "Las estadísticas ya sincronizadas permanecerán en su libro BookOrbit actual.",
           "chooseDifferent": "Elige diferente",
           "saving": "Guardando...",
-          "confirmLink": "Confirmar enlace"
+          "confirmLink": "Confirmar enlace",
+          "reviewTitle": "Libros de KOReader a revisar",
+          "reviewHint": "Aquí aparecen los libros sin una coincidencia automática y los libros que has desvinculado. Los libros desvinculados aún pueden sincronizarse mediante una coincidencia automática. Vincula un libro para anular esa coincidencia o descártalo para eliminarlo de esta lista.",
+          "loadingReview": "Cargando libros para revisar...",
+          "noReview": "No hay libros KOReader para revisar.",
+          "manualUnlinkConfirmBody": "Elimina la vinculación manual con {title} y devuelve este libro a la lista de revisión. Las futuras sincronizaciones utilizarán una coincidencia automática si existe. Las estadísticas que ya se hayan sincronizado permanecerán en su libro actual de BookOrbit.",
+          "reviewDismissConfirmBody": "Esto lo elimina de tus libros pendientes de revisión. La coincidencia automática y los datos de sincronización existentes se conservan. Si un dispositivo vuelve a informar del hash sin una coincidencia, puede volver a aparecer.",
+          "reviewDismissAllConfirmTitle": "{count, plural, =0 {No hay libros para revisar} one {Descartar todo # libro para revisar?} other {Descartar todos los # libros para revisar?}}",
+          "reviewDismissAllConfirmBody": "Esto vacía por completo tu lista de libros pendientes de revisión, incluidas las entradas de otras páginas. La coincidencia automática y los datos de sincronización existentes se conservan. Si un dispositivo vuelve a informar de un hash sin una coincidencia, puede volver a aparecer."
         },
         "remove": "Quitar",
         "removing": "Eliminando...",
@@ -5716,6 +5731,9 @@
         },
         "searchDrawer": {
           "searchTitle": "Metadatos de búsqueda",
+          "autoSearchOnOpen": "Buscar automáticamente cuando se abre",
+          "autoSearchOnOpenHint": "Utiliza los datos del libro la próxima vez que se abra este panel. Se guardará para tu cuenta en este navegador.",
+          "searchOptions": "Opciones de búsqueda",
           "compareTitle": "Comparar metadatos",
           "searchSubtitle": "Encuentre el mejor proveedor compatible con este libro.",
           "compareSubtitle": "Revisa las diferencias y aplica solo lo que quieras."
@@ -5935,6 +5953,8 @@
         "score": "Puntuación",
         "scoreTooltip": "Puntuación de metadatos {score} de 100",
         "emptyFields": "{count, plural, one {campo vacío} other {campos vacíos}}",
+        "emptyFieldsCount": "{count, plural, one {# campo vacío} other {# campos vacíos}}",
+        "emptyFieldsHeading": "Campos de metadatos vacíos",
         "emptyFieldsTooltip": "Aún no se han rellenado: {fields}. Búscalos en Internet para consultarlos.",
         "libraryRow": "Biblioteca",
         "primaryRow": "Principal",
@@ -6036,6 +6056,12 @@
         "resume": "Continuar",
         "audiobook": "Audiolibro",
         "writeTarget": "Objetivo de escritura",
+        "notWritten": {
+          "formatNotSupported": "No escrito: formato no soportado",
+          "formatDisabled": "No escrito: formato desactivado",
+          "fileExceedsSizeLimit": "No escrito: sobrepasa el límite de tamaño",
+          "notContentFile": "No escrito: no hay contenido de libro"
+        },
         "enabled": "Activado",
         "disabled": "Apagado",
         "notSet": "no establecido",
@@ -9002,12 +9028,22 @@
         },
         "cover": {
           "title": "Incluir imagen de portada",
-          "hint": "Vuelve a escribir la portada almacenada en formatos de archivo compatibles."
+          "hint": "Vuelve a escribir la portada almacenada en formatos de archivo compatibles.",
+          "mediumHint": "También escribe la portada guardada en el archivo. Los archivos de libros electrónicos reciben la portada del libro y los archivos de audio reciben la portada del audiolibro; si a un archivo le falta la portada, conserva la suya."
+        },
+        "allFiles": {
+          "title": "Escribir en cada archivo de un libro",
+          "hint": "También escribe en los otros archivos del libro, como un audiolibro guardado junto a su libro electrónico o un PDF en la misma carpeta. Se escribe en todos los formatos de libro que haya allí, así que coloca un archivo complementario, como un cuaderno de ejercicios, en su propia carpeta para mantenerlo fuera. Los interruptores de formato y los límites de tamaño indicados abajo siguen aplicándose. Al desactivar esta opción se detienen las escrituras futuras; no se deshacen los archivos en los que ya se ha escrito."
         },
         "epub": {
           "title": "EPUB",
           "hint": "Escribe metadatos en el archivo OPF dentro del archivo EPUB.",
           "toggleAria": "Escribir metadatos EPUB"
+        },
+        "readAlong": {
+          "title": "Lectura EPUB",
+          "hint": "EPUB con narración sincronizada, como los libros de lectura acompañada de Storyteller. Contienen el audio, por lo que son archivos grandes y necesitan más memoria para volver a escribirlos.",
+          "toggleAria": "Escribir metadatos de lectura a lo largo de EPUB"
         },
         "fb2": {
           "title": "FictionBook (FB2)",
@@ -9032,7 +9068,9 @@
         "audio": {
           "title": "Audio",
           "hint": "Incrusta la portada almacenada en archivos M4B, M4A, MP3 y FLAC.",
-          "toggleAria": "Escribir portadas de audio"
+          "toggleAria": "Escribir portadas de audio",
+          "tagsHint": "Escribe etiquetas como título, autores, narradores y series en archivos M4B, M4A, MP3 y FLAC.",
+          "tagsToggleAria": "Escribir metadatos de audio"
         },
         "coverAudioHint": "Escribe también la portada almacenada en el archivo. Los archivos de audio sólo pueden tener una portada.",
         "audioNeedsCover": "Necesita activar “Incluye imagen de portada”.",
@@ -9245,6 +9283,13 @@
         "createFolder": "No se pudo crear la carpeta"
       }
     },
+    "destination": {
+      "loadFailed": "No se pudo cargar las bibliotecas de destino. Cierra y vuelve a abrirlas para intentarlo de nuevo.",
+      "noLibraries": "No hay bibliotecas de libros disponibles. Cree una biblioteca o pida acceso a un administrador.",
+      "noFolders": "Esta biblioteca no tiene carpetas de destino. Añade una carpeta en la configuración de la Biblioteca.",
+      "unavailable": "La biblioteca seleccionada ya no está disponible.",
+      "selectFolder": "Seleccione una carpeta..."
+    },
     "upload": {
       "library": "Biblioteca",
       "selectLibrary": "Seleccione una biblioteca...",
@@ -9269,6 +9314,59 @@
       "dropzone": {
         "title": "Suelte los archivos aquí o haga clic para explorar",
         "hint": "{formats} - hasta {size} MB cada uno"
+      }
+    }
+  },
+  "metadataReminders": {
+    "title": "Recordatorios de campos que faltan",
+    "navDescription": "Elija los campos de metadatos que desea ver",
+    "personal": "Tus preferencias",
+    "description": "Elija qué campos faltan en los recordatorios de libros. Estas preferencias se aplican en su biblioteca y no cambian las puntuaciones de metadatos.",
+    "sheetDescription": "Elija los campos que le interesan sin abandonar este libro.",
+    "fieldsHeading": "Campos a revisar",
+    "autoSave": "Cambios guardados automáticamente en tu cuenta.",
+    "saving": "Guardando preferencias...",
+    "saved": "Preferencias guardadas.",
+    "reset": "Restablecer valores predeterminados",
+    "disabled": "No hay campos seleccionados. Faltan recordatorios de campo ocultos.",
+    "saveFailed": "No se pudieron guardar sus preferencias. Sus preferencias anteriores han sido restauradas.",
+    "customize": "Personalizar recordatorios...",
+    "missingHeading": "Falta metadatos",
+    "missingDescription": "Faltan campos que ha elegido seguir.",
+    "missingCount": "{count, plural, one {# campo faltante} other {# campos faltantes}}",
+    "missingFields": "{count, plural, one {campo faltante} other {campos faltantes}}",
+    "fields": {
+      "publisher": {
+        "label": "Editor",
+        "hint": "El editor está relleno."
+      },
+      "language": {
+        "label": "Idioma",
+        "hint": "El idioma está relleno."
+      },
+      "publication": {
+        "label": "Año de publicación",
+        "hint": "Un año de publicación o una fecha completa es suficiente."
+      },
+      "pageCount": {
+        "label": "Número de páginas",
+        "hint": "El número de páginas se ha rellenado. Los libros que solo contienen audio se omiten."
+      },
+      "isbn": {
+        "label": "ISBN",
+        "hint": "O bien ISBN-10 o ISBN-13 es suficiente."
+      },
+      "genres": {
+        "label": "Géneros",
+        "hint": "Al menos un género se ha rellenado."
+      },
+      "tags": {
+        "label": "Etiquetas",
+        "hint": "Al menos una etiqueta está rellenada."
+      },
+      "description": {
+        "label": "Descripción",
+        "hint": "La descripción ha sido completada."
       }
     }
   },
