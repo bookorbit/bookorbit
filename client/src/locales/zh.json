@@ -9272,6 +9272,46 @@
       }
     }
   },
+  "metadataReminders": {
+    "missingHeading": "缺少元数据",
+    "missingDescription": "缺少您选择要跟踪的字段。",
+    "missingCount": "{count, plural, one {# 个缺少的字段} other {# 个缺少的字段}}",
+    "missingFields": "{count, plural, one {# 个缺少的字段} other {# 个缺少的字段}}",
+    "fields": {
+      "publisher": {
+        "label": "出版商",
+        "hint": "出版商已填写。"
+      },
+      "language": {
+        "label": "语言",
+        "hint": "语言已填写。"
+      },
+      "publication": {
+        "label": "出版日期",
+        "hint": "出版年份或完整日期已足够。"
+      },
+      "pageCount": {
+        "label": "页数",
+        "hint": "页数已填写。仅有声书会被跳过。"
+      },
+      "isbn": {
+        "label": "ISBN 编号",
+        "hint": "ISBN-10或ISBN-13就够了。"
+      },
+      "genres": {
+        "label": "流派",
+        "hint": "至少填入一种流派。"
+      },
+      "tags": {
+        "label": "标签",
+        "hint": "至少填写了一个标签。"
+      },
+      "description": {
+        "label": "描述",
+        "hint": "描述已填写。"
+      }
+    }
+  },
   "metadataScore": {
     "missingFields": "{count, plural, =0 {没有字段丢失 - 编辑元数据} other {# 字段丢失 - 编辑元数据}}"
   },

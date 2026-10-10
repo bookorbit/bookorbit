@@ -1570,6 +1570,7 @@
         "publishedYear": "Anno di pubblicazione",
         "language": "Lingua",
         "pageCount": "Conteggio delle pagine",
+        "isbn": "ISBN",
         "communityRating": "Valutazione della comunità",
         "seriesName": "Nome della serie",
         "seriesIndex": "Indice delle serie",
@@ -2480,6 +2481,9 @@
         "usedBy": "Usato da {libraries}",
         "followsBase": "Segue la {base}.",
         "copyPattern": "Copia modello",
+        "recipes": "Modelli",
+        "recipesTitle": "Parti da un modello",
+        "recipesReplace": "Sostituisce l'intero modello",
         "recipeInUse": "In uso",
         "insert": "Inserisci",
         "insertToolbar": "Inserisci nel modello",
@@ -2496,7 +2500,8 @@
           "bookFolder": "Cartella del libro",
           "file": "Nome file",
           "skipWhenEmpty": "Salta {level} quando il suo valore è mancante",
-          "skippedWhenEmpty": "Saltato quando il suo valore è mancante. Fare clic per creare sempre questa cartella."
+          "skippedWhenEmpty": "Saltato quando il suo valore è mancante. Fare clic per creare sempre questa cartella.",
+          "alwaysCreated": "Sempre creata. Fai clic per ignorare questa cartella quando il suo valore è assente."
         },
         "result": "Risultato",
         "previewWith": "Anteprima con",
@@ -2509,7 +2514,19 @@
           "audiobook": "Audiolibro",
           "standalone": "Nessuna serie"
         },
-        "previewingCase": "Anteprima {case}"
+        "previewingCase": "Anteprima {case}",
+        "showComplete": "Mostra completati",
+        "previewStale": "L'anteprima si cattura una volta che il modello è fisso.",
+        "noChange": "Nessun cambiamento",
+        "tagSkipped": "ignorato",
+        "tagFallback": "alternativa",
+        "tagBookFolder": "cartella del libro",
+        "tagUploadedName": "nome caricato",
+        "tagShortened": "accorciato a 255 byte",
+        "tagEmptyName": "nome vuoto",
+        "levelSkipped": "Saltato perché {token} è vuoto",
+        "levelEmptyName": "Il nome della cartella è vuoto. Imposta un nome alternativo per assicurarti che ne abbia sempre uno.",
+        "renameNote": "I libri già sul disco mantengono i loro percorsi. Le librerie che rinominano i file applicano questo modello la prossima volta che i dettagli di un libro vengono salvati: {libraries}."
       },
       "kobo": {
         "title": "Kobo Sincronizza",
@@ -2870,7 +2887,11 @@
             "unmatchedDismissed": "Libro senza corrispondenza ignorato",
             "dismissFailed": "Impossibile ignorare il libro senza corrispondenza",
             "allDismissed": "{count, plural, =0 {Nessun libro senza corrispondenza ignorato} one {# libro senza corrispondenza ignorato} other {# libri senza corrispondenza ignorati} many {# libri senza corrispondenza ignorati}}",
-            "dismissAllFailed": "Impossibile eliminare tutti i libri senza corrispondenza"
+            "dismissAllFailed": "Impossibile eliminare tutti i libri senza corrispondenza",
+            "reviewRefreshed": "Libri da rivedere aggiornati",
+            "reviewRefreshFailed": "Impossibile aggiornare i libri da rivedere",
+            "reviewDismissed": "Libro ritirato dalla recensione",
+            "reviewDismissFailed": "Impossibile aggiornare i libri da rivedere"
           },
           "modal": {
             "linkTitle": "Collega il libro KOReader",
