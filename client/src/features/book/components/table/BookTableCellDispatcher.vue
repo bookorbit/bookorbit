@@ -104,7 +104,7 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-muted"
+          class="flex h-6 w-6 items-center justify-center rounded-xs transition-colors hover:bg-muted"
           :class="lockStateClass"
           :aria-label="isFullyLocked ? t('book.table.locks.unlockAll') : t('book.table.locks.lockAll')"
           @click.stop="handleToggleAllLocks"

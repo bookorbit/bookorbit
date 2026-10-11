@@ -13,16 +13,26 @@ import {
   timestamp,
   uniqueIndex,
   varchar,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { BOOK_REQUEST_MEDIA_KINDS } from '@bookorbit/types';
-import type { BookRequestMetadataSource } from '@bookorbit/types';
+import type { BookRequestMetadataSource, LegacyBookRequestMediaKind } from '@bookorbit/types';
 
 import { books } from './books';
 import { bookDockFiles } from './book-dock';
 import { libraries, libraryFolders } from './libraries';
 import { users } from './auth';
 
-export const bookRequestMediaKindEnum = pgEnum('book_request_media_kind', BOOK_REQUEST_MEDIA_KINDS);
+/**
+ * The stored type still lists the retired `comic`, after the media a request can ask for. Requests
+ * made before comics were retired keep it, and dropping the value would fail every upgrade of a
+ * server holding one. Nothing writes it any more: the request DTOs only accept the live media.
+ */
+const LEGACY_MEDIA_KINDS: readonly LegacyBookRequestMediaKind[] = ['comic'];
+export const bookRequestMediaKindEnum = pgEnum('book_request_media_kind', [...BOOK_REQUEST_MEDIA_KINDS, ...LEGACY_MEDIA_KINDS] as [
+  ...typeof BOOK_REQUEST_MEDIA_KINDS,
+  LegacyBookRequestMediaKind,
+]);
 
 /**
  * Status lists are spelled out rather than interpolated from the shared constants. A CHECK body
@@ -109,6 +119,25 @@ export const bookRequests = pgTable(
      */
     fulfillerUserId: integer('fulfiller_user_id').references(() => users.id, { onDelete: 'set null' }),
 
+    /**
+     * The other half of an ebook and audiobook pair, written on both rows so either one finds the
+     * other. A pair is two ordinary requests rather than one request for two media: everything
+     * after submission runs per medium, and the halves really do part ways - one is in the library
+     * a minute later while the other waits days for a seeder, or is rejected outright.
+     *
+     * Set null on delete, so deleting one half leaves the other as a request made on its own.
+     */
+    companionRequestId: integer('companion_request_id').references((): AnyPgColumn => bookRequests.id, { onDelete: 'set null' }),
+
+    /**
+     * The book the arriving files join, rather than becoming a book of their own. Without it the
+     * second format of a work is filed wherever the naming pattern puts it, and an m4b tagged
+     * "Dune (Unabridged)" resolves to a different folder than the epub called "Dune".
+     *
+     * Set null on delete: the files then land the way any other request's do.
+     */
+    targetBookId: integer('target_book_id').references(() => books.id, { onDelete: 'set null' }),
+
     dedupeKey: varchar('dedupe_key', { length: 500 }).notNull(),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -134,6 +163,13 @@ export const bookRequests = pgTable(
     // Partial on purpose. The sweeper asks for self-serve rows of a given status and age every ten
     // minutes, which is selective enough to scan a long way at library scale without it, and the
     // predicate keeps every ordinary request out of the index entirely.
+    // Both set-null cascades walk these, and a deleted book or request must not scan the table.
+    index('book_requests_companion_request_id_idx')
+      .on(t.companionRequestId)
+      .where(sql`${t.companionRequestId} is not null`),
+    index('book_requests_target_book_id_idx')
+      .on(t.targetBookId)
+      .where(sql`${t.targetBookId} is not null`),
     index('book_requests_self_serve_idx')
       .on(t.selfServe, t.status, t.createdAt)
       .where(sql`${t.selfServe}`),

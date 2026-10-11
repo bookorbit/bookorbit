@@ -33,7 +33,7 @@ function handleToggle(): void {
   <li class="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30">
     <input
       type="checkbox"
-      class="mt-0.5 shrink-0 rounded accent-primary"
+      class="mt-0.5 shrink-0 rounded-xs accent-primary"
       :checked="selected"
       :disabled="disabled"
       :aria-label="title"
@@ -43,7 +43,7 @@ function handleToggle(): void {
       <p class="truncate text-sm font-medium text-foreground">{{ title }}</p>
       <p v-if="entry.authors.length > 0" class="truncate text-xs text-muted-foreground">{{ formatList(entry.authors) }}</p>
       <ul class="mt-1 flex flex-wrap gap-1">
-        <li v-for="badge in badges" :key="badge.key" class="rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+        <li v-for="badge in badges" :key="badge.key" class="rounded-xs border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
           {{ badge.label }}
         </li>
       </ul>

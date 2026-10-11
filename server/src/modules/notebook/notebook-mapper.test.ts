@@ -158,15 +158,13 @@ describe('toNotebookBookLabel', () => {
     title: 'Dune',
     author: 'Frank Herbert, Brian Herbert',
     coverSource: 'extracted',
-    coverAspectRatio: '1/1',
-    updatedAt: updated,
     readFileId: 77,
     readFileFormat: 'EPUB',
     hasAudio: true,
   };
 
-  it('maps the label with the given cover version', () => {
-    expect(toNotebookBookLabel(row, 'audio:x:-')).toEqual({
+  it('maps the label with the given cover face', () => {
+    expect(toNotebookBookLabel(row, { coverVersion: 'audio:x:-', coverAspectRatio: '1/1' })).toEqual({
       id: 5,
       title: 'Dune',
       author: 'Frank Herbert, Brian Herbert',
@@ -179,12 +177,14 @@ describe('toNotebookBookLabel', () => {
     });
   });
 
-  it('falls back to the portrait ratio and reports a book with nothing to read', () => {
-    expect(
-      toNotebookBookLabel(
-        { ...row, coverSource: null, coverAspectRatio: 'odd', readFileId: null, readFileFormat: null, hasAudio: false },
-        'legacy:x',
-      ),
-    ).toMatchObject({ hasCover: false, coverAspectRatio: '2/3', readFileId: null, readFileFormat: null, hasAudio: false });
+  it('falls back to a portrait frame without a face and reports a book with nothing to read', () => {
+    expect(toNotebookBookLabel({ ...row, coverSource: null, readFileId: null, readFileFormat: null, hasAudio: false }, undefined)).toMatchObject({
+      hasCover: false,
+      coverVersion: null,
+      coverAspectRatio: '2/3',
+      readFileId: null,
+      readFileFormat: null,
+      hasAudio: false,
+    });
   });
 });

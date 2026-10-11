@@ -56,6 +56,7 @@ import type {
   BookKoboState,
   BookMetadataRefreshPreviewFields,
   BookMetadataRefreshPreviewResponse,
+  MetadataCacheUsage,
   BookMetadataLockField,
   BookDeletionAuditMeta,
   BookQuery,
@@ -87,6 +88,7 @@ import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { LibraryService } from '../library/library.service';
 import { books } from '../../db/schema';
 import { ExistingMetadataFields, MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
+import type { CacheDirective } from '../../common/provider-cache/provider-cache-spec';
 import { splitMetadataIsbn } from '../../common/text-match/isbn-normalize';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
 import { FileRenameService, RENAME_RELEVANT_FIELDS } from '../file-write/file-rename.service';
@@ -105,6 +107,8 @@ import { selectEmbeddedCoverSources } from '../book-cover-store/cover-sources';
 import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sync.service';
+import type { DeliveryArtifact } from './delivery-artifact.service';
+import { DeliverySelectionService } from './delivery-selection.service';
 import { AudiolessEpubService } from './audioless-epub.service';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
@@ -147,6 +151,8 @@ const METADATA_UPDATE_FAILPOINTS = [
 ] as const;
 
 const METADATA_PROVIDER_KEY_SET = new Set<string>(Object.values(MetadataProviderKey));
+/** An explicit single-book refresh goes live; a provider that fails may still answer from the cache. */
+const EXPLICIT_REFRESH_DIRECTIVE: CacheDirective = { policy: 'refresh', allowFallback: true };
 
 export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
 export type ExportScope = 'primary' | 'all' | 'audio';
@@ -308,6 +314,7 @@ export class BookService {
     @Optional() private readonly audiolessEpubService?: AudiolessEpubService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
     @Optional() private readonly readingAttemptEvents?: ReadingAttemptEventsService,
+    @Optional() private readonly deliverySelection?: DeliverySelectionService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -1152,7 +1159,7 @@ export class BookService {
         tagRows,
         seriesMembershipRows,
       );
-      await this.coverStore.enrichCardVersions(cards);
+      await this.coverStore.enrichCardFaces(cards);
       const result = {
         items: cards,
         total,
@@ -1195,7 +1202,7 @@ export class BookService {
       seriesMembershipRows,
       customMetadataRows,
     );
-    await this.coverStore.enrichCardVersions(cards);
+    await this.coverStore.enrichCardFaces(cards);
     const result = {
       items: cards,
       total,
@@ -1486,8 +1493,9 @@ export class BookService {
     size: number;
     filename: string;
     bookId: number;
-    removedEntries: number;
-    sanitizedEntries: number;
+    removedEntries: number | null;
+    sanitizedEntries: number | null;
+    artifact?: DeliveryArtifact;
     koreaderHash: string;
     cleanup: () => Promise<void>;
   }> {
@@ -1495,14 +1503,28 @@ export class BookService {
     const file = await this.verifyFileAccess(fileId, user);
     if (file.format?.toLowerCase() !== 'epub') throw new BadRequestException('Audioless export is only available for EPUB files');
 
-    const filename = this.withDownloadFilenameLabel(await this.resolveDownloadFilenameForFile(file), ' - KOReader', 'epub');
+    const filename = this.withDownloadFilenameLabel(await this.resolveDownloadFilenameForFile(file), ' - Text Only', 'epub');
+    if (this.deliverySelection) {
+      const artifact = await this.deliverySelection.prepare(user.id, 'web', file, 'audioless_epub');
+      return {
+        path: artifact.path,
+        size: artifact.sizeBytes,
+        artifact,
+        filename,
+        bookId: file.bookId,
+        removedEntries: artifact.actualVariant === 'audioless_epub' ? null : 0,
+        sanitizedEntries: artifact.actualVariant === 'audioless_epub' ? null : 0,
+        koreaderHash: artifact.fileHash,
+        cleanup: artifact.release,
+      };
+    }
     const tempDir = await mkdtemp(join(tmpdir(), 'bookorbit-koreader-epub-'));
     const tempPath = join(tempDir, 'download.epub');
     try {
       const result = await this.audiolessEpubService.writeArchive(file.absolutePath, tempPath);
       const [{ size }, koreaderHash] = await Promise.all([stat(tempPath), computeFileHash(tempPath)]);
       if (options.linkKoreaderHash) {
-        await this.bookRepo.upsertKoreaderBookHashLink(user.id, koreaderHash, file.id);
+        await this.bookRepo.recordFileHashHistory(file.id, koreaderHash);
       }
 
       return {
@@ -2870,7 +2892,16 @@ export class BookService {
     };
   }
 
-  async refreshMetadata(id: number, preview: boolean, user: RequestUser): Promise<BookDetailDto | BookMetadataRefreshPreviewResponse> {
+  /**
+   * An explicit refresh goes live (a provider that fails may still answer from the cache, and the
+   * response says which did); the bulk refresh passes its own directive so it can use the cache.
+   */
+  async refreshMetadata(
+    id: number,
+    preview: boolean,
+    user: RequestUser,
+    options?: { cacheDirective?: CacheDirective },
+  ): Promise<(BookDetailDto & { metadataCache?: MetadataCacheUsage }) | BookMetadataRefreshPreviewResponse> {
     const event = 'book.refresh_metadata';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} preview=${preview} - refresh metadata started`);
@@ -2878,7 +2909,7 @@ export class BookService {
       const found = await this.bookRepo.findById(id);
       if (!found) throw new NotFoundException(`Book ${id} not found`);
 
-      const { book, authorRows, genreRows, communityRatingRows, fileRows } = found;
+      const { book, authorRows, genreRows, communityRatingRows, fileRows, narratorRows } = found;
       await this.libraryService.verifyUserAccess(user.id, book.books.libraryId, this.isSuperuser(user));
       const meta = book.book_metadata;
 
@@ -2892,7 +2923,7 @@ export class BookService {
         seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: providerIds,
         hardcoverEditionId: meta?.hardcoverEditionId ?? undefined,
-        isAudiobook: resolveIsAudiobook(fileRows, meta),
+        isAudiobook: resolveIsAudiobook(fileRows, meta, book.books.primaryFileId),
         maxCandidatesPerProvider: 1,
       };
 
@@ -2913,6 +2944,10 @@ export class BookService {
         genres: genreRows.map((g) => g.name),
         duration: meta?.durationSeconds ?? undefined,
         abridged: meta?.abridged ?? undefined,
+        // Without these a fill-missing narrators rule saw none and wrote over the book's own narrators
+        // and chapters, which the queued fetch never did because it always passed them.
+        narrators: narratorRows.map((narrator) => narrator.name),
+        chapters: meta?.chapters,
       };
       if (meta?.lockedFields?.length) existingFields.lockedFields = meta.lockedFields;
       const coverState = await this.coverStore.fetchState(id);
@@ -2924,7 +2959,11 @@ export class BookService {
         resolved,
         providerIds: resolvedProviderIds,
         diagnostics,
-      } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId, coverInputs.options);
+        cache,
+      } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId, {
+        ...coverInputs.options,
+        cacheDirective: options?.cacheDirective ?? EXPLICIT_REFRESH_DIRECTIVE,
+      });
 
       if (preview) {
         const previewResult = this.buildMetadataRefreshPreview(resolved, resolvedProviderIds);
@@ -2992,10 +3031,11 @@ export class BookService {
       if (coverDownloaded) detail = await this.getDetail(id, user);
 
       const result = detail ?? (await this.getDetail(id, user));
+      const fallbackProviders = cache.servedProviders.filter((provider) => provider.source === 'fallback');
       this.logger.log(
-        `[${event}] [end] bookId=${id} preview=false durationMs=${Date.now() - startedAt} updatedFields=${updatedFields} skippedLockedFields=${skippedFields.join('|') || 'none'} coverDownloaded=${coverDownloaded} - refresh metadata completed`,
+        `[${event}] [end] bookId=${id} preview=false durationMs=${Date.now() - startedAt} updatedFields=${updatedFields} skippedLockedFields=${skippedFields.join('|') || 'none'} coverDownloaded=${coverDownloaded} cacheServed=${cache.servedProviders.length} cacheFallbacks=${fallbackProviders.length} - refresh metadata completed`,
       );
-      return result;
+      return fallbackProviders.length > 0 ? { ...result, metadataCache: { fallbackProviders } } : result;
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -3010,11 +3050,14 @@ export class BookService {
     bookIds: number[],
     user: RequestUser,
     onProgress?: (event: { bookId: number; success: boolean; detail?: BookDetailDto; error?: string }) => void,
-    options?: { isCancelled?: () => boolean },
+    options?: { isCancelled?: () => boolean; ignoreCache?: boolean },
   ): Promise<{ processed: number; failed: number }> {
     const event = 'book.bulk_refresh_metadata';
     const startedAt = Date.now();
-    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} - bulk refresh metadata started`);
+    const cacheDirective: CacheDirective = { policy: options?.ignoreCache ? 'refresh' : 'default', allowFallback: true };
+    this.logger.log(
+      `[${event}] [start] count=${bookIds.length} userId=${user.id} ignoreCache=${options?.ignoreCache === true} - bulk refresh metadata started`,
+    );
     try {
       if (bookIds.length === 0) {
         this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} processed=0 failed=0 - bulk refresh metadata completed`);
@@ -3035,7 +3078,7 @@ export class BookService {
         let detail: BookDetailDto | undefined;
         let errorMessage: string | undefined;
         try {
-          const refreshed = await this.refreshMetadata(id, false, user);
+          const refreshed = await this.refreshMetadata(id, false, user, { cacheDirective });
           detail = refreshed as BookDetailDto;
           processed++;
           success = true;
@@ -3268,7 +3311,7 @@ export class BookService {
       this.bookRepo.findReadAloudSyncMode(user.id, id),
       this.coverStore.contextFor(id),
     ]);
-    if (!result) throw new NotFoundException(`Book ${id} not found`);
+    if (!result || !coverContext) throw new NotFoundException(`Book ${id} not found`);
 
     const { book, authorRows, genreRows, tagRows, fileRows, narratorRows, seriesMembershipRows, communityRatingRows } = result;
     const meta = book.book_metadata;
@@ -3318,13 +3361,9 @@ export class BookService {
       personalNoteUpdatedAt: personalNote ? new Date(personalNote.updatedAt) : null,
       communityRatings: this.mapCommunityRatingRows(communityRatingRows),
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
-      coverMedia: [...(coverContext?.media.hasEbook ? (['ebook'] as const) : []), ...(coverContext?.media.hasAudio ? (['audio'] as const) : [])],
-      covers: coverContext ? this.coverStore.slotDtos(coverContext) : { ebook: null, audio: null },
-      coverVersion: this.coverStore.coverVersion(
-        book.libraries?.coverAspectRatio ?? '2/3',
-        coverContext?.slots ?? [],
-        (meta?.coverUpdatedAt ?? book.books.updatedAt ?? book.books.addedAt).toISOString(),
-      ),
+      coverMedia: [...(coverContext.media.hasEbook ? (['ebook'] as const) : []), ...(coverContext.media.hasAudio ? (['audio'] as const) : [])],
+      covers: this.coverStore.slotDtos(coverContext),
+      ...this.coverStore.faceForContext(coverContext, (meta?.coverUpdatedAt ?? book.books.updatedAt ?? book.books.addedAt).toISOString()),
       hardcoverEditionId: meta?.hardcoverEditionId ?? null,
       lockedFields: this.bookMetadataLockService.normalizeLockedFields(meta?.lockedFields),
       providerIds: {
@@ -3353,6 +3392,8 @@ export class BookService {
         absolutePath: f.absolutePath,
         createdAt: f.createdAt,
         filename: basename(f.absolutePath),
+        fileHash: f.fileHash,
+        contentVersion: f.updatedAt.toISOString(),
         durationSeconds: f.durationSeconds,
         mediaOverlay: mediaOverlayByFileId.get(f.id) ?? null,
       })),

@@ -191,8 +191,8 @@ describe('accent metadata records', () => {
 
       expect(lightBlock, `missing light CSS block for ${accent}`).toBeDefined()
       expect(darkBlock, `missing dark CSS block for ${accent}`).toBeDefined()
-      expect(lightBlock!).toContain(`--primary: oklch(${lightL} ${lightC} ${hue});`)
-      expect(darkBlock!).toContain(`--primary: oklch(${darkL} ${darkC} ${hue});`)
+      expect(lightBlock!).toContain(`--accent-primary: oklch(${lightL} ${lightC} ${hue});`)
+      expect(darkBlock!).toContain(`--accent-primary: oklch(${darkL} ${darkC} ${hue});`)
     }
   })
 

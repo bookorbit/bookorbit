@@ -8,6 +8,7 @@ import { promisify } from 'util';
 
 import { FORMAT_M4A, FORMAT_M4B, FORMAT_MP3 } from '../../file-write.constants';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { MP4_NATIVE_TAG_KEYS, writeMp4FreeformTags, type Mp4FreeformTag } from './mp4-freeform-tags';
 
 const execFile = promisify(execFileCallback);
 const FFMPEG_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -48,6 +49,9 @@ export class AudioMetadataEmbedder {
         maxBuffer: FFMPEG_OUTPUT_MAX_BUFFER_BYTES,
         timeout: FFMPEG_TIMEOUT_MS,
       });
+      if (usesMp4MetadataTags(format) && !useMp4MetadataTags) {
+        await writeMp4FreeformTags(tempPath, mp4FreeformTags(input.metadata), { carryOverFrom: filePath });
+      }
       await replaceFileAtomically(tempPath, filePath);
     } catch (error) {
       await removeFileIfPresent(tempPath);
@@ -111,6 +115,13 @@ function buildFfmpegArgs(
   args.push(tempPath);
 
   return args;
+}
+
+/** The tags FFmpeg's iTunes mode would drop, named upper case as iTunes-style taggers name freeform tags. */
+function mp4FreeformTags(metadata: AudioMetadataArg[]): Mp4FreeformTag[] {
+  return metadata
+    .filter((entry) => !entry.specifier && !MP4_NATIVE_TAG_KEYS.has(entry.key))
+    .map((entry) => ({ name: entry.key.toUpperCase(), value: entry.value }));
 }
 
 function usesMp4MetadataTags(format: string): boolean {

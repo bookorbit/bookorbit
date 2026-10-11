@@ -102,12 +102,12 @@ async function submit() {
           </div>
 
           <label class="flex items-center gap-2.5 cursor-pointer select-none">
-            <input type="checkbox" v-model="isPublic" class="h-4 w-4 rounded border border-input accent-primary" />
+            <input type="checkbox" v-model="isPublic" class="h-4 w-4 rounded-xs border border-input accent-primary" />
             <span class="text-sm text-foreground">{{ t('smartScope.visibleToAll') }}</span>
           </label>
 
           <label v-if="showKoboSync" class="flex items-center gap-2.5 cursor-pointer select-none">
-            <input type="checkbox" v-model="syncToKobo" class="h-4 w-4 rounded border border-input accent-primary" />
+            <input type="checkbox" v-model="syncToKobo" class="h-4 w-4 rounded-xs border border-input accent-primary" />
             <span class="text-sm text-foreground">{{ t('smartScope.syncToKobo') }}</span>
           </label>
 

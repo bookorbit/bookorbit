@@ -105,8 +105,8 @@ function timeRemaining(episode: PodcastEpisodeListItem) {
       <span class="sr-only">{{ t('podcast.library.loading') }}</span>
       <div v-for="(_, n) in SKELETONS" :key="n" class="w-[150px] shrink-0">
         <div class="aspect-square w-full animate-pulse rounded-lg bg-muted" />
-        <div class="mt-2 h-3.5 w-full animate-pulse rounded bg-muted" />
-        <div class="mt-1.5 h-3 w-2/3 animate-pulse rounded bg-muted" />
+        <div class="mt-2 h-3.5 w-full animate-pulse rounded-xs bg-muted" />
+        <div class="mt-1.5 h-3 w-2/3 animate-pulse rounded-xs bg-muted" />
       </div>
     </div>
 

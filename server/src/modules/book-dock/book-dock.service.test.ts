@@ -8,6 +8,13 @@ vi.mock('fs/promises', () => ({
 }));
 
 import { rmdir, unlink } from 'fs/promises';
+import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
+
+vi.mock('../reader/epub/epub-media-overlay-capability', () => ({
+  inspectEpubMediaOverlayFields: vi
+    .fn()
+    .mockResolvedValue({ mediaOverlayAvailable: false, mediaOverlayDurationSeconds: null, mediaOverlayCheckedAt: null }),
+}));
 
 function row(overrides?: Record<string, unknown>) {
   return {
@@ -135,6 +142,27 @@ describe('BookDockService', () => {
     expect(repo.findUnitFilesByDockFileIds).toHaveBeenCalledWith([shared.id]);
     expect(page.items[0].unitFiles).toEqual([member]);
     expect(detail.unitFiles).toEqual([member]);
+  });
+
+  it('says whether a single EPUB is a read-along, and never opens anything else to ask', async () => {
+    const { service, repo } = makeService();
+    vi.mocked(inspectEpubMediaOverlayFields).mockResolvedValueOnce({
+      mediaOverlayAvailable: true,
+      mediaOverlayDurationSeconds: 3600,
+      mediaOverlayCheckedAt: new Date(),
+    });
+    repo.findUnitFiles.mockResolvedValue([]);
+
+    repo.findById.mockResolvedValue(row({ format: 'epub', absolutePath: '/dock/dune.epub' }));
+    expect((await service.getFile(1, 1, true, { readAlong: true })).readAlong).toBe(true);
+    expect(inspectEpubMediaOverlayFields).toHaveBeenCalledWith('/dock/dune.epub', 'epub', expect.any(Function));
+
+    vi.mocked(inspectEpubMediaOverlayFields).mockClear();
+    // An ordinary read, which the upload response is too, never opens the file.
+    expect((await service.getFile(1, 1, true)).readAlong).toBeUndefined();
+    repo.findById.mockResolvedValue(row({ format: 'm4b', absolutePath: '/dock/dune.m4b' }));
+    expect((await service.getFile(1, 1, true, { readAlong: true })).readAlong).toBeUndefined();
+    expect(inspectEpubMediaOverlayFields).not.toHaveBeenCalled();
   });
 
   it('discards a shared-folder book and its members without touching sibling books', async () => {

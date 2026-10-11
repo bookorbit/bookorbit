@@ -33,10 +33,11 @@ import { UpdateAuthorMetadataPreferencesDto } from './dto/update-author-metadata
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
-import type { AuthorMetadataCandidate } from '@bookorbit/types';
+import type { AuthorMetadataSearchCandidateEvent } from '@bookorbit/types';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorAutoEnrichmentConfigDto } from './dto/author-auto-enrichment-config.dto';
-import { BulkAuthorIdsDto } from './dto/bulk-author-ids.dto';
+import { AuthorEnrichmentBackfillDto } from './dto/author-enrichment-backfill.dto';
+import { BulkRefreshAuthorsMetadataDto } from './dto/bulk-refresh-authors-metadata.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
 import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
@@ -82,7 +83,7 @@ export class AuthorsController {
 
   @Sse('metadata/stream')
   streamMetadata(@Query() dto: ListAuthorMetadataDto): Observable<MessageEvent> {
-    return this.authorsService.streamMetadata(dto).pipe(map((candidate: AuthorMetadataCandidate) => ({ data: candidate })));
+    return this.authorsService.streamMetadata(dto).pipe(map((candidate: AuthorMetadataSearchCandidateEvent) => ({ data: candidate })));
   }
 
   @Get('metadata/lookup')
@@ -93,7 +94,7 @@ export class AuthorsController {
   @Post('bulk-refresh-metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
-  async bulkRefreshMetadata(@Body() dto: BulkAuthorIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+  async bulkRefreshMetadata(@Body() dto: BulkRefreshAuthorsMetadataDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -106,9 +107,14 @@ export class AuthorsController {
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
     };
     try {
-      const result = await this.authorsService.bulkRefreshMetadata(dto.authorIds, user, (event) => {
-        sendEvent(event);
-      });
+      const result = await this.authorsService.bulkRefreshMetadata(
+        dto.authorIds,
+        user,
+        (event) => {
+          sendEvent(event);
+        },
+        { ignoreCache: dto.ignoreCache === true },
+      );
       sendEvent({ done: true, ...result });
     } finally {
       if (!reply.raw.destroyed && !reply.raw.writableEnded) {
@@ -155,15 +161,15 @@ export class AuthorsController {
 
   @Post('enrichment/backfill')
   @RequirePermission(Permission.ManageMetadataConfig)
-  async enqueueBackfill() {
-    const queued = await this.enrichmentOrchestrator.backfillLinkedAuthors();
+  async enqueueBackfill(@Body() dto?: AuthorEnrichmentBackfillDto) {
+    const queued = await this.enrichmentOrchestrator.backfillLinkedAuthors({ ignoreCache: dto?.ignoreCache === true });
     return { queued };
   }
 
   @Post('enrichment/backfill-all')
   @RequirePermission(Permission.ManageMetadataConfig)
-  async enqueueBackfillAll() {
-    const queued = await this.enrichmentOrchestrator.backfillAllLinkedAuthors();
+  async enqueueBackfillAll(@Body() dto?: AuthorEnrichmentBackfillDto) {
+    const queued = await this.enrichmentOrchestrator.backfillAllLinkedAuthors({ ignoreCache: dto?.ignoreCache === true });
     return { queued };
   }
 

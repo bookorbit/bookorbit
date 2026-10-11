@@ -69,7 +69,7 @@ describe('SeriesService', () => {
       seriesRepo as any,
       bookReadService as any,
       libraryService as any,
-      { enrichCardVersions: vi.fn().mockResolvedValue(undefined) } as any,
+      { enrichCardFaces: vi.fn().mockResolvedValue(undefined) } as any,
     );
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);

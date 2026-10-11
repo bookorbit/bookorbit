@@ -2,6 +2,11 @@ import { MetadataProviderKey, ProviderConfigurations } from '@bookorbit/types';
 import { firstValueFrom, toArray } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { MetadataCacheConfigService } from '../../../metadata-cache/metadata-cache-config.service';
+import type { MetadataCacheRepository } from '../../../metadata-cache/metadata-cache.repository';
+import type { MetadataCacheAccessTracker, MetadataCacheBudget, MetadataCacheCounterService } from '../../../metadata-cache/metadata-cache-state';
+import type { MetadataCacheSweeper } from '../../../metadata-cache/metadata-cache-sweeper.service';
+import { ProviderOperationExecutor } from '../../../metadata-cache/provider-operation-executor.service';
 import * as fetchWithThrottleModule from '../../fetch-with-throttle';
 import { MetadataFetchRepository } from '../../metadata-fetch.repository';
 import { MetadataFetchService } from '../../metadata-fetch.service';
@@ -206,9 +211,26 @@ function buildHarness(options: HarnessOptions = {}): Harness {
     { getConfig: () => Promise.resolve(providerConfig) } as unknown as ProviderConfigService,
     throttleTracker,
   );
-  const service = new MetadataFetchService(new ProviderRegistry([provider]), new ProviderThrottleTracker(), {} as MetadataFetchRepository);
+  const service = new MetadataFetchService(
+    new ProviderRegistry([provider]),
+    new ProviderThrottleTracker(),
+    {} as MetadataFetchRepository,
+    uncachedExecutor(),
+  );
 
   return { provider, service, throttleTracker, requestUrls, probedVolumeIds, detailVolumeIds, detailIssueIds, abortedPaths };
+}
+
+// Cache settings never load, so every call goes straight to the provider as it did before the cache.
+function uncachedExecutor(): ProviderOperationExecutor {
+  return new ProviderOperationExecutor(
+    { snapshot: () => Promise.reject(new Error('cache settings unavailable')) } as unknown as MetadataCacheConfigService,
+    {} as MetadataCacheRepository,
+    { increment: () => undefined, uncacheable: () => undefined } as unknown as MetadataCacheCounterService,
+    {} as MetadataCacheBudget,
+    {} as MetadataCacheAccessTracker,
+    {} as MetadataCacheSweeper,
+  );
 }
 
 async function runToCompletion<T>(work: Promise<T>): Promise<{ value: T; elapsedMs: number }> {

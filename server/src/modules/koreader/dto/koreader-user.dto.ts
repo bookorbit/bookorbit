@@ -1,6 +1,12 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+
+import { READ_ALOUD_DELIVERY_VARIANTS, type ReadAloudDeliveryPreference } from '@bookorbit/types';
 
 export class CreateKoreaderUserDto {
+  @IsOptional()
+  @IsIn(READ_ALOUD_DELIVERY_VARIANTS)
+  readAloudDelivery?: ReadAloudDeliveryPreference;
+
   @IsString()
   @MinLength(3)
   @MaxLength(100)
@@ -13,6 +19,10 @@ export class CreateKoreaderUserDto {
 }
 
 export class UpdateKoreaderUserDto {
+  @IsOptional()
+  @IsIn(READ_ALOUD_DELIVERY_VARIANTS)
+  readAloudDelivery?: ReadAloudDeliveryPreference;
+
   @IsString()
   @MinLength(3)
   @MaxLength(100)

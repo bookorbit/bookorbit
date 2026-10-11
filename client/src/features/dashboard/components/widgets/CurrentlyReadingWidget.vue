@@ -41,10 +41,10 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 gap-3">
       <div v-for="n in 2" :key="n" class="flex w-full gap-2.5">
-        <div class="h-16 w-11 shrink-0 animate-pulse rounded bg-muted" />
+        <div class="h-16 w-11 shrink-0 animate-pulse rounded-xs bg-muted" />
         <div class="flex-1 space-y-2">
-          <div class="h-3 w-3/4 animate-pulse rounded bg-muted" />
-          <div class="h-2.5 w-1/2 animate-pulse rounded bg-muted" />
+          <div class="h-3 w-3/4 animate-pulse rounded-xs bg-muted" />
+          <div class="h-2.5 w-1/2 animate-pulse rounded-xs bg-muted" />
           <div class="mt-1 h-1.5 w-full animate-pulse rounded-full bg-muted" />
         </div>
       </div>
@@ -75,7 +75,7 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
           <!-- Cover thumbnail -->
           <BookCoverSurface
             size="mini"
-            class="book-cover-surface--spine-fitted h-14 w-9 shrink-0 overflow-hidden rounded"
+            class="book-cover-surface--spine-fitted h-14 w-9 shrink-0 overflow-hidden rounded-xs"
             :is-comic="isComic(book.fileFormat)"
           >
             <BookCoverArtwork

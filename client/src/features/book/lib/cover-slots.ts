@@ -26,7 +26,10 @@ export function coverLockField(medium: CoverMedium | null): Extract<BookMetadata
   return medium === 'audio' ? 'audioCover' : 'cover'
 }
 
-/** Mirrors the server's face rule: a square library shows the audio slot, any other shape the ebook slot. */
+/**
+ * The slot a frame of this shape shows. Given the book's own `coverAspectRatio`, which the server
+ * derives from the slot it serves, this is the server's face.
+ */
 export function faceMedium(book: Pick<SlotBook, 'covers'>, aspectRatio: CoverAspectRatio | string): CoverMedium {
   const preferred: CoverMedium = aspectRatio === '1/1' ? 'audio' : 'ebook'
   if (book.covers[preferred]) return preferred

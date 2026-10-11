@@ -198,7 +198,7 @@ function cancelDelete() {
             <button
               v-for="v in VARIABLES"
               :key="v"
-              class="text-[11px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+              class="text-[11px] font-mono px-2 py-0.5 rounded-xs bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
               @click="insertVariable(v, 'bodyText')"
             >
               {{ v }}
@@ -246,10 +246,12 @@ function cancelDelete() {
           <div class="flex-1 min-w-0 cursor-pointer" @click="toggleTemplate(tpl.id)">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-sm font-medium text-foreground">{{ tpl.name }}</span>
-              <span v-if="tpl.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">{{
+              <span v-if="tpl.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-xs bg-primary/15 text-primary">{{
                 t('email.badge.default')
               }}</span>
-              <span v-if="tpl.isSystem" class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{{ t('email.badge.system') }}</span>
+              <span v-if="tpl.isSystem" class="text-[10px] px-1.5 py-0.5 rounded-xs bg-muted text-muted-foreground">{{
+                t('email.badge.system')
+              }}</span>
             </div>
             <p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">{{ tpl.subject }}</p>
           </div>

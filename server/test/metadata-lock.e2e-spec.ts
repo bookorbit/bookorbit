@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { readFile } from 'fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { MetadataProviderKey } from '@bookorbit/types';
+
+import { MetadataPreferencesService } from '../src/modules/metadata-preferences/metadata-preferences.service';
 
 import { buildMetadataLockCandidates } from './e2e/metadata-lock/metadata-lock-test-providers';
 import {
@@ -28,6 +31,16 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
 
   beforeAll(async () => {
     ctx = await createMetadataLockE2EContext();
+    // The stand-in Goodreads answers every field, the audiobook ones included, while the default
+    // rules for those name only the audiobook sources that really carry them, and keep a measured
+    // duration. These tests are about locks, so those rules say what the others do: overwrite
+    // whatever is not locked, from the one source that answers.
+    const preferences = ctx.app.get(MetadataPreferencesService);
+    const global = await preferences.getGlobal();
+    for (const field of ['narrators', 'duration', 'abridged'] as const) {
+      global.fields[field] = { enabled: true, providers: [MetadataProviderKey.GOODREADS], mergeStrategy: 'overwriteIfProvided' };
+    }
+    await preferences.setGlobal(global);
   }, 120_000);
 
   afterAll(async () => {

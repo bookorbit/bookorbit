@@ -88,7 +88,7 @@ function handleNavigate(cfi: string) {
         />
         <button
           v-if="inputValue"
-          class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+          class="flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
           @click="onClear"
         >
           <X :size="14" />
@@ -121,7 +121,7 @@ function handleNavigate(cfi: string) {
           >
             <p class="text-sm leading-relaxed line-clamp-3 mb-1">
               <span class="text-muted-foreground">{{ result.excerpt.pre }}</span
-              ><mark class="bg-yellow-300 text-yellow-900 rounded px-0.5">{{ result.excerpt.match }}</mark
+              ><mark class="bg-yellow-300 text-yellow-900 rounded-xs px-0.5">{{ result.excerpt.match }}</mark
               ><span class="text-muted-foreground">{{ result.excerpt.post }}</span>
             </p>
             <p v-if="result.sectionTitle" class="text-xs text-muted-foreground truncate">

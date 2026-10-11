@@ -134,7 +134,7 @@ function handlePurge() {
       <button
         v-if="selecting"
         type="button"
-        class="ml-auto grid size-[15px] place-items-center rounded border-[1.5px] transition-colors"
+        class="ml-auto grid size-[15px] place-items-center rounded-xs border-[1.5px] transition-colors"
         :class="selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary'"
         :aria-pressed="selected"
         :aria-label="t('annotations.listItem.selectAnnotation')"

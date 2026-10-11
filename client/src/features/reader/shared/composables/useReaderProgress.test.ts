@@ -615,6 +615,59 @@ describe('useReaderProgress', () => {
       await save()
       expect(postedProgressBody(1).source).toBe('text')
     })
+
+    it('saves and reloads later reading progress without losing the paused narration position', async () => {
+      mockApi.mockResolvedValue(makeOkResponse({}))
+      const progress = useReaderProgress(1, 42, ref(0))
+      progress.onRelocate({ fraction: 0.1, cfi: 'epubcfi(/6/4)' } as never)
+      progress.setMediaOverlayProgress('OPS/ch1.xhtml#s12', 2, 44.3)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(postedProgressBody()).toMatchObject({ source: 'narration', percentage: 10 })
+
+      progress.onRelocate({ fraction: 0.32, cfi: 'epubcfi(/6/40)' } as never)
+      await vi.advanceTimersByTimeAsync(2000)
+      const saved = postedProgressBody(1)
+      expect(saved).toMatchObject({
+        source: 'text',
+        percentage: 32,
+        cfi: 'epubcfi(/6/40)',
+        positionSeconds: 44.3,
+        mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+        mediaOverlaySectionIndex: 2,
+      })
+
+      mockApi.mockResolvedValueOnce(makeOkResponse(saved))
+      const reopened = useReaderProgress(1, 42, ref(0))
+      await reopened.load()
+      expect(reopened.cfi.value).toBe('epubcfi(/6/40)')
+      expect(reopened.percentage.value).toBe(32)
+      expect(reopened.positionSeconds.value).toBe(44.3)
+      expect(reopened.mediaOverlayFragment.value).toBe('OPS/ch1.xhtml#s12')
+      expect(reopened.mediaOverlaySectionIndex.value).toBe(2)
+    })
+
+    it('keeps delayed narration page relocations attributed to narration, then saves manual reading as text', async () => {
+      mockApi.mockResolvedValue(makeOkResponse({}))
+      const progress = useReaderProgress(1, 42, ref(0))
+      progress.onRelocate({ fraction: 0.32, cfi: 'epubcfi(/6/40)' })
+      await vi.advanceTimersByTimeAsync(2000)
+      progress.setMediaOverlayProgress('OPS/ch1.xhtml#s12', 2)
+      progress.onRelocate({ fraction: 0.1, cfi: 'epubcfi(/6/4)' }, 'narration')
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(postedProgressBody(1)).toMatchObject({ source: 'narration', percentage: 10 })
+
+      progress.onRelocate({ fraction: 0.11, cfi: 'epubcfi(/6/4)' }, 'narration')
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(postedProgressBody(2).source).toBe('narration')
+
+      progress.onRelocate({ fraction: 0.33, cfi: 'epubcfi(/6/42)' })
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(postedProgressBody(3)).toMatchObject({
+        source: 'text',
+        percentage: 33,
+        mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+      })
+    })
   })
 
   describe('cycleFooterMode()', () => {

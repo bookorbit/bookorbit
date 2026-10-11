@@ -1,54 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { Moon, Sun, Wallpaper } from '@lucide/vue'
-import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { fetchWithAuthProxyRecovery } from '@/lib/api'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
+import AuthAppearanceToolbar from './components/AuthAppearanceToolbar.vue'
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
-const accentOpen = ref(false)
-const radiusOpen = ref(false)
-const backgroundOpen = ref(false)
-const currentAccent = computed(() => ACCENT_OPTIONS.find((o) => o.id === themeStore.accent))
-
-function radiusPreview(id: string): string {
-  const map: Record<string, string> = {
-    sharp: '0px',
-    default: '4px',
-    rounded: '8px',
-    pill: '999px',
-  }
-  return map[id] ?? '4px'
-}
-
-function openRadius() {
-  radiusOpen.value = !radiusOpen.value
-  accentOpen.value = false
-  backgroundOpen.value = false
-}
-
-function openBackground() {
-  backgroundOpen.value = !backgroundOpen.value
-  accentOpen.value = false
-  radiusOpen.value = false
-}
-
-function openAccent() {
-  accentOpen.value = !accentOpen.value
-  radiusOpen.value = false
-  backgroundOpen.value = false
-}
-
-function closeAll() {
-  accentOpen.value = false
-  radiusOpen.value = false
-  backgroundOpen.value = false
-}
-
 const route = useRoute()
 const router = useRouter()
 
@@ -98,129 +56,7 @@ async function handleSubmit() {
 
 <template>
   <div class="login-bg min-h-screen flex flex-col items-center justify-center gap-3 px-4 overflow-hidden">
-    <!-- Compact theme picker -->
-    <div class="fixed bottom-5 right-5 z-20 flex items-center gap-1.5">
-      <!-- Dark / light toggle -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button class="theme-btn" @click="themeStore.toggleTheme()">
-            <Sun v-if="themeStore.resolvedTheme === 'dark'" :size="14" />
-            <Moon v-else :size="14" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{{
-          themeStore.resolvedTheme === 'dark' ? t('auth.themePicker.switchToLight') : t('auth.themePicker.switchToDark')
-        }}</TooltipContent>
-      </Tooltip>
-
-      <!-- Radius picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="radiusOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg">
-            <div class="flex items-center gap-1.5">
-              <Tooltip v-for="opt in RADIUS_OPTIONS" :key="opt.id">
-                <TooltipTrigger as-child>
-                  <button
-                    class="flex items-center justify-center w-8 h-8 rounded-lg transition-all focus:outline-none"
-                    :class="
-                      themeStore.radius === opt.id
-                        ? 'text-primary bg-primary/10'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
-                    "
-                    @click="themeStore.setRadius(opt.id)"
-                  >
-                    <span class="w-4 h-4 border-2 border-current block" :style="{ borderRadius: radiusPreview(opt.id) }" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ opt.label }}</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </Transition>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openRadius()">
-              <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeRadius') }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <!-- Background picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="backgroundOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg w-64 max-h-72 overflow-y-auto">
-            <div class="grid grid-cols-5 gap-1.5">
-              <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
-                <TooltipTrigger as-child>
-                  <button
-                    class="w-full h-9 rounded overflow-hidden ring-2 transition-all focus:outline-none shrink-0"
-                    :class="
-                      themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
-                    "
-                    @click="themeStore.setBackground(opt.id)"
-                  >
-                    <div class="w-full h-full bg-background pattern-preview" :class="opt.cssClass" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ opt.label }}</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </Transition>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openBackground()">
-              <Wallpaper :size="14" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeBackground') }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <!-- Accent picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-lg space-y-2 w-96 max-w-[calc(100vw-2rem)]">
-            <div class="overflow-x-auto no-scrollbar px-1 py-0.5">
-              <div class="space-y-2 w-max">
-                <div v-for="(row, rowIndex) in ACCENT_ROWS" :key="rowIndex" class="flex items-center gap-1.5">
-                  <Tooltip v-for="opt in row" :key="opt.id">
-                    <TooltipTrigger as-child>
-                      <button
-                        class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card shrink-0"
-                        :class="opt.swatchClass"
-                        :aria-label="t(opt.labelKey)"
-                        :style="{
-                          backgroundColor: opt.color,
-                          outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                          outlineOffset: '2px',
-                          transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
-                        }"
-                        @click="themeStore.setAccent(opt.id)"
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent>{{ t(opt.labelKey) }}</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Transition>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openAccent()">
-              <span class="w-3.5 h-3.5 rounded-full block" :class="currentAccent?.swatchClass" :style="{ backgroundColor: currentAccent?.color }" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
-        </Tooltip>
-      </div>
-    </div>
-
-    <!-- Click-outside backdrop -->
-    <div v-if="accentOpen || radiusOpen || backgroundOpen" class="fixed inset-0 z-10" @click="closeAll()" />
+    <AuthAppearanceToolbar placement="bottom" />
 
     <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
       <div class="text-center mb-8">
@@ -276,47 +112,6 @@ async function handleSubmit() {
 <style scoped>
 .login-bg {
   position: relative;
-}
-
-.theme-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 9999px;
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--elevation-md);
-  color: var(--muted-foreground);
-  transition: color 0.15s ease;
-}
-
-.theme-btn:hover {
-  color: var(--foreground);
-}
-
-.accent-popover {
-  background: color-mix(in oklch, var(--card) 80%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--elevation-lg);
-}
-
-.popover-enter-active,
-.popover-leave-active {
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
-}
-
-.popover-enter-from,
-.popover-leave-to {
-  opacity: 0;
-  transform: translateY(4px) scale(0.97);
 }
 
 .login-card {

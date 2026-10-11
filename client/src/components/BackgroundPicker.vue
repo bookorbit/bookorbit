@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
 const props = withDefaults(defineProps<{ touch?: boolean }>(), {
   touch: false,
 })
@@ -15,13 +17,14 @@ const props = withDefaults(defineProps<{ touch?: boolean }>(), {
         <button
           type="button"
           class="flex flex-col items-center cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :aria-label="opt.label"
+          :aria-label="t(opt.labelKey)"
+          :aria-pressed="themeStore.background === opt.id"
           @click="themeStore.setBackground(opt.id)"
         >
           <div
             class="w-full overflow-hidden ring-2 transition-all"
             :class="[
-              props.touch ? 'h-10 rounded-md' : 'h-8 rounded',
+              props.touch ? 'h-10 rounded-md' : 'h-8 rounded-xs',
               themeStore.background === opt.id ? 'ring-primary' : 'ring-border hover:ring-muted-foreground/40',
             ]"
           >
@@ -29,7 +32,7 @@ const props = withDefaults(defineProps<{ touch?: boolean }>(), {
           </div>
         </button>
       </TooltipTrigger>
-      <TooltipContent>{{ opt.label }}</TooltipContent>
+      <TooltipContent>{{ t(opt.labelKey) }}</TooltipContent>
     </Tooltip>
   </div>
 </template>

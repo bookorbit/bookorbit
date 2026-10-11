@@ -288,11 +288,20 @@ describe('OpdsBookService', () => {
   });
 
   it('resolves getBookFiles with fallback formatting and title values', async () => {
-    const { service } = makeService([[], [{ absolutePath: '/books/a.epub', format: null, title: null }], []]);
+    const { service } = makeService([
+      [],
+      [{ id: 1, updatedAt: new Date('2026-01-01'), absolutePath: '/books/a.epub', format: null, title: null }],
+      [],
+    ]);
 
     await expect(service.getBookFiles(7, 42)).resolves.toBeNull();
 
     await expect(service.getBookFiles(7)).resolves.toEqual({
+      id: 1,
+      mtime: undefined,
+      sizeBytes: undefined,
+      ino: undefined,
+      contentVersion: new Date('2026-01-01').toISOString(),
       absolutePath: '/books/a.epub',
       format: 'unknown',
       readAlong: false,
@@ -305,6 +314,7 @@ describe('OpdsBookService', () => {
     const rows = [
       {
         id: 1,
+        updatedAt: new Date('2026-01-01'),
         absolutePath: '/books/a.m4b',
         format: 'm4b',
         role: 'content',
@@ -316,6 +326,7 @@ describe('OpdsBookService', () => {
       },
       {
         id: 2,
+        updatedAt: new Date('2026-01-01'),
         absolutePath: '/books/a.epub',
         format: 'epub',
         role: 'content',
@@ -569,10 +580,10 @@ describe('OpdsBookService', () => {
         { bookId: 2, name: 'Author Two' },
       ],
       [
-        { bookId: 1, id: 10, format: 'epub', role: 'content' },
-        { bookId: 1, id: 11, format: 'mobi', role: 'content' },
-        { bookId: 1, id: 12, format: 'jpg', role: 'cover' },
-        { bookId: 2, id: 20, format: null, role: 'content' },
+        { bookId: 1, id: 10, format: 'epub', role: 'content', contentVersion: new Date('2026-01-01') },
+        { bookId: 1, id: 11, format: 'mobi', role: 'content', contentVersion: new Date('2026-01-01') },
+        { bookId: 1, id: 12, format: 'jpg', role: 'cover', contentVersion: new Date('2026-01-01') },
+        { bookId: 2, id: 20, format: null, role: 'content', contentVersion: new Date('2026-01-01') },
       ],
     ]);
 
@@ -583,17 +594,14 @@ describe('OpdsBookService', () => {
         seriesId: 42,
         hasCover: true,
         authors: ['Author One'],
-        files: [
-          { id: 10, format: 'epub' },
-          { id: 11, format: 'mobi' },
-        ],
+        files: [expect.objectContaining({ id: 10, format: 'epub' }), expect.objectContaining({ id: 11, format: 'mobi' })],
       }),
       expect.objectContaining({
         id: 2,
         title: 'second',
         hasCover: false,
         authors: ['Author Two'],
-        files: [{ id: 20, format: 'unknown' }],
+        files: [expect.objectContaining({ id: 20, format: 'unknown' })],
       }),
     ]);
 
@@ -621,7 +629,7 @@ describe('OpdsBookService', () => {
         },
       ],
       [{ bookId: 1, name: 'Author One' }],
-      [{ bookId: 1, id: 10, format: 'epub', role: 'content' }],
+      [{ bookId: 1, id: 10, format: 'epub', role: 'content', contentVersion: new Date('2026-01-01') }],
       [{ bookId: 1, seriesId: 42, seriesName: 'Secondary Arc', seriesIndex: '3' }],
     ]);
 

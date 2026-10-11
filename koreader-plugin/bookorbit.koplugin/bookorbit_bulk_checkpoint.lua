@@ -16,7 +16,7 @@ local util = require("util")
 
 local CHECKPOINT_DIR = "bookorbit-bulk-download"
 local CHECKPOINT_FILE = "checkpoint.lua"
-local VERSION = 1
+local VERSION = 2
 local MAX_COMPLETED = 250
 local MAX_FAILURES = 50
 

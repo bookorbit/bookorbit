@@ -8,6 +8,7 @@ import type {
   PluginRequestInit,
   PluginSearchFailure,
 } from '@bookorbit/plugin-api';
+import { isBookRequestMediaKind } from '@bookorbit/types';
 import type { BookRequestMediaKind, IndexerAdapterType, IndexerSettingsField, ReleaseAudioInfo } from '@bookorbit/types';
 
 import { boundedResponse } from '../../../../common/utils/bounded-response';
@@ -87,7 +88,8 @@ export class PluginIndexerAdapter implements IndexerAdapter {
     this.type = plugin.type as IndexerAdapterType;
     this.label = plugin.label;
     this.requiresCredential = plugin.requiresCredential;
-    this.mediaKinds = plugin.mediaKinds as readonly BookRequestMediaKind[];
+    // An older plugin can still list the retired `comic`; it is never searched for, so it is dropped.
+    this.mediaKinds = plugin.mediaKinds.filter(isBookRequestMediaKind);
     this.supportsIsbnSearch = plugin.supportsIsbnSearch === true;
     this.settingsFields = plugin.settingsFields ?? [];
     this.logger = new Logger(`plugin:${plugin.type}`);
@@ -398,7 +400,6 @@ function toPluginConfig(config: ResolvedIndexerConfig): PluginIndexerConfig {
     categories: {
       ebook: [...config.categories.ebook],
       audiobook: [...config.categories.audiobook],
-      comic: [...config.categories.comic],
     },
     settings: config.settings ? structuredClone(config.settings as Record<string, unknown>) : null,
   };

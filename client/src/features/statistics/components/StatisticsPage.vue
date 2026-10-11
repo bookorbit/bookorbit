@@ -177,10 +177,12 @@ function setTab(tab: StatisticsTab) {
           </PopoverTrigger>
           <PopoverContent align="end" class="w-56 p-1.5">
             <button
-              class="text-muted-foreground hover:bg-accent hover:text-foreground flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm"
+              class="text-muted-foreground hover:bg-accent hover:text-foreground flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-sm"
               @click="handleSelectAll"
             >
-              <div :class="['flex size-4 items-center justify-center rounded border', !isFiltered ? 'border-primary bg-primary' : 'border-border']">
+              <div
+                :class="['flex size-4 items-center justify-center rounded-xs border', !isFiltered ? 'border-primary bg-primary' : 'border-border']"
+              >
                 <Check v-if="!isFiltered" class="text-primary-foreground size-2.5" />
               </div>
               {{ t('statistics.filter.allLibraries') }}
@@ -189,12 +191,12 @@ function setTab(tab: StatisticsTab) {
             <button
               v-for="lib in libraries"
               :key="lib.id"
-              class="hover:bg-accent flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm"
+              class="hover:bg-accent flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-sm"
               @click="handleToggleLibrary(lib.id)"
             >
               <div
                 :class="[
-                  'flex size-4 shrink-0 items-center justify-center rounded border',
+                  'flex size-4 shrink-0 items-center justify-center rounded-xs border',
                   isLibrarySelected(lib.id) ? 'border-primary bg-primary' : 'border-border',
                 ]"
               >

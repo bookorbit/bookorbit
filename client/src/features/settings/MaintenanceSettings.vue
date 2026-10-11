@@ -11,6 +11,7 @@ import MigrationModal from '@/features/migration/components/MigrationModal.vue'
 import { api } from '@/lib/api'
 import { getWorkflowState, type MigrationWorkflowState } from '@/features/migration/lib/migration-api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useAppInfo } from './composables/useAppInfo'
 
 const { t } = useI18n()
 
@@ -29,7 +30,7 @@ const migrationLoading = ref(true)
 
 const updateCheckEnabled = ref(true)
 const updateCheckLoading = ref(false)
-const maxUploadSizeMb = ref(500)
+const { maxUploadSizeMb } = useAppInfo()
 const localMaxUploadSizeMb = ref(500)
 const maxUploadSizeSaving = ref(false)
 const achievementBackfillRunning = ref(false)

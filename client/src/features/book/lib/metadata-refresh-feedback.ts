@@ -22,6 +22,11 @@ const PROVIDER_LABELS: Record<MetadataProviderKeyType, string> = {
   [MetadataProviderKey.ALADIN]: 'Aladin',
 }
 
+/** A display name for a provider key, including the author providers that share the book registry's names. */
+export function metadataProviderLabel(provider: string): string {
+  return PROVIDER_LABELS[provider as MetadataProviderKeyType] ?? provider
+}
+
 export function metadataRefreshEmptyMessage(diagnostics: MetadataFetchDiagnostics, book: BookDetail): string {
   switch (diagnostics.reason) {
     case 'no_active_providers':

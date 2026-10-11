@@ -31,41 +31,55 @@ export class KoboProgressBridgeService {
     private readonly koboSpanConverter: KoboSpanConverterService,
   ) {}
 
-  async koboBookmarkToCanonical(userId: number, bookId: number, source: string, spanValue: string): Promise<CanonicalProgressPoint | null> {
+  async koboBookmarkToCanonical(
+    userId: number,
+    bookId: number,
+    source: string,
+    spanValue: string,
+    deviceId?: number,
+  ): Promise<CanonicalProgressPoint | null> {
     try {
-      const kepub = await this.kepubContextService.resolveForBook(userId, bookId);
+      const kepub = await this.kepubContextService.resolveForBook(userId, bookId, deviceId);
       if (!kepub.ok) return this.logDegraded('bookmark_to_canonical', userId, bookId, kepub.reason);
 
-      const outcome = await this.koboSpanConverter.koboBookmarkToPositions({
-        bookFileId: kepub.file.id,
-        ctx: kepub.ctx,
-        chapterFilename: source,
-        spanId: spanValue,
-      });
-      if (outcome.status === 'failed' || !outcome.cfi || !outcome.xpointer) {
-        return this.logDegraded('bookmark_to_canonical', userId, bookId, outcome.reason ?? 'incomplete_outcome');
+      try {
+        const outcome = await this.koboSpanConverter.koboBookmarkToPositions({
+          bookFileId: kepub.file.id,
+          ctx: kepub.ctx,
+          chapterFilename: source,
+          spanId: spanValue,
+        });
+        if (outcome.status === 'failed' || !outcome.cfi || !outcome.xpointer) {
+          return this.logDegraded('bookmark_to_canonical', userId, bookId, outcome.reason ?? 'incomplete_outcome');
+        }
+        return { cfi: outcome.cfi, xpointer: outcome.xpointer };
+      } finally {
+        await kepub.release?.();
       }
-      return { cfi: outcome.cfi, xpointer: outcome.xpointer };
     } catch (error) {
       this.logWarn('bookmark_to_canonical', userId, bookId, error);
       return null;
     }
   }
 
-  async cfiToKoboBookmark(userId: number, bookId: number, cfi: string): Promise<KoboBookmarkPoint | null> {
+  async cfiToKoboBookmark(userId: number, bookId: number, cfi: string, deviceId?: number): Promise<KoboBookmarkPoint | null> {
     try {
-      const kepub = await this.kepubContextService.resolveForBook(userId, bookId);
+      const kepub = await this.kepubContextService.resolveForBook(userId, bookId, deviceId);
       if (!kepub.ok) return this.logDegraded('cfi_to_bookmark', userId, bookId, kepub.reason);
 
-      const outcome = await this.koboSpanConverter.cfiPointToKoboBookmark({ bookFileId: kepub.file.id, ctx: kepub.ctx, cfi });
-      if (outcome.status === 'failed' || !outcome.spanId || !outcome.chapterFilename) {
-        return this.logDegraded('cfi_to_bookmark', userId, bookId, outcome.reason ?? 'incomplete_outcome');
+      try {
+        const outcome = await this.koboSpanConverter.cfiPointToKoboBookmark({ bookFileId: kepub.file.id, ctx: kepub.ctx, cfi });
+        if (outcome.status === 'failed' || !outcome.spanId || !outcome.chapterFilename) {
+          return this.logDegraded('cfi_to_bookmark', userId, bookId, outcome.reason ?? 'incomplete_outcome');
+        }
+        return {
+          source: outcome.chapterFilename,
+          value: outcome.spanId,
+          contentSourceProgressPercent: outcome.contentSourceProgressPercent ?? null,
+        };
+      } finally {
+        await kepub.release?.();
       }
-      return {
-        source: outcome.chapterFilename,
-        value: outcome.spanId,
-        contentSourceProgressPercent: outcome.contentSourceProgressPercent ?? null,
-      };
     } catch (error) {
       this.logWarn('cfi_to_bookmark', userId, bookId, error);
       return null;

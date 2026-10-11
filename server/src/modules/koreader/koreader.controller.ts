@@ -83,7 +83,7 @@ export class KoreaderController {
   @RequirePermission(Permission.KoreaderSync)
   @Post('credentials')
   async createCredentials(@CurrentUser() user: RequestUser, @Body() dto: CreateKoreaderUserDto) {
-    await this.koreaderService.createCredentials(user.id, dto.username, dto.password);
+    await this.koreaderService.createCredentials(user.id, dto.username, dto.password, dto.readAloudDelivery);
     return { success: true };
   }
 

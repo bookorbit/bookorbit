@@ -1,3 +1,5 @@
+import { loadIframeDocument } from './iframe-loader.js'
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const debounce = (f, wait, immediate) => {
@@ -248,6 +250,7 @@ class View {
   #column = true
   #size
   #layout = {}
+  #loadController
   constructor({ container, onExpand }) {
     this.container = container
     this.onExpand = onExpand
@@ -284,39 +287,30 @@ class View {
   }
   async load(src, afterLoad, beforeRender) {
     if (typeof src !== 'string') throw new Error(`${src} is not string`)
-    return new Promise((resolve) => {
-      this.#iframe.addEventListener(
-        'load',
-        () => {
-          const doc = this.document
-          afterLoad?.(doc)
+    this.#loadController?.abort()
+    this.#loadController = new AbortController()
+    const doc = await loadIframeDocument(this.#iframe, src, this.#loadController.signal)
+    afterLoad?.(doc)
 
-          // it needs to be visible for Firefox to get computed style
-          this.#iframe.style.display = 'block'
-          const { vertical, rtl } = getDirection(doc)
-          const background = getBackground(doc)
-          this.#iframe.style.display = 'none'
+    // it needs to be visible for Firefox to get computed style
+    this.#iframe.style.display = 'block'
+    const { vertical, rtl } = getDirection(doc)
+    const background = getBackground(doc)
+    this.#iframe.style.display = 'none'
 
-          this.#vertical = vertical
-          this.#rtl = rtl
+    this.#vertical = vertical
+    this.#rtl = rtl
 
-          this.#contentRange.selectNodeContents(doc.body)
-          const layout = beforeRender?.({ vertical, rtl, background })
-          this.#iframe.style.display = 'block'
-          this.render(layout)
-          this.#observer.observe(doc.body)
+    this.#contentRange.selectNodeContents(doc.body)
+    const layout = beforeRender?.({ vertical, rtl, background })
+    this.#iframe.style.display = 'block'
+    this.render(layout)
+    this.#observer.observe(doc.body)
 
-          // the resize observer above doesn't work in Firefox
-          // (see https://bugzilla.mozilla.org/show_bug.cgi?id=1832939)
-          // until the bug is fixed we can at least account for font load
-          doc.fonts.ready.then(() => this.expand())
-
-          resolve()
-        },
-        { once: true },
-      )
-      this.#iframe.src = src
-    })
+    // the resize observer above doesn't work in Firefox
+    // (see https://bugzilla.mozilla.org/show_bug.cgi?id=1832939)
+    // until the bug is fixed we can at least account for font load
+    doc.fonts.ready.then(() => this.expand())
   }
   render(layout) {
     if (!layout) return
@@ -450,6 +444,7 @@ class View {
     return this.#overlayer
   }
   destroy() {
+    this.#loadController?.abort()
     if (this.document) this.#observer.unobserve(this.document.body)
   }
 }

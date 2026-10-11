@@ -105,7 +105,7 @@ describe('AuthorEnrichmentRepository', () => {
     insertBuilder.returning.mockResolvedValueOnce([{ authorId: 1 }, { authorId: 2 }]).mockResolvedValueOnce([{ authorId: 3 }]);
     const repo = new AuthorEnrichmentRepository(db as never);
 
-    const count = await repo.upsertSchedule([1, 2, 3], 'metadata_replace', 2);
+    const count = await repo.upsertSchedule([1, 2, 3], 'metadata_replace', {}, 2);
 
     expect(count).toBe(3);
     expect(db.insert).toHaveBeenCalledTimes(2);
@@ -116,6 +116,110 @@ describe('AuthorEnrichmentRepository', () => {
     expect(insertBuilder.values).toHaveBeenNthCalledWith(2, [
       expect.objectContaining({ authorId: 3, status: 'queued', reason: 'metadata_replace', attemptCount: 0 }),
     ]);
+  });
+
+  describe('ignore_cache', () => {
+    it('leaves the flag untouched when the enqueue does not ask to ignore the cache', async () => {
+      const { db, insertBuilder } = makeDb();
+      const repo = new AuthorEnrichmentRepository(db as never);
+
+      await repo.upsertSchedule([3, 4], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL);
+
+      const [rows] = insertBuilder.values.mock.calls[0]!;
+      expect(rows.every((row: Record<string, unknown>) => !('ignoreCache' in row))).toBe(true);
+      expect(insertBuilder.onConflictDoUpdate.mock.calls[0]![0].set).not.toHaveProperty('ignoreCache');
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('sets the flag on inserted rows, reactivated failures and rows already queued', async () => {
+      const { db, insertBuilder, updateBuilder } = makeDb();
+      insertBuilder.returning.mockResolvedValueOnce([{ authorId: 3 }]);
+      const repo = new AuthorEnrichmentRepository(db as never);
+
+      const queued = await repo.upsertSchedule([3, 4], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, { ignoreCache: true });
+
+      expect(queued).toBe(1);
+      expect(insertBuilder.values).toHaveBeenCalledWith([
+        expect.objectContaining({ authorId: 3, ignoreCache: true }),
+        expect.objectContaining({ authorId: 4, ignoreCache: true }),
+      ]);
+      expect(insertBuilder.onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({ ignoreCache: true }),
+          setWhere: { op: 'eq', left: authorEnrichmentQueue.status, right: 'failed' },
+        }),
+      );
+      expect(db.update).toHaveBeenCalledWith(authorEnrichmentQueue);
+      expect(updateBuilder.set).toHaveBeenCalledWith(expect.objectContaining({ ignoreCache: true }));
+      expect(updateBuilder.where).toHaveBeenCalledWith({
+        op: 'and',
+        clauses: [
+          { op: 'inArray', left: authorEnrichmentQueue.authorId, right: [3, 4] },
+          { op: 'eq', left: authorEnrichmentQueue.ignoreCache, right: false },
+        ],
+      });
+    });
+
+    it('only ever sets the flag, never clears it', async () => {
+      const { db, insertBuilder, updateBuilder } = makeDb();
+      const repo = new AuthorEnrichmentRepository(db as never);
+
+      await repo.upsertSchedule([5], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, { ignoreCache: true });
+      await repo.upsertSchedule([5], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, { ignoreCache: false });
+
+      const writes = [
+        ...insertBuilder.values.mock.calls.flatMap(([rows]) => rows as Record<string, unknown>[]),
+        ...insertBuilder.onConflictDoUpdate.mock.calls.map(([config]) => config.set as Record<string, unknown>),
+        ...updateBuilder.set.mock.calls.map(([values]) => values as Record<string, unknown>),
+      ];
+      expect(writes.filter((values) => 'ignoreCache' in values).every((values) => values.ignoreCache === true)).toBe(true);
+    });
+
+    it('passes the flag through both backfill enqueues', async () => {
+      const { db, selectBuilder } = makeDb();
+      selectBuilder.limit
+        .mockResolvedValueOnce([{ authorId: 7 }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ authorId: 8 }])
+        .mockResolvedValueOnce([]);
+      const repo = new AuthorEnrichmentRepository(db as never);
+      const upsert = vi.spyOn(repo, 'upsertSchedule').mockResolvedValue(1);
+
+      await repo.enqueueEligibleLinkedAuthors(
+        AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL,
+        { neverEnriched: true, missingBio: false, missingPhoto: false },
+        { ignoreCache: true },
+      );
+      await repo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, { ignoreCache: true });
+
+      expect(upsert).toHaveBeenNthCalledWith(1, [7], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, { ignoreCache: true }, 1000);
+      expect(upsert).toHaveBeenNthCalledWith(2, [8], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, { ignoreCache: true }, 1000);
+    });
+
+    it('preserves the flag across retries and requeues', async () => {
+      const { db, updateBuilder } = makeDb();
+      const repo = new AuthorEnrichmentRepository(db as never);
+
+      await repo.markFailed({ authorId: 9, error: 'boom', httpStatus: 503, nextAttemptAt: new Date(), rateLimited: false });
+      await repo.requeueFailed();
+      await repo.recoverStuckProcessing(new Date());
+      await repo.resetAllProcessingOnBoot();
+
+      expect(updateBuilder.set).toHaveBeenCalledTimes(4);
+      for (const [values] of updateBuilder.set.mock.calls) expect(values).not.toHaveProperty('ignoreCache');
+    });
+
+    it('resets the flag when a row completes, because the row is removed', async () => {
+      const { db, deleteBuilder, updateBuilder } = makeDb();
+      deleteBuilder.where.mockResolvedValueOnce(undefined);
+      updateBuilder.where.mockResolvedValueOnce(undefined);
+      const repo = new AuthorEnrichmentRepository(db as never);
+
+      await repo.markDone(9, false);
+
+      expect(db.delete).toHaveBeenCalledWith(authorEnrichmentQueue);
+      expect(deleteBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: authorEnrichmentQueue.authorId, right: 9 });
+    });
   });
 
   it('fetchDue filters by active statuses and due time', async () => {
@@ -249,12 +353,13 @@ describe('AuthorEnrichmentRepository', () => {
         missingBio: true,
         missingPhoto: false,
       },
+      {},
       2,
     );
 
     expect(queued).toBe(3);
-    expect(upsert).toHaveBeenNthCalledWith(1, [10, 20], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, 2);
-    expect(upsert).toHaveBeenNthCalledWith(2, [40], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, 2);
+    expect(upsert).toHaveBeenNthCalledWith(1, [10, 20], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, {}, 2);
+    expect(upsert).toHaveBeenNthCalledWith(2, [40], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, {}, 2);
     expect(selectBuilder.limit).toHaveBeenCalledTimes(3);
     expect(selectBuilder.limit).toHaveBeenCalledWith(2);
   });
@@ -333,9 +438,9 @@ describe('AuthorEnrichmentRepository', () => {
     const repo = new AuthorEnrichmentRepository(db as never);
     const upsert = vi.spyOn(repo, 'upsertSchedule').mockResolvedValueOnce(2).mockResolvedValueOnce(1);
 
-    await expect(repo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, 2)).resolves.toBe(3);
-    expect(upsert).toHaveBeenNthCalledWith(1, [11, 12], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, 2);
-    expect(upsert).toHaveBeenNthCalledWith(2, [15], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, 2);
+    await expect(repo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, { ignoreCache: true }, 2)).resolves.toBe(3);
+    expect(upsert).toHaveBeenNthCalledWith(1, [11, 12], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, { ignoreCache: true }, 2);
+    expect(upsert).toHaveBeenNthCalledWith(2, [15], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, { ignoreCache: true }, 2);
     expect(selectBuilder.limit).toHaveBeenCalledTimes(3);
   });
 

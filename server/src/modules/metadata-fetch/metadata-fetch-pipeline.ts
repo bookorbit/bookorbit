@@ -6,6 +6,7 @@ import {
   CoverMedia,
   CoverMedium,
   FieldPreference,
+  MetadataCacheServedProvider,
   MetadataCandidate,
   MetadataFetchCoverSlotDiagnostics,
   MetadataFetchDiagnostics,
@@ -20,6 +21,7 @@ import {
 } from '@bookorbit/types';
 import { firstValueFrom, toArray } from 'rxjs';
 
+import type { CacheDirective } from '../../common/provider-cache/provider-cache-spec';
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
@@ -29,7 +31,7 @@ import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/ut
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { canonicalIsbn13, isValidIsbn10, isValidIsbn13, normalizeMetadataIsbn } from '../../common/text-match/isbn-normalize';
 import { acceptAgainstAnchor, resolveCandidateAgreement } from './candidate-agreement';
-import { MetadataFetchService } from './metadata-fetch.service';
+import { MetadataFetchService, type MetadataSearchEvent, type MetadataSearchOptions } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { MetadataSearchParams } from './providers/metadata-search-params';
@@ -81,6 +83,24 @@ export interface MetadataFetchRunOptions {
   coverMedia?: CoverMedia;
   /** Cover slots whose lock is set. A locked slot is neither resolved nor searched for. */
   lockedCoverSlots?: readonly CoverMedium[];
+  /** How providers may use the metadata cache. Defaults to reading fresh answers with fallback. */
+  cacheDirective?: CacheDirective;
+}
+
+/** How a fetch used the metadata cache, for callers that report fallbacks or pace bulk work. */
+export interface MetadataFetchCacheUsage {
+  servedProviders: MetadataCacheServedProvider[];
+  /** Outbound provider requests made by the fetch; 0 when every provider answered from the cache. */
+  outboundRequests: number;
+}
+
+/** Providers in cooldown still contribute what the cache holds for them, but are never called. */
+const CACHE_ONLY_DIRECTIVE: CacheDirective = { policy: 'only-if-cached', allowFallback: false };
+
+interface SearchCollection {
+  candidates: MetadataCandidate[];
+  servedProviders: MetadataCacheServedProvider[];
+  outboundRequests: number;
 }
 
 type ResolvedProviderIds = Partial<Record<MetadataProviderKey, string>>;
@@ -163,6 +183,7 @@ export class MetadataFetchPipeline {
     sources: Record<string, string>;
     providerIds: ResolvedProviderIds;
     diagnostics: MetadataFetchDiagnostics;
+    cache: MetadataFetchCacheUsage;
   }> {
     return this.runInternal(params, existingFields, libraryId, options);
   }
@@ -183,6 +204,7 @@ export class MetadataFetchPipeline {
     sources: Record<string, string>;
     providerIds: ResolvedProviderIds;
     diagnostics: MetadataFetchDiagnostics;
+    cache: MetadataFetchCacheUsage;
   }> {
     const { preferences, registeredKeys, providerConfig } = await this.resolveProviderPreferenceContext(libraryId);
     const scope = this.fetchScope(params, options);
@@ -194,12 +216,16 @@ export class MetadataFetchPipeline {
       scope.media,
       existingProviderIdsOnly ? params.existingProviderIds : undefined,
     );
-    const coverOnlyProviders = this.coverOnlyProviders(preferences, scope.media, providerSelection.activeProviders);
+    // Providers in cooldown are asked of the cache only, so they still contribute without a request.
+    const searchProviders = [...providerSelection.activeProviders, ...providerSelection.throttledProviders];
+    const searchOptions = this.searchOptions(options?.cacheDirective, providerSelection.throttledProviders);
+    const coverOnlyProviders = this.coverOnlyProviders(preferences, scope.media, searchProviders);
     const providerSearchParams = existingProviderIdsOnly ? { ...params, existingProviderIdsOnly: true } : params;
-    const searchParams = providerSelection.activeProviders.some((provider) => this.registry.servesOnlyAudiobooks(provider))
+    const searchParams = searchProviders.some((provider) => this.registry.servesOnlyAudiobooks(provider))
       ? { ...providerSearchParams, includeAudiobookProviders: true }
       : providerSearchParams;
-    const candidates = await this.searchCandidates(searchParams, providerSelection.activeProviders);
+    const pass1 = await this.searchCandidates(searchParams, searchProviders, searchOptions);
+    const candidates = pass1.candidates;
 
     // The service already swallows its own failures; this guards the invariant at the boundary so
     // that a future change there can never turn a series total into a failed metadata refresh.
@@ -209,7 +235,7 @@ export class MetadataFetchPipeline {
 
     const { anchor, accepted: agreeing } = this.rejectDisagreeingCandidates(
       preferences,
-      providerSelection.activeProviders,
+      searchProviders,
       this.firstPerProvider(candidates),
       params,
       coverOnlyProviders,
@@ -230,18 +256,20 @@ export class MetadataFetchPipeline {
     const otherMedium: CoverMedium = scope.primaryMedium === 'ebook' ? 'audio' : 'ebook';
     let pass2Candidates: MetadataCandidate[] = [];
     let pass2Providers: MetadataProviderKey[] = [];
+    let pass2Cache: MetadataFetchCacheUsage = { servedProviders: [], outboundRequests: 0 };
     if (this.hasMedium(scope.media, otherMedium)) {
       const other = await this.resolveOtherMediumSlot(
         preferences,
         scope,
         otherMedium,
-        { params: providerSearchParams, existingProviderIdsOnly, activeProviders: providerSelection.activeProviders },
+        { params: providerSearchParams, existingProviderIdsOnly, activeProviders: searchProviders, searchOptions },
         { anchor, agreeing },
         existingFields,
         options,
       );
       pass2Candidates = other.pass2Candidates;
       pass2Providers = other.pass2Providers;
+      pass2Cache = other.cache;
       if (other.slot) this.applyCoverSlot(resolved, sources, otherMedium, other.slot, coverSlots);
     }
 
@@ -249,21 +277,50 @@ export class MetadataFetchPipeline {
       if (this.coverSlotApplies(preferences, scope, medium) && !coverSlots[medium]) coverSlots[medium] = { provider: null, pass: null };
     }
 
+    const cache: MetadataFetchCacheUsage = {
+      servedProviders: mergeServedProviders([...pass1.servedProviders, ...pass2Cache.servedProviders]),
+      outboundRequests: pass1.outboundRequests + pass2Cache.outboundRequests,
+    };
     const diagnostics = this.buildDiagnostics(
       {
         ...providerSelection,
-        activeProviders: [...new Set([...providerSelection.activeProviders, ...pass2Providers])],
+        activeProviders: [
+          ...new Set([...providerSelection.activeProviders, ...pass2Providers.filter((p) => !providerSelection.throttledProviders.includes(p))]),
+        ],
       },
       [...agreeing.values(), ...pass2Candidates],
       resolved,
       coverSlots,
     );
-    return { resolved, sources, providerIds, diagnostics };
+    if (cache.servedProviders.length > 0) diagnostics.cacheServedProviders = cache.servedProviders;
+    return { resolved, sources, providerIds, diagnostics, cache };
   }
 
-  private async searchCandidates(params: MetadataSearchParams, providers: MetadataProviderKey[]): Promise<MetadataCandidate[]> {
-    if (providers.length === 0) return [];
-    return firstValueFrom(this.fetchService.searchCandidates(params, providers).pipe(toArray()), { defaultValue: [] as MetadataCandidate[] });
+  private searchOptions(directive: CacheDirective | undefined, throttledProviders: readonly MetadataProviderKey[]): MetadataSearchOptions {
+    return {
+      ...(directive ? { directive } : {}),
+      directiveByProvider: Object.fromEntries(throttledProviders.map((provider) => [provider, CACHE_ONLY_DIRECTIVE])),
+    };
+  }
+
+  private async searchCandidates(
+    params: MetadataSearchParams,
+    providers: MetadataProviderKey[],
+    options?: MetadataSearchOptions,
+  ): Promise<SearchCollection> {
+    const collection: SearchCollection = { candidates: [], servedProviders: [], outboundRequests: 0 };
+    if (providers.length === 0) return collection;
+    const events = await firstValueFrom(this.fetchService.search(params, providers, options).pipe(toArray()), {
+      defaultValue: [] as MetadataSearchEvent[],
+    });
+    for (const event of events) {
+      if (event.kind === 'candidate') collection.candidates.push(event.candidate);
+      else if (event.kind === 'run') {
+        collection.outboundRequests += event.run.outboundRequests;
+        if (event.run.served) collection.servedProviders.push(event.run.served);
+      }
+    }
+    return collection;
   }
 
   private firstPerProvider(candidates: readonly MetadataCandidate[]): CandidatesByProvider {
@@ -398,12 +455,23 @@ export class MetadataFetchPipeline {
     preferences: MetadataFetchPreferences,
     scope: FetchScope,
     medium: CoverMedium,
-    pass1: { params: MetadataSearchParams; existingProviderIdsOnly: boolean; activeProviders: readonly MetadataProviderKey[] },
+    pass1: {
+      params: MetadataSearchParams;
+      existingProviderIdsOnly: boolean;
+      activeProviders: readonly MetadataProviderKey[];
+      searchOptions: MetadataSearchOptions;
+    },
     agreement: { anchor: MetadataCandidate | undefined; agreeing: CandidatesByProvider },
     existingFields: ExistingMetadataFields,
     options: MetadataFetchRunOptions | undefined,
-  ): Promise<{ slot: CoverSlotResolution | null; pass2Candidates: MetadataCandidate[]; pass2Providers: MetadataProviderKey[] }> {
-    const none = { slot: null, pass2Candidates: [], pass2Providers: [] };
+  ): Promise<{
+    slot: CoverSlotResolution | null;
+    pass2Candidates: MetadataCandidate[];
+    pass2Providers: MetadataProviderKey[];
+    cache: MetadataFetchCacheUsage;
+  }> {
+    const noCache: MetadataFetchCacheUsage = { servedProviders: [], outboundRequests: 0 };
+    const none = { slot: null, pass2Candidates: [], pass2Providers: [], cache: noCache };
     if (!this.coverSlotApplies(preferences, scope, medium)) return none;
     const field = COVER_FIELD_BY_MEDIUM[medium];
     const mergeStrategy = options?.preserveExisting ? 'fillMissing' : preferences.fields[field].mergeStrategy;
@@ -422,6 +490,7 @@ export class MetadataFetchPipeline {
         slot: this.resolveCoverSlotForMedium(preferences, scope, medium, carried, existingFields, options, 1),
         pass2Candidates: [],
         pass2Providers,
+        cache: noCache,
       };
     }
 
@@ -435,13 +504,14 @@ export class MetadataFetchPipeline {
       isAudiobook: medium === 'audio',
       includeAudiobookProviders: false,
     };
-    const found = this.firstPerProvider(await this.searchCandidates(pass2Params, pass2Providers));
+    const pass2 = await this.searchCandidates(pass2Params, pass2Providers, pass1.searchOptions);
+    const found = this.firstPerProvider(pass2.candidates);
     const pass2Candidates = this.acceptPass2Candidates(agreement.anchor, [...found.values()], pass2Params);
     for (const candidate of pass2Candidates) carried.set(candidate.provider, candidate);
 
     const slot = this.resolveCoverSlotForMedium(preferences, scope, medium, carried, existingFields, options, 1);
     if (slot && pass2Candidates.some((candidate) => candidate.provider === slot.choices[0]?.provider)) slot.pass = 2;
-    return { slot, pass2Candidates, pass2Providers };
+    return { slot, pass2Candidates, pass2Providers, cache: { servedProviders: pass2.servedProviders, outboundRequests: pass2.outboundRequests } };
   }
 
   private acceptPass2Candidates(
@@ -592,7 +662,7 @@ export class MetadataFetchPipeline {
       if (this.throttleTracker.isThrottled(key)) {
         throttledProviders.push(key);
         this.logger.warn(
-          `[metadata_fetch.pipeline_provider] [fail] provider=${key} durationMs=0 errorClass=ProviderThrottleError error="provider is in cooldown" - provider skipped`,
+          `[metadata_fetch.pipeline_provider] [fail] provider=${key} durationMs=0 errorClass=ProviderThrottleError error="provider is in cooldown" - provider answered from cache only`,
         );
       } else {
         activeProviders.push(key);
@@ -770,13 +840,15 @@ export class MetadataFetchPipeline {
       }
     }
 
-    // Pass through chapters from the first candidate that has them, using the
-    // narrators field's provider preference order as the authority for audiobook data.
-    const narratorProviders = preferences.fields['narrators']?.providers ?? [];
-    const chapterProviders = [...narratorProviders, ...identifying.keys()];
+    // Pass through chapters from the first candidate that has them, using the narrators field's
+    // provider order as the authority for audiobook data, and its merge strategy too: a fill-missing
+    // rule keeps the chapters a book already has, as it keeps its narrators.
+    const narratorPreference = preferences.fields['narrators'];
+    const chapterProviders = [...(narratorPreference?.providers ?? []), ...identifying.keys()];
+    const chaptersFillOnly = options?.preserveExisting === true || narratorPreference?.mergeStrategy === 'fillMissing';
     for (const providerKey of chapterProviders) {
       const candidate = identifying.get(providerKey);
-      if (candidate?.chapters?.length && (!options?.preserveExisting || this.isMissing(existing.chapters))) {
+      if (candidate?.chapters?.length && (!chaptersFillOnly || this.isMissing(existing.chapters))) {
         result.chapters = candidate.chapters;
         break;
       }
@@ -1028,4 +1100,23 @@ export class MetadataFetchPipeline {
     }
     return false;
   }
+}
+
+/** One entry per provider across both passes; a fallback or stale answer outranks a fresh one. */
+function mergeServedProviders(served: readonly MetadataCacheServedProvider[]): MetadataCacheServedProvider[] {
+  const byProvider = new Map<string, MetadataCacheServedProvider>();
+  for (const entry of served) {
+    const existing = byProvider.get(entry.provider);
+    if (!existing) {
+      byProvider.set(entry.provider, entry);
+      continue;
+    }
+    byProvider.set(entry.provider, {
+      provider: entry.provider,
+      source: existing.source === 'fallback' || entry.source === 'fallback' ? 'fallback' : 'cache',
+      stale: existing.stale || entry.stale,
+      cachedAt: existing.cachedAt < entry.cachedAt ? existing.cachedAt : entry.cachedAt,
+    });
+  }
+  return [...byProvider.values()];
 }

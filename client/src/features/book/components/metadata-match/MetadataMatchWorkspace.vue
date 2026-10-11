@@ -5,6 +5,7 @@ import type {
   BookMetadataLockField,
   CoverMedium,
   MetadataCandidate,
+  MetadataCandidateCacheInfo,
   MetadataProviderInfo,
   MetadataProviderKey,
   MetadataProviderSearchOutcome,
@@ -29,6 +30,7 @@ import MetadataMatchRail from './MetadataMatchRail.vue'
 import MetadataMatchCompare, { type CoverCardModel, type RowFilter } from './MetadataMatchCompare.vue'
 import MetadataMatchFooter from './MetadataMatchFooter.vue'
 import type { MetadataQuery } from './MetadataMatchQuery.vue'
+import type { MetadataCacheSummary } from '@/features/metadata-cache/lib/metadata-cache'
 
 const props = defineProps<{
   current: MetadataSource
@@ -55,6 +57,10 @@ const props = defineProps<{
   fixedCandidate?: MetadataCandidate | null
   /** What Apply does, when it does more than fill a form. */
   applyHint?: string
+  /** Offers a search that skips saved answers; handle `searchFresh` when set. */
+  canSearchFresh?: boolean
+  cacheSummary?: MetadataCacheSummary | null
+  cacheInfo?: (candidate: MetadataCandidate) => MetadataCandidateCacheInfo | null
 }>()
 
 const emit = defineEmits<{
@@ -63,6 +69,7 @@ const emit = defineEmits<{
   selectAll: []
   selectFieldRules: []
   retryProvider: [MetadataProviderKey]
+  searchFresh: []
   apply: [MetadataDiffApply]
   cancel: []
 }>()
@@ -332,6 +339,10 @@ function handleRetry(provider: MetadataProviderKey) {
   emit('retryProvider', provider)
 }
 
+function handleSearchFresh() {
+  emit('searchFresh')
+}
+
 function handleCancel() {
   emit('cancel')
 }
@@ -428,11 +439,15 @@ defineExpose({ focusQuery: () => rail.value?.focusQuery() })
           :selected-key="selectedKey"
           :staged-by-candidate="stagedByCandidate"
           :cover-ratio="coverRatio"
+          :can-search-fresh="canSearchFresh"
+          :cache-summary="cacheSummary"
+          :cache-info="cacheInfo"
           @search="handleSearch"
           @toggle-provider="handleToggleProvider"
           @select-all="handleSelectAll"
           @select-field-rules="handleSelectFieldRules"
           @retry-provider="handleRetry"
+          @search-fresh="handleSearchFresh"
           @select="select"
         >
           <template #search-options><slot name="search-options" /></template>

@@ -204,7 +204,7 @@ async function onCopy() {
               <button
                 v-for="s in styles"
                 :key="s.id"
-                class="w-6 h-6 rounded text-xs font-bold transition-colors border"
+                class="w-6 h-6 rounded-xs text-xs font-bold transition-colors border"
                 :class="
                   selectedStyle === s.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted text-muted-foreground'
                 "
@@ -213,7 +213,7 @@ async function onCopy() {
                 {{ s.label }}
               </button>
               <button
-                class="flex-1 ml-1 px-2 py-0.5 rounded text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                class="flex-1 ml-1 px-2 py-0.5 rounded-xs text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                 @click="applyHighlight(selectedColor, selectedStyle)"
               >
                 {{ t('reader.selection.apply') }}

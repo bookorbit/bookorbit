@@ -42,21 +42,8 @@ vi.mock('../composables/useSetupStatus', () => ({
 
 vi.mock('vue-router', () => ({ useRoute: () => routeState }))
 
-vi.mock('@/stores/theme', () => ({
-  ACCENT_OPTIONS: [{ id: 'blue', color: '#00f', swatchClass: '', labelKey: 'common.close' }],
-  ACCENT_ROWS: [],
-  RADIUS_OPTIONS: [],
-  BACKGROUND_OPTIONS: [],
-  useThemeStore: () => ({
-    accent: 'blue',
-    radius: 'default',
-    background: 'none',
-    resolvedTheme: 'light',
-    toggleTheme: vi.fn<() => void>(),
-    setAccent: vi.fn<() => void>(),
-    setRadius: vi.fn<() => void>(),
-    setBackground: vi.fn<() => void>(),
-  }),
+vi.mock('../components/AuthAppearanceToolbar.vue', () => ({
+  default: { name: 'AuthAppearanceToolbar', template: '<div data-testid="auth-appearance-toolbar" />' },
 }))
 
 vi.mock('@/components/ui/tooltip', () => ({

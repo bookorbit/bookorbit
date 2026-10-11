@@ -4,8 +4,8 @@ import { useRoute } from 'vue-router'
 import { INIT_OPTIONS_KEY, THEME_KEY } from 'vue-echarts'
 import { APP_FEATURES } from '@bookorbit/types'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
-import { useThemeStore } from '@/stores/theme'
-import { getBookorbitThemeName, initChartThemes } from '@/lib/echarts'
+import { useChartTokens } from '@/composables/useChartTokens'
+import { buildChartTheme } from '@/lib/echarts'
 import ChangePasswordDialog from '@/features/auth/ChangePasswordDialog.vue'
 import WhatsNewDialog from '@/features/whats-new/WhatsNewDialog.vue'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
@@ -40,7 +40,7 @@ const TOASTER_MOBILE_OFFSET = {
 }
 
 const { isOpen } = useChangePasswordDialog()
-const themeStore = useThemeStore()
+const chartTokens = useChartTokens()
 
 const route = useRoute()
 const { user } = useAuth()
@@ -79,12 +79,10 @@ watch(
   (name) => syncPopup(name as string | undefined),
 )
 
-initChartThemes()
-
 provide(INIT_OPTIONS_KEY, { renderer: 'svg' })
 provide(
   THEME_KEY,
-  computed(() => getBookorbitThemeName(themeStore.resolvedTheme, themeStore.accent)),
+  computed(() => buildChartTheme(chartTokens.value)),
 )
 </script>
 

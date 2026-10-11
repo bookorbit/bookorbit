@@ -104,7 +104,7 @@ async function handleAccountMode() {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             <span class="settings-label">{{ t('settings.appearance.storage.device.title') }}</span>
-            <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+            <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-xs bg-primary/15 text-primary">
               {{ t('settings.appearance.storage.active') }}
             </span>
           </div>
@@ -131,12 +131,12 @@ async function handleAccountMode() {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             <span class="settings-label">{{ t('settings.appearance.storage.account.title') }}</span>
-            <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+            <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-xs bg-primary/15 text-primary">
               {{ t('settings.appearance.storage.active') }}
             </span>
             <span
               v-if="isDemoRestrictedAccount"
-              class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+              class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-xs bg-muted text-muted-foreground"
             >
               {{ t('settings.appearance.storage.notAvailable') }}
             </span>

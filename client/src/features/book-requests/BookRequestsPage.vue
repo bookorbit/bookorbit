@@ -12,6 +12,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { formatCompactNumber, formatNumber } from '@/i18n/formatters'
 import { canBulkActRequest, canDismissRequest, cancelStopsATransfer } from './requestActions'
+import { flattenRequestRows, rowRequests } from './requestPair'
 import RequestDrawer from './components/RequestDrawer.vue'
 import NoRequestSourcesNotice from './components/NoRequestSourcesNotice.vue'
 import RequestEmptyState from './components/RequestEmptyState.vue'
@@ -92,8 +93,10 @@ const isCompact = computed(() => density.value === 'compact')
  * holding the row objects would keep a stale copy of whatever the tick just changed.
  */
 const selectedIds = ref<number[]>([])
-const selectedRows = computed(() => activeList.value.items.value.filter((request) => selectedIds.value.includes(request.id)))
-const selectableRows = computed(() => activeList.value.items.value.filter((request) => canBulkActRequest(request, canManage.value)))
+/** Every request on the page with pairs unfolded, since a selection and a batch act on requests, not rows. */
+const activeRequests = computed(() => flattenRequestRows(activeList.value.items.value))
+const selectedRows = computed(() => activeRequests.value.filter((request) => selectedIds.value.includes(request.id)))
+const selectableRows = computed(() => activeRequests.value.filter((request) => canBulkActRequest(request, canManage.value)))
 
 /**
  * A selection can mix states, so each bulk button owns its own subset and says how big it is.
@@ -116,7 +119,8 @@ provide(REQUEST_DRAWER, {
 
 const STATUS_FILTERS: Array<BookRequestStatus | ''> = ['', ...BOOK_REQUEST_STATUSES]
 
-const confirming = ref<{ request: BookRequestItem; action: 'cancel' | 'delete' } | null>(null)
+/** One request, or both halves of a pair cancelled from their row in one press. */
+const confirming = ref<{ requests: BookRequestItem[]; action: 'cancel' | 'delete' } | null>(null)
 /** Open while the approver is writing the one reason the whole selection is being turned down for. */
 const rejectingSelection = ref(false)
 const rejectNote = ref('')
@@ -128,14 +132,14 @@ const confirmTitle = computed(() =>
 const confirmDescription = computed(() => {
   if (!confirming.value) return ''
   if (confirming.value.action === 'delete') return t('bookRequests.confirm.deleteDescription')
-  return cancelStopsATransfer(confirming.value.request)
+  return confirming.value.requests.some(cancelStopsATransfer)
     ? t('bookRequests.confirm.cancelDescriptionWithDownload')
     : t('bookRequests.confirm.cancelDescription')
 })
 
 const confirmLabel = computed(() => (confirming.value?.action === 'delete' ? t('bookRequests.actions.delete') : t('bookRequests.actions.cancel')))
-/** The dialog acts on one row, so it is busy only while that row's own action is running. */
-const confirmBusy = computed(() => actions.isPending(confirming.value?.request.id))
+/** The dialog acts on one row, so it is busy only while that row's own actions are running. */
+const confirmBusy = computed(() => confirming.value?.requests.some((request) => actions.isPending(request.id)) ?? false)
 
 async function loadActive() {
   if (activeTab.value === 'mine') await mine.fetchRequests()
@@ -176,7 +180,7 @@ watch(() => activeList.value.items.value, onRowsChanged)
 /** A refetch both trims the selection and retires the live ticks the fetched rows have overtaken. */
 function onRowsChanged() {
   pruneSelection()
-  pruneSettledProgress(activeList.value.items.value)
+  pruneSettledProgress(activeRequests.value)
 }
 
 function selectSearchTab() {
@@ -196,10 +200,13 @@ function clearSelection() {
   selectedIds.value = []
 }
 
-function toggleSelect(request: BookRequestItem) {
-  const index = selectedIds.value.indexOf(request.id)
-  if (index === -1) selectedIds.value.push(request.id)
-  else selectedIds.value.splice(index, 1)
+/** A pair row's checkbox stands for every half of it a bulk action can reach. */
+function toggleSelect(row: BookRequestItem) {
+  const ids = rowRequests(row)
+    .filter((request) => canBulkActRequest(request, canManage.value))
+    .map((request) => request.id)
+  const allSelected = ids.every((id) => selectedIds.value.includes(id))
+  selectedIds.value = allSelected ? selectedIds.value.filter((id) => !ids.includes(id)) : [...new Set([...selectedIds.value, ...ids])]
 }
 
 /** Tick-all covers the rows that can actually be approved, not every row on the page. */
@@ -337,8 +344,65 @@ function handleReject(request: BookRequestItem) {
 
 /** Stopping a live transfer and deleting a row both ask first; the rest are one click. */
 function handleCancel(request: BookRequestItem) {
-  if (cancelStopsATransfer(request)) confirming.value = { request, action: 'cancel' }
+  if (cancelStopsATransfer(request)) confirming.value = { requests: [request], action: 'cancel' }
   else void cancelRequest(request)
+}
+
+/**
+ * The halves of a pair, acted on from their row. One half goes through the same path a single
+ * request does; two go through the batch endpoints, which report each half's own outcome.
+ */
+function handlePairApprove(requests: BookRequestItem[]) {
+  if (requests.length === 1) {
+    void approveRequest(requests[0]!)
+    return
+  }
+  void runBulk(
+    requests,
+    actions.approveMany,
+    { failed: 'bookRequests.errors.bulkApproveFailed', done: 'bookRequests.toasts.pairApproved', partial: 'bookRequests.toasts.bulkApprovedPartial' },
+    false,
+  )
+}
+
+function handlePairReject(requests: BookRequestItem[]) {
+  if (requests.length === 1) {
+    void rejectRequest(requests[0]!)
+    return
+  }
+  void runBulk(
+    requests,
+    (ids) => actions.rejectMany(ids),
+    { failed: 'bookRequests.errors.bulkRejectFailed', done: 'bookRequests.toasts.pairRejected', partial: 'bookRequests.toasts.bulkRejectedPartial' },
+    false,
+  )
+}
+
+function handlePairCancel(requests: BookRequestItem[]) {
+  if (requests.some(cancelStopsATransfer)) confirming.value = { requests, action: 'cancel' }
+  else void cancelRequests(requests)
+}
+
+function handlePairDismiss(requests: BookRequestItem[]) {
+  void runBulk(
+    requests,
+    actions.dismissMany,
+    {
+      failed: 'bookRequests.errors.bulkDismissFailed',
+      done: 'bookRequests.toasts.bulkDismissed',
+      partial: 'bookRequests.toasts.bulkDismissedPartial',
+    },
+    !activeList.value.includeDismissed.value,
+  )
+}
+
+function handlePairRestore(requests: BookRequestItem[]) {
+  for (const request of requests) void restoreRequest(request)
+}
+
+/** One at a time, each with its own outcome, so one half refusing does not hide the other succeeding. */
+async function cancelRequests(requests: BookRequestItem[]) {
+  for (const request of requests) await cancelRequest(request)
 }
 
 function handleDismiss(request: BookRequestItem) {
@@ -350,15 +414,16 @@ function handleRestore(request: BookRequestItem) {
 }
 
 function handleRemove(request: BookRequestItem) {
-  confirming.value = { request, action: 'delete' }
+  confirming.value = { requests: [request], action: 'delete' }
 }
 
 /** Open until the action settles, so `busy` has something to render and a second Enter does nothing. */
 async function handleConfirm() {
   const pending = confirming.value
   if (!pending) return
-  if (pending.action === 'delete') await deleteRequest(pending.request)
-  else await cancelRequest(pending.request)
+  if (pending.action === 'delete') {
+    for (const request of pending.requests) await deleteRequest(request)
+  } else await cancelRequests(pending.requests)
   confirming.value = null
 }
 
@@ -621,7 +686,7 @@ function goToNextPage() {
             <input
               v-model="activeList.includeDismissed.value"
               type="checkbox"
-              class="h-3.5 w-3.5 rounded border-border accent-primary"
+              class="h-3.5 w-3.5 rounded-xs border-border accent-primary"
               @change="handleShowDismissedChange"
             />
             {{ t('bookRequests.filters.showDismissed') }}
@@ -736,6 +801,11 @@ function goToNextPage() {
           @restore="handleRestore"
           @remove="handleRemove"
           @grab="openReleases"
+          @pair-approve="handlePairApprove"
+          @pair-reject="handlePairReject"
+          @pair-cancel="handlePairCancel"
+          @pair-dismiss="handlePairDismiss"
+          @pair-restore="handlePairRestore"
           @sort="handleSort"
           @toggle-select="toggleSelect"
           @toggle-select-all="toggleSelectAll"

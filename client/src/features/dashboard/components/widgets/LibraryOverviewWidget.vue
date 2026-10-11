@@ -60,8 +60,8 @@ function navigate(route: StatRoute) {
     <!-- Loading -->
     <div v-if="loading" class="grid flex-1 grid-cols-2 gap-2">
       <div v-for="n in 4" :key="n" class="flex flex-col items-center justify-center rounded-lg bg-muted/40 p-2">
-        <div class="h-5 w-10 animate-pulse rounded bg-muted" />
-        <div class="mt-1 h-2.5 w-8 animate-pulse rounded bg-muted" />
+        <div class="h-5 w-10 animate-pulse rounded-xs bg-muted" />
+        <div class="mt-1 h-2.5 w-8 animate-pulse rounded-xs bg-muted" />
       </div>
     </div>
 

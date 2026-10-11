@@ -288,19 +288,19 @@ function cancelDelete() {
 
       <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
         <label class="flex items-center gap-2 cursor-pointer">
-          <input v-model="form.auth" type="checkbox" class="rounded border-border" />
+          <input v-model="form.auth" type="checkbox" class="rounded-xs border-border" />
           <span class="text-xs text-foreground">{{ t('email.providers.authentication') }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
-          <input v-model="form.ssl" type="checkbox" class="rounded border-border" />
+          <input v-model="form.ssl" type="checkbox" class="rounded-xs border-border" />
           <span class="text-xs text-foreground">SSL</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
-          <input v-model="form.startTls" type="checkbox" class="rounded border-border" />
+          <input v-model="form.startTls" type="checkbox" class="rounded-xs border-border" />
           <span class="text-xs text-foreground">STARTTLS</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
-          <input v-model="form.tlsRejectUnauthorized" type="checkbox" class="rounded border-border" />
+          <input v-model="form.tlsRejectUnauthorized" type="checkbox" class="rounded-xs border-border" />
           <span class="text-xs text-foreground">{{ t('email.providers.verifyTls') }}</span>
         </label>
       </div>
@@ -347,15 +347,15 @@ function cancelDelete() {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium text-foreground">{{ p.name }}</span>
-            <span v-if="p.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">{{
+            <span v-if="p.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-xs bg-primary/15 text-primary">{{
               t('email.badge.default')
             }}</span>
-            <span v-if="p.isShared" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{{
+            <span v-if="p.isShared" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-xs bg-muted text-muted-foreground">{{
               t('email.badge.shared')
             }}</span>
             <span
               v-if="p.isSystemProvider"
-              class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              class="text-[10px] font-semibold px-1.5 py-0.5 rounded-xs bg-amber-500/15 text-amber-600 dark:text-amber-400"
               >{{ t('email.badge.system') }}</span
             >
           </div>

@@ -257,3 +257,56 @@ describe('useCandidateGroups', () => {
     expect(groupsFor(results, {}, 'ebook')[0]!.key).not.toBe(groupsFor(results, {}, 'audiobook')[0]!.key)
   })
 })
+
+describe('useCandidateGroups for a pair search', () => {
+  function pairGroups(results: MetadataCandidate[], availability: Record<string, BookRequestAvailability>) {
+    const { groups } = useCandidateGroups(
+      ref(results),
+      ref<BookRequestMediaKind>('ebook'),
+      (item, kind = 'ebook') => availability[`${kind}|${item.provider}:${item.providerId}`] ?? null,
+      ref([MetadataProviderKey.AMAZON]),
+      ref(null),
+      ref([]),
+      { enabled: ref(true), audioCoverProviderOrder: ref([MetadataProviderKey.AUDIBLE]) },
+    )
+    return groups.value
+  }
+
+  /** Owning the ebook says nothing about the audiobook, so each half is answered on its own. */
+  it('answers each medium separately, merged across the records behind the work', () => {
+    const groups = pairGroups(
+      [
+        candidate({ provider: MetadataProviderKey.AMAZON, providerId: 'az1' }),
+        candidate({ provider: MetadataProviderKey.AUDIBLE, providerId: 'au1' }),
+      ],
+      {
+        'ebook|amazon:az1': { ownedBookId: 42, existingRequestId: null, existingRequestStatus: null, alreadySubscribed: false },
+        'audiobook|audible:au1': { ownedBookId: null, existingRequestId: 9, existingRequestStatus: 'pending', alreadySubscribed: false },
+      },
+    )
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]!.pairAvailability?.ebook?.ownedBookId).toBe(42)
+    expect(groups[0]!.pairAvailability?.audiobook?.existingRequestId).toBe(9)
+  })
+
+  it("orders the audiobook half's covers by the Audiobook cover rule, apart from the ebook's", () => {
+    const groups = pairGroups(
+      [
+        candidate({ provider: MetadataProviderKey.AMAZON, providerId: 'az1', coverUrl: 'https://covers.test/portrait.jpg' }),
+        candidate({ provider: MetadataProviderKey.AUDIBLE, providerId: 'au1', coverUrl: 'https://covers.test/square.jpg' }),
+      ],
+      {},
+    )
+
+    expect(groups[0]!.coverUrl).toBe('https://covers.test/portrait.jpg')
+    expect(groups[0]!.audioCoverUrls[0]).toBe('https://covers.test/square.jpg')
+  })
+
+  it('carries no pair answer at all outside a pair search', () => {
+    const groups = groupsFor([candidate({ provider: MetadataProviderKey.AMAZON, providerId: 'az1' })])
+
+    expect(groups[0]!.pairAvailability).toBeNull()
+    expect(groups[0]!.audioCoverUrls).toEqual([])
+  })
+})

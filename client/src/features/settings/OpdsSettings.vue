@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import ReadAloudDeliverySelect from '@/features/delivery/components/ReadAloudDeliverySelect.vue'
+import { useReadAloudDelivery } from '@/features/delivery/composables/useReadAloudDelivery'
+import type { ReadAloudDeliveryPreference } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { onMounted, ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,6 +16,8 @@ import { useMediaQuery } from '@vueuse/core'
 import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 
 const { t } = useI18n()
+const { supported: deliverySupported } = useReadAloudDelivery()
+const createDelivery = ref<ReadAloudDeliveryPreference>('audioless_epub')
 const { hasPermission } = usePermissions()
 const canManageSettings = computed(() => hasPermission('manage_app_settings'))
 
@@ -105,6 +110,7 @@ async function createUser() {
         username: createUsername.value,
         password: createPassword.value,
         sortOrder: createSortOrder.value,
+        ...(deliverySupported.value ? { readAloudDelivery: createDelivery.value } : {}),
       }),
     })
     if (!res.ok) {
@@ -125,6 +131,20 @@ async function createUser() {
   } finally {
     creating.value = false
   }
+}
+
+async function updateDelivery(user: OpdsUser, readAloudDelivery: ReadAloudDeliveryPreference) {
+  const res = await api(`/api/v1/opds-users/${user.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ readAloudDelivery }),
+  })
+  if (!res.ok) {
+    toast.error(t('settings.reader.opds.updateSettingsFailed'))
+    return
+  }
+  const updated: OpdsUser = await res.json()
+  opdsUsers.value = opdsUsers.value.map((profile) => (profile.id === user.id ? updated : profile))
 }
 
 async function updateSortOrder(user: OpdsUser, sortOrder: OpdsSortOrder) {
@@ -306,6 +326,7 @@ function cancelDelete() {
             </option>
           </select>
         </div>
+        <ReadAloudDeliverySelect v-if="deliverySupported" v-model="createDelivery" />
         <div v-if="createError" class="text-xs text-destructive">
           {{ createError }}
         </div>
@@ -353,6 +374,11 @@ function cancelDelete() {
                 {{ opt.label }}
               </option>
             </select>
+            <ReadAloudDeliverySelect
+              v-if="deliverySupported"
+              :model-value="user.readAloudDelivery"
+              @update:model-value="updateDelivery(user, $event)"
+            />
             <Button variant="destructive-ghost" size="icon-sm" class="hidden md:flex" @click="requestDeleteUser(user)">
               <Trash2 :size="14" />
             </Button>

@@ -105,6 +105,42 @@ export const SURFACE_OPACITY_MIN = 80;
 export const SURFACE_OPACITY_MAX = 100;
 export const SURFACE_OPACITY_DEFAULT = 92;
 
+/** Top glow reach, in percent of the active style's own reach. 0 turns the glow off. */
+export const GLOW_REACH_MIN = 0;
+export const GLOW_REACH_MAX = 200;
+export const GLOW_REACH_DEFAULT = 80;
+
+/** A whole visual style: surfaces, type, shell material and component accents. Independent of
+ *  mode, accent, radius and background, which keep their values when the style changes. */
+export const STYLE_IDS = ["bookorbit", "nostalgia"] as const;
+export type Style = (typeof STYLE_IDS)[number];
+export const DEFAULT_STYLE: Style = "bookorbit";
+
+/** Neutral ground palettes. Only styles that declare a surface palette control read them. */
+export const SURFACE_PALETTE_IDS = [
+  // Greys, darkest first, then tinted grounds.
+  "onyx",
+  "carbon",
+  "neutral",
+  "zinc",
+  "iron",
+  "steel",
+  "ash",
+  "smoke",
+  "charcoal",
+  "slate",
+  "midnight-blue",
+  "ocean",
+  "pine",
+  "olive",
+  "stone",
+  "sepia",
+  "crimson",
+  "plum",
+] as const;
+export type SurfacePalette = (typeof SURFACE_PALETTE_IDS)[number];
+export const DEFAULT_SURFACE_PALETTE: SurfacePalette = "steel";
+
 export interface ThemePreferences {
   theme: Theme;
   accent: Accent;
@@ -113,4 +149,11 @@ export interface ThemePreferences {
   brightness: number;
   /** Optional so a client that sends it stays valid against a server that predates it. */
   surfaceOpacity?: number;
+  /** Optional for the same reason; absent means the BookOrbit style. */
+  style?: Style;
+  /** Optional for the same reason; absent means steel. */
+  surfacePalette?: SurfacePalette;
+  /** How far the accent glow reaches down the page, as a percent of the style's own reach; 0 turns it off.
+   *  Optional for the same reason; absent means GLOW_REACH_DEFAULT. */
+  glowReach?: number;
 }

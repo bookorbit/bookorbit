@@ -2,14 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, Plus, X } from '@lucide/vue'
-import {
-  AUDIO_FORMAT_LIST,
-  COMIC_FORMAT_LIST,
-  EBOOK_FORMAT_LIST,
-  MAX_RELEASE_TIER_NAME_LENGTH,
-  MAX_RELEASE_TIERS,
-  REQUEST_LANGUAGE_CODES,
-} from '@bookorbit/types'
+import { BOOK_REQUEST_FORMATS_BY_MEDIA_KIND, MAX_RELEASE_TIER_NAME_LENGTH, MAX_RELEASE_TIERS, REQUEST_LANGUAGE_CODES } from '@bookorbit/types'
 import type {
   BookRequestMediaKind,
   IndexerAdapterDescriptor,
@@ -20,6 +13,7 @@ import type {
 } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import TokenSelect from '@/components/ui/TokenSelect.vue'
+import { createUuid } from '@/lib/uuid'
 import { formatLanguageName } from '@/i18n/formatters'
 
 /**
@@ -73,13 +67,9 @@ function clone(list: ReleaseTier[]): ReleaseTier[] {
 }
 
 /** Offered from the same lists the matcher accepts, so a form can never state an impossible tier. */
-const FORMATS: Record<BookRequestMediaKind, readonly string[]> = {
-  ebook: EBOOK_FORMAT_LIST,
-  audiobook: AUDIO_FORMAT_LIST,
-  comic: [...COMIC_FORMAT_LIST, 'pdf'],
-}
+const FORMATS = BOOK_REQUEST_FORMATS_BY_MEDIA_KIND
 
-/** Bitrate and channels describe an encode, which an ebook or a comic does not have. */
+/** Bitrate and channels describe an encode, which an ebook does not have. */
 const isAudio = computed(() => props.mediaKind === 'audiobook')
 const formats = computed(() => FORMATS[props.mediaKind])
 const languageOptions = computed(() =>
@@ -134,7 +124,7 @@ function prune(conditions: ReleaseTierConditions): ReleaseTierConditions {
 function addTier() {
   if (!canAdd.value) return
   const tier: ReleaseTier = {
-    id: crypto.randomUUID(),
+    id: createUuid(),
     name: t('settings.system.requests.profiles.newTier', { position: tiers.value.length + 1 }),
     conditions: {},
   }

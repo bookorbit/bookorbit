@@ -42,7 +42,7 @@ export function isContentBookFile(file: { format: string | null; role: string })
   return (file.role === "content" || file.role === "primary") && isBookFormat(file.format);
 }
 
-/** What BookOrbit accepts as an ebook, and what an ebook tier may therefore ask for. */
+/** Text and document formats, excluding comic archives and audio. */
 export const EBOOK_FORMAT_LIST = ["epub", "kepub", "mobi", "azw3", "azw", "fb2", "pdf", "djvu"] as const;
 
 export const READ_STATUSES = ["unread", "want_to_read", "reading", "on_hold", "rereading", "read", "skimmed", "abandoned"] as const;
@@ -187,6 +187,7 @@ export type BookSeriesMembership = {
 export type BookCard = {
   id: number;
   status: string;
+  /** The frame of the cover the book shows by default, which follows its primary file's medium rather than its library. */
   coverAspectRatio: CoverAspectRatio;
   title: string | null;
   authors: string[];
@@ -222,6 +223,8 @@ export type BookCard = {
 };
 
 export type BookDetailFile = {
+  fileHash?: string | null;
+  contentVersion?: string;
   id: number;
   format: string | null;
   role: string;
@@ -315,6 +318,8 @@ export type BookDetail = {
   coverSource: "extracted" | "custom" | null;
   coverMedia: CoverMedium[];
   covers: Record<CoverMedium, BookCoverSlot | null>;
+  /** The frame of the cover the book shows by default: square when that is its audiobook art. Absent from servers that predate it. */
+  coverAspectRatio?: CoverAspectRatio;
   coverVersion: string;
   hardcoverEditionId: string | null;
   providerIds: ProviderIds;
@@ -437,6 +442,8 @@ export type BookRecommendation = {
   title: string | null;
   coverAspectRatio: CoverAspectRatio;
   updatedAt: string | null;
+  /** The book card's cover cache key. Absent from servers that predate it, where `updatedAt` serves. */
+  coverVersion?: string;
   hasCover: boolean;
   authors: string[];
   readStatus: UserBookStatus | null;
@@ -452,6 +459,8 @@ export type SeriesBookRecommendation = {
   title: string | null;
   coverAspectRatio: CoverAspectRatio;
   updatedAt: string | null;
+  /** The book card's cover cache key. Absent from servers that predate it, where `updatedAt` serves. */
+  coverVersion?: string;
   seriesIndex: SeriesIndex | null;
   hasCover: boolean;
   authors: string[];

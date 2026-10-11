@@ -1,9 +1,10 @@
 import { createWriteStream } from 'fs';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import { ZipArchive, type Archiver } from 'archiver';
+import { ZipArchive } from 'archiver';
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
-import type { Readable } from 'stream';
+import { Transform } from 'stream';
+import { readEpubEntry, validateEpubEntries } from './epub-delivery-validation';
 import * as unzipper from 'unzipper';
 
 import { audiolessEpubConfig } from '../../config/config';
@@ -59,14 +60,8 @@ export type AudiolessEpubArchive = AudiolessEpubResult & {
  * so a crafted archive cannot turn a package document into an out-of-memory crash.
  */
 async function readBoundedEntry(entry: unzipper.File, maxBytes: number, label: string): Promise<Buffer> {
-  if (entry.uncompressedSize > maxBytes) {
-    throw new BadRequestException(`Invalid EPUB: ${label} is ${entry.uncompressedSize} bytes, over the ${maxBytes} byte limit`);
-  }
-  const buffer = await entry.buffer();
-  if (buffer.length > maxBytes) {
-    throw new BadRequestException(`Invalid EPUB: ${label} is ${buffer.length} bytes, over the ${maxBytes} byte limit`);
-  }
-  return buffer;
+  void label;
+  return readEpubEntry(entry, maxBytes);
 }
 
 function toArray<T>(value: T | T[] | undefined | null): T[] {
@@ -194,12 +189,6 @@ async function readRootfilePath(zip: unzipper.CentralDirectory, maxMetadataBytes
   throw new BadRequestException('Invalid EPUB: cannot find OPF path in container.xml');
 }
 
-function appendEntryStream(archive: Archiver, entry: { stream: () => Readable }, name: string, reject: (error: Error) => void): void {
-  const source = entry.stream();
-  source.once('error', reject);
-  archive.append(source, { name, date: ZIP_ENTRY_DATE });
-}
-
 /**
  * Rebuilds a read-along EPUB without its narration audio, keeping the sentence anchors that
  * KOReader needs to report a fragment-accurate position. Audio is identified by manifest
@@ -224,8 +213,13 @@ export class AudiolessEpubService {
       const output = createWriteStream(destinationPath);
       await new Promise<void>((resolve, reject) => {
         output.on('close', resolve);
-        output.on('error', reject);
-        archive.on('error', reject);
+        const fail = (error: Error) => {
+          archive.abort();
+          output.destroy();
+          reject(error);
+        };
+        output.on('error', fail);
+        archive.on('error', fail);
         archive.pipe(output);
         // finalize() reports failures through a rejected promise as well as the 'error' event.
         // Routing it back into reject() settles the build when only the promise fires, and keeps
@@ -244,6 +238,7 @@ export class AudiolessEpubService {
       throw new BadRequestException(`Invalid EPUB: archive declares ${zip.files.length} entries, over the ${this.config.maxSourceEntries} limit`);
     }
 
+    validateEpubEntries(zip.files, this.config.maxSourceEntries);
     const opfPath = await readRootfilePath(zip, this.config.maxMetadataBytes);
     const opfEntry = findEpubZipEntry(zip.files, opfPath);
     if (!opfEntry) throw new BadRequestException(`Invalid EPUB: OPF not found at ${opfPath}`);
@@ -257,6 +252,7 @@ export class AudiolessEpubService {
     const archive = new ZipArchive({ zlib: { level: 6 } });
     let removedEntries = 0;
     let sanitizedEntries = 0;
+    let inflatedBytes = Buffer.byteLength(patchedOpf);
     archive.append(Buffer.from('application/epub+zip'), { name: 'mimetype', store: true, date: ZIP_ENTRY_DATE });
 
     for (const entry of zip.files) {
@@ -280,7 +276,23 @@ export class AudiolessEpubService {
         archive.append(Buffer.from(patchStorytellerReadaloudStylesheet(css.toString('utf-8'))), { name: entryName, date: ZIP_ENTRY_DATE });
         continue;
       }
-      appendEntryStream(archive, entry, entryName, (error) => archive.emit('error', error));
+      const source = entry.stream();
+      const bound = new Transform({
+        transform: (chunk: Buffer, _encoding, callback) => {
+          inflatedBytes += chunk.length;
+          callback(inflatedBytes > this.config.maxOutputBytes ? new BadRequestException('Inflated EPUB exceeds rebuild limit') : null, chunk);
+        },
+      });
+      source.once('error', (error) => archive.emit('error', error));
+      bound.once('error', (error) => {
+        source.destroy();
+        archive.emit('error', error);
+      });
+      archive.once('error', () => {
+        source.destroy();
+        bound.destroy();
+      });
+      archive.append(source.pipe(bound), { name: entryName, date: ZIP_ENTRY_DATE });
     }
 
     return { archive, removedEntries, sanitizedEntries };
@@ -335,6 +347,7 @@ export class AudiolessEpubService {
     }
     // The released slot is handed straight to this waiter without the counter dropping, so a
     // build arriving before the waiter resumes cannot claim the same slot twice.
+    if (this.waiting.length >= 64) throw new BadRequestException({ code: 'DELIVERY_BUSY', message: 'Too many pending EPUB preparations' });
     await new Promise<void>((resolve) => this.waiting.push(resolve));
   }
 

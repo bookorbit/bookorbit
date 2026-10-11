@@ -48,10 +48,13 @@ const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
   MetadataProviderKey.OPEN_LIBRARY,
 ];
 
+const AUDIOBOOK_FIELD_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.LIBROFM];
+
 const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> = {
   isbn: { mergeStrategy: 'fillMissing' },
   title: { mergeStrategy: 'overwriteIfProvided', providers: PROVIDERS_WITH_ITUNES },
-  subtitle: { providers: PROVIDERS_WITH_ITUNES },
+  // iTunes and Open Library carry no subtitle, so listing them here would only flag the rule.
+  subtitle: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.AMAZON, MetadataProviderKey.KOBO] },
   description: { providers: PROVIDERS_WITH_ITUNES },
   cover: {
     providers: [
@@ -83,6 +86,16 @@ const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> =
     providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.KOBO],
   },
   communityRating: { providers: [...COMMUNITY_RATING_PROVIDER_KEYS] },
+  // Google and Open Library carry no series.
+  seriesName: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.AMAZON, MetadataProviderKey.KOBO] },
+  seriesIndex: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.AMAZON, MetadataProviderKey.KOBO] },
+  // Only audiobook sources carry these, so the base order could never fill them. Audnexus stays out
+  // for the reason it stays out of the audio cover: chapters follow the narrators order, and it would
+  // bring Audible's timings in over the book's own. Duration only fills a gap, because the one
+  // measured from the files is exact and a provider's is rounded to the minute.
+  narrators: { providers: AUDIOBOOK_FIELD_PROVIDERS },
+  duration: { providers: AUDIOBOOK_FIELD_PROVIDERS, mergeStrategy: 'fillMissing' },
+  abridged: { providers: AUDIOBOOK_FIELD_PROVIDERS },
 };
 
 @Injectable()

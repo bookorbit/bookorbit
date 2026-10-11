@@ -1,13 +1,16 @@
+import type { ReadAloudDeliveryPreference, ReadAloudDeliveryVariant, DeliveryArtifactMetadata } from "./delivery";
 import type { HighlightOfTheDayWidgetData, ReadingGoalWidgetData, ReadingStreakWidgetData } from "./dashboard";
 import type { SeriesIndex } from "./series-index";
 
 export interface KoreaderCredentials {
+  readAloudDelivery?: ReadAloudDeliveryPreference;
   username: string;
   syncEnabled: boolean;
   createdAt: string;
 }
 
 export interface KoreaderDeviceInfo {
+  readAloudDelivery?: ReadAloudDeliveryPreference;
   device: string;
   deviceId: string;
   lastSyncAt: string;
@@ -29,6 +32,7 @@ export interface KoreaderBookProgress {
 }
 
 export interface KoreaderDeviceSweepInfo {
+  readAloudDelivery?: ReadAloudDeliveryPreference;
   deviceId: string;
   deviceModel: string;
   pluginVersion: string | null;
@@ -144,11 +148,13 @@ export interface UnlinkKoreaderManualHashLinkResult {
 }
 
 export interface CreateKoreaderCredentialsPayload {
+  readAloudDelivery?: ReadAloudDeliveryPreference;
   username: string;
   password: string;
 }
 
 export interface UpdateKoreaderCredentialsPayload {
+  readAloudDelivery?: ReadAloudDeliveryPreference;
   username?: string;
   password?: string;
   syncEnabled?: boolean;
@@ -193,6 +199,13 @@ export interface KoreaderCatalogEntry {
 }
 
 export interface KoreaderCatalogFile {
+  fileHash?: string | null;
+  sourceMediaOverlayAvailable?: boolean;
+  narrationPlaybackAvailable?: boolean;
+  selection?: string;
+  delivery?: DeliveryArtifactMetadata;
+  requestedVariant?: "original" | "audioless_epub";
+  contentVersion?: string;
   id: number;
   format: string;
   role: string;
@@ -367,6 +380,11 @@ export interface KoreaderCatalogDashboardSectionResponse {
 // download route streams, so it doubles as the restart-validation checksum and
 // as the digest that keys local match state.
 export interface KoreaderCatalogManifestFile {
+  selection?: string;
+  delivery?: DeliveryArtifactMetadata;
+  requestedVariant?: "original" | "audioless_epub";
+  sourceMediaOverlayAvailable?: boolean;
+  narrationPlaybackAvailable?: boolean;
   id: number;
   format: string;
   downloadVariant: "original" | "audioless_epub";
@@ -401,7 +419,8 @@ export interface KoreaderCatalogManifestPage {
   restartRequired: boolean;
 }
 
-export type KoreaderPluginCapability = "catalogBulkManifest" | "catalogDashboardSections" | "bookmarkSync";
+export type KoreaderPluginCapability =
+  "catalogBulkManifest" | "catalogDashboardSections" | "bookmarkSync" | "readAloudDeliveryVariants" | "readAloudDeliverySettings";
 
 export interface KoreaderPluginVersionInfo {
   pluginVersion: string;
@@ -415,4 +434,15 @@ export interface KoreaderCatalogReadStatusResult {
 
 export interface KoreaderCatalogRatingResult {
   rating: number | null;
+}
+
+export interface KoreaderDeliverySettings {
+  readAloudDelivery: ReadAloudDeliveryVariant;
+  credentialDefault: ReadAloudDeliveryPreference;
+  deviceOverride: ReadAloudDeliveryPreference;
+  deviceConfigured: boolean;
+}
+
+export interface UpdateKoreaderDeliverySettingsPayload {
+  readAloudDelivery: ReadAloudDeliveryPreference;
 }

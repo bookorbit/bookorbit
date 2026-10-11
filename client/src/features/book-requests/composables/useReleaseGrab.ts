@@ -39,6 +39,8 @@ export interface ReleaseGrabOptions {
   setFilesExpanded: (release: ReleaseCandidateItem, expanded: boolean) => void
   /** Which download path this release uses. */
   deliveryFor: (release: ReleaseCandidateItem) => DownloadDelivery
+  /** Where a sent release leaves the approver, when that is not the request it belongs to. */
+  afterGrab?: (item: BookRequestItem) => void
 }
 
 /**
@@ -51,7 +53,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const { request, requestId, grab, setRequest, inspectRelease, setFilesExpanded, deliveryFor } = options
+  const { request, requestId, grab, setRequest, inspectRelease, setFilesExpanded, deliveryFor, afterGrab } = options
 
   const manualOpen = ref(false)
   const refusals = ref<GrabRefusal[]>([])
@@ -79,7 +81,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     refusals.value = []
   }
 
-  /** A sent release leaves nothing to pick, so the drawer pops back to the request it belongs to. */
+  /** A sent release leaves nothing to pick, so the drawer pops back to the request it belongs to, unless told otherwise. */
   async function sendGrab(body: GrabBookRequestPayload, delivery: DownloadDelivery) {
     if (!request.value) return
     const outcome = await grab(request.value.id, body)
@@ -91,7 +93,8 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     setRequest(outcome.item)
     manualOpen.value = false
     toast.success(t('bookRequests.toasts.grabbed'))
-    void router.push({ name: 'book-request-detail', params: { id: request.value.id }, query: route.query })
+    if (afterGrab) afterGrab(outcome.item)
+    else void router.push({ name: 'book-request-detail', params: { id: request.value.id }, query: route.query })
   }
 
   async function submitGrab(body: GrabBookRequestPayload) {

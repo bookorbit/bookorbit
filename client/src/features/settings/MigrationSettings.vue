@@ -1346,13 +1346,13 @@ function formatSourceCountLabel(key: string) {
 
             <div
               v-if="sourceValidationWarnings.length > 0"
-              class="rounded border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 space-y-1"
+              class="rounded-xs border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 space-y-1"
             >
               <p class="font-medium">{{ t('settings.admin.migration.sourceValidatedWithWarnings') }}</p>
               <p v-for="warn in sourceValidationWarnings" :key="warn">{{ warn }}</p>
             </div>
 
-            <div v-if="sourceCapabilities" class="rounded border border-border bg-muted/40 p-3 text-xs space-y-2">
+            <div v-if="sourceCapabilities" class="rounded-xs border border-border bg-muted/40 p-3 text-xs space-y-2">
               <p class="font-medium text-foreground">{{ t('settings.admin.migration.lastValidationSnapshot') }}</p>
               <p class="text-muted-foreground">
                 {{
@@ -1385,7 +1385,7 @@ function formatSourceCountLabel(key: string) {
               </Button>
             </div>
 
-            <div class="overflow-x-auto rounded border border-border">
+            <div class="overflow-x-auto rounded-xs border border-border">
               <table class="w-full text-sm">
                 <thead class="bg-muted/40 text-left">
                   <tr>
@@ -1403,7 +1403,7 @@ function formatSourceCountLabel(key: string) {
                       <div class="space-y-2">
                         <SearchableUserSelect v-model="row.targetUserId" :users="targetUsers" :disabled="hasActiveRun || row.skip" />
                         <label class="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                          <input v-model="row.skip" type="checkbox" class="size-4 rounded border-input accent-primary" :disabled="hasActiveRun" />
+                          <input v-model="row.skip" type="checkbox" class="size-4 rounded-xs border-input accent-primary" :disabled="hasActiveRun" />
                           {{ t('settings.admin.migration.doNotImport') }}
                         </label>
                       </div>
@@ -1457,7 +1457,7 @@ function formatSourceCountLabel(key: string) {
               </div>
             </div>
 
-            <div v-if="pathValidation" class="rounded border border-border bg-muted/40 p-3 text-xs space-y-1">
+            <div v-if="pathValidation" class="rounded-xs border border-border bg-muted/40 p-3 text-xs space-y-1">
               <p class="font-medium text-foreground">{{ t('settings.admin.migration.pathValidation') }}</p>
               <p class="text-muted-foreground">
                 {{
@@ -1488,7 +1488,7 @@ function formatSourceCountLabel(key: string) {
               {{ t('settings.admin.migration.runDryRun') }}
             </Button>
 
-            <div v-if="plan" class="rounded border border-border bg-muted/30 p-3 space-y-2 text-sm">
+            <div v-if="plan" class="rounded-xs border border-border bg-muted/30 p-3 space-y-2 text-sm">
               <p>
                 {{ t('settings.admin.migration.matched') }} <span class="font-medium">{{ plan.summary?.matchedBooks ?? 0 }}</span> ·
                 {{ t('settings.admin.migration.unresolved') }}
@@ -1515,14 +1515,14 @@ function formatSourceCountLabel(key: string) {
                   </p>
                 </div>
                 <div class="space-y-3">
-                  <div v-for="dup in duplicateMatches" :key="dup.targetBookId" class="rounded border border-border bg-background p-3 space-y-2">
+                  <div v-for="dup in duplicateMatches" :key="dup.targetBookId" class="rounded-xs border border-border bg-background p-3 space-y-2">
                     <p class="text-xs font-medium text-foreground">{{ targetBookLabel(dup.targetBookId) }}</p>
                     <p class="text-[11px] text-muted-foreground">{{ t('settings.admin.migration.targetBookNum', { id: dup.targetBookId }) }}</p>
                     <div class="space-y-1">
                       <label
                         v-for="sourceId in dup.sourceBookIds"
                         :key="sourceId"
-                        class="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50 cursor-pointer"
+                        class="flex items-center justify-between gap-2 rounded-xs px-2 py-1 text-xs hover:bg-muted/50 cursor-pointer"
                       >
                         <div class="flex min-w-0 items-center gap-2">
                           <input
@@ -1568,7 +1568,7 @@ function formatSourceCountLabel(key: string) {
 
           <!-- Step 3: Run Migration -->
           <div v-else-if="currentStep === 3" class="space-y-5">
-            <div class="rounded border border-border bg-muted/20 p-3 text-xs space-y-1.5">
+            <div class="rounded-xs border border-border bg-muted/20 p-3 text-xs space-y-1.5">
               <p class="font-medium text-foreground">{{ t('settings.admin.migration.preflightChecks') }}</p>
               <p v-if="preflight.ready" class="text-emerald-600">{{ t('settings.admin.migration.allChecksPassed') }}</p>
               <template v-else>
@@ -1641,13 +1641,13 @@ function formatSourceCountLabel(key: string) {
 
             <div
               v-if="pollingError"
-              class="rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-700"
+              class="rounded-xs border border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-700"
             >
               <span>{{ t('settings.admin.migration.statusPollingStopped') }}</span>
               <Button variant="link" size="sm" class="h-auto p-0" @click="onRetryPolling">{{ t('settings.admin.migration.retry') }}</Button>
             </div>
 
-            <div v-if="run" class="rounded border border-border bg-muted/30 px-4 py-3.5 flex items-center gap-3 text-xs">
+            <div v-if="run" class="rounded-xs border border-border bg-muted/30 px-4 py-3.5 flex items-center gap-3 text-xs">
               <span class="inline-flex rounded-full border px-2 py-0.5" :class="runStateClass(run.state)">{{ run.state }}</span>
               <span class="text-muted-foreground">
                 {{
@@ -1709,7 +1709,7 @@ function formatSourceCountLabel(key: string) {
               </div>
 
               <!-- Error (if failed) -->
-              <div v-if="run.errorMessage" class="rounded border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 space-y-2">
+              <div v-if="run.errorMessage" class="rounded-xs border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 space-y-2">
                 <div class="space-y-0.5">
                   <p class="font-medium">{{ t('settings.admin.migration.migrationFailed') }}</p>
                   <p>{{ run.errorMessage }}</p>
@@ -1724,7 +1724,7 @@ function formatSourceCountLabel(key: string) {
               <template v-if="runReport || runProgress">
                 <div class="grid gap-3 sm:grid-cols-2">
                   <!-- Books card -->
-                  <div class="rounded border border-border p-3 space-y-2">
+                  <div class="rounded-xs border border-border p-3 space-y-2">
                     <p class="text-sm font-semibold">{{ t('settings.admin.migration.booksCard') }}</p>
                     <div class="space-y-1.5 text-xs">
                       <div class="flex justify-between">
@@ -1762,7 +1762,7 @@ function formatSourceCountLabel(key: string) {
                   </div>
 
                   <!-- User data card -->
-                  <div class="rounded border border-border p-3 space-y-2">
+                  <div class="rounded-xs border border-border p-3 space-y-2">
                     <p class="text-sm font-semibold">{{ t('settings.admin.migration.userDataCard') }}</p>
                     <div class="space-y-1.5 text-xs">
                       <div class="flex justify-between">
@@ -1802,7 +1802,7 @@ function formatSourceCountLabel(key: string) {
               <template v-if="runReport">
                 <div
                   v-if="run.state === 'completed' && reportData.unresolvedBooks.length === 0 && reportData.coverFailureCount === 0"
-                  class="rounded border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-700"
+                  class="rounded-xs border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-700"
                 >
                   {{ t('settings.admin.migration.completedNoIssues') }}
                 </div>
@@ -1820,7 +1820,7 @@ function formatSourceCountLabel(key: string) {
                     <div
                       v-for="book in reportData.matchedBooks"
                       :key="`${book.sourceBookId}-${book.targetBookId}`"
-                      class="rounded border border-border px-3 py-2 text-xs"
+                      class="rounded-xs border border-border px-3 py-2 text-xs"
                     >
                       <p class="font-medium text-foreground">
                         {{ book.sourceTitle || t('settings.admin.migration.sourceBookFallback', { id: book.sourceBookId }) }}
@@ -1847,7 +1847,7 @@ function formatSourceCountLabel(key: string) {
                     <div
                       v-for="book in reportData.unresolvedBooks"
                       :key="book.sourceBookId"
-                      class="rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs"
+                      class="rounded-xs border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs"
                     >
                       <p class="font-medium text-foreground">
                         {{ book.title || t('settings.admin.migration.sourceBookFallback', { id: book.sourceBookId }) }}
@@ -1869,7 +1869,7 @@ function formatSourceCountLabel(key: string) {
                     <div
                       v-for="preview in reportData.userPreview"
                       :key="`${preview.sourceUserId}-${preview.targetUserId}`"
-                      class="rounded border border-border px-3 py-2 text-xs"
+                      class="rounded-xs border border-border px-3 py-2 text-xs"
                     >
                       <p class="font-medium text-foreground">{{ preview.username }}</p>
                       <p class="text-muted-foreground mt-0.5">{{ describeUserPreviewCounts(preview.counts) }}</p>
@@ -1877,7 +1877,7 @@ function formatSourceCountLabel(key: string) {
                   </div>
                 </div>
 
-                <div v-if="reportData.coverFailureCount > 0" class="rounded border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-700">
+                <div v-if="reportData.coverFailureCount > 0" class="rounded-xs border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-700">
                   {{ t('settings.admin.migration.coverImportsFailed', { count: reportData.coverFailureCount }) }}
                 </div>
               </template>

@@ -8,6 +8,7 @@ import {
   MAX_AUTO_SEARCH_BACKOFF_FACTOR,
   NotificationType,
   releaseProfileIsActive,
+  isBookRequestMediaKind,
 } from '@bookorbit/types';
 import type {
   BookRequestAutomationSettings,
@@ -214,6 +215,8 @@ export class RequestAutomationService implements OnModuleInit {
     if (!joined) return;
     const request = joined.request;
     if (!isGrabbableBookRequestStatus(request.status as BookRequestStatus)) return;
+    // A retired medium has nothing to search for; the request waits for a person to close it.
+    if (!isBookRequestMediaKind(request.mediaKind)) return;
 
     // What the guards below are reasoning about, and therefore the only status any of them may
     // write a decision from. Every one of them runs before this pass has claimed anything, so a

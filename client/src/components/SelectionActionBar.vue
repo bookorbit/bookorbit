@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useSlots, watch } from 'vue'
+import { computed, nextTick, ref, useSlots, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   BookOpen,
@@ -23,6 +23,8 @@ import {
   X,
 } from '@lucide/vue'
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
+import IgnoreCacheCheckbox from '@/features/metadata-cache/components/IgnoreCacheCheckbox.vue'
+import type { IgnoreCacheOptions } from '@/features/metadata-cache/lib/metadata-cache'
 import { usePublisherSearch, useSeriesNameSearch, useLanguageSearch } from '@/features/book/composables/useMetadataFieldSearch'
 import {
   DropdownMenu,
@@ -79,7 +81,7 @@ const emit = defineEmits<{
   send: []
   download: [scope: ExportScope]
   'export-metadata': []
-  'refresh-metadata': []
+  'refresh-metadata': [options: IgnoreCacheOptions]
   're-extract-cover': []
   'set-status': [status: ReadStatus]
   'set-rating': [rating: number | null]
@@ -100,6 +102,9 @@ const deleteInput = ref('')
 const exportMenuOpen = ref(false)
 const ratingMenuOpen = ref(false)
 const fieldMenuOpen = ref(false)
+const refreshConfirmOpen = ref(false)
+const refreshIgnoreCache = ref(false)
+const refreshConfirmButton = ref<HTMLButtonElement | null>(null)
 const bulkField = ref<BulkEditableField>('publisher')
 const fieldValue = ref('')
 const slots = useSlots()
@@ -172,9 +177,22 @@ function openFieldEditor() {
   fieldMenuOpen.value = true
 }
 
-function onRefreshMetadata() {
+async function onRefreshMetadata() {
   if (props.count === 0) return
-  emit('refresh-metadata')
+  refreshIgnoreCache.value = false
+  refreshConfirmOpen.value = true
+  // The menu item that opened this is gone, so focus would otherwise fall back to the page.
+  await nextTick()
+  refreshConfirmButton.value?.focus()
+}
+
+function confirmRefreshMetadata() {
+  emit('refresh-metadata', { ignoreCache: refreshIgnoreCache.value })
+  refreshConfirmOpen.value = false
+}
+
+function cancelRefreshMetadata() {
+  refreshConfirmOpen.value = false
 }
 
 function onReExtractCover() {
@@ -224,6 +242,7 @@ watch(
       confirmingDelete.value = false
       exportMenuOpen.value = false
       ratingMenuOpen.value = false
+      refreshConfirmOpen.value = false
       deleteInput.value = ''
       resetFieldEditor()
     }
@@ -258,7 +277,7 @@ watch(
             <slot name="content" :count="count" />
           </template>
 
-          <template v-else-if="!confirmingDelete && !exportMenuOpen && !ratingMenuOpen && !fieldMenuOpen">
+          <template v-else-if="!confirmingDelete && !exportMenuOpen && !ratingMenuOpen && !fieldMenuOpen && !refreshConfirmOpen">
             <span class="px-2.5 py-0.5 text-sm font-semibold tabular-nums whitespace-nowrap rounded-full bg-primary/10 text-primary">{{
               count
             }}</span>
@@ -521,6 +540,29 @@ watch(
             <button :class="BTN_TEXT_CANCEL" @click="ratingMenuOpen = false">{{ t('common.cancel') }}</button>
           </template>
 
+          <!-- Refresh metadata confirmation -->
+          <template v-else-if="refreshConfirmOpen">
+            <span class="px-3 text-sm font-semibold text-foreground whitespace-nowrap" data-testid="bulk-refresh-confirm">
+              {{ t('components.selectionActionBar.refreshConfirm', { count }) }}
+            </span>
+            <div :class="DIVIDER" />
+            <IgnoreCacheCheckbox v-model="refreshIgnoreCache" compact class="px-2" />
+            <div :class="DIVIDER" />
+            <button
+              ref="refreshConfirmButton"
+              type="button"
+              :class="BTN_TEXT_PRIMARY"
+              data-testid="bulk-refresh-confirm-action"
+              @click="confirmRefreshMetadata"
+            >
+              <RefreshCw :size="14" />
+              {{ t('components.selectionActionBar.refreshConfirmAction') }}
+            </button>
+            <button type="button" :class="BTN_TEXT_CANCEL" data-testid="bulk-refresh-cancel" @click="cancelRefreshMetadata">
+              {{ t('common.cancel') }}
+            </button>
+          </template>
+
           <!-- Field editor -->
           <template v-else-if="fieldMenuOpen">
             <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">{{
@@ -565,7 +607,7 @@ watch(
             <template v-if="count > 50">
               <input
                 v-model="deleteInput"
-                class="h-7 w-24 rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-destructive"
+                class="h-7 w-24 rounded-xs border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-destructive"
                 :placeholder="t('components.selectionActionBar.typeDelete')"
               />
             </template>

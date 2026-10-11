@@ -4,6 +4,7 @@ import {
   METADATA_PROVIDER_STATUS_EVENT,
   MetadataProviderKey,
   type MetadataCandidate,
+  type MetadataCandidateCacheInfo,
   type MetadataProviderInfo,
   type MetadataProviderSearchOutcome,
 } from '@bookorbit/types'
@@ -313,5 +314,106 @@ describe('useMetadataSearch', () => {
     scope.stop()
 
     expect(state.isStreaming.value).toBe(false)
+  })
+
+  describe('metadata cache', () => {
+    function cached(candidateValue: MetadataCandidate, cache: MetadataCandidateCacheInfo) {
+      return { ...candidateValue, cache }
+    }
+
+    function streamUrls(): string[] {
+      return apiMock.mock.calls.map(([input]) => String(input)).filter((url) => url.startsWith('/api/v1/metadata-fetch/stream'))
+    }
+
+    it('keeps the cache marker beside a candidate rather than on it and summarizes the visible results', async () => {
+      const google = candidate(MetadataProviderKey.GOOGLE, 'g1')
+      const amazon = candidate(MetadataProviderKey.AMAZON, 'a1')
+      const kobo = candidate(MetadataProviderKey.KOBO, 'k1')
+      apiMock.mockResolvedValue(
+        streamResponse([
+          event(cached(google, { fetchedAt: '2026-10-07T10:00:00.000Z', stale: false })),
+          event(cached(amazon, { fetchedAt: '2026-10-01T10:00:00.000Z', stale: true })),
+          event(kobo),
+        ]),
+      )
+
+      const scope = effectScope()
+      const state = scope.run(() => useMetadataSearch())!
+      await state.search({ title: 'Dune' })
+
+      expect(state.results.value.every((result) => !('cache' in result))).toBe(true)
+      expect(state.cacheInfoFor(google)).toEqual({ fetchedAt: '2026-10-07T10:00:00.000Z', stale: false })
+      expect(state.cacheInfoFor(amazon)).toEqual({ fetchedAt: '2026-10-01T10:00:00.000Z', stale: true })
+      expect(state.cacheInfoFor(kobo)).toBeNull()
+      expect(state.cacheSummary.value).toEqual({ cachedCount: 2, staleCount: 1, oldestFetchedAt: '2026-10-01T10:00:00.000Z' })
+      scope.stop()
+    })
+
+    it('leaves the cache query off a normal search', async () => {
+      apiMock.mockResolvedValue({ ok: false })
+
+      const scope = effectScope()
+      const state = scope.run(() => useMetadataSearch())!
+      await state.search({ title: 'Dune' })
+      scope.stop()
+
+      expect(streamUrls()).toEqual(['/api/v1/metadata-fetch/stream?title=Dune'])
+    })
+
+    it('runs the last search again with cache=refresh and forgets earlier cache markers', async () => {
+      const google = candidate(MetadataProviderKey.GOOGLE, 'g1')
+      apiMock
+        .mockResolvedValueOnce(streamResponse([event(cached(google, { fetchedAt: '2026-10-07T10:00:00.000Z', stale: false }))]))
+        .mockResolvedValueOnce(streamResponse([event(google)]))
+
+      const scope = effectScope()
+      const state = scope.run(() => useMetadataSearch())!
+      state.selectedProviders.value = [MetadataProviderKey.GOOGLE]
+      await state.search({ title: 'Dune', bookId: 42 })
+      expect(state.cacheSummary.value.cachedCount).toBe(1)
+
+      await state.searchFresh()
+      scope.stop()
+
+      expect(streamUrls()).toEqual([
+        '/api/v1/metadata-fetch/stream?title=Dune&bookId=42&providers=google',
+        '/api/v1/metadata-fetch/stream?title=Dune&bookId=42&providers=google&cache=refresh',
+      ])
+      expect(state.cacheInfoFor(google)).toBeNull()
+      expect(state.cacheSummary.value.cachedCount).toBe(0)
+    })
+
+    it('does nothing when asked to search fresh before any search', async () => {
+      const scope = effectScope()
+      const state = scope.run(() => useMetadataSearch())!
+      await state.searchFresh()
+      scope.stop()
+
+      expect(apiMock).not.toHaveBeenCalled()
+    })
+
+    it('retries a provider live and drops only its cache markers', async () => {
+      const google = candidate(MetadataProviderKey.GOOGLE, 'g1')
+      const amazon = candidate(MetadataProviderKey.AMAZON, 'a1')
+      apiMock
+        .mockResolvedValueOnce(
+          streamResponse([
+            event(cached(google, { fetchedAt: '2026-10-07T10:00:00.000Z', stale: false })),
+            event(cached(amazon, { fetchedAt: '2026-10-02T10:00:00.000Z', stale: true })),
+          ]),
+        )
+        .mockResolvedValueOnce(streamResponse([event(amazon)]))
+
+      const scope = effectScope()
+      const state = scope.run(() => useMetadataSearch())!
+      await state.search({ title: 'Dune' })
+      await state.retryProvider(MetadataProviderKey.AMAZON)
+      scope.stop()
+
+      expect(streamUrls()[1]).toBe('/api/v1/metadata-fetch/stream?title=Dune&providers=amazon&cache=refresh')
+      expect(state.cacheInfoFor(amazon)).toBeNull()
+      expect(state.cacheInfoFor(google)).toEqual({ fetchedAt: '2026-10-07T10:00:00.000Z', stale: false })
+      expect(state.cacheSummary.value).toEqual({ cachedCount: 1, staleCount: 0, oldestFetchedAt: '2026-10-07T10:00:00.000Z' })
+    })
   })
 })

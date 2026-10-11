@@ -20,7 +20,7 @@ describe('AuthorMetadataProviderRegistry', () => {
     ];
     return {
       providers,
-      registry: new AuthorMetadataProviderRegistry(providers as never),
+      registry: new AuthorMetadataProviderRegistry(providers as never, { register: vi.fn() } as never),
     };
   }
 
@@ -56,5 +56,22 @@ describe('AuthorMetadataProviderRegistry', () => {
 
     expect(registry.find('audnexus' as never)).toEqual(expect.objectContaining({ key: 'audnexus' }));
     expect(registry.find('missing' as never)).toBeUndefined();
+  });
+
+  it('registers every provider and its cache declaration with the metadata cache catalog', () => {
+    const spec = { version: 1, trustEmpty: true };
+    const providers = [
+      { key: 'audnexus', label: 'Audnexus', identifiable: true, cache: spec, search: vi.fn() },
+      { key: 'goodreads', label: 'Goodreads', identifiable: true, search: vi.fn() },
+    ];
+    const catalog = { register: vi.fn() };
+    const registry = new AuthorMetadataProviderRegistry(providers as never, catalog as never);
+
+    registry.onModuleInit();
+
+    expect(catalog.register).toHaveBeenCalledWith('author', [
+      { provider: 'audnexus', label: 'Audnexus', spec },
+      { provider: 'goodreads', label: 'Goodreads', spec: undefined },
+    ]);
   });
 });

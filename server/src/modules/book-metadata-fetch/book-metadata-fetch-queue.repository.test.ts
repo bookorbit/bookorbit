@@ -139,6 +139,8 @@ describe('BookMetadataFetchQueueRepository', () => {
     expect(hasNarratorsClause).toBe(true);
     expect(hasDurationClause).toBe(true);
     expect(hasAbridgedClause).toBe(true);
+    // Each is gated on the book having audio, read-along EPUBs included: an ebook cannot lack them.
+    expect(sqlCalls.some((call) => call.slice(1).includes(bookFiles.mediaOverlayAvailable))).toBe(true);
   });
 
   it('fetchEligibleBookIds finds books whose cover media include audio and whose audio slot is empty', async () => {
@@ -268,7 +270,7 @@ describe('BookMetadataFetchQueueRepository', () => {
     config.conditions.neverFetched.enabled = true;
 
     await expect(repo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, 2)).resolves.toBe(2);
-    expect(repo.upsertSchedule).toHaveBeenCalledWith([2, 5], 'manual_trigger');
+    expect(repo.upsertSchedule).toHaveBeenCalledWith([2, 5], 'manual_trigger', false);
   });
 
   it('fetchDue short-circuits for non-positive limits', async () => {

@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   search: vi.fn<(...args: unknown[]) => Promise<void>>(),
   saveMetadata: vi.fn<(...args: unknown[]) => Promise<null>>(),
   setTarget: vi.fn<(...args: unknown[]) => Promise<BookDockFile | null>>(),
+  fetchReadAlong: vi.fn<(id: number) => Promise<boolean>>(),
   filteredResults: [] as MetadataCandidate[],
   libraries: [] as LibraryOption[],
 }))
@@ -28,6 +29,7 @@ vi.mock('../../composables/useBookDockDetail', () => ({
     saveMetadata: mocks.saveMetadata,
     setTarget: mocks.setTarget,
     coverUrl: (id: number) => `/api/v1/book-dock/files/${id}/cover`,
+    fetchReadAlong: mocks.fetchReadAlong,
   }),
 }))
 
@@ -132,6 +134,7 @@ describe('BookDockFileSheet', () => {
     mocks.loadProviders.mockResolvedValue(undefined)
     mocks.saveMetadata.mockResolvedValue(null)
     mocks.setTarget.mockResolvedValue(null)
+    mocks.fetchReadAlong.mockResolvedValue(false)
     mocks.filteredResults.length = 0
     mocks.libraries.length = 0
     libraryOptions.value = mocks.libraries
@@ -281,6 +284,52 @@ describe('BookDockFileSheet', () => {
     wrapper.getComponent(WorkspaceStub).vm.$emit('cancel')
     await wrapper.vm.$nextTick()
     expect(wrapper.findComponent(WorkspaceStub).exists()).toBe(false)
+  })
+
+  it('asks the audiobook sources too for a read-along EPUB, still leading with the ebook', async () => {
+    mocks.fetchReadAlong.mockResolvedValueOnce(true)
+    const wrapper = mountSheet(makeFile({ id: 41, fileName: 'Dune.epub', format: 'epub' }))
+    await flushPromises()
+    const searchButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Search')
+    await searchButton!.trigger('click')
+
+    wrapper.getComponent(WorkspaceStub).vm.$emit('search', { title: 'Dune', author: '', isbn: '' })
+    await flushPromises()
+    expect(mocks.fetchReadAlong).toHaveBeenCalledWith(41)
+    expect(mocks.search).toHaveBeenLastCalledWith({ title: 'Dune', author: '', isbn: '', mediaKind: 'ebook', mediaKinds: ['ebook', 'audiobook'] })
+  })
+
+  it('holds the first automatic search of an EPUB until the file says whether it is a read-along', async () => {
+    let answer: (value: boolean) => void = () => {}
+    mocks.fetchReadAlong.mockReturnValueOnce(new Promise<boolean>((resolve) => (answer = resolve)))
+    const wrapper = mountSheet(makeFile({ id: 42, fileName: 'Dune.epub', format: 'epub' }))
+    const searchButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Search')
+    await searchButton!.trigger('click')
+    await flushPromises()
+    expect(mocks.search).not.toHaveBeenCalled()
+
+    answer(true)
+    await flushPromises()
+    expect(mocks.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune', mediaKind: 'ebook', mediaKinds: ['ebook', 'audiobook'] }))
+  })
+
+  it('drops a held search once another file is open', async () => {
+    let answer: (value: boolean) => void = () => {}
+    mocks.fetchReadAlong.mockReturnValueOnce(new Promise<boolean>((resolve) => (answer = resolve)))
+    const wrapper = mountSheet(makeFile({ id: 42, fileName: 'Dune.epub', format: 'epub' }))
+    const searchButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Search')
+    await searchButton!.trigger('click')
+
+    await wrapper.setProps({ file: makeFile({ id: 43, fileName: 'Saga.cbz', format: 'cbz' }) })
+    answer(true)
+    await flushPromises()
+    expect(mocks.search).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }))
+  })
+
+  it('never asks whether a file other than an EPUB is a read-along', async () => {
+    mountSheet(makeFile({ fileName: 'Dune.m4b', format: 'm4b' }))
+    await flushPromises()
+    expect(mocks.fetchReadAlong).not.toHaveBeenCalled()
   })
 
   it('searches a docked audio file as an audiobook and stages the audiobook cover it picks', async () => {

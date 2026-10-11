@@ -500,13 +500,15 @@ function BookOrbitApi:downloadBlocking(path, local_path, opts)
                 end
             end
 
+            local content_length = headers and tonumber(headers["content-length"] or headers["Content-Length"])
+            if (content_length and received ~= content_length) or (opts.expected_bytes and received ~= opts.expected_bytes) then return fail(out, "size_mismatch") end
             if progress_writer then progress_writer(received, true) end
 
             -- The parent owns publishing for user-cancellable transfers: a
             -- dismissed subprocess cannot be stopped once it starts renaming,
             -- which is harmless for a cover but wrong for a cancelled book.
             if opts.publish == "parent" then
-                local result = { temp_path = temp_path, bytes = received }
+                local result = { temp_path = temp_path, bytes = received, server_hash = headers and headers["x-bookorbit-file-hash"], artifact_id = headers and headers["x-bookorbit-artifact"] }
                 -- Hashing here keeps the digest off the UI thread and lets the
                 -- caller compare it to the manifest without a match request.
                 if opts.hash == "partial_md5" then
@@ -715,12 +717,24 @@ function BookOrbitApi:catalogManifest(params)
     return self:request("GET", self:query("/koreader/plugin/catalog/manifest", params))
 end
 
-function BookOrbitApi:catalogBook(book_id)
-    return self:request("GET", self:query("/koreader/plugin/catalog/books/" .. tostring(book_id), { deviceId = self.device_id }))
+function BookOrbitApi:getDeliverySettings()
+    return self:request("GET", "/koreader/plugin/delivery-settings/" .. util.urlEncode(tostring(self.device_id)))
+end
+
+function BookOrbitApi:setDeliverySettings(variant, migrate_only)
+    return self:request("PUT", "/koreader/plugin/delivery-settings/" .. util.urlEncode(tostring(self.device_id)), {
+        readAloudDelivery = variant or rapidjson.null,
+        migrateOnly = migrate_only == true,
+    })
+end
+
+function BookOrbitApi:catalogBook(book_id, variant)
+    return self:request("GET", self:query("/koreader/plugin/catalog/books/" .. tostring(book_id), { deviceId = self.device_id, variant = variant }))
 end
 
 function BookOrbitApi:downloadCatalogFile(file_id, local_path, opts)
-    return self:download("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", local_path, opts)
+    opts = opts or {}
+    return self:download(self:query("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", { variant = opts.variant, selection = opts.selection }), local_path, opts)
 end
 
 function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path, opts)

@@ -33,7 +33,7 @@ const status = computed(() => {
 
 const chipClasses = computed(() => [
   status.value.classes,
-  props.kind === 'removedFromFeed' ? 'rounded border border-warning/30' : 'rounded-full',
+  props.kind === 'removedFromFeed' ? 'rounded-xs border border-warning/30' : 'rounded-full',
   props.compact ? 'size-6 justify-center p-0' : 'gap-1 px-1.5 py-0.5',
 ])
 </script>

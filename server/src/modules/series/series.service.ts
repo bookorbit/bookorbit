@@ -164,7 +164,7 @@ export class SeriesService {
         cardData.tagRows,
         cardData.seriesMembershipRows,
       );
-      await this.coverStore.enrichCardVersions(cards);
+      await this.coverStore.enrichCardFaces(cards);
       const orderMap = new Map(bookPage.bookIds.map((id, i) => [id, i]));
       items = cards
         .map((card) => {

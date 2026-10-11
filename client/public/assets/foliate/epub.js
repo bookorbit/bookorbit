@@ -450,7 +450,7 @@ class MediaOverlay extends EventTarget {
     this.dispatchEvent(new CustomEvent('error', { detail: e }))
   }
   #highlight() {
-    this.dispatchEvent(new CustomEvent('highlight', { detail: this.#activeItem }))
+    this.dispatchEvent(new CustomEvent('highlight', { detail: { ...this.#activeItem, sectionIndex: this.#sectionIndex } }))
   }
   #unhighlight() {
     this.dispatchEvent(new CustomEvent('unhighlight', { detail: this.#activeItem }))

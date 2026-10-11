@@ -269,7 +269,7 @@ const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
         aria-busy="true"
       >
         <div v-if="showFirstLoadSkeleton" class="flex flex-col gap-2 px-3 py-3" aria-hidden="true">
-          <div v-for="row in 6" :key="row" class="h-4 rounded bg-muted animate-shimmer" />
+          <div v-for="row in 6" :key="row" class="h-4 rounded-xs bg-muted animate-shimmer" />
         </div>
       </div>
 

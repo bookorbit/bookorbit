@@ -78,7 +78,7 @@ function handleEditMetadata() {
     <div class="flex flex-col gap-2.5 px-3.5 py-3.5">
       <div class="flex items-center gap-1.5">
         <span
-          class="inline-flex h-[18px] items-center rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
+          class="inline-flex h-[18px] items-center rounded-xs px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
           :class="status?.enabled ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'"
         >
           {{ status?.enabled ? t('book.detail.files.enabled') : t('book.detail.files.disabled') }}
@@ -86,7 +86,7 @@ function handleEditMetadata() {
         <span
           v-for="format in writableFormats"
           :key="format"
-          class="inline-flex h-[18px] items-center rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
+          class="inline-flex h-[18px] items-center rounded-xs px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
           :style="{
             color: formatColorVar(format),
             backgroundColor: `color-mix(in oklch, ${formatColorVar(format)} 16%, transparent)`,
@@ -106,7 +106,7 @@ function handleEditMetadata() {
       <ul v-if="formatBreakdown.length > 0" class="flex flex-col gap-1">
         <li v-for="entry in formatBreakdown" :key="entry.format" class="flex items-center gap-2 text-[12px] text-muted-foreground">
           <span
-            class="inline-flex h-[18px] items-center rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
+            class="inline-flex h-[18px] items-center rounded-xs px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
             :style="{
               color: formatColorVar(entry.format),
               backgroundColor: `color-mix(in oklch, ${formatColorVar(entry.format)} 16%, transparent)`,
@@ -122,7 +122,7 @@ function handleEditMetadata() {
 
       <button
         v-if="canEdit"
-        class="-mx-1 inline-flex min-h-7 items-center gap-1 self-start rounded px-1 text-[12.5px] font-medium text-primary transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="-mx-1 inline-flex min-h-7 items-center gap-1 self-start rounded-xs px-1 text-[12.5px] font-medium text-primary transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         @click="handleEditMetadata"
       >
         {{ t('book.detail.files.editMetadata') }}

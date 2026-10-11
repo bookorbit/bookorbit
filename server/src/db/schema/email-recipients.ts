@@ -15,6 +15,7 @@ export const emailRecipients = pgTable(
     email: varchar('email', { length: 255 }).notNull(),
     isDefault: boolean('is_default').notNull().default(false),
     deviceType: varchar('device_type', { length: 20 }),
+    readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
     preferredFormat: varchar('preferred_format', { length: 20 }),
     defaultTemplateId: integer('default_template_id').references(() => emailTemplates.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

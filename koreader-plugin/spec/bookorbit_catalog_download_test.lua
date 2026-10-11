@@ -192,7 +192,7 @@ assertEqual(downloaded_path, "/mnt/onboard/library/Series/Southern Reach/1.00 - 
 downloaded_path = nil
 Catalog:showDownloadDialog(detail, file)
 dialog = shown_widget
-dialog.buttons[3][2].callback()
+dialog.buttons[4][2].callback()
 local input_dialog = shown_widget
 assertEqual(input_dialog.input, "1.00 - Annihilation", "filename editor starts with resolved filename")
 typed_filename = " Preferred/Name "
@@ -222,11 +222,11 @@ package.loaded["ui/downloadmgr"] = {
 }
 Catalog:showDownloadDialog(detail, file)
 dialog = shown_widget
-dialog.buttons[3][2].callback()
+dialog.buttons[4][2].callback()
 input_dialog = shown_widget
 typed_filename = "Custom Name"
 input_dialog.buttons[1][2].callback()
-dialog.buttons[3][1].callback()
+dialog.buttons[4][1].callback()
 assertEqual(#scheduled, 1, "folder change queues refreshed dialog")
 table.remove(scheduled, 1)()
 dialog = shown_widget

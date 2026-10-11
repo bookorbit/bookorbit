@@ -123,19 +123,21 @@ describe('useMediaOverlay', () => {
     player.pause()
     expect(player.isPlaying.value).toBe(false)
 
-    mo.dispatchEvent(new CustomEvent('highlight', { detail: { text: 'ch.xhtml#s1' } }))
+    mo.dispatchEvent(new CustomEvent('highlight', { detail: { text: 'ch.xhtml#s1', sectionIndex: 3 } }))
     expect(player.isPlaying.value).toBe(true)
     expect(player.currentFragment.value).toBe('ch.xhtml#s1')
+    expect(player.currentSectionIndex.value).toBe(3)
   })
 
   it('stop clears the tracked fragment', () => {
     const mo = makeFakeMediaOverlay()
     const player = useMediaOverlay()
     player.start(mo, vi.fn<() => void>(), book)
-    mo.dispatchEvent(new CustomEvent('highlight', { detail: { text: 'ch.xhtml#s9' } }))
+    mo.dispatchEvent(new CustomEvent('highlight', { detail: { text: 'ch.xhtml#s9', sectionIndex: 3 } }))
     expect(player.currentFragment.value).toBe('ch.xhtml#s9')
 
     player.stop()
     expect(player.currentFragment.value).toBeNull()
+    expect(player.currentSectionIndex.value).toBeNull()
   })
 })

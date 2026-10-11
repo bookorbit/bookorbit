@@ -3,12 +3,12 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type LocationQuery } from 'vue-router'
 import {
+  BookHeadphones,
   BookOpen,
   Check,
   ChevronDown,
   CircleHelp,
   Headphones,
-  Images,
   Library,
   Loader2,
   Pin,
@@ -18,11 +18,9 @@ import {
   Users,
 } from '@lucide/vue'
 import {
-  AUDIO_FORMAT_LIST,
+  BOOK_REQUEST_FORMATS_BY_MEDIA_KIND,
   BOOK_REQUEST_MEDIA_KINDS,
   canonicalizeBookRequestIsbn,
-  COMIC_FORMAT_LIST,
-  EBOOK_FORMAT_LIST,
   isBookRequestFulfiller,
   isGrabbableBookRequestStatus,
   MAX_BOOK_REQUEST_SEARCH_ISBNS,
@@ -31,6 +29,7 @@ import {
 import type {
   BookRequestMediaKind,
   BookRequestMetadataSource,
+  BookRequestPairSubmitResult,
   BookRequestSubmitResult,
   MetadataCandidate,
   MetadataProviderKey,
@@ -49,6 +48,8 @@ import { toast } from 'vue-sonner'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useMetadataSearch } from '@/features/book/composables/useMetadataSearch'
+import MetadataCacheNotice from '@/features/metadata-cache/components/MetadataCacheNotice.vue'
+import SearchFreshButton from '@/features/metadata-cache/components/SearchFreshButton.vue'
 import { providerIconPathSafe } from '@/features/book/lib/provider-icons'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { getProviderColor } from '@/lib/provider-colors'
@@ -57,6 +58,9 @@ import { formatLanguageName } from '@/i18n/formatters'
 import { requestLanguageOptions, useRequestDestinationDefault, useRequestLanguageDefault } from '../composables/useRequestDestinationDefault'
 import { submitFailureText, useRequestSubmission } from '../composables/useRequestSubmission'
 import RequestCover from './RequestCover.vue'
+import RequestPairCover from './RequestPairCover.vue'
+import { requestMediaIcon } from '../requestMedia'
+import { pairHalfState, pairSubmission, pairSubmissionLabelKey, type PairHalfState, type PairSubmission } from '../requestPair'
 
 const emit = defineEmits<{ submitted: [] }>()
 
@@ -72,13 +76,28 @@ const {
   providers,
   loadProviders,
   search,
+  searchFresh,
+  cacheSummary,
 } = useMetadataSearch()
 const { libraries, fetchLibraries } = useLibraries()
 const { hasPermission } = usePermissions()
 const { user } = useAuth()
 const router = useRouter()
 const route = useRoute()
-const { lastFailure, submitting, mediaKind, annotate, getAvailability, submit, submitFreeText, checkFreeText, candidateKey } = useRequestSubmission()
+const {
+  lastFailure,
+  submitting,
+  mediaKind,
+  pairMode,
+  annotate,
+  getAvailability,
+  submit,
+  submitPair,
+  submitFreeText,
+  submitPairFreeText,
+  checkFreeText,
+  candidateKey,
+} = useRequestSubmission()
 const { load: loadDefaultDestination, defaultFor: instanceDefaultFor, resolveDestination } = useRequestDestinationDefault()
 const {
   defaultLanguage,
@@ -88,17 +107,16 @@ const {
   resolveLanguage,
 } = useRequestLanguageDefault()
 
-const MEDIA_ICONS = { ebook: BookOpen, audiobook: Headphones, comic: Images } as const
+/** What the toggle offers: each medium on its own, then both together beside the two it combines. */
+type SearchChoice = BookRequestMediaKind | 'pair'
+const SEARCH_CHOICES: readonly SearchChoice[] = [...BOOK_REQUEST_MEDIA_KINDS, 'pair']
+const searchChoice = computed<SearchChoice>(() => (pairMode.value ? 'pair' : mediaKind.value))
 
 /**
  * What each medium may be asked for, taken from the shared lists rather than restated here, so the
  * form can never offer a format the scorer does not know how to recognise.
  */
-const FORMATS_BY_MEDIA: Record<BookRequestMediaKind, readonly string[]> = {
-  ebook: EBOOK_FORMAT_LIST,
-  audiobook: AUDIO_FORMAT_LIST,
-  comic: COMIC_FORMAT_LIST,
-}
+const FORMATS_BY_MEDIA = BOOK_REQUEST_FORMATS_BY_MEDIA_KIND
 
 const title = ref('')
 const author = ref('')
@@ -108,17 +126,27 @@ const language = ref<string | null>(null)
  * Kept per medium, because "epub" means nothing to an audiobook search and clearing the whole set
  * on every media-kind press would throw away a choice the requester had just made.
  */
-const preferredFormats = ref<Record<BookRequestMediaKind, string[]>>({ ebook: [], audiobook: [], comic: [] })
+const preferredFormats = ref<Record<BookRequestMediaKind, string[]>>({ ebook: [], audiobook: [] })
 const note = ref('')
 const optionsOpen = ref(false)
 const targetLibraryId = ref<number | null>(null)
 const targetFolderId = ref<number | null>(null)
+/**
+ * Where the audiobook half of a pair lands. The ebook half keeps the select a single request uses,
+ * and this one starts on the audiobook's own instance default, since the two media are often filed
+ * into different libraries.
+ */
+const audioTargetLibraryId = ref<number | null>(null)
+const audioTargetFolderId = ref<number | null>(null)
 const activeCoverUrls = ref<Record<string, string | null>>({})
 const failedProviderIcons = ref(new Set<MetadataProviderKey>())
 const expandedMetadataGroups = ref(new Set<string>())
 // An audiobook request shows audiobook art, so its covers follow the Audiobook cover rule.
 const requestCoverProviderOrder = computed(() => (mediaKind.value === 'audiobook' ? audioCoverProviderOrder.value : coverProviderOrder.value))
-const { groups } = useCandidateGroups(filteredResults, mediaKind, getAvailability, requestCoverProviderOrder, language, resultProviderOrder)
+const { groups } = useCandidateGroups(filteredResults, mediaKind, getAvailability, requestCoverProviderOrder, language, resultProviderOrder, {
+  enabled: pairMode,
+  audioCoverProviderOrder,
+})
 
 // Nobody approves these requests afterwards, so this is the only chance to say where the book goes.
 const autoApproves = computed(() => hasPermission(Permission.BookRequestAutoApprove))
@@ -135,6 +163,7 @@ const choosesRelease = computed(() => selfFulfils.value && (!autoApproves.value 
 const settlesOnCreate = computed(() => autoApproves.value || selfFulfils.value)
 const selectedLibrary = computed(() => libraries.value.find((library) => library.id === targetLibraryId.value) ?? null)
 const folders = computed(() => selectedLibrary.value?.folders ?? [])
+const audioFolders = computed(() => libraries.value.find((library) => library.id === audioTargetLibraryId.value)?.folders ?? [])
 const showDestination = computed(() => settlesOnCreate.value || libraries.value.length > 1)
 /**
  * Nowhere for the book to go, which for an auto-approving requester is fatal: nobody decides on
@@ -148,17 +177,52 @@ const destinationMissing = computed(
   () => settlesOnCreate.value && targetLibraryId.value === null && instanceDefaultFor(mediaKind.value).libraryId === null,
 )
 
+/** The library each half of a pair lands in: the one picked, or the instance default for its medium. */
+function pairLibraryId(kind: BookRequestMediaKind): number | null {
+  const picked = kind === 'ebook' ? targetLibraryId.value : audioTargetLibraryId.value
+  return picked ?? instanceDefaultFor(kind).libraryId
+}
+
+function pairDestinationMissing(kind: BookRequestMediaKind): boolean {
+  return settlesOnCreate.value && pairLibraryId(kind) === null
+}
+
+const pairDestinationsMissing = computed(() => pairMode.value && BOOK_REQUEST_MEDIA_KINDS.some(pairDestinationMissing))
+/** The indexer fallback creates whatever the toggle is on, so it needs every destination that will create. */
+const freeTextDestinationMissing = computed(() => (pairMode.value ? pairDestinationsMissing.value : destinationMissing.value))
+
+/**
+ * What the two destinations add up to, said before anything is submitted: one book holding both
+ * formats, two books in one library that keeps a book per file, or two libraries.
+ */
+const pairLandingHint = computed(() => {
+  if (!pairMode.value) return null
+  const ebookLibraryId = pairLibraryId('ebook')
+  const audioLibraryId = pairLibraryId('audiobook')
+  if (ebookLibraryId === null || audioLibraryId === null) return null
+  if (ebookLibraryId !== audioLibraryId) return t('bookRequests.search.pair.landsApart')
+
+  const library = libraries.value.find((candidate) => candidate.id === ebookLibraryId)
+  const name = library?.name ?? instanceDefaultFor('ebook').libraryName ?? ''
+  return library?.organizationMode === 'book_per_file'
+    ? t('bookRequests.search.pair.landsSeparately', { library: name })
+    : t('bookRequests.search.pair.landsTogether', { library: name })
+})
+
 const canSearch = computed(() => title.value.trim() !== '' || author.value.trim() !== '')
 
 /**
  * What "no library chosen" actually means for this medium. The instance default is applied by the
  * server, so without naming it here the requester submits with no idea where the book lands.
  */
-const unpickedDestinationLabel = computed(() => {
-  const fallback = instanceDefaultFor(mediaKind.value)
+const unpickedDestinationLabel = computed(() => unpickedLabelFor(mediaKind.value))
+const unpickedAudioDestinationLabel = computed(() => unpickedLabelFor('audiobook'))
+
+function unpickedLabelFor(kind: BookRequestMediaKind): string {
+  const fallback = instanceDefaultFor(kind)
   if (fallback.libraryName !== null) return t('bookRequests.search.libraryDefault', { library: fallback.libraryName })
   return settlesOnCreate.value ? t('bookRequests.search.libraryChoose') : t('bookRequests.search.libraryAny')
-})
+}
 
 const isLanguagePinned = computed(() => language.value !== null && defaultLanguage.value === language.value)
 
@@ -171,11 +235,16 @@ onMounted(async () => {
   language.value = resolveLanguage(locale.value)
   // One library is only worth preselecting for the requester who is also the approver.
   targetLibraryId.value = resolveDestination(libraries.value, undefined, settlesOnCreate.value).libraryId
+  audioTargetLibraryId.value = resolveDestination(libraries.value, undefined, settlesOnCreate.value).libraryId
 })
 
 // A folder only means anything inside its own library, so it never outlives the library choice.
 watch(targetLibraryId, () => {
   targetFolderId.value = folders.value[0]?.id ?? null
+})
+
+watch(audioTargetLibraryId, () => {
+  audioTargetFolderId.value = audioFolders.value[0]?.id ?? null
 })
 
 // Results stream in provider by provider, so annotate as they land rather than once at the end.
@@ -189,8 +258,17 @@ async function runSearch() {
   await search({
     title: title.value.trim() || undefined,
     author: author.value.trim() || undefined,
-    mediaKind: mediaKind.value,
+    ...(pairMode.value ? { mediaKinds: [...BOOK_REQUEST_MEDIA_KINDS] } : { mediaKind: mediaKind.value }),
   })
+}
+
+const showCacheNotice = computed(() => hasSearched.value && cacheSummary.value.cachedCount > 0)
+// Offered after every finished search: a provider whose saved answer was "nothing" leaves no result to mark.
+const showSearchFresh = computed(() => hasSearched.value && !isStreaming.value && !showCacheNotice.value)
+
+function handleSearchFresh() {
+  activeCoverUrls.value = {}
+  void searchFresh()
 }
 
 function handleSearchSubmit(event: Event) {
@@ -198,9 +276,18 @@ function handleSearchSubmit(event: Event) {
   void runSearch()
 }
 
-function selectMediaKind(kind: BookRequestMediaKind) {
-  mediaKind.value = kind
+function selectSearchChoice(choice: SearchChoice) {
+  pairMode.value = choice === 'pair'
+  mediaKind.value = choice === 'pair' ? 'ebook' : choice
   if (hasSearched.value) void runSearch()
+}
+
+function choiceLabel(choice: SearchChoice): string {
+  return choice === 'pair' ? t('bookRequests.search.pair.choice') : t(`bookRequests.mediaKind.${choice}`)
+}
+
+function choiceIcon(choice: SearchChoice) {
+  return choice === 'pair' ? BookHeadphones : mediaIconFor(choice)
 }
 
 function selectAutomaticFulfillment() {
@@ -232,12 +319,13 @@ async function toggleLanguageDefault() {
   )
 }
 
-const mediaFormats = computed(() => FORMATS_BY_MEDIA[mediaKind.value])
 const activeFormats = computed(() => preferredFormats.value[mediaKind.value])
+/** The media whose format preferences the options panel offers: one, or both halves of a pair. */
+const formatKinds = computed<BookRequestMediaKind[]>(() => (pairMode.value ? [...BOOK_REQUEST_MEDIA_KINDS] : [mediaKind.value]))
 
 /** What the collapsed row has to say for itself, so a set preference is never silently hidden. */
 const optionsSummary = computed(() => {
-  const formats = activeFormats.value
+  const formats = formatKinds.value.flatMap((kind) => preferredFormats.value[kind])
   const hasNote = note.value.trim() !== ''
   if (formats.length === 0 && !hasNote) return null
   if (formats.length === 0) return t('bookRequests.search.noteLabel')
@@ -245,14 +333,23 @@ const optionsSummary = computed(() => {
   return hasNote ? t('bookRequests.search.optionsSummary', { formats: listed }) : listed
 })
 
-function isPreferredFormat(format: string): boolean {
-  return activeFormats.value.includes(format)
+function formatsFor(kind: BookRequestMediaKind): readonly string[] {
+  return FORMATS_BY_MEDIA[kind]
 }
 
-function togglePreferredFormat(format: string) {
-  const current = activeFormats.value
+function formatLegend(kind: BookRequestMediaKind): string {
+  if (!pairMode.value) return t('bookRequests.search.preferredFormatsLabel')
+  return kind === 'audiobook' ? t('bookRequests.search.pair.preferredAudiobookFormats') : t('bookRequests.search.pair.preferredEbookFormats')
+}
+
+function isPreferredFormat(format: string, kind: BookRequestMediaKind): boolean {
+  return preferredFormats.value[kind].includes(format)
+}
+
+function togglePreferredFormat(format: string, kind: BookRequestMediaKind) {
+  const current = preferredFormats.value[kind]
   const next = current.includes(format) ? current.filter((value) => value !== format) : [...current, format]
-  preferredFormats.value = { ...preferredFormats.value, [mediaKind.value]: next }
+  preferredFormats.value = { ...preferredFormats.value, [kind]: next }
 }
 
 function toggleOptions() {
@@ -272,6 +369,16 @@ function handleLibraryChange(event: Event) {
 function handleFolderChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   targetFolderId.value = value === '' ? null : Number(value)
+}
+
+function handleAudioLibraryChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  audioTargetLibraryId.value = value === '' ? null : Number(value)
+}
+
+function handleAudioFolderChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  audioTargetFolderId.value = value === '' ? null : Number(value)
 }
 
 const providerLabels = computed(() => new Map(providers.value.map((provider) => [provider.key, provider.label])))
@@ -409,6 +516,57 @@ function isJoinable(group: CandidateGroup): boolean {
   return Boolean(group.availability?.existingRequestId) && !group.availability?.alreadySubscribed
 }
 
+const pairLabelMode = computed<'request' | 'get' | 'choose'>(() => (choosesRelease.value ? 'choose' : autoApproves.value ? 'get' : 'request'))
+
+/** Nothing is known yet for a half the annotation has not answered, which reads as not asked for. */
+function pairAvailabilityOf(group: CandidateGroup) {
+  return group.pairAvailability ?? { ebook: null, audiobook: null }
+}
+
+function pairPlan(group: CandidateGroup): PairSubmission {
+  return pairSubmission(pairAvailabilityOf(group))
+}
+
+function pairState(group: CandidateGroup, kind: BookRequestMediaKind): PairHalfState {
+  return pairHalfState(pairAvailabilityOf(group)[kind])
+}
+
+function pairRequestLabel(group: CandidateGroup): string {
+  return t(pairSubmissionLabelKey(pairPlan(group), pairAvailabilityOf(group), pairLabelMode.value))
+}
+
+/**
+ * Joining needs no destination, and nor does a format aimed at a copy already on the shelf, which
+ * lands beside it. Everything else needs one for each half it creates.
+ */
+function isPairRequestDisabled(group: CandidateGroup): boolean {
+  if (isGroupSubmitting(group)) return true
+  const plan = pairPlan(group)
+  if (plan.kind === 'none') return true
+  if (plan.kind === 'single') return plan.joinBookId === null && plan.state === 'new' && pairDestinationMissing(plan.mediaKind)
+  return plan.actionable.some((kind) => pairState(group, kind) === 'new' && pairDestinationMissing(kind))
+}
+
+/** A joined request reads as such, which is the only part of a half's state worth a colour. */
+const PAIR_STATE_CLASSES: Record<PairHalfState, string> = {
+  owned: 'border-success/40 bg-success/10 text-success',
+  following: 'border-info/40 bg-info/10 text-info',
+  joinable: 'border-info/40 bg-info/10 text-info',
+  new: 'border-border bg-background text-muted-foreground',
+}
+
+function pairStateClass(group: CandidateGroup, kind: BookRequestMediaKind): string {
+  return PAIR_STATE_CLASSES[pairState(group, kind)]
+}
+
+function pairStateLabel(group: CandidateGroup, kind: BookRequestMediaKind): string {
+  return t(`bookRequests.search.pair.state.${pairState(group, kind)}`)
+}
+
+function pairMediumLabel(kind: BookRequestMediaKind): string {
+  return t(`bookRequests.mediaKind.${kind}`)
+}
+
 /**
  * Only once a provider search has come back empty, and only for somebody who will pick the release
  * themselves. An approver handed a row that says nothing but a typed string has no way to tell
@@ -495,6 +653,19 @@ function releasesQuery(searchIsbn?: string | null): LocationQuery {
 async function startFreeTextSearch() {
   freeTextBusy.value = true
   try {
+    if (pairMode.value) {
+      const pair = await submitPairFreeText(
+        { title: title.value, author: author.value },
+        { language: language.value, selfServe: true, note: note.value.trim() || null, ...pairHalves() },
+      )
+      if (!pair) {
+        toast.error(submitFailureText(lastFailure.value, t) ?? t('bookRequests.search.submitFailed'))
+        return
+      }
+      await afterPairSubmit(pair, true)
+      return
+    }
+
     const result = await submitFreeText(
       { title: title.value, author: author.value },
       {
@@ -550,13 +721,116 @@ async function requestGroupChoice(group: CandidateGroup, candidate: MetadataCand
   await afterSubmit(result, openPicker, isbn)
 }
 
+/** Where each half of a pair lands and what it prefers, read off the two halves of the form. */
+function pairHalves(group?: CandidateGroup) {
+  return {
+    ebook: {
+      targetLibraryId: targetLibraryId.value,
+      targetFolderId: targetFolderId.value,
+      preferredFormats: [...preferredFormats.value.ebook],
+      ...(group ? { coverUrl: shownCover(group) } : {}),
+    },
+    audiobook: {
+      targetLibraryId: audioTargetLibraryId.value,
+      targetFolderId: audioTargetFolderId.value,
+      preferredFormats: [...preferredFormats.value.audiobook],
+      ...(group ? { coverUrl: shownAudioCover(group) } : {}),
+    },
+  }
+}
+
+/** The cover the requester is actually looking at, which is not always the first one offered. */
+function shownCover(group: CandidateGroup): string | null {
+  return Object.prototype.hasOwnProperty.call(activeCoverUrls.value, group.key) ? (activeCoverUrls.value[group.key] ?? null) : group.coverUrl
+}
+
+function shownAudioCover(group: CandidateGroup): string | null {
+  const key = `${group.key}|audio`
+  return Object.prototype.hasOwnProperty.call(activeCoverUrls.value, key) ? (activeCoverUrls.value[key] ?? null) : (group.audioCoverUrls[0] ?? null)
+}
+
+/**
+ * A "both" press, sent the way its availability says it should be: as a pair, or as the one
+ * format still missing, aimed at the copy already on the shelf so it joins it.
+ */
+async function requestPairGroup(group: CandidateGroup): Promise<void> {
+  const plan = pairPlan(group)
+  if (plan.kind === 'none') return
+
+  const choice = recommendedSearchChoice(group)
+  const candidate = choice?.candidate ?? group.candidate
+  const isbn = choice?.isbn ?? null
+  const openPicker = choosesRelease.value
+  const work = {
+    language: language.value,
+    selfServe: openPicker,
+    isbn10: null,
+    isbn13: isbn,
+    providerKey: candidate.provider,
+    providerId: candidate.providerId,
+    metadataSources: requestMetadataSources(group),
+    note: note.value.trim() || null,
+  }
+
+  if (plan.kind === 'single') {
+    const half = pairHalves(group)[plan.mediaKind]
+    const result = await submit(candidate, { ...work, ...half, mediaKind: plan.mediaKind, targetBookId: plan.joinBookId })
+    if (!result) {
+      toast.error(submitFailureText(lastFailure.value, t) ?? t('bookRequests.search.submitFailed'))
+      return
+    }
+    if (plan.joinBookId !== null && !result.subscribed && !openPicker) {
+      toast.success(t('bookRequests.search.pair.submittedJoinsBook'))
+      emit('submitted')
+      return
+    }
+    await afterSubmit(result, openPicker, isbn)
+    return
+  }
+
+  const result = await submitPair(candidate, { ...work, coverUrl: shownCover(group), ...pairHalves(group) })
+  if (!result) {
+    toast.error(submitFailureText(lastFailure.value, t) ?? t('bookRequests.search.submitFailed'))
+    return
+  }
+  await afterPairSubmit(result, openPicker, isbn)
+}
+
+/**
+ * Where a submitted pair leaves you. Somebody choosing their own releases goes straight to the
+ * picker for the first half they can drive, whose tabs then carry them to the other.
+ */
+async function afterPairSubmit(result: BookRequestPairSubmitResult, openPicker: boolean, searchIsbn?: string | null): Promise<void> {
+  const halves = BOOK_REQUEST_MEDIA_KINDS.map((kind) => result[kind])
+  if (openPicker) {
+    const drivable = halves.filter(
+      (half) => isBookRequestFulfiller(half.request, user.value?.id) && isGrabbableBookRequestStatus(half.request.status),
+    )
+    const first = drivable[0]
+    if (first) {
+      await router.push({ name: 'book-request-releases', params: { id: first.request.id }, query: releasesQuery(searchIsbn) })
+      return
+    }
+  }
+
+  const joined = halves.filter((half) => half.subscribed).length
+  toast.success(
+    joined === halves.length
+      ? t('bookRequests.search.joinedExisting')
+      : joined > 0
+        ? t('bookRequests.search.pair.submittedPartlyJoined')
+        : t('bookRequests.search.pair.submitted'),
+  )
+  emit('submitted')
+}
+
 function handleCoverSourceChange(payload: { key: string | undefined; src: string | null }) {
   if (!payload.key) return
   activeCoverUrls.value = { ...activeCoverUrls.value, [payload.key]: payload.src }
 }
 
 function mediaIconFor(kind: BookRequestMediaKind) {
-  return MEDIA_ICONS[kind] ?? BookOpen
+  return requestMediaIcon(kind)
 }
 </script>
 
@@ -605,20 +879,21 @@ function mediaIconFor(kind: BookRequestMediaKind) {
         </div>
 
         <div class="flex flex-wrap items-center gap-x-3.5 gap-y-2.5 border-t border-border bg-muted px-3 py-2.5">
-          <!-- A real track, so three buttons read as one control rather than as loose links. -->
-          <fieldset class="inline-flex h-9 items-center gap-0.5 rounded-lg border border-border bg-card p-[3px]">
+          <!-- A real track, so the choices read as one control rather than as loose links. -->
+          <fieldset class="inline-flex h-9 max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-border bg-card p-[3px]">
             <legend class="sr-only">{{ t('bookRequests.search.mediaKindLabel') }}</legend>
             <button
-              v-for="kind in BOOK_REQUEST_MEDIA_KINDS"
-              :key="kind"
+              v-for="choice in SEARCH_CHOICES"
+              :key="choice"
               type="button"
-              class="inline-flex h-full items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-              :class="mediaKind === kind ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-accent'"
-              :aria-pressed="mediaKind === kind"
-              @click="selectMediaKind(kind)"
+              class="inline-flex h-full shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
+              :class="searchChoice === choice ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground hover:bg-accent'"
+              :aria-pressed="searchChoice === choice"
+              :title="choice === 'pair' ? t('bookRequests.search.pair.choiceHint') : undefined"
+              @click="selectSearchChoice(choice)"
             >
-              <component :is="mediaIconFor(kind)" :size="13" aria-hidden="true" />
-              {{ t(`bookRequests.mediaKind.${kind}`) }}
+              <component :is="choiceIcon(choice)" :size="13" aria-hidden="true" />
+              {{ choiceLabel(choice) }}
             </button>
           </fieldset>
 
@@ -649,7 +924,11 @@ function mediaIconFor(kind: BookRequestMediaKind) {
 
           <template v-if="showDestination">
             <div class="flex w-full items-center gap-1.5 sm:w-auto">
-              <label for="request-library" class="sr-only">{{ t('bookRequests.search.libraryLabel') }}</label>
+              <!-- In a pair each select is one medium's, so the medium is said beside it, not only to a screen reader. -->
+              <BookOpen v-if="pairMode" :size="14" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+              <label for="request-library" class="sr-only">
+                {{ pairMode ? t('bookRequests.search.pair.ebookLibraryLabel') : t('bookRequests.search.libraryLabel') }}
+              </label>
               <select
                 id="request-library"
                 :value="targetLibraryId ?? ''"
@@ -673,6 +952,34 @@ function mediaIconFor(kind: BookRequestMediaKind) {
               >
                 <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
               </select>
+            </template>
+
+            <template v-if="pairMode">
+              <div class="flex w-full items-center gap-1.5 sm:w-auto">
+                <Headphones :size="14" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+                <label for="request-audio-library" class="sr-only">{{ t('bookRequests.search.pair.audiobookLibraryLabel') }}</label>
+                <select
+                  id="request-audio-library"
+                  :value="audioTargetLibraryId ?? ''"
+                  class="h-9 min-w-0 flex-1 rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:max-w-[15rem] sm:min-w-[11rem] sm:flex-none"
+                  @change="handleAudioLibraryChange"
+                >
+                  <option value="">{{ unpickedAudioDestinationLabel }}</option>
+                  <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+                </select>
+              </div>
+
+              <template v-if="settlesOnCreate && audioFolders.length > 1">
+                <label for="request-audio-folder" class="sr-only">{{ t('bookRequests.search.pair.audiobookFolderLabel') }}</label>
+                <select
+                  id="request-audio-folder"
+                  :value="audioTargetFolderId ?? ''"
+                  class="h-9 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:w-auto sm:max-w-[15rem] sm:min-w-[11rem]"
+                  @change="handleAudioFolderChange"
+                >
+                  <option v-for="folder in audioFolders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
+                </select>
+              </template>
             </template>
           </template>
 
@@ -726,7 +1033,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
             v-if="showManualSearchOverride"
             type="button"
             class="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60 motion-reduce:transition-none"
-            :disabled="freeTextBusy || destinationMissing"
+            :disabled="freeTextBusy || freeTextDestinationMissing"
             @click="startFreeTextSearch"
           >
             <Search :size="13" aria-hidden="true" />
@@ -735,23 +1042,26 @@ function mediaIconFor(kind: BookRequestMediaKind) {
         </div>
 
         <div v-show="optionsOpen" id="request-more-options" class="grid gap-3 border-t border-border bg-muted px-3 py-3">
-          <fieldset class="grid gap-1.5">
-            <legend class="text-xs font-medium text-foreground">{{ t('bookRequests.search.preferredFormatsLabel') }}</legend>
-            <p class="text-xs text-muted-foreground">{{ t('bookRequests.search.preferredFormatsHint') }}</p>
+          <p class="text-xs text-muted-foreground">{{ t('bookRequests.search.preferredFormatsHint') }}</p>
+          <fieldset v-for="kind in formatKinds" :key="kind" class="grid gap-1.5">
+            <legend class="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <component :is="mediaIconFor(kind)" v-if="pairMode" :size="12" class="text-muted-foreground" aria-hidden="true" />
+              {{ formatLegend(kind) }}
+            </legend>
             <div class="mt-0.5 flex flex-wrap gap-1.5">
               <button
-                v-for="format in mediaFormats"
+                v-for="format in formatsFor(kind)"
                 :key="format"
                 type="button"
                 class="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
                 :class="
-                  isPreferredFormat(format)
+                  isPreferredFormat(format, kind)
                     ? 'border-primary bg-primary/12 text-primary'
                     : 'border-input bg-card text-muted-foreground hover:text-foreground focus-visible:text-foreground'
                 "
-                :aria-pressed="isPreferredFormat(format)"
+                :aria-pressed="isPreferredFormat(format, kind)"
                 :aria-label="t('bookRequests.search.formatToggleAria', { format: format.toUpperCase() })"
-                @click="togglePreferredFormat(format)"
+                @click="togglePreferredFormat(format, kind)"
               >
                 {{ format.toUpperCase() }}
               </button>
@@ -773,7 +1083,15 @@ function mediaIconFor(kind: BookRequestMediaKind) {
       </div>
     </form>
 
-    <p v-if="destinationMissing" class="text-sm text-muted-foreground">{{ t('bookRequests.search.libraryRequired') }}</p>
+    <p v-if="pairMode ? pairDestinationsMissing : destinationMissing" class="text-sm text-muted-foreground">
+      {{ t('bookRequests.search.libraryRequired') }}
+    </p>
+
+    <!-- Said before anything is submitted, so nobody discovers afterwards that a pair became two books. -->
+    <p v-else-if="pairLandingHint" class="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <BookHeadphones :size="14" class="shrink-0" aria-hidden="true" />
+      {{ pairLandingHint }}
+    </p>
 
     <p v-if="isStreaming" role="status" class="sr-only">{{ t('bookRequests.search.searching') }}</p>
 
@@ -800,7 +1118,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
         variant="outline"
         size="sm"
         class="w-full shrink-0 sm:w-auto"
-        :disabled="freeTextBusy || destinationMissing"
+        :disabled="freeTextBusy || freeTextDestinationMissing"
         @click="startFreeTextSearch"
       >
         {{ t('bookRequests.search.freeTextAction') }}
@@ -808,6 +1126,10 @@ function mediaIconFor(kind: BookRequestMediaKind) {
     </div>
 
     <p v-if="interruptedMessage" role="status" class="text-sm text-muted-foreground">{{ interruptedMessage }}</p>
+    <MetadataCacheNotice v-if="showCacheNotice" :summary="cacheSummary" @search-fresh="handleSearchFresh" />
+    <div v-else-if="showSearchFresh" class="flex justify-end">
+      <SearchFreshButton @search-fresh="handleSearchFresh" />
+    </div>
 
     <!-- One row per work. The records behind it are a footnote on the row, not rows of their own. -->
     <ul v-if="groups.length" class="space-y-2">
@@ -816,7 +1138,19 @@ function mediaIconFor(kind: BookRequestMediaKind) {
         :key="group.key"
         class="flex flex-wrap items-center gap-3.5 rounded-lg border border-border bg-card p-3 transition-colors hover:border-ring/50 motion-reduce:transition-none"
       >
+        <RequestPairCover
+          v-if="pairMode"
+          :ebook-src="group.coverUrl"
+          :ebook-fallbacks="group.coverUrls.slice(1)"
+          :audio-src="group.audioCoverUrls[0] ?? null"
+          :audio-fallbacks="group.audioCoverUrls.slice(1)"
+          :source-key="group.key"
+          class="h-[74px] w-[50px]"
+          :icon-size="18"
+          @source-change="handleCoverSourceChange"
+        />
         <RequestCover
+          v-else
           :src="group.coverUrl"
           :fallback-sources="group.coverUrls.slice(1)"
           :source-key="group.key"
@@ -876,7 +1210,21 @@ function mediaIconFor(kind: BookRequestMediaKind) {
               />
             </button>
 
-            <template v-if="group.availability?.ownedBookId">
+            <!-- One chip per half, since owning the ebook says nothing about the audiobook. -->
+            <template v-if="pairMode">
+              <span class="size-[3px] rounded-full bg-border" aria-hidden="true"></span>
+              <span
+                v-for="kind in BOOK_REQUEST_MEDIA_KINDS"
+                :key="kind"
+                class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"
+                :class="pairStateClass(group, kind)"
+              >
+                <component :is="mediaIconFor(kind)" :size="12" aria-hidden="true" />
+                <span class="sr-only">{{ pairMediumLabel(kind) }}:</span>
+                {{ pairStateLabel(group, kind) }}
+              </span>
+            </template>
+            <template v-else-if="group.availability?.ownedBookId">
               <span class="size-[3px] rounded-full bg-border" aria-hidden="true"></span>
               <span class="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/10 px-2 py-0.5 text-success">
                 <Library :size="12" aria-hidden="true" />
@@ -895,7 +1243,19 @@ function mediaIconFor(kind: BookRequestMediaKind) {
           </div>
         </div>
 
-        <div v-if="choosesRelease && !isJoinable(group)" class="flex shrink-0 items-center gap-1.5">
+        <Button
+          v-if="pairMode"
+          size="sm"
+          class="shrink-0"
+          :variant="pairPlan(group).kind === 'none' ? 'outline' : 'default'"
+          :disabled="isPairRequestDisabled(group)"
+          @click="requestPairGroup(group)"
+        >
+          <BookHeadphones v-if="pairPlan(group).kind === 'pair'" :size="14" aria-hidden="true" />
+          {{ pairRequestLabel(group) }}
+        </Button>
+
+        <div v-else-if="choosesRelease && !isJoinable(group)" class="flex shrink-0 items-center gap-1.5">
           <Popover>
             <PopoverTrigger as-child>
               <Button
@@ -1006,7 +1366,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
                   <th scope="col" class="px-2 py-1.5 text-start font-medium">{{ t('bookRequests.search.identifiers.isbn') }}</th>
                   <th scope="col" class="px-2 py-1.5 text-start font-medium">{{ t('bookRequests.search.identifiers.year') }}</th>
                   <th scope="col" class="px-2 py-1.5 text-start font-medium">{{ t('bookRequests.search.identifiers.language') }}</th>
-                  <th v-if="choosesRelease && !isJoinable(group)" scope="col" class="px-2 py-1.5 text-end font-medium">
+                  <th v-if="choosesRelease && !isJoinable(group) && !pairMode" scope="col" class="px-2 py-1.5 text-end font-medium">
                     {{ t('bookRequests.search.identifiers.action') }}
                   </th>
                 </tr>
@@ -1024,7 +1384,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
                   <td class="px-2 py-2 font-mono text-foreground">{{ candidateIsbn(candidate) }}</td>
                   <td class="px-2 py-2 tabular-nums text-muted-foreground">{{ candidateYear(candidate) }}</td>
                   <td class="px-2 py-2 text-muted-foreground">{{ candidateLanguage(candidate) }}</td>
-                  <td v-if="choosesRelease && !isJoinable(group)" class="px-2 py-2 text-end">
+                  <td v-if="choosesRelease && !isJoinable(group) && !pairMode" class="px-2 py-2 text-end">
                     <Button
                       type="button"
                       variant="outline"

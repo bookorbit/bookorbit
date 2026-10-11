@@ -47,7 +47,7 @@ function handleStop() {
 
         <div class="flex items-center gap-2 px-3 py-2.5">
           <button
-            class="flex-shrink-0 w-8 h-10 rounded bg-muted overflow-hidden flex items-center justify-center"
+            class="flex-shrink-0 w-8 h-10 rounded-xs bg-muted overflow-hidden flex items-center justify-center"
             :aria-label="t('reader.narration.openControls')"
             :aria-expanded="showPanel"
             @click="togglePanel"

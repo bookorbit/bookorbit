@@ -102,7 +102,7 @@ function handleUnfollow() {
         :class="selected ? 'bg-primary/20 ring-2 ring-inset ring-primary' : ''"
       >
         <div
-          class="absolute bottom-2 left-2 flex size-5 items-center justify-center rounded transition-colors"
+          class="absolute bottom-2 left-2 flex size-5 items-center justify-center rounded-xs transition-colors"
           :class="selected ? 'bg-primary' : 'border border-white/50 bg-black/40'"
         >
           <Check v-if="selected" class="text-primary-foreground" :size="12" />

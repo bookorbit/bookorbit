@@ -8,7 +8,9 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import type { AuthorAutoEnrichmentConfig } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAuthorEligibleCountPreview } from './composables/useAuthorEligibleCountPreview'
+import { useAuthorEnrichmentActions } from './composables/useAuthorEnrichmentActions'
 import AuthorMetadataPreferences from './components/AuthorMetadataPreferences.vue'
+import IgnoreCacheCheckbox from '@/features/metadata-cache/components/IgnoreCacheCheckbox.vue'
 
 const { t } = useI18n()
 
@@ -26,6 +28,8 @@ const saving = ref(false)
 const metadataPreferencesRef = ref<InstanceType<typeof AuthorMetadataPreferences> | null>(null)
 const authorBackfillRunning = ref(false)
 const authorBackfillAllRunning = ref(false)
+const ignoreCache = ref(false)
+const { backfill, backfillAll } = useAuthorEnrichmentActions()
 
 const eligibleConditions = computed(() => config.value.conditions)
 const { count: eligibleCount, loading: countLoading } = useAuthorEligibleCountPreview(eligibleConditions)
@@ -85,11 +89,7 @@ async function runAuthorBackfill() {
   if (authorBackfillRunning.value) return
   authorBackfillRunning.value = true
   try {
-    const res = await api('/api/v1/authors/enrichment/backfill', {
-      method: 'POST',
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const { queued } = await res.json()
+    const { queued } = await backfill({ ignoreCache: ignoreCache.value })
     if (queued === 0) toast.info(t('settings.admin.authorEnrichment.noEligibleAuthors'))
   } catch {
     toast.error(t('settings.admin.authorEnrichment.queueFailed'))
@@ -102,11 +102,7 @@ async function runAuthorBackfillAll() {
   if (authorBackfillAllRunning.value) return
   authorBackfillAllRunning.value = true
   try {
-    const res = await api('/api/v1/authors/enrichment/backfill-all', {
-      method: 'POST',
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const { queued } = await res.json()
+    const { queued } = await backfillAll({ ignoreCache: ignoreCache.value })
     if (queued === 0) toast.info(t('settings.admin.authorEnrichment.noAuthorsToEnrich'))
   } catch {
     toast.error(t('settings.admin.authorEnrichment.queueFailed'))
@@ -178,7 +174,7 @@ async function runAuthorBackfillAll() {
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
-            class="w-4 h-4 rounded border-border accent-primary"
+            class="w-4 h-4 rounded-xs border-border accent-primary"
             :checked="config.conditions.neverEnriched"
             :disabled="saving"
             @change="toggleCondition('neverEnriched')"
@@ -193,7 +189,7 @@ async function runAuthorBackfillAll() {
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
-            class="w-4 h-4 rounded border-border accent-primary"
+            class="w-4 h-4 rounded-xs border-border accent-primary"
             :checked="config.conditions.missingBio"
             :disabled="saving"
             @change="toggleCondition('missingBio')"
@@ -208,7 +204,7 @@ async function runAuthorBackfillAll() {
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
-            class="w-4 h-4 rounded border-border accent-primary"
+            class="w-4 h-4 rounded-xs border-border accent-primary"
             :checked="config.conditions.missingPhoto"
             :disabled="saving"
             @change="toggleCondition('missingPhoto')"
@@ -221,6 +217,14 @@ async function runAuthorBackfillAll() {
           </div>
         </label>
       </div>
+    </div>
+
+    <div class="px-4 py-3 md:px-5 bg-card">
+      <IgnoreCacheCheckbox
+        v-model="ignoreCache"
+        :disabled="authorBackfillRunning || authorBackfillAllRunning"
+        :hint="t('metadataCache.ignoreCache.runHint')"
+      />
     </div>
 
     <div class="hidden md:flex items-center gap-3 px-5 py-4 bg-card">

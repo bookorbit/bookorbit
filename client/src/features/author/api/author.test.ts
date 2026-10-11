@@ -10,6 +10,7 @@ import {
   mergeAuthors,
   deleteAuthors,
   fetchAuthorMetadataCandidates,
+  streamAuthorMetadataCandidates,
   bulkRefreshAuthorsMetadata,
   refreshAuthorMetadata,
   MAX_AUTHOR_IMAGE_BYTES,
@@ -286,6 +287,35 @@ describe('fetchAuthorMetadataCandidates', () => {
 
     await expect(fetchAuthorMetadataCandidates({ q: 'tolkien' })).rejects.toThrow('Failed to load author metadata')
   })
+
+  it('asks for a live search only when cache=refresh is requested', async () => {
+    mockedApi.mockResolvedValue(mockOkResponse([]))
+
+    await fetchAuthorMetadataCandidates({ q: 'tolkien' })
+    await fetchAuthorMetadataCandidates({ q: 'tolkien', cache: 'refresh' })
+
+    expect(mockedApi.mock.calls[0]![0]).toBe('/api/v1/authors/metadata/search?q=tolkien')
+    expect(mockedApi.mock.calls[1]![0]).toBe('/api/v1/authors/metadata/search?q=tolkien&cache=refresh')
+  })
+})
+
+describe('streamAuthorMetadataCandidates', () => {
+  it('hands the cache marker over beside each candidate rather than on it', async () => {
+    const fetchedAt = '2026-10-05T08:00:00.000Z'
+    mockedApi.mockResolvedValue(
+      mockStreamResponse([
+        `data: ${JSON.stringify({ provider: 'goodreads', providerId: 'g1', name: 'Tolkien', cache: { fetchedAt, stale: true } })}\n`,
+        `data: ${JSON.stringify({ provider: 'audnexus', providerId: 'a1', name: 'Tolkien' })}\n`,
+      ]),
+    )
+    const onCandidate = vi.fn<(...args: unknown[]) => void>()
+
+    await streamAuthorMetadataCandidates({ q: 'tolkien', cache: 'refresh' }, onCandidate)
+
+    expect(mockedApi).toHaveBeenCalledWith('/api/v1/authors/metadata/stream?q=tolkien&cache=refresh', { signal: undefined })
+    expect(onCandidate).toHaveBeenNthCalledWith(1, { provider: 'goodreads', providerId: 'g1', name: 'Tolkien' }, { fetchedAt, stale: true })
+    expect(onCandidate).toHaveBeenNthCalledWith(2, { provider: 'audnexus', providerId: 'a1', name: 'Tolkien' }, null)
+  })
 })
 
 describe('bulkRefreshAuthorsMetadata', () => {
@@ -326,6 +356,17 @@ describe('bulkRefreshAuthorsMetadata', () => {
     mockedApi.mockResolvedValue(mockErrorResponse())
 
     await expect(bulkRefreshAuthorsMetadata([1])).rejects.toThrow('Failed to refresh author metadata')
+  })
+
+  it('sends ignoreCache only when cached results are ignored', async () => {
+    mockedApi.mockImplementation(async () => mockStreamResponse(['data: {"done":true,"processed":0,"failed":0,"updated":0}']))
+
+    await bulkRefreshAuthorsMetadata([1, 2])
+    await bulkRefreshAuthorsMetadata([1, 2], undefined, { ignoreCache: false })
+    await bulkRefreshAuthorsMetadata([1, 2], undefined, { ignoreCache: true })
+
+    const bodies = mockedApi.mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)))
+    expect(bodies).toEqual([{ authorIds: [1, 2] }, { authorIds: [1, 2] }, { authorIds: [1, 2], ignoreCache: true }])
   })
 })
 

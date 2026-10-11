@@ -91,7 +91,7 @@ function handleCancel() {
     </div>
 
     <label class="mt-4 flex items-center gap-2 text-sm text-foreground">
-      <input v-model="supportsVoiceDiscovery" type="checkbox" class="size-4 rounded border-border accent-primary" />
+      <input v-model="supportsVoiceDiscovery" type="checkbox" class="size-4 rounded-xs border-border accent-primary" />
       {{ t('settings.admin.tts.formDiscovery') }}
     </label>
 

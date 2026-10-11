@@ -33,6 +33,7 @@ import { BookRequestNotifier } from '../book-request-notifier.service';
 import { BookRequestRepository } from '../book-request.repository';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { RequestAutomationSettingsService } from './request-automation-settings.service';
+import { RequestCompanionService } from './request-companion.service';
 import { RequestFulfillmentService } from './request-fulfillment.service';
 
 /**
@@ -77,6 +78,8 @@ export interface VerificationOutcome {
 @Injectable()
 export class RequestVerificationService implements OnModuleInit {
   private readonly logger = new Logger(RequestVerificationService.name);
+  /** The tail of each pair's filing turns, so the two halves never file at the same time. */
+  private readonly pairFilings = new Map<number, Promise<void>>();
 
   constructor(
     private readonly events: BookDockEventsService,
@@ -89,6 +92,7 @@ export class RequestVerificationService implements OnModuleInit {
     private readonly notifier: BookRequestNotifier,
     private readonly gateway: BookRequestGateway,
     private readonly settings: RequestAutomationSettingsService,
+    private readonly companions: RequestCompanionService,
   ) {}
 
   onModuleInit(): void {
@@ -156,16 +160,39 @@ export class RequestVerificationService implements OnModuleInit {
     request: BookRequestRow,
     fileId: number,
   ): Promise<{ ok: true; bookId: number | null } | { ok: false; reason: string }> {
+    // The two halves of a pair can finish within moments of each other. Filed side by side, each
+    // would find the other not yet landed and both would become books of their own; one after the
+    // other, the second finds the first's book and joins it.
+    return this.serializeByPair(request, async () => {
+      // Read again inside the turn: the half that filed first may have just pointed this one at its book.
+      const current = (await this.requests.findById(request.id))?.request ?? request;
+      return this.fileIntoLibraryNow(download, current, fileId);
+    });
+  }
+
+  private async fileIntoLibraryNow(
+    download: BookRequestDownloadRow,
+    request: BookRequestRow,
+    fileId: number,
+  ): Promise<{ ok: true; bookId: number | null } | { ok: false; reason: string }> {
+    const join = await this.companions.resolveJoin(request);
+
     // A request with no folder still has a library; take its first folder rather than falling
     // through to the Book Dock's global default, which is usually unset and never the point here.
-    const folderId = request.targetFolderId ?? (await this.resolveFolder(request.targetLibraryId));
+    const folderId = join?.folderId ?? request.targetFolderId ?? (await this.resolveFolder(request.targetLibraryId));
     if (folderId === null) return { ok: false, reason: 'the destination library has no folder to file the book into' };
 
     const result = await this.finalizeService.finalizeManagedFile(fileId, {
-      libraryId: request.targetLibraryId ?? undefined,
+      libraryId: join?.libraryId ?? request.targetLibraryId ?? undefined,
       folderId,
+      ...(join ? { joinBook: join.joinBook } : {}),
     });
     if (!result.success) return { ok: false, reason: result.message ?? 'the Book Dock could not file this book' };
+    if (join) {
+      this.logger.log(
+        `[book_request.join_book] [end] requestId=${request.id} bookId=${join.joinBook.bookId} landedBookId=${result.bookId ?? 'none'} - filed as another format of an existing book`,
+      );
+    }
 
     // Conditional, like every other write in the pipeline. Scoring an import and handing it to the
     // Book Dock takes long enough for somebody to cancel the request underneath it, and an
@@ -200,9 +227,32 @@ export class RequestVerificationService implements OnModuleInit {
       message: `"${request.title}" is ready`,
       meta: { requestId: request.id, bookId: result.bookId ?? null },
     });
+    if (result.bookId != null) await this.companions.handOn(request, result.bookId);
     this.gateway.emitChanged();
 
     return { ok: true, bookId: result.bookId ?? null };
+  }
+
+  /**
+   * Runs one filing at a time per pair, keyed on the pair rather than on either request so both
+   * halves queue behind the same turn. A request made on its own is never held up by anything.
+   */
+  private async serializeByPair<T>(request: BookRequestRow, run: () => Promise<T>): Promise<T> {
+    if (request.companionRequestId === null) return run();
+    const key = Math.min(request.id, request.companionRequestId);
+
+    const previous = this.pairFilings.get(key) ?? Promise.resolve();
+    const turn = previous.then(run, run);
+    const settled = turn.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.pairFilings.set(key, settled);
+    try {
+      return await turn;
+    } finally {
+      if (this.pairFilings.get(key) === settled) this.pairFilings.delete(key);
+    }
   }
 
   /**

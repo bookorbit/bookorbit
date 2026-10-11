@@ -1,0 +1,119 @@
+/* ── Nostalgia style ─────────────────────────────────────────
+   Neutral grounds from the surface palette, system type, a flat
+   shell and a tall accent glow over a faint grid of squares.
+   Only reassigns tokens, so components never ask which style is
+   active. Accent, radius and background stay the user's: the
+   accent is only re-shaded (from --accent-primary), never replaced.
+
+   Same specificity as the accent classes and imported after them,
+   so where both set a token (--sidebar) the style wins.
+────────────────────────────────────────────────────────────── */
+html[data-style='nostalgia'] {
+  --app-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --app-font-serif: var(--app-font-sans);
+
+  --background: var(--surface-ground);
+  --foreground: oklch(0.2 calc(var(--surface-c) * 0.6) var(--surface-h));
+  --card: var(--surface-card);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --secondary: oklch(calc(0.94 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.6) var(--surface-h));
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(calc(0.94 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.6) var(--surface-h));
+  --muted-foreground: oklch(0.5 calc(var(--surface-c) * 0.6) var(--surface-h));
+  --accent: oklch(calc(0.94 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.6) var(--surface-h));
+  --accent-foreground: var(--foreground);
+  --border: var(--surface-edge);
+  --input: oklch(calc(0.85 + var(--surface-l) * 0.4) calc(var(--surface-c) * 1.2) var(--surface-h));
+
+  --surface-1: var(--card);
+  --surface-2: oklch(calc(0.965 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.6) var(--surface-h));
+  --surface-3: var(--muted);
+  --surface-4: oklch(calc(0.915 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.6) var(--surface-h));
+  --volume-unread: oklch(calc(0.86 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.8) var(--surface-h));
+  --dot-color: oklch(calc(0.83 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.8) var(--surface-h));
+  --scrollbar-thumb: oklch(0.8 calc(var(--surface-c) * 0.8) var(--surface-h));
+  --scrollbar-thumb-hover: oklch(0.7 calc(var(--surface-c) * 0.8) var(--surface-h));
+
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  /* Book counts wear the accent hue, held dark enough to clear AA on the sidebar card. */
+  --sidebar-count-foreground: oklch(from var(--primary) min(l, 0.5) c h);
+  --sidebar-heading-foreground: var(--foreground);
+  --sidebar-heading-size: 12px;
+  --sidebar-heading-weight: 700;
+  --sidebar-heading-tracking: 0.06em;
+  --sidebar-count-bg: transparent;
+  --sidebar-count-size: 14px;
+  --sidebar-count-weight: 400;
+  /* The classic active row is a faint wash, so the accent text and count on it keep their full contrast. */
+  --sidebar-active-bg: color-mix(in oklch, var(--primary) 7%, transparent);
+  --sidebar-active-weight: 700;
+
+  --shell-border: var(--border);
+  --shell-backdrop: none;
+  --shell-shadow: 0 3px 5px oklch(0 0 0 / 0.02), 0 0 2px oklch(0 0 0 / 0.05), 0 1px 4px oklch(0 0 0 / 0.08);
+  --shell-accent-wash: color-mix(in oklch, var(--primary) 8%, transparent);
+  --shell-accent-tint: color-mix(in oklch, var(--primary) 16%, transparent);
+
+  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 38%, transparent) 0%, transparent 100%);
+  --glow-band: 20rem;
+  --glow-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 84' fill='%23000'%3E%3Crect x='1' y='1' width='19' height='19' fill-opacity='0.044'/%3E%3Crect x='22' y='1' width='19' height='19' fill-opacity='0.058'/%3E%3Crect x='43' y='1' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='64' y='1' width='19' height='19' fill-opacity='0.035'/%3E%3Crect x='1' y='22' width='19' height='19' fill-opacity='0.059'/%3E%3Crect x='22' y='22' width='19' height='19' fill-opacity='0.02'/%3E%3Crect x='43' y='22' width='19' height='19' fill-opacity='0.054'/%3E%3Crect x='64' y='22' width='19' height='19' fill-opacity='0.03'/%3E%3Crect x='1' y='43' width='19' height='19' fill-opacity='0.024'/%3E%3Crect x='22' y='43' width='19' height='19' fill-opacity='0.023'/%3E%3Crect x='43' y='43' width='19' height='19' fill-opacity='0.031'/%3E%3Crect x='64' y='43' width='19' height='19' fill-opacity='0.052'/%3E%3Crect x='1' y='64' width='19' height='19' fill-opacity='0.026'/%3E%3Crect x='22' y='64' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='43' y='64' width='19' height='19' fill-opacity='0.045'/%3E%3Crect x='64' y='64' width='19' height='19' fill-opacity='0.034'/%3E%3C/svg%3E");
+  --glow-texture-size: 107px 107px;
+
+  --cover-hover-transform: translateY(-3px);
+
+  --format-chip-fill: 18%;
+  --format-chip-border: 55%;
+
+  --chip-genre-bg: oklch(0.6 0.2 25 / 0.12);
+  --chip-genre-fg: oklch(0.5 0.17 25);
+  --chip-genre-border: oklch(0.6 0.2 25 / 0.35);
+  --chip-tag-bg: oklch(0.65 0.17 150 / 0.12);
+  --chip-tag-fg: oklch(0.47 0.13 150);
+  --chip-tag-border: oklch(0.65 0.17 150 / 0.35);
+}
+
+/* The classic ash ladder, shifted by the palette's --surface-l. Ground, card and edge come from surfaces.css. The style pins surface brightness to 0, so
+   --bg-lift adds nothing here. Light mode takes 40% of the shift: enough to tell greys apart, not to dim a page. */
+html[data-style='nostalgia'].dark {
+  /* Accents at their classic 400-shade brightness: the darker ones (greens, lime) lift, the rest already sit there. */
+  --primary: oklch(from var(--accent-primary) max(l, 0.78) c h);
+
+  --foreground: oklch(1 0 0);
+  --secondary: oklch(calc(0.307 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --muted: oklch(calc(0.307 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --muted-foreground: oklch(0.76 calc(var(--surface-c) * 0.6) var(--surface-h));
+  --accent: oklch(calc(0.307 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --input: oklch(calc(0.432 + var(--bg-lift) + var(--surface-l)) calc(var(--surface-c) * 1.4) var(--surface-h));
+
+  --surface-2: oklch(calc(0.262 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --surface-4: oklch(calc(0.362 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --volume-unread: oklch(calc(0.362 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --dot-color: oklch(calc(0.302 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --scrollbar-thumb: oklch(0.38 var(--surface-c) var(--surface-h));
+  --scrollbar-thumb-hover: oklch(0.48 var(--surface-c) var(--surface-h));
+
+  --sidebar-count-foreground: oklch(from var(--primary) max(l, 0.72) c h);
+
+  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 60%, transparent) 0%, transparent 100%);
+  --glow-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 84' fill='%23fff'%3E%3Crect x='1' y='1' width='19' height='19' fill-opacity='0.056'/%3E%3Crect x='22' y='1' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='43' y='1' width='19' height='19' fill-opacity='0.082'/%3E%3Crect x='64' y='1' width='19' height='19' fill-opacity='0.036'/%3E%3Crect x='1' y='22' width='19' height='19' fill-opacity='0.073'/%3E%3Crect x='22' y='22' width='19' height='19' fill-opacity='0.059'/%3E%3Crect x='43' y='22' width='19' height='19' fill-opacity='0.035'/%3E%3Crect x='64' y='22' width='19' height='19' fill-opacity='0.071'/%3E%3Crect x='1' y='43' width='19' height='19' fill-opacity='0.033'/%3E%3Crect x='22' y='43' width='19' height='19' fill-opacity='0.065'/%3E%3Crect x='43' y='43' width='19' height='19' fill-opacity='0.036'/%3E%3Crect x='64' y='43' width='19' height='19' fill-opacity='0.037'/%3E%3Crect x='1' y='64' width='19' height='19' fill-opacity='0.064'/%3E%3Crect x='22' y='64' width='19' height='19' fill-opacity='0.096'/%3E%3Crect x='43' y='64' width='19' height='19' fill-opacity='0.04'/%3E%3Crect x='64' y='64' width='19' height='19' fill-opacity='0.048'/%3E%3C/svg%3E");
+
+  /* Solid chips in a deep shade of each format's hue with white ink, as the classic look wore them; at this
+     lightness every format clears 5.4:1. */
+  --format-chip-fill: 100%;
+  --format-chip-border: 100%;
+  --format-chip-fill-l: 0.5;
+  --format-chip-ink: oklch(1 0 0);
+
+  --chip-genre-bg: oklch(0.64 0.2 25 / 0.18);
+  --chip-genre-fg: oklch(0.82 0.1 25);
+  --chip-genre-border: oklch(0.64 0.2 25 / 0.35);
+  --chip-tag-bg: oklch(0.72 0.17 150 / 0.18);
+  --chip-tag-fg: oklch(0.84 0.12 150);
+  --chip-tag-border: oklch(0.72 0.17 150 / 0.35);
+}

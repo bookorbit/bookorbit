@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { access as fsAccess, readFile, rmdir, stat, unlink } from 'fs/promises';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DatabaseError } from 'pg';
 
@@ -39,7 +39,7 @@ import {
   Permission,
   resolveUploadPath,
 } from '@bookorbit/types';
-import type { BookRequestImportFormats } from '@bookorbit/types';
+import type { BookRequestImportFormats, CoverMedium } from '@bookorbit/types';
 import type { FileRole } from '../scanner/lib/classify';
 import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
@@ -52,7 +52,7 @@ import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/u
 import { buildPatternTokens, patternReferencesToken } from '../../common/utils/pattern-tokens.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookMetadata, libraries, libraryFolders } from '../../db/schema';
+import { bookMetadata, bookNarrators, libraries, libraryFolders } from '../../db/schema';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
@@ -75,10 +75,21 @@ type LibraryRow = typeof libraries.$inferSelect;
 type LibraryFolderRow = typeof libraryFolders.$inferSelect;
 type NamingLibrary = { name?: string | null; fileNamingPattern?: string | null; organizationMode?: string | null };
 
+type JoinBook = { bookId: number; folderPath: string; coverUrl?: string | null };
+
 type FinalizeOverrideEntry = {
   libraryId?: number;
   folderId?: number;
   targetFileName?: string;
+  /**
+   * An existing book this file should become another format of, by landing in that book's own
+   * folder. Honoured only where a folder is a book; anywhere else the file is filed as usual.
+   * `coverUrl` is the art chosen for this format when it was asked for, used only when the arriving
+   * files carry none of their own.
+   */
+  joinBook?: JoinBook;
+  /** A cover the metadata lookup found by itself, rather than one a person picked. See `applyMetadata`. */
+  lookedUpCoverUrl?: string | null;
 };
 
 const BATCH_SIZE = 100;
@@ -155,6 +166,9 @@ type FinalizeCandidateAnalysis = {
    * dirname there would file the book under the disc rather than under the book.
    */
   bookFolderPath?: string;
+  /** The existing book this file was placed into the folder of, when it was asked to join one. */
+  joinBook?: JoinBook;
+  lookedUpCoverUrl?: string | null;
 };
 
 /**
@@ -411,7 +425,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         bookId = written.bookIds[0]!;
         // Several ids only in a loose-file library, where each format is its own book. They are the
         // same work, so they get the same metadata rather than one of them getting all of it.
-        for (const created of written.bookIds) await this.applyMetadata(created, row, created === bookId);
+        for (const created of written.bookIds) {
+          // A book this file was asked to join keeps the metadata it already has; the new format
+          // brings only what belongs to that format.
+          if (created === analysis.joinBook?.bookId && !written.createdBookIds.includes(created)) {
+            await this.applyJoinedMetadata(created, row, analysis.joinBook.coverUrl ?? null, analysis.lookedUpCoverUrl ?? null);
+          } else await this.applyMetadata(created, row, created === bookId, analysis.lookedUpCoverUrl ?? null);
+        }
       } catch (err) {
         // The books committed before the failure, and metadata runs against services that cannot
         // join that transaction, so the compensation is explicit: take back exactly what this unit
@@ -607,6 +627,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         destPath = candidate;
       }
 
+      // Another format of a book already on the shelf goes into that book's folder under the name
+      // the pattern gave it, so the scan and the importer agree it is one book. The pattern's own
+      // folder would follow this file's metadata, and an m4b tagged "Dune (Unabridged)" names a
+      // different folder from the epub called "Dune".
+      const joinBook = this.resolveJoinBook(override?.joinBook, library, folder);
+      if (joinBook) destPath = join(joinBook.folderPath, basename(destPath));
+
       const { files: placement, bookFolderPath } = this.resolvePlacement(row, reduced.files, destPath, folder.path, library);
       // The primary's own destination follows the placement, which for a unit means it sits inside
       // the unit folder rather than at the path the naming pattern produced directly.
@@ -614,7 +641,21 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       const newName = destPath.substring(folder.path.length + 1);
 
-      return { fileId: row.id, fileName: row.fileName, row, status: 'ready', newName, library, folder, format, destPath, placement, bookFolderPath };
+      return {
+        fileId: row.id,
+        fileName: row.fileName,
+        row,
+        status: 'ready',
+        newName,
+        library,
+        folder,
+        format,
+        destPath,
+        placement,
+        bookFolderPath,
+        ...(joinBook ? { joinBook } : {}),
+        ...(override?.lookedUpCoverUrl ? { lookedUpCoverUrl: override.lookedUpCoverUrl } : {}),
+      };
     } catch (error) {
       const status = classifyFinalizePreviewError(error);
       if (status === 'error') this.logFinalizeFailure(row.id, 'target_resolution', error);
@@ -648,6 +689,19 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     );
 
     return { analyses, existingDestinations };
+  }
+
+  /**
+   * The book to join, when joining one is possible: the library keeps one book per folder, and the
+   * book's folder is a real folder inside the one being filed into. A book sitting loose at the
+   * folder root is its own file, so another format placed beside it would be a book of its own.
+   */
+  private resolveJoinBook(joinBook: FinalizeOverrideEntry['joinBook'], library: LibraryRow, folder: LibraryFolderRow): JoinBook | null {
+    if (!joinBook || library.organizationMode !== 'book_per_folder') return null;
+    const root = resolve(folder.path);
+    const bookFolder = resolve(joinBook.folderPath);
+    if (bookFolder === root || !bookFolder.startsWith(root + sep)) return null;
+    return joinBook;
   }
 
   /**
@@ -926,7 +980,10 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     if (row.autoFinalizeSuppressed) return;
     if (!shouldAutoFinalize(row, settings.metadataMode, settings.threshold)) return;
 
-    const autoFinalizeMetadata = resolveAutoFinalizeMetadata(settings.metadataMode, row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata);
+    const { metadata: autoFinalizeMetadata, lookedUpCoverUrl } = separateLookedUpCover(
+      resolveAutoFinalizeMetadata(settings.metadataMode, row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata),
+      row.selectedMetadata,
+    );
     const rowForFinalize = autoFinalizeMetadata
       ? {
           ...row,
@@ -934,7 +991,8 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         }
       : row;
 
-    const result = await this.finalizeFile(rowForFinalize, settings.libraryId, settings.folderId, new Map(), 0, true);
+    const overrideMap = new Map<number, FinalizeOverrideEntry>(lookedUpCoverUrl ? [[row.id, { lookedUpCoverUrl }]] : []);
+    const result = await this.finalizeFile(rowForFinalize, settings.libraryId, settings.folderId, overrideMap, 0, true);
     if (result.success) {
       this.logger.log(`Auto-finalized Book Dock file ${fileId} -> book ${result.bookId} (confidence ${row.confidence}%)`);
       this.emitChange();
@@ -963,19 +1021,24 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
    * Dock's auto-finalize metadata mode: that mode is an operator preference about unattended dock
    * files, and it does not govern a file another module vouched for.
    */
-  async finalizeManagedFile(fileId: number, override: { libraryId?: number; folderId?: number }): Promise<BookDockFinalizeFileResult> {
+  async finalizeManagedFile(
+    fileId: number,
+    override: { libraryId?: number; folderId?: number; joinBook?: JoinBook },
+  ): Promise<BookDockFinalizeFileResult> {
     const row = await this.repo.findById(fileId);
     if (!row) {
       return { fileId, fileName: `book-dock-file-${fileId}`, success: false, message: 'Book Dock file not found' };
     }
 
-    const merged = mergeBookDockMetadata(row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata);
+    const { metadata: merged, lookedUpCoverUrl } = separateLookedUpCover(
+      mergeBookDockMetadata(row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata),
+      row.selectedMetadata,
+    );
     const rowForFinalize = merged ? { ...row, selectedMetadata: merged } : row;
 
-    const overrideMap = new Map<number, FinalizeOverrideEntry>();
-    if (override.libraryId !== undefined || override.folderId !== undefined) {
-      overrideMap.set(fileId, { libraryId: override.libraryId, folderId: override.folderId });
-    }
+    const overrideMap = new Map<number, FinalizeOverrideEntry>([
+      [fileId, { libraryId: override.libraryId, folderId: override.folderId, joinBook: override.joinBook, lookedUpCoverUrl }],
+    ]);
 
     const result = await this.finalizeFile(rowForFinalize, undefined, undefined, overrideMap, 0, true);
     if (result.success) this.emitChange();
@@ -1144,28 +1207,140 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
   }
 
   /**
-   * The staged cover was read from the unit's primary file, so it fills only that file's medium on
-   * the book that owns it. The other books of a loose-file unit get their own art from reconcile.
+   * What a new format adds to a book that already exists: its own cover slot while that is empty,
+   * and the audio facts and identifiers the book does not have yet, unless they are locked. Nothing
+   * the book already says is overwritten - the title, authors and description were settled before
+   * this file arrived, and an audiobook's tags routinely disagree with them ("Unabridged", the
+   * narrator as author).
    */
-  private async applyMetadata(bookId: number, row: BookDockFileRow, ownsStagedCover = true): Promise<void> {
+  private async applyJoinedMetadata(
+    bookId: number,
+    row: BookDockFileRow,
+    requestedCoverUrl: string | null,
+    lookedUpCoverUrl: string | null,
+  ): Promise<void> {
     const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata);
     const audio = resolveAudioFinalizeFields(row.embeddedMetadata, row.selectedMetadata);
-    let selectedCoverApplied = false;
-
     const medium = row.format && isAudioFormat(row.format) ? 'audio' : 'ebook';
-    const selectedCoverUrl = meta.coverUrl;
-    if (selectedCoverUrl) {
-      selectedCoverApplied = await this.metadataService.downloadAndSaveCover([{ url: selectedCoverUrl }], bookId, medium, { userChosen: true });
+
+    // A cover picked in the Book Dock for this file is used as it is. Otherwise only an empty slot is
+    // filled: a cover the book already holds for this medium stays, a custom one resting dormant
+    // since the last copy of this format went away included. The requested art comes last.
+    const picked = meta.coverUrl
+      ? await this.metadataService.downloadAndSaveCover([{ url: meta.coverUrl }], bookId, medium, { userChosen: true })
+      : false;
+    if (!picked && (await this.metadataService.coverSlotIsEmpty(bookId, medium))) {
+      await this.applyUnpickedCover(bookId, row, medium, true, lookedUpCoverUrl, requestedCoverUrl);
     }
 
-    if (!selectedCoverApplied && ownsStagedCover && row.coverPath) {
+    const [current] = await this.db
+      .select({
+        lockedFields: bookMetadata.lockedFields,
+        durationSeconds: bookMetadata.durationSeconds,
+        abridged: bookMetadata.abridged,
+        chapters: bookMetadata.chapters,
+      })
+      .from(bookMetadata)
+      .where(eq(bookMetadata.bookId, bookId))
+      .limit(1);
+    const locked = new Set(current?.lockedFields ?? []);
+
+    const identifiers = {
+      googleBooksId: meta.googleBooksId,
+      goodreadsId: meta.goodreadsId,
+      amazonId: meta.amazonId,
+      hardcoverId: meta.hardcoverId,
+      openLibraryId: meta.openLibraryId,
+      itunesId: meta.itunesId,
+      audibleId: meta.audibleId,
+      librofmId: meta.librofmId,
+      koboId: meta.koboId,
+    } as const;
+    const fillMissing: Record<string, SQL> = {};
+    for (const [field, value] of Object.entries(identifiers)) {
+      if (value && !locked.has(field)) fillMissing[field] = sql`coalesce(${bookMetadata[field as keyof typeof identifiers]}, ${value})`;
+    }
+
+    const audioPatch = medium === 'audio' ? buildAudioMetadataPatch(audio) : {};
+    const audioFill = {
+      ...(audioPatch.durationSeconds !== undefined && current?.durationSeconds == null && !locked.has('durationSeconds')
+        ? { durationSeconds: audioPatch.durationSeconds }
+        : {}),
+      ...(audioPatch.abridged !== undefined && current?.abridged == null && !locked.has('abridged') ? { abridged: audioPatch.abridged } : {}),
+      ...(audioPatch.chapters !== undefined && !(Array.isArray(current?.chapters) && current.chapters.length > 0)
+        ? { chapters: audioPatch.chapters }
+        : {}),
+    };
+    if (Object.keys(fillMissing).length > 0 || Object.keys(audioFill).length > 0) {
+      await this.db
+        .update(bookMetadata)
+        .set({ ...fillMissing, ...audioFill, updatedAt: new Date() })
+        .where(eq(bookMetadata.bookId, bookId));
+    }
+
+    if (medium === 'audio' && audio.narrators.length > 0 && !locked.has('narrators') && !(await this.hasNarrators(bookId))) {
+      await this.metadataService.replaceNarrators(
+        bookId,
+        audio.narrators.map((name) => ({ name, sortName: null })),
+      );
+    }
+
+    await this.metadataScoreService.calculateAndSave(bookId);
+  }
+
+  private async hasNarrators(bookId: number): Promise<boolean> {
+    const [row] = await this.db.select({ bookId: bookNarrators.bookId }).from(bookNarrators).where(eq(bookNarrators.bookId, bookId)).limit(1);
+    return row !== undefined;
+  }
+
+  /**
+   * One cover slot for a file nobody picked a cover for, filled the way a metadata refresh fills it.
+   * The file's own art goes in first. The cover the field rules chose in the metadata lookup then
+   * replaces it only if it fits the slot, so the rules decide between providers while a portrait
+   * jacket can never displace the square art an m4b carries. `fallbackUrl` is tried only while the
+   * slot is still empty.
+   */
+  private async applyUnpickedCover(
+    bookId: number,
+    row: BookDockFileRow,
+    medium: CoverMedium,
+    ownsStagedCover: boolean,
+    lookedUpCoverUrl: string | null,
+    fallbackUrl: string | null,
+  ): Promise<void> {
+    let staged = false;
+    if (ownsStagedCover && row.coverPath) {
       try {
-        const bytes = await readFile(row.coverPath);
-        await this.metadataService.saveExtractedCoverBytes(bookId, bytes, medium);
+        await this.metadataService.saveExtractedCoverBytes(bookId, await readFile(row.coverPath), medium);
+        staged = true;
       } catch (err) {
         this.logger.warn(`Failed to copy Book Dock cover to book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
+    const urls = [lookedUpCoverUrl, staged ? null : fallbackUrl].filter((url, index, all): url is string => !!url && all.indexOf(url) === index);
+    if (urls.length > 0)
+      await this.metadataService.downloadAndSaveCover(
+        urls.map((url) => ({ url })),
+        bookId,
+        medium,
+      );
+  }
+
+  /**
+   * `lookedUpCoverUrl`: see `applyUnpickedCover`. A cover picked in the Book Dock is used as it is.
+   * The staged cover was read from the unit's primary file, so it fills only that file's medium on
+   * the book that owns it (`ownsStagedCover`); the other books of a loose-file unit get their own
+   * art from reconcile.
+   */
+  private async applyMetadata(bookId: number, row: BookDockFileRow, ownsStagedCover = true, lookedUpCoverUrl: string | null = null): Promise<void> {
+    const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata);
+    const audio = resolveAudioFinalizeFields(row.embeddedMetadata, row.selectedMetadata);
+
+    const medium = row.format && isAudioFormat(row.format) ? 'audio' : 'ebook';
+    const picked = meta.coverUrl
+      ? await this.metadataService.downloadAndSaveCover([{ url: meta.coverUrl }], bookId, medium, { userChosen: true })
+      : false;
+    if (!picked) await this.applyUnpickedCover(bookId, row, medium, ownsStagedCover, lookedUpCoverUrl, null);
 
     const scalarFields = {
       title: meta.title ?? null,
@@ -1647,6 +1822,20 @@ function mergeBookDockMetadata(
     ...(normalizeBookDockMetadata(selected) ?? {}),
   };
   return Object.keys(merged).length > 0 ? merged : null;
+}
+
+/**
+ * Splits off a cover the merge took from the metadata lookup. A cover in the row's own selection
+ * was picked by a person and stays; anything else the merge carried was found unattended.
+ */
+function separateLookedUpCover(
+  metadata: BookDockMetadata | null,
+  selected: BookDockMetadata | null | undefined,
+): { metadata: BookDockMetadata | null; lookedUpCoverUrl: string | null } {
+  const picked = normalizeBookDockMetadata(selected)?.coverUrl ?? null;
+  if (!metadata?.coverUrl || metadata.coverUrl === picked) return { metadata, lookedUpCoverUrl: null };
+  const { coverUrl, ...rest } = metadata;
+  return { metadata: Object.keys(rest).length > 0 ? rest : null, lookedUpCoverUrl: coverUrl };
 }
 
 function resolveAutoFinalizeMetadata(

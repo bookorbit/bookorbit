@@ -99,6 +99,11 @@ export interface BookDockFile {
    * single file, which is what `fileName` and `fileSize` already describe.
    */
   unitFiles: BookDockUnitFile[];
+  /**
+   * Whether this EPUB carries synced narration. Only a single file's read that asks for it with
+   * `readAlong=true` answers it, since it means opening the file; every other response leaves it out.
+   */
+  readAlong?: boolean;
 }
 
 export interface BookDockFilesPage {

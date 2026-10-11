@@ -39,7 +39,11 @@ const QUEUE_STATUS = {
 export class BookMetadataFetchQueueRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async upsertSchedule(bookIds: number[], reason: BookMetadataFetchReason): Promise<number> {
+  /**
+   * `ignoreCache` is only ever turned on: a book already waiting keeps a request to bypass cached
+   * provider answers even when a later, ordinary schedule touches it.
+   */
+  async upsertSchedule(bookIds: number[], reason: BookMetadataFetchReason, ignoreCache = false): Promise<number> {
     const unique = [...new Set(bookIds)].filter((id) => Number.isInteger(id) && id > 0);
     if (unique.length === 0) return 0;
 
@@ -52,6 +56,7 @@ export class BookMetadataFetchQueueRepository {
           status: QUEUE_STATUS.QUEUED,
           reason,
           attemptCount: 0,
+          ignoreCache,
         })),
       )
       .onConflictDoUpdate({
@@ -60,6 +65,7 @@ export class BookMetadataFetchQueueRepository {
           status: QUEUE_STATUS.QUEUED,
           reason,
           attemptCount: 0,
+          ignoreCache: sql`${bookMetadataFetchQueue.ignoreCache} OR ${ignoreCache}`,
           updatedAt: now,
         },
         // Only re-queue failed rows. Already-queued rows are intentionally ignored
@@ -68,16 +74,30 @@ export class BookMetadataFetchQueueRepository {
       })
       .returning({ bookId: bookMetadataFetchQueue.bookId });
 
+    if (ignoreCache) {
+      await this.db
+        .update(bookMetadataFetchQueue)
+        .set({ ignoreCache: true, updatedAt: now })
+        .where(
+          and(
+            inArray(bookMetadataFetchQueue.bookId, unique),
+            inArray(bookMetadataFetchQueue.status, [QUEUE_STATUS.QUEUED, QUEUE_STATUS.PROCESSING]),
+            eq(bookMetadataFetchQueue.ignoreCache, false),
+          ),
+        );
+    }
+
     return touched.length;
   }
 
-  async fetchDue(limit: number): Promise<{ bookId: number; title: string | null; reason: BookMetadataFetchReason }[]> {
+  async fetchDue(limit: number): Promise<{ bookId: number; title: string | null; reason: BookMetadataFetchReason; ignoreCache: boolean }[]> {
     if (limit <= 0) return [];
     const rows = await this.db
       .select({
         bookId: bookMetadataFetchQueue.bookId,
         title: sql<string | null>`COALESCE(${bookMetadata.title}, ${books.folderPath})`,
         reason: bookMetadataFetchQueue.reason,
+        ignoreCache: bookMetadataFetchQueue.ignoreCache,
       })
       .from(bookMetadataFetchQueue)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookMetadataFetchQueue.bookId))
@@ -208,6 +228,7 @@ export class BookMetadataFetchQueueRepository {
     reason: BookMetadataFetchReason,
     libraryId?: number,
     batchSize = 1000,
+    ignoreCache = false,
   ): Promise<number> {
     const whereClause = this.buildEligibleBooksWhereClause(config, libraryId);
     if (!whereClause || batchSize <= 0) return 0;
@@ -229,6 +250,7 @@ export class BookMetadataFetchQueueRepository {
       totalQueued += await this.upsertSchedule(
         rows.map((row) => row.bookId),
         reason,
+        ignoreCache,
       );
       cursorBookId = rows[rows.length - 1]!.bookId;
     }
@@ -356,12 +378,13 @@ export class BookMetadataFetchQueueRepository {
         return sql`NOT EXISTS (SELECT 1 FROM ${bookAuthors} WHERE ${bookAuthors.bookId} = ${bookMetadata.bookId})`;
       case 'genres':
         return sql`NOT EXISTS (SELECT 1 FROM ${bookGenres} WHERE ${bookGenres.bookId} = ${bookMetadata.bookId})`;
+      // Mirrors `BookMetadataFetchEligibilityService.isFieldMissing`: only a book with audio can lack these.
       case 'narrators':
-        return sql`NOT EXISTS (SELECT 1 FROM ${bookNarrators} WHERE ${bookNarrators.bookId} = ${bookMetadata.bookId})`;
+        return sql`(${coverMediaSql(bookMetadata.bookId).hasAudio} AND NOT EXISTS (SELECT 1 FROM ${bookNarrators} WHERE ${bookNarrators.bookId} = ${bookMetadata.bookId}))`;
       case 'duration':
-        return sql`${bookMetadata.durationSeconds} IS NULL`;
+        return sql`(${coverMediaSql(bookMetadata.bookId).hasAudio} AND ${bookMetadata.durationSeconds} IS NULL)`;
       case 'abridged':
-        return sql`${bookMetadata.abridged} IS NULL`;
+        return sql`(${coverMediaSql(bookMetadata.bookId).hasAudio} AND ${bookMetadata.abridged} IS NULL)`;
       case 'cover':
         return sql`${bookMetadata.coverSource} IS NULL`;
       case 'audioCover': {

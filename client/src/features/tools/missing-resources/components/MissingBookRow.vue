@@ -21,7 +21,7 @@ function handleToggle(): void {
   <li class="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30">
     <input
       type="checkbox"
-      class="mt-0.5 shrink-0 rounded accent-primary"
+      class="mt-0.5 shrink-0 rounded-xs accent-primary"
       :checked="selected"
       :disabled="disabled"
       :aria-label="title"
@@ -33,7 +33,11 @@ function handleToggle(): void {
       <p class="truncate text-xs text-muted-foreground" :title="entry.folderPath">{{ entry.folderPath }}</p>
     </div>
     <div class="hidden shrink-0 items-center gap-2 sm:flex">
-      <span v-for="format in entry.formats" :key="format" class="rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground uppercase">
+      <span
+        v-for="format in entry.formats"
+        :key="format"
+        class="rounded-xs border border-border px-1.5 py-0.5 text-xs text-muted-foreground uppercase"
+      >
         {{ format }}
       </span>
       <span class="text-xs text-muted-foreground">{{ entry.libraryName }}</span>

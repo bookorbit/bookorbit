@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { coverShapeFromSize, MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { markProviderDegraded, markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { amazonRequestHeaders, isAmazonBotChallenge } from '../../../../common/utils/amazon-http.utils';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { amazonOrigin } from '../../../../common/utils/metadata-provider-hosts.utils';
@@ -10,7 +12,9 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { pickSearchInputs, providerCacheContext, requestedMax } from '../provider-cache';
 import { buildRequestSignal, normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
+import { amazonLocaleCookies } from './amazon-locale-cookies';
 import { extractAsins, parseBookPage } from './amazon.scraper';
 
 @Injectable()
@@ -20,6 +24,21 @@ export class AmazonProvider implements IdentifiableProvider {
   readonly identifiable = true as const;
 
   private readonly logger = new Logger(AmazonProvider.name);
+
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: false,
+    context: async () => {
+      const { enabled, domain, cookie } = (await this.providerConfig.getConfig()).amazon;
+      return providerCacheContext(enabled, { domain, hasCookie: Boolean(cookie), localeCookies: amazonLocaleCookies(cookie) });
+    },
+    // The ISBN alone forms the query whenever one is given; title and author only matter without it.
+    describeSearch: (params) => ({
+      inputs: params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author']),
+      maxCandidates: requestedMax(params),
+    }),
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
 
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
@@ -38,6 +57,7 @@ export class AmazonProvider implements IdentifiableProvider {
         }
         const candidate = await this.fetchByAsin(asin, domain, cookie, params.signal);
         if (candidate) results.push(candidate);
+        else markProviderDegraded('amazon.search: product skipped');
       }
     } catch (err) {
       rethrowWithPartialCandidates(err, results);
@@ -64,7 +84,10 @@ export class AmazonProvider implements IdentifiableProvider {
     const html = await this.fetchHtml(url.toString(), cookie, 'lookup', undefined, asin, signal);
     if (!html) return null;
     const data = parseBookPage(html);
-    if (!data.title) return null;
+    if (!data.title) {
+      markProviderDegraded('amazon.lookup: product page did not parse');
+      return null;
+    }
     return {
       provider: MetadataProviderKey.AMAZON,
       providerId: asin,
@@ -119,6 +142,7 @@ export class AmazonProvider implements IdentifiableProvider {
       }
       const html = await res.text();
       if (isAmazonBotChallenge(html)) {
+        markProviderDegraded('amazon: bot challenge');
         throw new ProviderThrottleError(undefined, 'bot challenge');
       }
       this.logger.log(
@@ -132,6 +156,7 @@ export class AmazonProvider implements IdentifiableProvider {
         );
         throw err;
       }
+      markProviderFailed(`amazon.${op}: unusable response`);
       this.logger.warn(
         `[amazon] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );

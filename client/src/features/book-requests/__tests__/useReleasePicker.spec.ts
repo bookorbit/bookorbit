@@ -5,7 +5,13 @@ import type { ReleaseCandidateItem, ReleaseFileInspection } from '@bookorbit/typ
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn<(url: string, init?: RequestInit) => Promise<Response>>() }))
 vi.mock('@/lib/api', () => ({ api: apiMock }))
 
-import { TITLE_AUTHOR_SEARCH_KEY, useReleasePicker } from '../composables/useReleasePicker'
+import {
+  TITLE_AUTHOR_SEARCH_KEY,
+  clearReleaseSearchCache,
+  peekReleaseSearch,
+  prefetchReleaseSearch,
+  useReleasePicker,
+} from '../composables/useReleasePicker'
 
 function ok(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response
@@ -59,6 +65,7 @@ const inspection: ReleaseFileInspection = {
 describe('useReleasePicker', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearReleaseSearchCache()
     apiMock.mockResolvedValue(ok(inspection))
   })
 
@@ -316,6 +323,8 @@ describe('useReleasePicker', () => {
 describe('useReleasePicker out-of-order searches', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    apiMock.mockReset()
+    clearReleaseSearchCache()
   })
 
   function deferred() {
@@ -355,5 +364,94 @@ describe('useReleasePicker out-of-order searches', () => {
 
     expect(picker.releases.value).toEqual([])
     expect(picker.searched.value).toBe(false)
+  })
+
+  /** The picker for a pair searches both halves on open, and the trackers must only be asked once. */
+  describe('a default search shared across pickers', () => {
+    it('answers from a search already started ahead of time instead of asking again', async () => {
+      const found = deferred()
+      apiMock.mockImplementationOnce(() => found.pending)
+      prefetchReleaseSearch(true, 11)
+      const picker = useReleasePicker(() => true)
+
+      const loaded = picker.fetchReleases(11)
+      found.release(searchResult({ releases: [release] }))
+
+      await expect(loaded).resolves.toBe(true)
+      expect(apiMock).toHaveBeenCalledTimes(1)
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/admin/book-requests/11/releases')
+      expect(picker.releases.value).toEqual([release])
+    })
+
+    it('shows a search it already has in the same tick, without a loading state', async () => {
+      apiMock.mockResolvedValue(ok(searchResult({ releases: [release, release] })))
+      await useReleasePicker(() => true).fetchReleases(11)
+      const picker = useReleasePicker(() => true)
+
+      void picker.fetchReleases(11)
+
+      expect(picker.releases.value).toHaveLength(2)
+      expect(picker.loading.value).toBe(false)
+      // A list shown again from memory is one already searched, and the note says so.
+      expect(picker.cached.value).toBe(true)
+      expect(apiMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows the list last on screen when a half is opened again, a changed search included', async () => {
+      apiMock.mockResolvedValueOnce(ok(searchResult({ releases: [release] })))
+      const first = useReleasePicker(() => true)
+      await first.fetchReleases(11)
+      const narrowed = [{ indexerId: 3, guid: 'narrowed' } as ReleaseCandidateItem]
+      apiMock.mockResolvedValueOnce(ok(searchResult({ activeIsbn: '9781250301697', releases: narrowed })))
+      await first.fetchReleases(11, { overrides: { isbn: '9781250301697' } })
+
+      const again = useReleasePicker(() => true)
+      void again.fetchReleases(11)
+
+      expect(again.releases.value).toEqual(narrowed)
+      expect(apiMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('asks the trackers again when the search is refreshed', async () => {
+      apiMock.mockResolvedValue(ok(searchResult({ releases: [release] })))
+      const picker = useReleasePicker(() => true)
+      await picker.fetchReleases(11)
+
+      await picker.fetchReleases(11, { refresh: true })
+
+      expect(apiMock).toHaveBeenLastCalledWith('/api/v1/admin/book-requests/11/releases?refresh=true')
+      expect(apiMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('says a search is running, then how many releases it found', async () => {
+      const found = deferred()
+      apiMock.mockImplementationOnce(() => found.pending)
+
+      prefetchReleaseSearch(true, 11)
+      expect(peekReleaseSearch(true, 11)).toEqual({ searching: true, count: null })
+
+      found.release(searchResult({ releases: [release, release, release] }))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(peekReleaseSearch(true, 11)).toEqual({ searching: false, count: 3 })
+    })
+
+    it('forgets a failed search, so the next look asks again', async () => {
+      apiMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) } as Response)
+      prefetchReleaseSearch(true, 11)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(peekReleaseSearch(true, 11)).toEqual({ searching: false, count: null })
+
+      apiMock.mockResolvedValueOnce(ok(searchResult({ releases: [release] })))
+      await useReleasePicker(() => true).fetchReleases(11)
+      expect(apiMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('keeps a self-fulfiller and a moderator apart, since they search different endpoints', async () => {
+      apiMock.mockResolvedValue(ok(searchResult({ releases: [release] })))
+      prefetchReleaseSearch(true, 11)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(peekReleaseSearch(false, 11)).toEqual({ searching: false, count: null })
+    })
   })
 })

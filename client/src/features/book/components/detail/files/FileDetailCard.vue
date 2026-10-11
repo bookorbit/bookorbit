@@ -119,25 +119,25 @@ function handleCopyPath() {
           <div class="mt-2 flex flex-wrap items-center gap-1.5">
             <span
               v-if="file.role === 'primary'"
-              class="inline-flex h-[18px] items-center rounded bg-primary/15 px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-primary"
+              class="inline-flex h-[18px] items-center rounded-xs bg-primary/15 px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-primary"
             >
               {{ t('book.detail.files.roles.primary') }}
             </span>
             <span
               v-if="isWriteTarget"
-              class="inline-flex h-[18px] items-center rounded bg-success/15 px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-success"
+              class="inline-flex h-[18px] items-center rounded-xs bg-success/15 px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-success"
             >
               {{ t('book.detail.files.writeTarget') }}
             </span>
             <span
               v-else-if="writeSkipLabel"
-              class="inline-flex min-h-[18px] items-center rounded bg-muted px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground"
+              class="inline-flex min-h-[18px] items-center rounded-xs bg-muted px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground"
             >
               {{ writeSkipLabel }}
             </span>
             <span
               v-if="isAudioTrack"
-              class="inline-flex h-[18px] items-center rounded bg-muted px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground tabular-nums"
+              class="inline-flex h-[18px] items-center rounded-xs bg-muted px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground tabular-nums"
             >
               {{ t('book.detail.files.trackOf', { track: file.track, total: audioFiles.length }) }}
             </span>
@@ -150,7 +150,7 @@ function handleCopyPath() {
           <bdi>{{ file.absolutePath }}</bdi>
         </code>
         <button
-          class="inline-flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="inline-flex size-[22px] shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :aria-label="t('book.detail.files.copyPath')"
           @click="handleCopyPath"
         >

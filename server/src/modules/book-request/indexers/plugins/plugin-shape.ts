@@ -1,4 +1,7 @@
-import { BOOK_REQUEST_MEDIA_KINDS } from '@bookorbit/types';
+import { BOOK_REQUEST_MEDIA_KINDS, type LegacyBookRequestMediaKind } from '@bookorbit/types';
+
+/** What a plugin may declare: today's media, plus the retired one older plugins still list. */
+const PLUGIN_DECLARABLE_MEDIA_KINDS: readonly string[] = [...BOOK_REQUEST_MEDIA_KINDS, 'comic' satisfies LegacyBookRequestMediaKind];
 import type { PluginSettingsField, PluginUpdateChannel } from '@bookorbit/plugin-api';
 
 /** Bumped when a change to the contract would break a plugin written against the old one. */
@@ -61,7 +64,12 @@ export function assertPluginShape(plugin: DeclaredPluginShape): void {
     throw new Error('it declares no media kinds');
   }
   for (const kind of plugin.mediaKinds) {
-    if (!(BOOK_REQUEST_MEDIA_KINDS as readonly string[]).includes(kind as string)) throw new Error(`"${String(kind)}" is not a media kind`);
+    if (!(PLUGIN_DECLARABLE_MEDIA_KINDS as readonly string[]).includes(kind as string)) throw new Error(`"${String(kind)}" is not a media kind`);
+  }
+  // Plugins are released apart from BookOrbit, so one written before comics were retired still
+  // declares them. That is accepted and ignored; a plugin left with nothing else serves nothing.
+  if (!plugin.mediaKinds.some((kind) => (BOOK_REQUEST_MEDIA_KINDS as readonly string[]).includes(kind as string))) {
+    throw new Error('it only serves media BookOrbit no longer requests');
   }
 
   // Declaring both would leave the grab path guessing which one a release meant.

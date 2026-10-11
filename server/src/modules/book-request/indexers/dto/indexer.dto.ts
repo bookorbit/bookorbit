@@ -57,13 +57,6 @@ class IndexerCategoriesDto {
   @IsInt({ each: true })
   @Min(0, { each: true })
   audiobook?: number[];
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(30)
-  @IsInt({ each: true })
-  @Min(0, { each: true })
-  comic?: number[];
 }
 
 /**

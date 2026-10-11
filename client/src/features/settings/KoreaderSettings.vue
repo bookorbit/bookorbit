@@ -40,6 +40,10 @@ import type {
 } from '@bookorbit/types'
 import SettingsTabs from './components/SettingsTabs.vue'
 import KoreaderCredentialsDialog from './KoreaderCredentialsDialog.vue'
+import KoreaderDeliverySettings from './KoreaderDeliverySettings.vue'
+import ReadAloudDeliverySelect from '@/features/delivery/components/ReadAloudDeliverySelect.vue'
+import { useReadAloudDelivery } from '@/features/delivery/composables/useReadAloudDelivery'
+import type { ReadAloudDeliveryPreference } from '@bookorbit/types'
 import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -170,6 +174,9 @@ onUnmounted(() => {
 })
 
 const syncUrl = computed(() => new URL('/api/v1/koreader', getSyncUrl()).toString())
+const { supported: deliverySupported } = useReadAloudDelivery('koreader-delivery-settings')
+const newReadAloudDelivery = ref<ReadAloudDeliveryPreference>('audioless_epub')
+
 const hasCredentials = computed(() => !!credentials.value)
 const activeDevices = computed(() => (syncStatus.value?.devices ?? []).filter((device) => device.retiredAt === null))
 const retiredDevices = computed(() => (syncStatus.value?.devices ?? []).filter((device) => device.retiredAt !== null))
@@ -343,6 +350,7 @@ async function handleCreate() {
     await createCredentials({
       username: newUsername.value,
       password: newPassword.value,
+      ...(deliverySupported.value ? { readAloudDelivery: newReadAloudDelivery.value } : {}),
     })
     showSetupForm.value = false
     helpOpen.value = false
@@ -722,6 +730,7 @@ async function handleDownloadPlugin() {
           <p class="text-xs text-muted-foreground">
             {{ t('settings.reader.koreader.createFormHint') }}
           </p>
+          <ReadAloudDeliverySelect v-if="deliverySupported" v-model="newReadAloudDelivery" :disabled="creating" explicit-only />
           <div>
             <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('settings.reader.koreader.username') }}</label>
             <input
@@ -1022,6 +1031,14 @@ async function handleDownloadPlugin() {
             </div>
           </div>
         </div>
+
+        <KoreaderDeliverySettings
+          v-if="deliverySupported"
+          :credentials="credentials"
+          :devices="syncStatus?.devices ?? []"
+          :sweeps="syncStatus?.sweeps ?? []"
+          @updated="handleRefresh"
+        />
 
         <div class="mb-8">
           <p class="settings-group-label">

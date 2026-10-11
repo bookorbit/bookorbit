@@ -29,6 +29,6 @@ import { DevicePositionRebuilderRegistry } from './device-position-rebuilder';
     AnnotationHubService,
     DevicePositionRebuilderRegistry,
   ],
-  exports: [AnnotationSyncService, AnnotationHubService, DevicePositionRebuilderRegistry],
+  exports: [AnnotationSyncService, AnnotationHubService, AnnotationConversionService, DevicePositionRebuilderRegistry],
 })
 export class AnnotationModule {}

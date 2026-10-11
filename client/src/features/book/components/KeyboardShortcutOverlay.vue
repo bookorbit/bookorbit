@@ -68,7 +68,7 @@ const sections = computed(() => [
                     <kbd
                       v-for="key in shortcut.keys"
                       :key="key"
-                      class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 rounded border border-border bg-muted/50 text-xs font-mono text-muted-foreground"
+                      class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 rounded-xs border border-border bg-muted/50 text-xs font-mono text-muted-foreground"
                     >
                       {{ key }}
                     </kbd>

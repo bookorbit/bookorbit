@@ -1,6 +1,14 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { COVER_MEDIA, isAudioFormat, type BookCard, type BookCoverSlot, type CoverMedia, type CoverMedium } from '@bookorbit/types';
+import {
+  COVER_MEDIA,
+  isAudioFormat,
+  type BookCard,
+  type BookCoverSlot,
+  type CoverAspectRatio,
+  type CoverMedia,
+  type CoverMedium,
+} from '@bookorbit/types';
 import { randomUUID } from 'crypto';
 import { access, copyFile, cp, link, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'fs/promises';
 import { basename, join } from 'path';
@@ -23,7 +31,9 @@ import { BookCoverEventsService } from './book-cover-events.service';
 import { classifyCoverShape } from './cover-shape';
 import {
   BookCoverStoreRepository,
+  getCoverMediaFromDatabaseFiles,
   type BookCoverContext,
+  type BookCoverFaceRow,
   type BookCoverOrigin,
   type BookCoverSlotRow,
   type BookCoverSource,
@@ -42,6 +52,13 @@ type SaveOptions = {
 };
 
 type SlotStateOptions = { backfill?: boolean };
+
+export type BookCoverFaceInput = Omit<BookCoverFaceRow, 'bookId' | 'primaryFormat'> & {
+  primaryFormat: string | null | undefined;
+  slots: readonly BookCoverSlotRow[];
+};
+
+export type BookCoverFace = { coverAspectRatio: CoverAspectRatio; coverVersion: string };
 
 // A grid of books with missing thumbnails would otherwise resize every cover at once.
 const THUMBNAIL_REPAIR_CONCURRENCY = 4;
@@ -368,18 +385,7 @@ export class BookCoverStore {
 
   async faceMediumFor(bookId: number): Promise<CoverMedium> {
     const context = await this.requireContext(bookId);
-    const preferred = this.faceMedium(context);
-    const alternate = preferred === 'ebook' ? 'audio' : 'ebook';
-    const active = new Set(
-      context.slots
-        .filter((slot) => slot.dormantSince === null && this.mediumIsActive(slot.medium as CoverMedium, context.media))
-        .map((slot) => slot.medium as CoverMedium),
-    );
-    if (active.has(preferred)) return preferred;
-    if (active.has(alternate)) return alternate;
-    if (this.mediumIsActive(preferred, context.media)) return preferred;
-    if (this.mediumIsActive(alternate, context.media)) return alternate;
-    return preferred;
+    return this.servedFace(this.faceMedium(context), context.slots, context.media);
   }
 
   async mediaFor(bookId: number): Promise<CoverMedia> {
@@ -387,6 +393,12 @@ export class BookCoverStore {
   }
 
   /** Whether the slot is filled and served, after bringing a legacy root cover into its slot. */
+  /** Whether the slot holds no cover at all: not an active one, and not one resting dormant either. */
+  async slotIsEmpty(bookId: number, medium: CoverMedium): Promise<boolean> {
+    const context = await this.convertedContext(bookId);
+    return !context.slots.some((slot) => slot.medium === medium);
+  }
+
   async hasActiveSlot(bookId: number, medium: CoverMedium): Promise<boolean> {
     const context = await this.convertedContext(bookId);
     return context.slots.some((slot) => slot.medium === medium && slot.dormantSince === null) && this.mediumIsActive(medium, context.media);
@@ -410,10 +422,55 @@ export class BookCoverStore {
     return this.repository.slotsFor(bookIds);
   }
 
-  async enrichCardVersions(cards: BookCard[]): Promise<void> {
+  /**
+   * The cover a book shows when no medium is asked for, as the frame it is drawn in and its cache
+   * key. The face follows the primary file's medium, so an audiobook-primary book shows square art
+   * in any library; only a book with no content file takes its library's shape. The frame follows
+   * the slot actually served, so a book whose preferred slot is empty is framed for its fallback.
+   */
+  faceOf(input: BookCoverFaceInput): BookCoverFace {
+    const preferred = this.preferredFace(input.libraryCoverAspectRatio, input.primaryFormat);
+    return {
+      coverAspectRatio: this.servedFace(preferred, input.slots, input.media) === 'audio' ? '1/1' : '2/3',
+      coverVersion: this.coverVersion(preferred, input.slots, input.legacyVersion),
+    };
+  }
+
+  faceForContext(context: BookCoverContext, legacyVersion: string): BookCoverFace {
+    return this.faceOf({
+      libraryCoverAspectRatio: context.coverAspectRatio,
+      primaryFormat: this.primaryFile(context)?.format,
+      media: context.media,
+      slots: context.slots,
+      legacyVersion,
+    });
+  }
+
+  /** Faces for rows that carry no files of their own: two queries, whatever the number of books. */
+  async facesFor(bookIds: readonly number[]): Promise<Map<number, BookCoverFace>> {
+    const ids = [...new Set(bookIds)];
+    const faces = new Map<number, BookCoverFace>();
+    if (ids.length === 0) return faces;
+    const [rows, slotsByBookId] = await Promise.all([this.repository.findFaceRows(ids), this.repository.slotsFor(ids)]);
+    for (const row of rows) faces.set(row.bookId, this.faceOf({ ...row, slots: slotsByBookId.get(row.bookId) ?? [] }));
+    return faces;
+  }
+
+  /** Cards arrive carrying their library's shape, which this replaces with the shape of their face. */
+  async enrichCardFaces(cards: BookCard[]): Promise<void> {
     const slotsByBookId = await this.repository.slotsFor(cards.map((card) => card.id));
     for (const card of cards) {
-      card.coverVersion = this.coverVersion(card.coverAspectRatio, slotsByBookId.get(card.id) ?? [], card.updatedAt ?? card.addedAt);
+      const face = this.faceOf({
+        libraryCoverAspectRatio: card.coverAspectRatio,
+        primaryFormat: card.files.find((file) => file.role === 'primary')?.format,
+        media: getCoverMediaFromDatabaseFiles(
+          card.files.map((file) => ({ format: file.format, role: file.role, mediaOverlayAvailable: file.mediaOverlay?.available === true })),
+        ),
+        slots: slotsByBookId.get(card.id) ?? [],
+        legacyVersion: card.updatedAt ?? card.addedAt,
+      });
+      card.coverAspectRatio = face.coverAspectRatio;
+      card.coverVersion = face.coverVersion;
     }
   }
 
@@ -424,9 +481,8 @@ export class BookCoverStore {
     };
   }
 
-  coverVersion(coverAspectRatio: string, slots: readonly BookCoverSlotRow[], legacyVersion: string): string {
+  private coverVersion(face: CoverMedium, slots: readonly BookCoverSlotRow[], legacyVersion: string): string {
     if (slots.length === 0) return `legacy:${legacyVersion}`;
-    const face: CoverMedium = coverAspectRatio === '1/1' ? 'audio' : 'ebook';
     const other: CoverMedium = face === 'ebook' ? 'audio' : 'ebook';
     const stamp = (medium: CoverMedium) => slots.find((slot) => slot.medium === medium && slot.dormantSince === null)?.updatedAt.toISOString() ?? '-';
     return `${face}:${stamp(face)}:${stamp(other)}`;
@@ -616,8 +672,12 @@ export class BookCoverStore {
   }
 
   private primaryMedium(context: BookCoverContext): CoverMedium {
-    const primary = context.files.find((file) => file.id === context.primaryFileId) ?? context.files.find((file) => this.isContent(file.role));
+    const primary = this.primaryFile(context);
     return primary?.format ? this.formatMedium(primary.format) : 'ebook';
+  }
+
+  private primaryFile(context: Pick<BookCoverContext, 'files' | 'primaryFileId'>): BookCoverContext['files'][number] | undefined {
+    return context.files.find((file) => file.id === context.primaryFileId) ?? context.files.find((file) => this.isContent(file.role));
   }
 
   private isContent(role: string): boolean {
@@ -691,8 +751,25 @@ export class BookCoverStore {
     return [face, face === 'ebook' ? 'audio' : 'ebook'];
   }
 
-  private faceMedium(context: Pick<BookCoverContext, 'coverAspectRatio'>): CoverMedium {
-    return context.coverAspectRatio === '1/1' ? 'audio' : 'ebook';
+  private faceMedium(context: BookCoverContext): CoverMedium {
+    return this.preferredFace(context.coverAspectRatio, this.primaryFile(context)?.format);
+  }
+
+  private preferredFace(libraryCoverAspectRatio: string, primaryFormat: string | null | undefined): CoverMedium {
+    if (primaryFormat) return this.formatMedium(primaryFormat);
+    return libraryCoverAspectRatio === '1/1' ? 'audio' : 'ebook';
+  }
+
+  /** The preferred slot when it holds art, else the other one; with no art at all, a medium the book has. */
+  private servedFace(preferred: CoverMedium, slots: readonly BookCoverSlotRow[], media: CoverMedia): CoverMedium {
+    const alternate: CoverMedium = preferred === 'ebook' ? 'audio' : 'ebook';
+    const filled = (medium: CoverMedium) =>
+      this.mediumIsActive(medium, media) && slots.some((slot) => slot.medium === medium && slot.dormantSince === null);
+    if (filled(preferred)) return preferred;
+    if (filled(alternate)) return alternate;
+    if (this.mediumIsActive(preferred, media)) return preferred;
+    if (this.mediumIsActive(alternate, media)) return alternate;
+    return preferred;
   }
 
   private mediumIsActive(medium: CoverMedium, media: CoverMedia): boolean {

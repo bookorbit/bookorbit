@@ -254,6 +254,8 @@ function DetailTapLineWidget:onTapSelect()
     return true
 end
 
+local Delivery = require("bookorbit_delivery")
+
 local CatalogDetail = {}
 
 -- A trailing ".0" is noise on a series index: #3, not #3.0.
@@ -423,7 +425,7 @@ function CatalogDetail:detailCache()
 end
 
 function CatalogDetail:cachedBookDetail(book_id)
-    local entry = self:detailCache()[tostring(book_id)]
+    local entry = self:detailCache()[Delivery.key(self.client) .. "|" .. Delivery.preference(self.settings, self.client) .. "|" .. tostring(book_id)]
     if type(entry) == "table" and type(entry.detail) == "table" then
         return entry.detail
     end
@@ -433,7 +435,7 @@ end
 function CatalogDetail:cacheBookDetail(detail)
     if type(detail) ~= "table" or detail.id == nil then return end
     local cache = self:detailCache()
-    cache[tostring(detail.id)] = {
+    cache[Delivery.key(self.client) .. "|" .. Delivery.preference(self.settings, self.client) .. "|" .. tostring(detail.id)] = {
         detail = detail,
         cachedAt = os.time(),
     }
@@ -689,9 +691,7 @@ function CatalogDetail:showBookActionSheetForEntry(item)
         return
     end
     self:runConnected(function()
-        local detail, err = self:fetch(_("Loading book..."), function()
-            return self.client:catalogBook(book_id)
-        end)
+        local detail, err = self:fetchDeliveryBook(book_id)
         if not detail then
             if cached and err ~= "cancelled" then
                 self:showBookActionSheet(cached, {
@@ -819,9 +819,7 @@ function CatalogDetail:loadBookDetail(book_id)
         return
     end
     self:runConnected(function()
-        local detail, err = self:fetch(_("Loading book..."), function()
-            return self.client:catalogBook(book_id)
-        end)
+        local detail, err = self:fetchDeliveryBook(book_id)
         if not detail then
             if cached and err ~= "cancelled" then
                 self:showBookDetail(cached, { stale = true })

@@ -4,8 +4,8 @@ import { IndexerManagerRepository } from './indexer-manager.repository';
 import type { ProwlarrIndexer } from './prowlarr.client';
 
 const categories: Record<'torrent' | 'usenet', IndexerCategoryMap> = {
-  torrent: { ebook: [7020], audiobook: [3030], comic: [7030] },
-  usenet: { ebook: [7020], audiobook: [3030], comic: [7030] },
+  torrent: { ebook: [7020], audiobook: [3030] },
+  usenet: { ebook: [7020], audiobook: [3030] },
 };
 
 function source(id: number, color: RequestIndexerRow['color']): RequestIndexerRow {

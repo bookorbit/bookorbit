@@ -17,11 +17,21 @@ export const AUTHOR_ENRICHMENT_ACTIVE_STATUSES = ['queued', 'rate_limited'] as c
 
 export type AuthorEnrichmentQueueRow = typeof authorEnrichmentQueue.$inferSelect;
 
+export type AuthorEnrichmentEnqueueOptions = {
+  /** Enrich these authors without saved provider answers. Merged into rows already queued, never cleared by a later enqueue. */
+  ignoreCache?: boolean;
+};
+
 @Injectable()
 export class AuthorEnrichmentRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async upsertSchedule(authorIds: number[], reason: AuthorEnrichmentReason, batchSize = DEFAULT_SCHEDULE_BATCH_SIZE): Promise<number> {
+  async upsertSchedule(
+    authorIds: number[],
+    reason: AuthorEnrichmentReason,
+    options: AuthorEnrichmentEnqueueOptions = {},
+    batchSize = DEFAULT_SCHEDULE_BATCH_SIZE,
+  ): Promise<number> {
     const uniqueAuthorIds = [...new Set(authorIds)].filter((id) => Number.isInteger(id) && id > 0);
     if (uniqueAuthorIds.length === 0) return 0;
 
@@ -32,13 +42,13 @@ export class AuthorEnrichmentRepository {
     let totalTouched = 0;
     for (let offset = 0; offset < uniqueAuthorIds.length; offset += resolvedBatchSize) {
       const batch = uniqueAuthorIds.slice(offset, offset + resolvedBatchSize);
-      totalTouched += await this.upsertScheduleBatch(batch, reason, now);
+      totalTouched += await this.upsertScheduleBatch(batch, reason, now, options.ignoreCache === true);
     }
 
     return totalTouched;
   }
 
-  private async upsertScheduleBatch(authorIds: number[], reason: AuthorEnrichmentReason, now: Date): Promise<number> {
+  private async upsertScheduleBatch(authorIds: number[], reason: AuthorEnrichmentReason, now: Date, ignoreCache: boolean): Promise<number> {
     const touched = await this.db
       .insert(authorEnrichmentQueue)
       .values(
@@ -48,6 +58,7 @@ export class AuthorEnrichmentRepository {
           reason,
           attemptCount: 0,
           nextAttemptAt: now,
+          ...(ignoreCache ? { ignoreCache: true } : {}),
         })),
       )
       .onConflictDoUpdate({
@@ -58,15 +69,28 @@ export class AuthorEnrichmentRepository {
           attemptCount: 0,
           nextAttemptAt: now,
           updatedAt: now,
+          ...(ignoreCache ? { ignoreCache: true } : {}),
         },
         setWhere: eq(authorEnrichmentQueue.status, 'failed'),
       })
       .returning({ authorId: authorEnrichmentQueue.authorId });
 
+    // Rows still waiting are left as they are by the upsert above; they only gain the flag.
+    if (ignoreCache) {
+      await this.db
+        .update(authorEnrichmentQueue)
+        .set({ ignoreCache: true, updatedAt: now })
+        .where(and(inArray(authorEnrichmentQueue.authorId, authorIds), eq(authorEnrichmentQueue.ignoreCache, false)));
+    }
+
     return touched.length;
   }
 
-  async enqueueAllLinkedAuthors(reason: AuthorEnrichmentReason, batchSize = DEFAULT_SCHEDULE_BATCH_SIZE): Promise<number> {
+  async enqueueAllLinkedAuthors(
+    reason: AuthorEnrichmentReason,
+    options: AuthorEnrichmentEnqueueOptions = {},
+    batchSize = DEFAULT_SCHEDULE_BATCH_SIZE,
+  ): Promise<number> {
     const resolvedBatchSize = resolveBatchSize(batchSize);
     if (!resolvedBatchSize) return 0;
 
@@ -86,6 +110,7 @@ export class AuthorEnrichmentRepository {
       totalQueued += await this.upsertSchedule(
         rows.map((row) => row.authorId),
         reason,
+        options,
         resolvedBatchSize,
       );
       cursorAuthorId = rows[rows.length - 1]!.authorId;
@@ -124,6 +149,7 @@ export class AuthorEnrichmentRepository {
   async enqueueEligibleLinkedAuthors(
     reason: AuthorEnrichmentReason,
     conditions: AuthorEnrichmentConditions,
+    options: AuthorEnrichmentEnqueueOptions = {},
     batchSize = DEFAULT_SCHEDULE_BATCH_SIZE,
   ): Promise<number> {
     const eligibility = this.buildEligibilityPredicate(conditions);
@@ -149,6 +175,7 @@ export class AuthorEnrichmentRepository {
       totalQueued += await this.upsertSchedule(
         rows.map((row) => row.authorId),
         reason,
+        options,
         resolvedBatchSize,
       );
       cursorAuthorId = rows[rows.length - 1]!.authorId;

@@ -73,6 +73,8 @@ describe('AuthorEnrichmentExecutorService', () => {
         [AuthorMetadataProviderKey.AUDNEXUS, AUDNEXUS],
       ]),
       failures: [],
+      cacheServed: [],
+      outboundRequests: 4,
     });
   });
 
@@ -121,6 +123,8 @@ describe('AuthorEnrichmentExecutorService', () => {
         [AuthorMetadataProviderKey.GOODREADS, GOODREADS],
       ]),
       failures: [],
+      cacheServed: [],
+      outboundRequests: 4,
     });
     const preferences = prefs({
       description: { providers: [AuthorMetadataProviderKey.AUDNEXUS, AuthorMetadataProviderKey.GOODREADS] },
@@ -205,7 +209,7 @@ describe('AuthorEnrichmentExecutorService', () => {
   });
 
   it('reports no_match when no provider returned a candidate', async () => {
-    metadataFetch.collectByProvider.mockResolvedValue({ candidates: new Map(), failures: [] });
+    metadataFetch.collectByProvider.mockResolvedValue({ candidates: new Map(), failures: [], cacheServed: [], outboundRequests: 2 });
 
     const result = await service.execute({ authorId: 5, preferences: prefs() });
 
@@ -216,6 +220,8 @@ describe('AuthorEnrichmentExecutorService', () => {
     metadataFetch.collectByProvider.mockResolvedValue({
       candidates: new Map(),
       failures: [{ provider: AuthorMetadataProviderKey.GOODREADS, message: 'boom', httpStatus: 429, retryAfterMs: 1000, transient: true }],
+      cacheServed: [],
+      outboundRequests: 1,
     });
 
     const result = await service.execute({ authorId: 5, preferences: prefs() });
@@ -237,5 +243,88 @@ describe('AuthorEnrichmentExecutorService', () => {
     expect(imageStorage.saveFromUrl).toHaveBeenCalledWith(5, 'https://img.example/goodreads.jpg');
     expect(result).toMatchObject({ kind: 'done', imageUpdated: true });
     expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(5, expect.objectContaining({ hasPhoto: true }));
+  });
+
+  describe('metadata cache', () => {
+    const CACHED = { provider: AuthorMetadataProviderKey.GOODREADS, source: 'cache', stale: false, cachedAt: '2026-09-01T00:00:00.000Z' };
+
+    it('stays live without fallback when no directive is given', async () => {
+      await service.execute({ authorId: 5, preferences: prefs() });
+
+      expect(metadataFetch.collectByProvider).toHaveBeenCalledWith(expect.objectContaining({ name: 'Jane Doe' }), expect.any(Array), {
+        policy: 'refresh',
+        allowFallback: false,
+      });
+    });
+
+    it('passes the caller directive to the metadata fetch', async () => {
+      await service.execute({ authorId: 5, preferences: prefs() }, { policy: 'default', allowFallback: true });
+
+      expect(metadataFetch.collectByProvider).toHaveBeenCalledWith(expect.anything(), expect.anything(), { policy: 'default', allowFallback: true });
+    });
+
+    it('reports provider requests plus portrait downloads and the cache provenance', async () => {
+      metadataFetch.collectByProvider.mockResolvedValue({
+        candidates: new Map([[AuthorMetadataProviderKey.GOODREADS, GOODREADS]]),
+        failures: [],
+        cacheServed: [CACHED],
+        outboundRequests: 0,
+      });
+
+      const result = await service.execute({ authorId: 5, preferences: prefs() });
+
+      expect(imageStorage.saveFromUrl).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ kind: 'done', outboundRequests: 1, cacheServed: [CACHED] });
+    });
+
+    it('reports zero outbound requests when the cache answered and no portrait was needed', async () => {
+      authorsRepo.findByIdForEnrichment.mockResolvedValue({ id: 5, name: 'Jane Doe', description: 'Existing bio', hasPhoto: true, bookCount: 3 });
+      metadataFetch.collectByProvider.mockResolvedValue({
+        candidates: new Map([[AuthorMetadataProviderKey.GOODREADS, GOODREADS]]),
+        failures: [],
+        cacheServed: [CACHED],
+        outboundRequests: 0,
+      });
+
+      const result = await service.execute({ authorId: 5, preferences: prefs() });
+
+      expect(imageStorage.saveFromUrl).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ kind: 'done', outboundRequests: 0 });
+    });
+
+    it('counts every portrait download attempt, including ones that stored nothing or failed', async () => {
+      imageStorage.saveFromUrl.mockResolvedValueOnce(false).mockRejectedValueOnce(new AuthorImageStorageError('down', { transient: true }));
+
+      const result = await service.execute({
+        authorId: 5,
+        preferences: prefs({ photo: { providers: [AuthorMetadataProviderKey.AUDNEXUS, AuthorMetadataProviderKey.GOODREADS] } }),
+      });
+
+      expect(result).toMatchObject({ kind: 'failed', outboundRequests: 6 });
+    });
+
+    it('reports no outbound requests for authors skipped before any fetch', async () => {
+      authorsRepo.findByIdForEnrichment.mockResolvedValue(null);
+
+      await expect(service.execute({ authorId: 5, preferences: prefs() })).resolves.toMatchObject({ outboundRequests: 0, cacheServed: [] });
+    });
+
+    it('carries provenance on no-match and failure results', async () => {
+      metadataFetch.collectByProvider.mockResolvedValueOnce({ candidates: new Map(), failures: [], cacheServed: [CACHED], outboundRequests: 0 });
+      await expect(service.execute({ authorId: 5, preferences: prefs() })).resolves.toMatchObject({
+        kind: 'skipped',
+        reason: 'no_match',
+        outboundRequests: 0,
+        cacheServed: [CACHED],
+      });
+
+      metadataFetch.collectByProvider.mockResolvedValueOnce({
+        candidates: new Map(),
+        failures: [{ provider: AuthorMetadataProviderKey.GOODREADS, message: 'boom', httpStatus: 503, retryAfterMs: null, transient: true }],
+        cacheServed: [],
+        outboundRequests: 2,
+      });
+      await expect(service.execute({ authorId: 5, preferences: prefs() })).resolves.toMatchObject({ kind: 'failed', outboundRequests: 2 });
+    });
   });
 });

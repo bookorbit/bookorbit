@@ -52,12 +52,12 @@ describe('KoreaderCatalogController', () => {
     expect(catalogService.getDashboard).toHaveBeenCalledWith(user, undefined);
     expect(catalogService.getSectionEntries).toHaveBeenCalledWith(user, 'libraries', sectionQuery);
     expect(catalogService.getBooksPage).toHaveBeenCalledWith(user, query);
-    expect(catalogService.getBookDetail).toHaveBeenCalledWith(user, 10, 'device-1');
+    expect(catalogService.getBookDetail).toHaveBeenCalledWith(user, 10, 'device-1', undefined);
     expect(catalogService.getBulkManifest).toHaveBeenCalledWith(user, manifestQuery);
     expect(catalogService.setReadStatus).toHaveBeenCalledWith(user, 10, 'reading');
     expect(catalogService.setRating).toHaveBeenCalledWith(user, 10, 4);
     expect(catalogService.streamThumbnail).toHaveBeenCalledWith(user, 10, reply, '"etag"');
-    expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply);
+    expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply, undefined, undefined);
   });
 
   it('forwards an unread reset rather than treating it as a missing status', async () => {

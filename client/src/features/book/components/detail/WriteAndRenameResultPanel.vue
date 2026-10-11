@@ -86,7 +86,7 @@ function handleDismiss() {
           <span>{{ autoDisabledWarning }}</span>
         </div>
       </div>
-      <button class="shrink-0 rounded p-0.5 hover:bg-muted transition-colors text-muted-foreground" @click="handleDismiss">
+      <button class="shrink-0 rounded-xs p-0.5 hover:bg-muted transition-colors text-muted-foreground" @click="handleDismiss">
         <X class="size-3.5" />
       </button>
     </div>

@@ -295,6 +295,11 @@ export class MetadataService {
     return coverShapeFromSize(width, height) === (medium === 'audio' ? 'square' : 'portrait') ? 'fits' : 'wrong_shape';
   }
 
+  /** Whether a book's cover slot for this medium holds nothing, active or dormant. */
+  async coverSlotIsEmpty(bookId: number, medium: CoverMedium): Promise<boolean> {
+    return this.coverStore.slotIsEmpty(bookId, medium);
+  }
+
   async saveExtractedCoverBytes(bookId: number, bytes: Buffer, medium?: CoverMedium): Promise<void> {
     const target = medium ?? (await this.coverStore.chooseWriteMedium(bookId, bytes));
     if (await this.persistCover(bookId, target, bytes, true, 'dock')) await this.scoreService.calculateAndSave(bookId);

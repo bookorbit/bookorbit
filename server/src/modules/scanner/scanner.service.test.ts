@@ -162,7 +162,7 @@ const mockMetadata = {
 function makeService(
   repo: ReturnType<typeof makeRepo>,
   autoFetchOrchestrator?: { scheduleImportedBooksIfEligible: (...args: unknown[]) => Promise<number> },
-  coverStore: { enrichCardVersions: (cards: unknown[]) => Promise<void> } = { enrichCardVersions: vi.fn().mockResolvedValue(undefined) },
+  coverStore: { enrichCardFaces: (cards: unknown[]) => Promise<void> } = { enrichCardFaces: vi.fn().mockResolvedValue(undefined) },
   coverReconciler?: { enqueue: (...args: unknown[]) => Promise<void>; enqueueExpiredDormant?: (libraryId: number) => Promise<void> },
 ) {
   const jobStore = new ScanJobStore();
@@ -1244,6 +1244,11 @@ describe('file identity resolution', () => {
   });
 
   it('backfills media-overlay capability when an unchanged EPUB has not been checked', async () => {
+    mockInspectMediaOverlayFields.mockResolvedValueOnce({
+      mediaOverlayAvailable: false,
+      mediaOverlayDurationSeconds: null,
+      mediaOverlayCheckedAt: new Date(),
+    });
     const mtime = new Date('2024-01-01T00:00:00Z');
     const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', sizeBytes: 1024, mtime });
     const repo = makeRepo({

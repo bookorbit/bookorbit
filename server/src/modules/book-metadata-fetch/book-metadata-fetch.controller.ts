@@ -7,6 +7,7 @@ import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.ser
 import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orchestrator.service';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
+import { TriggerBookMetadataFetchRunDto } from './dto/trigger-run.dto';
 import { PreviewCountDto, UpdateBookMetadataFetchConfigDto, UpdateLibraryBookMetadataFetchConfigDto } from './dto/update-config.dto';
 
 @Controller('book-metadata-fetch')
@@ -56,16 +57,16 @@ export class BookMetadataFetchController {
 
   @Post('run')
   @RequirePermission(Permission.ManageMetadataConfig)
-  async triggerGlobal() {
-    const queued = await this.orchestrator.triggerGlobal();
+  async triggerGlobal(@Body() dto: TriggerBookMetadataFetchRunDto) {
+    const queued = await this.orchestrator.triggerGlobal(dto?.ignoreCache === true);
     return { queued };
   }
 
   @Post('run/:libraryId')
   @RequirePermission(Permission.ManageMetadataConfig)
   @RequireLibraryType('books')
-  async triggerForLibrary(@Param('libraryId', ParseIntPipe) libraryId: number) {
-    const queued = await this.orchestrator.triggerForLibrary(libraryId);
+  async triggerForLibrary(@Param('libraryId', ParseIntPipe) libraryId: number, @Body() dto: TriggerBookMetadataFetchRunDto) {
+    const queued = await this.orchestrator.triggerForLibrary(libraryId, dto?.ignoreCache === true);
     return { queued };
   }
 

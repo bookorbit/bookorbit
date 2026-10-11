@@ -344,7 +344,7 @@ function togglePinned() {
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
+                      class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-destructive transition-all shrink-0"
                       @click.stop="deleteBookmark(bm.id)"
                     >
                       <Trash2 :size="13" />
@@ -395,7 +395,7 @@ function togglePinned() {
                 </select>
               </div>
               <label class="flex items-center gap-2 text-xs text-muted-foreground">
-                <input v-model="highlightNotesOnly" type="checkbox" class="h-3.5 w-3.5 rounded border-border accent-primary" />
+                <input v-model="highlightNotesOnly" type="checkbox" class="h-3.5 w-3.5 rounded-xs border-border accent-primary" />
                 {{ t('reader.sidebar.notesOnly') }}
                 <span class="ml-auto tabular-nums">{{ filteredAndSortedHighlights.length }}</span>
               </label>
@@ -431,7 +431,7 @@ function togglePinned() {
                     <TooltipTrigger as-child>
                       <button
                         type="button"
-                        class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
+                        class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-destructive transition-all shrink-0"
                         @click.stop="deleteAnnotation(ann.id)"
                       >
                         <Trash2 :size="13" />

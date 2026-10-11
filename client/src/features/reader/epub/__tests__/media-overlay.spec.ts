@@ -109,8 +109,11 @@ describe('Foliate MediaOverlay concurrency', () => {
       return load.promise
     })
     const overlay = makeOverlay(loadBlob)
-    const highlights: string[] = []
-    overlay.addEventListener('highlight', (event: Event) => highlights.push((event as CustomEvent<{ text: string }>).detail.text))
+    const highlights: { text: string; sectionIndex: number }[] = []
+    overlay.addEventListener('highlight', (event: Event) => {
+      const { text, sectionIndex } = (event as CustomEvent<{ text: string; sectionIndex: number }>).detail
+      highlights.push({ text, sectionIndex })
+    })
 
     const selectedStart = overlay.start(0, (item: { text: string }) => item.text.endsWith('#selected'))
     await vi.waitFor(() => expect(loads).toHaveLength(1))
@@ -126,7 +129,7 @@ describe('Foliate MediaOverlay concurrency', () => {
     expect(FakeAudio.instances).toHaveLength(1)
 
     FakeAudio.instances[0]!.emitCanPlayThrough()
-    expect(highlights).toEqual(['OPS/chapter.xhtml#top'])
+    expect(highlights).toEqual([{ text: 'OPS/chapter.xhtml#top', sectionIndex: 0 }])
 
     overlay.stop()
     expect(FakeAudio.instances[0]!.paused).toBe(true)

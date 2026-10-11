@@ -95,17 +95,26 @@ describe('BookMetadataFetchEligibilityService', () => {
     const config = baseConfig();
     config.conditions.missingFields.enabled = true;
 
-    const missingNarrators = { ...baseBook(), hasNarrators: false };
+    const missingNarrators = { ...baseBook(), hasAudioCoverMedia: true, hasNarrators: false };
     config.conditions.missingFields.fields = ['narrators'];
     expect(service.isEligible(missingNarrators, config)).toBe(true);
 
-    const missingDuration = { ...baseBook(), durationSeconds: null };
+    const missingDuration = { ...baseBook(), hasAudioCoverMedia: true, durationSeconds: null };
     config.conditions.missingFields.fields = ['duration'];
     expect(service.isEligible(missingDuration, config)).toBe(true);
 
-    const missingAbridged = { ...baseBook(), abridged: null };
+    const missingAbridged = { ...baseBook(), hasAudioCoverMedia: true, abridged: null };
     config.conditions.missingFields.fields = ['abridged'];
     expect(service.isEligible(missingAbridged, config)).toBe(true);
+  });
+
+  it('never counts narrators, duration or abridged as missing on a book without audio', () => {
+    const config = baseConfig();
+    config.conditions.missingFields.enabled = true;
+    config.conditions.missingFields.fields = ['narrators', 'duration', 'abridged'];
+
+    const ebook = { ...baseBook(), hasAudioCoverMedia: false, hasNarrators: false, durationSeconds: null, abridged: null };
+    expect(service.isEligible(ebook, config)).toBe(false);
   });
 
   it('treats a missing community rating as eligible', () => {

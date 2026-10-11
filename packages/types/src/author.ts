@@ -1,4 +1,5 @@
 import type { BooksPage } from "./book";
+import type { MetadataCandidateCacheInfo } from "./metadata-cache";
 import type { MergeStrategy } from "./metadata-preferences";
 
 export type AuthorSummary = {
@@ -81,6 +82,9 @@ export type AuthorMetadataCandidate = {
   genres?: string[];
   influences?: string[];
 };
+
+/** An author candidate as a search response or stream sends it; `cache` only when the cache answered. */
+export type AuthorMetadataSearchCandidateEvent = AuthorMetadataCandidate & { cache?: MetadataCandidateCacheInfo };
 
 export type AuthorMetadataProviderInfo = {
   key: AuthorMetadataProviderKey;

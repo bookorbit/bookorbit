@@ -93,6 +93,14 @@ export type BookCoverContext = {
   slots: BookCoverSlotRow[];
 };
 
+export type BookCoverFaceRow = {
+  bookId: number;
+  libraryCoverAspectRatio: string;
+  primaryFormat: string | null;
+  media: CoverMedia;
+  legacyVersion: string;
+};
+
 export type BookCoverSourceFile = {
   id: number;
   absolutePath: string;
@@ -203,6 +211,37 @@ export class BookCoverStoreRepository {
       result.set(row.bookId, list);
     }
     return result;
+  }
+
+  /** What `BookCoverStore.facesFor` needs per book, for lists that carry no files of their own. */
+  async findFaceRows(bookIds: readonly number[]): Promise<BookCoverFaceRow[]> {
+    if (bookIds.length === 0) return [];
+    const outer = outerBookIdSql(books.id);
+    const rows = await this.db
+      .select({
+        bookId: books.id,
+        coverAspectRatio: libraries.coverAspectRatio,
+        primaryFormat: sql<string | null>`coalesce(
+          ${bookFiles.format},
+          (select first_content.format from ${bookFiles} as first_content
+            where first_content.book_id = ${outer} and first_content.role in ('content', 'primary')
+            order by first_content.id limit 1)
+        )`,
+        updatedAt: books.updatedAt,
+        addedAt: books.addedAt,
+        ...coverMediaSql(books.id),
+      })
+      .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(inArray(books.id, [...bookIds]));
+    return rows.map((row) => ({
+      bookId: row.bookId,
+      libraryCoverAspectRatio: row.coverAspectRatio,
+      primaryFormat: row.primaryFormat,
+      media: { hasEbook: row.hasEbook, hasAudio: row.hasAudio },
+      legacyVersion: (row.updatedAt ?? row.addedAt).toISOString(),
+    }));
   }
 
   async applySlotMutation(

@@ -6,7 +6,7 @@ import type { FieldPreference, MetadataField, MetadataMergeStrategy, MetadataPro
 import { Button } from '@/components/ui/button'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import ProviderAddMenu from './ProviderAddMenu.vue'
-import { resolvedProviders, skippedProviders, skipReasonFor } from '../lib/field-rules'
+import { providerHasOtherShape, resolvedProviders, skippedProviders, skipReasonFor } from '../lib/field-rules'
 
 const { t } = useI18n()
 
@@ -38,13 +38,14 @@ const rows = computed(() =>
       index,
       label: status?.label ?? key,
       short: PROVIDER_SHORT_LABELS[key] ?? key,
-      skipReason: skipReasonFor(status),
+      skipReason: skipReasonFor(status, props.field, key),
+      otherShape: providerHasOtherShape(key, props.field),
     }
   }),
 )
 
-const resolved = computed(() => resolvedProviders(props.preference.providers, props.statuses))
-const skipped = computed(() => skippedProviders(props.preference.providers, props.statuses))
+const resolved = computed(() => resolvedProviders(props.preference.providers, props.statuses, props.field))
+const skipped = computed(() => skippedProviders(props.preference.providers, props.statuses, props.field))
 const providerLabel = (key: MetadataProviderKey) => props.statuses.find((entry) => entry.key === key)?.label ?? key
 
 const mergeOptions = computed(() =>
@@ -121,7 +122,7 @@ function handleClose() {
               {{ row.skipReason ? '-' : resolved.indexOf(row.key) + 1 }}
             </span>
             <span
-              class="inline-flex h-6 items-center rounded px-2 text-xs font-medium"
+              class="inline-flex h-6 items-center rounded-xs px-2 text-xs font-medium"
               :class="row.skipReason ? 'provider-chip-skipped' : 'provider-chip'"
               :style="row.skipReason ? undefined : providerChipStyle(row.key)"
             >
@@ -129,6 +130,9 @@ function handleClose() {
             </span>
             <span v-if="row.skipReason" class="truncate text-xs text-warning">
               {{ t(`settings.metadata.fieldRules.providerState.${row.skipReason}`) }}
+            </span>
+            <span v-else-if="row.otherShape" class="truncate text-xs text-muted-foreground">
+              {{ t('settings.metadata.fieldRules.providerState.otherShape') }}
             </span>
             <div class="ml-auto flex shrink-0 items-center gap-0.5">
               <Button
@@ -169,7 +173,14 @@ function handleClose() {
         </p>
 
         <div class="mt-3">
-          <ProviderAddMenu :assigned="preference.providers" :statuses="statuses" :disabled="saving" :field-label="fieldLabel" @add="addProvider" />
+          <ProviderAddMenu
+            :assigned="preference.providers"
+            :statuses="statuses"
+            :disabled="saving"
+            :field-label="fieldLabel"
+            :field="field"
+            @add="addProvider"
+          />
         </div>
       </section>
 
@@ -209,7 +220,7 @@ function handleClose() {
             <div v-if="resolved.length" class="mt-2.5 flex flex-wrap items-center gap-1.5">
               <template v-for="(key, index) in resolved" :key="key">
                 <ArrowRight v-if="index > 0" :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span class="provider-chip inline-flex h-6 items-center rounded px-2 text-xs font-medium" :style="providerChipStyle(key)">
+                <span class="provider-chip inline-flex h-6 items-center rounded-xs px-2 text-xs font-medium" :style="providerChipStyle(key)">
                   {{ PROVIDER_SHORT_LABELS[key] ?? key }}
                 </span>
               </template>

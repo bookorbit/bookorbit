@@ -107,9 +107,51 @@
       },
       "theme": {
         "title": "Theme",
+        "style": {
+          "label": "Style",
+          "hint": "The overall look of the app. Mode, accent, corners and background keep their settings.",
+          "bookorbit": {
+            "label": "BookOrbit",
+            "description": "Tinted surfaces, glass panels and serif headings."
+          },
+          "nostalgia": {
+            "label": "Nostalgia",
+            "description": "Neutral grounds, system type, flat panels and a top glow."
+          }
+        },
         "colorScheme": {
           "label": "Color scheme",
           "hint": "Light or dark interface"
+        },
+        "surfacePalette": {
+          "label": "Surface",
+          "hint": "The neutral ground behind panels and cards.",
+          "palettes": {
+            "onyx": "Onyx",
+            "carbon": "Carbon",
+            "neutral": "Neutral",
+            "zinc": "Zinc",
+            "iron": "Iron",
+            "steel": "Steel",
+            "ash": "Ash",
+            "smoke": "Smoke",
+            "charcoal": "Charcoal",
+            "slate": "Slate",
+            "midnight-blue": "Midnight blue",
+            "ocean": "Ocean",
+            "pine": "Pine",
+            "olive": "Olive",
+            "stone": "Stone",
+            "sepia": "Sepia",
+            "crimson": "Crimson",
+            "plum": "Plum"
+          }
+        },
+        "topGlow": {
+          "label": "Top glow",
+          "hint": "How far the accent glow reaches down the page. Slide all the way left to turn it off.",
+          "value": "{value}%",
+          "off": "Off"
         },
         "accents": {
           "grey": "Grey",
@@ -183,7 +225,13 @@
         },
         "cornerRadius": {
           "label": "Corner radius",
-          "hint": "Roundness of cards and UI elements"
+          "hint": "Roundness of cards and UI elements",
+          "options": {
+            "sharp": "Sharp",
+            "default": "Default",
+            "rounded": "Rounded",
+            "pill": "Pill"
+          }
         },
         "surfaceBrightness": {
           "label": "Surface brightness",
@@ -202,7 +250,8 @@
           "structural": "Structural",
           "ambient": "Ambient",
           "refractive": "Refractive"
-        }
+        },
+        "syncSaveFailed": "Failed to save theme preferences"
       },
       "storage": {
         "title": "Where to save appearance preferences",
@@ -1216,6 +1265,11 @@
             "portrait": "2:3 portrait",
             "square": "1:1 square"
           },
+          "gridShape": "Grid shape",
+          "gridShapeValue": {
+            "tall": "Tall cells",
+            "square": "Square cells"
+          },
           "none": "None",
           "allSupported": "All supported",
           "patternCount": "{count, plural, one {# pattern} other {# patterns}}",
@@ -1767,7 +1821,8 @@
             "overwriteTerm": "Overwrite:",
             "overwriteBody": "Replace whenever a provider has data."
           },
-          "summary": "Providers are tried top to bottom and the first one that returns a value wins. The merge strategy decides whether that value may replace what the book already has; genres can also append new unique values. Set defaults here, then override individual fields per library."
+          "summary": "Providers are tried top to bottom and the first one that returns a value wins. The merge strategy decides whether that value may replace what the book already has; genres can also append new unique values. Set defaults here, then override individual fields per library.",
+          "summaryByMedium": "Providers are tried top to bottom, and the first one with a value wins; genres in merge mode and community ratings combine every provider instead. The merge strategy decides whether a value may replace what the book already has. Audible, AudNexus and Libro.fm only answer for books with audio, read-along EPUBs included, so putting them first prefers audiobook metadata without touching ebook-only books. Cover art of the wrong shape fills a slot only when nothing else can. A library override replaces that field's whole rule."
         },
         "libraryOverrides": {
           "title": "Library Overrides",
@@ -1836,6 +1891,7 @@
         },
         "field": {
           "noProviders": "Enabled but has no providers",
+          "noUsableProvider": "Enabled, but no provider here can fill it",
           "empty": "Empty",
           "config": "Config",
           "custom": "Custom",
@@ -1894,7 +1950,11 @@
           "disabled": "Disabled",
           "notConfigured": "Not configured",
           "disabledDetail": "{provider} is turned off, so it stays in the order but is skipped.",
-          "notConfiguredDetail": "{provider} has no credentials yet, so it stays in the order but is skipped."
+          "notConfiguredDetail": "{provider} has no credentials yet, so it stays in the order but is skipped.",
+          "neverSupplies": "Never supplies this",
+          "neverSuppliesDetail": "{provider} never supplies this field, so it is skipped here.",
+          "otherShape": "Other cover shape",
+          "otherShapeDetail": "{provider} only has covers of the other shape, so it fills this slot only when nothing else can."
         },
         "detail": {
           "priority": "Provider priority",
@@ -1947,6 +2007,123 @@
         "emptyTitle": "No blocked genres",
         "emptyHint": "Add exact values such as Audiobook or Adult to keep them out of fetched metadata.",
         "removeLabel": "Remove {genre}"
+      },
+      "searchCache": {
+        "loadFailed": "Could not load the search cache settings.",
+        "retry": "Try again",
+        "saved": "Search cache settings saved",
+        "saveFailed": "Failed to save search cache settings",
+        "units": {
+          "hours": "Hours",
+          "days": "Days"
+        },
+        "general": {
+          "title": "Saved answers",
+          "enabled": "Save provider answers",
+          "enabledHint": "Searches, bulk refreshes and background fetches reuse saved answers instead of asking each provider again.",
+          "resultsTtl": "Keep results for",
+          "resultsTtlHint": "How long an answer with results is reused before the provider is asked again.",
+          "resultsTtlUnit": "Results time unit",
+          "emptyTtl": "Keep empty answers for",
+          "emptyTtlHint": "How long a provider finding nothing is remembered. Only applies to providers marked as caching empty answers. 0 never keeps empty answers.",
+          "emptyTtlUnit": "Empty answers time unit",
+          "staleGrace": "Use expired answers for",
+          "staleGraceHint": "When a provider fails, an answer up to this long past its expiry is used instead. 0 never falls back.",
+          "staleGraceUnit": "Expired answers time unit",
+          "storage": "Storage budget",
+          "storageHint": "The oldest answers are removed once saved answers pass this size. On disk the table can take roughly 1.5 to 2 times the budget.",
+          "storageUnit": "MB"
+        },
+        "providers": {
+          "title": "Per-provider settings",
+          "hint": "Leave a box blank to use the value above. Turn a provider off to always ask it live.",
+          "books": "Books",
+          "authors": "Authors",
+          "none": "No providers are available.",
+          "globalOff": "Saving answers is turned off, so these settings apply once it is turned back on.",
+          "on": "On",
+          "off": "Off",
+          "enabledLabel": "Save answers from {provider}",
+          "resultsTtl": "Keep results for",
+          "resultsTtlLabel": "Keep {provider} results for",
+          "resultsTtlUnitLabel": "Time unit for {provider} results",
+          "emptyTtl": "Keep empty answers for",
+          "emptyTtlLabel": "Keep empty {provider} answers for",
+          "emptyTtlUnitLabel": "Time unit for empty {provider} answers",
+          "noEmptyCaching": "Empty answers from this provider are never saved.",
+          "notCacheable": "Answers from this provider are never saved.",
+          "reset": "Reset {provider} to the defaults"
+        },
+        "validation": {
+          "required": "Enter a value.",
+          "wholeNumber": "Enter a whole number.",
+          "range": "Enter a value from {min} to {max}.",
+          "tooManyOverrides": "Too many providers have their own settings. Reset some of them to save."
+        },
+        "save": {
+          "unsaved": "Unsaved changes",
+          "invalid": "Fix the highlighted fields to save",
+          "upToDate": "All changes saved",
+          "discard": "Discard",
+          "action": "Save"
+        },
+        "stats": {
+          "group": "Usage",
+          "title": "Saved answers",
+          "refresh": "Refresh",
+          "loadFailed": "Could not load cache usage.",
+          "storage": "Storage used",
+          "storageUsed": "{used} of {budget}",
+          "storageHint": "Size of the saved answers themselves. The table on disk is larger.",
+          "entries": "Saved answers",
+          "emptyEntries": "Empty answers",
+          "diskSize": "Table size on disk",
+          "hitRate": "Hit rate",
+          "requestsAvoided": "Requests avoided",
+          "fallbacks": "Fallbacks",
+          "skippedWrites": "Skipped writes",
+          "oldest": "Oldest answer",
+          "none": "None yet",
+          "countersHint": "Hit rate, requests avoided, fallbacks and skipped writes count since the server last started.",
+          "perProvider": "Saved answers by provider",
+          "provider": "Provider",
+          "kind": "Type",
+          "size": "Size",
+          "empty": "Nothing is saved yet."
+        },
+        "clear": {
+          "group": "Maintenance",
+          "title": "Clear saved answers",
+          "regionHint": "Providers can answer differently by location. Clear the cache after moving the server to another region or VPN.",
+          "action": "Clear",
+          "failed": "Failed to clear saved answers",
+          "done": "{count, plural, one {Removed # saved answer} other {Removed # saved answers}}",
+          "donePending": "{count, plural, one {Removed # saved answer. The rest are being removed in the background.} other {Removed # saved answers. The rest are being removed in the background.}}",
+          "empty": {
+            "label": "Clear empty answers only",
+            "hint": "Forgets that providers found nothing, so those searches ask again.",
+            "confirmTitle": "Clear empty answers?",
+            "confirmDescription": "Saved answers where a provider found nothing are removed. Answers with results are kept."
+          },
+          "book": {
+            "label": "Clear book answers",
+            "hint": "Removes everything saved from book providers.",
+            "confirmTitle": "Clear book answers?",
+            "confirmDescription": "Every saved answer from book providers is removed. The next searches ask those providers again."
+          },
+          "author": {
+            "label": "Clear author answers",
+            "hint": "Removes everything saved from author providers.",
+            "confirmTitle": "Clear author answers?",
+            "confirmDescription": "Every saved answer from author providers is removed. The next searches ask those providers again."
+          },
+          "all": {
+            "label": "Clear all saved answers",
+            "hint": "Empties the cache. Every provider is asked again on the next search.",
+            "confirmTitle": "Clear all saved answers?",
+            "confirmDescription": "The whole cache is emptied. Searches will be slower until it fills again, and nothing is left to fall back on while a provider is down."
+          }
+        }
       },
       "customFields": {
         "label": "Label",
@@ -2005,7 +2182,8 @@
         "genre-blocklist": "Genre Blocklist",
         "score": "Confidence Score",
         "auto-fetch": "Books",
-        "authors": "Authors"
+        "authors": "Authors",
+        "search-cache": "Search Cache"
       },
       "tabTitles": {
         "providers": "Providers",
@@ -2014,7 +2192,8 @@
         "genre-blocklist": "Genre Blocklist",
         "score": "Confidence Score",
         "auto-fetch": "Book Auto-Fetch",
-        "authors": "Author Auto-Fetch"
+        "authors": "Author Auto-Fetch",
+        "search-cache": "Search Cache"
       },
       "tabSubtitles": {
         "providers": "Enable external metadata sources and configure their credentials.",
@@ -2023,7 +2202,8 @@
         "genre-blocklist": "Prevent unwanted provider genre values from being written to books.",
         "score": "How each metadata field counts towards the completeness score shown on every book.",
         "auto-fetch": "Automatically fetch covers, descriptions, and other details when new books are added to your library.",
-        "authors": "Automatically fetch biographies and profile photos when new authors appear in your library."
+        "authors": "Automatically fetch biographies and profile photos when new authors appear in your library.",
+        "search-cache": "Reuse provider answers so repeat searches are fast and still work when a provider is down."
       },
       "preferences": {
         "toast": {
@@ -3604,6 +3784,7 @@
     "nav": {
       "title": "Settings",
       "ariaLabel": "Settings sections",
+      "breadcrumbLabel": "Breadcrumb",
       "searchPlaceholder": "Search settings",
       "clearSearch": "Clear search",
       "noResults": "No settings match {query}.",
@@ -4799,6 +4980,8 @@
         "selectVisible": "Select visible",
         "refreshMetadata": "Refresh metadata",
         "refreshingMetadata": "Refreshing metadata...",
+        "confirmRefreshCount": "{count, plural, one {Refresh metadata for # author?} other {Refresh metadata for # authors?}}",
+        "refreshAction": "Refresh",
         "deleteSelected": "Delete selected",
         "deleting": "Deleting...",
         "exitSelection": "Exit selection",
@@ -4958,6 +5141,10 @@
       "openAs": "Open as {format}",
       "openReadAlong": "Open read-along EPUB"
     },
+    "refreshMetadata": {
+      "success": "Metadata refreshed",
+      "failed": "Metadata refresh failed"
+    },
     "coverRegeneration": {
       "failed": "Could not regenerate the cover",
       "bulkInProgress": "Re-extracting covers",
@@ -4987,7 +5174,11 @@
       "exportFailed": "Export failed",
       "audiolessEpub": "KOReader EPUB",
       "audiolessEpubHint": "Download EPUB for KOReader with audio files removed",
-      "noAudio": "no audio"
+      "noAudio": "no audio",
+      "textOnlyEpub": "Text-only EPUB",
+      "textOnlyEpubHint": "Download a narration-free EPUB while preserving reading anchors.",
+      "originalNarrated": "Original EPUB with narration",
+      "originalNarratedEpub": "Original EPUB with narration"
     },
     "sort": {
       "moveUp": "Move up",
@@ -7122,7 +7313,40 @@
       "moreOptions": "More options",
       "fewerOptions": "Fewer options",
       "optionsSummary": "{formats} · note added",
-      "formatToggleAria": "Prefer {format}"
+      "formatToggleAria": "Prefer {format}",
+      "pair": {
+        "choice": "Both",
+        "choiceHint": "Ask for the e-book and the audiobook together",
+        "ebookLibraryLabel": "E-book library",
+        "audiobookLibraryLabel": "Audiobook library",
+        "audiobookFolderLabel": "Audiobook folder",
+        "landsTogether": "Both formats arrive as one book in {library}.",
+        "landsSeparately": "{library} keeps one book per file, so each format arrives as a book of its own.",
+        "landsApart": "The e-book and the audiobook go to different libraries, so they arrive as two books.",
+        "preferredEbookFormats": "Preferred e-book formats",
+        "preferredAudiobookFormats": "Preferred audiobook formats",
+        "state": {
+          "owned": "In your library",
+          "following": "You requested this",
+          "joinable": "Requested",
+          "new": "Not requested"
+        },
+        "requestBoth": "Request both",
+        "getBoth": "Get both",
+        "chooseReleases": "Choose releases",
+        "joinBoth": "Add me to both",
+        "requestEbook": "Request e-book",
+        "requestAudiobook": "Request audiobook",
+        "getEbook": "Get e-book",
+        "getAudiobook": "Get audiobook",
+        "joinEbook": "Add me to the e-book request",
+        "joinAudiobook": "Add me to the audiobook request",
+        "haveBoth": "In your library",
+        "requestedBoth": "Requested",
+        "submitted": "Requested the e-book and the audiobook",
+        "submittedPartlyJoined": "Requested both. One was already on its way, so you were added to that request",
+        "submittedJoinsBook": "Requested. It will join the copy already in your library"
+      }
     },
     "card": {
       "details": "Details",
@@ -7181,7 +7405,10 @@
         "forbidden": "That request belongs to someone else.",
         "loadFailed": "Could not load that request"
       },
-      "entityName": "Request"
+      "entityName": "Request",
+      "pairSwitchLabel": "Formats in this request",
+      "joinsBook": "Joins a book you have",
+      "joinsBookHint": "When this arrives it is added to the book already in your library"
     },
     "actions": {
       "approve": "Approve",
@@ -7196,7 +7423,29 @@
       "grab": "Find a release",
       "goToBook": "Go to book",
       "retryRelease": "Try another release",
-      "leave": "Leave request"
+      "leave": "Leave request",
+      "pair": {
+        "approveBoth": "Approve both",
+        "approveEbook": "Approve e-book",
+        "approveAudiobook": "Approve audiobook",
+        "rejectBoth": "Reject both",
+        "rejectEbook": "Reject e-book",
+        "rejectAudiobook": "Reject audiobook",
+        "cancelBoth": "Cancel both",
+        "cancelEbook": "Cancel e-book",
+        "cancelAudiobook": "Cancel audiobook",
+        "dismissBoth": "Dismiss both",
+        "dismissEbook": "Dismiss e-book",
+        "dismissAudiobook": "Dismiss audiobook",
+        "restoreBoth": "Restore both",
+        "restoreEbook": "Restore e-book",
+        "restoreAudiobook": "Restore audiobook",
+        "grabEbook": "Find an e-book release",
+        "grabAudiobook": "Find an audiobook release",
+        "chooseReleases": "Choose releases",
+        "openEbook": "Open the e-book request",
+        "openAudiobook": "Open the audiobook request"
+      }
     },
     "filters": {
       "status": "Status",
@@ -7239,7 +7488,9 @@
       "left": "You have left this request",
       "bulkRejected": "{count, plural, one {# request rejected} other {# requests rejected}}",
       "bulkRejectedPartial": "{done} rejected, {failed} could not be",
-      "importDiscarded": "The imported file was discarded"
+      "importDiscarded": "The imported file was discarded",
+      "pairApproved": "Approved both",
+      "pairRejected": "Rejected both"
     },
     "errors": {
       "loadFailed": "Could not load requests",
@@ -7259,7 +7510,9 @@
       "languageChangeFailed": "Could not change the request language",
       "leaveFailed": "That request could not be left",
       "bulkRejectFailed": "That selection could not be rejected",
-      "discardImportFailed": "That import could not be discarded"
+      "discardImportFailed": "That import could not be discarded",
+      "approveCompanionFailedEbook": "Approved this one, but the e-book could not be approved",
+      "approveCompanionFailedAudiobook": "Approved this one, but the audiobook could not be approved"
     },
     "grab": {
       "title": "Send to a download client",
@@ -7305,6 +7558,18 @@
     "releases": {
       "title": "Pick a release",
       "retryTitle": "Try another release",
+      "pairTitle": "Pick releases",
+      "pair": {
+        "tabsLabel": "Formats to pick releases for",
+        "releaseCount": "{count, plural, one {# release} other {# releases}}",
+        "searching": "Searching",
+        "toChoose": "To choose",
+        "sent": "Sent",
+        "finishedTitle": "Nothing left to choose",
+        "finishedHint": "Both formats have their release now. You can follow each one from the request.",
+        "backToRequest": "Back to the request",
+        "done": "Done"
+      },
       "subtitle": "Ranked across every enabled indexer.",
       "summaryCount": "{count, plural, one {# release} other {# releases}}",
       "allFreeleech": "all freeleech",
@@ -7594,7 +7859,8 @@
       "decidedBy": "Decided by",
       "decisionNote": "Decision note",
       "requestNote": "Request note",
-      "openDetail": "Open full detail"
+      "openDetail": "Open full detail",
+      "pairMedia": "E-book and audiobook"
     },
     "confirm": {
       "cancelDownloadTitle": "Cancel this download?",
@@ -7650,7 +7916,9 @@
       "SUBMIT_DESTINATION_REQUIRED": "Your requests are approved as soon as you make them, so pick the library the book should land in",
       "SUBMIT_SELF_SERVE_LIMIT": "Finish or cancel some downloads first: you can have {limit} in flight at once",
       "SUBMIT_ON_BEHALF_FORBIDDEN": "You are not allowed to request books for other people",
-      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "That user cannot have a book request made for them"
+      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "That user cannot have a book request made for them",
+      "SUBMIT_TARGET_BOOK_NOT_FOUND": "That book is not in a library you can reach",
+      "SUBMIT_TARGET_BOOK_HAS_MEDIUM": "That book already has this format"
     },
     "actionError": {
       "BOOK_REQUEST_NOT_PENDING": "Only a pending request supports this action; this request is currently {status}",
@@ -7736,7 +8004,22 @@
       "reviewSources": "Review sources"
     },
     "selfServeBadge": "Self-served",
-    "selfServeBadgeHint": "Downloaded directly by the requester, with no approval step"
+    "selfServeBadgeHint": "Downloaded directly by the requester, with no approval step",
+    "missingFormat": {
+      "labelAudiobook": "Audiobook for this book",
+      "labelEbook": "E-book for this book",
+      "noAudiobook": "No audiobook yet",
+      "noEbook": "No e-book yet",
+      "requestAudiobook": "Request audiobook",
+      "requestEbook": "Request e-book",
+      "requested": "Requested",
+      "requestedBySomeone": "Requested by someone else",
+      "ownedElsewhere": "In your library as a separate book",
+      "open": "Open",
+      "viewRequest": "View request",
+      "submittedAudiobook": "Requested. The audiobook will join this book when it arrives",
+      "submittedEbook": "Requested. The e-book will join this book when it arrives"
+    }
   },
   "collection": {
     "visibleToAll": "Visible to all users",
@@ -7813,6 +8096,9 @@
       "uploadBooks": "Upload books",
       "appearance": "Appearance",
       "appearanceDescription": "Choose theme, accent, corner radius, surface, and background options.",
+      "style": "Style",
+      "surfacePalette": "Surface",
+      "topGlow": "Top glow",
       "theme": "Theme",
       "accent": "Accent",
       "radius": "Radius",
@@ -7941,6 +8227,8 @@
       "moreActions": "More actions",
       "setField": "Set field",
       "refreshMetadata": "Refresh metadata",
+      "refreshConfirm": "{count, plural, one {Refresh metadata for # book?} other {Refresh metadata for # books?}}",
+      "refreshConfirmAction": "Refresh",
       "reExtractCover": "Re-extract cover",
       "metadataLock": "Metadata lock",
       "lockAll": "Lock all",
@@ -8110,6 +8398,28 @@
       "discardTitle": "Discard changes?",
       "discardDescription": "Your unsaved changes will be lost.",
       "discardConfirm": "Discard"
+    },
+    "backgroundPicker": {
+      "none": "None",
+      "dots": "Dots",
+      "cross": "Cross",
+      "millimeter": "Millimeter",
+      "blueprint": "Blueprint",
+      "brushed": "Brushed",
+      "scanlines": "Scanlines",
+      "vinyl": "Vinyl",
+      "carbon": "Carbon",
+      "perforated": "Perforated",
+      "aurora": "Aurora",
+      "horizon": "Horizon",
+      "glow": "Glow",
+      "mesh": "Mesh",
+      "elevation": "Elevation",
+      "prism": "Prism",
+      "spectrum": "Spectrum",
+      "spectrum-x": "Spectrum X",
+      "spectrum-plus": "Spectrum Plus",
+      "eclipse": "Eclipse"
     }
   },
   "customIcons": {
@@ -8817,6 +9127,14 @@
           "squareTitle": "Square 1:1",
           "squareHint": "Audiobook-only libraries",
           "slotsHint": "A book with both an ebook and an audiobook shows the cover that fits this shape."
+        },
+        "gridShape": {
+          "title": "Grid shape",
+          "tallTitle": "Tall cells",
+          "tallHint": "Best for ebooks or mixed libraries",
+          "squareTitle": "Square cells",
+          "squareHint": "Best for audiobook libraries",
+          "hint": "Each book shows the cover of its primary format, square for an audiobook. A cover that doesn't match the tile follows your cover display setting."
         }
       },
       "folders": {
@@ -9370,6 +9688,32 @@
       }
     }
   },
+  "metadataCache": {
+    "badge": {
+      "cached": "Cached",
+      "stale": "Stale",
+      "cachedHint": "Saved result from {when}",
+      "cachedHintUndated": "Saved result",
+      "staleHint": "The provider was unavailable, so a saved result from {when} was used",
+      "staleHintUndated": "The provider was unavailable, so a saved result was used"
+    },
+    "notice": {
+      "someCached": "Some results came from saved searches (oldest: {when}).",
+      "someCachedUndated": "Some results came from saved searches.",
+      "someStale": "Some providers were unavailable, so saved results were shown (oldest: {when}).",
+      "someStaleUndated": "Some providers were unavailable, so saved results were shown.",
+      "searchFresh": "Search fresh",
+      "searchFreshHint": "Ask every provider again instead of using saved answers"
+    },
+    "fallback": {
+      "usedSaved": "{count, plural, one {{providers} was unavailable, so saved results were used.} other {{providers} were unavailable, so saved results were used.}}"
+    },
+    "ignoreCache": {
+      "label": "Ignore cached results",
+      "hint": "Ask every provider again instead of reusing saved answers. Slower, and uses more of each provider's request allowance.",
+      "runHint": "Applies to the run you start here. Every provider is asked again instead of reusing saved answers, which is slower."
+    }
+  },
   "metadataScore": {
     "missingFields": "{count, plural, =0 {no fields missing - edit metadata} one {# field missing - edit metadata} other {# fields missing - edit metadata}}"
   },
@@ -9880,6 +10224,7 @@
     },
     "loadingBook": "Loading book…",
     "failedToLoadBook": "Failed to load book",
+    "bookLoadTimeout": "The book took too long to open. Try refreshing the page.",
     "chapterNumber": "Chapter {number}",
     "peek": {
       "badge": "Peeking",
@@ -12224,7 +12569,8 @@
       "genre-blocklist": "Genre Blocklist",
       "score": "Confidence Score",
       "auto-fetch": "Book Auto-Fetch",
-      "authors": "Author Auto-Fetch"
+      "authors": "Author Auto-Fetch",
+      "search-cache": "Search Cache"
     },
     "admin": {
       "users": "Users",
@@ -12334,6 +12680,41 @@
     },
     "errors": {
       "generic": "TTS error"
+    }
+  },
+  "delivery": {
+    "readAloud": {
+      "label": "Read-aloud EPUB delivery",
+      "automatic": "Automatic: prefer text-only, allow original fallback.",
+      "textOnly": "Text-only EPUB",
+      "original": "Original EPUB with narration",
+      "hint": "Applies to future deliveries. Originals preserve existing narration and can be much larger. Text-only preparation fails if a safe copy cannot be made.",
+      "koboHint": "Original EPUBs bypass KEPUB conversion. Native Kobo firmware may not play narration, and precise position and highlight sync are unavailable for that copy.",
+      "profileHint": "Use separate OPDS profiles for readers that need different EPUB variants.",
+      "replacementTitle": "Replace a Kobo copy",
+      "bookId": "Book ID",
+      "device": "Device",
+      "prepare": "Prepare replacement",
+      "offer": "I removed only the device copy; offer the replacement",
+      "confirm": "I installed the replacement",
+      "cancel": "Cancel replacement",
+      "replacementHint": "Prepare and review first. Removing a device copy does not delete the library book. Back up device-local notes yourself. BookOrbit preserves canonical progress and server annotations. Delayed events can limit precise sync.",
+      "prepared": "Replacement prepared: {format}, {size}. Remove this book only from the selected device, then offer the prepared replacement and sync.",
+      "offered": "Replacement offered. Sync and download on the device, then confirm installation. A completed HTTP transfer does not prove installation.",
+      "cancelled": "Replacement cancelled. Cancellation does not restore a removed or partially replaced device copy. Select the same book to prepare a recovery download.",
+      "failed": "Could not prepare or update this replacement.",
+      "searchBook": "Search for a book",
+      "chooseBook": "Select a book",
+      "moreResults": "Show more books",
+      "noResults": "No matching books found.",
+      "refresh": "Refresh delivery status",
+      "confirmed": "You confirmed installation. This records your confirmation, not device verification.",
+      "transferred": "The transfer completed. Open the replacement on the device before confirming installation.",
+      "koreaderDefaultTitle": "KOReader EPUB delivery",
+      "koreaderDefaultHint": "The default applies to future downloads on devices using these credentials. Device settings can override it. Existing copies and interrupted downloads stay unchanged. Automatic preserves existing device choices.",
+      "koreaderUseDefault": "Use credential default",
+      "koreaderSaveFailed": "Could not save the KOReader EPUB delivery setting. Try again.",
+      "koreaderSaved": "KOReader EPUB delivery setting saved."
     }
   }
 }

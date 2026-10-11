@@ -62,6 +62,16 @@ describe('EmailSendLogService', () => {
       expect(repo.markAbandoned).toHaveBeenCalledWith(101);
     });
 
+    it('recovers interrupted sends in bounded keyset batches', async () => {
+      vi.mocked(repo.findPending)
+        .mockResolvedValueOnce(Array.from({ length: 100 }, (_, index) => ({ id: index + 1 })) as never)
+        .mockResolvedValueOnce([{ id: 101 }] as never);
+      await service.onApplicationBootstrap();
+      expect(repo.findPending).toHaveBeenNthCalledWith(1, 0);
+      expect(repo.findPending).toHaveBeenNthCalledWith(2, 100);
+      expect(repo.markAbandoned).toHaveBeenCalledTimes(101);
+    });
+
     it('should do nothing if no pending entries', async () => {
       (repo.findPending as vi.Mock).mockResolvedValue([]);
       await service.onApplicationBootstrap();

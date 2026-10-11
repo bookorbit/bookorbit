@@ -1,8 +1,8 @@
-import { getBookMediaProfile, type CoverMedia, type CoverMedium } from '@bookorbit/types';
+import { getBookMediaKind, getBookMediaProfile, type CoverMedia, type CoverMedium } from '@bookorbit/types';
 
 import { compareBookFilePaths } from './audio-track-order.utils';
 
-type BookMediaFileRow = { format: string | null; role: string };
+type BookMediaFileRow = { id?: number; format: string | null; role: string };
 
 /** What a metadata fetch needs to know about a book's cover slots. */
 export type CoverFetchState = {
@@ -20,9 +20,18 @@ type AudiobookMetadataSignals = {
 /**
  * Media type of the book itself, for flows that must ask a provider for the right edition.
  * Files are authoritative; the audio metadata signals only fill in when no file states a format.
+ *
+ * `primaryFileId` is the file the library's format priority chose, which is what decides for a
+ * book holding an EPUB and an M4B. Without it the first content file stood in, and that is only
+ * path order: a ReadAloud+ book led with its EPUB because "Dune.epub" sorts before "Dune.m4b".
  */
-export function resolveIsAudiobook(files: readonly BookMediaFileRow[] | undefined, meta: AudiobookMetadataSignals | null | undefined): boolean {
-  const primaryMediaKind = files?.length ? getBookMediaProfile(files).primaryMediaKind : 'unknown';
+export function resolveIsAudiobook(
+  files: readonly BookMediaFileRow[] | undefined,
+  meta: AudiobookMetadataSignals | null | undefined,
+  primaryFileId?: number | null,
+): boolean {
+  const primary = primaryFileId == null ? undefined : files?.find((file) => file.id === primaryFileId);
+  const primaryMediaKind = primary ? getBookMediaKind(primary.format) : files?.length ? getBookMediaProfile(files).primaryMediaKind : 'unknown';
   if (primaryMediaKind !== 'unknown') return primaryMediaKind === 'audiobook';
   return meta?.durationSeconds != null || !!meta?.audibleId || !!meta?.librofmId;
 }

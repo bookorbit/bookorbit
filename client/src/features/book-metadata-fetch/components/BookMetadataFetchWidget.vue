@@ -242,7 +242,7 @@ onMounted(() => {
         </div>
       </button>
       <button
-        class="absolute end-1.5 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="absolute end-1.5 top-1.5 rounded-xs p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="t('bookMetadataFetch.actions.dismissBookStatus')"
         @click="handleDismissBookCard"
       >
@@ -275,7 +275,7 @@ onMounted(() => {
         </div>
       </button>
       <button
-        class="absolute end-1.5 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="absolute end-1.5 top-1.5 rounded-xs p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="t('bookMetadataFetch.actions.dismissAuthorStatus')"
         @click="handleDismissAuthorCard"
       >

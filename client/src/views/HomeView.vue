@@ -888,7 +888,7 @@ defineOptions({ name: 'HomeView' })
                 <button
                   v-if="hasSavedFilter"
                   @click="forgetSavedFilter"
-                  class="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  class="h-6 w-6 flex items-center justify-center rounded-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <X :size="11" />
                 </button>

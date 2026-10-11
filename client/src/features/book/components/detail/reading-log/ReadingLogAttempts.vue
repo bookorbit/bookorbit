@@ -183,7 +183,7 @@ defineExpose({ openAddForm })
     <div v-if="rereadOpen" class="flex-none border-b border-border bg-muted/40 px-3 py-2.5">
       <p class="text-xs font-medium text-foreground">{{ t('book.detail.readingLog.attempts.rereadPrompt') }}</p>
       <label class="mt-2 flex items-start gap-2 text-[11px] leading-snug text-muted-foreground">
-        <input v-model="resetProgress" type="checkbox" class="mt-0.5 size-3.5 shrink-0 rounded border-input" />
+        <input v-model="resetProgress" type="checkbox" class="mt-0.5 size-3.5 shrink-0 rounded-xs border-input" />
         {{ t('book.detail.readingLog.attempts.rereadResetProgress') }}
       </label>
       <div class="mt-2.5 flex gap-2">
@@ -251,7 +251,7 @@ defineExpose({ openAddForm })
     </div>
 
     <div v-if="ordered.length === 0 && loading" class="flex flex-1 flex-col gap-2 px-3 py-3" aria-hidden="true">
-      <div v-for="row in 3" :key="row" class="h-8 rounded bg-muted animate-shimmer" />
+      <div v-for="row in 3" :key="row" class="h-8 rounded-xs bg-muted animate-shimmer" />
     </div>
 
     <div v-else-if="ordered.length === 0" class="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 py-6 text-center">
@@ -275,13 +275,13 @@ defineExpose({ openAddForm })
               {{ t('book.detail.readingLog.attempts.ordinal', { index: ordinalById.get(attempt.id) }) }} · {{ outcomeLabel(attempt) }}
             </span>
             <span
-              class="inline-flex h-4 items-center rounded border border-border px-1 text-[9px] font-medium uppercase tracking-wider text-muted-foreground"
+              class="inline-flex h-4 items-center rounded-xs border border-border px-1 text-[9px] font-medium uppercase tracking-wider text-muted-foreground"
             >
               {{ attempt.origin }}
             </span>
             <span class="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
               <button
-                class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                class="inline-flex size-5 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 :aria-label="t('book.detail.readingLog.attempts.editAria')"
                 @click="handleEdit(attempt)"
               >
@@ -290,14 +290,14 @@ defineExpose({ openAddForm })
               <template v-if="canManage">
                 <button
                   v-if="confirmDeleteId === attempt.id"
-                  class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  class="inline-flex size-5 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   :aria-label="t('book.detail.readingLog.attempts.cancelDeleteAria')"
                   @click="handleCancelDelete"
                 >
                   <X class="size-3" />
                 </button>
                 <button
-                  class="inline-flex size-5 items-center justify-center rounded transition-colors"
+                  class="inline-flex size-5 items-center justify-center rounded-xs transition-colors"
                   :class="
                     confirmDeleteId === attempt.id
                       ? 'bg-destructive/15 text-destructive ring-1 ring-destructive/40'

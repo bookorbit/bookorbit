@@ -103,6 +103,7 @@ local Catalog = {}
 BulkDownload.install(Catalog)
 CatalogDownload.install(Catalog)
 Catalog.settings = {}
+Catalog.client = { server_url = "http://localhost", username = "test" }
 Catalog:initBulkDownloadState()
 
 local function findButton(dialog, prefix)
@@ -117,7 +118,7 @@ end
 -- The bulk settings popup offers the folder alongside the other two knobs.
 Catalog:showBulkDownloadSettings()
 local settings_dialog = shown[#shown]
-assertEqual(settings_dialog.title, "Bulk download settings", "the settings popup opened")
+assertEqual(settings_dialog.title, "Download settings", "the settings popup opened")
 
 local folder_button = findButton(settings_dialog, "Folder:")
 assertEqual(folder_button ~= nil, true, "the folder is offered as a button")

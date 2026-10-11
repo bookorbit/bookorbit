@@ -470,7 +470,7 @@ export class ScannerService implements OnApplicationBootstrap {
   private async buildAndEmitBookCards(libraryId: number, bookIds: number[]): Promise<void> {
     const { rows, authorRows, fileRows, genreRows } = await this.scannerRepo.findBookCardData(bookIds);
     const cards = assembleBookCards(rows, authorRows, fileRows, genreRows, []);
-    await this.coverStore.enrichCardVersions(cards);
+    await this.coverStore.enrichCardFaces(cards);
     if (cards.length > 0) {
       this.scanGateway.emitBooksAdded({ libraryId, books: cards } satisfies ScanBooksAddedEvent);
     }

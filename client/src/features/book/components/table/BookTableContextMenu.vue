@@ -150,17 +150,17 @@ onBeforeUnmount(() => {
       class="fixed z-[100] min-w-[180px] rounded-md border border-border bg-popover p-1 shadow-md"
       :style="{ top: `${adjustedY}px`, left: `${adjustedX}px` }"
     >
-      <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="emitAction('quick-view')">
+      <button class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent" @click="emitAction('quick-view')">
         <BookOpen :size="14" />
         {{ t('book.table.actions.quickView') }}
       </button>
-      <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="openBookDetails">
+      <button class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent" @click="openBookDetails">
         <ExternalLink :size="14" />
         {{ t('book.table.actions.bookDetails') }}
       </button>
       <button
         v-if="hasPermission('library_edit_metadata')"
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="openEditMetadata"
       >
         <Pencil :size="14" />
@@ -168,20 +168,23 @@ onBeforeUnmount(() => {
       </button>
       <button
         v-if="hasPermission('library_edit_metadata')"
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         :disabled="anyRefreshing"
         @click="refreshMetadata"
       >
         <RefreshCw :size="14" :class="{ 'animate-spin': anyRefreshing }" />
         {{ t('book.table.actions.refreshMetadata') }}
       </button>
-      <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="emitAction('add-to-collection')">
+      <button
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
+        @click="emitAction('add-to-collection')"
+      >
         <FolderPlus :size="14" />
         {{ t('book.table.actions.addToCollection') }}
       </button>
       <button
         v-if="hasPermission('library_edit_metadata')"
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="emitAction('move-to-library')"
       >
         <FolderInput :size="14" />
@@ -189,7 +192,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         v-if="hasPermission('email_send')"
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="openSendDialog"
       >
         <Send :size="14" />
@@ -197,7 +200,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         v-if="hasPermission('library_delete_books')"
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm text-destructive hover:bg-accent"
         @click="emitAction('delete')"
       >
         <Trash2 :size="14" />

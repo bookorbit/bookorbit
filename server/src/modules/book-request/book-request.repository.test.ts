@@ -1,7 +1,52 @@
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { drizzle } from 'drizzle-orm/node-postgres';
 
 import { BookRequestRepository } from './book-request.repository';
+
+describe('BookRequestRepository non-audio ownership', () => {
+  it.each(['cbz', 'cbr', 'cb7', 'cbx', 'CBZ', 'epub', 'pdf'])('recognizes an existing %s file as the non-audio half', async (format) => {
+    const query = vi.fn().mockResolvedValue({ rows: [[format]] });
+    const repo = new BookRequestRepository(drizzle({ query } as never) as never);
+
+    expect(await repo.findBookMediaKinds(42)).toEqual(new Set(['ebook']));
+    expect(query.mock.calls[0]?.[0].text).toContain('"book_id" =');
+    expect(query.mock.calls[0]?.[1]).toEqual([42, 'content']);
+  });
+
+  it('keeps audio separate and ignores unknown formats', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [['mp3'], [null], ['jpg']] });
+    const repo = new BookRequestRepository(drizzle({ query } as never) as never);
+    expect(await repo.findBookMediaKinds(42)).toEqual(new Set(['audiobook']));
+  });
+
+  it.each(['ebook', 'audiobook'] as const)('checks %s ownership by content format within the accessible libraries', async (mediaKind) => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new BookRequestRepository(drizzle({ query } as never) as never);
+
+    await repo.findOwnedMatches(['9781632150694'], ['saga'], [77], mediaKind);
+
+    expect(query).toHaveBeenCalledTimes(2);
+    for (const [statement, params] of query.mock.calls) {
+      expect(statement.text).toContain('exists');
+      expect(statement.text).toContain('"books"."library_id" in');
+      expect(params).toEqual(expect.arrayContaining(['present', 'content', 77]));
+      for (const format of ['cbz', 'cbr', 'cb7', 'cbx', 'epub', 'pdf']) {
+        if (mediaKind === 'ebook') expect(params).toContain(format);
+        else expect(params).not.toContain(format);
+      }
+      if (mediaKind === 'ebook') expect(params).not.toContain('mp3');
+      else expect(params).toContain('mp3');
+    }
+  });
+
+  it('does not probe ownership when the user cannot access any library', async () => {
+    const query = vi.fn();
+    const repo = new BookRequestRepository(drizzle({ query } as never) as never);
+    expect(await repo.findOwnedMatches(['9781632150694'], ['saga'], [], 'ebook')).toEqual({ byIsbn13: new Map(), byTitle: new Map() });
+    expect(query).not.toHaveBeenCalled();
+  });
+});
 
 function makeDb() {
   const chainable = {

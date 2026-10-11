@@ -6,7 +6,7 @@ import { resolveUploadPath } from '@bookorbit/types';
 
 import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import type { MoveBookData, MoveBookFile, MoveTargetLibrary } from './book-move.repository';
-import { MAX_PATH_LENGTH, isInsideRoot, withCollisionSuffix } from './book-move.utils';
+import { MAX_PATH_LENGTH, isInsideRoot, selectMovedPrimary, withCollisionSuffix } from './book-move.utils';
 
 export interface PlannedFileMove {
   fileId: number;
@@ -69,10 +69,15 @@ function displayTitle(book: MoveBookData): string {
   return primary ? basename(primary.absolutePath, extname(primary.absolutePath)) : `Book ${book.bookId}`;
 }
 
-function pickPrimaryFile(book: MoveBookData): MoveBookFile | null {
+/**
+ * The file the book's primary will be once it has moved, which is the one the target's naming
+ * pattern names and whose format the preview reports. Falls back to the current primary when the
+ * target allows none of the book's formats.
+ */
+function pickPrimaryFile(book: MoveBookData, target: MoveTargetLibrary): MoveBookFile | null {
   const contentFiles = book.files.filter((file) => file.role === CONTENT_ROLE);
   if (contentFiles.length === 0) return null;
-  return contentFiles.find((file) => file.id === book.primaryFileId) ?? contentFiles[0];
+  return selectMovedPrimary(book.files, book.primaryFileId, target) ?? contentFiles.find((file) => file.id === book.primaryFileId) ?? contentFiles[0];
 }
 
 /**
@@ -109,7 +114,7 @@ export class BookMovePlannerService {
       return { kind: 'ineligible', bookId: book.bookId, title, reason: 'book_not_present', detail: book.status };
     }
 
-    const primaryFile = pickPrimaryFile(book);
+    const primaryFile = pickPrimaryFile(book, input.target);
     if (!primaryFile) {
       return { kind: 'ineligible', bookId: book.bookId, title, reason: 'no_content_file' };
     }

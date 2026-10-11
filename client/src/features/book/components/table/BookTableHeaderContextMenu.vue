@@ -99,7 +99,7 @@ onUnmounted(() => {
     >
       <template v-if="column.sortField">
         <button
-          class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
           :class="{ 'text-primary font-medium': sortDir === 'asc' }"
           @click="handleAction(() => emit('sort-asc'))"
         >
@@ -107,7 +107,7 @@ onUnmounted(() => {
           {{ t('book.table.header.sortAscending') }}
         </button>
         <button
-          class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
           :class="{ 'text-primary font-medium': sortDir === 'desc' }"
           @click="handleAction(() => emit('sort-desc'))"
         >
@@ -116,7 +116,7 @@ onUnmounted(() => {
         </button>
         <button
           v-if="sortDir"
-          class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
           @click="handleAction(() => emit('clear-sort'))"
         >
           <X :size="14" />
@@ -129,7 +129,7 @@ onUnmounted(() => {
         <button
           v-for="option in quickFilters"
           :key="option.key"
-          class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
           @click="handleAction(() => emit('quick-filter', option.key))"
         >
           <Filter :size="14" />
@@ -140,7 +140,7 @@ onUnmounted(() => {
 
       <button
         v-if="column.pinned === null"
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="handleAction(() => emit('hide-column'))"
       >
         <EyeOff :size="14" />
@@ -149,14 +149,14 @@ onUnmounted(() => {
 
       <template v-if="column.pinned === null">
         <button
-          class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
           @click="handleAction(() => emit('pin-left'))"
         >
           <Pin :size="14" />
           {{ t('book.table.header.pinLeft') }}
         </button>
         <button
-          class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
           @click="handleAction(() => emit('pin-right'))"
         >
           <Pin :size="14" class="rotate-90" />
@@ -165,7 +165,7 @@ onUnmounted(() => {
       </template>
       <button
         v-else
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="handleAction(() => emit('unpin'))"
       >
         <PinOff :size="14" />
@@ -175,14 +175,14 @@ onUnmounted(() => {
       <div class="my-1 h-px bg-border" />
 
       <button
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="handleAction(() => emit('auto-fit'))"
       >
         <Columns3 :size="14" />
         {{ t('book.table.header.autoFitWidth') }}
       </button>
       <button
-        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="handleAction(() => emit('auto-fit-all'))"
       >
         <Columns3 :size="14" />

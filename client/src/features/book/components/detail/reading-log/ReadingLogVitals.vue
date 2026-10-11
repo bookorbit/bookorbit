@@ -370,7 +370,7 @@ function handleAddSession() {
             type="date"
             :max="todayDateInput"
             :disabled="savingDates"
-            class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            class="h-6 rounded-xs border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             :aria-label="t('book.detail.readingLog.vitals.editStarted')"
             autofocus
             @blur="handleStartedSave"
@@ -396,7 +396,7 @@ function handleAddSession() {
             type="date"
             :max="todayDateInput"
             :disabled="savingDates"
-            class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            class="h-6 rounded-xs border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             :aria-label="t('book.detail.readingLog.vitals.editFinished')"
             autofocus
             @blur="handleFinishedSave"

@@ -78,7 +78,12 @@ vi.mock('@/features/whats-new/composables/useWhatsNew', async () => {
 })
 
 vi.mock('@/stores/theme', () => ({
-  useThemeStore: () => ({ radius: 'rounded' }),
+  useThemeStore: () => ({
+    radius: 'rounded',
+    resolvedTheme: 'light',
+    glowReach: 100,
+    appearanceControls: { surfacePalette: false, background: true, surfaceOpacity: true, brightness: true },
+  }),
 }))
 
 vi.mock('@/stores/locale', () => ({

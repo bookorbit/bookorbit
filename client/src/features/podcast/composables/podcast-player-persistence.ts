@@ -1,5 +1,6 @@
 import type { PodcastPlaybackPreferences } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { createUuid } from '@/lib/uuid'
 
 type ApiRequest = (url: string, init?: RequestInit) => Promise<Response>
 
@@ -83,7 +84,7 @@ export function createPodcastPlayerPersistence(request: ApiRequest = api) {
     return stateWrite
   }
 
-  function startListeningSession(startedAt = new Date(), activeSessionId: string = crypto.randomUUID()) {
+  function startListeningSession(startedAt = new Date(), activeSessionId: string = createUuid()) {
     playStartedAt = startedAt
     sessionId = activeSessionId
   }

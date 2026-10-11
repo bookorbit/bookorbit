@@ -20,7 +20,7 @@ export async function generatePkce(): Promise<{ codeVerifier: string; codeChalle
   return { codeVerifier, codeChallenge }
 }
 
-function generateNonce(): string {
+export function generateNonce(): string {
   const array = new Uint8Array(16)
   crypto.getRandomValues(array)
   return btoa(String.fromCharCode(...array))

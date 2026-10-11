@@ -401,14 +401,14 @@ function dismissError(index: number) {
                   <div class="flex items-center gap-2 flex-wrap">
                     <select
                       v-model="editingVariantWeight"
-                      class="h-7 rounded border border-border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      class="h-7 rounded-xs border border-border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                       @keydown="handleVariantEditKeydown"
                     >
                       <option v-for="(label, w) in WEIGHT_LABELS" :key="w" :value="Number(w)">{{ label }} ({{ w }})</option>
                     </select>
                     <select
                       v-model="editingVariantStyle"
-                      class="h-7 rounded border border-border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      class="h-7 rounded-xs border border-border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                       @keydown="handleVariantEditKeydown"
                     >
                       <option value="normal">{{ t('settings.reader.fonts.styleNormal') }}</option>

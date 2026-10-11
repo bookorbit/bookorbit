@@ -69,13 +69,14 @@ function clearFilters() {
 </script>
 
 <template>
-  <div>
-    <!-- Column header. Hidden on mobile, where the row is a card rather than a table line.
-         The last two tracks are fixed rather than auto so the labels stay over their columns:
-         the header's text is narrower than the merge control and status badge below it.
-         FieldRuleRow repeats this template and the two must stay in step. -->
+  <!-- One grid for the whole table; the header, groups and rows are subgrids of it. The merge and
+       status tracks are auto, so they fit the widest control in any row (the four-option genres
+       control, translated labels) and the header stays over its column. Subgrid padding counts
+       toward the edge tracks, hence 24px more on the first track than its content needs. -->
+  <div class="md:grid md:grid-cols-[minmax(184px,224px)_minmax(0,1fr)_auto_auto] md:gap-x-4">
+    <!-- Column header. Hidden on mobile, where the row is a card rather than a table line. -->
     <div
-      class="hidden items-center gap-4 border-b border-border bg-muted/25 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground md:grid md:grid-cols-[minmax(160px,200px)_minmax(0,1fr)_272px_116px]"
+      class="hidden items-center border-b border-border bg-muted/25 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground md:col-span-full md:grid md:grid-cols-subgrid"
       aria-hidden="true"
     >
       <div>{{ t('settings.metadata.fieldRules.table.field') }}</div>
@@ -85,7 +86,7 @@ function clearFilters() {
       <div class="text-right">{{ isGlobalScope ? '' : t('settings.metadata.fieldRules.table.status') }}</div>
     </div>
 
-    <div v-if="isEmpty" class="flex flex-col items-center gap-3 px-6 py-12 text-center">
+    <div v-if="isEmpty" class="flex flex-col items-center gap-3 px-6 py-12 text-center md:col-span-full">
       <SearchX :size="22" class="text-muted-foreground" aria-hidden="true" />
       <p class="text-sm text-muted-foreground">{{ t('settings.metadata.fieldRules.table.noMatches') }}</p>
       <Button variant="outline" size="sm" type="button" @click="clearFilters">
@@ -94,9 +95,9 @@ function clearFilters() {
     </div>
 
     <template v-else>
-      <section v-for="group in groups" :key="group.id">
+      <section v-for="group in groups" :key="group.id" class="md:col-span-full md:grid md:grid-cols-subgrid">
         <h3
-          class="flex items-center gap-2 border-b border-border/60 bg-muted/25 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground md:px-6"
+          class="flex items-center gap-2 border-b border-border/60 bg-muted/25 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground md:col-span-full md:px-6"
         >
           {{ group.label }}
           <span class="ml-auto text-[10px] font-medium normal-case tracking-normal tabular-nums">

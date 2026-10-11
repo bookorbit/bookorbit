@@ -90,7 +90,7 @@ onMounted(() => loadPage(1))
           <button
             :disabled="page <= 1"
             @click="loadPage(page - 1)"
-            class="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-40"
+            class="px-2 py-1 text-xs border border-border rounded-xs hover:bg-muted disabled:opacity-40"
           >
             {{ t('common.previous') }}
           </button>
@@ -98,7 +98,7 @@ onMounted(() => loadPage(1))
           <button
             :disabled="page >= Math.ceil(data.total / limit)"
             @click="loadPage(page + 1)"
-            class="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-40"
+            class="px-2 py-1 text-xs border border-border rounded-xs hover:bg-muted disabled:opacity-40"
           >
             {{ t('common.next') }}
           </button>
@@ -106,7 +106,7 @@ onMounted(() => loadPage(1))
         <button
           @click="handleRetryAll"
           :disabled="retrying"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-xs hover:bg-primary/90 disabled:opacity-50"
         >
           <RefreshCw :size="12" :class="retrying ? 'animate-spin' : ''" />
           {{ t('bookMetadataFetch.report.retryAllFailed') }}

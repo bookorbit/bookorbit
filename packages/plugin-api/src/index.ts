@@ -14,7 +14,12 @@
 /** Bumped when a change to this contract would break a plugin written against the old one. */
 export const PLUGIN_API_VERSION = 1;
 
-export type PluginMediaKind = "ebook" | "audiobook" | "comic";
+/**
+ * What BookOrbit asks a plugin to search for. Comics are no longer requested: a plugin written
+ * before they were retired may still declare `comic` and its categories, and the loader accepts
+ * and ignores them, so nothing has to change for that plugin to keep working.
+ */
+export type PluginMediaKind = "ebook" | "audiobook";
 
 /** Distinct enough to act on: a rejected credential must not look like "nothing found". */
 export type PluginSearchFailure = "unauthorized" | "throttled" | "timeout" | "unreachable" | "unsupportedMedium" | "error";
@@ -25,7 +30,6 @@ export type PluginCredentialKind = "apiKey" | "sessionId" | null;
 export interface PluginCategoryMap {
   ebook: number[];
   audiobook: number[];
-  comic: number[];
 }
 
 /** A signed update feed controlled by the plugin publisher. */

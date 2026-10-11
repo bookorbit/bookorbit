@@ -57,8 +57,6 @@ function labelRow(id: number) {
     title: `Book ${id}`,
     author: 'Author',
     coverSource: 'extracted',
-    coverAspectRatio: '2/3',
-    updatedAt: at,
     readFileId: id * 10,
     readFileFormat: 'epub',
     hasAudio: false,
@@ -88,8 +86,9 @@ function makeService(libraryIds = [1, 2]) {
   };
   const libraryService = { findAccessibleLibraryIds: vi.fn().mockResolvedValue(libraryIds) };
   const coverStore = {
-    slotsFor: vi.fn().mockResolvedValue(new Map()),
-    coverVersion: vi.fn((ratio: string, _slots: unknown[], legacy: string) => `legacy:${ratio}:${legacy}`),
+    facesFor: vi.fn((ids: number[]) =>
+      Promise.resolve(new Map(ids.map((id) => [id, { coverVersion: `legacy:${at.toISOString()}`, coverAspectRatio: id === 6 ? '1/1' : '2/3' }]))),
+    ),
   };
   const service = new NotebookService(repo as never, libraryService as never, coverStore as never);
   return { service, repo, libraryService, coverStore };
@@ -152,7 +151,13 @@ describe('NotebookService.entries', () => {
     ]);
     expect(repo.findJournal).toHaveBeenCalledWith(8, []);
     expect(Object.keys(result.books).sort()).toEqual(['5', '6']);
-    expect(result.books['6']).toMatchObject({ id: 6, title: 'Book 6', coverVersion: `legacy:2/3:${at.toISOString()}`, readFileId: 60 });
+    expect(result.books['6']).toMatchObject({
+      id: 6,
+      title: 'Book 6',
+      coverVersion: `legacy:${at.toISOString()}`,
+      coverAspectRatio: '1/1',
+      readFileId: 60,
+    });
     expect(decodeNotebookCursor(result.nextCursor!, 'newest')).toEqual({ scope: 'newest', key: '2026-02-03T04:05:06.123456Z', rank: 0, id: 11 });
   });
 

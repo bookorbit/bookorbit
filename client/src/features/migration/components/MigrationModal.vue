@@ -1397,7 +1397,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                     @test-media-path="onTestMediaPath"
                   />
 
-                  <div v-if="sourceTypeCompatibility" class="rounded border border-border bg-muted/40 px-3.5 py-3 text-xs space-y-1">
+                  <div v-if="sourceTypeCompatibility" class="rounded-xs border border-border bg-muted/40 px-3.5 py-3 text-xs space-y-1">
                     <p class="font-medium text-foreground">{{ t('migration.source.compatibility.title') }}</p>
                     <p class="text-muted-foreground">
                       {{ t('migration.source.compatibility.verifiedAgainst') }}
@@ -1419,13 +1419,13 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
 
                   <div
                     v-if="sourceValidationWarnings.length > 0"
-                    class="rounded border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 space-y-1"
+                    class="rounded-xs border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 space-y-1"
                   >
                     <p class="font-medium">{{ t('migration.source.validatedWithWarnings') }}</p>
                     <p v-for="warn in sourceValidationWarnings" :key="warn">{{ warn }}</p>
                   </div>
 
-                  <div v-if="sourceCapabilities" class="rounded border border-border bg-muted/40 p-3 text-xs space-y-2">
+                  <div v-if="sourceCapabilities" class="rounded-xs border border-border bg-muted/40 p-3 text-xs space-y-2">
                     <p class="font-medium text-foreground">{{ t('migration.source.snapshot.title') }}</p>
                     <p class="text-muted-foreground">
                       {{
@@ -1460,7 +1460,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                     </Button>
                   </div>
 
-                  <div class="overflow-x-auto rounded border border-border">
+                  <div class="overflow-x-auto rounded-xs border border-border">
                     <table class="w-full text-sm">
                       <thead class="bg-muted/40 text-left">
                         <tr>
@@ -1481,7 +1481,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                                 <input
                                   v-model="row.skip"
                                   type="checkbox"
-                                  class="size-4 rounded border-input accent-primary"
+                                  class="size-4 rounded-xs border-input accent-primary"
                                   :disabled="hasActiveRun"
                                 />
                                 {{ t('migration.mappings.doNotImport') }}
@@ -1532,7 +1532,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                     </div>
                   </div>
 
-                  <div v-if="pathValidation" class="rounded border border-border bg-muted/40 p-3 text-xs space-y-1">
+                  <div v-if="pathValidation" class="rounded-xs border border-border bg-muted/40 p-3 text-xs space-y-1">
                     <p class="font-medium text-foreground">{{ t('migration.mappings.pathValidation.title') }}</p>
                     <p class="text-muted-foreground">
                       {{
@@ -1563,7 +1563,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                     {{ t('migration.dryRun.run') }}
                   </Button>
 
-                  <div v-if="plan" class="rounded border border-border bg-muted/30 p-3 space-y-2 text-sm">
+                  <div v-if="plan" class="rounded-xs border border-border bg-muted/30 p-3 space-y-2 text-sm">
                     <p>
                       {{ t('migration.dryRun.matched') }} <span class="font-medium">{{ plan.summary?.matchedBooks ?? 0 }}</span> ·
                       {{ t('migration.dryRun.unresolved') }}
@@ -1593,14 +1593,14 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                         <div
                           v-for="dup in duplicateMatches"
                           :key="dup.targetBookId"
-                          class="rounded border border-border bg-background p-3 space-y-1.5"
+                          class="rounded-xs border border-border bg-background p-3 space-y-1.5"
                         >
                           <p class="text-xs font-medium text-foreground">{{ targetBookLabel(dup.targetBookId) }}</p>
                           <p class="text-[11px] text-muted-foreground">{{ t('migration.duplicates.targetBookId', { id: dup.targetBookId }) }}</p>
                           <label
                             v-for="sourceId in dup.sourceBookIds"
                             :key="sourceId"
-                            class="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50 cursor-pointer"
+                            class="flex items-center justify-between gap-2 rounded-xs px-2 py-1 text-xs hover:bg-muted/50 cursor-pointer"
                           >
                             <div class="flex min-w-0 items-center gap-2">
                               <input
@@ -1644,7 +1644,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
 
                 <!-- Step 3: Run Migration -->
                 <div v-else-if="currentStep === 3" class="space-y-5">
-                  <div class="rounded border border-border bg-muted/20 p-3 text-xs space-y-1.5">
+                  <div class="rounded-xs border border-border bg-muted/20 p-3 text-xs space-y-1.5">
                     <p class="font-medium text-foreground">{{ t('migration.preflight.title') }}</p>
                     <p v-if="preflight.ready" class="text-emerald-600">{{ t('migration.preflight.allPassed') }}</p>
                     <template v-else>
@@ -1711,13 +1711,13 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
 
                   <div
                     v-if="pollingError"
-                    class="rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-700"
+                    class="rounded-xs border border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-700"
                   >
                     <span>{{ t('migration.run.pollingStopped') }}</span>
                     <Button variant="link" size="sm" class="h-auto p-0" @click="onRetryPolling">{{ t('migration.run.retry') }}</Button>
                   </div>
 
-                  <div v-if="run" class="rounded border border-border bg-muted/30 px-4 py-3.5 flex items-center gap-3 text-xs">
+                  <div v-if="run" class="rounded-xs border border-border bg-muted/30 px-4 py-3.5 flex items-center gap-3 text-xs">
                     <span class="inline-flex rounded-full border px-2 py-0.5" :class="runStateClass(run.state)">{{ run.state }}</span>
                     <span class="text-muted-foreground">
                       {{
@@ -1777,7 +1777,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                       </div>
                     </div>
 
-                    <div v-if="run.errorMessage" class="rounded border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 space-y-2">
+                    <div v-if="run.errorMessage" class="rounded-xs border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 space-y-2">
                       <div class="space-y-0.5">
                         <p class="font-medium">{{ t('migration.report.migrationFailed') }}</p>
                         <p>{{ run.errorMessage }}</p>
@@ -1790,7 +1790,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
 
                     <template v-if="runReport || runProgress">
                       <div class="grid gap-3 sm:grid-cols-2">
-                        <div class="rounded border border-border p-3 space-y-2">
+                        <div class="rounded-xs border border-border p-3 space-y-2">
                           <p class="text-sm font-semibold">{{ t('migration.report.booksSection') }}</p>
                           <div class="space-y-1.5 text-xs">
                             <div class="flex justify-between">
@@ -1826,7 +1826,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                             </div>
                           </div>
                         </div>
-                        <div class="rounded border border-border p-3 space-y-2">
+                        <div class="rounded-xs border border-border p-3 space-y-2">
                           <p class="text-sm font-semibold">{{ t('migration.report.userDataSection') }}</p>
                           <div class="space-y-1.5 text-xs">
                             <div class="flex justify-between">
@@ -1868,7 +1868,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                     <template v-if="runReport">
                       <div
                         v-if="run.state === 'completed' && reportData.unresolvedBooks.length === 0 && reportData.coverFailureCount === 0"
-                        class="rounded border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-700"
+                        class="rounded-xs border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-700"
                       >
                         {{ t('migration.report.completedNoIssues') }}
                       </div>
@@ -1883,7 +1883,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           <div
                             v-for="book in reportData.matchedBooks"
                             :key="`${book.sourceBookId}-${book.targetBookId}`"
-                            class="rounded border border-border px-3 py-2 text-xs"
+                            class="rounded-xs border border-border px-3 py-2 text-xs"
                           >
                             <p class="font-medium text-foreground">
                               {{ book.sourceTitle || t('migration.report.sourceBook', { id: book.sourceBookId }) }}
@@ -1909,7 +1909,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           <div
                             v-for="book in reportData.unresolvedBooks"
                             :key="book.sourceBookId"
-                            class="rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs"
+                            class="rounded-xs border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs"
                           >
                             <p class="font-medium text-foreground">{{ book.title || t('migration.report.sourceBook', { id: book.sourceBookId }) }}</p>
                             <p v-if="book.author" class="text-muted-foreground mt-0.5">{{ book.author }}</p>
@@ -1928,7 +1928,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           <div
                             v-for="preview in reportData.userPreview"
                             :key="`${preview.sourceUserId}-${preview.targetUserId}`"
-                            class="rounded border border-border px-3 py-2 text-xs"
+                            class="rounded-xs border border-border px-3 py-2 text-xs"
                           >
                             <p class="font-medium text-foreground">{{ preview.username }}</p>
                             <p class="text-muted-foreground mt-0.5">{{ describeUserPreviewCounts(preview.counts) }}</p>
@@ -1937,7 +1937,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                       </div>
                       <div
                         v-if="reportData.coverFailureCount > 0"
-                        class="rounded border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-700"
+                        class="rounded-xs border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-700"
                       >
                         {{ t('migration.report.coverFailures', { count: reportData.coverFailureCount }) }}
                       </div>

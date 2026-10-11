@@ -73,11 +73,8 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
       :aria-controls="contentId"
       @click="handleToggle"
     >
-      <span class="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{{ label }}</span>
-      <span
-        v-if="showCount"
-        class="shrink-0 rounded-md bg-(--shell-accent-tint) px-1.5 text-[11px] font-semibold tabular-nums text-sidebar-count-foreground"
-      >
+      <span class="sidebar-section-label min-w-0 truncate">{{ label }}</span>
+      <span v-if="showCount" class="sidebar-count shrink-0 rounded-md px-1.5 tabular-nums">
         {{ formatCompactNumber(count ?? 0) }}
       </span>
       <ChevronDown
@@ -88,7 +85,7 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
         :class="isOpen ? 'rotate-0' : '-rotate-90'"
       />
     </button>
-    <p v-else class="min-w-0 flex-1 truncate px-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{{ label }}</p>
+    <p v-else class="sidebar-section-label min-w-0 flex-1 truncate px-2">{{ label }}</p>
 
     <button
       v-if="canAdd"

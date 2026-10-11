@@ -405,7 +405,7 @@ onMounted(() => {
             <p class="text-sm font-medium text-foreground truncate">{{ field.label }}</p>
             <div class="flex flex-wrap items-center gap-2">
               <span
-                class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium"
+                class="inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-xs font-medium"
                 :class="CUSTOM_FIELD_TYPE_META[field.type].badgeClass"
               >
                 <component :is="CUSTOM_FIELD_TYPE_META[field.type].icon" :size="12" />

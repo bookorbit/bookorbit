@@ -143,7 +143,7 @@ describe('KoboDeviceController', () => {
 
     await controller.download('9', { id: 11 } as never, { deviceId: 4, deviceToken: 'dev-token' } as never, req as never, reply as never);
 
-    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 9, reply);
+    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 9, reply, 4, undefined);
     expect(historyService.recordSuccess).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 11,
@@ -177,7 +177,7 @@ describe('KoboDeviceController', () => {
     await controller.download('kobo-entitlement-id', { id: 11 } as never, { deviceToken: 'dev-token' } as never, req as never, reply as never);
     await controller.thumbnailSimple('kobo-cover-id', '355', '530', undefined, { id: 11 } as never, reply as never);
 
-    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 420, reply);
+    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 420, reply, undefined, undefined);
     expect(thumbnailService.serveThumbnail).toHaveBeenCalledWith(11, 420, undefined, reply);
   });
 

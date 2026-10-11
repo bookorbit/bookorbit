@@ -135,7 +135,7 @@ function handleShowJumpRailsChange(event: Event) {
         <input
           type="checkbox"
           :checked="coverFallback"
-          class="size-4 shrink-0 cursor-pointer rounded border-input accent-primary"
+          class="size-4 shrink-0 cursor-pointer rounded-xs border-input accent-primary"
           @change="handleCoverFallbackChange"
         />
       </label>
@@ -145,7 +145,7 @@ function handleShowJumpRailsChange(event: Event) {
         <input
           type="checkbox"
           :checked="showJumpRails"
-          class="size-4 shrink-0 cursor-pointer rounded border-input accent-primary"
+          class="size-4 shrink-0 cursor-pointer rounded-xs border-input accent-primary"
           @change="handleShowJumpRailsChange"
         />
       </label>

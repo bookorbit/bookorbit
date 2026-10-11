@@ -140,6 +140,26 @@ describe('PluginLoaderService', () => {
     expect(loader.loadFailures()[0].reason).toContain('newspaper');
   });
 
+  /**
+   * Plugins are released apart from BookOrbit, so one written before comics were retired still
+   * lists them. It has to keep loading; the retired medium is simply never searched.
+   */
+  it('keeps loading a plugin that still declares the retired comic medium, and drops it', async () => {
+    await writePlugin('older', pluginSource({ mediaKinds: "['ebook', 'comic']" }));
+
+    await loader.load();
+
+    expect(loader.loadFailures()).toEqual([]);
+  });
+
+  it('refuses a plugin that serves only the retired comic medium, since it has nothing to search', async () => {
+    await writePlugin('comics-only', pluginSource({ mediaKinds: "['comic']" }));
+
+    await loader.load();
+
+    expect(loader.loadFailures()[0].reason).toContain('no longer requests');
+  });
+
   /** A release is a torrent or a file. Declaring both leaves the grab path guessing. */
   it('refuses a plugin that declares both a torrent fetch and a file resolve', async () => {
     await writePlugin('both', pluginSource({ resolveFile: 'async () => ({})' }));

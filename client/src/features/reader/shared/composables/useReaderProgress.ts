@@ -127,7 +127,7 @@ export function useReaderProgress(
     saveTimer = setTimeout(() => save(), 2000)
   }
 
-  function onRelocate(detail: RelocateDetail) {
+  function onRelocate(detail: RelocateDetail, source: 'text' | 'narration' = 'text') {
     cfi.value = normalizeString(detail?.cfi)
     const relocatedFraction = normalizeFraction(detail?.fraction)
     if (relocatedFraction !== null) {
@@ -156,7 +156,7 @@ export function useReaderProgress(
       if (saveTimer) clearTimeout(saveTimer)
       return
     }
-    pendingSource.value = 'text'
+    pendingSource.value = source
     scheduleSave()
   }
 
@@ -166,12 +166,6 @@ export function useReaderProgress(
     positionSeconds.value = seconds
     pendingSource.value = 'narration'
     scheduleSave()
-  }
-
-  function clearMediaOverlayProgress() {
-    positionSeconds.value = null
-    mediaOverlayFragment.value = null
-    mediaOverlaySectionIndex.value = null
   }
 
   async function save() {
@@ -339,7 +333,6 @@ export function useReaderProgress(
     load,
     onRelocate,
     setMediaOverlayProgress,
-    clearMediaOverlayProgress,
     save,
     cycleFooterMode,
     updateHeadsFeet,

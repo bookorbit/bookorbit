@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MetadataProviderKey, type MetadataCandidate } from '@bookorbit/types';
 
+import { markProviderDegraded, markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import type { IdentifiableProvider } from '../metadata-provider';
 import type { MetadataSearchParams } from '../metadata-search-params';
+import { audiobookGate, pickSearchInputs, providerCacheContext, requestedMax } from '../provider-cache';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { allowsAudiobookProviders, buildRequestSignal, normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import { mapLibroFmAudiobook } from './librofm.mapper';
@@ -19,6 +22,10 @@ const REQUEST_HEADERS: HeadersInit = {
   'x-librofm-appver': '7.37.4',
 };
 
+function directLookupId(params: MetadataSearchParams): string | undefined {
+  return params.existingProviderIds?.[MetadataProviderKey.LIBROFM] ?? params.isbn?.trim();
+}
+
 @Injectable()
 export class LibroFmProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.LIBROFM;
@@ -29,13 +36,27 @@ export class LibroFmProvider implements IdentifiableProvider {
 
   private readonly logger = new Logger(LibroFmProvider.name);
 
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: false,
+    context: async () => providerCacheContext((await this.providerConfig.getConfig()).librofm.enabled),
+    describeSearch: (params) => {
+      const audiobook = audiobookGate(params);
+      const directId = directLookupId(params);
+      // A direct id answers with at most one book, so no result cap applies to it.
+      if (directId) return { inputs: { directId, audiobook } };
+      return { inputs: { ...pickSearchInputs(params, ['title', 'author']), audiobook }, maxCandidates: requestedMax(params) };
+    },
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
+
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const { enabled } = await this.providerConfig.getConfig().then((config) => config.librofm);
     if (!enabled || !allowsAudiobookProviders(params)) return [];
 
-    const directId = params.existingProviderIds?.[MetadataProviderKey.LIBROFM] ?? params.isbn?.trim();
+    const directId = directLookupId(params);
     if (directId) {
       const candidate = await this.fetchByIsbn(directId, params.signal);
       return candidate ? [candidate] : [];
@@ -55,6 +76,7 @@ export class LibroFmProvider implements IdentifiableProvider {
         if (candidates.length > 0) await sleep(PROVIDER_DELAYS_MS.LIBROFM_BETWEEN_REQUESTS, params.signal);
         const candidate = await this.fetchByIsbn(isbn, params.signal);
         if (candidate) candidates.push(candidate);
+        else markProviderDegraded('librofm.search: audiobook skipped');
       }
     } catch (err) {
       rethrowWithPartialCandidates(err, candidates);
@@ -101,6 +123,7 @@ export class LibroFmProvider implements IdentifiableProvider {
       return isbns;
     } catch (error) {
       if (error instanceof ProviderThrottleError) throw error;
+      markProviderFailed('librofm.search: unusable response');
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
       this.logger.warn(
@@ -145,6 +168,7 @@ export class LibroFmProvider implements IdentifiableProvider {
       return candidate;
     } catch (error) {
       if (error instanceof ProviderThrottleError) throw error;
+      markProviderFailed('librofm.lookup: unusable response');
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
       this.logger.warn(

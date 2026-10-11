@@ -226,7 +226,7 @@ function formatPillClass(filename: string): string {
                   <p class="text-xs font-medium text-foreground truncate">{{ item.file.name }}</p>
                   <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <span class="text-[11px] text-muted-foreground">{{ formatBytes(item.file.size) }}</span>
-                    <span class="text-[10px] font-semibold px-1.5 py-px rounded uppercase tracking-wide" :class="formatPillClass(item.file.name)">
+                    <span class="text-[10px] font-semibold px-1.5 py-px rounded-xs uppercase tracking-wide" :class="formatPillClass(item.file.name)">
                       {{ getFormat(item.file.name) }}
                     </span>
                     <span v-if="item.status === 'error'" class="text-[11px] text-destructive truncate">{{ item.error }}</span>
@@ -246,7 +246,7 @@ function formatPillClass(filename: string): string {
                 <div class="shrink-0 flex items-center gap-0.5">
                   <button
                     v-if="item.status === 'error'"
-                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    class="flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                     :title="t('book.detail.addFile.retry')"
                     @click="retryFile(item.id)"
                   >
@@ -254,7 +254,7 @@ function formatPillClass(filename: string): string {
                   </button>
                   <button
                     v-if="item.status !== 'uploading'"
-                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    class="flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     @click="removeFile(item.id)"
                   >
                     <X :size="12" />
@@ -292,7 +292,7 @@ function formatPillClass(filename: string): string {
               <input
                 v-model="renameAfter"
                 type="checkbox"
-                class="w-3.5 h-3.5 rounded border-border accent-primary cursor-pointer"
+                class="w-3.5 h-3.5 rounded-xs border-border accent-primary cursor-pointer"
                 :disabled="isUploading"
               />
               <span class="text-xs text-muted-foreground">{{ t('book.detail.addFile.renameAfter') }}</span>

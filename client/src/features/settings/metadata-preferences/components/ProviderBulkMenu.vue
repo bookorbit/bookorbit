@@ -90,7 +90,7 @@ function runBulk(provider: MetadataProviderKey, action: ProviderBulkAction) {
           <span class="flex min-w-0 flex-1 items-center gap-2">
             <Check :size="14" :class="filter === entry.key ? '' : 'opacity-0'" />
             <span
-              class="provider-chip inline-flex h-5 shrink-0 items-center rounded px-1.5 text-xs font-medium"
+              class="provider-chip inline-flex h-5 shrink-0 items-center rounded-xs px-1.5 text-xs font-medium"
               :style="providerChipStyle(entry.key)"
             >
               {{ entry.short }}

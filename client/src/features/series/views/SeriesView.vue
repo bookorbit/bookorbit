@@ -543,19 +543,19 @@ defineOptions({ name: 'SeriesView' })
           <div v-for="n in INITIAL_SKELETON_COUNT" :key="n" class="overflow-hidden rounded-xl border border-border bg-card">
             <div class="animate-pulse bg-muted/80" style="aspect-ratio: 5 / 4" />
             <div class="space-y-2 px-3 py-3">
-              <div class="h-3.5 w-2/3 rounded bg-muted/80" />
-              <div class="h-3 w-1/2 rounded bg-muted/70" />
+              <div class="h-3.5 w-2/3 rounded-xs bg-muted/80" />
+              <div class="h-3 w-1/2 rounded-xs bg-muted/70" />
             </div>
           </div>
         </div>
         <div v-else class="overflow-hidden rounded-xl border border-border bg-card">
           <div v-for="n in 12" :key="n" class="flex items-center gap-3 border-b border-border px-3.5 py-3 last:border-b-0">
-            <div class="h-10 w-7 shrink-0 animate-pulse rounded bg-muted/80" />
+            <div class="h-10 w-7 shrink-0 animate-pulse rounded-xs bg-muted/80" />
             <div class="min-w-0 flex-1 space-y-2">
-              <div class="h-3 w-2/5 rounded bg-muted/80" />
-              <div class="h-2.5 w-1/4 rounded bg-muted/70" />
+              <div class="h-3 w-2/5 rounded-xs bg-muted/80" />
+              <div class="h-2.5 w-1/4 rounded-xs bg-muted/70" />
             </div>
-            <div class="hidden h-2.5 w-1/3 rounded bg-muted/70 sm:block" />
+            <div class="hidden h-2.5 w-1/3 rounded-xs bg-muted/70 sm:block" />
           </div>
         </div>
       </template>

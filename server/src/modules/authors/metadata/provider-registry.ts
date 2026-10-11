@@ -1,15 +1,24 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { AuthorMetadataProviderKey } from '@bookorbit/types';
 
+import { MetadataCacheProviderCatalog } from '../../metadata-cache/metadata-cache-provider-catalog';
 import { AUTHOR_METADATA_PROVIDERS } from './constants';
 import { AuthorMetadataProvider } from './providers/author-metadata-provider';
 
 @Injectable()
-export class AuthorMetadataProviderRegistry {
+export class AuthorMetadataProviderRegistry implements OnModuleInit {
   constructor(
     @Inject(AUTHOR_METADATA_PROVIDERS)
     private readonly providers: AuthorMetadataProvider[],
+    private readonly cacheCatalog: MetadataCacheProviderCatalog,
   ) {}
+
+  onModuleInit(): void {
+    this.cacheCatalog.register(
+      'author',
+      this.providers.map((provider) => ({ provider: provider.key, label: provider.label, spec: provider.cache })),
+    );
+  }
 
   all(): AuthorMetadataProvider[] {
     return this.providers;

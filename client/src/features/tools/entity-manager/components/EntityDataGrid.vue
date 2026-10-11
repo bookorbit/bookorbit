@@ -87,7 +87,7 @@ function handleClearFilters(): void {
             <th scope="col" class="sticky top-0 z-10 w-10 border-b border-border bg-secondary px-3 py-2.5">
               <input
                 type="checkbox"
-                class="size-4 rounded accent-primary align-middle"
+                class="size-4 rounded-xs accent-primary align-middle"
                 :checked="allSelected"
                 :indeterminate="someSelected"
                 :aria-label="t('tools.entityManager.browse.selectAllOnPage')"
@@ -173,7 +173,7 @@ function handleClearFilters(): void {
             <td class="px-3" :class="cellPadding">
               <input
                 type="checkbox"
-                class="size-4 rounded accent-primary align-middle"
+                class="size-4 rounded-xs accent-primary align-middle"
                 :checked="selectedIds.has(item.id)"
                 :aria-label="t('tools.entityManager.browse.selectEntity', { name: item.name })"
                 @click="handleSelect(item.id, $event)"
@@ -262,7 +262,7 @@ function handleClearFilters(): void {
         >
           <input
             type="checkbox"
-            class="size-4 shrink-0 rounded accent-primary"
+            class="size-4 shrink-0 rounded-xs accent-primary"
             :checked="selectedIds.has(item.id)"
             :aria-label="t('tools.entityManager.browse.selectEntity', { name: item.name })"
             @click="handleSelect(item.id, $event)"

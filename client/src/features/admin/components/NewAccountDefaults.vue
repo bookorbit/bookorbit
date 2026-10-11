@@ -115,7 +115,7 @@ function saveLibraryDefaults() {
             <input
               type="checkbox"
               :checked="selectedLibraryIds.has(library.id)"
-              class="size-3.5 rounded border-input accent-primary"
+              class="size-3.5 rounded-xs border-input accent-primary"
               @change="toggleLibrary(library.id)"
             />
             <span class="min-w-0 truncate">{{ library.name }}</span>

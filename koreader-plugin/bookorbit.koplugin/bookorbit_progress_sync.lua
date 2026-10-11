@@ -147,7 +147,8 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
         return true
     end
 
-    if body.device == Device.model and body.device_id == self.device_id then
+    if body.device == Device.model and body.device_id == self.device_id
+            and (self.last_page_turn_timestamp or 0) > 0 then
         on_done(false)
         return true
     end
@@ -319,10 +320,10 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         return
     end
 
-    if body.device == Device.model and body.device_id == self.device_id then
-        if interactive then
-            UIManager:show(InfoMessage:new{ text = _("Latest progress is coming from this device."), timeout = 3 })
-        end
+    -- A fresh rendition or sidecar can resume behind this device's last upload.
+    -- Explicit pulls and opens before any page turn must still recover that position.
+    if not interactive and body.device == Device.model and body.device_id == self.device_id
+            and (self.last_page_turn_timestamp or 0) > 0 then
         return
     end
 

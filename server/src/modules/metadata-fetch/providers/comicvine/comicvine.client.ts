@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { PROVIDER_DELAYS_MS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
@@ -161,6 +162,7 @@ export class ComicVineClient {
 
       const body = (await res.json()) as ComicVineApiResponse<T>;
       if (body.status_code !== 1) {
+        markProviderFailed(`comicvine: api status_code=${body.status_code}`);
         this.logger.warn(`[comicvine] [fail] method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="${body.error}"`);
         return null;
       }
@@ -170,6 +172,7 @@ export class ComicVineClient {
       return body.results;
     } catch (err) {
       if (err instanceof ProviderThrottleError) throw err;
+      markProviderFailed('comicvine: unusable response');
       this.logger.warn(`[comicvine] [fail] method=GET durationMs=${Date.now() - startedAt} message="${sanitizeLogError(err)}"`);
       return null;
     }

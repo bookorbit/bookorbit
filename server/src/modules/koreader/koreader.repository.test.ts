@@ -1042,9 +1042,9 @@ describe('KoreaderRepository', () => {
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(8);
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
-      // Seven returning deletes plus the retirement marker, which is cleared without being counted.
-      expect(tx.delete).toHaveBeenCalledTimes(8);
-      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(8);
+      // Delivery configuration and retirement markers are cleared without changing the data-row count.
+      expect(tx.delete).toHaveBeenCalledTimes(9);
+      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(9);
       expect(returning).toHaveBeenCalledTimes(7);
       expect(tx.select).toHaveBeenCalledTimes(1);
 
@@ -1071,7 +1071,7 @@ describe('KoreaderRepository', () => {
 
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(1);
 
-      expect(tx.delete).toHaveBeenCalledTimes(7);
+      expect(tx.delete).toHaveBeenCalledTimes(8);
       expect(tx.select).not.toHaveBeenCalled();
     });
 

@@ -36,7 +36,7 @@ const buttonClass = [
   'group/item h-8 w-full min-w-0 gap-2 rounded-md px-2 font-normal',
   'before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-primary',
   'before:opacity-0 before:transition-opacity before:duration-150',
-  'data-[active=true]:bg-(--shell-accent-tint) data-[active=true]:font-medium data-[active=true]:before:opacity-100',
+  'data-[active=true]:bg-(--sidebar-active-bg) data-[active=true]:[font-weight:var(--sidebar-active-weight)] data-[active=true]:before:opacity-100',
 ].join(' ')
 
 // The grip sits out of flow, so a row only gives up right-edge space while one is rendered.

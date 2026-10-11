@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthUser, BookDetail, CoverMedium } from '@bookorbit/types'
+import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import EditMetadataTab from '../EditMetadataTab.vue'
 
@@ -222,6 +223,36 @@ describe('EditMetadataTab cover tiles', () => {
     await flushPromises()
     const body = JSON.parse(patchCalls()[0]![1]!.body as string)
     expect(body.metadata).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' })
+  })
+
+  it('warns when auto-fill used saved results for a provider that was unavailable', async () => {
+    vi.mocked(toast.warning).mockClear()
+    vi.mocked(api).mockImplementation(async (url) => {
+      if (String(url).includes('/refresh-metadata?preview=true')) {
+        return json({
+          metadata: { isbn13: '9780306406157' },
+          diagnostics: {
+            candidateProviders: ['google'],
+            enabledUnreferencedProviders: [],
+            cacheServedProviders: [
+              { provider: 'google', source: 'fallback', stale: true, cachedAt: '2026-10-01T00:00:00.000Z' },
+              { provider: 'amazon', source: 'cache', stale: false, cachedAt: '2026-10-02T00:00:00.000Z' },
+            ],
+          },
+        })
+      }
+      if (String(url).includes('/metadata-fetch/providers')) return json([])
+      return json({})
+    })
+    const wrapper = mountTab(makeBook())
+    await flushPromises()
+    await wrapper.get('[aria-label="book.detail.editMetadata.autoFill"]').trigger('click')
+    await flushPromises()
+
+    expect(toast.warning).toHaveBeenCalledTimes(1)
+    const [message] = vi.mocked(toast.warning).mock.calls[0]!
+    expect(String(message)).toContain('Google Books')
+    expect(String(message)).not.toContain('Amazon')
   })
 
   it.each(['isbn10', 'isbn13'] as const)('preserves the %s lock when applying preview ISBNs', async (lockedField) => {

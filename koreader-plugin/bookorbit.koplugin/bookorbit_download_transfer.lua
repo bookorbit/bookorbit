@@ -168,6 +168,13 @@ function Transfer.run(opts)
         return nil, "unsafe_destination"
     end
 
+    local expected_hash = opts.expected_hash or (type(result) == "table" and result.server_hash)
+    if expected_hash then
+        local digest = type(result) == "table" and result.hash
+        if not digest then local ok, hash = pcall(util.partialMD5, completed_path); digest = ok and hash or nil end
+        if digest ~= expected_hash then util.removeFile(completed_path); return nil, "hash_mismatch" end
+    end
+
     local renamed, rename_err = os.rename(completed_path, opts.destination)
     if not renamed then
         util.removeFile(completed_path)

@@ -134,7 +134,7 @@ function dayLabel(day: string, minutes: number): string {
           <BookFormatChip
             v-if="session.format"
             :format-key="session.format"
-            class="h-4.5 shrink-0 rounded px-1.5 text-[9px] leading-none tracking-wider"
+            class="h-4.5 shrink-0 rounded-xs px-1.5 text-[9px] leading-none tracking-wider"
           />
         </li>
       </ul>

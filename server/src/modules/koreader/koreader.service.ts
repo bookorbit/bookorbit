@@ -2,7 +2,13 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
 
-import { DEFAULT_KOREADER_DEVICE_PATTERN, type KoreaderBookSyncInfo, type KoreaderDeviceInfo, type KoreaderSyncStatus } from '@bookorbit/types';
+import {
+  DEFAULT_KOREADER_DEVICE_PATTERN,
+  type ReadAloudDeliveryPreference,
+  type KoreaderBookSyncInfo,
+  type KoreaderDeviceInfo,
+  type KoreaderSyncStatus,
+} from '@bookorbit/types';
 import { StatsCache } from '../../common/cache/stats-cache';
 import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
@@ -55,7 +61,7 @@ export interface KoreaderProgressBookFile {
 
 /** What one applied sync push changed, for callers that have to reason about the move it made. */
 export interface KoreaderProgressApplyResult {
-  /** Whether shared reading progress moved; false when the push was held behind a reset. */
+  /** Whether shared reading progress moved; false for stale pushes or pending reset holds. */
   shared: boolean;
   /** BookOrbit-scale position held before this push, across every device of this user. */
   previousPercentage: number | null;
@@ -84,7 +90,7 @@ export class KoreaderService {
     private readonly packageService: KoreaderPackageService,
   ) {}
 
-  async createCredentials(userId: number, username: string, password: string) {
+  async createCredentials(userId: number, username: string, password: string, readAloudDelivery?: ReadAloudDeliveryPreference) {
     this.logger.log(`[${CREDENTIALS_EVENT}] [start] userId=${userId} username=${username} - creating credentials`);
 
     const existing = await this.repo.findKoreaderUser(userId);
@@ -96,12 +102,21 @@ export class KoreaderService {
     const passwordHash = await bcryptHash(password, BCRYPT_ROUNDS);
     const passwordMd5 = createHash('md5').update(password).digest('hex');
 
-    const result = await this.repo.createKoreaderUser({ userId, username, passwordHash, passwordMd5 });
+    const result = await this.repo.createKoreaderUser({
+      userId,
+      username,
+      passwordHash,
+      passwordMd5,
+      ...(readAloudDelivery !== undefined ? { readAloudDelivery } : {}),
+    });
     this.logger.log(`[${CREDENTIALS_EVENT}] [end] userId=${userId} username=${username} - credentials created`);
     return result;
   }
 
-  async updateCredentials(userId: number, data: { username?: string; password?: string; syncEnabled?: boolean }) {
+  async updateCredentials(
+    userId: number,
+    data: { username?: string; password?: string; syncEnabled?: boolean; readAloudDelivery?: ReadAloudDeliveryPreference },
+  ) {
     this.logger.log(`[${CREDENTIALS_EVENT}] [start] userId=${userId} - updating credentials`);
 
     const existing = await this.repo.findKoreaderUser(userId);
@@ -119,6 +134,8 @@ export class KoreaderService {
       updatePayload.passwordHash = await bcryptHash(data.password, BCRYPT_ROUNDS);
       updatePayload.passwordMd5 = createHash('md5').update(data.password).digest('hex');
     }
+
+    if (data.readAloudDelivery !== undefined) updatePayload.readAloudDelivery = data.readAloudDelivery;
 
     if (data.syncEnabled !== undefined) {
       updatePayload.syncEnabled = data.syncEnabled;
@@ -141,7 +158,12 @@ export class KoreaderService {
   async getCredentials(userId: number) {
     const row = await this.repo.findKoreaderUser(userId);
     if (!row) return null;
-    return { username: row.username, syncEnabled: row.syncEnabled, createdAt: row.createdAt.toISOString() };
+    return {
+      username: row.username,
+      syncEnabled: row.syncEnabled,
+      createdAt: row.createdAt.toISOString(),
+      readAloudDelivery: row.readAloudDelivery ?? null,
+    };
   }
 
   async testConnection(userId: number, username: string, password: string): Promise<boolean> {
@@ -199,11 +221,20 @@ export class KoreaderService {
   ): Promise<KoreaderProgressApplyResult> {
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
-    const previousDeviceProgress = await this.repo.getLatestDeviceProgress(bookFile.id, userId);
+    const [previousDeviceProgress, readingProgress] = await Promise.all([
+      this.repo.getLatestDeviceProgress(bookFile.id, userId),
+      this.repo.getReadingProgress(bookFile.id, userId),
+    ]);
     const result: KoreaderProgressApplyResult = {
       shared: false,
       previousPercentage: previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null,
     };
+
+    const newestKnown = Math.max(
+      previousDeviceProgress?.syncTimestamp ?? Math.floor((previousDeviceProgress?.updatedAt?.getTime() ?? 0) / 1000),
+      Math.floor((readingProgress?.updatedAt?.getTime() ?? 0) / 1000),
+    );
+    if (data.timestamp && data.timestamp < newestKnown) return result;
 
     this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
 
@@ -553,7 +584,15 @@ export class KoreaderService {
       this.packageService.getVersionInfo(),
       this.repo.listRetiredDeviceIds(userId),
     ]);
-    const devices = this.mapDevices(deviceRows, deviceSettings);
+    const deliveryRows = await this.repo.getDeviceDeliverySettingsForDevices(userId, [
+      ...deviceRows.map((row) => row.deviceId),
+      ...sweepRows.map((row) => row.deviceId),
+    ]);
+    const deliveryByDevice = new Map(deliveryRows.map((row) => [row.deviceId, row.readAloudDelivery]));
+    const devices = this.mapDevices(deviceRows, deviceSettings).map((device) => ({
+      ...device,
+      readAloudDelivery: deliveryByDevice.get(device.deviceId) ?? null,
+    }));
     // Rows are ordered newest first, so the first active device is the last sync that still counts.
     const lastSyncAt = devices.find((device) => device.retiredAt === null)?.lastSyncAt ?? null;
     const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
@@ -563,6 +602,7 @@ export class KoreaderService {
       return {
         deviceId: row.deviceId,
         deviceModel: row.deviceModel,
+        readAloudDelivery: deliveryByDevice.get(row.deviceId) ?? null,
         pluginVersion: row.pluginVersion,
         latestPluginVersion,
         updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),

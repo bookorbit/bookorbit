@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import KoboReplacement from '@/features/delivery/components/KoboReplacement.vue'
+import ReadAloudDeliverySelect from '@/features/delivery/components/ReadAloudDeliverySelect.vue'
+import { useReadAloudDelivery } from '@/features/delivery/composables/useReadAloudDelivery'
+import type { ReadAloudDeliveryPreference } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -15,6 +19,8 @@ import { useKoboSyncHistory } from '@/features/kobo/composables/useKoboSyncHisto
 import type { KoboDevice, KoboSyncHistoryEntry } from '@bookorbit/types'
 
 const { t } = useI18n()
+const { supported: deliverySupported } = useReadAloudDelivery()
+const readAloudDelivery = ref<ReadAloudDeliveryPreference>(null)
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false,
 })
@@ -29,6 +35,7 @@ const error = ref<string | null>(null)
 // Create device
 const showCreateForm = ref(false)
 const newDeviceName = ref('')
+const firstDeviceDelivery = ref<ReadAloudDeliveryPreference>('audioless_epub')
 const creating = ref(false)
 const createError = ref<string | null>(null)
 
@@ -147,6 +154,7 @@ function applySettingsToLocal() {
   twoWayProgressSync.value = settings.value.twoWayProgressSync
   syncBookOrbitAnnotationsToKobo.value = settings.value.syncBookOrbitAnnotationsToKobo
   storeSync.value = settings.value.storeSync
+  readAloudDelivery.value = settings.value.readAloudDelivery ?? null
 }
 
 function formatLastSeen(date: string | null): string {
@@ -581,6 +589,10 @@ async function submitCreate() {
   creating.value = true
   createError.value = null
   try {
+    if (deliverySupported.value && devices.value.length === 0) {
+      await updateSettings({ readAloudDelivery: firstDeviceDelivery.value })
+      readAloudDelivery.value = firstDeviceDelivery.value
+    }
     const device = await createDevice(newDeviceName.value.trim())
     newDeviceToken.value = device.token
     newDeviceSyncUrl.value = `${window.location.origin}/api/v1/kobo/${device.token}`
@@ -680,6 +692,7 @@ async function saveSettings() {
       twoWayProgressSync: twoWayProgressSync.value,
       syncBookOrbitAnnotationsToKobo: syncBookOrbitAnnotationsToKobo.value,
       storeSync: storeSync.value,
+      ...(deliverySupported.value ? { readAloudDelivery: readAloudDelivery.value } : {}),
     })
     applySettingsToLocal()
     toast.success(t('settings.reader.kobo.settingsSaved'))
@@ -691,6 +704,7 @@ async function saveSettings() {
   }
 }
 function beginCreate() {
+  firstDeviceDelivery.value = settings.value?.readAloudDelivery ?? 'audioless_epub'
   showCreateForm.value = true
 }
 </script>
@@ -787,6 +801,10 @@ function beginCreate() {
               autofocus
               class="input-field w-full"
             />
+          </div>
+          <div v-if="deliverySupported && devices.length === 0" class="space-y-2">
+            <ReadAloudDeliverySelect v-model="firstDeviceDelivery" :disabled="creating" />
+            <p class="text-xs text-muted-foreground">{{ t('delivery.readAloud.koboHint') }}</p>
           </div>
           <div v-if="createError" class="text-xs text-destructive">
             {{ createError }}
@@ -1038,6 +1056,13 @@ function beginCreate() {
         </template>
       </div>
     </div>
+
+    <div v-if="deliverySupported && activeTab === 'settings'" class="rounded-xs border border-border bg-card p-5 space-y-3">
+      <ReadAloudDeliverySelect v-model="readAloudDelivery" :disabled="savingSettings" />
+      <p class="text-xs text-muted-foreground">{{ t('delivery.readAloud.koboHint') }}</p>
+    </div>
+
+    <KoboReplacement v-if="deliverySupported && activeTab === 'settings'" :devices="devices" />
 
     <!-- Sync settings -->
     <div v-show="activeTab === 'settings' || props.embedded" class="mb-8">

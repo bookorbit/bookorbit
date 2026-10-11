@@ -9,14 +9,14 @@ import {
   MetadataProviderKey,
   ProviderConfigurations,
 } from '@bookorbit/types';
-import { of } from 'rxjs';
+import { map, of } from 'rxjs';
 
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
-import { MetadataFetchService } from './metadata-fetch.service';
+import { MetadataFetchService, type MetadataSearchEvent } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import type { MetadataProvider } from './providers/metadata-provider';
@@ -75,6 +75,10 @@ describe('MetadataFetchPipeline', () => {
     fetchService = {
       searchCandidates: vi.fn(),
     } as unknown as Mocked<MetadataFetchService>;
+    // The pipeline reads the full event stream; tests describe candidates, so wrap them as events.
+    (fetchService as unknown as { search: unknown }).search = vi.fn((params: MetadataSearchParams, keys: MetadataProviderKey[]) =>
+      (fetchService.searchCandidates(params, keys) ?? of()).pipe(map((candidate): MetadataSearchEvent => ({ kind: 'candidate', candidate }))),
+    );
 
     preferencesService = {
       getGlobal: vi.fn(),
@@ -483,9 +487,78 @@ describe('MetadataFetchPipeline', () => {
 
     const { diagnostics } = await pipeline.runWithSources({ title: 'Query' }, {});
 
-    expect(fetchService.searchCandidates).not.toHaveBeenCalled();
+    // A provider in cooldown is asked of the cache only; with nothing cached it still contributes nothing.
+    const search = (fetchService as unknown as { search: ReturnType<typeof vi.fn> }).search;
+    expect(search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE], {
+      directiveByProvider: { [MetadataProviderKey.GOOGLE]: { policy: 'only-if-cached', allowFallback: false } },
+    });
     expect(diagnostics.reason).toBe('providers_throttled');
     expect(diagnostics.throttledProviders).toEqual([MetadataProviderKey.GOOGLE]);
+    expect(diagnostics.activeProviders).toEqual([]);
+  });
+
+  describe('metadata cache', () => {
+    function useTitleRule(providers: MetadataProviderKey[]) {
+      const global = createPreferences((fields) => {
+        fields.title = { enabled: true, providers, mergeStrategy: 'overwriteIfProvided' };
+      });
+      preferencesService.getGlobal.mockResolvedValue(global);
+      resolver.resolve.mockReturnValue(global);
+      resolver.withForwardCompatibility.mockReturnValue(global);
+      registry.all.mockReturnValue(providers.map((key) => ({ key })) as never);
+    }
+
+    function searchMock() {
+      return (fetchService as unknown as { search: ReturnType<typeof vi.fn> }).search;
+    }
+
+    it('resolves fields from a provider in cooldown when the cache holds its answer', async () => {
+      useTitleRule([MetadataProviderKey.GOOGLE]);
+      throttleTracker.isThrottled.mockReturnValue(true);
+      searchMock().mockReturnValue(
+        of<MetadataSearchEvent>(
+          { kind: 'candidate', candidate: { provider: MetadataProviderKey.GOOGLE, providerId: 'g1', title: 'Cached Title' } },
+          {
+            kind: 'run',
+            run: {
+              provider: MetadataProviderKey.GOOGLE,
+              served: { provider: MetadataProviderKey.GOOGLE, source: 'fallback', stale: true, cachedAt: '2026-01-01T00:00:00.000Z' },
+              outboundRequests: 0,
+            },
+          },
+        ),
+      );
+
+      const { resolved, diagnostics, cache } = await pipeline.runWithSources({ title: 'Query' }, {});
+
+      expect(resolved.title).toBe('Cached Title');
+      expect(diagnostics.reason).toBeNull();
+      expect(diagnostics.cacheServedProviders).toEqual([
+        { provider: MetadataProviderKey.GOOGLE, source: 'fallback', stale: true, cachedAt: '2026-01-01T00:00:00.000Z' },
+      ]);
+      expect(cache.outboundRequests).toBe(0);
+    });
+
+    it('forwards the cache directive and sums outbound requests across providers', async () => {
+      useTitleRule([MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
+      searchMock().mockReturnValue(
+        of<MetadataSearchEvent>(
+          { kind: 'candidate', candidate: { provider: MetadataProviderKey.GOOGLE, providerId: 'g1', title: 'Live Title' } },
+          { kind: 'run', run: { provider: MetadataProviderKey.GOOGLE, served: null, outboundRequests: 2 } },
+          { kind: 'run', run: { provider: MetadataProviderKey.OPEN_LIBRARY, served: null, outboundRequests: 3 } },
+        ),
+      );
+      const directive = { policy: 'refresh' as const, allowFallback: true };
+
+      const { cache, diagnostics } = await pipeline.runWithSources({ title: 'Query' }, {}, undefined, { cacheDirective: directive });
+
+      expect(searchMock()).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY], {
+        directive,
+        directiveByProvider: {},
+      });
+      expect(cache).toEqual({ servedProviders: [], outboundRequests: 5 });
+      expect(diagnostics.cacheServedProviders).toBeUndefined();
+    });
   });
 
   it('returns diagnostics when active providers return no candidates', async () => {
@@ -1954,10 +2027,36 @@ describe('MetadataFetchPipeline', () => {
       expect(resolved.hardcoverEditionId).toBe('ebook-edition');
     });
 
+    it("keeps a book's own chapters under a fill-missing narrators rule, and replaces them otherwise", async () => {
+      const chapters = [{ title: 'From Audnexus', startMs: 0 }];
+      register(MetadataProviderKey.AUDNEXUS);
+      answer({ [MetadataProviderKey.AUDNEXUS]: { audio: { title: 'Dune', authors: ['Frank Herbert'], chapters } } });
+      const existing = { chapters: [{ title: 'Own chapter', startMs: 0 }] };
+
+      usePreferences((preferences) => {
+        preferences.fields.narrators = { enabled: true, providers: [MetadataProviderKey.AUDNEXUS], mergeStrategy: 'fillMissing' };
+      });
+      const kept = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, existing, undefined, { coverMedia: AUDIO_ONLY });
+      expect(kept.resolved.chapters).toBeUndefined();
+
+      usePreferences((preferences) => {
+        preferences.fields.narrators = { enabled: true, providers: [MetadataProviderKey.AUDNEXUS], mergeStrategy: 'overwriteIfProvided' };
+      });
+      const replaced = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, existing, undefined, { coverMedia: AUDIO_ONLY });
+      expect(replaced.resolved.chapters).toEqual(chapters);
+
+      usePreferences((preferences) => {
+        preferences.fields.narrators = { enabled: true, providers: [MetadataProviderKey.AUDNEXUS], mergeStrategy: 'fillMissing' };
+      });
+      const filled = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, { chapters: [] }, undefined, { coverMedia: AUDIO_ONLY });
+      expect(filled.resolved.chapters).toEqual(chapters);
+    });
+
     it('takes nothing but art from a provider only a cover rule brought in, apart from an audiobook id', async () => {
       usePreferences((preferences) => {
-        // Community ratings name Audible and Hardcover by default, which would make them full providers.
+        // Community ratings and the audiobook fields name Audible by default, which would make it a full provider.
         preferences.fields.communityRating.providers = [MetadataProviderKey.GOOGLE];
+        for (const field of ['narrators', 'duration', 'abridged'] as const) preferences.fields[field].providers = [MetadataProviderKey.GOOGLE];
         preferences.fields.audioCover.providers = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.HARDCOVER];
       });
       register(MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE, MetadataProviderKey.HARDCOVER);
@@ -1991,6 +2090,7 @@ describe('MetadataFetchPipeline', () => {
     it('lets a cover-only provider be checked against the anchor without choosing it', async () => {
       usePreferences((preferences) => {
         preferences.fields.communityRating.providers = [MetadataProviderKey.GOOGLE];
+        for (const field of ['narrators', 'duration', 'abridged'] as const) preferences.fields[field].providers = [MetadataProviderKey.GOOGLE];
         preferences.fields.audioCover.providers = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.GOOGLE];
       });
       register(MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE);

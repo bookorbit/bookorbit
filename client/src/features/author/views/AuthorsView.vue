@@ -26,6 +26,10 @@ import { useAuthorsList } from '../composables/useAuthorsList'
 import { useRefreshingAuthors } from '../composables/useRefreshingAuthors'
 import { authorLetterKey, isLetterSort } from '../lib/author-identity'
 import { RECENTLY_ADDED_DAYS, type AuthorListSort, type AuthorQuickFilter, type AuthorSummary, type SortDirection } from '../types/author'
+import IgnoreCacheCheckbox from '@/features/metadata-cache/components/IgnoreCacheCheckbox.vue'
+import { showCacheFallbackToast } from '@/features/metadata-cache/lib/cache-feedback'
+import { splitMetadataCacheUsage, usageFallbackProviders, type IgnoreCacheOptions } from '@/features/metadata-cache/lib/metadata-cache'
+import { metadataProviderLabel } from '@/features/book/lib/metadata-refresh-feedback'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
 
 const { t } = useI18n()
@@ -55,6 +59,9 @@ const bulkRefreshing = ref(false)
 const bulkDeleting = ref(false)
 const deletingAuthorId = ref<number | null>(null)
 const confirmingBulkDelete = ref(false)
+const confirmingBulkRefresh = ref(false)
+const bulkRefreshIgnoreCache = ref(false)
+const bulkRefreshConfirmButton = ref<HTMLButtonElement | null>(null)
 
 const pendingDeleteIds = ref<number[]>([])
 const deleteDialogOpen = ref(false)
@@ -288,26 +295,49 @@ async function clearFilters() {
   suppressAutoReload.value = false
 }
 
-async function refreshSelectedAuthorsMetadata() {
+async function startBulkRefreshConfirm() {
+  if (selectedCount.value === 0 || bulkRefreshing.value || !canRefreshMetadata.value) return
+  bulkRefreshIgnoreCache.value = false
+  confirmingBulkRefresh.value = true
+  // The button that opened this is replaced by the confirmation, so focus would otherwise fall back to the page.
+  await nextTick()
+  bulkRefreshConfirmButton.value?.focus()
+}
+
+function cancelBulkRefreshConfirm() {
+  confirmingBulkRefresh.value = false
+}
+
+function confirmBulkRefresh() {
+  const ignoreCache = bulkRefreshIgnoreCache.value
+  confirmingBulkRefresh.value = false
+  void refreshSelectedAuthorsMetadata({ ignoreCache })
+}
+
+async function refreshSelectedAuthorsMetadata(options: IgnoreCacheOptions = {}) {
   const ids = [...selectedIds.value]
   if (ids.length === 0 || bulkRefreshing.value || !canRefreshMetadata.value) return
 
   bulkRefreshing.value = true
   markRefreshing(ids)
   try {
-    const result = await bulkRefreshAuthorsMetadata(ids, (event) => {
-      if (event.imageUpdated) {
-        const index = items.value.findIndex((item) => item.id === event.authorId)
-        if (index !== -1) {
-          const next = [...items.value]
-          const current = next[index]
-          if (!current) return
-          next[index] = { ...current, imageUrl: event.imageUrl ?? null }
-          items.value = next
+    const result = await bulkRefreshAuthorsMetadata(
+      ids,
+      (event) => {
+        if (event.imageUpdated) {
+          const index = items.value.findIndex((item) => item.id === event.authorId)
+          if (index !== -1) {
+            const next = [...items.value]
+            const current = next[index]
+            if (!current) return
+            next[index] = { ...current, imageUrl: event.imageUrl ?? null }
+            items.value = next
+          }
         }
-      }
-      clearRefreshing([event.authorId])
-    })
+        clearRefreshing([event.authorId])
+      },
+      { ignoreCache: options.ignoreCache === true },
+    )
 
     if (result.failed > 0) {
       toast.warning(t('author.list.toast.bulkRefreshPartial', { updated: result.updated, failed: result.failed }))
@@ -327,7 +357,7 @@ async function refreshSingleAuthorMetadata(authorId: number) {
 
   markRefreshing([authorId])
   try {
-    const updated = await refreshAuthorMetadata(authorId)
+    const { value: updated, usage } = splitMetadataCacheUsage(await refreshAuthorMetadata(authorId))
     const index = items.value.findIndex((item) => item.id === authorId)
     if (index !== -1) {
       const next = [...items.value]
@@ -337,6 +367,7 @@ async function refreshSingleAuthorMetadata(authorId: number) {
       items.value = next
     }
     showRefreshResultToast(updated)
+    showCacheFallbackToast(usageFallbackProviders(usage), metadataProviderLabel)
   } catch (actionError) {
     toast.error(actionError instanceof Error ? actionError.message : t('author.list.toast.refreshFailed'))
   } finally {
@@ -466,7 +497,10 @@ watch(
 watch(
   [selectionMode, selectedCount],
   ([mode, count]) => {
-    if (!mode || count === 0) confirmingBulkDelete.value = false
+    if (!mode || count === 0) {
+      confirmingBulkDelete.value = false
+      confirmingBulkRefresh.value = false
+    }
   },
   { flush: 'post' },
 )
@@ -591,13 +625,13 @@ defineOptions({ name: 'AuthorsView' })
                 class="aspect-square w-full animate-pulse bg-muted/60"
                 :class="authorCoverShape === 'circle' ? 'rounded-full' : 'rounded-[10px]'"
               />
-              <div class="h-3 w-3/4 animate-pulse rounded bg-muted/50" />
+              <div class="h-3 w-3/4 animate-pulse rounded-xs bg-muted/50" />
             </div>
           </div>
           <div v-else class="flex flex-col gap-1">
             <div v-for="index in INITIAL_SKELETON_COUNT" :key="`author-skeleton-row-${index}`" class="flex items-center gap-3 px-2 py-1">
               <div class="size-[30px] shrink-0 animate-pulse rounded-lg bg-muted/60" />
-              <div class="h-3 w-40 max-w-[45%] animate-pulse rounded bg-muted/50" />
+              <div class="h-3 w-40 max-w-[45%] animate-pulse rounded-xs bg-muted/50" />
             </div>
           </div>
         </div>
@@ -695,7 +729,37 @@ defineOptions({ name: 'AuthorsView' })
 
     <SelectionActionBar :visible="selectionMode" :count="selectedCount" @exit="exitSelectionMode">
       <template #content>
-        <template v-if="!confirmingBulkDelete">
+        <template v-if="confirmingBulkRefresh">
+          <span class="whitespace-nowrap px-3 text-sm font-semibold text-foreground" data-testid="author-bulk-refresh-confirm">
+            {{ t('author.list.selection.confirmRefreshCount', { count: selectedCount }) }}
+          </span>
+
+          <div class="mx-1 h-5 w-px shrink-0 bg-border" />
+
+          <IgnoreCacheCheckbox v-model="bulkRefreshIgnoreCache" compact class="px-2" />
+
+          <div class="mx-1 h-5 w-px shrink-0 bg-border" />
+
+          <button
+            ref="bulkRefreshConfirmButton"
+            type="button"
+            class="h-8 rounded-full px-3 text-sm font-medium text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+            data-testid="author-bulk-refresh-confirm-action"
+            @click="confirmBulkRefresh"
+          >
+            {{ t('author.list.selection.refreshAction') }}
+          </button>
+
+          <button
+            type="button"
+            class="h-8 rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            @click="cancelBulkRefreshConfirm"
+          >
+            {{ t('common.cancel') }}
+          </button>
+        </template>
+
+        <template v-else-if="!confirmingBulkDelete">
           <span class="whitespace-nowrap rounded-full bg-primary/10 px-2.5 py-0.5 text-sm font-semibold tabular-nums text-primary">
             {{ selectedCount }}
           </span>
@@ -726,7 +790,8 @@ defineOptions({ name: 'AuthorsView' })
                 :aria-label="t('author.list.selection.refreshMetadata')"
                 class="flex size-9 items-center justify-center rounded-full transition-colors"
                 :class="selectedCount > 0 ? 'text-foreground hover:bg-muted' : 'cursor-not-allowed text-muted-foreground'"
-                @click="refreshSelectedAuthorsMetadata"
+                data-testid="author-bulk-refresh"
+                @click="startBulkRefreshConfirm"
               >
                 <RefreshCcw :size="17" :class="bulkRefreshing ? 'animate-spin' : ''" />
               </button>

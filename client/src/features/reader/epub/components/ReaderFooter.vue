@@ -145,7 +145,7 @@ watch(
         v-model="goToValue"
         type="text"
         :placeholder="t('reader.footer.goToPlaceholder')"
-        class="w-24 h-8 text-sm tabular-nums text-center bg-muted border border-border rounded px-2 py-1 text-foreground outline-none focus:ring-1 focus:ring-primary"
+        class="w-24 h-8 text-sm tabular-nums text-center bg-muted border border-border rounded-xs px-2 py-1 text-foreground outline-none focus:ring-1 focus:ring-primary"
         @keydown.enter="handleGoToSubmit"
         @keydown="handleGoToKeydown"
         @blur="handleGoToBlur"

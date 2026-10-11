@@ -93,7 +93,7 @@ function onReset() {
       <button
         v-if="changed"
         type="button"
-        class="inline-flex shrink-0 items-center gap-1 rounded px-1 text-xs font-semibold tabular-nums text-primary transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary md:hidden"
+        class="inline-flex shrink-0 items-center gap-1 rounded-xs px-1 text-xs font-semibold tabular-nums text-primary transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary md:hidden"
         :aria-label="t('settings.admin.scoreWeights.revertField', { field: label })"
         @click="onReset"
       >
@@ -106,7 +106,7 @@ function onReset() {
       <button
         v-if="changed"
         type="button"
-        class="inline-flex items-center gap-1 rounded px-1 text-xs font-semibold tabular-nums text-primary transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+        class="inline-flex items-center gap-1 rounded-xs px-1 text-xs font-semibold tabular-nums text-primary transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
         :aria-label="t('settings.admin.scoreWeights.revertField', { field: label })"
         @click="onReset"
       >

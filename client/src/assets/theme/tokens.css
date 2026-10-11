@@ -25,7 +25,9 @@
   --popover: oklch(0.975 var(--tint-c-surface) var(--tint-h));
   --popover-foreground: oklch(0.145 var(--tint-c-surface) var(--tint-h));
 
-  --primary: oklch(0.21 var(--tint-c-surface) var(--tint-h));
+  /* The accent class sets --accent-primary; a style may derive --primary from it instead. */
+  --accent-primary: oklch(0.21 var(--tint-c-surface) var(--tint-h));
+  --primary: var(--accent-primary);
   --primary-foreground: oklch(0.985 0.004 var(--tint-h));
 
   --secondary: oklch(0.955 var(--tint-c-surface) var(--tint-h));
@@ -39,12 +41,6 @@
 
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.52 0.16 150);
-  --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.57 0.15 75);
-  --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.52 0.17 245);
-  --info-foreground: oklch(0.985 0 0);
 
   --success: oklch(0.52 0.14 148);
   --success-foreground: oklch(0.985 0 0);
@@ -56,6 +52,7 @@
 
   /* In flight: neither finished nor broken. Tuned per theme for the same reason. */
   --info: oklch(0.55 0.12 255);
+  --info-foreground: oklch(0.985 0 0);
 
   --star-highlight: oklch(0.76 0.18 90);
 
@@ -129,6 +126,16 @@
   /* Shape */
   --radius: 0.625rem;
 
+  /* The default surface palette (steel, as in surfaces.css), so a ladder that reads these is valid before data-surface lands. */
+  --surface-h: 258;
+  --surface-c: 0.01;
+  --surface-l: -0.005;
+
+  /* Type. The bridge maps the Tailwind font utilities onto these, so a style can swap them at runtime. */
+  --app-font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --app-font-serif: 'Fraunces Variable', ui-serif, Georgia, serif;
+  --app-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
   /* App shell (sidebar + header): one card gap, one material.
      --shell-surface-opacity is user-controlled and overwritten on <html>. */
   --shell-gap: 0.75rem;
@@ -140,6 +147,43 @@
   --shell-accent-tint: color-mix(in oklch, var(--primary) 12%, transparent);
   --shell-accent-line: color-mix(in oklch, var(--primary) 30%, transparent);
   --shell-border: var(--shell-accent-line);
+  --shell-backdrop: blur(24px) saturate(150%);
+  --shell-shadow: var(--elevation-lg);
+
+  /* Accent glow behind the top of the shell (.glow-wrapper). --glow-band is the style's own reach and
+     --glow-reach the user's multiplier on it, written on <html>. A texture keeps its tile size at any reach;
+     only the fade that reveals it follows the band. */
+  --glow-reach: 0.8;
+  --glow-band: 12rem;
+  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
+  --glow-texture: none;
+  --glow-texture-size: auto;
+
+  /* How a grid cover answers the pointer. */
+  --cover-hover-transform: scale(1.02);
+
+  /* Sidebar section labels, counts and the active navigation row. */
+  --sidebar-heading-foreground: var(--muted-foreground);
+  --sidebar-heading-size: 11px;
+  --sidebar-heading-weight: 500;
+  --sidebar-heading-tracking: 0.14em;
+  --sidebar-count-bg: var(--shell-accent-tint);
+  --sidebar-count-size: 11px;
+  --sidebar-count-weight: 600;
+  --sidebar-active-bg: var(--shell-accent-tint);
+  --sidebar-active-weight: 500;
+
+  /* How strongly a format chip wears its format colour (see formatChipStyle). */
+  --format-chip-fill: 10%;
+  --format-chip-border: 40%;
+
+  /* Book detail metadata chips. Tag ink is tuned like --warning so it clears AA on a light card. */
+  --chip-genre-bg: var(--muted);
+  --chip-genre-fg: var(--foreground);
+  --chip-genre-border: transparent;
+  --chip-tag-bg: oklch(0.769 0.188 70.08 / 0.1);
+  --chip-tag-fg: oklch(0.52 0.13 68);
+  --chip-tag-border: oklch(0.769 0.188 70.08 / 0.3);
 
   --dot-color: oklch(0.82 var(--tint-c-surface) var(--tint-h));
 
@@ -250,31 +294,6 @@
   --audit-collections: oklch(0.55 0.09 255);
   --audit-integrations: oklch(0.58 0.15 150);
   --audit-settings: oklch(0.55 0.15 25);
-
-  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
-     reason every other text colour is: one set of hex values for both themes left the brightest
-     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
-  --pill-format-default: oklch(0.55 0.02 260);
-  --pill-format-epub: oklch(0.55 0.14 150);
-  --pill-format-kepub: oklch(0.55 0.12 178);
-  --pill-format-mobi: oklch(0.55 0.18 275);
-  --pill-format-azw3: oklch(0.53 0.11 185);
-  --pill-format-azw: oklch(0.55 0.14 235);
-  --pill-format-fb2: oklch(0.55 0.17 355);
-  --pill-format-djvu: oklch(0.55 0.04 255);
-  --pill-format-txt: oklch(0.55 0.03 60);
-  --pill-format-pdf: oklch(0.55 0.17 25);
-  --pill-format-cbz: oklch(0.55 0.16 260);
-  --pill-format-cbr: oklch(0.58 0.15 55);
-  --pill-format-cb7: oklch(0.55 0.19 300);
-  --pill-format-cbx: oklch(0.55 0.17 325);
-  --pill-format-m4b: oklch(0.58 0.13 75);
-  --pill-format-m4a: oklch(0.58 0.13 95);
-  --pill-format-mp3: oklch(0.56 0.15 145);
-  --pill-format-opus: oklch(0.55 0.11 205);
-  --pill-format-ogg: oklch(0.56 0.15 130);
-  --pill-format-flac: oklch(0.55 0.13 165);
-  --pill-format-readalong: oklch(0.52 0.1 186);
 }
 
 @media (min-width: 40rem) {
@@ -304,7 +323,7 @@
   --popover: oklch(calc(0.18 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));
   --popover-foreground: oklch(0.985 0.001 var(--tint-h));
 
-  --primary: oklch(0.91 var(--tint-c-surface) var(--tint-h));
+  --accent-primary: oklch(0.91 var(--tint-c-surface) var(--tint-h));
   --primary-foreground: oklch(0.18 var(--tint-c-surface) var(--tint-h));
 
   --secondary: oklch(calc(0.245 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));
@@ -318,12 +337,6 @@
 
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.74 0.15 150);
-  --success-foreground: oklch(0.145 0 0);
-  --warning: oklch(0.78 0.14 75);
-  --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.75 0.14 245);
-  --info-foreground: oklch(0.145 0 0);
 
   --success: oklch(0.72 0.15 148);
   --success-foreground: oklch(0.145 0 0);
@@ -332,6 +345,7 @@
   --warning-foreground: oklch(0.145 0 0);
 
   --info: oklch(0.72 0.12 255);
+  --info-foreground: oklch(0.145 0 0);
 
   --star-highlight: oklch(0.84 0.17 95);
 
@@ -389,6 +403,8 @@
 
   --scrollbar-thumb: oklch(0.35 var(--tint-c) var(--tint-h));
   --scrollbar-thumb-hover: oklch(0.45 var(--tint-c) var(--tint-h));
+
+  --chip-tag-fg: oklch(0.828 0.189 84.429);
 
   /* Lifted lightness so pills read on dark surfaces */
   --pill-web: oklch(0.72 0.14 245);
@@ -474,30 +490,4 @@
   --audit-collections: oklch(0.72 0.09 255);
   --audit-integrations: oklch(0.75 0.13 150);
   --audit-settings: oklch(0.72 0.15 25);
-
-  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
-     reason every other text colour is: one set of hex values for both themes left the brightest
-     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
-
-  --pill-format-default: oklch(0.75 0.02 260);
-  --pill-format-epub: oklch(0.75 0.13 150);
-  --pill-format-kepub: oklch(0.75 0.11 178);
-  --pill-format-mobi: oklch(0.72 0.16 275);
-  --pill-format-azw3: oklch(0.76 0.11 185);
-  --pill-format-azw: oklch(0.72 0.13 235);
-  --pill-format-fb2: oklch(0.73 0.15 355);
-  --pill-format-djvu: oklch(0.75 0.04 255);
-  --pill-format-txt: oklch(0.76 0.03 60);
-  --pill-format-pdf: oklch(0.72 0.15 25);
-  --pill-format-cbz: oklch(0.72 0.14 260);
-  --pill-format-cbr: oklch(0.76 0.13 55);
-  --pill-format-cb7: oklch(0.72 0.17 300);
-  --pill-format-cbx: oklch(0.73 0.15 325);
-  --pill-format-m4b: oklch(0.79 0.13 75);
-  --pill-format-m4a: oklch(0.8 0.13 95);
-  --pill-format-mp3: oklch(0.78 0.15 145);
-  --pill-format-opus: oklch(0.76 0.11 205);
-  --pill-format-ogg: oklch(0.78 0.15 130);
-  --pill-format-flac: oklch(0.75 0.13 165);
-  --pill-format-readalong: oklch(0.78 0.11 186);
 }

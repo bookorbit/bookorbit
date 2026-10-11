@@ -117,20 +117,23 @@ function exportJson() {
     </PopoverTrigger>
     <PopoverContent align="end" class="w-44 p-1">
       <button
-        class="flex items-center gap-2 w-full px-3 py-2 rounded text-sm text-foreground hover:bg-muted transition-colors"
+        class="flex items-center gap-2 w-full px-3 py-2 rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
         @click="exportMarkdown"
       >
         <FileText :size="14" class="text-muted-foreground" />
         Markdown
       </button>
       <button
-        class="flex items-center gap-2 w-full px-3 py-2 rounded text-sm text-foreground hover:bg-muted transition-colors"
+        class="flex items-center gap-2 w-full px-3 py-2 rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
         @click="exportPlainText"
       >
         <FileType :size="14" class="text-muted-foreground" />
         {{ t('book.detail.highlights.export.plainText') }}
       </button>
-      <button class="flex items-center gap-2 w-full px-3 py-2 rounded text-sm text-foreground hover:bg-muted transition-colors" @click="exportJson">
+      <button
+        class="flex items-center gap-2 w-full px-3 py-2 rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
+        @click="exportJson"
+      >
         <FileJson :size="14" class="text-muted-foreground" />
         JSON
       </button>

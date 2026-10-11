@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, Eye, Folder, FolderPlus, Headphones, Pencil, Star, Trash2, X } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -15,7 +15,7 @@ import BookFormatChip from './BookFormatChip.vue'
 import { bookFormatEntries, fileFormatKey } from '../lib/book-formats'
 import { displayPublishedDate } from '../lib/published-date'
 import { FORMAT_TO_GROUP, getPrimaryBookFile } from '@bookorbit/types'
-import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
+import { useBookCoverAspectRatio } from '../composables/useBookCoverAspectRatio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
@@ -77,7 +77,7 @@ const providerLinks = computed(() => (detail.value ? createBookProviderLinks(det
 
 const safeDescription = useSafeHtml(() => detail.value?.description)
 
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const coverAspectRatio = useBookCoverAspectRatio(() => detail.value)
 const { bookCoverDisplayMode } = useDisplaySettings()
 const quickViewCoverAspectRatio = computed(() => {
   if (
@@ -180,7 +180,7 @@ function handleDelete() {
           <!-- Header: cover + title block -->
           <div class="p-5 pt-10 border-b shrink-0">
             <div v-if="loading" class="flex gap-4 items-start">
-              <Skeleton class="w-24 rounded shrink-0" :style="{ aspectRatio: coverAspectRatio }" />
+              <Skeleton class="w-24 rounded-xs shrink-0" :style="{ aspectRatio: coverAspectRatio }" />
               <div class="flex-1 space-y-2 pt-1">
                 <Skeleton class="h-4 w-full" />
                 <Skeleton class="h-3 w-3/4" />
@@ -192,7 +192,7 @@ function handleDelete() {
               <!-- Cover -->
               <BookCoverSurface
                 size="mini"
-                class="book-cover-surface--spine-fitted w-24 shrink-0 rounded overflow-hidden relative"
+                class="book-cover-surface--spine-fitted w-24 shrink-0 rounded-xs overflow-hidden relative"
                 :disable-spine="isPrimaryAudio"
                 :is-comic="isPrimaryComic"
                 :class="detail.coverSource && !coverFailed ? 'cursor-zoom-in' : ''"
@@ -232,7 +232,7 @@ function handleDelete() {
                     target="_blank"
                     rel="noopener noreferrer"
                     :title="t('book.quickView.openIn', { provider: link.label })"
-                    class="inline-flex size-6 items-center justify-center rounded border transition-colors hover:bg-muted/60"
+                    class="inline-flex size-6 items-center justify-center rounded-xs border transition-colors hover:bg-muted/60"
                     :style="providerLinkStyle(link.key)"
                   >
                     <img
@@ -265,12 +265,12 @@ function handleDelete() {
           <div class="flex-1 overflow-y-auto p-5 space-y-4">
             <template v-if="loading">
               <div class="flex gap-1.5">
-                <Skeleton class="h-5 w-12 rounded" />
-                <Skeleton class="h-5 w-16 rounded" />
-                <Skeleton class="h-5 w-10 rounded" />
+                <Skeleton class="h-5 w-12 rounded-xs" />
+                <Skeleton class="h-5 w-16 rounded-xs" />
+                <Skeleton class="h-5 w-10 rounded-xs" />
               </div>
               <Skeleton class="h-3 w-1/2" />
-              <Skeleton class="h-32 w-full rounded" />
+              <Skeleton class="h-32 w-full rounded-xs" />
             </template>
 
             <template v-else-if="detail">
@@ -281,17 +281,17 @@ function handleDelete() {
                   :key="entry.key"
                   :format-key="entry.key"
                   :primary="entry.primary"
-                  class="rounded px-2 py-0.5 text-[10px] tracking-wider"
+                  class="rounded-xs px-2 py-0.5 text-[10px] tracking-wider"
                 />
-                <span v-if="detail.pageCount" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                <span v-if="detail.pageCount" class="text-[10px] font-semibold px-2 py-0.5 rounded-xs bg-muted text-muted-foreground">
                   {{ t('book.quickView.pages', { count: detail.pageCount }) }}
                 </span>
-                <span v-if="publishedDisplay" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                <span v-if="publishedDisplay" class="text-[10px] font-semibold px-2 py-0.5 rounded-xs bg-muted text-muted-foreground">
                   {{ publishedDisplay }}
                 </span>
                 <span
                   v-if="detail.language"
-                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground"
+                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs bg-muted text-muted-foreground"
                 >
                   {{ detail.language }}
                 </span>
@@ -309,8 +309,8 @@ function handleDelete() {
                   {{ primaryFile.filename ?? t('book.quickView.fileNumber', { id: primaryFile.id }) }}
                 </p>
                 <div class="mt-1.5 flex items-center gap-1.5">
-                  <BookFormatChip :format-key="fileFormatKey(primaryFile) ?? '?'" class="rounded px-2 py-0.5 text-[10px] tracking-wider" />
-                  <span class="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                  <BookFormatChip :format-key="fileFormatKey(primaryFile) ?? '?'" class="rounded-xs px-2 py-0.5 text-[10px] tracking-wider" />
+                  <span class="text-[10px] px-2 py-0.5 rounded-xs bg-muted text-muted-foreground">
                     {{ formatBytes(primaryFile.sizeBytes) }}
                   </span>
                 </div>

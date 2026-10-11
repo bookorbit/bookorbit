@@ -307,7 +307,7 @@ describe('BookRequestDedupeService.checkAvailability', () => {
     const results = await service.checkAvailability(
       [
         { title: 'Dune', isbn13: '9780441013593', mediaKind: 'ebook' },
-        { title: 'Dune', isbn13: '9780441013593', mediaKind: 'comic' },
+        { title: 'Dune', isbn13: '9780441013593', mediaKind: 'audiobook' },
       ],
       1,
       null,
@@ -315,7 +315,7 @@ describe('BookRequestDedupeService.checkAvailability', () => {
 
     expect(results.map((result) => result.ownedBookId)).toEqual([42, null]);
     expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593'], ['dune'], null, 'ebook');
-    expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593'], ['dune'], null, 'comic');
+    expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593'], ['dune'], null, 'audiobook');
   });
 
   it('falls back to a title match when the candidate has no ISBN', async () => {

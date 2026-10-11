@@ -1,4 +1,4 @@
-import { readCssColor } from '@/lib/echarts'
+import { readCssColor } from '@/lib/css-color'
 
 type Rgb = {
   r: number

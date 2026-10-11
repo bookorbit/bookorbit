@@ -42,7 +42,10 @@ import RadiusPicker from '@/components/RadiusPicker.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import ThemePicker from '@/components/ThemePicker.vue'
 import SurfaceBrightnessPicker from '@/components/SurfaceBrightnessPicker.vue'
-import SurfacePicker from '@/components/SurfacePicker.vue'
+import SurfaceOpacityPicker from '@/components/SurfaceOpacityPicker.vue'
+import StylePicker from '@/components/StylePicker.vue'
+import SurfacePalettePicker from '@/components/SurfacePalettePicker.vue'
+import GlowReachPicker from '@/components/GlowReachPicker.vue'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
@@ -71,6 +74,8 @@ const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 const { subscribe: subscribeNotifications } = useNotifications()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const themeStore = useThemeStore()
+const showSurfaceOpacity = computed(() => themeStore.appearanceControls.surfaceOpacity)
+const showSurfaceBrightness = computed(() => themeStore.resolvedTheme === 'dark' && themeStore.appearanceControls.brightness)
 const localeStore = useLocaleStore()
 const { openLegalNotices } = useLegalNotices()
 const currentLanguageLabel = computed(() => LOCALE_LABELS[localeStore.locale])
@@ -343,7 +348,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
 
 <template>
   <header
-    class="relative z-30 mx-(--shell-gap) mt-(--shell-gap) flex h-12 flex-none shrink-0 items-center gap-2 rounded-(--shell-radius) border border-(--shell-border) bg-(--shell-surface) px-3 shadow-lg backdrop-blur-xl backdrop-saturate-150"
+    class="relative z-30 mx-(--shell-gap) mt-(--shell-gap) flex h-12 flex-none shrink-0 items-center gap-2 rounded-(--shell-radius) border border-(--shell-border) bg-(--shell-surface) px-3 shadow-(--shell-shadow) shell-backdrop"
   >
     <!-- Mobile: search active overlay -->
     <template v-if="mobileSearchOpen">
@@ -397,7 +402,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
                   :book-id="row.result.id"
                   type="thumbnail"
                   :version="row.result.coverVersion"
-                  class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
+                  class="h-16 w-12 object-cover rounded-xs shrink-0 bg-muted"
                   :alt="row.result.title ?? ''"
                 />
                 <div class="flex-1 min-w-0">
@@ -427,7 +432,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
                     v-for="entry in resultFormatEntries(row.result)"
                     :key="entry.key"
                     :format-key="entry.key"
-                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded"
+                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded-xs"
                   />
                 </div>
               </button>
@@ -481,7 +486,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
           </button>
           <kbd
             v-else
-            class="hidden h-5 select-none items-center gap-1 rounded border border-(--shell-accent-line) px-1.5 font-mono text-[11px] font-semibold text-muted-foreground lg:inline-flex"
+            class="hidden h-5 select-none items-center gap-1 rounded-xs border border-(--shell-accent-line) px-1.5 font-mono text-[11px] font-semibold text-muted-foreground lg:inline-flex"
           >
             <span class="leading-none">⌘</span>
             <span class="leading-none">K</span>
@@ -522,7 +527,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
                   :book-id="row.result.id"
                   type="thumbnail"
                   :version="row.result.coverVersion"
-                  class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
+                  class="h-16 w-12 object-cover rounded-xs shrink-0 bg-muted"
                   :alt="row.result.title ?? ''"
                 />
                 <div class="flex-1 min-w-0">
@@ -552,7 +557,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
                     v-for="entry in resultFormatEntries(row.result)"
                     :key="entry.key"
                     :format-key="entry.key"
-                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded"
+                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded-xs"
                   />
                 </div>
               </button>
@@ -774,6 +779,18 @@ function resultFormatEntries(result: GlobalSearchResult) {
                 <div class="space-y-4">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">{{ t('components.appHeader.appearance') }}</p>
                   <div class="space-y-1.5">
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.style') }}</span>
+                    <StylePicker />
+                  </div>
+                  <div v-if="themeStore.appearanceControls.surfacePalette" class="space-y-1.5">
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.surfacePalette') }}</span>
+                    <SurfacePalettePicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.topGlow') }}</span>
+                    <GlowReachPicker />
+                  </div>
+                  <div class="space-y-1.5">
                     <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
                     <ThemePicker />
                   </div>
@@ -785,15 +802,15 @@ function resultFormatEntries(result: GlobalSearchResult) {
                     <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
                     <RadiusPicker />
                   </div>
-                  <div class="space-y-1.5">
+                  <div v-if="showSurfaceOpacity" class="space-y-1.5">
                     <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.surfaceOpacity') }}</span>
-                    <SurfacePicker />
+                    <SurfaceOpacityPicker />
                   </div>
-                  <div v-if="themeStore.resolvedTheme === 'dark'" class="space-y-1.5">
+                  <div v-if="showSurfaceBrightness" class="space-y-1.5">
                     <span class="text-[13px] text-muted-foreground">{{ t('settings.appearance.theme.surfaceBrightness.label') }}</span>
                     <SurfaceBrightnessPicker />
                   </div>
-                  <div class="space-y-1.5">
+                  <div v-if="themeStore.appearanceControls.background" class="space-y-1.5">
                     <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.background') }}</span>
                     <BackgroundPicker />
                   </div>
@@ -892,6 +909,21 @@ function resultFormatEntries(result: GlobalSearchResult) {
         <SheetDescription class="sr-only">{{ t('components.appHeader.appearanceDescription') }}</SheetDescription>
       </SheetHeader>
       <div class="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <section class="space-y-3 rounded-lg border border-border bg-card p-3">
+          <div class="space-y-2">
+            <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.style') }}</h3>
+            <StylePicker touch />
+          </div>
+          <div v-if="themeStore.appearanceControls.surfacePalette" class="space-y-2 border-t border-border pt-3">
+            <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.surfacePalette') }}</h3>
+            <SurfacePalettePicker touch />
+          </div>
+          <div class="space-y-2 border-t border-border pt-3">
+            <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.topGlow') }}</h3>
+            <GlowReachPicker />
+          </div>
+        </section>
+
         <section class="space-y-2 rounded-lg border border-border bg-card p-3">
           <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.theme') }}</h3>
           <ThemePicker touch />
@@ -907,18 +939,18 @@ function resultFormatEntries(result: GlobalSearchResult) {
           <RadiusPicker touch />
         </section>
 
-        <section class="space-y-3 rounded-lg border border-border bg-card p-3">
-          <div class="space-y-2">
+        <section v-if="showSurfaceOpacity || showSurfaceBrightness" class="space-y-3 rounded-lg border border-border bg-card p-3">
+          <div v-if="showSurfaceOpacity" class="space-y-2">
             <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.surfaceOpacity') }}</h3>
-            <SurfacePicker />
+            <SurfaceOpacityPicker />
           </div>
-          <div v-if="themeStore.resolvedTheme === 'dark'" class="space-y-2 border-t border-border pt-3">
+          <div v-if="showSurfaceBrightness" class="space-y-2" :class="showSurfaceOpacity ? 'border-t border-border pt-3' : ''">
             <h3 class="text-xs font-medium text-foreground">{{ t('settings.appearance.theme.surfaceBrightness.label') }}</h3>
             <SurfaceBrightnessPicker />
           </div>
         </section>
 
-        <section class="space-y-2 rounded-lg border border-border bg-card p-3">
+        <section v-if="themeStore.appearanceControls.background" class="space-y-2 rounded-lg border border-border bg-card p-3">
           <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.background') }}</h3>
           <BackgroundPicker touch />
         </section>

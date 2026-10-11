@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailRecipientRepository } from './email-recipient.repository';
@@ -24,6 +24,7 @@ export class EmailRecipientService {
   }
 
   async create(dto: CreateEmailRecipientDto, user: RequestUser) {
+    if (dto.deviceType === 'kindle' && dto.readAloudDelivery === 'original') throw new BadRequestException({ code: 'KINDLE_ORIGINAL_UNAVAILABLE' });
     await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [created] = await this.repo.insert({
@@ -32,6 +33,7 @@ export class EmailRecipientService {
         email: dto.email,
         deviceType: dto.deviceType ?? null,
         preferredFormat: dto.preferredFormat ?? null,
+        readAloudDelivery: dto.readAloudDelivery ?? null,
         defaultTemplateId: dto.defaultTemplateId ?? null,
       });
       return created;
@@ -44,7 +46,11 @@ export class EmailRecipientService {
   }
 
   async update(id: number, dto: UpdateEmailRecipientDto, user: RequestUser) {
-    await this.getOwnedById(id, user);
+    const current = await this.getOwnedById(id, user);
+    const deviceType = dto.deviceType === undefined ? current.deviceType : dto.deviceType;
+    if (deviceType === 'kindle' && dto.readAloudDelivery === 'original') throw new BadRequestException({ code: 'KINDLE_ORIGINAL_UNAVAILABLE' });
+    if (deviceType === 'kindle' && current.readAloudDelivery === 'original' && dto.readAloudDelivery === undefined)
+      dto.readAloudDelivery = 'audioless_epub';
     await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [updated] = await this.repo.update(id, user.id, dto);

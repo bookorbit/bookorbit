@@ -922,5 +922,53 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
+    "className": "MetadataCacheController",
+    "methodName": "getConfig",
+    "httpMethod": "GET",
+    "path": "/metadata-cache/config",
+    "permissions": ["Permission.ManageMetadataConfig"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
+    "className": "MetadataCacheController",
+    "methodName": "updateConfig",
+    "httpMethod": "PUT",
+    "path": "/metadata-cache/config",
+    "permissions": ["Permission.ManageMetadataConfig"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
+    "className": "MetadataCacheController",
+    "methodName": "getStats",
+    "httpMethod": "GET",
+    "path": "/metadata-cache/stats",
+    "permissions": ["Permission.ManageMetadataConfig"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
+    "className": "MetadataCacheController",
+    "methodName": "clear",
+    "httpMethod": "DELETE",
+    "path": "/metadata-cache",
+    "permissions": ["Permission.ManageMetadataConfig"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

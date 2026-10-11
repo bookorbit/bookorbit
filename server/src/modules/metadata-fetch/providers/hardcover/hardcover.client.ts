@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { markProviderDegraded, markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
 import { toBearerAuthorization } from '../../../../common/utils/bearer-token.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
@@ -91,6 +92,14 @@ class RateLimiter {
   }
 }
 
+// GraphQL reports query and permission faults in a 200 body, sometimes alongside partial data.
+function reportGraphqlBodyQuality(body: unknown, op: string): void {
+  const record = typeof body === 'object' && body !== null ? (body as { errors?: unknown; data?: unknown }) : null;
+  if (!record || record.errors !== undefined || record.data === undefined || record.data === null) {
+    markProviderFailed(`hardcover.${op}: graphql error body`);
+  }
+}
+
 @Injectable()
 export class HardcoverClient {
   private readonly logger = new Logger(HardcoverClient.name);
@@ -98,6 +107,7 @@ export class HardcoverClient {
 
   async searchByIsbn(isbn: string, apiKey: string, signal?: AbortSignal): Promise<HardcoverBookWithEditions[]> {
     const body = await this.post<HardcoverBooksResponse>('search-by-isbn', SEARCH_BY_ISBN_QUERY, { isbn }, apiKey, signal);
+    if (body && !Array.isArray(body.data?.books)) markProviderFailed('hardcover.search-by-isbn: response without books');
     return body?.data?.books ?? [];
   }
 
@@ -109,11 +119,16 @@ export class HardcoverClient {
       apiKey,
       signal,
     );
-    return body?.data?.search?.results?.hits?.map((h) => h.document).filter((d): d is HardcoverSearchDocument => d != null) ?? [];
+    const hits = body?.data?.search?.results?.hits;
+    if (body && !Array.isArray(hits)) markProviderFailed('hardcover.search: response without hits');
+    const documents = hits?.map((h) => h.document).filter((d): d is HardcoverSearchDocument => d != null) ?? [];
+    if (hits && documents.length < hits.length) markProviderDegraded('hardcover.search: hit without document');
+    return documents;
   }
 
   async lookupBySlug(slug: string, apiKey: string, signal?: AbortSignal): Promise<HardcoverBookWithEditions | null> {
     const body = await this.post<HardcoverBooksResponse>('lookup', LOOKUP_BY_SLUG_QUERY, { slug }, apiKey, signal);
+    if (body && !Array.isArray(body.data?.books)) markProviderFailed('hardcover.lookup: response without books');
     return body?.data?.books?.[0] ?? null;
   }
 
@@ -147,6 +162,7 @@ export class HardcoverClient {
       }
 
       const body = (await res.json()) as T;
+      reportGraphqlBodyQuality(body, op);
       this.logger.log(`[hardcover] [end] op=${op} method=POST status=${res.status} durationMs=${Date.now() - startedAt}`);
       return body;
     } catch (err) {
@@ -154,6 +170,7 @@ export class HardcoverClient {
         this.logger.warn(`[hardcover] [fail] op=${op} method=POST durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
+      markProviderFailed(`hardcover.${op}: unusable response`);
       this.logger.warn(`[hardcover] [fail] op=${op} method=POST durationMs=${Date.now() - startedAt} message="${sanitizeLogError(err)}"`);
       return null;
     }

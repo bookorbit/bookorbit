@@ -2,12 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { markProviderDegraded, markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_BUDGETS_MS, PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_RETRY, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { pickSearchInputs, providerCacheContext } from '../provider-cache';
 import { buildRequestSignal, createSearchDeadline, rethrowWithPartialCandidates, SearchDeadline, sleep } from '../provider-utils';
 import { mapGoodreadsApolloState, mapGoodreadsAutocompleteItem } from './goodreads.mapper';
 import { GoodreadsAutocompleteItem, GoodreadsNextData } from './goodreads.types';
@@ -48,6 +51,16 @@ export class GoodreadsProvider implements IdentifiableProvider {
 
   private readonly logger = new Logger(GoodreadsProvider.name);
 
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: false,
+    context: async () => providerCacheContext((await this.providerConfig.getConfig()).goodreads.enabled),
+    // An ISBN picks the query, but title and author still rank what autocomplete returns for it.
+    describeSearch: (params) => ({ inputs: pickSearchInputs(params, ['title', 'author', 'isbn']) }),
+    // Only the blocked fallback reads the search fields, and it is never cached.
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
+
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
@@ -81,14 +94,17 @@ export class GoodreadsProvider implements IdentifiableProvider {
             }
           }
           if (!candidate && target.item) {
+            markProviderDegraded('goodreads.search: autocomplete summary in place of detail');
             autocompleteCandidate = mapGoodreadsAutocompleteItem(target.item, target.id);
             candidate = autocompleteCandidate;
           }
           if (candidate) results.push(candidate);
+          else markProviderDegraded('goodreads.search: book skipped');
           if (blocked) {
             // Goodreads keeps autocomplete available while WAF gates HTML pages. Keep the source
             // useful with summary candidates instead of putting the whole provider in cooldown.
             if (!autocompleteCandidate) throw blockedError();
+            markProviderDegraded('goodreads.search: blocked, remaining books from autocomplete');
             for (const remaining of limitedTargets.slice(index + 1)) {
               if (!remaining.item) continue;
               const fallback = mapGoodreadsAutocompleteItem(remaining.item, remaining.id);
@@ -115,6 +131,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
     try {
       const { candidate, outcome } = await this.fetchBook(providerId, deadline);
       if (outcome === 'blocked') {
+        markProviderDegraded('goodreads.lookup: blocked, autocomplete fallback');
         if (!params) throw blockedError();
         const targets = await this.searchAutocompleteTargets(params, deadline);
         const matchingItem = targets.find((target) => target.id === providerId)?.item;
@@ -160,6 +177,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
         deadline.signal,
       );
       if (Array.isArray(autocomplete)) autocompleteItems.push(...autocomplete);
+      else if (autocomplete !== null) markProviderFailed('goodreads.search-autocomplete: response not a list');
     }
     return rankAutocompleteItems(autocompleteItems, params, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS);
   }
@@ -186,8 +204,9 @@ export class GoodreadsProvider implements IdentifiableProvider {
     if (!html) return { candidate: null, outcome };
     const nextData = extractNextData(html);
     const state = nextData?.props?.pageProps?.apolloState;
-    if (!state) return { candidate: null, outcome: 'ok' };
-    return { candidate: mapGoodreadsApolloState(state, bookId), outcome: 'ok' };
+    const candidate = state ? mapGoodreadsApolloState(state, bookId) : null;
+    if (!candidate) markProviderDegraded('goodreads.lookup: book page did not parse');
+    return { candidate, outcome: 'ok' };
   }
 
   /**
@@ -234,6 +253,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
       }
       const html = await res.text();
       if (isWafChallenge(res.status, html)) {
+        markProviderDegraded(`goodreads.${op}: bot challenge`);
         this.logger.warn(`[goodreads] [fail] op=${op}${suffix} status=${res.status} durationMs=${Date.now() - startedAt} message="bot challenge"`);
         return { html: null, outcome: 'blocked' };
       }
@@ -244,6 +264,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
         this.logger.warn(`[goodreads] [fail] op=${op}${suffix} durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
+      markProviderFailed(`goodreads.${op}: request failed`);
       this.logger.warn(
         `[goodreads] [fail] op=${op}${suffix} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
@@ -278,6 +299,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
         );
         throw err;
       }
+      markProviderFailed(`goodreads.${op}: unusable response`);
       this.logger.warn(
         `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );

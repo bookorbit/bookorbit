@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
-import { AuthorMetadataProviderKey } from '@bookorbit/types';
+import { IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { AuthorMetadataProviderKey, METADATA_CACHE_REQUEST_POLICIES, type MetadataCacheRequestPolicy } from '@bookorbit/types';
 
 export class ListAuthorMetadataDto {
   @IsString()
@@ -38,4 +38,12 @@ export class ListAuthorMetadataDto {
   })
   @IsEnum(AuthorMetadataProviderKey, { each: true })
   providers?: AuthorMetadataProviderKey[];
+
+  /**
+   * `refresh` skips saved answers and asks every provider live. Clients must only send it to servers
+   * advertising the `metadata-search-cache` feature.
+   */
+  @IsOptional()
+  @IsIn(METADATA_CACHE_REQUEST_POLICIES)
+  cache?: MetadataCacheRequestPolicy;
 }

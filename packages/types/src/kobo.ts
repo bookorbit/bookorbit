@@ -1,3 +1,5 @@
+import type { ReadAloudDeliveryPreference } from "./delivery";
+
 export interface KoboDevice {
   id: number;
   name: string;
@@ -17,6 +19,7 @@ export interface KoboSyncSettings {
   kepubConversionLimitMb: number;
   twoWayProgressSync: boolean;
   syncBookOrbitAnnotationsToKobo: boolean;
+  readAloudDelivery?: ReadAloudDeliveryPreference;
   storeSync: boolean;
 }
 
@@ -55,5 +58,6 @@ export interface UpdateKoboSyncSettingsRequest {
   kepubConversionLimitMb?: number;
   twoWayProgressSync?: boolean;
   syncBookOrbitAnnotationsToKobo?: boolean;
+  readAloudDelivery?: ReadAloudDeliveryPreference;
   storeSync?: boolean;
 }

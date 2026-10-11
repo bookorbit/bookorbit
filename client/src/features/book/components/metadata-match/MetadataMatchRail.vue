@@ -2,7 +2,16 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, RefreshCw, RotateCcw, ScanSearch, TriangleAlert } from '@lucide/vue'
-import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, MetadataProviderSearchOutcome } from '@bookorbit/types'
+import type {
+  MetadataCandidate,
+  MetadataCandidateCacheInfo,
+  MetadataProviderInfo,
+  MetadataProviderKey,
+  MetadataProviderSearchOutcome,
+} from '@bookorbit/types'
+import MetadataCacheNotice from '@/features/metadata-cache/components/MetadataCacheNotice.vue'
+import SearchFreshButton from '@/features/metadata-cache/components/SearchFreshButton.vue'
+import type { MetadataCacheSummary } from '@/features/metadata-cache/lib/metadata-cache'
 import { candidateKey, type MatchGroups } from '../../lib/metadata-match'
 import type { DifferenceSummary } from '../../lib/metadata-diff-fields'
 import MetadataMatchQuery, { type MetadataQuery } from './MetadataMatchQuery.vue'
@@ -23,6 +32,10 @@ const props = defineProps<{
   selectedKey: string | null
   stagedByCandidate: Map<string, number>
   coverRatio: string
+  /** Offers a search that skips saved answers; the parent must handle `searchFresh`. */
+  canSearchFresh?: boolean
+  cacheSummary?: MetadataCacheSummary | null
+  cacheInfo?: (candidate: MetadataCandidate) => MetadataCandidateCacheInfo | null
 }>()
 
 const emit = defineEmits<{
@@ -32,6 +45,7 @@ const emit = defineEmits<{
   selectFieldRules: []
   retryProvider: [MetadataProviderKey]
   select: [MetadataCandidate]
+  searchFresh: []
 }>()
 
 const { t } = useI18n()
@@ -55,6 +69,8 @@ const interruptions = computed(() =>
 )
 const noResults = computed(() => props.hasSearched && !props.isStreaming && total.value === 0 && !props.retryingProviders.length)
 const sourceCount = computed(() => props.selectedProviders.length || props.providers.length)
+// Shown while results still stream in too: a fresh search cancels the running one, so it stays reachable throughout.
+const showCacheNotice = computed(() => props.canSearchFresh && props.hasSearched && (props.cacheSummary?.cachedCount ?? 0) > 0)
 
 const SUMMARY_NONE: DifferenceSummary = { fills: 0, changes: 0 }
 
@@ -64,6 +80,10 @@ function summaryOf(candidate: MetadataCandidate): DifferenceSummary {
 
 function stagedOf(candidate: MetadataCandidate): number {
   return props.stagedByCandidate.get(candidateKey(candidate)) ?? 0
+}
+
+function cacheOf(candidate: MetadataCandidate): MetadataCandidateCacheInfo | null {
+  return props.cacheInfo?.(candidate) ?? null
 }
 
 function isSelected(candidate: MetadataCandidate): boolean {
@@ -100,6 +120,10 @@ function handleRetry(provider: MetadataProviderKey) {
 
 function handleSelect(candidate: MetadataCandidate) {
   emit('select', candidate)
+}
+
+function handleSearchFresh() {
+  emit('searchFresh')
 }
 
 function toggleOtherBooks() {
@@ -164,10 +188,21 @@ defineExpose({ focusQuery })
           >
             {{ t('book.detail.editMetadata.match.results.searchTitleOnly') }}
           </button>
+          <SearchFreshButton v-if="canSearchFresh" @search-fresh="handleSearchFresh" />
         </div>
       </div>
 
       <template v-else>
+        <MetadataCacheNotice
+          v-if="showCacheNotice && cacheSummary"
+          class="mx-2 mt-2 rounded-lg border border-dashed border-border px-2.5 py-2"
+          :summary="cacheSummary"
+          @search-fresh="handleSearchFresh"
+        />
+        <!-- A provider whose saved answer was "nothing" leaves no result to mark, so this is always offered. -->
+        <div v-else-if="canSearchFresh" class="mx-2 mt-2 flex justify-end">
+          <SearchFreshButton @search-fresh="handleSearchFresh" />
+        </div>
         <template v-if="groups.strong.length">
           <h3 class="flex items-center gap-2 px-2 pt-3 pb-1.5 text-[10.5px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
             {{ t('book.detail.editMetadata.match.results.best')
@@ -183,6 +218,7 @@ defineExpose({ focusQuery })
             :selected="isSelected(match.candidate)"
             :staged-count="stagedOf(match.candidate)"
             :cover-ratio="coverRatio"
+            :cache="cacheOf(match.candidate)"
             @select="handleSelect"
           />
         </template>
@@ -202,6 +238,7 @@ defineExpose({ focusQuery })
             :selected="isSelected(match.candidate)"
             :staged-count="stagedOf(match.candidate)"
             :cover-ratio="coverRatio"
+            :cache="cacheOf(match.candidate)"
             @select="handleSelect"
           />
         </template>
@@ -213,9 +250,9 @@ defineExpose({ focusQuery })
           <div v-for="n in total ? 2 : 5" :key="n" class="grid grid-cols-[2.875rem_minmax(0,1fr)] gap-2.5 p-2" aria-hidden="true">
             <span class="block w-full animate-pulse rounded-[5px] bg-muted motion-reduce:animate-none" :style="{ aspectRatio: coverRatio }" />
             <span class="grid content-start gap-1.5 pt-1">
-              <span class="h-3 w-4/5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-              <span class="h-2.5 w-3/5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-              <span class="h-4 w-2/5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+              <span class="h-3 w-4/5 animate-pulse rounded-xs bg-muted motion-reduce:animate-none" />
+              <span class="h-2.5 w-3/5 animate-pulse rounded-xs bg-muted motion-reduce:animate-none" />
+              <span class="h-4 w-2/5 animate-pulse rounded-xs bg-muted motion-reduce:animate-none" />
             </span>
           </div>
         </template>
@@ -266,6 +303,7 @@ defineExpose({ focusQuery })
               :selected="isSelected(match.candidate)"
               :staged-count="stagedOf(match.candidate)"
               :cover-ratio="coverRatio"
+              :cache="cacheOf(match.candidate)"
               @select="handleSelect"
             />
           </template>

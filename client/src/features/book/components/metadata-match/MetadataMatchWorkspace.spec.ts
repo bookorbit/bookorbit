@@ -190,4 +190,54 @@ describe('MetadataMatchWorkspace', () => {
     expect(wrapper.text()).toContain('Fetched')
     wrapper.unmount()
   })
+
+  describe('metadata cache', () => {
+    const cacheInfo = (candidate: MetadataCandidate) =>
+      candidate.provider === 'amazon' ? { fetchedAt: '2026-10-01T00:00:00.000Z', stale: true } : null
+    const cacheSummary = { cachedCount: 1, staleCount: 1, oldestFetchedAt: '2026-10-01T00:00:00.000Z' }
+
+    it('badges results the cache answered for and offers a fresh search', async () => {
+      const wrapper = mountWorkspace({ canSearchFresh: true, cacheInfo, cacheSummary })
+
+      const badges = wrapper.findAll('[data-testid="metadata-cache-badge"]')
+      expect(badges).toHaveLength(1)
+      expect(badges[0]!.attributes('data-stale')).toBe('true')
+      expect(wrapper.find('[data-testid="metadata-cache-notice"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="metadata-cache-notice"] [data-testid="metadata-cache-search-fresh"]').trigger('click')
+      expect(wrapper.emitted('searchFresh')).toHaveLength(1)
+      wrapper.unmount()
+    })
+
+    it('shows no notice when the parent cannot search fresh or nothing came from the cache', () => {
+      const unsupported = mountWorkspace({ cacheInfo, cacheSummary })
+      expect(unsupported.find('[data-testid="metadata-cache-notice"]').exists()).toBe(false)
+      unsupported.unmount()
+
+      const live = mountWorkspace({ canSearchFresh: true, cacheSummary: { cachedCount: 0, staleCount: 0, oldestFetchedAt: null } })
+      expect(live.find('[data-testid="metadata-cache-notice"]').exists()).toBe(false)
+      expect(live.find('[data-testid="metadata-cache-badge"]').exists()).toBe(false)
+      live.unmount()
+    })
+
+    it('still offers a fresh search beside live results, since a saved empty answer leaves no result to mark', async () => {
+      const wrapper = mountWorkspace({ canSearchFresh: true, cacheSummary: { cachedCount: 0, staleCount: 0, oldestFetchedAt: null } })
+
+      await wrapper.get('[data-testid="metadata-cache-search-fresh"]').trigger('click')
+      expect(wrapper.emitted('searchFresh')).toHaveLength(1)
+      wrapper.unmount()
+
+      const unsupported = mountWorkspace({})
+      expect(unsupported.find('[data-testid="metadata-cache-search-fresh"]').exists()).toBe(false)
+      unsupported.unmount()
+    })
+
+    it('offers a fresh search when nothing matched, since a saved empty answer may be the cause', async () => {
+      const wrapper = mountWorkspace({ results: [], providerCounts: {}, canSearchFresh: true })
+
+      await wrapper.get('[data-testid="metadata-cache-search-fresh"]').trigger('click')
+      expect(wrapper.emitted('searchFresh')).toHaveLength(1)
+      wrapper.unmount()
+    })
+  })
 })

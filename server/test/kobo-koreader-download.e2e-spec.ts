@@ -1,12 +1,12 @@
 import { randomUUID } from 'crypto';
-import { readFile, readdir, stat, writeFile } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { and, eq, sql } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../src/db/book-file-hash-history';
-import { AudiolessEpubService } from '../src/modules/book/audioless-epub.service';
+import { KoboDeliveryService } from '../src/modules/kobo/services/kobo-delivery.service';
 import { KoboSettingsService } from '../src/modules/kobo/services/kobo-settings.service';
 import { KoboDownloadHashRegistrationService } from '../src/modules/kobo/services/kobo-download-hash-registration.service';
 import { computeFileHash } from '../src/common/utils/file-hash.utils';
@@ -62,8 +62,8 @@ describe('Kobo download identity in KOReader (e2e)', { timeout: 180_000 }, () =>
     return response.json() as { matches: { hash: string; bookId: number; bookFileId: number }[]; libraryVersion: string };
   }
 
-  async function download() {
-    return ctx.app.inject({ method: 'GET', url: `/api/v1/kobo/${deviceToken}/v1/books/${source.bookId}/download` });
+  async function download(token = deviceToken) {
+    return ctx.app.inject({ method: 'GET', url: `/api/v1/kobo/${token}/v1/books/${source.bookId}/download` });
   }
 
   async function withCurrentHashCollision(run: () => Promise<void>) {
@@ -132,8 +132,6 @@ describe('Kobo download identity in KOReader (e2e)', { timeout: 180_000 }, () =>
       payload: { convertToKepub: true, storeSync: false },
     });
     expect(settings.statusCode).toBe(200);
-    const sync = await ctx.app.inject({ method: 'GET', url: `/api/v1/kobo/${deviceToken}/v1/library/sync` });
-    expect(sync.statusCode).toBe(200);
     // The external converter is substituted with a different valid EPUB. The download, hashing,
     // history persistence, matching, access checks and progress endpoints are the real app.
     downloadPath = await createEpubFixture(join(ctx.fixture.booksPath, '.kepub-cache', String(source.bookId)), `${originalHash}.kepub.epub`, {
@@ -143,6 +141,8 @@ describe('Kobo download identity in KOReader (e2e)', { timeout: 180_000 }, () =>
     deliveredHash = await computeFileHash(downloadPath);
     expect(deliveredHash).not.toBe(originalHash);
     vi.spyOn(ctx.app.get(KepubConversionService), 'getKepubPath').mockResolvedValue(downloadPath);
+    const sync = await ctx.app.inject({ method: 'GET', url: `/api/v1/kobo/${deviceToken}/v1/library/sync` });
+    expect(sync.statusCode).toBe(200);
   });
 
   afterAll(async () => {
@@ -185,6 +185,17 @@ describe('Kobo download identity in KOReader (e2e)', { timeout: 180_000 }, () =>
   it('ships a download while its library is locked, rolls back registration, then replays its queued identity', async () => {
     const path = await createEpubFixture(ctx.fixture.rootPath, 'lock-wait.epub', { title: 'Lock wait regression', uid: `urn:uuid:${randomUUID()}` });
     const hash = await computeFileHash(path);
+    const device = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/kobo/devices',
+      headers: authHeader(user.accessToken),
+      payload: { name: 'Pinned retry device' },
+    });
+    expect(device.statusCode).toBe(201);
+    const freshDevice = device.json() as { id: number; token: string };
+    vi.spyOn(ctx.app.get(KepubConversionService), 'getKepubPath').mockResolvedValue(path);
+    await ctx.app.get(KoboDeliveryService).offer(user.userId, freshDevice.id, source.bookId);
+    vi.spyOn(ctx.app.get(KepubConversionService), 'getKepubPath').mockResolvedValue(downloadPath);
     const [book] = await ctx.db.select({ libraryId: schema.books.libraryId }).from(schema.books).where(eq(schema.books.id, source.bookId));
     const [before] = await ctx.db
       .select({ revision: schema.libraries.koreaderHashRevision })
@@ -211,7 +222,8 @@ describe('Kobo download identity in KOReader (e2e)', { timeout: 180_000 }, () =>
       expect(Date.now() - duplicateStart).toBeLessThan(1000);
       vi.spyOn(ctx.app.get(KepubConversionService), 'getKepubPath').mockResolvedValue(path);
       const startedAt = Date.now();
-      const response = await download();
+      expect((await download()).statusCode).toBe(409);
+      const response = await download(freshDevice.token);
       const durationMs = Date.now() - startedAt;
       expect(response.statusCode).toBe(200);
       expect(response.rawPayload).toEqual(await readFile(path));
@@ -334,37 +346,26 @@ describe('Kobo download identity in KOReader (e2e)', { timeout: 180_000 }, () =>
     }
   });
 
-  it('delivers an uncached audioless EPUB during a database outage and recovers identity after temporary cleanup', async () => {
+  it('keeps an issued offer pinned across settings edits and queues registration during a database outage', async () => {
     const repository = ctx.app.get(KoboDownloadRepository);
     const settings = ctx.app.get(KoboSettingsService);
     const storedSettings = await settings.getSettings(user.userId);
-    const settingsSpy = vi.spyOn(settings, 'getSettings').mockResolvedValue({ ...storedSettings, convertToKepub: false });
-    const temporaryPaths: string[] = [];
-    const stripSpy = vi.spyOn(ctx.app.get(AudiolessEpubService), 'writeArchive').mockImplementation(async (input, output) => {
-      temporaryPaths.push(output);
-      await writeFile(output, Buffer.concat([await readFile(input), Buffer.from('narration-free delivery regression')]));
-      return { removedEntries: 1, sanitizedEntries: 1 };
-    });
-    await ctx.db.update(schema.bookFiles).set({ mediaOverlayAvailable: true }).where(eq(schema.bookFiles.id, source.bookFileId));
+    const settingsSpy = vi
+      .spyOn(settings, 'getSettings')
+      .mockResolvedValue({ ...storedSettings, convertToKepub: false, readAloudDelivery: 'original' });
     const registrationSpy = vi.spyOn(repository, 'registerDeliveredHash').mockRejectedValue(new Error('Transient database outage'));
-    let queuedHash: string;
     try {
       const response = await download();
       expect(response.statusCode).toBe(200);
-      expect(response.rawPayload.length).toBeGreaterThan(0);
-      queuedHash = registrationSpy.mock.calls[0]![1];
-      expect(queuedHash).not.toBe(originalHash);
-      expect((await match(queuedHash)).matches).toEqual([]);
+      expect(response.rawPayload).toEqual(await readFile(downloadPath));
+      expect(registrationSpy).toHaveBeenCalledWith(source.bookFileId, deliveredHash);
+      expect(await readdir(join(ctx.fixture.booksPath, '.kobo-download-hashes'))).toContain(`${source.bookFileId}-${deliveredHash}`);
     } finally {
       registrationSpy.mockRestore();
       settingsSpy.mockRestore();
-      stripSpy.mockRestore();
-      await ctx.db.update(schema.bookFiles).set({ mediaOverlayAvailable: false }).where(eq(schema.bookFiles.id, source.bookFileId));
     }
-    expect(temporaryPaths).toHaveLength(1);
-    await expect(stat(temporaryPaths[0]!)).rejects.toMatchObject({ code: 'ENOENT' });
     await ctx.app.get(KoboDownloadHashRegistrationService).replay();
-    expect((await match(queuedHash)).matches).toEqual([{ hash: queuedHash, bookId: source.bookId, bookFileId: source.bookFileId }]);
+    expect((await match(deliveredHash)).matches).toEqual([{ hash: deliveredHash, bookId: source.bookId, bookFileId: source.bookFileId }]);
   });
 
   it('increments the scoped revision once for concurrent duplicate registrations and supports rollback', async () => {

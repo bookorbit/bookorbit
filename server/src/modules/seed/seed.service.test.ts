@@ -52,6 +52,7 @@ describe('SeedService', () => {
     expect(insertedRows).toContainEqual({ key: APP_SETTING_KEYS.ALLOW_REGISTRATION, value: 'false' });
     expect(insertedRows).toContainEqual({ key: APP_SETTING_KEYS.OPDS_ENABLED, value: 'true' });
     expect(insertedRows).toContainEqual({ key: APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED, value: 'true' });
+    expect(insertedRows).toContainEqual({ key: APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB, value: '4096' });
 
     const oidcRow = insertedRows.find((row) => row.key === APP_SETTING_KEYS.OIDC_CONFIG);
     expect(oidcRow).toBeDefined();

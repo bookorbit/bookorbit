@@ -154,14 +154,14 @@ function close() {
                   <input
                     type="checkbox"
                     :checked="selectedRecipientIds.includes(r.id)"
-                    class="rounded border-border text-primary"
+                    class="rounded-xs border-border text-primary"
                     @change="toggleRecipient(r.id)"
                   />
                   <div class="flex-1 min-w-0">
                     <p class="text-sm text-foreground">{{ r.name }}</p>
                     <p class="text-xs text-muted-foreground truncate">{{ r.email }}</p>
                   </div>
-                  <span v-if="r.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">{{
+                  <span v-if="r.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-xs bg-primary/15 text-primary">{{
                     t('email.badge.default')
                   }}</span>
                 </label>
@@ -181,7 +181,7 @@ function close() {
                   <input
                     type="checkbox"
                     :checked="selectedGroupIds.includes(g.id)"
-                    class="rounded border-border text-primary"
+                    class="rounded-xs border-border text-primary"
                     @change="toggleGroup(g.id)"
                   />
                   <div class="flex-1 min-w-0">

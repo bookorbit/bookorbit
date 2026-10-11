@@ -77,6 +77,8 @@ export function useBookRequests(scope: RequestScope) {
     if (selfServe.value !== '') query.set('selfServe', selfServe.value)
     query.set('sortBy', sortBy.value)
     query.set('sortDir', sortDir.value)
+    // A pair is one row here, led by its ebook, with the audiobook riding along as its companion.
+    query.set('groupPairs', 'true')
 
     try {
       const res = await api(`${basePath}?${query}`)
@@ -154,8 +156,16 @@ export function useBookRequests(scope: RequestScope) {
    */
   function replaceItem(updated: BookRequestItem): void {
     const index = items.value.findIndex((item) => item.id === updated.id)
-    if (index === -1) return
-    items.value.splice(index, 1, updated)
+    if (index !== -1) {
+      // A single request comes back flat, so the half it leads keeps the companion it already had.
+      items.value.splice(index, 1, { ...updated, companion: items.value[index]!.companion ?? null })
+      localEdits++
+      return
+    }
+
+    const pairIndex = items.value.findIndex((item) => item.companion?.id === updated.id)
+    if (pairIndex === -1) return
+    items.value.splice(pairIndex, 1, { ...items.value[pairIndex]!, companion: updated })
     localEdits++
   }
 
@@ -165,9 +175,22 @@ export function useBookRequests(scope: RequestScope) {
    */
   function dropItem(id: number): void {
     const index = items.value.findIndex((item) => item.id === id)
-    if (index === -1) return
-    items.value.splice(index, 1)
-    total.value = Math.max(0, total.value - 1)
+    if (index !== -1) {
+      const companion = items.value[index]!.companion
+      // The other half of a pair is still a request somebody is waiting on, so it stays as a row
+      // of its own rather than leaving with the half that went.
+      if (companion) items.value.splice(index, 1, { ...companion, companion: null })
+      else {
+        items.value.splice(index, 1)
+        total.value = Math.max(0, total.value - 1)
+      }
+      localEdits++
+      return
+    }
+
+    const pairIndex = items.value.findIndex((item) => item.companion?.id === id)
+    if (pairIndex === -1) return
+    items.value.splice(pairIndex, 1, { ...items.value[pairIndex]!, companion: null })
     localEdits++
   }
 

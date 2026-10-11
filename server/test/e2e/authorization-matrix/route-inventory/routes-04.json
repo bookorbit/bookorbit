@@ -646,5 +646,113 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "prepareReplacement",
+    "httpMethod": "POST",
+    "path": "/kobo/devices/:id/books/:bookId/replacement",
+    "permissions": ["Permission.KoboSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "offerReplacement",
+    "httpMethod": "POST",
+    "path": "/kobo/devices/:id/replacements/:deliveryId/offer",
+    "permissions": ["Permission.KoboSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "confirmReplacement",
+    "httpMethod": "POST",
+    "path": "/kobo/devices/:id/replacements/:deliveryId/confirm",
+    "permissions": ["Permission.KoboSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "cancelReplacement",
+    "httpMethod": "POST",
+    "path": "/kobo/devices/:id/replacements/:deliveryId/cancel",
+    "permissions": ["Permission.KoboSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "getReplacement",
+    "httpMethod": "GET",
+    "path": "/kobo/devices/:id/replacements/:deliveryId",
+    "permissions": ["Permission.KoboSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-user.controller.ts",
+    "className": "KoboUserController",
+    "methodName": "getDelivery",
+    "httpMethod": "GET",
+    "path": "/kobo/devices/:id/books/:bookId/delivery",
+    "permissions": ["Permission.KoboSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/koreader/koreader-delivery.controller.ts",
+    "className": "KoreaderDeliveryController",
+    "methodName": "getSettings",
+    "httpMethod": "GET",
+    "path": "/koreader/plugin/delivery-settings/:deviceId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": ["KoreaderAuthGuard"]
+  },
+  {
+    "file": "server/src/modules/koreader/koreader-delivery.controller.ts",
+    "className": "KoreaderDeliveryController",
+    "methodName": "updatePluginSettings",
+    "httpMethod": "PUT",
+    "path": "/koreader/plugin/delivery-settings/:deviceId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": ["KoreaderAuthGuard"]
+  },
+  {
+    "file": "server/src/modules/koreader/koreader-delivery.controller.ts",
+    "className": "KoreaderDeliveryController",
+    "methodName": "updateSettings",
+    "httpMethod": "PATCH",
+    "path": "/koreader/devices/:deviceId/delivery-settings",
+    "permissions": ["Permission.KoreaderSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { ReadAloudDeliveryPreference } from '@bookorbit/types';
 import { chunk } from '../../common/utils/batch.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -97,13 +98,68 @@ export class KoreaderRepository {
     });
   }
 
-  async createKoreaderUser(data: { userId: number; username: string; passwordHash: string; passwordMd5: string }) {
+  async createKoreaderUser(data: {
+    userId: number;
+    username: string;
+    passwordHash: string;
+    passwordMd5: string;
+    readAloudDelivery?: ReadAloudDeliveryPreference;
+  }) {
     const [row] = await this.db.insert(schema.koreaderUsers).values(data).returning();
     return row!;
   }
 
-  async updateKoreaderUser(userId: number, data: Partial<{ username: string; passwordHash: string; passwordMd5: string; syncEnabled: boolean }>) {
+  async updateKoreaderUser(
+    userId: number,
+    data: Partial<{
+      username: string;
+      passwordHash: string;
+      passwordMd5: string;
+      syncEnabled: boolean;
+      readAloudDelivery: ReadAloudDeliveryPreference;
+    }>,
+  ) {
     await this.db.update(schema.koreaderUsers).set(data).where(eq(schema.koreaderUsers.userId, userId));
+  }
+
+  async getDeviceDeliverySettings(userId: number, deviceId: string) {
+    return this.db.query.koreaderDeviceDeliverySettings.findFirst({
+      where: and(eq(schema.koreaderDeviceDeliverySettings.userId, userId), eq(schema.koreaderDeviceDeliverySettings.deviceId, deviceId)),
+    });
+  }
+
+  async getDeviceDeliverySettingsForDevices(userId: number, deviceIds: string[]) {
+    const rows: (typeof schema.koreaderDeviceDeliverySettings.$inferSelect)[] = [];
+    for (const batch of chunk([...new Set(deviceIds)], BATCH_QUERY_SIZE)) {
+      rows.push(
+        ...(await this.db
+          .select()
+          .from(schema.koreaderDeviceDeliverySettings)
+          .where(and(eq(schema.koreaderDeviceDeliverySettings.userId, userId), inArray(schema.koreaderDeviceDeliverySettings.deviceId, batch)))),
+      );
+    }
+    return rows;
+  }
+
+  async setDeviceDeliverySettings(userId: number, deviceId: string, variant: ReadAloudDeliveryPreference, migrateOnly = false) {
+    await this.db.transaction(async (tx) => {
+      const [credential] = await tx.select().from(schema.koreaderUsers).where(eq(schema.koreaderUsers.userId, userId)).for('update');
+      if (!credential) throw new NotFoundException('KOReader credentials not found');
+      // Locking the credential makes migration atomic with a web default change.
+      const values = {
+        userId,
+        credentialId: credential.id,
+        deviceId,
+        readAloudDelivery: migrateOnly && credential.readAloudDelivery ? null : variant,
+      };
+      const insert = tx.insert(schema.koreaderDeviceDeliverySettings).values(values);
+      if (migrateOnly) await insert.onConflictDoNothing();
+      else
+        await insert.onConflictDoUpdate({
+          target: [schema.koreaderDeviceDeliverySettings.userId, schema.koreaderDeviceDeliverySettings.deviceId],
+          set: { readAloudDelivery: variant, updatedAt: new Date() },
+        });
+    });
   }
 
   async deleteKoreaderUser(userId: number) {
@@ -1017,6 +1073,10 @@ export class KoreaderRepository {
             )
             .returning({ id: schema.annotationSyncState.id }),
         ]);
+
+      await tx
+        .delete(schema.koreaderDeviceDeliverySettings)
+        .where(and(eq(schema.koreaderDeviceDeliverySettings.userId, userId), eq(schema.koreaderDeviceDeliverySettings.deviceId, deviceId)));
 
       // Not counted towards the deleted-row total: a marker on its own never made the device listable.
       await tx

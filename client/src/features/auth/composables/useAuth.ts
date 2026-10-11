@@ -14,6 +14,7 @@ import { resetSmartScopes } from '@/features/smart-scope/composables/useSmartSco
 import { resetCollections } from '@/features/collection/composables/useCollections'
 import { resetBrowseCounts } from '@/composables/useBrowseCounts'
 import { resetBookRequestSummary } from '@/features/book-requests/composables/useBookRequestSummary'
+import { clearReleaseSearchCache } from '@/features/book-requests/composables/useReleasePicker'
 
 const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
@@ -61,6 +62,7 @@ function clearAuth() {
   resetCollections()
   resetBrowseCounts()
   resetBookRequestSummary()
+  clearReleaseSearchCache()
   user.value = null
   setAccessToken(null)
   disconnectAuthorEnrichmentSocket()

@@ -12,6 +12,9 @@ const parser = new XMLParser({
   isArray: (name) => ['item', 'meta', 'reference'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
+  // The whole package is written back from this parse; see writerParser in epub-opf-builder.
+  parseTagValue: false,
+  htmlEntities: true,
 });
 
 const documentParser = new XMLParser({

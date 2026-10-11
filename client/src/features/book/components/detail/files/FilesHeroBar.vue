@@ -114,7 +114,7 @@ function handleAddFile() {
 
     <div class="hero-actions flex shrink-0 items-center gap-2 border-l border-border pl-4">
       <span
-        class="inline-flex h-[18px] items-center gap-1 rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
+        class="inline-flex h-[18px] items-center gap-1 rounded-xs px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
         :class="isMissing ? 'bg-destructive/15 text-destructive' : 'bg-success/15 text-success'"
       >
         <TriangleAlert v-if="isMissing" class="size-2.5" aria-hidden="true" />

@@ -139,7 +139,7 @@ function handleBack(): void {
 
           <button
             type="button"
-            class="absolute end-3 top-3 grid size-6 place-items-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="absolute end-3 top-3 grid size-6 place-items-center rounded-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             :aria-label="t('tools.entityManager.duplicates.dismissEntityTitle')"
             :title="t('tools.entityManager.duplicates.dismissEntityTitle')"
             @click="handleDismissEntity(entity.id)"
@@ -160,12 +160,12 @@ function handleBack(): void {
             class="flex items-center gap-2 rounded-md bg-secondary px-2.5 py-1.5"
           >
             <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground"> {{ entityName(pair.idA) }} &harr; {{ entityName(pair.idB) }} </span>
-            <span class="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums" :style="pairStyle(pair.similarity)">
+            <span class="shrink-0 rounded-xs px-1.5 py-0.5 text-[11px] font-semibold tabular-nums" :style="pairStyle(pair.similarity)">
               {{ pairPercent(pair.similarity) }}%
             </span>
             <button
               type="button"
-              class="grid size-6 shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="grid size-6 shrink-0 place-items-center rounded-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               :aria-label="t('tools.entityManager.duplicates.dismissPairTitle')"
               :title="t('tools.entityManager.duplicates.dismissPairTitle')"
               @click="handleDismissPair(pair.idA, pair.idB)"

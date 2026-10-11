@@ -46,6 +46,8 @@ function request(overrides: Partial<BookRequestItem> = {}): BookRequestItem {
     subscribers: [],
     download: null,
     dismissed: false,
+    companionRequestId: null,
+    targetBookId: null,
     createdAt: '2026-09-29T12:00:00.000Z',
     updatedAt: '2026-09-29T12:00:00.000Z',
     ...overrides,
@@ -103,5 +105,66 @@ describe('RequestListTable', () => {
     const titleButton = wrapper.findAll('tbody button').find((button) => button.text() === LONG_TITLE)
 
     expect(titleButton?.text()).toBe(LONG_TITLE)
+  })
+})
+
+describe('RequestListTable pairs', () => {
+  const ebook = request({ id: 10, mediaKind: 'ebook', status: 'pending', title: 'Dune', companionRequestId: 11, matchedBookId: null })
+  const audiobook = request({ id: 11, mediaKind: 'audiobook', status: 'downloading', title: 'Dune', companionRequestId: 10, matchedBookId: null })
+
+  function renderPair(selectedIds: number[] = []) {
+    return mount(RequestListTable, {
+      props: {
+        requests: [{ ...ebook, companion: audiobook }],
+        canManage: true,
+        canSelfFulfil: false,
+        currentUserId: 1,
+        busyIds: new Set<number>(),
+        progressByRequest: {},
+        density: 'comfortable',
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+        selectedIds,
+      },
+      global: {
+        stubs: {
+          RouterLink: RouterLinkStub,
+          RequestCover: true,
+          RequestPipeline: true,
+          RequestStatusBadge: { props: ['status'], template: '<span class="status-badge">{{ status }}</span>' },
+          RequestPairRowActions: {
+            props: ['row'],
+            emits: ['approve'],
+            template: '<button class="pair-approve" @click="$emit(\'approve\', [row, row.companion])">approve</button>',
+          },
+        },
+      },
+    })
+  }
+
+  it('renders the pair as one row with a lane per half, the ebook first', () => {
+    const wrapper = renderPair()
+
+    expect(wrapper.findAll('tbody tr')).toHaveLength(1)
+    const lanes = wrapper
+      .get('table')
+      .findAll('.status-badge')
+      .map((badge) => badge.text())
+    expect(lanes).toEqual(['pending', 'downloading'])
+    expect(wrapper.find('table').text()).toContain('E-book and audiobook')
+  })
+
+  it('hands a row press on to the page with exactly the halves it applies to', async () => {
+    const wrapper = renderPair()
+
+    await wrapper.get('table .pair-approve').trigger('click')
+
+    expect(wrapper.emitted('pair-approve')?.[0]?.[0]).toEqual([expect.objectContaining({ id: 10 }), expect.objectContaining({ id: 11 })])
+  })
+
+  it('ticks the row only when every half a bulk action can reach is selected', () => {
+    // Only the pending ebook can be acted on in bulk; the downloading audiobook cannot.
+    expect((renderPair([10]).get('table tbody input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
+    expect((renderPair([]).get('table tbody input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
   })
 })

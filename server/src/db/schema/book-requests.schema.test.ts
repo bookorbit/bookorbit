@@ -49,7 +49,11 @@ describe('book_requests status SQL matches the shared constants', () => {
     }
   });
 
-  it('declares the media kind enum from the shared constant', () => {
-    expect(config.columns.find((c) => c.name === 'media_kind')?.enumValues).toEqual([...BOOK_REQUEST_MEDIA_KINDS]);
+  /**
+   * The live media from the shared constant, then the retired `comic` after them. Dropping it from
+   * the stored type would fail every upgrade of a server that still holds a comic request.
+   */
+  it('declares the media kind enum from the shared constant, keeping the retired comic last', () => {
+    expect(config.columns.find((c) => c.name === 'media_kind')?.enumValues).toEqual([...BOOK_REQUEST_MEDIA_KINDS, 'comic']);
   });
 });

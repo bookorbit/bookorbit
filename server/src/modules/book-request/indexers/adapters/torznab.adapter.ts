@@ -64,7 +64,7 @@ export class TorznabAdapter implements IndexerAdapter {
   readonly type = 'torznab' as const;
   readonly label = 'Torznab';
   /** Whatever the proxy behind it indexes, which is every medium a request can ask for. */
-  readonly mediaKinds: readonly BookRequestMediaKind[] = ['ebook', 'audiobook', 'comic'];
+  readonly mediaKinds: readonly BookRequestMediaKind[] = ['ebook', 'audiobook'];
   readonly supportsIsbnSearch = false;
   /** Jackett and Prowlarr want an API key, but a self-hosted proxy may be left open. */
   readonly requiresCredential = false;

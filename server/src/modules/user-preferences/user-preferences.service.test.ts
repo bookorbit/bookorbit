@@ -10,7 +10,14 @@ import type {
   ServerFontPreferences,
   ThemePreferences,
 } from '@bookorbit/types';
-import { ANNOTATION_COLOR_NAME_MAX_ENTRIES, ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS, MAX_SERVER_FONTS, SUPPORTED_LOCALES } from '@bookorbit/types';
+import {
+  ANNOTATION_COLOR_NAME_MAX_ENTRIES,
+  ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS,
+  MAX_SERVER_FONTS,
+  STYLE_IDS,
+  SUPPORTED_LOCALES,
+  SURFACE_PALETTE_IDS,
+} from '@bookorbit/types';
 
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { UserPreferencesService } from './user-preferences.service';
@@ -325,6 +332,46 @@ describe('UserPreferencesService', () => {
 
   it.each([79, 101, 50.5])('upsertThemePreferences rejects surfaceOpacity %s', async (surfaceOpacity) => {
     await expect(service.upsertThemePreferences(11, { ...validThemePreferences, surfaceOpacity })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it.each(STYLE_IDS)('upsertThemePreferences accepts the %s style', async (style) => {
+    const preferences = { ...validThemePreferences, style };
+
+    await expect(service.upsertThemePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', preferences);
+  });
+
+  it.each(SURFACE_PALETTE_IDS)('upsertThemePreferences accepts the %s surface palette', async (surfacePalette) => {
+    const preferences = { ...validThemePreferences, style: 'nostalgia', surfacePalette } as const;
+
+    await expect(service.upsertThemePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', preferences);
+  });
+
+  it.each([0, 100, 200])('upsertThemePreferences accepts glowReach %i', async (glowReach) => {
+    const preferences = { ...validThemePreferences, glowReach };
+
+    await expect(service.upsertThemePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', preferences);
+  });
+
+  it.each([-10, 201, 50.5, 'off'])('upsertThemePreferences rejects glowReach %s', async (glowReach) => {
+    await expect(service.upsertThemePreferences(11, { ...validThemePreferences, glowReach } as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertThemePreferences rejects an unknown style', async () => {
+    await expect(service.upsertThemePreferences(11, { ...validThemePreferences, style: 'retro' } as never)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertThemePreferences rejects an unknown surface palette', async () => {
+    await expect(service.upsertThemePreferences(11, { ...validThemePreferences, surfacePalette: 'teal' } as never)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(repo.upsert).not.toHaveBeenCalled();
   });
 

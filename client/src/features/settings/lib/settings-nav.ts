@@ -13,6 +13,7 @@ import {
   Globe,
   Headphones,
   Highlighter,
+  History,
   Image,
   KeyRound,
   LayoutGrid,
@@ -332,6 +333,15 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
             icon: Sparkles,
             keywords: 'author biography photo enrichment',
             isVisible: anyPermission('manage_metadata_config'),
+          },
+          {
+            id: 'metadata-search-cache',
+            routeName: 'settings-metadata-search-cache',
+            labelKey: 'settings.metadata.tabs.search-cache',
+            descriptionKey: 'settings.metadata.tabSubtitles.search-cache',
+            icon: History,
+            keywords: 'cache saved search results provider ttl expiry offline fallback storage clear',
+            isVisible: anyPermission(Permission.ManageMetadataConfig),
           },
           {
             id: 'metadata-genre-blocklist',

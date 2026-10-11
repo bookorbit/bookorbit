@@ -31,13 +31,18 @@ export const koreaderUsers = pgTable(
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     passwordMd5: varchar('password_md5', { length: 32 }),
     syncEnabled: boolean('sync_enabled').notNull().default(true),
+    readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [uniqueIndex('koreader_users_user_id_uidx').on(t.userId), uniqueIndex('koreader_users_username_uidx').on(t.username)],
+  (t) => [
+    uniqueIndex('koreader_users_user_id_uidx').on(t.userId),
+    uniqueIndex('koreader_users_username_uidx').on(t.username),
+    check('koreader_users_delivery_chk', sql`${t.readAloudDelivery} in ('original', 'audioless_epub')`),
+  ],
 );
 
 export type KoreaderUser = typeof koreaderUsers.$inferSelect;
@@ -419,3 +424,25 @@ export const koreaderProgressResetDevices = pgTable(
 
 export type KoreaderProgressResetDevice = typeof koreaderProgressResetDevices.$inferSelect;
 export type NewKoreaderProgressResetDevice = typeof koreaderProgressResetDevices.$inferInsert;
+
+export const koreaderDeviceDeliverySettings = pgTable(
+  'koreader_device_delivery_settings',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    credentialId: integer('credential_id')
+      .notNull()
+      .references(() => koreaderUsers.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.deviceId] }),
+    check('koreader_device_delivery_chk', sql`${t.readAloudDelivery} in ('original', 'audioless_epub')`),
+  ],
+);

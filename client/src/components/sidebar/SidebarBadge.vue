@@ -14,7 +14,7 @@ const props = withDefaults(
 const inkClass = computed(() => {
   if (props.tone === 'accent') return 'font-bold text-primary'
   if (props.variant === 'progress') return 'font-semibold text-primary'
-  return 'font-semibold text-sidebar-count-foreground group-data-[active=true]/item:text-primary'
+  return 'group-data-[active=true]/item:text-primary'
 })
 </script>
 
@@ -28,7 +28,7 @@ const inkClass = computed(() => {
   />
   <span
     v-else
-    class="ml-auto shrink-0 rounded-md bg-(--shell-accent-tint) px-1.5 py-0.5 text-[11px] tabular-nums transition-colors duration-150 group-data-[collapsible=icon]:hidden"
+    class="sidebar-count ml-auto shrink-0 rounded-md px-1.5 py-0.5 tabular-nums transition-colors duration-150 group-data-[collapsible=icon]:hidden"
     :class="inkClass"
     :aria-label="label"
     :title="label"

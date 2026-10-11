@@ -37,13 +37,20 @@ export class KoboPositionRebuildService implements DevicePositionRebuilder, OnMo
     const [koboSpan] = await this.annotationSync.findPositions([annotation.id], ['kobo_span']);
     if (!koboSpan?.pos0) return { rebuilt: false, reason: 'no_kobo_span_position' };
 
-    const resolved = await this.kepubContext.resolveForBook(userId, annotation.bookId);
+    const provenance = koboSpan.extras as { deliveryId?: string; deviceId?: number; uncertainDelivery?: boolean } | null;
+    if (!provenance?.deliveryId || !provenance.deviceId || provenance.uncertainDelivery)
+      return { rebuilt: false, reason: 'unknown_originating_rendition' };
+    const resolved = await this.kepubContext.resolveForDelivery(userId, annotation.bookId, provenance.deviceId, provenance.deliveryId);
     if (!resolved.ok) return { rebuilt: false, reason: resolved.reason };
 
-    const outcome = await this.materializer.convertFromKoboSpan(userId, annotation, koboSpan, resolved.file, resolved.ctx);
-    this.logger.log(
-      `[${EVENT}] [end] userId=${userId} annotationId=${annotation.id} converted=${outcome.converted} reason="${sanitizeLogValue(outcome.reason ?? 'none')}" - kobo span rebuild finished`,
-    );
-    return { rebuilt: outcome.converted, reason: outcome.reason };
+    try {
+      const outcome = await this.materializer.convertFromKoboSpan(userId, annotation, koboSpan, resolved.file, resolved.ctx);
+      this.logger.log(
+        `[${EVENT}] [end] userId=${userId} annotationId=${annotation.id} converted=${outcome.converted} reason="${sanitizeLogValue(outcome.reason ?? 'none')}" - kobo span rebuild finished`,
+      );
+      return { rebuilt: outcome.converted, reason: outcome.reason };
+    } finally {
+      await resolved.release?.();
+    }
   }
 }

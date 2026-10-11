@@ -152,14 +152,45 @@ describe('SelectionActionBar demo restriction', () => {
   it('emits bulk metadata actions from Metadata menu', async () => {
     const wrapper = mountBar()
 
-    await wrapper.find('[data-testid="action-bulk-refresh-metadata"]').trigger('click')
     await wrapper.find('[data-testid="action-bulk-re-extract-cover"]').trigger('click')
     await wrapper.find('[data-testid="action-bulk-lock-metadata"]').trigger('click')
     await wrapper.find('[data-testid="action-bulk-unlock-metadata"]').trigger('click')
 
-    expect(wrapper.emitted('refresh-metadata')).toHaveLength(1)
     expect(wrapper.emitted('re-extract-cover')).toHaveLength(1)
     expect(wrapper.emitted('lock-metadata')?.map((args) => args[0])).toEqual([true, false])
+  })
+
+  it('confirms a bulk metadata refresh and keeps the cache unless asked to ignore it', async () => {
+    const wrapper = mountBar()
+
+    await wrapper.find('[data-testid="action-bulk-refresh-metadata"]').trigger('click')
+    expect(wrapper.emitted('refresh-metadata')).toBeUndefined()
+    expect(wrapper.find('[data-testid="bulk-refresh-confirm"]').exists()).toBe(true)
+    const checkbox = wrapper.get<HTMLInputElement>('[data-testid="ignore-cache-checkbox"]')
+    expect(checkbox.element.checked).toBe(false)
+
+    await wrapper.get('[data-testid="bulk-refresh-confirm-action"]').trigger('click')
+    expect(wrapper.emitted('refresh-metadata')?.[0]).toEqual([{ ignoreCache: false }])
+    expect(wrapper.find('[data-testid="bulk-refresh-confirm"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="action-bulk-refresh-metadata"]').trigger('click')
+    await wrapper.get('[data-testid="ignore-cache-checkbox"]').setValue(true)
+    await wrapper.get('[data-testid="bulk-refresh-confirm-action"]').trigger('click')
+    expect(wrapper.emitted('refresh-metadata')?.[1]).toEqual([{ ignoreCache: true }])
+  })
+
+  it('resets the ignore-cache choice and emits nothing when a bulk refresh is cancelled', async () => {
+    const wrapper = mountBar()
+
+    await wrapper.find('[data-testid="action-bulk-refresh-metadata"]').trigger('click')
+    await wrapper.get('[data-testid="ignore-cache-checkbox"]').setValue(true)
+    await wrapper.get('[data-testid="bulk-refresh-cancel"]').trigger('click')
+
+    expect(wrapper.emitted('refresh-metadata')).toBeUndefined()
+    expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="action-bulk-refresh-metadata"]').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('[data-testid="ignore-cache-checkbox"]').element.checked).toBe(false)
   })
 
   it('emits set-field from the field editor flow', async () => {

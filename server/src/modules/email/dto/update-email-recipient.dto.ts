@@ -1,8 +1,13 @@
+import { READ_ALOUD_DELIVERY_VARIANTS, type ReadAloudDeliveryPreference } from '@bookorbit/types';
 import { IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { RECIPIENT_DEVICE_TYPES, RECIPIENT_FORMATS } from './email-recipient.constants';
 
 export class UpdateEmailRecipientDto {
+  @IsOptional()
+  @IsIn(READ_ALOUD_DELIVERY_VARIANTS)
+  readAloudDelivery?: ReadAloudDeliveryPreference;
+
   @IsOptional()
   @IsString()
   @MaxLength(255)

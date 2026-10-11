@@ -15,6 +15,16 @@ describe('resolveIsAudiobook', () => {
     expect(resolveIsAudiobook(files, null)).toBe(false);
   });
 
+  it('leads with the file the library ranked first, not the one that sorts first by path', () => {
+    const files = [
+      { id: 1, format: 'epub', role: 'content' },
+      { id: 2, format: 'm4b', role: 'content' },
+    ];
+    expect(resolveIsAudiobook(files, null, 2)).toBe(true);
+    expect(resolveIsAudiobook(files, null, 1)).toBe(false);
+    expect(resolveIsAudiobook(files, null, null)).toBe(false);
+  });
+
   it('ignores stale audiobook identifiers on an ebook', () => {
     expect(resolveIsAudiobook([{ format: 'epub', role: 'primary' }], { audibleId: 'B0ABC12345', durationSeconds: 3600 })).toBe(false);
   });

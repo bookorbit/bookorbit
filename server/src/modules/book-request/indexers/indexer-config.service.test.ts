@@ -400,7 +400,7 @@ describe('IndexerConfigService', () => {
 
     await service.create({ ...createDto, categories: { ebook: [8010] } });
 
-    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [8010], audiobook: [3030], comic: [7030] } }));
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [8010], audiobook: [3030] } }));
   });
 
   /** A key for one tracker is not a key for another, and its settings are the old adapter's. */
@@ -440,12 +440,12 @@ describe('IndexerConfigService', () => {
   /** A plugin declares its own; the compile-time map only knows the built-ins. */
   it('falls back to a plugin adapter default categories rather than to nothing', async () => {
     const { service, repo } = makeService({
-      registry: { defaultCategories: vi.fn().mockReturnValue({ ebook: [4040], audiobook: [4050], comic: [] }) },
+      registry: { defaultCategories: vi.fn().mockReturnValue({ ebook: [4040], audiobook: [4050] }) },
     });
 
     await service.create({ ...createDto, adapterType: 'librivox' as never, categories: undefined });
 
-    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [4040], audiobook: [4050], comic: [] } }));
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [4040], audiobook: [4050] } }));
   });
 
   it('reports a duplicate name as a conflict rather than a 500', async () => {

@@ -1,5 +1,6 @@
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
 import type { CoverMedium } from "./book";
+import type { MetadataCacheServedProvider, MetadataCandidateCacheInfo } from "./metadata-cache";
 import type { SeriesIndex } from "./series-index";
 
 export const MetadataProviderKey = {
@@ -126,6 +127,12 @@ export interface MetadataCandidate {
   communityRatingCount?: number;
 }
 
+/**
+ * A candidate as a search stream sends it. `cache` is present only when the metadata cache answered
+ * for the candidate's provider; it is never part of the candidate itself.
+ */
+export type MetadataSearchCandidateEvent = MetadataCandidate & { cache?: MetadataCandidateCacheInfo };
+
 export interface MetadataProviderInfo {
   key: MetadataProviderKey;
   label: string;
@@ -172,6 +179,8 @@ export interface MetadataFetchDiagnostics {
   resolvedFieldCount: number;
   /** One entry per cover slot the fetch applied to; a slot outside the book's media is absent. */
   coverSlots?: Partial<Record<CoverMedium, MetadataFetchCoverSlotDiagnostics>>;
+  /** Providers the metadata cache answered for. Absent on servers without the cache. */
+  cacheServedProviders?: MetadataCacheServedProvider[];
 }
 
 export interface ProviderThrottleRuntimeState {

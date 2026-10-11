@@ -75,7 +75,7 @@ function resetScope() {
       <button
         v-if="query"
         type="button"
-        class="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+        class="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
         :aria-label="t('settings.metadata.fieldRules.toolbar.clearSearch')"
         @click="clearQuery"
       >
@@ -96,7 +96,7 @@ function resetScope() {
       <button
         type="button"
         :aria-pressed="!overriddenOnly"
-        class="h-7 rounded px-2.5 text-xs transition-colors focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+        class="h-7 rounded-xs px-2.5 text-xs transition-colors focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
         :class="!overriddenOnly ? 'bg-muted font-semibold text-foreground' : 'font-medium text-muted-foreground hover:text-foreground'"
         @click="showAllFields"
       >
@@ -105,7 +105,7 @@ function resetScope() {
       <button
         type="button"
         :aria-pressed="overriddenOnly"
-        class="h-7 rounded px-2.5 text-xs transition-colors focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+        class="h-7 rounded-xs px-2.5 text-xs transition-colors focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
         :class="overriddenOnly ? 'bg-muted font-semibold text-foreground' : 'font-medium text-muted-foreground hover:text-foreground'"
         @click="toggleOverriddenOnly"
       >

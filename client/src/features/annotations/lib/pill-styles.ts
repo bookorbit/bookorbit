@@ -7,7 +7,7 @@ export interface PillStyle {
   class: string
 }
 
-const PILL_BASE = 'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium'
+const PILL_BASE = 'inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[10px] font-medium'
 
 export const SOURCE_PILLS: Record<AnnotationOrigin, PillStyle> = {
   web: { label: 'Web', class: 'border-[var(--pill-web)]/40 bg-[var(--pill-web)]/10 text-[var(--pill-web)]' },

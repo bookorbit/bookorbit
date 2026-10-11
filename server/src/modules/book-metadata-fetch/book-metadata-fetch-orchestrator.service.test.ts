@@ -46,7 +46,7 @@ function makeService(withGateway = true) {
     replaceCommunityRatings: vi.fn().mockResolvedValue(undefined),
   };
   const pipeline = {
-    runWithSources: vi.fn().mockResolvedValue({ resolved: {}, providerIds: {} }),
+    runWithSources: vi.fn().mockResolvedValue({ resolved: {}, providerIds: {}, cache: { servedProviders: [], outboundRequests: 0 } }),
   };
   const metadataService = {
     replaceAuthors: vi.fn().mockResolvedValue(undefined),
@@ -157,7 +157,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
     queueRepo.scheduleEligibleBooksInBatches.mockResolvedValue(0);
 
     await expect(service.triggerForLibrary(11)).resolves.toBe(0);
-    expect(queueRepo.scheduleEligibleBooksInBatches).toHaveBeenCalledWith(baseConfig(false, true), 'manual_trigger', 11, 1000);
+    expect(queueRepo.scheduleEligibleBooksInBatches).toHaveBeenCalledWith(baseConfig(false, true), 'manual_trigger', 11, 1000, false);
     expect(configService.recordLibraryRun).toHaveBeenCalledWith(11, 0);
   });
 
@@ -257,7 +257,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       communityRatingRows: [],
     });
     coverStore.fetchState.mockResolvedValue({ media: { hasEbook: true, hasAudio: true }, filled: { ebook: false, audio: true }, locked: ['ebook'] });
-    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(undefined);
+    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(0);
 
     await (service as any).processOne(17, 'Both media');
 
@@ -265,6 +265,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
     expect(pipeline.runWithSources).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ cover: null, audioCover: true }), 2, {
       coverMedia: { hasEbook: true, hasAudio: true },
       lockedCoverSlots: ['ebook'],
+      cacheDirective: { policy: 'default', allowFallback: true },
     });
   });
 
@@ -418,14 +419,70 @@ describe('BookMetadataFetchOrchestratorService', () => {
 
   it('pollOnce processes due items and waits random delay', async () => {
     const { service, queueRepo } = makeService();
-    queueRepo.fetchDue.mockResolvedValue([{ bookId: 44, title: 'Queued Book', reason: 'manual_trigger' }]);
-    const processSpy = vi.spyOn(service as any, 'processOne').mockResolvedValue(undefined);
+    queueRepo.fetchDue.mockResolvedValue([{ bookId: 44, title: 'Queued Book', reason: 'manual_trigger', ignoreCache: false }]);
+    const processSpy = vi.spyOn(service as any, 'processOne').mockResolvedValue({ outboundRequests: 3, deferred: false });
     const delaySpy = vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
 
     await (service as any).pollOnce();
 
-    expect(processSpy).toHaveBeenCalledWith(44, 'Queued Book', 'manual_trigger');
+    expect(processSpy).toHaveBeenCalledTimes(1);
+    expect(processSpy).toHaveBeenCalledWith(44, 'Queued Book', 'manual_trigger', false);
     expect(delaySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('pollOnce moves straight on to the next book when one was answered entirely from the cache', async () => {
+    const { service, queueRepo } = makeService();
+    queueRepo.fetchDue
+      .mockResolvedValueOnce([{ bookId: 1, title: 'Cached', reason: 'manual_trigger', ignoreCache: false }])
+      .mockResolvedValueOnce([{ bookId: 2, title: 'Live', reason: 'manual_trigger', ignoreCache: true }])
+      .mockResolvedValue([]);
+    const processSpy = vi
+      .spyOn(service as any, 'processOne')
+      .mockResolvedValueOnce({ outboundRequests: 0, deferred: false })
+      .mockResolvedValueOnce({ outboundRequests: 2, deferred: false });
+    const delaySpy = vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
+
+    await (service as any).pollOnce();
+
+    expect(processSpy).toHaveBeenNthCalledWith(1, 1, 'Cached', 'manual_trigger', false);
+    expect(processSpy).toHaveBeenNthCalledWith(2, 2, 'Live', 'manual_trigger', true);
+    expect(delaySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('pollOnce does not chain onto a book handed back while it is still importing', async () => {
+    const { service, queueRepo } = makeService();
+    queueRepo.fetchDue.mockResolvedValue([{ bookId: 5, title: 'Importing', reason: 'manual_trigger', ignoreCache: false }]);
+    const processSpy = vi.spyOn(service as any, 'processOne').mockResolvedValue({ outboundRequests: 0, deferred: true });
+    const delaySpy = vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
+
+    await (service as any).pollOnce();
+
+    expect(processSpy).toHaveBeenCalledTimes(1);
+    expect(delaySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('processOne asks providers live when the queue row asked to ignore the cache', async () => {
+    const { service, bookReadService, coverStore, pipeline } = makeService();
+    bookReadService.findById.mockResolvedValue({
+      book: { books: { libraryId: 2, status: 'present', primaryFileId: null }, book_metadata: { title: 'Fresh' } },
+      authorRows: [],
+      genreRows: [],
+      narratorRows: [],
+      communityRatingRows: [],
+      fileRows: [],
+    });
+    coverStore.fetchState.mockResolvedValue({ media: { hasEbook: true, hasAudio: false }, filled: { ebook: true, audio: false }, locked: [] });
+    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(1);
+
+    const outcome = await (service as any).processOne(8, 'Fresh', 'manual_trigger', true);
+
+    expect(pipeline.runWithSources).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Object),
+      2,
+      expect.objectContaining({ cacheDirective: { policy: 'refresh', allowFallback: true } }),
+    );
+    expect(outcome).toEqual({ outboundRequests: 1, deferred: false });
   });
 
   it('processOne exits early when queue row cannot be claimed', async () => {
@@ -500,8 +557,8 @@ describe('BookMetadataFetchOrchestratorService', () => {
       communityRatingRows: [],
     });
     comicMetadataRepository.findByBookId.mockResolvedValue({ issueNumber: '28', volumeName: null });
-    pipeline.runWithSources.mockResolvedValue({ resolved: {}, providerIds: {} });
-    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(undefined);
+    pipeline.runWithSources.mockResolvedValue({ resolved: {}, providerIds: {}, cache: { servedProviders: [], outboundRequests: 0 } });
+    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(0);
 
     await (service as any).processOne(33, 'Akira', 'event_import');
 
@@ -532,8 +589,8 @@ describe('BookMetadataFetchOrchestratorService', () => {
       narratorRows: [],
       communityRatingRows: [],
     });
-    pipeline.runWithSources.mockResolvedValue({ resolved: {}, providerIds: {} });
-    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(undefined);
+    pipeline.runWithSources.mockResolvedValue({ resolved: {}, providerIds: {}, cache: { servedProviders: [], outboundRequests: 0 } });
+    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(0);
     scoreService.calculateAndSave.mockRejectedValue(new Error('score delayed'));
 
     await (service as any).processOne(90, 'Book');

@@ -187,6 +187,17 @@ describe('RequestAutomationService.considerRequest', () => {
     expect(notifier.notifyApprovers).not.toHaveBeenCalled();
   });
 
+  /** A request for the retired comic medium has nothing to search for, so automation leaves it be. */
+  it('never searches for a request made for the retired comic medium', async () => {
+    const { service, releases, fulfillment } = makeService({ request: { status: 'approved', mediaKind: 'comic' } });
+
+    service.considerRequest(7);
+    await settle();
+
+    expect(releases.search).not.toHaveBeenCalled();
+    expect(fulfillment.setRequestStatus).not.toHaveBeenCalled();
+  });
+
   /** Every other hand-back already wrote a reason; what none of them did was tell anybody. */
   it('tells the approvers when an auto-approved request is handed back for any other reason', async () => {
     const { service, notifier } = makeService({ releases: [release({ score: 61 })], settings: { autoGrabMinScore: 80 } });

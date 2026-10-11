@@ -1,4 +1,4 @@
-import { deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
+import { recordBookFileHashHistory, deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { SQL, and, asc, count, eq, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
@@ -1460,6 +1460,8 @@ export class BookRepository {
           sizeBytes: bookFiles.sizeBytes,
           absolutePath: bookFiles.absolutePath,
           createdAt: bookFiles.createdAt,
+          updatedAt: bookFiles.updatedAt,
+          fileHash: bookFiles.fileHash,
           durationSeconds: bookFiles.durationSeconds,
           sortOrder: bookFiles.sortOrder,
           mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
@@ -1539,6 +1541,10 @@ export class BookRepository {
       });
   }
 
+  async recordFileHashHistory(fileId: number, hash: string): Promise<void> {
+    await this.db.transaction((tx) => recordBookFileHashHistory(tx, fileId, hash, 'kobo_download'));
+  }
+
   async upsertKoreaderBookHashLink(userId: number, hash: string, bookFileId: number): Promise<void> {
     const now = new Date();
     await this.db
@@ -1579,6 +1585,7 @@ export class BookRepository {
         libraryId: books.libraryId,
         libraryFolderPath: libraryFolders.path,
         fileHash: bookFiles.fileHash,
+        updatedAt: bookFiles.updatedAt,
         sizeBytes: bookFiles.sizeBytes,
         durationSeconds: bookFiles.durationSeconds,
         mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
@@ -2074,9 +2081,17 @@ export class BookRepository {
       .orderBy(asc(books.id));
   }
 
-  async findPrimaryReaderFilesByBookIds(
-    bookIds: number[],
-  ): Promise<{ id: number; bookId: number; absolutePath: string; format: string | null; fileHash: string | null; sizeBytes: number | null }[]> {
+  async findPrimaryReaderFilesByBookIds(bookIds: number[]): Promise<
+    {
+      id: number;
+      bookId: number;
+      absolutePath: string;
+      format: string | null;
+      fileHash: string | null;
+      sizeBytes: number | null;
+      mediaOverlayAvailable: boolean;
+    }[]
+  > {
     if (bookIds.length === 0) return [];
     return this.db
       .select({
@@ -2085,6 +2100,7 @@ export class BookRepository {
         absolutePath: bookFiles.absolutePath,
         format: bookFiles.format,
         fileHash: bookFiles.fileHash,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
         sizeBytes: bookFiles.sizeBytes,
       })
       .from(books)

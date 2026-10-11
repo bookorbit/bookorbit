@@ -69,7 +69,35 @@ describe('AudiobookCoversCoverProvider', () => {
     const [requestUrl] = fetchMock.mock.calls[0] as [string];
     const parsed = new URL(requestUrl);
     expect(parsed.pathname).toBe('/search');
-    expect(parsed.searchParams.get('q')).toBe('Dune Frank Herbert');
+    expect(parsed.searchParams.get('title')).toBe('Dune');
+    expect(parsed.searchParams.get('author')).toBe('Frank Herbert');
+    expect(parsed.searchParams.has('q')).toBe(false);
+  });
+
+  it.each([undefined, '   '])('searches by title when author is %j', async (author) => {
+    fetchMock.mockResolvedValueOnce(new Response(pageHtml(['1c98a3d5-9c05-4157-81a5-558cbb5ea87a']), { status: 200 }));
+
+    const results = await provider.search({ title: 'Dune', author, isAudiobook: true });
+
+    expect(results).toHaveLength(1);
+    const [requestUrl] = fetchMock.mock.calls[0] as [string];
+    const parsed = new URL(requestUrl);
+    expect(parsed.searchParams.get('title')).toBe('Dune');
+    expect(parsed.searchParams.has('author')).toBe(false);
+    expect(parsed.searchParams.has('q')).toBe(false);
+  });
+
+  it('trims and encodes title and author as separate search parameters', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(pageHtml([]), { status: 200 }));
+
+    await provider.search({ title: '  Sense & Sensibility  ', author: '  Jane Austen  ', isAudiobook: true });
+
+    const [requestUrl] = fetchMock.mock.calls[0] as [string];
+    const parsed = new URL(requestUrl);
+    expect([...parsed.searchParams.entries()]).toEqual([
+      ['title', 'Sense & Sensibility'],
+      ['author', 'Jane Austen'],
+    ]);
   });
 
   it('deduplicates repeated ids in the response', async () => {

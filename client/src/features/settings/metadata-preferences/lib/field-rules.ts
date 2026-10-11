@@ -1,4 +1,4 @@
-import { ALL_METADATA_FIELDS } from '@bookorbit/types'
+import { ALL_METADATA_FIELDS, providerFieldSupport } from '@bookorbit/types'
 import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 
 /** Display grouping for the rule table. Every metadata field belongs to exactly one group. */
@@ -25,45 +25,66 @@ export function fieldRuleLabelKey(field: MetadataField): string {
   return field === 'cover' ? 'settings.metadata.fieldRules.bookCover' : `settings.metadata.fields.${field}`
 }
 
-/** Why a provider that sits in a priority order will not be consulted. */
-export type ProviderSkipReason = 'disabled' | 'notConfigured'
+/**
+ * Why a provider that sits in a priority order will not be consulted. With a field, a provider
+ * that never fills that field counts as skipped for it: it takes a turn and always comes back empty.
+ */
+export type ProviderSkipReason = 'disabled' | 'notConfigured' | 'neverSupplies'
 
 export type ProviderBulkAction = 'first' | 'last' | 'remove'
 
-export function skipReasonFor(status: ProviderStatus | undefined): ProviderSkipReason | null {
-  if (!status) return null
-  if (!status.enabled) return 'disabled'
-  if (!status.configured) return 'notConfigured'
+export function skipReasonFor(
+  status: ProviderStatus | undefined,
+  field?: MetadataField,
+  provider: MetadataProviderKey | undefined = status?.key as MetadataProviderKey | undefined,
+): ProviderSkipReason | null {
+  if (status && !status.enabled) return 'disabled'
+  if (status && !status.configured) return 'notConfigured'
+  if (field && provider && providerFieldSupport(provider, field) === 'never') return 'neverSupplies'
   return null
+}
+
+/**
+ * A cover rule's provider whose art is always the other shape. It is not skipped: it still fills an
+ * empty slot when nothing else can. The server tries it after every provider whose art can fit,
+ * whatever its place in the order, so it ranks there too.
+ */
+export function providerHasOtherShape(provider: MetadataProviderKey, field: MetadataField | undefined): boolean {
+  return field !== undefined && providerFieldSupport(provider, field) === 'otherShape'
 }
 
 /**
  * A provider with no status entry counts as usable: an unknown key is stale data rather
  * than a broken provider, and hiding it would leave no way to remove it.
  */
-export function isProviderUsable(provider: MetadataProviderKey, statuses: ProviderStatus[]): boolean {
+export function isProviderUsable(provider: MetadataProviderKey, statuses: ProviderStatus[], field?: MetadataField): boolean {
+  if (field && providerFieldSupport(provider, field) === 'never') return false
   const status = statuses.find((entry) => entry.key === provider)
   return status ? status.enabled && status.configured : true
 }
 
-/** The providers that will actually be consulted, in priority order. */
-export function resolvedProviders(providers: MetadataProviderKey[], statuses: ProviderStatus[]): MetadataProviderKey[] {
-  return providers.filter((provider) => isProviderUsable(provider, statuses))
+/** The providers that will actually be consulted, in the order the server tries them. */
+export function resolvedProviders(providers: MetadataProviderKey[], statuses: ProviderStatus[], field?: MetadataField): MetadataProviderKey[] {
+  const usable = providers.filter((provider) => isProviderUsable(provider, statuses, field))
+  return [
+    ...usable.filter((provider) => !providerHasOtherShape(provider, field)),
+    ...usable.filter((provider) => providerHasOtherShape(provider, field)),
+  ]
 }
 
 /** The providers that stay in the order but are skipped on every fetch. */
-export function skippedProviders(providers: MetadataProviderKey[], statuses: ProviderStatus[]): MetadataProviderKey[] {
-  return providers.filter((provider) => !isProviderUsable(provider, statuses))
+export function skippedProviders(providers: MetadataProviderKey[], statuses: ProviderStatus[], field?: MetadataField): MetadataProviderKey[] {
+  return providers.filter((provider) => !isProviderUsable(provider, statuses, field))
 }
 
 /**
  * Display rank for a provider, counting only the ones that will run. A skipped provider
  * has no rank because it never takes a turn, so numbering it would overstate the order.
  */
-export function providerRank(providers: MetadataProviderKey[], index: number, statuses: ProviderStatus[]): number | null {
+export function providerRank(providers: MetadataProviderKey[], index: number, statuses: ProviderStatus[], field?: MetadataField): number | null {
   const provider = providers[index]
-  if (!provider || !isProviderUsable(provider, statuses)) return null
-  return providers.slice(0, index + 1).filter((entry) => isProviderUsable(entry, statuses)).length
+  if (!provider || !isProviderUsable(provider, statuses, field)) return null
+  return resolvedProviders(providers, statuses, field).indexOf(provider) + 1
 }
 
 export function applyProviderAction(

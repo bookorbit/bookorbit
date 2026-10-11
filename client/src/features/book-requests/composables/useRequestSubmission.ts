@@ -1,13 +1,16 @@
-import { onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
-import { bookRequestSubmitErrorCode } from '@bookorbit/types'
+import { BOOK_REQUEST_MEDIA_KINDS, bookRequestSubmitErrorCode } from '@bookorbit/types'
 import type {
   BookRequestAvailability,
   BookRequestFailureMeta,
   BookRequestMediaKind,
   BookRequestMetadataSource,
+  BookRequestPairHalfPayload,
+  BookRequestPairSubmitResult,
   BookRequestSubmitErrorCode,
   BookRequestSubmitResult,
+  CreateBookRequestPairPayload,
   CreateBookRequestPayload,
   MetadataCandidate,
 } from '@bookorbit/types'
@@ -41,7 +44,8 @@ export interface SubmitFailure {
 
 const UNCLASSIFIED_FAILURE: SubmitFailure = { code: null, meta: null, message: null }
 
-async function submitFailure(res: Response): Promise<SubmitFailure> {
+/** Reads a refused submission into the shape the form renders, for every caller that submits. */
+export async function submitFailure(res: Response): Promise<SubmitFailure> {
   try {
     const body = (await res.json()) as { message?: string | string[]; errorCode?: unknown; errorMeta?: BookRequestFailureMeta }
     const message = Array.isArray(body.message) ? body.message[0] : body.message
@@ -85,6 +89,24 @@ function requestSeriesIndex(candidate: MetadataCandidate): number | null {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null
 }
 
+/** One answer per medium asked about, so a pair search can hold both without one overwriting the other. */
+function availabilityKey(mediaKind: BookRequestMediaKind, candidate: MetadataCandidate): string {
+  return `${mediaKind}|${candidateKey(candidate)}`
+}
+
+/** What every submission path says about the work itself, whichever media it asks for. */
+interface WorkExtras {
+  note?: string | null
+  language?: string | null
+  coverUrl?: string | null
+  selfServe?: boolean
+  isbn10?: string | null
+  isbn13?: string | null
+  providerKey?: string | null
+  providerId?: string | null
+  metadataSources?: BookRequestMetadataSource[]
+}
+
 export function useRequestSubmission() {
   const availability = ref<Record<string, BookRequestAvailability>>({})
   /**
@@ -96,6 +118,12 @@ export function useRequestSubmission() {
   const lastFailure = ref<SubmitFailure | null>(null)
   const submitting = ref<string | null>(null)
   const mediaKind = ref<BookRequestMediaKind>('ebook')
+  /**
+   * Asking for the ebook and the audiobook together. The search then covers both media, every
+   * result is annotated for both, and `mediaKind` stays on the ebook that leads the pair.
+   */
+  const pairMode = ref(false)
+  const annotatedKinds = computed<BookRequestMediaKind[]>(() => (pairMode.value ? [...BOOK_REQUEST_MEDIA_KINDS] : [mediaKind.value]))
 
   /** Claimed keys, in flight or already answered, so a candidate is never asked about twice. */
   let claimed = new Set<string>()
@@ -132,7 +160,8 @@ export function useRequestSubmission() {
       while (queue.length) {
         const batch = queue.splice(0, ANNOTATE_BATCH_LIMIT)
         const asked = generation
-        const answered = await fetchAvailability(batch)
+        const kinds = annotatedKinds.value
+        const answered = await fetchAvailability(batch, kinds)
 
         // The media kind changed while this was in flight, so the answer is to the wrong question.
         if (generation !== asked) return
@@ -140,8 +169,10 @@ export function useRequestSubmission() {
 
         const next = { ...availability.value }
         batch.forEach((candidate, index) => {
-          const result = answered[index]
-          if (result) next[candidateKey(candidate)] = result
+          kinds.forEach((kind, offset) => {
+            const result = answered[index * kinds.length + offset]
+            if (result) next[availabilityKey(kind, candidate)] = result
+          })
         })
         availability.value = next
       }
@@ -150,20 +181,23 @@ export function useRequestSubmission() {
     }
   }
 
-  async function fetchAvailability(batch: MetadataCandidate[]): Promise<BookRequestAvailability[] | null> {
+  async function fetchAvailability(batch: MetadataCandidate[], kinds: BookRequestMediaKind[]): Promise<BookRequestAvailability[] | null> {
     try {
       const res = await api('/api/v1/book-requests/availability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // One item per medium asked about, candidate-major, which is the order the answer is read back in.
         body: JSON.stringify({
-          items: batch.map((c) => ({
-            title: candidateTitle(c),
-            author: c.authors?.[0],
-            isbn13: c.isbn13,
-            providerKey: c.provider,
-            providerId: c.providerId,
-            mediaKind: mediaKind.value,
-          })),
+          items: batch.flatMap((c) =>
+            kinds.map((kind) => ({
+              title: candidateTitle(c),
+              author: c.authors?.[0],
+              isbn13: c.isbn13,
+              providerKey: c.provider,
+              providerId: c.providerId,
+              mediaKind: kind,
+            })),
+          ),
         }),
       })
       if (res.ok) return (await res.json()) as BookRequestAvailability[]
@@ -180,7 +214,7 @@ export function useRequestSubmission() {
   }
 
   /** A different medium is a different question, so every annotation is recomputed. */
-  watch(mediaKind, () => {
+  watch([mediaKind, pairMode], () => {
     generation += 1
     availability.value = {}
     claimed = new Set()
@@ -194,30 +228,14 @@ export function useRequestSubmission() {
     coalesceHandle = null
   })
 
-  function getAvailability(candidate: MetadataCandidate): BookRequestAvailability | null {
-    return availability.value[candidateKey(candidate)] ?? null
+  function getAvailability(candidate: MetadataCandidate, kind: BookRequestMediaKind = mediaKind.value): BookRequestAvailability | null {
+    return availability.value[availabilityKey(kind, candidate)] ?? null
   }
 
-  async function submit(
-    candidate: MetadataCandidate,
-    extra: {
-      targetLibraryId?: number | null
-      targetFolderId?: number | null
-      note?: string | null
-      preferredFormats?: string[]
-      language?: string | null
-      coverUrl?: string | null
-      selfServe?: boolean
-      isbn10?: string | null
-      isbn13?: string | null
-      providerKey?: string | null
-      providerId?: string | null
-      metadataSources?: BookRequestMetadataSource[]
-    },
-  ): Promise<BookRequestSubmitResult | null> {
-    const payload: CreateBookRequestPayload = {
+  /** The work as a candidate describes it, shared by a single request and by both halves of a pair. */
+  function workPayload(candidate: MetadataCandidate, extra: WorkExtras) {
+    return {
       title: candidateTitle(candidate),
-      mediaKind: mediaKind.value,
       ...(extra.selfServe ? { selfServe: true } : {}),
       subtitle: candidate.subtitle ?? null,
       authors: candidate.authors ?? [],
@@ -233,16 +251,29 @@ export function useRequestSubmission() {
       providerKey: extra.providerKey !== undefined ? extra.providerKey : candidate.provider,
       providerId: extra.providerId !== undefined ? extra.providerId : candidate.providerId,
       metadataSources: extra.metadataSources ?? [],
-      targetLibraryId: extra.targetLibraryId ?? null,
-      targetFolderId: extra.targetFolderId ?? null,
       note: extra.note ?? null,
-      preferredFormats: extra.preferredFormats ?? [],
     }
+  }
 
-    submitting.value = candidateKey(candidate)
+  /** What is now known for certain about one medium of a candidate, claimed so no queued answer lands on it. */
+  function recordSubmitted(candidate: MetadataCandidate, kind: BookRequestMediaKind, result: BookRequestSubmitResult): void {
+    claimed.add(candidateKey(candidate))
+    availability.value = {
+      ...availability.value,
+      [availabilityKey(kind, candidate)]: {
+        ownedBookId: getAvailability(candidate, kind)?.ownedBookId ?? null,
+        existingRequestId: result.request.id,
+        existingRequestStatus: result.request.status,
+        alreadySubscribed: true,
+      },
+    }
+  }
+
+  async function post<T>(path: string, payload: unknown, key: string): Promise<T | null> {
+    submitting.value = key
     lastFailure.value = null
     try {
-      const res = await api('/api/v1/book-requests', {
+      const res = await api(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -251,20 +282,7 @@ export function useRequestSubmission() {
         lastFailure.value = await submitFailure(res)
         return null
       }
-
-      const result = (await res.json()) as BookRequestSubmitResult
-      // Claim the key so a queued annotation cannot land on top of what we now know for certain.
-      claimed.add(candidateKey(candidate))
-      availability.value = {
-        ...availability.value,
-        [candidateKey(candidate)]: {
-          ownedBookId: getAvailability(candidate)?.ownedBookId ?? null,
-          existingRequestId: result.request.id,
-          existingRequestStatus: result.request.status,
-          alreadySubscribed: true,
-        },
-      }
-      return result
+      return (await res.json()) as T
     } catch {
       // A network failure never reached the server, so there is no classified refusal to show. The
       // caller falls back to its generic message on a null return; without this the promise
@@ -274,6 +292,51 @@ export function useRequestSubmission() {
     } finally {
       submitting.value = null
     }
+  }
+
+  async function submit(
+    candidate: MetadataCandidate,
+    extra: WorkExtras & {
+      targetLibraryId?: number | null
+      targetFolderId?: number | null
+      preferredFormats?: string[]
+      /** The medium to ask for, when it is not the one the search is on: one half of a pair. */
+      mediaKind?: BookRequestMediaKind
+      /** The book on the shelf the new format should join. */
+      targetBookId?: number | null
+    },
+  ): Promise<BookRequestSubmitResult | null> {
+    const kind = extra.mediaKind ?? mediaKind.value
+    const payload: CreateBookRequestPayload = {
+      ...workPayload(candidate, extra),
+      mediaKind: kind,
+      targetLibraryId: extra.targetLibraryId ?? null,
+      targetFolderId: extra.targetFolderId ?? null,
+      preferredFormats: extra.preferredFormats ?? [],
+      ...(extra.targetBookId ? { targetBookId: extra.targetBookId } : {}),
+    }
+
+    const result = await post<BookRequestSubmitResult>('/api/v1/book-requests', payload, candidateKey(candidate))
+    if (result) recordSubmitted(candidate, kind, result)
+    return result
+  }
+
+  /** The ebook and the audiobook of one candidate, in one submission. */
+  async function submitPair(
+    candidate: MetadataCandidate,
+    extra: WorkExtras & { ebook: BookRequestPairHalfPayload; audiobook: BookRequestPairHalfPayload },
+  ): Promise<BookRequestPairSubmitResult | null> {
+    const payload: CreateBookRequestPairPayload = {
+      ...workPayload(candidate, extra),
+      ebook: halfPayload(extra.ebook),
+      audiobook: halfPayload(extra.audiobook),
+    }
+
+    const result = await post<BookRequestPairSubmitResult>('/api/v1/book-requests/pairs', payload, candidateKey(candidate))
+    if (result) {
+      for (const kind of BOOK_REQUEST_MEDIA_KINDS) recordSubmitted(candidate, kind, result[kind])
+    }
+    return result
   }
 
   /**
@@ -332,25 +395,34 @@ export function useRequestSubmission() {
       ...(extra.selfServe ? { selfServe: true } : {}),
     }
 
-    submitting.value = FREE_TEXT_KEY
-    lastFailure.value = null
-    try {
-      const res = await api('/api/v1/book-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        lastFailure.value = await submitFailure(res)
-        return null
-      }
-      return (await res.json()) as BookRequestSubmitResult
-    } catch {
-      lastFailure.value = UNCLASSIFIED_FAILURE
-      return null
-    } finally {
-      submitting.value = null
+    return post<BookRequestSubmitResult>('/api/v1/book-requests', payload, FREE_TEXT_KEY)
+  }
+
+  /** The same, for both media at once. */
+  async function submitPairFreeText(
+    work: { title: string; author?: string | null },
+    extra: {
+      language?: string | null
+      selfServe?: boolean
+      note?: string | null
+      ebook: BookRequestPairHalfPayload
+      audiobook: BookRequestPairHalfPayload
+    },
+  ): Promise<BookRequestPairSubmitResult | null> {
+    const title = work.title.trim()
+    if (!title) return null
+
+    const payload: CreateBookRequestPairPayload = {
+      title,
+      authors: work.author?.trim() ? [work.author.trim()] : [],
+      language: extra.language ?? null,
+      note: extra.note ?? null,
+      ...(extra.selfServe ? { selfServe: true } : {}),
+      ebook: halfPayload(extra.ebook),
+      audiobook: halfPayload(extra.audiobook),
     }
+
+    return post<BookRequestPairSubmitResult>('/api/v1/book-requests/pairs', payload, FREE_TEXT_KEY)
   }
 
   return {
@@ -358,13 +430,26 @@ export function useRequestSubmission() {
     lastFailure,
     submitting,
     mediaKind,
+    pairMode,
     annotate,
     getAvailability,
     submit,
+    submitPair,
     submitFreeText,
+    submitPairFreeText,
     checkFreeText,
     candidateKey,
     candidateTitle,
+  }
+}
+
+/** Null where a half names nothing, which the server reads the same as leaving the field out. */
+function halfPayload(half: BookRequestPairHalfPayload): BookRequestPairHalfPayload {
+  return {
+    targetLibraryId: half.targetLibraryId ?? null,
+    targetFolderId: half.targetFolderId ?? null,
+    preferredFormats: half.preferredFormats ?? [],
+    coverUrl: normalizeCoverUrl(half.coverUrl),
   }
 }
 

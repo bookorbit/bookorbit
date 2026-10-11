@@ -49,7 +49,7 @@ interface NewznabItem {
 export class NewznabAdapter implements IndexerAdapter {
   readonly type = 'newznab' as const;
   readonly label = 'Newznab';
-  readonly mediaKinds: readonly BookRequestMediaKind[] = ['ebook', 'audiobook', 'comic'];
+  readonly mediaKinds: readonly BookRequestMediaKind[] = ['ebook', 'audiobook'];
   readonly supportsIsbnSearch = true;
   readonly requiresCredential = true;
 

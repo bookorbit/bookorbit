@@ -139,7 +139,7 @@ function handleReview() {
             </p>
             <button
               type="button"
-              class="-mx-1 mt-0.5 inline-flex h-6 items-center rounded px-1 text-[11.5px] font-semibold text-[var(--pill-repaired)] underline underline-offset-2"
+              class="-mx-1 mt-0.5 inline-flex h-6 items-center rounded-xs px-1 text-[11.5px] font-semibold text-[var(--pill-repaired)] underline underline-offset-2"
               @click="handleReview"
             >
               {{ t('annotations.hub.reviewThem') }}

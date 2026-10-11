@@ -131,7 +131,6 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
     return {
       ebook: categories.ebook.map(String),
       audiobook: categories.audiobook.map(String),
-      comic: categories.comic.map(String),
     }
   }
 
@@ -162,7 +161,7 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
       seedTimeMinutes: '',
       seedRatioBadInput: false,
       seedTimeBadInput: false,
-      categories: toCategoryDraft(adapter?.defaultCategories ?? { ebook: [], audiobook: [], comic: [] }),
+      categories: toCategoryDraft(adapter?.defaultCategories ?? { ebook: [], audiobook: [] }),
       searchedMediaKinds: [...BOOK_REQUEST_MEDIA_KINDS],
       searchByIsbn: true,
       settings: defaultSettings(adapter),
@@ -468,7 +467,6 @@ export function useIndexerDraft(options: IndexerDraftOptions) {
       categories: {
         ebook: parseCategories(current.categories.ebook),
         audiobook: parseCategories(current.categories.audiobook),
-        comic: parseCategories(current.categories.comic),
       },
       disabledMediaKinds: BOOK_REQUEST_MEDIA_KINDS.filter((mediaKind) => !current.searchedMediaKinds.includes(mediaKind)),
       isbnSearchDisabled: !current.searchByIsbn,

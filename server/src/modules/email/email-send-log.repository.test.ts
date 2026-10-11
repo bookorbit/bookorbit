@@ -1,5 +1,6 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
+  gt: vi.fn((left: unknown, right: unknown) => ({ op: 'gt', left, right })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
@@ -93,10 +94,13 @@ describe('EmailSendLogRepository', () => {
     void repo.findPending();
 
     expect(eq).toHaveBeenCalledWith(emailSendLog.status, 'pending');
+    expect(selectBuilder.limit).toHaveBeenCalledWith(100);
     expect(selectBuilder.where).toHaveBeenCalledWith({
-      op: 'eq',
-      left: emailSendLog.status,
-      right: 'pending',
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: emailSendLog.status, right: 'pending' },
+        { op: 'gt', left: emailSendLog.id, right: 0 },
+      ],
     });
   });
 
@@ -149,7 +153,8 @@ describe('EmailSendLogRepository', () => {
     expect(updateBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: emailSendLog.id, right: 33 });
     expect(updateBuilder.set).toHaveBeenCalledWith({
       status: 'failed',
-      errorMessage: 'Server restarted before send completed. Use resend to retry.',
+      errorMessage: 'Server restarted before send completed. SMTP acceptance may be unknown. Review before resending.',
+      failureCode: 'SEND_INTERRUPTED',
       nextRetryAt: null,
       updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
     });

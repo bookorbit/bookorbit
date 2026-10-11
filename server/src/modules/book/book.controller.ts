@@ -30,8 +30,10 @@ import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteService } from '../file-write/file-write.service';
 import { BookService } from './book.service';
+import { openDeliveryStream } from './delivery-stream';
 import { BookQueryPipe } from './pipes/book-query.pipe';
 import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
+import { BulkRefreshMetadataDto } from './dto/bulk-refresh-metadata.dto';
 import { BulkSetStatusDto } from './dto/bulk-set-status.dto';
 import { BulkSetRatingDto } from './dto/bulk-set-rating.dto';
 import { BulkSetMetadataDto } from './dto/bulk-set-metadata.dto';
@@ -161,7 +163,7 @@ export class BookController {
       return `Bulk refreshed metadata for ${count} book${count !== 1 ? 's' : ''}`;
     },
   })
-  async bulkRefreshMetadata(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+  async bulkRefreshMetadata(@Body() dto: BulkRefreshMetadataDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     const ids = await this.bookService.resolveSelectionToIds(dto, user);
     const stream = this.createSseStream(reply);
     try {
@@ -171,7 +173,7 @@ export class BookController {
         (event) => {
           stream.send(event);
         },
-        { isCancelled: stream.isClosed },
+        { isCancelled: stream.isClosed, ignoreCache: dto.ignoreCache === true },
       );
       if (!stream.isClosed()) {
         stream.send({ done: true, ...result });
@@ -472,8 +474,8 @@ export class BookController {
     const event = 'book.download_audioless_epub';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - audioless EPUB download started`);
-    let removedEntries = 0;
-    let sanitizedEntries = 0;
+    let removedEntries: number | null = 0;
+    let sanitizedEntries: number | null = 0;
     let sizeBytes = 0;
     let clientDisconnected = false;
     const handleDisconnect = () => {
@@ -487,21 +489,25 @@ export class BookController {
       removedEntries = result.removedEntries;
       sanitizedEntries = result.sanitizedEntries;
       sizeBytes = result.size;
-      const stream = createReadStream(result.path);
+      const stream = result.artifact ? await openDeliveryStream(result.artifact) : createReadStream(result.path);
+      reply.raw.once('close', () => stream.destroy());
       stream.once('close', () => {
         void result.cleanup();
       });
+      if (clientDisconnected || reply.raw.destroyed) {
+        stream.destroy();
+        return;
+      }
 
       reply.raw.setHeader('Content-Type', 'application/epub+zip');
       reply.raw.setHeader('Content-Disposition', contentDispositionHeader('attachment', result.filename, 'download'));
       reply.raw.setHeader('Content-Length', result.size);
-      reply.send(stream);
-
-      if (!clientDisconnected) {
+      stream.once('end', () => {
         this.logger.log(
           `[${event}] [end] fileId=${fileId} userId=${user.id} durationMs=${Date.now() - startedAt} sizeBytes=${sizeBytes} removedEntries=${removedEntries} sanitizedEntries=${sanitizedEntries} hash=${result.koreaderHash.slice(0, 8)} - audioless EPUB download completed`,
         );
-      }
+      });
+      reply.send(stream);
     } catch (err) {
       if (clientDisconnected) {
         this.logger.log(

@@ -126,7 +126,7 @@ function handleDelete(): void {
         <input type="checkbox" class="peer sr-only" :checked="selected" @change="handleSelect" />
         <span class="sr-only">{{ t('tools.bookDuplicates.selectGroup', { title }) }}</span>
         <span
-          class="grid size-4 place-items-center rounded border peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
+          class="grid size-4 place-items-center rounded-xs border peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
           :class="selected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50'"
           aria-hidden="true"
         >

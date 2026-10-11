@@ -21,14 +21,18 @@ import {
   RETIRED_BOOK_REQUEST_PREFERENCE_FIELDS,
   DEFAULT_COVER_SEARCH_PROVIDER,
   FONT_FAMILY_NAME_MAX_LENGTH,
+  GLOW_REACH_MAX,
+  GLOW_REACH_MIN,
   GRID_CARD_LABEL_FIELDS,
   MAX_SERVER_FONTS,
   RADIUS_IDS,
   REQUEST_LANGUAGE_CODES,
   SERIES_CARD_COVER_MODES,
+  STYLE_IDS,
   SUPPORTED_LOCALES,
   SURFACE_OPACITY_MAX,
   SURFACE_OPACITY_MIN,
+  SURFACE_PALETTE_IDS,
   TABLE_DENSITIES,
   THEME_IDS,
   type AnnotationColorNamePreferences,
@@ -56,6 +60,9 @@ const THEME_PREFERENCES_SCHEMA = z
     background: z.enum(BACKGROUND_IDS),
     brightness: z.number().int().min(0).max(100),
     surfaceOpacity: z.number().int().min(SURFACE_OPACITY_MIN).max(SURFACE_OPACITY_MAX).optional(),
+    style: z.enum(STYLE_IDS).optional(),
+    surfacePalette: z.enum(SURFACE_PALETTE_IDS).optional(),
+    glowReach: z.number().int().min(GLOW_REACH_MIN).max(GLOW_REACH_MAX).optional(),
   })
   .strict();
 

@@ -328,15 +328,18 @@ defineExpose({ scrollToIndex })
       <template #default="{ item }">
         <div class="book-grid-cell" :class="{ 'book-grid-cell--new': props.newBookIds.has(item.id) }">
           <BookCoverSkeleton v-if="isBookPlaceholder(item)" />
+          <!-- Every tile takes the grid's shape; art of the other shape follows the cover display setting. -->
           <CollapsedSeriesCard
             v-else-if="asBook(item).collapsedSeries"
             :book="asBook(item)"
+            :cover-aspect-ratio="coverAspectRatio"
             :show-label="showLabel"
             :selection-mode="selectionMode"
           />
           <BookCoverCard
             v-else
             :book="asBook(item)"
+            :cover-aspect-ratio="coverAspectRatio"
             :show-label="showLabel"
             :selection-mode="selectionMode"
             :selected="isSelected?.(item.id) ?? false"

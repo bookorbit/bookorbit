@@ -22,6 +22,7 @@ local _ = require("gettext")
 local BookOrbitStateManager = require("bookorbit_state_manager")
 local CatalogUtil = require("bookorbit_catalog_util")
 local Transfer = require("bookorbit_download_transfer")
+local Delivery = require("bookorbit_delivery")
 
 local formatBytes = CatalogUtil.formatBytes
 local safeFilenameBase = CatalogUtil.safeFilenameBase
@@ -68,6 +69,47 @@ local function splitDownloadPreview(download_dir, relative_path, filetype)
 end
 
 function CatalogDownload.install(Catalog)
+    function Catalog:fetchDeliveryPreference(variant, update)
+        local message = update and _("Saving EPUB delivery preference...") or _("Loading EPUB delivery preference...")
+        local body, err = self:fetch(message, function()
+            local resolved, resolve_err
+            if update then resolved, resolve_err = Delivery.update(self.settings, self.client, variant)
+            else resolved, resolve_err = Delivery.resolve(self.settings, self.client, variant) end
+            if resolve_err then return nil, resolve_err end
+            -- Only returned values cross the fork; apply settings and caches in the parent.
+            return {
+                variant = resolved,
+                delivery_settings = self.client.delivery_settings,
+                profiles = self.settings.catalog_delivery_profiles,
+                server_profiles = self.settings.catalog_delivery_server_profiles,
+            }
+        end)
+        if not body then return nil, err end
+        self.client.delivery_settings = body.delivery_settings
+        if body.profiles then self:persistSetting("catalog_delivery_profiles", body.profiles) end
+        if body.server_profiles then self:persistSetting("catalog_delivery_server_profiles", body.server_profiles) end
+        return body.variant
+    end
+
+    function Catalog:fetchDeliveryBook(book_id, override, message)
+        local variant, err = self:fetchDeliveryPreference(override)
+        if err then return nil, err end
+        return self:fetch(message or _("Loading book..."), function()
+            return self.client:catalogBook(book_id, variant)
+        end)
+    end
+
+    function Catalog:changeDownloadVariant(detail, file, use_default)
+        local variant = file.downloadVariant == "original" and "audioless_epub" or "original"
+        if use_default then variant = nil end
+        self:runConnected(function()
+            local selected, err = self:fetchDeliveryBook(detail.id, variant, _("Loading EPUB variant..."))
+            if not selected then self:showRetry(err, function() self:changeDownloadVariant(detail, file, use_default) end); return end
+            for _, candidate in ipairs(selected.files or {}) do
+                if candidate.id == file.id then self:showDownloadDialog(selected, candidate); return end
+            end
+        end)
+    end
     function Catalog:showFileChoices(detail)
         local files = self:supportedFiles(detail)
 
@@ -219,7 +261,21 @@ function CatalogDownload.install(Catalog)
                         end,
                     },
                 },
-                {},
+                {
+                    {
+                        text = file.downloadVariant == "original" and _("Use text-only EPUB")
+                            or (file.sourceMediaOverlayAvailable and _("Use original EPUB with narration") or _("Use original EPUB")),
+                        enabled = filetype == "epub",
+                        callback = function() UIManager:close(dialog); self:changeDownloadVariant(detail, file) end,
+                    },
+                },
+                {
+                    {
+                        text = _("Use BookOrbit default"),
+                        enabled = filetype == "epub",
+                        callback = function() UIManager:close(dialog); self:changeDownloadVariant(detail, file, true) end,
+                    },
+                },
                 {
                     {
                         text = _("Choose folder"),
@@ -281,7 +337,7 @@ function CatalogDownload.install(Catalog)
 
         if lfs.attributes(local_path) then
             UIManager:show(ConfirmBox:new{
-                text = T(_("The file %1 already exists. Do you want to overwrite it?"), BD.filepath(local_path)),
+                text = T(_("The file %1 already exists. Replacing it can invalidate its reading position and highlights. The previous file stays intact until the download finishes. Continue?"), BD.filepath(local_path)),
                 ok_text = _("Overwrite"),
                 ok_callback = download,
             })
@@ -362,11 +418,15 @@ function CatalogDownload.install(Catalog)
                 destination = local_path,
                 generation = generation,
                 expected_bytes = total,
+                expected_hash = file.fileHash,
+                hash = "partial_md5",
                 on_progress = onProgress,
                 is_current = function()
                     return self.download_generation == generation
                 end,
                 perform = function(download_opts)
+                    download_opts.variant = file.selection and (file.requestedVariant or file.downloadVariant) or nil
+                    download_opts.selection = file.selection
                     return self.client:downloadCatalogFile(file.id, local_path, download_opts)
                 end,
             }
@@ -379,6 +439,11 @@ function CatalogDownload.install(Catalog)
                 return
             end
 
+            if file.selection then
+                local variants = self.settings.catalog_downloaded_variants or {}
+                variants[Delivery.key(self.client) .. "|" .. tostring(file.id) .. "|" .. file.downloadVariant] = { path = local_path, selection = file.selection }
+                self:persistSetting("catalog_downloaded_variants", variants)
+            end
             local linked = self:linkDownloadedFile(local_path, file)
             if linked then
                 self:refreshOnDevice()

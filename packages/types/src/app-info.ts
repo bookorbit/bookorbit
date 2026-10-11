@@ -5,7 +5,19 @@
  *
  * Named apart from `APP_FEATURES` in app-features.ts, which holds the build-time feature flags.
  */
-export const SERVER_FEATURES = ["annotation-stars", "annotation-color-names", "annotation-trash", "book-journal", "bookmark-edit", "notebook-hub"] as const;
+export const SERVER_FEATURES = [
+  "annotation-stars",
+  "annotation-color-names",
+  "annotation-trash",
+  "book-journal",
+  "bookmark-edit",
+  "notebook-hub",
+  "book-request-pairs",
+  /** Metadata searches (book and author) accept `cache=refresh` and mark candidates answered from the cache. */
+  "metadata-search-cache",
+  "read-aloud-delivery",
+  "koreader-delivery-settings",
+] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
 

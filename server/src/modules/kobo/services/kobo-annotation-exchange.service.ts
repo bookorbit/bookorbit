@@ -1,12 +1,14 @@
 import { randomUUID } from 'crypto';
 
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Optional, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { AnnotationPosition, AnnotationRow, AnnotationSyncStateRow } from '../../../db/schema';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { AnnotationSyncService, formatDeviceDatetime, type IncomingDeviceAnnotation } from '../../annotation/annotation-sync.service';
+import { AnnotationConversionService } from '../../annotation/annotation-conversion.service';
 import { KoboSpanConverterService, serializeKoboSpanPos } from '../../position-converter/kobo-span-converter.service';
 import { parseSpanSelector } from '../../position-converter/kobo-span.core';
+import { KoboDeliveryService } from './kobo-delivery.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboAnnotationMaterializerService } from './kobo-annotation-materializer.service';
 import { KoboKepubContextService } from './kobo-kepub-context.service';
@@ -70,6 +72,8 @@ export class KoboAnnotationExchangeService {
     private readonly materializer: KoboAnnotationMaterializerService,
     private readonly koboSpanConverter: KoboSpanConverterService,
     private readonly settingsService: KoboSettingsService,
+    @Optional() private readonly deliveries?: KoboDeliveryService,
+    @Optional() private readonly annotationConversion?: AnnotationConversionService,
   ) {}
 
   async getContentAnnotations(
@@ -82,87 +86,118 @@ export class KoboAnnotationExchangeService {
     const bookId = await this.resolveBookIdByContentId(userId, contentId);
     if (bookId === null) throw new KoboContentNotFoundException(contentId);
 
-    const kepub = await this.kepubContextService.resolveForBook(userId, bookId);
-    const includeAllOrigins = kepub.settings?.syncBookOrbitAnnotationsToKobo ?? false;
-    if (kepub.ok) {
-      await this.materializer.ensureKoboSpanPositionsForBook(userId, bookId, kepub.file, kepub.ctx, { includeAllOrigins });
-    }
-
-    const annotations = await this.annotationSync.listActiveForBook(userId, bookId);
-    const stateRows = await this.annotationSync.listStatesBySourceForBook(userId, 'kobo', bookId);
-    const externalKeyByAnnotation = this.pickStableExternalKeys(stateRows);
-
-    const positions = new Map<number, AnnotationPosition>();
-    for (const row of await this.annotationSync.findPositions(
-      annotations.map((annotation) => annotation.id),
-      ['kobo_span'],
-    )) {
-      positions.set(row.annotationId, row);
-    }
-
-    const served: ServeAnnotation[] = [];
-    const ackEntries: ServedAckPlan['entries'] = [];
-    let skippedNoLocation = 0;
-
-    for (const annotation of annotations) {
-      const known = externalKeyByAnnotation.get(annotation.id);
-      if (!known && !includeAllOrigins) continue;
-
-      const position = positions.get(annotation.id);
-      const location = this.usableLocation(position);
-      if (!location) {
-        if (known || includeAllOrigins) skippedNoLocation += 1;
-        continue;
+    const kepub = await this.kepubContextService.resolveForBook(userId, bookId, deviceId);
+    try {
+      const includeAllOrigins = kepub.settings?.syncBookOrbitAnnotationsToKobo ?? false;
+      if (this.deliveries && !kepub.ok) throw new ConflictException({ code: 'KOBO_PRECISE_SYNC_UNAVAILABLE' });
+      if (this.deliveries && kepub.ok) await this.annotationConversion?.ensureCfiPositionsForBook(userId, bookId, 200);
+      if (kepub.ok && !this.deliveries) {
+        await this.materializer.ensureKoboSpanPositionsForBook(userId, bookId, kepub.file, kepub.ctx, { includeAllOrigins });
       }
 
-      const externalKey = known?.externalKey ?? (await this.annotationSync.ensureExternalKey(annotation.id, 'kobo', () => randomUUID()));
-      const deviceCreatedAt = await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation);
-      served.push({
-        externalKey,
-        clientLastModifiedUtc: toIsoUtc(annotation.deviceUpdatedAt ?? deviceCreatedAt),
-        colorHex: annotation.color,
-        text: annotation.text,
-        note: annotation.note,
-        hasNote: annotation.note != null && annotation.note !== '',
-        location,
-      });
-      ackEntries.push({
-        annotationId: annotation.id,
-        version: annotation.version,
-        externalKey,
-        externalCreatedAt: known?.externalCreatedAt ?? deviceCreatedAt,
-      });
+      const annotations = await this.annotationSync.listActiveForBook(userId, bookId);
+      const stateRows = await this.annotationSync.listStatesBySourceForBook(userId, 'kobo', bookId);
+      const externalKeyByAnnotation = this.pickStableExternalKeys(stateRows);
+
+      const positions = new Map<number, AnnotationPosition>();
+      for (const row of await this.annotationSync.findPositions(
+        annotations.map((annotation) => annotation.id),
+        ['kobo_span', 'cfi'],
+      )) {
+        positions.set(row.annotationId, row);
+      }
+
+      const allPositions = this.deliveries
+        ? await this.annotationSync.findPositions(
+            annotations.map((annotation) => annotation.id),
+            ['cfi', 'kobo_span'],
+          )
+        : [];
+      const renditionHash = kepub.ok && this.deliveries ? await this.koboSpanConverter.computeRenditionHash(kepub.ctx) : null;
+      const served: ServeAnnotation[] = [];
+      const ackEntries: ServedAckPlan['entries'] = [];
+      let skippedNoLocation = 0;
+
+      for (const annotation of annotations) {
+        const known = externalKeyByAnnotation.get(annotation.id);
+        if (!known && !includeAllOrigins) continue;
+
+        const position = positions.get(annotation.id);
+        let location = this.usableLocation(position);
+        if (this.deliveries && kepub.ok) {
+          const canonical = allPositions.find(
+            (candidate) => candidate.annotationId === annotation.id && candidate.format === 'cfi' && candidate.status !== 'failed',
+          );
+          const raw = allPositions.find((candidate) => candidate.annotationId === annotation.id && candidate.format === 'kobo_span');
+          location = raw && (raw.extras as { renditionHash?: string } | null)?.renditionHash === renditionHash ? this.usableLocation(raw) : null;
+          if (canonical?.pos0 && (!location || (raw?.extras as { sourceCfi?: string } | null)?.sourceCfi !== canonical.pos0)) {
+            const converted = await this.koboSpanConverter.canonicalToKoboSpan({
+              bookFileId: kepub.file.id,
+              ctx: kepub.ctx,
+              cfi: canonical.pos0,
+              text: annotation.text || null,
+              chapterTitle: annotation.chapterTitle,
+            });
+            location = converted.status === 'failed' ? null : (converted.location ?? null);
+          }
+          if (!location && known) throw new ConflictException({ code: 'KOBO_ANNOTATION_RENDITION_UNAVAILABLE' });
+        }
+        if (!location) {
+          if (known || includeAllOrigins) skippedNoLocation += 1;
+          continue;
+        }
+
+        const externalKey = known?.externalKey ?? (await this.annotationSync.ensureExternalKey(annotation.id, 'kobo', () => randomUUID()));
+        const deviceCreatedAt = await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation);
+        served.push({
+          externalKey,
+          clientLastModifiedUtc: toIsoUtc(annotation.deviceUpdatedAt ?? deviceCreatedAt),
+          colorHex: annotation.color,
+          text: annotation.text,
+          note: annotation.note,
+          hasNote: annotation.note != null && annotation.note !== '',
+          location,
+        });
+        ackEntries.push({
+          annotationId: annotation.id,
+          version: annotation.version,
+          externalKey,
+          externalCreatedAt: known?.externalCreatedAt ?? deviceCreatedAt,
+        });
+      }
+
+      // Deletions propagate by omission: the device reconciles its local annotations
+      // against the active set returned here, removing anything absent. Tombstone
+      // flags do not work - the device keeps any annotation still present in the
+      // response and ignores deleted markers.
+      const tombstones = await this.annotationSync.listDeleteCandidates(userId, 'kobo', String(deviceId), bookId, 500);
+      const servedAck: ServedAckPlan = { entries: ackEntries, tombstoneStateIds: tombstones.map((row) => row.state.id) };
+
+      const etag = this.buildEtag(served.length, ackEntries, renditionHash);
+      const notModified = this.etagMatches(ifNoneMatch, etag);
+
+      this.logger.log(
+        `[${GET_EVENT}] [end] userId=${userId} bookId=${bookId} deviceId=${deviceId} durationMs=${Date.now() - startedAtMs} served=${served.length} tombstones=${servedAck.tombstoneStateIds.length} skippedNoLocation=${skippedNoLocation} notModified=${notModified} - kobo annotations served`,
+      );
+
+      if (notModified) {
+        return { bookId, etag, notModified: true, servedAck, servedCount: served.length, tombstoneCount: servedAck.tombstoneStateIds.length };
+      }
+      return {
+        bookId,
+        etag,
+        notModified: false,
+        servedAck,
+        servedCount: served.length,
+        tombstoneCount: servedAck.tombstoneStateIds.length,
+        response: {
+          annotations: served.map((row) => toKoboReadingServiceAnnotation(row)),
+          nextPageOffsetToken: null,
+        },
+      };
+    } finally {
+      if (kepub.ok) await kepub.release?.();
     }
-
-    // Deletions propagate by omission: the device reconciles its local annotations
-    // against the active set returned here, removing anything absent. Tombstone
-    // flags do not work - the device keeps any annotation still present in the
-    // response and ignores deleted markers.
-    const tombstones = await this.annotationSync.listDeleteCandidates(userId, 'kobo', String(deviceId), bookId, 500);
-    const servedAck: ServedAckPlan = { entries: ackEntries, tombstoneStateIds: tombstones.map((row) => row.state.id) };
-
-    const etag = this.buildEtag(served.length, ackEntries);
-    const notModified = this.etagMatches(ifNoneMatch, etag);
-
-    this.logger.log(
-      `[${GET_EVENT}] [end] userId=${userId} bookId=${bookId} deviceId=${deviceId} durationMs=${Date.now() - startedAtMs} served=${served.length} tombstones=${servedAck.tombstoneStateIds.length} skippedNoLocation=${skippedNoLocation} notModified=${notModified} - kobo annotations served`,
-    );
-
-    if (notModified) {
-      return { bookId, etag, notModified: true, servedAck, servedCount: served.length, tombstoneCount: servedAck.tombstoneStateIds.length };
-    }
-    return {
-      bookId,
-      etag,
-      notModified: false,
-      servedAck,
-      servedCount: served.length,
-      tombstoneCount: servedAck.tombstoneStateIds.length,
-      response: {
-        annotations: served.map((row) => toKoboReadingServiceAnnotation(row)),
-        nextPageOffsetToken: null,
-      },
-    };
   }
 
   /** Called on response flush; the only place served versions and tombstones get acked. */
@@ -189,40 +224,56 @@ export class KoboAnnotationExchangeService {
 
     const file = await this.kepubContextService.resolveReaderFile(bookId);
     if (!file) throw new NotFoundException(`Kobo content ${contentId} has no reader file`);
-    const kepub = await this.kepubContextService.resolveForBook(userId, bookId);
+    const kepub = await this.kepubContextService.resolveForBook(userId, bookId, deviceId);
 
-    const incoming = upserts.map((operation) => this.toIncomingAnnotation(operation));
-    const result = await this.annotationSync.ingestDeviceAnnotations({
-      userId,
-      source: 'kobo',
-      deviceId: String(deviceId),
-      bookId,
-      bookFileId: file.id,
-      annotations: incoming,
-    });
-
-    const deletedCount = await this.annotationSync.applyDeviceDeletes({
-      userId,
-      source: 'kobo',
-      deviceId: String(deviceId),
-      bookId,
-      deletes: deletes.map((operation) => ({ externalKey: operation.id })),
-    });
-
-    if (kepub.ok && upserts.length > 0) {
-      await this.materializer.convertIncomingForBook(
+    try {
+      const delivery = await this.deliveries?.current(userId, deviceId, bookId);
+      const incoming = upserts.map((operation) => {
+        const annotation = this.toIncomingAnnotation(operation);
+        annotation.posExtras = {
+          ...(annotation.posExtras ?? {}),
+          deviceId,
+          deliveryId: delivery?.id ?? null,
+          sourceRevision: delivery?.metadata.sourceRevision ?? null,
+          artifactId: delivery?.metadata.artifactId ?? null,
+          uncertainDelivery: !kepub.ok || !!delivery?.previousId || !!delivery?.options.replacement,
+        };
+        return annotation;
+      });
+      const result = await this.annotationSync.ingestDeviceAnnotations({
         userId,
+        source: 'kobo',
+        deviceId: String(deviceId),
         bookId,
-        kepub.file,
-        kepub.ctx,
-        upserts.map((operation) => operation.id),
-      );
-    }
+        bookFileId: file.id,
+        annotations: incoming,
+      });
 
-    this.logger.log(
-      `[${PATCH_EVENT}] [end] userId=${userId} bookId=${bookId} deviceId=${deviceId} durationMs=${Date.now() - startedAtMs} created=${result.created} updated=${result.updated} unchanged=${result.unchanged} deleted=${deletedCount} kepubReady=${kepub.ok} - kobo annotation operations applied`,
-    );
-    return { bookId, created: result.created, updated: result.updated, unchanged: result.unchanged, deleted: deletedCount, kepubReady: kepub.ok };
+      const deletedCount = await this.annotationSync.applyDeviceDeletes({
+        userId,
+        source: 'kobo',
+        deviceId: String(deviceId),
+        bookId,
+        deletes: deletes.map((operation) => ({ externalKey: operation.id })),
+      });
+
+      if (kepub.ok && upserts.length > 0) {
+        await this.materializer.convertIncomingForBook(
+          userId,
+          bookId,
+          kepub.file,
+          kepub.ctx,
+          upserts.map((operation) => operation.id),
+        );
+      }
+
+      this.logger.log(
+        `[${PATCH_EVENT}] [end] userId=${userId} bookId=${bookId} deviceId=${deviceId} durationMs=${Date.now() - startedAtMs} created=${result.created} updated=${result.updated} unchanged=${result.unchanged} deleted=${deletedCount} kepubReady=${kepub.ok} - kobo annotation operations applied`,
+      );
+      return { bookId, created: result.created, updated: result.updated, unchanged: result.unchanged, deleted: deletedCount, kepubReady: kepub.ok };
+    } finally {
+      if (kepub.ok) await kepub.release?.();
+    }
   }
 
   async getChangedContentIds(userId: number, deviceId: number): Promise<string[]> {
@@ -300,9 +351,9 @@ export class KoboAnnotationExchangeService {
     }
   }
 
-  private buildEtag(count: number, entries: ServedAckPlan['entries']): string {
+  private buildEtag(count: number, entries: ServedAckPlan['entries'], renditionHash?: string | null): string {
     const maxVersion = entries.reduce((max, entry) => Math.max(max, entry.version), 0);
-    return `W/"${maxVersion}-${count}"`;
+    return `W/"${maxVersion}-${count}${renditionHash ? `-${renditionHash}` : ''}"`;
   }
 
   private etagMatches(ifNoneMatch: string | undefined, etag: string): boolean {

@@ -58,12 +58,14 @@ export class BookMetadataFetchEligibilityService {
         return !book.hasAuthors;
       case 'genres':
         return !book.hasGenres;
+      // Only a book with audio can be missing these; an ebook has nothing for them to describe, and
+      // counting them sent every ebook back into the queue on every pass.
       case 'narrators':
-        return !book.hasNarrators;
+        return book.hasAudioCoverMedia && !book.hasNarrators;
       case 'duration':
-        return book.durationSeconds === null;
+        return book.hasAudioCoverMedia && book.durationSeconds === null;
       case 'abridged':
-        return book.abridged === null;
+        return book.hasAudioCoverMedia && book.abridged === null;
       case 'cover':
         return book.coverSource === null;
       case 'audioCover':

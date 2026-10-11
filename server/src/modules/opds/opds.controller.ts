@@ -30,6 +30,8 @@ import { OpdsEnabledGuard } from './opds-enabled.guard';
 import { OpdsUser } from './opds-user.decorator';
 import { OpdsBookService } from './opds-book.service';
 import { OpdsService } from './opds.service';
+import { DeliverySelectionService } from '../book/delivery-selection.service';
+import { READ_ALOUD_DELIVERY_VARIANTS, type ReadAloudDeliveryVariant } from '@bookorbit/types';
 import { AudiolessEpubService } from '../book/audioless-epub.service';
 import { BookService } from '../book/book.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -45,6 +47,7 @@ export class OpdsController {
     private readonly bookService: BookService,
     private readonly coverStore: BookCoverStore,
     @Optional() private readonly audiolessEpubService?: AudiolessEpubService,
+    @Optional() private readonly selections?: DeliverySelectionService,
   ) {}
 
   private readonly logger = new Logger(OpdsController.name);
@@ -151,7 +154,17 @@ export class OpdsController {
     const feedId = filterSuffix ? `urn:bookorbit:catalog:${filterSuffix}` : 'urn:bookorbit:catalog';
 
     const feedTitle = q ? `Search: ${q}` : 'Catalog';
-    const xml = this.opdsService.generateAcquisitionFeed(feedTitle, feedId, entries, total, clampedPage, clampedSize, selfPath, user.coverToken);
+    const xml = this.opdsService.generateAcquisitionFeed(
+      feedTitle,
+      feedId,
+      entries,
+      total,
+      clampedPage,
+      clampedSize,
+      selfPath,
+      user.coverToken,
+      user,
+    );
     this.sendXml(reply!, xml, OPDS_MIME_ACQ);
   }
 
@@ -183,6 +196,7 @@ export class OpdsController {
       clampedSize,
       selfPath,
       user.coverToken,
+      user,
     );
     this.sendXml(reply!, xml, OPDS_MIME_ACQ);
   }
@@ -199,6 +213,7 @@ export class OpdsController {
       25,
       '/api/v1/opds/surprise',
       user.coverToken,
+      user,
     );
     this.sendXml(reply, xml, OPDS_MIME_ACQ);
   }
@@ -284,13 +299,37 @@ export class OpdsController {
     @Query('fileId', new DefaultValuePipe(0), ParseIntPipe) fileId: number,
     @OpdsUser() user: OpdsRequestUser,
     @Res() reply: FastifyReply,
+    @Query('variant') override?: ReadAloudDeliveryVariant,
+    @Query('selection') selection?: string,
   ) {
+    if (override !== undefined && !READ_ALOUD_DELIVERY_VARIANTS.includes(override))
+      throw new BadRequestException({ code: 'INVALID_DELIVERY_VARIANT' });
+    const variant = override ?? user.readAloudDelivery;
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser, user.contentFilters);
 
-    const bookFiles = await this.opdsBookService.getBookFiles(bookId, fileId);
+    const bookFiles = await this.opdsBookService.getBookFiles(bookId, fileId, variant === 'original');
     if (!bookFiles) throw new NotFoundException('File not found');
 
     const { absolutePath, format } = bookFiles;
+    if (this.selections) {
+      const artifact = await this.selections.prepare(
+        user.userId,
+        `opds:${user.opdsUserId}`,
+        { ...bookFiles, id: bookFiles.id, absolutePath, format, mediaOverlayAvailable: bookFiles.readAlong },
+        variant ?? null,
+        selection,
+        bookFiles.contentVersion,
+        override !== undefined,
+      );
+      const filename = await this.bookService.resolveDownloadFilename({
+        bookId,
+        absolutePath,
+        format,
+        mediaOverlayAvailable: artifact.actualVariant === 'original' && bookFiles.readAlong,
+      });
+      return this.selections.stream(artifact, filename, fileMimeType(format), reply);
+    }
+
     const served = bookFiles.readAlong ? await this.audiolessCopy(absolutePath, bookId, fileId) : null;
     const servedPath = served?.path ?? absolutePath;
     try {

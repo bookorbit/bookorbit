@@ -35,7 +35,7 @@ function config(overrides: Partial<ResolvedIndexerConfig> = {}): ResolvedIndexer
     applyTrackerSeedGoals: true,
     seedRatioGoal: null,
     seedTimeMinutes: null,
-    categories: { ebook: [7020], audiobook: [3030], comic: [7030] },
+    categories: { ebook: [7020], audiobook: [3030] },
     disabledMediaKinds: [],
     isbnSearchDisabled: false,
     settings: null,

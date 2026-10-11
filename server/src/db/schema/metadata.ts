@@ -222,6 +222,8 @@ export const authorEnrichmentQueue = pgTable(
     lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
     lastError: text('last_error'),
     lastHttpStatus: integer('last_http_status'),
+    /** Set by a run that asked to bypass cached provider answers; survives requeues. */
+    ignoreCache: boolean('ignore_cache').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -322,6 +324,8 @@ export const bookMetadataFetchQueue = pgTable(
     lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
     lastError: text('last_error'),
     lastHttpStatus: integer('last_http_status'),
+    /** Set by a run that asked to bypass cached provider answers; survives requeues. */
+    ignoreCache: boolean('ignore_cache').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()

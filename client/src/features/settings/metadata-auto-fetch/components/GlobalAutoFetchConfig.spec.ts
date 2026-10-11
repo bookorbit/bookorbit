@@ -5,7 +5,7 @@ import type { BookMetadataFetchConfig, BookMetadataFetchStatusEvent } from '@boo
 
 // --- hoisted mocks ---------------------------------------------------------
 
-const mockTriggerGlobal = vi.fn<() => Promise<{ queued: number }>>()
+const mockTriggerGlobal = vi.fn<(options?: { ignoreCache?: boolean }) => Promise<{ queued: number }>>()
 const mockSaveGlobalConfig = vi.fn<(c: BookMetadataFetchConfig) => Promise<BookMetadataFetchConfig>>()
 const mockStatus = ref<BookMetadataFetchStatusEvent>({
   queued: 0,
@@ -184,6 +184,19 @@ describe('GlobalAutoFetchConfig', () => {
     await flushPromises()
 
     expect(wrapper.find('.hidden.md\\:flex span').text()).toBe('Queued 50 books')
+  })
+
+  it('runs with cached results unless the ignore-cache box is checked', async () => {
+    const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
+
+    await buttonByText(wrapper, 'Run now').trigger('click')
+    await flushPromises()
+    expect(mockTriggerGlobal).toHaveBeenLastCalledWith({ ignoreCache: false })
+
+    await wrapper.get('[data-testid="ignore-cache-checkbox"]').setValue(true)
+    await buttonByText(wrapper, 'Run now').trigger('click')
+    await flushPromises()
+    expect(mockTriggerGlobal).toHaveBeenLastCalledWith({ ignoreCache: true })
   })
 
   it('invalidates eligible count previews after trigger', async () => {

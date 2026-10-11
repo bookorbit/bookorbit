@@ -68,3 +68,8 @@ export interface AladinLookupResponse {
   searchCategoryName: string;
   item: AladinItem[];
 }
+
+export interface AladinErrorBody {
+  errorCode?: number;
+  errorMessage?: string;
+}

@@ -25,7 +25,7 @@ const hiddenCount = computed(() => entries.value.length - visibleEntries.value.l
           :key="entry.key"
           :format-key="entry.key"
           variant="solid"
-          class="gap-0.5 rounded px-1.5 py-0.5 text-[10px] tracking-wide"
+          class="gap-0.5 rounded-xs px-1.5 py-0.5 text-[10px] tracking-wide"
         />
         <span v-if="hiddenCount > 0" class="ml-0.5 text-xs text-muted-foreground">+{{ hiddenCount }}</span>
       </div>

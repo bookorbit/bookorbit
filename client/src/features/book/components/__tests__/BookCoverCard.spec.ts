@@ -166,7 +166,7 @@ describe('BookCoverCard — missing state', () => {
     const wrapper = mountCard(missingBook)
     const coverDiv = wrapper.find('[style*="aspect-ratio"]')
     const classes = coverDiv.classes().join(' ')
-    expect(classes).not.toContain('group-hover:scale-[1.02]')
+    expect(classes).not.toContain('group-hover:[transform:var(--cover-hover-transform)]')
   })
 
   it('renders the amber missing badge with TriangleAlert icon', () => {
@@ -306,7 +306,7 @@ describe('BookCoverCard - present state', () => {
     const wrapper = mountCard(presentBook)
     const coverDiv = wrapper.find('[style*="aspect-ratio"]')
     const classes = coverDiv.classes().join(' ')
-    expect(classes).toContain('group-hover:scale-[1.02]')
+    expect(classes).toContain('group-hover:[transform:var(--cover-hover-transform)]')
   })
 
   it('clamps fallback title to 2 lines for 2/3 covers and keeps author to one line', () => {

@@ -34,6 +34,9 @@ import { useAuthorBooks } from '../composables/useAuthorBooks'
 import { useAuthorDetail } from '../composables/useAuthorDetail'
 import { useAuthorMetadataPreview } from '../composables/useAuthorMetadataPreview'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+import { showCacheFallbackToast } from '@/features/metadata-cache/lib/cache-feedback'
+import { splitMetadataCacheUsage, usageFallbackProviders } from '@/features/metadata-cache/lib/metadata-cache'
+import { metadataProviderLabel } from '@/features/book/lib/metadata-refresh-feedback'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -82,10 +85,14 @@ const pageTitle = computed(() => {
 usePageTitle(pageTitle)
 const {
   preview: metadataPreview,
+  previewCache: metadataPreviewCache,
+  cacheSummary: metadataCacheSummary,
   loading: loadingMetadataPreview,
+  searched: metadataPreviewSearched,
   error: metadataPreviewError,
   cancel: cancelMetadataPreview,
   load: loadMetadataPreview,
+  loadFresh: loadFreshMetadataPreview,
 } = useAuthorMetadataPreview(authorName)
 
 const canUpdate = computed(() => hasPermission('library_edit_metadata'))
@@ -443,15 +450,20 @@ async function refreshMetadata() {
   if (!author.value || refreshingMetadata.value) return
   refreshingMetadata.value = true
   try {
-    const updated = await refreshAuthorMetadata(author.value.id)
+    const { value: updated, usage } = splitMetadataCacheUsage(await refreshAuthorMetadata(author.value.id))
     author.value = updated
     await loadMetadataPreview()
     showRefreshResultToast(updated)
+    showCacheFallbackToast(usageFallbackProviders(usage), metadataProviderLabel)
   } catch (error) {
     toast.error(error instanceof Error ? error.message : t('author.detail.toast.refreshFailed'))
   } finally {
     refreshingMetadata.value = false
   }
+}
+
+function searchMetadataPreviewFresh() {
+  void loadFreshMetadataPreview()
 }
 
 onMounted(async () => {
@@ -540,7 +552,10 @@ defineOptions({ name: 'AuthorDetailView' })
           :image-url="author.imageUrl ?? metadataPreview?.imageUrl ?? null"
           :preview-description="metadataPreview?.description ?? null"
           :preview-provider="metadataPreview?.provider ?? null"
+          :preview-cache="metadataPreviewCache"
+          :cache-summary="metadataCacheSummary"
           :loading-preview="loadingMetadataPreview"
+          :preview-searched="metadataPreviewSearched"
           :can-update="canUpdate"
           :can-merge="canMerge"
           :can-delete="canDelete"
@@ -548,6 +563,7 @@ defineOptions({ name: 'AuthorDetailView' })
           @edit="toggleEdit"
           @merge="toggleMerge"
           @refresh="refreshMetadata"
+          @search-fresh="searchMetadataPreviewFresh"
           @delete="confirmDeleteOpen = true"
         />
 

@@ -26,7 +26,13 @@ interface SelfUpdateClientIdentity {
 // Wire features this server advertises. The plugin selects a new route only
 // when its name appears here, so a downgraded server transparently returns the
 // plugin to its legacy path.
-const SERVER_CAPABILITIES: readonly KoreaderPluginCapability[] = ['catalogBulkManifest', 'catalogDashboardSections', 'bookmarkSync'];
+const SERVER_CAPABILITIES: readonly KoreaderPluginCapability[] = [
+  'catalogBulkManifest',
+  'catalogDashboardSections',
+  'bookmarkSync',
+  'readAloudDeliveryVariants',
+  'readAloudDeliverySettings',
+];
 
 @Injectable()
 export class KoreaderPackageService {

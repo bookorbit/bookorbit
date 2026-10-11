@@ -115,7 +115,7 @@ describe('AuthorsService', () => {
       enrichmentExecutor as any,
       enrichmentOrchestrator as any,
       metadataScoreService as any,
-      { enrichCardVersions: vi.fn().mockResolvedValue(undefined) } as any,
+      { enrichCardFaces: vi.fn().mockResolvedValue(undefined) } as any,
     );
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);
@@ -238,6 +238,8 @@ describe('AuthorsService', () => {
       provider: 'audnexus',
       descriptionUpdated: true,
       imageUpdated: false,
+      outboundRequests: 2,
+      cacheServed: [],
     });
     authorsRepo.findById.mockResolvedValue({
       id: 20,
@@ -250,11 +252,34 @@ describe('AuthorsService', () => {
 
     const result = await service.refreshEnrichment(reqUser(), 20);
 
-    expect(enrichmentExecutor.execute).toHaveBeenCalledWith({
-      authorId: 20,
-      preferences: expect.objectContaining({ fields: expect.any(Object) }),
-    });
+    expect(enrichmentExecutor.execute).toHaveBeenCalledWith(
+      {
+        authorId: 20,
+        preferences: expect.objectContaining({ fields: expect.any(Object) }),
+      },
+      { policy: 'refresh', allowFallback: true },
+    );
     expect(result.description).toBe('Provider description');
+    expect(result).not.toHaveProperty('metadataCache');
+  });
+
+  it('refreshEnrichment reports only the providers that fell back to saved answers', async () => {
+    authorsRepo.findVisibleAuthorIds.mockResolvedValue([25]);
+    authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
+    const fallback = { provider: 'goodreads', source: 'fallback', stale: true, cachedAt: '2026-08-01T00:00:00.000Z' };
+    enrichmentExecutor.execute.mockResolvedValue({
+      kind: 'done',
+      provider: 'goodreads',
+      descriptionUpdated: true,
+      imageUpdated: false,
+      outboundRequests: 3,
+      cacheServed: [{ provider: 'audnexus', source: 'cache', stale: false, cachedAt: '2026-09-01T00:00:00.000Z' }, fallback],
+    });
+    authorsRepo.findById.mockResolvedValue({ id: 25, name: 'Jane Doe', sortName: null, description: 'Bio', bookCount: 1, lastAddedAt: null });
+
+    const result = await service.refreshEnrichment(reqUser(), 25);
+
+    expect(result).toEqual(expect.objectContaining({ id: 25, metadataCache: { fallbackProviders: [fallback] } }));
   });
 
   it('refreshEnrichment stores fetched author image on disk when provider returns one', async () => {
@@ -265,6 +290,8 @@ describe('AuthorsService', () => {
       provider: 'audnexus',
       descriptionUpdated: false,
       imageUpdated: true,
+      outboundRequests: 2,
+      cacheServed: [],
     });
     authorsRepo.findById.mockResolvedValue({
       id: 21,
@@ -277,10 +304,13 @@ describe('AuthorsService', () => {
 
     await service.refreshEnrichment(reqUser(), 21);
 
-    expect(enrichmentExecutor.execute).toHaveBeenCalledWith({
-      authorId: 21,
-      preferences: expect.objectContaining({ fields: expect.any(Object) }),
-    });
+    expect(enrichmentExecutor.execute).toHaveBeenCalledWith(
+      {
+        authorId: 21,
+        preferences: expect.objectContaining({ fields: expect.any(Object) }),
+      },
+      { policy: 'refresh', allowFallback: true },
+    );
   });
 
   it('refreshEnrichment throws when provider fails so callers can surface failure', async () => {
@@ -669,7 +699,28 @@ describe('AuthorsService', () => {
     await expect(service.searchMetadata({ q: 'John Smith', region: 'us', limit: 2, providers: ['audnexus'] })).resolves.toEqual([
       { provider: 'audnexus', providerId: 'A1', name: 'John Smith' },
     ]);
-    expect(authorMetadataFetchService.search).toHaveBeenCalledWith({ name: 'John Smith', region: 'us', limit: 2 }, { keys: ['audnexus'] });
+    expect(authorMetadataFetchService.search).toHaveBeenCalledWith(
+      { name: 'John Smith', region: 'us', limit: 2 },
+      { keys: ['audnexus'], directive: { policy: 'default', allowFallback: true } },
+    );
+  });
+
+  it('searchMetadata goes live when the client asks to refresh', async () => {
+    authorMetadataFetchService.search.mockResolvedValue([]);
+
+    await service.searchMetadata({ q: 'John Smith', cache: 'refresh' });
+
+    expect(authorMetadataFetchService.search).toHaveBeenCalledWith(expect.anything(), {
+      keys: undefined,
+      directive: { policy: 'refresh', allowFallback: true },
+    });
+  });
+
+  it('searchMetadata returns cache provenance on candidates unchanged', async () => {
+    const cached = { provider: 'audnexus', providerId: 'A1', name: 'John Smith', cache: { fetchedAt: '2026-09-01T00:00:00.000Z', stale: false } };
+    authorMetadataFetchService.search.mockResolvedValue([cached]);
+
+    await expect(service.searchMetadata({ q: 'John Smith' })).resolves.toEqual([cached]);
   });
 
   it('lookupMetadata forwards provider key and id', async () => {
@@ -680,6 +731,14 @@ describe('AuthorsService', () => {
       providerId: 'A1',
       name: 'John Smith',
     });
+    expect(authorMetadataFetchService.lookupById).toHaveBeenCalledWith('audnexus', 'A1', 'ca', {
+      directive: { policy: 'default', allowFallback: true },
+    });
+
+    await service.lookupMetadata({ provider: 'audnexus', id: 'A1', cache: 'refresh' });
+    expect(authorMetadataFetchService.lookupById).toHaveBeenLastCalledWith('audnexus', 'A1', undefined, {
+      directive: { policy: 'refresh', allowFallback: true },
+    });
   });
 
   it('streamMetadata proxies through provider stream options', () => {
@@ -689,7 +748,16 @@ describe('AuthorsService', () => {
     const stream = service.streamMetadata({ q: 'Jane', region: 'us', limit: 5, providers: ['audnexus'] });
 
     expect(stream).toBe(mockStream);
-    expect(authorMetadataFetchService.stream).toHaveBeenCalledWith({ name: 'Jane', region: 'us', limit: 5 }, { keys: ['audnexus'] });
+    expect(authorMetadataFetchService.stream).toHaveBeenCalledWith(
+      { name: 'Jane', region: 'us', limit: 5 },
+      { keys: ['audnexus'], directive: { policy: 'default', allowFallback: true } },
+    );
+
+    service.streamMetadata({ q: 'Jane', cache: 'refresh' });
+    expect(authorMetadataFetchService.stream).toHaveBeenLastCalledWith(expect.anything(), {
+      keys: undefined,
+      directive: { policy: 'refresh', allowFallback: true },
+    });
   });
 
   it('update returns current detail when no mutable fields are provided', async () => {
@@ -833,6 +901,73 @@ describe('AuthorsService', () => {
 
     expect(result).toEqual({ processed: 2, failed: 1, updated: 1 });
     expect(progress).toHaveBeenCalledTimes(2);
+  });
+
+  describe('bulkRefreshMetadata metadata cache', () => {
+    function doneResult(outboundRequests: number) {
+      return { kind: 'done', provider: 'audnexus', descriptionUpdated: true, imageUpdated: false, outboundRequests, cacheServed: [] };
+    }
+
+    beforeEach(() => {
+      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1, 2, 3]);
+      authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
+    });
+
+    it('uses the cache with fallback by default', async () => {
+      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1]);
+      enrichmentExecutor.execute.mockResolvedValue(doneResult(1));
+      vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+
+      await service.bulkRefreshMetadata([1], reqUser());
+
+      expect(enrichmentExecutor.execute).toHaveBeenCalledWith(expect.objectContaining({ authorId: 1 }), { policy: 'default', allowFallback: true });
+    });
+
+    it('goes live with fallback when asked to ignore the cache', async () => {
+      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1]);
+      enrichmentExecutor.execute.mockResolvedValue(doneResult(1));
+      vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+
+      await service.bulkRefreshMetadata([1], reqUser(), undefined, { ignoreCache: true });
+
+      expect(enrichmentExecutor.execute).toHaveBeenCalledWith(expect.objectContaining({ authorId: 1 }), { policy: 'refresh', allowFallback: true });
+    });
+
+    it('only yields between items that made no outbound requests', async () => {
+      enrichmentExecutor.execute.mockResolvedValueOnce(doneResult(0)).mockResolvedValueOnce(doneResult(3)).mockResolvedValueOnce(doneResult(0));
+      const sleep = vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+
+      await service.bulkRefreshMetadata([1, 2, 3], reqUser());
+
+      expect(sleep).toHaveBeenCalledTimes(2);
+      expect(sleep).toHaveBeenNthCalledWith(1, 100);
+      const providerDelay = sleep.mock.calls[1]![0] as number;
+      expect(providerDelay).toBeGreaterThanOrEqual(250);
+      expect(providerDelay).toBeLessThanOrEqual(1_000);
+    });
+
+    it('keeps the provider delay after a failed item', async () => {
+      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1, 2]);
+      enrichmentExecutor.execute
+        .mockResolvedValueOnce({
+          kind: 'failed',
+          message: 'down',
+          provider: 'audnexus',
+          httpStatus: 503,
+          retryAfterMs: null,
+          transient: true,
+          descriptionUpdated: false,
+          imageUpdated: false,
+          outboundRequests: 0,
+          cacheServed: [],
+        })
+        .mockResolvedValueOnce(doneResult(0));
+      const sleep = vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+
+      await service.bulkRefreshMetadata([1, 2], reqUser());
+
+      expect((sleep.mock.calls[0]![0] as number) >= 250).toBe(true);
+    });
   });
 
   describe('findJumpBuckets', () => {

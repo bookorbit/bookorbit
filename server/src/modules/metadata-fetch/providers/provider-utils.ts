@@ -1,5 +1,6 @@
 import { MetadataCandidate } from '@bookorbit/types';
 
+import { markProviderTruncated } from '../../../common/provider-cache/provider-call-context';
 import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
 import { ProviderThrottleError } from '../provider-throttle.error';
 import { MetadataSearchParams } from './metadata-search-params';
@@ -39,13 +40,23 @@ export interface SearchDeadline {
 export function createSearchDeadline(budgetMs: number, parentSignal?: AbortSignal): SearchDeadline {
   const at = Date.now() + budgetMs;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), budgetMs);
+  // Runs in the caller's async context, so the metadata cache learns this search was cut short.
+  const timer = setTimeout(() => {
+    markProviderTruncated();
+    controller.abort();
+  }, budgetMs);
   const signal = parentSignal ? AbortSignal.any([parentSignal, controller.signal]) : controller.signal;
 
   return {
     at,
     signal,
-    expired: () => Date.now() >= at,
+    // A caller can see the budget spent before the timer has fired and then dispose of it, so the
+    // check itself has to report the truncation too.
+    expired: () => {
+      const spent = Date.now() >= at;
+      if (spent) markProviderTruncated();
+      return spent;
+    },
     dispose: () => clearTimeout(timer),
   };
 }

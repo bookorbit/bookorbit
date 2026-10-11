@@ -104,7 +104,7 @@ function isCurrent(id: NamingRuleId): boolean {
               />
               <span
                 v-else-if="item.custom"
-                class="shrink-0 rounded bg-primary/15 px-1 py-px text-[9.5px] font-bold uppercase tracking-wide text-primary"
+                class="shrink-0 rounded-xs bg-primary/15 px-1 py-px text-[9.5px] font-bold uppercase tracking-wide text-primary"
               >
                 {{ t('settings.reader.fileNaming.badgeCustom') }}
               </span>

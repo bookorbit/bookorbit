@@ -5,7 +5,7 @@ import VChart from 'vue-echarts'
 import { Clock3 } from '@lucide/vue'
 import type { ReadingSessionSourceBucket } from '@bookorbit/types'
 
-import { useThemeStore } from '@/stores/theme'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { DEFAULT_BREAKDOWN_DIMENSION, getBreakdownSeries, type BreakdownDimension } from '../../lib/breakdown'
 import { useUserPeakReadingHours } from '../../composables/useUserPeakReadingHours'
 import BreakdownSelect from '../BreakdownSelect.vue'
@@ -14,7 +14,7 @@ import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_EVENTS = 20
 
-const themeStore = useThemeStore()
+const chartTokens = useChartTokens()
 const { t } = useI18n()
 
 const { data, loading, error } = useUserPeakReadingHours()
@@ -40,7 +40,7 @@ watchEffect(() => {
   if (isEmpty.value || lowConfidence.value || !data.value.length) return
 
   const formatKeys = [...new Set(data.value.flatMap((item) => Object.keys(item.byFormat)))].sort()
-  const seriesMeta = getBreakdownSeries(dimension.value, `${themeStore.resolvedTheme}:${themeStore.accent}`, formatKeys)
+  const seriesMeta = getBreakdownSeries(dimension.value, chartTokens.value.key, formatKeys)
   const series = seriesMeta.map((meta) => ({
     type: 'bar',
     name: meta.label,

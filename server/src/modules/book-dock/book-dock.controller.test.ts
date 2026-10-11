@@ -142,6 +142,17 @@ describe('BookDockController', () => {
     expect(service.getFile).toHaveBeenCalledWith(44, MOCK_USER.id, false);
   });
 
+  it('opens a file to check for narration only when the read asks for it', async () => {
+    const { controller, service } = makeController();
+    service.getFile.mockResolvedValue({ id: 44, fileName: 'book.epub' });
+
+    await controller.getFile(MOCK_USER, 44);
+    expect(service.getFile).toHaveBeenLastCalledWith(44, MOCK_USER.id, false, { readAlong: false });
+
+    await controller.getFile(MOCK_USER, 44, 'true');
+    expect(service.getFile).toHaveBeenLastCalledWith(44, MOCK_USER.id, false, { readAlong: true });
+  });
+
   it('bulk and finalize endpoints delegate payload fields as expected', async () => {
     const { controller, service, finalizeService, watcherService } = makeController();
 

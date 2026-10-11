@@ -7,7 +7,6 @@ import {
   NOTEBOOK_PAGE_SIZE_DEFAULT,
   NOTEBOOK_REVIEW_DAILY_SIZE,
   NOTEBOOK_REVIEW_SHUFFLE_MAX,
-  normalizeCoverAspectRatio,
   type AnnotationItem,
   type NotebookBookLabel,
   type NotebookBookRow,
@@ -261,20 +260,13 @@ export class NotebookService {
     return entries;
   }
 
-  /** The label sidecar: one query for the books and one for their cover slots, whatever the page size. */
+  /** The label sidecar: one query for the books and two for their covers, whatever the page size. */
   private async labels(bookIds: readonly number[]): Promise<Record<string, NotebookBookLabel>> {
     const ids = [...new Set(bookIds)];
     if (ids.length === 0) return {};
-    const [rows, slotsByBook] = await Promise.all([this.repo.findLabels(ids), this.coverStore.slotsFor(ids)]);
+    const [rows, faces] = await Promise.all([this.repo.findLabels(ids), this.coverStore.facesFor(ids)]);
     const labels: Record<string, NotebookBookLabel> = {};
-    for (const row of rows) {
-      const coverVersion = this.coverStore.coverVersion(
-        normalizeCoverAspectRatio(row.coverAspectRatio),
-        slotsByBook.get(row.id) ?? [],
-        row.updatedAt.toISOString(),
-      );
-      labels[String(row.id)] = toNotebookBookLabel(row, coverVersion);
-    }
+    for (const row of rows) labels[String(row.id)] = toNotebookBookLabel(row, faces.get(row.id));
     return labels;
   }
 }

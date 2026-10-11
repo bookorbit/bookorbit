@@ -67,6 +67,23 @@ export default defineConfigWithVueTs(
     },
   },
 
+  // randomUUID exists only in secure contexts, so a self-hosted install opened over plain HTTP throws
+  // on the first call. A separate rule from the one above, because a second no-restricted-syntax
+  // block would replace that block's options rather than add to them.
+  {
+    files: ['src/**/*.{vue,ts,mts,tsx}'],
+    ignores: ['src/lib/uuid.ts', 'src/**/__tests__/*', 'src/**/*.spec.ts', 'src/**/*.test.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'randomUUID',
+          message: "Use createUuid from '@/lib/uuid' so IDs can be created on HTTP/self-hosted origins.",
+        },
+      ],
+    },
+  },
+
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
 
   skipFormatting,

@@ -183,7 +183,7 @@ function handleMoveTop() {
         <span class="shrink-0">{{ formatPodcastDuration(episode.durationSeconds) }}</span>
         <span
           v-if="episode.explicit"
-          class="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border px-1 text-[10px] font-bold text-foreground"
+          class="inline-flex h-5 min-w-5 items-center justify-center rounded-xs border border-border px-1 text-[10px] font-bold text-foreground"
           :aria-label="t('podcast.labels.explicit')"
           :title="t('podcast.labels.explicit')"
         >

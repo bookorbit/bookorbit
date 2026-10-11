@@ -1,25 +1,7 @@
+import type { EmailRecipient, EmailRecipientForm } from '@bookorbit/types'
+export type { EmailRecipient, EmailRecipientForm } from '@bookorbit/types'
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-
-export interface EmailRecipient {
-  id: number
-  userId: number
-  name: string
-  email: string
-  isDefault: boolean
-  deviceType: string | null
-  preferredFormat: string | null
-  defaultTemplateId: number | null
-  createdAt: string
-}
-
-export interface EmailRecipientForm {
-  name: string
-  email: string
-  deviceType: string | null
-  preferredFormat: string | null
-  defaultTemplateId: number | null
-}
 
 const recipients = ref<EmailRecipient[]>([])
 let fetchPromise: Promise<void> | null = null

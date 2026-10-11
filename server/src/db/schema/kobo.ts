@@ -13,10 +13,11 @@ import {
   timestamp,
   unique,
   uuid,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
 
-import { books } from './books';
+import { books, bookFiles } from './books';
 import { users } from './auth';
 
 export const koboDevices = pgTable(
@@ -54,6 +55,7 @@ export const koboSyncSettings = pgTable(
     kepubConversionLimitMb: integer('kepub_conversion_limit_mb').notNull().default(100),
     twoWayProgressSync: boolean('two_way_progress_sync').notNull().default(false),
     syncBookOrbitAnnotationsToKobo: boolean('sync_bookorbit_annotations_to_kobo').notNull().default(false),
+    readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
     storeSync: boolean('store_sync').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -140,6 +142,8 @@ export const koboSnapshotBooks = pgTable(
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
+    deliveryRetryAt: timestamp('delivery_retry_at', { withTimezone: true }),
+    deliveryFailureCode: varchar('delivery_failure_code', { length: 64 }),
     synced: boolean('synced').notNull().default(false),
     pendingDelete: boolean('pending_delete').notNull().default(false),
     isNew: boolean('is_new').notNull().default(true),
@@ -250,3 +254,66 @@ export type KoboBookEntitlement = typeof koboBookEntitlements.$inferSelect;
 export type KoboReadingState = typeof koboReadingStates.$inferSelect;
 export type KoboSyncHistory = typeof koboSyncHistory.$inferSelect;
 export type NewKoboSyncHistory = typeof koboSyncHistory.$inferInsert;
+
+export const koboDeviceDeliveries = pgTable(
+  'kobo_device_deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: integer('device_id').notNull(),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    sourceFileId: integer('source_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
+    metadata: jsonb('metadata').$type<import('@bookorbit/types').DeliveryArtifactMetadata>().notNull(),
+    options: jsonb('options').$type<{ hyphenate: boolean; converterVersion: string | null; replacement?: boolean }>().notNull(),
+    state: varchar('state', { length: 32 }).notNull().default('offered'),
+    previousId: uuid('previous_id'),
+    current: boolean('current').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.deviceId, table.userId],
+      foreignColumns: [koboDevices.id, koboDevices.userId],
+      name: 'kobo_device_deliveries_owner_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('kobo_device_deliveries_current_idx')
+      .on(table.userId, table.deviceId, table.bookId)
+      .where(sql`${table.current} = true`),
+    index('kobo_device_deliveries_device_book_idx').on(table.userId, table.deviceId, table.bookId),
+  ],
+);
+
+export const koboDeviceReadingStates = pgTable(
+  'kobo_device_reading_states',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: integer('device_id').notNull(),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    entitlementId: varchar('entitlement_id', { length: 255 }).notNull(),
+    deliveryId: uuid('delivery_id').references(() => koboDeviceDeliveries.id, { onDelete: 'set null' }),
+    createdAtKobo: varchar('created_at_kobo', { length: 50 }),
+    lastModifiedKobo: varchar('last_modified_kobo', { length: 50 }),
+    priorityTimestamp: varchar('priority_timestamp', { length: 50 }),
+    currentBookmark: jsonb('current_bookmark'),
+    statistics: jsonb('statistics'),
+    statusInfo: jsonb('status_info'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.deviceId, table.bookId] }),
+    foreignKey({
+      columns: [table.deviceId, table.userId],
+      foreignColumns: [koboDevices.id, koboDevices.userId],
+      name: 'kobo_device_reading_states_owner_fk',
+    }).onDelete('cascade'),
+  ],
+);

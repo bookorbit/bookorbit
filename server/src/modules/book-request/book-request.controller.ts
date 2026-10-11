@@ -9,6 +9,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookRequestService } from './book-request.service';
 import { CheckAvailabilityDto } from './dto/check-availability.dto';
 import { CreateBookRequestDto } from './dto/create-book-request.dto';
+import { CreateBookRequestPairDto } from './dto/create-book-request-pair.dto';
 import { BulkBookRequestsDto } from './dto/bulk-book-requests.dto';
 import { ListBookRequestsDto } from './dto/list-book-requests.dto';
 import { UpdateBookRequestLanguageDto } from './dto/update-book-request-language.dto';
@@ -27,6 +28,25 @@ export class BookRequestController {
   })
   submit(@Body() dto: CreateBookRequestDto, @CurrentUser() user: RequestUser) {
     return this.service.submit(dto, user);
+  }
+
+  /**
+   * An ebook and an audiobook of one work in one submission. A separate route rather than a flag on
+   * the one above, because the answer is two requests and a released client reads that route's
+   * answer as exactly one. Advertised by the `book-request-pairs` server feature.
+   */
+  @Post('pairs')
+  @Auditable({
+    action: AuditAction.BookRequestCreate,
+    resource: AuditResource.BookRequest,
+    getResourceId: (_req, body) => {
+      const pair = body as { ebook?: { request?: { id?: number } }; audiobook?: { request?: { id?: number } } } | undefined;
+      return pair?.ebook?.request?.id ?? pair?.audiobook?.request?.id;
+    },
+    description: 'Created an ebook and audiobook book request pair',
+  })
+  submitPair(@Body() dto: CreateBookRequestPairDto, @CurrentUser() user: RequestUser) {
+    return this.service.submitPair(dto, user);
   }
 
   @Get()

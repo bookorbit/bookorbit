@@ -1,7 +1,32 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, exists, ilike, inArray, isNull, lt, notExists, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  not,
+  notExists,
+  notInArray,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { ACTIVE_BOOK_REQUEST_STATUSES, AUDIO_FORMAT_LIST, COMIC_FORMAT_LIST, EBOOK_FORMAT_LIST } from '@bookorbit/types';
+import { alias } from 'drizzle-orm/pg-core';
+import {
+  ACTIVE_BOOK_REQUEST_STATUSES,
+  BOOK_REQUEST_FORMATS_BY_MEDIA_KIND,
+  BOOK_REQUEST_MEDIA_KINDS,
+  WORKER_WRITABLE_BOOK_REQUEST_STATUSES,
+} from '@bookorbit/types';
 import type {
   BookRequestMediaKind,
   BookRequestRequesterOption,
@@ -86,12 +111,6 @@ const ABANDONABLE_SELF_SERVE_STATUSES: readonly BookRequestStatus[] = ['approved
  */
 const SELF_SERVE_CAP_LOCK_NAMESPACE = 248_001;
 
-const OWNED_FORMATS_BY_MEDIA_KIND: Record<BookRequestMediaKind, readonly string[]> = {
-  ebook: EBOOK_FORMAT_LIST,
-  audiobook: AUDIO_FORMAT_LIST,
-  comic: COMIC_FORMAT_LIST,
-};
-
 export interface ListRequestsOptions {
   page: number;
   limit: number;
@@ -107,7 +126,31 @@ export interface ListRequestsOptions {
   selfServe?: boolean;
   sortBy?: BookRequestSortField;
   sortDir?: BookRequestSortDirection;
+  /**
+   * One row per visible pair, led by its ebook half. The other half is folded away and named in
+   * `visibleCompanionId` instead, and the pair matches a filter when either half does.
+   */
+  groupPairs?: boolean;
 }
+
+/** A list row, plus the companion folded into it when the list groups pairs. */
+export type BookRequestListRow = BookRequestJoinedRow & { visibleCompanionId: number | null };
+
+/** Where a book lives, which is everything filing a second format into it has to agree with. */
+export interface BookPlacement {
+  bookId: number;
+  libraryId: number;
+  libraryFolderId: number;
+  folderPath: string;
+  status: string;
+  organizationMode: string;
+}
+
+/** The other half of a pair, joined back onto the same table. */
+const companionRequests = alias(bookRequests, 'companion');
+
+/** The visibility and filter rules are asked of a request and of its companion alike. */
+type RequestTable = typeof bookRequests | typeof companionRequests;
 
 export interface BookRequestJoinedRow {
   request: BookRequestRow;
@@ -132,28 +175,41 @@ export interface OwnedMatchLookup {
 export class BookRequestRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async findAll(opts: ListRequestsOptions): Promise<{ items: BookRequestJoinedRow[]; total: number }> {
+  /**
+   * Who may see a row on this list: the requester or a subscriber when the list is personal, and
+   * never a row this viewer hid. Built against a table rather than `bookRequests` itself, so the
+   * same rule can be asked of a pair's other half.
+   */
+  private visibilityConditions(table: RequestTable, opts: ListRequestsOptions): SQL[] {
     const conditions: SQL[] = [];
-    if (opts.status) conditions.push(eq(bookRequests.status, opts.status));
-    if (opts.mediaKind) conditions.push(eq(bookRequests.mediaKind, opts.mediaKind));
-    if (opts.requesterUserId !== undefined) conditions.push(eq(bookRequests.userId, opts.requesterUserId));
-    if (opts.selfServe !== undefined) conditions.push(eq(bookRequests.selfServe, opts.selfServe));
     if (opts.userId !== undefined) {
       const subscribed = this.db
         .select({ id: bookRequestSubscribers.requestId })
         .from(bookRequestSubscribers)
         .where(eq(bookRequestSubscribers.userId, opts.userId));
-      conditions.push(or(eq(bookRequests.userId, opts.userId), inArray(bookRequests.id, subscribed)) as SQL);
+      conditions.push(or(eq(table.userId, opts.userId), inArray(table.id, subscribed)) as SQL);
     }
     if (opts.excludeDismissedFor !== undefined) {
       const dismissed = this.db
         .select({ id: bookRequestDismissals.requestId })
         .from(bookRequestDismissals)
         .where(eq(bookRequestDismissals.userId, opts.excludeDismissedFor));
-      conditions.push(notInArray(bookRequests.id, dismissed));
+      conditions.push(notInArray(table.id, dismissed));
     }
+    return conditions;
+  }
 
-    const where = conditions.length ? and(...conditions) : undefined;
+  /** What the viewer narrowed the list to, as opposed to what they are allowed to see. */
+  private filterConditions(table: RequestTable, opts: ListRequestsOptions): SQL[] {
+    const conditions: SQL[] = [];
+    if (opts.status) conditions.push(eq(table.status, opts.status));
+    if (opts.mediaKind) conditions.push(eq(table.mediaKind, opts.mediaKind));
+    if (opts.requesterUserId !== undefined) conditions.push(eq(table.userId, opts.requesterUserId));
+    if (opts.selfServe !== undefined) conditions.push(eq(table.selfServe, opts.selfServe));
+    return conditions;
+  }
+
+  async findAll(opts: ListRequestsOptions): Promise<{ items: BookRequestListRow[]; total: number }> {
     const direction = opts.sortDir === 'asc' ? asc : desc;
     const SORT_COLUMNS = {
       createdAt: bookRequests.createdAt,
@@ -166,6 +222,50 @@ export class BookRequestRepository {
     // boundary when two requests share a title or a timestamp.
     const orderBy = [direction(SORT_COLUMNS[opts.sortBy ?? 'createdAt']), direction(bookRequests.id)];
 
+    const visible = this.visibilityConditions(bookRequests, opts);
+    const filters = this.filterConditions(bookRequests, opts);
+
+    if (!opts.groupPairs) {
+      const conditions = [...visible, ...filters];
+      const where = conditions.length ? and(...conditions) : undefined;
+      const [rows, [totals]] = await Promise.all([
+        this.db
+          .select({
+            request: bookRequests,
+            requesterUsername: users.username,
+            requesterName: users.name,
+            targetLibraryName: libraries.name,
+          })
+          .from(bookRequests)
+          .innerJoin(users, eq(users.id, bookRequests.userId))
+          .leftJoin(libraries, eq(libraries.id, bookRequests.targetLibraryId))
+          .where(where)
+          .orderBy(...orderBy)
+          .limit(opts.limit)
+          .offset((opts.page - 1) * opts.limit),
+        this.db.select({ total: count() }).from(bookRequests).where(where),
+      ]);
+      return { items: await this.withDecidedBy(rows.map((row) => ({ ...row, visibleCompanionId: null }))), total: totals?.total ?? 0 };
+    }
+
+    // Both pointers have to agree, so a half-written link can never fold a row away.
+    const companion = companionRequests;
+    const pairJoin = and(
+      eq(companion.id, bookRequests.companionRequestId),
+      eq(companion.companionRequestId, bookRequests.id),
+      ne(companion.mediaKind, bookRequests.mediaKind),
+    );
+    const companionVisible = and(isNotNull(companion.id), ...this.visibilityConditions(companion, opts)) as SQL;
+    const companionFilters = this.filterConditions(companion, opts);
+    const companionMatches = companionFilters.length ? (and(companionVisible, ...companionFilters) as SQL) : companionVisible;
+
+    const conditions: SQL[] = [...visible];
+    // The pair is one row, so it stays on the list when either half is what the viewer asked for.
+    if (filters.length) conditions.push(or(and(...filters), companionMatches) as SQL);
+    // The audiobook half folds into its ebook whenever the viewer can see both.
+    conditions.push(not(and(companionVisible, eq(bookRequests.mediaKind, 'audiobook')) as SQL));
+    const where = and(...conditions);
+
     const [rows, [totals]] = await Promise.all([
       this.db
         .select({
@@ -173,26 +273,46 @@ export class BookRequestRepository {
           requesterUsername: users.username,
           requesterName: users.name,
           targetLibraryName: libraries.name,
+          visibleCompanionId: sql<number | null>`case when ${companionVisible} then ${companion.id} else null end`,
         })
         .from(bookRequests)
         .innerJoin(users, eq(users.id, bookRequests.userId))
         .leftJoin(libraries, eq(libraries.id, bookRequests.targetLibraryId))
+        .leftJoin(companion, pairJoin)
         .where(where)
         .orderBy(...orderBy)
         .limit(opts.limit)
         .offset((opts.page - 1) * opts.limit),
-      this.db.select({ total: count() }).from(bookRequests).where(where),
+      this.db.select({ total: count() }).from(bookRequests).leftJoin(companion, pairJoin).where(where),
     ]);
 
-    const decidedByNames = await this.findUsernames(rows.map((r) => r.request.decidedByUserId));
+    return { items: await this.withDecidedBy(rows), total: totals?.total ?? 0 };
+  }
 
-    return {
-      items: rows.map((row) => ({
-        ...row,
-        decidedByUsername: row.request.decidedByUserId != null ? (decidedByNames.get(row.request.decidedByUserId) ?? null) : null,
-      })),
-      total: totals?.total ?? 0,
-    };
+  /** The joined form of a set of requests, in no particular order, for a pair's folded-away halves. */
+  async findByIds(ids: number[]): Promise<BookRequestJoinedRow[]> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return [];
+    const rows = await this.db
+      .select({
+        request: bookRequests,
+        requesterUsername: users.username,
+        requesterName: users.name,
+        targetLibraryName: libraries.name,
+      })
+      .from(bookRequests)
+      .innerJoin(users, eq(users.id, bookRequests.userId))
+      .leftJoin(libraries, eq(libraries.id, bookRequests.targetLibraryId))
+      .where(inArray(bookRequests.id, unique));
+    return this.withDecidedBy(rows);
+  }
+
+  private async withDecidedBy<T extends { request: BookRequestRow }>(rows: T[]): Promise<Array<T & { decidedByUsername: string | null }>> {
+    const decidedByNames = await this.findUsernames(rows.map((r) => r.request.decidedByUserId));
+    return rows.map((row) => ({
+      ...row,
+      decidedByUsername: row.request.decidedByUserId != null ? (decidedByNames.get(row.request.decidedByUserId) ?? null) : null,
+    }));
   }
 
   /**
@@ -267,6 +387,121 @@ export class BookRequestRepository {
       if ((await countLiveSelfServe(tx, data.userId)) >= maxLive) return null;
       return this.insertWithAliases(tx, data, aliasKeys);
     });
+  }
+
+  /**
+   * Both new halves of a pair in one transaction, linked to each other before it commits.
+   *
+   * One transaction rather than two creates, because a pair that half exists is worse than either
+   * outcome: the cap could refuse the second half after the first was already queued, and a unique
+   * violation on the second would leave the first behind for the caller to retry into a fold.
+   * Rolling both back makes the retry see the world exactly as it was. Null means the cap refused.
+   */
+  async createPair(
+    entries: Array<{ data: NewBookRequestRow; aliasKeys: string[] }>,
+    selfServeCap: { userId: number; maxLive: number; newRows: number } | null,
+  ): Promise<BookRequestRow[] | null> {
+    return this.db.transaction(async (tx) => {
+      if (selfServeCap && selfServeCap.newRows > 0) {
+        await tx.execute(sql`select pg_advisory_xact_lock(${SELF_SERVE_CAP_LOCK_NAMESPACE}, ${selfServeCap.userId})`);
+        if ((await countLiveSelfServe(tx, selfServeCap.userId)) + selfServeCap.newRows > selfServeCap.maxLive) return null;
+      }
+
+      const rows: BookRequestRow[] = [];
+      for (const entry of entries) rows.push(await this.insertWithAliases(tx, entry.data, entry.aliasKeys));
+
+      if (rows.length === 2) {
+        const [first, second] = rows as [BookRequestRow, BookRequestRow];
+        await tx.update(bookRequests).set({ companionRequestId: second.id }).where(eq(bookRequests.id, first.id));
+        await tx.update(bookRequests).set({ companionRequestId: first.id }).where(eq(bookRequests.id, second.id));
+        first.companionRequestId = second.id;
+        second.companionRequestId = first.id;
+      }
+      return rows;
+    });
+  }
+
+  /**
+   * Points two requests at each other, when neither is already paired with something still live.
+   *
+   * Used when a half of a pair joined a request that already existed. That request may have been
+   * paired before; a partner that is still live is the one the dedupe claim says this pair should
+   * have joined anyway, so the link is refused rather than stolen, and a settled partner is let go
+   * so it stops pointing at a request that no longer points back. Locked, because two pairs for the
+   * same work can be submitted at the same moment.
+   */
+  async linkCompanions(firstId: number, secondId: number): Promise<boolean> {
+    if (firstId === secondId) return false;
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ id: bookRequests.id, mediaKind: bookRequests.mediaKind, companionRequestId: bookRequests.companionRequestId })
+        .from(bookRequests)
+        .where(inArray(bookRequests.id, [firstId, secondId]))
+        .for('update');
+      if (rows.length !== 2 || rows[0]!.mediaKind === rows[1]!.mediaKind) return false;
+      if (rows.every((row) => row.companionRequestId === (row.id === firstId ? secondId : firstId))) return true;
+
+      const previous = rows.map((row) => row.companionRequestId).filter((id): id is number => id !== null && id !== firstId && id !== secondId);
+      if (previous.length > 0) {
+        const partners = await tx
+          .select({ id: bookRequests.id, status: bookRequests.status })
+          .from(bookRequests)
+          .where(inArray(bookRequests.id, previous))
+          .for('update');
+        if (partners.some((partner) => ACTIVE_BOOK_REQUEST_STATUSES.includes(partner.status as BookRequestStatus))) return false;
+        await tx
+          .update(bookRequests)
+          .set({ companionRequestId: null })
+          .where(and(inArray(bookRequests.id, previous), inArray(bookRequests.companionRequestId, [firstId, secondId])));
+      }
+
+      await tx.update(bookRequests).set({ companionRequestId: secondId }).where(eq(bookRequests.id, firstId));
+      await tx.update(bookRequests).set({ companionRequestId: firstId }).where(eq(bookRequests.id, secondId));
+      return true;
+    });
+  }
+
+  /**
+   * Names the book a request's files should join, unless one is already named or the request has
+   * already landed. A request somebody pointed at a book on purpose keeps that book.
+   */
+  async setTargetBookIfUnset(id: number, bookId: number): Promise<boolean> {
+    const rows = await this.db
+      .update(bookRequests)
+      .set({ targetBookId: bookId })
+      .where(
+        and(eq(bookRequests.id, id), isNull(bookRequests.targetBookId), inArray(bookRequests.status, [...WORKER_WRITABLE_BOOK_REQUEST_STATUSES])),
+      )
+      .returning({ id: bookRequests.id });
+    return rows.length > 0;
+  }
+
+  /** Where a book lives, or undefined when it is gone. */
+  async findBookPlacement(bookId: number): Promise<BookPlacement | undefined> {
+    const [row] = await this.db
+      .select({
+        bookId: books.id,
+        libraryId: books.libraryId,
+        libraryFolderId: books.libraryFolderId,
+        folderPath: books.folderPath,
+        status: books.status,
+        organizationMode: libraries.organizationMode,
+      })
+      .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .where(eq(books.id, bookId))
+      .limit(1);
+    return row;
+  }
+
+  /** Which media a book already holds, judged by its content files the way ownership is. */
+  async findBookMediaKinds(bookId: number): Promise<Set<BookRequestMediaKind>> {
+    const rows = await this.db
+      .selectDistinct({ format: bookFiles.format })
+      .from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'content')));
+    const formats = new Set(rows.map((row) => row.format?.toLowerCase()).filter((format): format is string => Boolean(format)));
+    return new Set(BOOK_REQUEST_MEDIA_KINDS.filter((kind) => BOOK_REQUEST_FORMATS_BY_MEDIA_KIND[kind].some((format) => formats.has(format))));
   }
 
   private async insertWithAliases(tx: RequestWriteExecutor, data: NewBookRequestRow, aliasKeys: string[]): Promise<BookRequestRow> {
@@ -608,6 +843,8 @@ export class BookRequestRepository {
       .where(
         and(
           eq(bookRequests.status, 'approved'),
+          // A request for a retired medium is never searched, so it is never due either.
+          inArray(bookRequests.mediaKind, [...BOOK_REQUEST_MEDIA_KINDS]),
           sql`${bookRequests.targetLibraryId} is not null`,
           sql`${bookRequests.createdAt} > now() - make_interval(days => ${maxAgeDays})`,
           sql`now() - ${bookRequests.updatedAt} >= make_interval(hours => ${baseIntervalHours}) * least(
@@ -727,7 +964,11 @@ export class BookRequestRepository {
         .select({ id: bookFiles.id })
         .from(bookFiles)
         .where(
-          and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'content'), inArray(bookFiles.format, [...OWNED_FORMATS_BY_MEDIA_KIND[mediaKind]])),
+          and(
+            eq(bookFiles.bookId, books.id),
+            eq(bookFiles.role, 'content'),
+            inArray(bookFiles.format, [...BOOK_REQUEST_FORMATS_BY_MEDIA_KIND[mediaKind]]),
+          ),
         ),
     );
 

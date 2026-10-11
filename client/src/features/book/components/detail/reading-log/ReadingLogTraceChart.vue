@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, watchEffect } from 'vue'
+import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import type { BookReadingSession, BookReadingSessionStats, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { toReadingSessionSourceBucket, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
-import { useThemeStore } from '@/stores/theme'
-import { getBookorbitThemeName, initChartThemes, readCssColor } from '@/lib/echarts'
+import { useChartTokens } from '@/composables/useChartTokens'
 
 const props = defineProps<{
   sessions: BookReadingSession[]
@@ -15,11 +14,8 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
-const chartTheme = computed(() => getBookorbitThemeName(themeStore.resolvedTheme, themeStore.accent))
+const chartTokens = useChartTokens()
 const option = shallowRef({})
-
-onMounted(() => initChartThemes())
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const BUCKET_TOKEN: Record<ReadingSessionSourceBucket, string> = {
@@ -124,7 +120,9 @@ watchEffect(() => {
     const end = Math.max(0, Math.min(100, session.endProgress ?? 0))
     const from = Math.max(0, Math.min(100, end - delta))
     const backwards = delta < -0.5
-    const color = backwards ? readCssColor('--pill-warning') : readCssColor(BUCKET_TOKEN[toReadingSessionSourceBucket(session.source)])
+    const color = backwards
+      ? chartTokens.value.color('--pill-warning')
+      : chartTokens.value.color(BUCKET_TOKEN[toReadingSessionSourceBucket(session.source)])
     return {
       value: [index, Math.min(from, end), Math.max(from, end), slot, perSlot.get(index) ?? 1],
       itemStyle: { color, opacity: backwards ? 0.95 : 0.85 },
@@ -200,7 +198,7 @@ watchEffect(() => {
 
 <template>
   <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }">
-    <VChart :theme="chartTheme" :option autoresize class="absolute inset-0" />
+    <VChart :option autoresize class="absolute inset-0" />
   </div>
   <div v-else-if="loading" class="flex flex-1 items-end gap-1 px-2 pb-5 pt-2" aria-hidden="true">
     <div v-for="bar in 18" :key="bar" class="flex-1 rounded-t bg-muted animate-shimmer" :style="{ height: `${18 + ((bar * 37) % 60)}%` }" />

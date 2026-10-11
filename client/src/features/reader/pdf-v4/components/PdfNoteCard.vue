@@ -53,7 +53,7 @@ function handleDelete() {
       <span class="flex-1" />
       <button
         type="button"
-        class="flex size-6 items-center justify-center rounded text-muted-foreground opacity-100 transition-opacity hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:focus-visible:opacity-100 [@media(pointer:fine)]:group-hover:opacity-100"
+        class="flex size-6 items-center justify-center rounded-xs text-muted-foreground opacity-100 transition-opacity hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:focus-visible:opacity-100 [@media(pointer:fine)]:group-hover:opacity-100"
         :aria-label="t('reader.sidebar.deleteHighlight')"
         @click="handleDelete"
       >

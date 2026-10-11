@@ -41,7 +41,7 @@ function indexer(overrides: Partial<ResolvedIndexerConfig> = {}): ResolvedIndexe
     applyTrackerSeedGoals: true,
     seedRatioGoal: null,
     seedTimeMinutes: null,
-    categories: { ebook: [7020], audiobook: [3030], comic: [7030] },
+    categories: { ebook: [7020], audiobook: [3030] },
     disabledMediaKinds: [],
     isbnSearchDisabled: false,
     settings: null,
@@ -98,7 +98,7 @@ function makeService(
   const registry = {
     find: vi.fn((type: string) => {
       const adapter = adapters[type];
-      return adapter ? { mediaKinds: ['ebook', 'audiobook', 'comic'], supportsIsbnSearch: false, ...adapter } : undefined;
+      return adapter ? { mediaKinds: ['ebook', 'audiobook'], supportsIsbnSearch: false, ...adapter } : undefined;
     }),
     seedsBack: vi.fn((type: string) => adapters[type]?.seedsBack ?? true),
     delivery: vi.fn((type: string) => adapters[type]?.delivery ?? (adapters[type]?.seedsBack === false ? 'file' : 'torrent')),
@@ -114,6 +114,36 @@ function makeService(
 }
 
 describe('IndexerSearchService', () => {
+  it('keeps books and comic archives in the same non-audio search without returning audiobooks', async () => {
+    const adapter = {
+      mediaKinds: ['ebook', 'audiobook'],
+      search: vi
+        .fn()
+        .mockResolvedValue([
+          release({ guid: 'comic', format: 'cbz', title: 'Saga - Brian K Vaughan [CBZ]' }),
+          release({ guid: 'book', format: 'epub', title: 'Saga - Brian K Vaughan [EPUB]' }),
+          release({ guid: 'audio', format: 'mp3', title: 'Saga - Brian K Vaughan [MP3]' }),
+        ]),
+    };
+    const { service } = makeService([indexer({ adapterType: pluginType('example-plugin') })], { 'example-plugin': adapter });
+
+    const result = await service.search(request({ title: 'Saga', authors: ['Brian K Vaughan'], preferredFormats: ['cbz'] }));
+
+    expect(adapter.search).toHaveBeenCalledWith(expect.objectContaining({ mediaKind: 'ebook' }), expect.anything(), expect.any(AbortSignal));
+    expect(result.releases.map((item) => item.guid)).toEqual(['comic', 'book']);
+    expect(result.releases[0]).toMatchObject({ format: 'cbz', formats: ['cbz'] });
+    expect(result.indexers[0]).toMatchObject({ ok: true, count: 2, filtered: 1 });
+  });
+
+  /** The picker for an old comic request says why, rather than asking every tracker for nothing. */
+  it('refuses to search for a request made for the retired comic medium', async () => {
+    const search = vi.fn();
+    const { service } = makeService([indexer()], { [indexer().adapterType]: { search } });
+
+    await expect(service.search(request({ mediaKind: 'comic' }))).rejects.toThrow('Comic requests are no longer supported');
+    expect(search).not.toHaveBeenCalled();
+  });
+
   /**
    * A rotated or unset encryption key leaves stored credentials unreadable. Decrypting the whole
    * enabled list up front meant one such row threw out of the resolve and took every other source

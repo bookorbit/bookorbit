@@ -63,6 +63,8 @@ export function mapBookRequestRow(
     subscribers,
     download: download ? mapBookRequestDownload(download) : null,
     dismissed,
+    companionRequestId: r.companionRequestId ?? null,
+    targetBookId: r.targetBookId ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };

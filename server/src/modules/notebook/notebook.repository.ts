@@ -16,7 +16,6 @@ import {
   bookMetadata,
   bookmarks,
   books,
-  libraries,
   userBookNotes,
   userBookRatings,
 } from '../../db/schema';
@@ -335,8 +334,6 @@ export class NotebookRepository {
           where ${bookAuthors.bookId} = ${books.id}
         )`,
         coverSource: bookMetadata.coverSource,
-        coverAspectRatio: libraries.coverAspectRatio,
-        updatedAt: books.updatedAt,
         readFileId: readFileSql<number | null>(sql`${bookFiles.id}`),
         readFileFormat: readFileSql<string | null>(sql`lower(${bookFiles.format})`),
         hasAudio: sql<boolean>`exists (
@@ -347,7 +344,6 @@ export class NotebookRepository {
         )`,
       })
       .from(books)
-      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .where(inArray(books.id, [...bookIds]));
   }

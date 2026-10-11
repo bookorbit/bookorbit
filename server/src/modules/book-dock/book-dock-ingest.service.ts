@@ -13,6 +13,7 @@ import { SUPPORTED_BOOK_FORMATS, UploadValidatorService } from '../upload/upload
 import { UploadStorageService } from '../upload/upload-storage.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { MetadataFetchPipeline } from '../metadata-fetch/metadata-fetch-pipeline';
+import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
 import { interpretRelease } from '../scanner/lib/release-plan';
 import { buildSingleBookCandidate } from '../scanner/lib/walk';
 import { BookDockRepository } from './book-dock.repository';
@@ -336,6 +337,27 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     );
   }
 
+  /**
+   * Where an unattended upload is filed, when auto-finalize will file it: the same conditions it
+   * checks before filing, and a library that still exists. The setting outlives a deleted library,
+   * and its rules cannot be read for one.
+   */
+  private async autoFinalizeLibraryId(): Promise<number | null> {
+    const { enabled, libraryId, folderId } = await this.appSettings.getAutoFinalizeSettings();
+    if (!enabled || libraryId === null || folderId === null) return null;
+    return (await this.repo.bookLibraryExists(libraryId)) ? libraryId : null;
+  }
+
+  private async isReadAlong(absolutePath: string, format: string | null): Promise<boolean> {
+    const startedAt = Date.now();
+    const fields = await inspectEpubMediaOverlayFields(absolutePath, format, (err) => {
+      this.logger.warn(
+        `[book_dock.media_overlay_capability] [fail] path="${sanitizeLogValue(absolutePath)}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - EPUB media-overlay inspection failed`,
+      );
+    });
+    return fields.mediaOverlayAvailable;
+  }
+
   private async autoFetchMetadataAsync(fileId: number, force = false): Promise<void> {
     if (!force) {
       const enabled = await this.appSettings.isBookDockAutoFetchEnabled();
@@ -353,6 +375,11 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       isAudiobook: row.format != null && isAudioFormat(row.format),
     };
     if (!params.title && !params.isbn) return;
+    // The same field rules the book will be refreshed by once it is on a shelf: the library it is
+    // headed for, and a read-along EPUB counted as narrated, so audiobook sources answer for it.
+    // Auto-finalize never files a row another module owns, so its library says nothing about one.
+    const libraryId = row.targetLibraryId ?? (row.autoFinalizeSuppressed ? null : await this.autoFinalizeLibraryId());
+    const coverMedia = { hasEbook: !params.isAudiobook, hasAudio: params.isAudiobook || (await this.isReadAlong(row.absolutePath, row.format)) };
 
     await this.repo.update(fileId, { status: 'fetching' });
     this.emitChange();
@@ -361,10 +388,22 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
         resolved,
         sources,
         providerIds = {},
-      } = await this.metadataFetchPipeline.runWithSources(params, {
-        isbn10: meta?.isbn10,
-        isbn13: meta?.isbn13,
-      });
+      } = await this.metadataFetchPipeline.runWithSources(
+        params,
+        {
+          isbn10: meta?.isbn10,
+          isbn13: meta?.isbn13,
+        },
+        libraryId ?? undefined,
+        // A dock file keeps one cover, its own medium's, so the other slot's search would be thrown away.
+        // A manual refetch is live only: nothing on the dock would say a saved answer stood in for a
+        // provider that failed. Automatic ingest may answer from the metadata cache.
+        {
+          coverMedia,
+          lockedCoverSlots: [params.isAudiobook ? 'ebook' : 'audio'],
+          cacheDirective: force ? { policy: 'refresh', allowFallback: false } : { policy: 'default', allowFallback: true },
+        },
+      );
       // A dock file has one medium, so its one cover is that medium's slot.
       if (params.isAudiobook) {
         resolved.coverUrl = resolved.audioCoverUrl;

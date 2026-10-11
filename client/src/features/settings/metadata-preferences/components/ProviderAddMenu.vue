@@ -2,10 +2,10 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Plus } from '@lucide/vue'
-import type { MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
+import type { MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
-import { skipReasonFor } from '../lib/field-rules'
+import { providerHasOtherShape, skipReasonFor } from '../lib/field-rules'
 
 const { t } = useI18n()
 
@@ -15,24 +15,30 @@ const props = defineProps<{
   disabled?: boolean
   /** Rendered in the trigger and used as its accessible name. */
   fieldLabel: string
+  /** The rule being added to, so a provider that can never fill it is said to be so. */
+  field?: MetadataField
 }>()
 
 const emit = defineEmits<{ add: [provider: MetadataProviderKey] }>()
 
 const open = ref(false)
 
-// Usable providers first: an unconfigured one can still be added, but it is not the
-// choice anyone is looking for.
+// Usable providers first: an unconfigured one, or one that never fills this field, can still be
+// added, but it is not the choice anyone is looking for.
 const candidates = computed(() => {
   const available = props.statuses.filter((status) => !props.assigned.includes(status.key as MetadataProviderKey))
   return available
-    .map((status) => ({
-      key: status.key as MetadataProviderKey,
-      label: status.label,
-      short: PROVIDER_SHORT_LABELS[status.key] ?? status.key,
-      skipReason: skipReasonFor(status),
-    }))
-    .sort((a, b) => Number(Boolean(a.skipReason)) - Number(Boolean(b.skipReason)))
+    .map((status) => {
+      const skipReason = skipReasonFor(status, props.field)
+      return {
+        key: status.key as MetadataProviderKey,
+        label: status.label,
+        short: PROVIDER_SHORT_LABELS[status.key] ?? status.key,
+        skipReason,
+        otherShape: !skipReason && providerHasOtherShape(status.key as MetadataProviderKey, props.field),
+      }
+    })
+    .sort((a, b) => Number(Boolean(a.skipReason || a.otherShape)) - Number(Boolean(b.skipReason || b.otherShape)))
 })
 
 function add(provider: MetadataProviderKey) {
@@ -47,7 +53,7 @@ function add(provider: MetadataProviderKey) {
       type="button"
       :disabled="disabled || candidates.length === 0"
       :aria-label="t('settings.metadata.fieldRules.field.addProviderTo', { field: fieldLabel })"
-      class="inline-flex h-6 shrink-0 items-center gap-1 rounded border border-dashed border-input px-2 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+      class="inline-flex h-6 shrink-0 items-center gap-1 rounded-xs border border-dashed border-input px-2 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Plus :size="12" :stroke-width="3" aria-hidden="true" />
       {{ t('settings.metadata.fieldRules.field.add') }}
@@ -64,11 +70,14 @@ function add(provider: MetadataProviderKey) {
           class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
           @click="add(candidate.key)"
         >
-          <span class="provider-chip inline-flex h-5 items-center rounded px-1.5 text-xs font-medium" :style="providerChipStyle(candidate.key)">
+          <span class="provider-chip inline-flex h-5 items-center rounded-xs px-1.5 text-xs font-medium" :style="providerChipStyle(candidate.key)">
             {{ candidate.short }}
           </span>
           <span v-if="candidate.skipReason" class="ml-auto text-xs text-muted-foreground">
             {{ t(`settings.metadata.fieldRules.providerState.${candidate.skipReason}`) }}
+          </span>
+          <span v-else-if="candidate.otherShape" class="ml-auto text-xs text-muted-foreground">
+            {{ t('settings.metadata.fieldRules.providerState.otherShape') }}
           </span>
         </button>
       </div>

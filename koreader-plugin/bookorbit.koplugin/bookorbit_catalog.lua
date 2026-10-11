@@ -439,9 +439,7 @@ function BookOrbitCatalog:refreshCurrent()
     elseif context.kind == "detail" and context.detail then
         self:evictCachedCovers(self:detailThumbnailBooks(context.detail))
         self:runConnected(function()
-            local detail, err = self:fetch(_("Refreshing..."), function()
-                return self.client:catalogBook(context.detail.id)
-            end)
+            local detail, err = self:fetchDeliveryBook(context.detail.id, nil, _("Refreshing..."))
             if not detail then
                 local cached = self:cachedBookDetail(context.detail.id)
                 if cached and err ~= "cancelled" then
@@ -617,6 +615,14 @@ function BookOrbitCatalog:dashboardResumePath(book)
 end
 
 function BookOrbitCatalog:onDeviceFilePath(file)
+    if file and file.selection then
+        local Delivery = require("bookorbit_delivery")
+        local variants = self.settings.catalog_downloaded_variants or {}
+        local marker = variants[Delivery.key(self.client) .. "|" .. tostring(file.id) .. "|" .. file.downloadVariant]
+        if type(marker) ~= "table" or marker.selection ~= file.selection then return nil end
+        local path = marker.path
+        return path and lfs.attributes(path) and path or nil
+    end
     return file ~= nil and file.id ~= nil and self.on_device_files and self.on_device_files[file.id] or nil
 end
 

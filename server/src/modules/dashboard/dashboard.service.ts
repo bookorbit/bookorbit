@@ -35,7 +35,7 @@ export class DashboardService {
       userId,
     );
     const cards = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows, narratorRows, tagRows);
-    await this.coverStore.enrichCardVersions(cards);
+    await this.coverStore.enrichCardFaces(cards);
     const cardsById = new Map(cards.map((card) => [card.id, card]));
     return bookIds.map((id) => cardsById.get(id)).filter((card): card is BookCard => card != null);
   }

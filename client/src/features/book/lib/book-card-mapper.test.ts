@@ -119,6 +119,13 @@ describe('mergeBookCardWithDetail', () => {
     expect(result.metadataScore).toBe(95)
   })
 
+  it("takes the detail's cover frame, keeping the card's when the detail has none", () => {
+    const book = makeBook({ coverAspectRatio: '2/3' })
+
+    expect(mergeBookCardWithDetail(book, makeDetail({ coverAspectRatio: '1/1' })).coverAspectRatio).toBe('1/1')
+    expect(mergeBookCardWithDetail(book, makeDetail()).coverAspectRatio).toBe('2/3')
+  })
+
   it('maps authors from detail.authors[].name array', () => {
     const book = makeBook()
     const detail = makeDetail({

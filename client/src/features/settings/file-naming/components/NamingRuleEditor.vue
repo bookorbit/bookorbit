@@ -305,8 +305,8 @@ async function handleCopyPattern() {
           class="mt-1.5 text-[11px] leading-relaxed text-muted-foreground"
           scope="global"
         >
-          <template #enter><kbd class="rounded border border-border px-1 font-mono text-[10.5px]">Enter</kbd></template>
-          <template #brace><kbd class="rounded border border-border px-1 font-mono text-[10.5px]">{</kbd></template>
+          <template #enter><kbd class="rounded-xs border border-border px-1 font-mono text-[10.5px]">Enter</kbd></template>
+          <template #brace><kbd class="rounded-xs border border-border px-1 font-mono text-[10.5px]">{</kbd></template>
         </i18n-t>
       </div>
 

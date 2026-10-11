@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AUTHOR_PROVIDER_SUPPORTED_FIELDS, AuthorMetadataCandidate, AuthorMetadataField, AuthorMetadataProviderKey } from '@bookorbit/types';
 
+import { canonicalId, canonicalText } from '../../../../../common/provider-cache/canonicalize';
+import { markProviderDegraded, markProviderFailed } from '../../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../../common/provider-cache/provider-cache-spec';
+import { authorProviderFetch, authorRequestSignal } from '../author-fetch';
 import { AuthorMetadataProviderError, AuthorMetadataSearchParams, IdentifiableAuthorMetadataProvider } from '../author-metadata-provider';
+import { authorProviderCacheContext, canonicalAuthorRegion } from '../author-provider-cache';
 import { AudnexusAuthorResponse } from './audnexus.types';
 
 const BASE_URL = 'https://api.audnex.us';
-const DEFAULT_REGION = 'us';
 const REQUEST_TIMEOUT_MS = 12_000;
 
 @Injectable()
@@ -17,27 +21,54 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
 
   private readonly logger = new Logger(AudnexusAuthorMetadataProvider.name);
 
+  // Empty answers are trusted because every way Audnexus can fail (transport, status, malformed or
+  // unexpected body, unmappable rows) leaves the call record uncacheable; see the provider tests.
+  readonly cache: ProviderCacheSpec<AuthorMetadataSearchParams> = {
+    version: 1,
+    trustEmpty: true,
+    context: () => Promise.resolve(authorProviderCacheContext(true)),
+    describeSearch: (params) => {
+      const name = canonicalText(params.name);
+      if (!name) return null;
+      return { inputs: { name, region: canonicalAuthorRegion(params.region) }, maxCandidates: this.normalizeLimit(params.limit) };
+    },
+    describeLookup: (providerId, params) => {
+      const id = canonicalId(providerId);
+      if (!id) return null;
+      return { inputs: { id, region: canonicalAuthorRegion(params?.region) } };
+    },
+  };
+
   async search(params: AuthorMetadataSearchParams): Promise<AuthorMetadataCandidate[]> {
     const name = params.name?.trim();
     if (!name) return [];
 
-    const region = params.region?.trim() || DEFAULT_REGION;
+    const region = canonicalAuthorRegion(params.region);
     const limit = this.normalizeLimit(params.limit);
 
-    const rows = await this.fetchJson<AudnexusAuthorResponse[]>(
+    const body = await this.fetchJson(
       `${BASE_URL}/authors?${new URLSearchParams({
         name,
         region,
       }).toString()}`,
+      params.signal,
     );
-    if (!rows?.length) return [];
+    if (!Array.isArray(body)) {
+      markProviderFailed('audnexus_unexpected_search_body');
+      return [];
+    }
+    const rows = body as AudnexusAuthorResponse[];
+    if (!rows.length) return [];
 
     const seenProviderIds = new Set<string>();
     const candidates: AuthorMetadataCandidate[] = [];
 
     for (const row of rows) {
-      const candidate = this.toCandidate(row);
-      if (!candidate) continue;
+      const candidate = this.mapRow(row);
+      if (!candidate) {
+        markProviderDegraded('audnexus_unmapped_row');
+        continue;
+      }
       if (seenProviderIds.has(candidate.providerId)) continue;
       seenProviderIds.add(candidate.providerId);
       candidates.push(candidate);
@@ -47,16 +78,18 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
     return candidates;
   }
 
-  async lookupById(providerId: string, region?: string): Promise<AuthorMetadataCandidate | null> {
+  async lookupById(providerId: string, region?: string, signal?: AbortSignal): Promise<AuthorMetadataCandidate | null> {
     const asin = providerId.trim();
     if (!asin) return null;
 
     const query = new URLSearchParams({
-      region: region?.trim() || DEFAULT_REGION,
+      region: canonicalAuthorRegion(region),
     }).toString();
 
-    const row = await this.fetchJson<AudnexusAuthorResponse>(`${BASE_URL}/authors/${encodeURIComponent(asin)}?${query}`);
-    return this.toCandidate(row);
+    const row = await this.fetchJson<AudnexusAuthorResponse>(`${BASE_URL}/authors/${encodeURIComponent(asin)}?${query}`, signal);
+    const candidate = this.mapRow(row);
+    if (!candidate) markProviderFailed('audnexus_unexpected_lookup_body');
+    return candidate;
   }
 
   private normalizeLimit(limit?: number): number {
@@ -65,11 +98,11 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
     return Math.max(1, Math.min(25, Math.floor(numeric)));
   }
 
-  private async fetchJson<T>(url: string): Promise<T | null> {
+  private async fetchJson<T = unknown>(url: string, signal?: AbortSignal): Promise<T> {
     const startedAt = Date.now();
     this.logger.log(`[audnexus] [start] method=GET`);
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      const res = await authorProviderFetch(url, { signal: authorRequestSignal(REQUEST_TIMEOUT_MS, signal) });
       if (!res.ok) {
         const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'));
         const message = `[audnexus] [fail] method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`;
@@ -80,7 +113,13 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
           transient: res.status === 429 || res.status >= 500,
         });
       }
-      const body = (await res.json()) as T;
+      let body: T;
+      try {
+        body = (await res.json()) as T;
+      } catch (error) {
+        markProviderFailed('audnexus_malformed_json');
+        throw error;
+      }
       this.logger.log(`[audnexus] [end] method=GET status=${res.status} durationMs=${Date.now() - startedAt}`);
       return body;
     } catch (error) {
@@ -92,6 +131,16 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
       throw new AuthorMetadataProviderError(`[audnexus] [fail] method=GET durationMs=${Date.now() - startedAt} message="${message}"`, {
         transient: true,
       });
+    }
+  }
+
+  /** A mapping error marks the answer as failed before it propagates, so it can never be cached. */
+  private mapRow(input: AudnexusAuthorResponse | null | undefined): AuthorMetadataCandidate | null {
+    try {
+      return this.toCandidate(input);
+    } catch (error) {
+      markProviderFailed('audnexus_mapper_error');
+      throw error;
     }
   }
 

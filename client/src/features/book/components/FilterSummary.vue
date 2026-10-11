@@ -14,7 +14,7 @@ defineProps<{
 <template>
   <span class="inline-flex flex-wrap items-center gap-1">
     <span
-      class="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0"
+      class="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-xs shrink-0"
       :class="node.join === 'OR' ? 'bg-amber-500/15 text-amber-500' : 'bg-sky-500/15 text-sky-500'"
     >
       {{ node.join === 'AND' ? t('book.filter.all') : t('book.filter.any') }}

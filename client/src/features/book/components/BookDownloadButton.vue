@@ -102,28 +102,30 @@ function handleExportPrimary() {
     <PopoverContent class="w-60 p-1" align="start">
       <!-- Multi-track audiobook: offer ZIP download, then any non-audio formats individually -->
       <template v-if="isMultiTrackAudio">
-        <button class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors" @click="handleExportPrimary">
+        <button class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors" @click="handleExportPrimary">
           <Download class="size-3.5 shrink-0" />
           <span>{{ t('book.download.audiobookZip') }}</span>
         </button>
         <button
           v-for="file in nonAudioFiles"
           :key="file.id"
-          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors"
           @click="handleFileDownload(file)"
         >
-          <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="shrink-0 rounded px-1.5 py-0.5 text-[10px] tracking-wider" />
-          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ formatFileSize(file.sizeBytes) }}</span>
+          <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="shrink-0 rounded-xs px-1.5 py-0.5 text-[10px] tracking-wider" />
+          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{
+            isAudiolessEpubCandidate(file) ? t('book.download.originalNarratedEpub') : formatFileSize(file.sizeBytes)
+          }}</span>
         </button>
         <button
           v-for="file in audiolessEpubFiles"
           :key="`audioless-${file.id}`"
-          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
-          :title="t('book.download.audiolessEpubHint')"
+          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors"
+          :title="t('book.download.textOnlyEpubHint')"
           @click="handleAudiolessEpubDownload(file)"
         >
-          <BookFormatChip format-key="epub" class="shrink-0 rounded px-1.5 py-0.5 text-[10px] tracking-wider" />
-          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ t('book.download.audiolessEpub') }}</span>
+          <BookFormatChip format-key="epub" class="shrink-0 rounded-xs px-1.5 py-0.5 text-[10px] tracking-wider" />
+          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ t('book.download.textOnlyEpub') }}</span>
           <span class="text-[10px] font-medium text-muted-foreground shrink-0">{{ t('book.download.noAudio') }}</span>
         </button>
       </template>
@@ -133,22 +135,24 @@ function handleExportPrimary() {
         <button
           v-for="file in readableFiles"
           :key="file.id"
-          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors"
           @click="handleFileDownload(file)"
         >
-          <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="shrink-0 rounded px-1.5 py-0.5 text-[10px] tracking-wider" />
-          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ formatFileSize(file.sizeBytes) }}</span>
+          <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="shrink-0 rounded-xs px-1.5 py-0.5 text-[10px] tracking-wider" />
+          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{
+            isAudiolessEpubCandidate(file) ? t('book.download.originalNarratedEpub') : formatFileSize(file.sizeBytes)
+          }}</span>
           <span v-if="file.role === 'primary'" class="text-[10px] text-primary font-medium shrink-0">{{ t('book.file.primary') }}</span>
         </button>
         <button
           v-for="file in audiolessEpubFiles"
           :key="`audioless-${file.id}`"
-          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
-          :title="t('book.download.audiolessEpubHint')"
+          class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors"
+          :title="t('book.download.textOnlyEpubHint')"
           @click="handleAudiolessEpubDownload(file)"
         >
-          <BookFormatChip format-key="epub" class="shrink-0 rounded px-1.5 py-0.5 text-[10px] tracking-wider" />
-          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ t('book.download.audiolessEpub') }}</span>
+          <BookFormatChip format-key="epub" class="shrink-0 rounded-xs px-1.5 py-0.5 text-[10px] tracking-wider" />
+          <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ t('book.download.textOnlyEpub') }}</span>
           <span class="text-[10px] font-medium text-muted-foreground shrink-0">{{ t('book.download.noAudio') }}</span>
           <span v-if="isAudiolessEpubCandidate(file) && file.role === 'primary'" class="text-[10px] text-primary font-medium shrink-0">{{
             t('book.file.primary')
@@ -156,14 +160,14 @@ function handleExportPrimary() {
         </button>
         <div class="my-1 border-t border-border" />
         <button
-          class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors text-muted-foreground"
+          class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors text-muted-foreground"
           @click="handleExportAll"
         >
           <Download class="size-3.5 shrink-0" />
           <span>{{ t('book.download.allFormatsZip') }}</span>
         </button>
         <button
-          class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors text-muted-foreground"
+          class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors text-muted-foreground"
           @click="handleExportPrimary"
         >
           <Download class="size-3.5 shrink-0" />

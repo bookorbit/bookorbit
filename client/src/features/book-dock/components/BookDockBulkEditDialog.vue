@@ -136,7 +136,7 @@ function handleClose() {
               <input
                 type="checkbox"
                 :checked="enabledFields.has(f.key)"
-                class="size-3.5 rounded border-input accent-primary shrink-0"
+                class="size-3.5 rounded-xs border-input accent-primary shrink-0"
                 @change="toggleField(f.key)"
               />
               <label class="flex-1">
@@ -152,7 +152,7 @@ function handleClose() {
           </div>
 
           <label class="flex items-center gap-2 text-xs text-muted-foreground">
-            <input v-model="mergeArrays" type="checkbox" class="size-3.5 rounded border-input accent-primary" />
+            <input v-model="mergeArrays" type="checkbox" class="size-3.5 rounded-xs border-input accent-primary" />
             {{ t('bookDock.bulkEdit.mergeArrays') }}
           </label>
 

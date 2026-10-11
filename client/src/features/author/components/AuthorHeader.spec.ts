@@ -52,3 +52,31 @@ describe('life dates', () => {
     expect(wrapper.text()).toContain('1929')
   })
 })
+
+describe('fresh metadata lookup', () => {
+  const freshButton = '[data-testid="metadata-cache-search-fresh"]'
+
+  it('is offered once the lookup finished, even when it found nothing', async () => {
+    const wrapper = mount(AuthorHeader, { props: { author, previewSearched: true } })
+
+    await wrapper.get(freshButton).trigger('click')
+
+    expect(wrapper.emitted('searchFresh')).toHaveLength(1)
+  })
+
+  it('is not offered before the lookup finished or when the author has a biography of their own', () => {
+    expect(mount(AuthorHeader, { props: { author } }).find(freshButton).exists()).toBe(false)
+    expect(
+      mount(AuthorHeader, { props: { author, previewSearched: true, loadingPreview: true } })
+        .find(freshButton)
+        .exists(),
+    ).toBe(false)
+    expect(
+      mount(AuthorHeader, {
+        props: { author: { ...author, description: 'Written by hand', imageUrl: 'https://img.example/a.jpg' }, previewSearched: true },
+      })
+        .find(freshButton)
+        .exists(),
+    ).toBe(false)
+  })
+})

@@ -1,5 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -15,8 +17,8 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-import { CONCRETE_BOOK_MEDIA_KINDS, MetadataProviderKey } from '@bookorbit/types';
-import type { ConcreteBookMediaKind } from '@bookorbit/types';
+import { CONCRETE_BOOK_MEDIA_KINDS, METADATA_CACHE_REQUEST_POLICIES, MetadataProviderKey } from '@bookorbit/types';
+import type { ConcreteBookMediaKind, MetadataCacheRequestPolicy } from '@bookorbit/types';
 
 @ValidatorConstraint({ name: 'atLeastOneSearchTerm', async: false })
 class AtLeastOneSearchTermConstraint implements ValidatorConstraintInterface {
@@ -86,6 +88,21 @@ export class MetadataSearchDto {
   @IsIn(CONCRETE_BOOK_MEDIA_KINDS)
   mediaKind?: ConcreteBookMediaKind;
 
+  /**
+   * Several media at once, for a search that asks for an ebook and an audiobook of the same work.
+   * The providers are the union of the ones serving each medium; results are ranked as for the
+   * first medium named, with audiobook-only providers still asked.
+   */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    const items = typeof value === 'string' ? value.split(',') : Array.isArray(value) ? value : undefined;
+    return items?.map((item) => (typeof item === 'string' ? item.trim() : item)).filter((item) => item !== '');
+  })
+  @IsArray()
+  @ArrayMaxSize(CONCRETE_BOOK_MEDIA_KINDS.length)
+  @IsIn(CONCRETE_BOOK_MEDIA_KINDS, { each: true })
+  mediaKinds?: ConcreteBookMediaKind[];
+
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
@@ -106,4 +123,12 @@ export class MetadataSearchDto {
   })
   @IsEnum(MetadataProviderKey, { each: true })
   providers?: MetadataProviderKey[];
+
+  /**
+   * `refresh` asks every provider live instead of answering from the metadata cache. Clients must
+   * only send it to servers advertising the `metadata-search-cache` feature.
+   */
+  @IsOptional()
+  @IsIn(METADATA_CACHE_REQUEST_POLICIES)
+  cache?: MetadataCacheRequestPolicy;
 }

@@ -2,15 +2,17 @@ import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
 import {
   CoverMedia,
   METADATA_PROVIDER_STATUS_EVENT,
-  MetadataCandidate,
+  MetadataCacheRequestPolicy,
   MetadataProviderInfo,
   MetadataProviderKey,
+  MetadataSearchCandidateEvent,
   Permission,
   ProviderThrottleRuntimeSnapshot,
 } from '@bookorbit/types';
-import { map, Observable } from 'rxjs';
+import { filter, map, Observable } from 'rxjs';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { CacheDirective } from '../../common/provider-cache/provider-cache-spec';
 import type { RequestUser } from '../../common/types/request-user';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { LookupMetadataDto } from './dto/lookup-metadata.dto';
@@ -29,6 +31,11 @@ function normalizeSearchTitle(title: string | undefined): string | undefined {
   if (!title) return title;
   // Normalize comic issue tags (e.g. "#007" -> "#7") before provider search.
   return title.trim().replace(/#0*(\d+)/g, '#$1');
+}
+
+/** Interactive searches answer from the cache unless the user asked for a fresh one. */
+function requestDirective(policy: MetadataCacheRequestPolicy | undefined): CacheDirective {
+  return { policy: policy === 'refresh' ? 'refresh' : 'default', allowFallback: true };
 }
 
 /**
@@ -89,7 +96,11 @@ export class MetadataFetchController {
     ]);
     // A stated medium describes the book, so it settles which providers can answer at all. It
     // narrows the caller's provider list rather than widening it, and never adds a disabled one.
-    const providerKeys = dto.mediaKind ? this.registry.keysForMediaKind(enabledProviderKeys, dto.mediaKind) : enabledProviderKeys;
+    const media = [...new Set([...(dto.mediaKind ? [dto.mediaKind] : []), ...(dto.mediaKinds ?? [])])];
+    const providerKeys = media.length
+      ? [...new Set(media.flatMap((mediaKind) => this.registry.keysForMediaKind(enabledProviderKeys, mediaKind)))]
+      : enabledProviderKeys;
+    const leadMediaKind = media[0];
     const servesOnlyAudiobooks = (providerKey: MetadataProviderKey) => this.registry.servesOnlyAudiobooks(providerKey);
     const requestedAudiobookProvider = (dto.providers ?? []).some(servesOnlyAudiobooks);
     const onlyAudiobookProviders = providerKeys.length > 0 && providerKeys.every(servesOnlyAudiobooks);
@@ -97,7 +108,7 @@ export class MetadataFetchController {
       requestedAudiobookProvider ||
       onlyAudiobookProviders ||
       Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE] || existingProviderIds[MetadataProviderKey.LIBROFM]);
-    const isAudiobook = dto.isAudiobook ?? (dto.mediaKind ? dto.mediaKind === 'audiobook' : inferredIsAudiobook);
+    const isAudiobook = dto.isAudiobook ?? (leadMediaKind ? leadMediaKind === 'audiobook' : inferredIsAudiobook);
 
     const searchTitle = normalizeSearchTitle(dto.title);
     const params: MetadataSearchParams = {
@@ -116,30 +127,32 @@ export class MetadataFetchController {
     const genreOptions = preferences.options?.genres;
     const blockedGenreTokens = createGenreBlocklistTokenSet(genreOptions?.blocklist);
 
-    return this.metadataFetchService
-      .search(params, providerKeys)
-      .pipe(
-        map((event: MetadataSearchEvent) =>
-          event.kind === 'candidate'
-            ? { data: applyGenreFetchOptionsToCandidate(event.candidate, blockedGenreTokens, genreOptions?.maxCount) }
-            : { type: METADATA_PROVIDER_STATUS_EVENT, data: event.status },
-        ),
-      );
+    return this.metadataFetchService.search(params, providerKeys, { directive: requestDirective(dto.cache) }).pipe(
+      // Run summaries are for internal callers; the stream carries only candidates and statuses.
+      filter((event): event is Exclude<MetadataSearchEvent, { kind: 'run' }> => event.kind !== 'run'),
+      map((event): MessageEvent => {
+        if (event.kind === 'status') return { type: METADATA_PROVIDER_STATUS_EVENT, data: event.status };
+        const candidate = applyGenreFetchOptionsToCandidate(event.candidate, blockedGenreTokens, genreOptions?.maxCount);
+        const data: MetadataSearchCandidateEvent = event.cache ? { ...candidate, cache: event.cache } : candidate;
+        return { data };
+      }),
+    );
   }
 
   @Get('lookup')
-  async lookup(@Query() dto: LookupMetadataDto): Promise<MetadataCandidate | null> {
+  async lookup(@Query() dto: LookupMetadataDto): Promise<MetadataSearchCandidateEvent | null> {
     const [enabledProvider] = await this.resolveEnabledProviderKeys([dto.provider]);
     if (!enabledProvider) return null;
 
-    const [candidate, preferences] = await Promise.all([
-      this.metadataFetchService.lookupById(enabledProvider, dto.id),
+    const [result, preferences] = await Promise.all([
+      this.metadataFetchService.lookupById(enabledProvider, dto.id, { directive: requestDirective(dto.cache) }),
       this.metadataPreferences.getGlobal(),
     ]);
-    if (!candidate) return null;
+    if (!result) return null;
     const genreOptions = preferences.options?.genres;
     const blockedGenreTokens = createGenreBlocklistTokenSet(genreOptions?.blocklist);
-    return applyGenreFetchOptionsToCandidate(candidate, blockedGenreTokens, genreOptions?.maxCount);
+    const candidate = applyGenreFetchOptionsToCandidate(result.candidate, blockedGenreTokens, genreOptions?.maxCount);
+    return result.cache ? { ...candidate, cache: result.cache } : candidate;
   }
 
   private async resolveEnabledProviderKeys(requestedProviders?: MetadataProviderKey[]): Promise<MetadataProviderKey[]> {

@@ -10,6 +10,7 @@ import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderCatalogService } from './koreader-catalog.service';
 import {
   KoreaderCatalogBookDetailQueryDto,
+  KoreaderCatalogDownloadQueryDto,
   KoreaderCatalogBooksQueryDto,
   KoreaderCatalogDashboardQueryDto,
   KoreaderCatalogDashboardSectionQueryDto,
@@ -75,7 +76,7 @@ export class KoreaderCatalogController {
   @Get('books/:bookId')
   @Header('Cache-Control', 'private, max-age=30')
   bookDetail(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Query() query: KoreaderCatalogBookDetailQueryDto) {
-    return this.catalogService.getBookDetail(user, bookId, query.deviceId);
+    return this.catalogService.getBookDetail(user, bookId, query.deviceId, query.variant);
   }
 
   @Put('books/:bookId/read-status')
@@ -99,7 +100,12 @@ export class KoreaderCatalogController {
   }
 
   @Get('files/:fileId/download')
-  download(@CurrentUser() user: RequestUser, @Param('fileId', ParseIntPipe) fileId: number, @Res() reply: FastifyReply) {
-    return this.catalogService.streamFile(user, fileId, reply);
+  download(
+    @CurrentUser() user: RequestUser,
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @Res() reply: FastifyReply,
+    @Query() query: KoreaderCatalogDownloadQueryDto = {},
+  ) {
+    return this.catalogService.streamFile(user, fileId, reply, query.variant, query.selection);
   }
 }

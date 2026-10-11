@@ -160,7 +160,7 @@ export class KoboAnnotationMaterializerService {
         pos1: koboSpan.pos1,
         status: koboSpan.status as 'exact' | 'repaired' | 'failed' | 'pending',
         converterVersion: this.koboSpanConverter.version,
-        extras: { ...(koboSpan.extras ?? {}), chapterIndex: outcome.chapterIndex, renditionHash: outcome.renditionHash },
+        extras: { ...(koboSpan.extras ?? {}), chapterIndex: outcome.chapterIndex, renditionHash: outcome.renditionHash, sourceCfi: outcome.cfi },
       });
     }
 

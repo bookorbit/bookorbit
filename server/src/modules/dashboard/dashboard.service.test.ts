@@ -50,7 +50,7 @@ function makeService() {
     findOne: vi.fn().mockResolvedValue({ mediaType: 'books' }),
   };
 
-  const coverStore = { enrichCardVersions: vi.fn().mockResolvedValue(undefined) };
+  const coverStore = { enrichCardFaces: vi.fn().mockResolvedValue(undefined) };
   const service = new DashboardService(
     dashboardRepo as never,
     bookReadService as never,

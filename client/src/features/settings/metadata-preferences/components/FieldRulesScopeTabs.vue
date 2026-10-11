@@ -44,7 +44,7 @@ function select(id: FieldRuleScopeId) {
       />
       <span
         v-else-if="scope.overrideCount > 0"
-        class="rounded bg-primary/15 px-1.5 py-px text-[10px] font-bold tabular-nums text-primary"
+        class="rounded-xs bg-primary/15 px-1.5 py-px text-[10px] font-bold tabular-nums text-primary"
         :aria-label="t('settings.metadata.fieldRules.scope.overrideCount', { count: scope.overrideCount })"
       >
         {{ scope.overrideCount }}

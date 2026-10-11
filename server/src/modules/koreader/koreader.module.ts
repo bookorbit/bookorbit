@@ -31,6 +31,8 @@ import { KoreaderPluginController } from './koreader-plugin.controller';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderPluginService } from './koreader-plugin.service';
 import { KoreaderRepository } from './koreader.repository';
+import { KoreaderDeliveryService } from './koreader-delivery.service';
+import { KoreaderDeliveryController } from './koreader-delivery.controller';
 import { KoreaderService } from './koreader.service';
 import { KoreaderStatsService } from './koreader-stats.service';
 import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cleanup.service';
@@ -53,8 +55,9 @@ import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cle
     ReadingSessionModule,
     RecommendationModule,
   ],
-  controllers: [KoreaderController, KoreaderPluginController, KoreaderCatalogController],
+  controllers: [KoreaderDeliveryController, KoreaderController, KoreaderPluginController, KoreaderCatalogController],
   providers: [
+    KoreaderDeliveryService,
     KoreaderService,
     KoreaderHashLinkService,
     KoreaderRepository,

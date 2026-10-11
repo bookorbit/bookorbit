@@ -166,8 +166,39 @@ local own = makePlugin({
     device = "Kobo Libra",
     device_id = "this-device",
     timestamp = 5000,
-})
+}, { last_page_turn_timestamp = 9000 })
 own:getProgress(false, false)
 assertEqual(#confirm_boxes, 0, "progress from this device is skipped, which is why the reset is not attributed to it")
+
+local restored_body = {
+    percentage = 0.75,
+    progress = "/body/DocFragment[12]/body",
+    device = "Kobo Libra",
+    device_id = "this-device",
+    timestamp = 5000,
+}
+local manual_restore = makePlugin(restored_body, { local_percent = 0.006, last_page_turn_timestamp = 9000 })
+manual_restore:getProgress(false, true)
+assertEqual(events[1].name, "GotoXPointer", "explicit pull restores this device's saved position")
+assertEqual(events[1].value, restored_body.progress, "explicit pull restores the saved rendition position")
+
+local fresh_copy = makePlugin(restored_body, { local_percent = 0.006 })
+fresh_copy:getProgress(false, false)
+assertEqual(#confirm_boxes, 1, "fresh copy can recover this device's previous upload")
+confirm_boxes[1].ok_callback()
+assertEqual(events[1].value, restored_body.progress, "fresh-copy recovery applies the saved position")
+
+local reconciled
+local fresh_book_sync = makePlugin(restored_body, { local_percent = 0.006 })
+fresh_book_sync:reconcileProgressBeforeBookSync(fresh_book_sync:getDocumentDigest(), function(skip)
+    reconciled = skip
+end)
+assertEqual(#confirm_boxes, 1, "manual book sync checks the saved position before a fresh copy upload")
+confirm_boxes[1].cancel_callback()
+assertEqual(reconciled, true, "declining recovery prevents fresh-copy progress from overwriting the saved position")
+
+local same_position = makePlugin(restored_body, { local_percent = 0.75, local_progress = restored_body.progress })
+same_position:getProgress(false, true)
+assertEqual(#events, 0, "same-position explicit pull remains idempotent")
 
 print("bookorbit_progress_reset_test.lua: ok")

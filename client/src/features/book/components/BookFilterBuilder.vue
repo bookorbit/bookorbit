@@ -524,7 +524,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             <span
               v-for="libraryName in node.rule.valueChips"
               :key="libraryName"
-              class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
+              class="flex items-center gap-1 h-5 px-1.5 rounded-xs bg-primary/15 text-primary text-xs font-medium shrink-0"
             >
               {{ libraryName }}
               <button type="button" class="text-primary hover:text-primary leading-none" @click="removeLibraryChip(index, libraryName)">
@@ -562,7 +562,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             <span
               v-for="status in node.rule.valueChips"
               :key="status"
-              class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
+              class="flex items-center gap-1 h-5 px-1.5 rounded-xs bg-primary/15 text-primary text-xs font-medium shrink-0"
             >
               {{ READ_STATUS_LABELS[status] ?? status }}
               <button type="button" class="text-primary hover:text-primary leading-none" @click="removeStatusChip(index, status)">

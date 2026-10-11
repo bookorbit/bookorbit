@@ -4,13 +4,19 @@ import { DevicePositionRebuilderRegistry } from '../../annotation/device-positio
 import { KoboPositionRebuildService } from './kobo-position-rebuild.service';
 
 const TARGET = { id: 1, bookId: 5, text: 'selected text' };
-const KOBO_SPAN_ROW = { annotationId: 1, format: 'kobo_span', pos0: 'kobo.6.2:0', pos1: 'kobo.6.2:28', extras: {} };
+const KOBO_SPAN_ROW = {
+  annotationId: 1,
+  format: 'kobo_span',
+  pos0: 'kobo.6.2:0',
+  pos1: 'kobo.6.2:28',
+  extras: { deliveryId: 'delivery-1', deviceId: 2 },
+};
 const CONTEXT = { ok: true as const, file: { id: 9 }, ctx: { kepubPath: '/tmp/b.kepub.epub' }, settings: {} };
 
 function makeService(overrides: { positions?: unknown[]; context?: unknown; converted?: boolean; reason?: string } = {}) {
   const registry = new DevicePositionRebuilderRegistry();
   const annotationSync = { findPositions: vi.fn().mockResolvedValue(overrides.positions ?? [KOBO_SPAN_ROW]) };
-  const kepubContext = { resolveForBook: vi.fn().mockResolvedValue(overrides.context ?? CONTEXT) };
+  const kepubContext = { resolveForDelivery: vi.fn().mockResolvedValue(overrides.context ?? CONTEXT) };
   const materializer = {
     convertFromKoboSpan: vi.fn().mockResolvedValue({ converted: overrides.converted ?? true, reason: overrides.reason }),
   };
@@ -46,7 +52,7 @@ describe('KoboPositionRebuildService', () => {
     const { service, kepubContext } = makeService({ positions: [] });
 
     await expect(service.rebuildCanonicalPositions(10, TARGET)).resolves.toEqual({ rebuilt: false, reason: 'no_kobo_span_position' });
-    expect(kepubContext.resolveForBook).not.toHaveBeenCalled();
+    expect(kepubContext.resolveForDelivery).not.toHaveBeenCalled();
   });
 
   it('does nothing when the kepub artifact is unavailable', async () => {

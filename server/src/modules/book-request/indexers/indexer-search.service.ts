@@ -1,5 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { canonicalizeBookRequestIsbn, compareByTier, MAX_BOOK_REQUEST_SEARCH_ISBNS, releaseProfileIsActive } from '@bookorbit/types';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  canonicalizeBookRequestIsbn,
+  compareByTier,
+  isBookRequestMediaKind,
+  MAX_BOOK_REQUEST_SEARCH_ISBNS,
+  releaseProfileIsActive,
+} from '@bookorbit/types';
 import type {
   BookRequestMediaKind,
   IndexerSearchQuery,
@@ -15,6 +21,7 @@ import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { withDeadline } from '../../../common/utils/with-deadline.utils';
 import type { BookRequestRow } from '../../../db/schema';
 import { RequestAutomationSettingsService } from '../fulfillment/request-automation-settings.service';
+import { RETIRED_MEDIUM_REFUSAL } from '../retired-media';
 import { IndexerSearchException, type ReleaseCandidate, type ReleaseQuery, type ResolvedIndexerConfig } from './indexer-adapter';
 import { IndexerConfigService } from './indexer-config.service';
 import { IndexerOperationLock } from './indexer-operation-lock';
@@ -68,6 +75,9 @@ export class IndexerSearchService {
   ) {}
 
   async search(request: BookRequestRow, options: IndexerSearchOptions = {}): Promise<ReleaseSearchResult> {
+    const mediaKind = request.mediaKind;
+    if (!isBookRequestMediaKind(mediaKind)) throw new BadRequestException(RETIRED_MEDIUM_REFUSAL);
+
     const searchKey = JSON.stringify({ overrides: options.overrides ?? null, indexerMode: options.indexerMode ?? 'all' });
     const cacheKey = `${request.id}:${searchKey}`;
     const cached = this.cache.get(cacheKey);
@@ -80,8 +90,8 @@ export class IndexerSearchService {
     // source switched off" need opposite fixes.
     const [configs, sources] = await Promise.all([this.indexers.resolveEnabledConfigs(), this.indexers.countSources()]);
     const { profiles } = await this.automationSettings.get();
-    const tiers = profiles[request.mediaKind] ?? [];
-    const { scoringRequest, availableIsbns } = prepareScoringRequest(request, tiers, options.overrides);
+    const tiers = profiles[mediaKind] ?? [];
+    const { scoringRequest, availableIsbns } = prepareScoringRequest({ ...request, mediaKind }, tiers, options.overrides);
     const query = toQuery(scoringRequest);
 
     // A source that does not carry the requested medium is left out of the search rather than
@@ -481,7 +491,7 @@ function toQuery(request: ScoringRequest): ReleaseQuery {
 }
 
 function prepareScoringRequest(
-  request: BookRequestRow,
+  request: BookRequestRow & { mediaKind: BookRequestMediaKind },
   tiers: readonly ReleaseTier[],
   overrides?: ReleaseSearchOverrides,
 ): { scoringRequest: ScoringRequest; availableIsbns: string[] } {

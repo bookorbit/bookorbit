@@ -125,6 +125,9 @@ package.loaded["bookorbit_catalog_util"] = {
     shortText = function(value)
         return value
     end,
+    shortPath = function(value)
+        return value
+    end,
 }
 
 local link_batches = {}
@@ -170,6 +173,12 @@ CatalogDownload.install(Catalog)
 -- test can drive each step deterministically.
 function Catalog:runOffThread(fn)
     return fn()
+end
+function Catalog:fetch(_, fn)
+    return fn()
+end
+function Catalog:persistSetting(key, value)
+    self.settings[key] = value
 end
 
 local function assertEqual(actual, expected, label)
@@ -385,7 +394,7 @@ resetRun()
 files["/downloads/Books/Book1.epub"] = { size = 1001 }
 hashes["/downloads/Books/Book1.epub"] = "hash1001"
 checkpoint_store.record = {
-    source_key = "filter|sort=title",
+    source_key = "https://books.example.com/api/v1|reader|nil|filter|sort=title",
     cursor = "cursor-2",
     manifest_version = "lib-v1",
     completed = { ["1"] = "/downloads/Books/Book1.epub" },
@@ -417,7 +426,7 @@ files["/downloads/Books/Book2.epub"] = nil
 -- page, so the resumed run cannot skip the books it had not reached yet.
 resetRun()
 checkpoint_store.record = {
-    source_key = "filter|sort=title",
+    source_key = "https://books.example.com/api/v1|reader|nil|filter|sort=title",
     cursor = "cursor-A",
     manifest_version = "lib-v1",
     completed = {},
@@ -452,7 +461,7 @@ assertEqual(checkpoint_store.record.completed["2"], nil, "an unreached book is n
 
 -- A stale checkpoint from another source never resumes into the wrong run.
 resetRun()
-checkpoint_store.record = { source_key = "filter|sort=author", cursor = "other", completed = {} }
+checkpoint_store.record = { source_key = "https://books.example.com/api/v1|reader|nil|filter|sort=author", cursor = "other", completed = {} }
 Catalog.client = makeClient{
     capabilities = { "catalogBulkManifest" },
     manifest = function(params)
@@ -648,4 +657,116 @@ assertEqual(shown_widget.title:find("Renamed path conflicts: 2", 1, true) ~= nil
 assertEqual(shown_widget.title:find("Conflicting destinations were renamed with BookOrbit IDs.", 1, true) ~= nil, true, "completion summary explains renaming")
 assertEqual(shown_widget.title:find(" -> ", 1, true), nil, "completion summary omits long path mappings")
 
+local count_skips = Catalog:bulkCountKnownSkips({ manifestBook(1, "hash1001") })
+assertEqual(count_skips.unsupported, 0, "bulk confirmation counts supported formats without a run context")
+assertEqual(count_skips.on_device, 0, "unknown variant recognition does not promise a skip")
+
+local oldOnDeviceFilePath = Catalog.onDeviceFilePath
+Catalog.onDeviceFilePath = function() return "/downloads/existing.epub" end
+assertEqual(Catalog:bulkChooseFile(manifestBook(1, "hash1001")), nil, "ordinary bulk recognizes downloaded variant")
+assertEqual(Catalog:bulkChooseFile(manifestBook(1, "hash1001"), true).id, 101, "resumed bulk validates bytes even when local marker exists")
+Catalog.onDeviceFilePath = oldOnDeviceFilePath
+
+local resumed_path = "/downloads/unknown-size.epub"
+files[resumed_path] = { size = 42 }
+hashes[resumed_path] = "prepared-fingerprint"
+local resumed_file = { id = 101, selection = "captured-selection", downloadVariant = "audioless_epub" }
+local captured = { path = resumed_path, file_id = 101, selection = "captured-selection", size = 42, hash = "prepared-fingerprint" }
+local resumed_ctx = { pending_links = {} }
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1, captured), true, "unknown-size derivative resumes with captured identity")
+resumed_file.selection = "changed-selection"
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1, captured), false, "changed selection cannot reuse checkpoint bytes")
+resumed_file.selection = "captured-selection"
+hashes[resumed_path] = "changed-content"
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1, captured), false, "changed local contents restart safely")
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1), false, "unknown metadata cannot validate an old path-only checkpoint")
+
 print("bookorbit_catalog_bulk_download_test.lua: ok")
+
+-- A fork discards child UI schedules and object mutations; only the returned
+-- body is marshalled back. Drive the real buttons across that boundary.
+local function copy(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, item in pairs(value) do result[key] = copy(item) end
+    return result
+end
+BulkDownload.install(Catalog)
+CatalogDownload.install(Catalog)
+resetRun()
+Catalog.settings = {}
+Catalog.runConnected = function(_, fn) return fn() end
+local persisted = {}
+Catalog.persistSetting = function(self, key, value)
+    self.settings[key] = value
+    persisted[key] = copy(value)
+end
+local in_child = false
+Catalog.fetch = function(self, _, fn)
+    assertEqual(in_child, false, "network boundaries are owned by the parent")
+    local parent = {}
+    for key, value in pairs(self) do parent[key] = value end
+    local parent_scheduled, parent_widget = scheduled, shown_widget
+    local parent_prevent, parent_allow = prevent_calls, allow_calls
+    self.settings, self.client = copy(self.settings), copy(self.client)
+    scheduled = {}
+    in_child = true
+    local ok, body, err = pcall(fn)
+    in_child = false
+    for key in pairs(self) do self[key] = nil end
+    for key, value in pairs(parent) do self[key] = value end
+    scheduled, shown_widget = parent_scheduled, parent_widget
+    prevent_calls, allow_calls = parent_prevent, parent_allow
+    if not ok then error(body) end
+    return copy(body), err
+end
+local server_override
+local server_default = "original"
+Catalog.client = makeClient{
+    capabilities = { "catalogBulkManifest", "readAloudDeliveryVariants", "readAloudDeliverySettings" },
+    manifest = function()
+        return { items = { manifestBook(1, "hash1001") }, hasNext = false, manifestVersion = "lib-v1" }
+    end,
+}
+function Catalog.client:getDeliverySettings()
+    return { readAloudDelivery = server_override or server_default, deviceOverride = server_override,
+        credentialDefault = server_default, deviceConfigured = true }
+end
+function Catalog.client:setDeliverySettings(variant)
+    server_override = variant
+    return self:getDeliverySettings()
+end
+function Catalog.client:catalogBook(id, variant)
+    return { id = id, variant = variant, files = {} }
+end
+transfer_result_hash = function(opts) return "hash" .. tostring(opts.expected_bytes) end
+Catalog:confirmBulkSource{ kind = "filter", label = "All", total = 1, params = {} }
+shown_widget.buttons[1][1].callback()
+assertEqual(Catalog.bulk_running, true, "the Download button starts the run in parent memory")
+assertEqual(#scheduled > 0, true, "the Download button schedules enumeration in the parent")
+assertEqual(Catalog.bulk_ctx.source.variant, "original", "the run captures the server default")
+drain()
+assertEqual(#transfers, 1, "the real Download button completes its transfer")
+assertEqual(Catalog.bulk_running, false, "the parent observes completion")
+
+Catalog:showDeliveryPreferenceDialog()
+assertEqual(shown_widget.buttons[1][1].text:sub(-2), " *", "inherited preference remains selected after the fork")
+shown_widget.buttons[3][1].callback()
+local key = "https://books.example.com/api/v1|reader"
+assertEqual(server_override, "original", "the preference button updates the server")
+assertEqual(Catalog.client.delivery_settings.deviceOverride, "original", "the parent retains the new override")
+assertEqual(persisted.catalog_delivery_server_profiles[key], "original", "the parent persists the resolved server preference")
+Catalog:showDeliveryPreferenceDialog()
+assertEqual(shown_widget.buttons[3][1].text:sub(-2), " *", "the new override remains selected")
+shown_widget.buttons[1][1].callback()
+assertEqual(server_override, nil, "the default button restores server inheritance")
+assertEqual(Catalog.client.delivery_settings.deviceOverride, nil, "the parent clears the cached override")
+
+server_default = "audioless_epub"
+local fetched = Catalog:fetchDeliveryBook(1)
+assertEqual(fetched.variant, "audioless_epub", "book details use the refreshed preference")
+assertEqual(Catalog.client.delivery_settings.readAloudDelivery, "audioless_epub", "book detail fetch retains parent preference state")
+assertEqual(persisted.catalog_delivery_server_profiles[key], "audioless_epub", "book detail preference survives restart")
+Capabilities.remember(Catalog.client, { capabilities = {} })
+assertEqual(require("bookorbit_delivery").preference(Catalog.settings, Catalog.client), "audioless_epub", "downgrade preserves the cached server preference")
+print("catalog delivery fork isolation: ok")

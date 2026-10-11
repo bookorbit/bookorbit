@@ -19,6 +19,7 @@ const error = ref<string | null>(null)
 // The SMIL text fragment of the sentence currently being narrated, e.g.
 // ".../chap02.xhtml#sentence14". Used to persist + resume the exact sentence.
 const currentFragment = ref<string | null>(null)
+const currentSectionIndex = ref<number | null>(null)
 
 let instance: FoliateMediaOverlay | null = null
 let highlightListener: ((e: Event) => void) | null = null
@@ -60,6 +61,7 @@ function stop() {
   isPlaying.value = false
   currentBook.value = null
   currentFragment.value = null
+  currentSectionIndex.value = null
   error.value = null
   mediaSession.clearHandlers()
   mediaSession.setPlaybackState('none')
@@ -98,6 +100,8 @@ export function useMediaOverlay() {
     highlightListener = (e: Event) => {
       isPlaying.value = true
       const text = (e as CustomEvent).detail?.text
+      const section = (e as CustomEvent).detail?.sectionIndex
+      currentSectionIndex.value = Number.isInteger(section) && section >= 0 ? section : null
       if (typeof text === 'string') currentFragment.value = text
       mediaSession.setPlaybackState('playing')
     }
@@ -153,6 +157,7 @@ export function useMediaOverlay() {
     volume,
     currentBook,
     currentFragment,
+    currentSectionIndex,
     error,
     sleepTimer,
     start,

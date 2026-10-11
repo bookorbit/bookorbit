@@ -1,7 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
-import { KOREADER_DASHBOARD_SECTION_TYPES } from '@bookorbit/types';
+import { READ_ALOUD_DELIVERY_VARIANTS, type ReadAloudDeliveryVariant, KOREADER_DASHBOARD_SECTION_TYPES } from '@bookorbit/types';
 import type {
   KoreaderCatalogReadStatusFilter,
   KoreaderCatalogSettableReadStatus,
@@ -129,6 +129,10 @@ export class KoreaderCatalogBooksQueryDto {
 // the manifest has one fixed cursor order and no page/sort inputs.
 export class KoreaderCatalogManifestQueryDto {
   @IsOptional()
+  @IsIn(READ_ALOUD_DELIVERY_VARIANTS)
+  variant?: ReadAloudDeliveryVariant;
+
+  @IsOptional()
   @IsString()
   @MaxLength(512)
   cursor?: string;
@@ -237,6 +241,10 @@ export class KoreaderCatalogSectionQueryDto {
 
 export class KoreaderCatalogBookDetailQueryDto {
   @IsOptional()
+  @IsIn(READ_ALOUD_DELIVERY_VARIANTS)
+  variant?: ReadAloudDeliveryVariant;
+
+  @IsOptional()
   @IsString()
   @MaxLength(100)
   @Matches(KOREADER_DEVICE_ID_REGEX)
@@ -254,4 +262,15 @@ export class KoreaderCatalogSetRatingDto {
   @Min(0)
   @Max(5)
   rating?: number | null;
+}
+
+export class KoreaderCatalogDownloadQueryDto {
+  @IsOptional()
+  @IsIn(READ_ALOUD_DELIVERY_VARIANTS)
+  variant?: ReadAloudDeliveryVariant;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  selection?: string;
 }

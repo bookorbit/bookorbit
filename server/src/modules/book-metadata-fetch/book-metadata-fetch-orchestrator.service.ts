@@ -24,6 +24,21 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
 const POLL_INTERVAL_MS = 4_000;
 const BATCH_SIZE = 1;
 const SCHEDULE_BATCH_SIZE = 1000;
+// A book answered entirely from the metadata cache made no request, so the next one starts after a
+// short yield instead of the usual pause. The chain is bounded so one poll never runs unchecked.
+const CACHED_CHAIN_MAX_ITEMS = 50;
+const CACHED_CHAIN_MAX_MS = 30_000;
+const CACHED_ITEM_YIELD_MS = 100;
+const STATUS_EMIT_MIN_INTERVAL_MS = 500;
+
+interface ProcessOutcome {
+  /** Provider requests and cover downloads the book caused; 0 when everything came from the cache. */
+  outboundRequests: number;
+  /** The book was handed back to the queue (still importing), so the next poll should not chain onto it. */
+  deferred: boolean;
+}
+
+const NO_OUTBOUND: ProcessOutcome = { outboundRequests: 0, deferred: false };
 
 type BookReadResult = NonNullable<Awaited<ReturnType<BookReadService['findById']>>>;
 
@@ -33,6 +48,8 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private paused = false;
+  private lastStatusEmitAt = 0;
+  private pendingStatusEmit: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly queueRepo: BookMetadataFetchQueueRepository,
@@ -65,6 +82,10 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+    if (this.pendingStatusEmit) {
+      clearTimeout(this.pendingStatusEmit);
+      this.pendingStatusEmit = null;
+    }
   }
 
   async scheduleImportedBooksIfEligible(libraryId: number, bookIds: readonly number[]): Promise<number> {
@@ -79,9 +100,9 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     return queued;
   }
 
-  async triggerGlobal(): Promise<number> {
+  async triggerGlobal(ignoreCache = false): Promise<number> {
     const config = await this.configService.getGlobalConfig();
-    const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, SCHEDULE_BATCH_SIZE);
+    const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, SCHEDULE_BATCH_SIZE, ignoreCache);
     await this.unpauseIfNeeded();
     if (queued > 0) {
       this.session.addToTotal(queued);
@@ -91,9 +112,9 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     return queued;
   }
 
-  async triggerForLibrary(libraryId: number): Promise<number> {
+  async triggerForLibrary(libraryId: number, ignoreCache = false): Promise<number> {
     const config = await this.configService.getEffectiveConfig(libraryId);
-    const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', libraryId, SCHEDULE_BATCH_SIZE);
+    const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', libraryId, SCHEDULE_BATCH_SIZE, ignoreCache);
     await this.configService.recordLibraryRun(libraryId, queued);
     await this.unpauseIfNeeded();
     if (queued > 0) {
@@ -142,11 +163,19 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       await this.queueRepo.recoverStuckProcessing();
       await this.checkAndResetSession();
 
-      if (this.paused) return;
-      const dueRows = await this.queueRepo.fetchDue(BATCH_SIZE);
-      if (dueRows.length > 0) {
-        await this.processOne(dueRows[0].bookId, dueRows[0].title, dueRows[0].reason);
-        await this.randomDelay();
+      const chainStartedAt = Date.now();
+      for (let processed = 0; ; processed++) {
+        if (this.paused) return;
+        const dueRows = await this.queueRepo.fetchDue(BATCH_SIZE);
+        if (dueRows.length === 0) return;
+        const row = dueRows[0];
+        const outcome = await this.processOne(row.bookId, row.title, row.reason, row.ignoreCache);
+        if (outcome.outboundRequests > 0 || outcome.deferred) {
+          await this.randomDelay();
+          return;
+        }
+        if (processed + 1 >= CACHED_CHAIN_MAX_ITEMS || Date.now() - chainStartedAt >= CACHED_CHAIN_MAX_MS) return;
+        await new Promise((resolve) => setTimeout(resolve, CACHED_ITEM_YIELD_MS));
       }
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
@@ -159,10 +188,15 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     }
   }
 
-  private async processOne(bookId: number, title: string | null, reason: BookMetadataFetchReason = 'manual_trigger'): Promise<void> {
+  private async processOne(
+    bookId: number,
+    title: string | null,
+    reason: BookMetadataFetchReason = 'manual_trigger',
+    ignoreCache = false,
+  ): Promise<ProcessOutcome> {
     const startedAt = Date.now();
     const claimed = await this.queueRepo.markProcessing(bookId);
-    if (!claimed) return;
+    if (!claimed) return NO_OUTBOUND;
     this.session.setCurrentItemName(title ?? null);
     this.logger.debug(`[book.metadata_fetch] [start] bookId=${bookId} - metadata fetch started`);
     await this.emitStatus();
@@ -171,7 +205,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       const found = await this.bookReadService.findById(bookId);
       if (!found) {
         await this.completeMissingBook(bookId, startedAt);
-        return;
+        return NO_OUTBOUND;
       }
 
       const { book, authorRows, genreRows, narratorRows, communityRatingRows, fileRows } = found;
@@ -185,7 +219,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
           `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=awaiting_import_completion - metadata fetch deferred`,
         );
         await this.emitStatus();
-        return;
+        return { outboundRequests: 0, deferred: true };
       }
 
       if (book.books.status !== undefined && book.books.status !== 'present') {
@@ -196,13 +230,13 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
           `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=book_not_present - metadata fetch completed`,
         );
         await this.emitStatus();
-        return;
+        return NO_OUTBOUND;
       }
 
       const coverState = await this.coverStore.fetchState(bookId);
       if (!coverState) {
         await this.completeMissingBook(bookId, startedAt);
-        return;
+        return NO_OUTBOUND;
       }
       const preserveExisting = reason === 'event_import';
       if (preserveExisting) {
@@ -215,7 +249,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
             `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=event_import_no_longer_eligible - metadata fetch completed`,
           );
           await this.emitStatus();
-          return;
+          return NO_OUTBOUND;
         }
       }
 
@@ -227,7 +261,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: this.collectProviderIds(meta ?? {}),
         hardcoverEditionId: meta?.hardcoverEditionId ?? undefined,
-        isAudiobook: resolveIsAudiobook(fileRows, meta),
+        isAudiobook: resolveIsAudiobook(fileRows, meta, book.books.primaryFileId),
         maxCandidatesPerProvider: 1,
       };
 
@@ -260,20 +294,25 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         existingFields.comicMetadata = await this.comicMetadataRepository.findByBookId(bookId);
       }
 
-      const { resolved, providerIds } = await this.pipeline.runWithSources(searchParams, existingFields, libraryId, {
+      const { resolved, providerIds, cache } = await this.pipeline.runWithSources(searchParams, existingFields, libraryId, {
         ...coverInputs.options,
         ...(preserveExisting ? { preserveExisting: true } : {}),
+        cacheDirective: { policy: ignoreCache ? 'refresh' : 'default', allowFallback: true },
       });
 
-      await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, narratorRows);
+      const coverDownloads = await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, narratorRows);
 
       await this.scoreService.calculateAndSave(bookId);
 
-      this.logger.debug(`[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} - metadata fetch completed`);
+      const outboundRequests = cache.outboundRequests + coverDownloads;
+      this.logger.debug(
+        `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} ignoreCache=${ignoreCache} cacheServed=${cache.servedProviders.length} outbound=${outboundRequests} - metadata fetch completed`,
+      );
       await this.queueRepo.markDone(bookId);
       this.session.incrementDone();
       this.session.setCurrentItemName(null);
       await this.emitStatus();
+      return { outboundRequests, deferred: false };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const httpStatus = extractHttpStatus(error);
@@ -284,6 +323,8 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       await this.queueRepo.markFailed(bookId, message, httpStatus);
       this.session.setCurrentItemName(null);
       await this.emitStatus();
+      // The failure may have come mid-request, so the usual pause applies.
+      return { outboundRequests: 1, deferred: false };
     }
   }
 
@@ -294,7 +335,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     existingAuthorRows: { name: string }[],
     existingGenreRows: { name: string }[],
     existingNarratorRows: { name: string }[],
-  ): Promise<void> {
+  ): Promise<number> {
     const {
       resolved: filteredResolved,
       providerIds: filteredProviderIds,
@@ -414,16 +455,21 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       await this.metadataService.upsertComicMetadata(bookId, filteredResolved.comicMetadata);
     }
 
+    // Cover downloads reach provider CDNs too, so they count against the pause between books.
+    let coverDownloads = 0;
     if (filteredResolved.coverUrl) {
+      coverDownloads += 1;
       await this.metadataService.downloadAndSaveCover(filteredResolved.coverChoices ?? [{ url: filteredResolved.coverUrl }], bookId, 'ebook');
     }
     if (filteredResolved.audioCoverUrl) {
+      coverDownloads += 1;
       await this.metadataService.downloadAndSaveCover(
         filteredResolved.audioCoverChoices ?? [{ url: filteredResolved.audioCoverUrl }],
         bookId,
         'audio',
       );
     }
+    return coverDownloads;
   }
 
   private async completeMissingBook(bookId: number, startedAt: number): Promise<void> {
@@ -533,8 +579,23 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     }
   }
 
+  /** Coalesced: cached books can complete several times a second, which would flood the socket. */
   private async emitStatus(): Promise<void> {
     if (!this.gateway) return;
+    const wait = STATUS_EMIT_MIN_INTERVAL_MS - (Date.now() - this.lastStatusEmitAt);
+    if (wait > 0) {
+      this.pendingStatusEmit ??= setTimeout(() => {
+        this.pendingStatusEmit = null;
+        void this.emitStatusNow().catch(() => undefined);
+      }, wait);
+      return;
+    }
+    await this.emitStatusNow();
+  }
+
+  private async emitStatusNow(): Promise<void> {
+    if (!this.gateway) return;
+    this.lastStatusEmitAt = Date.now();
     const summary = await this.queueRepo.getStatusSummary();
     this.gateway.emitStatus({ ...summary, paused: this.paused, ...this.session.getSnapshot() });
   }

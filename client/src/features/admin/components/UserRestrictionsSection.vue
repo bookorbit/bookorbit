@@ -113,7 +113,7 @@ function toggleContentFilters(enabled: boolean) {
           <p class="settings-hint">{{ t('adminFeature.userForm.excludeGenresHint') }}</p>
         </div>
         <label class="flex cursor-pointer items-start gap-2 focus-within:ring-2 focus-within:ring-ring @lg:col-span-2">
-          <input v-model="seeOwnRequestedBooks" type="checkbox" class="mt-0.5 size-4 shrink-0 rounded border-input accent-primary" />
+          <input v-model="seeOwnRequestedBooks" type="checkbox" class="mt-0.5 size-4 shrink-0 rounded-xs border-input accent-primary" />
           <span>
             <span class="block text-sm leading-tight text-foreground">{{ t('adminFeature.userForm.seeOwnRequestedBooks') }}</span>
             <span class="settings-hint block">{{ t('adminFeature.userForm.seeOwnRequestedBooksHint') }}</span>
@@ -137,7 +137,7 @@ function toggleContentFilters(enabled: boolean) {
         <input
           type="checkbox"
           :checked="restriction.checked"
-          class="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
+          class="mt-0.5 size-4 shrink-0 rounded-xs border-input accent-primary"
           @change="toggleRestriction(restriction.name)"
         />
         <span>

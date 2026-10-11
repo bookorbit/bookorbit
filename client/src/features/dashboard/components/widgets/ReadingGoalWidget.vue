@@ -4,13 +4,14 @@ import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Target, Pencil } from '@lucide/vue'
 
-import { readCssColor } from '@/lib/echarts'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { useReadingGoalWidget } from '../../composables/useReadingGoalWidget'
 import { useDashboardWidgets } from '../../composables/useDashboardWidgets'
 
 const { data, loading, error, refresh } = useReadingGoalWidget()
 const { readingGoal, saveReadingGoal } = useDashboardWidgets()
 const { t } = useI18n()
+const chartTokens = useChartTokens()
 
 const editing = ref(false)
 const goalInput = ref('')
@@ -53,7 +54,7 @@ watchEffect(() => {
           {
             value: Math.max(goal - data.value.completedBooks, 0),
             name: 'Remaining',
-            itemStyle: { color: readCssColor('--muted') },
+            itemStyle: { color: chartTokens.value.color('--muted') },
           },
         ],
       },
@@ -158,7 +159,7 @@ function handleCancelEdit() {
       <div class="flex items-center justify-between">
         <p class="text-xs text-muted-foreground">{{ t('dashboard.widgets.readingGoal.percentComplete', { percentage }) }}</p>
         <button
-          class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
+          class="flex h-6 w-6 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
           :title="t('dashboard.widgets.readingGoal.editGoal')"
           @click="handleStartEditing"
         >

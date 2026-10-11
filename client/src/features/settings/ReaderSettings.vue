@@ -71,7 +71,7 @@ async function setStorageMode(sync: boolean) {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             <span class="settings-label">{{ t('settings.reader.general.deviceOnly') }}</span>
-            <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+            <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-xs bg-primary/15 text-primary">
               {{ t('settings.reader.general.active') }}
             </span>
           </div>
@@ -99,12 +99,12 @@ async function setStorageMode(sync: boolean) {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             <span class="settings-label">{{ t('settings.reader.general.myAccount') }}</span>
-            <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+            <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-xs bg-primary/15 text-primary">
               {{ t('settings.reader.general.active') }}
             </span>
             <span
               v-if="isDemoRestrictedAccount"
-              class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+              class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-xs bg-muted text-muted-foreground"
             >
               {{ t('settings.reader.general.notAvailable') }}
             </span>

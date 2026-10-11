@@ -1,4 +1,5 @@
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import type { DOMWrapper, VueWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Permission } from '@bookorbit/types'
@@ -13,12 +14,22 @@ const hasPermission = vi.fn<(permission: string) => boolean>()
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: (permission: string) => hasPermission(permission) }),
 }))
-vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { id: '7' }, query: {} }),
-  useRouter: () => ({ push: vi.fn<() => void>() }),
+// A route that can move, so a pair's tabs and the hop after a send can be followed. Pushing to a
+// release picker moves it the way the router would; every other destination is only recorded.
+const nav = vi.hoisted(() => ({
+  route: null as unknown as { params: { id: string }; query: Record<string, string> },
+  push: vi.fn<(to: { name: string; params?: { id: number } }) => void>(),
 }))
+vi.mock('vue-router', async () => {
+  const { reactive } = await import('vue')
+  nav.route = reactive({ params: { id: '7' }, query: {} })
+  return { useRoute: () => nav.route, useRouter: () => ({ push: nav.push }) }
+})
+// The real composable builds the router at module scope.
+vi.mock('@/features/auth/composables/useAuth', () => ({ useAuth: () => ({ user: { value: { id: 1 } } }) }))
 
 import ReleasePickerPanel from '../components/ReleasePickerPanel.vue'
+import { clearReleaseSearchCache } from '../composables/useReleasePicker'
 
 function request(overrides: Partial<BookRequestItem> = {}): BookRequestItem {
   return {
@@ -47,6 +58,8 @@ function request(overrides: Partial<BookRequestItem> = {}): BookRequestItem {
     subscribers: [],
     download: null,
     dismissed: false,
+    companionRequestId: null,
+    targetBookId: null,
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
     title: 'Spark of the Everflame',
@@ -195,6 +208,13 @@ beforeEach(() => {
   api.mockReset()
   // A moderator by default, which is the path every existing case in this file was written against.
   hasPermission.mockReturnValue(true)
+  clearReleaseSearchCache()
+  nav.push.mockReset()
+  nav.push.mockImplementation((to) => {
+    if (to.name === 'book-request-releases' && to.params) nav.route.params.id = String(to.params.id)
+  })
+  nav.route.params.id = '7'
+  nav.route.query = {}
 })
 
 describe('ReleasePickerPanel', () => {
@@ -861,5 +881,121 @@ describe('ReleasePickerPanel', () => {
       expect(wrapper.text()).toContain('did not state a language; this tier requires English')
       expect(wrapper.text()).not.toContain('Review E-book profile')
     })
+  })
+})
+
+describe('ReleasePickerPanel for a pair', () => {
+  const ebookHalf = (overrides: Partial<BookRequestItem> = {}) => request({ id: 7, companionRequestId: 8, ...overrides })
+  const audioHalf = (overrides: Partial<BookRequestItem> = {}) => request({ id: 8, mediaKind: 'audiobook', companionRequestId: 7, ...overrides })
+  const AUDIO_SEARCH = {
+    ...MIXED,
+    releases: [release({ guid: 'audio-1', format: 'm4b', formats: ['m4b'] })],
+    criteria: { ...MIXED.criteria, mediaKind: 'audiobook' },
+    indexers: [status()],
+  }
+
+  async function renderPair(audio: BookRequestItem = audioHalf()) {
+    api.mockImplementation((input: string) => {
+      if (input.includes('/releases/inspect')) return respond(READY_INSPECTION)
+      if (input.includes('/7/releases')) return respond(MIXED)
+      if (input.includes('/8/releases')) return respond(AUDIO_SEARCH)
+      if (input.includes('/7/grab')) return respond(ebookHalf({ status: 'grabbed' }))
+      if (input.includes('download-clients')) return respond([])
+      if (input.endsWith('/book-requests/8')) return respond(audio)
+      return respond(ebookHalf())
+    })
+    const wrapper = mount(ReleasePickerPanel, { global: { stubs: { RouterLink: RouterLinkStub } } })
+    await flushPromises()
+    return wrapper
+  }
+
+  const tabs = (wrapper: VueWrapper) => wrapper.get('nav[aria-label="Formats to pick releases for"]')
+  const searchesFor = (id: number) => api.mock.calls.filter(([input]) => input.endsWith(`/${id}/releases`)).length
+
+  async function sendFirstRelease(wrapper: VueWrapper) {
+    const send = releaseRows(wrapper)[0]!
+      .findAll('button')
+      .find((button) => /Download release|Send/.test(button.text()))!
+    await send.trigger('click')
+    await flushPromises()
+  }
+
+  it('tabs between the halves, each with its release count and what it still needs', async () => {
+    const wrapper = await renderPair()
+
+    expect(wrapper.text()).toContain('Pick releases')
+    // The open half is where you are, so only the other one is a link.
+    const ebook = tabs(wrapper).get('[aria-current="page"]')
+    const [audiobook, ...rest] = tabs(wrapper).findAll('a')
+    expect(rest).toHaveLength(0)
+    expect(ebook.text()).toContain('E-book')
+    expect(ebook.text()).toContain('2 releases')
+    expect(ebook.text()).toContain('To choose')
+    expect(audiobook!.text()).toContain('Audiobook')
+    expect(audiobook!.text()).toContain('1 release')
+    expect(audiobook!.text()).toContain('To choose')
+  })
+
+  it('searches the other half once, as the picker opens, and switches to it without a loading state', async () => {
+    const wrapper = await renderPair()
+    expect(searchesFor(8)).toBe(1)
+
+    nav.route.params.id = '8'
+    await nextTick()
+
+    expect(releaseRows(wrapper)).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('Searching')
+    await flushPromises()
+    expect(searchesFor(8)).toBe(1)
+    expect(searchesFor(7)).toBe(1)
+  })
+
+  it('moves to the other half once a release is sent for this one', async () => {
+    const wrapper = await renderPair()
+
+    await sendFirstRelease(wrapper)
+
+    expect(nav.push).toHaveBeenCalledWith({ name: 'book-request-releases', params: { id: 8 }, query: {} })
+  })
+
+  it('ends on a closing state once neither half needs a release', async () => {
+    const wrapper = await renderPair(audioHalf({ status: 'downloading' }))
+
+    await sendFirstRelease(wrapper)
+
+    expect(wrapper.text()).toContain('Nothing left to choose')
+    expect(releaseRows(wrapper)).toHaveLength(0)
+    expect(tabs(wrapper).text().match(/Sent/g)).toHaveLength(2)
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Done')!
+      .trigger('click')
+    expect(nav.push).toHaveBeenLastCalledWith({ name: 'book-requests', query: {} })
+  })
+
+  it('returns to the request when the other half is not waiting on a release', async () => {
+    const wrapper = await renderPair(audioHalf({ status: 'pending' }))
+
+    await sendFirstRelease(wrapper)
+
+    expect(nav.push).toHaveBeenCalledWith({ name: 'book-request-detail', params: { id: 7 }, query: {} })
+    expect(wrapper.text()).not.toContain('Nothing left to choose')
+  })
+
+  it('shows a half nobody can pick a release for yet as a label, not a link, and never searches it', async () => {
+    const wrapper = await renderPair(audioHalf({ status: 'pending' }))
+
+    expect(tabs(wrapper).findAll('a')).toHaveLength(0)
+    expect(tabs(wrapper).text()).toContain('Pending')
+    expect(searchesFor(8)).toBe(0)
+  })
+
+  it('leaves the ISBN one half was opened with out of the link to the other', async () => {
+    nav.route.query = { tab: 'mine', isbn: '9781234567897' }
+    const wrapper = await renderPair()
+
+    const links = wrapper.findAllComponents(RouterLinkStub)
+    const toAudiobook = links.find((link) => (link.props('to') as { params?: { id: number } }).params?.id === 8)!
+    expect(toAudiobook.props('to')).toEqual({ name: 'book-request-releases', params: { id: 8 }, query: { tab: 'mine' } })
   })
 })

@@ -4,11 +4,14 @@ import type { FileHandle } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import { HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException, Optional, OnModuleInit } from '@nestjs/common';
+import { HttpAdapterHost } from '@nestjs/core';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import { computeFileHashFromHandle } from '../../../common/utils/file-hash.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
+import { DeliverySelectionService } from '../../book/delivery-selection.service';
+import { KoboDeliveryService } from './kobo-delivery.service';
 import { AudiolessEpubService } from '../../book/audioless-epub.service';
 import { KoboDownloadHashRegistrationService } from './kobo-download-hash-registration.service';
 import { KoboDownloadRepository } from '../kobo-download.repository';
@@ -30,7 +33,8 @@ const MIME: Record<string, string> = {
 };
 
 @Injectable()
-export class KoboDownloadService {
+export class KoboDownloadService implements OnModuleInit {
+  private readonly transfers = new WeakMap<object, { consumed: boolean; complete: () => Promise<void> }>();
   private readonly logger = new Logger(KoboDownloadService.name);
 
   constructor(
@@ -40,9 +44,44 @@ export class KoboDownloadService {
     private readonly settingsService: KoboSettingsService,
     private readonly bookAccessService: KoboBookAccessService,
     private readonly audiolessEpubService: AudiolessEpubService,
+    @Optional() private readonly deliveries?: KoboDeliveryService,
+    @Optional() private readonly selections?: DeliverySelectionService,
+    @Optional() private readonly adapterHost?: HttpAdapterHost,
   ) {}
 
-  async streamBook(userId: number, bookId: number, reply: FastifyReply) {
+  onModuleInit() {
+    if (this.adapterHost?.httpAdapter?.getType() !== 'fastify') return;
+    const server = this.adapterHost.httpAdapter.getInstance<FastifyInstance>();
+    server.addHook('onResponse', async (request, reply) => {
+      const transfer = this.transfers.get(request);
+      this.transfers.delete(request);
+      if (transfer?.consumed && reply.statusCode === 200 && !request.raw.aborted) await transfer.complete().catch(() => {});
+    });
+  }
+
+  async streamBook(userId: number, bookId: number, reply: FastifyReply, deviceId?: number, deliveryId?: string) {
+    if (deviceId && this.deliveries && this.selections) {
+      const record = await this.deliveries.offer(userId, deviceId, bookId);
+      if (deliveryId && record.id !== deliveryId) throw new NotFoundException('Delivery offer is no longer current');
+      const artifact = await this.deliveries.resolve(userId, deviceId, record);
+      try {
+        if (record.sourceFileId !== null) await this.hashRegistration.record(record.sourceFileId, artifact.fileHash);
+      } catch (error) {
+        await artifact.release();
+        throw error;
+      }
+      const transfer = { consumed: false, complete: () => this.deliveries!.transferObserved(userId, deviceId, record) };
+      this.transfers.set(reply.request, transfer);
+      return this.selections.stream(
+        artifact,
+        `book-${record.sourceFileId}.${artifact.format === 'kepub' ? 'kepub.epub' : artifact.format}`,
+        MIME[artifact.format] ?? 'application/epub+zip',
+        reply,
+        () => {
+          transfer.consumed = true;
+        },
+      );
+    }
     const book = await this.repository.findBook(bookId);
     if (!book) throw new NotFoundException('Book not found');
 

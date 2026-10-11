@@ -7,13 +7,22 @@ import {
   AuthorMetadataPreferences,
   AuthorMetadataProviderKey,
   MergeStrategy,
+  MetadataCacheServedProvider,
 } from '@bookorbit/types';
 
+import type { CacheDirective } from '../../common/provider-cache/provider-cache-spec';
 import { AuthorMetadataFetchService } from './metadata/author-metadata-fetch.service';
 import { AuthorImageStorageError, AuthorImageStorageService } from './author-image-storage.service';
 import { AuthorEnrichmentRow, AuthorsRepository } from './authors.repository';
 
-export type AuthorEnrichmentExecutionResult =
+/** How an execution used the network and the metadata cache, for provenance and pacing. */
+export type AuthorEnrichmentProvenance = {
+  /** Provider requests plus portrait download attempts; 0 when the cache answered everything. */
+  outboundRequests: number;
+  cacheServed: MetadataCacheServedProvider[];
+};
+
+type AuthorEnrichmentOutcome =
   | {
       kind: 'done';
       provider: string | null;
@@ -23,7 +32,7 @@ export type AuthorEnrichmentExecutionResult =
     }
   | {
       kind: 'skipped';
-      reason: 'author_not_found' | 'orphaned' | 'provider_disabled' | 'no_match';
+      reason: SkipReason;
       provider: string | null;
       descriptionUpdated: false;
       imageUpdated: false;
@@ -41,7 +50,16 @@ export type AuthorEnrichmentExecutionResult =
       fieldsUpdated: [];
     };
 
+export type AuthorEnrichmentExecutionResult = AuthorEnrichmentOutcome & AuthorEnrichmentProvenance;
+
 type AuthorUpdate = Parameters<AuthorsRepository['updateAuthorById']>[1];
+
+type SkipReason = 'author_not_found' | 'orphaned' | 'provider_disabled' | 'no_match';
+
+/** Without a directive an execution behaves as it did before the cache: always live, no fallback. */
+const LIVE_DIRECTIVE: CacheDirective = { policy: 'refresh', allowFallback: false };
+
+const NO_PROVENANCE: AuthorEnrichmentProvenance = { outboundRequests: 0, cacheServed: [] };
 
 @Injectable()
 export class AuthorEnrichmentExecutorService {
@@ -51,7 +69,10 @@ export class AuthorEnrichmentExecutorService {
     private readonly authorImageStorage: AuthorImageStorageService,
   ) {}
 
-  async execute(params: { authorId: number; preferences: AuthorMetadataPreferences }): Promise<AuthorEnrichmentExecutionResult> {
+  async execute(
+    params: { authorId: number; preferences: AuthorMetadataPreferences },
+    directive: CacheDirective = LIVE_DIRECTIVE,
+  ): Promise<AuthorEnrichmentExecutionResult> {
     const author = await this.authorsRepo.findByIdForEnrichment(params.authorId);
     if (!author) return this.skipped('author_not_found');
     if (author.bookCount <= 0) return this.skipped('orphaned');
@@ -59,14 +80,16 @@ export class AuthorEnrichmentExecutorService {
     const providerOrder = this.providersInUse(params.preferences);
     if (providerOrder.length === 0) return this.skipped('provider_disabled');
 
-    const { candidates, failures } = await this.authorMetadataFetchService.collectByProvider(
+    const { candidates, failures, outboundRequests, cacheServed } = await this.authorMetadataFetchService.collectByProvider(
       { name: author.name, region: 'us', limit: 1 },
       providerOrder,
+      directive,
     );
+    const provenance: AuthorEnrichmentProvenance = { outboundRequests, cacheServed };
 
     if (candidates.size === 0) {
       const failure = failures[0];
-      if (!failure) return this.skipped('no_match');
+      if (!failure) return this.skipped('no_match', provenance);
       return {
         kind: 'failed',
         message: failure.message,
@@ -77,18 +100,21 @@ export class AuthorEnrichmentExecutorService {
         descriptionUpdated: false,
         imageUpdated: false,
         fieldsUpdated: [],
+        ...provenance,
       };
     }
 
-    return this.applyCandidates(author, params.preferences, candidates);
+    return this.applyCandidates(author, params.preferences, candidates, provenance);
   }
 
   private async applyCandidates(
     author: AuthorEnrichmentRow,
     preferences: AuthorMetadataPreferences,
     candidates: Map<AuthorMetadataProviderKey, AuthorMetadataCandidate>,
+    provenance: AuthorEnrichmentProvenance,
   ): Promise<AuthorEnrichmentExecutionResult> {
     const update: AuthorUpdate = {};
+    const downloads = { attempts: 0 };
     const fieldsUpdated: AuthorMetadataField[] = [];
     const winners = new Map<AuthorMetadataField, AuthorMetadataProviderKey>();
     let imageUpdated = false;
@@ -98,9 +124,9 @@ export class AuthorEnrichmentExecutorService {
       if (!preference?.enabled) continue;
 
       if (field === 'photo') {
-        const photo = await this.applyPhoto(author, preference, candidates);
+        const photo = await this.applyPhoto(author, preference, candidates, downloads);
         if (photo) {
-          if (photo.kind === 'failed') return photo.result;
+          if (photo.kind === 'failed') return { ...photo.result, ...this.withDownloads(provenance, downloads.attempts) };
           imageUpdated = true;
           fieldsUpdated.push('photo');
           winners.set('photo', photo.provider);
@@ -133,7 +159,12 @@ export class AuthorEnrichmentExecutorService {
       descriptionUpdated: fieldsUpdated.includes('description'),
       imageUpdated,
       fieldsUpdated,
+      ...this.withDownloads(provenance, downloads.attempts),
     };
+  }
+
+  private withDownloads(provenance: AuthorEnrichmentProvenance, downloads: number): AuthorEnrichmentProvenance {
+    return { outboundRequests: provenance.outboundRequests + downloads, cacheServed: provenance.cacheServed };
   }
 
   private resolveField(
@@ -203,13 +234,18 @@ export class AuthorEnrichmentExecutorService {
     author: AuthorEnrichmentRow,
     preference: AuthorFieldPreference,
     candidates: Map<AuthorMetadataProviderKey, AuthorMetadataCandidate>,
-  ): Promise<{ kind: 'stored'; provider: AuthorMetadataProviderKey } | { kind: 'failed'; result: AuthorEnrichmentExecutionResult } | null> {
+    downloads: { attempts: number },
+  ): Promise<
+    { kind: 'stored'; provider: AuthorMetadataProviderKey } | { kind: 'failed'; result: Extract<AuthorEnrichmentOutcome, { kind: 'failed' }> } | null
+  > {
     if (preference.mergeStrategy === 'fillMissing' && author.hasPhoto) return null;
 
     for (const provider of preference.providers) {
       const imageUrl = candidates.get(provider)?.imageUrl;
       if (!imageUrl) continue;
 
+      // Counted per attempt rather than per request: a cached candidate still costs a download.
+      downloads.attempts += 1;
       try {
         const stored = await this.authorImageStorage.saveFromUrl(author.id, imageUrl);
         if (!stored) continue;
@@ -272,7 +308,7 @@ export class AuthorEnrichmentExecutorService {
     return ordered;
   }
 
-  private skipped(reason: 'author_not_found' | 'orphaned' | 'provider_disabled' | 'no_match'): AuthorEnrichmentExecutionResult {
-    return { kind: 'skipped', reason, provider: null, descriptionUpdated: false, imageUpdated: false, fieldsUpdated: [] };
+  private skipped(reason: SkipReason, provenance: AuthorEnrichmentProvenance = NO_PROVENANCE): AuthorEnrichmentExecutionResult {
+    return { kind: 'skipped', reason, provider: null, descriptionUpdated: false, imageUpdated: false, fieldsUpdated: [], ...provenance };
   }
 }

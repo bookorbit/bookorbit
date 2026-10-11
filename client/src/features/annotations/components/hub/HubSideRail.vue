@@ -130,7 +130,7 @@ function handleOpenTrash() {
             v-for="entry in overview.originBreakdown"
             :key="entry.origin"
             type="button"
-            class="-mx-1 inline-flex h-6 items-center gap-1.5 rounded px-1 text-[11.5px] transition-colors"
+            class="-mx-1 inline-flex h-6 items-center gap-1.5 rounded-xs px-1 text-[11.5px] transition-colors"
             :class="selectedOrigin === entry.origin ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
             :aria-pressed="selectedOrigin === entry.origin"
             @click="emit('toggleOrigin', entry.origin)"
@@ -151,7 +151,7 @@ function handleOpenTrash() {
             </p>
             <button
               type="button"
-              class="-mx-1 mt-0.5 inline-flex h-6 items-center rounded px-1 text-[11.5px] font-semibold text-[var(--pill-repaired)] underline underline-offset-2"
+              class="-mx-1 mt-0.5 inline-flex h-6 items-center rounded-xs px-1 text-[11.5px] font-semibold text-[var(--pill-repaired)] underline underline-offset-2"
               @click="handleReview"
             >
               {{ t('annotations.hub.reviewThem') }}
@@ -183,7 +183,7 @@ function handleOpenTrash() {
         <RouterLink
           v-if="overview.books > overview.shelf.length"
           :to="{ name: 'libraries' }"
-          class="mt-1 inline-flex h-6 flex-none items-center gap-1 rounded px-1.5 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:text-primary"
+          class="mt-1 inline-flex h-6 flex-none items-center gap-1 rounded-xs px-1.5 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:text-primary"
         >
           {{ t('annotations.hub.allBooks', { count: overview.books }) }}
           <ChevronRight :size="10" />

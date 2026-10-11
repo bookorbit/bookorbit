@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -41,8 +41,17 @@ export class EmailSendLogRepository {
       .offset(offset);
   }
 
-  findPending() {
-    return this.db.select().from(emailSendLog).where(eq(emailSendLog.status, EMAIL_SEND_STATUS_PENDING));
+  findPending(afterId = 0) {
+    return this.db
+      .select()
+      .from(emailSendLog)
+      .where(and(eq(emailSendLog.status, EMAIL_SEND_STATUS_PENDING), gt(emailSendLog.id, afterId)))
+      .orderBy(emailSendLog.id)
+      .limit(100);
+  }
+
+  updateDelivery(id: number, patch: Partial<typeof emailSendLog.$inferInsert>) {
+    return this.db.update(emailSendLog).set(patch).where(eq(emailSendLog.id, id)).returning();
   }
 
   markSent(id: number) {
@@ -72,7 +81,8 @@ export class EmailSendLogRepository {
       .update(emailSendLog)
       .set({
         status: EMAIL_SEND_STATUS_FAILED,
-        errorMessage: 'Server restarted before send completed. Use resend to retry.',
+        errorMessage: 'Server restarted before send completed. SMTP acceptance may be unknown. Review before resending.',
+        failureCode: 'SEND_INTERRUPTED',
         nextRetryAt: null,
         updatedAt: sql`now()`,
       })

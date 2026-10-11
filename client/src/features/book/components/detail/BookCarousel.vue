@@ -15,6 +15,7 @@ export interface CarouselBook {
   title: string | null
   coverAspectRatio: CoverAspectRatio
   updatedAt?: string | null
+  coverVersion?: string
   seriesIndex?: string | null
   hasCover: boolean
   authors: string[]
@@ -149,7 +150,7 @@ defineExpose({ scroll })
         @click="navigateToBook(book.id)"
       >
         <BookCoverSurface
-          class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-transform duration-150 group-hover:scale-[1.02]"
+          class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-transform duration-150 group-hover:[transform:var(--cover-hover-transform)] motion-reduce:group-hover:[transform:none]"
           :interactive="true"
           :disable-spine="isAudiobook(book)"
           :is-comic="isComic(book)"
@@ -157,7 +158,7 @@ defineExpose({ scroll })
           :style="{ aspectRatio: cardAspectRatio(book) }"
         >
           <BookCoverArtwork
-            :src="coverUrl(book.id, 'thumbnail', book.updatedAt)"
+            :src="coverUrl(book.id, 'thumbnail', book.coverVersion ?? book.updatedAt)"
             :has-cover="book.hasCover"
             :title="book.title"
             :author-line="book.authors.length > 0 ? book.authors.join(', ') : null"

@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 
+import { KoboDeliveryService } from './kobo-delivery.service';
+import { DeliveryArtifactService } from '../../book/delivery-artifact.service';
 import { KepubContext } from '../../position-converter/kobo-span-converter.service';
 import { BookReadService } from '../../book/book-read.service';
 import { KepubConversionService } from './kepub-conversion.service';
@@ -13,10 +15,12 @@ export interface KepubReaderFile {
   format: string | null;
   fileHash: string | null;
   sizeBytes: number | null;
+  mediaOverlayAvailable?: boolean;
 }
 
 export type KepubContextResult =
-  { ok: true; ctx: KepubContext; file: KepubReaderFile; settings: KoboSettings } | { ok: false; reason: string; settings: KoboSettings | null };
+  | { ok: true; ctx: KepubContext; file: KepubReaderFile; settings: KoboSettings; release?: () => Promise<void> }
+  | { ok: false; reason: string; settings: KoboSettings | null };
 
 /**
  * Resolves the kepub artifact context for a book: the primary reader file, the
@@ -31,6 +35,8 @@ export class KoboKepubContextService {
     private readonly koboSettingsService: KoboSettingsService,
     private readonly kepubConversionService: KepubConversionService,
     private readonly kepubifyBinaryService: KepubifyBinaryService,
+    @Optional() private readonly deliveries?: KoboDeliveryService,
+    @Optional() private readonly artifacts?: DeliveryArtifactService,
   ) {}
 
   async resolveReaderFile(bookId: number): Promise<KepubReaderFile | null> {
@@ -38,7 +44,57 @@ export class KoboKepubContextService {
     return file ?? null;
   }
 
-  async resolveForBook(userId: number, bookId: number): Promise<KepubContextResult> {
+  async resolveForDelivery(userId: number, bookId: number, deviceId: number, deliveryId: string): Promise<KepubContextResult> {
+    const settings = await this.koboSettingsService.getSettings(userId);
+    const record = await this.deliveries?.byId(userId, deviceId, deliveryId);
+    if (!record || record.bookId !== bookId || record.metadata.format !== 'kepub')
+      return { ok: false, reason: 'historical_artifact_unavailable', settings };
+    try {
+      const artifact = await this.deliveries!.resolve(userId, deviceId, record);
+      const file = await this.resolveReaderFile(bookId);
+      if (!file || file.id !== record.sourceFileId) {
+        await artifact.release();
+        return { ok: false, reason: 'historical_source_unavailable', settings };
+      }
+      const ctx = {
+        kepubPath: artifact.path,
+        fileHash: artifact.sha256,
+        hyphenate: record.options.hyphenate,
+        kepubifyVersion: record.options.converterVersion ?? 'native-kepub',
+      };
+      return { ok: true, file, settings, ctx, release: artifact.release };
+    } catch {
+      return { ok: false, reason: 'historical_artifact_unavailable', settings };
+    }
+  }
+
+  async resolveForBook(userId: number, bookId: number, deviceId?: number): Promise<KepubContextResult> {
+    if (deviceId && this.deliveries) {
+      const settings = await this.koboSettingsService.getSettings(userId);
+      const record = await this.deliveries.current(userId, deviceId, bookId);
+      if (record && record.state === 'prepared' && record.previousId) return this.resolveForDelivery(userId, bookId, deviceId, record.previousId);
+      if (!record || record.state === 'offered' || record.state === 'prepared' || record.state === 'cancelled')
+        return { ok: false, reason: 'unknown_delivery', settings };
+      if (record.previousId || record.options.replacement) return { ok: false, reason: 'replacement_events_ambiguous', settings };
+      if (record.metadata.format !== 'kepub') return { ok: false, reason: 'kepub_required', settings };
+      try {
+        const artifact = await this.deliveries.resolve(userId, deviceId, record);
+        const file = await this.resolveReaderFile(bookId);
+        if (!file || file.id !== record.sourceFileId) {
+          await artifact.release();
+          return { ok: false, reason: 'historical_source_unavailable', settings };
+        }
+        const ctx = {
+          kepubPath: artifact.path,
+          fileHash: artifact.sha256,
+          hyphenate: record.options.hyphenate,
+          kepubifyVersion: record.options.converterVersion ?? 'native-kepub',
+        };
+        return { ok: true, file, settings, ctx, release: artifact.release };
+      } catch {
+        return { ok: false, reason: 'historical_artifact_unavailable', settings };
+      }
+    }
     const file = await this.resolveReaderFile(bookId);
     if (!file) return { ok: false, reason: 'no_reader_file', settings: null };
 
@@ -51,19 +107,31 @@ export class KoboKepubContextService {
         ctx: { kepubPath: file.absolutePath, fileHash: file.fileHash, hyphenate: false, kepubifyVersion: 'native-kepub' },
       };
     }
-    const readiness = this.getKepubReadinessFailure(file, settings);
-    if (readiness) return { ok: false, reason: readiness, settings };
+    const prepared =
+      file.format === 'epub' && file.mediaOverlayAvailable && this.artifacts
+        ? await this.artifacts.prepare(file, settings.readAloudDelivery ?? null)
+        : null;
+    const selected = prepared ? { ...file, absolutePath: prepared.path, sizeBytes: prepared.sizeBytes, fileHash: prepared.sha256 } : file;
+    const readiness =
+      settings.readAloudDelivery === 'original' && file.mediaOverlayAvailable ? 'kepub_required' : this.getKepubReadinessFailure(selected, settings);
+    if (readiness) {
+      await prepared?.release();
+      return { ok: false, reason: readiness, settings };
+    }
 
     let kepubPath: string;
     try {
       kepubPath = await this.kepubConversionService.getKepubPath({
-        sourcePath: file.absolutePath,
-        fileHash: file.fileHash,
+        sourcePath: selected.absolutePath,
+        fileHash: selected.fileHash,
+        ...(prepared ? { audioless: prepared.actualVariant === 'audioless_epub', sourceRevision: prepared.sha256 } : {}),
         bookId,
         hyphenate: settings.forceEnableHyphenation,
       });
     } catch {
       return { ok: false, reason: 'conversion_failed', settings };
+    } finally {
+      await prepared?.release();
     }
 
     const kepubifyVersion = await this.kepubifyBinaryService.getVersion();
@@ -71,7 +139,7 @@ export class KoboKepubContextService {
       ok: true,
       file,
       settings,
-      ctx: { kepubPath, fileHash: file.fileHash, hyphenate: settings.forceEnableHyphenation, kepubifyVersion },
+      ctx: { kepubPath, fileHash: selected.fileHash, hyphenate: settings.forceEnableHyphenation, kepubifyVersion },
     };
   }
 

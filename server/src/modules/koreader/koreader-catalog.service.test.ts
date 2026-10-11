@@ -742,7 +742,7 @@ describe('KoreaderCatalogService', () => {
         libraryName: 'Main',
         progress: expect.objectContaining({ fileId: 100, percentage: 47.4 }),
         files: [
-          {
+          expect.objectContaining({
             id: 100,
             format: 'epub',
             role: 'primary',
@@ -751,7 +751,7 @@ describe('KoreaderCatalogService', () => {
             durationSeconds: null,
             downloadUrl: '/api/v1/koreader/plugin/catalog/files/100/download',
             devicePath: 'Series/Dune/01.00 - Dune.epub',
-          },
+          }),
         ],
         relatedSections: [
           {

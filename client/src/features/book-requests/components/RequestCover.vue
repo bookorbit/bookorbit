@@ -1,22 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { BookOpen, Headphones, Images } from '@lucide/vue'
-import type { BookRequestMediaKind } from '@bookorbit/types'
+import type { StoredBookRequestMediaKind } from '@bookorbit/types'
+import { requestMediaIcon } from '../requestMedia'
 
 const props = withDefaults(
   defineProps<{
     src: string | null
     fallbackSources?: string[]
     sourceKey?: string
-    mediaKind: BookRequestMediaKind
+    mediaKind: StoredBookRequestMediaKind
     /** Sizing lives with the caller, because a table thumbnail and a page header differ. */
     class?: string
     iconSize?: number
   }>(),
   { class: '', iconSize: 18 },
 )
-
-const MEDIA_ICONS = { ebook: BookOpen, audiobook: Headphones, comic: Images } as const
 
 /**
  * Cover URLs come from metadata providers, so they point at hosts BookOrbit does not control and
@@ -51,7 +49,7 @@ watch(
 )
 
 const showImage = computed(() => currentSrc.value !== null)
-const icon = computed(() => MEDIA_ICONS[props.mediaKind] ?? BookOpen)
+const icon = computed(() => requestMediaIcon(props.mediaKind))
 
 function handleError() {
   failedIndex.value += 1
@@ -63,12 +61,12 @@ function handleError() {
     v-if="showImage"
     :src="currentSrc ?? undefined"
     alt=""
-    class="shrink-0 rounded border border-border bg-muted object-cover"
+    class="shrink-0 rounded-xs border border-border bg-muted object-cover"
     :class="props.class"
     loading="lazy"
     @error="handleError"
   />
-  <div v-else class="flex shrink-0 items-center justify-center rounded border border-border bg-muted" :class="props.class" aria-hidden="true">
+  <div v-else class="flex shrink-0 items-center justify-center rounded-xs border border-border bg-muted" :class="props.class" aria-hidden="true">
     <component :is="icon" :size="iconSize" class="text-muted-foreground" />
   </div>
 </template>

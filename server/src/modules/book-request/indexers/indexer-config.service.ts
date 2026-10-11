@@ -416,7 +416,6 @@ function mergeCategories(defaults: IndexerCategoryMap, categories: Partial<Index
   return {
     ebook: categories?.ebook ?? defaults.ebook,
     audiobook: categories?.audiobook ?? defaults.audiobook,
-    comic: categories?.comic ?? defaults.comic,
   };
 }
 

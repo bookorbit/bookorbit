@@ -2,10 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { markProviderDegraded } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { ProviderThrottleTracker } from '../../provider-throttle.tracker';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { pickSearchInputs, providerCacheContext, requestedMax } from '../provider-cache';
 import { PROVIDER_BUDGETS_MS, PROVIDER_LIMITS } from '../provider-constants';
 import { createSearchDeadline, normalizeMaxCandidates, SearchDeadline } from '../provider-utils';
 import { ComicVineClient } from './comicvine.client';
@@ -99,6 +102,22 @@ export class ComicVineProvider implements IdentifiableProvider {
 
   private readonly logger = new Logger(ComicVineProvider.name);
 
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: true,
+    // The issue endpoint answers an unknown id with 404.
+    authoritativeLookupStatuses: [404],
+    context: async () => {
+      const { enabled, apiKey } = (await this.providerConfig.getConfig()).comicvine;
+      return providerCacheContext(enabled && Boolean(apiKey));
+    },
+    describeSearch: (params) => ({
+      inputs: pickSearchInputs(params, ['title', 'seriesName', 'seriesIndex', 'titleIsExplicitQuery']),
+      maxCandidates: requestedMax(params),
+    }),
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
+
   constructor(
     private readonly client: ComicVineClient,
     private readonly providerConfig: ProviderConfigService,
@@ -153,9 +172,12 @@ export class ComicVineProvider implements IdentifiableProvider {
         const volume = signal
           ? await this.client.getVolumeById(issue.volume.id, apiKey, signal)
           : await this.client.getVolumeById(issue.volume.id, apiKey);
+        // A lookup treats a 404 as an answer, so an issue missing its volume must not pass as complete.
+        if (!volume) markProviderDegraded('comicvine.lookup: volume unavailable');
         return mapIssueToCandidate(issue, { volume: volume ?? undefined });
       } catch (err) {
         if (err instanceof ProviderThrottleError) {
+          markProviderDegraded('comicvine.lookup: volume throttled');
           this.recordThrottle();
           return mapIssueToCandidate(issue);
         }
@@ -200,7 +222,10 @@ export class ComicVineProvider implements IdentifiableProvider {
       const probed = await Promise.allSettled(wave.map((volume) => this.probeVolume(volume, issueNumber, apiKey, deadline.signal)));
 
       for (const result of probed) {
-        if (result.status !== 'fulfilled') continue;
+        if (result.status !== 'fulfilled') {
+          markProviderDegraded('comicvine.search: volume probe failed');
+          continue;
+        }
         for (const issue of result.value.issues) {
           if (seenIssueIds.has(issue.id)) continue;
           seenIssueIds.add(issue.id);
@@ -259,9 +284,11 @@ export class ComicVineProvider implements IdentifiableProvider {
       try {
         const volume = await this.client.getVolumeById(volumeId, apiKey, deadline.signal);
         const linkedVolume = volume?.id === volumeId ? volume : null;
+        if (!linkedVolume) markProviderDegraded('comicvine.search: volume unavailable');
         volumes.set(volumeId, linkedVolume);
         enriched.push({ ...match, volume: linkedVolume ?? undefined });
       } catch (err) {
+        markProviderDegraded('comicvine.search: volume enrichment stopped');
         enriched.push(match);
         stopped = true;
         if (err instanceof ProviderThrottleError) this.recordThrottle();
@@ -291,8 +318,10 @@ export class ComicVineProvider implements IdentifiableProvider {
       this.logger.debug(`ComicVine: issue ${match.issue.id} has no credits from list endpoint, fetching detail`);
       try {
         const detailed = await this.client.getIssueById(String(match.issue.id), apiKey, deadline.signal);
+        if (!detailed) markProviderDegraded('comicvine.search: issue detail unavailable');
         enriched.push(detailed ? { ...match, issue: detailed } : match);
       } catch (err) {
+        markProviderDegraded('comicvine.search: issue detail stopped');
         enriched.push(match);
         stopped = true;
         if (err instanceof ProviderThrottleError) this.recordThrottle();

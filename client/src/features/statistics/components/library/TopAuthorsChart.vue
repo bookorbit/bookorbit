@@ -4,12 +4,11 @@ import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Users } from '@lucide/vue'
 
-import { useThemeStore } from '@/stores/theme'
-import { getThemePalette, readCssColor } from '@/lib/echarts'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { useTopAuthors } from '../../composables/useTopAuthors'
 import ChartCard from '../ChartCard.vue'
 
-const themeStore = useThemeStore()
+const chartTokens = useChartTokens()
 const { t } = useI18n()
 
 const { data, loading, error } = useTopAuthors()
@@ -34,9 +33,9 @@ watchEffect(() => {
     return parseFloat(((running / total) * 100).toFixed(1))
   })
 
-  const palette = getThemePalette(themeStore.resolvedTheme, themeStore.accent)
+  const palette = chartTokens.value.palette()
   const primary = palette[0] ?? '#6b7280'
-  const mutedColor = readCssColor('--muted-foreground')
+  const mutedColor = chartTokens.value.color('--muted-foreground')
 
   const barColors = items.map((_, i) => {
     if (i < 3) return primary

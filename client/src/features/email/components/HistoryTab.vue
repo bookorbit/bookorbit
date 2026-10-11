@@ -98,7 +98,7 @@ function cancelDelete() {
       <div v-for="entry in logEntries" :key="entry.id" class="px-4 py-3 bg-card flex flex-col md:flex-row md:items-start gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap mb-0.5">
-            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide" :class="statusClass(entry.status)">
+            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-xs uppercase tracking-wide" :class="statusClass(entry.status)">
               {{ statusLabel(entry.status) }}
             </span>
             <span class="text-sm text-foreground truncate">{{ entry.toName || entry.toEmail }}</span>

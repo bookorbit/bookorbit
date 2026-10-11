@@ -15,6 +15,7 @@ export interface OpdsRequestUser {
   userId: number;
   username: string;
   sortOrder: 'recent' | 'title_asc' | 'title_desc' | 'author_asc' | 'author_desc' | 'series_asc' | 'series_desc';
+  readAloudDelivery?: 'original' | 'audioless_epub' | null;
   isSuperuser: boolean;
   coverToken: string;
   contentFilters: ContentFilterRules;
@@ -134,6 +135,7 @@ export class OpdsAuthGuard implements CanActivate {
       userId: result.parentUser.id,
       username: result.opdsUser.username,
       sortOrder: result.opdsUser.sortOrder,
+      readAloudDelivery: result.opdsUser.readAloudDelivery,
       isSuperuser: fullUser.isSuperuser,
       coverToken: createCoverToken(result.parentUser.id, secret),
       contentFilters: fullUser.contentFilters,

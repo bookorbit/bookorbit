@@ -188,6 +188,8 @@ local function chunkIds(ids, size)
     return chunks
 end
 
+local Delivery = require("bookorbit_delivery")
+
 local CatalogBulkDownload = {}
 
 function CatalogBulkDownload.install(Catalog)
@@ -406,13 +408,50 @@ function CatalogBulkDownload.install(Catalog)
         UIManager:show(dialog)
     end
 
+    function Catalog:showDeliveryPreferenceDialog()
+        self:runConnected(function()
+            local current, err = self:fetchDeliveryPreference()
+            if err then UIManager:show(InfoMessage:new{ text = err }); return end
+            local server_settings = self.client.delivery_settings
+            local selected = server_settings and server_settings.deviceOverride or current
+            local uses_default = server_settings and server_settings.deviceOverride == nil
+            local dialog
+            local function select(variant)
+                UIManager:close(dialog)
+                self:runConnected(function()
+                    local resolved, save_err = self:fetchDeliveryPreference(variant, true)
+                    if not resolved then UIManager:show(InfoMessage:new{ text = save_err }); return end
+                    self:showBulkDownloadSettings()
+                end)
+            end
+            dialog = ButtonDialog:new{
+                title = _("Choose EPUB delivery for this device. On supported servers this is saved in BookOrbit Settings > KOReader. Existing copies and interrupted downloads remain unchanged."),
+                buttons = {
+                    {{ text = _("Use BookOrbit default") .. (uses_default and " *" or ""), callback = function() select(nil) end }},
+                    {{ text = _("Text-only EPUB") .. (not uses_default and selected == "audioless_epub" and " *" or ""), callback = function() select("audioless_epub") end }},
+                    {{ text = _("Original EPUB with narration") .. (not uses_default and selected == "original" and " *" or ""), callback = function() select("original") end }},
+                },
+            }
+            UIManager:show(dialog)
+        end)
+    end
+
     function Catalog:showBulkDownloadSettings()
         local dialog
         local preset = self:bulkFormatPreset()
         local policy = self:bulkExistingPolicy()
         dialog = ButtonDialog:new{
-            title = _("Bulk download settings"),
+            title = _("Download settings"),
             buttons = {
+                {
+                    {
+                        text = _("Read-aloud EPUB delivery"),
+                        callback = function()
+                            UIManager:close(dialog)
+                            self:showDeliveryPreferenceDialog()
+                        end,
+                    },
+                },
                 {
                     {
                         text = T(_("Folder: %1"), BD.dirpath(shortPath(self:getCurrentDownloadDir(), FOLDER_LABEL_LENGTH))),
@@ -495,8 +534,10 @@ function CatalogBulkDownload.install(Catalog)
 
     function Catalog:bulkCountKnownSkips(books)
         local counts = { on_device = 0, unsupported = 0 }
+        local capabilities = Capabilities.cached(self.client)
+        local legacy = capabilities and not capabilities.readAloudDeliveryVariants
         for _, book in ipairs(books or {}) do
-            if self:isOnDevice(book) then
+            if legacy and self:isOnDevice(book) then
                 counts.on_device = counts.on_device + 1
             elseif not self:bulkSupportedFormatHint(book) then
                 counts.unsupported = counts.unsupported + 1
@@ -514,6 +555,9 @@ function CatalogBulkDownload.install(Catalog)
             T(_("Format: %1"), self:bulkFormatPreset().label),
             T(_("Existing files: %1"), self:bulkExistingPolicy().label),
         }
+        if self:bulkExistingPolicy().id == "overwrite" then
+            table.insert(lines, _("Replacing existing files can invalidate their reading positions and highlights. Previous files remain intact until each download completes."))
+        end
         if source.known_skips then
             if source.known_skips.on_device > 0 then
                 table.insert(lines, T(_("Already on device: %1"), source.known_skips.on_device))
@@ -543,7 +587,9 @@ function CatalogBulkDownload.install(Catalog)
                         text = _("Download"),
                         callback = function()
                             UIManager:close(dialog)
-                            self:startBulkSource(source)
+                            self:runConnected(function()
+                                self:startBulkSource(source)
+                            end)
                         end,
                     },
                 },
@@ -592,10 +638,11 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:bulkSourceKey(source)
+        local prefix = source.account_key and (source.account_key .. "|" .. tostring(source.variant) .. "|") or ""
         if source.kind == "ids" then
-            return "ids|" .. idListKey(source.ids)
+            return prefix .. "ids|" .. idListKey(source.ids)
         end
-        return "filter|" .. sortedParamKey(source.params or {})
+        return prefix .. "filter|" .. sortedParamKey(source.params or {})
     end
 
     function Catalog:startBulkSource(source)
@@ -604,6 +651,18 @@ function CatalogBulkDownload.install(Catalog)
             return
         end
 
+        source.account_key = Delivery.key(self.client)
+        local checkpoint = self:bulkOpenCheckpoint():load()
+        local pinned_variant
+        if checkpoint then
+            for _, candidate in ipairs({ "original", "audioless_epub" }) do
+                source.variant = candidate
+                if checkpoint.source_key == self:bulkSourceKey(source) then pinned_variant = candidate; break end
+            end
+        end
+        local variant, variant_err = self:fetchDeliveryPreference(pinned_variant)
+        if variant_err then UIManager:show(InfoMessage:new{ text = variant_err }); return end
+        source.variant = variant
         local ctx = {
             source = source,
             source_key = self:bulkSourceKey(source),
@@ -774,6 +833,7 @@ function CatalogBulkDownload.install(Catalog)
         params.size = PAGE_SIZE
         params.cursor = position.cursor
 
+        params.variant = ctx.source.variant
         local body, err = self.client:catalogManifest(params)
         if not body then
             -- A server that answers the route with "not found" is a confirmed
@@ -1037,14 +1097,19 @@ function CatalogBulkDownload.install(Catalog)
 
     -- Restart validation: a destination this run already published is accepted
     -- only when its size and content hash still match the manifest.
-    function Catalog:bulkValidatePublished(ctx, path, file, book_id)
+    function Catalog:bulkValidatePublished(ctx, path, file, book_id, recorded)
         if not path then return false end
         local size = lfs.attributes(path, "size")
         if not size then return false end
-        if file.sizeBytes and file.sizeBytes > 0 and size ~= file.sizeBytes then return false end
-        if not file.fileHash then return false end
+        local expected_size, expected_hash = file.sizeBytes, file.fileHash
+        if type(recorded) == "table" then
+            if recorded.selection ~= file.selection or recorded.file_id ~= file.id then return false end
+            expected_size, expected_hash = recorded.size, recorded.hash
+        end
+        if expected_size and expected_size > 0 and size ~= expected_size then return false end
+        if not expected_hash then return false end
         local hashed, digest = pcall(util.partialMD5, path)
-        if not hashed or digest ~= file.fileHash then return false end
+        if not hashed or digest ~= expected_hash then return false end
         self:bulkQueueLink(ctx, {
             digest = digest,
             bookId = book_id,
@@ -1057,7 +1122,7 @@ function CatalogBulkDownload.install(Catalog)
     function Catalog:bulkProcessBook(ctx, book)
         self:bulkShowStatus(ctx, _("Checking book..."), book, ctx.index % 5 == 0)
 
-        if self:isOnDevice(book) then
+        if not (ctx.source and ctx.source.variant) and self:isOnDevice(book) then
             ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
             self:bulkShowStatus(ctx, _("Already on device - skipping"), book, ctx.index % 5 == 0)
             return
@@ -1072,7 +1137,7 @@ function CatalogBulkDownload.install(Catalog)
         if not book.files then
             -- Only reached on a server without the manifest capability.
             self:bulkShowStatus(ctx, _("Loading book details..."), book, true)
-            local body, err = self.client:catalogBook(book.id)
+            local body, err = self.client:catalogBook(book.id, ctx.source.variant)
             if not body then
                 logger.warn("BookOrbit: bulk detail fetch failed", book.id, err)
                 self:bulkRecordFailure(ctx, book)
@@ -1080,14 +1145,19 @@ function CatalogBulkDownload.install(Catalog)
                 return
             end
             detail = body
-            if self:isOnDevice(detail) then
+            if not (ctx.source and ctx.source.variant) and self:isOnDevice(detail) then
                 ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
                 self:bulkShowStatus(ctx, _("Already on device - skipping"), detail, true)
                 return
             end
         end
 
-        local file = self:bulkChooseFile(detail)
+        local file = self:bulkChooseFile(detail, ctx.resumed)
+        if not file and #self:supportedFiles(detail) > 0 then
+            ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
+            self:bulkShowStatus(ctx, _("Already on device - skipping"), detail, true)
+            return
+        end
         if not file then
             ctx.counts.skipped_unsupported = ctx.counts.skipped_unsupported + 1
             self:bulkShowStatus(ctx, _("No supported format - skipping"), detail, true)
@@ -1099,11 +1169,12 @@ function CatalogBulkDownload.install(Catalog)
 
         if ctx.resumed then
             local recorded = ctx.resumed_completed and ctx.resumed_completed[tostring(book_id)]
-            for _, candidate in ipairs({ recorded, local_path }) do
-                if self:bulkValidatePublished(ctx, candidate, file, book_id) then
+            local recorded_path = type(recorded) == "table" and recorded.path or recorded
+            for candidate_index, candidate in ipairs({ recorded_path or local_path, local_path }) do
+                if self:bulkValidatePublished(ctx, candidate, file, book_id, candidate == recorded_path and recorded or nil) then
                     ctx.counts.skipped_present = ctx.counts.skipped_present + 1
                     ctx.destination_paths[pathKey(candidate)] = { book_id = book_id, file_id = file.id }
-                    ctx.completed[tostring(book_id)] = candidate
+                    ctx.completed[tostring(book_id)] = recorded or candidate
                     self:bulkShowStatus(ctx, _("Already downloaded - skipping"), detail, true)
                     return
                 end
@@ -1126,11 +1197,19 @@ function CatalogBulkDownload.install(Catalog)
         end
         ctx.counts.downloaded = ctx.counts.downloaded + 1
         ctx.destination_paths[pathKey(local_path)] = { book_id = book_id, file_id = file.id }
-        ctx.completed[tostring(book_id)] = local_path
+        if file.selection then
+            local hashed, digest = pcall(util.partialMD5, local_path)
+            ctx.completed[tostring(book_id)] = {
+                path = local_path, selection = file.selection, file_id = file.id,
+                size = lfs.attributes(local_path, "size"), hash = hashed and digest or nil,
+            }
+        else
+            ctx.completed[tostring(book_id)] = local_path
+        end
         self:bulkShowStatus(ctx, _("Download complete"), detail, true)
     end
 
-    function Catalog:bulkChooseFile(detail)
+    function Catalog:bulkChooseFile(detail, validate_present)
         local files = self:supportedFiles(detail)
         if #files == 0 then return nil end
 
@@ -1138,13 +1217,13 @@ function CatalogBulkDownload.install(Catalog)
             local wanted = string.lower(format)
             for _, file in ipairs(files) do
                 local file_format = string.lower(file.format or "")
-                if file_format == wanted and not self:onDeviceFilePath(file) then
+                if file_format == wanted and (validate_present or not self:onDeviceFilePath(file)) then
                     return file
                 end
             end
         end
         for _, file in ipairs(files) do
-            if not self:onDeviceFilePath(file) then
+            if validate_present or not self:onDeviceFilePath(file) then
                 return file
             end
         end
@@ -1181,12 +1260,15 @@ function CatalogBulkDownload.install(Catalog)
             destination = local_path,
             generation = generation,
             expected_bytes = total,
+            expected_hash = file.fileHash,
             hash = "partial_md5",
             on_progress = onProgress,
             is_current = function()
                 return ctx == self.bulk_ctx and not ctx.cancel_requested
             end,
             perform = function(download_opts)
+                download_opts.variant = file.selection and (file.requestedVariant or file.downloadVariant) or nil
+                download_opts.selection = file.selection
                 return self.client:downloadCatalogFile(file.id, local_path, download_opts)
             end,
         }
@@ -1195,6 +1277,12 @@ function CatalogBulkDownload.install(Catalog)
             return false
         end
 
+        if file.selection then
+            local variants = self.settings.catalog_downloaded_variants or {}
+            variants[Delivery.key(self.client) .. "|" .. tostring(file.id) .. "|" .. file.downloadVariant] = { path = local_path, selection = file.selection }
+            self.settings.catalog_downloaded_variants = variants
+            ctx.delivery_markers_dirty = true
+        end
         local digest = result and result.hash
         if digest and file.fileHash and digest == file.fileHash then
             -- The manifest hash is the digest local match state keys on, so a
@@ -1237,8 +1325,12 @@ function CatalogBulkDownload.install(Catalog)
     -- single bounded match check, instead of one request and one flush per file.
     function Catalog:bulkFlushLinks(ctx, force)
         local pending = #ctx.pending_links + #ctx.pending_matches
-        if pending == 0 then return end
         if not force and pending < LINK_BATCH_SIZE then return end
+        if ctx.delivery_markers_dirty then
+            self:persistSetting("catalog_downloaded_variants", self.settings.catalog_downloaded_variants)
+            ctx.delivery_markers_dirty = false
+        end
+        if pending == 0 then return end
 
         local links = ctx.pending_links
         local matches = ctx.pending_matches

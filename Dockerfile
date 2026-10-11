@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:26.8.1-alpine3.23@sha256:871eb674ad6e692c91330a8959f1ce2f80ba3f445cdc54e306869d2ea265e42d
+ARG NODE_IMAGE=node:26.11.1-alpine3.23@sha256:f1394b3ffc021bc3f4aaf363e70a8d9667f7a9a63538bc824d7cc583129fffad
 
 FROM ${NODE_IMAGE} AS base
 RUN npm install -g pnpm@11.22.0

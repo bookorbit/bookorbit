@@ -1,4 +1,14 @@
-export const METADATA_TABS = ['providers', 'field-rules', 'custom-fields', 'score', 'auto-fetch', 'authors', 'genre-blocklist', 'reminders'] as const
+export const METADATA_TABS = [
+  'providers',
+  'field-rules',
+  'custom-fields',
+  'score',
+  'auto-fetch',
+  'authors',
+  'search-cache',
+  'genre-blocklist',
+  'reminders',
+] as const
 
 export type MetadataTab = (typeof METADATA_TABS)[number]
 

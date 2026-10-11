@@ -89,6 +89,7 @@ function makeService(
     downloads?: Record<string, unknown>;
     automationSettings?: Record<string, unknown>;
     libraryService?: Record<string, unknown>;
+    companions?: Record<string, unknown>;
     /** The user a delegated submission names, as `AuthService` would resolve them. */
     actingUser?: RequestUser | null;
   } = {},
@@ -119,6 +120,12 @@ function makeService(
     findLibraryNames: vi.fn().mockResolvedValue(new Map([[7, 'Audiobooks']])),
     bookDockFileExists: vi.fn().mockResolvedValue(true),
     folderBelongsToLibrary: vi.fn().mockResolvedValue(true),
+    createPair: vi.fn().mockResolvedValue([]),
+    linkCompanions: vi.fn().mockResolvedValue(true),
+    setTargetBookIfUnset: vi.fn().mockResolvedValue(true),
+    findByIds: vi.fn().mockResolvedValue([]),
+    findBookPlacement: vi.fn().mockResolvedValue(undefined),
+    findBookMediaKinds: vi.fn().mockResolvedValue(new Set()),
     ...overrides.repo,
   };
   const dedupe = {
@@ -168,6 +175,8 @@ function makeService(
   const auth = { findActingUser: vi.fn().mockResolvedValue(overrides.actingUser ?? null) };
   const attribution = new BookRequestAttributionService(auth as never);
 
+  const companions = { handOn: vi.fn().mockResolvedValue(false), ...overrides.companions };
+
   const service = new BookRequestService(
     repo as never,
     dedupe as never,
@@ -179,9 +188,11 @@ function makeService(
     removal as never,
     gateway as never,
     attribution,
+    {} as never,
+    companions as never,
   );
 
-  return { service, repo, dedupe, libraryService, notifications, downloads, automation, automationSettings, removal, gateway, auth };
+  return { service, repo, dedupe, libraryService, notifications, downloads, automation, automationSettings, removal, gateway, auth, companions };
 }
 
 const dto = { title: 'Dune', mediaKind: 'ebook' as const, authors: ['Frank Herbert'] };
@@ -1996,6 +2007,7 @@ describe('BookRequestService.getDefaultDestinations', () => {
     await expect(service.getDefaultDestinations()).resolves.toEqual({
       ebook: { libraryId: null, libraryName: null, folderId: null },
       audiobook: { libraryId: 7, libraryName: 'Audiobooks', folderId: 21 },
+      // Retired, but released iOS builds decode it as a required field, so it is always answered empty.
       comic: { libraryId: null, libraryName: null, folderId: null },
     });
   });
@@ -2018,7 +2030,7 @@ describe('BookRequestService.getDefaultDestinations', () => {
     await service.getDefaultDestinations();
 
     expect(repo.findLibraryNames).toHaveBeenCalledTimes(1);
-    expect(repo.findLibraryNames).toHaveBeenCalledWith([7, 7, 7]);
+    expect(repo.findLibraryNames).toHaveBeenCalledWith([7, 7]);
   });
 
   /**
@@ -2092,5 +2104,339 @@ describe('BookRequestService.assertCanFulfil', () => {
     repo.findById.mockResolvedValue(undefined);
 
     await expect(service.assertCanFulfil(10, owner())).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('BookRequestService with a request for the retired comic medium', () => {
+  /** It still loads and can be closed, but nothing may send it looking for a release. */
+  it('refuses to approve it, leaving the request untouched', async () => {
+    const { service, repo, automation } = makeService();
+    repo.findById.mockResolvedValue(joined({ mediaKind: 'comic', targetLibraryId: 3 }));
+
+    await expect(service.approve(10, {}, moderator())).rejects.toThrow('Comic requests are no longer supported');
+    expect(repo.updateIf).not.toHaveBeenCalled();
+    expect(automation.considerRequest).not.toHaveBeenCalled();
+  });
+
+  it('still lets it be rejected', async () => {
+    const { service, repo } = makeService();
+    repo.findById.mockResolvedValue(joined({ mediaKind: 'comic' }));
+
+    await service.reject(10, {}, moderator());
+
+    expect(repo.updateIf).toHaveBeenCalledWith(10, ['pending'], expect.objectContaining({ status: 'rejected' }));
+  });
+});
+
+describe('BookRequestService.submitPair', () => {
+  const pairDto = {
+    title: 'Dune',
+    authors: ['Frank Herbert'],
+    ebook: { targetLibraryId: 3 },
+    audiobook: { targetLibraryId: 3, coverUrl: 'https://covers.example/dune-square.jpg', preferredFormats: ['m4b'] },
+  };
+
+  /** The repository answers a pair insert the way the real one does: both rows, already linked. */
+  function pairRows(overrides: { ebook?: Record<string, unknown>; audiobook?: Record<string, unknown> } = {}) {
+    const ebook = row({ id: 10, mediaKind: 'ebook', companionRequestId: 11, ...overrides.ebook });
+    const audiobook = row({ id: 11, mediaKind: 'audiobook', companionRequestId: 10, ...overrides.audiobook });
+    return { ebook, audiobook };
+  }
+
+  function findByIdFor(rows: Array<ReturnType<typeof row>>) {
+    return vi.fn().mockImplementation((id: number) => {
+      const found = rows.find((candidate) => candidate.id === id);
+      return Promise.resolve(found ? { ...joined(), request: found } : undefined);
+    });
+  }
+
+  it('creates both halves in one insert, each carrying its own medium, destination and formats', async () => {
+    const { ebook, audiobook } = pairRows();
+    const { service, repo } = makeService({
+      repo: { createPair: vi.fn().mockResolvedValue([ebook, audiobook]), findById: findByIdFor([ebook, audiobook]) },
+    });
+
+    const result = await service.submitPair(pairDto, user());
+
+    expect(repo.createPair).toHaveBeenCalledTimes(1);
+    const [entries, cap] = repo.createPair.mock.calls[0] as [Array<{ data: Record<string, unknown>; aliasKeys: string[] }>, unknown];
+    expect(entries.map((entry) => entry.data.mediaKind)).toEqual(['ebook', 'audiobook']);
+    expect(entries[0]!.data).toMatchObject({
+      status: 'pending',
+      targetLibraryId: 3,
+      dedupeKey: 'work:dune:frankherbert:ebook',
+      preferredFormats: [],
+    });
+    expect(entries[1]!.data).toMatchObject({
+      status: 'pending',
+      dedupeKey: 'work:dune:frankherbert:audiobook',
+      coverUrl: 'https://covers.example/dune-square.jpg',
+      preferredFormats: ['m4b'],
+    });
+    expect(cap).toBeNull();
+    expect(repo.createPair).toHaveBeenCalledWith(expect.any(Array), null);
+    expect(result.ebook.request.companionRequestId).toBe(11);
+    expect(result.audiobook.request.companionRequestId).toBe(10);
+    expect(result.ebook.subscribed).toBe(false);
+  });
+
+  it('tells the approvers once, naming both media, rather than once per half', async () => {
+    const { ebook, audiobook } = pairRows();
+    const { service, notifications } = makeService({
+      repo: { createPair: vi.fn().mockResolvedValue([ebook, audiobook]), findById: findByIdFor([ebook, audiobook]) },
+    });
+
+    await service.submitPair(pairDto, user());
+
+    const submitted = notifications.notify.mock.calls.filter(([payload]) => payload.type === NotificationType.BookRequestSubmitted);
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]![0]).toMatchObject({ message: 'Reader requested "Dune" as an ebook and an audiobook', meta: { requestId: 10 } });
+  });
+
+  it('joins a half somebody already asked for, creates the other, and links the two', async () => {
+    const existingEbook = row({ id: 7, userId: 2, mediaKind: 'ebook' });
+    const created = row({ id: 11, mediaKind: 'audiobook' });
+    const findActiveRequestFor = vi
+      .fn()
+      .mockImplementation((work: { mediaKind: string }) => Promise.resolve(work.mediaKind === 'ebook' ? existingEbook : undefined));
+    const { service, repo } = makeService({
+      dedupe: { findActiveRequestFor },
+      repo: {
+        createPair: vi.fn().mockResolvedValue([created]),
+        linkCompanions: vi.fn().mockResolvedValue(true),
+        findById: findByIdFor([existingEbook, created]),
+      },
+    });
+
+    const result = await service.submitPair(pairDto, user());
+
+    expect(repo.createPair).toHaveBeenCalledWith([expect.objectContaining({ data: expect.objectContaining({ mediaKind: 'audiobook' }) })], null);
+    expect(repo.addSubscriber).toHaveBeenCalledWith(7, 1);
+    expect(repo.linkCompanions).toHaveBeenCalledWith(7, 11);
+    expect(result.ebook.subscribed).toBe(true);
+    expect(result.audiobook.subscribed).toBe(false);
+  });
+
+  it('refuses the whole pair before writing either half when one half is refused', async () => {
+    const verifyUserAccess = vi
+      .fn()
+      .mockImplementation((_userId: number, libraryId: number) =>
+        libraryId === 9 ? Promise.reject(new ForbiddenException('No access to that library')) : Promise.resolve(undefined),
+      );
+    const { service, repo } = makeService({ libraryService: { verifyUserAccess }, repo: { createPair: vi.fn() } });
+
+    await expect(service.submitPair({ ...pairDto, audiobook: { targetLibraryId: 9 } }, user())).rejects.toMatchObject({
+      response: expect.objectContaining({ errorCode: 'SUBMIT_LIBRARY_FORBIDDEN' }),
+    });
+    expect(repo.createPair).not.toHaveBeenCalled();
+    expect(repo.addSubscriber).not.toHaveBeenCalled();
+  });
+
+  it('counts both new self-serve halves against the cap in one go, and refuses when they would overrun it', async () => {
+    const { service, repo } = makeService({ repo: { createPair: vi.fn().mockResolvedValue(null) } });
+
+    await expect(
+      service.submitPair({ ...pairDto, selfServe: true }, user({ permissions: [Permission.BookRequestAccess, Permission.BookRequestSelfFulfill] })),
+    ).rejects.toMatchObject({ response: expect.objectContaining({ errorCode: 'SUBMIT_SELF_SERVE_LIMIT' }) });
+    expect(repo.createPair).toHaveBeenCalledWith(expect.any(Array), { userId: 1, maxLive: 10, newRows: 2 });
+  });
+
+  it('points the half still to come at the book the other half is already on the shelf as', async () => {
+    const findOwnedBookFor = vi.fn().mockImplementation((work: { mediaKind: string }) => Promise.resolve(work.mediaKind === 'ebook' ? 42 : null));
+    const { ebook, audiobook } = pairRows({ ebook: { status: 'available', matchedBookId: 42 } });
+    const { service, repo } = makeService({
+      dedupe: { findOwnedBookFor },
+      repo: {
+        createPair: vi.fn().mockResolvedValue([ebook, audiobook]),
+        findById: findByIdFor([ebook, audiobook]),
+        findBookPlacement: vi.fn().mockResolvedValue({
+          bookId: 42,
+          libraryId: 3,
+          libraryFolderId: 4,
+          folderPath: '/lib/Dune',
+          status: 'present',
+          organizationMode: 'book_per_folder',
+        }),
+      },
+    });
+
+    await service.submitPair(
+      pairDto,
+      user({ contentFilters: { includeTagIds: [], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [], exemptRequestsFromUserId: 1 } }),
+    );
+
+    const [entries] = repo.createPair.mock.calls[0] as [Array<{ data: Record<string, unknown> }>];
+    expect(entries[0]!.data).toMatchObject({ status: 'available', matchedBookId: 42, targetBookId: null });
+    expect(entries[1]!.data).toMatchObject({ status: 'pending', targetBookId: 42 });
+  });
+
+  it('leaves the half still to come alone when it is headed for a different library than the shelved half', async () => {
+    const findOwnedBookFor = vi.fn().mockImplementation((work: { mediaKind: string }) => Promise.resolve(work.mediaKind === 'ebook' ? 42 : null));
+    const { ebook, audiobook } = pairRows({ ebook: { status: 'available', matchedBookId: 42 } });
+    const { service, repo } = makeService({
+      dedupe: { findOwnedBookFor },
+      repo: {
+        createPair: vi.fn().mockResolvedValue([ebook, audiobook]),
+        findById: findByIdFor([ebook, audiobook]),
+        findBookPlacement: vi.fn().mockResolvedValue({
+          bookId: 42,
+          libraryId: 5,
+          libraryFolderId: 6,
+          folderPath: '/other/Dune',
+          status: 'present',
+          organizationMode: 'book_per_folder',
+        }),
+      },
+    });
+
+    await service.submitPair(
+      pairDto,
+      user({ contentFilters: { includeTagIds: [], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [], exemptRequestsFromUserId: 1 } }),
+    );
+
+    const [entries] = repo.createPair.mock.calls[0] as [Array<{ data: Record<string, unknown> }>];
+    expect(entries[1]!.data).toMatchObject({ targetBookId: null });
+  });
+
+  it('plans again after losing an insert race, and joins whichever half the winner claimed', async () => {
+    const violation = Object.assign(new Error('duplicate key'), { code: '23505' });
+    const winner = row({ id: 7, userId: 2, mediaKind: 'audiobook' });
+    const created = row({ id: 10, mediaKind: 'ebook' });
+    const findActiveRequestFor = vi
+      .fn()
+      // First plan: nothing claimed either half.
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      // Second plan: somebody claimed the audiobook in between.
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(winner);
+    const createPair = vi.fn().mockRejectedValueOnce(violation).mockResolvedValueOnce([created]);
+    const { service, repo } = makeService({
+      dedupe: { findActiveRequestFor },
+      repo: { createPair, linkCompanions: vi.fn().mockResolvedValue(true), findById: findByIdFor([winner, created]) },
+    });
+
+    const result = await service.submitPair(pairDto, user());
+
+    expect(createPair).toHaveBeenCalledTimes(2);
+    expect(repo.linkCompanions).toHaveBeenCalledWith(10, 7);
+    expect(result.audiobook.subscribed).toBe(true);
+  });
+});
+
+describe('BookRequestService.submit for a book that is missing a format', () => {
+  const folderBook = {
+    bookId: 42,
+    libraryId: 3,
+    libraryFolderId: 4,
+    folderPath: '/lib/Dune',
+    status: 'present',
+    organizationMode: 'book_per_folder',
+  };
+
+  it("pins the request to the book, landing it in the book's own library and folder", async () => {
+    const { service, repo } = makeService({
+      repo: { findBookPlacement: vi.fn().mockResolvedValue(folderBook), findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['ebook'])) },
+    });
+
+    await service.submit({ ...dto, mediaKind: 'audiobook', targetBookId: 42, targetLibraryId: 8 }, user({ isSuperuser: true }));
+
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ targetBookId: 42, targetLibraryId: 3, targetFolderId: 4 }), expect.any(Array));
+  });
+
+  it('files into a loose-file library the ordinary way, since a single file cannot hold a second format', async () => {
+    const { service, repo } = makeService({
+      repo: {
+        findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, organizationMode: 'book_per_file' }),
+        findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['ebook'])),
+      },
+    });
+
+    await service.submit({ ...dto, mediaKind: 'audiobook', targetBookId: 42, targetLibraryId: 8 }, user({ isSuperuser: true }));
+
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ targetBookId: null, targetLibraryId: 8 }), expect.any(Array));
+  });
+
+  it('refuses a book in a library the requester cannot reach as if it did not exist', async () => {
+    const { service, repo } = makeService({
+      repo: { findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, libraryId: 99 }), findBookMediaKinds: vi.fn() },
+    });
+
+    await expect(service.submit({ ...dto, mediaKind: 'audiobook', targetBookId: 42 }, user())).rejects.toMatchObject({
+      response: expect.objectContaining({ errorCode: 'SUBMIT_TARGET_BOOK_NOT_FOUND' }),
+    });
+    expect(repo.findBookMediaKinds).not.toHaveBeenCalled();
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a format the book already has', async () => {
+    const { service, repo } = makeService({
+      repo: { findBookPlacement: vi.fn().mockResolvedValue(folderBook), findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['ebook'])) },
+    });
+
+    await expect(service.submit({ ...dto, targetBookId: 42 }, user({ isSuperuser: true }))).rejects.toMatchObject({
+      response: expect.objectContaining({ errorCode: 'SUBMIT_TARGET_BOOK_HAS_MEDIUM', errorMeta: { mediaKind: 'ebook' } }),
+    });
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('points a request it joins at the book, when that request lands in the same library', async () => {
+    const existing = row({ id: 7, userId: 2, mediaKind: 'audiobook', targetLibraryId: 3 });
+    const { service, repo } = makeService({
+      dedupe: { findActiveRequestFor: vi.fn().mockResolvedValue(existing) },
+      repo: {
+        findBookPlacement: vi.fn().mockResolvedValue(folderBook),
+        findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['ebook'])),
+        setTargetBookIfUnset: vi.fn().mockResolvedValue(true),
+        findById: vi.fn().mockResolvedValue(joined({ id: 7, userId: 2, mediaKind: 'audiobook' })),
+      },
+    });
+
+    const result = await service.submit({ ...dto, mediaKind: 'audiobook', targetBookId: 42 }, user({ isSuperuser: true }));
+
+    expect(result.subscribed).toBe(true);
+    expect(repo.setTargetBookIfUnset).toHaveBeenCalledWith(7, 42);
+  });
+});
+
+describe('BookRequestService grouped lists', () => {
+  it("attaches each pair's folded-away half to the half that leads it, read in one batch", async () => {
+    const lead = { ...joined({ id: 10, mediaKind: 'ebook', companionRequestId: 11 }), visibleCompanionId: 11 };
+    const single = { ...joined({ id: 12 }), visibleCompanionId: null };
+    const { service, repo } = makeService({
+      repo: {
+        findAll: vi.fn().mockResolvedValue({ items: [lead, single], total: 2 }),
+        findByIds: vi.fn().mockResolvedValue([joined({ id: 11, mediaKind: 'audiobook', companionRequestId: 10 })]),
+      },
+    });
+
+    const page = await service.listMine({ groupPairs: true }, user());
+
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ groupPairs: true }));
+    expect(repo.findByIds).toHaveBeenCalledTimes(1);
+    expect(repo.findByIds).toHaveBeenCalledWith([11]);
+    expect(page.items[0]!.companion?.id).toBe(11);
+    expect(page.items[1]!.companion).toBeNull();
+  });
+
+  it('leaves the shape alone for a caller that did not ask to group', async () => {
+    const { service, repo } = makeService({
+      repo: { findAll: vi.fn().mockResolvedValue({ items: [{ ...joined({ id: 10 }), visibleCompanionId: null }], total: 1 }), findByIds: vi.fn() },
+    });
+
+    const page = await service.listMine({}, user());
+
+    expect(repo.findByIds).not.toHaveBeenCalled();
+    expect(page.items[0]).not.toHaveProperty('companion');
+  });
+});
+
+describe('BookRequestService.markFulfilled for one half of a pair', () => {
+  it('hands the book on to the companion so the other half lands beside it', async () => {
+    const { service, companions } = makeService({ companions: { handOn: vi.fn().mockResolvedValue(false) } });
+
+    await service.markFulfilled(10, { matchedBookId: 42 }, moderator());
+
+    expect(companions.handOn).toHaveBeenCalledWith(expect.objectContaining({ id: 10 }), 42);
   });
 });

@@ -11,6 +11,7 @@ import { useBookMetadataFetchActions } from '@/features/book-metadata-fetch/comp
 import { useBookMetadataFetchStatus } from '@/features/book-metadata-fetch/composables/useBookMetadataFetchStatus'
 import { invalidateEligibleCountPreviews, useEligibleCountPreview } from '@/features/book-metadata-fetch/composables/useEligibleCountPreview'
 import { useMediaQuery } from '@vueuse/core'
+import IgnoreCacheCheckbox from '@/features/metadata-cache/components/IgnoreCacheCheckbox.vue'
 
 const { t } = useI18n()
 const { saveGlobalConfig } = useBookMetadataFetchConfig()
@@ -24,6 +25,7 @@ const local = ref<BookMetadataFetchConfig>(JSON.parse(JSON.stringify(props.confi
 const saving = ref(false)
 const triggering = ref(false)
 const triggerResult = ref<string | null>(null)
+const ignoreCache = ref(false)
 const isMobile = useMediaQuery('(max-width: 767px)')
 const conditionsOpen = ref(true)
 
@@ -97,7 +99,7 @@ async function handleTrigger() {
   triggering.value = true
   triggerResult.value = null
   try {
-    const { queued } = await triggerGlobal()
+    const { queued } = await triggerGlobal({ ignoreCache: ignoreCache.value })
     triggerResult.value =
       queued > 0 ? t('settings.metadata.autoFetch.trigger.queued', { count: queued }) : t('settings.metadata.autoFetch.trigger.noneFound')
     invalidateEligibleCountPreviews()
@@ -155,6 +157,10 @@ function toggleConditions() {
         {{ activeConditionSummary }}
       </p>
       <ConditionConfigurator v-if="conditionsOpen" v-model="local.conditions" />
+    </div>
+
+    <div class="px-4 py-3 md:px-5 bg-card">
+      <IgnoreCacheCheckbox v-model="ignoreCache" :disabled="triggering" :hint="t('metadataCache.ignoreCache.runHint')" />
     </div>
 
     <div class="md:hidden sticky bottom-2 z-10 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">

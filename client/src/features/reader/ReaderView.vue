@@ -244,6 +244,7 @@ function handleTranslate() {
 }
 
 const bookMeta = ref<BookDetail | null>(null)
+const initialNavigationPending = ref(true)
 
 const {
   foliateReady,
@@ -267,7 +268,10 @@ let mediaOverlayStartId = 0
 const isMediaOverlayAvailable = computed(() => isTtsAvailable && hasMediaOverlay.value)
 const isTtsActive = computed(() => isActive.value && currentBook.value?.bookFileId === fileId)
 const isNavigationLocked = computed(
-  () => (isTtsActive.value && playbackState.value === 'playing') || (mediaOverlay.isActive.value && mediaOverlay.isPlaying.value),
+  () =>
+    initialNavigationPending.value ||
+    (isTtsActive.value && playbackState.value === 'playing') ||
+    (mediaOverlay.isActive.value && mediaOverlay.isPlaying.value),
 )
 
 useTtsKeyboard(() => mediaOverlay.isActive.value, {
@@ -281,28 +285,15 @@ const isOverlayFooterVisible = computed(() => footerVisible.value && !showTapZon
 const showTtsResumePrompt = ref(false)
 const clearingSavedTtsPosition = ref(false)
 const pendingTtsChapterNavigation = ref<number | null>(null)
-const isTtsRelocating = ref(false)
 const lastNavigationBlockedToastAt = ref(0)
-let initialOpenCompleted = false
-let pendingManualNavigationClearsMediaOverlay = false
-let pendingManualNavigationClearTimer: ReturnType<typeof setTimeout> | null = null
 let mediaOverlayPlaylistPromise: Promise<EpubMediaOverlayPlaylist | null> | null = null
+// A paused narration can still finish loading its page. Keep its relocations separate from
+// reading progress until the reader explicitly navigates, rather than relying on playback state.
+let relocationSource: 'text' | 'narration' = 'text'
 
-function withTtsRelocation(fn: () => void | Promise<void>) {
-  isTtsRelocating.value = true
-  const res = fn()
-  if (res instanceof Promise) {
-    void res.finally(() => {
-      setTimeout(() => {
-        isTtsRelocating.value = false
-      }, 150)
-    })
-  } else {
-    setTimeout(() => {
-      isTtsRelocating.value = false
-    }, 150)
-  }
-}
+watch(mediaOverlay.isPlaying, (playing) => {
+  if (playing) relocationSource = 'narration'
+})
 
 function ensureTtsAvailable(): boolean {
   if (isTtsAvailable) return true
@@ -385,9 +376,7 @@ watch([isTtsActive, foliateReady, sectionIndex], () => {
     pendingTtsChapterNavigation.value = null
     return
   }
-  withTtsRelocation(() => {
-    syncFoliateHighlightToCurrentBlock()
-  })
+  syncFoliateHighlightToCurrentBlock()
 })
 
 watch([foliateReady, isTtsActive, sectionIndex, () => ttsPosition.savedPosition.value?.cfi], ([ready, active, , savedCfi], previous) => {
@@ -400,24 +389,22 @@ watch([foliateReady, isTtsActive, sectionIndex, () => ttsPosition.savedPosition.
 })
 
 // Keep the Foliate overlay in lockstep with TTS block changes.
-watch([currentChapterIndex, currentBlockIndex], ([chapterIdx]) => {
+watch([currentChapterIndex, currentBlockIndex], async ([chapterIdx]) => {
   if (!isTtsActive.value || !foliateReady.value) return
 
-  withTtsRelocation(async () => {
-    // Keep the visual reader chapter aligned with the TTS chapter before
-    // highlighting; otherwise chapter rollover can jump backwards. The highlight
-    // for the new chapter is applied by the foliateReady/sectionIndex watcher
-    // once navigation settles and the new document's block ranges are ready.
-    if (sectionIndex.value !== chapterIdx) {
-      if (pendingTtsChapterNavigation.value !== chapterIdx) {
-        pendingTtsChapterNavigation.value = chapterIdx
-        await goToSection(chapterIdx)
-      }
-      return
+  // Keep the visual reader chapter aligned with the TTS chapter before
+  // highlighting; otherwise chapter rollover can jump backwards. The highlight
+  // for the new chapter is applied by the foliateReady/sectionIndex watcher
+  // once navigation settles and the new document's block ranges are ready.
+  if (sectionIndex.value !== chapterIdx) {
+    if (pendingTtsChapterNavigation.value !== chapterIdx) {
+      pendingTtsChapterNavigation.value = chapterIdx
+      await goToSection(chapterIdx)
     }
-    pendingTtsChapterNavigation.value = null
-    syncFoliateHighlightToCurrentBlock()
-  })
+    return
+  }
+  pendingTtsChapterNavigation.value = null
+  syncFoliateHighlightToCurrentBlock()
 })
 
 /**
@@ -579,14 +566,12 @@ async function resolveSavedNarrationPos(): Promise<MediaOverlayResumePosition | 
 }
 
 // Persist the exact narrated sentence so playback can resume there after reload.
-watch(
-  () => mediaOverlay.currentFragment.value,
-  (fragment) => {
-    if (!mediaOverlay.isActive.value || !fragment) return
-    saveNarrationPos(sectionIndex.value, fragment)
-    progress.setMediaOverlayProgress(fragment, sectionIndex.value)
-  },
-)
+watch([mediaOverlay.currentFragment, mediaOverlay.currentSectionIndex], ([fragment, narratedSection]) => {
+  if (!mediaOverlay.isActive.value || !fragment || narratedSection === null) return
+  relocationSource = 'narration'
+  saveNarrationPos(narratedSection, fragment)
+  progress.setMediaOverlayProgress(fragment, narratedSection)
+})
 
 // When narration is stopped (mini player closed), foliate clears its highlight.
 // Re-mark the last sentence so the resume point stays visible.
@@ -611,6 +596,8 @@ async function beginNarration(sectionIdx: number, matches: ((item: { text: strin
   if (!book) return
 
   clearResumeNarrationHighlight()
+
+  relocationSource = 'narration'
 
   await mediaOverlay.start(
     mo,
@@ -746,15 +733,7 @@ async function handlePlayFromCurrentPage() {
 }
 
 function onRelocateHandler(detail: RelocateDetail) {
-  progress.onRelocate(detail)
-  if (initialOpenCompleted && !mediaOverlay.isActive.value && !isTtsRelocating.value && pendingManualNavigationClearsMediaOverlay) {
-    progress.clearMediaOverlayProgress()
-    pendingManualNavigationClearsMediaOverlay = false
-    if (pendingManualNavigationClearTimer) {
-      clearTimeout(pendingManualNavigationClearTimer)
-      pendingManualNavigationClearTimer = null
-    }
-  }
+  progress.onRelocate(detail, relocationSource)
   onActivity()
   bookmarks.setCfi(detail?.cfi ?? null)
   toc.setActiveHref(detail?.tocItem?.href ?? '')
@@ -775,8 +754,10 @@ function onMiddleTapHandler() {
 }
 
 function canRunManualNavigation(): boolean {
+  if (initialNavigationPending.value) return false
+
   if (!isNavigationLocked.value) {
-    markManualNavigation()
+    relocationSource = 'text'
     return true
   }
 
@@ -787,15 +768,6 @@ function canRunManualNavigation(): boolean {
   }
 
   return false
-}
-
-function markManualNavigation() {
-  pendingManualNavigationClearsMediaOverlay = true
-  if (pendingManualNavigationClearTimer) clearTimeout(pendingManualNavigationClearTimer)
-  pendingManualNavigationClearTimer = setTimeout(() => {
-    pendingManualNavigationClearsMediaOverlay = false
-    pendingManualNavigationClearTimer = null
-  }, 2_500)
 }
 
 function handleBlockedPageInteraction() {
@@ -899,9 +871,7 @@ onMounted(async () => {
     fixedLayoutSpread: state.value.fixedLayoutSpread,
     mediaOverlayFragment: savedNarration?.fragment,
     mediaOverlaySectionIndex: savedNarration?.section,
-    preferMediaOverlay: savedNarration != null,
   })
-  initialOpenCompleted = true
   setChapters(getChapters())
   sectionFractions.value = getSectionFractions()
   await bookmarks.load(bookId)
@@ -925,6 +895,8 @@ onMounted(async () => {
       toast.error(t('reader.toast.linkedHighlightError'))
     }
   }
+
+  initialNavigationPending.value = error.value !== null
 
   const resumedPercentage = resumeTarget.checkpointPercentage ?? (hadProgress ? progress.percentage.value : null)
   if (resumedPercentage !== null) {
@@ -1227,7 +1199,6 @@ watch(
 
 onUnmounted(() => {
   mediaOverlayStartId++
-  if (pendingManualNavigationClearTimer) clearTimeout(pendingManualNavigationClearTimer)
   setReaderFooterVisible(false)
   mediaOverlay.stop()
 })

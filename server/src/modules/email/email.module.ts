@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 
+import { UserModule } from '../user/user.module';
 import { BookModule } from '../book/book.module';
 import { LibraryModule } from '../library/library.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -34,7 +35,7 @@ import { EmailTransportService } from './email-transport.service';
 import { SystemMailService } from './system-mail.service';
 
 @Module({
-  imports: [forwardRef(() => BookModule), forwardRef(() => LibraryModule), forwardRef(() => NotificationModule)],
+  imports: [UserModule, forwardRef(() => BookModule), forwardRef(() => LibraryModule), forwardRef(() => NotificationModule)],
   controllers: [
     EmailProviderController,
     EmailRecipientController,

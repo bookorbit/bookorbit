@@ -2,6 +2,8 @@ import { createHash } from 'crypto';
 
 import type { MetadataCandidate } from '@bookorbit/types';
 
+import { recordAuxiliaryProviderRequest } from '../../../../common/provider-cache/provider-call-context';
+
 import { GOOGLE_BOOKS_PLACEHOLDER_HASHES, GOOGLE_BOOKS_PLACEHOLDER_LENGTHS } from '../../../../common/utils/placeholder-cover.utils';
 import { buildRequestSignal } from '../provider-utils';
 
@@ -49,6 +51,8 @@ export class GoogleCoverValidator {
         const job = jobs[cursor++];
         if (!job?.candidate.coverUrl) continue;
         const usable = await this.isUsable(job.candidate.coverUrl, signal);
+        // An indefinite check leaves the cover in place, so the answer is not known to be validated.
+        recordAuxiliaryProviderRequest(usable !== null);
         if (usable === false) output[job.index] = { ...job.candidate, coverUrl: undefined };
       }
     });

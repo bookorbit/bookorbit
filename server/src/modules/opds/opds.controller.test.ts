@@ -144,6 +144,7 @@ describe('OpdsController', () => {
       100,
       expect.stringContaining('/api/v1/opds/catalog?'),
       'token',
+      user,
     );
   });
 
@@ -161,6 +162,7 @@ describe('OpdsController', () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
+      user,
     );
 
     const libraryOnly = makeController();
@@ -174,6 +176,7 @@ describe('OpdsController', () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
+      user,
     );
 
     const searchOnly = makeController();
@@ -187,6 +190,7 @@ describe('OpdsController', () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
+      user,
     );
 
     const multiFilter = makeController();
@@ -200,6 +204,7 @@ describe('OpdsController', () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
+      user,
     );
   });
 
@@ -234,6 +239,7 @@ describe('OpdsController', () => {
       25,
       '/api/v1/opds/surprise',
       'cover-token',
+      user,
     );
   });
 

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
+import { markProviderDegraded, markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
@@ -8,6 +10,7 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { providerCacheContext, requestedMax } from '../provider-cache';
 import { buildRequestSignal, normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import {
   buildLubimyczytacBookUrl,
@@ -30,6 +33,10 @@ type FetchContext = {
   providerId?: string;
 };
 
+function searchPhrase(params: MetadataSearchParams): string | undefined {
+  return params.title?.trim() || params.isbn?.trim();
+}
+
 @Injectable()
 export class LubimyczytacProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.LUBIMYCZYTAC;
@@ -39,6 +46,18 @@ export class LubimyczytacProvider implements IdentifiableProvider {
   readonly timeoutMs = PROVIDER_TIMEOUT_MS.SCRAPE;
 
   private readonly logger = new Logger(LubimyczytacProvider.name);
+
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: false,
+    context: async () => providerCacheContext((await this.providerConfig.getConfig()).lubimyczytac.enabled),
+    // The phrase is the title, or the ISBN only without one; the author always narrows it.
+    describeSearch: (params) => ({
+      inputs: { query: searchPhrase(params), author: params.author },
+      maxCandidates: requestedMax(params),
+    }),
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
 
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
@@ -52,12 +71,16 @@ export class LubimyczytacProvider implements IdentifiableProvider {
     const results: MetadataCandidate[] = [];
     try {
       for (const link of links.slice(0, maxCandidates)) {
-        if (params.signal?.aborted) break;
+        if (params.signal?.aborted) {
+          markProviderDegraded('lubimyczytac.search: aborted before every book loaded');
+          break;
+        }
         if (results.length > 0) {
           await sleep(PROVIDER_DELAYS_MS.LUBIMYCZYTAC_BETWEEN_REQUESTS, params.signal);
         }
         const candidate = await this.fetchByUrl(link.url, link.providerId, params.signal);
         if (candidate) results.push(candidate);
+        else markProviderDegraded('lubimyczytac.search: book skipped');
       }
     } catch (err) {
       rethrowWithPartialCandidates(err, results);
@@ -75,7 +98,7 @@ export class LubimyczytacProvider implements IdentifiableProvider {
   }
 
   private async searchBookLinks(params: MetadataSearchParams, limit: number, signal?: AbortSignal): Promise<LubimyczytacSearchResultLink[]> {
-    const query = params.title?.trim() || params.isbn?.trim();
+    const query = searchPhrase(params);
     if (!query) return [];
 
     const url = buildLubimyczytacSearchUrl(query, params.author);
@@ -89,7 +112,10 @@ export class LubimyczytacProvider implements IdentifiableProvider {
 
     const data = parseLubimyczytacBookPage(html, url);
     const providerId = data.providerId || extractLubimyczytacPath(url) || fallbackProviderId;
-    if (!data.title || !providerId) return null;
+    if (!data.title || !providerId) {
+      markProviderDegraded('lubimyczytac.lookup: book page did not parse');
+      return null;
+    }
 
     return {
       provider: MetadataProviderKey.LUBIMYCZYTAC,
@@ -139,6 +165,7 @@ export class LubimyczytacProvider implements IdentifiableProvider {
         );
         throw error;
       }
+      markProviderFailed(`lubimyczytac.${context.op}: request failed`);
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
       this.logger.warn(

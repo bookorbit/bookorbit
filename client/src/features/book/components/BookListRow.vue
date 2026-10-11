@@ -305,7 +305,7 @@ function handleRowClick(event: MouseEvent) {
     <div
       v-if="selectionMode"
       data-testid="book-selection-checkbox"
-      class="h-5 w-5 rounded shrink-0 flex items-center justify-center transition-colors"
+      class="h-5 w-5 rounded-xs shrink-0 flex items-center justify-center transition-colors"
       :class="selected ? 'bg-primary' : 'border border-border bg-background'"
     >
       <Check v-if="selected" class="text-primary-foreground" :size="12" />
@@ -314,7 +314,7 @@ function handleRowClick(event: MouseEvent) {
     <!-- Cover -->
     <BookCoverSurface
       size="mini"
-      class="book-cover-surface--spine-fitted w-16 rounded shrink-0 overflow-hidden relative"
+      class="book-cover-surface--spine-fitted w-16 rounded-xs shrink-0 overflow-hidden relative"
       :disable-spine="isAudiobook"
       :is-comic="isComic"
       :class="isMissing ? 'opacity-50 grayscale' : ''"
@@ -373,7 +373,7 @@ function handleRowClick(event: MouseEvent) {
       <div class="flex items-center gap-1">
         <span
           v-if="isMissing"
-          class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
+          class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-xs bg-amber-500/15 text-amber-600 dark:text-amber-400"
         >
           <TriangleAlert class="size-3 shrink-0" />
           <span class="hidden sm:inline">{{ t('book.card.missing') }}</span>
@@ -382,7 +382,7 @@ function handleRowClick(event: MouseEvent) {
           <Tooltip v-for="entry in formatEntries" :key="entry.key">
             <TooltipTrigger as-child>
               <button
-                class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-xs"
                 :class="formatButtonClasses(entry)"
                 :style="formatButtonStyle(entry)"
                 :aria-label="formatButtonTooltip(entry)"
@@ -399,7 +399,7 @@ function handleRowClick(event: MouseEvent) {
 
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <button class="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+          <button class="p-1 rounded-xs hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
             <MoreHorizontal class="size-4" />
           </button>
         </DropdownMenuTrigger>

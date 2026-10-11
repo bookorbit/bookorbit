@@ -1,6 +1,6 @@
 import {
-  normalizeCoverAspectRatio,
   type AnnotationPositionStatus,
+  type CoverAspectRatio,
   type NotebookBookLabel,
   type NotebookBookmarkItem,
   type NotebookHighlightEntry,
@@ -60,8 +60,6 @@ export interface NotebookLabelRow {
   title: string | null;
   author: string | null;
   coverSource: string | null;
-  coverAspectRatio: string;
-  updatedAt: Date;
   readFileId: number | null;
   readFileFormat: string | null;
   hasAudio: boolean;
@@ -147,15 +145,18 @@ export function toNotebookReview(row: NotebookReviewRow): NotebookReviewItem {
   };
 }
 
-/** `coverVersion` is computed by the cover store, exactly as it is for a library book card. */
-export function toNotebookBookLabel(row: NotebookLabelRow, coverVersion: string): NotebookBookLabel {
+/** The face is computed by the cover store, exactly as it is for a library book card. */
+export function toNotebookBookLabel(
+  row: NotebookLabelRow,
+  face: { coverVersion: string; coverAspectRatio: CoverAspectRatio } | undefined,
+): NotebookBookLabel {
   return {
     id: row.id,
     title: row.title ?? null,
     author: row.author ?? null,
     hasCover: row.coverSource != null,
-    coverVersion,
-    coverAspectRatio: normalizeCoverAspectRatio(row.coverAspectRatio),
+    coverVersion: face?.coverVersion ?? null,
+    coverAspectRatio: face?.coverAspectRatio ?? '2/3',
     readFileId: row.readFileId ?? null,
     readFileFormat: row.readFileFormat ? row.readFileFormat.toLowerCase() : null,
     hasAudio: row.hasAudio === true,

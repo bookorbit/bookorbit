@@ -190,7 +190,7 @@ async function handleCopy() {
           <button
             v-for="s in styles"
             :key="s.id"
-            class="h-6 w-6 rounded border text-xs font-bold transition-colors"
+            class="h-6 w-6 rounded-xs border text-xs font-bold transition-colors"
             :class="
               selectedStyle === s.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:bg-muted'
             "
@@ -202,7 +202,7 @@ async function handleCopy() {
             {{ s.label }}
           </button>
           <button
-            class="ml-1 flex-1 rounded bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            class="ml-1 flex-1 rounded-xs bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             :disabled="props.disabled"
             @click="handleApply"
           >

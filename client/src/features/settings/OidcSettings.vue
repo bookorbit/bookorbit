@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
-import { generatePkce } from '@/features/auth/composables/useOidc'
+import { generateNonce, generatePkce } from '@/features/auth/composables/useOidc'
 import { toast } from 'vue-sonner'
 import { OidcErrorCode, Permission, PERMISSION_LABELS } from '@bookorbit/types'
 import { ArrowLeft, Plus, ShieldCheck, Trash2 } from '@lucide/vue'
@@ -314,7 +314,7 @@ async function previewOidcClaims() {
     const stateRes = await api(`/api/v1/auth/oidc/${editingSlug.value}/preview-state`, { method: 'POST' })
     if (!stateRes.ok) throw new Error(t('settings.oidc.errors.previewState'))
     const { state, authorizationEndpoint } = await stateRes.json()
-    const nonce = crypto.randomUUID()
+    const nonce = generateNonce()
     const { codeVerifier, codeChallenge } = await generatePkce()
 
     const params = new URLSearchParams({
@@ -561,7 +561,7 @@ async function deleteGroupMapping(id: number) {
                 v-if="form.iconUrl"
                 :src="form.iconUrl"
                 :alt="t('settings.oidc.form.iconPreviewAlt')"
-                class="h-5 w-5 shrink-0 rounded object-contain"
+                class="h-5 w-5 shrink-0 rounded-xs object-contain"
               />
               <input v-model="form.iconUrl" type="url" placeholder="https://example.com/logo.svg" class="input-field min-w-0 flex-1" />
             </div>
@@ -683,13 +683,13 @@ async function deleteGroupMapping(id: number) {
           <p class="font-medium text-foreground mb-1.5">
             {{ t('settings.oidc.form.mappedClaims') }}
           </p>
-          <pre class="text-muted-foreground overflow-auto rounded bg-muted/40 p-2 text-[11px]">{{
+          <pre class="text-muted-foreground overflow-auto rounded-xs bg-muted/40 p-2 text-[11px]">{{
             JSON.stringify(previewClaims.mapped, null, 2)
           }}</pre>
           <p class="mt-2 font-medium text-foreground mb-1.5">
             {{ t('settings.oidc.form.rawClaims') }}
           </p>
-          <pre class="text-muted-foreground overflow-auto rounded bg-muted/40 p-2 text-[11px] max-h-40">{{
+          <pre class="text-muted-foreground overflow-auto rounded-xs bg-muted/40 p-2 text-[11px] max-h-40">{{
             JSON.stringify(previewClaims.raw, null, 2)
           }}</pre>
         </div>
@@ -763,7 +763,7 @@ async function deleteGroupMapping(id: number) {
                 <input
                   type="checkbox"
                   :checked="defaultPermissionSet.has(perm)"
-                  class="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                  class="h-4 w-4 rounded-xs border-input accent-primary cursor-pointer"
                   @change="toggleDefaultPermission(perm)"
                 />
                 <span class="text-sm text-foreground">{{ PERMISSION_LABELS[perm] }}</span>

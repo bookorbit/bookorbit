@@ -163,11 +163,11 @@ function onUpload() {
   <div ref="listEl" class="book-dock-list" tabindex="-1" @keydown="onKeydown">
     <div v-if="!props.initialized && props.loading && !props.items.length" data-test="book-dock-loading-skeleton" class="divide-y divide-border">
       <div v-for="n in 6" :key="n" class="flex animate-pulse items-center gap-3 px-3 py-2.5">
-        <div class="size-4 rounded bg-muted" />
-        <div class="h-[57px] w-[38px] shrink-0 rounded bg-muted" />
+        <div class="size-4 rounded-xs bg-muted" />
+        <div class="h-[57px] w-[38px] shrink-0 rounded-xs bg-muted" />
         <div class="flex-1 space-y-1.5">
-          <div class="h-3 w-3/5 rounded bg-muted" />
-          <div class="h-2.5 w-2/5 rounded bg-muted" />
+          <div class="h-3 w-3/5 rounded-xs bg-muted" />
+          <div class="h-2.5 w-2/5 rounded-xs bg-muted" />
         </div>
         <div class="h-7 w-24 rounded-lg bg-muted" />
       </div>

@@ -7,6 +7,7 @@ import type {
   CustomMetadataBookValue,
   ComicMetadataFields,
   BookCoverSlot,
+  CoverAspectRatio,
   CoverMedium,
   NarratorRef,
   ProviderIds,
@@ -16,6 +17,8 @@ import type {
 } from '@bookorbit/types';
 
 export class BookFileDto {
+  fileHash?: string | null;
+  contentVersion?: string;
   id: number;
   format: string | null;
   role: string;
@@ -63,6 +66,8 @@ export class BookDetailDto {
   coverSource: 'extracted' | 'custom' | null;
   coverMedia: CoverMedium[];
   covers: Record<CoverMedium, BookCoverSlot | null>;
+  /** The frame of the cover the book shows by default: square when that is its audiobook art. */
+  coverAspectRatio: CoverAspectRatio;
   coverVersion: string;
   hardcoverEditionId: string | null;
   providerIds: ProviderIds;

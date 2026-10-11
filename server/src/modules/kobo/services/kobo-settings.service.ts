@@ -15,6 +15,7 @@ export interface KoboSettings {
   kepubConversionLimitMb: number;
   twoWayProgressSync: boolean;
   syncBookOrbitAnnotationsToKobo: boolean;
+  readAloudDelivery?: 'original' | 'audioless_epub' | null;
   storeSync: boolean;
 }
 
@@ -51,6 +52,7 @@ export class KoboSettingsService {
       kepubConversionLimitMb: row.kepubConversionLimitMb,
       twoWayProgressSync: row.twoWayProgressSync,
       syncBookOrbitAnnotationsToKobo: row.syncBookOrbitAnnotationsToKobo,
+      readAloudDelivery: row.readAloudDelivery,
       storeSync: row.storeSync,
     };
   }
@@ -78,6 +80,7 @@ export class KoboSettingsService {
         kepubConversionLimitMb: patch.kepubConversionLimitMb ?? current.kepubConversionLimitMb,
         twoWayProgressSync: newTwoWayProgressSync,
         syncBookOrbitAnnotationsToKobo: newAnnotationSync,
+        readAloudDelivery: patch.readAloudDelivery === undefined ? current.readAloudDelivery : patch.readAloudDelivery,
         storeSync: patch.storeSync ?? current.storeSync,
         updatedAt: sql`now()`,
       })
@@ -100,6 +103,7 @@ export class KoboSettingsService {
       kepubConversionLimitMb: updated.kepubConversionLimitMb,
       twoWayProgressSync: updated.twoWayProgressSync,
       syncBookOrbitAnnotationsToKobo: updated.syncBookOrbitAnnotationsToKobo,
+      readAloudDelivery: updated.readAloudDelivery,
       storeSync: updated.storeSync,
     };
   }

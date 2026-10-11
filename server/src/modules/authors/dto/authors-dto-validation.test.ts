@@ -1,10 +1,13 @@
 import 'reflect-metadata';
 
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AuthorMetadataProviderKey } from '@bookorbit/types';
 
+import { AuthorEnrichmentBackfillDto } from './author-enrichment-backfill.dto';
 import { BulkAuthorIdsDto } from './bulk-author-ids.dto';
+import { BulkRefreshAuthorsMetadataDto } from './bulk-refresh-authors-metadata.dto';
 import { DeleteAuthorsDto } from './delete-authors.dto';
 import { ListAuthorBooksDto } from './list-author-books.dto';
 import { ListAuthorMetadataDto } from './list-author-metadata.dto';
@@ -128,5 +131,43 @@ describe('Authors DTO validation', () => {
 
     expect((await errorsFor(PreviewAuthorEnrichmentCountDto, {})).length).toBeGreaterThan(0);
     expect((await errorsFor(PreviewAuthorEnrichmentCountDto, { conditions: { neverEnriched: 'true' } })).length).toBeGreaterThan(0);
+  });
+
+  describe('metadata cache options', () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    const body = <T>(metatype: new () => T, value: unknown) => pipe.transform(value, { type: 'body', metatype }) as Promise<T>;
+    const query = <T>(metatype: new () => T, value: unknown) => pipe.transform(value, { type: 'query', metatype }) as Promise<T>;
+
+    it('accepts an optional cache policy on metadata search and lookup queries', async () => {
+      expect((await query(ListAuthorMetadataDto, { q: 'Jane' })).cache).toBeUndefined();
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'refresh' })).resolves.toMatchObject({ cache: 'refresh' });
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'default' })).resolves.toMatchObject({ cache: 'default' });
+      await expect(query(LookupAuthorMetadataDto, { provider: 'audnexus', id: 'A1', cache: 'refresh' })).resolves.toMatchObject({ cache: 'refresh' });
+    });
+
+    it('rejects cache policies a client may not choose', async () => {
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'bypass' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'only-if-cached' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(query(LookupAuthorMetadataDto, { provider: 'audnexus', id: 'A1', cache: 'live' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('accepts an optional ignoreCache flag on the bulk refresh body', async () => {
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [1, 2] })).resolves.toMatchObject({ authorIds: [1, 2] });
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [1], ignoreCache: true })).resolves.toMatchObject({ ignoreCache: true });
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [1], ignoreCache: 'yes' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [] })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('keeps rejecting ignoreCache on other bulk author bodies', async () => {
+      await expect(body(BulkAuthorIdsDto, { authorIds: [1], ignoreCache: true })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('accepts an absent, empty or flagged backfill body', async () => {
+      await expect(body(AuthorEnrichmentBackfillDto, undefined)).resolves.toBeInstanceOf(AuthorEnrichmentBackfillDto);
+      expect((await body(AuthorEnrichmentBackfillDto, {})).ignoreCache).toBeUndefined();
+      await expect(body(AuthorEnrichmentBackfillDto, { ignoreCache: true })).resolves.toMatchObject({ ignoreCache: true });
+      await expect(body(AuthorEnrichmentBackfillDto, { ignoreCache: 1 })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(body(AuthorEnrichmentBackfillDto, { force: true })).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

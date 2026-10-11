@@ -206,6 +206,18 @@
   {
     "file": "server/src/modules/book-request/book-request.controller.ts",
     "className": "BookRequestController",
+    "methodName": "submitPair",
+    "httpMethod": "POST",
+    "path": "/book-requests/pairs",
+    "permissions": ["Permission.BookRequestAccess"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-request/book-request.controller.ts",
+    "className": "BookRequestController",
     "methodName": "listMine",
     "httpMethod": "GET",
     "path": "/book-requests",

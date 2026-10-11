@@ -5,12 +5,13 @@ import { NotificationType, Permission } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { METADATA_AUTHORS_REPLACED, MetadataAuthorsReplacedEvent, MetadataEventsService } from '../metadata/metadata-events.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { backgroundEnrichmentCacheDirective, CACHE_ONLY_ITEM_YIELD_MS } from './author-cache-directives';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorMetadataPreferencesService } from './author-metadata-preferences.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 import { AUTHOR_ENRICHMENT_REASONS, AuthorEnrichmentReason } from './author-enrichment-reasons';
-import { AuthorEnrichmentRepository } from './author-enrichment.repository';
+import { AuthorEnrichmentEnqueueOptions, AuthorEnrichmentRepository } from './author-enrichment.repository';
 import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
 
 const POLL_INTERVAL_MS = 4_000;
@@ -95,10 +96,10 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     return queued;
   }
 
-  async backfillLinkedAuthors(): Promise<number> {
+  async backfillLinkedAuthors(options: AuthorEnrichmentEnqueueOptions = {}): Promise<number> {
     const config = await this.enrichmentConfig.getConfig();
     await this.finalizeCompletedSession();
-    const queued = await this.queueRepo.enqueueEligibleLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, config.conditions);
+    const queued = await this.queueRepo.enqueueEligibleLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, config.conditions, options);
     if (queued > 0) {
       this.session.addToTotal(queued);
       await this.unpauseIfNeeded();
@@ -108,9 +109,9 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     return queued;
   }
 
-  async backfillAllLinkedAuthors(): Promise<number> {
+  async backfillAllLinkedAuthors(options: AuthorEnrichmentEnqueueOptions = {}): Promise<number> {
     await this.finalizeCompletedSession();
-    const queued = await this.queueRepo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL);
+    const queued = await this.queueRepo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, options);
     if (queued > 0) {
       this.session.addToTotal(queued);
       await this.unpauseIfNeeded();
@@ -167,8 +168,14 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
       const dueRows = await this.queueRepo.fetchDue(BATCH_SIZE);
       for (const row of dueRows) {
-        await this.processOne(row.authorId, row.attemptCount, row.authorName, row.reason as AuthorEnrichmentReason);
-        await this.randomDelay();
+        const outboundRequests = await this.processOne(
+          row.authorId,
+          row.attemptCount,
+          row.authorName,
+          row.reason as AuthorEnrichmentReason,
+          row.ignoreCache,
+        );
+        await (outboundRequests === 0 ? this.cacheOnlyYield() : this.randomDelay());
       }
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
@@ -219,14 +226,16 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
       .catch(() => {});
   }
 
+  /** Returns the outbound requests the item made, so the poll loop can skip pacing for cache-only work. */
   private async processOne(
     authorId: number,
     previousAttemptCount: number,
     authorName: string | null = null,
     reason: AuthorEnrichmentReason = AUTHOR_ENRICHMENT_REASONS.UNKNOWN,
-  ): Promise<void> {
+    ignoreCache = false,
+  ): Promise<number> {
     const claimed = await this.queueRepo.markProcessing(authorId);
-    if (!claimed) return;
+    if (!claimed) return 0;
     const trackSession = reason !== AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE;
     if (trackSession) {
       this.session.setCurrentItemName(authorName);
@@ -235,11 +244,14 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
     const preferences = await this.metadataPreferences.getPreferences();
 
-    const result = await this.executor.execute({ authorId, preferences });
+    const attemptNumber = previousAttemptCount + 1;
+    const directive = backgroundEnrichmentCacheDirective(ignoreCache, attemptNumber >= MAX_ATTEMPTS);
+    const result = await this.executor.execute({ authorId, preferences }, directive);
+    const outboundRequests = result.outboundRequests;
 
     if (result.kind === 'done') {
       this.logger.debug(
-        `[author.enrichment.process] [end] authorId=${authorId} outcome=done provider=${result.provider ?? 'none'} descriptionUpdated=${result.descriptionUpdated} imageUpdated=${result.imageUpdated} - author enrichment processed`,
+        `[author.enrichment.process] [end] authorId=${authorId} ignoreCache=${ignoreCache} outcome=done provider=${result.provider ?? 'none'} descriptionUpdated=${result.descriptionUpdated} imageUpdated=${result.imageUpdated} outboundRequests=${outboundRequests} - author enrichment processed`,
       );
       await this.queueRepo.markDone(authorId, result.imageUpdated);
       if (trackSession) {
@@ -247,12 +259,12 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
         this.session.setCurrentItemName(null);
         await this.emitStatusSnapshot();
       }
-      return;
+      return outboundRequests;
     }
 
     if (result.kind === 'skipped') {
       this.logger.debug(
-        `[author.enrichment.process] [end] authorId=${authorId} outcome=skipped reason=${result.reason} - author enrichment processed`,
+        `[author.enrichment.process] [end] authorId=${authorId} ignoreCache=${ignoreCache} outcome=skipped reason=${result.reason} outboundRequests=${outboundRequests} - author enrichment processed`,
       );
       await this.queueRepo.markDone(authorId, false);
       if (trackSession) {
@@ -260,10 +272,9 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
         this.session.setCurrentItemName(null);
         await this.emitStatusSnapshot();
       }
-      return;
+      return outboundRequests;
     }
 
-    const attemptNumber = previousAttemptCount + 1;
     const finalFailure = attemptNumber >= MAX_ATTEMPTS || !result.transient;
     const nextAttemptAt = finalFailure ? null : this.computeNextAttemptAt(attemptNumber, result.retryAfterMs);
 
@@ -289,6 +300,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
       this.session.setCurrentItemName(null);
       await this.emitStatusSnapshot();
     }
+    return outboundRequests;
   }
 
   private computeNextAttemptAt(attemptNumber: number, retryAfterMs: number | null): Date {
@@ -305,6 +317,10 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   private randomDelay(): Promise<void> {
     const ms = 1_000 + Math.random() * 2_000;
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private cacheOnlyYield(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, CACHE_ONLY_ITEM_YIELD_MS));
   }
 
   private async emitStatusSnapshot(): Promise<void> {

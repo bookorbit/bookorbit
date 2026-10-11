@@ -251,7 +251,7 @@ function handleLoadMore() {
     </header>
 
     <div v-if="sessions.length === 0 && loading" class="flex flex-1 flex-col gap-2 px-3 py-3" aria-hidden="true">
-      <div v-for="row in 6" :key="row" class="h-4 rounded bg-muted animate-shimmer" />
+      <div v-for="row in 6" :key="row" class="h-4 rounded-xs bg-muted animate-shimmer" />
     </div>
 
     <div v-else-if="sessions.length === 0" class="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
@@ -377,7 +377,7 @@ function handleLoadMore() {
               <RouterLink
                 v-if="checkpointRoute(row.session)"
                 :to="checkpointRoute(row.session)!"
-                class="rounded underline decoration-border underline-offset-2 transition-colors hover:decoration-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                class="rounded-xs underline decoration-border underline-offset-2 transition-colors hover:decoration-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 :aria-label="t('book.detail.readingLog.table.jumpToProgress', { progress: row.session.endProgress?.toFixed(1) })"
               >
                 {{ formatEndProgress(row.session.endProgress) }}
@@ -388,7 +388,7 @@ function handleLoadMore() {
               <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: sourceColor(row.session) }" :title="sourceLabel(row.session)" />
               <span
                 v-if="row.session.format"
-                class="inline-flex h-4 shrink-0 items-center rounded border px-1 text-[10px] font-bold uppercase leading-none tracking-wider"
+                class="inline-flex h-4 shrink-0 items-center rounded-xs border px-1 text-[10px] font-bold uppercase leading-none tracking-wider"
                 :style="formatBadgeStyle(row.session.format)"
               >
                 {{ row.session.format }}
@@ -397,7 +397,7 @@ function handleLoadMore() {
             <span class="flex items-center justify-end">
               <button
                 v-if="confirmDeleteId === row.session.id"
-                class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                class="inline-flex size-5 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 :title="t('book.detail.readingLog.table.cancelDelete')"
                 :aria-label="t('book.detail.readingLog.table.cancelDeleteAria')"
                 @click="clearConfirmDelete"
@@ -406,7 +406,7 @@ function handleLoadMore() {
               </button>
               <button
                 :data-session-id="row.session.id"
-                class="inline-flex size-5 items-center justify-center rounded transition-colors"
+                class="inline-flex size-5 items-center justify-center rounded-xs transition-colors"
                 :class="
                   confirmDeleteId === row.session.id
                     ? 'bg-destructive/15 text-destructive ring-1 ring-destructive/40'

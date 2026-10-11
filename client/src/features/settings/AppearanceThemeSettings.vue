@@ -4,11 +4,15 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Monitor, Moon, Sun } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { THEME_STYLES, type ThemeStyleDefinition } from '@/lib/theme-styles'
 import { ACCENT_ROWS, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
+import SurfacePalettePicker from '@/components/SurfacePalettePicker.vue'
+import GlowReachPicker from '@/components/GlowReachPicker.vue'
 import AppearancePreferenceStorage from './AppearancePreferenceStorage.vue'
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
+const showSurfaceBrightness = computed(() => themeStore.resolvedTheme === 'dark' && themeStore.appearanceControls.brightness)
 
 const backgroundGroups = computed<{ label: string; ids: string[] }[]>(() => [
   {
@@ -28,6 +32,10 @@ const backgroundGroups = computed<{ label: string; ids: string[] }[]>(() => [
     ids: ['prism', 'spectrum', 'spectrum-x', 'spectrum-plus', 'eclipse'],
   },
 ])
+
+function selectStyle(style: ThemeStyleDefinition) {
+  themeStore.setStyle(style.id)
+}
 
 function handleLightTheme() {
   themeStore.setTheme('light')
@@ -59,6 +67,52 @@ function handleBrightnessInput(event: Event) {
         {{ t('settings.appearance.theme.title') }}
       </p>
       <div class="settings-card">
+        <div class="settings-row">
+          <div>
+            <p class="settings-label">
+              {{ t('settings.appearance.theme.style.label') }}
+            </p>
+            <p class="settings-hint settings-prose">
+              {{ t(themeStore.styleDefinition.descriptionKey) }}
+            </p>
+          </div>
+          <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
+            <button
+              v-for="style in THEME_STYLES"
+              :key="style.id"
+              type="button"
+              class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              :class="themeStore.style === style.id ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :aria-pressed="themeStore.style === style.id"
+              @click="selectStyle(style)"
+            >
+              {{ t(style.labelKey) }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="themeStore.appearanceControls.surfacePalette" class="settings-row">
+          <div>
+            <p class="settings-label">
+              {{ t('settings.appearance.theme.surfacePalette.label') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.appearance.theme.surfacePalette.hint') }}
+            </p>
+          </div>
+          <SurfacePalettePicker class="self-start md:w-80 md:shrink-0" />
+        </div>
+
+        <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <p class="settings-label mb-0.5">
+            {{ t('settings.appearance.theme.topGlow.label') }}
+          </p>
+          <p class="settings-hint mb-3">
+            {{ t('settings.appearance.theme.topGlow.hint') }}
+          </p>
+          <GlowReachPicker />
+        </div>
+
         <div class="settings-row">
           <div>
             <p class="settings-label">
@@ -150,12 +204,12 @@ function handleBrightnessInput(event: Event) {
               "
               @click="themeStore.setRadius(opt.id)"
             >
-              {{ opt.label }}
+              {{ t(opt.labelKey) }}
             </button>
           </div>
         </div>
 
-        <div v-if="themeStore.resolvedTheme === 'dark'" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div v-if="showSurfaceBrightness" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3 mb-0.5">
               <p class="settings-label">
@@ -188,7 +242,7 @@ function handleBrightnessInput(event: Event) {
       </div>
     </div>
 
-    <div>
+    <div v-if="themeStore.appearanceControls.background">
       <p class="settings-group-label">
         {{ t('settings.appearance.theme.libraryBackground.title') }}
       </p>
@@ -216,7 +270,7 @@ function handleBrightnessInput(event: Event) {
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="w-14 h-10 rounded overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
+                      class="w-14 h-10 rounded-xs overflow-hidden transition-all ring-2 focus:outline-none shrink-0"
                       :class="
                         themeStore.background === opt.id ? 'ring-primary shadow-xs shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
                       "
@@ -225,7 +279,7 @@ function handleBrightnessInput(event: Event) {
                       <div class="w-full h-full bg-background [transform:translate(0)] pattern-preview" :class="opt.cssClass" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ opt.label }}</TooltipContent>
+                  <TooltipContent>{{ t(opt.labelKey) }}</TooltipContent>
                 </Tooltip>
               </div>
             </div>

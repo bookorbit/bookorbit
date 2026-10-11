@@ -82,7 +82,7 @@ const { t } = useI18n()
     >
       <div
         data-sidebar="sidebar"
-        class="relative z-0 flex h-full w-full flex-col border-r border-(--shell-border) bg-(--shell-surface) backdrop-blur-xl backdrop-saturate-150 group-data-[variant=floating]:rounded-(--shell-radius) group-data-[variant=floating]:border group-data-[variant=floating]:shadow-lg"
+        class="relative z-0 flex h-full w-full flex-col border-r border-(--shell-border) bg-(--shell-surface) shell-backdrop group-data-[variant=floating]:rounded-(--shell-radius) group-data-[variant=floating]:border group-data-[variant=floating]:shadow-(--shell-shadow)"
       >
         <slot />
       </div>

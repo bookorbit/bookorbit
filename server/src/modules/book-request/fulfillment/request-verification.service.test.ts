@@ -153,6 +153,7 @@ describe('RequestVerificationService against the configured threshold', () => {
     };
     const gateway = { emitChanged: vi.fn() };
     const settings = { get: vi.fn().mockResolvedValue({ verificationEnabled, verificationThreshold: threshold }) };
+    const companions = { resolveJoin: vi.fn().mockResolvedValue(null), handOn: vi.fn().mockResolvedValue(false) };
 
     const service = new RequestVerificationService(
       events as never,
@@ -165,6 +166,7 @@ describe('RequestVerificationService against the configured threshold', () => {
       notifier as never,
       gateway as never,
       settings as never,
+      companions as never,
     );
 
     service.onModuleInit();
@@ -345,6 +347,7 @@ describe('RequestVerificationService review surface', () => {
         verificationThreshold: overrides.threshold ?? 70,
       }),
     };
+    const companions = { resolveJoin: vi.fn().mockResolvedValue(null), handOn: vi.fn().mockResolvedValue(false) };
 
     const service = new RequestVerificationService(
       { on: vi.fn() } as never,
@@ -357,9 +360,10 @@ describe('RequestVerificationService review surface', () => {
       notifier as never,
       gateway as never,
       settings as never,
+      companions as never,
     );
 
-    return { service, dock, dockRepo, finalizeService, downloads, requests, notifier, gateway, fulfillment };
+    return { service, dock, dockRepo, finalizeService, downloads, requests, notifier, gateway, fulfillment, companions };
   }
 
   it('describes a loose single file from the anchor row, which already describes it fully', async () => {
@@ -503,6 +507,57 @@ describe('RequestVerificationService review surface', () => {
       expect.objectContaining({ status: 'available', matchedBookId: 55, statusReason: null }),
     );
     expect(notifier.notifyBookAvailable).toHaveBeenCalled();
+  });
+
+  it("files a half of a pair into the book it joins, in that book's own library and folder", async () => {
+    const { service, finalizeService, companions } = makeService();
+    const join = { libraryId: 8, folderId: 9, joinBook: { bookId: 42, folderPath: '/lib/Dune' } };
+    companions.resolveJoin.mockResolvedValue(join);
+
+    await service.fileHeldImport(7, { id: 9 } as never);
+
+    expect(finalizeService.finalizeManagedFile).toHaveBeenCalledWith(100, { libraryId: 8, folderId: 9, joinBook: join.joinBook });
+  });
+
+  it('hands the book that landed on to the other half of the pair', async () => {
+    const { service, companions } = makeService();
+
+    await service.fileHeldImport(7, { id: 9 } as never);
+
+    expect(companions.handOn).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 55);
+  });
+
+  /**
+   * Filed side by side, each half would find the other not yet landed and both would become books
+   * of their own. The second has to start only once the first has finished.
+   */
+  it('files the two halves of a pair one after the other rather than side by side', async () => {
+    const { service, finalizeService, requests, downloads } = makeService();
+    const halves = new Map([
+      [7, { ...heldRequest, id: 7, companionRequestId: 8, bookDockFileId: 100 }],
+      [8, { ...heldRequest, id: 8, mediaKind: 'audiobook', companionRequestId: 7, bookDockFileId: 101 }],
+    ]);
+    requests.findById.mockImplementation((id: number) => Promise.resolve({ request: halves.get(id) }));
+    downloads.findLatestForRequests.mockImplementation((ids: number[]) =>
+      Promise.resolve(new Map(ids.map((id) => [id, { download: { id: id + 100, requestId: id, status: 'needs_review', bookDockFileId: null } }]))),
+    );
+
+    let releaseFirst!: () => void;
+    finalizeService.finalizeManagedFile
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = () => resolve({ success: true, bookId: 55 }))))
+      .mockResolvedValueOnce({ success: true, bookId: 55 });
+
+    const first = service.fileHeldImport(7, { id: 9 } as never);
+    const second = service.fileHeldImport(8, { id: 9 } as never);
+    await vi.waitFor(() => expect(finalizeService.finalizeManagedFile).toHaveBeenCalledTimes(1));
+    // Give the second half every chance to jump the queue before the first is let go.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(finalizeService.finalizeManagedFile).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(finalizeService.finalizeManagedFile).toHaveBeenCalledTimes(2);
+    expect(finalizeService.finalizeManagedFile.mock.calls.map(([fileId]) => fileId)).toEqual([100, 101]);
   });
 
   /** A failure here is the approver's to see, not another silent hold they have to come back to. */

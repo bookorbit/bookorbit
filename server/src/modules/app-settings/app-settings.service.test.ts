@@ -620,9 +620,9 @@ describe('AppSettingsService', () => {
   });
 
   describe('getMaxUploadSizeMb', () => {
-    it('returns 500 by default when setting is absent', async () => {
+    it('returns 4096 by default when setting is absent', async () => {
       repo.findByKey.mockResolvedValue(undefined);
-      expect(await service.getMaxUploadSizeMb()).toBe(500);
+      expect(await service.getMaxUploadSizeMb()).toBe(4096);
     });
 
     it('returns parsed integer value when valid', async () => {
@@ -630,9 +630,14 @@ describe('AppSettingsService', () => {
       expect(await service.getMaxUploadSizeMb()).toBe(1024);
     });
 
-    it('returns 500 when value is invalid or <= 0', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '-50' } as never);
+    it('preserves an existing 500 MB limit', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '500' } as never);
       expect(await service.getMaxUploadSizeMb()).toBe(500);
+    });
+
+    it('returns 4096 when value is invalid or <= 0', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '-50' } as never);
+      expect(await service.getMaxUploadSizeMb()).toBe(4096);
     });
   });
 

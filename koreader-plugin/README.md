@@ -75,3 +75,7 @@ Position-only bookmarks (dogears) sync the same way:
 - A device clock far in the past can delay edit detection for web-modified highlights.
 - The full sweep is manual-only; books you never reopen only sync when you run it.
 - A cloned device with a different KOReader `device_id` double-counts reading time; clones keeping the same `device_id` deduplicate naturally.
+
+### EPUB delivery defaults
+
+With plugin 1.7.0 and a supported server, set the default in BookOrbit web Settings > KOReader > Sync Settings > KOReader EPUB delivery. Devices can override the credential default. In KOReader, Open dashboard > Download > Settings > Read-aloud EPUB delivery edits the same server device setting. The single-download dialog offers Use BookOrbit default and an override to the other EPUB variant. Existing local preferences are imported once when the server has no configured default, and interrupted transfers keep their captured variant.

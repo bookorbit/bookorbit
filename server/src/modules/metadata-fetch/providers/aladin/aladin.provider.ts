@@ -2,15 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { pickSearchInputs, providerCacheContext } from '../provider-cache';
 import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { buildRequestSignal } from '../provider-utils';
 import { mapAladinItem } from './aladin.mapper';
-import { AladinLookupResponse, AladinSearchResponse } from './aladin.types';
+import { AladinErrorBody, AladinLookupResponse, AladinSearchResponse } from './aladin.types';
 
 const BASE_URL = 'https://www.aladin.co.kr/ttb/api';
 const API_VERSION = '20131101';
@@ -26,6 +29,18 @@ function getIsbnItemIdType(isbn: string): 'ISBN13' | 'ISBN' | null {
   return null;
 }
 
+// Aladin reports a bad key, an exhausted quota and similar faults in a 200 body, not a status.
+function reportAladinBodyQuality(body: AladinErrorBody & { item?: unknown; totalResults?: unknown }, op: 'search' | 'lookup'): void {
+  if (body.errorCode !== undefined || (body.item !== undefined && !Array.isArray(body.item))) {
+    markProviderFailed(`aladin.${op}: api error body`);
+    return;
+  }
+  // Without an item list or a result count the body says nothing about whether the book exists.
+  if (body.item === undefined && typeof body.totalResults !== 'number') {
+    markProviderFailed(`aladin.${op}: response without results`);
+  }
+}
+
 @Injectable()
 export class AladinProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.ALADIN;
@@ -34,6 +49,18 @@ export class AladinProvider implements IdentifiableProvider {
   readonly coverShape = 'portrait' as const;
 
   private readonly logger = new Logger(AladinProvider.name);
+
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: true,
+    context: async () => {
+      const { enabled, ttbKey } = (await this.providerConfig.getConfig()).aladin;
+      return providerCacheContext(enabled && ttbKey.trim().length > 0);
+    },
+    // The ISBN alone forms the query whenever one is given; title and author only matter without it.
+    describeSearch: (params) => ({ inputs: params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author']) }),
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
 
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
@@ -75,7 +102,8 @@ export class AladinProvider implements IdentifiableProvider {
         );
         return [];
       }
-      const body = (await res.json()) as AladinSearchResponse;
+      const body = (await res.json()) as AladinSearchResponse & AladinErrorBody;
+      reportAladinBodyQuality(body, 'search');
       const items = (body.item ?? []).map(mapAladinItem);
       this.logger.log(
         `[aladin.search] [end] query="${safeQuery}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
@@ -88,6 +116,7 @@ export class AladinProvider implements IdentifiableProvider {
         );
         throw err;
       }
+      markProviderFailed('aladin.search: unusable response');
       this.logger.warn(
         `[aladin.search] [fail] query="${safeQuery}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
       );
@@ -114,7 +143,8 @@ export class AladinProvider implements IdentifiableProvider {
         );
         return [];
       }
-      const body = (await res.json()) as AladinLookupResponse;
+      const body = (await res.json()) as AladinLookupResponse & AladinErrorBody;
+      reportAladinBodyQuality(body, 'search');
       const items = (body.item ?? []).map(mapAladinItem);
       this.logger.log(
         `[aladin.search] [end] isbn="${safeIsbn}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
@@ -127,6 +157,7 @@ export class AladinProvider implements IdentifiableProvider {
         );
         throw err;
       }
+      markProviderFailed('aladin.search: unusable response');
       this.logger.warn(
         `[aladin.search] [fail] isbn="${safeIsbn}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
       );
@@ -148,7 +179,8 @@ export class AladinProvider implements IdentifiableProvider {
         );
         return null;
       }
-      const body = (await res.json()) as AladinLookupResponse;
+      const body = (await res.json()) as AladinLookupResponse & AladinErrorBody;
+      reportAladinBodyQuality(body, 'lookup');
       const item = body.item?.[0];
       if (!item) {
         this.logger.log(`[aladin.lookup] [end] providerId="${safeId}" status=${res.status} found=false durationMs=${Date.now() - startedAt}`);
@@ -164,6 +196,7 @@ export class AladinProvider implements IdentifiableProvider {
         );
         throw err;
       }
+      markProviderFailed('aladin.lookup: unusable response');
       this.logger.warn(
         `[aladin.lookup] [fail] providerId="${safeId}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
       );

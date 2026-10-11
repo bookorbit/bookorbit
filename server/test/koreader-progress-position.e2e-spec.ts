@@ -44,7 +44,7 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
     return row!.fileHash!;
   }
 
-  async function syncFromDevice(hash: string, percentage: number, progress?: string | number) {
+  async function syncFromDevice(hash: string, percentage: number, progress?: string | number, timestamp?: number) {
     const response = await ctx.app.inject({
       method: 'PUT',
       url: '/api/v1/koreader/syncs/progress',
@@ -55,6 +55,7 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
         device: 'Regression device',
         device_id: DEVICE_ID,
         ...(progress === undefined ? {} : { progress }),
+        ...(timestamp === undefined ? {} : { timestamp }),
       },
     });
     expect(response.statusCode).toBe(200);
@@ -240,6 +241,38 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
       await syncFromDevice(epubHash, (25 + offset) / 100, `/body[1]/DocFragment[1]/body[1]/p[1]/text()[1].${nextOffset}`);
       await expect(readerProgress(epub.bookFileId)).resolves.toEqual(expect.objectContaining({ cfi: `epubcfi(/6/2!/4/2/1:${nextOffset})` }));
     }
+  });
+
+  it('does not let a delayed single update overwrite newer web progress or the next device pull', async () => {
+    const cfi = 'epubcfi(/6/2!/4/2/1:3)';
+    await saveFromWebReader(epub.bookFileId, { percentage: 62, cfi, source: 'text' });
+
+    await syncFromDevice(epubHash, 0.05, '/body/DocFragment[1]/body', Math.floor(Date.now() / 1000) - 3600);
+
+    await expect(readerProgress(epub.bookFileId)).resolves.toEqual(expect.objectContaining({ percentage: 62, cfi }));
+    const pull = await ctx.app.inject({ method: 'GET', url: `/api/v1/koreader/syncs/progress/${epubHash}`, headers: deviceHeaders() });
+    expect(pull.statusCode).toBe(200);
+    expect(pull.json()).toEqual(expect.objectContaining({ percentage: 0.62, progress: '/body/DocFragment[1]/body/p/text().3', device: 'web' }));
+  });
+
+  it('retains the newest device position when an older single update arrives afterwards', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const recent = '/body/DocFragment[1]/body/p/text().4';
+    await syncFromDevice(epubHash, 0.75, recent, now);
+    await syncFromDevice(epubHash, 0.2, '/body/DocFragment[1]/body/p/text().1', now - 60);
+
+    await expect(readerProgress(epub.bookFileId)).resolves.toEqual(expect.objectContaining({ percentage: 75, cfi: 'epubcfi(/6/2!/4/2/1:4)' }));
+    const pull = await ctx.app.inject({ method: 'GET', url: `/api/v1/koreader/syncs/progress/${epubHash}`, headers: deviceHeaders() });
+    expect(pull.statusCode).toBe(200);
+    expect(pull.json()).toEqual(expect.objectContaining({ percentage: 0.75, progress: recent }));
+  });
+
+  it('accepts deliberate backward updates with the same second timestamp', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await syncFromDevice(epubHash, 0.75, '/body/DocFragment[1]/body/p/text().4', now);
+    await syncFromDevice(epubHash, 0.2, '/body/DocFragment[1]/body/p/text().1', now);
+
+    await expect(readerProgress(epub.bookFileId)).resolves.toEqual(expect.objectContaining({ percentage: 20, cfi: 'epubcfi(/6/2!/4/2/1:1)' }));
   });
 
   it('serves percentage fallback for an unresolvable reader position', async () => {
