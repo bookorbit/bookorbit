@@ -288,6 +288,7 @@ export class RequestFulfillmentService {
           fileUrl: directUrl as string,
           fileName: directFileName as string,
           clientKey: grab.clientKey,
+          indexerId: grab.indexerId ?? null,
         });
       } else {
         const config = await this.clients.resolveConfig(client.id);
