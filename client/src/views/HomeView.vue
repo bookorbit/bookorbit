@@ -33,6 +33,7 @@ import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import { useMoveToLibraryTarget } from '@/features/book/composables/useMoveToLibraryTarget'
+import MergeBooksSheet from '@/features/book/components/MergeBooksSheet.vue'
 import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
@@ -444,6 +445,16 @@ const {
   selectedCount: computed(() => (querySelection.value ? querySelection.value.total : selectedCount.value)),
 })
 
+const mergeBooksOpen = ref(false)
+const mergePayload = computed(() => getSelectionPayload())
+const mergeCount = computed(() => (querySelection.value ? querySelection.value.total : selectedCount.value))
+function openMergeForSelection() {
+  mergeBooksOpen.value = true
+}
+function setMergeOpen(next: boolean) {
+  mergeBooksOpen.value = next
+}
+
 const { onBookMissing, onBookRestored, onBookMoved, onBookTransferred } = useBookEvents()
 const TRANSFER_REFRESH_DEBOUNCE_MS = 300
 let transferRefreshTimer: ReturnType<typeof setTimeout> | null = null
@@ -546,6 +557,11 @@ const {
 // sheet only has to drop the now-stale selection.
 function handleBooksMoved() {
   exitSelectionMode()
+}
+
+function handleBooksMerged() {
+  exitSelectionMode()
+  resetBooks()
 }
 
 function handleEditSelected() {
@@ -1067,6 +1083,7 @@ defineOptions({ name: 'HomeView' })
       @export-metadata="openMetadataExport(querySelection ? 'all-matching' : 'selected')"
       @add-to-collection="addToCollectionOpen = true"
       @move-to-library="openMoveForSelection"
+      @merge-books="openMergeForSelection"
       @edit="handleEditSelected"
       @edit-individually="handleEditIndividually"
       @refresh-metadata="handleBulkRefreshMetadata"
@@ -1107,6 +1124,14 @@ defineOptions({ name: 'HomeView' })
       :current-library-id="libraryId"
       @update:open="setMoveOpen"
       @moved="handleBooksMoved"
+    />
+
+    <MergeBooksSheet
+      :open="mergeBooksOpen"
+      :selection-payload="mergePayload"
+      :selected-count="mergeCount"
+      @update:open="setMergeOpen"
+      @merged="handleBooksMerged"
     />
 
     <BulkEditMetadataDialog
