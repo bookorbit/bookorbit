@@ -38,10 +38,12 @@ const USER_AGENT = 'BookOrbit';
 /** Cloud-side spellings that mean the torrent has not started moving yet. */
 const QUEUED_STATES = new Set(['queued', 'paused', 'metaDL', 'checkingResumeData']);
 const HTML_CONTENT_TYPE = /^text\/html\b/i;
+const STAGING_CANCELLED_MESSAGE = 'The download was removed while it was being staged';
 
 interface StagingJob {
   downloadedBytes: number;
   totalBytes: number;
+  cancelled: boolean;
   cancelWatchers: Set<() => void>;
 }
 
@@ -149,25 +151,33 @@ export class TorboxAdapter implements DownloadClientAdapter {
 
   async stage(clientKey: string, config: ResolvedClientConfig): Promise<StagedDownloadResult> {
     const key = normalizeKey(clientKey);
-    const found = await this.api.findByHashes(config, new Set([key]));
-    const torrent = found.get(key);
-    if (!torrent) throw new BadRequestException('TorBox no longer has this download');
-    if (!torrent.downloadFinished) throw new BadRequestException('TorBox has not finished this download');
-    if (torrent.files.length === 0) throw new BadRequestException('TorBox did not report which files this download holds');
-
     const directory = stagedClientDir(this.appDataPath, this.type, key);
-    await mkdir(directory, { recursive: true });
-    const job: StagingJob = { downloadedBytes: 0, totalBytes: torrent.totalBytes ?? 0, cancelWatchers: new Set() };
+    // Registered before the first await so a remove that lands during setup still finds this job
+    // instead of slipping past cancelStaging and letting the fetch run over the removed attempt.
+    const job: StagingJob = { downloadedBytes: 0, totalBytes: 0, cancelled: false, cancelWatchers: new Set() };
     this.stagingFor(config.id).set(key, job);
     const startedAt = Date.now();
-
-    this.logger.log(
-      `[download_client.stage] [start] clientId=${config.id} clientKey=${key} files=${torrent.files.length} - staging a cloud download`,
-    );
     let partial: string | null = null;
+
     try {
+      const found = await this.api.findByHashes(config, new Set([key]));
+      this.ensureNotCancelled(job);
+
+      const torrent = found.get(key);
+      if (!torrent) throw new BadRequestException('TorBox no longer has this download');
+      if (!torrent.downloadFinished) throw new BadRequestException('TorBox has not finished this download');
+      if (torrent.files.length === 0) throw new BadRequestException('TorBox did not report which files this download holds');
+      job.totalBytes = torrent.totalBytes ?? 0;
+
+      await mkdir(directory, { recursive: true });
+      this.ensureNotCancelled(job);
+
+      this.logger.log(
+        `[download_client.stage] [start] clientId=${config.id} clientKey=${key} files=${torrent.files.length} - staging a cloud download`,
+      );
       const targets = uniqueTargetsFor(directory, torrent.files);
       for (let index = 0; index < torrent.files.length; index += 1) {
+        this.ensureNotCancelled(job);
         const file = torrent.files[index];
         const target = targets[index];
         // Idempotent by file: a restart re-runs this and skips everything already fetched whole.
@@ -182,6 +192,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
         await mkdir(dirname(target), { recursive: true });
         await rm(part, { force: true });
         const link = await this.api.requestDownloadLink(config, torrent.torrentId, file.fileId);
+        this.ensureNotCancelled(job);
         partial = part;
         await this.downloadToFile(link, part, file.size, job);
         await rename(part, target);
@@ -273,7 +284,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
 
   private async downloadToFile(url: string, target: string, expectedBytes: number | null, job: StagingJob): Promise<void> {
     const cancelled = new AbortController();
-    const onCancel = () => cancelled.abort(new Error('The download was removed while it was being staged'));
+    const onCancel = () => cancelled.abort(new Error(STAGING_CANCELLED_MESSAGE));
     job.cancelWatchers.add(onCancel);
 
     const stalled = new AbortController();
@@ -379,8 +390,15 @@ export class TorboxAdapter implements DownloadClientAdapter {
     const jobs = this.staging.get(clientId);
     const job = jobs?.get(clientKey);
     if (!job) return;
+    // The flag also covers a cancel that lands before the job has registered a watcher for the
+    // transfer it is about to start.
+    job.cancelled = true;
     jobs?.delete(clientKey);
     for (const watcher of job.cancelWatchers) watcher();
+  }
+
+  private ensureNotCancelled(job: StagingJob): void {
+    if (job.cancelled) throw new Error(STAGING_CANCELLED_MESSAGE);
   }
 
   private stagingFor(clientId: number): Map<string, StagingJob> {
