@@ -75,6 +75,7 @@
     "@nestjs/throttler": "^6.7.1",
     "@nestjs/websockets": "^12.1.2",
     "@types/archiver": "^8.0.0",
+    "@zip.js/zip.js": "^2.23.0",
     "archiver": "~8.0.0",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",

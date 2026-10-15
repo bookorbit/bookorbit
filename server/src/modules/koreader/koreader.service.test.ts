@@ -1174,6 +1174,60 @@ describe('KoreaderService', () => {
       expect(mockPositionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
     });
 
+    it.each(['pdf', 'cbz', 'cbr', 'cb7'])('serves the stored page to KOReader for a %s written by a BookOrbit client', async (format) => {
+      const readerTime = new Date('2026-02-01T11:00:00.000Z');
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 42, cfi: null, pageNumber: 37, koreaderProgress: null, updatedAt: readerTime });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
+        document: 'doc-hash',
+        percentage: 0.42,
+        progress: '37',
+        device: 'web',
+        device_id: 'bookorbit-web',
+        timestamp: Math.floor(readerTime.getTime() / 1000),
+      });
+      expect(mockPositionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
+    });
+
+    it('keeps the page KOReader itself stored for a paged file', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'pdf' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 12, pageNumber: 12, koreaderProgress: '12', updatedAt: new Date() });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: '12' }));
+    });
+
+    it('prefers the stored page over a non-page pointer on a paged file', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'cbz' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 12,
+        pageNumber: 9,
+        koreaderProgress: '/body/DocFragment[2]/body',
+        updatedAt: new Date(),
+      });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: '9' }));
+    });
+
+    it.each([null, 0])('serves no position for a paged file whose stored page is %s', async (pageNumber) => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'pdf' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 5, pageNumber, koreaderProgress: null, updatedAt: new Date() });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: null, percentage: 0.05 }));
+    });
+
+    it('never turns a stored page into a position for a reflowable file', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'epub' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 5, cfi: null, pageNumber: 4, koreaderProgress: null, updatedAt: new Date() });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: null }));
+    });
+
     it('returns null when neither device nor web reader progress exists', async () => {
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue(null);

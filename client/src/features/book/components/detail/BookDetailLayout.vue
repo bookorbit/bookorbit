@@ -3,7 +3,7 @@ import BookDetailHeader from './BookDetailHeader.vue'
 import { coverTintVars, type CoverTint } from '@/features/book/lib/cover-tint'
 import { computed } from 'vue'
 
-const props = withDefaults(defineProps<{ bookId: number; coverTint?: CoverTint | null }>(), { coverTint: null })
+const props = withDefaults(defineProps<{ bookId: number; canEditMetadata?: boolean; coverTint?: CoverTint | null }>(), { coverTint: null })
 
 const tintVars = computed(() => coverTintVars(props.coverTint))
 </script>
@@ -16,7 +16,7 @@ const tintVars = computed(() => coverTintVars(props.coverTint))
     ]"
     :style="tintVars"
   >
-    <BookDetailHeader :book-id="bookId" />
+    <BookDetailHeader :book-id="bookId" :can-edit-metadata="canEditMetadata" />
     <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:px-6 sm:py-4">
       <slot />
     </main>

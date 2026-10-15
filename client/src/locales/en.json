@@ -9802,6 +9802,7 @@
         "add": "Add",
         "emptyCreate": "Nobody else yet. People you add here get access as soon as the library exists.",
         "superusers": "Superusers always have full access.",
+        "levelsHint": "Viewers can browse and read. Editors and owners can also edit metadata when their account has the Edit metadata permission.",
         "levelFor": "Access level for {name}",
         "revokeFor": "Remove access for {name}",
         "revokeQuestion": "Remove access?",

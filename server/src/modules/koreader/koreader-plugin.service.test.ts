@@ -49,6 +49,7 @@ describe('KoreaderPluginService', () => {
     findOne: ReturnType<typeof vi.fn>;
     findByBookIds: ReturnType<typeof vi.fn>;
     setManual: ReturnType<typeof vi.fn>;
+    updateManual: ReturnType<typeof vi.fn>;
   };
   let userBookNoteService: {
     findByBookIds: ReturnType<typeof vi.fn>;
@@ -87,6 +88,7 @@ describe('KoreaderPluginService', () => {
       findOne: vi.fn().mockResolvedValue(null),
       findByBookIds: vi.fn().mockResolvedValue(new Map()),
       setManual: vi.fn().mockResolvedValue(undefined),
+      updateManual: vi.fn().mockResolvedValue(undefined),
     };
     userBookNoteService = {
       findByBookIds: vi.fn().mockResolvedValue(new Map()),
@@ -400,7 +402,13 @@ describe('KoreaderPluginService', () => {
     it('applies a status when no server status exists', async () => {
       const result = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-06-01' }]));
 
-      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read', 'UTC');
+      expect(userBookStatusService.updateManual).toHaveBeenCalledWith(
+        7,
+        20,
+        { status: 'read', finishedAt: new Date('2026-06-01T00:00:00.000Z') },
+        { endedOn: '2026-06-01' },
+        'UTC',
+      );
       expect(result.results[0]).toMatchObject({ hash: HASH_A, statusApplied: true, ratingApplied: false, reviewApplied: false });
     });
 
@@ -410,7 +418,32 @@ describe('KoreaderPluginService', () => {
         statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-06-01' }]),
       );
 
-      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read', 'America/Chicago');
+      expect(userBookStatusService.updateManual).toHaveBeenCalledWith(
+        7,
+        20,
+        { status: 'read', finishedAt: new Date('2026-06-01T00:00:00.000Z') },
+        { endedOn: '2026-06-01' },
+        'America/Chicago',
+      );
+    });
+
+    it.each([undefined, '2026-02-30', '0000-01-01'])('keeps completion uploads compatible without a usable date: %s', async (statusModified) => {
+      const result = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'complete', statusModified }]));
+
+      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read', 'UTC');
+      expect(userBookStatusService.updateManual).not.toHaveBeenCalled();
+      expect(result.results[0]!.statusApplied).toBe(true);
+    });
+
+    it('does not introduce a date-order failure when a device finish precedes the existing start', async () => {
+      userBookStatusService.findByBookIds.mockResolvedValue(
+        new Map([[20, { status: 'reading', source: 'manual', startedAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-06-01T08:00:00.000Z' }]]),
+      );
+
+      await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-06-02' }]));
+
+      expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read', 'UTC');
+      expect(userBookStatusService.updateManual).not.toHaveBeenCalled();
     });
 
     it('treats an identical status as applied without writing', async () => {
@@ -419,6 +452,7 @@ describe('KoreaderPluginService', () => {
       const result = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-01-01' }]));
 
       expect(userBookStatusService.setManual).not.toHaveBeenCalled();
+      expect(userBookStatusService.updateManual).not.toHaveBeenCalled();
       expect(result.results[0]!.statusApplied).toBe(true);
     });
 
@@ -437,6 +471,7 @@ describe('KoreaderPluginService', () => {
       const older = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-06-04' }]));
 
       expect(userBookStatusService.setManual).not.toHaveBeenCalled();
+      expect(userBookStatusService.updateManual).not.toHaveBeenCalled();
       expect(tie.results[0]!.statusApplied).toBe(false);
       expect(older.results[0]!.statusApplied).toBe(false);
     });
@@ -594,7 +629,7 @@ describe('KoreaderPluginService', () => {
         ]),
       );
 
-      expect(userBookStatusService.setManual).toHaveBeenCalledTimes(1);
+      expect(userBookStatusService.updateManual).toHaveBeenCalledTimes(1);
       expect(userBookStatusService.findOne).toHaveBeenCalledTimes(1);
       expect(result.results.map((entry) => entry.statusApplied)).toEqual([true, true]);
     });

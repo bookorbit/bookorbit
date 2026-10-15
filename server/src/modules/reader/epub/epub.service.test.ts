@@ -2,11 +2,14 @@ vi.mock('fs/promises', () => ({ stat: vi.fn() }));
 vi.mock('unzipper', () => ({ Open: { file: vi.fn() } }));
 
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { stat } from 'fs/promises';
 import { Readable } from 'stream';
 import * as unzipper from 'unzipper';
 
 import { EpubService } from './epub.service';
+import { BookReadService } from '../../book/book-read.service';
+import { LibraryService } from '../../library/library.service';
 
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockOpenFile = (unzipper as any).Open.file as vi.Mock;
@@ -169,7 +172,7 @@ function makeMediaOverlayArchive(smil = SMIL_XML) {
   ]);
 }
 
-function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?: boolean; lowerCasePaths?: boolean }) {
+function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?: boolean; lowerCasePaths?: boolean; opf?: string }) {
   const lower = options?.lowerCasePaths === true;
   const ops = lower ? 'ops' : 'OPS';
   const navSpec: ZipEntrySpec = options?.navBufferError
@@ -178,7 +181,7 @@ function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?:
 
   return makeArchive([
     { path: 'META-INF/container.xml', content: CONTAINER_XML },
-    { path: `${ops}/content.opf`, content: OPF_XML },
+    { path: `${ops}/content.opf`, content: options?.opf ?? OPF_XML },
     navSpec,
     { path: `${ops}/toc.ncx`, content: NCX_XML },
     ...(options?.omitChapterFile
@@ -203,13 +206,75 @@ describe('EpubService', () => {
   };
   let service: EpubService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
-    service = new EpubService(bookReadService as any, libraryService as any);
+    const module = await Test.createTestingModule({
+      providers: [EpubService, { provide: BookReadService, useValue: bookReadService }, { provide: LibraryService, useValue: libraryService }],
+    }).compile();
+    service = module.get(EpubService);
     bookReadService.findLibraryIdByBookId.mockResolvedValue(3);
     bookReadService.findPrimaryFilesByBookIds.mockResolvedValue([{ format: 'epub', absolutePath: '/books/book.epub', sizeBytes: null }]);
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
     mockStat.mockResolvedValue({ mtimeMs: 100 } as Awaited<ReturnType<typeof stat>>);
+  });
+
+  it.each([
+    { name: 'the reported opf:metadata declaration', prefix: '', metadataPrefix: 'opf', dcPrefix: 'dc' },
+    { name: 'an arbitrary metadata prefix', prefix: '', metadataPrefix: 'publication', dcPrefix: 'dc' },
+    { name: 'fully prefixed package elements', prefix: 'opf', metadataPrefix: 'opf', dcPrefix: 'dc' },
+    { name: 'arbitrary OPF and Dublin Core prefixes', prefix: 'publication', metadataPrefix: 'publication', dcPrefix: 'bibliography' },
+    { name: 'an unprefixed package with a default namespace', prefix: '', metadataPrefix: '', dcPrefix: 'dc' },
+  ])('preserves metadata, cover, manifest and spine with $name', async ({ prefix, metadataPrefix, dcPrefix }) => {
+    const qualify = (name: string, nsPrefix: string) => (nsPrefix ? `${nsPrefix}:${name}` : name);
+    const opf = OPF_XML.replace('<package version="3.0">', '<package xmlns="http://www.idpf.org/2007/opf" version="2.0">')
+      .replaceAll('<metadata ', `<metadata xmlns:${metadataPrefix || 'opf'}="http://www.idpf.org/2007/opf" `)
+      .replaceAll('xmlns:dc=', `xmlns:${dcPrefix}=`)
+      .replaceAll('dc:', `${dcPrefix}:`)
+      .replaceAll('<dc:language>en</dc:language>'.replaceAll('dc:', `${dcPrefix}:`), `<${dcPrefix}:language>pt</${dcPrefix}:language>`)
+      .replace(
+        /<(\/?)(package|metadata|manifest|item|spine|itemref|meta)(?=[\s>])/g,
+        (_, closing: string, name: string) => `<${closing}${qualify(name, name === 'metadata' ? metadataPrefix : prefix)}`,
+      )
+      .replace('version="2.0"', `xmlns:${prefix || 'opf'}="http://www.idpf.org/2007/opf" version="2.0"`);
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive({ opf }) as any);
+
+    const info = await service.getBookInfo(99, undefined, user);
+
+    expect(info.metadata).toEqual({
+      title: 'Reader Test',
+      creator: 'Jane Doe',
+      language: 'pt',
+      publisher: 'Acme',
+      description: 'A sample EPUB',
+      identifier: 'book-1',
+    });
+    expect(info.coverPath).toBe('OPS/images/cover.jpg');
+    expect(info.manifest).toHaveLength(6);
+    expect(info.spine.map((item) => item.idref)).toEqual(['chap1', 'chap2']);
+    expect(info.spine[1].linear).toBe(false);
+    expect(info.toc?.children?.[0].label).toBe('Chapter 1');
+  });
+
+  it('resolves namespace declarations on each element without accepting foreign metadata or prefix rebinding', async () => {
+    const opf = OPF_XML.replace(
+      '<package version="3.0">',
+      '<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="urn:foreign" version="3.0">' +
+        '<metadata xmlns="urn:foreign"><dc:language>de</dc:language></metadata>',
+    )
+      .replace(
+        '<dc:title>',
+        '<dc:title xmlns:dc="urn:foreign">Foreign title</dc:title><bibliography:title xmlns:bibliography="http://purl.org/dc/elements/1.1/">',
+      )
+      .replace('</dc:title>\n', '</bibliography:title>\n')
+      .replace('<dc:language>en</dc:language>', '<language xmlns="http://purl.org/dc/elements/1.1/">pt-BR</language>')
+      .replace('<dc:identifier>book-1</dc:identifier>', '<dc:identifier>0000123</dc:identifier>');
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive({ opf }) as any);
+
+    const info = await service.getBookInfo(99, undefined, user);
+
+    expect(info.metadata).toMatchObject({ title: 'Reader Test', creator: 'Jane Doe', language: 'pt-BR', identifier: '0000123' });
+    expect(info.coverPath).toBe('OPS/images/cover.jpg');
+    expect(info.spine).toHaveLength(2);
   });
 
   it('parses EPUB metadata, spine, TOC, and optional META-INF files', async () => {
@@ -361,6 +426,32 @@ describe('EpubService', () => {
     expect(result.contentRange).toBe('bytes 2-5/10');
     expect(result.contentType).toBe('audio/mpeg');
     expect(result.data).toEqual(Buffer.from('2345'));
+  });
+
+  // A player asks for many ranges of one clip. Each used to parse every SMIL in the book again.
+  it('builds the playlist once for every range of a clip', async () => {
+    mockOpenFile.mockImplementation(() => Promise.resolve(makeMediaOverlayArchive() as any));
+
+    await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=0-1', user);
+    const opensForFirst = mockOpenFile.mock.calls.length;
+    const second = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=2-3', user);
+
+    expect(mockOpenFile.mock.calls.length - opensForFirst).toBe(1);
+    expect(second.data).toEqual(Buffer.from('23'));
+  });
+
+  it('answers a range past the end with 416 and ignores a header it cannot read', async () => {
+    mockOpenFile.mockImplementation(() => Promise.resolve(makeMediaOverlayArchive() as any));
+
+    const beyond = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=20-30', user);
+    expect(beyond.status).toBe(416);
+    expect(beyond.contentRange).toBe('bytes */10');
+    expect(beyond.data.length).toBe(0);
+
+    const unreadable = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=abc', user);
+    expect(unreadable.status).toBe(200);
+    expect(unreadable.contentRange).toBeNull();
+    expect(unreadable.data.length).toBe(10);
   });
 
   it('rejects media-overlay file requests for non-playlist resources', async () => {

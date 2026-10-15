@@ -224,6 +224,7 @@ const {
   handleImportPresetBackup,
   selectedIds,
   selectedCount,
+  canEditSelectionMetadata,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -475,6 +476,7 @@ defineOptions({ name: 'SmartScopeView' })
     />
 
     <SelectionActionBar
+      :metadata-editable="canEditSelectionMetadata"
       :visible="selectionMode"
       :count="selectedCount"
       :in-flight="inFlight"

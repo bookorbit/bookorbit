@@ -75,6 +75,52 @@ describe('AuditInterceptor', () => {
     });
   });
 
+  it('records nothing when the endpoint says this call is not worth recording', async () => {
+    const when = vi.fn().mockReturnValue(false);
+    const reflector = {
+      get: vi.fn().mockReturnValue({
+        action: 'book.metadata_update',
+        description: 'Refreshed metadata for book #4',
+        when,
+      }),
+    };
+    const auditEvents = {
+      emit: vi.fn(),
+    };
+    const interceptor = new AuditInterceptor(reflector as never, auditEvents as never);
+    const next: CallHandler = {
+      handle: vi.fn().mockReturnValue(of({ id: 4 })),
+    };
+    const request = { ip: '::1', query: { preview: 'true' } };
+
+    const response = await firstValueFrom(interceptor.intercept(makeContext(request), next));
+
+    expect(response).toEqual({ id: 4 });
+    expect(when).toHaveBeenCalledWith(request, { id: 4 });
+    expect(auditEvents.emit).not.toHaveBeenCalled();
+  });
+
+  it('records the call when the endpoint says it is worth recording', async () => {
+    const reflector = {
+      get: vi.fn().mockReturnValue({
+        action: 'book.metadata_update',
+        description: 'Refreshed metadata for book #4',
+        when: () => true,
+      }),
+    };
+    const auditEvents = {
+      emit: vi.fn(),
+    };
+    const interceptor = new AuditInterceptor(reflector as never, auditEvents as never);
+    const next: CallHandler = {
+      handle: vi.fn().mockReturnValue(of({ id: 4 })),
+    };
+
+    await firstValueFrom(interceptor.intercept(makeContext({ ip: '::1', query: {} }), next));
+
+    expect(auditEvents.emit).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to system actor when request user is absent', async () => {
     const reflector = {
       get: vi.fn().mockReturnValue({

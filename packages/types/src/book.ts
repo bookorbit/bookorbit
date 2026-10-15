@@ -186,6 +186,7 @@ export type BookSeriesMembership = {
 
 export type BookCard = {
   id: number;
+  libraryId?: number;
   status: string;
   /** The frame of the cover the book shows by default, which follows its primary file's medium rather than its library. */
   coverAspectRatio: CoverAspectRatio;
@@ -478,7 +479,5 @@ export type CoverSearchResult = {
   source: string;
 };
 
-export type CoverSearchResponse = {
-  results: CoverSearchResult[];
-  total: number;
-};
+/** `GET /books/cover/search` answers with a bare array of results, not an envelope. */
+export type CoverSearchResponse = CoverSearchResult[];

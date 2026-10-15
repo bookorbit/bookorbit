@@ -119,11 +119,26 @@ describe('OpenAiCompatibleProvider', () => {
     it('passes the abort signal to the upstream request', async () => {
       const provider = makeProvider();
       const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(mockFetchResponse(null));
-      const { signal } = new AbortController();
+      const controller = new AbortController();
 
-      await provider.synthesize('hello', 'alloy', 1.0, 'mp3', signal);
+      await provider.synthesize('hello', 'alloy', 1.0, 'mp3', controller.signal);
 
-      expect((fetchSpy.mock.calls[0]![1] as RequestInit).signal).toBe(signal);
+      const sent = (fetchSpy.mock.calls[0]![1] as RequestInit).signal!;
+      expect(sent.aborted).toBe(false);
+      controller.abort();
+      expect(sent.aborted).toBe(true);
+    });
+
+    // A provider that never answered held the request for as long as Node allowed.
+    it('gives up on a provider that does not answer in time', async () => {
+      const provider = makeProvider();
+      const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(mockFetchResponse(null));
+
+      await provider.synthesize('hello', 'alloy', 1.0, 'mp3');
+
+      expect(timeoutSpy).toHaveBeenCalledWith(120_000);
+      expect((fetchSpy.mock.calls[0]![1] as RequestInit).signal).toBe(timeoutSpy.mock.results[0]!.value);
     });
 
     it('does not log a cancelled request as an error', async () => {

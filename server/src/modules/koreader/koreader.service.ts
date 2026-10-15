@@ -547,7 +547,13 @@ export class KoreaderService {
 
     if (readingProg) {
       let xpointer = readingProg.koreaderProgress ?? null;
-      if (!xpointer && readingProg.cfi && !isPagedReadingFormat(bookFile.format)) {
+      const paged = isPagedReadingFormat(bookFile.format);
+      // A BookOrbit client write clears koreaderProgress for a paged file and keeps only the
+      // page, so the page is what KOReader has to be sent back, in the form it reports itself.
+      if (paged && parseKoreaderPageNumber(xpointer) === null && isServablePageNumber(readingProg.pageNumber)) {
+        xpointer = String(readingProg.pageNumber);
+      }
+      if (!xpointer && readingProg.cfi && !paged) {
         const startedAt = Date.now();
         try {
           const outcome = await this.positionConverter.cfiPointToXpointer({ bookFileId: bookFile.id, cfi: readingProg.cfi });
@@ -897,4 +903,8 @@ function toBookorbitPercentage(koreaderPct: number): number {
 
 function toKoreaderPercentage(bookorbitPct: number): number {
   return Math.round(bookorbitPct * 100) / 10000;
+}
+
+function isServablePageNumber(pageNumber: number | null | undefined): pageNumber is number {
+  return typeof pageNumber === 'number' && Number.isSafeInteger(pageNumber) && pageNumber >= 1;
 }

@@ -757,6 +757,58 @@ describe('BookRepository', () => {
     expect(resetWhere).toHaveBeenCalledOnce();
   });
 
+  it('moves the narration stamp with a bridged marker', async () => {
+    const returning = vi.fn().mockResolvedValue([{ fileId: 20 }]);
+    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    const db = {
+      insert: vi.fn().mockReturnValue({ values }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const repo = new BookRepository(db as never);
+    const sourceUpdatedAt = new Date('2026-10-13T12:00:00.000Z');
+    const base = {
+      userId: 7,
+      fileId: 20,
+      cfi: 'epubcfi(/6/4)',
+      percentage: 42,
+      mediaOverlayFragment: 'OPS/chapter.xhtml#p2',
+      mediaOverlaySectionIndex: 1,
+      koreaderProgress: null,
+      sourceUpdatedAt,
+    };
+
+    await repo.upsertSyncedEpubProgressIfNewer({ ...base, positionSeconds: 120 });
+    const stamp = { narrationPercentage: 42, narrationUpdatedAt: sourceUpdatedAt };
+    expect(values).toHaveBeenLastCalledWith(expect.objectContaining(stamp));
+    expect(onConflictDoUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ set: expect.objectContaining(stamp) }));
+
+    await repo.upsertSyncedEpubProgressIfNewer({ ...base, positionSeconds: null });
+    expect(values.mock.lastCall![0]).not.toHaveProperty('narrationUpdatedAt');
+    expect(onConflictDoUpdate.mock.lastCall![0].set).not.toHaveProperty('narrationUpdatedAt');
+  });
+
+  it('keeps the stored narration marker when a write leaves it out, and clears it on an explicit null', async () => {
+    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    const db = {
+      insert: vi.fn().mockReturnValue({ values }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', null, 40);
+    const kept = onConflictDoUpdate.mock.lastCall![0].set;
+    expect(kept).not.toHaveProperty('positionSeconds');
+    expect(kept).not.toHaveProperty('mediaOverlayFragment');
+    expect(kept).not.toHaveProperty('mediaOverlaySectionIndex');
+
+    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', null, 40, null, null, null);
+    expect(onConflictDoUpdate.mock.lastCall![0].set).toEqual(
+      expect.objectContaining({ positionSeconds: null, mediaOverlayFragment: null, mediaOverlaySectionIndex: null }),
+    );
+  });
+
   it('clears a stale narration marker when bridging to a copy without media overlays', async () => {
     const returning = vi.fn().mockResolvedValue([{ fileId: 20 }]);
     const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });

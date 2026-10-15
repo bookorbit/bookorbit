@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, Eye, Folder, FolderPlus, Headphones, Pencil, Star, Trash2, X } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose, DialogTitle, DialogDescription } from 'reka-ui'
@@ -27,6 +28,8 @@ const { t } = useI18n()
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', detail.value?.libraryId, 'editor'))
 const emit = defineEmits<{
   'update:open': [value: boolean]
   action: [type: 'add-to-collection' | 'delete']
@@ -412,7 +415,7 @@ function handleDelete() {
               </TooltipTrigger>
               <TooltipContent>{{ t('book.actions.peek') }}</TooltipContent>
             </Tooltip>
-            <Tooltip v-if="hasPermission('library_edit_metadata')">
+            <Tooltip v-if="canEditMetadata">
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"

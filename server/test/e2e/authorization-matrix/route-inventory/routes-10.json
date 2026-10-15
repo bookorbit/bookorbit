@@ -970,5 +970,17 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/server-identity/server-identity.controller.ts",
+    "className": "ServerIdentityController",
+    "methodName": "getIdentity",
+    "httpMethod": "GET",
+    "path": "/server-identity",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

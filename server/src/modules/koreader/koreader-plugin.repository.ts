@@ -5,6 +5,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { chunk } from '../../common/utils/batch.utils';
+import { buildSessionIdPrefix, koreaderSessionDeviceKey } from '../../common/utils/koreader-session-id.utils';
 import {
   aggregateReadingSessionDailyStats,
   getDayRangeForDateKeys,
@@ -14,8 +15,8 @@ import {
 import {
   KOREADER_MAX_EVENT_DURATION_SECONDS,
   KOREADER_SESSION_GAP_SECONDS,
-  buildSessionIdPrefix,
   deriveKoreaderSessions,
+  excludeTombstonedEvents,
   type DerivedKoreaderSession,
   type KoreaderPageEvent,
 } from './koreader-stats.util';
@@ -115,7 +116,22 @@ export class KoreaderPluginRepository {
         )
         .orderBy(schema.koreaderPageStats.startTime, schema.koreaderPageStats.page);
 
-      const desired = deriveKoreaderSessions(windowEvents, deviceId, bookFileId);
+      // The window still grows over suppressed events: dropping events only widens the gaps
+      // between the rest, so its edges stay true cluster boundaries.
+      const tombstones = await tx
+        .select({ startTime: schema.koreaderSessionTombstones.startTime, endTime: schema.koreaderSessionTombstones.endTime })
+        .from(schema.koreaderSessionTombstones)
+        .where(
+          and(
+            eq(schema.koreaderSessionTombstones.userId, userId),
+            eq(schema.koreaderSessionTombstones.bookFileId, bookFileId),
+            eq(schema.koreaderSessionTombstones.deviceKey, koreaderSessionDeviceKey(deviceId)),
+            lte(schema.koreaderSessionTombstones.startTime, window.lastStart),
+            gt(schema.koreaderSessionTombstones.endTime, window.firstStart),
+          ),
+        );
+
+      const desired = deriveKoreaderSessions(excludeTombstonedEvents(windowEvents, tombstones), deviceId, bookFileId);
       const prefix = buildSessionIdPrefix(deviceId, bookFileId);
 
       // Selected by time overlap rather than by recomputed id: a merged cluster changes

@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import BookDetailTabs from './BookDetailTabs.vue'
 import { useBookNavigation } from '../../composables/useBookNavigation'
 
-const props = defineProps<{ bookId: number }>()
+const props = defineProps<{ bookId: number; canEditMetadata?: boolean }>()
 
 const { t } = useI18n()
 const route = useRoute()
@@ -36,7 +36,7 @@ async function navigateToBook(id: number) {
   <div
     class="flex items-stretch border-b shrink-0 h-10 md:h-9 px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-3"
   >
-    <BookDetailTabs :book-id="bookId" />
+    <BookDetailTabs :book-id="bookId" :can-edit-metadata="canEditMetadata" />
 
     <div v-if="hasContext" class="hidden sm:flex items-center gap-1 ml-4 border-l pl-4">
       <span v-if="index !== -1" class="text-xs text-muted-foreground mr-2 font-medium tabular-nums">

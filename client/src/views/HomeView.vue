@@ -396,6 +396,7 @@ const {
   handleImportPresetBackup,
   selectedIds,
   selectedCount,
+  canEditSelectionMetadata,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -1058,6 +1059,7 @@ defineOptions({ name: 'HomeView' })
     </Transition>
 
     <SelectionActionBar
+      :metadata-editable="canEditSelectionMetadata"
       :visible="selectionMode"
       :count="querySelection ? querySelection.total : selectedCount"
       :in-flight="inFlight"

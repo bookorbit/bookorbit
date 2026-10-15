@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { EmbedPDF } from '@embedpdf/core/vue'
@@ -70,7 +70,8 @@ const plugins = shallowRef<PluginBatchRegistrations>([])
 const documentBuffer = shallowRef<ArrayBuffer | null>(null)
 const readerReady = shallowRef(false)
 const documentError = shallowRef<Error | null>(null)
-const initialPage = shallowRef(1)
+const initialPage = shallowRef<number | null>(null)
+const initialPercentage = shallowRef(0)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let settingsTimer: ReturnType<typeof setTimeout> | null = null
 let documentAbortController: AbortController | null = null
@@ -127,14 +128,18 @@ function buildPlugins(settings: PdfReaderSettings): PluginBatchRegistrations {
   ]
 }
 
+function setPosition(pageNumber: number, totalPages: number) {
+  progress.pageNumber.value = pageNumber
+  progress.percentage.value = totalPages > 0 ? (pageNumber / totalPages) * 100 : progress.percentage.value
+}
+
 function applyPendingProgress() {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = null
   if (!pendingPageUpdate) return false
   const { pageNumber, totalPages } = pendingPageUpdate
   pendingPageUpdate = null
-  progress.pageNumber.value = pageNumber
-  progress.percentage.value = totalPages > 0 ? (pageNumber / totalPages) * 100 : progress.percentage.value
+  setPosition(pageNumber, totalPages)
   return true
 }
 
@@ -142,7 +147,14 @@ function flushProgress() {
   if (applyPendingProgress()) void progress.save()
 }
 
-function handlePageChange(pageNumber: number, totalPages: number) {
+function handlePageChange(pageNumber: number, totalPages: number, restored = false) {
+  // Landing on the opening page is not a move: writing it back would replace another client's
+  // percentage-only position with a snapped page, so it is only remembered for an explicit save.
+  if (restored) {
+    setPosition(pageNumber, totalPages)
+    onActivity()
+    return
+  }
   onActivity()
   pendingPageUpdate = { pageNumber, totalPages }
   if (saveTimer) clearTimeout(saveTimer)
@@ -196,7 +208,9 @@ async function loadReader() {
     if (buffer.byteLength === 0) throw new Error(t('reader.pdf.emptyDocument'))
     if (sequence !== loadSequence || abortController.signal.aborted) return
     const settings = bookSettings.effective.value as PdfReaderSettings
-    initialPage.value = parseDeepLinkPage() ?? progress.pageNumber.value ?? 1
+    const savedPage = progress.pageNumber.value
+    initialPage.value = parseDeepLinkPage() ?? (savedPage !== null && savedPage > 0 ? savedPage : null)
+    initialPercentage.value = progress.percentage.value
     documentBuffer.value = buffer
     plugins.value = buildPlugins(settings)
     readerReady.value = true
@@ -259,10 +273,13 @@ function handleRetry() {
 
 onMounted(loadReader)
 
+// Before unmount, because useReadingSession ends the session from its own unmounted hook, which
+// runs first and would otherwise miss a page turn still inside the save debounce.
+onBeforeUnmount(flushProgress)
+
 onUnmounted(() => {
   loadSequence += 1
   documentAbortController?.abort()
-  flushProgress()
   flushSettings()
 })
 </script>
@@ -308,6 +325,7 @@ onUnmounted(() => {
           :book-id="props.bookId"
           :file-id="props.fileId"
           :initial-page="initialPage"
+          :initial-percentage="initialPercentage"
           :settings="effectiveSettings"
           :peek-mode="props.peekMode"
           @back="handleBack"

@@ -1,4 +1,4 @@
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   scrollToIndex: vi.fn<(index: number, options: { align: string }) => void>(),
   updateBookSettings: vi.fn<(patch: unknown) => void>(),
   resetBookSettings: vi.fn<() => void>(),
+  sessionEndSnapshots: [] as Array<{ percentage: number; pageNumber?: number | null }>,
 }))
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -127,8 +128,12 @@ vi.mock('../shared/composables/useReaderProgress', () => ({
   }),
 }))
 
+// Like the real composable, the session ends from an unmounted hook registered before the view's own.
 vi.mock('../shared/composables/useReadingSession', () => ({
-  useReadingSession: () => ({ onActivity: vi.fn<() => void>(), elapsedMinutes: ref(0) }),
+  useReadingSession: (_fileId: number, getProgress: () => { percentage: number; pageNumber?: number | null }) => {
+    onUnmounted(() => mocks.sessionEndSnapshots.push(getProgress()))
+    return { onActivity: vi.fn<() => void>(), elapsedMinutes: ref(0) }
+  },
 }))
 
 vi.mock('../shared/composables/useVisibility', () => ({
@@ -157,6 +162,7 @@ describe('CbzReaderView', () => {
     mocks.savedAutoAdvance = false
     mocks.seriesId = 42
     mocks.nextBook = null
+    mocks.sessionEndSnapshots.length = 0
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0)
       return 1
@@ -401,6 +407,23 @@ describe('CbzReaderView', () => {
     expect(wrapper.findComponent(NextIssueCard).exists()).toBe(false)
 
     wrapper.unmount()
+  })
+
+  it('flushes a debounced page turn before the reading session ends', async () => {
+    mocks.savedMode = 'paginated'
+    mocks.pageCount = 6
+    mocks.savedPageNumber = 2
+
+    const wrapper = shallowMount(CbzReaderView, { props: { bookId: 11, fileId: 22 } })
+    await flushPromises()
+    await nextTick()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    await nextTick()
+    wrapper.unmount()
+
+    expect(mocks.sessionEndSnapshots).toEqual([{ percentage: 50, pageNumber: 3 }])
+    expect(mocks.progressSave).toHaveBeenCalledOnce()
   })
 
   it('places the next book after the last page in continuous modes', async () => {

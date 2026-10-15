@@ -47,6 +47,7 @@ const baseProps = {
   isLocked: false,
   isActive: false,
   isReadOnly: false,
+  canEditMetadata: true,
   isFullyLocked: false,
   lockedFieldCount: 0,
   selectionMode: false,
@@ -99,6 +100,18 @@ describe('BookTableCellDispatcher lock row', () => {
 
     await button.trigger('click')
     expect(wrapper.emitted('lockAll')).toBeTruthy()
+    expect(wrapper.emitted('unlockAll')).toBeFalsy()
+  })
+
+  it('disables the row lock toggle when the book sits in a library the user can only read', async () => {
+    const wrapper = mountDispatcher({ isFullyLocked: false, lockedFieldCount: 2, canEditMetadata: false })
+    const button = wrapper.get('button')
+
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.classes()).toContain('text-amber-600/90')
+
+    await button.trigger('click')
+    expect(wrapper.emitted('lockAll')).toBeFalsy()
     expect(wrapper.emitted('unlockAll')).toBeFalsy()
   })
 

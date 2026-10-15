@@ -89,7 +89,7 @@ describe('UploadService', () => {
   };
 
   const appSettings = { getUploadPattern: vi.fn(), getUploadPatternBookPerFolder: vi.fn(), isCrossPlatformPathSanitizationEnabled: vi.fn() };
-  const libraryService = { verifyUserAccess: vi.fn() };
+  const libraryService = { verifyUserAccess: vi.fn(), verifyUserAccessLevel: vi.fn() };
   const validator = {
     sanitizeFilename: vi.fn(),
     validateFormat: vi.fn(),
@@ -142,6 +142,7 @@ describe('UploadService', () => {
     storage.cleanup.mockResolvedValue(undefined);
     processor.createBookRecord.mockResolvedValue({ bookId: 99, created: true });
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
+    libraryService.verifyUserAccessLevel.mockResolvedValue(undefined);
     appSettings.getUploadPattern.mockResolvedValue(null);
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue(null);
     appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(false);
@@ -1443,7 +1444,42 @@ describe('UploadService', () => {
       db.select.mockReturnValueOnce(selectChain([{ id: 10, libraryId: 1 }]));
 
       await expect(service.renameBookFiles(10, user)).resolves.toBeUndefined();
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 1, false, 'editor');
       expect(mockRenameService.performRename).toHaveBeenCalledWith(10, user.id, true, false);
+    });
+
+    it('rejects a viewer before resolving or invoking the rename service', async () => {
+      const renameService = { performRename: vi.fn() };
+      moduleRef.get.mockReturnValue(renameService);
+      db.select.mockReturnValueOnce(selectChain([{ id: 10, libraryId: 1 }]));
+      libraryService.verifyUserAccessLevel.mockRejectedValue(new ForbiddenException('Editor access required'));
+
+      await expect(service.renameBookFiles(10, user)).rejects.toThrow(ForbiddenException);
+      expect(moduleRef.get).not.toHaveBeenCalled();
+      expect(renameService.performRename).not.toHaveBeenCalled();
+    });
+
+    it('checks the current role again after a downgrade', async () => {
+      const renameService = { performRename: vi.fn().mockResolvedValue({ status: 'success' }) };
+      moduleRef.get.mockReturnValue(renameService);
+      db.select.mockReturnValue(selectChain([{ id: 10, libraryId: 1 }]));
+      await service.renameBookFiles(10, user);
+      renameService.performRename.mockClear();
+      libraryService.verifyUserAccessLevel.mockRejectedValue(new ForbiddenException('Editor access required'));
+
+      await expect(service.renameBookFiles(10, user)).rejects.toThrow(ForbiddenException);
+      expect(renameService.performRename).not.toHaveBeenCalled();
+    });
+
+    it('passes the superuser bypass through the editor authorization check', async () => {
+      const caller = { ...user, isSuperuser: true };
+      const renameService = { performRename: vi.fn().mockResolvedValue({ status: 'success' }) };
+      moduleRef.get.mockReturnValue(renameService);
+      db.select.mockReturnValueOnce(selectChain([{ id: 10, libraryId: 1 }]));
+
+      await service.renameBookFiles(10, caller);
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(caller.id, 1, true, 'editor');
+      expect(renameService.performRename).toHaveBeenCalledWith(10, caller.id, true, false);
     });
 
     it('throws NotFoundException when book does not exist', async () => {
@@ -1454,7 +1490,7 @@ describe('UploadService', () => {
 
     it('throws ForbiddenException when user has no library access', async () => {
       db.select.mockReturnValueOnce(selectChain([{ id: 10, libraryId: 1 }]));
-      libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('No access'));
+      libraryService.verifyUserAccessLevel.mockRejectedValue(new ForbiddenException('No access to this library'));
 
       await expect(service.renameBookFiles(10, user)).rejects.toBeInstanceOf(ForbiddenException);
     });

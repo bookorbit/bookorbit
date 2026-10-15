@@ -23,6 +23,7 @@ export class AuditInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap((responseBody) => {
+        if (options.when && !options.when(req, responseBody)) return;
         const user = req.user;
         const action = typeof options.action === 'function' ? options.action(req, responseBody) : options.action;
         const description = typeof options.description === 'function' ? options.description(req, responseBody) : options.description;

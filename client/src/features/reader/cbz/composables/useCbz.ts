@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { BookDetail } from '@bookorbit/types'
+import type { BookDetail, ComicPageCountResponse } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 /** The series a book is read as part of: its first membership, matching how the book pages order them. */
@@ -27,7 +27,7 @@ export function useCbz(fileId: number, bookId: number) {
       loading.value = false
       return
     }
-    const [pagesData, bookData] = await Promise.all([pagesRes.json(), bookRes.ok ? bookRes.json() : null])
+    const [pagesData, bookData] = await Promise.all([pagesRes.json() as Promise<ComicPageCountResponse>, bookRes.ok ? bookRes.json() : null])
     pageCount.value = pagesData.pageCount
     bookTitle.value = bookData?.title ?? ''
     seriesId.value = primarySeriesId(bookData)

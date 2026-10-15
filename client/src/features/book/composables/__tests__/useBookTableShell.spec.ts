@@ -33,6 +33,13 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
 }))
 
+vi.mock('@/features/auth/composables/usePermissions', () => ({
+  usePermissions: () => ({ hasPermission: () => true, isSuperuser: ref(false) }),
+}))
+vi.mock('@/features/library/composables/useLibraries', () => ({
+  useLibraries: () => ({ libraries: ref([{ id: 7, accessLevel: 'editor' }]) }),
+}))
+
 vi.mock('../useBookNavigation', () => ({
   useBookNavigation: () => ({ setBookContext: mocks.setBookContext }),
 }))
@@ -78,6 +85,7 @@ import { useBookTableShell } from '../useBookTableShell'
 function makeBook(overrides: Partial<BookCard> = {}): BookCard {
   return {
     id: 1,
+    libraryId: 7,
     status: 'present',
     coverAspectRatio: '2/3',
     title: 'Test Book',

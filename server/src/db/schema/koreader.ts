@@ -302,6 +302,37 @@ export const koreaderPageStats = pgTable(
 export type KoreaderPageStat = typeof koreaderPageStats.$inferSelect;
 export type NewKoreaderPageStat = typeof koreaderPageStats.$inferInsert;
 
+/**
+ * Spans of page events whose derived session the reader deleted. Sessions are re-derived from the
+ * stored page events whenever a nearby event arrives, and a plugin can upload its history again,
+ * so deleting the session row alone does not stick: derivation skips events inside these spans.
+ *
+ * Keyed on the device key a KOReader session id carries rather than the full device id, because
+ * that is all a deleted session row records about the device that produced it.
+ */
+export const koreaderSessionTombstones = pgTable(
+  'koreader_session_tombstones',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    deviceKey: varchar('device_key', { length: 100 }).notNull(),
+    // Unix seconds on the device clock, half-open: [startTime, endTime).
+    startTime: bigint('start_time', { mode: 'number' }).notNull(),
+    endTime: bigint('end_time', { mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('kst_user_file_device_start_idx').on(t.userId, t.bookFileId, t.deviceKey, t.startTime),
+    index('koreader_session_tombstones_book_file_id_idx').on(t.bookFileId),
+    check('koreader_session_tombstones_range_chk', sql`${t.endTime} > ${t.startTime}`),
+  ],
+);
+
 export const koreaderDeviceSweeps = pgTable(
   'koreader_device_sweeps',
   {

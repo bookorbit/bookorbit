@@ -13,9 +13,9 @@ import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
-import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -48,7 +48,6 @@ const route = useRoute()
 const router = useRouter()
 const mainRef = ref<HTMLElement | null>(null)
 useScrollRestoreOnActivate(mainRef)
-const { hasPermission } = usePermissions()
 const { setBookContext } = useBookNavigation()
 const { coverUrl } = useCoverVersions()
 
@@ -103,7 +102,11 @@ const leadBook = ref<{
 let observer: IntersectionObserver | null = null
 let leadBookRequestToken = 0
 
-const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
+const { hasLibraryPermission, hasPermissionInAnyLibrary } = useLibraryPermissions()
+function canEditBookMetadata(book: BookCard): boolean {
+  return hasLibraryPermission('library_edit_metadata', book.libraryId, 'editor')
+}
+const canEditMetadata = computed(() => hasPermissionInAnyLibrary('library_edit_metadata', 'editor'))
 const safeLeadDescription = useSafeHtml(() => leadBook.value?.description)
 const visibleSeriesAuthors = computed(() => (seriesInfo.value?.authors ?? []).slice(0, 5))
 const hiddenSeriesAuthorsCount = computed(() => Math.max(0, (seriesInfo.value?.authors.length ?? 0) - visibleSeriesAuthors.value.length))
@@ -378,7 +381,7 @@ async function editSeriesMetadata() {
       return
     }
 
-    const ids = books.value.map((book) => book.id)
+    const ids = books.value.filter(canEditBookMetadata).map((book) => book.id)
     if (ids.length === 0) {
       toast.error(t('series.detail.noBooksToEdit'))
       return

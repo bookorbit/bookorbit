@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard } from '@bookorbit/types'
 
@@ -6,12 +7,17 @@ import BookListRow from '../BookListRow.vue'
 
 const { hasPermissionMock } = vi.hoisted(() => ({ hasPermissionMock: vi.fn<(permission: string) => boolean>() }))
 
+vi.mock('@/features/library/composables/useLibraries', () => ({
+  useLibraries: () => ({ libraries: ref([{ id: 1, accessLevel: 'editor' }]) }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
-  usePermissions: () => ({ hasPermission: hasPermissionMock, isDemoRestrictedAccount: { value: false } }),
+  usePermissions: () => ({ hasPermission: hasPermissionMock, isDemoRestrictedAccount: { value: false }, isSuperuser: { value: false } }),
 }))
 
 const book: BookCard = {
   id: 12,
+  libraryId: 1,
   status: 'present',
   coverAspectRatio: '2/3',
   title: 'Dune',

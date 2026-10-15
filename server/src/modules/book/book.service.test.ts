@@ -158,6 +158,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown; appDataPath
     deleteByIdsAndInvalidateScanState: vi.fn(),
     findAllIds: vi.fn(),
     findIdsByWhere: vi.fn(),
+    findDistinctLibraryIdsByWhere: vi.fn(),
     findCardsCollapsed: vi.fn(),
     findJumpBuckets: vi.fn(),
     findJumpBucketsCollapsed: vi.fn(),
@@ -167,6 +168,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown; appDataPath
   };
   const libraryService = {
     verifyUserAccess: vi.fn().mockResolvedValue(undefined),
+    verifyUserAccessLevel: vi.fn().mockResolvedValue(undefined),
     findAll: vi.fn().mockResolvedValue([]),
     findOne: vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 }),
   };
@@ -951,13 +953,14 @@ describe('BookService', () => {
     it('returns file info with unknown format fallback', async () => {
       const { service, bookRepo } = makeService();
       bookRepo.findFileById.mockResolvedValue({ id: 10, absolutePath: '/books/test.book', format: null, bookId: 1, libraryId: 7 });
-      mockStat.mockResolvedValue({ size: 1234 } as never);
+      mockStat.mockResolvedValue({ size: 1234, mtimeMs: 1_700_000_000_000 } as never);
 
       const result = await service.getFileInfo(10, makeUser());
 
       expect(result).toEqual({
         path: '/books/test.book',
         size: 1234,
+        mtimeMs: 1_700_000_000_000,
         format: 'unknown',
         bookId: 1,
         originalFilename: 'test.book',
@@ -1023,7 +1026,7 @@ describe('BookService', () => {
         metadata: { title: 'New Title', isbn10: '0306406152', isbn13: '9780306406157' },
         diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 3 }),
       });
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 7, false);
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 7, false, 'editor');
       expect(pipeline.runWithSources).toHaveBeenCalledWith(
         {
           title: 'Old Title',
@@ -1757,7 +1760,7 @@ describe('BookService', () => {
         { postSaveMode: 'sync' },
       );
 
-      expect(verifySpy).toHaveBeenCalledWith(5, user);
+      expect(verifySpy).toHaveBeenCalledWith(5, user, 'editor');
       expect(bookRepo.withTransaction).toHaveBeenCalledTimes(1);
       expect(bookRepo.updateMetadataFields).toHaveBeenCalledWith(
         5,
@@ -2394,7 +2397,7 @@ describe('BookService', () => {
       const result = await service.bulkReExtractCover([1, 2], user, onProgress);
 
       expect(result).toEqual({ processed: 2, updated: 1 });
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 7, false);
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 7, false, 'editor');
       expect(onProgress).toHaveBeenCalledTimes(2);
       expect(onProgress).toHaveBeenNthCalledWith(1, 1);
       expect(onProgress).toHaveBeenNthCalledWith(2, 2);
@@ -2543,6 +2546,54 @@ describe('BookService', () => {
       expect(bookMetadataLockService.getCoverLockedBookIds).toHaveBeenCalledWith([1]);
       expect(metadataService.refreshCoverForBook).not.toHaveBeenCalled();
       expect(onProgress).not.toHaveBeenCalled();
+    });
+
+    it('reExtractCover answers 409 for a locked slot rather than an empty count', async () => {
+      const { service, bookRepo, bookMetadataLockService, metadataService } = makeService();
+      const user = makeUser();
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+      bookRepo.findCoverSourceFilesByBookIds.mockResolvedValue([
+        {
+          id: 10,
+          bookId: 1,
+          absolutePath: '/books/1.epub',
+          format: 'epub',
+          role: 'content',
+          sizeBytes: 10,
+          mediaOverlayAvailable: false,
+          formatPriority: ['epub', 'm4b'],
+        },
+      ]);
+      bookMetadataLockService.getCoverLockedBookIds.mockResolvedValue(new Set([1]));
+      bookMetadataLockService.assertFieldsUnlocked.mockRejectedValue(new ConflictException('Metadata fields are locked: cover'));
+
+      await expect(service.reExtractCover(1, user, 'ebook')).rejects.toThrow(ConflictException);
+
+      expect(bookMetadataLockService.assertFieldsUnlocked).toHaveBeenCalledWith(1, ['cover']);
+      expect(metadataService.refreshCoverForBook).not.toHaveBeenCalled();
+    });
+
+    it('reExtractCover returns the count when nothing it would write is locked', async () => {
+      const { service, bookRepo, bookMetadataLockService, metadataService } = makeService();
+      const user = makeUser();
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+      bookRepo.findCoverSourceFilesByBookIds.mockResolvedValue([
+        {
+          id: 10,
+          bookId: 1,
+          absolutePath: '/books/1.epub',
+          format: 'epub',
+          role: 'content',
+          sizeBytes: 10,
+          mediaOverlayAvailable: false,
+          formatPriority: ['epub', 'm4b'],
+        },
+      ]);
+      metadataService.refreshCoverForBook.mockResolvedValue(false);
+
+      await expect(service.reExtractCover(1, user)).resolves.toEqual({ processed: 1, updated: 0 });
+
+      expect(bookMetadataLockService.assertFieldsUnlocked).not.toHaveBeenCalled();
     });
 
     it('stops bulk metadata refresh when cancelled', async () => {
@@ -3121,8 +3172,8 @@ describe('BookService', () => {
         null,
         25,
         900,
-        null,
-        null,
+        undefined,
+        undefined,
         null,
         null,
         null,
@@ -3133,7 +3184,7 @@ describe('BookService', () => {
       );
     });
 
-    it('passes null positionSeconds when not provided in DTO', async () => {
+    it('leaves the narration marker out when the DTO omits it', async () => {
       const { service, bookRepo, libraryService, userBookStatusService } = makeService();
       const user = makeUser();
 
@@ -3150,9 +3201,9 @@ describe('BookService', () => {
         null,
         null,
         50,
-        null,
-        null,
-        null,
+        undefined,
+        undefined,
+        undefined,
         null,
         null,
         null,
@@ -3188,9 +3239,9 @@ describe('BookService', () => {
         null,
         null,
         50,
-        null,
-        null,
-        null,
+        undefined,
+        undefined,
+        undefined,
         null,
         null,
         null,
@@ -3869,15 +3920,29 @@ describe('BookService', () => {
         expect(result).toEqual({ id: 10, personalNote: 'Loved it.' });
       });
 
-      it('normalizes an undefined note to null when clearing', async () => {
+      it('clears the note with an explicit null', async () => {
         const { service, userBookNoteService } = makeService();
         const user = makeUser({ id: 77 });
         vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
         vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 10, personalNote: null } as never);
 
-        await service.updatePersonalNote(10, {}, user);
+        await service.updatePersonalNote(10, { note: null }, user);
 
         expect(userBookNoteService.setNote).toHaveBeenCalledWith(77, 10, null);
+      });
+
+      it('leaves the note alone when the body has no note key', async () => {
+        const { service, userBookNoteService } = makeService();
+        const user = makeUser({ id: 77 });
+        const accessSpy = vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+        const detailSpy = vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 10, personalNote: 'Loved it.' } as never);
+
+        const result = await service.updatePersonalNote(10, {}, user);
+
+        expect(accessSpy).toHaveBeenCalledWith(10, user);
+        expect(userBookNoteService.setNote).not.toHaveBeenCalled();
+        expect(detailSpy).toHaveBeenCalledWith(10, user);
+        expect(result).toEqual({ id: 10, personalNote: 'Loved it.' });
       });
     });
 
@@ -4189,7 +4254,7 @@ describe('BookService', () => {
   });
 
   describe('bulk metadata actions', () => {
-    it('bulkSetRating updates ratings and queues file writes and score recalculation', async () => {
+    it('bulkSetRating updates personal ratings without shared metadata effects', async () => {
       const { service, bookRepo, fileWriteService, fileRenameService, scoreService } = makeService();
       const user = makeUser({ id: 42 });
       vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
@@ -4197,12 +4262,9 @@ describe('BookService', () => {
       await service.bulkSetRating([3, 5], 4, user);
 
       expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3, 5], 4, 42);
-      expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(1, 3, 'auto', 42);
-      expect(fileWriteService.scheduleWrite).toHaveBeenNthCalledWith(2, 5, 'auto', 42);
-      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(1, 3, 42);
-      expect(fileRenameService.scheduleRename).toHaveBeenNthCalledWith(2, 5, 42);
-      expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(1, 3);
-      expect(scoreService.calculateAndSave).toHaveBeenNthCalledWith(2, 5);
+      expect(fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      expect(fileRenameService.scheduleRename).not.toHaveBeenCalled();
+      expect(scoreService.calculateAndSave).not.toHaveBeenCalled();
     });
 
     it('bulkSetRating skips books where rating is metadata-locked', async () => {
@@ -4215,23 +4277,22 @@ describe('BookService', () => {
 
       expect(bookMetadataLockService.getBookIdsWithLockedField).toHaveBeenCalledWith([3, 5], 'rating');
       expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3], 4, 42);
-      expect(fileWriteService.scheduleWrite).toHaveBeenCalledTimes(1);
-      expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(3, 'auto', 42);
-      expect(fileRenameService.scheduleRename).toHaveBeenCalledTimes(1);
-      expect(fileRenameService.scheduleRename).toHaveBeenCalledWith(3, 42);
-      expect(scoreService.calculateAndSave).toHaveBeenCalledTimes(1);
-      expect(scoreService.calculateAndSave).toHaveBeenCalledWith(3);
+      expect(fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      expect(fileRenameService.scheduleRename).not.toHaveBeenCalled();
+      expect(scoreService.calculateAndSave).not.toHaveBeenCalled();
     });
 
-    it('bulkSetRating propagates score recalculation failures', async () => {
-      const { service, bookRepo, scoreService } = makeService();
+    it('bulkSetRating propagates personal rating persistence failures', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
       const user = makeUser({ id: 42 });
       vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
-      scoreService.calculateAndSave.mockRejectedValue(new Error('score exploded'));
+      bookRepo.bulkSetRating.mockRejectedValue(new Error('rating persistence failed'));
 
-      await expect(service.bulkSetRating([3], 4, user)).rejects.toThrow('score exploded');
+      await expect(service.bulkSetRating([3], 4, user)).rejects.toThrow('rating persistence failed');
 
       expect(bookRepo.bulkSetRating).toHaveBeenCalledWith([3], 4, 42);
+      expect(fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      expect(fileRenameService.scheduleRename).not.toHaveBeenCalled();
     });
 
     it('bulkSetMetadata updates a single metadata field and queues follow-up work', async () => {
@@ -4674,7 +4735,7 @@ describe('BookService', () => {
 
       await service.bulkEditMetadata([7, 8, 9], fields, user);
 
-      expect(verifySpy).toHaveBeenCalledWith([7, 8, 9], user);
+      expect(verifySpy).toHaveBeenCalledWith([7, 8, 9], user, 'editor');
     });
   });
 
@@ -5767,7 +5828,7 @@ describe('BookService', () => {
       const verifySpy = vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
 
       await expect(service.resolveSelectionToIds({ bookIds: [1, 2] }, user)).resolves.toEqual([1, 2]);
-      expect(verifySpy).toHaveBeenCalledWith([1, 2], user);
+      expect(verifySpy).toHaveBeenCalledWith([1, 2], user, 'viewer');
     });
 
     it('throws when bookIds and query are both provided', async () => {
@@ -5782,6 +5843,46 @@ describe('BookService', () => {
       vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockRejectedValue(error);
 
       await expect(service.resolveSelectionToIds({ bookIds: [1, 2] }, makeUser())).rejects.toBe(error);
+    });
+
+    it('requires editor access before returning an explicit metadata selection', async () => {
+      const { service } = makeService();
+      const user = makeUser();
+      const error = new ForbiddenException('Editor access required');
+      const verifySpy = vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockRejectedValue(error);
+
+      await expect(service.resolveSelectionToIds({ bookIds: [10, 11] }, user, 'editor')).rejects.toBe(error);
+      expect(verifySpy).toHaveBeenCalledWith([10, 11], user, 'editor');
+    });
+
+    it('checks the matched libraries, not every matched book id, before resolving a query selection for editing', async () => {
+      const { service, bookRepo, libraryService, queryBuilder } = makeService();
+      const user = makeUser();
+      libraryService.findAll.mockResolvedValue([{ id: 5 }, { id: 9 }]);
+      queryBuilder.buildWhere.mockReturnValue('where-clause');
+      bookRepo.findDistinctLibraryIdsByWhere.mockResolvedValue([5, 9]);
+      const error = new ForbiddenException('Insufficient library access level');
+      libraryService.verifyUserAccessLevel.mockImplementation((_userId: number, libraryId: number) =>
+        libraryId === 9 ? Promise.reject(error) : Promise.resolve(),
+      );
+
+      await expect(service.resolveSelectionToIds({ query: {} }, user, 'editor')).rejects.toBe(error);
+      expect(bookRepo.findDistinctLibraryIdsByWhere).toHaveBeenCalledWith('where-clause');
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 5, false, 'editor');
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 9, false, 'editor');
+      expect(bookRepo.findIdsByWhere).not.toHaveBeenCalled();
+      expect(bookRepo.findLibraryIdsByBookIds).not.toHaveBeenCalled();
+    });
+
+    it('skips the matched-library lookup for superusers resolving a query selection for editing', async () => {
+      const { service, bookRepo, libraryService, queryBuilder } = makeService();
+      const user = makeUser({ isSuperuser: true });
+      libraryService.findAll.mockResolvedValue([{ id: 5 }]);
+      queryBuilder.buildWhere.mockReturnValue('where-clause');
+      bookRepo.findIdsByWhere.mockResolvedValue([10, 11]);
+
+      await expect(service.resolveSelectionToIds({ query: {} }, user, 'editor')).resolves.toEqual([10, 11]);
+      expect(bookRepo.findDistinctLibraryIdsByWhere).not.toHaveBeenCalled();
     });
 
     it('rejects explicit selections when any requested book id is missing', async () => {

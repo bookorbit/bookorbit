@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
@@ -8,6 +8,7 @@ import { BookReadService } from '../../book/book-read.service';
 import { LibraryService } from '../../library/library.service';
 import type { RequestUser } from '../../../common/types/request-user';
 import { buildEpubMediaOverlayPlaylist, findEpubZipEntry, normalizeEpubZipPath } from './epub-media-overlay';
+import { parseEpubPackage } from './epub-package';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.xhtml': 'application/xhtml+xml',
@@ -52,6 +53,8 @@ interface CacheEntry {
   mtime: number;
   validPaths: Set<string>;
   lastAccessed: number;
+  /** Narration playlists built from this copy of the file, by `bookId:fileId`. */
+  playlists?: Map<string, Promise<EpubMediaOverlayPlaylist>>;
 }
 
 interface EpubFileResolution {
@@ -204,8 +207,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
 
   const opfEntry = findInZip(zip.files, opfPath);
   if (!opfEntry) throw new Error(`OPF not found: ${opfPath}`);
-  const opfDoc = xmlParser.parse(await opfEntry.buffer()) as Record<string, unknown>;
-  const pkg = (opfDoc['package'] ?? opfDoc) as Record<string, unknown>;
+  const pkg = parseEpubPackage(await opfEntry.buffer());
   const manifestEl = pkg['manifest'] as Record<string, unknown> | undefined;
   const spineEl = pkg['spine'] as Record<string, unknown> | undefined;
   const metadataEl = pkg['metadata'] as Record<string, unknown> | undefined;
@@ -328,7 +330,26 @@ export class EpubService {
   async getMediaOverlayPlaylist(bookId: number, fileId: number | undefined, user: RequestUser): Promise<EpubMediaOverlayPlaylist> {
     const resolved = await this.resolveEpubFile(bookId, fileId, user);
     const cached = await this.getCachedEntry(resolved.absolutePath);
-    return buildEpubMediaOverlayPlaylist(resolved.absolutePath, cached.info, bookId, resolved.fileId);
+    return this.cachedPlaylist(cached, resolved.absolutePath, bookId, resolved.fileId);
+  }
+
+  /**
+   * The playlist, built once per copy of the file. Every audio request needs it to check its
+   * resource, and a player asks for many ranges of one clip, each of which used to parse every
+   * SMIL in the book again.
+   */
+  private cachedPlaylist(entry: CacheEntry, absolutePath: string, bookId: number, fileId: number | null): Promise<EpubMediaOverlayPlaylist> {
+    const playlists = (entry.playlists ??= new Map());
+    const key = `${bookId}:${fileId ?? ''}`;
+    const existing = playlists.get(key);
+    if (existing) return existing;
+    const built = buildEpubMediaOverlayPlaylist(absolutePath, entry.info, bookId, fileId);
+    playlists.set(key, built);
+    // A failure is not kept, so the next request tries again.
+    built.catch(() => {
+      if (playlists.get(key) === built) playlists.delete(key);
+    });
+    return built;
   }
 
   async streamMediaOverlayFile(
@@ -344,7 +365,7 @@ export class EpubService {
 
     const resolved = await this.resolveEpubFile(bookId, fileId, user);
     const cached = await this.getCachedEntry(resolved.absolutePath);
-    const playlist = await buildEpubMediaOverlayPlaylist(resolved.absolutePath, cached.info, bookId, resolved.fileId);
+    const playlist = await this.cachedPlaylist(cached, resolved.absolutePath, bookId, resolved.fileId);
     const resource = playlist.resources.find((item) => item.href === normalizedPath);
     if (!resource) throw new NotFoundException(`Media-overlay resource not in playlist: ${normalizedPath}`);
 
@@ -354,6 +375,15 @@ export class EpubService {
 
     const full = await entry.buffer();
     const range = this.parseRange(rangeHeader, full.length);
+    if (range === 'unsatisfiable') {
+      return {
+        data: Buffer.alloc(0),
+        contentType: resource.mediaType,
+        size: full.length,
+        status: 416,
+        contentRange: `bytes */${full.length}`,
+      };
+    }
     const data = range ? full.subarray(range.start, range.end + 1) : full;
     return {
       data,
@@ -413,27 +443,31 @@ export class EpubService {
     return { fileId: null, absolutePath: file.absolutePath, readerPath: file.absolutePath, sizeBytes: file.sizeBytes };
   }
 
-  private parseRange(rangeHeader: string | undefined, size: number): ByteRange | null {
+  /**
+   * The bytes a Range header asks for. A header this cannot read is ignored and the whole file
+   * sent, as HTTP has it; a range that reads but lies outside the file is a 416.
+   */
+  private parseRange(rangeHeader: string | undefined, size: number): ByteRange | 'unsatisfiable' | null {
     if (!rangeHeader) return null;
     const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
-    if (!match) throw new BadRequestException('Invalid Range header');
+    if (!match) return null;
     const [, startRaw, endRaw] = match;
-    if (!startRaw && !endRaw) throw new BadRequestException('Invalid Range header');
+    if (!startRaw && !endRaw) return null;
 
     let start: number;
     let end: number;
     if (!startRaw) {
       const suffixLength = Number(endRaw);
-      if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) throw new BadRequestException('Invalid Range header');
+      if (!Number.isSafeInteger(suffixLength)) return null;
+      if (suffixLength <= 0 || size === 0) return 'unsatisfiable';
       start = Math.max(0, size - suffixLength);
       end = size - 1;
     } else {
       start = Number(startRaw);
       end = endRaw ? Number(endRaw) : size - 1;
     }
-    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || start >= size) {
-      throw new BadRequestException('Invalid Range header');
-    }
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) return null;
+    if (start >= size) return 'unsatisfiable';
     return { start, end: Math.min(end, size - 1) };
   }
 

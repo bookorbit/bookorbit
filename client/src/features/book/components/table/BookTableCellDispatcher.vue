@@ -31,6 +31,7 @@ const props = defineProps<{
   isLocked: boolean
   isActive: boolean
   isReadOnly: boolean
+  canEditMetadata: boolean
   isFullyLocked: boolean
   lockedFieldCount: number
   selectionMode: boolean
@@ -86,6 +87,7 @@ const lockStateClass = computed(() => {
 })
 
 function handleToggleAllLocks() {
+  if (!props.canEditMetadata) return
   if (props.isFullyLocked) {
     emit('unlockAll')
     return
@@ -104,8 +106,9 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="flex h-6 w-6 items-center justify-center rounded-xs transition-colors hover:bg-muted"
+          class="flex h-6 w-6 items-center justify-center rounded-xs transition-colors hover:bg-muted disabled:pointer-events-none"
           :class="lockStateClass"
+          :disabled="!canEditMetadata"
           :aria-label="isFullyLocked ? t('book.table.locks.unlockAll') : t('book.table.locks.lockAll')"
           @click.stop="handleToggleAllLocks"
         >
@@ -128,7 +131,13 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
     @cover-click="emit('coverClick')"
   />
 
-  <BookTableLockableCell v-else-if="cellType === 'text'" :is-locked="isLocked" :has-lock-field="hasLockField" @toggle-lock="emit('toggleLock')">
+  <BookTableLockableCell
+    v-else-if="cellType === 'text'"
+    :is-locked="isLocked"
+    :has-lock-field="hasLockField"
+    :read-only="!canEditMetadata"
+    @toggle-lock="emit('toggleLock')"
+  >
     <BookTableTextCell
       :value="asString(value)"
       :is-active="isActive"
@@ -146,7 +155,13 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
 
   <BookTableMetadataScoreCell v-else-if="colId === 'metadataScore'" :value="asNumber(value)" />
 
-  <BookTableLockableCell v-else-if="cellType === 'number'" :is-locked="isLocked" :has-lock-field="hasLockField" @toggle-lock="emit('toggleLock')">
+  <BookTableLockableCell
+    v-else-if="cellType === 'number'"
+    :is-locked="isLocked"
+    :has-lock-field="hasLockField"
+    :read-only="!canEditMetadata"
+    @toggle-lock="emit('toggleLock')"
+  >
     <BookTableNumberCell
       :value="asNumberInput(value)"
       :is-active="isActive"
@@ -159,11 +174,23 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
     />
   </BookTableLockableCell>
 
-  <BookTableLockableCell v-else-if="cellType === 'rating'" :is-locked="isLocked" :has-lock-field="hasLockField" @toggle-lock="emit('toggleLock')">
+  <BookTableLockableCell
+    v-else-if="cellType === 'rating'"
+    :is-locked="isLocked"
+    :has-lock-field="hasLockField"
+    :read-only="!canEditMetadata"
+    @toggle-lock="emit('toggleLock')"
+  >
     <BookTableRatingCell :value="asNumber(value)" :is-read-only="isReadOnly" @save="emit('save', $event)" />
   </BookTableLockableCell>
 
-  <BookTableLockableCell v-else-if="cellType === 'chips'" :is-locked="isLocked" :has-lock-field="hasLockField" @toggle-lock="emit('toggleLock')">
+  <BookTableLockableCell
+    v-else-if="cellType === 'chips'"
+    :is-locked="isLocked"
+    :has-lock-field="hasLockField"
+    :read-only="!canEditMetadata"
+    @toggle-lock="emit('toggleLock')"
+  >
     <BookTableChipsCell
       :value="asStringArray(value)"
       :is-active="isActive"

@@ -1,5 +1,6 @@
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
+import { parseEpubPackage } from './epub-package';
 
 import type {
   EpubBookInfo,
@@ -119,19 +120,16 @@ function attr(node: unknown, name: string): string | null {
 async function readPackageMediaDurationSeconds(zip: unzipper.CentralDirectory, opfPath: string): Promise<number | null> {
   const entry = opfPath ? findEpubZipEntry(zip.files, opfPath) : undefined;
   if (!entry) return null;
-  let doc: Record<string, unknown>;
+  let pkg: Record<string, unknown>;
   try {
-    doc = smilParser.parse(await entry.buffer()) as Record<string, unknown>;
+    pkg = parseEpubPackage(await entry.buffer());
   } catch {
     return null;
   }
-  const pkg = (doc['package'] ?? doc) as Record<string, unknown>;
   const metadata = pkg['metadata'] as Record<string, unknown> | undefined;
   for (const meta of toArray(metadata?.meta)) {
     if (attr(meta, 'property') !== 'media:duration' || attr(meta, 'refines') != null) continue;
-    // fast-xml-parser turns a bare timecount such as "21103.35" into a number.
-    const value = (meta as Record<string, unknown>)['#text'];
-    const seconds = typeof value === 'number' ? value : parseClock(value);
+    const seconds = parseClock((meta as Record<string, unknown>)['#text']);
     if (seconds != null && Number.isFinite(seconds) && seconds > 0) return seconds;
   }
   return null;
@@ -158,8 +156,7 @@ async function parseEpubMediaOverlayBookInfo(epubPath: string): Promise<EpubBook
   const opfEntry = findEpubZipEntry(zip.files, opfPath);
   if (!opfEntry) throw new Error(`OPF not found: ${opfPath}`);
 
-  const opfDoc = smilParser.parse(await opfEntry.buffer()) as Record<string, unknown>;
-  const pkg = (opfDoc['package'] ?? opfDoc) as Record<string, unknown>;
+  const pkg = parseEpubPackage(await opfEntry.buffer());
   const manifestEl = pkg['manifest'] as Record<string, unknown> | undefined;
   const spineEl = pkg['spine'] as Record<string, unknown> | undefined;
 
@@ -380,8 +377,7 @@ export async function inspectEpubMediaOverlayFile(epubPath: string): Promise<Epu
   const opfEntry = findEpubZipEntry(zip.files, opfPath);
   if (!opfEntry) return { available: false, durationSeconds: null };
 
-  const opfDoc = smilParser.parse(await opfEntry.buffer()) as Record<string, unknown>;
-  const pkg = (opfDoc['package'] ?? opfDoc) as Record<string, unknown>;
+  const pkg = parseEpubPackage(await opfEntry.buffer());
   const manifestEl = pkg['manifest'] as Record<string, unknown> | undefined;
   const spineEl = pkg['spine'] as Record<string, unknown> | undefined;
 

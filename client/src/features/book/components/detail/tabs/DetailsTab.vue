@@ -45,6 +45,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
 import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/composables/usePersonalNote'
@@ -59,6 +60,7 @@ import MetadataScoreBreakdown from '@/features/metadata-score/components/Metadat
 import { useMetadataScoreWeights } from '@/features/metadata-score/composables/useMetadataScoreWeights'
 import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 import { useKoreaderBookProgress } from '@/features/koreader/composables/useKoreaderBookProgress'
+import KoreaderResetHoldNotice from '@/features/koreader/components/KoreaderResetHoldNotice.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { formatCommunityRatingValue } from '@/features/book/lib/community-rating'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
@@ -254,6 +256,7 @@ onBeforeUnmount(() => {
 })
 
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
 const { load: loadLocks, isLocked } = useMetadataLocks()
 watch(
   () => props.book,
@@ -264,7 +267,8 @@ watch(
 const isRatingLocked = computed(() => isLocked('rating'))
 const canViewKobo = computed(() => hasPermission('kobo_sync'))
 const canViewKoreader = computed(() => hasPermission('koreader_sync'))
-const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
+const canManageReadingState = computed(() => hasPermission('library_edit_metadata'))
 const resetReadingStateBookId = computed(() => props.book.id)
 const {
   open: resetReadingStateDialogOpen,
@@ -880,28 +884,9 @@ function formatKoboDeviceNames(snapshots: BookKoboState['snapshots']): string {
 }
 
 const resetHeldDevices = computed(() => (canViewKoreader.value ? (koreaderBookProgress.value?.heldByReset ?? []) : []))
-const releasingDeviceIds = ref<string[]>([])
-const failedReleaseDeviceIds = ref<string[]>([])
 
-function isReleasingHold(deviceId: string): boolean {
-  return releasingDeviceIds.value.includes(deviceId)
-}
-
-function hasReleaseFailed(deviceId: string): boolean {
-  return failedReleaseDeviceIds.value.includes(deviceId)
-}
-
-async function handleReleaseResetHold(deviceId: string) {
-  if (isReleasingHold(deviceId)) return
-  releasingDeviceIds.value = [...releasingDeviceIds.value, deviceId]
-  failedReleaseDeviceIds.value = failedReleaseDeviceIds.value.filter((id) => id !== deviceId)
-  try {
-    const released = await releaseKoreaderResetHold(props.book.id, deviceId)
-    // A button that re-enables with the hold still showing reads as nothing having happened.
-    if (!released) failedReleaseDeviceIds.value = [...failedReleaseDeviceIds.value, deviceId]
-  } finally {
-    releasingDeviceIds.value = releasingDeviceIds.value.filter((id) => id !== deviceId)
-  }
+function releaseResetHold(deviceId: string): Promise<boolean> {
+  return releaseKoreaderResetHold(props.book.id, deviceId)
 }
 
 const koboAnomaly = computed(() => {
@@ -964,13 +949,6 @@ function formatAddedDateTime(iso: string): string {
     minute: '2-digit',
     timeZone: userTimeZone.value,
   })
-}
-
-function formatPercent(value: number): string {
-  const clamped = Math.max(0, Math.min(100, value))
-  if (clamped > 0 && clamped < 1) return '<1%'
-  if (clamped > 99 && clamped < 100) return '>99%'
-  return `${Math.round(clamped)}%`
 }
 
 function formatDate(iso: string): string {
@@ -1055,6 +1033,7 @@ function handleCoverLightboxOpenChange(open: boolean) {
 }
 
 function openEditCover() {
+  if (!canEditMetadata.value) return
   router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
 }
 
@@ -1271,7 +1250,7 @@ watch(
                 :aria-label="t('book.detail.details.viewCover')"
                 @click="handleCoverClick"
               />
-              <Tooltip>
+              <Tooltip v-if="canEditMetadata">
                 <TooltipTrigger as-child>
                   <button
                     class="absolute top-1.5 right-1.5 z-10 p-1 rounded-xs bg-black/50 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
@@ -1453,7 +1432,11 @@ watch(
             >
               <Send class="size-3.5" />
             </button>
-            <Popover v-if="canEditMetadata || hasPermission('library_delete_books')" :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
+            <Popover
+              v-if="canManageReadingState || canEditMetadata || hasPermission('library_delete_books')"
+              :open="moreMenuOpen"
+              @update:open="(v) => (moreMenuOpen = v)"
+            >
               <PopoverTrigger as-child>
                 <button
                   class="flex flex-1 items-center justify-center h-9 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
@@ -1463,7 +1446,7 @@ watch(
               </PopoverTrigger>
               <PopoverContent class="w-44 p-1" align="end">
                 <button
-                  v-if="canEditMetadata"
+                  v-if="canManageReadingState"
                   class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
                   @click="handleOpenResetReadingState"
                 >
@@ -1471,7 +1454,7 @@ watch(
                   Reset reading state
                 </button>
                 <button
-                  v-if="hasPermission('library_edit_metadata')"
+                  v-if="canEditMetadata"
                   class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors"
                   @click="handleMoveFromMenu"
                 >
@@ -1491,24 +1474,7 @@ watch(
           </div>
         </div>
 
-        <div v-for="held in resetHeldDevices" :key="held.deviceId" class="mt-2 flex items-start gap-1.5">
-          <TriangleAlert class="size-3 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
-          <div class="min-w-0">
-            <p class="text-[11px] text-amber-500">
-              {{ t('book.detail.details.resetHoldNotice', { device: held.device, percent: formatPercent(held.percentage) }) }}
-            </p>
-            <button
-              class="mt-0.5 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="isReleasingHold(held.deviceId)"
-              @click="handleReleaseResetHold(held.deviceId)"
-            >
-              {{ isReleasingHold(held.deviceId) ? t('book.detail.details.resetHoldReleasing') : t('book.detail.details.resetHoldRelease') }}
-            </button>
-            <p v-if="hasReleaseFailed(held.deviceId)" role="alert" class="text-[11px] text-destructive">
-              {{ t('book.detail.details.resetHoldReleaseFailed') }}
-            </p>
-          </div>
-        </div>
+        <KoreaderResetHoldNotice v-if="resetHeldDevices.length > 0" class="mt-2" :held="resetHeldDevices" :release="releaseResetHold" />
         <Tooltip v-if="koboAnomaly">
           <TooltipTrigger as-child>
             <div class="mt-2 flex items-center gap-1.5 cursor-help" tabindex="0">

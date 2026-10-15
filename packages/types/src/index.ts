@@ -49,6 +49,7 @@ export * from "./indexer-manager";
 export * from "./request-credential";
 export * from "./file-write";
 export * from "./epub";
+export * from "./comic";
 export * from "./author";
 export * from "./metadata-score";
 export * from "./metadata-reminders";

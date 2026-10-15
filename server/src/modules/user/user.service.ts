@@ -431,7 +431,7 @@ export class UserService {
 
     const normalizedLibraryIds = this.uniqueIds(libraryIds);
     await this.assertKnownLibraryIds(normalizedLibraryIds);
-    await this.userRepo.replaceViewerLibraries(targetUserId, normalizedLibraryIds);
+    await this.userRepo.replaceLibraries(targetUserId, normalizedLibraryIds);
   }
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, FolderInput, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetadata'
 import { useBookRefreshFeedback } from '@/features/book/composables/useBookRefreshFeedback'
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
@@ -27,6 +28,8 @@ const emit = defineEmits<{
 const router = useRouter()
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { refreshWithFeedback, refreshing } = useRefreshMetadata()
 const refreshFeedback = useBookRefreshFeedback()
 const { isRefreshing } = useRefreshingBooks()
@@ -159,7 +162,7 @@ onBeforeUnmount(() => {
         {{ t('book.table.actions.bookDetails') }}
       </button>
       <button
-        v-if="hasPermission('library_edit_metadata')"
+        v-if="canEditMetadata"
         class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="openEditMetadata"
       >
@@ -167,7 +170,7 @@ onBeforeUnmount(() => {
         {{ t('book.table.actions.editMetadata') }}
       </button>
       <button
-        v-if="hasPermission('library_edit_metadata')"
+        v-if="canEditMetadata"
         class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         :disabled="anyRefreshing"
         @click="refreshMetadata"
@@ -183,7 +186,7 @@ onBeforeUnmount(() => {
         {{ t('book.table.actions.addToCollection') }}
       </button>
       <button
-        v-if="hasPermission('library_edit_metadata')"
+        v-if="canEditMetadata"
         class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="emitAction('move-to-library')"
       >

@@ -51,6 +51,7 @@ import {
   resolveUploadPath,
 } from '@bookorbit/types';
 import type {
+  AccessLevel,
   AudiobookChapter,
   BookCommunityRating,
   BookKoboState,
@@ -336,16 +337,32 @@ export class BookService {
     return code === 'ENOENT' || code === 'ENOTDIR';
   }
 
-  private async verifyLibraryAccessForBookIds(bookIds: number[], user: RequestUser): Promise<{ id: number; libraryId: number }[]> {
+  private async verifyLibraryAccessForBookIds(
+    bookIds: number[],
+    user: RequestUser,
+    required: AccessLevel = 'viewer',
+  ): Promise<{ id: number; libraryId: number }[]> {
     const uniqueBookIds = [...new Set(bookIds)];
     const rows = await this.bookRepo.findLibraryIdsByBookIds(uniqueBookIds);
     if (rows.length !== uniqueBookIds.length) {
       throw new NotFoundException('One or more books were not found');
     }
-    const uniqueLibraryIds = [...new Set(rows.map((row) => row.libraryId))];
-    const isSuperuser = this.isSuperuser(user);
-    await Promise.all(uniqueLibraryIds.map((libraryId) => this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser)));
+    await this.verifyLibraryAccessLevels(
+      rows.map((row) => row.libraryId),
+      user,
+      required,
+    );
     return rows;
+  }
+
+  private async verifyLibraryAccessLevels(libraryIds: number[], user: RequestUser, required: AccessLevel): Promise<void> {
+    const isSuperuser = this.isSuperuser(user);
+    if (isSuperuser) return;
+    await mapWithConcurrency([...new Set(libraryIds)], 8, (libraryId) =>
+      required === 'viewer'
+        ? this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser)
+        : this.libraryService.verifyUserAccessLevel(user.id, libraryId, isSuperuser, required),
+    );
   }
 
   private collectExistingProviderIds(meta: {
@@ -526,7 +543,7 @@ export class BookService {
     return normalized;
   }
 
-  async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
+  async verifyBookAccess(bookId: number, user: RequestUser, required: AccessLevel = 'viewer'): Promise<void> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
     // Not found, rather than forbidden. A 403 tells the caller the book exists, and book ids are
@@ -547,6 +564,7 @@ export class BookService {
       const passes = await this.checkBookPassesContentFilters(bookId, user.contentFilters);
       if (!passes) throw new NotFoundException(`Book ${bookId} not found`);
     }
+    if (required !== 'viewer') await this.libraryService.verifyUserAccessLevel(user.id, libraryId, this.isSuperuser(user), required);
   }
 
   setHardcoverEditionIdIfEmpty(bookId: number, hardcoverEditionId: string): Promise<boolean> {
@@ -566,12 +584,12 @@ export class BookService {
     return file;
   }
 
-  async resolveSelectionToIds(dto: BulkSelectionDto, user: RequestUser): Promise<number[]> {
+  async resolveSelectionToIds(dto: BulkSelectionDto, user: RequestUser, required: AccessLevel = 'viewer'): Promise<number[]> {
     if (dto.bookIds && dto.query) {
       throw new BadRequestException('bookIds and query are mutually exclusive');
     }
     if (dto.bookIds) {
-      await this.verifyLibraryAccessForBookIds(dto.bookIds, user);
+      await this.verifyLibraryAccessForBookIds(dto.bookIds, user, required);
       return dto.bookIds;
     }
     if (dto.query) {
@@ -592,6 +610,9 @@ export class BookService {
         timeZone,
         contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
       });
+      if (required !== 'viewer' && !this.isSuperuser(user)) {
+        await this.verifyLibraryAccessLevels(await this.bookRepo.findDistinctLibraryIdsByWhere(where), user, required);
+      }
       return this.bookRepo.findIdsByWhere(where);
     }
     throw new BadRequestException('Either bookIds or query must be provided');
@@ -1453,11 +1474,20 @@ export class BookService {
   async getFileInfo(
     fileId: number,
     user: RequestUser,
-  ): Promise<{ path: string; size: number; format: string; bookId: number; originalFilename: string; mediaOverlayAvailable: boolean }> {
+  ): Promise<{
+    path: string;
+    size: number;
+    mtimeMs: number;
+    format: string;
+    bookId: number;
+    originalFilename: string;
+    mediaOverlayAvailable: boolean;
+  }> {
     const file = await this.verifyFileAccess(fileId, user);
     let size: number;
+    let mtimeMs: number;
     try {
-      ({ size } = await stat(file.absolutePath));
+      ({ size, mtimeMs } = await stat(file.absolutePath));
     } catch (err) {
       if (this.isMissingFilesystemEntry(err)) {
         throw new NotFoundException(`File ${fileId} not found on disk`);
@@ -1468,6 +1498,7 @@ export class BookService {
     return {
       path: file.absolutePath,
       size,
+      mtimeMs,
       format: file.format ?? 'unknown',
       bookId: file.bookId,
       originalFilename,
@@ -1555,6 +1586,7 @@ export class BookService {
     this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - rename file started`);
     try {
       const file = await this.verifyFileAccess(fileId, user);
+      await this.libraryService.verifyUserAccessLevel(user.id, file.libraryId, this.isSuperuser(user), 'editor');
 
       let newAbsolutePath = file.absolutePath;
       if (dto.filename && dto.filename !== basename(file.absolutePath)) {
@@ -1729,7 +1761,7 @@ export class BookService {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} - metadata update started`);
     try {
-      await this.verifyBookAccess(id, user);
+      await this.verifyBookAccess(id, user, 'editor');
       await this.bookMetadataLockService.assertManualUpdateAllowed(id, dto);
       const { detail, scalarFieldCount, write, libraryAutoWriteEnabled } = await this.persistMetadataUpdate(id, dto, user, {
         postSaveMode: options.postSaveMode ?? 'schedule',
@@ -1749,7 +1781,7 @@ export class BookService {
   }
 
   async updateAddedAt(id: number, dto: UpdateBookAddedAtDto, user: RequestUser): Promise<BookDetailDto> {
-    await this.verifyBookAccess(id, user);
+    await this.verifyBookAccess(id, user, 'editor');
     const timeZone = this.resolveUserTimeZone(user);
     if (!isDateKey(dto.addedAt)) throw new BadRequestException('addedAt must be a valid date');
     if (dto.addedAt > toDateKeyInTimeZone(new Date(), timeZone)) throw new BadRequestException('addedAt cannot be in the future');
@@ -1770,7 +1802,7 @@ export class BookService {
       `[${event}] [start] bookId=${id} userId=${user.id} metadataFields=${Object.keys(metadata).length} lockFields=${dto.lockedFields.length} - metadata and lock update started`,
     );
     try {
-      await this.verifyBookAccess(id, user);
+      await this.verifyBookAccess(id, user, 'editor');
       // No lock guard here: this endpoint sets metadata and locks together from one explicit manual
       // request, so a field carried in the payload is always an intentional edit (the editor disables
       // locked inputs). Guarding on the final lock state would reject the legitimate unlock -> edit ->
@@ -2048,7 +2080,7 @@ export class BookService {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} - metadata lock update started`);
     try {
-      await this.verifyBookAccess(id, user);
+      await this.verifyBookAccess(id, user, 'editor');
       const normalizedLockedFields = await this.bookMetadataLockService.replaceLockedFields(id, lockedFields);
       const detail = await this.getDetail(id, user);
       this.logger.log(
@@ -2289,9 +2321,10 @@ export class BookService {
       text.cfi,
       text.pageNumber,
       text.percentage,
-      dto.positionSeconds ?? null,
-      dto.mediaOverlayFragment ?? null,
-      dto.mediaOverlaySectionIndex ?? null,
+      // Omitted, these keep the narration marker the file holds; only an explicit null clears it.
+      dto.positionSeconds,
+      dto.mediaOverlayFragment,
+      dto.mediaOverlaySectionIndex,
       dto.koboLocationSource ?? null,
       dto.koboLocationType ?? null,
       dto.koboLocationValue ?? null,
@@ -2509,7 +2542,6 @@ export class BookService {
     const updatableIds = bookIds.filter((bookId) => !lockedIds.has(bookId));
     if (updatableIds.length > 0) {
       await this.bookRepo.bulkSetRating(updatableIds, rating, user.id);
-      await this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
       this.achievementEvents?.emit(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, {
         userId: user.id,
         bookIds: updatableIds,
@@ -2525,7 +2557,7 @@ export class BookService {
     const event = 'book.bulk.set_metadata';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} field=${field} - bulk set metadata started`);
-    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
     const lockField = BULK_METADATA_LOCK_FIELD_BY_FIELD[field];
     const lockedIds = await this.bookMetadataLockService.getBookIdsWithLockedField(bookIds, lockField);
     const updatableIds = bookIds.filter((bookId) => !lockedIds.has(bookId));
@@ -2587,7 +2619,7 @@ export class BookService {
     const event = 'book.bulk.update_tags';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} mode=${mode} tagCount=${tags.length} - bulk update tags started`);
-    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
     await this.bookRepo.withTransaction(async (tx) => {
       if (mode === 'replace') {
         for (const bookId of bookIds) {
@@ -2614,7 +2646,7 @@ export class BookService {
     const event = 'book.bulk.set_metadata_lock';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} locked=${locked} - bulk set metadata lock started`);
-    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
     const fields: BookMetadataLockField[] = locked ? [...BOOK_METADATA_LOCK_FIELDS] : [];
     await this.bookMetadataLockService.bulkReplaceLockedFields(bookIds, fields);
     this.logger.log(
@@ -2635,7 +2667,7 @@ export class BookService {
       throw new BadRequestException('array fields with add or remove mode must have a non-empty values array');
     }
 
-    await this.verifyLibraryAccessForBookIds(bookIds, user);
+    await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
 
     const locksMap = await this.bookMetadataLockService.getLockedFieldsMap(bookIds);
     const fieldResults: Record<string, BulkEditFieldResult> = {};
@@ -2910,7 +2942,7 @@ export class BookService {
       if (!found) throw new NotFoundException(`Book ${id} not found`);
 
       const { book, authorRows, genreRows, communityRatingRows, fileRows, narratorRows } = found;
-      await this.libraryService.verifyUserAccess(user.id, book.books.libraryId, this.isSuperuser(user));
+      await this.libraryService.verifyUserAccessLevel(user.id, book.books.libraryId, this.isSuperuser(user), 'editor');
       const meta = book.book_metadata;
 
       const providerIds = this.collectExistingProviderIds(meta ?? {});
@@ -3063,7 +3095,7 @@ export class BookService {
         this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} processed=0 failed=0 - bulk refresh metadata completed`);
         return { processed: 0, failed: 0 };
       }
-      await this.verifyLibraryAccessForBookIds(bookIds, user);
+      await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
 
       let processed = 0;
       let failed = 0;
@@ -3116,7 +3148,7 @@ export class BookService {
     bookIds: number[],
     user: RequestUser,
     onProgress?: (bookId: number) => void,
-    options?: { isCancelled?: () => boolean; medium?: CoverMedium },
+    options?: { isCancelled?: () => boolean; medium?: CoverMedium; onSkippedLocked?: (bookId: number) => void },
   ): Promise<{ processed: number; updated: number }> {
     const event = 'book.bulk_reextract_cover';
     const startedAt = Date.now();
@@ -3126,7 +3158,7 @@ export class BookService {
         this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} processed=0 updated=0 - bulk re-extract cover completed`);
         return { processed: 0, updated: 0 };
       }
-      await this.verifyLibraryAccessForBookIds(bookIds, user);
+      await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
 
       const [files, coverLockedBookIds, audioCoverLockedBookIds] = await Promise.all([
         this.bookRepo.findCoverSourceFilesByBookIds(bookIds),
@@ -3161,6 +3193,7 @@ export class BookService {
         const unlocked = targets.filter(({ medium }) => !(medium === 'audio' ? audioCoverLockedBookIds : coverLockedBookIds).has(id));
         if (unlocked.length === 0) {
           skipped++;
+          options?.onSkippedLocked?.(id);
           continue;
         }
         processed++;
@@ -3191,6 +3224,25 @@ export class BookService {
       );
       throw err;
     }
+  }
+
+  /**
+   * Re-extracts one book's cover. When every slot it would write is locked it answers 409, as the
+   * other cover writes do, rather than `{ processed: 0, updated: 0 }`, which a client cannot tell
+   * from a file with no art. Nothing is written in that case, so the check can follow the run.
+   */
+  async reExtractCover(id: number, user: RequestUser, medium?: CoverMedium): Promise<{ processed: number; updated: number }> {
+    let skippedLocked = false;
+    const result = await this.bulkReExtractCover([id], user, undefined, {
+      medium,
+      onSkippedLocked: () => {
+        skippedLocked = true;
+      },
+    });
+    if (skippedLocked) {
+      await this.bookMetadataLockService.assertFieldsUnlocked(id, medium ? [medium === 'audio' ? 'audioCover' : 'cover'] : ['cover', 'audioCover']);
+    }
+    return result;
   }
 
   private async resolveExportFileSize(file: ExportCandidateFile): Promise<number> {
@@ -3510,7 +3562,7 @@ export class BookService {
   }
 
   async writeAndRename(bookId: number, user: RequestUser): Promise<BookWriteAndRenameResult> {
-    await this.verifyBookAccess(bookId, user);
+    await this.verifyBookAccess(bookId, user, 'editor');
 
     this.fileWriteService?.cancelPendingWrite(bookId);
     this.fileRenameService?.cancelPendingRename(bookId);
@@ -3559,7 +3611,9 @@ export class BookService {
 
   async updatePersonalNote(id: number, dto: UpdatePersonalNoteDto, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    await this.userBookNoteService.setNote(user.id, id, dto.note ?? null);
+    // A body without `note` leaves the note alone, as an omitted key does on the other partial
+    // routes; `null` clears it. The web and every iOS build send the key, null included.
+    if (dto.note !== undefined) await this.userBookNoteService.setNote(user.id, id, dto.note);
     return this.getDetail(id, user);
   }
 

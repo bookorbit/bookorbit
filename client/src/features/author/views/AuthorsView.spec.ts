@@ -73,6 +73,10 @@ vi.mock('@/features/library/composables/useLibraries', () => ({
   useLibraries: () => ({ libraries: ref([]), fetchLibraries: mocks.fetchLibraries }),
 }))
 
+vi.mock('@/features/library/composables/useLibraryPermissions', () => ({
+  useLibraryPermissions: () => ({ hasLibraryPermission: () => true, hasPermissionInAnyLibrary: () => true }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: () => true, isDemoRestrictedAccount: ref(false), isSuperuser: ref(false) }),
 }))

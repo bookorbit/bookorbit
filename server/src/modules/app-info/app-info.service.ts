@@ -5,6 +5,7 @@ import { SERVER_FEATURES, type AppInfoResponse } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { ServerIdentityService } from '../server-identity/server-identity.service';
 import { GITHUB_RELEASES_API, SEMVER_RE, UPDATE_CHECK_TIMEOUT_MS } from './app-info.constants';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class AppInfoService implements OnApplicationBootstrap {
   constructor(
     private readonly config: ConfigService,
     private readonly appSettingsService: AppSettingsService,
+    private readonly identity: ServerIdentityService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -43,14 +45,30 @@ export class AppInfoService implements OnApplicationBootstrap {
     }
 
     const maxUploadSizeMb = await this.appSettingsService.getMaxUploadSizeMb();
+    const instanceId = await this.instanceId();
 
     return {
+      ...(instanceId ? { instanceId } : {}),
       version,
       updateAvailable: this.updateAvailable,
       latestVersion: this.latestVersion,
       maxUploadSizeMb,
       features: [...SERVER_FEATURES],
     };
+  }
+
+  /** Clients detect features through app-info, so an identity failure omits only the identity. */
+  private async instanceId(): Promise<string | undefined> {
+    try {
+      return (await this.identity.getIdentity()).instanceId;
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `[app-info.identity] [fail] errorClass=${errorClass} error="${sanitizeLogValue(message)}" - installation identity unavailable, omitting instanceId`,
+      );
+      return undefined;
+    }
   }
 
   private async checkForUpdate(currentVersion: string): Promise<void> {

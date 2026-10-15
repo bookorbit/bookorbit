@@ -236,7 +236,7 @@ describe('ScannerRepository', () => {
         coverAspectRatio: '1/1',
       }),
     ]);
-    expect(db.select.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ coverAspectRatio: expect.anything() }));
+    expect(db.select.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ libraryId: expect.anything(), coverAspectRatio: expect.anything() }));
     expect(chains.select[0]?.mocks.innerJoin).toHaveBeenCalledTimes(1);
   });
 

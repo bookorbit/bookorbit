@@ -170,6 +170,21 @@ describe('LibraryService', () => {
     ).resolves.toEqual([3, 4]);
   });
 
+  it('findEditableLibraryIds reads all IDs for superusers and editor-or-owner IDs for normal users', async () => {
+    libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 4 }]);
+
+    await expect(service.findEditableLibraryIds({ id: 99, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual([
+      1, 2,
+    ]);
+    expect(libraryRepo.findAccessibleIdsForUser).not.toHaveBeenCalled();
+
+    await expect(service.findEditableLibraryIds({ id: 42, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual([
+      4,
+    ]);
+    expect(libraryRepo.findAccessibleIdsForUser).toHaveBeenCalledWith(42, ['editor', 'owner']);
+  });
+
   it('findOne returns library details and normalizes organization mode', async () => {
     libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Main', organizationMode: null }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 50, path: '/books/main' }]);

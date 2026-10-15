@@ -14,6 +14,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import JumpRail from '@/features/book/components/JumpRail.vue'
 import { bulkRefreshAuthorsMetadata, deleteAuthors, refreshAuthorMetadata } from '../api/author'
 import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
@@ -39,7 +40,8 @@ const mainRef = ref<HTMLElement | null>(null)
 useScrollRestoreOnActivate(mainRef)
 const { gridGap, viewMode, authorCoverSize, authorCoverShape, authorRowDensity, authorCoverFallback, showJumpRails } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
-const { hasPermission, isDemoRestrictedAccount, isSuperuser } = usePermissions()
+const { hasPermissionInAnyLibrary } = useLibraryPermissions()
+const { isDemoRestrictedAccount, isSuperuser } = usePermissions()
 const list = useAuthorsList()
 const { items, total, loading, error, hasMore, q, sort, order, libraryId, hasPhoto, hasSortName, addedWithinDays, minBookCount, load } = list
 const { markRefreshing, clearRefreshing, isRefreshing } = useRefreshingAuthors()
@@ -66,7 +68,7 @@ const bulkRefreshConfirmButton = ref<HTMLButtonElement | null>(null)
 const pendingDeleteIds = ref<number[]>([])
 const deleteDialogOpen = ref(false)
 
-const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata') && !isDemoRestrictedAccount.value)
+const canRefreshMetadata = computed(() => hasPermissionInAnyLibrary('library_edit_metadata', 'editor') && !isDemoRestrictedAccount.value)
 const canDeleteAuthors = computed(() => isSuperuser.value)
 
 /** The page offers exactly the two views the design has; `table` is not one of them. */

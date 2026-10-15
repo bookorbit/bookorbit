@@ -105,7 +105,7 @@ describe('EPUB media overlay duration', () => {
     await rm(fixtureRoot, { recursive: true, force: true });
   });
 
-  async function writeReadAlongEpub(chapters: [Clip[], Clip[]], durationMetas: string): Promise<string> {
+  async function writeReadAlongEpub(chapters: [Clip[], Clip[]], durationMetas: string, packageXml = opf(durationMetas)): Promise<string> {
     const path = join(fixtureRoot, `${Math.random().toString(36).slice(2)}.epub`);
     const archive = new ZipArchive({ zlib: { level: 0 } });
     const chunks: Buffer[] = [];
@@ -116,7 +116,7 @@ describe('EPUB media overlay duration', () => {
     });
     archive.append('application/epub+zip', { name: 'mimetype', store: true });
     archive.append(CONTAINER_XML, { name: 'META-INF/container.xml' });
-    archive.append(opf(durationMetas), { name: 'OEBPS/content.opf' });
+    archive.append(packageXml, { name: 'OEBPS/content.opf' });
     for (const [index, clips] of chapters.entries()) {
       const chapter = index + 1;
       archive.append(`<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Chapter ${chapter}</p></body></html>`, {
@@ -135,6 +135,25 @@ describe('EPUB media overlay duration', () => {
     const [first, second] = MEASURABLE_CHAPTERS;
     return [[first[0]!, clip], second];
   }
+
+  it.each([false, true])('reads prefixed package duration metadata and narration resources with fullyPrefixed=%s', async (fullyPrefixed) => {
+    const packageXml = opf(STORYTELLER_PACKAGE_DURATION)
+      .replace('version="3.0"', 'xmlns:publication="http://www.idpf.org/2007/opf" version="3.0"')
+      .replace(/<(\/?)(package|metadata|meta|manifest|item|spine|itemref)(?=[\s>])/g, (tag, closing: string, name: string) =>
+        fullyPrefixed || name === 'metadata' || name === 'meta' ? `<${closing}publication:${name}` : tag,
+      );
+    const path = await writeReadAlongEpub(STORYTELLER_TRACK_BOUNDARY_CHAPTERS, STORYTELLER_PACKAGE_DURATION, packageXml);
+
+    const playlist = await buildEpubMediaOverlayPlaylistFromFile(path, 1, 2);
+
+    expect(playlist.durationSeconds).toBeCloseTo(STORYTELLER_PACKAGE_DURATION_SECONDS, 6);
+    expect(playlist.sections).toHaveLength(2);
+    expect(playlist.items).toHaveLength(4);
+    expect(await inspectEpubMediaOverlayFile(path)).toEqual({
+      available: true,
+      durationSeconds: expect.closeTo(STORYTELLER_PACKAGE_DURATION_SECONDS, 6),
+    });
+  });
 
   it('sums the clips when every clip can be measured, even when the package declares another total', async () => {
     const path = await writeReadAlongEpub(MEASURABLE_CHAPTERS, '<meta property="media:duration">01:00:00.00</meta>');

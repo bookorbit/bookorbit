@@ -8,11 +8,10 @@ import { promisify } from 'util';
 
 import { FORMAT_M4A, FORMAT_M4B, FORMAT_MP3 } from '../../file-write.constants';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { runFfmpeg } from './ffmpeg-runner';
 import { MP4_NATIVE_TAG_KEYS, writeMp4FreeformTags, type Mp4FreeformTag } from './mp4-freeform-tags';
 
 const execFile = promisify(execFileCallback);
-const FFMPEG_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
-const FFMPEG_TIMEOUT_MS = 60_000;
 const FFPROBE_TIMEOUT_MS = 30_000;
 /** The only audio FFmpeg's ipod muxer accepts; an MP4 can also carry MP3, MP2, Opus, FLAC and E-AC-3. */
 const IPOD_MUXER_AUDIO_CODECS = new Set(['aac', 'alac', 'ac3']);
@@ -54,10 +53,7 @@ export class AudioMetadataEmbedder {
       const streams = isMp4Format(format) ? await probeStreams(filePath) : null;
       const useMp4MetadataTags = shouldUseMp4MetadataTags(format, coverPath, streams);
       const muxer = outputMuxer(format, streams);
-      await execFile(resolveFfmpegPath(), buildFfmpegArgs(filePath, coverPath, tempPath, format, input.metadata, { useMp4MetadataTags, muxer }), {
-        maxBuffer: FFMPEG_OUTPUT_MAX_BUFFER_BYTES,
-        timeout: FFMPEG_TIMEOUT_MS,
-      });
+      await runFfmpeg(resolveFfmpegPath(), buildFfmpegArgs(filePath, coverPath, tempPath, format, input.metadata, { useMp4MetadataTags, muxer }));
       if (isMp4Format(format) && !useMp4MetadataTags) {
         await writeMp4FreeformTags(tempPath, mp4FreeformTags(input.metadata), { carryOverFrom: filePath });
       }

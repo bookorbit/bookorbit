@@ -208,5 +208,6 @@ onMounted(() => {
       <ShieldCheck :size="13" class="shrink-0" aria-hidden="true" />
       {{ t('library.creator.access.superusers') }}
     </p>
+    <p class="text-xs text-muted-foreground">{{ t('library.creator.access.levelsHint') }}</p>
   </div>
 </template>

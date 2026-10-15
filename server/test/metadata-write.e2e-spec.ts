@@ -8,6 +8,7 @@ import { Permission, type LibraryFileSyncProgressEvent } from '@bookorbit/types'
 import * as schema from '../src/db/schema';
 import { BookService, type MetadataUpdateFailpoint } from '../src/modules/book/book.service';
 import { FileWriteService } from '../src/modules/file-write/file-write.service';
+import { FileRenameService } from '../src/modules/file-write/file-rename.service';
 import { extractCb7Metadata, extractCbzMetadata } from '../src/modules/metadata/lib/cbz-metadata';
 import { extractEpubMetadata } from '../src/modules/metadata/lib/epub';
 import { parseFb2File } from '../src/modules/metadata/lib/fb2-parser';
@@ -1600,6 +1601,147 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
   });
 
   describe('access control', () => {
+    it('rejects viewer forced renames and keeps personal ratings free of shared file effects', async () => {
+      const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+      await createEpubFixture(library.folderPath, 'access/viewer.epub');
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+      const book = await locateBookFileByRelPath(context, library.libraryId, 'access/viewer.epub');
+      const before = await readFile(book.absolutePath);
+      const metadataBefore = await context.db.query.bookMetadata.findFirst({ where: eq(schema.bookMetadata.bookId, book.bookId) });
+      const caller = await createUserAndLogin(context, { permissions: [Permission.LibraryEditMetadata] });
+      await grantLibraryAccess(context, caller.userId, library.libraryId, 'viewer');
+      await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEnabled: true, fileWriteEpubEnabled: true });
+      await context.db.update(schema.libraries).set({ fileRenameEnabled: true }).where(eq(schema.libraries.id, library.libraryId));
+      const renameService = context.app.get(FileRenameService);
+      const writeService = context.app.get(FileWriteService);
+      const performRename = vi.spyOn(renameService, 'performRename');
+      const scheduleRename = vi.spyOn(renameService, 'scheduleRename');
+      const scheduleWrite = vi.spyOn(writeService, 'scheduleWrite');
+      try {
+        const rename = await context.app.inject({
+          method: 'POST',
+          url: `/api/v1/books/${book.bookId}/rename-files`,
+          headers: authHeader(caller.accessToken),
+        });
+        expect(rename.statusCode).toBe(403);
+        expect(performRename).not.toHaveBeenCalled();
+        for (const rating of [4, null]) {
+          const response = await context.app.inject({
+            method: 'POST',
+            url: '/api/v1/books/bulk-set-rating',
+            headers: authHeader(caller.accessToken),
+            payload: { bookIds: [book.bookId], rating },
+          });
+          expect(response.statusCode).toBe(204);
+          const personal = await context.db.query.userBookRatings.findFirst({ where: eq(schema.userBookRatings.userId, caller.userId) });
+          expect(personal).toMatchObject({ bookId: book.bookId, rating });
+        }
+        expect(scheduleWrite).not.toHaveBeenCalled();
+        expect(scheduleRename).not.toHaveBeenCalled();
+        expect(await readFile(book.absolutePath)).toEqual(before);
+        const metadataAfter = await context.db.query.bookMetadata.findFirst({ where: eq(schema.bookMetadata.bookId, book.bookId) });
+        expect(metadataAfter).toEqual(metadataBefore);
+      } finally {
+        performRename.mockRestore();
+        scheduleRename.mockRestore();
+        scheduleWrite.mockRestore();
+      }
+    });
+
+    it('enforces editor access for every manual metadata save and rejects mixed-library bulk writes atomically', async () => {
+      const editor = await createLibraryWithFolder(context, { mode: 'book_per_folder' });
+      const viewer = await createLibraryWithFolder(context, { mode: 'book_per_folder' });
+      const caller = await createUserAndLogin(context, { permissions: [Permission.LibraryEditMetadata] });
+      await grantLibraryAccess(context, caller.userId, editor.libraryId, 'editor');
+      await grantLibraryAccess(context, caller.userId, viewer.libraryId, 'viewer');
+      const bookIds: number[] = [];
+      for (const library of [editor, viewer]) {
+        const [book] = await context.db
+          .insert(schema.books)
+          .values({
+            libraryId: library.libraryId,
+            libraryFolderId: library.libraryFolderId,
+            folderPath: library.folderPath,
+          })
+          .returning({ id: schema.books.id });
+        await context.db.insert(schema.bookMetadata).values({ bookId: book.id, title: 'Original', publisher: 'Original publisher' });
+        bookIds.push(book.id);
+      }
+      const routes = [
+        { path: 'metadata', payload: { title: 'Forbidden title' } },
+        { path: 'metadata-and-locks', payload: { metadata: { title: 'Forbidden title' }, lockedFields: ['title'] } },
+        { path: 'metadata-locks', payload: { lockedFields: ['title'] } },
+      ];
+      for (const route of routes) {
+        const response = await context.app.inject({
+          method: 'PATCH',
+          url: `/api/v1/books/${bookIds[1]}/${route.path}`,
+          headers: authHeader(caller.accessToken),
+          payload: route.payload,
+        });
+        expect(response.statusCode).toBe(403);
+        const metadata = await context.db.query.bookMetadata.findFirst({ where: eq(schema.bookMetadata.bookId, bookIds[1]) });
+        expect(metadata?.title).toBe('Original');
+        expect(metadata?.lockedFields).toEqual([]);
+      }
+      for (const route of ['bulk-refresh-metadata', 'bulk-re-extract-cover']) {
+        const response = await context.app.inject({
+          method: 'POST',
+          url: `/api/v1/books/${route}`,
+          headers: authHeader(caller.accessToken),
+          payload: { bookIds },
+        });
+        expect(response.statusCode).toBe(403);
+        expect(response.headers['content-type']).not.toContain('text/event-stream');
+      }
+      const mixed = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/books/bulk-set-metadata',
+        headers: authHeader(caller.accessToken),
+        payload: { bookIds, field: 'publisher', value: 'Forbidden publisher' },
+      });
+      expect(mixed.statusCode).toBe(403);
+      for (const bookId of bookIds) {
+        const metadata = await context.db.query.bookMetadata.findFirst({ where: eq(schema.bookMetadata.bookId, bookId) });
+        expect(metadata?.publisher).toBe('Original publisher');
+      }
+      for (const level of ['editor', 'owner'] as const) {
+        await grantLibraryAccess(context, caller.userId, viewer.libraryId, level);
+        const rename = await context.app.inject({
+          method: 'POST',
+          url: `/api/v1/books/${bookIds[1]}/rename-files`,
+          headers: authHeader(caller.accessToken),
+        });
+        expect(rename.statusCode).toBe(204);
+        const response = await context.app.inject({
+          method: 'PATCH',
+          url: `/api/v1/books/${bookIds[1]}/metadata-and-locks`,
+          headers: authHeader(caller.accessToken),
+          payload: { metadata: { title: `Allowed ${level}` }, lockedFields: [] },
+        });
+        expect(response.statusCode).toBe(200);
+        const metadata = await context.db.query.bookMetadata.findFirst({ where: eq(schema.bookMetadata.bookId, bookIds[1]) });
+        expect(metadata?.title).toBe(`Allowed ${level}`);
+      }
+      await grantLibraryAccess(context, caller.userId, viewer.libraryId, 'viewer');
+      const downgraded = await context.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${bookIds[1]}/metadata`,
+        headers: authHeader(caller.accessToken),
+        payload: { title: 'Forbidden after downgrade' },
+      });
+      expect(downgraded.statusCode).toBe(403);
+      const renameAfterDowngrade = await context.app.inject({
+        method: 'POST',
+        url: `/api/v1/books/${bookIds[1]}/rename-files`,
+        headers: authHeader(caller.accessToken),
+      });
+      expect(renameAfterDowngrade.statusCode).toBe(403);
+      const readable = await context.app.inject({ method: 'GET', url: `/api/v1/books/${bookIds[1]}`, headers: authHeader(caller.accessToken) });
+      expect(readable.statusCode).toBe(200);
+      expect(readable.json().title).toBe('Allowed owner');
+    });
+
     it('enforces permission and library access for PATCH /books/:id/metadata', async () => {
       const library = await createLibraryWithFolder(context, { mode: 'book_per_file' });
       await createPdfFixture(library.folderPath, 'access/patch.pdf');

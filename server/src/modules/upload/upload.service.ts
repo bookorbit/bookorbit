@@ -388,7 +388,7 @@ export class UploadService {
 
     if (!bookRow) throw new NotFoundException(`Book ${bookId} not found`);
 
-    await this.libraryService.verifyUserAccess(user.id, bookRow.libraryId, user.isSuperuser);
+    await this.libraryService.verifyUserAccessLevel(user.id, bookRow.libraryId, user.isSuperuser, 'editor');
 
     const fileRenameService = this.resolveFileRenameService();
     if (!fileRenameService) {

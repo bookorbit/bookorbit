@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useVirtualizer } from '@tanstack/vue-virtual'
@@ -779,11 +779,16 @@ onBeforeRouteLeave(async () => {
   await flushPendingProgress()
 })
 
+// Before unmount, because useReadingSession ends the session from its own unmounted hook, which
+// runs first and would otherwise miss a page turn still inside the save debounce.
+onBeforeUnmount(() => {
+  void flushPendingProgress()
+})
+
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
   if (stripScrollFrame !== null) cancelAnimationFrame(stripScrollFrame)
-  void flushPendingProgress()
 })
 </script>
 

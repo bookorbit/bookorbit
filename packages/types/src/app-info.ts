@@ -17,15 +17,25 @@ export const SERVER_FEATURES = [
   "metadata-search-cache",
   "read-aloud-delivery",
   "koreader-delivery-settings",
+  "server-connection-identity",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
 
 export interface AppInfoResponse {
+  /** Stable installation identity, absent on older servers. */
+  instanceId?: string;
   version: string;
   updateAvailable: boolean | null;
   latestVersion: string | null;
   maxUploadSizeMb: number;
   /** Absent on servers older than the field itself, which a client treats as an empty list. */
   features?: ServerFeature[];
+}
+
+/** Public, credential-free identity check for explicitly enrolled connection aliases. */
+export interface ServerIdentityResponse {
+  product: "bookorbit";
+  protocolVersion: 1;
+  instanceId: string;
 }

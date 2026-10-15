@@ -2,14 +2,13 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { CheckCircle2, FileUp, Loader2, Plus, Upload, X, XCircle, RotateCcw } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import { Permission } from '@bookorbit/types'
 import { SUPPORTED_FORMATS_ACCEPT, useAddBookFile } from '@/features/book/composables/useAddBookFile'
-import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import { formatBytes } from '@/lib/formatting'
 
 const props = defineProps<{
   bookId: number
+  canRenameFiles: boolean
 }>()
 
 const emit = defineEmits<{
@@ -18,7 +17,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const { hasPermission } = usePermissions()
 const { maxUploadSizeMb } = useAppInfo()
 
 const isDragging = ref(false)
@@ -91,7 +89,7 @@ function onFileInputChange(e: Event) {
 
 async function handleUpload() {
   if (pendingCount.value === 0 || isUploading.value) return
-  await startUpload(props.bookId, { renameAfter: renameAfter.value })
+  await startUpload(props.bookId, { renameAfter: props.canRenameFiles && renameAfter.value })
 }
 
 function fileRowClass(status: string): string {
@@ -288,7 +286,7 @@ function formatPillClass(filename: string): string {
             <span v-else-if="isUploading" class="text-xs text-muted-foreground tabular-nums">{{
               t('book.detail.addFile.uploadingProgress', { done: doneCount, total: files.length })
             }}</span>
-            <label v-else-if="hasPermission(Permission.LibraryEditMetadata)" class="flex items-center gap-2 cursor-pointer select-none">
+            <label v-else-if="canRenameFiles" class="flex items-center gap-2 cursor-pointer select-none">
               <input
                 v-model="renameAfter"
                 type="checkbox"

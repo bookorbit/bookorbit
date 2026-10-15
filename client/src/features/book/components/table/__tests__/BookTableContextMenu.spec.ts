@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard } from '@bookorbit/types'
 
@@ -6,8 +7,12 @@ import BookTableContextMenu from '../BookTableContextMenu.vue'
 
 const { hasPermissionMock } = vi.hoisted(() => ({ hasPermissionMock: vi.fn<(permission: string) => boolean>() }))
 
+vi.mock('@/features/library/composables/useLibraries', () => ({
+  useLibraries: () => ({ libraries: ref([{ id: 1, accessLevel: 'editor' }]) }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
-  usePermissions: () => ({ hasPermission: hasPermissionMock, isDemoRestrictedAccount: { value: false } }),
+  usePermissions: () => ({ hasPermission: hasPermissionMock, isDemoRestrictedAccount: { value: false }, isSuperuser: { value: false } }),
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(to: unknown) => void>() }) }))
@@ -28,7 +33,7 @@ vi.mock('@/features/book/composables/useRefreshingBooks', () => ({
   useRefreshingBooks: () => ({ isRefreshing: () => false }),
 }))
 
-const book = { id: 7, title: 'Dune' } as BookCard
+const book = { id: 7, libraryId: 1, title: 'Dune' } as BookCard
 
 function mountMenu() {
   return mount(BookTableContextMenu, {

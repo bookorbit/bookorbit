@@ -218,6 +218,7 @@ const {
   handleImportPresetBackup,
   selectedIds,
   selectedCount,
+  canEditSelectionMetadata,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -424,6 +425,7 @@ defineOptions({ name: 'CollectionView' })
     />
 
     <SelectionActionBar
+      :metadata-editable="canEditSelectionMetadata"
       :visible="selectionMode"
       :count="selectedCount"
       :in-collection="isCollectionOwner"

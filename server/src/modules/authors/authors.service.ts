@@ -649,7 +649,7 @@ export class AuthorsService {
   }
 
   private async assertMutationAccess(user: RequestUser, authorIds: number[]) {
-    const libraryIds = await this.resolveLibraryIds(user);
+    const [libraryIds, editableLibraryIds] = await Promise.all([this.resolveLibraryIds(user), this.libraryService.findEditableLibraryIds(user)]);
     const [visible, relatedLibraryIds] = await Promise.all([
       this.authorsRepo.findVisibleAuthorIds(authorIds, libraryIds),
       this.authorsRepo.findRelatedLibraryIds(authorIds),
@@ -657,8 +657,8 @@ export class AuthorsService {
     if (visible.length !== authorIds.length) {
       throw new NotFoundException('Author not found');
     }
-    const accessibleSet = new Set(libraryIds);
-    if (relatedLibraryIds.some((libraryId) => !accessibleSet.has(libraryId))) {
+    const editableSet = new Set(editableLibraryIds);
+    if (relatedLibraryIds.some((libraryId) => !editableSet.has(libraryId))) {
       throw new ForbiddenException('Insufficient library access to mutate one or more selected authors');
     }
   }

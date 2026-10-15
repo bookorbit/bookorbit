@@ -659,6 +659,7 @@ export class ScannerRepository {
       this.db
         .select({
           id: books.id,
+          libraryId: books.libraryId,
           status: books.status,
           coverAspectRatio: libraries.coverAspectRatio,
           formatPriority: libraries.formatPriority,

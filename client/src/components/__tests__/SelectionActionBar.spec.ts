@@ -55,6 +55,14 @@ function mountBar() {
 }
 
 describe('SelectionActionBar demo restriction', () => {
+  it('hides metadata actions when the selection includes a read-only library', async () => {
+    const wrapper = mountBar()
+    await wrapper.setProps({ metadataEditable: false })
+    expect(wrapper.find('[data-testid="action-edit-individually"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-bulk-set-field"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-bulk-set-rating"]').exists()).toBe(true)
+  })
+
   beforeEach(() => {
     permissionState.allowed = new Set(['library_edit_metadata', 'library_download', 'email_send', 'library_delete_books'])
     permissionState.demoRestricted = false

@@ -65,6 +65,7 @@ describe('AuthorsService', () => {
   const libraryService = {
     findAll: vi.fn(),
     findAccessibleLibraryIds: vi.fn(),
+    findEditableLibraryIds: vi.fn(),
   };
 
   const authorMetadataFetchService = {
@@ -119,6 +120,7 @@ describe('AuthorsService', () => {
     );
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);
+    libraryService.findEditableLibraryIds.mockResolvedValue([1, 2]);
     authorImageStorage.getThumbnailUrlIfExists.mockResolvedValue(null);
     authorImageStorage.getImageUrlIfExists.mockResolvedValue(null);
     enrichmentOrchestrator.schedule.mockResolvedValue(1);
@@ -196,6 +198,15 @@ describe('AuthorsService', () => {
     expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(10, AUTHOR_ENRICHMENT_REASONS.AUTHOR_MERGE_TARGET);
     expect(result.mergedAuthorIds).toEqual([11, 12]);
     expect(result.affectedBookCount).toBe(8);
+  });
+
+  it('update rejects authors whose books sit in a library the user can only read', async () => {
+    authorsRepo.findVisibleAuthorIds.mockResolvedValue([20]);
+    authorsRepo.findRelatedLibraryIds.mockResolvedValue([1, 2]);
+    libraryService.findEditableLibraryIds.mockResolvedValue([1]);
+
+    await expect(service.update(reqUser(), 20, { name: 'Renamed' })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(authorsRepo.updateAuthorById).not.toHaveBeenCalled();
   });
 
   it('update normalizes author names and blank optional fields', async () => {

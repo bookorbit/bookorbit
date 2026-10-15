@@ -8,6 +8,7 @@ vi.mock('drizzle-orm', () => ({
   inArray: vi.fn((left: unknown, right: unknown) => ({ op: 'inArray', left, right })),
   isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
   ne: vi.fn((left: unknown, right: unknown) => ({ op: 'ne', left, right })),
+  notInArray: vi.fn((left: unknown, right: unknown) => ({ op: 'notInArray', left, right })),
   or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: Object.assign(
     vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
@@ -843,7 +844,7 @@ describe('UserRepository', () => {
     expect(onConflictDoNothing).toHaveBeenCalled();
   });
 
-  it('findLibraryIdsByUserId and replaceViewerLibraries manage user-library rows', async () => {
+  it('findLibraryIdsByUserId and replaceLibraries manage user-library rows', async () => {
     const where = vi.fn().mockResolvedValue([{ libraryId: 10 }, { libraryId: 11 }]);
     const from = vi.fn().mockReturnValue({ where });
     select.mockReturnValue({ from });
@@ -852,7 +853,8 @@ describe('UserRepository', () => {
 
     const txDeleteWhere = vi.fn().mockResolvedValue(undefined);
     const txDelete = vi.fn().mockReturnValue({ where: txDeleteWhere });
-    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    const txOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const txInsertValues = vi.fn().mockReturnValue({ onConflictDoNothing: txOnConflictDoNothing });
     const txInsert = vi.fn().mockReturnValue({ values: txInsertValues });
     db.transaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) =>
       cb({
@@ -861,15 +863,24 @@ describe('UserRepository', () => {
       }),
     );
 
-    await repo.replaceViewerLibraries(2, []);
+    await repo.replaceLibraries(2, []);
     expect(txDelete).toHaveBeenCalledWith(schema.userLibraryAccess);
     expect(txDeleteWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.userLibraryAccess.userId, right: 2 }));
     expect(txInsert).not.toHaveBeenCalled();
 
-    await repo.replaceViewerLibraries(2, [10, 11]);
+    txDeleteWhere.mockClear();
+    await repo.replaceLibraries(2, [10, 11]);
+    expect(txDeleteWhere).toHaveBeenCalledWith({
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: schema.userLibraryAccess.userId, right: 2 },
+        { op: 'notInArray', left: schema.userLibraryAccess.libraryId, right: [10, 11] },
+      ],
+    });
     expect(txInsertValues).toHaveBeenCalledWith([
       { userId: 2, libraryId: 10, accessLevel: 'viewer' },
       { userId: 2, libraryId: 11, accessLevel: 'viewer' },
     ]);
+    expect(txOnConflictDoNothing).toHaveBeenCalled();
   });
 });

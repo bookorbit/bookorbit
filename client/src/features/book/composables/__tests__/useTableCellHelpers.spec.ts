@@ -134,6 +134,15 @@ describe('useTableCellHelpers', () => {
       expect(helpers.isCellReadOnly(book, { id: 'title', isEditable: true })).toBe(true)
     })
 
+    it('locks metadata columns on rows whose library the user can only read, but keeps personal reading state editable', () => {
+      const canEdit = vi.fn<(book: BookCard) => boolean>((book) => book.libraryId === 1)
+      helpers = useTableCellHelpers(locks, () => false, undefined, canEdit)
+
+      expect(helpers.isCellReadOnly(makeBook({ libraryId: 2 }), { id: 'title', isEditable: true })).toBe(true)
+      expect(helpers.isCellReadOnly(makeBook({ libraryId: 2 }), { id: 'readStatus', isEditable: true })).toBe(false)
+      expect(helpers.isCellReadOnly(makeBook({ libraryId: 1 }), { id: 'title', isEditable: true })).toBe(false)
+    })
+
     it('returns true when isReadOnly global flag is set', () => {
       isReadOnly = true
       const book = makeBook()

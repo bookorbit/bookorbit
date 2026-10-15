@@ -73,6 +73,7 @@ type BookRepositoryTx = Parameters<Parameters<NodePgDatabase<typeof schema>['tra
 
 type CollapsedRawRow = {
   id: number | null;
+  library_id: number;
   status: string;
   cover_aspect_ratio: string;
   primary_file_id: number | null;
@@ -554,6 +555,7 @@ export class BookRepository {
     const rows = await this.db
       .select({
         id: books.id,
+        libraryId: books.libraryId,
         status: books.status,
         coverAspectRatio: libraries.coverAspectRatio,
         primaryFileId: books.primaryFileId,
@@ -1051,6 +1053,7 @@ export class BookRepository {
       representatives AS (
         SELECT DISTINCT ON (${sql.raw(COLLAPSE_GROUP_KEY_SQL)})
           base.id,
+          base.library_id,
           base.status,
           base.cover_aspect_ratio,
           base.primary_file_id,
@@ -1131,6 +1134,7 @@ export class BookRepository {
 
     const mappedRows = rawRows.map((r) => ({
       id: r.id,
+      libraryId: r.library_id,
       status: r.status,
       coverAspectRatio: r.cover_aspect_ratio,
       primaryFileId: r.primary_file_id,
@@ -2053,6 +2057,15 @@ export class BookRepository {
     return rows.map((r) => r.id);
   }
 
+  async findDistinctLibraryIdsByWhere(where: SQL | undefined): Promise<number[]> {
+    const rows = await this.db
+      .selectDistinct({ libraryId: books.libraryId })
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(this.visibleWhere(where));
+    return rows.map((r) => r.libraryId);
+  }
+
   async findPrimaryFile(bookId: number): Promise<{ absolutePath: string; format: string | null } | null> {
     const [row] = await this.db
       .select({ absolutePath: bookFiles.absolutePath, format: bookFiles.format })
@@ -2408,6 +2421,13 @@ export class BookRepository {
       ? { narrationPercentage: this.clampProgressPercentage(narration.percentage), narrationUpdatedAt: narration.updatedAt }
       : {};
     const textColumns = textUpdatedAt ? { textUpdatedAt } : {};
+    // A write that leaves out the narration marker keeps the one stored: a client that saves only
+    // its text position used to erase the marker another client had left. An explicit null clears.
+    const markerColumns = {
+      ...(positionSeconds !== undefined ? { positionSeconds } : {}),
+      ...(mediaOverlayFragment !== undefined ? { mediaOverlayFragment } : {}),
+      ...(mediaOverlaySectionIndex !== undefined ? { mediaOverlaySectionIndex } : {}),
+    };
     await this.db
       .insert(readingProgress)
       .values({
@@ -2434,9 +2454,7 @@ export class BookRepository {
           cfi,
           pageNumber,
           percentage,
-          positionSeconds: positionSeconds ?? null,
-          mediaOverlayFragment: mediaOverlayFragment ?? null,
-          mediaOverlaySectionIndex: mediaOverlaySectionIndex ?? null,
+          ...markerColumns,
           koboLocationSource: normalizedKoboLocationSource,
           koboLocationType: normalizedKoboLocationType,
           koboLocationValue: normalizedKoboLocationValue,
@@ -2467,6 +2485,12 @@ export class BookRepository {
     koreaderProgress: string | null;
     sourceUpdatedAt: Date;
   }): Promise<boolean> {
+    // A marker moved here moves the narration's stamp with it, or a comparison of stamps would
+    // prefer the text position over a newer marker.
+    const narrationColumns =
+      params.positionSeconds != null
+        ? { narrationPercentage: this.clampProgressPercentage(params.percentage), narrationUpdatedAt: params.sourceUpdatedAt }
+        : {};
     const rows = await this.db
       .insert(readingProgress)
       .values({
@@ -2482,6 +2506,7 @@ export class BookRepository {
         updatedAt: params.sourceUpdatedAt,
         lastReadAt: params.sourceUpdatedAt,
         textUpdatedAt: params.sourceUpdatedAt,
+        ...narrationColumns,
       })
       .onConflictDoUpdate({
         target: [readingProgress.bookFileId, readingProgress.userId],
@@ -2496,6 +2521,7 @@ export class BookRepository {
           updatedAt: params.sourceUpdatedAt,
           lastReadAt: params.sourceUpdatedAt,
           textUpdatedAt: params.sourceUpdatedAt,
+          ...narrationColumns,
         },
         setWhere: lte(readingProgress.updatedAt, params.sourceUpdatedAt),
       })

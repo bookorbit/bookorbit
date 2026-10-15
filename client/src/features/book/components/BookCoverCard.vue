@@ -44,6 +44,7 @@ import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { mergeBookCardWithDetail } from '../lib/book-card-mapper'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useDisplaySettings, type GridCardLabelField } from '@/composables/useDisplaySettings'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, coverAspectRatioValue, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
@@ -124,6 +125,8 @@ async function handleRefreshMetadata() {
   if (updated) emit('update:book', mergeBookCardWithDetail(props.book, updated))
 }
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } = useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed<CoverAspectRatio>(
@@ -681,8 +684,8 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     <BookText class="size-4 mr-2" />
                     {{ t('book.actions.bookDetails') }}
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-                  <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
+                  <DropdownMenuSeparator v-if="canEditMetadata" />
+                  <DropdownMenuSub v-if="canEditMetadata">
                     <DropdownMenuSubTrigger>
                       <Pencil class="size-4 mr-2" />
                       {{ t('book.actions.metadata') }}
@@ -708,7 +711,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     <FolderPlus class="size-4 mr-2" />
                     {{ t('book.actions.addToCollection') }}
                   </DropdownMenuItem>
-                  <DropdownMenuItem v-if="allowMoveToLibrary && hasPermission('library_edit_metadata')" @click="emit('action', 'move-to-library')">
+                  <DropdownMenuItem v-if="allowMoveToLibrary && canEditMetadata" @click="emit('action', 'move-to-library')">
                     <FolderInput class="size-4 mr-2" />
                     {{ t('book.move.action') }}
                   </DropdownMenuItem>
@@ -823,8 +826,8 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               <BookText class="size-4 mr-2" />
               {{ t('book.actions.bookDetails') }}
             </DropdownMenuItem>
-            <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-            <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
+            <DropdownMenuSeparator v-if="canEditMetadata" />
+            <DropdownMenuSub v-if="canEditMetadata">
               <DropdownMenuSubTrigger>
                 <Pencil class="size-4 mr-2" />
                 {{ t('book.actions.metadata') }}
