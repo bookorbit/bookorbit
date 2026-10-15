@@ -3242,12 +3242,13 @@
         "clientsEmpty": {
           "title": "No download client yet",
           "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch releases delivered by torrent or Usenet too.",
-          "note": "qBittorrent, Transmission, Deluge, NZBGet and SABnzbd are supported."
+          "note": "qBittorrent, Transmission, Deluge, NZBGet, SABnzbd and TorBox are supported."
         },
         "summary": "{type} - category {category}, priority {priority}",
         "disabled": "Disabled",
         "test": "Test connection",
         "testSaveFirst": "Save your changes before testing",
+        "validateKey": "Validate key",
         "testOk": "Connected to {client} {version}",
         "testOkNoVersion": "Connected to {client}",
         "lastTestOk": "Last tested {time}: connected",
@@ -3259,7 +3260,8 @@
           "transmission": "Transmission",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd"
+          "sabnzbd": "SABnzbd",
+          "torbox": "TorBox"
         },
         "color": {
           "label": "Color",
@@ -3772,7 +3774,8 @@
           "transmission": "Your own Transmission. It has no categories, so the category becomes a subfolder of its download directory.",
           "deluge": "Your own Deluge. Sign in with the Web UI password; the category needs the Label plugin switched on.",
           "nzbget": "Your own NZBGet. BookOrbit sends NZB files over its JSON-RPC API.",
-          "sabnzbd": "Your own SABnzbd. BookOrbit sends NZB files using its API key."
+          "sabnzbd": "Your own SABnzbd. BookOrbit sends NZB files using its API key.",
+          "torbox": "Your own TorBox cloud account. BookOrbit sends torrents to it and fetches the finished files for import."
         },
         "searchHealth": {
           "failingOnce": "Last search failed",

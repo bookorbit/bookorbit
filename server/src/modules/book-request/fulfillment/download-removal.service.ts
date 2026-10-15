@@ -1,10 +1,14 @@
+import { rm } from 'node:fs/promises';
+
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { IN_FLIGHT_BOOK_REQUEST_DOWNLOAD_STATUSES } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { BookRequestDownloadRow } from '../../../db/schema';
 import { DownloadClientConfigService } from '../download-clients/download-client-config.service';
 import { DownloadClientRegistry } from '../download-clients/download-client-registry';
+import { stagedClientDir } from '../download-clients/download-client-adapter';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DirectDownloadService } from './direct-download.service';
 
@@ -23,13 +27,17 @@ export interface DownloadRemovalOutcome {
 @Injectable()
 export class DownloadRemovalService {
   private readonly logger = new Logger(DownloadRemovalService.name);
+  private readonly appDataPath: string;
 
   constructor(
     private readonly downloads: BookRequestDownloadRepository,
     private readonly clients: DownloadClientConfigService,
     private readonly registry: DownloadClientRegistry,
     private readonly direct: DirectDownloadService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.appDataPath = config.getOrThrow<string>('storage.appDataPath');
+  }
 
   /**
    * Strict: an operator who pressed Remove wants the client's own refusal, not a shrug. Resolves
@@ -112,6 +120,27 @@ export class DownloadRemovalService {
     }
   }
 
+  /**
+   * A staged cloud download is a copy BookOrbit fetched for the import, not a seed: once the Book
+   * Dock owns the bytes there is nothing left to keep, so this is best-effort like the direct
+   * staging cleanup.
+   */
+  async cleanupStagedClientDownload(download: BookRequestDownloadRow): Promise<void> {
+    if (download.source === 'direct_url' || download.downloadClientId === null || download.clientKey === null) return;
+
+    try {
+      const config = await this.clients.resolveConfig(download.downloadClientId);
+      const adapter = this.registry.require(config.adapterType);
+      if (typeof adapter.stage !== 'function') return;
+      await rm(stagedClientDir(this.appDataPath, config.adapterType, download.clientKey), { recursive: true, force: true });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `[book_request.staging_cleanup] [fail] requestId=${download.requestId} downloadId=${download.id} errorClass=${(error as Error)?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(message)}" - staged client download files were left on disk`,
+      );
+    }
+  }
+
   /** A direct file is ours to drop; a torrent is detached from the client that holds it. */
   private async detach(download: BookRequestDownloadRow, deleteFiles: boolean): Promise<void> {
     // An attempt a source refused was never handed to anything, so there is nothing holding it.
@@ -119,7 +148,8 @@ export class DownloadRemovalService {
 
     const isDirect = download.source === 'direct_url';
     // There is no swarm to preserve on a staged file, so its bytes always go with the attempt.
-    const shouldDeleteFiles = isDirect || deleteFiles;
+    const stagesLocally = !isDirect && download.downloadClientId !== null && (await this.clients.stagesLocally(download.downloadClientId));
+    const shouldDeleteFiles = isDirect || stagesLocally || deleteFiles;
 
     if (isDirect) {
       await this.direct.remove(download.clientKey, { deleteFiles: shouldDeleteFiles });

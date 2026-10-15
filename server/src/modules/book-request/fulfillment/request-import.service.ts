@@ -35,6 +35,7 @@ import { BookRequestRepository } from '../book-request.repository';
 import { BookRequestGateway } from '../book-request.gateway';
 import { DownloadClientConfigService } from '../download-clients/download-client-config.service';
 import { PathMappingService, type ResolvedDownloadPath } from '../download-clients/path-mapping.service';
+import { stagedDownloadRoot } from '../download-clients/download-client-adapter';
 import { directDownloadRoot } from './direct-download.service';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DownloadRemovalService } from './download-removal.service';
@@ -174,13 +175,19 @@ export class RequestImportService implements OnApplicationBootstrap {
 
   /**
    * A direct file was staged by BookOrbit itself, so what it reported is already a path we can
-   * open, bounded by the staging root it was written into. Anything a download client reported is
+   * open, bounded by the staging root it was written into. A cloud client that fetches its files
+   * lands in BookOrbit's own staging root the same way. Anything else a download client reported is
    * in that client's own filesystem namespace and has to be translated through the mappings
    * configured for it, which is also what declares the directory the import may read out of.
    */
   private async resolveLocalPath(download: BookRequestDownloadRow, contentPath: string): Promise<ResolvedDownloadPath> {
     if (download.source === 'direct_url') {
       const containmentRoot = directDownloadRoot(this.config.getOrThrow<string>('storage.appDataPath'));
+      await this.pathMappings.assertWithinRoot(containmentRoot, contentPath);
+      return { localPath: contentPath, containmentRoot };
+    }
+    if (download.downloadClientId !== null && (await this.clients.stagesLocally(download.downloadClientId))) {
+      const containmentRoot = stagedDownloadRoot(this.config.getOrThrow<string>('storage.appDataPath'));
       await this.pathMappings.assertWithinRoot(containmentRoot, contentPath);
       return { localPath: contentPath, containmentRoot };
     }
@@ -327,6 +334,7 @@ export class RequestImportService implements OnApplicationBootstrap {
       });
 
     await this.removal.cleanupStagedDirectDownload(download);
+    await this.removal.cleanupStagedClientDownload(download);
   }
 
   /**

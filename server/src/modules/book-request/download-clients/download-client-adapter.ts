@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import type { DownloadClientTestResult, DownloadClientType, DownloadDelivery } from '@bookorbit/types';
 
 /** A client row with its credentials already decrypted. Never logged, never returned over HTTP. */
@@ -61,7 +63,11 @@ export interface DownloadStatus {
   progressPercent: number;
   downloadedBytes: number;
   totalBytes: number | null;
-  /** Where the finished content sits, in the client's own filesystem namespace. */
+  /**
+   * Where the finished content sits. In the client's own filesystem namespace for a client that
+   * has one, and a BookOrbit-local staged directory for a staging adapter, which is why the
+   * import only opens either after checking it against the root it is allowed to read from.
+   */
   contentPath: string | null;
   /** Only meaningful once the bytes are down; the poll loop ignores it. */
   seed?: SeedInfo;
@@ -72,6 +78,16 @@ export interface DownloadStatus {
    * classifies the message before deciding whether the attempt is over.
    */
   trackerError?: string;
+}
+
+/**
+ * The directory a staging adapter fetched its files into, on a filesystem BookOrbit can read.
+ * A cloud client holds the finished torrent itself, so "done" there is not yet importable; this
+ * is the local form the import path takes over from.
+ */
+export interface StagedDownloadResult {
+  /** Local directory holding the finished release, inside `stagedDownloadRoot()`. */
+  contentPath: string;
 }
 
 export interface OwnedDownloadClientItem extends DownloadStatus {
@@ -100,10 +116,33 @@ export interface DownloadClientAdapter {
   remove(clientKey: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void>;
   test(config: ResolvedClientConfig): Promise<DownloadClientTestResult>;
   /**
+   * Cloud clients that hold the finished files remotely implement this. The monitor calls it when
+   * a status reports completion with no content path, then keeps polling: once the bytes are
+   * local the adapter reports the staged path and the ordinary import path takes over. A client
+   * that already reports a path BookOrbit can read leaves it unimplemented.
+   *
+   * Keep the shared DOWNLOAD_CLIENT_STAGES_LOCALLY flag in sync with this: the settings form reads
+   * that instead of the registry, so a staging adapter missing from it is asked for path mappings.
+   */
+  stage?(clientKey: string, config: ResolvedClientConfig): Promise<StagedDownloadResult>;
+  /**
    * Drop anything cached against this client id. Called whenever a row's URL or credentials
    * change, so a stale session cannot outlive the config it was opened with.
    */
   forget?(clientId: number): void;
+}
+
+/**
+ * Where staging adapters land fetched cloud files, and the containment root their imports are
+ * checked against: a staged path outside this directory is refused rather than opened.
+ */
+export function stagedDownloadRoot(appDataPath: string): string {
+  return join(appDataPath, 'client-downloads');
+}
+
+/** One directory per client key under one per adapter type, so two clients never share a root. */
+export function stagedClientDir(appDataPath: string, adapterType: DownloadClientType, clientKey: string): string {
+  return join(stagedDownloadRoot(appDataPath), adapterType, clientKey);
 }
 
 export const DOWNLOAD_CLIENT_ADAPTERS = Symbol('DOWNLOAD_CLIENT_ADAPTERS');

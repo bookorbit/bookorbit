@@ -3053,6 +3053,7 @@
         "disabled": "Deaktiviert",
         "test": "Verbindung testen",
         "testSaveFirst": "Änderungen vor dem Testen speichern",
+        "validateKey": "Schlüssel prüfen",
         "testOk": "Verbunden mit {client} {version}",
         "testOkNoVersion": "Verbunden mit {client}",
         "lastTestOk": "Zuletzt getestet {time}: verbunden",
@@ -3064,7 +3065,8 @@
           "transmission": "Transmission",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd"
+          "sabnzbd": "SABnzbd",
+          "torbox": "TorBox"
         },
         "color": {
           "label": "Farbe",
@@ -3577,7 +3579,8 @@
           "transmission": "Ihr eigenes Transmission. Da es keine Kategorien gibt, wird die Kategorie zu einem Unterordner des Download-Verzeichnisses.",
           "deluge": "Ihr eigenes Deluge. Melden Sie sich mit dem Passwort der Weboberfläche an. Für die Kategorie muss das Label-Plugin aktiviert sein.",
           "nzbget": "Ihr eigenes NZBGet. BookOrbit sendet NZB Dateien über seine JSON-RPC API.",
-          "sabnzbd": "Ihr eigenes SABnzbd. BookOrbit sendet NZB Dateien mit seinem API-Schlüssel."
+          "sabnzbd": "Ihr eigenes SABnzbd. BookOrbit sendet NZB Dateien mit seinem API-Schlüssel.",
+          "torbox": "Dein eigenes TorBox-Konto in der Cloud. BookOrbit sendet Torrents dorthin und lädt fertige Dateien zum Import herunter."
         },
         "searchHealth": {
           "failingOnce": "Letzte Suche fehlgeschlagen",

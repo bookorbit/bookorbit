@@ -10,7 +10,7 @@ import type {
   DownloadClientType,
   PathMappingHardlinkTestResult,
 } from '@bookorbit/types';
-import { DOWNLOAD_CLIENT_DELIVERY } from '@bookorbit/types';
+import { DOWNLOAD_CLIENT_CREDENTIAL_KIND, DOWNLOAD_CLIENT_DELIVERY } from '@bookorbit/types';
 
 import { isUniqueViolation } from '../../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
@@ -22,7 +22,7 @@ import type { ResolvedClientConfig } from './download-client-adapter';
 import { DownloadClientRegistry } from './download-client-registry';
 import { DownloadClientRepository, type DownloadClientWithMappings } from './download-client.repository';
 import { ADD_PATH_MAPPING_HINT, PathMappingService } from './path-mapping.service';
-import type { CreateDownloadClientDto, UpdateDownloadClientDto } from './dto/download-client.dto';
+import type { CreateDownloadClientDto, UpdateDownloadClientDto, ValidateDownloadClientDto } from './dto/download-client.dto';
 
 /** Editing any of these changes how the adapter reaches the client, so its session must be dropped. */
 const CONNECTION_FIELDS = ['baseUrl', 'username', 'password', 'allowPrivateAddress', 'adapterType'] as const satisfies ReadonlyArray<
@@ -74,7 +74,7 @@ export class DownloadClientConfigService {
     // after the insert would answer "that path is not absolute" while leaving a half-made client
     // behind, which the operator then cannot save over because the name is taken.
     await this.assertReachableUrl(dto.baseUrl, dto.allowPrivateAddress ?? true);
-    const pathMappings = requireMappings(normalizeMappings(dto.pathMappings));
+    const pathMappings = this.normalizeRequiredMappings(dto.adapterType, dto.pathMappings);
     this.assertCredentialPresent(dto.adapterType, Boolean(dto.password?.trim()));
     const credentialsEnc = dto.password ? this.credentials.encrypt(dto.password) : null;
 
@@ -120,7 +120,8 @@ export class DownloadClientConfigService {
 
     // Only when the edit actually carries mappings. An operator toggling `enabled` on a row that
     // predates this rule must not be refused for a field the form did not send.
-    const pathMappings = dto.pathMappings !== undefined ? requireMappings(normalizeMappings(dto.pathMappings)) : null;
+    const pathMappings =
+      dto.pathMappings !== undefined ? this.normalizeRequiredMappings(existing.client.adapterType as DownloadClientType, dto.pathMappings) : null;
 
     const patch: Partial<DownloadClientRow> = {};
     if (dto.name !== undefined) patch.name = dto.name.trim();
@@ -201,6 +202,26 @@ export class DownloadClientConfigService {
   }
 
   /**
+   * A credential check for a client that may not have been saved yet: the form can tell an
+   * operator their key is wrong while they are still typing it. The config is built from what
+   * the form sent, handed to the adapter and discarded, so nothing is stored or returned.
+   */
+  async validate(dto: ValidateDownloadClientDto): Promise<DownloadClientTestResult> {
+    const adapter = this.registry.require(dto.adapterType);
+    return adapter.test({
+      id: 0,
+      name: adapter.label,
+      adapterType: dto.adapterType,
+      baseUrl: dto.baseUrl.trim(),
+      username: dto.username?.trim() || null,
+      password: dto.password ?? null,
+      category: 'bookorbit',
+      allowPrivateAddress: false,
+      settings: null,
+    });
+  }
+
+  /**
    * The directory comes from the named mapping, never from the request body: the probe writes and
    * unlinks where it is pointed, so a caller-supplied path would make this an arbitrary-directory
    * write and existence oracle over the whole host, which is exactly what every other filesystem
@@ -232,6 +253,12 @@ export class DownloadClientConfigService {
     };
   }
 
+  /** Whether the configured client keeps its files remotely and BookOrbit stages them itself. */
+  async stagesLocally(id: number): Promise<boolean> {
+    const { client } = await this.requireClient(id);
+    return this.adapterStagesLocally(client.adapterType as DownloadClientType);
+  }
+
   async findPreferredEnabled(adapterTypes: readonly DownloadClientType[]): Promise<DownloadClientRow | undefined> {
     return this.repo.findPreferredEnabled(adapterTypes);
   }
@@ -239,6 +266,24 @@ export class DownloadClientConfigService {
   async useHardlinks(id: number): Promise<boolean> {
     const { client } = await this.requireClient(id);
     return client.useHardlinks;
+  }
+
+  private normalizeRequiredMappings(
+    adapterType: DownloadClientType,
+    mappings: Array<{ remotePath: string; localPath: string }> | undefined,
+  ): Array<{ remotePath: string; localPath: string }> {
+    const normalized = normalizeMappings(mappings);
+    // A client that stages its own files lands them under a root BookOrbit owns, so a mapping
+    // declaring which directory may be imported from has nothing to declare.
+    if (normalized.length > 0 || this.adapterStagesLocally(adapterType)) return normalized;
+    throw downloadClientError(
+      'DOWNLOAD_CLIENT_MAPPING_REQUIRED',
+      `A download client needs at least one path mapping, so BookOrbit knows which directory it may import from. ${ADD_PATH_MAPPING_HINT}`,
+    );
+  }
+
+  private adapterStagesLocally(adapterType: DownloadClientType): boolean {
+    return typeof this.registry.find(adapterType)?.stage === 'function';
   }
 
   private async requireClient(id: number): Promise<DownloadClientWithMappings> {
@@ -273,8 +318,9 @@ export class DownloadClientConfigService {
   }
 
   private assertCredentialPresent(adapterType: DownloadClientType, hasCredential: boolean): void {
-    if (adapterType === 'sabnzbd' && !hasCredential) {
-      throw downloadClientError('DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED', 'SABnzbd needs an API key');
+    if (DOWNLOAD_CLIENT_CREDENTIAL_KIND[adapterType] === 'apiKey' && !hasCredential) {
+      const label = this.registry.find(adapterType)?.label ?? adapterType;
+      throw downloadClientError('DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED', `${label} needs an API key`);
     }
   }
 }
@@ -311,19 +357,6 @@ function normalizeMappings(mappings: Array<{ remotePath: string; localPath: stri
     normalized.push({ remotePath, localPath });
   }
   return normalized;
-}
-
-/**
- * The mapping is what declares the directory the import may read out of, so a client without one
- * is a client BookOrbit cannot safely import from. Required in the single-host case too, where it
- * is an identity mapping: same filesystem is a translation that does nothing, not an absent root.
- */
-function requireMappings(mappings: Array<{ remotePath: string; localPath: string }>): Array<{ remotePath: string; localPath: string }> {
-  if (mappings.length > 0) return mappings;
-  throw downloadClientError(
-    'DOWNLOAD_CLIENT_MAPPING_REQUIRED',
-    `A download client needs at least one path mapping, so BookOrbit knows which directory it may import from. ${ADD_PATH_MAPPING_HINT}`,
-  );
 }
 
 function toItem({ client, pathMappings }: DownloadClientWithMappings): DownloadClientItem {

@@ -3053,6 +3053,7 @@
         "disabled": "已禁用",
         "test": "测试连接",
         "testSaveFirst": "请先保存更改再测试",
+        "validateKey": "验证密钥",
         "testOk": "已连接到 {client} {version}",
         "testOkNoVersion": "已连接到 {client}",
         "lastTestOk": "上次测试 {time}：已连接",
@@ -3064,7 +3065,8 @@
           "transmission": "Transmission",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd"
+          "sabnzbd": "SABnzbd",
+          "torbox": "TorBox"
         },
         "color": {
           "label": "颜色",
@@ -3577,7 +3579,8 @@
           "transmission": "你自己的 Transmission。它没有分类功能,因此分类会成为其下载目录中的子文件夹。",
           "deluge": "你自己的 Deluge。使用 Web UI 密码登录;分类需要开启 Label 插件。",
           "nzbget": "你自己的 NZBGet。BookOrbit 通过其 JSON-RPC API 发送 NZB 文件。",
-          "sabnzbd": "你自己的 SABnzbd。BookOrbit 使用其 API 密钥发送 NZB 文件。"
+          "sabnzbd": "你自己的 SABnzbd。BookOrbit 使用其 API 密钥发送 NZB 文件。",
+          "torbox": "你自己的 TorBox 云端账户。BookOrbit 会把种子发送到 TorBox，并取回完成的文件以进行导入。"
         },
         "searchHealth": {
           "failingOnce": "上次搜索失败",

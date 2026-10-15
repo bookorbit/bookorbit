@@ -3058,6 +3058,7 @@
         "disabled": "Disabilitato",
         "test": "Test di connessione",
         "testSaveFirst": "Salva le tue modifiche prima di testare",
+        "validateKey": "Verifica chiave",
         "testOk": "Connesso a {client} {version}",
         "testOkNoVersion": "Connesso a {client}",
         "lastTestOk": "Ultimo test {time}: connesso",
@@ -3069,7 +3070,8 @@
           "transmission": "Trasmissione",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd"
+          "sabnzbd": "SABnzbd",
+          "torbox": "TorBox"
         },
         "color": {
           "label": "Colore",
@@ -3582,7 +3584,8 @@
           "transmission": "Il tuo Transmission. Non ha categorie, quindi la categoria diventa una sottocartella della directory di download.",
           "deluge": "Il tuo Deluge. Accedi con la password dell'interfaccia web; per usare la categoria deve essere attivato il plugin Label.",
           "nzbget": "Il tuo NZBGet. BookOrbit invia NZB file tramite il suo JSON-RPC API.",
-          "sabnzbd": "Il tuo SABnzbd. BookOrbit invia i file NZB utilizzando la chiave API."
+          "sabnzbd": "Il tuo SABnzbd. BookOrbit invia i file NZB utilizzando la chiave API.",
+          "torbox": "Il tuo account TorBox. BookOrbit invia i torrent e scarica i file completati per l'importazione."
         },
         "searchHealth": {
           "failingOnce": "Ultima ricerca non riuscita",

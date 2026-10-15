@@ -5,7 +5,7 @@ import { Auditable } from '../../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { DownloadClientConfigService } from './download-client-config.service';
 import { DownloadClientReconciliationService } from './download-client-reconciliation.service';
-import { CreateDownloadClientDto, TestPathMappingDto, UpdateDownloadClientDto } from './dto/download-client.dto';
+import { CreateDownloadClientDto, TestPathMappingDto, UpdateDownloadClientDto, ValidateDownloadClientDto } from './dto/download-client.dto';
 import { AdoptDownloadClientItemDto, RemoveOrphanedDownloadClientItemDto } from './dto/reconcile-download-client.dto';
 
 /**
@@ -91,6 +91,17 @@ export class DownloadClientController {
   })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
+  }
+
+  /**
+   * Checks a credential the operator has typed against a client that has not been saved yet, so
+   * the form can say whether an API key is right before the row exists. Read-only: nothing is
+   * persisted and the value is used for this one call only.
+   */
+  @Post('validate')
+  @HttpCode(HttpStatus.OK)
+  validate(@Body() dto: ValidateDownloadClientDto) {
+    return this.service.validate(dto);
   }
 
   @Post(':id/test')
