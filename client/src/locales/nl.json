@@ -3002,7 +3002,6 @@
         "disabled": "Uitgeschakeld",
         "test": "Verbinding testen",
         "testSaveFirst": "Sla je wijzigingen op voordat je gaat testen",
-        "validateKey": "Sleutel controleren",
         "testOk": "Verbonden met {client} {version}",
         "testOkNoVersion": "Verbonden met {client}",
         "lastTestOk": "Laatst getest {time}: verbonden",
@@ -3014,8 +3013,7 @@
           "transmission": "Transmission",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd",
-          "torbox": "TorBox"
+          "sabnzbd": "SABnzbd"
         },
         "color": {
           "label": "Kleur",
@@ -3528,8 +3526,7 @@
           "transmission": "Je eigen Transmission. Het heeft geen categorieën, dus de categorie wordt een submap van de downloadmap.",
           "deluge": "Je eigen Deluge. Meld je aan met het wachtwoord van de webinterface. Voor de categorie moet de Label-plug-in zijn ingeschakeld.",
           "nzbget": "Je eigen NZBGet. BookOrbit verzendt NZB bestanden via zijn JSON-RPC API.",
-          "sabnzbd": "Je eigen SABnzbd. BookOrbit verzendt NZB bestanden met behulp van de API sleutel.",
-          "torbox": "Je eigen TorBox-account. BookOrbit stuurt torrents ernaartoe en haalt de voltooide bestanden op voor import."
+          "sabnzbd": "Je eigen SABnzbd. BookOrbit verzendt NZB bestanden met behulp van de API sleutel."
         },
         "searchHealth": {
           "failingOnce": "Laatste zoekopdracht mislukt",

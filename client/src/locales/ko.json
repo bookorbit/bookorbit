@@ -3002,7 +3002,6 @@
         "disabled": "비활성화됨",
         "test": "연결 테스트",
         "testSaveFirst": "테스트 전 변경사항을 저장하십시오",
-        "validateKey": "키 확인",
         "testOk": "{client} {version} 연결됨",
         "testOkNoVersion": "{client} 연결됨",
         "lastTestOk": "최근 테스트 {time}: 연결됨",
@@ -3014,8 +3013,7 @@
           "transmission": "Transmission",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd",
-          "torbox": "TorBox"
+          "sabnzbd": "SABnzbd"
         },
         "color": {
           "label": "색상",
@@ -3528,8 +3526,7 @@
           "transmission": "나만의 Transmission. 카테고리가 없으므로 카테고리는 다운로드 디렉토리의 하위 폴더가 됩니다.",
           "deluge": "내 Deluge입니다. 웹 UI 비밀번호로 로그인하세요. 카테고리를 사용하려면 Label 플러그인을 켜야 합니다.",
           "nzbget": "나만의 NZBGet. BookOrbit는 JSON-RPC API를 통해 NZB 파일을 보냅니다.",
-          "sabnzbd": "나만의 SABnzbd. BookOrbit는 API 키를 사용하여 NZB 파일을 보냅니다.",
-          "torbox": "나만의 TorBox 계정입니다. BookOrbit가 토렌트를 보내고 완료된 파일을 다운로드하여 가져옵니다."
+          "sabnzbd": "나만의 SABnzbd. BookOrbit는 API 키를 사용하여 NZB 파일을 보냅니다."
         },
         "searchHealth": {
           "failingOnce": "마지막 검색 실패",

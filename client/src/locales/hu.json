@@ -3065,7 +3065,6 @@
         "disabled": "Letiltva",
         "test": "Kapcsolat tesztelése",
         "testSaveFirst": "Mentsd el a módosításokat tesztelés előtt",
-        "validateKey": "Kulcs ellenőrzése",
         "testOk": "Csatlakoztatva ehhez: {client} {version}",
         "testOkNoVersion": "Csatlakozva ehhez: {client}",
         "lastTestOk": "Utolsó tesztelés {time}: csatlakoztatva",
@@ -3077,8 +3076,7 @@
           "transmission": "Transmission",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd",
-          "torbox": "TorBox"
+          "sabnzbd": "SABnzbd"
         },
         "color": {
           "label": "Szín",
@@ -3591,8 +3589,7 @@
           "transmission": "A te Transmissionöd. Nincsenek kategóriái, így a kategória a letöltési mappa egy almappájává válik.",
           "deluge": "A te Deluge-od. Jelentkezz be a webes felhasználói felület jelszavával; a kategóriához be kell kapcsolni a Címke bővítményt.",
           "nzbget": "A saját NZBGet-szervered. A BookOrbit JSON-RPC API-n keresztül küldi el az NZB-fájlokat.",
-          "sabnzbd": "A saját SABnzbd-szervered. A BookOrbit az API-kulcs használatával küldi el az NZB-fájlokat.",
-          "torbox": "A saját TorBox-fiókod. A BookOrbit ide küldi a torrenteket, és lementi a kész fájlokat importáláshoz."
+          "sabnzbd": "A saját SABnzbd-szervered. A BookOrbit az API-kulcs használatával küldi el az NZB-fájlokat."
         },
         "searchHealth": {
           "failingOnce": "Utolsó keresés sikertelen",

@@ -3290,6 +3290,7 @@
           "allowPrivateAddressHint": "Needed when the client runs on your local network or the same machine.",
           "passwordBrief": "Stored encrypted.",
           "apiKeyBrief": "Found in SABnzbd under Config > General. Stored encrypted.",
+          "torboxApiKeyBrief": "Can be found at https://torbox.app/settings?section=account. Stored encrypted.",
           "useHardlinksBrief": "Imports without using the disk twice. Falls back to a copy across filesystems."
         },
         "mappings": {

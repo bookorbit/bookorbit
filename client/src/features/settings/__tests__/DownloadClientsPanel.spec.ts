@@ -153,6 +153,7 @@ describe('DownloadClientsPanel', () => {
 
     expect(sheet().querySelector('#download-client-username')).toBeNull()
     expect(sheet().querySelector('label[for="download-client-password"]')?.textContent).toContain('API key')
+    expect(sheet().textContent).toContain('Found in SABnzbd under Config > General')
 
     typeInto('#download-client-name', 'SAB')
     typeInto('#download-client-url', 'http://sabnzbd:8080')
@@ -180,6 +181,8 @@ describe('DownloadClientsPanel', () => {
     await flushPromises()
 
     expect(sheet().querySelector<HTMLInputElement>('#download-client-url')?.value).toBe('https://api.torbox.app')
+    expect(sheet().textContent).toContain('Can be found at https://torbox.app/settings?section=account')
+    expect(sheet().textContent).not.toContain('SABnzbd under Config')
   })
 
   it('hides path mappings and saves a TorBox client without mappings', async () => {
