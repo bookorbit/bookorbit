@@ -147,6 +147,9 @@ export class TorboxApiClient {
   ): Promise<unknown> {
     const apiKey = this.requireApiKey(config);
     const base = await ensureSafeUrl(config.baseUrl, { allowPrivate: config.allowPrivateAddress });
+    // TorBox is a hosted service, never a LAN daemon, so a plain-http base URL can only be a way to
+    // carry the API key in cleartext. Refuse it before the key reaches the URL or the headers.
+    if (base.protocol !== 'https:') throw new BadRequestException('TorBox requires an https:// base URL');
     const target = endpointUrl(base, path);
     for (const [name, value] of Object.entries(params)) target.searchParams.set(name, value);
 
