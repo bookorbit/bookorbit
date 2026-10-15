@@ -419,6 +419,10 @@ function normalizeKey(value: string): string {
 /**
  * The targets for a release's files, with later files whose sanitized name collides getting a
  * numbered suffix. Deterministic for a given file order, so a re-run and the staged check agree.
+ *
+ * The temp path (`<target>.part`) is reserved alongside the target: otherwise a file named
+ * `book.epub` would claim a `.part` path that is the finished target of an earlier `book.epub.part`
+ * file, and staging it would delete that completed file through `rm(part)`.
  */
 function uniqueTargetsFor(directory: string, files: ReadonlyArray<{ name: string }>): string[] {
   const claimed = new Set<string>();
@@ -426,11 +430,12 @@ function uniqueTargetsFor(directory: string, files: ReadonlyArray<{ name: string
     const base = stagedTargetFor(directory, file.name);
     let target = base;
     let counter = 1;
-    while (claimed.has(target)) {
+    while (claimed.has(target) || claimed.has(`${target}.part`)) {
       target = suffixedTarget(base, counter);
       counter += 1;
     }
     claimed.add(target);
+    claimed.add(`${target}.part`);
     return target;
   });
 }

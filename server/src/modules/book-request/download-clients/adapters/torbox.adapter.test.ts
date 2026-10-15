@@ -260,6 +260,33 @@ describe('TorboxAdapter', () => {
     await expect(readFile(join(directory, 'Dune (1).epub'), 'utf8')).resolves.toBe('book');
   });
 
+  it('does not let a temp path overwrite a completed file with a .part name', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([
+        [
+          CLIENT_KEY,
+          torrent({
+            downloadFinished: true,
+            files: [
+              { fileId: 7, name: 'book.epub.part', size: 4 },
+              { fileId: 8, name: 'book.epub', size: 4 },
+            ],
+          }),
+        ],
+      ]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }))),
+    );
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
+    await expect(readFile(join(directory, 'book.epub.part'), 'utf8')).resolves.toBe('book');
+    await expect(readFile(join(directory, 'book (1).epub'), 'utf8')).resolves.toBe('book');
+  });
+
   it('leaves no partial file behind when a fetch fails mid-transfer', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
