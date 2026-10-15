@@ -19,7 +19,7 @@ import type {
   StagedDownloadResult,
   ResolvedClientConfig,
 } from '../download-client-adapter';
-import { stagedClientDir } from '../download-client-adapter';
+import { legacyStagedClientDir, stagedClientDir } from '../download-client-adapter';
 import { TORBOX_LABEL, TorboxApiClient } from './torbox.api';
 import type { TorboxTorrent } from './torbox.api';
 
@@ -50,8 +50,8 @@ interface StagingJob {
 /**
  * TorBox holds the downloads; BookOrbit cannot open them where they are. The adapter therefore
  * implements `stage()`: once TorBox reports a torrent finished, the monitor asks for it to be
- * fetched file by file into `client-downloads/torbox/<infohash>`, and only then reports the local
- * path that the import pipeline knows how to read.
+ * fetched file by file into `client-downloads/torbox/<clientId>/<infohash>`, and only then reports
+ * the local path that the import pipeline knows how to read.
  */
 @Injectable()
 export class TorboxAdapter implements DownloadClientAdapter {
@@ -129,7 +129,8 @@ export class TorboxAdapter implements DownloadClientAdapter {
     if (torrent) await this.api.controlTorrent(config, torrent.torrentId, 'delete');
 
     if (opts.deleteFiles) {
-      await rm(stagedClientDir(this.appDataPath, this.type, key), { recursive: true, force: true });
+      await rm(stagedClientDir(this.appDataPath, this.type, config.id, key), { recursive: true, force: true });
+      await rm(legacyStagedClientDir(this.appDataPath, this.type, key), { recursive: true, force: true });
     }
   }
 
@@ -151,7 +152,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
 
   async stage(clientKey: string, config: ResolvedClientConfig): Promise<StagedDownloadResult> {
     const key = normalizeKey(clientKey);
-    const directory = stagedClientDir(this.appDataPath, this.type, key);
+    const directory = stagedClientDir(this.appDataPath, this.type, config.id, key);
     // Registered before the first await so a remove that lands during setup still finds this job
     // instead of slipping past cancelStaging and letting the fetch run over the removed attempt.
     const job: StagingJob = { downloadedBytes: 0, totalBytes: 0, cancelled: false, cancelWatchers: new Set() };
@@ -250,7 +251,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
         return { ...base, state: 'failed', errorMessage: 'TorBox reported the download as finished but did not report which files it holds' };
       }
 
-      const staged = await this.stagedPathIfComplete(clientKey, torrent);
+      const staged = await this.stagedPathIfComplete(clientKey, torrent, clientId);
       return {
         ...base,
         state: 'completed',
@@ -268,18 +269,27 @@ export class TorboxAdapter implements DownloadClientAdapter {
    * The local directory, once every file the account lists is on disk at its listed size. Null
    * means "not staged yet, or not whole", which is what sends the monitor off to stage it.
    */
-  private async stagedPathIfComplete(clientKey: string, torrent: TorboxTorrent): Promise<string | null> {
-    const directory = stagedClientDir(this.appDataPath, this.type, clientKey);
+  private async stagedPathIfComplete(clientKey: string, torrent: TorboxTorrent, clientId: number): Promise<string | null> {
+    const directory = stagedClientDir(this.appDataPath, this.type, clientId, clientKey);
+    if (await this.directoryHoldsAll(directory, torrent.files)) return directory;
+    // A release staged before staging was isolated by client id lives under the old layout.
+    const legacy = legacyStagedClientDir(this.appDataPath, this.type, clientKey);
+    if (await this.directoryHoldsAll(legacy, torrent.files)) return legacy;
+    return null;
+  }
+
+  /** Every listed file present on disk at its listed size. False when a name cannot be resolved. */
+  private async directoryHoldsAll(directory: string, files: ReadonlyArray<{ name: string; size: number | null }>): Promise<boolean> {
     let targets: string[];
     try {
-      targets = uniqueTargetsFor(directory, torrent.files);
+      targets = uniqueTargetsFor(directory, files);
     } catch {
-      return null;
+      return false;
     }
-    for (let index = 0; index < torrent.files.length; index += 1) {
-      if ((await completeFileSize(targets[index], torrent.files[index].size)) === null) return null;
+    for (let index = 0; index < files.length; index += 1) {
+      if ((await completeFileSize(targets[index], files[index].size)) === null) return false;
     }
-    return directory;
+    return true;
   }
 
   private async downloadToFile(url: string, target: string, expectedBytes: number | null, job: StagingJob): Promise<void> {

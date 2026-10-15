@@ -17,17 +17,18 @@ vi.mock('dns/promises', async (importOriginal) => ({
 
 import { forgetDispatchers } from '../../../../common/utils/safe-fetch';
 import type { ResolvedClientConfig } from '../download-client-adapter';
-import { stagedClientDir } from '../download-client-adapter';
+import { legacyStagedClientDir, stagedClientDir } from '../download-client-adapter';
 import { TorboxAdapter } from './torbox.adapter';
 import { TorboxApiClient } from './torbox.api';
 import type { TorboxTorrent } from './torbox.api';
 
 const CLIENT_KEY = 'a'.repeat(64);
 const OTHER_KEY = 'b'.repeat(64);
+const CLIENT_ID = 9;
 
 function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientConfig {
   return {
-    id: 9,
+    id: CLIENT_ID,
     name: 'torbox',
     adapterType: 'torbox',
     baseUrl: 'https://api.torbox.app',
@@ -152,12 +153,44 @@ describe('TorboxAdapter', () => {
       expect.objectContaining({ clientKey: CLIENT_KEY, state: 'completed', contentPath: null }),
     ]);
 
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, 'Dune.epub'), Buffer.alloc(100));
 
     await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([
       expect.objectContaining({ clientKey: CLIENT_KEY, state: 'completed', contentPath: directory }),
+    ]);
+  });
+
+  it('isolates staging by client id so two clients holding one infohash do not share a directory', async () => {
+    const finished = torrent({ downloadFinished: true, progressPercent: 100, downloadedBytes: 100 });
+    api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, finished]]));
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'Dune.epub'), Buffer.alloc(100));
+
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([
+      expect.objectContaining({ clientKey: CLIENT_KEY, contentPath: directory }),
+    ]);
+    await expect(adapter.status([CLIENT_KEY], config({ id: CLIENT_ID + 1 }))).resolves.toEqual([
+      expect.objectContaining({ clientKey: CLIENT_KEY, contentPath: null }),
+    ]);
+
+    await adapter.remove(CLIENT_KEY, config({ id: CLIENT_ID + 1 }), { deleteFiles: true });
+    await expect(readFile(join(directory, 'Dune.epub'))).resolves.toBeDefined();
+  });
+
+  it('still reads a release staged before staging was isolated by client id', async () => {
+    const finished = torrent({ downloadFinished: true, progressPercent: 100, downloadedBytes: 100 });
+    api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, finished]]));
+
+    const legacy = legacyStagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    await mkdir(legacy, { recursive: true });
+    await writeFile(join(legacy, 'Dune.epub'), Buffer.alloc(100));
+
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([
+      expect.objectContaining({ clientKey: CLIENT_KEY, state: 'completed', contentPath: legacy }),
     ]);
   });
 
@@ -191,7 +224,7 @@ describe('TorboxAdapter', () => {
   });
 
   it('skips complete staged files without requesting download links', async () => {
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, 'Dune.epub'), Buffer.alloc(100));
     api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, torrent({ downloadFinished: true })]]));
@@ -210,7 +243,7 @@ describe('TorboxAdapter', () => {
     );
 
     const result = await adapter.stage(CLIENT_KEY, config());
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     const target = resolve(directory, 'escape.txt');
     await expect(readFile(target, 'utf8')).resolves.toBe('safe');
     expect(target.startsWith(directory)).toBe(true);
@@ -227,7 +260,7 @@ describe('TorboxAdapter', () => {
       vi.fn(() => Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }))),
     );
 
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
     await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('book');
     await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
@@ -254,7 +287,7 @@ describe('TorboxAdapter', () => {
       vi.fn(() => Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }))),
     );
 
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
     await expect(readFile(join(directory, 'Dune.epub'), 'utf8')).resolves.toBe('book');
     await expect(readFile(join(directory, 'Dune (1).epub'), 'utf8')).resolves.toBe('book');
@@ -281,7 +314,7 @@ describe('TorboxAdapter', () => {
       vi.fn(() => Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }))),
     );
 
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
     await expect(readFile(join(directory, 'book.epub.part'), 'utf8')).resolves.toBe('book');
     await expect(readFile(join(directory, 'book (1).epub'), 'utf8')).resolves.toBe('book');
@@ -303,7 +336,7 @@ describe('TorboxAdapter', () => {
       vi.fn(() => Promise.resolve(new Response(broken, { headers: { 'content-length': '4' } }))),
     );
 
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await expect(adapter.stage(CLIENT_KEY, config())).rejects.toThrow('connection reset');
     await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
   });
@@ -352,12 +385,12 @@ describe('TorboxAdapter', () => {
 
     await expect(staging).rejects.toThrow('The download was removed while it was being staged');
     expect(fetchMock).not.toHaveBeenCalled();
-    await expect(stat(stagedClientDir(appDataPath, 'torbox', CLIENT_KEY))).rejects.toThrow();
+    await expect(stat(stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY))).rejects.toThrow();
   });
 
   it('deletes the remote torrent and optionally its staged files', async () => {
     api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, torrent()]]));
-    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_KEY);
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, 'book.epub'), 'book');
 

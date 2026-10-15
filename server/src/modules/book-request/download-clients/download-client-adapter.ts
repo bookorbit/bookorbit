@@ -140,8 +140,22 @@ export function stagedDownloadRoot(appDataPath: string): string {
   return join(appDataPath, 'client-downloads');
 }
 
-/** One directory per client key under one per adapter type, so two clients never share a root. */
-export function stagedClientDir(appDataPath: string, adapterType: DownloadClientType, clientKey: string): string {
+/**
+ * Where one client row's staged copy of one release lands. The configured client id is part of the
+ * path because two client rows can hold the same infohash: sharing a directory would let their
+ * concurrent transfers clobber each other's `.part` files and let one row's cleanup delete the
+ * other's staging.
+ */
+export function stagedClientDir(appDataPath: string, adapterType: DownloadClientType, clientId: number, clientKey: string): string {
+  return join(stagedDownloadRoot(appDataPath), adapterType, String(clientId), clientKey);
+}
+
+/**
+ * The pre-isolation layout, without the client id. Staging still reads it so a release already on
+ * disk before the layout change is not fetched again, and cleanup removes it so the stale
+ * directory drains. New staging always lands under `stagedClientDir()`.
+ */
+export function legacyStagedClientDir(appDataPath: string, adapterType: DownloadClientType, clientKey: string): string {
   return join(stagedDownloadRoot(appDataPath), adapterType, clientKey);
 }
 

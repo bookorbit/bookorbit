@@ -159,7 +159,7 @@ describe('DownloadRemovalService.cleanupStagedClientDownload', () => {
   it('deletes staged cloud client files from the app data directory', async () => {
     const staged = download({ clientKey: INFO_HASH });
     const { service, appDataPath } = await makeService({ latest: staged, stageCapable: true });
-    const stagedDir = join(appDataPath, 'client-downloads', 'torbox', INFO_HASH);
+    const stagedDir = join(appDataPath, 'client-downloads', 'torbox', '4', INFO_HASH);
     await mkdir(stagedDir, { recursive: true });
 
     await service.cleanupStagedClientDownload(staged);

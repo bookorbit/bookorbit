@@ -8,7 +8,7 @@ import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { BookRequestDownloadRow } from '../../../db/schema';
 import { DownloadClientConfigService } from '../download-clients/download-client-config.service';
 import { DownloadClientRegistry } from '../download-clients/download-client-registry';
-import { stagedClientDir } from '../download-clients/download-client-adapter';
+import { legacyStagedClientDir, stagedClientDir } from '../download-clients/download-client-adapter';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DirectDownloadService } from './direct-download.service';
 
@@ -132,7 +132,8 @@ export class DownloadRemovalService {
       const config = await this.clients.resolveConfig(download.downloadClientId);
       const adapter = this.registry.require(config.adapterType);
       if (typeof adapter.stage !== 'function') return;
-      await rm(stagedClientDir(this.appDataPath, config.adapterType, download.clientKey), { recursive: true, force: true });
+      await rm(stagedClientDir(this.appDataPath, config.adapterType, config.id, download.clientKey), { recursive: true, force: true });
+      await rm(legacyStagedClientDir(this.appDataPath, config.adapterType, download.clientKey), { recursive: true, force: true });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
