@@ -45,6 +45,9 @@ interface StagingJob {
   totalBytes: number;
   cancelled: boolean;
   cancelWatchers: Set<() => void>;
+  /** Resolves once `stage()` has finished unwinding, so a removal can wait before deleting files. */
+  settled: Promise<void>;
+  settle: () => void;
 }
 
 /**
@@ -120,7 +123,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
 
   async remove(clientKey: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void> {
     const key = normalizeKey(clientKey);
-    this.cancelStaging(config.id, key);
+    await this.cancelStaging(config.id, key);
 
     const found = await this.api.findByHashes(config, new Set([key]));
     const torrent = found.get(key);
@@ -155,7 +158,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
     const directory = stagedClientDir(this.appDataPath, this.type, config.id, key);
     // Registered before the first await so a remove that lands during setup still finds this job
     // instead of slipping past cancelStaging and letting the fetch run over the removed attempt.
-    const job: StagingJob = { downloadedBytes: 0, totalBytes: 0, cancelled: false, cancelWatchers: new Set() };
+    const job: StagingJob = { ...settleable(), downloadedBytes: 0, totalBytes: 0, cancelled: false, cancelWatchers: new Set() };
     this.stagingFor(config.id).set(key, job);
     const startedAt = Date.now();
     let partial: string | null = null;
@@ -210,7 +213,11 @@ export class TorboxAdapter implements DownloadClientAdapter {
       );
       throw error;
     } finally {
-      this.stagingFor(config.id).delete(key);
+      const jobs = this.stagingFor(config.id);
+      // Only drop the entry when it is still ours: a re-grab may have registered a newer job under
+      // the same key while this attempt was unwinding.
+      if (jobs.get(key) === job) jobs.delete(key);
+      job.settle();
     }
 
     this.logger.log(
@@ -353,6 +360,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
         }
       }
     } catch (error) {
+      if (cancelled.signal.aborted) throw new Error(STAGING_CANCELLED_MESSAGE, { cause: error });
       if (stalled.signal.aborted) throw new Error(stallMessage, { cause: error });
       if (ceiling.aborted) throw new Error('Staging this download took longer than twelve hours', { cause: error });
       throw error;
@@ -396,7 +404,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
     throw new Error('The TorBox download link redirected too many times');
   }
 
-  private cancelStaging(clientId: number, clientKey: string): void {
+  private async cancelStaging(clientId: number, clientKey: string): Promise<void> {
     const jobs = this.staging.get(clientId);
     const job = jobs?.get(clientKey);
     if (!job) return;
@@ -404,7 +412,12 @@ export class TorboxAdapter implements DownloadClientAdapter {
     // transfer it is about to start.
     job.cancelled = true;
     jobs?.delete(clientKey);
+    // A transfer already writing has to stop before the caller deletes its directory, so wait for it
+    // to unwind. When no transfer is running, waiting would only block the caller on whatever network
+    // await staging is parked on, and the flag above already stops it.
+    const transferRunning = job.cancelWatchers.size > 0;
     for (const watcher of job.cancelWatchers) watcher();
+    if (transferRunning) await job.settled;
   }
 
   private ensureNotCancelled(job: StagingJob): void {
@@ -424,6 +437,15 @@ function normalizeKey(value: string): string {
   const key = value.trim().toLowerCase();
   if (!/^[a-f0-9]{40,64}$/.test(key)) throw new BadRequestException('Invalid client key');
   return key;
+}
+
+/** A settle handle for a staging job: a promise that resolves when `stage()` reaches its finally block. */
+function settleable(): Pick<StagingJob, 'settled' | 'settle'> {
+  let settle!: () => void;
+  const settled = new Promise<void>((resolve) => {
+    settle = resolve;
+  });
+  return { settled, settle };
 }
 
 /**

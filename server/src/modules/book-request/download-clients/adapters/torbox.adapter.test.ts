@@ -388,6 +388,60 @@ describe('TorboxAdapter', () => {
     await expect(stat(stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY))).rejects.toThrow();
   });
 
+  it('keeps a newer staging job tracked after an older attempt is cancelled', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const firstLink = deferred<string>();
+    api.requestDownloadLink.mockImplementationOnce(() => firstLink.promise);
+    const first = adapter.stage(CLIENT_KEY, config());
+    await vi.waitFor(() => expect(api.requestDownloadLink).toHaveBeenCalledTimes(1));
+
+    // Cancelling drops the first job from the map while its stage() is still parked on the link.
+    await adapter.remove(CLIENT_KEY, config(), { deleteFiles: false });
+
+    // A fresh attempt claims the same key before the cancelled one has unwound.
+    const secondLink = deferred<string>();
+    api.requestDownloadLink.mockImplementation(() => secondLink.promise);
+    const second = adapter.stage(CLIENT_KEY, config());
+    await vi.waitFor(() => expect(api.requestDownloadLink).toHaveBeenCalledTimes(2));
+
+    firstLink.resolve('https://example.com/book.epub');
+    await expect(first).rejects.toThrow('The download was removed while it was being staged');
+
+    // The first attempt's cleanup must not have dropped the second job: status still reports staging.
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([expect.objectContaining({ state: 'downloading' })]);
+
+    secondLink.resolve('https://example.com/book.epub');
+    await expect(second).resolves.toEqual({ contentPath: stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY) });
+  });
+
+  it('waits for an in-flight transfer to stop before deleting its files', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 100 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub');
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('book'));
+      },
+    });
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(body, { headers: { 'content-length': '100' } })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const staging = adapter.stage(CLIENT_KEY, config());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    void staging.catch(() => undefined);
+
+    await adapter.remove(CLIENT_KEY, config(), { deleteFiles: true });
+
+    await expect(staging).rejects.toThrow('The download was removed while it was being staged');
+    await expect(stat(stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY))).rejects.toThrow();
+  });
+
   it('deletes the remote torrent and optionally its staged files', async () => {
     api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, torrent()]]));
     const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
