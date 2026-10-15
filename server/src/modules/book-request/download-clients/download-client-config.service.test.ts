@@ -367,13 +367,13 @@ describe('DownloadClientConfigService', () => {
     const result = { success: false, error: 'invalid key' };
     const { service, adapter, repo, registry } = makeService();
     adapter.test.mockResolvedValue(result);
-    registry.require.mockReturnValue({ label: 'TorBox', test: adapter.test });
+    registry.require.mockReturnValue({ label: 'TorBox', test: adapter.test, forget: adapter.forget });
 
     await expect(
       service.validate({ adapterType: 'torbox', baseUrl: '  https://api.torbox.app  ', username: '  user  ', password: 'key' }),
     ).resolves.toBe(result);
     expect(adapter.test).toHaveBeenCalledWith({
-      id: 0,
+      id: expect.any(Number),
       name: 'TorBox',
       adapterType: 'torbox',
       baseUrl: 'https://api.torbox.app',
@@ -383,9 +383,39 @@ describe('DownloadClientConfigService', () => {
       allowPrivateAddress: false,
       settings: null,
     });
+    // A negative id can never collide with a saved client, so a validation session cannot be
+    // picked up by a later one, and the id is dropped once the call returns.
+    const { id } = adapter.test.mock.calls[0]![0] as { id: number };
+    expect(id).toBeLessThan(0);
+    expect(adapter.forget).toHaveBeenCalledWith(id);
     expect(repo.create).not.toHaveBeenCalled();
     expect(repo.createWithPathMappings).not.toHaveBeenCalled();
     expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it('gives each validation its own session slot and disposes it', async () => {
+    const { service, adapter, registry } = makeService();
+    registry.require.mockReturnValue({ label: 'qBittorrent', test: adapter.test, forget: adapter.forget });
+
+    await service.validate({ adapterType: 'qbittorrent', baseUrl: 'http://192.0.2.5:8080', password: 'right' });
+    await service.validate({ adapterType: 'qbittorrent', baseUrl: 'http://192.0.2.5:8080', password: 'wrong' });
+
+    const first = adapter.test.mock.calls[0]![0] as { id: number };
+    const second = adapter.test.mock.calls[1]![0] as { id: number };
+    // Distinct slots, so the second call cannot reuse the first's cached session.
+    expect(first.id).not.toBe(second.id);
+    expect(adapter.forget).toHaveBeenNthCalledWith(1, first.id);
+    expect(adapter.forget).toHaveBeenNthCalledWith(2, second.id);
+  });
+
+  it('disposes the validation session even when the adapter test throws', async () => {
+    const { service, adapter, registry } = makeService();
+    adapter.test.mockRejectedValue(new Error('boom'));
+    registry.require.mockReturnValue({ label: 'qBittorrent', test: adapter.test, forget: adapter.forget });
+
+    await expect(service.validate({ adapterType: 'qbittorrent', baseUrl: 'http://192.0.2.5:8080', password: 'x' })).rejects.toThrow('boom');
+    const { id } = adapter.test.mock.calls[0]![0] as { id: number };
+    expect(adapter.forget).toHaveBeenCalledWith(id);
   });
 
   it('records why a connection test failed, and reports it as a failure rather than a 200', async () => {

@@ -33,6 +33,8 @@ const CONNECTION_FIELDS = ['baseUrl', 'username', 'password', 'allowPrivateAddre
 export class DownloadClientConfigService {
   private readonly logger = new Logger(DownloadClientConfigService.name);
   private readonly bookDockPath: string;
+  /** Negative ids handed to session-caching adapters during a transient validation, one per call. */
+  private validateSeq = 0;
 
   constructor(
     private readonly repo: DownloadClientRepository,
@@ -208,17 +210,27 @@ export class DownloadClientConfigService {
    */
   async validate(dto: ValidateDownloadClientDto): Promise<DownloadClientTestResult> {
     const adapter = this.registry.require(dto.adapterType);
-    return adapter.test({
-      id: 0,
-      name: adapter.label,
-      adapterType: dto.adapterType,
-      baseUrl: dto.baseUrl.trim(),
-      username: dto.username?.trim() || null,
-      password: dto.password ?? null,
-      category: 'bookorbit',
-      allowPrivateAddress: false,
-      settings: null,
-    });
+    // A session-caching adapter keys its cookie by config id, so a shared id would let one
+    // validation's session authenticate the next, and would send the earlier host's cookie to a
+    // URL the operator has since changed. A negative id cannot collide with a saved client's
+    // serial, and one per call keeps concurrent validations from sharing a slot.
+    const ephemeralId = --this.validateSeq;
+    try {
+      return await adapter.test({
+        id: ephemeralId,
+        name: adapter.label,
+        adapterType: dto.adapterType,
+        baseUrl: dto.baseUrl.trim(),
+        username: dto.username?.trim() || null,
+        password: dto.password ?? null,
+        category: 'bookorbit',
+        allowPrivateAddress: false,
+        settings: null,
+      });
+    } finally {
+      // Disposed either way, so no session outlives the validation that opened it.
+      adapter.forget?.(ephemeralId);
+    }
   }
 
   /**
