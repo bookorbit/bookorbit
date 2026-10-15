@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -25,6 +25,8 @@ import type { TorboxTorrent } from './torbox.api';
 const CLIENT_KEY = 'a'.repeat(64);
 const OTHER_KEY = 'b'.repeat(64);
 const CLIENT_ID = 9;
+/** Mirrors the adapter's MAX_FILE_BYTES, which also caps a whole release. */
+const MAX_STAGE_BYTES = 8 * 1024 * 1024 * 1024;
 
 function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientConfig {
   return {
@@ -264,6 +266,70 @@ describe('TorboxAdapter', () => {
     await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
     await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('book');
     await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
+  });
+
+  it('rejects a release whose listed size is over the staging ceiling before fetching anything', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([
+        [
+          CLIENT_KEY,
+          torrent({
+            downloadFinished: true,
+            totalBytes: MAX_STAGE_BYTES * 2,
+            files: [
+              { fileId: 7, name: 'part-one.m4b', size: MAX_STAGE_BYTES },
+              { fileId: 8, name: 'part-two.m4b', size: MAX_STAGE_BYTES },
+            ],
+          }),
+        ],
+      ]),
+    );
+
+    await expect(adapter.stage(CLIENT_KEY, config())).rejects.toThrow('larger than the 8 GiB');
+    expect(api.requestDownloadLink).not.toHaveBeenCalled();
+    await expect(stat(stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY))).rejects.toThrow();
+  });
+
+  it('refuses a release whose already-staged files exceed the ceiling', async () => {
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'Dune.epub'), '');
+    await truncate(join(directory, 'Dune.epub'), MAX_STAGE_BYTES + 1);
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, totalBytes: 0, files: [{ fileId: null, name: 'Dune.epub', size: null }] })]]),
+    );
+
+    await expect(adapter.stage(CLIENT_KEY, config())).rejects.toThrow('larger than the 8 GiB');
+    expect(api.requestDownloadLink).not.toHaveBeenCalled();
+  });
+
+  it('stops staging once the release passes the ceiling while streaming', async () => {
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'Dune.epub'), '');
+    await truncate(join(directory, 'Dune.epub'), MAX_STAGE_BYTES - 1);
+    api.findByHashes.mockResolvedValue(
+      new Map([
+        [
+          CLIENT_KEY,
+          torrent({
+            downloadFinished: true,
+            files: [
+              { fileId: null, name: 'Dune.epub', size: null },
+              { fileId: 8, name: 'bonus.epub', size: 100 },
+            ],
+          }),
+        ],
+      ]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/bonus.epub');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(Buffer.alloc(100), { headers: { 'content-length': '100' } }))),
+    );
+
+    await expect(adapter.stage(CLIENT_KEY, config())).rejects.toBeInstanceOf(BadRequestException);
+    await expect(stat(join(directory, 'bonus.epub.part'))).rejects.toThrow();
   });
 
   it('gives colliding sanitized names distinct targets instead of overwriting', async () => {

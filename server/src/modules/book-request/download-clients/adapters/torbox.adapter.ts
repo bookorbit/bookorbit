@@ -27,9 +27,14 @@ const MEBIBYTE = 1024 * 1024;
 /**
  * The same per-file ceiling the built-in downloader enforces. A cloud client can hold a release
  * far larger than a book import will ever use, and staging must not be the way that lands.
+ *
+ * It bounds the whole release as well: staging writes every file before the import frees any of
+ * them, so without a release-wide ceiling a torrent of many files, each just under the per-file
+ * limit, could fill the volume while every file passed its own check.
  */
 const MAX_FILE_BYTES = 8 * 1024 * MEBIBYTE;
 const MAX_FILE_LABEL = `${MAX_FILE_BYTES / (1024 * MEBIBYTE)} GiB`;
+const RELEASE_TOO_LARGE_MESSAGE = `This download is larger than the ${MAX_FILE_LABEL} BookOrbit will stage`;
 const IDLE_TIMEOUT_MS = 120_000;
 const IDLE_CHECK_MS = 5_000;
 const MAX_TRANSFER_MS = 12 * 60 * 60 * 1000;
@@ -173,6 +178,14 @@ export class TorboxAdapter implements DownloadClientAdapter {
       if (torrent.files.length === 0) throw new BadRequestException('TorBox did not report which files this download holds');
       job.totalBytes = torrent.totalBytes ?? 0;
 
+      // Bounded before anything is fetched. The larger of the release total and the sum of the
+      // listed files is what the volume would have to hold, so under-reporting one cannot dodge it.
+      const declaredBytes = Math.max(
+        torrent.totalBytes ?? 0,
+        torrent.files.reduce((sum, file) => sum + (file.size ?? 0), 0),
+      );
+      if (declaredBytes > MAX_FILE_BYTES) throw new BadRequestException(RELEASE_TOO_LARGE_MESSAGE);
+
       await mkdir(directory, { recursive: true });
       this.ensureNotCancelled(job);
 
@@ -188,6 +201,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
         const existing = await completeFileSize(target, file.size);
         if (existing !== null) {
           job.downloadedBytes += existing;
+          ensureWithinReleaseBudget(job);
           continue;
         }
 
@@ -345,6 +359,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
             throw new BadRequestException(`A file in this release is larger than the ${MAX_FILE_LABEL} BookOrbit will fetch`);
           }
           job.downloadedBytes += value.byteLength;
+          ensureWithinReleaseBudget(job);
           yield value;
         }
       };
@@ -507,6 +522,14 @@ async function completeFileSize(target: string, expected: number | null): Promis
   } catch {
     return null;
   }
+}
+
+/**
+ * Stops a release that has already spent the ceiling. Checked against the bytes actually written
+ * and the files retained from earlier attempts, which both accumulate in `job.downloadedBytes`.
+ */
+function ensureWithinReleaseBudget(job: StagingJob): void {
+  if (job.downloadedBytes > MAX_FILE_BYTES) throw new BadRequestException(RELEASE_TOO_LARGE_MESSAGE);
 }
 
 function percentOf(done: number, total: number): number {
