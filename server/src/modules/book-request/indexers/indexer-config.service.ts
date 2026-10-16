@@ -23,6 +23,7 @@ import { IndexerRegistry } from './indexer-registry';
 import { IndexerRepository } from './indexer.repository';
 import { IndexerManagerRepository } from './indexer-manager.repository';
 import type { CreateIndexerDto, UpdateIndexerDto } from './dto/indexer.dto';
+import { BookRequestDownloadRepository } from '../fulfillment/book-request-download.repository';
 
 const MAX_INDEXER_SETTING_STRING_LENGTH = 2_048;
 
@@ -38,6 +39,7 @@ export class IndexerConfigService {
     private readonly credentials: RequestCredentialService,
     private readonly registry: IndexerRegistry,
     private readonly managers: IndexerManagerRepository,
+    private readonly downloads: BookRequestDownloadRepository,
   ) {}
 
   async findAll(): Promise<IndexerListResult> {
@@ -166,6 +168,10 @@ export class IndexerConfigService {
     if (existing.managerId !== null) throw new BadRequestException('A managed indexer must be deleted with its indexer manager');
     if (!(INDEXER_ADAPTER_TYPES as readonly string[]).includes(existing.adapterType)) {
       throw new BadRequestException('A plugin-backed source must be deleted with its plugin');
+    }
+    const active = await this.downloads.findActiveDirectByIndexer(id);
+    if (active.length > 0) {
+      throw new BadRequestException('This source has a direct download still running; cancel or wait for it to finish before deleting it');
     }
     this.registry.find(existing.adapterType as IndexerAdapterType)?.forget?.(id);
     await this.repo.delete(id);
