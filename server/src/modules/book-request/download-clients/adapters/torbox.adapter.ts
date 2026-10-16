@@ -249,7 +249,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
       contentPath: null,
     };
 
-    if (torrent.downloadPresent === false) {
+    if (torrent.downloadFinished && torrent.downloadPresent === false) {
       return { ...base, state: 'failed', errorMessage: 'TorBox no longer holds the files for this download' };
     }
     if (torrent.state === 'error') {
