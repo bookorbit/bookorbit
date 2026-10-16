@@ -7172,7 +7172,7 @@
       "restore": "Ripristina",
       "delete": "Elimina richiesta",
       "markFulfilled": "Voto soddisfatto",
-      "grab": "Trova una liberatoria",
+      "grab": "Cerca una release",
       "goToBook": "Vai al libro",
       "retryRelease": "Prova un'altra versione",
       "leave": "Richiesta di uscita"
@@ -7243,7 +7243,7 @@
     "grab": {
       "title": "Invia a un client di download",
       "subtitle": "Incolla un collegamento magnetico o carica un file .torrent per \"{title}\".",
-      "singleFileNote": "Una pubblicazione può essere un libro in diversi formati, un audiolibro in parti o un archivio: tutti questi vengono importati come un singolo libro. Una liberatoria che contiene diversi libri separati ti chiede quale conservare.",
+      "singleFileNote": "Una pubblicazione può essere un libro in diversi formati, un audiolibro in parti o un archivio: tutti questi vengono importati come un singolo libro. Una release che contiene diversi libri separati ti chiede quale conservare.",
       "magnet": "Collegamento magnetico",
       "torrentFile": "file .torrent",
       "client": "Scarica il client",
@@ -7351,7 +7351,7 @@
         "clientRefused": "Il tuo client di download ha rifiutato una versione precedente",
         "clientUnavailable": "Il tuo client di download non ha risposto a una versione precedente"
       },
-      "singleFileNote": "Una pubblicazione può essere un libro in diversi formati, un audiolibro in parti o un archivio: tutti questi vengono importati come un singolo libro. Una liberatoria che contiene diversi libri separati ti chiede quale conservare.",
+      "singleFileNote": "Una pubblicazione può essere un libro in diversi formati, un audiolibro in parti o un archivio: tutti questi vengono importati come un singolo libro. Una release che contiene diversi libri separati ti chiede quale conservare.",
       "searching": "Ricerca negli indicizzatori...",
       "refresh": "Cerca di nuovo",
       "cached": "Mostra l'ultima ricerca. Cerca di nuovo per nuovi risultati.",
@@ -7531,7 +7531,7 @@
       "steps": {
         "asked": "Chiesto",
         "approved": "Approvato",
-        "release": "Liberatoria trovata",
+        "release": "Release trovata",
         "downloading": "Download in corso",
         "filed": "Archiviato"
       },

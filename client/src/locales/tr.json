@@ -17,7 +17,14 @@
     "no": "Hayır",
     "show": "Göster",
     "hide": "Gizle",
-    "undo": "Geri Al"
+    "undo": "Geri Al",
+    "pagination": {
+      "label": "Sayfalandırma",
+      "pageOf": "Sayfa {page} / {totalPages}",
+      "previousPage": "Önceki sayfa",
+      "nextPage": "Sonraki sayfa",
+      "goToPage": "{page} sayfasına git"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -70,10 +77,23 @@
       "history": {
         "title": "Profil erişim geçmişi",
         "description": "Paylaşılan okuma profilinizin yakın zamandaki yönetici görüntülemeleri.",
-        "empty": "Hiçbir yönetici paylaşılan okuma profilinizi görüntülemedi."
+        "empty": "Hiçbir yönetici paylaşılan okuma profilinizi görüntülemedi.",
+        "paginationLabel": "Profil erişim geçmişi sayfaları"
+      },
+      "unknownTitle": "İsimsiz kitap",
+      "errors": {
+        "load": "Paylaşım ayarları yüklenemedi.",
+        "save": "Paylaşım ayarları güncellenemedi."
       }
     },
     "appearance": {
+      "language": {
+        "title": "Dil",
+        "description": "Arayüzde kullanılacak dili seçin.",
+        "label": "Dil",
+        "loadError": "Seçilen dil yüklenemedi",
+        "saveError": "Dil terchileri kaydedilemedi"
+      },
       "theme": {
         "accents": {
           "fuchsia": "Fuşya",
