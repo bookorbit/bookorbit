@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lt, lte, max, min, notLike, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lt, lte, max, min, notLike, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -38,6 +38,25 @@ const ESTIMATE_CLEANUP_PAGE_SIZE = 500;
 const CLEANUP_DAILY_STATS_MAX_SPAN_DAYS = 31;
 // Cumulative device counters tick in whole minutes, so less than one tick left is rounding, not reading.
 const SYNC_COUNTER_RESOLUTION_SECONDS = 60;
+
+// A device can push its counter while a book is open, on waking or on a manual sync, so a counter
+// interval can begin or end inside a measured session. The session's seconds are split by how much
+// of its wall-clock span falls in each interval rather than given whole to the one holding its start.
+// `measuredSecondsInWindow` and `measuredShareOfWindow` must apply the same rule.
+function measuredSecondsInWindow(windowStart: Date, windowEnd: Date): SQL<number> {
+  return sql<number>`case when ${readingSessions.endedAt} > ${readingSessions.startedAt} then round(
+    ${readingSessions.durationSeconds} * greatest(0, extract(epoch from (
+      least(${readingSessions.endedAt}, ${windowEnd}::timestamptz) - greatest(${readingSessions.startedAt}, ${windowStart}::timestamptz)
+    ))) / extract(epoch from (${readingSessions.endedAt} - ${readingSessions.startedAt}))
+  ) else ${readingSessions.durationSeconds} end`;
+}
+
+function measuredShareOfWindow(session: { seconds: number; startedAt: Date; endedAt: Date }, windowStart: Date, windowEnd: Date): number {
+  const spanMs = session.endedAt.getTime() - session.startedAt.getTime();
+  if (spanMs <= 0) return session.seconds;
+  const overlapMs = Math.min(session.endedAt.getTime(), windowEnd.getTime()) - Math.max(session.startedAt.getTime(), windowStart.getTime());
+  return Math.round((session.seconds * Math.max(0, overlapMs)) / spanMs);
+}
 
 function scaleProgressDelta(progressDelta: number | null, keptSeconds: number, totalSeconds: number): number | null {
   if (progressDelta === null || keptSeconds === totalSeconds) return progressDelta;
@@ -309,13 +328,13 @@ export class ReadingSessionRepository {
       }
 
       // The counter covers everything read since the previous push, however long ago that reading
-      // was: a device that read offline only pushes with its next sync. Sessions the device also
-      // measured in that interval are subtracted rather than taken as proof the whole delta is
-      // covered, so reading it did not measure is kept.
+      // was: a device that read offline only pushes with its next sync. The share of measured
+      // sessions that falls in that interval is subtracted rather than taken as proof the whole
+      // delta is covered, so reading the device did not measure is kept.
       const counterSeconds = (params.counter - cursor.counter) * 60;
 
       const [measured] = await tx
-        .select({ seconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int` })
+        .select({ seconds: sql<number>`coalesce(sum(${measuredSecondsInWindow(cursor.lastModified, params.endedAt)}), 0)::int` })
         .from(readingSessions)
         .where(
           and(
@@ -324,8 +343,8 @@ export class ReadingSessionRepository {
             eq(readingSessions.source, params.source),
             eq(readingSessions.sourceDeviceKey, params.sourceDeviceKey),
             notLike(readingSessions.sessionId, `${params.sessionIdPrefix}%`),
-            gte(readingSessions.startedAt, cursor.lastModified),
             lt(readingSessions.startedAt, params.endedAt),
+            gt(readingSessions.endedAt, cursor.lastModified),
           ),
         );
 
@@ -844,10 +863,10 @@ export class ReadingSessionRepository {
    * An estimate stands for whatever was read between two counter pushes, and it is dated on the
    * minutes leading up to the push. That is only when the reading happened if the device pushed
    * right after it; after offline reading the push comes with the next sync. So the measured
-   * session is matched to the estimate whose counter interval contains its start, and its seconds
-   * are taken off that estimate once, when they are first stored: a replay takes nothing, and one
-   * session never reaches a second estimate. What is left stays as reading the device did not
-   * measure, unless it is below the counter resolution.
+   * session is matched to every estimate whose counter interval it overlaps, and each takes the
+   * share of its seconds that falls in that interval. They are taken once, when first stored: a
+   * replay takes nothing, and the shares never add up to more than the session. What is left
+   * stays as reading the device did not measure, unless it is below the counter resolution.
    *
    * Estimates written before the interval was recorded keep the overlap rule they were created under.
    */
@@ -921,16 +940,26 @@ export class ReadingSessionRepository {
     }
 
     if (params.newlyMeasuredSeconds > 0) {
-      const [estimate] = await tx
-        .select(estimateColumns)
+      const measured = { seconds: params.newlyMeasuredSeconds, startedAt: params.startedAt, endedAt: params.endedAt };
+      const overlapping = await tx
+        .select({ ...estimateColumns, syncIntervalStartedAt: readingSessions.syncIntervalStartedAt })
         .from(readingSessions)
-        .where(and(sameDeviceEstimate, lte(readingSessions.syncIntervalStartedAt, params.startedAt), gt(readingSessions.endedAt, params.startedAt)))
-        .orderBy(asc(readingSessions.endedAt), asc(readingSessions.id))
-        .limit(1);
+        .where(
+          and(
+            sameDeviceEstimate,
+            isNotNull(readingSessions.syncIntervalStartedAt),
+            lt(readingSessions.syncIntervalStartedAt, params.endedAt),
+            gt(readingSessions.endedAt, params.startedAt),
+          ),
+        )
+        .orderBy(asc(readingSessions.endedAt), asc(readingSessions.id));
 
-      if (estimate) {
+      for (const estimate of overlapping) {
+        const share = measuredShareOfWindow(measured, estimate.syncIntervalStartedAt!, estimate.endedAt);
+        if (share <= 0) continue;
+
         const ownEstimate = and(eq(readingSessions.userId, params.userId), eq(readingSessions.id, estimate.id));
-        const remainingSeconds = estimate.durationSeconds - params.newlyMeasuredSeconds;
+        const remainingSeconds = estimate.durationSeconds - share;
         collectAffectedDays(estimate);
 
         if (remainingSeconds < SYNC_COUNTER_RESOLUTION_SECONDS) {

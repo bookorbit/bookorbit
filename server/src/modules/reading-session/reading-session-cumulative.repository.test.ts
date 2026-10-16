@@ -212,12 +212,16 @@ describe('ReadingSessionRepository.recordCumulativeSyncedSession', () => {
 
 describe('ReadingSessionRepository measured-session reconciliation', () => {
   type EstimateRow = { id: number; startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null };
+  type IntervalEstimateRow = EstimateRow & { syncIntervalStartedAt: Date };
   type SurvivingRow = Omit<EstimateRow, 'id'>;
 
   const estimateLookup = (rows: EstimateRow[]) => ({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({ orderBy: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue(rows) }) }),
     }),
+  });
+  const intervalLookup = (rows: IntervalEstimateRow[]) => ({
+    from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ orderBy: vi.fn().mockResolvedValue(rows) }) }),
   });
   const survivingLookup = (rows: SurvivingRow[]) => ({
     from: vi.fn().mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(rows) }) }),
@@ -276,7 +280,7 @@ describe('ReadingSessionRepository measured-session reconciliation', () => {
     };
     const { saveMeasured, transaction, sessionValues, dailyValues, updateSet, deleteFn } = makeMeasuredHarness([
       estimateLookup([legacyEstimate]),
-      estimateLookup([]),
+      intervalLookup([]),
       survivingLookup([measured]),
     ]);
 
@@ -298,10 +302,11 @@ describe('ReadingSessionRepository measured-session reconciliation', () => {
       endedAt: new Date('2026-08-21T07:00:00.000Z'),
       durationSeconds: 600,
       progressDelta: 2,
+      syncIntervalStartedAt: new Date('2026-08-20T07:00:00.000Z'),
     };
     const { saveMeasured, dailyValues, updateSet, deleteFn } = makeMeasuredHarness([
       estimateLookup([]),
-      estimateLookup([lateEstimate]),
+      intervalLookup([lateEstimate]),
       survivingLookup([measured]),
     ]);
 
@@ -322,6 +327,7 @@ describe('ReadingSessionRepository measured-session reconciliation', () => {
       endedAt: new Date('2026-08-21T07:00:00.000Z'),
       durationSeconds: 3600,
       progressDelta: 6,
+      syncIntervalStartedAt: new Date('2026-08-20T07:00:00.000Z'),
     };
     const shortened = {
       startedAt: new Date('2026-08-21T06:10:00.000Z'),
@@ -331,7 +337,7 @@ describe('ReadingSessionRepository measured-session reconciliation', () => {
     };
     const { saveMeasured, dailyValues, updateSet, deleteFn } = makeMeasuredHarness([
       estimateLookup([]),
-      estimateLookup([lateEstimate]),
+      intervalLookup([lateEstimate]),
       survivingLookup([measured, shortened]),
     ]);
 
@@ -342,6 +348,38 @@ describe('ReadingSessionRepository measured-session reconciliation', () => {
     expect(dailyValues).toHaveBeenLastCalledWith([
       expect.objectContaining({ day: '2026-08-21', readingSeconds: 3000, progressDelta: 5, sessionsCount: 1 }),
     ]);
+  });
+
+  it('splits a measured session across the estimates whose counter intervals it overlaps', async () => {
+    const pushedMidSession = new Date('2026-08-20T19:25:00.000Z');
+    const before = {
+      id: 20,
+      startedAt: new Date('2026-08-20T19:05:00.000Z'),
+      endedAt: pushedMidSession,
+      durationSeconds: 1200,
+      progressDelta: null,
+      syncIntervalStartedAt: new Date('2026-08-20T07:00:00.000Z'),
+    };
+    const after = {
+      id: 22,
+      startedAt: new Date('2026-08-21T06:40:00.000Z'),
+      endedAt: new Date('2026-08-21T07:00:00.000Z'),
+      durationSeconds: 1200,
+      progressDelta: null,
+      syncIntervalStartedAt: pushedMidSession,
+    };
+    const { saveMeasured, updateSet, deleteFn } = makeMeasuredHarness([
+      estimateLookup([]),
+      intervalLookup([before, after]),
+      survivingLookup([measured]),
+    ]);
+
+    await expect(saveMeasured()).resolves.toEqual({ kind: 'saved' });
+
+    expect(updateSet).toHaveBeenCalledTimes(2);
+    expect(updateSet).toHaveBeenNthCalledWith(1, { startedAt: new Date('2026-08-20T19:10:00.000Z'), durationSeconds: 900, progressDelta: null });
+    expect(updateSet).toHaveBeenNthCalledWith(2, { startedAt: new Date('2026-08-21T06:45:00.000Z'), durationSeconds: 900, progressDelta: null });
+    expect(deleteFn).not.toHaveBeenCalledWith(readingSessions);
   });
 
   it('takes nothing off an estimate when the measured session is a replay', async () => {

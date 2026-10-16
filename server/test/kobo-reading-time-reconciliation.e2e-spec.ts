@@ -18,7 +18,7 @@ type KoboDevice = { id: number; token: string };
 type Book = { bookId: number; bookFileId: number; entitlementId: string };
 type MeasuredSession = { id: string; startedAt: string; endedAt: string; seconds: number };
 
-const BOOK_COUNT = 8;
+const BOOK_COUNT = 13;
 const RUN = randomUUID().slice(0, 8);
 
 /** Day `n` of a calendar that starts on 2026-03-01, so every scenario owns its own dates. */
@@ -391,5 +391,89 @@ describe('Kobo reading time reconciliation (e2e)', { timeout: 180_000 }, () => {
 
     expect(await storedSessions(book)).toEqual([stored(deviceA, first), stored(deviceA, second)]);
     expect(await dailySeconds(32, 33, 34)).toEqual({ [day(33)]: 3600 });
+  });
+
+  describe('a counter push made while the book is open', () => {
+    it('retires the estimate when the device syncs on waking, seconds after the book reopens', async () => {
+      const book = books[8]!;
+      const session = measured('wake-sync', 37, '20:00:00', '20:30:00');
+      await pushCounter(deviceA, book, 100, at(36, '07:00:00'));
+      await pushCounter(deviceA, book, 100, at(37, '20:00:05'));
+      await pushCounter(deviceA, book, 130, at(37, '20:30:10'));
+
+      expect(await storedSessions(book)).toEqual([estimate(deviceA, book, 130, at(37, '20:30:10'), 1800, at(37, '20:00:05'))]);
+
+      await sendMeasured(deviceA, book, [session]);
+
+      expect(await storedSessions(book)).toEqual([stored(deviceA, session)]);
+      expect(await dailySeconds(36, 37, 38)).toEqual({ [day(37)]: 1800 });
+    });
+
+    it('derives no estimate after a wake-up sync when the measured session arrives first', async () => {
+      const book = books[9]!;
+      const session = measured('wake-sync-first', 40, '20:00:00', '20:30:00');
+      await pushCounter(deviceA, book, 100, at(39, '07:00:00'));
+      await pushCounter(deviceA, book, 100, at(40, '20:00:05'));
+      await sendMeasured(deviceA, book, [session]);
+      await pushCounter(deviceA, book, 130, at(40, '20:30:10'));
+
+      expect(await storedSessions(book)).toEqual([stored(deviceA, session)]);
+      expect(await dailySeconds(39, 40, 41)).toEqual({ [day(40)]: 1800 });
+    });
+
+    it('shares the session between the estimates on both sides of a push made while reading', async () => {
+      const book = books[10]!;
+      const session = measured('mid-session', 43, '20:00:00', '20:30:00');
+      await pushCounter(deviceA, book, 100, at(42, '07:00:00'));
+      await pushCounter(deviceA, book, 110, at(43, '20:10:00'));
+      await pushCounter(deviceA, book, 130, at(43, '20:30:05'));
+
+      expect(await storedSessions(book)).toEqual([
+        estimate(deviceA, book, 110, at(43, '20:10:00'), 600, at(42, '07:00:00')),
+        estimate(deviceA, book, 130, at(43, '20:30:05'), 1200, at(43, '20:10:00')),
+      ]);
+
+      await sendMeasured(deviceA, book, [session]);
+
+      expect(await storedSessions(book)).toEqual([stored(deviceA, session)]);
+      expect(await dailySeconds(42, 43, 44)).toEqual({ [day(43)]: 1800 });
+    });
+
+    it('retires the estimate of reading that carried on after the sync that reported the evening', async () => {
+      const book = books[11]!;
+      const evening = measured('carried-on-evening', 46, '20:16:11', '21:09:57');
+      const morning = measured('carried-on-morning', 47, '07:41:50', '08:10:00');
+      await pushCounter(deviceA, book, 9, at(45, '20:52:44'));
+      await pushCounter(deviceA, book, 63, at(47, '07:41:58'));
+      await sendMeasured(deviceA, book, [evening]);
+      await pushCounter(deviceA, book, 91, at(47, '12:00:00'));
+
+      expect(await storedSessions(book)).toEqual([
+        stored(deviceA, evening),
+        estimate(deviceA, book, 91, at(47, '12:00:00'), 1680, at(47, '07:41:58')),
+      ]);
+
+      await sendMeasured(deviceA, book, [morning]);
+
+      expect(await storedSessions(book)).toEqual([stored(deviceA, evening), stored(deviceA, morning)]);
+      expect(await dailySeconds(45, 46, 47)).toEqual({ [day(46)]: 3226, [day(47)]: 1690 });
+    });
+
+    it('keeps the unmeasured reading of an earlier interval that the session only grazes', async () => {
+      const book = books[12]!;
+      const session = measured('grazing', 50, '19:59:50', '20:20:00');
+      await pushCounter(deviceA, book, 100, at(49, '07:00:00'));
+      await pushCounter(deviceA, book, 105, at(50, '19:59:55'));
+      await pushCounter(deviceA, book, 125, at(51, '08:00:00'));
+
+      await sendMeasured(deviceA, book, [session]);
+
+      // Five of the session's 1210 seconds fall before the push, so the earlier estimate gives up only those.
+      expect(await storedSessions(book)).toEqual([
+        estimate(deviceA, book, 105, at(50, '19:59:55'), 295, at(49, '07:00:00')),
+        stored(deviceA, session),
+      ]);
+      expect(await dailySeconds(49, 50, 51)).toEqual({ [day(50)]: 1505 });
+    });
   });
 });
