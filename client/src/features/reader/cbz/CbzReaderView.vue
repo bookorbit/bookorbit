@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useVirtualizer } from '@tanstack/vue-virtual'
@@ -17,6 +17,7 @@ import {
   PinOff,
   Plus,
   Settings,
+  FileText,
 } from '@lucide/vue'
 import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
@@ -33,6 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import ReaderSettingsSheet from '@/features/reader/shared/components/ReaderSettingsSheet.vue'
 import CbzSettingsPanel from './components/CbzSettingsPanel.vue'
 import NextIssueCard from './components/NextIssueCard.vue'
+import DjvuTextSheet from '../djvu/DjvuTextSheet.vue'
 
 const TWO_PAGE_BREAKPOINT = 900
 // A page turn that only just landed on the last page must not carry through into the next book:
@@ -44,7 +46,7 @@ const ZOOM_STEP = 0.25
 
 const { t } = useI18n()
 
-const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
+const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean; source?: 'cbz' | 'djvu' }>()
 const route = useRoute()
 const router = useRouter()
 const trackingEnabled = computed(() => !props.peekMode)
@@ -61,7 +63,7 @@ const { onActivity, elapsedMinutes } = useReadingSession(
   { trackingEnabled },
 )
 const progress = useReaderProgress(props.bookId, props.fileId, elapsedMinutes, 0, { trackingEnabled })
-const { pageCount, bookTitle, seriesId, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
+const { pageCount, bookTitle, seriesId, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId, props.source ?? 'cbz')
 const {
   fitMode,
   viewMode,
@@ -77,9 +79,47 @@ const {
   imgFitClass,
 } = useCbzSettings()
 const { nextBook, load: loadNextBook } = useSeriesNextBook('cbx')
-const bookSettings = useReaderSettings(props.fileId, 'cbz')
+const bookSettings = useReaderSettings(props.fileId, props.source === 'djvu' ? 'djvu' : 'cbz')
 
 const currentPage = ref(0)
+const imageError = ref(false)
+const imageGeneration = ref(0)
+const showPageText = ref(false)
+function goBack() {
+  router.back()
+}
+function firstPage() {
+  goToPage(0)
+}
+function lastPage() {
+  goToPage(pageCount.value - 1)
+}
+function onPageSlider(event: Event) {
+  goToPage(Number((event.target as HTMLInputElement).value))
+}
+function openPageText() {
+  showPageText.value = true
+}
+function onTextOpenChange(open: boolean) {
+  showPageText.value = open
+}
+function onImageError() {
+  imageError.value = true
+}
+async function retryImages() {
+  await load()
+  if (disposed || error.value || pageCount.value <= 0) return
+  currentPage.value = Math.min(currentPage.value, pageCount.value - 1)
+  imageError.value = false
+  currentImageLoaded.value = false
+  loadedImageCount.value = 0
+  imageGeneration.value++
+  preloadCache.clear()
+}
+function onPaginatedLoad(event: Event) {
+  const image = event.target
+  if (image instanceof HTMLImageElement) onPaginatedImageLoad(Number(image.dataset.page), event)
+}
 const showSettings = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 const paginatedViewport = ref<HTMLElement | null>(null)
@@ -93,7 +133,20 @@ const pageDimensions = ref<Array<{ width: number; height: number } | undefined>>
 const stripImagesReady = ref(false)
 const zoomScale = ref(1)
 
-watch(showSettings, setVisibilityLock)
+// Only keyboard focus holds the controls open; a clicked or tapped button keeps focus too, and
+// must not stop the bars from hiding.
+const controlsFocused = ref(false)
+function onControlsFocus(event: FocusEvent) {
+  controlsFocused.value = event.target instanceof HTMLElement && event.target.matches(':focus-visible')
+}
+function onControlsBlur(event: FocusEvent) {
+  const next = event.relatedTarget
+  if (!(next instanceof HTMLElement && next.closest('[data-reader-controls]'))) controlsFocused.value = false
+}
+watch([showSettings, showPageText, controlsFocused], ([settings, text, focused]) => {
+  setVisibilityLock(settings || text || focused)
+  if (focused) footerVisible.value = true
+})
 
 // The settings surface is one panel in two containers: an anchored popover where there
 // is room beside the page, a bottom sheet where the thumb is and the page must stay visible.
@@ -331,6 +384,7 @@ const canGoNext = computed(() => {
 })
 
 watch(renderKey, () => {
+  imageError.value = false
   const spread = currentSpread.value
   const expected = spread?.pages.length ?? 0
   pendingImageLoads.value = expected
@@ -361,12 +415,16 @@ function preload(n: number) {
   preloadCache.set(n, img)
 }
 
+// Every DjVu page is rendered on the server by a small shared decoder pool, so it looks one spread
+// ahead instead of four and leaves the pool free for the page on screen.
+const PRELOAD_SPREAD_OFFSETS = props.source === 'djvu' ? [0, 1] : [-1, 0, 1, 2]
+
 function schedulePreload(anchorPage: number) {
   const layout = spreadLayout.value
   const centerSpreadIndex = layout.spreadIndexForPage(anchorPage)
   const pagesToPreload = new Set<number>()
 
-  for (const offset of [-1, 0, 1, 2]) {
+  for (const offset of PRELOAD_SPREAD_OFFSETS) {
     const spread = layout.spreads[centerSpreadIndex + offset]
     if (!spread) continue
     for (const page of spread.pages) pagesToPreload.add(page)
@@ -567,7 +625,14 @@ function onWheel(e: WheelEvent) {
 // ── Keyboard ───────────────────────────────────────────────────────────────────
 function onKeyDown(e: KeyboardEvent) {
   const target = (e.composedPath?.()[0] || e.target) as HTMLElement | null
-  if (target?.tagName === 'INPUT') return
+  if (e.defaultPrevented || showPageText.value) return
+  if (showSettings.value) {
+    if (e.key === 'Escape') showSettings.value = false
+    return
+  }
+  if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable=true], [role=dialog]')) return
+  // A clicked button keeps focus, so arrows must still turn pages; only its own activation keys are left to it.
+  if ((e.key === ' ' || e.key === 'Enter') && target instanceof HTMLElement && target.closest('button, a')) return
   const isRtl = direction.value === 'rtl'
 
   switch (e.key) {
@@ -596,9 +661,6 @@ function onKeyDown(e: KeyboardEvent) {
       e.preventDefault()
       goToPage(pageCount.value - 1)
       break
-    case 'Escape':
-      showSettings.value = false
-      break
     case '+':
     case '=':
       e.preventDefault()
@@ -616,6 +678,7 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 let readerReady = false
+let disposed = false
 let restoringContinuousPosition = false
 let stripScrollFrame: number | null = null
 
@@ -741,61 +804,93 @@ async function startTrackedReading() {
 }
 
 // ── Mount / unmount ────────────────────────────────────────────────────────────
-onMounted(async () => {
+async function initializeReader() {
   viewportWidth.value = window.innerWidth
   viewportHeight.value = window.innerHeight
+  loading.value = true
+  error.value = null
+  try {
+    await progress.load()
+    if (disposed) return
+    await bookSettings.load()
+    if (disposed) return
+
+    applySettings(bookSettings.effective.value as CbxReaderSettings)
+
+    await load()
+    if (disposed || error.value || pageCount.value <= 0) return
+    const saved = progress.pageNumber.value
+    if (saved && saved > 1) {
+      currentPage.value = Math.min(saved - 1, pageCount.value - 1)
+    } else if (progress.percentage.value > 0 && pageCount.value > 1) {
+      const estimated = Math.round((progress.percentage.value / 100) * pageCount.value)
+      currentPage.value = Math.max(0, Math.min(estimated - 1, pageCount.value - 1))
+    }
+
+    if (scrollMode.value === 'paginated' && isTwoPageEffective.value) {
+      currentPage.value = spreadLayout.value.anchorForPage(currentPage.value)
+    }
+
+    if (seriesFlowEnabled.value) void loadNextBook(seriesId.value, props.bookId)
+
+    readerReady = true
+    if (scrollMode.value !== 'paginated') {
+      await scrollContinuousToPage(currentPage.value, true)
+      stripImagesReady.value = true
+    }
+    schedulePreload(currentPage.value)
+  } catch {
+    error.value = 'reader.pageImages.loadFailed'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onKeyDown)
-
-  await progress.load()
-  await bookSettings.load()
-
-  applySettings(bookSettings.effective.value as CbxReaderSettings)
-
-  await load()
-  const saved = progress.pageNumber.value
-  if (saved && saved > 1) {
-    currentPage.value = Math.min(saved - 1, pageCount.value - 1)
-  } else if (progress.percentage.value > 0 && pageCount.value > 1) {
-    const estimated = Math.round((progress.percentage.value / 100) * pageCount.value)
-    currentPage.value = Math.max(0, Math.min(estimated - 1, pageCount.value - 1))
-  }
-
-  if (scrollMode.value === 'paginated' && isTwoPageEffective.value) {
-    currentPage.value = spreadLayout.value.anchorForPage(currentPage.value)
-  }
-
-  if (seriesFlowEnabled.value) void loadNextBook(seriesId.value, props.bookId)
-
-  readerReady = true
-  if (scrollMode.value !== 'paginated') {
-    await scrollContinuousToPage(currentPage.value, true)
-    stripImagesReady.value = true
-  }
-  schedulePreload(currentPage.value)
+  void initializeReader()
 })
 
 onBeforeRouteLeave(async () => {
   await flushPendingProgress()
 })
 
+// Before unmount, because useReadingSession ends the session from its own unmounted hook, which
+// runs first and would otherwise miss a page turn still inside the save debounce.
+onBeforeUnmount(() => {
+  disposed = true
+  for (const image of preloadCache.values()) image.onload = null
+  preloadCache.clear()
+  void flushPendingProgress()
+})
+
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
   if (stripScrollFrame !== null) cancelAnimationFrame(stripScrollFrame)
-  void flushPendingProgress()
 })
 </script>
 
 <template>
   <div class="fixed inset-0 select-none overflow-hidden" :style="{ background: bgValue }">
+    <span class="sr-only" role="status" aria-live="polite">{{ pageLabel }}</span>
     <!-- ── Header ──────────────────────────────────────────────────────────── -->
     <div
+      data-reader-controls
+      @focusin="onControlsFocus"
+      @focusout="onControlsBlur"
       class="absolute top-0 inset-x-0 z-50 transition-all duration-300"
       :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
     >
       <div class="h-12 flex items-center gap-1 px-3 bg-background/90 backdrop-blur-md border-b border-border">
-        <button class="viewer-btn" @click="router.back()"><ArrowLeft :size="16" /></button>
+        <button
+          class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+          :aria-label="t('common.back')"
+          @click="goBack"
+        >
+          <ArrowLeft :size="16" />
+        </button>
         <div class="flex-1 min-w-0 flex flex-col justify-center px-2">
           <span v-if="bookTitle" class="text-sm font-serif text-foreground truncate leading-tight">{{ bookTitle }}</span>
           <span class="text-xs text-muted-foreground tabular-nums">{{ pageLabel }}</span>
@@ -812,7 +907,12 @@ onUnmounted(() => {
         <div class="hidden items-center md:flex" :aria-label="t('reader.cbz.zoomControls')" role="group">
           <Tooltip>
             <TooltipTrigger as-child>
-              <button class="viewer-btn" :disabled="!canZoomOut" :aria-label="t('reader.cbz.zoomOut')" @click="zoomOut">
+              <button
+                class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+                :disabled="!canZoomOut"
+                :aria-label="t('reader.cbz.zoomOut')"
+                @click="zoomOut"
+              >
                 <Minus :size="15" />
               </button>
             </TooltipTrigger>
@@ -821,7 +921,12 @@ onUnmounted(() => {
           <span class="min-w-12 text-center text-xs tabular-nums text-muted-foreground" aria-live="polite">{{ zoomPercent }}%</span>
           <Tooltip>
             <TooltipTrigger as-child>
-              <button class="viewer-btn" :disabled="!canZoomIn" :aria-label="t('reader.cbz.zoomIn')" @click="zoomIn">
+              <button
+                class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+                :disabled="!canZoomIn"
+                :aria-label="t('reader.cbz.zoomIn')"
+                @click="zoomIn"
+              >
                 <Plus :size="15" />
               </button>
             </TooltipTrigger>
@@ -830,7 +935,11 @@ onUnmounted(() => {
         </div>
         <Tooltip>
           <TooltipTrigger as-child>
-            <button class="viewer-btn" :aria-label="fullscreenLabel" @click="toggleFullscreen">
+            <button
+              class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+              :aria-label="fullscreenLabel"
+              @click="toggleFullscreen"
+            >
               <Minimize v-if="isFullscreen" :size="15" />
               <Maximize v-else :size="15" />
             </button>
@@ -841,20 +950,30 @@ onUnmounted(() => {
         <Tooltip>
           <TooltipTrigger as-child>
             <button
-              class="viewer-btn"
+              class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
               :class="isPinned ? '!bg-muted !text-primary' : ''"
-              :aria-label="isPinned ? 'Unpin menu' : 'Pin menu'"
+              :aria-label="t(isPinned ? 'reader.pageImages.unpin' : 'reader.pageImages.pin')"
               @click="togglePinned"
             >
               <PinOff v-if="isPinned" :size="15" />
               <Pin v-else :size="15" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>{{ isPinned ? 'Unpin menu' : 'Pin menu' }}</TooltipContent>
+          <TooltipContent>{{ t(isPinned ? 'reader.pageImages.unpin' : 'reader.pageImages.pin') }}</TooltipContent>
         </Tooltip>
+        <button
+          v-if="props.source === 'djvu'"
+          type="button"
+          class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+          :aria-label="t('reader.djvu.pageText')"
+          :title="t('reader.djvu.pageText')"
+          @click="openPageText"
+        >
+          <FileText :size="16" />
+        </button>
         <template v-if="isCompact">
           <button
-            class="viewer-btn"
+            class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
             :class="showSettings ? '!bg-muted !text-foreground' : ''"
             :title="t('reader.settings.title')"
             :aria-label="t('reader.settings.ariaLabel')"
@@ -876,7 +995,7 @@ onUnmounted(() => {
         <Popover v-else :open="showSettings" @update:open="onSettingsOpenChange">
           <PopoverTrigger as-child>
             <button
-              class="viewer-btn"
+              class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
               :class="showSettings ? '!bg-muted !text-foreground' : ''"
               :title="t('reader.settings.title')"
               :aria-label="t('reader.settings.ariaLabel')"
@@ -928,11 +1047,14 @@ onUnmounted(() => {
               <img
                 v-if="renderLeftPage !== null"
                 :src="pageUrl(renderLeftPage)"
+                :key="`${renderLeftPage}:${imageGeneration}`"
+                :data-page="renderLeftPage"
                 :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
                 :style="{ maxWidth: '100%', maxHeight: '100%' }"
-                alt=""
+                :alt="t('reader.pageImages.pageAlt', { page: renderLeftPage + 1 })"
                 draggable="false"
-                @load="onPaginatedImageLoad(renderLeftPage, $event)"
+                @load="onPaginatedLoad"
+                @error="onImageError"
               />
               <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
             </div>
@@ -940,11 +1062,14 @@ onUnmounted(() => {
               <img
                 v-if="renderRightPage !== null"
                 :src="pageUrl(renderRightPage)"
+                :key="`${renderRightPage}:${imageGeneration}`"
+                :data-page="renderRightPage"
                 :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
                 :style="{ maxWidth: '100%', maxHeight: '100%' }"
-                alt=""
+                :alt="t('reader.pageImages.pageAlt', { page: renderRightPage + 1 })"
                 draggable="false"
-                @load="onPaginatedImageLoad(renderRightPage, $event)"
+                @load="onPaginatedLoad"
+                @error="onImageError"
               />
               <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
             </div>
@@ -953,10 +1078,13 @@ onUnmounted(() => {
           <img
             v-else-if="renderSinglePage !== null"
             :src="pageUrl(renderSinglePage)"
+            :key="`${renderSinglePage}:${imageGeneration}`"
+            :data-page="renderSinglePage"
             :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
-            alt=""
+            :alt="t('reader.pageImages.pageAlt', { page: renderSinglePage + 1 })"
             draggable="false"
-            @load="onPaginatedImageLoad(renderSinglePage, $event)"
+            @load="onPaginatedLoad"
+            @error="onImageError"
           />
         </div>
       </div>
@@ -977,12 +1105,14 @@ onUnmounted(() => {
         >
           <img
             :src="pageUrl(page.index)"
+            :key="`${page.index}:${imageGeneration}`"
             :class="stripImageClass"
             :style="stripImageStyle(page.index)"
-            alt=""
+            :alt="t('reader.pageImages.pageAlt', { page: page.index + 1 })"
             decoding="async"
             draggable="false"
             @load="onStripImageLoad(page.index, $event)"
+            @error="onImageError"
           />
         </div>
       </div>
@@ -998,6 +1128,9 @@ onUnmounted(() => {
 
     <!-- ── Footer ──────────────────────────────────────────────────────────── -->
     <div
+      data-reader-controls
+      @focusin="onControlsFocus"
+      @focusout="onControlsBlur"
       class="absolute bottom-0 inset-x-0 z-50 transition-all duration-300"
       :class="footerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'"
     >
@@ -1005,12 +1138,25 @@ onUnmounted(() => {
         <div class="hidden sm:block">
           <Tooltip>
             <TooltipTrigger as-child>
-              <button class="viewer-btn" @click="goToPage(0)"><ChevronsLeft :size="16" /></button>
+              <button
+                class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+                :aria-label="t('reader.cbz.firstPage')"
+                @click="firstPage"
+              >
+                <ChevronsLeft :size="16" />
+              </button>
             </TooltipTrigger>
             <TooltipContent>{{ t('reader.cbz.firstPage') }}</TooltipContent>
           </Tooltip>
         </div>
-        <button class="viewer-btn" :disabled="!canGoPrev" @click="prevPage"><ChevronLeft :size="16" /></button>
+        <button
+          class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+          :disabled="!canGoPrev"
+          :aria-label="t('reader.pageImages.previousPage')"
+          @click="prevPage"
+        >
+          <ChevronLeft :size="16" />
+        </button>
 
         <div class="relative flex-1 min-w-0 flex items-center h-6">
           <input
@@ -1024,18 +1170,32 @@ onUnmounted(() => {
               accentColor: 'var(--primary)',
               background: `linear-gradient(to right, var(--primary) ${sliderFillPercent}%, var(--border) ${sliderFillPercent}%)`,
             }"
-            @input="goToPage(Number(($event.target as HTMLInputElement).value))"
+            :aria-label="t('reader.pageImages.goToPage')"
+            @input="onPageSlider"
           />
           <datalist id="cbz-ticks">
             <option v-for="t in sliderTicks" :key="t" :value="t" />
           </datalist>
         </div>
 
-        <button class="viewer-btn" :disabled="!canGoNext" @click="nextPage"><ChevronRight :size="16" /></button>
+        <button
+          class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+          :disabled="!canGoNext"
+          :aria-label="t('reader.pageImages.nextPage')"
+          @click="nextPage"
+        >
+          <ChevronRight :size="16" />
+        </button>
         <div class="hidden sm:block">
           <Tooltip>
             <TooltipTrigger as-child>
-              <button class="viewer-btn" @click="goToPage(pageCount - 1)"><ChevronsRight :size="16" /></button>
+              <button
+                class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+                :aria-label="t('reader.cbz.lastPage')"
+                @click="lastPage"
+              >
+                <ChevronsRight :size="16" />
+              </button>
             </TooltipTrigger>
             <TooltipContent>{{ t('reader.cbz.lastPage') }}</TooltipContent>
           </Tooltip>
@@ -1056,8 +1216,43 @@ onUnmounted(() => {
     </div>
 
     <div v-if="error" class="absolute inset-0 flex items-center justify-center z-50 p-8 text-center bg-background">
-      <p class="text-sm text-foreground">{{ error }}</p>
+      <div class="flex flex-col items-center gap-4" role="alert">
+        <p class="text-sm text-foreground">{{ t(error) }}</p>
+        <button
+          type="button"
+          class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+          @click="initializeReader"
+        >
+          {{ t('common.retry') }}
+        </button>
+        <button type="button" class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2" @click="goBack">
+          {{ t('common.back') }}
+        </button>
+      </div>
     </div>
+
+    <div v-if="imageError && !error && !loading" class="absolute inset-0 z-40 flex items-center justify-center bg-background/95 p-8">
+      <div class="flex flex-col items-center gap-4 text-center" role="alert">
+        <p class="text-sm text-foreground">{{ t('reader.pageImages.pageFailed') }}</p>
+        <button
+          type="button"
+          class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+          @click="retryImages"
+        >
+          {{ t('common.retry') }}
+        </button>
+        <button type="button" class="viewer-btn focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2" @click="goBack">
+          {{ t('common.back') }}
+        </button>
+      </div>
+    </div>
+    <DjvuTextSheet
+      v-if="props.source === 'djvu'"
+      :open="showPageText"
+      :file-id="props.fileId"
+      :page-index="currentPage"
+      @update:open="onTextOpenChange"
+    />
 
     <!-- Progress bar -->
     <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-30">

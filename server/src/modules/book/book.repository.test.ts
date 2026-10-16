@@ -757,6 +757,58 @@ describe('BookRepository', () => {
     expect(resetWhere).toHaveBeenCalledOnce();
   });
 
+  it('moves the narration stamp with a bridged marker', async () => {
+    const returning = vi.fn().mockResolvedValue([{ fileId: 20 }]);
+    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    const db = {
+      insert: vi.fn().mockReturnValue({ values }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const repo = new BookRepository(db as never);
+    const sourceUpdatedAt = new Date('2026-10-13T12:00:00.000Z');
+    const base = {
+      userId: 7,
+      fileId: 20,
+      cfi: 'epubcfi(/6/4)',
+      percentage: 42,
+      mediaOverlayFragment: 'OPS/chapter.xhtml#p2',
+      mediaOverlaySectionIndex: 1,
+      koreaderProgress: null,
+      sourceUpdatedAt,
+    };
+
+    await repo.upsertSyncedEpubProgressIfNewer({ ...base, positionSeconds: 120 });
+    const stamp = { narrationPercentage: 42, narrationUpdatedAt: sourceUpdatedAt };
+    expect(values).toHaveBeenLastCalledWith(expect.objectContaining(stamp));
+    expect(onConflictDoUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ set: expect.objectContaining(stamp) }));
+
+    await repo.upsertSyncedEpubProgressIfNewer({ ...base, positionSeconds: null });
+    expect(values.mock.lastCall![0]).not.toHaveProperty('narrationUpdatedAt');
+    expect(onConflictDoUpdate.mock.lastCall![0].set).not.toHaveProperty('narrationUpdatedAt');
+  });
+
+  it('keeps the stored narration marker when a write leaves it out, and clears it on an explicit null', async () => {
+    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    const db = {
+      insert: vi.fn().mockReturnValue({ values }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', null, 40);
+    const kept = onConflictDoUpdate.mock.lastCall![0].set;
+    expect(kept).not.toHaveProperty('positionSeconds');
+    expect(kept).not.toHaveProperty('mediaOverlayFragment');
+    expect(kept).not.toHaveProperty('mediaOverlaySectionIndex');
+
+    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', null, 40, null, null, null);
+    expect(onConflictDoUpdate.mock.lastCall![0].set).toEqual(
+      expect.objectContaining({ positionSeconds: null, mediaOverlayFragment: null, mediaOverlaySectionIndex: null }),
+    );
+  });
+
   it('clears a stale narration marker when bridging to a copy without media overlays', async () => {
     const returning = vi.fn().mockResolvedValue([{ fileId: 20 }]);
     const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
@@ -1196,6 +1248,43 @@ describe('BookRepository', () => {
     const total = await repo.countWhere(undefined as never);
 
     expect(total).toBe(42);
+  });
+
+  it('countFormatFacets counts distinct visible books per requested format through an aliased file join', async () => {
+    const db = {
+      execute: vi.fn().mockResolvedValue({
+        rows: [
+          { format: 'epub', count: '7' },
+          { format: 'pdf', count: 3 },
+        ],
+      }),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.countFormatFacets(sql`${bookMetadata.title} is not null`, ['epub', 'pdf']);
+
+    const query = new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]);
+    const normalized = query.sql.replace(/\s+/g, ' ');
+    expect(normalized).toContain('count(DISTINCT "books"."id")');
+    expect(normalized).toContain('LEFT JOIN "book_metadata" ON "book_metadata"."book_id" = "books"."id"');
+    expect(normalized).toContain('INNER JOIN "book_files" AS facet_file ON facet_file.book_id = "books"."id"');
+    expect(normalized).toContain('"book_metadata"."title" is not null');
+    expect(normalized).toContain('"books"."status" <>');
+    expect(normalized).toContain('facet_file.format IN ($2, $3)');
+    expect(normalized).toContain('GROUP BY facet_file.format');
+    expect(query.params).toEqual(['processing', 'epub', 'pdf']);
+    expect(result).toEqual([
+      { format: 'epub', count: 7 },
+      { format: 'pdf', count: 3 },
+    ]);
+  });
+
+  it('countFormatFacets skips the query when no formats are requested', async () => {
+    const db = { execute: vi.fn() };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.countFormatFacets(undefined, [])).resolves.toEqual([]);
+    expect(db.execute).not.toHaveBeenCalled();
   });
 
   it('returns empty file lists without querying when bookIds are empty', async () => {

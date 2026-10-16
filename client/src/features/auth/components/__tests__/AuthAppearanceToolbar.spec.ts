@@ -14,10 +14,10 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
-function mountToolbar(placement: 'top' | 'bottom') {
+function mountToolbar() {
   return mount(TooltipProvider, {
     props: { delayDuration: 0 },
-    slots: { default: () => h(AuthAppearanceToolbar, { placement }) },
+    slots: { default: () => h(AuthAppearanceToolbar) },
     attachTo: document.body,
   })
 }
@@ -44,45 +44,33 @@ afterEach(() => {
 })
 
 describe('AuthAppearanceToolbar', () => {
-  it.each([
-    { placement: 'top', edge: 'top-5' },
-    { placement: 'bottom', edge: 'bottom-5' },
-  ] as const)('pins to the $placement edge', ({ placement, edge }) => {
-    wrapper = mountToolbar(placement)
+  it('names the current language on its picker button', () => {
+    wrapper = mountToolbar()
 
-    expect(wrapper.get('.fixed').classes()).toContain(edge)
+    expect(wrapper.get('[data-testid="auth-language-control"]').attributes('aria-label')).toBe('Language')
+    expect(wrapper.get('[data-testid="auth-language-control"]').text()).toContain('English')
+  })
+
+  it('offers an endpaper picker in place of the app background and corner pickers', async () => {
+    wrapper = mountToolbar()
+
+    expect(wrapper.find('button[aria-label="Change background"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Change corner radius"]').exists()).toBe(false)
+    await wrapper.get('button[aria-label="Change endpaper"]').trigger('click')
+    await flushPromises()
+    document.body.querySelector<HTMLButtonElement>('button[aria-label="Greek key"]')!.click()
+    await flushPromises()
+
+    expect(JSON.parse(localStorage.getItem('authEndpaper') ?? 'null')).toBe('greek-key')
   })
 
   it('toggles between light and dark', async () => {
-    wrapper = mountToolbar('top')
+    wrapper = mountToolbar()
     const store = useThemeStore()
 
     await wrapper.get('button[aria-label="Switch to dark"]').trigger('click')
 
     expect(store.resolvedTheme).toBe('dark')
     expect(wrapper.find('button[aria-label="Switch to light"]').exists()).toBe(true)
-  })
-
-  it('picks a corner radius from its popover', async () => {
-    wrapper = mountToolbar('bottom')
-    const store = useThemeStore()
-
-    await wrapper.get('button[aria-label="Change corner radius"]').trigger('click')
-    await flushPromises()
-    const pill = document.body.querySelector<HTMLButtonElement>('button[aria-label="Pill-shaped corners"]')
-    pill!.click()
-
-    expect(store.radius).toBe('pill')
-  })
-
-  it('picks a background from its popover', async () => {
-    wrapper = mountToolbar('bottom')
-    const store = useThemeStore()
-
-    await wrapper.get('button[aria-label="Change background"]').trigger('click')
-    await flushPromises()
-    document.body.querySelector<HTMLButtonElement>('button[aria-label="Aurora"]')!.click()
-
-    expect(store.background).toBe('aurora')
   })
 })

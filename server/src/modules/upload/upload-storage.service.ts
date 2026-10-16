@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, RequestTimeoutException } from '@nestjs/common';
 import { mkdir, open, rename, stat, unlink } from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
 import { tmpdir } from 'os';
@@ -24,17 +24,30 @@ export class UploadStorageService {
   constructor(private readonly appSettings: AppSettingsService) {}
 
   /**
-   * Streams the multipart file to a temp path on disk.
+   * Streams the multipart file to a temp path on disk. With `idleTimeoutMs`, a source that sends
+   * nothing for that long is given up, so a connection gone half-open does not hold a request open
+   * until the server restarts.
    */
-  async streamToTemp(source: Readable, requestedLimitBytes?: number): Promise<{ tempPath: string; sizeBytes: number }> {
+  async streamToTemp(
+    source: Readable,
+    requestedLimitBytes?: number,
+    options: { idleTimeoutMs?: number } = {},
+  ): Promise<{ tempPath: string; sizeBytes: number }> {
     const tempPath = join(tmpdir(), `bookorbit-upload-${randomUUID()}`);
     const writeStream = createWriteStream(tempPath);
     const configuredMb = await this.appSettings.getMaxUploadSizeMb();
     const configuredBytes = Math.min(HARD_MAX_UPLOAD_BYTES, configuredMb * 1_024 * 1_024);
     const limitBytes = Math.min(configuredBytes, requestedLimitBytes ?? configuredBytes);
     let totalBytes = 0;
+    let idleTimer: NodeJS.Timeout | undefined;
+    const armIdleTimer = () => {
+      if (!options.idleTimeoutMs) return;
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => source.destroy(new RequestTimeoutException('No upload data arrived in time')), options.idleTimeoutMs);
+    };
     const limiter = new Transform({
       transform(chunk: Buffer, _encoding, callback) {
+        armIdleTimer();
         totalBytes += chunk.length;
         if (totalBytes > limitBytes) {
           callback(uploadError.tooLarge(`File exceeds the ${Math.floor(limitBytes / 1_024 / 1_024)} MB upload limit`));
@@ -45,6 +58,7 @@ export class UploadStorageService {
     });
 
     try {
+      armIdleTimer();
       await pipeline(source, limiter, writeStream);
     } catch (err) {
       await this.cleanup(tempPath);
@@ -52,6 +66,8 @@ export class UploadStorageService {
         throw uploadError.storageFull('The server does not have enough storage for this upload');
       }
       throw err;
+    } finally {
+      clearTimeout(idleTimer);
     }
 
     if ((source as Readable & { truncated?: boolean }).truncated) {

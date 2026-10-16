@@ -64,14 +64,18 @@ const BTN_TEXT_DESTRUCTIVE =
   'h-8 px-3 rounded-full text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors'
 const DIVIDER = 'w-px h-5 bg-border mx-1 shrink-0'
 
-const props = defineProps<{
-  count: number
-  visible: boolean
-  inCollection?: boolean
-  inFlight?: InFlightOp | null
-  // Selection is query-scoped (all matching across pages), so individual ids aren't enumerable.
-  queryScoped?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    count: number
+    visible: boolean
+    inCollection?: boolean
+    inFlight?: InFlightOp | null
+    // Selection is query-scoped (all matching across pages), so individual ids aren't enumerable.
+    queryScoped?: boolean
+    metadataEditable?: boolean
+  }>(),
+  { metadataEditable: true },
+)
 
 const emit = defineEmits<{
   'add-to-collection': []
@@ -111,8 +115,9 @@ const slots = useSlots()
 const hasCustomContent = computed(() => Boolean(slots.content))
 const canBulkActions = computed(() => !isDemoRestrictedAccount.value)
 const canDownload = computed(() => hasPermission('library_download') && canBulkActions.value)
-const canEditMetadata = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
-const canMoveToLibrary = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
+const canSetRating = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
+const canEditMetadata = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value && props.metadataEditable !== false)
+const canMoveToLibrary = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value && props.metadataEditable !== false)
 const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value || canMoveToLibrary.value)
 const canShare = computed(() => hasPermission('email_send') || canDownload.value)
 const numericFieldSelected = computed(() => bulkField.value === 'publishedYear')
@@ -310,7 +315,7 @@ watch(
               <TooltipContent side="top">{{ t('components.selectionActionBar.setReadingStatus') }}</TooltipContent>
             </Tooltip>
 
-            <Tooltip v-if="canEditMetadata">
+            <Tooltip v-if="canSetRating">
               <TooltipTrigger as-child>
                 <button
                   data-testid="action-bulk-set-rating"

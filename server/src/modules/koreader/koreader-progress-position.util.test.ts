@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isPagedReadingFormat, parseKoreaderPageNumber } from './koreader-progress-position.util';
 
 describe('isPagedReadingFormat', () => {
-  it.each(['pdf', 'PDF', 'cbz', 'cbr', 'cb7', 'cbx', 'CBZ'])('treats %s as paged', (format) => {
+  it.each(['pdf', 'PDF', 'cbz', 'cbr', 'cb7', 'cbx', 'CBZ', 'djvu', 'DJVU'])('treats %s as paged', (format) => {
     expect(isPagedReadingFormat(format)).toBe(true);
   });
 
@@ -15,7 +15,7 @@ describe('isPagedReadingFormat', () => {
     expect(isPagedReadingFormat(format)).toBe(false);
   });
 
-  it.each([null, undefined, '', '   ', 'djvu'])('falls back to non-paged for %s', (format) => {
+  it.each([null, undefined, '', '   '])('falls back to non-paged for %s', (format) => {
     expect(isPagedReadingFormat(format)).toBe(false);
   });
 });

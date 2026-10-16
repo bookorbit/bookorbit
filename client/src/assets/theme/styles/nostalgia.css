@@ -59,9 +59,6 @@ html[data-style='nostalgia'] {
   --shell-shadow: 0 3px 5px oklch(0 0 0 / 0.02), 0 0 2px oklch(0 0 0 / 0.05), 0 1px 4px oklch(0 0 0 / 0.08);
   --shell-accent-wash: color-mix(in oklch, var(--primary) 8%, transparent);
   --shell-accent-tint: color-mix(in oklch, var(--primary) 16%, transparent);
-
-  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 38%, transparent) 0%, transparent 100%);
-  --glow-band: 20rem;
   --glow-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 84' fill='%23000'%3E%3Crect x='1' y='1' width='19' height='19' fill-opacity='0.044'/%3E%3Crect x='22' y='1' width='19' height='19' fill-opacity='0.058'/%3E%3Crect x='43' y='1' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='64' y='1' width='19' height='19' fill-opacity='0.035'/%3E%3Crect x='1' y='22' width='19' height='19' fill-opacity='0.059'/%3E%3Crect x='22' y='22' width='19' height='19' fill-opacity='0.02'/%3E%3Crect x='43' y='22' width='19' height='19' fill-opacity='0.054'/%3E%3Crect x='64' y='22' width='19' height='19' fill-opacity='0.03'/%3E%3Crect x='1' y='43' width='19' height='19' fill-opacity='0.024'/%3E%3Crect x='22' y='43' width='19' height='19' fill-opacity='0.023'/%3E%3Crect x='43' y='43' width='19' height='19' fill-opacity='0.031'/%3E%3Crect x='64' y='43' width='19' height='19' fill-opacity='0.052'/%3E%3Crect x='1' y='64' width='19' height='19' fill-opacity='0.026'/%3E%3Crect x='22' y='64' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='43' y='64' width='19' height='19' fill-opacity='0.045'/%3E%3Crect x='64' y='64' width='19' height='19' fill-opacity='0.034'/%3E%3C/svg%3E");
   --glow-texture-size: 107px 107px;
 
@@ -99,8 +96,6 @@ html[data-style='nostalgia'].dark {
   --scrollbar-thumb-hover: oklch(0.48 var(--surface-c) var(--surface-h));
 
   --sidebar-count-foreground: oklch(from var(--primary) max(l, 0.72) c h);
-
-  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 60%, transparent) 0%, transparent 100%);
   --glow-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 84' fill='%23fff'%3E%3Crect x='1' y='1' width='19' height='19' fill-opacity='0.056'/%3E%3Crect x='22' y='1' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='43' y='1' width='19' height='19' fill-opacity='0.082'/%3E%3Crect x='64' y='1' width='19' height='19' fill-opacity='0.036'/%3E%3Crect x='1' y='22' width='19' height='19' fill-opacity='0.073'/%3E%3Crect x='22' y='22' width='19' height='19' fill-opacity='0.059'/%3E%3Crect x='43' y='22' width='19' height='19' fill-opacity='0.035'/%3E%3Crect x='64' y='22' width='19' height='19' fill-opacity='0.071'/%3E%3Crect x='1' y='43' width='19' height='19' fill-opacity='0.033'/%3E%3Crect x='22' y='43' width='19' height='19' fill-opacity='0.065'/%3E%3Crect x='43' y='43' width='19' height='19' fill-opacity='0.036'/%3E%3Crect x='64' y='43' width='19' height='19' fill-opacity='0.037'/%3E%3Crect x='1' y='64' width='19' height='19' fill-opacity='0.064'/%3E%3Crect x='22' y='64' width='19' height='19' fill-opacity='0.096'/%3E%3Crect x='43' y='64' width='19' height='19' fill-opacity='0.04'/%3E%3Crect x='64' y='64' width='19' height='19' fill-opacity='0.048'/%3E%3C/svg%3E");
 
   /* Solid chips in a deep shade of each format's hue with white ink, as the classic look wore them; at this

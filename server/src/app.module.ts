@@ -12,6 +12,7 @@ import {
   bookRequestConfig,
   coverSlotsConfig,
   dbConfig,
+  djvuConfig,
   emailConfig,
   fileWriteConfig,
   migrationConfig,
@@ -33,6 +34,7 @@ import { AppSettingsModule } from './modules/app-settings/app-settings.module';
 import { CollectionModule } from './modules/collection/collection.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CbzModule } from './modules/reader/cbz/cbz.module';
+import { DjvuModule } from './modules/reader/djvu/djvu.module';
 import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { BookJournalModule } from './modules/book-journal/book-journal.module';
 import { NotebookModule } from './modules/notebook/notebook.module';
@@ -114,6 +116,7 @@ import { PodcastModule } from './modules/podcast/podcast.module';
         oidcRuntimeConfig,
         podcastConfig,
         audiolessEpubConfig,
+        djvuConfig,
       ],
     }),
     ScheduleModule.forRoot(),
@@ -162,6 +165,7 @@ import { PodcastModule } from './modules/podcast/podcast.module';
     DashboardModule,
     HealthModule,
     CbzModule,
+    DjvuModule,
     ReaderPreferencesModule,
     UserPreferencesModule,
     EpubModule,

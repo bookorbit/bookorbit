@@ -108,7 +108,7 @@ export const SURFACE_OPACITY_DEFAULT = 92;
 /** Top glow reach, in percent of the active style's own reach. 0 turns the glow off. */
 export const GLOW_REACH_MIN = 0;
 export const GLOW_REACH_MAX = 200;
-export const GLOW_REACH_DEFAULT = 80;
+export const GLOW_REACH_DEFAULT = 50;
 
 /** A whole visual style: surfaces, type, shell material and component accents. Independent of
  *  mode, accent, radius and background, which keep their values when the style changes. */

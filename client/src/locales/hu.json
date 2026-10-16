@@ -107,9 +107,51 @@
       },
       "theme": {
         "title": "Téma",
+        "style": {
+          "label": "Stílus",
+          "hint": "Az alkalmazás általános megjelenése. A mód, a kiemelőszín, a sarkok és a háttér megőrzik a beállításaikat.",
+          "bookorbit": {
+            "label": "BookOrbit",
+            "description": "Színezett felületek, üvegpanelek és talpas címsorok."
+          },
+          "nostalgia": {
+            "label": "Nosztalgia",
+            "description": "Semleges hátterek, rendszerszintű betűtípus, lapos panelek és felső ragyogás."
+          }
+        },
         "colorScheme": {
           "label": "Színséma",
           "hint": "Világos vagy sötét felület"
+        },
+        "surfacePalette": {
+          "label": "Felület",
+          "hint": "A panelek és kártyák mögötti semleges háttér.",
+          "palettes": {
+            "onyx": "Ónix",
+            "carbon": "Karbon",
+            "neutral": "Semleges",
+            "zinc": "Cink",
+            "iron": "Vas",
+            "steel": "Acél",
+            "ash": "Hamu",
+            "smoke": "Füst",
+            "charcoal": "Faszén",
+            "slate": "Pala",
+            "midnight-blue": "Éjkék",
+            "ocean": "Óceán",
+            "pine": "Fenyő",
+            "olive": "Olíva",
+            "stone": "Kő",
+            "sepia": "Szépia",
+            "crimson": "Karmazsin",
+            "plum": "Szilva"
+          }
+        },
+        "topGlow": {
+          "label": "Felső ragyogás",
+          "hint": "Azt határozza meg, milyen mélyen nyúlik le a kiemelő ragyogás az oldalon. A kikapcsolásához húzd a csúszkát teljesen balra.",
+          "value": "{value}%",
+          "off": "Ki"
         },
         "accents": {
           "grey": "Szürke",
@@ -182,7 +224,13 @@
         },
         "cornerRadius": {
           "label": "Sarokkerekítés",
-          "hint": "A kártyák és a felhasználói felület elemeinek kereksége"
+          "hint": "A kártyák és a felhasználói felület elemeinek kereksége",
+          "options": {
+            "sharp": "Szögletes",
+            "default": "Alapértelmezett",
+            "rounded": "Lekerekített",
+            "pill": "Kapszula"
+          }
         },
         "surfaceBrightness": {
           "label": "Felület fényessége",
@@ -201,7 +249,8 @@
           "structural": "Strukturális",
           "ambient": "Környezeti",
           "refractive": "Fénytörő"
-        }
+        },
+        "syncSaveFailed": "A témabeállítások mentése sikertelen"
       },
       "storage": {
         "title": "A megjelenési beállítások mentésének helye",
@@ -414,7 +463,7 @@
         "title": "Könyvtár viselkedése",
         "thumbnailClicks": {
           "label": "Indexkép kattintások",
-          "hint": "Válaszd ki, hogy mi történjen, ha rács- és listanézetből nyit meg egy könyvet",
+          "hint": "Válaszd ki, hogy mi történjen, ha rács- és listanézetből nyitsz meg egy könyvet",
           "readFirst": "Olvasás először",
           "readFirstHint": "Nyissa meg az olvasót, ha létezik olvasható fájl",
           "openDetails": "Részletek megnyitása",
@@ -1213,6 +1262,11 @@
             "portrait": "2:3 álló",
             "square": "1:1 négyzetes"
           },
+          "gridShape": "Rácsforma",
+          "gridShapeValue": {
+            "tall": "Magas cellák",
+            "square": "Négyzetes cellák"
+          },
           "none": "Egyik sem",
           "allSupported": "Minden támogatott",
           "patternCount": "{count, plural,one {# minta} other {# minta}}",
@@ -1764,7 +1818,8 @@
             "overwriteTerm": "Felülírás:",
             "overwriteBody": "Cserélje ki, valahányszor a szolgáltató rendelkezik adatokkal."
           },
-          "summary": "A szolgáltatókat felülről lefelé próbálja ki a rendszer, és az első értéket visszaadó nyer. Az egyesítési stratégia dönti el, hogy az új érték felülírhatja-e a könyvben már meglévőt; a zsánerek új, egyedi értékeket is hozzáfűzhetnek. Állítsd be itt az alapértelmezett értékeket, majd bíráld felül az egyes mezőket könyvtáranként."
+          "summary": "A szolgáltatókat felülről lefelé próbálja ki a rendszer, és az első értéket visszaadó nyer. Az egyesítési stratégia dönti el, hogy az új érték felülírhatja-e a könyvben már meglévőt; a zsánerek új, egyedi értékeket is hozzáfűzhetnek. Állítsd be itt az alapértelmezett értékeket, majd bíráld felül az egyes mezőket könyvtáranként.",
+          "summaryByMedium": "A szolgáltatók próbálkozása fentről lefelé halad, és az első értékkel rendelkező nyer; az összevonási módban lévő zsánerek és a közösségi értékelések ehelyett minden szolgáltatót kombinálnak. Az összevonási stratégia dönti el, hogy egy érték helyettesítheti-e azt, amivel a könyv már rendelkezik. Az Audible, az AudNexus és a Libro.fm csak a hanganyaggal rendelkező könyvekre válaszol, a hangos EPUB-okat is beleértve, így az élre helyezésük a hangoskönyv-metaadatokat részesíti előnyben anélkül, hogy hozzáérne a csak e-könyv formátumú könyvekhez. A nem megfelelő formájú borítókép csak akkor tölt be egy helyet, ha semmi más nem áll rendelkezésre. Egy könyvtárszintű felülbírálás kicseréli az adott mező teljes szabályát."
         },
         "libraryOverrides": {
           "title": "Könyvtár felülbírálások",
@@ -1833,6 +1888,7 @@
         },
         "field": {
           "noProviders": "Engedélyezve, de nincsenek szolgáltatói",
+          "noUsableProvider": "Engedélyezve, de nincs itt olyan szolgáltató, amely ki tudná tölteni",
           "empty": "Üres",
           "config": "Beállítás",
           "custom": "Egyéni",
@@ -1891,7 +1947,11 @@
           "disabled": "Letiltva",
           "notConfigured": "Nincs konfigurálva",
           "disabledDetail": "A {provider} ki van kapcsolva, így a sorban marad, de kimarad.",
-          "notConfiguredDetail": "A {provider} még nem rendelkezik hitelesítő adatokkal, így a sorban marad, de kimarad."
+          "notConfiguredDetail": "A {provider} még nem rendelkezik hitelesítő adatokkal, így a sorban marad, de kimarad.",
+          "neverSupplies": "Soha nem szolgáltatja ezt",
+          "neverSuppliesDetail": "A(z) {provider} soha nem szolgáltatja ezt a mezőt, ezért itt ki van hagyva.",
+          "otherShape": "Egyéb borítóforma",
+          "otherShapeDetail": "A(z) {provider} csak egyéb borítóformájú képekkel rendelkezik, így ezt a helyet csak akkor tölti be, ha semmi más nem áll rendelkezésre."
         },
         "detail": {
           "priority": "Szolgáltatói prioritás",
@@ -1944,6 +2004,123 @@
         "emptyTitle": "Nincsenek blokkolt zsánerek",
         "emptyHint": "Adj meg pontos értékeket, például Hangoskönyv vagy Felnőtt, hogy ezek ne szerepeljenek a lekért metaadatokban.",
         "removeLabel": "{genre} eltávolítása"
+      },
+      "searchCache": {
+        "loadFailed": "A keresési gyorsítótár beállításainak betöltése sikertelen.",
+        "retry": "Próbáld újra",
+        "saved": "A keresési gyorsítótár beállításai elmentve",
+        "saveFailed": "A keresési gyorsítótár beállításainak mentése sikertelen",
+        "units": {
+          "hours": "Óra",
+          "days": "Nap"
+        },
+        "general": {
+          "title": "Elmentett válaszok",
+          "enabled": "Szolgáltatói válaszok mentése",
+          "enabledHint": "A keresések, a tömeges frissítések és a háttérbeli lekérések újrahasznosítják az elmentett válaszokat, ahelyett, hogy újra megkérdeznének minden egyes szolgáltatót.",
+          "resultsTtl": "Találatok megőrzési ideje",
+          "resultsTtlHint": "Azt határozza meg, hogy a találatokat tartalmazó válasz mennyi ideig kerül újrahasznosításra, mielőtt a rendszer újra megkérdezné a szolgáltatót.",
+          "resultsTtlUnit": "Találatok időegysége",
+          "emptyTtl": "Üres válaszok megőrzési ideje",
+          "emptyTtlHint": "Azt határozza meg, hogy a rendszer mennyi ideig emlékszik arra, ha egy szolgáltató nem talált semmit. Csak azokra a szolgáltatókra vonatkozik, amelyeknél be van állítva az üres válaszok gyorsítótárazása. A 0 érték azt jelenti, hogy soha nem őrzi meg az üres válaszokat.",
+          "emptyTtlUnit": "Üres válaszok időegysége",
+          "staleGrace": "Elévült válaszok megőrzési ideje",
+          "staleGraceHint": "Ha egy szolgáltató hibázik, helyette egy az elévülését legfeljebb ennyivel meghaladó válasz kerül felhasználásra. A 0 soha nem lép vissza tartalékra.",
+          "staleGraceUnit": "Elévült válaszok időegysége",
+          "storage": "Tárhelykeret",
+          "storageHint": "A legrégebbi válaszok eltávolításra kerülnek, amint az elmentett válaszok túllépik ezt a méretet. A lemezen a táblázat nagyjából a tárhelykeret 1,5–2-szeresét foglalhatja el.",
+          "storageUnit": "MB"
+        },
+        "providers": {
+          "title": "Szolgáltatónkénti beállítások",
+          "hint": "Hagyj egy mezőt üresen a fenti érték használatához. Kapcsolj ki egy szolgáltatót, ha azt szeretnéd, hogy mindig élőben kérdezze le.",
+          "books": "Könyvek",
+          "authors": "Szerzők",
+          "none": "Nem érhetők el szolgáltatók.",
+          "globalOff": "A válaszok mentése ki van kapcsolva, így ezek a beállítások a funkció újbóli bekapcsolása után lépnek életbe.",
+          "on": "Be",
+          "off": "Ki",
+          "enabledLabel": "A(z) {provider} válaszainak mentése",
+          "resultsTtl": "Találatok megőrzési ideje",
+          "resultsTtlLabel": "A(z) {provider} találatainak megőrzési ideje",
+          "resultsTtlUnitLabel": "A(z) {provider} találatainak időegysége",
+          "emptyTtl": "Üres válaszok megőrzési ideje",
+          "emptyTtlLabel": "A(z) {provider} üres válaszainak megőrzési ideje",
+          "emptyTtlUnitLabel": "A(z) {provider} üres válaszainak időegysége",
+          "noEmptyCaching": "Ebből a szolgáltatóból származó üres válaszok soha nem kerülnek mentésre.",
+          "notCacheable": "Ebből a szolgáltatóból származó válaszok soha nem kerülnek mentésre.",
+          "reset": "A(z) {provider} visszaállítása az alapértelmezésekre"
+        },
+        "validation": {
+          "required": "Adj meg egy értéket.",
+          "wholeNumber": "Adj meg egy egész számot.",
+          "range": "Adj meg egy {min} és {max} közötti értéket.",
+          "tooManyOverrides": "Túl sok szolgáltató rendelkezik egyedi beállításokkal. A mentéshez állíts vissza néhányat közülük az alapértelmezésekre."
+        },
+        "save": {
+          "unsaved": "Nem mentett módosítások",
+          "invalid": "A mentéshez javítsd a kiemelt mezőket",
+          "upToDate": "Minden módosítás elmentve",
+          "discard": "Elvetés",
+          "action": "Mentés"
+        },
+        "stats": {
+          "group": "Használat",
+          "title": "Elmentett válaszok",
+          "refresh": "Frissítés",
+          "loadFailed": "A gyorsítótár-kihasználtság betöltése sikertelen.",
+          "storage": "Felhasznált tárhely",
+          "storageUsed": "{used}/{budget}",
+          "storageHint": "Maguknak az elmentett válaszoknak a mérete. A lemezen lévő táblázat ennél nagyobb.",
+          "entries": "Elmentett válaszok",
+          "emptyEntries": "Üres válaszok",
+          "diskSize": "Tábla mérete a lemezen",
+          "hitRate": "Találati arány",
+          "requestsAvoided": "Elkerült lekérdezések",
+          "fallbacks": "Tartalékok",
+          "skippedWrites": "Kihagyott írások",
+          "oldest": "Legrégebbi válaszok",
+          "none": "Még nincs",
+          "countersHint": "A találati arány, az elkerült lekérdezések, a tartalékok és a kihagyott írások száma a szerver legutóbbi elindulása óta.",
+          "perProvider": "Elmentett válaszok szolgáltatónként",
+          "provider": "Szolgáltató",
+          "kind": "Típus",
+          "size": "Méret",
+          "empty": "Még semmi sincs elmentve."
+        },
+        "clear": {
+          "group": "Karbantartás",
+          "title": "Elmentett válaszok törlése",
+          "regionHint": "A szolgáltatók helyszíntől függően eltérő válaszokat adhatnak. Töröld a gyorsítótárat, ha a szervert másik régióba költözteted, vagy VPN-t használsz.",
+          "action": "Törlés",
+          "failed": "Az elmentett válaszok törlése sikertelen",
+          "done": "{count, plural, one {# elmentett válasz törölve} other {# elmentett válasz törölve}}",
+          "donePending": "{count, plural, one {# elmentett válasz törölve. A többi eltávolítása a háttérben zajlik.} other {# elmentett válasz törölve. A többi eltávolítása a háttérben zajlik.}}",
+          "empty": {
+            "label": "Csak az üres válaszok törlése",
+            "hint": "Elfelejti, hogy a szolgáltatók nem találtak semmit, így azok a keresések újra lekérdezésre kerülnek.",
+            "confirmTitle": "Üres válaszok törlése?",
+            "confirmDescription": "Azok az elmentett válaszok, ahol a szolgáltató nem talált semmit, eltávolításra kerültek. A találatokat tartalmazó válaszok megőrzésre kerülnek."
+          },
+          "book": {
+            "label": "Könyvválaszok törlése",
+            "hint": "Eltávolít a könyvszolgáltatóktól elmentett minden adatot.",
+            "confirmTitle": "Könyvválaszok törlése?",
+            "confirmDescription": "Minden, a könyvszolgáltatóktól elmentett válasz eltávolításra került. A következő keresések újra lekérdezik ezeket a szolgáltatókat."
+          },
+          "author": {
+            "label": "Szerzői válaszok törlése",
+            "hint": "Eltávolít a szerzőszolgáltatóktól elmentett minden adatot.",
+            "confirmTitle": "Szerzői válaszok törlése?",
+            "confirmDescription": "Minden, a szerzőszolgáltatóktól elmentett válasz eltávolításra került. A következő keresések újra lekérdezik ezeket a szolgáltatókat."
+          },
+          "all": {
+            "label": "Összes elmentett válasz törlése",
+            "hint": "Kiüríti a gyorsítótárat. A következő kereséskor minden szolgáltató újra lekérdezésre kerül.",
+            "confirmTitle": "Összes elmentett válasz törlése?",
+            "confirmDescription": "A teljes gyorsítótár kiürítésre került. A keresések lassabbak lesznek, amíg az újra meg nem telik, és nem marad semmi, amire tartalékként támaszkodhatnál, ha egy szolgáltató leáll."
+          }
+        }
       },
       "customFields": {
         "label": "Címke",
@@ -2002,7 +2179,8 @@
         "genre-blocklist": "Zsáner tiltólista",
         "score": "Megbízhatósági pontszám",
         "auto-fetch": "Könyvek",
-        "authors": "Szerzők"
+        "authors": "Szerzők",
+        "search-cache": "Keresési gyorsítótár"
       },
       "tabTitles": {
         "providers": "Szolgáltatók",
@@ -2011,7 +2189,8 @@
         "genre-blocklist": "Zsáner tiltólista",
         "score": "Megbízhatósági pontszám",
         "auto-fetch": "Könyv automatikus lekérése",
-        "authors": "Szerző automatikus lekérése"
+        "authors": "Szerző automatikus lekérése",
+        "search-cache": "Keresési gyorsítótár"
       },
       "tabSubtitles": {
         "providers": "Engedélyezd a külső metaadat-forrásokat, és konfiguráld a hitelesítő adataikat.",
@@ -2020,7 +2199,8 @@
         "genre-blocklist": "Akadályozd meg a nem kívánt szolgáltatói zsánerértékek könyvekbe írását.",
         "score": "Hogyan számítanak bele az egyes metaadatmezők az egyes könyveknél megjelenített teljességi pontszámba.",
         "auto-fetch": "Automatikusan lekéri a borítókat, leírásokat és egyéb részleteket, amikor új könyvek kerülnek a könyvtáradba.",
-        "authors": "Automatikusan lekéri az életrajzokat és profilfotókat, amikor új szerzők jelennek meg a könyvtáradban."
+        "authors": "Automatikusan lekéri az életrajzokat és profilfotókat, amikor új szerzők jelennek meg a könyvtáradban.",
+        "search-cache": "Újrahasznosítja a szolgáltatói válaszokat, így az ismételt keresések gyorsak lesznek, és akkor is működnek, ha egy szolgáltató leáll."
       },
       "preferences": {
         "toast": {
@@ -2501,7 +2681,7 @@
           "alwaysCreated": "Mindig létrejön. Kattints ide a mappa átugrásához, ha hiányzik az értéke."
         },
         "result": "Eredmény",
-        "previewWith": "Előnézet ezzel",
+        "previewWith": "Előnézet ezzel:",
         "previewWithAria": "Előnézet ezzel: {title}",
         "previewBook": {
           "sample": "Példa könyv",
@@ -3601,6 +3781,7 @@
     "nav": {
       "title": "Beállítások",
       "ariaLabel": "Beállítások szakaszai",
+      "breadcrumbLabel": "Morzsamenü",
       "searchPlaceholder": "Keresési beállítások",
       "clearSearch": "Keresés törlése",
       "noResults": "Nincsenek a következőnek megfelelő beállítások: {query}.",
@@ -4318,7 +4499,7 @@
       "pink": "Rózsaszín",
       "orange": "Narancssárga",
       "red": "Piros",
-      "olive": "Olívazöld",
+      "olive": "Olíva",
       "cyan": "Ciánkék",
       "purple": "Lila",
       "gray": "Szürke"
@@ -4796,6 +4977,8 @@
         "selectVisible": "Láthatók kiválasztása",
         "refreshMetadata": "Metaadatok frissítése",
         "refreshingMetadata": "Metaadatok frissítése...",
+        "confirmRefreshCount": "{count, plural, one {# szerző metaadatainak frissítése?} other {# szerző metaadatainak frissítése?}}",
+        "refreshAction": "Frissítés",
         "deleteSelected": "Kiválasztottak törlése",
         "deleting": "Törlés...",
         "exitSelection": "Kilépés a kiválasztásból",
@@ -4929,7 +5112,7 @@
       "opus": "Opus-hangfájl",
       "ogg": "OGG-hangfájl",
       "flac": "FLAC-hangfájl",
-      "readAlong": "Hangos EPUB",
+      "readAlong": "Hanggal rendelkező EPUB",
       "primary": "Elsődleges formátum"
     },
     "actions": {
@@ -4953,7 +5136,11 @@
       "sendViaEmail": "Küldés emailben",
       "rate": "{star} csillagos értékelés",
       "openAs": "Megnyitás {format} formátumban",
-      "openReadAlong": "Hangos EPUB megnyitása"
+      "openReadAlong": "Hanggal rendelkező EPUB megnyitása"
+    },
+    "refreshMetadata": {
+      "success": "Metaadatok frissítve",
+      "failed": "A metaadatok frissítése sikertelen"
     },
     "coverRegeneration": {
       "failed": "Nem sikerült újragenerálni a borítót",
@@ -4984,7 +5171,11 @@
       "exportFailed": "Exportálás sikertelen",
       "audiolessEpub": "KOReader EPUB",
       "audiolessEpubHint": "EPUB letöltése KOReaderhez a hangfájlok eltávolításával",
-      "noAudio": "nincs hang"
+      "noAudio": "nincs hang",
+      "textOnlyEpub": "Csak szöveges EPUB",
+      "textOnlyEpubHint": "Narrációmentes EPUB letöltése az olvasási horgonyok megőrzésével.",
+      "originalNarrated": "Eredeti EPUB felolvasással",
+      "originalNarratedEpub": "Eredeti EPUB felolvasással"
     },
     "sort": {
       "moveUp": "Mozgatás fel",
@@ -5448,10 +5639,10 @@
           "disabledDescription": "Mindegyik formátum megőrzi a saját olvasási pozícióját.",
           "epubCopiesDescription": "A webes olvasó-, Kobo- és KOReader-pozíciók szinkronban maradnak az EPUB-példányok között. Adj hozzá egyező hangoskönyvfájlokat a hangoskönyv szinkronizálásához.",
           "reason": {
-            "no_media_overlay_epub": "Médiaátfedésekkel rendelkező, hangos EPUB szükséges.",
+            "no_media_overlay_epub": "Médiaátfedésekkel rendelkező, hanggal rendelkező EPUB szükséges.",
             "no_audio_files": "Egyező, önálló hangoskönyvfájlok szükségesek.",
             "missing_duration": "Hiányos hangidőtartam-metaadatok.",
-            "durationMismatch": "Az időtartamok nem egyeznek kellő pontossággal: hangoskönyv: {audio}, hangos EPUB: {overlay}."
+            "durationMismatch": "Az időtartamok nem egyeznek kellő pontossággal: hangoskönyv: {audio}, hanggal rendelkező EPUB: {overlay}."
           },
           "enable": "Engedélyezés",
           "disable": "Letiltás",
@@ -6860,6 +7051,22 @@
       "nFailed": "{count} sikertelen",
       "nTotal": "{count} összesen"
     },
+    "uploadFailures": {
+      "heading": "{count, plural, one {# fájl feltöltése sikertelen} other {# fájl feltöltése sikertelen}}",
+      "dismissAll": "Összes elvetése",
+      "retry": "{name} feltöltésének megismétlése",
+      "dismiss": "{name} elvetése",
+      "reason": {
+        "unsupported": "Nem támogatott fájltípus: .{extension}",
+        "noExtension": "A fájl nem rendelkezik kiterjesztéssel, így a formátuma ismeretlen",
+        "tooLarge": "Nagyobb, mint a(z) {limit} feltöltési korlát",
+        "tooLargeServer": "Nagyobb, mint a szerver feltöltési korlátja",
+        "tooLargeProxy": "Elutasítva mint túl nagy, még mielőtt elérte volna a BookOrbitot – valószínűleg egy fordított proxy által",
+        "storageFull": "A szerver tárhelye megtelt",
+        "network": "A szerver elérése sikertelen",
+        "status": "A feltöltés sikertelen (HTTP {status})"
+      }
+    },
     "fileList": {
       "emptyTitle": "Nincsenek fájlok a könyvdokkban",
       "emptyMessageDefault": "Fájlok feltöltése, vagy behúzása a könyvdokk mappájába",
@@ -7119,7 +7326,40 @@
       "moreOptions": "További lehetőségek",
       "fewerOptions": "Kevesebb lehetőség",
       "optionsSummary": "{formats} · jegyzet hozzáadva",
-      "formatToggleAria": "{format} előnyben részesítése"
+      "formatToggleAria": "{format} előnyben részesítése",
+      "pair": {
+        "choice": "Mindkettő",
+        "choiceHint": "Az e-könyv és a hangoskönyv kérése együtt",
+        "ebookLibraryLabel": "E-könyv-könyvtár",
+        "audiobookLibraryLabel": "Hangoskönyv-könyvtár",
+        "audiobookFolderLabel": "Hangoskönyv-mappa",
+        "landsTogether": "Mindkét formátum egy könyvként érkezik meg a(z) {library} könyvtárba.",
+        "landsSeparately": "A(z) {library} fájlonként egy könyvet tart nyilván, így minden formátum saját külön könyvként érkezik meg.",
+        "landsApart": "Az e-könyv és a hangoskönyv különböző könyvtárakba kerül, így két könyvként érkeznek meg.",
+        "preferredEbookFormats": "Előnyben részesített e-könyv-formátumok",
+        "preferredAudiobookFormats": "Előnyben részesített hangoskönyv-formátumok",
+        "state": {
+          "owned": "A könyvtáradban",
+          "following": "Te kérted ezt",
+          "joinable": "Kérve",
+          "new": "Nincs kérve"
+        },
+        "requestBoth": "Mindkettő kérése",
+        "getBoth": "Mindkettő beszerzése",
+        "chooseReleases": "Kiadások kiválasztása",
+        "joinBoth": "Adjon hozzá mindkettőhöz",
+        "requestEbook": "E-könyv kérése",
+        "requestAudiobook": "Hangoskönyv kérése",
+        "getEbook": "E-könyv beszerzése",
+        "getAudiobook": "Hangoskönyv beszerzése",
+        "joinEbook": "Adjon hozzá az e-könyv-kéréshez",
+        "joinAudiobook": "Adjon hozzá a hangoskönyv-kéréshez",
+        "haveBoth": "A könyvtáradban",
+        "requestedBoth": "Kérve",
+        "submitted": "Az e-könyv és a hangoskönyv kérve",
+        "submittedPartlyJoined": "Mindkettő kérve. Az egyik már folyamatban volt, így hozzáadva lettél ahhoz a kéréshez",
+        "submittedJoinsBook": "Kérve. Beérkezésekor a könyvtáradban már meglévő példányhoz fog kapcsolódni"
+      }
     },
     "card": {
       "details": "Részletek",
@@ -7178,7 +7418,10 @@
         "forbidden": "Ez a kérés egy másik felhasználóhoz tartozik.",
         "loadFailed": "Nem sikerült betölteni a kérést"
       },
-      "entityName": "Kérés"
+      "entityName": "Kérés",
+      "pairSwitchLabel": "A kérésben szereplő formátumok",
+      "joinsBook": "Csatlakozik egy már meglévő könyvedhez",
+      "joinsBookHint": "Beérkezésekor a könyvtáradban már meglévő könyvhöz lesz hozzáadva"
     },
     "actions": {
       "approve": "Jóváhagyás",
@@ -7193,7 +7436,29 @@
       "grab": "Kiadás keresése",
       "goToBook": "Ugrás a könyvhöz",
       "retryRelease": "Másik kiadás választása",
-      "leave": "Kérés elhagyása"
+      "leave": "Kérés elhagyása",
+      "pair": {
+        "approveBoth": "Mindkettő jóváhagyása",
+        "approveEbook": "E-könyv jóváhagyása",
+        "approveAudiobook": "Hangoskönyv jóváhagyása",
+        "rejectBoth": "Mindkettő elutasítása",
+        "rejectEbook": "E-könyv elutasítása",
+        "rejectAudiobook": "Hangoskönyv elutasítása",
+        "cancelBoth": "Mindkettő megszakítása",
+        "cancelEbook": "E-könyv megszakítása",
+        "cancelAudiobook": "Hangoskönyv megszakítása",
+        "dismissBoth": "Mindkettő elvetése",
+        "dismissEbook": "E-könyv elvetése",
+        "dismissAudiobook": "Hangoskönyv elvetése",
+        "restoreBoth": "Mindkettő visszaállítása",
+        "restoreEbook": "E-könyv visszaállítása",
+        "restoreAudiobook": "Hangoskönyv visszaállítása",
+        "grabEbook": "E-könyv-kiadás keresése",
+        "grabAudiobook": "Hangoskönyv-kiadás keresése",
+        "chooseReleases": "Kiadások kiválasztása",
+        "openEbook": "E-könyv-kérés nyitása",
+        "openAudiobook": "Hangoskönyv-kérés nyitása"
+      }
     },
     "filters": {
       "status": "Állapot",
@@ -7236,7 +7501,9 @@
       "left": "Eltávolítva a saját kérések közül",
       "bulkRejected": "{count, plural,one {# kérés elutasítva} other {# kérés elutasítva}}",
       "bulkRejectedPartial": "{done} elutasítva, {failed} nem sikerült",
-      "importDiscarded": "Az importált fájl elvetve"
+      "importDiscarded": "Az importált fájl elvetve",
+      "pairApproved": "Mindkettő jóváhagyva",
+      "pairRejected": "Mindkettő elutasítva"
     },
     "errors": {
       "loadFailed": "Nem sikerült betölteni a kéréseket",
@@ -7256,7 +7523,9 @@
       "languageChangeFailed": "Nem sikerült megváltoztatni a kérés nyelvét",
       "leaveFailed": "Ebből a kérésből nem lehet kilépni",
       "bulkRejectFailed": "A kiválasztott elemeket nem sikerült elutasítani",
-      "discardImportFailed": "Az importálást nem sikerült elvetni"
+      "discardImportFailed": "Az importálást nem sikerült elvetni",
+      "approveCompanionFailedEbook": "Ez jóváhagyva, de az e-könyv jóváhagyása sikertelen",
+      "approveCompanionFailedAudiobook": "Ez jóváhagyva, de a hangoskönyv jóváhagyása sikertelen"
     },
     "grab": {
       "title": "Küldés egy letöltőkliensbe",
@@ -7302,6 +7571,18 @@
     "releases": {
       "title": "Válassz kiadást",
       "retryTitle": "Másik kiadás választása",
+      "pairTitle": "Válassz kiadásokat",
+      "pair": {
+        "tabsLabel": "Kiadásválasztásban érintett formátumok",
+        "releaseCount": "{count, plural, one {# kiadás} other {# kiadás}}",
+        "searching": "Keresés",
+        "toChoose": "Kiválasztandó",
+        "sent": "Elküldve",
+        "finishedTitle": "Nem maradt kiválasztandó elem",
+        "finishedHint": "Most már mindkét formátum rendelkezik kiadással. Mindegyiket követheted a kérésből.",
+        "backToRequest": "Vissza a kéréshez",
+        "done": "Kész"
+      },
       "subtitle": "Rangsorolva minden engedélyezett indexelőben.",
       "summaryCount": "{count, plural, one {# kiadás} other {# kiadás}}",
       "allFreeleech": "összes aránymentes",
@@ -7591,7 +7872,8 @@
       "decidedBy": "Döntéshozó",
       "decisionNote": "Döntési megjegyzés",
       "requestNote": "Kérési megjegyzés",
-      "openDetail": "Részletek megnyitása"
+      "openDetail": "Részletek megnyitása",
+      "pairMedia": "E-könyv és hangoskönyv"
     },
     "confirm": {
       "cancelDownloadTitle": "Letöltés megszakítása?",
@@ -7647,7 +7929,9 @@
       "SUBMIT_DESTINATION_REQUIRED": "A kérések a benyújtásuk után azonnal jóváhagyásra kerülnek, ezért válaszd ki azt a könyvtárat, ahová a könyvnek kerülnie kell",
       "SUBMIT_SELF_SERVE_LIMIT": "Fejezz be vagy szakíts meg néhány letöltést előbb: egyszerre legfeljebb {limit} letöltésed lehet folyamatban",
       "SUBMIT_ON_BEHALF_FORBIDDEN": "Nem kérhetsz könyveket mások számára",
-      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "A felhasználó számára nem küldhető be könyvkérés"
+      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "A felhasználó számára nem küldhető be könyvkérés",
+      "SUBMIT_TARGET_BOOK_NOT_FOUND": "Ez a könyv nem olyan könyvtárban van, amelyet elérhetsz",
+      "SUBMIT_TARGET_BOOK_HAS_MEDIUM": "Ez a könyv már rendelkezik ezzel a formátummal"
     },
     "actionError": {
       "BOOK_REQUEST_NOT_PENDING": "Ez a művelet csak függőben lévő kérés esetén támogatott; ennek a kérésnek az állapota jelenleg {status}",
@@ -7733,7 +8017,22 @@
       "reviewSources": "Források áttekintése"
     },
     "selfServeBadge": "Önkiszolgáló",
-    "selfServeBadgeHint": "A kérő által közvetlenül letöltve, jóváhagyási lépés nélkül"
+    "selfServeBadgeHint": "A kérő által közvetlenül letöltve, jóváhagyási lépés nélkül",
+    "missingFormat": {
+      "labelAudiobook": "Ehhez a könyvhöz tartozó hangoskönyv",
+      "labelEbook": "Ehhez a könyvhöz tartozó e-könyv",
+      "noAudiobook": "Még nincs hangoskönyv",
+      "noEbook": "Még nincs e-könyv",
+      "requestAudiobook": "Hangoskönyv kérése",
+      "requestEbook": "E-könyv kérése",
+      "requested": "Kérve",
+      "requestedBySomeone": "Valaki más által kérve",
+      "ownedElsewhere": "Különálló könyvként szerepel a könyvtáradban",
+      "open": "Megnyitás",
+      "viewRequest": "Kérés megtekintése",
+      "submittedAudiobook": "Kérve. A hangoskönyv beérkezésekor ehhez a könyvhöz fog kapcsolódni",
+      "submittedEbook": "Kérve. Az e-könyv beérkezésekor ehhez a könyvhöz fog kapcsolódni"
+    }
   },
   "collection": {
     "visibleToAll": "Minden felhasználó számára látható",
@@ -7810,6 +8109,9 @@
       "uploadBooks": "Könyvek feltöltése",
       "appearance": "Megjelenés",
       "appearanceDescription": "Válassz témát, kiemelőszínt, lekerekítési sugarat, felületi elemeket és háttérbeállításokat.",
+      "style": "Stílus",
+      "surfacePalette": "Felület",
+      "topGlow": "Felső ragyogás",
       "theme": "Téma",
       "accent": "Kiemelőszín",
       "radius": "Lekerekítettség",
@@ -7938,6 +8240,8 @@
       "moreActions": "További műveletek",
       "setField": "Mező beállítása",
       "refreshMetadata": "Metaadatok frissítése",
+      "refreshConfirm": "{count, plural, one {# könyv metaadatainak frissítése?} other {# könyv metaadatainak frissítése?}}",
+      "refreshConfirmAction": "Frissítés",
       "reExtractCover": "Borító újbóli kibontása",
       "metadataLock": "Metaadat-zárolás",
       "lockAll": "Összes zárolása",
@@ -8107,6 +8411,28 @@
       "discardTitle": "Módosítások elvetése?",
       "discardDescription": "A nem mentett módosításaid el fognak veszni.",
       "discardConfirm": "Elvetés"
+    },
+    "backgroundPicker": {
+      "none": "Egyik sem",
+      "dots": "Pöttyök",
+      "cross": "Kereszt",
+      "millimeter": "Milliméter",
+      "blueprint": "Tervrajz",
+      "brushed": "Szálcsiszolt",
+      "scanlines": "Pásztázóvonalak",
+      "vinyl": "Bakelit",
+      "carbon": "Karbon",
+      "perforated": "Perforált",
+      "aurora": "Auróra",
+      "horizon": "Horizont",
+      "glow": "Ragyogás",
+      "mesh": "Háló",
+      "elevation": "Kiemelés",
+      "prism": "Prizma",
+      "spectrum": "Spektrum",
+      "spectrum-x": "Spektrum X",
+      "spectrum-plus": "Spektrum Plusz",
+      "eclipse": "Napfogyatkozás"
     }
   },
   "customIcons": {
@@ -8352,6 +8678,7 @@
     },
     "tabs": {
       "providers": "Szolgáltatók",
+      "servers": "Levelezőszerverek",
       "recipients": "Címzettek",
       "groups": "Csoportok",
       "templates": "Sablonok",
@@ -8520,6 +8847,306 @@
       "sending": "Küldés...",
       "queued": "{count, plural, =0 {nincs email a várólistán} one {egy email a várólistán} other {# email a várólistán}}",
       "failed": "Küldés sikertelen"
+    },
+    "page": {
+      "addRecipient": "Címzett hozzáadása",
+      "recipients": "Címzettek",
+      "groups": "Csoportok",
+      "newGroup": "Új csoport",
+      "servers": "Levelezőszerverek",
+      "addServer": "Levelezőszerver hozzáadása",
+      "templates": "Sablonok",
+      "newTemplate": "Új sablon",
+      "noServersReadonly": "Még nincs veled megosztott levelezőszerver. Kérj meg egy adminisztrátort, hogy adjon hozzá egyet.",
+      "roleShared": "Megosztva mindenkivel",
+      "roleSystem": "Jelszó-visszaállítások",
+      "cantConnect": "Nem lehet csatlakozni",
+      "builtIn": "Beépített",
+      "recipientsEmptyTitle": "Add meg az e-olvasót vagy bejövő fiókot, ahová a könyveket küldöd",
+      "recipientsEmptyBody": "A Kindle-címek {kindle} végződésűek, és az Amazon-fiókod Eszközök menüpontjában találhatók. A PocketBook-címek {pocketbook} végződésűek. Bármilyen hagyományos bejövő fiók is megfelelő.",
+      "kindleNote": "A Kindle kizárólag jóváhagyott feladóktól fogad leveleket. Add hozzá a(z) {address} címet a Személyes dokumentumok beállításai menüpontban az Amazon-fiókodban.",
+      "copyAddress": "Cím másolása",
+      "addressCopied": "Cím másolva",
+      "editServer": "{name} szerkesztése",
+      "editTemplate": "{name} szerkesztése",
+      "editGroup": "{name} szerkesztése",
+      "groupCount": "{count, plural, one {# címzett} other {# címzett}}",
+      "recipientsHint": "A csillaggal megjelölt lesz kiválasztva, amikor küldést indítasz.",
+      "groupsHint": "Küldés egyszerre több címzettnek.",
+      "groupsEmpty": "Még nincsenek csoportok.",
+      "serversHint": "A csillaggal megjelölt küldi el a könyveidet.",
+      "templatesHint": "Az egyes könyvekkel elküldött tárgy és üzenet.",
+      "kindleTemplateNote": "A Kindle soha nem jeleníti meg a sablont: a levelei mindig a(z) {subject} tárggyal mennek ki.",
+      "test": "Tesztelés",
+      "testServer": "{name} tesztelése",
+      "testOk": "{name} csatlakoztatva",
+      "testFailed": "{name} kapcsolódása sikertelen",
+      "defaultRecipient": "Alapértelmezett címzett",
+      "makeDefaultRecipient": "{name} beállítása alapértelmezett címzettként",
+      "defaultServer": "Alapértelmezett szerver",
+      "makeDefaultServer": "{name} beállítása alapértelmezett szerverként",
+      "defaultTemplate": "Alapértelmezett sablon",
+      "makeDefaultTemplate": "{name} beállítása alapértelmezett sablonként",
+      "editRecipient": "{name} szerkesztése",
+      "serversEmptyTitle": "Még nincs levelezőszerver",
+      "serversEmptyBody": "A könyvek egy SMTP-fiókon keresztül mennek ki. A Gmail, az Outlook, az iCloud és a Fastmail egy kattintással elérhető; bármilyen más szerver is működik.",
+      "needServerTitle": "Küldés előtt adj meg egy levelezőszervert",
+      "needServerBody": "A BookOrbit egy saját tulajdonú SMTP-fiókon keresztül küldi a könyveket, mint például a Gmail egy alkalmazásjelszóval.",
+      "needServerAsk": "Kérj meg egy adminisztrátort, hogy osszon meg veled egy levelezőszervert.",
+      "goToServers": "Ugrás a levelezőszerverekhez",
+      "noEncryption": "Nincs titkosítás"
+    },
+    "route": {
+      "defaultSaved": "Alapértelmezés frissítve"
+    },
+    "attention": {
+      "title": "Figyelmet igényel",
+      "count": "{count, plural, one {# elem} other {# elem}}",
+      "hide": "Elrejtés",
+      "show": "Megjelenítés",
+      "serverDown": "{name} kapcsolódása sikertelen",
+      "notDelivered": "{book} nem érkezett meg a(z) {recipient} címzetthez",
+      "maybeDelivered": "Lehet, hogy {book} nem érkezett meg a(z) {recipient} címzetthez",
+      "testedAgo": "tesztelve {time}",
+      "editServer": "Szerver szerkesztése",
+      "editRecipient": "Címzett szerkesztése",
+      "resend": "Újraküldés"
+    },
+    "reason": {
+      "tooLarge": "A(z) {size} méret nagyobb, mint amit a(z) {server} elfogad.",
+      "tooLargeGmail": "A(z) {size} méret meghaladja a Gmail 25 MB-os mellékletkorlátját.",
+      "tooLargeFix": "Küldj egy kisebb kiadást, vagy állítsd a címzettet csak szöveges EPUB-okra.",
+      "signIn": "A(z) {server} elutasította a bejelentkezést.",
+      "signInFix": "Ellenőrizd a felhasználónevet és a jelszót a levelezőszerveren.",
+      "unreachable": "A(z) {server} nem válaszolt.",
+      "unconfirmed": "A kapcsolat megszakadt az üzenet átadása után, így lehet, hogy megérkezett.",
+      "unconfirmedFix": "Újbóli küldés előtt ellenőrizd a bejövő fiókot, különben lehet, hogy kétszer érkezik meg.",
+      "interrupted": "A BookOrbit újraindult az e-mail kiküldése közben.",
+      "interruptedFix": "Újbóli küldés előtt ellenőrizd a bejövő fiókot.",
+      "preparation": "A fájl előkészítése a küldésre sikertelen.",
+      "other": "A levelezőszerver elutasította azt.",
+      "server": "a levelezőszerver",
+      "serverMessage": "Szerverüzenet",
+      "retryAt": "Következő próba {time}."
+    },
+    "status": {
+      "sent": "Elküldve",
+      "sending": "Küldés",
+      "retrying": "Megismétlés · {attempt}/{total}",
+      "unconfirmed": "Nincs visszaigazolva",
+      "failed": "Sikertelen"
+    },
+    "recent": {
+      "moreActions": "További műveletek ehhez: {title}",
+      "deletedBook": "Törölt könyv",
+      "openBook": "Könyv megnyitása",
+      "resend": "Újraküldés",
+      "delete": "Bejegyzés törlése"
+    },
+    "log": {
+      "all": "Összes",
+      "attention": "Figyelmet igényel",
+      "active": "Folyamatban",
+      "book": "Könyv",
+      "sentTo": "Elküldve ide",
+      "file": "Fájl",
+      "status": "Állapot",
+      "when": "Mikor",
+      "sentMeans": "Az „Elküldve” azt jelenti, hogy a levelezőszervered elfogadta azt",
+      "emptyFilter": "Jelenleg nincs itt semmi.",
+      "loadMore": "Több betöltése",
+      "showing": "{shown}/{total} megjelenítve",
+      "emptyTitle": "Még semmi sincs elküldve",
+      "emptyBody": "Az emailben elküldött könyvek itt jelennek meg a célállomásukkal együtt, valamint azzal, hogy a levelezőszerver befogadta-e őket."
+    },
+    "card": {
+      "nothingSent": "Még semmi sincs elküldve",
+      "failed": "sikertelen",
+      "retrying": "megismétlés",
+      "unconfirmed": "nincs visszaigazolva",
+      "sending": "küldés",
+      "narration": "Narráció",
+      "narrationTitle": "A hanggal rendelkező könyvek megőrzik a narrációt"
+    },
+    "device": {
+      "kindle": "Kindle",
+      "kobo": "Kobo",
+      "other": "Egyéb e-olvasó",
+      "otherShort": "E-olvasó",
+      "none": "Személy vagy bejövő fiók"
+    },
+    "sheet": {
+      "title": "Küldés emailben",
+      "sendTo": "Küldés ide",
+      "groups": "Csoportok",
+      "templateName": "{name} sablon",
+      "eachFormat": "Az egyes címzettek formátuma",
+      "formatForAll": "{format} mindenki számára",
+      "file": "Fájl",
+      "mailServer": "Levelezőszerver",
+      "template": "Sablon",
+      "yourDefault": "a te alapértelmezésed",
+      "emails": "{count, plural, one {# email} other {# email}}",
+      "noOnePicked": "Senki sincs kiválasztva",
+      "total": "{size} összesen",
+      "send": "{count, plural, one {Küldés} other {# email küldése}}",
+      "noFormat": "Nincs {format}, a(z) {got} formátumot kapja",
+      "readAlong": "Hanggal rendelkező, {size}",
+      "overKindle": "{size}, meghaladja a Kindle 50 MB-os korlátját",
+      "overGmail": "{size}, meghaladja a Gmail 25 MB-os korlátját",
+      "kindleRejects": "A Kindle elutasítja a(z) {format} formátumot",
+      "blockedKindle": "{name} nem tudja befogadni a(z) {format} formátumot. Válassz EPUB-ot vagy PDF-et, vagy vedd ki a pipát.",
+      "books": "{count, plural, one {# könyv} other {# könyv}}",
+      "notReadyTitle": "Az email még nincs beállítva",
+      "notReadyBody": "Mielőtt egy könyv bárhová elküldhető lenne, ennek a fióknak szüksége van egy levelezőszerverre és egy címzettre.",
+      "addServer": "Adj hozzá egy levelezőszervert",
+      "addServerHint": "Gmail, Outlook, iCloud, Fastmail vagy bármilyen SMTP-fiók.",
+      "askForServer": "Kérj meg egy adminisztrátort, hogy osszon meg egy levelezőszervert.",
+      "addRecipient": "Adj hozzá egy címzettet",
+      "addRecipientHint": "A Kindle-öd, PocketBookod vagy bármilyen bejövő fiók.",
+      "openSettings": "Email beállítások megnyitása",
+      "sendingTitle": "{title} küldése",
+      "closeHint": "Ezt bezárhatod. A hibák az értesítéseid között és az email előzményeidben is megjelennek.",
+      "openHistory": "Előzmények megnyitása",
+      "done": "Kész",
+      "acceptedBy": "A(z) {server} elfogadta {time}",
+      "handingOver": "Átadása a(z) {server} szervernek"
+    },
+    "editor": {
+      "kindleSubject": "konvertálás",
+      "recipient": {
+        "newTitle": "Új címzett",
+        "description": "A címzett neve, címe, eszköze és amit kap.",
+        "sectionRecipient": "Címzett",
+        "sectionReceives": "Amit kap",
+        "name": "Név",
+        "email": "Email cím",
+        "device": "Eszköz",
+        "deviceHint": "A Kindle {subject} értékre módosítja a tárgyat, és korlátozza az alábbi formátumokat.",
+        "format": "Formátum",
+        "formatPrimary": "A könyv elsődlegese",
+        "formatHint": "Az ezzel a formátummal nem rendelkező könyv az elsődleges kiadását kapja.",
+        "kindleFormatHint": "Az Amazon 2023-ban megszüntette a MOBI és AZW3 formátumok emailben történő fogadását, így ezek nem érhetők el a Kindle-höz. Az ezzel a formátummal nem rendelkező könyv az elsődleges kiadását kapja.",
+        "kindleLegacyFormat": "A Kindle már nem fogadja el a(z) {format} formátumot emailben. Válassz EPUB-ot vagy PDF-et.",
+        "readAlong": "Hanggal rendelkező könyvek",
+        "readAlongAutomatic": "Automatikus",
+        "readAlongAutomaticHint": "Csak szöveges, ha biztonságos másolat készíthető, egyébként az eredeti.",
+        "readAlongTextOnly": "Csak szöveges EPUB",
+        "readAlongTextOnlyHint": "A narráció eltávolítva. Elég kicsi az emailhez.",
+        "readAlongOriginal": "Eredeti, narrációval",
+        "readAlongOriginalHint": "Megőrzi a narrációt. Gyakran 100 MB vagy több, ami meghaladja a legtöbb levelezőszerver korlátját.",
+        "notForKindle": "Kindle-höz nem használható",
+        "template": "Sablon",
+        "templateDefault": "A te alapértelmezésed ({name})",
+        "templateKindleHint": "A Kindle esetében figyelmen kívül hagyva, mivel soha nem jeleníti meg az üzenetet.",
+        "approveTitle": "Hagyd jóvá a feladót az Amazonon",
+        "approveBody": "A Kindle némán eldobja az ismeretlen címekről érkező emaileket, hibaüzenet nélkül. A(z) {path} helyen add hozzá a(z) {address} címet",
+        "approvePath": "Tartalom és eszközök kezelése › Beállítások › Személyes dokumentumok beállításai",
+        "approveNoServer": "Először adj hozzá egy levelezőszervert, hogy lásd a Kindle által jóváhagyandó címet.",
+        "lastSent": "Legutóbbi elküldött könyv {time}",
+        "sendTest": "Teszt email küldése",
+        "testSubject": "BookOrbit teszt email",
+        "testBody": "Ez egy teszt a BookOrbit alkalmazásból. Ha ezt olvasod, a(z) {name} részére küldött könyvek is megérkeznek ide.",
+        "testSent": "Teszt email elküldve ide: {name}",
+        "testFailed": "A teszt email küldése sikertelen: {error}",
+        "makeDefault": "Beállítás gyors küldési címzettként",
+        "remove": "Címzett törlése",
+        "removeConfirm": "{name} törlése?",
+        "removeConsequence": "A küldési előzményei megmaradnak.",
+        "removeDefaultConsequence": "A küldési előzményei megmaradnak, a gyors küldés pedig leáll, amíg csillaggal meg nem jelölsz egy másik címzettet.",
+        "required": "A név és az email cím megadása kötelező.",
+        "sectionLastSent": "Legutóbbi küldés"
+      },
+      "server": {
+        "newTitle": "Új levelezőszerver",
+        "description": "Az SMTP-szerver, annak bejelentkezése és a küldésre jogosultak.",
+        "sectionProvider": "Szolgáltató",
+        "sectionServer": "Szerver",
+        "sectionSignIn": "Bejelentkezés",
+        "sectionSender": "Feladó",
+        "sectionWho": "Ki használja",
+        "presetGmail": "Gmail",
+        "presetOutlook": "Outlook",
+        "presetIcloud": "iCloud Mail",
+        "presetFastmail": "Fastmail",
+        "presetOther": "Egyéb SMTP",
+        "presetHint": "Egy előre beállított sablon kitölti a kiszolgálót, a portot és a biztonságot. Ezeket továbbra is módosíthatod.",
+        "name": "Név",
+        "host": "Kiszolgáló",
+        "port": "Port",
+        "security": "Biztonság",
+        "securityStarttls": "STARTTLS",
+        "securitySsl": "SSL/TLS",
+        "securityNone": "Egyik sem",
+        "securityHint": "STARTTLS az 587-es, SSL/TLS a 465-ös porton. Az egyik vagy a másik, a kettő együtt soha.",
+        "needsPassword": "Ez a szerver jelszót igényel",
+        "username": "Felhasználónév",
+        "password": "Jelszó",
+        "appPassword": "Alkalmazásjelszó",
+        "passwordKeep": "Elmentve. Gépelj a felülíráshoz",
+        "appPasswordHint": "A Gmail és az iCloud alkalmazásjelszót igényel, nem a fiók jelszavát.",
+        "fromName": "Feladó neve",
+        "fromAddress": "Feladó címe",
+        "fromAddressHint": "A Kindle-tulajdonosoknak jóvá kell hagyniuk ezt a címet.",
+        "share": "Megosztás mindenkivel",
+        "shareHint": "Más felhasználók is küldhetnek könyveket ezen a szerveren keresztül a jelszó láthatósága nélkül.",
+        "system": "Jelszó-visszaállítások és bejelentkezési linkek küldése",
+        "systemHint": "Az a szerver, amelyet maga a BookOrbit használ. Ezt kizárólag szuperfelhasználó módosíthatja.",
+        "verifyTls": "A szervertanúsítvány ellenőrzése",
+        "verifyTlsHint": "Kizárólag a saját hálózatodon lévő, saját aláírású tanúsítvánnyal rendelkező szervereknél kapcsold ki.",
+        "test": "Kapcsolat tesztelése",
+        "testDirty": "Előbb mentsd el, csak utána teszteld",
+        "testOk": "Csatlakoztatva",
+        "testFailed": "Csatlakozás sikertelen: {error}",
+        "remove": "Szerver törlése",
+        "removeConfirm": "{name} törlése?",
+        "removeConsequence": "Mindenki elveszíti a hozzáférést, akivel meg van osztva.",
+        "removeSystemFirst": "A szerver törlése előtt kapcsold ki rajta a jelszó-visszaállításokat.",
+        "makeDefault": "Használat saját alapértelmezésként",
+        "required": "A név és a kiszolgáló megadása kötelező."
+      },
+      "template": {
+        "newTitle": "Új sablon",
+        "description": "Az egyes könyvekkel elküldött tárgy és üzenet.",
+        "sectionTemplate": "Sablon",
+        "sectionInsert": "Beillesztés",
+        "sectionPreview": "Előnézet",
+        "name": "Név",
+        "subject": "Tárgy",
+        "message": "Üzenet",
+        "groupBook": "Könyv",
+        "groupFile": "Fájl",
+        "groupOther": "Egyéb",
+        "insertHint": "A kurzor pozíciójánál szúródik be a tárgyba vagy az üzenetbe. Az üres értékek helyett semmi sem jelenik meg.",
+        "insertVariable": "{variable} beillesztése",
+        "previewWith": "Előnézet ezzel:",
+        "previewEmpty": "Küldj el egy könyvet egyszer, hogy megtekinthesd a vele készült sablon előnézetét.",
+        "previewFailed": "Az előnézet renderelése sikertelen.",
+        "previewTo": "Címzett",
+        "builtInReadonly": "Beépített. Kizárólag szuperfelhasználó módosíthatja.",
+        "kindleNote": "A Kindle soha nem jelenít meg sablont: mindig a(z) {subject} tárggyal megy ki.",
+        "makeDefault": "Beállítás saját alapértelmezésként",
+        "remove": "Sablon törlése",
+        "removeConfirm": "{name} törlése?",
+        "removeConsequence": "Az ezt használó címzettek visszatérnek a te alapértelmezett sablonodhoz.",
+        "required": "A név és a tárgy megadása kötelező.",
+        "attachment": "Csatolva: {name}"
+      },
+      "group": {
+        "newTitle": "Új csoport",
+        "description": "Címzettek egy csoportja, amellyel egy könyv egyszerre több helyre is elküldhető.",
+        "sectionGroup": "Csoport",
+        "sectionMembers": "Tagok",
+        "name": "Név",
+        "memberCount": "{count}/{total}",
+        "noRecipientsTitle": "Nincsenek választható címzettek",
+        "noRecipientsBody": "A csoport címzettek egy halmaza. Először adj hozzá egy címzettet.",
+        "remove": "Csoport törlése",
+        "removeConfirm": "{name} törlése?",
+        "removeConsequence": "A címzettjei megmaradnak.",
+        "required": "A csoportnév megadása kötelező.",
+        "updated": "Csoport frissítve"
+      }
     }
   },
   "errors": {
@@ -8814,6 +9441,14 @@
           "squareTitle": "Négyzetes 1:1",
           "squareHint": "Csak hangoskönyv-könyvtárak",
           "slotsHint": "Az e-könyvként és hangoskönyvként egyaránt elérhető műveknél az alakzatnak megfelelő borító jelenik meg."
+        },
+        "gridShape": {
+          "title": "Rácsforma",
+          "tallTitle": "Magas cellák",
+          "tallHint": "E-könyvekhez vagy vegyes könyvtárakhoz a legjobb",
+          "squareTitle": "Négyzetes cellák",
+          "squareHint": "Hangoskönyv könyvtárakhoz a legjobb",
+          "hint": "Minden könyv az elsődleges formátumának borítóját jeleníti meg, ami hangoskönyv esetén négyzet alakú. A csempéhez nem illeszkedő borító a borítómegjelenítési beállításodat követi."
         }
       },
       "folders": {
@@ -9038,9 +9673,9 @@
           "toggleAria": "EPUB-metaadatok beírása"
         },
         "readAlong": {
-          "title": "Hangos EPUB",
+          "title": "Hanggal rendelkező EPUB",
           "hint": "Szinkronizált narrációval rendelkező EPUB-ok, például Storyteller-felolvasások. Magukkal hordozzák a hanganyagukat, ezért nagy méretűek, és több memóriára van szükségük az újraíráshoz.",
-          "toggleAria": "Hangos EPUB-ok metaadatainak írása"
+          "toggleAria": "Hanggal rendelkező EPUB-ok metaadatainak írása"
         },
         "fb2": {
           "title": "FictionBook (FB2)",
@@ -9161,6 +9796,7 @@
         "add": "Hozzáadás",
         "emptyCreate": "Még nincs más felhasználó hozzáadva. Az itt megadott személyek azonnal hozzáférést kapnak, amint a könyvtár létrejön.",
         "superusers": "A szuperfelhasználók mindig teljes hozzáféréssel rendelkeznek.",
+        "levelsHint": "A megtekintők böngészhetnek és olvashatnak. A szerkesztők és a tulajdonosok a metaadatokat is módosíthatják, amennyiben a fiókjuk rendelkezik a „Metaadatok szerkesztése” jogosultsággal.",
         "levelFor": "{name} hozzáférési szintje",
         "revokeFor": "{name} hozzáférésének eltávolítása",
         "revokeQuestion": "Hozzáférés eltávolítása?",
@@ -9365,6 +10001,32 @@
         "label": "Leírás",
         "hint": "A leírás ki van töltve."
       }
+    }
+  },
+  "metadataCache": {
+    "badge": {
+      "cached": "Gyorsítótárazott",
+      "stale": "Elavult",
+      "cachedHint": "{when} időpontból mentett találat",
+      "cachedHintUndated": "Mentett találat",
+      "staleHint": "A szolgáltató nem volt elérhető, ezért egy {when} időpontból mentett találat került felhasználásra",
+      "staleHintUndated": "A szolgáltató nem volt elérhető, ezért egy mentett találat került felhasználásra"
+    },
+    "notice": {
+      "someCached": "Néhány találat mentett keresésekből származik (legrégebbi: {when}).",
+      "someCachedUndated": "Néhány találat mentett keresésekből származik.",
+      "someStale": "Néhány szolgáltató nem volt elérhető, ezért mentett találatok kerültek megjelenítésre (legrégebbi: {when}).",
+      "someStaleUndated": "Néhány szolgáltató nem volt elérhető, ezért mentett találatok kerültek megjelenítésre.",
+      "searchFresh": "Friss keresés",
+      "searchFreshHint": "Minden szolgáltató újra lekérdezésre kerül az elmentett válaszok használata helyett"
+    },
+    "fallback": {
+      "usedSaved": "{count, plural, one {A(z) {providers} nem volt elérhető, ezért mentett találatok kerültek felhasználásra.} other {A(z) {providers} nem voltak elérhető, ezért mentett találatok kerültek felhasználásra.}}"
+    },
+    "ignoreCache": {
+      "label": "Gyorsítótárazott találatok figyelmen kívül hagyása",
+      "hint": "Minden szolgáltató újra lekérdezésre kerül az elmentett válaszok újrahasznosítása helyett. Lassabb, és többet fogyaszt az egyes szolgáltatók lekérdezési keretéből.",
+      "runHint": "Az itt indított futtatásra vonatkozik. Minden szolgáltató újra lekérdezésre kerül az elmentett válaszok újrahasznosítása helyett, ami lassabb."
     }
   },
   "metadataScore": {
@@ -9877,6 +10539,7 @@
     },
     "loadingBook": "Könyv betöltése...",
     "failedToLoadBook": "Nem sikerült betölteni a könyvet",
+    "bookLoadTimeout": "A könyv megnyitása túl sok időt vett igénybe. Próbáld meg frissíteni az oldalt.",
     "chapterNumber": "{number}. fejezet",
     "peek": {
       "badge": "Betekintés",
@@ -12208,6 +12871,7 @@
     },
     "email": {
       "providers": "Szolgáltatók",
+      "servers": "Levelezőszerverek",
       "recipients": "Címzettek",
       "groups": "Csoportok",
       "templates": "Sablonok",
@@ -12221,7 +12885,8 @@
       "genre-blocklist": "Zsáner tiltólista",
       "score": "Megbízhatósági pontszám",
       "auto-fetch": "Könyv automatikus lekérése",
-      "authors": "Szerző automatikus lekérése"
+      "authors": "Szerző automatikus lekérése",
+      "search-cache": "Keresési gyorsítótár"
     },
     "admin": {
       "users": "Felhasználók",
@@ -12331,6 +12996,41 @@
     },
     "errors": {
       "generic": "TTS hiba"
+    }
+  },
+  "delivery": {
+    "readAloud": {
+      "label": "Hangos felolvasást támogató EPUB kézbesítése",
+      "automatic": "Automatikus: csak szöveges előnyben részesítése, eredeti engedélyezése tartalékként.",
+      "textOnly": "Csak szöveges EPUB",
+      "original": "Eredeti EPUB felolvasással",
+      "hint": "A jövőbeli kézbesítésekre vonatkozik. Az eredeti változatok megőrzik a meglévő felolvasást, és jóval nagyobbak lehetnek. A csak szöveges előkészítés sikertelen lesz, ha nem hozható létre biztonságos másolat.",
+      "koboHint": "An eredeti EPUB-ok megkerülik a KEPUB-konverziót. A gyári Kobo rendszerszoftver nem biztos, hogy lejátsza a felolvasást, valamint a pontos pozíció- és kiemelésszinkronizálás sem érhető el ennél a példánynál.",
+      "profileHint": "Használj külön OPDS-profilokat az eltérő EPUB-változatokat igénylő olvasókhoz.",
+      "replacementTitle": "Egy Kobo-példány cseréje",
+      "bookId": "Könyvazonosító",
+      "device": "Eszköz",
+      "prepare": "Csere előkészítése",
+      "offer": "Kizárólag az eszközpéldány került eltávolításra; a csere felkínálása",
+      "confirm": "A csere telepítésre került",
+      "cancel": "Csere megszakítása",
+      "replacementHint": "Először készítsd elő és vizsgáld felül. Az eszközpéldány eltávolítása nem törli a könyvtárban lévő könyvet. A készüléken lévő helyi jegyzeteket magadnak kell elmentened. A BookOrbit megőrzi a kanonikus haladást és a szerveroldali annotációkat. A késleltetett események korlátozhatják a pontos szinkronizálást.",
+      "prepared": "Csere előkészítve: {format}, {size}. Távolítsd el ezt a könyvet kizárólag a kiválasztott eszközről, majd ajánld fel az előkészített cserét és szinkronizálj.",
+      "offered": "Csere felkínálva. Szinkronizálj és töltsd le az eszközön, majd igazold vissza a telepítést. A befejezett HTTP-átvitel nem bizonyítja a telepítést.",
+      "cancelled": "Csere megszakítva. A megszakítás nem állítja vissza az eltávolított vagy részben lecserélt eszközpéldányt. Válaszd ki ugyanazt a könyvet a helyreállítási letöltés előkészítéséhez.",
+      "failed": "A csere előkészítése vagy frissítése sikertelen.",
+      "searchBook": "Könyv keresése",
+      "chooseBook": "Könyv kiválasztása",
+      "moreResults": "Több könyv megjelenítése",
+      "noResults": "Nem találhatók egyező könyvek.",
+      "refresh": "Kézbesítési állapot frissítése",
+      "confirmed": "Igazoltad a telepítést. Ez a te megerősítésedet rögzíti, nem az eszköz oldali ellenőrzést.",
+      "transferred": "Az átvitel befejeződött. Nyisd meg a cserét az eszközön a telepítés visszaigazolása előtt.",
+      "koreaderDefaultTitle": "EPUB átvitele KOReader-re",
+      "koreaderDefaultHint": "Az alapértelmezés az ezeket a hitelesítési adatokat használó eszközök jövőbeli letöltéseire vonatkozik. Az eszközbeállítások felülbírálhatják azt. A meglévő példányok és a megszakított letöltések változatlanok maradnak. Az automatikus mód megőrzi a meglévő eszközoldali választásokat.",
+      "koreaderUseDefault": "Hitelesítési alapértelmezés használata",
+      "koreaderSaveFailed": "A KOReader EPUB-átviteli beállítás mentése sikertelen. Próbáld újra.",
+      "koreaderSaved": "A KOReader EPUB-átviteli beállítás elmentve."
     }
   }
 }

@@ -365,6 +365,21 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
   });
 
   describe('recipients/groups/preferences ownership and conflicts', () => {
+    it('persists DjVu format preferences for ordinary recipients', async () => {
+      const created = await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', {
+        name: 'DjVu documents',
+        email: 'djvu-reader@example.com',
+        deviceType: 'other',
+        preferredFormat: 'djvu',
+      });
+      expect(created.statusCode).toBe(201);
+      const recipient = created.json() as { id: number; preferredFormat: string };
+      expect(recipient.preferredFormat).toBe('djvu');
+      const loaded = await apiAs(senderOnly, 'GET', `/api/v1/email/recipients/${recipient.id}`);
+      expect(loaded.statusCode).toBe(200);
+      expect(loaded.json()).toMatchObject({ preferredFormat: 'djvu', deviceType: 'other' });
+    });
+
     it('enforces recipient ownership and duplicate-email conflicts', async () => {
       const recipientResponse = await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', {
         name: 'Sender Kindle',

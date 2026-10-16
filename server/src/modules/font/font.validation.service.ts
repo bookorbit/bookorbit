@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import type { FontFormat, FontNamedInstance, FontStyle } from '@bookorbit/types';
+import type { FontFormat, FontNamedInstance, FontStyle, FontUploadErrorCode } from '@bookorbit/types';
 import { CSS_FONT_WEIGHT_MAX, CSS_FONT_WEIGHT_MIN, FONT_FORMATS, FONT_WEIGHTS, compareFontVariants, isCssFontWeight } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { parseFontMetadata, type FontVariationAxis, type FontVariationInstance } from './font-metadata.parser';
+
+const INVALID_FILE: FontUploadErrorCode = 'FONT_INVALID_FILE';
 
 export interface FontMetadata {
   familyName: string | null;
@@ -69,22 +71,25 @@ export class FontValidationService {
 
   validateFormat(buffer: Buffer, declaredFormat: FontFormat): void {
     if (!FONT_FORMATS.includes(declaredFormat)) {
-      throw new BadRequestException(`Unsupported font format: ${declaredFormat}`);
+      throw new BadRequestException({
+        message: `Unsupported font format: ${declaredFormat}`,
+        errorCode: 'FONT_UNSUPPORTED_TYPE' satisfies FontUploadErrorCode,
+      });
     }
 
     if (buffer.length < 4) {
-      throw new BadRequestException('File too small to be a valid font');
+      throw new BadRequestException({ message: 'File too small to be a valid font', errorCode: INVALID_FILE });
     }
 
     const magic = buffer.subarray(0, 4).toString('hex');
     const allowedFormats = MAGIC_BYTES[magic];
 
     if (!allowedFormats) {
-      throw new BadRequestException('File does not appear to be a valid font (unrecognized magic bytes)');
+      throw new BadRequestException({ message: 'File does not appear to be a valid font (unrecognized magic bytes)', errorCode: INVALID_FILE });
     }
 
     if (!allowedFormats.includes(declaredFormat)) {
-      throw new BadRequestException(`File content does not match declared format "${declaredFormat}"`);
+      throw new BadRequestException({ message: `File content does not match declared format "${declaredFormat}"`, errorCode: INVALID_FILE });
     }
   }
 

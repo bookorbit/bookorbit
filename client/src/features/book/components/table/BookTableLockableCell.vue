@@ -8,6 +8,7 @@ const { t } = useI18n()
 defineProps<{
   isLocked: boolean
   hasLockField: boolean
+  readOnly?: boolean
 }>()
 
 defineEmits<{
@@ -26,7 +27,8 @@ defineEmits<{
           type="button"
           :aria-pressed="isLocked"
           :aria-label="isLocked ? t('book.table.locks.unlockField') : t('book.table.locks.lockField')"
-          class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm transition-colors"
+          class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm transition-colors disabled:pointer-events-none"
+          :disabled="readOnly"
           :class="
             isLocked ? 'text-primary hover:text-primary' : 'opacity-0 text-muted-foreground group-hover/cell:opacity-100 hover:text-muted-foreground'
           "

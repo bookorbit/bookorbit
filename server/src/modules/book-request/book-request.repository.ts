@@ -758,9 +758,14 @@ export class BookRequestRepository {
    * from. They matter because a live row holds the dedupe claim on its work, so an abandoned one
    * quietly subscribes the next person to ask for that book to a request nobody is driving.
    *
+   * Timed from when the row became self-serve, which `decidedAt` records both for a request made
+   * self-serve and for one a fulfiller took on, not from `createdAt`: an older request taken on
+   * was already past the limit and was cancelled at the next sweep under its new fulfiller.
+   *
    * Bounded, because this runs on a timer and a backlog must not turn into one enormous sweep.
    */
   async findAbandonedSelfServe(olderThan: Date, limit: number): Promise<BookRequestRow[]> {
+    const selfServeSince = sql`coalesce(${bookRequests.decidedAt}, ${bookRequests.createdAt})`;
     const withAttempt = this.db
       .select({ id: bookRequestDownloads.requestId })
       .from(bookRequestDownloads)
@@ -773,11 +778,11 @@ export class BookRequestRepository {
         and(
           eq(bookRequests.selfServe, true),
           inArray(bookRequests.status, [...ABANDONABLE_SELF_SERVE_STATUSES]),
-          lt(bookRequests.createdAt, olderThan),
+          lt(selfServeSince, olderThan),
           notExists(withAttempt),
         ),
       )
-      .orderBy(asc(bookRequests.createdAt))
+      .orderBy(asc(selfServeSince))
       .limit(limit);
   }
 

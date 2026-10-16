@@ -295,6 +295,20 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       });
       expectError(invalidPermissionUpdate, 400, 'permissionNames');
 
+      await ctx.db
+        .update(schema.userLibraryAccess)
+        .set({ accessLevel: 'editor' })
+        .where(and(eq(schema.userLibraryAccess.userId, created.id), eq(schema.userLibraryAccess.libraryId, libraryA.libraryId)));
+      const readAccessLevels = async () =>
+        Object.fromEntries(
+          (
+            await ctx.db
+              .select({ libraryId: schema.userLibraryAccess.libraryId, accessLevel: schema.userLibraryAccess.accessLevel })
+              .from(schema.userLibraryAccess)
+              .where(eq(schema.userLibraryAccess.userId, created.id))
+          ).map((row) => [row.libraryId, row.accessLevel]),
+        );
+
       const libraryUpdate = await ctx.app.inject({
         method: 'PUT',
         url: `/api/v1/users/${created.id}/libraries`,
@@ -314,6 +328,25 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       expect((readLibrariesAfterUpdate.json() as number[]).toSorted((a, b) => a - b)).toEqual(
         [libraryA.libraryId, libraryB.libraryId].toSorted((a, b) => a - b),
       );
+      expect(await readAccessLevels()).toEqual({ [libraryA.libraryId]: 'editor', [libraryB.libraryId]: 'viewer' });
+
+      const narrowedLibraryUpdate = await ctx.app.inject({
+        method: 'PUT',
+        url: `/api/v1/users/${created.id}/libraries`,
+        headers: authHeader(manageUsersAdmin.accessToken),
+        payload: { libraryIds: [libraryA.libraryId] },
+      });
+      expect(narrowedLibraryUpdate.statusCode).toBe(204);
+      expect(await readAccessLevels()).toEqual({ [libraryA.libraryId]: 'editor' });
+
+      const restoredLibraryUpdate = await ctx.app.inject({
+        method: 'PUT',
+        url: `/api/v1/users/${created.id}/libraries`,
+        headers: authHeader(manageUsersAdmin.accessToken),
+        payload: { libraryIds: [libraryA.libraryId, libraryB.libraryId] },
+      });
+      expect(restoredLibraryUpdate.statusCode).toBe(204);
+      expect(await readAccessLevels()).toEqual({ [libraryA.libraryId]: 'editor', [libraryB.libraryId]: 'viewer' });
 
       const deleteResponse = await ctx.app.inject({
         method: 'DELETE',

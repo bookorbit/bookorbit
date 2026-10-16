@@ -506,6 +506,30 @@
   {
     "file": "server/src/modules/library/library.controller.ts",
     "className": "LibraryController",
+    "methodName": "validateRegexMetadata",
+    "httpMethod": "POST",
+    "path": "/libraries/regex-metadata/validate",
+    "permissions": ["Permission.ManageLibraries"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "previewRegexMetadata",
+    "httpMethod": "POST",
+    "path": "/libraries/regex-metadata/preview",
+    "permissions": ["Permission.ManageLibraries"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
     "methodName": "findOne",
     "httpMethod": "GET",
     "path": "/libraries/:id",

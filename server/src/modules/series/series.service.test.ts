@@ -616,13 +616,24 @@ describe('SeriesService', () => {
       expect([...params.formats].sort()).toEqual(['cb7', 'cbr', 'cbz']);
     });
 
-    it('allows every readable format when no group is requested', async () => {
+    it('offers DjVu only to a caller that says it can open it', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(null);
+
+      await service.findNextBook(reqUser(), 42, 90, { formatGroup: 'cbx', includeDjvu: true });
+      await service.findNextBook(reqUser(), 42, 90, { includeDjvu: true });
+
+      expect([...seriesRepo.findNextReadableBook.mock.calls[0]![0].formats].sort()).toEqual(['cb7', 'cbr', 'cbz', 'djvu']);
+      expect(seriesRepo.findNextReadableBook.mock.calls[1]![0].formats).toContain('djvu');
+    });
+
+    it('allows every readable format except opt-in ones when no group is requested', async () => {
       seriesRepo.findNextReadableBook.mockResolvedValue(null);
 
       await service.findNextBook(reqUser(), 42, 90, {});
 
       const params = seriesRepo.findNextReadableBook.mock.calls[0]![0];
       expect(params.formats).toEqual(expect.arrayContaining(['epub', 'pdf', 'cbz', 'm4b']));
+      expect(params.formats).not.toContain('djvu');
     });
 
     it('applies the user content filters and exempts superusers', async () => {

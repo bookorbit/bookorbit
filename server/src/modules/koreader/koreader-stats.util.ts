@@ -1,3 +1,5 @@
+import { buildSessionId } from '../../common/utils/koreader-session-id.utils';
+
 export const KOREADER_SESSION_GAP_SECONDS = 1800;
 /** Upper bound accepted for a single page event, used to bound backward window scans. */
 export const KOREADER_MAX_EVENT_DURATION_SECONDS = 86400;
@@ -18,19 +20,6 @@ export interface DerivedKoreaderSession {
   durationSeconds: number;
   progressDelta: number | null;
   endProgress: number | null;
-}
-
-/** Everything one device's derived sessions share, across every book it has read. */
-export function buildDeviceSessionIdPrefix(deviceId: string): string {
-  return `kor:${deviceId.slice(0, 8)}:`;
-}
-
-export function buildSessionIdPrefix(deviceId: string, bookFileId: number): string {
-  return `${buildDeviceSessionIdPrefix(deviceId)}${bookFileId}:`;
-}
-
-export function buildSessionId(deviceId: string, bookFileId: number, clusterStartEpoch: number): string {
-  return `${buildSessionIdPrefix(deviceId, bookFileId)}${clusterStartEpoch}`;
 }
 
 export function clusterPageStats(events: KoreaderPageEvent[], gapSeconds: number = KOREADER_SESSION_GAP_SECONDS): KoreaderPageEvent[][] {
@@ -80,6 +69,22 @@ export function computeClusterMetrics(cluster: KoreaderPageEvent[], deviceId: st
     progressDelta,
     endProgress,
   };
+}
+
+/** A span of device-clock seconds, half-open: [startTime, endTime). */
+export interface KoreaderEventSpan {
+  startTime: number;
+  endTime: number;
+}
+
+/**
+ * Drops events that start inside a deleted session's span. Half-open because the page after a
+ * session's last one typically starts on the very second that session ends, and that page belongs
+ * to whatever the reader did next.
+ */
+export function excludeTombstonedEvents<T extends { startTime: number }>(events: T[], spans: KoreaderEventSpan[]): T[] {
+  if (spans.length === 0) return events;
+  return events.filter((event) => !spans.some((span) => event.startTime >= span.startTime && event.startTime < span.endTime));
 }
 
 export function deriveKoreaderSessions(

@@ -25,6 +25,7 @@ import {
   GLOW_REACH_MIN,
   GRID_CARD_LABEL_FIELDS,
   MAX_SERVER_FONTS,
+  PLACEHOLDER_COVER_STYLES,
   RADIUS_IDS,
   REQUEST_LANGUAGE_CODES,
   SERIES_CARD_COVER_MODES,
@@ -94,6 +95,7 @@ const DISPLAY_PREFERENCES_SCHEMA = z
     gridCardSecondaryLabel: z.enum(GRID_CARD_LABEL_FIELDS).default('hidden'),
     cardInfoMode: z.enum(CARD_INFO_MODES).default('hover-overlay'),
     thumbnailClickAction: z.enum(BOOK_THUMBNAIL_CLICK_ACTION).default('reader'),
+    placeholderCoverStyle: z.enum(PLACEHOLDER_COVER_STYLES).default('bauhaus'),
   })
   .strict()
   .superRefine((data, ctx) => {

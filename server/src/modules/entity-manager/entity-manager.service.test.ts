@@ -38,6 +38,7 @@ function makeService() {
 
   const libraryService = {
     findAccessibleLibraryIds: vi.fn().mockResolvedValue([1, 2]),
+    findEditableLibraryIds: vi.fn().mockResolvedValue([1, 2]),
   };
 
   const fileWriteService = {
@@ -604,6 +605,27 @@ describe('EntityManagerService', () => {
   });
 
   describe('merge', () => {
+    it('scopes every mutation to libraries the user can edit, not every library they can read', async () => {
+      const { service, strategies, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2, 3]);
+      libraryService.findEditableLibraryIds.mockResolvedValue([2]);
+      (strategies.tag.merge as any).mockResolvedValue({ affectedBookIds: [] });
+      (strategies.tag.rename as any).mockResolvedValue({ affectedBookIds: [] });
+      (strategies.genre.deleteEntity as any).mockResolvedValue({ affectedBookIds: [] });
+      (strategies.author.split as any).mockResolvedValue({ originalName: 'Author', newEntities: [], affectedBookIds: [] });
+
+      await service.merge('tag', mockUser, 1, [2], false);
+      await service.rename('tag', mockUser, 1, 'Renamed', false);
+      await service.deleteEntity('genre', mockUser, 5, 'hard', false);
+      await service.split('author', mockUser, 5, ['Author A', 'Author B'], false);
+
+      expect(strategies.tag.merge).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2] }));
+      expect(strategies.tag.rename).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2] }));
+      expect(strategies.genre.deleteEntity).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2] }));
+      expect(strategies.author.split).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2] }));
+      expect(libraryService.findEditableLibraryIds).toHaveBeenCalledTimes(4);
+    });
+
     it('calls strategy merge and cleans up dismissed pairs for first-class', async () => {
       const { service, strategies, repo, duplicateCompute, metadataScoreService } = makeService();
       (strategies.author.merge as any).mockResolvedValue({

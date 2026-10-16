@@ -14,6 +14,7 @@ function toBookFileRef(file: BookDetail['files'][number]): BookFileRef {
 export function mergeBookCardWithDetail(book: BookCard, detail: BookDetail): BookCard {
   return {
     ...book,
+    libraryId: detail.libraryId,
     status: detail.status,
     title: detail.title,
     subtitle: detail.subtitle,

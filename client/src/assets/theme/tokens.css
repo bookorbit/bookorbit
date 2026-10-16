@@ -153,9 +153,9 @@
   /* Accent glow behind the top of the main column (.shell-glow). --glow-band is the style's own reach and
      --glow-reach the user's multiplier on it, written on <html>. A texture keeps its tile size at any reach;
      only the fade that reveals it follows the band. */
-  --glow-reach: 0.8;
-  --glow-band: 12rem;
-  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
+  --glow-reach: 0.5;
+  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 38%, transparent) 0%, transparent 100%);
+  --glow-band: 20rem;
   --glow-texture: none;
   --glow-texture-size: auto;
 
@@ -288,12 +288,54 @@
   --path-fold: oklch(0.62 0.02 var(--tint-h));
 
   --audit-authentication: oklch(0.55 0.17 295);
+  --audit-requests: oklch(0.56 0.17 350);
+  /* Settings events sit on a neutral, so red in the audit log only ever means something was deleted. */
+  --audit-config: oklch(0.56 0.035 255);
   --audit-books: oklch(0.55 0.16 245);
   --audit-users: oklch(0.62 0.14 70);
   --audit-libraries: oklch(0.55 0.1 195);
   --audit-collections: oklch(0.55 0.09 255);
   --audit-integrations: oklch(0.58 0.15 150);
   --audit-settings: oklch(0.55 0.15 25);
+
+  /* Achievement medals. Rarity is a metal, the same four finishes the iOS app uses (pewter, steel,
+     amethyst, gold), each as three stops (shadow, body, highlight) so a medal reads as struck metal
+     rather than a flat colour. A medal is an object, so its faces keep the bright stops in both
+     themes; rarity text uses the -ink tokens, which are tuned per theme to clear AA, and bars use
+     the -fill tokens. */
+  --medal-common-shadow: oklch(0.454 0.014 84.6);
+  --medal-common-body: oklch(0.72 0.018 84.6);
+  --medal-common-highlight: oklch(0.929 0.013 86.8);
+  --medal-rare-shadow: oklch(0.452 0.077 244.9);
+  --medal-rare-body: oklch(0.712 0.085 244.9);
+  --medal-rare-highlight: oklch(0.933 0.028 239.7);
+  --medal-epic-shadow: oklch(0.423 0.116 299.6);
+  --medal-epic-body: oklch(0.652 0.137 294.7);
+  --medal-epic-highlight: oklch(0.895 0.051 308.4);
+  --medal-legendary-shadow: oklch(0.54 0.105 85.4);
+  --medal-legendary-body: oklch(0.827 0.129 89.2);
+  --medal-legendary-highlight: oklch(0.964 0.06 96.1);
+  --rarity-common: oklch(0.472 0.018 90.4);
+  --rarity-rare: oklch(0.495 0.094 246.5);
+  --rarity-epic: oklch(0.448 0.125 297.7);
+  --rarity-legendary: oklch(0.495 0.096 86);
+  --rarity-common-fill: oklch(0.632 0.019 84.6);
+  --rarity-rare-fill: oklch(0.621 0.101 246.1);
+  --rarity-epic-fill: oklch(0.575 0.151 294.4);
+  --rarity-legendary-fill: oklch(0.726 0.133 88.4);
+  /* A medal not yet earned: an unstruck blank in the card's own colour. */
+  --medal-blank: color-mix(in oklch, var(--foreground) 5%, var(--card));
+  --medal-blank-edge: color-mix(in oklch, var(--foreground) 15%, var(--card));
+  --medal-blank-face-low: color-mix(in oklch, var(--foreground) 3%, var(--card));
+  --medal-blank-face-high: color-mix(in oklch, var(--foreground) 8%, var(--card));
+  --medal-blank-glyph: color-mix(in oklch, var(--muted-foreground) 70%, var(--card));
+  --medal-shadow: oklch(0.2 0.02 260 / 0.22);
+  --shelf-line: color-mix(in oklch, var(--foreground) 14%, transparent);
+  /* Sign-in pages: a bookplate pasted on an endpaper. Light mode prints the plate on a warm sheet. */
+  --plate: oklch(0.975 0.012 84);
+  --plate-rule: color-mix(in oklch, var(--foreground) 42%, transparent);
+  --endpaper: color-mix(in oklch, var(--primary) 5%, var(--background));
+  --endpaper-ink: color-mix(in oklch, var(--primary) 14%, var(--background));
 }
 
 @media (min-width: 40rem) {
@@ -309,6 +351,10 @@
 }
 
 .dark {
+  /* Every style shares one glow reach and strength, so a percentage looks the same in each; only
+     Nostalgia lays its square texture over it. */
+  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 60%, transparent) 0%, transparent 100%);
+
   color-scheme: dark;
   --tint-c: 0.0175;
   --tint-c-surface: var(--tint-c);
@@ -484,10 +530,31 @@
   --path-fold: oklch(0.6 0.01 var(--tint-h));
 
   --audit-authentication: oklch(0.72 0.17 295);
+  --audit-requests: oklch(0.74 0.14 350);
+  --audit-config: oklch(0.74 0.035 255);
   --audit-books: oklch(0.72 0.14 245);
   --audit-users: oklch(0.78 0.13 70);
   --audit-libraries: oklch(0.74 0.1 195);
   --audit-collections: oklch(0.72 0.09 255);
   --audit-integrations: oklch(0.75 0.13 150);
   --audit-settings: oklch(0.72 0.15 25);
+
+  --rarity-common: oklch(0.781 0.018 84.6);
+  --rarity-rare: oklch(0.789 0.072 244.4);
+  --rarity-epic: oklch(0.764 0.102 296.2);
+  --rarity-legendary: oklch(0.846 0.125 90.3);
+  --rarity-common-fill: oklch(0.714 0.018 84.6);
+  --rarity-rare-fill: oklch(0.712 0.085 244.9);
+  --rarity-epic-fill: oklch(0.652 0.137 294.7);
+  --rarity-legendary-fill: oklch(0.827 0.129 89.2);
+  --medal-blank: color-mix(in oklch, var(--foreground) 6%, var(--card));
+  --medal-blank-edge: color-mix(in oklch, var(--foreground) 16%, var(--card));
+  --medal-blank-face-high: color-mix(in oklch, var(--foreground) 9%, var(--card));
+  --medal-blank-glyph: color-mix(in oklch, var(--muted-foreground) 62%, var(--card));
+  --medal-shadow: oklch(0 0 0 / 0.55);
+  --shelf-line: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --plate: var(--card);
+  --plate-rule: color-mix(in oklch, var(--foreground) 34%, transparent);
+  --endpaper: color-mix(in oklch, var(--primary) 7%, var(--background));
+  --endpaper-ink: color-mix(in oklch, var(--primary) 17%, var(--background));
 }

@@ -780,4 +780,25 @@ describe('UploadProcessorService', () => {
     expect(coverReconciler.enqueue).toHaveBeenCalledWith([7], { filesChanged: true });
     expect(coverReconciler.enqueue.mock.invocationCallOrder[0]).toBeGreaterThan(metadataService.extractAndSave.mock.invocationCallOrder[0]!);
   });
+
+  it.each([
+    [true, 0],
+    [false, 1],
+  ])('lets the library regex rules own extraction when they apply (%s)', async (handled, plainCalls) => {
+    const scanner = { extractMetadataWithLibraryRules: vi.fn().mockResolvedValue(handled) };
+    const withRules = new UploadProcessorService(
+      db as any,
+      metadataService as any,
+      coverStore as any,
+      orchestrator as any,
+      undefined,
+      scanner as any,
+    );
+    metadataService.extractAndSave.mockResolvedValue(undefined);
+
+    await withRules.extractMetadata(7, '/tmp/book.epub', 'epub');
+
+    expect(scanner.extractMetadataWithLibraryRules).toHaveBeenCalledWith(7);
+    expect(metadataService.extractAndSave).toHaveBeenCalledTimes(plainCalls);
+  });
 });

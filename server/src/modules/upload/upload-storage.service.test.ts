@@ -1,5 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { PayloadTooLargeException } from '@nestjs/common';
+import { PayloadTooLargeException, RequestTimeoutException } from '@nestjs/common';
 import { createReadStream, type WriteStream } from 'fs';
 import { copyFile, mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, symlink, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -107,6 +107,29 @@ describe('UploadStorageService', () => {
     );
     await expect(service.streamToTemp(input)).rejects.toBe(failure);
     expect(await readdir(control.tempDir)).toEqual(['source.epub']);
+  });
+
+  it('gives up a source that sends nothing for the idle timeout and removes its temporary file', async () => {
+    const input = new PassThrough();
+    input.write(payload);
+
+    await expect(service.streamToTemp(input, undefined, { idleTimeoutMs: 20 })).rejects.toBeInstanceOf(RequestTimeoutException);
+    expect(await readdir(control.tempDir)).toEqual(['source.epub']);
+  });
+
+  it('keeps reading a source that keeps sending, however long it takes in all', async () => {
+    const input = new PassThrough();
+    const sent = (async () => {
+      for (let index = 0; index < 4; index += 1) {
+        input.write(payload);
+        await new Promise((resolve) => setTimeout(resolve, 15));
+      }
+      input.end();
+    })();
+
+    const result = await service.streamToTemp(input, undefined, { idleTimeoutMs: 40 });
+    await sent;
+    expect(result.sizeBytes).toBe(payload.length * 4);
   });
 
   it('uses rename directly on the same filesystem, without opening a staging file', async () => {

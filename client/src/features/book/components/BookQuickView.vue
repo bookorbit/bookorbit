@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, Eye, Folder, FolderPlus, Headphones, Pencil, Star, Trash2, X } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose, DialogTitle, DialogDescription } from 'reka-ui'
@@ -14,7 +15,7 @@ import { useCoverVersions } from '../composables/useCoverVersions'
 import BookFormatChip from './BookFormatChip.vue'
 import { bookFormatEntries, fileFormatKey } from '../lib/book-formats'
 import { displayPublishedDate } from '../lib/published-date'
-import { FORMAT_TO_GROUP, getPrimaryBookFile } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, getPrimaryBookFile, isComicFormat } from '@bookorbit/types'
 import { useBookCoverAspectRatio } from '../composables/useBookCoverAspectRatio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -27,6 +28,8 @@ const { t } = useI18n()
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', detail.value?.libraryId, 'editor'))
 const emit = defineEmits<{
   'update:open': [value: boolean]
   action: [type: 'add-to-collection' | 'delete']
@@ -72,6 +75,7 @@ const seriesLine = computed(() => {
 })
 
 const authorLine = computed(() => detail.value?.authors.map((a) => a.name).join(', ') ?? null)
+const coverAuthors = computed(() => detail.value?.authors.map((a) => a.name) ?? null)
 const ratingStars = [1, 2, 3, 4, 5]
 const providerLinks = computed(() => (detail.value ? createBookProviderLinks(detail.value.providerIds) : []))
 
@@ -95,7 +99,7 @@ const quickViewCoverAspectRatio = computed(() => {
 
 const primaryFile = computed(() => (detail.value ? getPrimaryBookFile(detail.value.files) : null))
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const isPrimaryComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 const formatEntries = computed(() => (detail.value ? bookFormatEntries(detail.value.files, detail.value.formatPriority) : []))
 const publishedDisplay = computed(() => (detail.value ? displayPublishedDate(detail.value.publishedDate, detail.value.publishedYear) : null))
 
@@ -211,6 +215,11 @@ function handleDelete() {
                   loading="eager"
                   :spine="!isPrimaryAudio"
                   :is-comic="isPrimaryComic"
+                  :authors="coverAuthors"
+                  :subtitle="detail.subtitle"
+                  :series-name="detail.seriesName"
+                  :series-index="detail.seriesIndex"
+                  :genres="detail.genres"
                   @load="handleCoverLoad"
                   @error="handleCoverError"
                 />
@@ -412,7 +421,7 @@ function handleDelete() {
               </TooltipTrigger>
               <TooltipContent>{{ t('book.actions.peek') }}</TooltipContent>
             </Tooltip>
-            <Tooltip v-if="hasPermission('library_edit_metadata')">
+            <Tooltip v-if="canEditMetadata">
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"

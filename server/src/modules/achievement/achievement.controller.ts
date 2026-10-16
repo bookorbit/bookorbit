@@ -1,11 +1,12 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
-import type { AchievementCatalogueResponse, AchievementCelebrationClaim } from '@bookorbit/types';
+import type { AchievementCatalogueResponse, AchievementCelebrationClaim, AchievementHintsResponse } from '@bookorbit/types';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AchievementService } from './achievement.service';
 import { AchievementBackfillService, type BackfillResult } from './achievement-backfill.service';
+import { AchievementHintsService } from './achievement-hints.service';
 
 @Controller('achievements')
 @UseGuards(JwtAuthGuard)
@@ -13,11 +14,17 @@ export class AchievementController {
   constructor(
     private readonly service: AchievementService,
     private readonly backfillService: AchievementBackfillService,
+    private readonly hintsService: AchievementHintsService,
   ) {}
 
   @Get()
   async getCatalogue(@CurrentUser() user: RequestUser): Promise<AchievementCatalogueResponse> {
     return this.service.getCatalogue(user);
+  }
+
+  @Get('hints')
+  async getHints(@CurrentUser() user: RequestUser): Promise<AchievementHintsResponse> {
+    return this.hintsService.getHints(user);
   }
 
   @Post('celebrations/claim')

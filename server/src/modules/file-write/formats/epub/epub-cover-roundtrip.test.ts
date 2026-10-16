@@ -1,4 +1,5 @@
 import { ZipArchive } from 'archiver';
+import { randomBytes } from 'crypto';
 import { createWriteStream } from 'fs';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -26,7 +27,11 @@ afterEach(async () => {
   await rm(testRoot, { recursive: true, force: true });
 });
 
-async function writeArchive(filePath: string, opfXml: string, entries: Array<{ path: string; content: string | Buffer }>): Promise<void> {
+async function writeArchive(
+  filePath: string,
+  opfXml: string,
+  entries: Array<{ path: string; content: string | Buffer; store?: boolean }>,
+): Promise<void> {
   const output = createWriteStream(filePath);
   const archive = new ZipArchive({ zlib: { level: 6 } });
 
@@ -38,7 +43,7 @@ async function writeArchive(filePath: string, opfXml: string, entries: Array<{ p
     archive.append(Buffer.from('application/epub+zip'), { name: 'mimetype', store: true });
     archive.append(Buffer.from(containerXml), { name: 'META-INF/container.xml' });
     archive.append(Buffer.from(opfXml), { name: 'OPS/content.opf' });
-    for (const entry of entries) archive.append(entry.content, { name: entry.path });
+    for (const entry of entries) archive.append(entry.content, { name: entry.path, store: entry.store });
     void archive.finalize();
   });
 }
@@ -225,6 +230,51 @@ describe('EPUB cover write round trip', () => {
 });
 
 describe('EPUB metadata write round trip', () => {
+  it('preserves original entry compression and content across repeated metadata saves', async () => {
+    const filePath = join(testRoot, 'image-heavy.epub');
+    const opf = `
+      <package version="3.0" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:identifier id="uid">urn:test:image-heavy</dc:identifier>
+          <dc:title>Old title</dc:title>
+          <dc:language>en</dc:language>
+        </metadata>
+        <manifest>
+          <item id="image" href="images/page.JPG" media-type="image/jpeg" />
+          <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+        </manifest>
+        <spine><itemref idref="chapter" /></spine>
+      </package>`;
+    const image = await sharp(randomBytes(256 * 256 * 3), { raw: { width: 256, height: 256, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    const compressible = Buffer.alloc(100_000);
+    const chapter = `<html><body>${'chapter text '.repeat(1000)}</body></html>`;
+    await writeArchive(filePath, opf, [
+      { path: 'OPS/images/page.JPG', content: image, store: true },
+      { path: 'OPS/images/mislabeled.png', content: compressible },
+      { path: 'OPS/chapter.xhtml', content: chapter },
+    ]);
+
+    for (const title of ['First title', 'Second title']) {
+      const result = await new EpubFormatWriter().write(filePath, { title }, { fieldMask: new Set(['title']), dryRun: false });
+      expect(result.status).toBe('success');
+      const zip = await unzipper.Open.file(filePath);
+      const byPath = new Map(zip.files.map((entry) => [entry.path, entry]));
+      expect(zip.files[0]!.path).toBe('mimetype');
+      expect(zip.files[0]!.compressionMethod).toBe(0);
+      expect(byPath.get('OPS/images/page.JPG')!.compressionMethod).toBe(0);
+      expect(byPath.get('OPS/images/mislabeled.png')!.compressionMethod).toBe(8);
+      expect(byPath.get('OPS/chapter.xhtml')!.compressionMethod).toBe(8);
+      expect(byPath.get('OPS/content.opf')!.compressionMethod).toBe(8);
+      await expect(byPath.get('OPS/images/page.JPG')!.buffer()).resolves.toEqual(image);
+      await expect(byPath.get('OPS/images/mislabeled.png')!.buffer()).resolves.toEqual(compressible);
+      await expect(byPath.get('OPS/chapter.xhtml')!.buffer()).resolves.toEqual(Buffer.from(chapter));
+      const pkg = objectParser.parse((await byPath.get('OPS/content.opf')!.buffer()).toString()).package;
+      expect(pkg.metadata.title['#text']).toBe(title);
+    }
+  });
+
   async function listEntryPaths(filePath: string): Promise<string[]> {
     const zip = await unzipper.Open.file(filePath);
     return zip.files.map((entry) => entry.path).sort();

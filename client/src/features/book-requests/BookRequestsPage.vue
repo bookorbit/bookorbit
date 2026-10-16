@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 import { BookPlus, Rows3, Rows4, X } from '@lucide/vue'
 import { BOOK_REQUEST_MEDIA_KINDS, BOOK_REQUEST_STATUSES, Permission } from '@bookorbit/types'
 import type { BookRequestBulkResult, BookRequestItem, BookRequestSortField, BookRequestStatus } from '@bookorbit/types'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -552,16 +553,12 @@ function goToNextPage() {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-420 flex-col py-4">
-    <header class="mb-4">
-      <div class="flex items-center gap-2.5">
-        <div class="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-          <BookPlus class="size-4.5 text-primary" aria-hidden="true" />
-        </div>
-        <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('bookRequests.title') }}</h1>
-      </div>
-      <p class="mt-1.5 text-sm text-muted-foreground">{{ t('bookRequests.subtitle') }}</p>
-    </header>
+  <div class="mx-auto flex w-full max-w-420 flex-col pt-2 pb-4">
+    <PageTitleRow class="mb-4" :title="t('bookRequests.title')" :icon="BookPlus">
+      <template #facts>
+        <span class="truncate">{{ t('bookRequests.subtitle') }}</span>
+      </template>
+    </PageTitleRow>
 
     <!--
       Above the tabs rather than inside one of them: it is the same fact whether you are filing a

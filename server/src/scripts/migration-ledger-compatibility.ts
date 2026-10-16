@@ -7,6 +7,58 @@ type CompatibilityResult = {
   repairedRows: number;
 };
 
+/**
+ * Ledger rows written by builds that never shipped. Drizzle applies only migrations newer than the
+ * newest recorded one, so a row recorded after release migrations its build never had hides those
+ * migrations for good. A hash belongs here only when a released migration recreates its effect
+ * idempotently, which makes dropping the row safe.
+ */
+const UNRELEASED_MIGRATION_HASHES = [
+  // `server_identity`, created by local connection-address builds before
+  // 0112_add_server_connection_identity, which creates the same table if it is missing.
+  '1ec15e36d30f9bf4e79f92cb59eb461e5f76f53f43293d1b08a15253f22f35cf',
+] as const;
+
+export async function dropUnreleasedMigrationRows(
+  pool: Pick<Pool, 'connect'>,
+  migrations: readonly Pick<MigrationMeta, 'hash'>[],
+): Promise<{ removedRows: number }> {
+  const known = new Set(migrations.map((migration) => migration.hash));
+  const hashes = UNRELEASED_MIGRATION_HASHES.filter((hash) => !known.has(hash));
+  if (hashes.length === 0) return { removedRows: 0 };
+
+  const client = await pool.connect();
+  const startedAt = Date.now();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('bookorbit'), hashtext('migration-ledger-compatibility'))`);
+    const table = await client.query<{ tableName: string | null }>(`SELECT to_regclass('drizzle.__drizzle_migrations')::text AS "tableName"`);
+    if (table.rows[0]?.tableName === null || table.rows.length === 0) {
+      await client.query('COMMIT');
+      return { removedRows: 0 };
+    }
+    const removed = await client.query(`DELETE FROM drizzle.__drizzle_migrations WHERE hash = ANY($1::text[])`, [hashes]);
+    await client.query('COMMIT');
+    const removedRows = removed.rowCount ?? 0;
+    if (removedRows > 0) {
+      console.warn(
+        `[db.migration-ledger-compatibility] [end] durationMs=${Date.now() - startedAt} removed=${removedRows} - unreleased migration records dropped`,
+      );
+    }
+    return { removedRows };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    const errorClass = error instanceof Error ? error.name : typeof error;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[db.migration-ledger-compatibility] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${sanitizeLogValue(message)}" - unreleased migration records could not be dropped`,
+    );
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 type LedgerRow = {
   id: number;
   hash: string;

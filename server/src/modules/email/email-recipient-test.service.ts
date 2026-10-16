@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
+import type { EmailTestResult } from '@bookorbit/types';
+
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { EmailProviderResolver } from './email-provider-resolver';
@@ -22,7 +24,7 @@ export class EmailRecipientTestService {
     private readonly transport: EmailTransportService,
   ) {}
 
-  async send(recipientId: number, subject: string, text: string, user: RequestUser): Promise<{ success: boolean; error?: string }> {
+  async send(recipientId: number, subject: string, text: string, user: RequestUser): Promise<EmailTestResult> {
     const startedAt = Date.now();
     const recipient = await this.recipientService.getOwnedById(recipientId, user);
     // Amazon answers a message without a document with an error email of its own.

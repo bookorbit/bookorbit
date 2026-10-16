@@ -38,11 +38,16 @@ export class CustomMetadataRepository {
       .orderBy(asc(customMetadataLibraryFields.libraryId), asc(customMetadataLibraryFields.displayOrder), asc(customMetadataLibraryFields.fieldId));
   }
 
-  countValuesByField() {
-    return this.db
-      .select({ fieldId: bookCustomMetadataValues.fieldId, count: count() })
+  /** Stored values per field and library, including libraries the field has since been turned off for. */
+  countValuesByFieldAndLibrary(fieldId?: number) {
+    const query = this.db
+      .select({ fieldId: bookCustomMetadataValues.fieldId, libraryId: books.libraryId, count: count() })
       .from(bookCustomMetadataValues)
-      .groupBy(bookCustomMetadataValues.fieldId);
+      .innerJoin(books, eq(books.id, bookCustomMetadataValues.bookId));
+    return (fieldId === undefined ? query : query.where(eq(bookCustomMetadataValues.fieldId, fieldId))).groupBy(
+      bookCustomMetadataValues.fieldId,
+      books.libraryId,
+    );
   }
 
   findActiveFieldTypes(fieldIds: number[]) {
@@ -94,7 +99,7 @@ export class CustomMetadataRepository {
         key: customMetadataFields.key,
         label: customMetadataFields.label,
         type: customMetadataFields.type,
-        displayOrder: customMetadataLibraryFields.displayOrder,
+        displayOrder: customMetadataFields.displayOrder,
         archivedAt: customMetadataFields.archivedAt,
         createdAt: customMetadataFields.createdAt,
         updatedAt: customMetadataFields.updatedAt,
@@ -102,7 +107,7 @@ export class CustomMetadataRepository {
       .from(customMetadataLibraryFields)
       .innerJoin(customMetadataFields, eq(customMetadataFields.id, customMetadataLibraryFields.fieldId))
       .where(and(eq(customMetadataLibraryFields.libraryId, libraryId), isNull(customMetadataFields.archivedAt)))
-      .orderBy(asc(customMetadataLibraryFields.displayOrder), asc(customMetadataFields.label), asc(customMetadataFields.id));
+      .orderBy(asc(customMetadataFields.displayOrder), asc(customMetadataFields.label), asc(customMetadataFields.id));
   }
 
   findValuesForBook(bookId: number) {
@@ -145,7 +150,7 @@ export class CustomMetadataRepository {
         key: customMetadataFields.key,
         label: customMetadataFields.label,
         type: customMetadataFields.type,
-        displayOrder: customMetadataLibraryFields.displayOrder,
+        displayOrder: customMetadataFields.displayOrder,
         valueText: bookCustomMetadataValues.valueText,
         valueNumber: bookCustomMetadataValues.valueNumber,
         valueDate: bookCustomMetadataValues.valueDate,
@@ -159,7 +164,7 @@ export class CustomMetadataRepository {
         and(eq(bookCustomMetadataValues.bookId, books.id), eq(bookCustomMetadataValues.fieldId, customMetadataFields.id)),
       )
       .where(inArray(books.id, bookIds))
-      .orderBy(asc(customMetadataLibraryFields.displayOrder), asc(customMetadataFields.label), asc(customMetadataFields.id));
+      .orderBy(asc(customMetadataFields.displayOrder), asc(customMetadataFields.label), asc(customMetadataFields.id));
   }
 
   async findBookLibraryId(bookId: number) {

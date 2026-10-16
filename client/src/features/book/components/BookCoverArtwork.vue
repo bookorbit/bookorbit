@@ -24,6 +24,11 @@ const props = withDefaults(
     resetKey?: string | number | null
     spine?: boolean
     isComic?: boolean
+    authors?: readonly string[] | null
+    subtitle?: string | null
+    seriesName?: string | null
+    seriesIndex?: string | number | null
+    genres?: readonly string[] | null
   }>(),
   {
     authorLine: null,
@@ -38,6 +43,11 @@ const props = withDefaults(
     resetKey: null,
     spine: true,
     isComic: false,
+    authors: null,
+    subtitle: null,
+    seriesName: null,
+    seriesIndex: null,
+    genres: null,
   },
 )
 
@@ -187,6 +197,16 @@ function handleImageError() {
       effectiveMode === 'natural-bottom' ? 'book-cover-artwork-placeholder-natural overflow-hidden rounded-[inherit]' : '',
     ]"
   >
-    <BookCoverPlaceholder :title="title" :author-line="authorLine" :is-audio="isAudio" :seed="seed" />
+    <BookCoverPlaceholder
+      :title="title"
+      :author-line="authorLine"
+      :is-audio="isAudio"
+      :seed="seed"
+      :authors="authors"
+      :subtitle="subtitle"
+      :series-name="seriesName"
+      :series-index="seriesIndex"
+      :genres="genres"
+    />
   </span>
 </template>

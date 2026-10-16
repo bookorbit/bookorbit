@@ -782,8 +782,50 @@
     {
       "idx": 111,
       "version": "7",
-      "when": 1791919246697,
-      "tag": "0111_add_reading_session_sync_interval",
+      "when": 1791853301183,
+      "tag": "0111_add_koreader_session_tombstones",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1791941743914,
+      "tag": "0112_add_server_connection_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1792002996105,
+      "tag": "0113_add_djvu_email_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1792163623360,
+      "tag": "0114_add_book_metadata_page_count_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1792168359342,
+      "tag": "0115_add_audit_resource_label",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1792185442568,
+      "tag": "0116_regex_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1792191772317,
+      "tag": "0117_add_reading_session_sync_interval",
       "breakpoints": true
     }
   ]

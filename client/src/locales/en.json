@@ -283,6 +283,21 @@
           "loadError": "Failed to load the default cover search provider",
           "saveError": "Failed to save the default cover search provider"
         },
+        "placeholderStyle": {
+          "title": "Placeholder style",
+          "hint": "Books without cover art are drawn in this style.",
+          "options": {
+            "bauhaus": "Bauhaus",
+            "constructivist": "Constructivist",
+            "memphis": "Memphis",
+            "clothbound": "Clothbound",
+            "poster": "Poster",
+            "aurora": "Aurora",
+            "vista": "Vista",
+            "marbled": "Marbled",
+            "paperback": "Paperback"
+          }
+        },
         "displayMode": {
           "title": "Cover display mode",
           "hint": "Controls how real covers fit inside book slots when aspect ratios differ",
@@ -1572,7 +1587,132 @@
         "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
         "listLabel": "Server fonts",
         "noFontsYet": "No server fonts yet",
-        "noFontsHint": "Fonts you add here appear in every user's reader."
+        "noFontsHint": "Fonts you add here appear in every user's reader.",
+        "addFonts": "Add fonts",
+        "filterLabel": "Filter families",
+        "filterPlaceholder": "Filter families",
+        "filterClear": "Clear filter",
+        "noMatches": "No families match “{query}”",
+        "previewLabel": "Preview text",
+        "previewPlaceholder": "Type to preview it in every family",
+        "previewSize": "Preview size",
+        "previewSizeOption": "{size} px",
+        "familiesUnit": "{count, plural, one {family} other {families}}",
+        "filesOfMax": "{count} of {max} files",
+        "onDisk": "{size} on disk",
+        "columns": {
+          "family": "Family",
+          "specimen": "Specimen",
+          "styles": "Styles",
+          "readers": "Readers"
+        },
+        "fileSummary": "{count, plural, one {# file} other {# files}} · {size}",
+        "newBadge": "New",
+        "styles": {
+          "single": "{style} only",
+          "many": "{count} styles",
+          "manyNoItalics": "{count} styles, no italics"
+        },
+        "facts": {
+          "books": "{count, plural, one {On # book} other {On # books}}",
+          "booksDetail": "{books, plural, one {Set on # book} other {Set on # books}} by {readers, plural, one {# reader} other {# readers}}",
+          "defaults": "{count, plural, one {Default for # reader} other {Default for # readers}}",
+          "hidden": "{count, plural, one {Hidden by # reader} other {Hidden by # readers}}"
+        },
+        "moreActions": "More for {name}",
+        "menu": {
+          "rename": "Rename family",
+          "addFiles": "Add files",
+          "remove": "Remove family…"
+        },
+        "footerHint": "Every reader sees these in the reader's font list and can hide any of them under Reader › Fonts.",
+        "empty": {
+          "dropHint": "or drop files anywhere on this page",
+          "tip": "A family reads best as four files: Regular, Italic, Bold and Bold Italic. One variable file can stand in for every weight."
+        },
+        "drop": {
+          "title": "{count, plural, one {Drop to add # file for every reader} other {Drop to add # files for every reader}}"
+        },
+        "upload": {
+          "ariaLabel": "Upload progress",
+          "title": "{count, plural, one {Adding # file} other {Adding # files}}",
+          "progress": "{done} of {total} done",
+          "addedCount": "{count} added",
+          "duplicateCount": "{count} already here",
+          "refusedCount": "{count} not added",
+          "dismiss": "Dismiss",
+          "newFamily": "new family",
+          "states": {
+            "queued": "Waiting",
+            "uploading": "Uploading",
+            "added": "Added",
+            "duplicate": "Already on the server",
+            "refused": "Not added",
+            "failed": "Failed"
+          },
+          "reasons": {
+            "tooLarge": "Larger than {maxMb} MB.",
+            "unsupportedType": "Not a font file. Use TTF, OTF, WOFF or WOFF2.",
+            "invalidFile": "The file is damaged or is not really a font.",
+            "faceTaken": "{familyName} already has a file at this weight and style.",
+            "limitReached": "The server already holds {limit} font files.",
+            "failed": "Upload failed. Try again."
+          }
+        },
+        "sheet": {
+          "description": "Preview, rename and manage the files of {name}",
+          "variable": "Variable",
+          "preview": "Preview",
+          "pageColour": "Page colour",
+          "papers": {
+            "app": "App surface",
+            "white": "White page",
+            "sepia": "Sepia page",
+            "night": "Night page"
+          },
+          "previewHeading": "The Garden of Live Flowers",
+          "previewParagraph1": "Alice looked round her in great surprise. “Why, I do believe we’ve been under this tree the whole time! Everything’s just as it was!”",
+          "previewParagraph2": "“Now, here, you see, it takes all the running you can do, to keep in the same place. If you want to get somewhere else, you must run at least twice as fast as that!”",
+          "styles": "Styles",
+          "stylesHint": "What the reader's Style row offers",
+          "singleStyleNote": "One style, so readers get no Style row. Bold and italic text in books is faked by the browser from {style}.",
+          "inReader": "In the reader",
+          "inReaderHint": "The font list every reader gets in Reader › Settings, with {name} chosen.",
+          "pickerLabel": "Preview of the reader's font list",
+          "files": "Files",
+          "filesUsed": "{count} of {max} used on this server",
+          "fileDetail": "{summary} · Added {date}",
+          "upright": "Upright",
+          "italic": "Italic",
+          "fileActions": "More for {name}",
+          "changeStyle": "Change weight and style",
+          "removeFile": "Remove file",
+          "removeFileQuestion": "Remove this file for every reader?",
+          "weight": "Weight",
+          "style": "Style",
+          "name": "Family name",
+          "nameHint": "Readers pick fonts by this name.",
+          "nameHiddenWarning": "{count, plural, one {# reader hid {name}} other {# readers hid {name}}}; a new name shows it to them again.",
+          "nameBooksWarning": "A new name sends {count, plural, one {the # book that uses it} other {the # books that use it}} back to the book’s own font.",
+          "readers": "Readers",
+          "stats": {
+            "books": "{count, plural, one {book uses it} other {books use it}}",
+            "defaults": "{count, plural, one {reader's default} other {readers' default}}",
+            "hidden": "{count, plural, one {reader hid it} other {readers hid it}}"
+          },
+          "readersPrivacy": "Counts only. Which books and which readers stay private to them.",
+          "removeLabel": "Remove family",
+          "removeQuestion": "Remove {name} for every reader?",
+          "removeConsequenceBooks": "{books, plural, one {It is set on # book} other {It is set on # books}} by {readers, plural, one {# reader} other {# readers}}; those books go back to the book's own font.",
+          "removeConsequenceFiles": "{count, plural, one {Its file is deleted from the server.} other {All # files are deleted from the server.}}",
+          "loadFailedNote": "This browser could not load the font file, so the previews show a fallback face. Readers' browsers will most likely refuse it too; try a different copy of the font."
+        },
+        "toasts": {
+          "removed": "{name} removed",
+          "removePartial": "{failed, plural, one {# file} other {# files}} of {name} could not be removed",
+          "renameTaken": "{name} already has a file at the same weight and style"
+        },
+        "loadFailed": "This browser can't load it"
       }
     },
     "common": {
@@ -1726,6 +1866,92 @@
           "inheritFromGlobal": "Inherit from global",
           "usingGlobalDefaults": "Using global defaults.",
           "saveOverride": "Save override"
+        },
+        "scope": {
+          "ownSettings": "{count, plural, one {# own setting} other {# own settings}}",
+          "globalIntro": "Every library follows this rule unless it has its own.",
+          "globalCoverage": "{libraryCount, plural, one {Applies to # library} other {Applies to # libraries}}, {bookCount, plural, one {# book} other {# books}}.",
+          "ownLibraries": "{names} {count, plural, one {has its own rule.} other {have their own rules.}}",
+          "libraryFollows": "{library} follows the global rule. Change anything here to give it its own.",
+          "libraryOwn": "{library} has its own rule for {count, plural, one {# setting} other {# settings}}. Everything else follows the global rule.",
+          "lastRun": "Last run {when}, queued {count, plural, one {# book} other {# books}}.",
+          "neverRun": "Not run yet.",
+          "useGlobalRule": "Use the global rule",
+          "loadFailed": "Auto-fetch settings could not be loaded. Reload the page to try again.",
+          "saved": "Saved {scope}",
+          "saveFailed": "Could not save {scope}. Try again."
+        },
+        "run": {
+          "all": "Run for every library",
+          "library": "Run for {library}",
+          "saveFirst": "Runs use the saved rule. Save first.",
+          "failed": "The run could not be started. Try again."
+        },
+        "onImport": {
+          "label": "Fetch metadata for new books",
+          "hint": "Scans and uploads queue matching books right away. A fetch on import only fills empty fields; locked fields are never changed.",
+          "follow": "Follow global",
+          "on": "On",
+          "off": "Off"
+        },
+        "columns": {
+          "books": "{count, plural, one {book} other {books}}",
+          "ofTotal": "of {total}",
+          "off": "Off",
+          "own": "Own",
+          "global": "Global",
+          "useGlobal": "Use global",
+          "globalValue": "Global rule: {value}",
+          "on": "On",
+          "scoreBelowValue": "Score below {threshold}",
+          "neverFetchedSplit": "{count, plural, one {# never fetched} other {# never fetched}}",
+          "fetchedBeforeSplit": "{count, plural, one {# fetched before} other {# fetched before}}",
+          "lowScoreLabel": "Low confidence score",
+          "lowScoreHint": "Fetch books whose confidence score is under the line.",
+          "outOf": "/ 100",
+          "lowerThreshold": "Lower the threshold",
+          "raiseThreshold": "Raise the threshold",
+          "missingHint": "Fetch if any selected field is empty. Each field shows how many books lack it.",
+          "audioGroup": "Books with audio",
+          "audioHint": "{count, plural, =0 {None here have audio.} one {Only the # book with audio can lack these.} other {Only the # with audio can lack these.}}",
+          "fieldCount": "{field}: {count, plural, one {# book lacks it} other {# books lack it}}"
+        },
+        "histogram": {
+          "label": "Confidence score threshold",
+          "valueText": "Score below {threshold}"
+        },
+        "preview": {
+          "title": "What a run would fetch",
+          "matching": "{matching, plural, one {# of {total} books matches} other {# of {total} books match}}",
+          "showing": "{count, plural, one {showing the least complete} other {showing the # least complete}}",
+          "empty": "No book matches this rule, so a run would queue nothing.",
+          "unknownAuthor": "Unknown author",
+          "score": "Score {score}",
+          "more": "+{count}",
+          "missing": {
+            "title": "No title",
+            "subtitle": "No subtitle",
+            "description": "No description",
+            "cover": "No cover",
+            "audioCover": "No audiobook cover",
+            "authors": "No authors",
+            "publisher": "No publisher",
+            "isbn": "No ISBN",
+            "publishedYear": "No published year",
+            "language": "No language",
+            "pageCount": "No page count",
+            "communityRating": "No community rating",
+            "seriesName": "No series name",
+            "seriesIndex": "No series index",
+            "genres": "No genres",
+            "narrators": "No narrators",
+            "duration": "No duration",
+            "abridged": "Abridged not set"
+          }
+        },
+        "queue": {
+          "progress": "{done} of {total}",
+          "failed": "{count, plural, one {# book could not be fetched} other {# books could not be fetched}}"
         }
       },
       "providers": {
@@ -2173,7 +2399,145 @@
         "selectAll": "Select all",
         "clear": "Clear",
         "noLibraries": "No libraries available yet.",
-        "allLibraries": "All libraries"
+        "allLibraries": "All libraries",
+        "pageFacts": "{fields, plural, one {# field} other {# fields}} · {values, plural, one {# value stored} other {# values stored}}",
+        "newFieldAction": "New field",
+        "views": {
+          "label": "Show active or archived fields",
+          "active": "Active",
+          "archived": "Archived"
+        },
+        "columns": {
+          "order": "Order",
+          "field": "Field",
+          "type": "Type",
+          "libraries": "Libraries",
+          "filled": "Filled",
+          "valuesKept": "Values kept",
+          "archived": "Archived",
+          "actions": "Actions"
+        },
+        "orderHint": "Drag to set the order fields appear in on Edit Metadata, in table columns and in exports.",
+        "archivedHint": "Archived fields are hidden from books, filters and exports. Their values stay stored until the field is deleted.",
+        "coverage": "{filled} of {total}",
+        "coverageAria": "{filled} of {total} books have a value",
+        "onNoLibrary": "No libraries",
+        "onNoLibraryHint": "On no library, so this field appears nowhere",
+        "moreLibraries": "+{count}",
+        "noValues": "None",
+        "rowActions": {
+          "edit": "Edit",
+          "editField": "Edit field",
+          "moveUp": "Move up",
+          "moveDown": "Move down",
+          "archive": "Archive",
+          "restore": "Restore",
+          "deletePermanently": "Delete permanently…",
+          "more": "More actions for {label}"
+        },
+        "toasts": {
+          "loadFailed": "Couldn't load custom fields",
+          "created": "{label} created",
+          "createFailed": "Couldn't create {label}",
+          "saved": "{label} saved",
+          "saveFailed": "Couldn't save {label}",
+          "archived": "{label} archived",
+          "archiveFailed": "Couldn't archive {label}",
+          "restored": "{label} restored",
+          "restoreFailed": "Couldn't restore {label}",
+          "deleted": "{label} deleted",
+          "deleteFailed": "Couldn't delete {label}",
+          "reorderFailed": "Couldn't save the new order"
+        },
+        "empty": {
+          "body": "Track what BookOrbit has no field for, like where a book sits on your shelf or who has borrowed it. Fields appear on Edit Metadata, in table columns and in filters.",
+          "examples": "Start from an example",
+          "shelfNumber": "Shelf Number",
+          "acquiredOn": "Acquired On",
+          "signedCopy": "Signed Copy",
+          "loanedTo": "Loaned To"
+        },
+        "types": {
+          "text": {
+            "label": "Text",
+            "hint": "Any words",
+            "example": "First printing, signed bookplate"
+          },
+          "url": {
+            "label": "Link",
+            "hint": "Opens in a new tab",
+            "example": "https://example.com/book"
+          },
+          "number": {
+            "label": "Number",
+            "hint": "Sorts by value",
+            "example": "42"
+          },
+          "date": {
+            "label": "Date",
+            "hint": "A calendar day",
+            "example": "2024-03-09"
+          },
+          "boolean": {
+            "label": "Yes / No",
+            "hint": "A checkbox",
+            "example": "Yes"
+          }
+        },
+        "sheet": {
+          "newTitle": "New field",
+          "editDescription": "Edit a custom field's label and libraries, and see where it appears.",
+          "newDescription": "Name a new custom field, pick its type and choose its libraries.",
+          "archivedDescription": "An archived custom field. Restore it, or delete it with its values.",
+          "statusFilled": "{filled} of {total, plural, one {# book} other {# books}} filled",
+          "statusNone": "Not on any library",
+          "statusHidden": "{count} hidden",
+          "statusCreated": "created {date}",
+          "labelHint": "Shown on Edit Metadata, in table columns and in filters.",
+          "renameHint": "Renaming keeps every stored value and the file key {key}.",
+          "keyHint": "Saved in files and exports as {key}, which stays the same if you rename the field.",
+          "typeLocked": "Set when created",
+          "typeLockedHint": "The type cannot change later, so stored values always match it.",
+          "libraries": "Libraries",
+          "books": "{count, plural, one {# book} other {# books}}",
+          "filledOfBooks": "{filled} of {total, plural, one {# book} other {# books}}",
+          "hiddenCount": "{count} hidden",
+          "leavingNote": "{count, plural, one {# value in {libraries} stays stored but hidden while the field is off there.} other {# values in {libraries} stay stored but hidden while the field is off there.}} Turning it back on brings them back.",
+          "noLibraryWarning": "With no libraries this field appears nowhere: not on Edit Metadata, in filters or in exports.",
+          "appears": {
+            "title": "Where it appears",
+            "editMetadata": "Edit Metadata",
+            "details": "Details tab",
+            "filters": "Filters",
+            "table": "Table and sort",
+            "tableBody": "Available as a table column and a sort option",
+            "files": "Files",
+            "filesWritten": "Written into EPUB and FB2 files in {libraries}, where writing metadata to files is on.",
+            "filesNotWritten": "Not written into files: none of these libraries write metadata to EPUB or FB2 files.",
+            "exports": "Exports"
+          },
+          "archiveAction": "Archive field",
+          "archiveConfirm": "Archive {label}?",
+          "archiveConsequence": "{count, plural, =0 {It leaves Edit Metadata, filters and exports. Restore it from Archived at any time.} one {It leaves Edit Metadata, filters and exports. # value stays stored until the field is deleted.} other {It leaves Edit Metadata, filters and exports. # values stay stored until the field is deleted.}}",
+          "create": "Create field",
+          "onLibraries": "On {count} of {total} libraries",
+          "onAllLibraries": "On all {total} libraries",
+          "archivedBadge": "Archived",
+          "archivedTitle": "Archived {when}.",
+          "archivedBody": "{count, plural, =0 {This field is hidden from books, filters and exports. It holds no values.} one {This field is hidden from books, filters and exports. # stored value is kept and comes back on restore.} other {This field is hidden from books, filters and exports. # stored values are kept and come back on restore.}}",
+          "facts": {
+            "type": "Type",
+            "libraries": "Libraries",
+            "valuesKept": "Values kept",
+            "fileKey": "File key",
+            "created": "Created",
+            "archived": "Archived"
+          },
+          "deleteQuestion": "Delete {label} for good?",
+          "deleteConsequence": "{count, plural, =0 {It holds no values. This cannot be undone.} one {Its # stored value is removed from every book. Files already written keep their copy. This cannot be undone.} other {Its # stored values are removed from every book. Files already written keep their copy. This cannot be undone.}}",
+          "deleteConfirmLabel": "Type the field name to confirm",
+          "deleteConfirmPlaceholder": "Type {label} to confirm"
+        }
       },
       "tabs": {
         "providers": "Providers",
@@ -2419,7 +2783,25 @@
         "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
         "serverFontsShown": "{count} of {total} shown",
         "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
-        "serverFontVisibilityFailed": "Failed to update server font visibility"
+        "serverFontVisibilityFailed": "Failed to update server font visibility",
+        "library": {
+          "columns": {
+            "use": "In use"
+          },
+          "yourDefault": "Your default",
+          "hiddenBadge": "Hidden",
+          "emptyHint": "Add fonts above, or drop files anywhere on this page.",
+          "dropTitle": "{count, plural, one {Drop to add # file to your fonts} other {Drop to add # files to your fonts}}",
+          "limitReached": "You already have {limit} font files.",
+          "filesUsed": "{count} of your {max} used",
+          "nameHint": "This is the name in your reader’s font list.",
+          "inReaderHint": "Your font list in Reader › Settings, with {name} chosen.",
+          "showInReader": "Show in my reader",
+          "showFamily": "Show {name} in my reader",
+          "removeConsequenceBooks": "{count, plural, one {It is set on # of your books; that book goes back to its own font.} other {It is set on # of your books; they go back to their own fonts.}}",
+          "removeConsequenceDefault": "It is your default font; books without their own setting go back to the book default.",
+          "removeQuestion": "Remove {name} from your fonts?"
+        }
       },
       "bookDock": {
         "title": "Book Dock",
@@ -3831,9 +4213,58 @@
         "serverFonts": "Fonts installed for every reader on this server.",
         "bookDock": "Quick actions shown on book pages.",
         "auditLog": "Who changed what, and when.",
-        "requests": "Sources, download clients, and what happens to a book once it downloads."
+        "requests": "Sources, download clients, and what happens to a book once it downloads.",
+        "readerTts": "Read-aloud voice, speed, and narration defaults.",
+        "adminTts": "Text-to-speech engines available to every reader on this server."
       },
-      "backToApp": "Back to library"
+      "backToApp": "Back to library",
+      "pageDescriptions": {
+        "profile": "Your name, photo, timezone and achievement tracking, plus your password and the sign-in providers linked to this account.",
+        "appearance-theme": "Choose where your appearance settings are saved, then set the style, colour scheme, accent, corners, surface brightness and the pattern behind your library.",
+        "appearance-book-covers": "How covers look across the app: placeholder art for books without one, how covers fit their slots, spine and gloss effects, and the cover tint on book pages.",
+        "appearance-icons": "Upload your own icons to use alongside the built-in set for libraries, smart scopes and collections.",
+        "appearance-layout": "Cover sizes and spacing for the library grid, the cover shown for a collapsed series, and how the author grid is laid out.",
+        "appearance-behavior": "What opening a book from a grid or list does, whether series collapse into one card, and whether Book Requests appear in this account.",
+        "appearance-language": "The language BookOrbit uses for menus, labels and messages, and the regional formats for dates and numbers.",
+        "reader-ebook": "Defaults for the eBook reader: whether new books start with your settings, page flow and columns, theme, and typography such as font, size and spacing.",
+        "reader-pdf": "How PDFs open: page by page or one continuous scroll, which page starts a two-page spread, and the default zoom fit.",
+        "reader-comics": "How comics read: reading mode and direction, single or two-page spreads, fit, wide-page handling, and moving on to the next book in the series.",
+        "reader-audio": "The starting speed and volume for new audiobooks, and how far the skip back and skip forward buttons jump.",
+        "reader-fonts": "Upload your own fonts for the reader, and choose which fonts shared by your server administrator appear in it.",
+        "reader-general": "Where your reader preferences are saved, and the defaults shared by every reading mode.",
+        "tts": "Your default voice and speed when BookOrbit reads a book aloud.",
+        "notifications": "Choose which events notify you, from finished scans and metadata fetches to file renames, imports and Book Dock results.",
+        "privacy": "Decide how much of your reading activity administrators can see, preview your shared profile, and check who has viewed it.",
+        "restrictions": "Content limits set on this account, such as age ratings and hidden content, and what they keep out of your libraries.",
+        "libraries": "Every library at a glance: its folders, what it holds, how it is scanned and when it last ran. Add, edit or rescan libraries here.",
+        "metadata-providers": "Turn metadata sources on or off, add API keys or cookies where a source needs them, and test the credentials against the live service.",
+        "metadata-field-rules": "Choose which providers fill each metadata field and in what order, how values are merged, and how genres and provider IDs are collected.",
+        "metadata-custom-fields": "Create your own metadata fields, choose their type and the libraries that use them, and reorder or archive them.",
+        "metadata-score": "Decide how much each metadata field counts towards the completeness score shown on every book.",
+        "metadata-auto-fetch": "Fetch book metadata automatically when books are imported or are missing details, with overrides for each library.",
+        "metadata-authors": "Fetch author biographies and photos automatically, choose the order sources are tried, and decide which authors qualify.",
+        "metadata-search-cache": "Keep provider answers so repeat searches are fast and still work when a provider is down, and control how long and how much is kept.",
+        "metadata-genre-blocklist": "Genre values listed here are stripped from provider results before metadata is written, so labels like Audiobook stay out of your books.",
+        "metadata-reminders": "Choose which missing fields show up in book reminders. This changes the reminders only, not metadata scores.",
+        "file-naming": "Folder and file name patterns used when BookOrbit renames books on disk, with a preview of the result and what happens when a value is missing.",
+        "maintenance": "Server housekeeping: the upload size limit, past imports, rebuilding recommendations, backfilling achievements and checking for updates.",
+        "kobo": "Connect Kobo e-readers, choose how books, shelves and reading progress sync, and follow each device's recent sync activity.",
+        "koreader": "Sync progress, reading activity and highlights with KOReader, get the sync URL and plugin, and manage the devices that connect.",
+        "opds": "Turn on the OPDS catalog and create accounts so third-party reading apps can browse and download your books.",
+        "email": "Manage the addresses books are sent to, such as Kindle inboxes, star the default one, and group recipients to send to several at once.",
+        "hardcover": "Connect your Hardcover account and choose when reading status, progress and ratings sync, and how synced books appear there.",
+        "readwise": "Connect your Readwise account to send your highlights there automatically.",
+        "storygraph": "Connect your StoryGraph account using your browser session cookies to sync reading progress and status.",
+        "users": "Create and manage accounts, their roles, permissions and library access, and see which accounts need attention.",
+        "account-activity": "See when each account was last active and how it signs in, and open per-user reading and session insights.",
+        "magic-links": "Create shareable links that sign someone in without a password, and revoke them when they are no longer needed.",
+        "oidc": "Connect a single sign-on provider such as Keycloak, map its claims, and decide how new accounts are created.",
+        "requests": "Where BookOrbit searches for requested books, which download clients fetch them, and what happens once a download finishes.",
+        "admin-tts": "The text-to-speech engines readers can use for read-aloud, the voices offered from each, and the order they appear in.",
+        "book-dock": "The Book Dock drop folder, automatic metadata fetching for new files, and the score at which files are finalized on their own.",
+        "server-fonts": "Upload fonts once for every reader on this server. Each reader can still hide any of them.",
+        "audit-log": "A searchable record of who changed what and when, filterable by event, person, affected item and date."
+      }
     },
     "field": {
       "required": "(required)"
@@ -3868,6 +4299,201 @@
       "earned": "Earned ({count})",
       "inProgress": "In Progress ({count})",
       "locked": "Locked ({count})"
+    },
+    "tiersEarnedFact": "{earned} of {total} tiers",
+    "loading": "Loading achievements",
+    "filters": {
+      "label": "Filter achievements",
+      "all": "All",
+      "earned": "Earned",
+      "inProgress": "In progress",
+      "locked": "Locked"
+    },
+    "showcase": {
+      "label": "Highlights",
+      "latest": "Latest unlock",
+      "newToday": "{count, plural, one {# new today} other {# new today}}",
+      "secretRevealed": "Secret revealed",
+      "categoryAndDate": "{category} · {date}",
+      "alsoNew": "Also new",
+      "openMedal": "Open {name}",
+      "emptyTitle": "Your first medal is waiting",
+      "emptyBody": "Finish a book, rate one or highlight a passage, and it lands here.",
+      "collection": "Collection",
+      "shareOfTiers": "{percent} of every tier",
+      "tiersEarned": "{earned} of {total} tiers earned",
+      "closest": "Closest to unlocking",
+      "allInProgress": "All {count}",
+      "tierOfSet": "Tier {tier} of {set}",
+      "nothingCounting": "Nothing is counting toward a medal yet."
+    },
+    "shelf": {
+      "tiers": "{earned} / {total}",
+      "progressLabel": "{category} tiers earned"
+    },
+    "medal": {
+      "label": "{name}, {rarity}, {status}",
+      "tier": "Tier {tier}",
+      "allTiers": "{count, plural, one {The only tier} other {All # tiers}}",
+      "keepReading": "Keep reading",
+      "notStarted": "Not started"
+    },
+    "progress": {
+      "generic": "{current} / {threshold}",
+      "toGo": "{count, plural, one {# to go} other {# to go}}"
+    },
+    "hints": {
+      "howToGetIt": "How to get it",
+      "readingPace": "{count, plural, one {You read # hour in the last {days} days.} other {You read # hours in the last {days} days.}}",
+      "etaDays": "{count, plural, one {About # day at this pace.} other {About # days at this pace.}}",
+      "etaWeeks": "{count, plural, one {About # week at this pace.} other {About # weeks at this pace.}}",
+      "etaMonths": "{count, plural, one {About # month at this pace.} other {About # months at this pace.}}",
+      "decadeUnread": "{count, plural, one {# book from the {decade}s is waiting on your shelves.} other {# books from the {decade}s are waiting on your shelves.}}",
+      "centuryUnread": "{count, plural, one {# book from the {century}s is waiting on your shelves.} other {# books from the {century}s are waiting on your shelves.}}",
+      "stalled": "{title} is {percent} read and was started on {date}.",
+      "stalledNoProgress": "{title} was started on {date}.",
+      "untitledBook": "A book in progress",
+      "nearlyFinished": "{count, plural, one {# book in progress is past {percent}.} other {# books in progress are past {percent}.}}",
+      "unratedFinished": "{count, plural, one {# book you finished has no rating yet.} other {# books you finished have no rating yet.}}",
+      "shortBooks": "{count, plural, one {# book under {pages} pages is waiting on your shelves.} other {# books under {pages} pages are waiting on your shelves.}}",
+      "alreadyStarted": "{count, plural, one {# is already in progress.} other {# are already in progress.}}",
+      "longBooks": "{count, plural, one {# book of {pages} pages or more is waiting on your shelves.} other {# books of {pages} pages or more are waiting on your shelves.}}",
+      "oldBooks": "{count, plural, one {# book published before {year} is waiting on your shelves.} other {# books published before {year} are waiting on your shelves.}}",
+      "authorUnread": "{author}: {finished, plural, one {# finished} other {# finished}}, {count, plural, one {# more on your shelves} other {# more on your shelves}}.",
+      "languageUnread": "{count, plural, one {# book in {language} is waiting on your shelves.} other {# books in {language} are waiting on your shelves.}}",
+      "monthsRead": "{count, plural, one {You have read in # month of {year} so far.} other {You have read in # months of {year} so far.}}",
+      "monthsLeft": "{count, plural, one {{months} is left.} other {{months} are left.}}",
+      "noLongBook": "No book on your shelves has {pages} pages or more yet.",
+      "nothingBeforeYear": "Nothing on your shelves was published before {year}.",
+      "tooFewDecades": "{count, plural, one {Your shelves span only # decade so far.} other {Your shelves span only # decades so far.}}",
+      "tooFewCenturies": "{count, plural, one {Your shelves span only # century so far.} other {Your shelves span only # centuries so far.}}",
+      "missedMonth": "You did not read in {month}, so {year} is out of reach. The count starts again in January.",
+      "continueReading": "Continue reading",
+      "rateFinished": "Rate a finished book",
+      "viewAuthor": "View author",
+      "openBook": "Open {title}",
+      "openUntitledBook": "Open book"
+    },
+    "sets": {
+      "booksFinished": "Books finished",
+      "pagesRead": "Pages read",
+      "hoursRead": "Hours read",
+      "longestBook": "Longest book finished",
+      "librarySize": "Library size",
+      "annotations": "Annotations",
+      "booksRated": "Books rated",
+      "genresFinished": "Genres finished",
+      "languagesFinished": "Languages finished",
+      "readingStreak": "Reading streak"
+    },
+    "units": {
+      "books": {
+        "progress": "{current} / {threshold} books",
+        "toGo": "{count, plural, one {# book to go} other {# books to go}}"
+      },
+      "pages": {
+        "progress": "{current} / {threshold} pages",
+        "toGo": "{count, plural, one {# page to go} other {# pages to go}}"
+      },
+      "hours": {
+        "progress": "{current} / {threshold} hours",
+        "toGo": "{count, plural, one {# hour to go} other {# hours to go}}"
+      },
+      "annotations": {
+        "progress": "{current} / {threshold} annotations",
+        "toGo": "{count, plural, one {# annotation to go} other {# annotations to go}}"
+      },
+      "ratings": {
+        "progress": "{current} / {threshold} ratings",
+        "toGo": "{count, plural, one {# rating to go} other {# ratings to go}}"
+      },
+      "genres": {
+        "progress": "{current} / {threshold} genres",
+        "toGo": "{count, plural, one {# genre to go} other {# genres to go}}"
+      },
+      "languages": {
+        "progress": "{current} / {threshold} languages",
+        "toGo": "{count, plural, one {# language to go} other {# languages to go}}"
+      },
+      "days": {
+        "progress": "{current} / {threshold} days",
+        "toGo": "{count, plural, one {# day to go} other {# days to go}}"
+      }
+    },
+    "moments": {
+      "nthBook": "Book {number} was {title}",
+      "pagesAtUnlock": "{count, plural, one {# page} other {# pages}} when it unlocked",
+      "hoursAtUnlock": "{count, plural, one {# hour} other {# hours}} when it unlocked",
+      "titleWithPages": "{title}, {count, plural, one {# page} other {# pages}}",
+      "booksAtUnlock": "{count, plural, one {# book} other {# books}} in your library when it unlocked",
+      "annotationsAtUnlock": "{count, plural, one {# annotation} other {# annotations}} when it unlocked",
+      "ratingsAtUnlock": "{count, plural, one {# rating} other {# ratings}} when it unlocked",
+      "genresAtUnlock": "{count, plural, one {# genre} other {# genres}} when it unlocked",
+      "languagesAtUnlock": "{count, plural, one {# language} other {# languages}} when it unlocked",
+      "streakAtUnlock": "{count, plural, one {# day} other {# days}} in a row at the time",
+      "longSession": "One session ran {duration}",
+      "durationHours": "{hours} h {minutes} min",
+      "durationMinutes": "{minutes} min",
+      "sessionStartedAt": "A session that started at {time}",
+      "oneDayBook": "{title}, start to finish in one day",
+      "booksInWeek": "{count, plural, one {# book} other {# books}} finished in one week",
+      "booksInMonth": "{count, plural, one {# book} other {# books}} finished in {month}",
+      "booksInYear": "{count, plural, one {# book} other {# books}} finished in {year}",
+      "wholeBookOneSession": "A whole book in one session",
+      "pagesInSession": "{count, plural, one {# page} other {# pages}} in one session",
+      "pagesInDay": "{count, plural, one {# page} other {# pages}} in one day",
+      "slowBurn": "{title}, finished after {count, plural, one {# day} other {# days}}",
+      "formatsOwned": "{count, plural, one {# format} other {# formats}} on your shelves",
+      "annotationsWithNote": "{count, plural, one {# annotation} other {# annotations}} with a note",
+      "annotationsInDay": "{count, plural, one {# annotation} other {# annotations}} in one day",
+      "everyStar": "Every rating from one star to five",
+      "everyColour": "Every highlight colour used",
+      "titlePublished": "{title}, published {year}",
+      "booksInGenre": "{count, plural, one {# book} other {# books}} in one genre",
+      "firstInSeries": "{title}, from the {series} series",
+      "centuries": "Books from {count, plural, one {# century} other {# centuries}}",
+      "booksBySameAuthor": "{count, plural, one {# book} other {# books}} by one author",
+      "decades": "Books from {count, plural, one {# decade} other {# decades}}",
+      "shortBooks": "{count, plural, one {# short book} other {# short books}} finished",
+      "allSeasons": "All four seasons of {year}",
+      "consistentDays": "{count, plural, one {# day} other {# days}} of 30 minutes or more",
+      "weekendsInRow": "{count, plural, one {# weekend} other {# weekends}} in a row",
+      "weekendHours": "{count, plural, one {# hour} other {# hours}} over the weekend of {date}",
+      "categoriesCovered": "{count, plural, one {# category} other {# categories}} with an achievement",
+      "readingSources": "{count, plural, one {# reading source} other {# reading sources}}",
+      "oneBookSources": "One book read from {count, plural, one {# source} other {# sources}}"
+    },
+    "records": {
+      "title": "Record book",
+      "subtitle": "The numbers behind your medals, as they stood when each unlocked",
+      "value": "{value}",
+      "oneSession": "One reading session",
+      "pagesInSession": "Pages in one session",
+      "pagesInDay": "Pages in one day",
+      "booksInWeek": "Books in one week",
+      "booksInMonth": "Books in {month}",
+      "booksInYear": "Books finished in {year}",
+      "annotations": "Annotations",
+      "genresFinished": "Genres finished",
+      "daysInRow": "Days in a row",
+      "booksInLibrary": "Books in your library"
+    },
+    "detail": {
+      "categoryTierSet": "{category} · Tier set",
+      "secretHint": "Keep reading to reveal this one.",
+      "tierOf": "Tier {earned} of {total}",
+      "current": "Current",
+      "noneYet": "None yet",
+      "progress": "Progress",
+      "allTiersEarned": "Every tier earned",
+      "tiers": "Tiers",
+      "earned": "Earned",
+      "status": "Status",
+      "hidden": "Hidden",
+      "rarity": "Rarity",
+      "category": "Category",
+      "theSet": "The set",
+      "theMoment": "The moment"
     }
   },
   "adminFeature": {
@@ -4599,7 +5225,13 @@
       "user": "User",
       "action": "Action",
       "description": "Description",
-      "ip": "IP"
+      "ip": "IP",
+      "time": "Time",
+      "person": "Person",
+      "source": "Source",
+      "open": "Open",
+      "network": "Network",
+      "activity": "Activity"
     },
     "categories": {
       "authentication": "Authentication",
@@ -4609,7 +5241,10 @@
       "collections": "Collections",
       "integrations": "Integrations",
       "settings": "Settings",
-      "other": "Other"
+      "other": "Other",
+      "access": "Sign-in & access",
+      "requests": "Requests",
+      "devices": "Devices & email"
     },
     "resourceLabels": {
       "User": "User",
@@ -4773,10 +5408,178 @@
       "MaintenanceMissingBooksClean": "Cleaned missing books",
       "MaintenanceBrokenCoversClean": "Cleaned broken covers",
       "MaintenanceOrphanedCoversClean": "Cleaned orphaned cover folders"
-    }
+    },
+    "views": {
+      "label": "Show",
+      "changes": "Changes",
+      "signins": "Sign-ins",
+      "security": "Security",
+      "all": "All"
+    },
+    "search": {
+      "label": "Search events",
+      "placeholder": "Search people, targets or IP addresses",
+      "placeholderShort": "Search events"
+    },
+    "range": {
+      "label": "Date range: {range}",
+      "today": "Today",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "all": "Everything kept",
+      "custom": "Custom range",
+      "from": "From",
+      "to": "To",
+      "between": "{from} to {to}",
+      "since": "Since {date}",
+      "until": "Until {date}",
+      "sinceOldest": "Since {date}"
+    },
+    "filterMenu": {
+      "button": "Filters",
+      "category": "Category",
+      "person": "Person",
+      "findPerson": "Find a person",
+      "noPeople": "No matching people",
+      "clear": "Clear",
+      "done": "Done"
+    },
+    "activeFilters": {
+      "target": "{type}: {name}",
+      "clearAll": "Clear all"
+    },
+    "securityGroups": {
+      "label": "Security event type",
+      "all": "Everything",
+      "failed": "Failed sign-ins",
+      "accounts": "Accounts",
+      "passwords": "Passwords",
+      "permissions": "Permissions",
+      "access": "Library access",
+      "links": "Sign-in links"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "changes": "{count, plural, one {# change} other {# changes}}",
+      "events": "{count, plural, one {# event} other {# events}}"
+    },
+    "person": {
+      "system": "System",
+      "deleted": "Deleted account",
+      "automation": "Automation"
+    },
+    "source": {
+      "server": "This server",
+      "local": "Local network",
+      "internet": "Internet",
+      "job": "Background job",
+      "unknown": "Not recorded"
+    },
+    "target": {
+      "none": "No target",
+      "more": "+{count}",
+      "sinceDeleted": "Since deleted",
+      "withId": "{type} #{id}"
+    },
+    "openEvent": "Open details: {event}",
+    "signIns": {
+      "signIns": "{count, plural, one {# sign-in} other {# sign-ins}}",
+      "signOuts": "{count, plural, one {# sign-out} other {# sign-outs}}",
+      "failed": "{count, plural, one {# failed attempt} other {# failed attempts}}",
+      "failedAs": "{count, plural, one {# failed as {names}} other {# failed as {names}}}",
+      "range": "{from} – {to}",
+      "footer": "{count, plural, one {{events} sign-in events, folded into # row by person, day and network} other {{events} sign-in events, folded into # rows by person, day and network}}"
+    },
+    "pager": {
+      "label": "Pages",
+      "previous": "Previous page",
+      "next": "Next page",
+      "page": "Page {page}",
+      "changes": "{from}–{to} of {count, plural, one {# change} other {# changes}}",
+      "events": "{from}–{to} of {count, plural, one {# event} other {# events}}"
+    },
+    "drawer": {
+      "description": "Details of one audit event",
+      "close": "Close",
+      "subtitle": "{category} · {day}, {time}",
+      "when": "When",
+      "person": "Person",
+      "source": "Source",
+      "target": "Target",
+      "usernameTried": "Username tried",
+      "deletedHere": "{type} · deleted by this event",
+      "deletedSince": "{type} · since deleted",
+      "inThisRow": "{count, plural, one {# event in this row} other {# events in this row}}",
+      "around": "Around this event",
+      "aroundHint": "{name}, 40 minutes either side",
+      "aroundEmpty": "Nothing else from {name} within 40 minutes.",
+      "history": "History",
+      "historyCount": "{count, plural, one {# event} other {# events}}",
+      "historyMeta": "{name} · {date}, {time}",
+      "thisEvent": "This event",
+      "raw": "Raw event",
+      "rawEventId": "Event ID",
+      "rawAction": "Action",
+      "rawTarget": "Target type",
+      "rawNote": "Server note",
+      "only": "Only {name}"
+    },
+    "facts": {
+      "format": "Format",
+      "size": "Size",
+      "download": "Download",
+      "dockFile": "Book Dock file",
+      "rejected": "Rejected",
+      "failed": "Failed",
+      "cleaned": "Cleaned",
+      "skipped": "Skipped",
+      "remaining": "Remaining",
+      "sharingLevel": "Sharing level",
+      "sharing": {
+        "private": "Not shared",
+        "summary": "Summary",
+        "detailed": "Detailed"
+      }
+    },
+    "retention": {
+      "button": "{count, plural, one {Kept for # day} other {Kept for # days}}",
+      "title": "Keep events for",
+      "days": "{count, plural, one {# day} other {# days}}",
+      "hint": "Older events are deleted every night at midnight.",
+      "hintWithOldest": "Older events are deleted every night at midnight. The oldest event kept is from {date}.",
+      "readOnly": "Only people who can change app settings can change this.",
+      "saved": "{count, plural, one {Audit events are now kept for # day.} other {Audit events are now kept for # days.}}",
+      "saveFailed": "Could not change how long events are kept."
+    },
+    "export": {
+      "button": "Export",
+      "title": "Export what is shown",
+      "hint": "Uses the current view, filters and date range.",
+      "csv": "CSV",
+      "json": "JSON",
+      "failed": "Could not export the audit log."
+    },
+    "emptyFiltered": "No events match these filters."
   },
   "auth": {
     "backToSignIn": "Back to sign in",
+    "plate": {
+      "exLibris": "Ex Libris"
+    },
+    "endpaper": {
+      "change": "Change endpaper",
+      "options": {
+        "seigaiha": "Waves",
+        "shippo": "Linked circles",
+        "asanoha": "Hemp leaf",
+        "quatrefoil": "Quatrefoil",
+        "ogee": "Ogee",
+        "harlequin": "Harlequin",
+        "greekKey": "Greek key",
+        "plain": "Plain"
+      }
+    },
     "themePicker": {
       "switchToLight": "Switch to light",
       "switchToDark": "Switch to dark",
@@ -4794,7 +5597,10 @@
       "confirmPassword": "Confirm password",
       "confirmNewPassword": "Confirm new password",
       "currentPassword": "Current password",
-      "passwordHint": "Min. 8 characters with uppercase, lowercase, and a digit"
+      "passwordHint": "Min. 8 characters with uppercase, lowercase, and a digit",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "capsLockOn": "Caps Lock is on"
     },
     "errors": {
       "generic": "Something went wrong. Please try again.",
@@ -4806,9 +5612,11 @@
       "signingIn": "Signing in...",
       "orDivider": "or",
       "forgotPassword": "Forgot password?",
+      "resetPasswordAction": "Reset password",
       "noAccount": "Don't have an account?",
       "signUp": "Sign up",
       "registeredNotice": "Account created. Sign in to continue. An administrator needs to grant permissions before you can access the library.",
+      "resetNotice": "Password updated. Sign in with your new password.",
       "errors": {
         "invalidCredentials": "Invalid username or password",
         "tooManyAttempts": "Too many login attempts. Please wait a minute and try again.",
@@ -5085,6 +5893,19 @@
   },
   "book": {
     "untitled": "Untitled",
+    "placeholder": {
+      "volume": "Vol. {number}",
+      "genre": {
+        "horror": "Horror",
+        "romance": "Romance",
+        "fantasy": "Fantasy",
+        "scifi": "Sci-fi",
+        "mystery": "Mystery",
+        "classic": "Classics",
+        "nonfiction": "Non-fiction",
+        "young": "Young readers"
+      }
+    },
     "unknownFormat": "unknown",
     "collapsedSeries": {
       "label": "Series",
@@ -5099,6 +5920,7 @@
       "audiobook": "Audiobook"
     },
     "formats": {
+      "djvu": "DjVu document",
       "epub": "EPUB e-book",
       "kepub": "KEPUB e-book",
       "pdf": "PDF document",
@@ -5474,7 +6296,8 @@
       },
       "header": {
         "previousBook": "Previous book",
-        "nextBook": "Next book"
+        "nextBook": "Next book",
+        "backToLibrary": "Back to {library}"
       },
       "tabs": {
         "details": "Details",
@@ -8212,7 +9035,8 @@
       "updateTooltip": "{version} update available",
       "openUpdateRelease": "Open the {version} release on GitHub",
       "zones": {
-        "browse": "Browse"
+        "browse": "Browse",
+        "reading": "Reading"
       },
       "reorder": {
         "gripAria": "Reorder {name}",
@@ -8305,6 +9129,69 @@
         "list": "List view",
         "table": "Table view"
       }
+    },
+    "browseHeader": {
+      "eyebrow": {
+        "library": "Library",
+        "smartScope": "Smart scope",
+        "collection": "Collection",
+        "browse": "Browse"
+      },
+      "facts": {
+        "books": "{count, plural, one {# book} other {# books}}",
+        "booksOf": "{matching} of {total, plural, one {# book} other {# books}}",
+        "authors": "{count, plural, one {# author} other {# authors}}",
+        "series": "{count, plural, one {# series} other {# series}}",
+        "scanned": "Scanned {time}",
+        "scanningProgress": "Scanning {processed} / {total}",
+        "syncsToKobo": "Syncs to Kobo"
+      },
+      "switcher": {
+        "open": "Switch from {name}",
+        "jumpTo": "Jump to...",
+        "libraries": "Libraries",
+        "smartScopes": "Smart scopes",
+        "collections": "Collections",
+        "empty": "Nothing matches"
+      },
+      "search": {
+        "removeToken": "Remove filter {label}",
+        "clearAll": "Clear search and filters",
+        "save": "Save",
+        "summaryToken": "{count, plural, one {# filter} other {# filters}}"
+      },
+      "tokens": {
+        "anyOf": "Any of {count, plural, one {# rule} other {# rules}}",
+        "allOf": "All of {count, plural, one {# rule} other {# rules}}"
+      },
+      "sort": {
+        "sortBy": "Sort by {field}",
+        "ascending": "Ascending. Switch to descending",
+        "descending": "Descending. Switch to ascending"
+      },
+      "facets": {
+        "format": "Format",
+        "rules": "Rules",
+        "show": "Show",
+        "library": "Library",
+        "status": "Status",
+        "ruleCount": "{count, plural, one {# rule} other {# rules}}"
+      },
+      "menu": {
+        "more": "More for {name}",
+        "editRules": "Edit rules",
+        "deleteSmartScope": "Delete Smart Scope",
+        "deleteCollection": "Delete collection",
+        "confirmDelete": "Delete \"{name}\"? This cannot be undone.",
+        "upload": "Upload books"
+      },
+      "scan": {
+        "scanning": "Scanning",
+        "started": "Scanning {name}",
+        "finished": "Scan of {name} finished"
+      },
+      "viewModes": "View mode",
+      "legend": "Volume colours"
     },
     "iconPicker": {
       "clearSelectionAria": "Clear selected icon",
@@ -9648,6 +10535,68 @@
           "opfHint": "Saved next to the book by Calibre",
           "swap": "Swap the order",
           "hint": "BookOrbit uses the first one a book has and ignores the other. Calibre libraries usually want metadata.opf first."
+        },
+        "regex": {
+          "title": "Configure regex metadata",
+          "sourceTitle": "Regex",
+          "description": "Extract metadata from the primary file path relative to its library folder. The file extension is removed before matching. The first rule with usable fields wins.",
+          "enable": "Enable regex metadata",
+          "primaryFileHint": "For a book made of several files, such as audiobook tracks, the rules read the primary file's path.",
+          "groups": "Named groups:",
+          "valuesHint": "Use author for one author or authors separated by semicolons. Dates use YYYY-MM-DD. Flags: i ignores case, u enables Unicode.",
+          "rules": "Ordered extraction rules",
+          "rule": "Rule {number}",
+          "moveUp": "Move rule up",
+          "moveDown": "Move rule down",
+          "remove": "Remove rule",
+          "basePath": "Library folder",
+          "extensionHint": "The file extension is automatically ignored. The end anchor matches the filename without its extension.",
+          "flags": "Flags",
+          "add": "Add rule",
+          "examplePath": "Example relative file path, including extension",
+          "examplePlaceholder": "Author/Series/08 - My.Book.epub",
+          "exampleTitle": "Example with an author backreference",
+          "exampleTestPath": "Test path (including extension)",
+          "validating": "Checking rules…",
+          "validationSuccess": "Rule syntax and groups are valid. Use the preview to check matches for a file path.",
+          "validationError": "Could not validate the rules. Try again before applying them.",
+          "validationRetry": "Check again",
+          "validationRuleCount": "Add between {min} and {max} rules.",
+          "preview": "Preview",
+          "previewing": "Testing rules…",
+          "previewError": "Could not preview the rules. Check the relative path and configuration, then try again.",
+          "actualInput": "Path tested:",
+          "matched": "Matched rule {number}",
+          "noMatch": "No usable match. File metadata will be used.",
+          "scanHint": "Changes apply to future metadata extraction for new or changed files. Saving does not start a scan or update unchanged books.",
+          "apply": "Apply to library form",
+          "configure": "Configure",
+          "enabledHint": "Extract fields from relative paths without file extensions.",
+          "disabledHint": "Disabled. Configure rules to enable.",
+          "moveSourceUp": "Move {source} up",
+          "moveSourceDown": "Move {source} down",
+          "diagnostics": {
+            "pattern_required": "Enter a regular expression.",
+            "pattern_too_long": "The expression must not exceed {count} characters.",
+            "invalid_flags": "Only i and u are allowed, each at most once.",
+            "invalid_pattern": "Invalid regular expression.",
+            "missing_group": "Include at least one supported named group.",
+            "conflicting_authors": "Use either author or authors, not both.",
+            "invalid_value": "An invalid field value was skipped.",
+            "timeout": "The expression took too long. Simplify the pattern.",
+            "busy": "All preview workers are busy. Try again shortly.",
+            "worker_failed": "The expression could not be evaluated. Try again."
+          },
+          "precedenceHint": "The first available file source supplies metadata. Regex fields follow this order and missing values are filled from the other source.",
+          "summary": "{format} first, regex metadata preferred",
+          "fields": {
+            "title": "Title",
+            "authors": "Authors",
+            "series": "Series",
+            "seriesIndex": "Series number",
+            "publishedYear": "Published year",
+            "publishedDate": "Published date"
+          }
         }
       },
       "fileWrite": {
@@ -9799,6 +10748,7 @@
         "add": "Add",
         "emptyCreate": "Nobody else yet. People you add here get access as soon as the library exists.",
         "superusers": "Superusers always have full access.",
+        "levelsHint": "Viewers can browse and read. Editors and owners can also edit metadata when their account has the Edit metadata permission.",
         "levelFor": "Access level for {name}",
         "revokeFor": "Remove access for {name}",
         "revokeQuestion": "Remove access?",
@@ -10471,6 +11421,22 @@
     }
   },
   "reader": {
+    "pageImages": {
+      "loadFailed": "Could not open this document. Check your access or try again.",
+      "pageFailed": "This page could not be loaded. Retry when the server is available.",
+      "pageAlt": "Page {page}",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "goToPage": "Go to page",
+      "pin": "Pin reader menu",
+      "unpin": "Unpin reader menu"
+    },
+    "djvu": {
+      "pageText": "Embedded page text",
+      "textDescription": "Text stored in the DjVu document. OCR may contain mistakes.",
+      "noText": "This page has no embedded text.",
+      "textFailed": "Could not load this page's embedded text."
+    },
     "retry": "Retry",
     "pdf": {
       "openError": "Unable to open this PDF",
@@ -13034,5 +14000,56 @@
       "koreaderSaveFailed": "Could not save the KOReader EPUB delivery setting. Try again.",
       "koreaderSaved": "KOReader EPUB delivery setting saved."
     }
+  },
+  "commandPalette": {
+    "title": "Search",
+    "description": "Search books, authors, series and settings, jump to a place, or run an action.",
+    "placeholder": "Search books, authors, series, or go to…",
+    "close": "Close search",
+    "clear": "Clear search",
+    "tabs": {
+      "all": "All",
+      "books": "Books",
+      "authors": "Authors",
+      "series": "Series",
+      "settings": "Settings"
+    },
+    "sections": {
+      "continueReading": "Continue Reading",
+      "goTo": "Go to",
+      "actions": "Actions",
+      "books": "Books",
+      "authors": "Authors",
+      "series": "Series",
+      "settings": "Settings"
+    },
+    "kinds": {
+      "author": "Author",
+      "series": "Series",
+      "library": "Library",
+      "smartScope": "Smart scope",
+      "collection": "Collection",
+      "page": "Page",
+      "setting": "Setting"
+    },
+    "showAllBooks": "{count, plural, one {Show # book} other {Show all # books}}",
+    "showAllAuthors": "{count, plural, one {Show # author} other {Show all # authors}}",
+    "showAllSeries": "{count, plural, one {Show # series} other {Show all # series}}",
+    "showAllSettings": "{count, plural, one {Show # setting} other {Show all # settings}}",
+    "actions": {
+      "lightTheme": "Switch to light theme",
+      "darkTheme": "Switch to dark theme"
+    },
+    "hints": {
+      "navigate": "Navigate",
+      "open": "Open",
+      "filter": "Filter",
+      "close": "Close"
+    },
+    "keys": {
+      "escape": "esc",
+      "tab": "tab"
+    },
+    "resultCount": "{count, plural, =0 {No results} one {# result} other {# results}}"
   }
 }

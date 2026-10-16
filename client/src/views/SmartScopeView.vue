@@ -3,32 +3,30 @@ import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
-import {
-  AlertTriangle,
-  Settings2,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  ArrowUpDown,
-  Aperture,
-  CheckSquare,
-  FileSpreadsheet,
-  Filter,
-  Layers,
-  Search,
-  SlidersHorizontal,
-  Square,
-  Tablet,
-  X,
-} from '@lucide/vue'
+import { AlertTriangle, FileSpreadsheet, Settings2, Tablet, Trash2 } from '@lucide/vue'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import VirtualBookTable from '@/features/book/components/VirtualBookTable.vue'
 import TableColumnPanel from '@/features/book/components/TableColumnPanel.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
-import ViewHeader from '@/components/ViewHeader.vue'
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import BrowseHeader from '@/components/browse-header/BrowseHeader.vue'
+import BrowseSearchField from '@/components/browse-header/BrowseSearchField.vue'
+import BrowseSortControl from '@/components/browse-header/BrowseSortControl.vue'
+import BrowseFilterControl from '@/components/browse-header/BrowseFilterControl.vue'
+import BrowseInlineGroup from '@/components/browse-header/BrowseInlineGroup.vue'
+import BrowseRuleChips from '@/components/browse-header/BrowseRuleChips.vue'
+import BrowseViewControls from '@/components/browse-header/BrowseViewControls.vue'
+import BrowsePageMenu from '@/components/browse-header/BrowsePageMenu.vue'
+import { barDivider, outlineButton } from '@/components/browse-header/browse-header'
+import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
+import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
+import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
+import { useFilterTokens } from '@/features/book/composables/useFilterTokens'
+import { useViewSort } from '@/features/book/composables/useViewSort'
+import { DEFAULT_SORT } from '@/features/book/lib/sort-defaults'
+import { cn } from '@/lib/utils'
 import SmartScopeEditorPanel from '@/features/smart-scope/components/SmartScopeEditorPanel.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
@@ -49,7 +47,6 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
-import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { sortFieldLabel } from '@/features/book/lib/filter-labels'
 import BookShuffleButton from '@/features/book/components/BookShuffleButton.vue'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -63,7 +60,7 @@ import { useSavedViews, type SavedView } from '@/features/book/composables/useSa
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
-import type { BookCard, GroupRule, SortField } from '@bookorbit/types'
+import type { BookCard, GroupRule, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const { t } = useI18n()
@@ -71,7 +68,7 @@ const route = useRoute()
 const router = useRouter()
 const { viewMode, effectiveViewMode } = useEffectiveViewMode()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
-const { smartScopeFilterExpanded, tableDensity, showJumpRails } = useDisplaySettings()
+const { tableDensity, showJumpRails } = useDisplaySettings()
 
 const smartScopeId = shallowRef(Number(route.params.id))
 const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
@@ -101,6 +98,7 @@ const {
   loading,
   initialized: booksInitialized,
   error: booksError,
+  filter,
   sort: tableSort,
   randomSortActive,
   reshuffle,
@@ -148,14 +146,35 @@ const pageTitle = computed(() => {
 })
 usePageTitle(pageTitle)
 
-const sortChip = computed(() => {
-  const specs = smartScope.value?.defaultSort
-  if (!specs?.length) return null
-  return specs.map((s) => `${sortFieldLabel(s.field as SortField)} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', ')
-})
+const scopeDefaultSort = computed<SortSpec[]>(() => (smartScope.value?.defaultSort?.length ? [...smartScope.value.defaultSort] : DEFAULT_SORT))
+const { sortModel: tableSortModel, isDefaultSort, resetSort, loadSort } = useViewSort(tableSort, 'smartScope', smartScopeId, scopeDefaultSort)
+const sortLabel = computed(() => (tableSort.value[0] ? sortFieldLabel(tableSort.value[0].field) : ''))
+const sortDirection = computed<'asc' | 'desc'>(() => tableSort.value[0]?.dir ?? 'asc')
 
-const filterExpanded = smartScopeFilterExpanded
-const mobileControlsExpanded = ref(false)
+function toggleSortDirection() {
+  const [first, ...rest] = tableSort.value
+  if (!first) return
+  tableSortModel.value = [{ ...first, dir: first.dir === 'asc' ? 'desc' : 'asc' }, ...rest]
+}
+
+const scopeRules = computed(() => (smartScope.value?.filter as GroupRule | null | undefined) ?? null)
+const filterOpen = ref(false)
+const { tokens: filterTokens, ruleCount: filterRuleCount, removeToken: removeFilterToken } = useFilterTokens(filter, { formatFacet: false })
+const isNarrowed = computed(() => filterRuleCount.value > 0 || debouncedQuery.value.trim().length > 0)
+const canExport = computed(() => hasPermission('library_download') && !isDemoRestrictedAccount.value)
+
+function clearFilters() {
+  filter.value = undefined
+}
+
+function handleClearAll() {
+  clearFilters()
+  clearSearch()
+}
+
+function openFilterPanel() {
+  filterOpen.value = true
+}
 
 function handleSaveCurrentView(name: string) {
   if (!tableRef.value) return
@@ -224,6 +243,7 @@ const {
   handleImportPresetBackup,
   selectedIds,
   selectedCount,
+  canEditSelectionMetadata,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -233,7 +253,7 @@ const {
   toggleSelectionMode,
   deleteBookId,
   deletingBook,
-  cancelDelete,
+  cancelDelete: cancelBookDelete,
   confirmDelete,
   inFlight,
   handleBulkRefreshMetadata,
@@ -309,7 +329,7 @@ watch(
   smartScope,
   async (scope) => {
     scopeQueryReady.value = false
-    tableSort.value = scope?.defaultSort?.length ? [...scope.defaultSort] : [{ field: 'title', dir: 'asc' }]
+    loadSort()
     if (!scope) return
     await nextTick()
     if (smartScope.value?.id === scope.id) scopeQueryReady.value = true
@@ -318,7 +338,7 @@ watch(
 )
 
 const editorOpen = ref(false)
-const confirmSmartScopeDelete = ref(false)
+const confirmDeleteOpen = ref(false)
 const deleting = ref(false)
 
 const {
@@ -338,14 +358,43 @@ async function handleToggleKoboSync() {
   } catch {
     toast.error(t('views.smartScope.toast.koboSyncFailed', { name }))
   }
-  collapseMobileControlsIfNeeded()
+}
+
+const hasPageMenu = computed(() => isSmartScopeOwner.value || canExport.value || canToggleKoboSync.value)
+
+interface HeaderFact {
+  key: string
+  text: string
+}
+
+const headerFacts = computed<HeaderFact[]>(() => {
+  const facts: HeaderFact[] = []
+  const scopeTotal = smartScope.value?.bookCount ?? null
+  if (typeof scopeTotal === 'number') {
+    if (isNarrowed.value && !effectiveCollapseEnabled.value && booksInitialized.value) {
+      facts.push({ key: 'count', text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(total.value), total: scopeTotal }) })
+    } else {
+      facts.push({ key: 'count', text: t('components.browseHeader.facts.books', { count: scopeTotal }) })
+    }
+  }
+  if (koboSyncEnabled.value) facts.push({ key: 'kobo', text: t('components.browseHeader.facts.syncsToKobo') })
+  return facts
+})
+
+const foldedCount = computed(() => {
+  const count = smartScope.value?.bookCount
+  return typeof count === 'number' ? formatNumber(count) : undefined
+})
+
+function requestDelete() {
+  confirmDeleteOpen.value = true
+}
+
+function cancelDelete() {
+  confirmDeleteOpen.value = false
 }
 
 async function handleDelete() {
-  if (!confirmSmartScopeDelete.value) {
-    confirmSmartScopeDelete.value = true
-    return
-  }
   deleting.value = true
   const name = smartScope.value?.name ?? t('views.smartScope.defaultName')
   try {
@@ -356,55 +405,33 @@ async function handleDelete() {
     toast.error(t('views.smartScope.toast.deleteFailed', { name }))
   } finally {
     deleting.value = false
-    confirmSmartScopeDelete.value = false
+    confirmDeleteOpen.value = false
   }
-}
-
-function isMobileViewport() {
-  return typeof window !== 'undefined' && window.innerWidth < 640
-}
-
-function closeMobileControls() {
-  mobileControlsExpanded.value = false
-  confirmSmartScopeDelete.value = false
-}
-
-function collapseMobileControlsIfNeeded() {
-  if (!mobileControlsExpanded.value) return
-  if (!isMobileViewport()) return
-  closeMobileControls()
-}
-
-function toggleMobileControls() {
-  mobileControlsExpanded.value = !mobileControlsExpanded.value
-}
-
-function toggleFilterSummary() {
-  filterExpanded.value = !filterExpanded.value
-  collapseMobileControlsIfNeeded()
 }
 
 function openEditor() {
   if (!isSmartScopeOwner.value) return
   editorOpen.value = true
-  confirmSmartScopeDelete.value = false
-  collapseMobileControlsIfNeeded()
 }
 
 function openMetadataExport() {
   metadataExportOpen.value = true
-  collapseMobileControlsIfNeeded()
 }
 
-const collapseToggleLabel = computed(() => (effectiveCollapseEnabled.value ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')))
-const collapseToggleHint = computed(() => (selectionMode.value ? t('views.bookView.collapseLockedWhileSelecting') : collapseToggleLabel.value))
-const collapseMenuLabel = computed(() =>
-  selectionMode.value ? t('views.bookView.collapseLockedWhileSelecting') : t('views.bookView.collapseSeries'),
-)
+function handleCoverSizeUpdate(value: number) {
+  coverSize.value = value
+}
 
-async function handleToggleCollapse() {
+function handleGridGapUpdate(value: number) {
+  gridGap.value = value
+}
+
+function handleShowJumpRailsUpdate(value: boolean) {
+  showJumpRails.value = value
+}
+
+async function handleCollapseSeriesUpdate(next: boolean) {
   if (selectionMode.value) return
-  const next = !collapseEnabledRef.value
   collapseEnabledRef.value = next
   await setPreference({ smartScopeId: smartScopeId.value }, next)
 }
@@ -457,6 +484,7 @@ async function retrySmartScopeLoad() {
 
 watch(smartScopeId, async () => {
   clearSearch()
+  filter.value = undefined
   await retrySmartScopeLoad()
 })
 
@@ -475,6 +503,7 @@ defineOptions({ name: 'SmartScopeView' })
     />
 
     <SelectionActionBar
+      :metadata-editable="canEditSelectionMetadata"
       :visible="selectionMode"
       :count="selectedCount"
       :in-flight="inFlight"
@@ -537,253 +566,172 @@ defineOptions({ name: 'SmartScopeView' })
       @sent="exitSelectionMode"
     />
 
-    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelBookDelete" />
+
+    <ConfirmDialog
+      :open="confirmDeleteOpen"
+      :title="t('components.browseHeader.menu.deleteSmartScope')"
+      :description="t('components.browseHeader.menu.confirmDelete', { name: smartScope?.name ?? t('views.smartScope.defaultName') })"
+      :confirm-label="t('common.delete')"
+      :busy="deleting"
+      @confirm="handleDelete"
+      @cancel="cancelDelete"
+    />
 
     <section class="flex flex-1 flex-col min-h-0">
-      <ViewHeader
+      <BrowseHeader
+        :eyebrow="t('components.browseHeader.eyebrow.smartScope')"
         :title="smartScope?.name ?? t('views.smartScope.title')"
         :icon="smartScope?.icon ?? undefined"
         fallback-icon="Aperture"
-        :total="total"
-        v-model:coverSize="coverSize"
-        v-model:gridGap="gridGap"
-        :show-jump-rail-toggle="true"
-        v-model:showJumpRails="showJumpRails"
-        v-model:viewMode="viewMode"
-        :selection-mode="selectionMode"
-        :searchable="true"
-        :mobile-search-in-menu="false"
-        v-model:searchQuery="searchQuery"
-        @toggle-selection="toggleSelectionMode"
+        :folded-count="foldedCount"
+        :switcher="Number.isFinite(smartScopeId) ? { kind: 'smartScope', id: smartScopeId } : null"
+        :scroll-container="mainRef"
       >
-        <template #toolbar>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                v-if="smartScope?.filter || sortChip"
-                class="hidden sm:flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
-                :class="
-                  filterExpanded
-                    ? 'border-primary text-primary bg-primary/10'
-                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                "
-                :aria-label="filterExpanded ? 'Hide filter summary' : 'Show filter summary'"
-                @click="toggleFilterSummary"
-              >
-                <Filter :size="13" />
-                <span>{{ t('views.smartScope.filter') }}</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ filterExpanded ? 'Hide filter summary' : 'Show filter summary' }}</TooltipContent>
-          </Tooltip>
+        <template #facts>
+          <template v-for="(fact, index) in headerFacts" :key="fact.key">
+            <span v-if="index > 0" class="size-[3px] shrink-0 rounded-full bg-muted-foreground" aria-hidden="true" />
+            <span class="inline-flex min-w-0 items-center gap-1.5 truncate" :class="fact.key === 'count' ? 'shrink-0' : ''">
+              <Tablet v-if="fact.key === 'kobo'" :size="13" class="shrink-0" aria-hidden="true" />
+              {{ fact.text }}
+            </span>
+          </template>
+        </template>
+
+        <template #actions>
+          <button v-if="isSmartScopeOwner" type="button" :class="cn(outlineButton, 'hidden md:inline-flex')" @click="openEditor">
+            <Settings2 :size="14" class="text-muted-foreground" aria-hidden="true" />
+            {{ t('components.browseHeader.menu.editRules') }}
+          </button>
+          <BrowsePageMenu v-if="hasPageMenu" :name="smartScope?.name ?? t('views.smartScope.title')">
+            <DropdownMenuItem v-if="isSmartScopeOwner" class="md:hidden" @click="openEditor">
+              <Settings2 :size="14" class="mr-2" />
+              {{ t('components.browseHeader.menu.editRules') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="canExport" @click="openMetadataExport">
+              <FileSpreadsheet :size="14" class="mr-2" />
+              {{ t('views.bookView.exportMetadata') }}
+            </DropdownMenuItem>
+            <DropdownMenuCheckboxItem
+              v-if="canToggleKoboSync"
+              :model-value="koboSyncEnabled"
+              :disabled="koboSyncPending"
+              @update:model-value="handleToggleKoboSync"
+            >
+              {{ t('views.smartScope.koboSync.label') }}
+            </DropdownMenuCheckboxItem>
+            <template v-if="isSmartScopeOwner">
+              <DropdownMenuSeparator />
+              <DropdownMenuItem class="text-destructive focus:text-destructive" @click="requestDelete">
+                <Trash2 :size="14" class="mr-2" />
+                {{ t('components.browseHeader.menu.deleteSmartScope') }}
+              </DropdownMenuItem>
+            </template>
+          </BrowsePageMenu>
+        </template>
+
+        <template #bar>
+          <BrowseSearchField
+            v-model="searchQuery"
+            :placeholder="t('views.bookView.searchPlaceholder')"
+            :tokens="filterTokens"
+            :active="isNarrowed"
+            @remove-token="removeFilterToken"
+            @clear="handleClearAll"
+            @open-filters="openFilterPanel"
+          />
+          <span :class="barDivider" aria-hidden="true" />
+          <BrowseSortControl
+            v-if="effectiveViewMode !== 'table'"
+            :label="sortLabel"
+            :direction="sortDirection"
+            :changed="!isDefaultSort"
+            @toggle-direction="toggleSortDirection"
+          >
+            <BookSortBuilder v-model="tableSortModel" />
+            <button
+              v-if="!isDefaultSort"
+              type="button"
+              class="mt-3 w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              @click="resetSort"
+            >
+              {{ t('views.bookView.resetSort') }}
+            </button>
+          </BrowseSortControl>
           <BookShuffleButton v-if="randomSortActive" desktop-only compact @shuffle="reshuffle" />
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-                :class="
-                  effectiveCollapseEnabled
-                    ? 'border-primary text-primary bg-primary/10'
-                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                "
-                :aria-label="collapseToggleLabel"
-                :aria-disabled="selectionMode || undefined"
-                @click="handleToggleCollapse"
-              >
-                <Layers :size="14" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {{ collapseToggleHint }}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
-                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
-                :aria-label="t('views.bookView.exportMetadata')"
-                @click="openMetadataExport"
-              >
-                <FileSpreadsheet :size="14" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('views.bookView.exportMetadata') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="canToggleKoboSync">
-            <TooltipTrigger as-child>
+          <BrowseFilterControl v-model:open="filterOpen" :count="filterRuleCount">
+            <BookFilterBuilder v-model="filter" :max-depth="4" />
+            <template v-if="filterRuleCount > 0" #footer>
+              <span class="flex-1" />
               <button
                 type="button"
-                role="switch"
-                :aria-checked="koboSyncEnabled"
-                :disabled="koboSyncPending"
-                class="hidden sm:flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors disabled:opacity-60"
-                :class="
-                  koboSyncEnabled
-                    ? 'border-primary text-primary hover:bg-primary/10'
-                    : 'border-input text-muted-foreground hover:bg-muted hover:text-foreground'
-                "
-                @click="handleToggleKoboSync"
+                class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive"
+                @click="clearFilters"
               >
-                <Tablet :size="13" />
-                <span>{{ t('views.smartScope.koboSync.label') }}</span>
+                {{ t('views.bookView.clearAllFilters') }}
               </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {{ koboSyncEnabled ? t('views.smartScope.koboSync.enabledHint') : t('views.smartScope.koboSync.disabledHint') }}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="isSmartScopeOwner">
-            <TooltipTrigger as-child>
-              <button
-                class="hidden sm:flex h-8 items-center gap-1.5 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                :aria-label="t('views.smartScope.edit')"
-                @click="openEditor"
+            </template>
+          </BrowseFilterControl>
+          <template v-if="scopeRules">
+            <span :class="barDivider" aria-hidden="true" />
+            <BrowseInlineGroup :label="t('components.browseHeader.facets.rules')" :value="formatNumber(scopeRules.rules.length)" hide-on-phone>
+              <BrowseRuleChips :rules="scopeRules" :editable="isSmartScopeOwner" @edit="openEditor" />
+            </BrowseInlineGroup>
+          </template>
+          <span :class="barDivider" aria-hidden="true" />
+          <BrowseViewControls
+            v-model:view-mode="viewMode"
+            :selection-mode="selectionMode"
+            :display-wide="effectiveViewMode === 'table'"
+            @toggle-selection="toggleSelectionMode"
+          >
+            <template #display>
+              <ViewHeaderDisplayControls
+                :view-mode="effectiveViewMode"
+                :cover-size="coverSize"
+                :grid-gap="gridGap"
+                show-jump-rail-toggle
+                :show-jump-rails="showJumpRails"
+                show-collapse-series
+                :collapse-series="effectiveCollapseEnabled"
+                :collapse-series-locked="selectionMode"
+                @update:cover-size="handleCoverSizeUpdate"
+                @update:grid-gap="handleGridGapUpdate"
+                @update:show-jump-rails="handleShowJumpRailsUpdate"
+                @update:collapse-series="handleCollapseSeriesUpdate"
               >
-                <Settings2 :size="13" />
-                <span>{{ t('common.edit') }}</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('views.smartScope.edit') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="isSmartScopeOwner">
-            <TooltipTrigger as-child>
-              <button
-                :disabled="deleting"
-                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
-                :class="
-                  confirmSmartScopeDelete
-                    ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
-                    : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
-                "
-                :aria-label="confirmSmartScopeDelete ? 'Confirm delete Smart Scope' : 'Delete Smart Scope'"
-                @click="handleDelete"
-              >
-                <Trash2 :size="14" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ confirmSmartScopeDelete ? 'Confirm delete' : 'Delete Smart Scope' }}</TooltipContent>
-          </Tooltip>
-          <button
-            class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            :aria-label="t('views.smartScope.showControlsAria')"
-            @click="toggleMobileControls"
-          >
-            <SlidersHorizontal :size="14" />
-          </button>
+                <template #columns>
+                  <TableColumnPanel
+                    v-if="tableRef"
+                    :all-columns="tableRef.allColumns"
+                    :all-presets="tableRef.allPresets"
+                    :saved-views="allSavedViews"
+                    :table-density="tableDensity"
+                    @toggle-column="handleToggleColumn"
+                    @reorder-columns="handleColumnPanelReorder"
+                    @apply-preset="handleApplyTablePreset"
+                    @save-preset="handleSaveTablePreset"
+                    @delete-preset="handleDeleteTablePreset"
+                    @rename-preset="handleRenameTablePreset"
+                    @duplicate-preset="handleDuplicateTablePreset"
+                    @favorite-preset="handleTogglePresetFavorite"
+                    @apply-view="handleApplySavedView"
+                    @save-view="handleSaveCurrentView"
+                    @delete-view="deleteView"
+                    @rename-view="renameView"
+                    @duplicate-view="duplicateView"
+                    @favorite-view="toggleFavorite"
+                    @update:density="handleTableDensityChange"
+                    @export-backup="handleExportTableBackup"
+                    @import-backup="handleImportTableBackup"
+                    @reset="handleResetColumns"
+                  />
+                </template>
+              </ViewHeaderDisplayControls>
+            </template>
+          </BrowseViewControls>
         </template>
-        <template #mobile-menu>
-          <DropdownMenuItem :disabled="selectionMode" @click="handleToggleCollapse">
-            <CheckSquare v-if="effectiveCollapseEnabled" :size="14" class="mr-2" />
-            <Square v-else :size="14" class="mr-2" />
-            {{ collapseMenuLabel }}
-          </DropdownMenuItem>
-        </template>
-        <template v-if="effectiveViewMode === 'table'" #columns>
-          <TableColumnPanel
-            v-if="tableRef"
-            :all-columns="tableRef.allColumns"
-            :all-presets="tableRef.allPresets"
-            :saved-views="allSavedViews"
-            :table-density="tableDensity"
-            @toggle-column="handleToggleColumn"
-            @reorder-columns="handleColumnPanelReorder"
-            @apply-preset="handleApplyTablePreset"
-            @save-preset="handleSaveTablePreset"
-            @delete-preset="handleDeleteTablePreset"
-            @rename-preset="handleRenameTablePreset"
-            @duplicate-preset="handleDuplicateTablePreset"
-            @favorite-preset="handleTogglePresetFavorite"
-            @apply-view="handleApplySavedView"
-            @save-view="handleSaveCurrentView"
-            @delete-view="deleteView"
-            @rename-view="renameView"
-            @duplicate-view="duplicateView"
-            @favorite-view="toggleFavorite"
-            @update:density="handleTableDensityChange"
-            @export-backup="handleExportTableBackup"
-            @import-backup="handleImportTableBackup"
-            @reset="handleResetColumns"
-          />
-        </template>
-      </ViewHeader>
-
-      <section v-if="mobileControlsExpanded" class="mb-3 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
-        <div class="mb-2 flex h-9 items-center rounded-md border border-input bg-background px-2.5">
-          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground" />
-          <input
-            v-model="searchQuery"
-            type="search"
-            :placeholder="t('views.bookView.searchPlaceholder')"
-            class="mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          />
-          <button v-if="searchQuery.trim()" class="ml-1 text-muted-foreground transition-colors hover:text-foreground" @click="clearSearch">
-            <X :size="12" />
-          </button>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            v-if="smartScope?.filter || sortChip"
-            @click="toggleFilterSummary"
-            class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
-            <span>{{ filterExpanded ? 'Hide filter' : 'Show filter' }}</span>
-          </button>
-          <BookShuffleButton v-if="randomSortActive" @shuffle="reshuffle" />
-          <button
-            v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
-            @click="openMetadataExport"
-            class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <FileSpreadsheet :size="13" />
-            <span>{{ t('views.bookView.export') }}</span>
-          </button>
-          <button
-            v-if="canToggleKoboSync"
-            type="button"
-            role="switch"
-            :aria-checked="koboSyncEnabled"
-            :disabled="koboSyncPending"
-            class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors disabled:opacity-60"
-            :class="koboSyncEnabled ? 'border-primary text-primary' : 'border-input text-muted-foreground hover:bg-muted hover:text-foreground'"
-            @click="handleToggleKoboSync"
-          >
-            <Tablet :size="13" />
-            <span>{{ t('views.smartScope.koboSync.label') }}</span>
-          </button>
-          <button
-            v-if="isSmartScopeOwner"
-            @click="openEditor"
-            class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Settings2 :size="13" />
-            <span>{{ t('common.edit') }}</span>
-          </button>
-          <button
-            v-if="isSmartScopeOwner"
-            @click="handleDelete"
-            :disabled="deleting"
-            class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
-            :class="
-              confirmSmartScopeDelete
-                ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
-                : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
-            "
-          >
-            <Trash2 :size="13" />
-            <span>{{ confirmSmartScopeDelete ? t('views.smartScope.confirmDelete') : t('common.delete') }}</span>
-          </button>
-          <button
-            class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            @click="closeMobileControls"
-          >
-            <X :size="13" />
-            <span>{{ t('common.close') }}</span>
-          </button>
-        </div>
-      </section>
+      </BrowseHeader>
 
       <main ref="mainRef" :class="effectiveViewMode === 'table' ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto'">
         <div v-if="smartScopeLoadError" class="flex flex-col items-center justify-center gap-3 py-24 text-center">
@@ -803,23 +751,6 @@ defineOptions({ name: 'SmartScopeView' })
         <EntityNotFound v-else-if="smartScopeNotFound" :entity="t('views.entity.smartScope')" />
 
         <template v-else>
-          <!-- Filter summary -->
-          <div
-            v-if="filterExpanded && (smartScope?.filter || sortChip)"
-            class="flex flex-wrap items-center gap-2 mb-4"
-            :class="isSmartScopeOwner ? 'cursor-pointer' : ''"
-            @click="openEditor"
-          >
-            <FilterSummary v-if="smartScope?.filter" :node="smartScope.filter as GroupRule" />
-            <span v-if="sortChip" class="inline-flex items-center text-xs rounded-md border border-border/60 overflow-hidden">
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border-r border-border/60">
-                <ArrowUpDown :size="10" class="shrink-0" />
-                <span class="font-semibold">{{ t('views.bookView.sort') }}</span>
-              </span>
-              <span class="px-2 py-0.5 bg-muted/40 text-foreground font-medium">{{ sortChip }}</span>
-            </span>
-          </div>
-
           <!-- Empty state: no rules configured -->
           <div
             v-if="booksInitialized && !loading && !smartScope?.filter && books.length === 0"

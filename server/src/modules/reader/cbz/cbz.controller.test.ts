@@ -24,21 +24,45 @@ describe('CbzController', () => {
     expect(cbzService.getPageCount).toHaveBeenCalledWith(12, user);
   });
 
-  it('sets response headers and streams page bytes', async () => {
+  it('asks clients to revalidate pages and streams page bytes', async () => {
     const user = { id: 7, isSuperuser: false, permissions: [] } as any;
     const stream = new PassThrough();
     const reply = {
       header: vi.fn(),
       type: vi.fn(),
+      status: vi.fn(),
       send: vi.fn(),
     };
-    cbzService.streamPage.mockResolvedValue({ stream, mimeType: 'image/png' });
+    cbzService.streamPage.mockResolvedValue({ notModified: false, etag: '"page-tag"', stream, mimeType: 'image/png' });
 
     await controller.getPage(12, 3, user, reply as any);
 
-    expect(cbzService.streamPage).toHaveBeenCalledWith(12, 3, user);
-    expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'public, max-age=31536000, immutable');
+    expect(cbzService.streamPage).toHaveBeenCalledWith(12, 3, user, undefined);
+    expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'private, no-cache');
+    expect(reply.header).toHaveBeenCalledWith('ETag', '"page-tag"');
     expect(reply.type).toHaveBeenCalledWith('image/png');
+    expect(reply.status).not.toHaveBeenCalled();
     expect(reply.send).toHaveBeenCalledWith(stream);
+  });
+
+  it('answers 304 with the validator when the client already holds the page', async () => {
+    const user = { id: 7, isSuperuser: false, permissions: [] } as any;
+    const reply = {
+      header: vi.fn(),
+      type: vi.fn(),
+      status: vi.fn(),
+      send: vi.fn(),
+    };
+    reply.status.mockReturnValue(reply);
+    cbzService.streamPage.mockResolvedValue({ notModified: true, etag: '"page-tag"' });
+
+    await controller.getPage(12, 3, user, reply as any, '"page-tag"');
+
+    expect(cbzService.streamPage).toHaveBeenCalledWith(12, 3, user, '"page-tag"');
+    expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'private, no-cache');
+    expect(reply.header).toHaveBeenCalledWith('ETag', '"page-tag"');
+    expect(reply.status).toHaveBeenCalledWith(304);
+    expect(reply.send).toHaveBeenCalledWith();
+    expect(reply.type).not.toHaveBeenCalled();
   });
 });

@@ -33,6 +33,7 @@ describe('useSidebarPrefs', () => {
       const { parseSidebarConfig } = await loadModule()
 
       expect(parseSidebarConfig(undefined)).toEqual({
+        reading: { open: true },
         browse: { open: true },
         libraries: { open: true, cap: 8 },
         podcasts: { open: true, cap: 8 },
@@ -141,6 +142,7 @@ describe('useSidebarPrefs', () => {
             settings: {
               sidebarConfig: {
                 sections: {
+                  reading: { open: true },
                   browse: { open: true },
                   libraries: { open: true, cap: 8 },
                   podcasts: { open: true, cap: 8 },

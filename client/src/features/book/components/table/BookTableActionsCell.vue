@@ -6,6 +6,7 @@ import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, Pencil, RefreshCw, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetadata'
 import { useBookRefreshFeedback } from '@/features/book/composables/useBookRefreshFeedback'
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
@@ -27,6 +28,8 @@ const router = useRouter()
 
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { refreshWithFeedback, refreshing } = useRefreshMetadata()
 const refreshFeedback = useBookRefreshFeedback()
 const { isRefreshing } = useRefreshingBooks()
@@ -67,15 +70,12 @@ async function handleRefresh() {
           <ExternalLink :size="13" class="mr-2" />
           {{ t('book.table.actions.bookDetails') }}
         </DropdownMenuItem>
-        <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-        <DropdownMenuItem
-          v-if="hasPermission('library_edit_metadata')"
-          @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
-        >
+        <DropdownMenuSeparator v-if="canEditMetadata" />
+        <DropdownMenuItem v-if="canEditMetadata" @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
           <Pencil :size="13" class="mr-2" />
           {{ t('book.table.actions.editMetadata') }}
         </DropdownMenuItem>
-        <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="anyRefreshing" @click="handleRefresh">
+        <DropdownMenuItem v-if="canEditMetadata" :disabled="anyRefreshing" @click="handleRefresh">
           <RefreshCw :size="13" class="mr-2" :class="{ 'animate-spin': anyRefreshing }" />
           {{ t('book.table.actions.refreshMetadata') }}
         </DropdownMenuItem>

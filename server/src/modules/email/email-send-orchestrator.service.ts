@@ -2,7 +2,7 @@ import { ForbiddenException, BadRequestException, Injectable, Logger, Optional }
 import type { Readable } from 'stream';
 import { createReadStream } from 'fs';
 import { openDeliveryStream } from '../book/delivery-stream';
-import type { DeliveryArtifactMetadata } from '@bookorbit/types';
+import type { DeliveryArtifactMetadata, EmailSendAccepted } from '@bookorbit/types';
 import { ConflictException } from '@nestjs/common';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -73,7 +73,7 @@ export class EmailSendOrchestrator {
     @Optional() private readonly users?: UserService,
   ) {}
 
-  async send(dto: SendBookDto, user: RequestUser): Promise<{ queued: number }> {
+  async send(dto: SendBookDto, user: RequestUser): Promise<EmailSendAccepted> {
     const startedAt = Date.now();
     const requestedRecipientCount = (dto.recipientIds?.length ?? 0) + (dto.groupIds?.length ?? 0);
     this.logger.log(
@@ -108,7 +108,7 @@ export class EmailSendOrchestrator {
     }
   }
 
-  async resend(logEntryId: number, user: RequestUser): Promise<{ queued: number }> {
+  async resend(logEntryId: number, user: RequestUser): Promise<EmailSendAccepted> {
     const startedAt = Date.now();
     this.logger.log(`[${EMAIL_RESEND_EVENT}] [start] userId=${user.id} logEntryId=${logEntryId} - resend enqueue started`);
 
@@ -173,7 +173,7 @@ export class EmailSendOrchestrator {
     }
   }
 
-  async quickSend(bookId: number, user: RequestUser): Promise<{ queued: number }> {
+  async quickSend(bookId: number, user: RequestUser): Promise<EmailSendAccepted> {
     const startedAt = Date.now();
     this.logger.log(`[${EMAIL_QUICK_SEND_EVENT}] [start] userId=${user.id} bookId=${bookId} - quick send enqueue started`);
 

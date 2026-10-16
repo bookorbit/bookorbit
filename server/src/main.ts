@@ -23,6 +23,7 @@ import {
   buildEmptyJsonBodyStream,
   registerConditionalHsts,
   registerDeclaredBodyLimits,
+  registerDeclaredCompressionOptOuts,
   registerEmptyBodyContentTypeParser,
   shouldInjectEmptyJsonBody,
   shouldServeSpaFallback,
@@ -42,6 +43,7 @@ async function bootstrap() {
   const standardFastify = fastify as unknown as FastifyInstance;
 
   registerDeclaredBodyLimits(fastify);
+  registerDeclaredCompressionOptOuts(fastify);
 
   // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.
   fastify.addHook('preParsing', (request, _reply, payload, done) => {

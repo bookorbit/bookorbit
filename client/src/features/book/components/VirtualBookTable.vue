@@ -35,13 +35,14 @@ import BookTableContextMenu from './table/BookTableContextMenu.vue'
 import BookTableHeader from './table/BookTableHeader.vue'
 import BookTableHeaderContextMenu from './table/BookTableHeaderContextMenu.vue'
 import type { BookCard, Rule, SortSpec, TableLayoutState, TableViewType } from '@bookorbit/types'
-import { BOOK_METADATA_LOCK_FIELDS } from '@bookorbit/types'
+import { BOOK_METADATA_LOCK_FIELDS, Permission } from '@bookorbit/types'
 import { isBookPlaceholder, type BookSlot } from '@/features/book/composables/useBookWindow'
 import { useNarratorSearch } from '@/features/book/composables/useNarratorSearch'
 import { sortFieldLabel } from '@/features/book/lib/filter-labels'
 import { DEFAULT_SORT } from '@/features/book/lib/sort-defaults'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -144,16 +145,22 @@ const { getSortDir, handleColumnSort, removeSortField } = useTableSorting(
   () => props.defaultSort ?? DEFAULT_SORT,
 )
 const { getQuickFilterOptions, buildQuickFilterRule } = useTableQuickFilters(props.viewType)
+const { hasLibraryPermission } = useLibraryPermissions()
+function canEditBookMetadata(book: BookCard): boolean {
+  return hasLibraryPermission(Permission.LibraryEditMetadata, book.libraryId, 'editor')
+}
 const { getCellValue, isCellLocked, isCellReadOnly, isMandatoryFieldEmpty, isBookFileMissing, getPinnedCellBackground } = useTableCellHelpers(
   locks,
   () => isReadOnly.value,
   () => combinedColumnMap.value,
+  canEditBookMetadata,
 )
 const { coverDialogBook, handleCoverClick, handleCoverDialogUpdateBook } = useTableCoverDialog(
   () => props.selectionMode ?? false,
   (updated) => emit('update:book', updated),
   () => loadedBooks.value,
 )
+const isCoverDialogReadOnly = computed(() => isReadOnly.value || (coverDialogBook.value !== null && !canEditBookMetadata(coverDialogBook.value)))
 
 function getChipsSearchFn(colId: string): (q: string) => Promise<string[]> {
   if (colId === 'authors') return searchAuthors
@@ -605,6 +612,7 @@ function emitLockStateUpdate(book: BookCard, nextFields: BookCard['lockedFields'
 }
 
 async function handleToggleCellLock(book: BookCard, colId: string) {
+  if (!canEditBookMetadata(book)) return
   const lockField = COLUMN_DEF_MAP.get(colId)?.lockField
   if (!lockField) return
   const beforeFields = [...locks.getFields(book.id)]
@@ -615,6 +623,7 @@ async function handleToggleCellLock(book: BookCard, colId: string) {
 }
 
 async function handleLockAllRow(book: BookCard) {
+  if (!canEditBookMetadata(book)) return
   const beforeFields = [...locks.getFields(book.id)]
   await locks.lockAll(book.id)
   const afterFields = [...locks.getFields(book.id)]
@@ -623,6 +632,7 @@ async function handleLockAllRow(book: BookCard) {
 }
 
 async function handleUnlockAllRow(book: BookCard) {
+  if (!canEditBookMetadata(book)) return
   const beforeFields = [...locks.getFields(book.id)]
   await locks.unlockAll(book.id)
   const afterFields = [...locks.getFields(book.id)]
@@ -894,6 +904,7 @@ defineExpose({
                     :is-locked="isCellLocked(rowBook(vItem.index), col.id)"
                     :is-active="editor.isActive(rowBook(vItem.index).id, col.id)"
                     :is-read-only="isCellReadOnly(rowBook(vItem.index), col)"
+                    :can-edit-metadata="canEditBookMetadata(rowBook(vItem.index))"
                     :is-fully-locked="isRowFullyLocked(rowBook(vItem.index))"
                     :locked-field-count="getRowLockedFieldCount(rowBook(vItem.index))"
                     :selection-mode="props.selectionMode ?? false"
@@ -1050,7 +1061,12 @@ defineExpose({
     />
   </div>
 
-  <BookCoverDialog :book="coverDialogBook" :read-only="isReadOnly" @close="coverDialogBook = null" @update:book="handleCoverDialogUpdateBook" />
+  <BookCoverDialog
+    :book="coverDialogBook"
+    :read-only="isCoverDialogReadOnly"
+    @close="coverDialogBook = null"
+    @update:book="handleCoverDialogUpdateBook"
+  />
   <KeyboardShortcutOverlay v-model:open="shortcutOverlayOpen" />
 </template>
 

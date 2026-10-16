@@ -1,8 +1,9 @@
+import { RegexMetadataPreviewDto, RegexMetadataValidationDto } from './dto/regex-metadata.dto';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
-import type { BookQuery, BulkRenameProgressEvent, JumpBucketsQuery, LibraryFileSyncProgressEvent } from '@bookorbit/types';
+import type { BookQuery, BulkRenameProgressEvent, JumpBucketsQuery, LibraryBookFacets, LibraryFileSyncProgressEvent } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequireLibraryType } from '../../common/decorators/require-library-type.decorator';
@@ -48,6 +49,20 @@ export class LibraryController {
     return this.libraryService.getOverview(user);
   }
 
+  @Post('regex-metadata/validate')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(Permission.ManageLibraries)
+  validateRegexMetadata(@Body() dto: RegexMetadataValidationDto) {
+    return this.libraryService.validateRegexMetadata(dto);
+  }
+
+  @Post('regex-metadata/preview')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(Permission.ManageLibraries)
+  previewRegexMetadata(@Body() dto: RegexMetadataPreviewDto) {
+    return this.libraryService.previewRegexMetadata(dto);
+  }
+
   @Get(':id')
   @RequireLibraryAccess('viewer')
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -59,6 +74,17 @@ export class LibraryController {
   @RequireLibraryType('books')
   queryBooks(@Param('id', ParseIntPipe) libraryId: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.bookService.queryForLibrary(user, libraryId, query);
+  }
+
+  @Post(':id/books/facets')
+  @RequireLibraryAccess('viewer')
+  @RequireLibraryType('books')
+  getBookFacets(
+    @Param('id', ParseIntPipe) libraryId: number,
+    @Body(BookQueryPipe) query: BookQuery,
+    @CurrentUser() user: RequestUser,
+  ): Promise<LibraryBookFacets> {
+    return this.bookService.facetsForLibrary(user, libraryId, query);
   }
 
   @Post(':id/books/jump-buckets')

@@ -115,6 +115,14 @@ describe('useBookDockUpload client-side validation', () => {
     expect(upload.failures.value).toHaveLength(0)
   })
 
+  it('sends DjVu to the Book Dock instead of rejecting it as unsupported', async () => {
+    const { upload } = await loadComposable()
+    upload.addFiles([book('DjVuLibre-book.DJVU')])
+    await flushPromises()
+    expect(FakeXhr.sent).toHaveLength(1)
+    expect(upload.failures.value).toHaveLength(0)
+  })
+
   it('rejects a file over the configured upload limit before sending it', async () => {
     const { upload, appInfo } = await loadComposable()
     appInfo.maxUploadSizeMb.value = 1

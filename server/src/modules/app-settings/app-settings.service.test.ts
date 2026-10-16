@@ -657,4 +657,19 @@ describe('AppSettingsService', () => {
       expect(repo.updateByKey).not.toHaveBeenCalled();
     });
   });
+
+  describe('update audit_retention_days validation', () => {
+    it('stores a whole number of days', async () => {
+      repo.updateByKey.mockResolvedValue({ key: 'audit_retention_days', value: '365' } as never);
+      await service.update('audit_retention_days', ' 365 ');
+      expect(repo.updateByKey).toHaveBeenCalledWith('audit_retention_days', '365');
+    });
+
+    it('rejects anything that is not between 1 and 3650 days', async () => {
+      for (const value of ['0', '-1', '3651', '12.5', '90 days', 'forever']) {
+        await expect(service.update('audit_retention_days', value)).rejects.toThrow(BadRequestException);
+      }
+      expect(repo.updateByKey).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,78 +1,68 @@
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BookCoverPlaceholder from '../BookCoverPlaceholder.vue'
-import { useThemeStore } from '@/stores/theme'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-type PaletteResult = {
-  gradient: string
-  from: string
-  to: string
-  color: string
-  accent: string
-  textMuted: string
+const width = ref(134)
+const height = ref(201)
+
+vi.mock('@vueuse/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@vueuse/core')>()),
+  useElementSize: () => ({ width, height }),
+}))
+
+function mountPlaceholder(props: Partial<InstanceType<typeof BookCoverPlaceholder>['$props']> = {}) {
+  return mount(BookCoverPlaceholder, { props: { title: 'Dune', authorLine: 'Frank Herbert', seed: 'dune', ...props } })
 }
 
-const paletteSpy = vi.fn<() => PaletteResult>(() => ({
-  gradient: 'linear-gradient(135deg, oklch(0.6 0.18 210) 0%, oklch(0.45 0.18 210) 100%)',
-  from: 'oklch(0.6 0.18 210)',
-  to: 'oklch(0.45 0.18 210)',
-  color: 'oklch(0.99 0.01 210)',
-  accent: 'oklch(0.86 0.08 210)',
-  textMuted: 'oklch(0.9 0.02 210)',
-}))
-
-vi.mock('@/features/book/lib/book-cover', () => ({
-  bookCoverPalette: (...args: Parameters<typeof paletteSpy>) => paletteSpy(...args),
-}))
-
 describe('BookCoverPlaceholder', () => {
+  const settings = useDisplaySettings()
+
   beforeEach(() => {
-    paletteSpy.mockClear()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    width.value = 134
+    height.value = 201
+    settings.placeholderCoverStyle.value = 'bauhaus'
   })
 
-  it('recomputes palette when accent changes', async () => {
-    const pinia = createPinia()
-    setActivePinia(pinia)
-    const wrapper = mount(BookCoverPlaceholder, {
-      props: {
-        title: 'Dune',
-        authorLine: 'Frank Herbert',
-        isAudio: false,
-        seed: 'dune-seed',
-      },
-      global: { plugins: [pinia] },
-    })
-
-    const store = useThemeStore(pinia)
-    const initialCalls = paletteSpy.mock.calls.length
-    store.setAccent(store.accent === 'blue' ? 'rose' : 'blue')
-    await nextTick()
-
-    expect(paletteSpy.mock.calls.length).toBeGreaterThan(initialCalls)
-    wrapper.unmount()
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
-  it('recomputes palette when light/dark theme changes', async () => {
-    const pinia = createPinia()
-    setActivePinia(pinia)
-    const wrapper = mount(BookCoverPlaceholder, {
-      props: {
-        title: 'Dune',
-        authorLine: 'Frank Herbert',
-        isAudio: false,
-        seed: 'dune-seed',
-      },
-      global: { plugins: [pinia] },
-    })
+  it('draws the style chosen in display settings', async () => {
+    const wrapper = mountPlaceholder()
+    const art = wrapper.get('[data-testid="cover-placeholder-art"]')
+    expect(art.attributes('data-placeholder-style')).toBe('bauhaus')
+    expect(art.find('svg').exists()).toBe(true)
 
-    const store = useThemeStore(pinia)
-    const initialCalls = paletteSpy.mock.calls.length
-    store.setTheme(store.theme === 'dark' ? 'light' : 'dark')
+    settings.placeholderCoverStyle.value = 'paperback'
     await nextTick()
+    expect(art.attributes('data-placeholder-style')).toBe('paperback')
+  })
 
-    expect(paletteSpy.mock.calls.length).toBeGreaterThan(initialCalls)
-    wrapper.unmount()
+  it('lets a preview override the setting', () => {
+    const wrapper = mountPlaceholder({ variant: 'memphis' })
+    expect(wrapper.get('[data-testid="cover-placeholder-art"]').attributes('data-placeholder-style')).toBe('memphis')
+  })
+
+  it('is hidden from assistive technology', () => {
+    expect(mountPlaceholder().get('[data-testid="cover-placeholder-art"]').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('escapes book text', () => {
+    const wrapper = mountPlaceholder({ title: '<img src=x onerror=alert(1)>' })
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.text()).toContain('<img')
+  })
+
+  it('draws nothing until it has a size', () => {
+    width.value = 0
+    height.value = 0
+    expect(mountPlaceholder().get('[data-testid="cover-placeholder-art"]').html()).not.toContain('<svg')
+  })
+
+  it('uses the untitled label when the title is missing', () => {
+    expect(mountPlaceholder({ title: null }).text()).toContain('Untitled')
   })
 })

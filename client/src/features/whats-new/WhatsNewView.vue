@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { ChevronDown, ExternalLink, Search, Sparkles } from '@lucide/vue'
 import type { ReleaseNote, ReleaseNotesResponse } from '@bookorbit/types'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 import { api } from '@/lib/api'
 import { useWhatsNew } from './composables/useWhatsNew'
 import { formatReleaseDate } from './lib/whats-new.logic'
@@ -126,16 +127,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="w-full max-w-6xl px-4 py-6">
-    <header class="mb-5 flex items-center gap-3">
-      <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-        <Sparkles :size="20" />
-      </span>
-      <div>
-        <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('whatsNew.title') }}</h1>
-        <p class="text-sm text-muted-foreground">{{ t('whatsNew.subtitle') }}</p>
-      </div>
-    </header>
+  <div class="w-full max-w-6xl pt-2 pb-6">
+    <PageTitleRow class="mb-5" :title="t('whatsNew.title')" :icon="Sparkles">
+      <template #facts>
+        <span class="truncate">{{ t('whatsNew.subtitle') }}</span>
+      </template>
+    </PageTitleRow>
 
     <div class="lg:flex lg:gap-6">
       <nav v-if="!loading && !error && filtered.length" class="hidden w-48 shrink-0 lg:order-last lg:block">

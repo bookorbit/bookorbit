@@ -15,6 +15,7 @@ import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrol
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
@@ -43,11 +44,12 @@ const route = useRoute()
 const router = useRouter()
 const mainRef = ref<HTMLElement | null>(null)
 useScrollRestoreOnActivate(mainRef)
-const { hasPermission, isSuperuser } = usePermissions()
+const { isSuperuser } = usePermissions()
 const { width: windowWidth } = useWindowSize()
 
 const { portraitCoverSize, gridGap } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
+const { hasPermissionInAnyLibrary } = useLibraryPermissions()
 
 const authorBooksViewMode = ref<'grid' | 'list'>('grid')
 
@@ -95,7 +97,7 @@ const {
   loadFresh: loadFreshMetadataPreview,
 } = useAuthorMetadataPreview(authorName)
 
-const canUpdate = computed(() => hasPermission('library_edit_metadata'))
+const canUpdate = computed(() => hasPermissionInAnyLibrary('library_edit_metadata', 'editor'))
 const canMerge = computed(() => isSuperuser.value)
 const canDelete = computed(() => isSuperuser.value)
 
@@ -524,7 +526,7 @@ defineOptions({ name: 'AuthorDetailView' })
 <template>
   <div class="flex h-full flex-col">
     <main ref="mainRef" class="flex flex-1 min-h-0 w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden pr-0 sm:pr-2">
-      <div class="mb-3 mt-2 mr-0 sm:mr-4 flex items-center gap-2 px-1">
+      <div class="mb-3 mt-2 mr-0 sm:mr-4 flex min-h-11 items-center gap-2 px-1">
         <button
           class="inline-flex h-8 items-center gap-1 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="goBack"

@@ -20,9 +20,11 @@ import { ZipArchive } from 'archiver';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
+import { RouteConfig } from '@nestjs/platform-fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
+import { fileValidators, planFileResponse, type FileConditionalHeaders } from '../../common/utils/file-range.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
@@ -77,6 +79,7 @@ const BOOK_MIME_TYPES: Record<string, string> = {
   epub: 'application/epub+zip',
   kepub: 'application/epub+zip',
   pdf: 'application/pdf',
+  djvu: 'image/vnd.djvu',
   mobi: 'application/x-mobipocket-ebook',
   azw: 'application/vnd.amazon.ebook',
   azw3: 'application/vnd.amazon.ebook',
@@ -164,7 +167,7 @@ export class BookController {
     },
   })
   async bulkRefreshMetadata(@Body() dto: BulkRefreshMetadataDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
-    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    const ids = await this.bookService.resolveSelectionToIds(dto, user, 'editor');
     const stream = this.createSseStream(reply);
     try {
       const result = await this.bookService.bulkRefreshMetadata(
@@ -195,7 +198,7 @@ export class BookController {
     },
   })
   async bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
-    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    const ids = await this.bookService.resolveSelectionToIds(dto, user, 'editor');
     const stream = this.createSseStream(reply);
     try {
       const result = await this.bookService.bulkReExtractCover(
@@ -217,9 +220,7 @@ export class BookController {
   @Post(':id/re-extract-cover')
   @RequirePermission(Permission.LibraryEditMetadata)
   reExtractCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Query() query?: CoverMediumQueryDto) {
-    return query?.medium
-      ? this.bookService.bulkReExtractCover([id], user, undefined, { medium: query.medium })
-      : this.bookService.bulkReExtractCover([id], user);
+    return this.bookService.reExtractCover(id, user, query?.medium);
   }
 
   @Post('export')
@@ -340,6 +341,7 @@ export class BookController {
   }
 
   @Get(':id/cover')
+  @RouteConfig({ compress: false })
   async getCover(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
@@ -367,6 +369,7 @@ export class BookController {
   }
 
   @Get(':id/thumbnail')
+  @RouteConfig({ compress: false })
   async getThumbnail(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
@@ -396,52 +399,39 @@ export class BookController {
   // These MUST come before `:id/*` routes to avoid NestJS matching 'files' as :id.
 
   @Get('files/:fileId/serve')
+  @RouteConfig({ compress: false })
   async serveFile(
     @Param('fileId', ParseIntPipe) fileId: number,
     @CurrentUser() user: RequestUser,
     @Headers('range') rangeHeader: string | undefined,
     @Res() reply: FastifyReply,
+    @Headers('if-range') ifRange?: string,
+    @Headers('if-none-match') ifNoneMatch?: string,
   ) {
-    const { path, size, format, originalFilename } = await this.bookService.getFileInfo(fileId, user);
-    if (resolveAudioMimeType(format)) throw new NotFoundException('File route not found');
-    const mimeType = resolveBookMimeType(format);
-    const filename = originalFilename;
+    const file = await this.bookService.getFileInfo(fileId, user);
+    if (resolveAudioMimeType(file.format)) throw new NotFoundException('File route not found');
 
-    reply.header('Accept-Ranges', 'bytes');
-    reply.header('Content-Disposition', contentDispositionHeader('inline', filename, 'download'));
-    reply.type(mimeType);
-
-    if (rangeHeader) {
-      const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
-      if (match) {
-        const start = parseInt(match[1], 10);
-        const end = match[2] ? parseInt(match[2], 10) : size - 1;
-        if (start >= size || end < start || end >= size) {
-          reply.status(416);
-          reply.header('Content-Range', `bytes */${size}`);
-          reply.send();
-          return;
-        }
-        reply.status(206);
-        reply.header('Content-Range', `bytes ${start}-${end}/${size}`);
-        reply.header('Content-Length', end - start + 1);
-        reply.send(createReadStream(path, { start, end }));
-        return;
-      }
-    }
-
-    reply.header('Content-Length', size);
-    reply.send(createReadStream(path));
+    reply.header('Content-Disposition', contentDispositionHeader('inline', file.originalFilename, 'download'));
+    reply.type(resolveBookMimeType(file.format));
+    this.sendBookFile(reply, { id: fileId, path: file.path, size: file.size, mtimeMs: file.mtimeMs }, { range: rangeHeader, ifRange, ifNoneMatch });
   }
 
   @Get('files/:fileId/download')
   @RequirePermission(Permission.LibraryDownload)
-  async downloadFile(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+  @RouteConfig({ compress: false })
+  async downloadFile(
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @CurrentUser() user: RequestUser,
+    @Res() reply: FastifyReply,
+    @Headers('range') rangeHeader?: string,
+    @Headers('if-range') ifRange?: string,
+    @Headers('if-none-match') ifNoneMatch?: string,
+  ) {
     const event = 'book.download_file';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - download file started`);
     try {
-      const { path, size, format, bookId, mediaOverlayAvailable } = await this.bookService.getFileInfo(fileId, user);
+      const { path, size, mtimeMs, format, bookId, mediaOverlayAvailable } = await this.bookService.getFileInfo(fileId, user);
       const mimeType = resolveBookMimeType(format);
       const filename = await this.bookService.resolveDownloadFilename({
         bookId,
@@ -450,11 +440,9 @@ export class BookController {
         mediaOverlayAvailable,
       });
 
-      reply.header('Accept-Ranges', 'bytes');
       reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
       reply.type(mimeType);
-      reply.header('Content-Length', size);
-      reply.send(createReadStream(path));
+      this.sendBookFile(reply, { id: fileId, path, size, mtimeMs }, { range: rangeHeader, ifRange, ifNoneMatch });
       this.logger.log(
         `[${event}] [end] fileId=${fileId} userId=${user.id} durationMs=${Date.now() - startedAt} sizeBytes=${size} - download file completed`,
       );
@@ -470,6 +458,7 @@ export class BookController {
 
   @Get('files/:fileId/audioless-epub/download')
   @RequirePermission(Permission.LibraryDownload)
+  @RouteConfig({ compress: false })
   async downloadAudiolessEpub(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     const event = 'book.download_audioless_epub';
     const startedAt = Date.now();
@@ -668,6 +657,8 @@ export class BookController {
     resource: AuditResource.Book,
     getResourceId: (req) => parseInt(req.params['id'], 10),
     description: (req) => `Refreshed metadata for book #${req.params['id']}`,
+    // A preview writes nothing, so recording it would fill the log with refreshes that never happened.
+    when: (req) => (req.query as { preview?: string } | undefined)?.preview !== 'true',
   })
   refreshMetadata(@Param('id', ParseIntPipe) id: number, @Query('preview') preview: string | undefined, @CurrentUser() user: RequestUser) {
     return this.bookService.refreshMetadata(id, preview === 'true', user);
@@ -830,6 +821,38 @@ export class BookController {
   @Get(':id')
   getDetail(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.getDetail(id, user);
+  }
+
+  private sendBookFile(
+    reply: FastifyReply,
+    file: { id: number; path: string; size: number; mtimeMs: number },
+    conditionalHeaders: FileConditionalHeaders,
+  ): void {
+    const validators = fileValidators(file);
+    reply.header('Accept-Ranges', 'bytes');
+    reply.header('ETag', validators.etag);
+    reply.header('Last-Modified', validators.lastModified);
+    reply.header('Cache-Control', 'private, no-cache');
+
+    const plan = planFileResponse(file.size, validators, conditionalHeaders);
+    switch (plan.kind) {
+      case 'not-modified':
+        reply.status(304).send();
+        return;
+      case 'unsatisfiable':
+        reply.status(416).header('Content-Range', `bytes */${file.size}`).send();
+        return;
+      case 'partial':
+        reply.status(206);
+        reply.header('Content-Range', `bytes ${plan.start}-${plan.end}/${file.size}`);
+        reply.header('Content-Length', plan.end - plan.start + 1);
+        reply.send(createReadStream(file.path, { start: plan.start, end: plan.end }));
+        return;
+      case 'full':
+        reply.header('Content-Length', file.size);
+        reply.send(createReadStream(file.path));
+        return;
+    }
   }
 
   private createSseStream(reply: FastifyReply): {

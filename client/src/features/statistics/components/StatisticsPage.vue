@@ -2,10 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, ChevronDown, GripVertical, Settings2 } from '@lucide/vue'
+import { BarChart3, Check, ChevronDown, GripVertical, Settings2 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 
 import type { ChartConfigEntry, StatisticsChartId } from '@bookorbit/types'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -139,83 +140,87 @@ function setTab(tab: StatisticsTab) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6 pt-4">
-    <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex w-full items-center gap-1 rounded-lg bg-muted p-1 sm:w-auto">
-        <button
-          :class="[
-            'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
-            activeTab === 'library' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          ]"
-          @click="setTab('library')"
-        >
-          {{ t('statistics.tabs.library') }}
-        </button>
-        <button
-          :class="[
-            'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
-            activeTab === 'user' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          ]"
-          @click="setTab('user')"
-        >
-          {{ t('statistics.tabs.user') }}
-        </button>
-      </div>
+  <div class="flex flex-col gap-5 pt-2">
+    <PageTitleRow :eyebrow="t('components.sidebar.zones.reading')" :title="t('components.appHeader.statistics')" :icon="BarChart3">
+      <template #inline>
+        <div class="flex w-full items-center gap-1 rounded-lg bg-muted p-1 sm:w-auto">
+          <button
+            :class="[
+              'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
+              activeTab === 'library' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            ]"
+            @click="setTab('library')"
+          >
+            {{ t('statistics.tabs.library') }}
+          </button>
+          <button
+            :class="[
+              'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
+              activeTab === 'user' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            ]"
+            @click="setTab('user')"
+          >
+            {{ t('statistics.tabs.user') }}
+          </button>
+        </div>
+      </template>
 
-      <div class="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:justify-end">
-        <Popover v-if="libraries.length > 1">
-          <PopoverTrigger as-child>
-            <button
-              :class="[
-                'flex h-8 min-w-0 flex-1 items-center justify-between gap-1.5 rounded-md border px-3 text-sm transition-colors sm:w-auto sm:flex-none sm:justify-start',
-                isFiltered ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-border text-foreground hover:bg-accent',
-              ]"
-            >
-              <span class="truncate">{{ libraryLabel }}</span>
-              <ChevronDown class="size-3.5 opacity-60" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" class="w-56 p-1.5">
-            <button
-              class="text-muted-foreground hover:bg-accent hover:text-foreground flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-sm"
-              @click="handleSelectAll"
-            >
-              <div
-                :class="['flex size-4 items-center justify-center rounded-xs border', !isFiltered ? 'border-primary bg-primary' : 'border-border']"
-              >
-                <Check v-if="!isFiltered" class="text-primary-foreground size-2.5" />
-              </div>
-              {{ t('statistics.filter.allLibraries') }}
-            </button>
-            <div class="border-border my-1 border-t" />
-            <button
-              v-for="lib in libraries"
-              :key="lib.id"
-              class="hover:bg-accent flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-sm"
-              @click="handleToggleLibrary(lib.id)"
-            >
-              <div
+      <template #actions>
+        <div class="flex min-w-0 items-center gap-2">
+          <Popover v-if="libraries.length > 1">
+            <PopoverTrigger as-child>
+              <button
                 :class="[
-                  'flex size-4 shrink-0 items-center justify-center rounded-xs border',
-                  isLibrarySelected(lib.id) ? 'border-primary bg-primary' : 'border-border',
+                  'flex h-8 min-w-0 flex-1 items-center justify-between gap-1.5 rounded-md border px-3 text-sm transition-colors sm:w-auto sm:flex-none sm:justify-start',
+                  isFiltered ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-border text-foreground hover:bg-accent',
                 ]"
               >
-                <Check v-if="isLibrarySelected(lib.id)" class="text-primary-foreground size-2.5" />
-              </div>
-              <span class="truncate">{{ lib.name }}</span>
-            </button>
-          </PopoverContent>
-        </Popover>
+                <span class="truncate">{{ libraryLabel }}</span>
+                <ChevronDown class="size-3.5 opacity-60" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" class="w-56 p-1.5">
+              <button
+                class="text-muted-foreground hover:bg-accent hover:text-foreground flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-sm"
+                @click="handleSelectAll"
+              >
+                <div
+                  :class="['flex size-4 items-center justify-center rounded-xs border', !isFiltered ? 'border-primary bg-primary' : 'border-border']"
+                >
+                  <Check v-if="!isFiltered" class="text-primary-foreground size-2.5" />
+                </div>
+                {{ t('statistics.filter.allLibraries') }}
+              </button>
+              <div class="border-border my-1 border-t" />
+              <button
+                v-for="lib in libraries"
+                :key="lib.id"
+                class="hover:bg-accent flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-sm"
+                @click="handleToggleLibrary(lib.id)"
+              >
+                <div
+                  :class="[
+                    'flex size-4 shrink-0 items-center justify-center rounded-xs border',
+                    isLibrarySelected(lib.id) ? 'border-primary bg-primary' : 'border-border',
+                  ]"
+                >
+                  <Check v-if="isLibrarySelected(lib.id)" class="text-primary-foreground size-2.5" />
+                </div>
+                <span class="truncate">{{ lib.name }}</span>
+              </button>
+            </PopoverContent>
+          </Popover>
 
-        <button
-          class="bg-muted text-foreground hover:bg-muted/70 flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors"
-          @click="openConfig"
-        >
-          <Settings2 class="size-3.5" />
-          {{ t('statistics.config.button') }}
-        </button>
-      </div>
-    </div>
+          <button
+            class="bg-muted text-foreground hover:bg-muted/70 flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors"
+            @click="openConfig"
+          >
+            <Settings2 class="size-3.5" />
+            {{ t('statistics.config.button') }}
+          </button>
+        </div>
+      </template>
+    </PageTitleRow>
 
     <StatisticsSummaryCard />
 

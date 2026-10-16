@@ -70,7 +70,9 @@ useReaderPageTitle(bookId)
 const normalizedFileFormat = fileFormat.toLowerCase()
 const isAudioFormat = getFormatGroup(fileFormat) === 'audio'
 const isPdfFormat = fileFormat === 'pdf'
-const isComicFormat = fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7'
+const isDjvuFormat = normalizedFileFormat === 'djvu'
+const isComicFormat = fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7' || isDjvuFormat
+const pageImageSource = isDjvuFormat ? 'djvu' : 'cbz'
 const isPeekMode = computed(() => {
   const mode = route.query.mode
   return (Array.isArray(mode) ? mode[0] : mode) === 'peek'
@@ -1206,7 +1208,7 @@ onUnmounted(() => {
 
 <template>
   <PdfV4ReaderView v-if="isPdfFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
-  <CbzReaderView v-else-if="isComicFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
+  <CbzReaderView v-else-if="isComicFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" :source="pageImageSource" />
   <AudiobookReaderView v-else-if="isAudioFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
   <div
     v-else

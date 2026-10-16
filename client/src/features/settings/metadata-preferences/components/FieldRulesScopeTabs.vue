@@ -5,7 +5,15 @@ import type { FieldRuleScope, FieldRuleScopeId } from '../composables/useFieldRu
 
 const { t } = useI18n()
 
-defineProps<{ scopes: FieldRuleScope[]; activeId: FieldRuleScopeId }>()
+withDefaults(
+  defineProps<{
+    scopes: FieldRuleScope[]
+    activeId: FieldRuleScopeId
+    /** What the badge counts, for pages whose overrides are not fields. */
+    overrideCountKey?: string
+  }>(),
+  { overrideCountKey: 'settings.metadata.fieldRules.scope.overrideCount' },
+)
 const emit = defineEmits<{ select: [id: FieldRuleScopeId] }>()
 
 function select(id: FieldRuleScopeId) {
@@ -45,7 +53,7 @@ function select(id: FieldRuleScopeId) {
       <span
         v-else-if="scope.overrideCount > 0"
         class="rounded-xs bg-primary/15 px-1.5 py-px text-[10px] font-bold tabular-nums text-primary"
-        :aria-label="t('settings.metadata.fieldRules.scope.overrideCount', { count: scope.overrideCount })"
+        :aria-label="t(overrideCountKey, { count: scope.overrideCount })"
       >
         {{ scope.overrideCount }}
       </span>

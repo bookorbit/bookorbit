@@ -12,6 +12,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { RouteConfig } from '@nestjs/platform-fastify';
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
 import { Auditable } from '../../common/decorators/auditable.decorator';
@@ -26,7 +27,7 @@ import { RequestSeedService } from './fulfillment/request-seed.service';
 import { RequestVerificationService } from './fulfillment/request-verification.service';
 import { BulkBookRequestsDto, BulkRejectBookRequestsDto } from './dto/bulk-book-requests.dto';
 import { DecideBookRequestDto } from './dto/decide-book-request.dto';
-import { GrabBookRequestDto } from './dto/grab-book-request.dto';
+import { GRAB_BODY_LIMIT_BYTES, GrabBookRequestDto } from './dto/grab-book-request.dto';
 import { InspectBookRequestReleaseDto } from './dto/inspect-book-request-release.dto';
 import { FulfillBookRequestDto } from './dto/fulfill-book-request.dto';
 import { ListAllBookRequestsDto } from './dto/list-book-requests.dto';
@@ -232,6 +233,7 @@ export class BookRequestAdminController {
    * .torrent by hand. All three go down the same pipeline from here.
    */
   @Post(':id/grab')
+  @RouteConfig({ bodyLimit: GRAB_BODY_LIMIT_BYTES })
   @HttpCode(HttpStatus.OK)
   @Auditable({
     action: AuditAction.BookRequestGrab,

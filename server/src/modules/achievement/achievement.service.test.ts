@@ -40,6 +40,7 @@ function makeRepo() {
     countBooksFinishedInYear: vi.fn().mockResolvedValue(0),
     countDistinctEarnedCategories: vi.fn().mockResolvedValue(0),
     countDistinctSeasonsWithReading: vi.fn().mockResolvedValue(0),
+    countDistinctMonthsWithReading: vi.fn().mockResolvedValue(0),
   };
 }
 
@@ -478,6 +479,16 @@ describe('AchievementService', () => {
       const result = await service.getCatalogue({ id: 1, isSuperuser: false } as never);
       const item = result.categories.find((c) => c.key === 'dedication')?.achievements.find((a) => a.key === 'seasonal_reader');
       expect(item?.currentProgress).toBe(2);
+    });
+
+    it('returns year_round_reader progress as months read this year', async () => {
+      repo.findAllAchievements.mockResolvedValue([makeSingleBadgeRow('year_round_reader', 'dedication')]);
+      repo.findUserAchievements.mockResolvedValue([]);
+      repo.countDistinctMonthsWithReading.mockResolvedValue(10);
+      const result = await service.getCatalogue({ id: 1, isSuperuser: false } as never);
+      const item = result.categories.find((c) => c.key === 'dedication')?.achievements.find((a) => a.key === 'year_round_reader');
+      expect(item?.currentProgress).toBe(10);
+      expect(repo.countDistinctMonthsWithReading).toHaveBeenCalledWith(1, new Date().getUTCFullYear());
     });
 
     it('returns null progress for consistent_reader', async () => {

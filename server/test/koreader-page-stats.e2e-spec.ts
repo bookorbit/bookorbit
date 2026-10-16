@@ -4,13 +4,8 @@ import { join } from 'path';
 import { and, asc, eq, gte, like } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
-import {
-  KOREADER_SESSION_GAP_SECONDS,
-  buildSessionId,
-  buildSessionIdPrefix,
-  deriveKoreaderSessions,
-  type KoreaderPageEvent,
-} from '../src/modules/koreader/koreader-stats.util';
+import { buildSessionId, buildSessionIdPrefix } from '../src/common/utils/koreader-session-id.utils';
+import { KOREADER_SESSION_GAP_SECONDS, deriveKoreaderSessions, type KoreaderPageEvent } from '../src/modules/koreader/koreader-stats.util';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -265,6 +260,126 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     expect(await waitForAchievement(session!.userId, 'power_hour')).toBe(true);
   });
 
+  async function deleteSessionFromLog(sessionRowId: number) {
+    const response = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/books/${epub.bookId}/sessions/${sessionRowId}`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(response.statusCode).toBe(204);
+  }
+
+  async function sessionsBetween(fromEpoch: number, toEpoch: number) {
+    return (await storedSessions()).filter((row) => row.startedAt.getTime() >= fromEpoch * 1000 && row.startedAt.getTime() < toEpoch * 1000);
+  }
+
+  async function tombstonesFor(fromEpoch: number) {
+    return ctx.db
+      .select({
+        deviceKey: schema.koreaderSessionTombstones.deviceKey,
+        startTime: schema.koreaderSessionTombstones.startTime,
+        endTime: schema.koreaderSessionTombstones.endTime,
+      })
+      .from(schema.koreaderSessionTombstones)
+      .where(and(eq(schema.koreaderSessionTombstones.bookFileId, epub.bookFileId), gte(schema.koreaderSessionTombstones.startTime, fromEpoch)));
+  }
+
+  it('keeps a deleted session deleted when the device reads on within the session gap', async () => {
+    const base = BASE_EPOCH + 15_000_000;
+    const sitting = cluster(base, 20, 1);
+    await uploadPageStats(sitting);
+    const [derived] = await sessionsBetween(base, base + 86_400);
+    expect(derived?.sessionId).toBe(buildSessionId(DEVICE_ID, epub.bookFileId, base));
+
+    await deleteSessionFromLog(derived!.id);
+    expect(await sessionsBetween(base, base + 86_400)).toEqual([]);
+    expect(await tombstonesFor(base)).toEqual([
+      { deviceKey: DEVICE_ID.slice(0, 8), startTime: base, endTime: sitting.at(-1)!.startTime + sitting.at(-1)!.durationSeconds },
+    ]);
+
+    // Ten minutes after the deleted sitting ended: close enough that derivation used to merge the
+    // stored events back in and re-insert the deleted session under its old id.
+    const later = cluster(sitting.at(-1)!.startTime + sitting.at(-1)!.durationSeconds + 600, 5, 21);
+    await uploadPageStats(later);
+
+    const after = await sessionsBetween(base, base + 86_400);
+    expect(comparable(after)).toEqual(expectedSessions(later));
+    expect(after.some((row) => row.sessionId === derived!.sessionId)).toBe(false);
+  });
+
+  it('counts the page that starts on the second a deleted session ended', async () => {
+    const base = BASE_EPOCH + 15_500_000;
+    const sitting = cluster(base, 10, 1);
+    await uploadPageStats(sitting);
+    const [derived] = await sessionsBetween(base, base + 86_400);
+    await deleteSessionFromLog(derived!.id);
+
+    const sessionEnd = sitting.at(-1)!.startTime + sitting.at(-1)!.durationSeconds;
+    const next = cluster(sessionEnd, 5, 11);
+    await uploadPageStats(next);
+
+    expect(comparable(await sessionsBetween(base, base + 86_400))).toEqual(expectedSessions(next));
+  });
+
+  it('does not bring a deleted session back when its events are uploaded again', async () => {
+    const base = BASE_EPOCH + 16_000_000;
+    const sitting = cluster(base, 15, 30);
+    await uploadPageStats(sitting);
+    const [derived] = await sessionsBetween(base, base + 86_400);
+    await deleteSessionFromLog(derived!.id);
+
+    // KOReader's own statistics sync can deliver more pages for the same span from another copy of
+    // the history, and a plugin that lost its state resends everything it has.
+    const sameSpan = sitting.map((event) => ({ ...event, page: event.page + 500 }));
+    const extra = await uploadPageStats(sameSpan);
+    expect(extra.results[0]!.accepted).toBe(sameSpan.length);
+    expect(await sessionsBetween(base, base + 86_400)).toEqual([]);
+
+    await ctx.db
+      .delete(schema.koreaderPageStats)
+      .where(and(eq(schema.koreaderPageStats.bookFileId, epub.bookFileId), gte(schema.koreaderPageStats.startTime, base)));
+    const resent = await uploadPageStats(sitting);
+    expect(resent.results[0]!.accepted).toBe(sitting.length);
+    expect(await sessionsBetween(base, base + 86_400)).toEqual([]);
+  });
+
+  it('builds a bridged session from the surviving events only', async () => {
+    const base = BASE_EPOCH + 17_000_000;
+    const early = cluster(base, 10, 0);
+    const late = cluster(base + 3 * KOREADER_SESSION_GAP_SECONDS, 10, 40);
+    await uploadPageStats([...early, ...late]);
+    const [earlyRow, lateRow] = await sessionsBetween(base, base + 86_400);
+    expect(earlyRow?.sessionId).toBe(buildSessionId(DEVICE_ID, epub.bookFileId, base));
+
+    await deleteSessionFromLog(earlyRow!.id);
+
+    // Would have merged early, bridge and late into one session starting at the early sitting.
+    const bridge = cluster(early.at(-1)!.startTime + 1_760, 22, 10);
+    await uploadPageStats(bridge);
+
+    const after = await sessionsBetween(base, base + 86_400);
+    expect(comparable(after)).toEqual(expectedSessions([...bridge, ...late]));
+    expect(after.some((row) => row.sessionId === earlyRow!.sessionId)).toBe(false);
+    expect(after.some((row) => row.sessionId === lateRow!.sessionId)).toBe(false);
+  });
+
+  it('leaves the neighbouring sessions of a deleted one untouched', async () => {
+    const base = BASE_EPOCH + 18_000_000;
+    const first = cluster(base, 8, 0);
+    const second = cluster(base + 3 * KOREADER_SESSION_GAP_SECONDS, 8, 10);
+    const third = cluster(base + 6 * KOREADER_SESSION_GAP_SECONDS, 8, 20);
+    await uploadPageStats([...first, ...second, ...third]);
+    const rows = await sessionsBetween(base, base + 86_400);
+    expect(rows).toHaveLength(3);
+
+    await deleteSessionFromLog(rows[1]!.id);
+    await uploadPageStats(cluster(third.at(-1)!.startTime + 120, 4, 30));
+
+    const after = await sessionsBetween(base, base + 86_400);
+    expect(after.map((row) => row.sessionId)).toEqual([rows[0]!.sessionId, rows[2]!.sessionId]);
+    expect(after[0]).toEqual(rows[0]);
+  });
+
   // A file hash is not unique: identical bytes in two places are two book file rows. The server
   // must refuse to guess, then honor an accessible file identity previously verified by the
   // plugin so every later upload has one stable target.
@@ -327,5 +442,100 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     expect(targets.map((row) => row.bookFileId).sort((left, right) => left - right)).toEqual(
       [epub.bookFileId, sharing[1]!.id].sort((left, right) => left - right),
     );
+  });
+  it('keeps accepting fresh reading events after deleting a KOReader session from the reading log', async () => {
+    const opening = cluster(BASE_EPOCH + 30_000_000, 4, 200);
+    await uploadPageStats(opening, epub.bookFileId);
+    const first = (await storedSessions()).find((row) => row.sessionId === buildSessionId(DEVICE_ID, epub.bookFileId, opening[0]!.startTime))!;
+
+    const deleted = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/books/${epub.bookId}/sessions/${first.id}`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(deleted.statusCode).toBe(204);
+    expect((await storedSessions()).some((row) => row.sessionId === first.sessionId)).toBe(false);
+    const resets = await ctx.db.select().from(schema.koreaderProgressResets).where(eq(schema.koreaderProgressResets.bookFileId, epub.bookFileId));
+    expect(resets).toHaveLength(0);
+
+    const replay = await uploadPageStats(opening, epub.bookFileId);
+    expect(replay.results[0]!.accepted).toBe(0);
+    expect(replay.results[0]!.duplicates).toBe(opening.length);
+    expect((await storedSessions()).some((row) => row.sessionId === first.sessionId)).toBe(false);
+
+    const continued = cluster(opening.at(-1)!.startTime + 60, 4, 204);
+    expect((await uploadPageStats(continued, epub.bookFileId)).results[0]!.accepted).toBe(continued.length);
+    const afterContinuation = await storedSessions();
+    expect(afterContinuation.some((row) => row.sessionId === first.sessionId)).toBe(false);
+    const newSession = afterContinuation.filter((row) => row.startedAt.getTime() === continued[0]!.startTime * 1000);
+    expect(comparable(newSession)).toEqual(expectedSessions(continued));
+
+    const later = cluster(BASE_EPOCH + 30_010_000, 4, 210);
+    expect((await uploadPageStats(later, epub.bookFileId)).results[0]!.accepted).toBe(later.length);
+    const log = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${epub.bookId}/sessions?sortBy=startedAt&sortDir=desc`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(log.statusCode).toBe(200);
+    expect(log.json().items[0].startedAt).toBe(new Date(later[0]!.startTime * 1000).toISOString());
+  });
+
+  it('exposes a reset hold while accepting fresh sessions, then restores the selected device position on release', async () => {
+    const reset = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${epub.bookId}/reset-reading-state`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(reset.statusCode).toBe(201);
+    expect(await storedSessions()).toHaveLength(0);
+
+    const pushed = await ctx.app.inject({
+      method: 'PUT',
+      url: '/api/v1/koreader/syncs/progress',
+      headers: deviceHeaders(),
+      payload: {
+        document: fileHash,
+        percentage: 0.42,
+        progress: '/body/DocFragment[8]/body/p[12]/text().0',
+        device: 'Kindle Paperwhite',
+        device_id: DEVICE_ID,
+      },
+    });
+    expect(pushed.statusCode).toBe(200);
+    const progress = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/koreader/books/${epub.bookId}/progress`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(progress.statusCode).toBe(200);
+    expect(progress.json().heldByReset).toEqual([expect.objectContaining({ deviceId: DEVICE_ID, percentage: 42 })]);
+    expect(progress.json().canonicalPercentage).toBe(0);
+
+    const fresh = cluster(Math.floor(Date.now() / 1000) + 60, 4, 130);
+    expect((await uploadPageStats(fresh, epub.bookFileId)).results[0]!.accepted).toBe(fresh.length);
+    const log = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${epub.bookId}/sessions`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(log.statusCode).toBe(200);
+    expect(log.json().total).toBe(1);
+
+    const released = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/koreader/books/${epub.bookId}/reset-hold/release`,
+      headers: authHeader(ctx.adminToken),
+      payload: { deviceId: DEVICE_ID },
+    });
+    expect(released.statusCode).toBe(201);
+    const after = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/koreader/books/${epub.bookId}/progress`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(after.statusCode).toBe(200);
+    expect(after.json().heldByReset).toEqual([]);
+    expect(after.json().canonicalPercentage).toBe(42);
   });
 });

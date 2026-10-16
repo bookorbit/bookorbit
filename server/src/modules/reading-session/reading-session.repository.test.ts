@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { readingSessions, userReadingDailyStats } from '../../db/schema';
+import { koreaderSessionTombstones, readingSessions, userReadingDailyStats } from '../../db/schema';
 import { ReadingSessionRepository } from './reading-session.repository';
 
 function makeDbHarness(options?: {
@@ -694,7 +694,17 @@ describe('ReadingSessionRepository - deleteSessionByBook', () => {
   });
 
   function makeDeleteHarness(
-    sessionRow: { id: number; startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null; libraryId: number } | null,
+    sessionRow: {
+      id: number;
+      startedAt: Date;
+      endedAt: Date;
+      durationSeconds: number;
+      progressDelta: number | null;
+      libraryId: number;
+      sessionId?: string | null;
+      source?: string | null;
+      bookFileId?: number | null;
+    } | null,
     recomputeRows: Array<{ startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null }> = [],
   ) {
     const limit = vi.fn().mockResolvedValue(sessionRow ? [sessionRow] : []);
@@ -711,18 +721,92 @@ describe('ReadingSessionRepository - deleteSessionByBook', () => {
     const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
     const dailyConflictUpdate = vi.fn().mockResolvedValue(undefined);
     const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: dailyConflictUpdate });
+    const tombstoneValues = vi.fn().mockResolvedValue(undefined);
     const insert = vi.fn((table: unknown) => {
       if (table === userReadingDailyStats) return { values: dailyValues };
+      if (table === koreaderSessionTombstones) return { values: tombstoneValues };
       throw new Error('Unexpected table in insert');
     });
 
     const tx = { execute: vi.fn().mockResolvedValue(undefined), select, delete: deleteFn, insert };
     const transaction = vi.fn(async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx));
-    const db = { transaction };
+    const db = { transaction, insert: vi.fn() };
     const repo = new ReadingSessionRepository(db as never);
 
-    return { repo, innerJoin: lookupInnerJoin, deleteFn, dailyValues, transaction, tx };
+    return { repo, innerJoin: lookupInnerJoin, deleteFn, dailyValues, tombstoneValues, transaction, tx, db };
   }
+
+  const KOREADER_ROW = {
+    id: 5,
+    sessionId: 'kor:abcdef12:16:1791594307',
+    source: 'koreader',
+    bookFileId: 16,
+    startedAt: new Date(1_791_594_307_000),
+    endedAt: new Date(1_791_595_507_000),
+    durationSeconds: 1200,
+    progressDelta: 6.67,
+    libraryId: 3,
+  };
+
+  it('tombstones the span of a deleted KOReader session so derivation cannot rebuild it', async () => {
+    const { repo, tombstoneValues, tx, db } = makeDeleteHarness(KOREADER_ROW);
+
+    await expect(repo.deleteSessionByBook(1, 2, 5)).resolves.toEqual({ found: true });
+
+    expect(tx.insert).toHaveBeenCalledWith(koreaderSessionTombstones);
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(tombstoneValues).toHaveBeenCalledExactlyOnceWith({
+      userId: 1,
+      bookFileId: 16,
+      deviceKey: 'abcdef12',
+      startTime: 1_791_594_307,
+      endTime: 1_791_595_507,
+    });
+  });
+
+  it('widens a fractional span outward so no event of the session escapes it', async () => {
+    const { repo, tombstoneValues } = makeDeleteHarness({
+      ...KOREADER_ROW,
+      startedAt: new Date(1_791_594_307_400),
+      endedAt: new Date(1_791_595_507_200),
+    });
+
+    await repo.deleteSessionByBook(1, 2, 5);
+
+    expect(tombstoneValues).toHaveBeenCalledWith(expect.objectContaining({ startTime: 1_791_594_307, endTime: 1_791_595_508 }));
+  });
+
+  it('keeps the tombstone on the file the session row points at', async () => {
+    const { repo, tombstoneValues } = makeDeleteHarness({ ...KOREADER_ROW, bookFileId: 99 });
+
+    await repo.deleteSessionByBook(1, 2, 5);
+
+    expect(tombstoneValues).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 99 }));
+  });
+
+  it.each([
+    ['a web reader session', { source: 'web', sessionId: '3f1c2f9e-0d6b-4d5e-9a51-2b2c1d8e7f60' }],
+    ['a manual session', { source: 'manual', sessionId: null }],
+    ['a legacy KOReader estimate', { source: 'koreader', sessionId: `ks-${'a'.repeat(12)}-${'b'.repeat(32)}` }],
+    ['a KOReader-shaped id from another source', { source: 'kobo', sessionId: 'kor:abcdef12:16:1791594307' }],
+    ['a session whose file is gone', { bookFileId: null }],
+    ['a session with no duration span', { endedAt: KOREADER_ROW.startedAt }],
+  ])('writes no tombstone for %s', async (_label, overrides) => {
+    const { repo, tx, tombstoneValues } = makeDeleteHarness({ ...KOREADER_ROW, ...overrides });
+
+    await expect(repo.deleteSessionByBook(1, 2, 5)).resolves.toEqual({ found: true });
+
+    expect(tx.insert).not.toHaveBeenCalledWith(koreaderSessionTombstones);
+    expect(tombstoneValues).not.toHaveBeenCalled();
+  });
+
+  it('writes no tombstone when the session is not found', async () => {
+    const { repo, tx } = makeDeleteHarness(null);
+
+    await repo.deleteSessionByBook(1, 2, 5);
+
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
 
   it('returns { found: false } when session not found', async () => {
     const { repo } = makeDeleteHarness(null);

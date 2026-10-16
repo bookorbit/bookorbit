@@ -21,7 +21,8 @@ const POLYGLOT_TIERS = [
 
 const DECADE_SAMPLER_THRESHOLD = 5;
 const SHORT_STORY_FAN_THRESHOLD = 5;
-const SHORT_STORY_MAX_PAGES = 100;
+export const SHORT_STORY_MAX_PAGES = 100;
+export const OLD_SOUL_BEFORE_YEAR = 1900;
 const THICK_AND_THIN_THIN_MAX = 100;
 const THICK_AND_THIN_THICK_MIN = 800;
 const TRILOGY_SIZE = 3;
@@ -107,7 +108,7 @@ export class ExplorationEvaluator implements IAchievementEvaluator {
   private async evaluateOldSoul(userId: number, bookId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
     if (earnedKeys.has('old_soul')) return;
     const publishedYear = await this.repo.getBookPublishedYear(bookId);
-    if (publishedYear !== null && publishedYear < 1900) {
+    if (publishedYear !== null && publishedYear < OLD_SOUL_BEFORE_YEAR) {
       const bookTitle = await this.repo.getBookTitle(bookId);
       awards.push({ key: 'old_soul', context: { bookId, bookTitle, publishedYear } });
     }
@@ -189,7 +190,7 @@ export class ExplorationEvaluator implements IAchievementEvaluator {
 
   private async evaluateOldSoulBackfill(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
     if (earnedKeys.has('old_soul')) return;
-    const hasBook = await this.repo.hasFinishedBookPublishedBefore(userId, 1900);
+    const hasBook = await this.repo.hasFinishedBookPublishedBefore(userId, OLD_SOUL_BEFORE_YEAR);
     if (hasBook) {
       awards.push({ key: 'old_soul', context: {} });
     }

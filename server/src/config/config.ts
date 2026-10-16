@@ -53,6 +53,13 @@ export const fileWriteConfig = registerAs('fileWrite', () => ({
   maxConcurrentWrites: parsePositiveInteger(process.env.FILE_WRITE_MAX_CONCURRENT_WRITES, 2),
 }));
 
+export const djvuConfig = registerAs('djvu', () => ({
+  maxConcurrent: parsePositiveInteger(process.env.DJVU_MAX_CONCURRENT, 2),
+  timeoutMs: parsePositiveInteger(process.env.DJVU_TIMEOUT_MS, 30_000),
+  maxSourceBytes: parsePositiveInteger(process.env.DJVU_MAX_SOURCE_BYTES, 256 * 1024 * 1024),
+  cacheBytes: parsePositiveInteger(process.env.DJVU_CACHE_BYTES, 64 * 1024 * 1024),
+}));
+
 export const audiolessEpubConfig = registerAs('audiolessEpub', () => ({
   maxConcurrentBuilds: parsePositiveInteger(process.env.AUDIOLESS_EPUB_MAX_CONCURRENT_BUILDS, 2),
   maxSourceEntries: parsePositiveInteger(process.env.AUDIOLESS_EPUB_MAX_SOURCE_ENTRIES, 50_000),

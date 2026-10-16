@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { AUDIO_FORMAT_LIST, BOOK_FORMATS, isAudioFormat, type NotebookEntryKind } from '@bookorbit/types';
+import { AUDIO_FORMAT_LIST, BOOK_FORMATS, isAudioFormat, isOptInReaderFormat, type NotebookEntryKind } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -73,7 +73,8 @@ export interface NotebookBookActivityRow {
 
 type RawKeyRow = { kind_rank: number; id: number; book_id: number; sort_key: string };
 
-const READABLE_FORMATS = BOOK_FORMATS.filter((format) => !isAudioFormat(format));
+// Only iOS reads the label's read file, and released builds cannot open opt-in formats such as DjVu.
+const READABLE_FORMATS = BOOK_FORMATS.filter((format) => !isAudioFormat(format) && !isOptInReaderFormat(format));
 
 function sqlList(values: readonly string[]): SQL {
   return sql.join(

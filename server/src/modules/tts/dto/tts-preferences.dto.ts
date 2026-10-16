@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class UpdateTtsPreferencesDto {
   @IsOptional()
@@ -7,6 +7,7 @@ export class UpdateTtsPreferencesDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   voiceId?: string;
 
   @IsOptional()

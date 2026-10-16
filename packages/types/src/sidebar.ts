@@ -1,4 +1,5 @@
 export const SIDEBAR_SECTION_IDS = [
+  "reading",
   "browse",
   "libraries",
   "podcasts",

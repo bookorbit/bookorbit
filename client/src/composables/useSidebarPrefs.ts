@@ -32,6 +32,7 @@ function isCappedSection(id: SidebarSectionId): id is SidebarCappedSectionId {
 
 function defaultSections(): Record<SidebarSectionId, SidebarSectionState> {
   return {
+    reading: { open: true },
     browse: { open: true },
     libraries: { open: true, cap: SIDEBAR_DEFAULT_CAP },
     podcasts: { open: true, cap: SIDEBAR_DEFAULT_CAP },

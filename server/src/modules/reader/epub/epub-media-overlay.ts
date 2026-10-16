@@ -1,5 +1,6 @@
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
+import { parseEpubPackage } from './epub-package';
 
 import type {
   EpubBookInfo,
@@ -10,11 +11,24 @@ import type {
   EpubTocItem,
 } from '@bookorbit/types';
 
-const smilParser = new XMLParser({
+const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   textNodeName: '#text',
 });
+
+// Grouping same-named children would move a <seq> nested between two <par>s after both.
+const smilParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+  preserveOrder: true,
+});
+
+interface OrderedXmlNode {
+  [name: string]: unknown;
+  ':@'?: Record<string, unknown>;
+}
 
 function toArray<T>(v: T | T[] | undefined | null): T[] {
   if (v == null) return [];
@@ -29,11 +43,9 @@ function safeDecodeURI(path: string): string {
   }
 }
 
-export function normalizeEpubZipPath(path: string): string {
-  const clean = safeDecodeURI((path ?? '').replace(/\\/g, '/')).replace(/^\/+/, '');
-  const parts = clean.split('/');
+function joinZipPathSegments(path: string): string {
   const resolved: string[] = [];
-  for (const part of parts) {
+  for (const part of path.replace(/^\/+/, '').split('/')) {
     if (!part || part === '.') continue;
     if (part === '..') {
       if (resolved.length > 0) resolved.pop();
@@ -42,6 +54,15 @@ export function normalizeEpubZipPath(path: string): string {
     resolved.push(part);
   }
   return resolved.join('/');
+}
+
+export function normalizeEpubZipPath(path: string): string {
+  return joinZipPathSegments(safeDecodeURI((path ?? '').replace(/\\/g, '/')));
+}
+
+/** The same normalization without percent-decoding, for a path that has already been decoded once. */
+export function cleanEpubZipPath(path: string): string {
+  return joinZipPathSegments((path ?? '').replace(/\\/g, '/'));
 }
 
 export function resolveEpubHref(href: string, basePath: string): string {
@@ -57,16 +78,24 @@ function zipDir(path: string): string {
   return path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
 }
 
+/**
+ * An entry named exactly `path` wins. Decoded names are compared only after that: hrefs arrive
+ * decoded, so an entry whose name holds a literal escape such as `%20` is found only that way, but
+ * it must not answer for the entry its escape decodes to.
+ */
 export function findEpubZipEntry(files: unzipper.File[], path: string): unzipper.File | undefined {
+  const exact = cleanEpubZipPath(path);
   const clean = normalizeEpubZipPath(path);
   const cleanLower = clean.toLowerCase();
+  let decodedMatch: unzipper.File | undefined;
   let ciMatch: unzipper.File | undefined;
   for (const file of files) {
+    if (cleanEpubZipPath(file.path) === exact) return file;
     const fp = normalizeEpubZipPath(file.path);
-    if (fp === clean) return file;
+    if (!decodedMatch && fp === clean) decodedMatch = file;
     if (!ciMatch && fp.toLowerCase() === cleanLower) ciMatch = file;
   }
-  return ciMatch;
+  return decodedMatch ?? ciMatch;
 }
 
 function parseClock(value: unknown): number | null {
@@ -92,15 +121,28 @@ function parseClock(value: unknown): number | null {
   return null;
 }
 
-function collectPars(node: unknown, acc: Record<string, unknown>[] = []): Record<string, unknown>[] {
-  if (Array.isArray(node)) {
-    for (const child of node) collectPars(child, acc);
-    return acc;
+function elementName(node: OrderedXmlNode): string | null {
+  for (const key of Object.keys(node)) {
+    if (key !== ':@' && key !== '#text') return key;
   }
-  if (typeof node !== 'object' || node === null) return acc;
-  const obj = node as Record<string, unknown>;
-  if (obj.text != null && obj.audio != null) acc.push(obj);
-  for (const value of Object.values(obj)) collectPars(value, acc);
+  return null;
+}
+
+function elementChildren(node: OrderedXmlNode): OrderedXmlNode[] {
+  const name = elementName(node);
+  const children = name ? node[name] : null;
+  return Array.isArray(children) ? (children as OrderedXmlNode[]) : [];
+}
+
+/** Every element holding both a <text> and an <audio> child, in document order. */
+function collectPars(nodes: OrderedXmlNode[], acc: Array<{ text: OrderedXmlNode; audio: OrderedXmlNode }> = []) {
+  for (const node of nodes) {
+    const children = elementChildren(node);
+    const text = children.find((child) => elementName(child) === 'text');
+    const audio = children.find((child) => elementName(child) === 'audio');
+    if (text && audio) acc.push({ text, audio });
+    collectPars(children, acc);
+  }
   return acc;
 }
 
@@ -110,31 +152,45 @@ function attr(node: unknown, name: string): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function orderedAttr(node: OrderedXmlNode, name: string): string | null {
+  return attr(node[':@'], name);
+}
+
+interface PackageMediaDurations {
+  totalSeconds: number | null;
+  byOverlayId: Map<string, number>;
+}
+
 /**
- * The total narration length every EPUB 3 Media Overlay package must declare, in a
- * `media:duration` meta that refines nothing. It stands in when a clip cannot be measured:
- * Storyteller 2.x ends the last clip of each audio track at the track's real length, which can
- * fall before the clip's start, and one such clip voids the whole clip sum.
+ * The `media:duration` metas every EPUB 3 Media Overlay package must declare: the total, which
+ * refines nothing, and one per overlay document, refining its manifest item. They stand in when a
+ * clip cannot be measured: Storyteller 2.x ends the last clip of each audio track at the track's
+ * real length, which can fall before the clip's start, and one such clip voids the clip sum.
  */
-async function readPackageMediaDurationSeconds(zip: unzipper.CentralDirectory, opfPath: string): Promise<number | null> {
+async function readPackageMediaDurations(zip: unzipper.CentralDirectory, opfPath: string): Promise<PackageMediaDurations> {
+  const durations: PackageMediaDurations = { totalSeconds: null, byOverlayId: new Map() };
   const entry = opfPath ? findEpubZipEntry(zip.files, opfPath) : undefined;
-  if (!entry) return null;
-  let doc: Record<string, unknown>;
+  if (!entry) return durations;
+  let pkg: Record<string, unknown>;
   try {
-    doc = smilParser.parse(await entry.buffer()) as Record<string, unknown>;
+    pkg = parseEpubPackage(await entry.buffer());
   } catch {
-    return null;
+    return durations;
   }
-  const pkg = (doc['package'] ?? doc) as Record<string, unknown>;
   const metadata = pkg['metadata'] as Record<string, unknown> | undefined;
   for (const meta of toArray(metadata?.meta)) {
-    if (attr(meta, 'property') !== 'media:duration' || attr(meta, 'refines') != null) continue;
-    // fast-xml-parser turns a bare timecount such as "21103.35" into a number.
-    const value = (meta as Record<string, unknown>)['#text'];
-    const seconds = typeof value === 'number' ? value : parseClock(value);
-    if (seconds != null && Number.isFinite(seconds) && seconds > 0) return seconds;
+    if (attr(meta, 'property') !== 'media:duration') continue;
+    const seconds = parseClock((meta as Record<string, unknown>)['#text']);
+    if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) continue;
+    const refines = attr(meta, 'refines');
+    if (refines == null) {
+      durations.totalSeconds ??= seconds;
+    } else {
+      const overlayId = refines.replace(/^#/, '');
+      if (overlayId && !durations.byOverlayId.has(overlayId)) durations.byOverlayId.set(overlayId, seconds);
+    }
   }
-  return null;
+  return durations;
 }
 
 function splitHrefFragment(href: string): { href: string; fragment: string | null } {
@@ -147,7 +203,7 @@ async function parseEpubMediaOverlayBookInfo(epubPath: string): Promise<EpubBook
   const containerEntry = findEpubZipEntry(zip.files, 'META-INF/container.xml');
   if (!containerEntry) throw new Error('Missing META-INF/container.xml');
 
-  const containerDoc = smilParser.parse(await containerEntry.buffer()) as Record<string, unknown>;
+  const containerDoc = xmlParser.parse(await containerEntry.buffer()) as Record<string, unknown>;
   const container = containerDoc['container'] as Record<string, unknown>;
   const rootfiles = (container?.rootfiles as Record<string, unknown>)?.rootfile;
   const rootfile: unknown = Array.isArray(rootfiles) ? rootfiles[0] : rootfiles;
@@ -158,8 +214,7 @@ async function parseEpubMediaOverlayBookInfo(epubPath: string): Promise<EpubBook
   const opfEntry = findEpubZipEntry(zip.files, opfPath);
   if (!opfEntry) throw new Error(`OPF not found: ${opfPath}`);
 
-  const opfDoc = smilParser.parse(await opfEntry.buffer()) as Record<string, unknown>;
-  const pkg = (opfDoc['package'] ?? opfDoc) as Record<string, unknown>;
+  const pkg = parseEpubPackage(await opfEntry.buffer());
   const manifestEl = pkg['manifest'] as Record<string, unknown> | undefined;
   const spineEl = pkg['spine'] as Record<string, unknown> | undefined;
 
@@ -239,16 +294,16 @@ async function parseSmilItems(
   const entry = findEpubZipEntry(zip.files, smilHref);
   if (!entry) return [];
   const smilDir = zipDir(smilHref);
-  const doc = smilParser.parse(await entry.buffer()) as Record<string, unknown>;
+  const doc = smilParser.parse(await entry.buffer()) as OrderedXmlNode[];
   return collectPars(doc)
     .map((par) => {
-      const textSrc = attr(par.text, 'src');
-      const audioSrc = attr(par.audio, 'src');
+      const textSrc = orderedAttr(par.text, 'src');
+      const audioSrc = orderedAttr(par.audio, 'src');
       if (!textSrc || !audioSrc) return null;
       const text = splitHrefFragment(resolveEpubHref(textSrc, smilDir));
       const audio = splitHrefFragment(resolveEpubHref(audioSrc, smilDir));
-      const begin = parseClock(attr(par.audio, 'clipBegin')) ?? 0;
-      const end = parseClock(attr(par.audio, 'clipEnd'));
+      const begin = parseClock(orderedAttr(par.audio, 'clipBegin')) ?? 0;
+      const end = parseClock(orderedAttr(par.audio, 'clipEnd'));
       const duration = end != null && end >= begin ? end - begin : null;
       return {
         textHref: text.href,
@@ -278,6 +333,9 @@ export async function buildEpubMediaOverlayPlaylist(
   const audioHrefs = new Set<string>();
   let totalKnownDuration = 0;
   let hasUnknownDuration = false;
+  let clockSeconds = 0;
+  let packageDurations: Promise<PackageMediaDurations> | undefined;
+  const loadPackageDurations = () => (packageDurations ??= readPackageMediaDurations(zip, info.containerPath));
 
   for (let sectionIndex = 0; sectionIndex < info.spine.length; sectionIndex += 1) {
     const spineItem = info.spine[sectionIndex];
@@ -288,18 +346,19 @@ export async function buildEpubMediaOverlayPlaylist(
     const overlay = manifestById.get(overlayId);
     if (!overlay) continue;
 
-    const sectionStart = totalKnownDuration;
-    let sectionDuration: number | null = 0;
+    const sectionStart = clockSeconds;
+    let knownSectionSeconds = 0;
+    let sectionHasUnknownClip = false;
     const smilItems = await parseSmilItems(zip, overlay.href);
     for (const smilItem of smilItems) {
       const audioManifest = manifestByHref.get(smilItem.audioHref);
       audioHrefs.add(smilItem.audioHref);
       if (smilItem.durationSeconds == null) {
         hasUnknownDuration = true;
-        sectionDuration = null;
+        sectionHasUnknownClip = true;
       } else {
         totalKnownDuration += smilItem.durationSeconds;
-        if (sectionDuration != null) sectionDuration += smilItem.durationSeconds;
+        knownSectionSeconds += smilItem.durationSeconds;
       }
       items.push({
         index: items.length,
@@ -315,6 +374,14 @@ export async function buildEpubMediaOverlayPlaylist(
         label: tocLabels.get(smilItem.textHref) ?? tocLabels.get(spineItem.href) ?? null,
       });
     }
+
+    let sectionDuration: number | null = knownSectionSeconds;
+    if (sectionHasUnknownClip) {
+      // A declared length shorter than the clips already measured is wrong; the section stays unknown.
+      const declared = (await loadPackageDurations()).byOverlayId.get(overlayId);
+      sectionDuration = declared != null && declared >= knownSectionSeconds ? declared : null;
+    }
+    clockSeconds += sectionDuration ?? knownSectionSeconds;
 
     if (smilItems.length > 0) {
       sections.push({
@@ -340,7 +407,7 @@ export async function buildEpubMediaOverlayPlaylist(
   return {
     bookId,
     fileId,
-    durationSeconds: hasUnknownDuration ? await readPackageMediaDurationSeconds(zip, info.containerPath) : totalKnownDuration,
+    durationSeconds: hasUnknownDuration ? (await loadPackageDurations()).totalSeconds : totalKnownDuration,
     items,
     sections,
     resources,
@@ -369,7 +436,7 @@ export async function inspectEpubMediaOverlayFile(epubPath: string): Promise<Epu
   const containerEntry = findEpubZipEntry(zip.files, 'META-INF/container.xml');
   if (!containerEntry) return { available: false, durationSeconds: null };
 
-  const containerDoc = smilParser.parse(await containerEntry.buffer()) as Record<string, unknown>;
+  const containerDoc = xmlParser.parse(await containerEntry.buffer()) as Record<string, unknown>;
   const container = containerDoc['container'] as Record<string, unknown>;
   const rootfiles = (container?.rootfiles as Record<string, unknown>)?.rootfile;
   const rootfile: unknown = Array.isArray(rootfiles) ? rootfiles[0] : rootfiles;
@@ -380,8 +447,7 @@ export async function inspectEpubMediaOverlayFile(epubPath: string): Promise<Epu
   const opfEntry = findEpubZipEntry(zip.files, opfPath);
   if (!opfEntry) return { available: false, durationSeconds: null };
 
-  const opfDoc = smilParser.parse(await opfEntry.buffer()) as Record<string, unknown>;
-  const pkg = (opfDoc['package'] ?? opfDoc) as Record<string, unknown>;
+  const pkg = parseEpubPackage(await opfEntry.buffer());
   const manifestEl = pkg['manifest'] as Record<string, unknown> | undefined;
   const spineEl = pkg['spine'] as Record<string, unknown> | undefined;
 

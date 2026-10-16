@@ -71,6 +71,16 @@
   --color-path-dim: var(--path-dim);
   --color-path-fold: var(--path-fold);
 
+  --color-rarity-common: var(--rarity-common);
+  --color-rarity-rare: var(--rarity-rare);
+  --color-rarity-epic: var(--rarity-epic);
+  --color-rarity-legendary: var(--rarity-legendary);
+  --color-rarity-common-fill: var(--rarity-common-fill);
+  --color-rarity-rare-fill: var(--rarity-rare-fill);
+  --color-rarity-epic-fill: var(--rarity-epic-fill);
+  --color-rarity-legendary-fill: var(--rarity-legendary-fill);
+  --color-shelf-line: var(--shelf-line);
+
   --shadow-xs: var(--elevation-xs);
   --shadow-sm: var(--elevation-sm);
   --shadow-md: var(--elevation-md);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Image } from '@lucide/vue'
@@ -12,12 +12,15 @@ import {
   type BookShadowStrength,
   type BookSpineOverlay,
   type CardOverlayKey,
+  type PlaceholderCoverStyle,
 } from '@/composables/useDisplaySettings'
+import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
 import { useCoverSearchPreferences } from '@/features/book/composables/useCoverSearchPreferences'
 
 const { t } = useI18n()
 
-const { cardOverlays, bookSpineOverlay, showSpineOnComics, bookShadowStrength, bookCoverDisplayMode, bookDetailCoverTint } = useDisplaySettings()
+const { cardOverlays, bookSpineOverlay, showSpineOnComics, bookShadowStrength, bookCoverDisplayMode, bookDetailCoverTint, placeholderCoverStyle } =
+  useDisplaySettings()
 const {
   defaultProvider: defaultCoverSearchProvider,
   isLoading: isCoverSearchPreferenceLoading,
@@ -25,6 +28,90 @@ const {
   load: loadCoverSearchPreferences,
   update: updateCoverSearchPreferences,
 } = useCoverSearchPreferences()
+
+// Bibliographic sample data, so it stays untranslated like any other book in the library. The set
+// spans short and long titles, a series, and several genres, since each style colours by genre.
+interface PlaceholderSample {
+  title: string
+  subtitle: string | null
+  authors: string[]
+  seriesName: string | null
+  seriesIndex: string | null
+  genres: string[]
+  seed: string
+}
+
+const PLACEHOLDER_SAMPLES: PlaceholderSample[] = [
+  {
+    title: 'Emma',
+    subtitle: null,
+    authors: ['Jane Austen'],
+    seriesName: null,
+    seriesIndex: null,
+    genres: ['Romance', 'Classics'],
+    seed: 'sample-emma',
+  },
+  {
+    title: 'The Hound of the Baskervilles',
+    subtitle: null,
+    authors: ['Arthur Conan Doyle'],
+    seriesName: 'Sherlock Holmes',
+    seriesIndex: '3',
+    genres: ['Mystery'],
+    seed: 'sample-hound',
+  },
+  {
+    title: 'Frankenstein',
+    subtitle: 'The Modern Prometheus',
+    authors: ['Mary Shelley'],
+    seriesName: null,
+    seriesIndex: null,
+    genres: ['Horror', 'Classics'],
+    seed: 'sample-frankenstein',
+  },
+  {
+    title: 'Twenty Thousand Leagues Under the Seas',
+    subtitle: null,
+    authors: ['Jules Verne'],
+    seriesName: null,
+    seriesIndex: null,
+    genres: ['Science Fiction'],
+    seed: 'sample-leagues',
+  },
+  {
+    title: "Alice's Adventures in Wonderland",
+    subtitle: null,
+    authors: ['Lewis Carroll'],
+    seriesName: null,
+    seriesIndex: null,
+    genres: ['Fantasy'],
+    seed: 'sample-alice',
+  },
+  {
+    title: 'Meditations',
+    subtitle: null,
+    authors: ['Marcus Aurelius'],
+    seriesName: null,
+    seriesIndex: null,
+    genres: ['Philosophy'],
+    seed: 'sample-meditations',
+  },
+]
+
+const hoveredPlaceholderStyle = ref<PlaceholderCoverStyle | null>(null)
+const shownPlaceholderStyle = computed(() => hoveredPlaceholderStyle.value ?? placeholderCoverStyle.value)
+
+const placeholderStyleOptions = computed<{ id: PlaceholderCoverStyle; label: string }[]>(() => [
+  { id: 'bauhaus', label: t('settings.appearance.bookCovers.placeholderStyle.options.bauhaus') },
+  { id: 'constructivist', label: t('settings.appearance.bookCovers.placeholderStyle.options.constructivist') },
+  { id: 'memphis', label: t('settings.appearance.bookCovers.placeholderStyle.options.memphis') },
+  { id: 'clothbound', label: t('settings.appearance.bookCovers.placeholderStyle.options.clothbound') },
+  { id: 'poster', label: t('settings.appearance.bookCovers.placeholderStyle.options.poster') },
+  { id: 'aurora', label: t('settings.appearance.bookCovers.placeholderStyle.options.aurora') },
+  { id: 'vista', label: t('settings.appearance.bookCovers.placeholderStyle.options.vista') },
+  { id: 'marbled', label: t('settings.appearance.bookCovers.placeholderStyle.options.marbled') },
+  { id: 'paperback', label: t('settings.appearance.bookCovers.placeholderStyle.options.paperback') },
+])
 
 const coverSearchProviderOptions = computed<{ id: CoverSearchDefaultProvider; label: string }[]>(() => [
   { id: 'duckduckgo', label: 'DuckDuckGo' },
@@ -146,6 +233,18 @@ function setBookShadowStrength(mode: BookShadowStrength) {
   bookShadowStrength.value = mode
 }
 
+function setPlaceholderCoverStyle(style: PlaceholderCoverStyle) {
+  placeholderCoverStyle.value = style
+}
+
+function previewPlaceholderStyle(style: PlaceholderCoverStyle) {
+  hoveredPlaceholderStyle.value = style
+}
+
+function endPlaceholderPreview() {
+  hoveredPlaceholderStyle.value = null
+}
+
 function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
   bookCoverDisplayMode.value = mode
 }
@@ -194,6 +293,51 @@ onMounted(async () => {
             {{ provider.label }}
           </option>
         </select>
+      </div>
+      <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div>
+          <p id="placeholder-style-label" class="settings-label">
+            {{ t('settings.appearance.bookCovers.placeholderStyle.title') }}
+          </p>
+          <p class="settings-hint">
+            {{ t('settings.appearance.bookCovers.placeholderStyle.hint') }}
+          </p>
+        </div>
+        <div
+          class="mt-3 inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1"
+          role="group"
+          aria-labelledby="placeholder-style-label"
+          @mouseleave="endPlaceholderPreview"
+          @focusout="endPlaceholderPreview"
+        >
+          <button
+            v-for="opt in placeholderStyleOptions"
+            :key="opt.id"
+            type="button"
+            class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :class="placeholderCoverStyle === opt.id ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+            :aria-pressed="placeholderCoverStyle === opt.id"
+            @click="setPlaceholderCoverStyle(opt.id)"
+            @mouseenter="previewPlaceholderStyle(opt.id)"
+            @focus="previewPlaceholderStyle(opt.id)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <div class="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6" data-testid="placeholder-style-preview">
+          <span v-for="sample in PLACEHOLDER_SAMPLES" :key="sample.seed" class="relative block aspect-[2/3] overflow-hidden rounded-sm shadow-sm">
+            <BookCoverPlaceholder
+              :title="sample.title"
+              :subtitle="sample.subtitle"
+              :authors="sample.authors"
+              :series-name="sample.seriesName"
+              :series-index="sample.seriesIndex"
+              :genres="sample.genres"
+              :seed="sample.seed"
+              :variant="shownPlaceholderStyle"
+            />
+          </span>
+        </div>
       </div>
       <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>

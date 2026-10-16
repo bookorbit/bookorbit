@@ -212,7 +212,7 @@ export class CoverService {
   private async verifyAccess(bookId: number, user: RequestUser): Promise<void> {
     const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+    await this.libraryService.verifyUserAccessLevel(user.id, libraryId, user.isSuperuser, 'editor');
   }
 
   /**

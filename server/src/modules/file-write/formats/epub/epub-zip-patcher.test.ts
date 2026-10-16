@@ -1,186 +1,70 @@
-import { EventEmitter } from 'events';
-import { PassThrough, Readable } from 'stream';
-import type { MockedFunction } from 'vitest';
-import { createWriteStream } from 'fs';
-import * as fs from 'fs/promises';
 import * as unzipper from 'unzipper';
-import { ZipArchive } from 'archiver';
-
+import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { rewriteEpubZip } from './epub-zip-rewrite';
 import { listEntryPaths, patch, readEntry } from './epub-zip-patcher';
 
-vi.mock('fs', async () => {
-  const actual = await vi.importActual('fs');
-  return {
-    ...actual,
-    createWriteStream: vi.fn(),
-  };
-});
+vi.mock('unzipper', () => ({ Open: { file: vi.fn() } }));
+vi.mock('./epub-zip-rewrite', () => ({ rewriteEpubZip: vi.fn() }));
+vi.mock('../shared/atomic-file-replace', () => ({ replaceFileAtomically: vi.fn() }));
 
-vi.mock('fs/promises', async () => {
-  const actual = await vi.importActual('fs/promises');
-  return {
-    ...actual,
-    rename: vi.fn(),
-    unlink: vi.fn(),
-  };
-});
-
-vi.mock('unzipper', () => ({
-  Open: {
-    file: vi.fn(),
-  },
-}));
-
-let lastArchive: EventEmitter & {
-  append: vi.Mock;
-  pipe: vi.Mock;
-  finalize: vi.Mock;
-};
-
-const processedEntries: string[] = [];
-
-vi.mock('archiver', () => ({
-  ZipArchive: vi.fn(function () {
-    let output: EventEmitter | null = null;
-    const emitter = new EventEmitter() as EventEmitter & {
-      append: vi.Mock;
-      pipe: vi.Mock;
-      finalize: vi.Mock;
-    };
-    // The real archiver emits `entry` once it has consumed and written an appended source.
-    emitter.append = vi.fn((source: unknown, data: { name: string }) => {
-      if (source instanceof Readable) source.resume();
-      setImmediate(() => {
-        processedEntries.push(data.name);
-        emitter.emit('entry', data);
-      });
-      return emitter;
-    });
-    emitter.pipe = vi.fn((out: EventEmitter) => {
-      output = out;
-    });
-    emitter.finalize = vi.fn(() => {
-      setImmediate(() => output?.emit('close'));
-    });
-    lastArchive = emitter;
-    return emitter;
-  }),
-}));
-
-const mockCreateWriteStream = createWriteStream as MockedFunction<typeof createWriteStream>;
-const mockRename = fs.rename as MockedFunction<typeof fs.rename>;
-const mockUnlink = fs.unlink as MockedFunction<typeof fs.unlink>;
-const mockOpenFile = unzipper.Open.file as MockedFunction<typeof unzipper.Open.file>;
-const streamFrom = (value: string) => Readable.from([Buffer.from(value)]);
+const mockOpenFile = vi.mocked(unzipper.Open.file);
+const mockRewrite = vi.mocked(rewriteEpubZip);
+const mockReplace = vi.mocked(replaceFileAtomically);
 
 describe('epub-zip-patcher', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    processedEntries.length = 0;
-    mockCreateWriteStream.mockImplementation(() => new PassThrough() as never);
-    mockRename.mockResolvedValue(undefined);
-    mockUnlink.mockResolvedValue(undefined);
+    vi.resetAllMocks();
+    mockRewrite.mockResolvedValue(undefined);
+    mockReplace.mockResolvedValue(undefined);
   });
 
-  it('readEntry returns UTF-8 text for existing entry', async () => {
+  it('readEntry returns UTF-8 text for an existing entry', async () => {
     mockOpenFile.mockResolvedValue({
       files: [{ path: 'OPS/content.opf', buffer: vi.fn().mockResolvedValue(Buffer.from('<package/>')) }],
     } as never);
-
-    await expect(readEntry('/book.epub', 'OPS/content.opf')).resolves.toBe('<package/>');
+    await expect(readEntry('/path/to/book.epub', 'OPS/content.opf')).resolves.toBe('<package/>');
   });
 
-  it('readEntry throws for missing entry', async () => {
+  it('readEntry rejects a missing entry', async () => {
     mockOpenFile.mockResolvedValue({ files: [] } as never);
-
-    await expect(readEntry('/book.epub', 'OPS/content.opf')).rejects.toThrow('Entry not found in EPUB: OPS/content.opf');
+    await expect(readEntry('/path/to/book.epub', 'OPS/content.opf')).rejects.toThrow('Entry not found in EPUB: OPS/content.opf');
   });
 
   it('lists every occupied archive entry path', async () => {
-    mockOpenFile.mockResolvedValue({
-      files: [{ path: 'mimetype' }, { path: 'OPS/content.opf' }, { path: 'OPS/images/cover.webp' }],
-    } as never);
-
-    await expect(listEntryPaths('/book.epub')).resolves.toEqual(['mimetype', 'OPS/content.opf', 'OPS/images/cover.webp']);
+    mockOpenFile.mockResolvedValue({ files: [{ path: 'mimetype' }, { path: 'OPS/content.opf' }, { path: 'OPS/images/cover.webp' }] } as never);
+    await expect(listEntryPaths('/path/to/book.epub')).resolves.toEqual(['mimetype', 'OPS/content.opf', 'OPS/images/cover.webp']);
   });
 
-  it('patch writes mimetype first, patches existing entries, and appends new ones', async () => {
-    const opfEntry = { path: 'OPS/content.opf', stream: vi.fn(() => Buffer.from('old-opf')) };
-    const chapterEntry = { path: 'OPS/ch1.xhtml', stream: vi.fn(() => streamFrom('old-ch1')) };
-    const mimetypeEntry = { path: 'mimetype', stream: vi.fn(() => streamFrom('old-mimetype')) };
-
-    mockOpenFile.mockResolvedValue({ files: [mimetypeEntry, opfEntry, chapterEntry] } as never);
-
-    const patches = new Map<string, Buffer>([
-      ['OPS/content.opf', Buffer.from('new-opf')],
-      ['OPS/images/cover.jpg', Buffer.from('new-cover')],
-    ]);
-
-    await patch('/book.epub', patches);
-
-    expect(ZipArchive).toHaveBeenCalledWith({ zlib: { level: 6 } });
-    expect(lastArchive.append).toHaveBeenNthCalledWith(1, Buffer.from('application/epub+zip'), { name: 'mimetype', store: true });
-    expect(lastArchive.append).toHaveBeenCalledWith(Buffer.from('new-opf'), { name: 'OPS/content.opf' });
-    expect(chapterEntry.stream).toHaveBeenCalledTimes(1);
-    expect(lastArchive.append).toHaveBeenCalledWith(expect.objectContaining({ pipe: expect.any(Function) }), { name: 'OPS/ch1.xhtml' });
-    expect(lastArchive.append).toHaveBeenCalledWith(Buffer.from('new-cover'), { name: 'OPS/images/cover.jpg' });
-    expect(mockRename).toHaveBeenCalledWith(expect.stringMatching(/^\/\.epub-write-[0-9a-f-]{36}$/), '/book.epub');
+  it('replaces the original only after the rewrite completes', async () => {
+    const patches = new Map([['OPS/content.opf', Buffer.from('new-opf')]]);
+    mockRewrite.mockImplementation(() => {
+      expect(mockReplace).not.toHaveBeenCalled();
+      return Promise.resolve();
+    });
+    await patch('/path/to/book.epub', patches);
+    const tempPath = mockRewrite.mock.calls[0]![1];
+    expect(tempPath).toMatch(/^\/path\/to\/\.epub-write-[0-9a-f-]{36}$/);
+    expect(mockRewrite).toHaveBeenCalledWith('/path/to/book.epub', tempPath, patches);
+    expect(mockReplace).toHaveBeenCalledWith(tempPath, '/path/to/book.epub');
   });
 
-  it('writes beside the book under a hidden random name that never grows with the file name', async () => {
-    mockOpenFile.mockResolvedValue({ files: [] } as never);
-    const longName = `/library/${'L'.repeat(250)}.epub`;
-
+  it('uses distinct short temporary names even for a long book filename', async () => {
+    const longName = `/path/to/${'L'.repeat(250)}.epub`;
     await patch(longName, new Map());
-
-    const [tempPath, target] = mockRename.mock.calls[0]!;
-    expect(target).toBe(longName);
-    expect(String(tempPath)).toMatch(/^\/library\/\.epub-write-[0-9a-f-]{36}$/);
+    await patch(longName, new Map());
+    const paths = mockRewrite.mock.calls.map((call) => call[1]);
+    expect(paths[0]).not.toBe(paths[1]);
+    for (const path of paths) expect(path).toMatch(/^\/path\/to\/\.epub-write-[0-9a-f-]{36}$/);
   });
 
-  it('opens each carried-over entry stream only after the previous entry was written', async () => {
-    const openedAfter: string[][] = [];
-    const carried = ['OPS/ch1.xhtml', 'OPS/ch2.xhtml', 'OPS/ch3.xhtml'].map((path) => ({
-      path,
-      stream: vi.fn(() => {
-        openedAfter.push([...processedEntries]);
-        return streamFrom(path);
-      }),
-    }));
-
-    mockOpenFile.mockResolvedValue({ files: carried } as never);
-
-    await patch('/book.epub', new Map());
-
-    expect(openedAfter).toEqual([['mimetype'], ['mimetype', 'OPS/ch1.xhtml'], ['mimetype', 'OPS/ch1.xhtml', 'OPS/ch2.xhtml']]);
-    expect(processedEntries).toEqual(['mimetype', 'OPS/ch1.xhtml', 'OPS/ch2.xhtml', 'OPS/ch3.xhtml']);
-    for (const entry of carried) expect(entry.stream).toHaveBeenCalledTimes(1);
+  it('never replaces the original when the rewrite fails', async () => {
+    mockRewrite.mockRejectedValue(new Error('read failed'));
+    await expect(patch('/path/to/book.epub', new Map())).rejects.toThrow('read failed');
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('rejects when a source entry stream errors while patching', async () => {
-    const sourceError = Object.assign(new Error('ENOENT: no such file or directory, open /book.epub'), { code: 'ENOENT' });
-    const missingEntry = {
-      path: 'OPS/ch1.xhtml',
-      stream: vi.fn(() => {
-        const source = new PassThrough();
-        process.nextTick(() => source.emit('error', sourceError));
-        return source;
-      }),
-    };
-    mockOpenFile.mockResolvedValue({ files: [missingEntry] } as never);
-
-    await expect(patch('/book.epub', new Map())).rejects.toThrow('ENOENT');
-
-    expect(missingEntry.stream).toHaveBeenCalledTimes(1);
-    expect(mockRename).not.toHaveBeenCalled();
-    expect(mockUnlink).toHaveBeenCalledWith(expect.stringMatching(/^\/\.epub-write-/));
-  });
-
-  it('deletes temp file when rename fails', async () => {
-    mockOpenFile.mockResolvedValue({ files: [] } as never);
-    mockRename.mockRejectedValue(new Error('rename failed'));
-
-    await expect(patch('/book.epub', new Map())).rejects.toThrow('rename failed');
-    expect(mockUnlink).toHaveBeenCalledWith(mockRename.mock.calls[0]![0]);
+  it('propagates atomic replacement failures', async () => {
+    mockReplace.mockRejectedValue(new Error('rename failed'));
+    await expect(patch('/path/to/book.epub', new Map())).rejects.toThrow('rename failed');
   });
 });

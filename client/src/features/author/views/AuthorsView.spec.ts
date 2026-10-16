@@ -4,7 +4,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import type { AuthorSummary } from '@bookorbit/types'
 import type { AuthorListSort, SortDirection } from '../types/author'
 import AuthorsView from './AuthorsView.vue'
-import AuthorFilterChips from '../components/AuthorFilterChips.vue'
+import BrowseHeader from '@/components/browse-header/BrowseHeader.vue'
 
 class MockIntersectionObserver {
   observe = vi.fn<(target: Element) => void>()
@@ -73,6 +73,10 @@ vi.mock('@/features/library/composables/useLibraries', () => ({
   useLibraries: () => ({ libraries: ref([]), fetchLibraries: mocks.fetchLibraries }),
 }))
 
+vi.mock('@/features/library/composables/useLibraryPermissions', () => ({
+  useLibraryPermissions: () => ({ hasLibraryPermission: () => true, hasPermissionInAnyLibrary: () => true }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: () => true, isDemoRestrictedAccount: ref(false), isSuperuser: ref(false) }),
 }))
@@ -139,6 +143,20 @@ async function mountView() {
   return wrapper
 }
 
+/** Renders the header's bar so its controls can be driven; everything else stays shallow. */
+async function mountWithBar() {
+  const wrapper = shallowMount(AuthorsView, {
+    global: {
+      stubs: {
+        BrowseHeader: { template: '<div data-testid="browse-header"><slot name="bar" /></div>' },
+        BrowseInlineGroup: { template: '<div><slot /></div>' },
+      },
+    },
+  })
+  await flushPromises()
+  return wrapper
+}
+
 describe('AuthorsView', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
@@ -169,14 +187,14 @@ describe('AuthorsView', () => {
     vi.clearAllMocks()
   })
 
-  it('keeps the filter chips outside the scrolling <main> so they stay anchored', async () => {
+  it('keeps the quick filters outside the scrolling <main> so they stay anchored', async () => {
     const wrapper = await mountView()
 
     expect(wrapper.find('main').exists()).toBe(true)
-    const chips = wrapper.findComponent(AuthorFilterChips)
-    expect(chips.exists()).toBe(true)
+    const header = wrapper.findComponent(BrowseHeader)
+    expect(header.exists()).toBe(true)
     // Regression guard for #326: filters must NOT live inside the scroll container.
-    expect(chips.element.closest('main')).toBeNull()
+    expect(header.element.closest('main')).toBeNull()
   })
 
   it('hydrates a quick filter from the route into the matching list filters', async () => {
@@ -191,11 +209,13 @@ describe('AuthorsView', () => {
 
   it('treats the quick filters as mutually exclusive', async () => {
     mocks.route.query = { filter: 'multipleBooks' }
-    const wrapper = await mountView()
+    const wrapper = await mountWithBar()
 
     expect(mocks.minBookCount.value).toBe(2)
 
-    wrapper.findComponent(AuthorFilterChips).vm.$emit('update:quickFilter', 'recentlyAdded')
+    const quickFilters = wrapper.get('[data-testid="browse-header"]').findAll('button[aria-pressed]')
+    // All, No portrait, 2+ books, Added this week, No sort name.
+    await quickFilters[3]!.trigger('click')
     await flushPromises()
 
     expect(mocks.minBookCount.value).toBeNull()

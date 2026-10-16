@@ -33,6 +33,7 @@ import { useCoverVersions } from '../composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -61,6 +62,8 @@ const emit = defineEmits<{
 }>()
 
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { thumbnailClickAction } = useDisplaySettings()
 const showSendDialog = ref(false)
 
@@ -331,6 +334,11 @@ function handleRowClick(event: MouseEvent) {
         backdrop-class="blur-md brightness-50"
         :spine="!isAudiobook"
         :is-comic="isComic"
+        :authors="book.authors"
+        :subtitle="book.subtitle"
+        :series-name="book.seriesName"
+        :series-index="book.seriesIndex"
+        :genres="book.genres"
       />
     </BookCoverSurface>
 
@@ -421,19 +429,16 @@ function handleRowClick(event: MouseEvent) {
             {{ t('book.actions.bookDetails') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            v-if="hasPermission('library_edit_metadata')"
-            @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
-          >
+          <DropdownMenuItem v-if="canEditMetadata" @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
             <Pencil class="size-4 mr-2" />
             {{ t('book.actions.editMetadata') }}
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
+          <DropdownMenuItem v-if="canEditMetadata" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
             <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
             <RefreshCw v-else class="size-4 mr-2" />
             {{ t('book.actions.refreshMetadata') }}
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="allowMoveToLibrary && hasPermission('library_edit_metadata')" @click="emit('action', 'move-to-library')">
+          <DropdownMenuItem v-if="allowMoveToLibrary && canEditMetadata" @click="emit('action', 'move-to-library')">
             <FolderInput class="size-4 mr-2" />
             {{ t('book.move.action') }}
           </DropdownMenuItem>

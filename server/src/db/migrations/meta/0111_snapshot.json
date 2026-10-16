@@ -1,5 +1,5 @@
 {
-  "id": "500a3149-7bef-4e66-affd-e560f3005ed0",
+  "id": "68149e7c-5627-424c-b6ea-dbc600d2f9ec",
   "prevId": "aa0873fc-44ae-4a3a-808a-6fcfda65b34f",
   "version": "7",
   "dialect": "postgresql",
@@ -10153,12 +10153,6 @@
           "type": "real",
           "primaryKey": false,
           "notNull": false
-        },
-        "sync_interval_started_at": {
-          "name": "sync_interval_started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -18941,6 +18935,135 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.koreader_session_tombstones": {
+      "name": "koreader_session_tombstones",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "book_file_id": {
+          "name": "book_file_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_key": {
+          "name": "device_key",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "kst_user_file_device_start_idx": {
+          "name": "kst_user_file_device_start_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_time",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "koreader_session_tombstones_book_file_id_idx": {
+          "name": "koreader_session_tombstones_book_file_id_idx",
+          "columns": [
+            {
+              "expression": "book_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "koreader_session_tombstones_user_id_users_id_fk": {
+          "name": "koreader_session_tombstones_user_id_users_id_fk",
+          "tableFrom": "koreader_session_tombstones",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "koreader_session_tombstones_book_file_id_book_files_id_fk": {
+          "name": "koreader_session_tombstones_book_file_id_book_files_id_fk",
+          "tableFrom": "koreader_session_tombstones",
+          "tableTo": "book_files",
+          "columnsFrom": ["book_file_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "koreader_session_tombstones_range_chk": {
+          "name": "koreader_session_tombstones_range_chk",
+          "value": "\"koreader_session_tombstones\".\"end_time\" > \"koreader_session_tombstones\".\"start_time\""
+        }
+      },
       "isRLSEnabled": false
     },
     "public.koreader_unmatched_book_devices": {

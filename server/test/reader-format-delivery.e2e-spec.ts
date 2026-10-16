@@ -50,7 +50,13 @@ function escapeXml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 }
 
-async function createReaderDeliveryEpub(rootPath: string, relativePath: string, title: string): Promise<string> {
+async function createReaderDeliveryEpub(
+  rootPath: string,
+  relativePath: string,
+  title: string,
+  options: { metadataPrefix?: string; language?: string } = {},
+): Promise<string> {
+  const metadataPrefix = options.metadataPrefix ?? '';
   const identifier = `urn:uuid:${randomUUID()}`;
   const author = 'Reader Fixture Author';
   const publisher = 'Reader Fixture Publisher';
@@ -63,15 +69,15 @@ async function createReaderDeliveryEpub(rootPath: string, relativePath: string, 
 </container>`;
   const opfXml = `<?xml version="1.0" encoding="UTF-8"?>
 <package version="3.0" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <${metadataPrefix}metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
     <dc:identifier id="uid">${escapeXml(identifier)}</dc:identifier>
     <dc:title>${escapeXml(title)}</dc:title>
     <dc:creator>${escapeXml(author)}</dc:creator>
-    <dc:language>en</dc:language>
+    <dc:language>${escapeXml(options.language ?? 'en')}</dc:language>
     <dc:publisher>${escapeXml(publisher)}</dc:publisher>
     <dc:description>${escapeXml(description)}</dc:description>
     <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
-  </metadata>
+  </${metadataPrefix}metadata>
   <manifest>
     <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
@@ -125,6 +131,7 @@ describe('Reader format delivery (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
   let hiddenLibrary!: Awaited<ReturnType<typeof createLibraryWithFolder>>;
 
   let sharedEpub!: LocatedBookFile;
+  let prefixedEpub!: LocatedBookFile;
   let sharedCbz!: LocatedBookFile;
   let hiddenEpub!: LocatedBookFile;
 
@@ -139,6 +146,15 @@ describe('Reader format delivery (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
     hiddenLibrary = await createLibraryWithFolder(ctx, { name: `reader-delivery-hidden-${randomUUID()}` });
 
     const sharedEpubPath = await createReaderDeliveryEpub(sharedLibrary.folderPath, 'delivery/reader-delivery.epub', 'Reader Delivery EPUB');
+    const prefixedEpubPath = await createReaderDeliveryEpub(
+      sharedLibrary.folderPath,
+      'delivery/prefixed-metadata.epub',
+      'Portuguese Namespace EPUB',
+      {
+        metadataPrefix: 'opf:',
+        language: 'pt',
+      },
+    );
     const sharedCbzPath = await createReaderDeliveryCbz(sharedLibrary.folderPath, 'delivery/reader-delivery.cbz', 'Reader Delivery Comic');
     const hiddenEpubPath = await createEpubFixture(hiddenLibrary.folderPath, 'restricted/hidden-reader.epub', {
       title: 'Hidden Reader EPUB',
@@ -148,6 +164,7 @@ describe('Reader format delivery (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
     await triggerAndWaitForLibraryScan(ctx, hiddenLibrary.libraryId);
 
     sharedEpub = await locateBookByAbsolutePath(ctx, sharedEpubPath);
+    prefixedEpub = await locateBookByAbsolutePath(ctx, prefixedEpubPath);
     sharedCbz = await locateBookByAbsolutePath(ctx, sharedCbzPath);
     hiddenEpub = await locateBookByAbsolutePath(ctx, hiddenEpubPath);
 
@@ -167,6 +184,30 @@ describe('Reader format delivery (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
   });
 
   describe('EPUB info and asset delivery', () => {
+    it('returns Portuguese metadata and readable chapters for the prefixed metadata reported in issue 1789', async () => {
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/epub/${prefixedEpub.bookId}/info?fileId=${prefixedEpub.bookFileId}`,
+        headers: authHeader(viewer.accessToken),
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        metadata: { title: 'Portuguese Namespace EPUB', creator: 'Reader Fixture Author', language: 'pt' },
+        spine: [{ idref: 'chapter', href: 'OPS/chapter.xhtml', mediaType: 'application/xhtml+xml', linear: true }],
+        coverPath: 'OPS/images/cover image.png',
+      });
+
+      const chapter = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/epub/${prefixedEpub.bookId}/file/OPS/chapter.xhtml?fileId=${prefixedEpub.bookFileId}`,
+        headers: authHeader(viewer.accessToken),
+      });
+      expect(chapter.statusCode).toBe(200);
+      expect(chapter.headers['content-type']).toContain('application/xhtml+xml');
+      expect(chapter.body).toContain('Portuguese Namespace EPUB');
+    });
+
     it('returns the EPUB info shape the reader expects and serves manifest and optional files', async () => {
       const infoResponse = await ctx.app.inject({
         method: 'GET',
@@ -338,8 +379,17 @@ describe('Reader format delivery (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
       });
       expect(firstPageResponse.statusCode).toBe(200);
       expect(firstPageResponse.headers['content-type']).toContain('image/png');
-      expect(firstPageResponse.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+      expect(firstPageResponse.headers['cache-control']).toBe('private, no-cache');
+      expect(firstPageResponse.headers.etag).toEqual(expect.stringMatching(/^".+"$/));
       expect(responseBuffer(firstPageResponse)).toEqual(PAGE_PNG);
+
+      const revalidatedPageResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/cbz/files/${sharedCbz.bookFileId}/pages/0`,
+        headers: { ...authHeader(viewer.accessToken), 'if-none-match': String(firstPageResponse.headers.etag) },
+      });
+      expect(revalidatedPageResponse.statusCode).toBe(304);
+      expect(revalidatedPageResponse.headers.etag).toBe(firstPageResponse.headers.etag);
 
       const secondPageResponse = await ctx.app.inject({
         method: 'GET',

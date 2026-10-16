@@ -17,7 +17,7 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
  * - `tag` - resolved via `book_tags` join to `tags.name`
  * - `collection` - resolved via `collection_books` join to `collections.name`
  * - `library` - resolved via `books.library_id` join to `libraries.name`
- * - `format` - resolved via `book_files.format` (primary file)
+ * - `format` - matches `book_files.format` on any of the book's files, not only the primary one
  * - `fileSize` - resolved via `book_files.size_bytes` (primary file; rule values are bytes)
  * - `isbn` - matches both `isbn10` and `isbn13` in `book_metadata`
  * - `publishedDate` - uses full dates when available and falls back to published year

@@ -192,7 +192,7 @@ describe('CoverSlotReconciler on real files', () => {
     const { CoverSlotReconciler } = await import('./cover-slot-reconciler.service');
     repository = new MemoryCoverRepository(helpers);
     const store = new BookCoverStore({ getOrThrow: () => dataPath } as never, repository as never, { emitChanged: vi.fn() } as never);
-    reconciler = new CoverSlotReconciler(store, new MetadataExtractionService());
+    reconciler = new CoverSlotReconciler(store, new MetadataExtractionService({ extractMetadata: vi.fn(), extractCover: vi.fn() } as never));
   });
 
   async function image(width: number, height: number, color = { r: 30, g: 90, b: 160 }): Promise<Buffer> {

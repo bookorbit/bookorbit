@@ -1,6 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { FONT_FORMATS, MAX_FONT_FILE_SIZE, type FontFormat, type FontNamedInstance, type FontStyle } from '@bookorbit/types';
+import {
+  FONT_FORMATS,
+  MAX_FONT_FILE_SIZE,
+  type FontFormat,
+  type FontNamedInstance,
+  type FontStyle,
+  type FontUploadErrorCode,
+} from '@bookorbit/types';
 
 import { familyNameFromFilename, type FontValidationService } from './font.validation.service';
 
@@ -27,7 +34,10 @@ export function resolveFontFormat(filename: string): FontFormat {
   if (ext && (FONT_FORMATS as readonly string[]).includes(ext)) {
     return ext as FontFormat;
   }
-  throw new BadRequestException(`Unsupported file extension. Supported formats: ${FONT_FORMATS.join(', ')}`);
+  throw new BadRequestException({
+    message: `Unsupported file extension. Supported formats: ${FONT_FORMATS.join(', ')}`,
+    errorCode: 'FONT_UNSUPPORTED_TYPE' satisfies FontUploadErrorCode,
+  });
 }
 
 /**
@@ -37,7 +47,11 @@ export function resolveFontFormat(filename: string): FontFormat {
  */
 export function inspectFontUpload(validation: FontValidationService, buffer: Buffer, filename: string): InspectedFontUpload {
   if (buffer.length > MAX_FONT_FILE_SIZE) {
-    throw new BadRequestException(`Font file exceeds maximum size of ${MAX_FONT_FILE_SIZE / 1024 / 1024} MB`);
+    throw new BadRequestException({
+      message: `Font file exceeds maximum size of ${MAX_FONT_FILE_SIZE / 1024 / 1024} MB`,
+      errorCode: 'FONT_TOO_LARGE' satisfies FontUploadErrorCode,
+      errorMeta: { maxMb: MAX_FONT_FILE_SIZE / 1024 / 1024 },
+    });
   }
 
   const format = resolveFontFormat(filename);

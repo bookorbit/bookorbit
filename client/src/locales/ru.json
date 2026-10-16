@@ -107,9 +107,40 @@
       },
       "theme": {
         "title": "Тема",
+        "style": {
+          "bookorbit": {
+            "label": "BookOrbit"
+          }
+        },
         "colorScheme": {
           "label": "Цветовая схема",
           "hint": "Легкий или темный интерфейс"
+        },
+        "surfacePalette": {
+          "label": "Поверхность",
+          "palettes": {
+            "onyx": "Оникс",
+            "carbon": "Карбон",
+            "neutral": "Нейтральный",
+            "zinc": "Цинк",
+            "iron": "Железный",
+            "steel": "Стальной",
+            "ash": "Пепельный",
+            "smoke": "Дымчатый",
+            "charcoal": "Угольный",
+            "midnight-blue": "Полночно-Синий",
+            "ocean": "Морской",
+            "olive": "Оливковый",
+            "sepia": "Сепия",
+            "crimson": "Багровый",
+            "plum": "Сливовый"
+          }
+        },
+        "topGlow": {
+          "label": "Верхнее свечение",
+          "hint": "Как далеко свечение акцента достигает низа страницы. Сдвиньте влево, чтобы выключить его.",
+          "value": "{value}%",
+          "off": "Откл."
         },
         "accents": {
           "grey": "Серый",
@@ -182,7 +213,11 @@
         },
         "cornerRadius": {
           "label": "Corner radius",
-          "hint": "Округление карт и элементов интерфейса"
+          "hint": "Округление карт и элементов интерфейса",
+          "options": {
+            "default": "Стандартный",
+            "rounded": "Скруглённый"
+          }
         },
         "surfaceBrightness": {
           "label": "Яркость поверхности",
@@ -201,7 +236,8 @@
           "structural": "Структура",
           "ambient": "Окружающий",
           "refractive": "Рефракция"
-        }
+        },
+        "syncSaveFailed": "Не удалось сохранить настройки темы"
       },
       "storage": {
         "title": "Где сохранить настройки внешнего вида",
@@ -834,7 +870,7 @@
         "achievementBackfillComplete": "Достижение завершено: присуждено наград {count}",
         "backfillRunFailed": "Не удалось запустить backfill",
         "achievementBackfillFailed": "Не удалось запустить резервную копию: {error}",
-        "uploadsGroup": "Выгрузки",
+        "uploadsGroup": "Загрузки",
         "maxUploadSize": "Максимальный размер загружаемого файла",
         "maxUploadSizeHint": "Настройте максимальный размер для загрузки файлов по всей системе.",
         "save": "Сохранить",
@@ -1138,6 +1174,7 @@
         "scanCounts": "{processed} из {total}",
         "scanNoChange": "без изменений",
         "outcomeSeparator": ", ",
+        "scanOutcome": "{trigger} · {outcome}",
         "syncConfirmBody": "Это перезапишет метаданные во всех поддерживаемых файлах непосредственно в папке {name} на диске. Это действие нельзя отменить.",
         "columns": {
           "library": "Библиотека",
@@ -1167,6 +1204,10 @@
           "on": "{name}: вкл",
           "off": "{name}: выкл"
         },
+        "stateOn": "Вкл.",
+        "stateOff": "Откл.",
+        "toggleDetail": "Показать подробности для {name}",
+        "durationMs": "{ms} мс",
         "durationSeconds": "{seconds} с",
         "durationMinutes": "{minutes}м {seconds}с",
         "history": {
@@ -1176,6 +1217,8 @@
           "result": "Результат",
           "status": "Состояние",
           "statusValue": {
+            "running": "Запущено",
+            "completed": "Выполнено",
             "failed": "Провалено"
           }
         },
@@ -1184,9 +1227,25 @@
           "allowedFormats": "Разрешенные форматы",
           "countsAsFinished": "Считать законченными",
           "peopleWithAccess": "Пользователи с доступом",
+          "added": "Добавлено",
+          "coverShape": "Форма обложек",
+          "coverShapeValue": {
+            "portrait": "2:3 портретный",
+            "square": "1:1 квадрат"
+          },
           "none": "Отсутствует",
-          "allSupported": "Все поддерживаемые"
-        }
+          "allSupported": "Все поддерживаемые",
+          "historyEmpty": "Эта библиотека никогда не сканировалась.",
+          "historyFailed": "Не удалось загрузить историю сканирования для этой библиотеки."
+        },
+        "schedule": {
+          "at": "{preset} · {time}",
+          "weeklyAt": "{preset} · {day} {time}"
+        },
+        "quick": {
+          "renameOn": "\"{name}\" будет переименовывать файлы по вашему шаблону при следующем сохранении их данных"
+        },
+        "viewChanges": "Просмотр изменений"
       },
       "authorEnrichment": {
         "configuration": "Конфигурация",
@@ -1214,6 +1273,14 @@
         "noEligibleAuthors": "Авторы не найдены",
         "noAuthorsToEnrich": "Нет авторов для обогащения",
         "queueFailed": "Не удалось создать резервную копию автора",
+        "fields": {
+          "description": "Биография",
+          "photo": "Фото",
+          "birthDate": "Дата рождения",
+          "deathDate": "Дата Смерти",
+          "website": "Сайт",
+          "genres": "Жанры"
+        },
         "metadataPreferences": {
           "title": "Источники полей"
         }
@@ -1292,6 +1359,30 @@
         "oidc": "OIDC / ССО",
         "server-fonts": "Шрифты сервера"
       },
+      "tts": {
+        "formNamePlaceholder": "Kokoro",
+        "formBaseUrl": "Базовый URL",
+        "formBaseUrlPlaceholder": "http://localhost:8880/v1",
+        "formApiKey": "API ключ",
+        "formApiKeyPlaceholder": "sk-...",
+        "formApiKeyKeep": "Оставьте пустым, чтобы сохранить текущий ключ",
+        "formModel": "Модель по умолчанию",
+        "formModelPlaceholder": "tts-1",
+        "curation": {
+          "title": "Управление голосами - {provider}",
+          "columnId": "ID",
+          "columnName": "Имя",
+          "columnGender": "Пол",
+          "genderMale": "Мужской",
+          "genderFemale": "Женский",
+          "genderUnknown": "Неизвестно",
+          "cancelEdit": "Отменить редактирование",
+          "editVoice": "Редактировать {name}",
+          "deleteVoice": "Удалить {name}",
+          "previewVoice": "Предпросмотр {name}",
+          "stopPreview": "Остановить предпросмотр {name}"
+        }
+      },
       "serverFonts": {
         "title": "Шрифты сервера",
         "subtitle": "Загрузите шрифты, которые каждый пользователь может выбрать в для чтения книг, не загружая свои собственные.",
@@ -1306,15 +1397,18 @@
         "display": "Отображение",
         "reader": "Чтение",
         "metadata": "Метаданные",
+        "usersAccess": "Пользователи и Доступ",
         "email": "Почта",
         "opds": "OPDS",
         "kobo": "Kobo",
         "koreader": "KOReader",
+        "tts": "Преобразование текста в речь",
         "integrations": "Интеграции",
-        "hardcover": "Хардкокрышка",
+        "hardcover": "Hardcover",
         "admin": "Админ",
         "system": "Система",
-        "account": "Аккаунт"
+        "account": "Аккаунт",
+        "podcasts": "Подкасты"
       }
     },
     "integrations": {
@@ -1322,7 +1416,9 @@
       "subtitle": "Подключите внешние сервисы для синхронизации данных и цитат.",
       "noPermission": "У вас нет прав на использование интеграции.",
       "tabs": {
-        "hardcover": "Обложка"
+        "hardcover": "Hardcover",
+        "readwise": "Readwise",
+        "storygraph": "StoryGraph"
       },
       "providerSubtitles": {
         "readwise": "Отправляйте свои цитаты в \"Readwise\" автоматически.",
@@ -1338,11 +1434,13 @@
         "subtitle": "Субтитры",
         "description": "Описание",
         "cover": "Обложка",
+        "audioCover": "Обложка аудиокниги",
         "authors": "Авторы",
         "publisher": "Издатель",
         "publishedYear": "Опубликованный год",
         "language": "Язык",
         "pageCount": "Счетчик страниц",
+        "isbn": "ISBNs",
         "communityRating": "Рейтинг сообщества",
         "seriesName": "Название серии",
         "seriesIndex": "Индекс серии",
@@ -1350,12 +1448,27 @@
         "narrators": "Нарраторы",
         "duration": "Продолжительность",
         "abridged": "Сокращено",
-        "tags": "Метки"
+        "tags": "Метки",
+        "isbn13": "ISBN-13",
+        "isbn10": "ISBN-10",
+        "googleBooksId": "Google Books ID",
+        "goodreadsId": "Goodreads ID",
+        "amazonId": "Amazon ID",
+        "hardcoverId": "Hardcover ID",
+        "openLibraryId": "Open Library ID",
+        "itunesId": "iTunes ID",
+        "koboId": "Kobo ID",
+        "aladinId": "Aladin ID"
       },
       "mergeStrategy": {
         "fillMissing": {
           "label": "Заполнить недостающие",
-          "description": "Записать только если поле в настоящее время пустое"
+          "description": "Записать только если поле в настоящее время пустое",
+          "short": "Заполнить пробелы"
+        },
+        "mergeExisting": {
+          "label": "Объединить с существующим",
+          "short": "Объединить"
         },
         "overwriteIfProvided": {
           "label": "Перезаписать при наличии",
@@ -1430,12 +1543,21 @@
       "providers": {
         "availableSources": "Доступные источники",
         "saveChanges": "Сохранить изменения",
+        "configure": "Настроить",
         "test": "Тест",
         "testing": "Тестирование...",
         "enabled": "Включено",
         "retryIn": "Повторить в {duration}",
         "runTestBeforeEnabling": "Запустите тест перед включением",
         "hardcoverEnableHint": "Выполните тест с текущим токеном, чтобы разблокировать переключатель.",
+        "filter": {
+          "all": "Все"
+        },
+        "groups": {
+          "audiobooks": "Аудиокниги",
+          "comics": "Комиксы и легкие романы",
+          "regional": "Региональные каталоги"
+        },
         "badge": {
           "setupRequired": "Требуется установка",
           "throttled": "Затухал",
@@ -1469,8 +1591,8 @@
         },
         "blocked": {
           "google": "Книги Google требуют ключ API перед включением",
-          "hardcover": "Для включения жесткого обложки требуется ключ API",
-          "hardcoverTest": "Токен жесткого покрытия должен пройти тест, прежде чем он может быть включен",
+          "hardcover": "Для включения Hardcover требуется ключ API",
+          "hardcoverTest": "Токен Hardcover должен пройти тест, прежде чем он будет включен",
           "comicvine": "ComicVine требует ключ API перед включением",
           "aladin": "Aladin требует TTB ключ перед его включением"
         }
@@ -1479,6 +1601,7 @@
         "clearAllProviders": "Очистить все провайдеры",
         "clearAll": "Очистить все",
         "resetToDefault": "Сброс по умолчанию",
+        "bookCover": "Обложка книги",
         "reset": "Reset",
         "dragProvidersHint": "Перетащите поставщиков отсюда на любое поле, чтобы добавить их",
         "dragProviderHere": "перетащите провайдера сюда",
@@ -1558,7 +1681,10 @@
           "config": "Настройка",
           "custom": "Свой",
           "default": "По умолчанию",
-          "resetToDefault": "Сброс по умолчанию"
+          "resetToDefault": "Сброс по умолчанию",
+          "configure": "Настроить {field}",
+          "add": "Добавить",
+          "removeProvider": "Удалить {provider}"
         },
         "reservoir": {
           "disabled": "{provider} - отключён",
@@ -1572,6 +1698,20 @@
           "statusDisabled": "отключено",
           "statusNotConfigured": "не настроен",
           "done": "Готово"
+        },
+        "toolbar": {
+          "anyProvider": "Любой",
+          "allFields": "Все поля"
+        },
+        "providerState": {
+          "notConfigured": "Не настроено"
+        },
+        "detail": {
+          "collapse": "Свернуть"
+        },
+        "save": {
+          "upToDate": "Нет несохраненных изменений",
+          "discard": "Отменить"
         }
       },
       "genreBlocklist": {
@@ -1589,6 +1729,33 @@
         "emptyTitle": "Нет заблокированных жанров",
         "emptyHint": "Добавьте точные значения, такие как Audiobook или Adult, чтобы они не были загружены метаданными.",
         "removeLabel": "Удалить {genre}"
+      },
+      "searchCache": {
+        "retry": "Повторить попытку",
+        "units": {
+          "hours": "Часы",
+          "days": "Дни"
+        },
+        "general": {
+          "title": "Сохраненные ответы"
+        },
+        "providers": {
+          "books": "Книги",
+          "authors": "Авторы",
+          "on": "Вкл.",
+          "off": "Откл."
+        },
+        "save": {
+          "unsaved": "Несохраненные изменения",
+          "invalid": "Исправьте выделенные поля для сохранения",
+          "upToDate": "Все изменения сохранены",
+          "discard": "Отменить",
+          "action": "Сохранить"
+        },
+        "stats": {
+          "group": "Использование",
+          "refresh": "Обновить"
+        }
       },
       "customFields": {
         "label": "Метка",
@@ -2443,6 +2610,47 @@
         "book-dock": "Книжный док-бар",
         "maintenance": "Техническое обслуживание",
         "audit-log": "Журнал аудита"
+      },
+      "requests": {
+        "indexers": {
+          "sources": {
+            "plugin": "Установить плагин"
+          },
+          "network": {
+            "resolvers": "Серверы DNS",
+            "proxyUrl": "URL прокси-сервера"
+          },
+          "fields": {
+            "credential": {
+              "apiKey": "API ключ"
+            },
+            "searchByIsbn": "Поиск по ISBN"
+          },
+          "color": {
+            "label": "Цвет",
+            "none": "Нет цвета",
+            "options": {
+              "blue": "Синий",
+              "indigo": "Индиго",
+              "purple": "Фиолетовый",
+              "pink": "Розовый",
+              "red": "Красный",
+              "yellow": "Желтый",
+              "lime": "Лайм",
+              "green": "Зеленый",
+              "teal": "Бирюзовый"
+            }
+          },
+          "categories": {
+            "title": "Категории"
+          },
+          "plugin": "Плагин"
+        }
+      }
+    },
+    "nav": {
+      "descriptions": {
+        "hardcover": "Синхронизировать состояние чтения и обзоры с Hardcover."
       }
     }
   },
@@ -2864,6 +3072,9 @@
         "bulkRecolored": "{count, plural, =0 {Переписано не заметок} one {Переписано # аннотация} few {Переписано # аннотации} many {Переписано # аннотации} other {Переписано # аннотации}}",
         "bulkRestyled": "{count, plural, =0 {Не написано никаких аннотаций} one {Переставлено # аннотации} few {Переставлено # аннотаций} many {Переставлено # аннотаций} other {Переставлено # аннотаций}}"
       }
+    },
+    "colors": {
+      "pink": "Розовый"
     }
   },
   "audit": {
@@ -3261,6 +3472,7 @@
         "selectVisible": "Выберите видимый",
         "refreshMetadata": "Обновить метаданные",
         "refreshingMetadata": "Обновление метаданных...",
+        "refreshAction": "Обновить",
         "deleteSelected": "Удалить выбранные",
         "deleting": "Удаление...",
         "exitSelection": "Выйти из выбора",
@@ -3964,7 +4176,13 @@
           "empty": "пустой",
           "showLess": "Меньше",
           "showMore": "Показать еще",
-          "coverPreviewAlt": "Просмотр обложки"
+          "coverPreviewAlt": "Просмотр обложки",
+          "fields": {
+            "authors": "Авторы"
+          },
+          "providerIds": {
+            "hardcover": "Hardcover ID"
+          }
         },
         "searchDrawer": {
           "searchTitle": "Поиск метаданных",
@@ -3990,6 +4208,11 @@
           "noResults": "Ничего не найдено",
           "noResultsHint": "Попробуйте изменить заголовок или автора",
           "searchPrompt": "Поиск выше, затем нажмите на результат, чтобы начать сравнение метаданных."
+        },
+        "match": {
+          "query": {
+            "author": "Автор"
+          }
         },
         "writeAndRename": "Записать в файл и переименовать",
         "writeAndRenameShort": "Запись и переименование"
@@ -4443,6 +4666,13 @@
       "nDone": "{count} завершён",
       "nFailed": "{count} не удалось"
     },
+    "uploadFailures": {
+      "reason": {
+        "storageFull": "На сервере не хватает свободного места",
+        "network": "Не удалось подключиться к серверу",
+        "status": "Ошибка загрузки (HTTP {status})"
+      }
+    },
     "fileList": {
       "emptyTitle": "Нет файлов в книжном док-баре",
       "emptyMessageDefault": "Загрузите файлы или добавьте их в папку \"Книга док\"",
@@ -4514,6 +4744,47 @@
       "alreadyExistsSaveAs": "Уже существует - сохранить как:",
       "renamePlaceholder": "напр. {name} (2)",
       "import": "Импорт"
+    }
+  },
+  "bookRequests": {
+    "search": {
+      "authorLabel": "Автор",
+      "authorPlaceholder": "Имя автора"
+    },
+    "grab": {
+      "subtitle": "Вставьте magnet-ссылку или загрузите .torrent для \"{title}\"."
+    },
+    "releases": {
+      "criteria": {
+        "isbn10": "ISBN-10",
+        "isbn13": "ISBN-13",
+        "isbns": "ISBNs",
+        "language": "Язык",
+        "languagePlaceholder": "Любой язык",
+        "formatsPlaceholder": "epub, azw3",
+        "customIsbnPlaceholder": "ISBN-10 или ISBN-13",
+        "addIsbn": "Добавить ISBN"
+      },
+      "refresh": "Повторить поиск",
+      "addSource": "Добавить источник",
+      "protocol": {
+        "torrent": "Торрент",
+        "direct": "Прямая загрузка"
+      }
+    },
+    "seed": {
+      "state": "Статус",
+      "uploaded": "Загружено"
+    },
+    "drawer": {
+      "label": "Детали запроса",
+      "previous": "Предыдущий запрос",
+      "next": "Следующий запрос",
+      "position": "{position} из {total}"
+    },
+    "table": {
+      "cover": "Обложка",
+      "title": "Заголовок"
     }
   },
   "collection": {
@@ -5173,6 +5444,48 @@
       "sending": "Отправка...",
       "queued": "{count, plural, =0 {Нет сообщений в очереди} one {одно письмо в очереди на} few {# писем в очереди} many {# писем в очереди} other {# писем в очереди}}",
       "failed": "Не удалось отправить"
+    },
+    "page": {
+      "editServer": "Редактировать {name}",
+      "editTemplate": "Редактировать {name}",
+      "editGroup": "Редактировать {name}"
+    },
+    "attention": {
+      "hide": "Скрыть",
+      "show": "Показать"
+    },
+    "status": {
+      "sending": "Отправка",
+      "failed": "Неудачно"
+    },
+    "log": {
+      "status": "Статус"
+    },
+    "editor": {
+      "recipient": {
+        "kindleLegacyFormat": "Kindle больше не принимает {format} по электронной почте. Выберите EPUB или PDF."
+      },
+      "server": {
+        "sectionProvider": "Провайдер",
+        "sectionServer": "Сервер",
+        "sectionSignIn": "Войти",
+        "sectionSender": "Отправитель",
+        "sectionWho": "Кто использует",
+        "presetGmail": "Gmail",
+        "presetOutlook": "Outlook",
+        "presetIcloud": "iCloud Mail",
+        "presetFastmail": "Fastmail",
+        "presetOther": "Другой SMTP",
+        "name": "Имя",
+        "host": "Хост",
+        "port": "Порт",
+        "security": "Безопасность",
+        "securityStarttls": "STARTTLS",
+        "securitySsl": "SSL/TLS",
+        "securityHint": "STARTTLS на 587, SSL/TLS на 465. Необходимо выбрать один.",
+        "username": "Имя пользователя",
+        "password": "Пароль"
+      }
     }
   },
   "errors": {
@@ -5191,7 +5504,7 @@
       "subtitle": "Синхронизируйте данные о прогрессе в чтении, статусе и рейтингах с Hardcover."
     },
     "bookSync": {
-      "label": "Синхронизация с жестким покрытием",
+      "label": "Синхронизация с Hardcover",
       "toggleAriaLabel": "Синхронизировать эту книгу с Hardcover",
       "syncNow": "Синхронизировать сейчас"
     },
@@ -5245,9 +5558,9 @@
       "disconnect": "Отключиться",
       "toast": {
         "enterToken": "Введите ваш API-токен Hardcover",
-        "saved": "Настройки плавного обложки сохранены",
+        "saved": "Настройки Hardcover сохранены",
         "saveFailed": "Не удалось сохранить настройки",
-        "disconnected": "Хардкокрытие отключено"
+        "disconnected": "Hardcover отключено"
       }
     },
     "sync": {
@@ -5276,6 +5589,7 @@
       },
       "lastSynced": {
         "justNow": "Только что",
+        "minutesAgo": "{count} минут назад",
         "hoursAgo": "{count, plural, =0 {# час назад} one {# час назад} few {# часов назад} many {# часов назад} other {# часов назад}}",
         "daysAgo": "{count, plural, =0 {# день назад} one {# день назад} few {# дней назад} many {# дней назад} other {# дней назад}}"
       }
@@ -5304,7 +5618,7 @@
         "skipped": "Пропущено"
       },
       "result": {
-        "summary": "{applied} импортировал{progress}, {failed} не удалось",
+        "summary": "{applied} импортировал {progress}, {failed} не удалось",
         "progressUpdated": "Обновлен прогресс {count}"
       },
       "toast": {
@@ -5364,6 +5678,34 @@
       },
       "column": {
         "progress": "Прогресс"
+      }
+    },
+    "linkedBooks": {
+      "title": "Связанные книги",
+      "loading": "Загрузка книг...",
+      "loadError": "Не удалось загрузить книги.",
+      "retry": "Повторить",
+      "empty": "Никаких книг в настоящее время не читается.",
+      "untitled": "Без названия",
+      "unknownAuthor": "Неизвестный автор",
+      "matchMethod": {
+        "isbn": "ISBN",
+        "title": "Название",
+        "cached": "Кэшировано",
+        "manual": "Вручную"
+      },
+      "status": {
+        "error": "Ошибка: {error}"
+      },
+      "editionsLoadError": "Не удалось загрузить редакции.",
+      "viewEditions": "Просмотр редакций",
+      "noEditionsFound": "Редакции не найдены.",
+      "isbn": "ISBN {isbn}",
+      "current": "Текущий",
+      "useThis": "Использовать",
+      "toast": {
+        "switched": "Переключено на {format}",
+        "switchFailed": "Не удалось переключить редакцию"
       }
     }
   },

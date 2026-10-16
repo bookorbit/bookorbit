@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Clock, Play } from '@lucide/vue'
 import { useRouter } from 'vue-router'
-import { FORMAT_TO_GROUP } from '@bookorbit/types'
+import { isComicFormat } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -17,7 +17,7 @@ const { coverUrl } = useCoverVersions()
 
 const isComic = computed(() => {
   const format = data.value?.fileFormat
-  return format != null && FORMAT_TO_GROUP[format] === 'cbx'
+  return format != null && isComicFormat(format)
 })
 
 function goToBook() {

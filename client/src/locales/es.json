@@ -107,9 +107,51 @@
       },
       "theme": {
         "title": "Tema",
+        "style": {
+          "label": "Estilo",
+          "hint": "El aspecto general de la aplicación. Modo, acento, esquinas y fondo mantienen sus ajustes.",
+          "bookorbit": {
+            "label": "BookOrbit",
+            "description": "Superficies tintadas, paneles de vidrio y encabezados con tipografía serif."
+          },
+          "nostalgia": {
+            "label": "Nostalgia",
+            "description": "Fondos neutros, tipografía de sistema, paneles planos y un brillo en la parte superior."
+          }
+        },
         "colorScheme": {
           "label": "Esquema de color",
           "hint": "Interfaz clara u oscura"
+        },
+        "surfacePalette": {
+          "label": "Superficie",
+          "hint": "El fondo neutro detrás de los paneles y las tarjetas.",
+          "palettes": {
+            "onyx": "Ónice",
+            "carbon": "Carbón",
+            "neutral": "Neutral",
+            "zinc": "Zinc",
+            "iron": "Hierro",
+            "steel": "Madera",
+            "ash": "Ceniza",
+            "smoke": "Humo",
+            "charcoal": "Carbón Vegetal",
+            "slate": "Pizarra",
+            "midnight-blue": "Azul medianoche",
+            "ocean": "Océano",
+            "pine": "Pino",
+            "olive": "Oliva",
+            "stone": "Piedra",
+            "sepia": "Sepia",
+            "crimson": "Carmesí",
+            "plum": "Ciruela"
+          }
+        },
+        "topGlow": {
+          "label": "Brillo superior",
+          "hint": "Hasta dónde se extiende el brillo de acento hacia abajo en la página. Desliza el control completamente hacia la izquierda para desactivarlo.",
+          "value": "{value}%",
+          "off": "Apagado"
         },
         "accents": {
           "grey": "Gris",
@@ -183,7 +225,13 @@
         },
         "cornerRadius": {
           "label": "Curvatura de las esquinas",
-          "hint": "Redondez de tarjetas y elementos de interfaz de usuario"
+          "hint": "Redondez de tarjetas y elementos de interfaz de usuario",
+          "options": {
+            "sharp": "Afilado",
+            "default": "Nítido",
+            "rounded": "Redondeado",
+            "pill": "Forma de píldora"
+          }
         },
         "surfaceBrightness": {
           "label": "Brillo de superficie",
@@ -202,7 +250,8 @@
           "structural": "Estructural",
           "ambient": "Ambiental",
           "refractive": "Refractivo"
-        }
+        },
+        "syncSaveFailed": "Error al guardar las preferencias del tema"
       },
       "storage": {
         "title": "Dónde guardar las preferencias de apariencia",
@@ -1216,6 +1265,11 @@
             "portrait": "2:3 vertical",
             "square": "1:1 cuadrado"
           },
+          "gridShape": "Forma cuadrícula",
+          "gridShapeValue": {
+            "tall": "Celdas altas",
+            "square": "Celdas cuadradas"
+          },
           "none": "Ninguno",
           "allSupported": "Todos soportados",
           "patternCount": "{count, plural, one {# patrón} other {# patrones}}",
@@ -1767,7 +1821,8 @@
             "overwriteTerm": "Sobrescribir:",
             "overwriteBody": "Reemplazar cada vez que un proveedor tenga datos."
           },
-          "summary": "Los proveedores se prueban de arriba abajo y gana el primero que devuelve un valor. La estrategia de combinación determina si ese valor puede reemplazar lo que el libro ya tiene; los géneros también pueden añadir valores nuevos y únicos. Establece aquí los valores predeterminados y, después, sobrescribe campos individuales para cada biblioteca."
+          "summary": "Los proveedores se prueban de arriba abajo y gana el primero que devuelve un valor. La estrategia de combinación determina si ese valor puede reemplazar lo que el libro ya tiene; los géneros también pueden añadir valores nuevos y únicos. Establece aquí los valores predeterminados y, después, sobrescribe campos individuales para cada biblioteca.",
+          "summaryByMedium": "Los proveedores se prueban de arriba abajo y se utiliza el primero que tenga un valor. En cambio, los géneros en modo de combinación y las valoraciones de la comunidad combinan los resultados de todos los proveedores. La estrategia de combinación determina si un valor puede sustituir al que ya tiene el libro. Audible, AudNexus y Libro.fm solo proporcionan resultados para libros con audio, incluidos los EPUB con lectura sincronizada. Por eso, colocarlos en primer lugar permite priorizar los metadatos de audiolibros sin afectar a los libros que solo están disponibles en formato electrónico. Las portadas con una proporción incorrecta solo ocupan un espacio cuando no hay ninguna otra disponible. Una sobrescritura de biblioteca sustituye por completo la regla de ese campo."
         },
         "libraryOverrides": {
           "title": "Anulaciones de biblioteca",
@@ -1836,6 +1891,7 @@
         },
         "field": {
           "noProviders": "Habilitado pero no tiene proveedores.",
+          "noUsableProvider": "Habilitado, pero ningún proveedor puede llenarlo",
           "empty": "Vacío",
           "config": "Configuración",
           "custom": "Personalizado",
@@ -1894,7 +1950,11 @@
           "disabled": "Deshabilitado",
           "notConfigured": "No configurado",
           "disabledDetail": "{provider} está desactivado, por lo que permanece en el orden, pero se omite.",
-          "notConfiguredDetail": "{provider} aún no tiene credenciales, por lo que permanece en el orden, pero se omite."
+          "notConfiguredDetail": "{provider} aún no tiene credenciales, por lo que permanece en el orden, pero se omite.",
+          "neverSupplies": "Nunca suministra esto",
+          "neverSuppliesDetail": "{provider} nunca suministra este campo, así que se omite aquí.",
+          "otherShape": "Otra forma de portada",
+          "otherShapeDetail": "{provider} solo tiene portadas con la otra forma, por lo que ocupa este espacio únicamente cuando no hay ninguna otra disponible."
         },
         "detail": {
           "priority": "Prioridad del proveedor",
@@ -1947,6 +2007,123 @@
         "emptyTitle": "Sin géneros bloqueados",
         "emptyHint": "Agregue valores exactos como Audiolibro o Adulto para mantenerlos fuera de los metadatos recuperados.",
         "removeLabel": "Eliminar {genre}"
+      },
+      "searchCache": {
+        "loadFailed": "No se pudo cargar la configuración de la caché de búsqueda.",
+        "retry": "Inténtalo de nuevo",
+        "saved": "Ajustes de caché de búsqueda guardados",
+        "saveFailed": "Error al guardar la configuración de la caché de búsqueda",
+        "units": {
+          "hours": "Horas",
+          "days": "Días"
+        },
+        "general": {
+          "title": "Respuestas guardadas",
+          "enabled": "Guardar respuestas del proveedor",
+          "enabledHint": "Las búsquedas, las actualizaciones masivas y las recetas en segundo plano reutilizan las respuestas guardadas en lugar de preguntar a cada proveedor de nuevo.",
+          "resultsTtl": "Mantener resultados para",
+          "resultsTtlHint": "Cuánto tiempo se reutiliza una respuesta con resultados antes de que se vuelva a preguntar al proveedor.",
+          "resultsTtlUnit": "Resultados de unidad de tiempo",
+          "emptyTtl": "Mantener respuestas vacías para",
+          "emptyTtlHint": "Durante cuánto tiempo se recuerda que un proveedor no ha encontrado resultados. Solo se aplica a los proveedores que tienen activada la caché de respuestas vacías. El valor 0 significa que las respuestas vacías nunca se guardan en caché.",
+          "emptyTtlUnit": "Unidad de tiempo de respuestas vacías",
+          "staleGrace": "Usar respuestas caducadas para",
+          "staleGraceHint": "Cuando un proveedor falla, se utiliza una respuesta anterior hasta este tiempo después de su caducidad. El valor 0 desactiva el uso de respuestas anteriores como alternativa.",
+          "staleGraceUnit": "Unidad de tiempo de respuestas caducadas",
+          "storage": "Presupuesto de almacenamiento",
+          "storageHint": "Las respuestas más antiguas se eliminan una vez que las respuestas guardadas pasan este tamaño. En disco la tabla puede tomar aproximadamente 1,5 a 2 veces el presupuesto.",
+          "storageUnit": "MB"
+        },
+        "providers": {
+          "title": "Configuración por proveedor",
+          "hint": "Deja un cuadro en blanco para usar el valor de arriba. Apague un proveedor para siempre preguntarle vivo.",
+          "books": "Libros",
+          "authors": "Autores",
+          "none": "No hay proveedores disponibles.",
+          "globalOff": "Guardar respuestas está desactivado, por lo que estos ajustes se aplican una vez que está activado.",
+          "on": "Activado",
+          "off": "Desactivado",
+          "enabledLabel": "Guardar respuestas de {provider}",
+          "resultsTtl": "Mantener resultados para",
+          "resultsTtlLabel": "Mantener resultados {provider} para",
+          "resultsTtlUnitLabel": "Unidad de tiempo para resultados {provider}",
+          "emptyTtl": "Mantener respuestas vacías para",
+          "emptyTtlLabel": "Mantener las respuestas {provider} vacías para",
+          "emptyTtlUnitLabel": "Unidad de tiempo para respuestas {provider} vacías",
+          "noEmptyCaching": "Las respuestas vacías de este proveedor nunca se guardan.",
+          "notCacheable": "Las respuestas de este proveedor nunca se guardan.",
+          "reset": "Restablecer {provider} al patrón predeterminado"
+        },
+        "validation": {
+          "required": "Introduzca un valor.",
+          "wholeNumber": "Introduce un número entero.",
+          "range": "Introduzca un valor de {min} a {max}.",
+          "tooManyOverrides": "Demasiados proveedores tienen ajustes propios. Restablece algunos para poder guardar los cambios."
+        },
+        "save": {
+          "unsaved": "Cambios no guardados",
+          "invalid": "Corregir los campos resaltados para guardar",
+          "upToDate": "Todos los cambios guardados",
+          "discard": "Descartar",
+          "action": "Guardar"
+        },
+        "stats": {
+          "group": "Uso",
+          "title": "Respuestas guardadas",
+          "refresh": "Refrescar",
+          "loadFailed": "No se pudo cargar el uso de la caché.",
+          "storage": "Almacenamiento usado",
+          "storageUsed": "{used} de {budget}",
+          "storageHint": "Tamaño de las respuestas guardadas. La tabla almacenada en disco ocupa más espacio.",
+          "entries": "Respuestas guardadas",
+          "emptyEntries": "Respuestas vacías",
+          "diskSize": "Tamaño de la tabla en disco",
+          "hitRate": "Tasa de aciertos",
+          "requestsAvoided": "Solicitudes evitadas",
+          "fallbacks": "Alternativas",
+          "skippedWrites": "Escrituras omitidas",
+          "oldest": "Respuesta más antigua",
+          "none": "Ninguno todavía",
+          "countersHint": "La tasa de aciertos, las solicitudes evitadas, las alternativas utilizadas y las escrituras omitidas se contabilizan desde el último inicio del servidor.",
+          "perProvider": "Respuestas guardadas por el proveedor",
+          "provider": "Proveedor",
+          "kind": "Tipo",
+          "size": "Tamaño",
+          "empty": "Todavía no se ha guardado nada."
+        },
+        "clear": {
+          "group": "Mantenimiento",
+          "title": "Borrar respuestas guardadas",
+          "regionHint": "Los proveedores pueden responder de forma diferente por ubicación. Limpia la caché después de mover el servidor a otra región o VPN.",
+          "action": "Limpiar",
+          "failed": "Error al borrar las respuestas guardadas",
+          "done": "{count, plural, one {Se ha eliminado # respuesta guardada} other {Se han eliminado # respuestas guardadas}}",
+          "donePending": "{count, plural, one {Se ha eliminado # la respuesta guardada. El resto se está quitando en segundo plano.} other {Se han eliminado # respuestas guardadas. El resto se están eliminando en segundo plano.}}",
+          "empty": {
+            "label": "Borrar solo respuestas vacías",
+            "hint": "Olvida que los proveedores no encontraron nada, así que esas búsquedas preguntan de nuevo.",
+            "confirmTitle": "¿Borrar respuestas vacías?",
+            "confirmDescription": "Se eliminan las respuestas guardadas en las que un proveedor no encontró resultados. Las respuestas con resultados se conservan."
+          },
+          "book": {
+            "label": "Limpiar respuestas de libro",
+            "hint": "Elimina todos los datos guardados de los proveedores de libros.",
+            "confirmTitle": "¿Borrar respuestas de libro?",
+            "confirmDescription": "Todas las respuestas guardadas de los proveedores de libros son eliminadas. Las siguientes búsquedas preguntan a esos proveedores de nuevo."
+          },
+          "author": {
+            "label": "Limpiar respuestas del autor",
+            "hint": "Elimina todo lo guardado de los proveedores de autor.",
+            "confirmTitle": "¿Borrar respuestas del autor?",
+            "confirmDescription": "Cada respuesta guardada de los proveedores de autor es eliminada. Las siguientes búsquedas preguntan a esos proveedores de nuevo."
+          },
+          "all": {
+            "label": "Borrar todas las respuestas guardadas",
+            "hint": "Vaciar la caché. Se vuelve a preguntar a cada proveedor en la siguiente búsqueda.",
+            "confirmTitle": "¿Borrar todas las respuestas guardadas?",
+            "confirmDescription": "Se vacía toda la caché. Las búsquedas serán más lentas hasta que vuelva a llenarse y no habrá respuestas guardadas a las que recurrir si un proveedor deja de estar disponible."
+          }
+        }
       },
       "customFields": {
         "label": "Etiqueta",
@@ -2005,7 +2182,8 @@
         "genre-blocklist": "Lista de bloqueo de género",
         "score": "Puntuación",
         "auto-fetch": "Libros",
-        "authors": "Autores"
+        "authors": "Autores",
+        "search-cache": "Buscar Caché"
       },
       "tabTitles": {
         "providers": "Proveedores",
@@ -2014,7 +2192,8 @@
         "genre-blocklist": "Lista de bloqueo de género",
         "score": "Puntuación de confianza",
         "auto-fetch": "Búsqueda automática de libros",
-        "authors": "Recuperación automática del autor"
+        "authors": "Recuperación automática del autor",
+        "search-cache": "Buscar Caché"
       },
       "tabSubtitles": {
         "providers": "Habilite fuentes de metadatos externas y configure sus credenciales.",
@@ -2023,7 +2202,8 @@
         "genre-blocklist": "Evite que se escriban en libros valores de género de proveedores no deseados.",
         "score": "Asigne pesos a los campos de metadatos para calcular en qué medida confiar en los resultados obtenidos.",
         "auto-fetch": "Obtenga automáticamente portadas, descripciones y otros detalles cuando se agreguen libros nuevos a su biblioteca.",
-        "authors": "Obtenga automáticamente biografías y fotos de perfil cuando aparezcan nuevos autores en su biblioteca."
+        "authors": "Obtenga automáticamente biografías y fotos de perfil cuando aparezcan nuevos autores en su biblioteca.",
+        "search-cache": "Reutilizar las respuestas del proveedor así que las búsquedas repetidas son rápidas y todavía funcionan cuando un proveedor está caído."
       },
       "preferences": {
         "toast": {
@@ -2491,7 +2671,7 @@
         "insertFallback": "Alternativa de respaldo",
         "insertFolder": "Carpeta",
         "lineHint": "Pulsa {enter} para iniciar una nueva carpeta o escribe {brace} para elegir un token. Haga clic en el icono de una carpeta para omitir esa carpeta cuando su valor no esté disponible.",
-        "downloadLineHint": "Las descargas no tienen carpetas, por lo que sólo se utiliza la última parte del patrón.",
+        "downloadLineHint": "Las descargas no tienen carpetas, por lo que solo se utiliza la última parte del patrón.",
         "tokenSuggestions": "Tokens coincidentes",
         "noTokenMatch": "Ningún token coincide con \"{query}\".",
         "uploadedNameKept": "Se conserva el nombre del archivo subido",
@@ -3604,6 +3784,7 @@
     "nav": {
       "title": "Configuración",
       "ariaLabel": "Configuración de secciones",
+      "breadcrumbLabel": "Miga de pan",
       "searchPlaceholder": "Ajustes de búsqueda",
       "clearSearch": "Borrar búsqueda",
       "noResults": "No hay ajustes que coincidan con {query}.",
@@ -4799,6 +4980,8 @@
         "selectVisible": "Seleccionar visible",
         "refreshMetadata": "Actualizar metadatos",
         "refreshingMetadata": "Actualizando metadatos...",
+        "confirmRefreshCount": "{count, plural, one {Actualizar metadatos para # autor?} other {Actualizar metadatos para # autores?}}",
+        "refreshAction": "Refrescar",
         "deleteSelected": "Eliminar seleccionado",
         "deleting": "Eliminando...",
         "exitSelection": "Salir de la selección",
@@ -4958,6 +5141,10 @@
       "openAs": "Abrir como {format}",
       "openReadAlong": "Abrir lectura a lo largo de EPUB"
     },
+    "refreshMetadata": {
+      "success": "Metadatos actualizados",
+      "failed": "Error al actualizar los metadatos"
+    },
     "coverRegeneration": {
       "failed": "No se pudo regenerar la portada",
       "bulkInProgress": "Volver a extraer portadas de libros",
@@ -4978,7 +5165,7 @@
       "action": "Descargar",
       "audiobookZip": "Audiolibro (ZIP)",
       "allFormatsZip": "Todos los formatos (ZIP)",
-      "primaryOnlyZip": "Solo primaria (ZIP)",
+      "primaryOnlyZip": "Solo principal (ZIP)",
       "preparing": "Preparando descarga...",
       "preparingExport": "Preparando {count, plural, one {# libro} other {# libros}} para descargar...",
       "progressPercent": "Descargando {percent} de {total}",
@@ -4987,7 +5174,11 @@
       "exportFailed": "Exportación fallida",
       "audiolessEpub": "EPUB KOReader",
       "audiolessEpubHint": "Descargar EPUB para KOReader con archivos de audio eliminados",
-      "noAudio": "sin audio"
+      "noAudio": "sin audio",
+      "textOnlyEpub": "EPUB solo texto",
+      "textOnlyEpubHint": "Descargar un EPUB sin narración, conservando los marcadores de lectura.",
+      "originalNarrated": "EPUB original con narración",
+      "originalNarratedEpub": "EPUB original con narración"
     },
     "sort": {
       "moveUp": "Subir",
@@ -5803,7 +5994,7 @@
             "differentAuthor": "Autor diferente",
             "titleDiffers": "Difiere el título",
             "sparse": "Disperso",
-            "sparseHint": "{count, plural, one {Solo # campo rellenado} other {Sólo # campos rellenados}}",
+            "sparseHint": "{count, plural, one {Solo # campo rellenado} other {Solo # campos rellenados}}",
             "staged": "{count, plural, one {# cambios realizados a partir de este resultado} other {# cambios realizados a partir de este resultado}}",
             "noMatches": "No hay coincidencias para esta consulta",
             "noMatchesHint": "{count, plural, one {La fuente respondió sin nada.} other {# fuentes respondidas sin nada.}} Mida la búsqueda e inténtalo de nuevo.",
@@ -6863,6 +7054,22 @@
       "nFailed": "{count} falló",
       "nTotal": "{count} total"
     },
+    "uploadFailures": {
+      "heading": "{count, plural, one {No se pudo subir # archivo} other {No se pudieron subir # archivos}}",
+      "dismissAll": "Descartar todo",
+      "retry": "Reintentar subir {name}",
+      "dismiss": "Descartar {name}",
+      "reason": {
+        "unsupported": "Tipo de archivo no soportado: .{extension}",
+        "noExtension": "El archivo no tiene extensión, por lo que su formato es desconocido",
+        "tooLarge": "Más grande que el límite de carga {limit}",
+        "tooLargeServer": "Más grande que el límite de carga del servidor",
+        "tooLargeProxy": "Rechazado por ser demasiado grande antes de llegar a BookOrbit, probablemente por un proxy inverso",
+        "storageFull": "El servidor está fuera de espacio de almacenamiento",
+        "network": "No se pudo alcanzar ese indexador",
+        "status": "La carga falló para {status})"
+      }
+    },
     "fileList": {
       "emptyTitle": "No hay archivos en Book Dock",
       "emptyMessageDefault": "Cargue archivos o suéltelos en la carpeta Book Dock",
@@ -7122,7 +7329,40 @@
       "moreOptions": "Más opciones",
       "fewerOptions": "Menos opciones",
       "optionsSummary": "{formats} · nota añadida",
-      "formatToggleAria": "Preferir {format}"
+      "formatToggleAria": "Preferir {format}",
+      "pair": {
+        "choice": "Ambos",
+        "choiceHint": "Pide el libro electrónico y el audiolibro juntos",
+        "ebookLibraryLabel": "Biblioteca E-book",
+        "audiobookLibraryLabel": "Biblioteca de audiolibro",
+        "audiobookFolderLabel": "Portada de audiolibro",
+        "landsTogether": "Ambos formatos llegan como un libro en {library}.",
+        "landsSeparately": "{library} mantiene un libro por archivo, por lo que cada formato llega como un libro propio.",
+        "landsApart": "El e-book y el audiolibro van a diferentes bibliotecas, por lo que llegan como dos libros.",
+        "preferredEbookFormats": "Formatos de e-book preferidos",
+        "preferredAudiobookFormats": "Formatos de audiolibros preferidos",
+        "state": {
+          "owned": "En tu biblioteca",
+          "following": "Has solicitado esto",
+          "joinable": "Solicitado",
+          "new": "No solicitado"
+        },
+        "requestBoth": "Solicitar ambos",
+        "getBoth": "Obtener ambos",
+        "chooseReleases": "Elegir versiones",
+        "joinBoth": "Añadirme a ambos",
+        "requestEbook": "Solicitar e-book",
+        "requestAudiobook": "Solicitar audiolibro",
+        "getEbook": "Obtener e-book",
+        "getAudiobook": "Obtener audiolibro",
+        "joinEbook": "Añádame a la solicitud de e-book",
+        "joinAudiobook": "Añádame a la solicitud de audiolibro",
+        "haveBoth": "En tu biblioteca",
+        "requestedBoth": "Solicitado",
+        "submitted": "Solicitado el e-book y el audiolibro",
+        "submittedPartlyJoined": "Solicitaste ambos. Uno ya estaba en camino, así que te añadieron a esa solicitud.",
+        "submittedJoinsBook": "Solicitado. Se añadirá al ejemplar que ya tienes en tu biblioteca."
+      }
     },
     "card": {
       "details": "Detalles",
@@ -7181,7 +7421,10 @@
         "forbidden": "Esa solicitud pertenece a otra persona.",
         "loadFailed": "No se pudo cargar esa solicitud"
       },
-      "entityName": "Solicitar"
+      "entityName": "Solicitar",
+      "pairSwitchLabel": "Formatos en esta solicitud",
+      "joinsBook": "Se añade a un libro que ya tienes",
+      "joinsBookHint": "Cuando llegue, se añadirá al libro que ya tienes en tu biblioteca"
     },
     "actions": {
       "approve": "Aprobar",
@@ -7196,7 +7439,29 @@
       "grab": "Buscar una versión",
       "goToBook": "Ir al libro",
       "retryRelease": "Prueba otra versión",
-      "leave": "Retirar solicitud"
+      "leave": "Retirar solicitud",
+      "pair": {
+        "approveBoth": "Aprobar ambos",
+        "approveEbook": "Aprobar e-book",
+        "approveAudiobook": "Aprobar audiolibro",
+        "rejectBoth": "Rechazar ambos",
+        "rejectEbook": "Rechazar e-book",
+        "rejectAudiobook": "Rechazar audiolibro",
+        "cancelBoth": "Cancelar ambos",
+        "cancelEbook": "Cancelar e-book",
+        "cancelAudiobook": "Cancelar audiolibro",
+        "dismissBoth": "Descartar ambos",
+        "dismissEbook": "Descartar e-book",
+        "dismissAudiobook": "Descartar audiolibro",
+        "restoreBoth": "Restaurar ambos",
+        "restoreEbook": "Restaurar e-book",
+        "restoreAudiobook": "Restaurar audiolibro",
+        "grabEbook": "Busca una edición en e-book",
+        "grabAudiobook": "Busca una edición en audiolibro",
+        "chooseReleases": "Elegir versiones",
+        "openEbook": "Abrir la solicitud de e-book",
+        "openAudiobook": "Abre la solicitud de audiolibro"
+      }
     },
     "filters": {
       "status": "Estado",
@@ -7239,7 +7504,9 @@
       "left": "Has abandonado esta solicitud",
       "bulkRejected": "{count, plural, one {# solicitud rechazada} other {# solicitudes rechazadas}}",
       "bulkRejectedPartial": "{done} rechazado, {failed} no pudo ser",
-      "importDiscarded": "El archivo importado ha sido descartado"
+      "importDiscarded": "El archivo importado ha sido descartado",
+      "pairApproved": "Aprobar ambos",
+      "pairRejected": "Rechazar ambos"
     },
     "errors": {
       "loadFailed": "No se pudieron cargar las solicitudes",
@@ -7259,7 +7526,9 @@
       "languageChangeFailed": "No se ha podido cambiar el idioma de la solicitud",
       "leaveFailed": "No se pudo dejar esa solicitud",
       "bulkRejectFailed": "Esa selección no ha podido ser rechazada",
-      "discardImportFailed": "No se pudo descartar esa importación"
+      "discardImportFailed": "No se pudo descartar esa importación",
+      "approveCompanionFailedEbook": "Se aprobó este, pero no se pudo aprobar el libro electrónico",
+      "approveCompanionFailedAudiobook": "Se aprobó este, pero no se pudo aprobar el audiolibro"
     },
     "grab": {
       "title": "Enviar a un cliente de descarga",
@@ -7305,6 +7574,18 @@
     "releases": {
       "title": "Elige una versión",
       "retryTitle": "Prueba otra versión",
+      "pairTitle": "Elegir ediciones",
+      "pair": {
+        "tabsLabel": "Formatos para elegir las ediciones",
+        "releaseCount": "{count, plural, one {# release} other {# release}}",
+        "searching": "Buscando",
+        "toChoose": "Para elegir",
+        "sent": "Enviado",
+        "finishedTitle": "Nada que elegir",
+        "finishedHint": "Ambos formatos ya tienen su propia edición. Puedes seguir el estado de cada uno desde la solicitud.",
+        "backToRequest": "Volver a la solicitud",
+        "done": "Hecho"
+      },
       "subtitle": "Clasificado entre todos los indexadores habilitados.",
       "summaryCount": "{count, plural, one {# versión} other {# versiones}}",
       "allFreeleech": "todo freeleech",
@@ -7594,7 +7875,8 @@
       "decidedBy": "Decidido por",
       "decisionNote": "Nota de decisión",
       "requestNote": "Solicitar nota",
-      "openDetail": "Abrir detalle completo"
+      "openDetail": "Abrir detalle completo",
+      "pairMedia": "Libro electrónico y audiolibro"
     },
     "confirm": {
       "cancelDownloadTitle": "¿Cancelar esta descarga?",
@@ -7650,7 +7932,9 @@
       "SUBMIT_DESTINATION_REQUIRED": "Tus solicitudes son aprobadas tan pronto como las hagas, así que elige la biblioteca en la que se aloje el libro",
       "SUBMIT_SELF_SERVE_LIMIT": "Primero, termina o cancela algunas descargas: puedes tener {limit} descargas activas a la vez",
       "SUBMIT_ON_BEHALF_FORBIDDEN": "No tienes permiso para solicitar libros para otras personas",
-      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "No se puede crear una solicitud de libro para ese usuario"
+      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "No se puede crear una solicitud de libro para ese usuario",
+      "SUBMIT_TARGET_BOOK_NOT_FOUND": "Ese libro no está en una biblioteca a la que puedas acceder",
+      "SUBMIT_TARGET_BOOK_HAS_MEDIUM": "Ese libro ya tiene este formato"
     },
     "actionError": {
       "BOOK_REQUEST_NOT_PENDING": "Solo una solicitud pendiente admite esta acción; esta solicitud es actualmente {status}",
@@ -7736,7 +8020,22 @@
       "reviewSources": "Revisar fuentes"
     },
     "selfServeBadge": "Auto-servicio",
-    "selfServeBadgeHint": "Descargado directamente por el solicitante, sin paso de aprobación"
+    "selfServeBadgeHint": "Descargado directamente por el solicitante, sin paso de aprobación",
+    "missingFormat": {
+      "labelAudiobook": "Audiolibro para este libro",
+      "labelEbook": "E-book para este libro",
+      "noAudiobook": "Aún no hay audio",
+      "noEbook": "Aún no hay e-book",
+      "requestAudiobook": "Solicitar audiolibro",
+      "requestEbook": "Solicitar e-book",
+      "requested": "Solicitado",
+      "requestedBySomeone": "Solicitado por otra persona",
+      "ownedElsewhere": "En tu biblioteca como un libro separado",
+      "open": "Abierto",
+      "viewRequest": "Ver solicitud",
+      "submittedAudiobook": "Solicitado. El audiolibro se unirá a este libro cuando llegue",
+      "submittedEbook": "Solicitado. El libro electrónico se unirá a este libro cuando llegue"
+    }
   },
   "collection": {
     "visibleToAll": "Visible para todos los usuarios",
@@ -7813,6 +8112,9 @@
       "uploadBooks": "Subir libros",
       "appearance": "Apariencia",
       "appearanceDescription": "Elegir las opciones de tema, acento, radio de esquina, superficie y fondo.",
+      "style": "Estilo",
+      "surfacePalette": "Superficie",
+      "topGlow": "Brillo superior",
       "theme": "Tema",
       "accent": "Acento",
       "radius": "Radio",
@@ -7941,6 +8243,8 @@
       "moreActions": "Más acciones",
       "setField": "Establecer campo",
       "refreshMetadata": "Actualizar metadatos",
+      "refreshConfirm": "{count, plural, one {¿Actualizar los metadatos de # libro?} other {¿Actualizar los metadatos de # libros?}}",
+      "refreshConfirmAction": "Refrescar",
       "reExtractCover": "Vuelva a extraer la cubierta",
       "metadataLock": "Bloqueo de metadatos",
       "lockAll": "Bloquear todo",
@@ -8110,6 +8414,28 @@
       "discardTitle": "¿Descartar cambios?",
       "discardDescription": "Los cambios no guardados se perderán.",
       "discardConfirm": "Descartar"
+    },
+    "backgroundPicker": {
+      "none": "Ninguno",
+      "dots": "Puntos",
+      "cross": "Equis",
+      "millimeter": "Milímetro",
+      "blueprint": "Plano",
+      "brushed": "Cepillado",
+      "scanlines": "Líneas de Visión",
+      "vinyl": "Vinilo",
+      "carbon": "Carbón",
+      "perforated": "Perforado",
+      "aurora": "Aurora",
+      "horizon": "Horizonte",
+      "glow": "Brillo",
+      "mesh": "Malla",
+      "elevation": "Elevación",
+      "prism": "Prisma",
+      "spectrum": "Espectro",
+      "spectrum-x": "Espectro X",
+      "spectrum-plus": "Spectrum Plus",
+      "eclipse": "Eclipse"
     }
   },
   "customIcons": {
@@ -8132,7 +8458,7 @@
     "uploadCount": "Subir {count}",
     "onlySvgSupported": "Solo se admiten archivos SVG",
     "maxStaged": "Puedes organizar como máximo {max} íconos a la vez",
-    "onlyMoreCanStage": "{count, plural, =0 {No se pueden montar más iconos} one {Sólo # Se pueden organizar más íconos.} other {Sólo # Se pueden organizar más íconos.} many {Sólo # Se pueden organizar más íconos.}}",
+    "onlyMoreCanStage": "{count, plural, =0 {No se pueden montar más iconos} one {Solo # Se pueden organizar más íconos.} other {Solo # Se pueden organizar más íconos.} many {Solo # Se pueden organizar más íconos.}}",
     "readFailed": "No se pudieron leer los archivos SVG",
     "uploadedCount": "{count, plural, =0 {No se han subido iconos} one {subido # icono} other {subido # iconos} many {subido # iconos}}",
     "uploadedPartial": "Subido {created}, {failed} falló",
@@ -8355,6 +8681,7 @@
     },
     "tabs": {
       "providers": "Proveedores",
+      "servers": "Servidores de correo",
       "recipients": "Destinatarios",
       "groups": "Grupos",
       "templates": "Plantillas",
@@ -8523,6 +8850,305 @@
       "sending": "Enviando...",
       "queued": "{count, plural, =0 {no hay correos electrónicos en cola} one {un correo electrónico en cola} other {# correos electrónicos en cola} many {# correos electrónicos en cola}}",
       "failed": "No se pudo enviar"
+    },
+    "page": {
+      "addRecipient": "Agregar destinatario",
+      "recipients": "Destinatarios",
+      "groups": "Grupos",
+      "newGroup": "Nuevo grupo",
+      "servers": "Servidores de correo",
+      "addServer": "Añadir servidor de correo",
+      "templates": "Plantillas",
+      "newTemplate": "Nueva plantilla",
+      "noServersReadonly": "Aún no hay ningún servidor de correo compartido contigo. Pídele a un administrador que añada uno.",
+      "roleShared": "Compartido con todos",
+      "roleSystem": "Reiniciar contraseña",
+      "cantConnect": "No se pudo conectar",
+      "builtIn": "Incorporado",
+      "recipientsEmptyTitle": "Añade el lector electrónico o la dirección de correo a la que envías los libros",
+      "recipientsEmptyBody": "La dirección de un Kindle termina en {kindle} y aparece en Dispositivos en tu cuenta de Amazon. Un Libro de PocketBook termina en {pocketbook}. Cualquier bandeja de entrada normal también funciona.",
+      "copyAddress": "Copiar dirección",
+      "addressCopied": "Dirección copiada",
+      "editServer": "Editar {name}",
+      "editTemplate": "Editar {name}",
+      "editGroup": "Editar {name}",
+      "groupCount": "{count, plural, one {# recipient} other {# recipients}}",
+      "recipientsHint": "Se seleccionará el que tenga la estrella cuando envíes el libro.",
+      "groupsHint": "Enviar a varios destinatarios a la vez.",
+      "groupsEmpty": "Aún no hay grupos.",
+      "serversHint": "El que tiene la estrella es el que envía tus libros.",
+      "templatesHint": "El asunto y el mensaje enviados con cada libro.",
+      "kindleTemplateNote": "Un Kindle nunca muestra la plantilla: su correo electrónico siempre sale con el asunto {subject}.",
+      "test": "Prueba",
+      "testServer": "Prueba {name}",
+      "testOk": "{name} conectado",
+      "testFailed": "{name} no puede conectarse",
+      "defaultRecipient": "Destinatario por defecto",
+      "makeDefaultRecipient": "Hacer {name} el destinatario predeterminado",
+      "defaultServer": "Servidor por defecto",
+      "makeDefaultServer": "Hacer de {name} el servidor predeterminado",
+      "defaultTemplate": "Plantilla predeterminada",
+      "makeDefaultTemplate": "Hacer de {name} la plantilla predeterminada",
+      "editRecipient": "Editar {name}",
+      "serversEmptyTitle": "Aún no hay servidor de correo",
+      "serversEmptyBody": "Los libros se envían a través de una cuenta SMTP. Gmail, Outlook, iCloud y Fastmail se configuran con un solo clic, pero también puedes utilizar cualquier otro servidor.",
+      "needServerTitle": "Añadir un servidor de correo antes de enviar",
+      "needServerBody": "BookOrbit envía libros a través de una cuenta SMTP que usted posee, como Gmail con una contraseña de aplicación.",
+      "needServerAsk": "Pida a un administrador que comparta un servidor de correo con usted.",
+      "goToServers": "Ir a servidores de correo",
+      "noEncryption": "Sin cifrado"
+    },
+    "route": {
+      "defaultSaved": "Predeterminado actualizado"
+    },
+    "attention": {
+      "title": "Requiere atención",
+      "count": "{count, plural, one {# elemento} other {# elementos}}",
+      "hide": "Ocultar",
+      "show": "Mostrar",
+      "serverDown": "{name} no puede conectarse",
+      "notDelivered": "{book} no llegó a {recipient}",
+      "maybeDelivered": "Es posible {book} que no ha llegado a {recipient}",
+      "testedAgo": "probado {time}",
+      "editServer": "Editar servidor",
+      "editRecipient": "Editar destinatario",
+      "resend": "Reenviar"
+    },
+    "reason": {
+      "tooLarge": "{size} es más que lo que {server} acepta.",
+      "tooLargeGmail": "El {size} supera el límite de 25 MB de adjunto de Gmail.",
+      "tooLargeFix": "Envía una edición más ligera o configura el destinatario para que reciba únicamente archivos EPUB sin formato enriquecido.",
+      "signIn": "{server} rechazó la conexión.",
+      "signInFix": "Compruebe el nombre de usuario y la contraseña en el servidor de correo.",
+      "unreachable": "{server} no respondió.",
+      "unconfirmed": "La conexión se interrumpió después de entregar el mensaje, por lo que es posible que haya llegado.",
+      "unconfirmedFix": "Comprueba la bandeja de entrada antes de volver a enviarlo para evitar que llegue duplicado.",
+      "interrupted": "BookOrbit se reinició mientras se enviaba este correo electrónico.",
+      "interruptedFix": "Comprueba la bandeja de entrada antes de volver a enviarlo.",
+      "preparation": "El archivo no pudo ser preparado para el envío.",
+      "other": "El servidor de correo lo rechazó.",
+      "server": "el servidor de correo",
+      "serverMessage": "Mensaje del servidor",
+      "retryAt": "Próximo intento {time}."
+    },
+    "status": {
+      "sent": "Enviado",
+      "sending": "Enviando",
+      "retrying": "Reintentando · {attempt} de {total}",
+      "unconfirmed": "Sin confirmar",
+      "failed": "Fallido"
+    },
+    "recent": {
+      "moreActions": "Más acciones para {title}",
+      "deletedBook": "Libros eliminados",
+      "openBook": "Libro abierto",
+      "resend": "Reenviar",
+      "delete": "Eliminar la entrada"
+    },
+    "log": {
+      "all": "Todos",
+      "attention": "Requiere atención",
+      "active": "En curso",
+      "book": "Libro",
+      "sentTo": "Enviado a",
+      "file": "Archivo",
+      "status": "Estado",
+      "when": "Cuando",
+      "sentMeans": "Enviado significa que su servidor de correo lo aceptó",
+      "emptyFilter": "Nada aquí en este momento.",
+      "loadMore": "Cargar más",
+      "showing": "Mostrando {shown} de {total}",
+      "emptyTitle": "Aún no se ha enviado nada",
+      "emptyBody": "Los libros que envíes por correo aparecerán aquí, junto con el destinatario y el estado de aceptación por parte del servidor de correo."
+    },
+    "card": {
+      "nothingSent": "Aún no se ha enviado nada",
+      "failed": "fallido",
+      "retrying": "reintentando",
+      "unconfirmed": "sin confirmar",
+      "sending": "enviando",
+      "narration": "Narración",
+      "narrationTitle": "Los libros con narración sincronizada conservan su audio"
+    },
+    "device": {
+      "kindle": "Kindle",
+      "kobo": "Kobo",
+      "other": "Otro libro electrónico",
+      "otherShort": "Libro electrónico",
+      "none": "Persona o bandeja de entrada"
+    },
+    "sheet": {
+      "title": "Enviar por correo electrónico",
+      "sendTo": "Enviar a",
+      "groups": "Grupos",
+      "templateName": "Plantilla {name}",
+      "eachFormat": "Formato de cada destinatario",
+      "formatForAll": "{format} para todos",
+      "file": "Archivo",
+      "mailServer": "Servidor de correo",
+      "template": "Plantilla",
+      "yourDefault": "tus valores por defecto",
+      "emails": "{count, plural, one {# correo electrónico} other {# correos electrónicos}}",
+      "noOnePicked": "Nadie ha elegido",
+      "total": "{size} en total",
+      "send": "{count, plural, one {Envía} other {Envía # emails}}",
+      "noFormat": "No {format}, obtiene {got}",
+      "readAlong": "Lectura sincronizada, {size}",
+      "overKindle": "{size}, sobre el límite de 50 MB de Kindle",
+      "overGmail": "{size}, sobre el límite de 25 MB de Gmail",
+      "kindleRejects": "Kindle rechaza {format}",
+      "blockedKindle": "El {name} no puede tomar {format}. Elige EPUB o PDF, o desmarcarlo.",
+      "books": "{count, plural, one {# libro} other {# libros}}",
+      "notReadyTitle": "El correo electrónico aún no está configurado",
+      "notReadyBody": "Antes de que un libro pueda ir a cualquier parte, esta cuenta necesita un servidor de correo y un destinatario.",
+      "addServer": "Añadir servidor de correo",
+      "addServerHint": "Gmail, Outlook, iCloud, Fastmail o cualquier cuenta SMTP.",
+      "askForServer": "Pida a un administrador que comparta un servidor de correo con usted.",
+      "addRecipient": "Añadir un destinatario",
+      "addRecipientHint": "Tu Kindle, PocketBook o cualquier bandeja de entrada.",
+      "openSettings": "Abrir ajustes de correo",
+      "sendingTitle": "Enviando {title}",
+      "closeHint": "Puedes cerrar esto. Los fallos también aparecen en tus notificaciones y en tu historial de correo electrónico.",
+      "openHistory": "Abrir historial",
+      "done": "Hecho",
+      "acceptedBy": "Aceptado por {server} {time}",
+      "handingOver": "Otorgando a {server}"
+    },
+    "editor": {
+      "kindleSubject": "convertir",
+      "recipient": {
+        "newTitle": "Nuevo destinatario",
+        "description": "Nombre del destinatario, dirección, dispositivo y lo que recibe.",
+        "sectionRecipient": "Destinatario",
+        "sectionReceives": "Lo que recibe",
+        "name": "Nombre",
+        "email": "Dirección de correo electrónico",
+        "device": "Dispositivo",
+        "deviceHint": "Kindle cambia el asunto a {subject} y limita los formatos que se indican a continuación.",
+        "format": "Formato",
+        "formatPrimary": "Principal del libro",
+        "formatHint": "Si un libro no está disponible en este formato, se utilizará su edición principal.",
+        "kindleFormatHint": "Amazon dejó de aceptar archivos MOBI y AZW3 por correo electrónico en 2023, por lo que no se ofrecen para Kindle. Si un libro no está disponible en este formato, se utilizará su edición principal.",
+        "kindleLegacyFormat": "Kindle ya no acepta {format} por correo electrónico. Elige EPUB o PDF.",
+        "readAlong": "Libros con lectura sincronizada",
+        "readAlongAutomatic": "Automático",
+        "readAlongAutomaticHint": "Solo texto cuando se pueda crear una copia segura; de lo contrario, se enviará el original.",
+        "readAlongTextOnly": "EPUB solo texto",
+        "readAlongTextOnlyHint": "Narración eliminada. Lo suficientemente pequeña para correo electrónico.",
+        "readAlongOriginal": "EPUB original con narración",
+        "readAlongOriginalHint": "Mantiene la narración. A menudo 100 MB o más, por encima de los límites de la mayoría de los servidores de correo.",
+        "notForKindle": "No para Kindle",
+        "template": "Plantilla",
+        "templateDefault": "Tu predeterminado ({name})",
+        "templateKindleHint": "No se aplica a Kindle, ya que nunca muestra el mensaje.",
+        "approveTitle": "Aprobar el remitente en Amazon",
+        "approveBody": "Kindle descarta los correos de direcciones que no reconoce sin enviar un aviso de error. En {path}, añade {address}",
+        "approvePath": "Gestione su contenido y dispositivos › Preferencias › Configuración de documentos personales",
+        "approveNoServer": "Agregue un servidor de correo primero para ver la dirección que Kindle debe aprobar.",
+        "lastSent": "Último libro enviado {time}",
+        "sendTest": "Enviar un email de prueba",
+        "testSubject": "Email de prueba de BookOrbit",
+        "testBody": "Esta es una prueba de BookOrbit. Si puedes leerla, los libros enviados a {name} también llegarán aquí.",
+        "testSent": "Email de prueba enviado a {name}",
+        "testFailed": "El correo electrónico de prueba no salió: {error}",
+        "makeDefault": "Hacer destinatario de Envío Rápido",
+        "remove": "Eliminar destinatario",
+        "removeConfirm": "¿Eliminar {name}?",
+        "removeConsequence": "Su historial de envíos permanece.",
+        "removeDefaultConsequence": "Se conservará su historial de envíos y la opción Envío rápido dejará de funcionar hasta que marques otro destinatario con una estrella.",
+        "required": "Nombre y correo electrónico son requeridos.",
+        "sectionLastSent": "Último enviado"
+      },
+      "server": {
+        "newTitle": "Nuevo servidor de correo",
+        "description": "El servidor SMTP, su inicio de sesión y quién puede enviar a través de él.",
+        "sectionProvider": "Proveedor",
+        "sectionServer": "Servidor",
+        "sectionSignIn": "Iniciar sesión",
+        "sectionSender": "Remitente",
+        "sectionWho": "Quién lo utiliza",
+        "presetGmail": "Gmail",
+        "presetOutlook": "Outlook",
+        "presetIcloud": "iCloud Mail",
+        "presetFastmail": "Fastmail",
+        "presetOther": "Otro SMTP",
+        "presetHint": "Una configuración preestablecida completa el servidor, el puerto y la seguridad. Puedes modificarlos igualmente.",
+        "name": "Nombre",
+        "host": "Servidor",
+        "port": "Puerto",
+        "security": "Seguridad",
+        "securityStarttls": "STARTTLS",
+        "securitySsl": "SSL/TLS",
+        "securityNone": "Ninguno",
+        "securityHint": "STARTTLS en 587, SSL/TLS en 465, uno u otro, nunca ambos.",
+        "needsPassword": "Este servidor necesita una contraseña",
+        "username": "Nombre de usuario",
+        "password": "Contraseña",
+        "appPassword": "Contraseña de la app",
+        "passwordKeep": "Guardado. Escriba para reemplazarlo",
+        "appPasswordHint": "Gmail e iCloud necesitan una contraseña de la aplicación, no la contraseña de tu cuenta.",
+        "fromName": "Nombre del remitente",
+        "fromAddress": "Dirección del remitente",
+        "fromAddressHint": "Los usuarios de Kindle deben autorizar esta dirección.",
+        "share": "Compartir con todos",
+        "shareHint": "Otras personas pueden enviar libros a través de este servidor sin ver la contraseña.",
+        "system": "Enviar cambios de contraseña y enlaces de inicio de sesión",
+        "systemHint": "El servidor que utiliza el propio BookOrbit. Solo un superusuario puede modificarlo.",
+        "verifyTls": "Verificar el certificado del servidor",
+        "verifyTlsHint": "Desactívalo solo para un servidor de tu propia red que utilice un certificado autofirmado.",
+        "test": "Prueba de conexión",
+        "testDirty": "Guarda los cambios primero y después haz la prueba",
+        "testOk": "Conectado",
+        "testFailed": "No se puede conectar: {error}",
+        "remove": "Eliminar servidor",
+        "removeConfirm": "¿Eliminar {name}?",
+        "removeConsequence": "Dejará de estar disponible para todas las personas con las que se comparte.",
+        "removeSystemFirst": "Desactiva los restablecimientos de contraseña en este servidor antes de eliminarlo.",
+        "makeDefault": "Usar como predeterminado",
+        "required": "El nombre y el host son obligatorios."
+      },
+      "template": {
+        "newTitle": "Nueva plantilla",
+        "description": "El asunto y el mensaje enviados con cada libro.",
+        "sectionTemplate": "Plantilla",
+        "sectionInsert": "Insertar",
+        "sectionPreview": "Vista previa",
+        "name": "Nombre",
+        "subject": "Asunto",
+        "message": "Mensaje",
+        "groupBook": "Libro",
+        "groupFile": "Archivo",
+        "groupOther": "Otro",
+        "insertHint": "Se inserta en la posición del cursor, en el asunto o en el mensaje. Los valores vacíos no muestran nada.",
+        "insertVariable": "Insertar {variable}",
+        "previewWith": "Vista previa con",
+        "previewEmpty": "Envía un libro una vez para ver una vista previa de la plantilla con él.",
+        "previewFailed": "No se pudo procesar la vista previa.",
+        "previewTo": "A",
+        "builtInReadonly": "Integrado. Solo un superusuario puede modificarlo.",
+        "kindleNote": "Un Kindle nunca muestra la plantilla: su correo electrónico siempre sale con el asunto {subject}.",
+        "makeDefault": "Hacer mi predeterminado",
+        "remove": "Eliminar plantilla",
+        "removeConfirm": "¿Eliminar {name}?",
+        "removeConsequence": "Los destinatarios que lo utilizan vuelven a su plantilla predeterminada.",
+        "required": "El nombre y el asunto son obligatorios.",
+        "attachment": "Adjunto: {name}"
+      },
+      "group": {
+        "newTitle": "Nuevo grupo",
+        "description": "Un conjunto de destinatarios a los que enviar un libro a la vez.",
+        "sectionGroup": "Grupo",
+        "sectionMembers": "Miembros",
+        "name": "Nombre",
+        "memberCount": "{count} de {total}",
+        "noRecipientsTitle": "No hay destinatarios de los que elegir",
+        "noRecipientsBody": "Un grupo es un conjunto de destinatarios. Agregue un destinatario primero.",
+        "remove": "Eliminar grupo",
+        "removeConfirm": "¿Eliminar {name}?",
+        "removeConsequence": "Sus destinatarios permanecen.",
+        "required": "Un grupo necesita un nombre.",
+        "updated": "Grupo actualizado"
+      }
     }
   },
   "errors": {
@@ -8817,6 +9443,14 @@
           "squareTitle": "Cuadrado 1:1",
           "squareHint": "Bibliotecas exclusivas de audiolibros",
           "slotsHint": "Un libro que tiene tanto un libro electrónico como un audiolibro muestra la portada que se ajusta a esta forma."
+        },
+        "gridShape": {
+          "title": "Forma cuadrícula",
+          "tallTitle": "Celdas altas",
+          "tallHint": "Lo mejor para ebooks o bibliotecas mixtas",
+          "squareTitle": "Celdas cuadradas",
+          "squareHint": "Lo mejor para las bibliotecas de audiolibros",
+          "hint": "Cada libro muestra la portada de su formato principal; en el caso de los audiolibros, es cuadrada. Si la portada no coincide con la del recuadro, se debe a tu configuración de visualización de portadas."
         }
       },
       "folders": {
@@ -9072,7 +9706,7 @@
           "tagsHint": "Escribe etiquetas como título, autores, narradores y series en archivos M4B, M4A, MP3 y FLAC.",
           "tagsToggleAria": "Escribir metadatos de audio"
         },
-        "coverAudioHint": "Escribe también la portada almacenada en el archivo. Los archivos de audio sólo pueden tener una portada.",
+        "coverAudioHint": "Escribe también la portada almacenada en el archivo. Los archivos de audio solo pueden tener una portada.",
         "audioNeedsCover": "Necesita activar “Incluye imagen de portada”.",
         "table": {
           "format": "Formato",
@@ -9164,6 +9798,7 @@
         "add": "Añadir",
         "emptyCreate": "Todavía no hay nadie más. Las personas que añadas aquí tendrán acceso en cuanto exista la biblioteca.",
         "superusers": "Los Superusuarios siempre tienen acceso total.",
+        "levelsHint": "Los lectores pueden explorar y leer. Los editores y propietarios también pueden modificar los metadatos si su cuenta tiene el permiso Editar metadatos.",
         "levelFor": "Nivel de acceso para {name}",
         "revokeFor": "Eliminar acceso para {name}",
         "revokeQuestion": "¿Eliminar acceso?",
@@ -9368,6 +10003,32 @@
         "label": "Descripción",
         "hint": "La descripción ha sido completada."
       }
+    }
+  },
+  "metadataCache": {
+    "badge": {
+      "cached": "Cacheado",
+      "stale": "Rancio",
+      "cachedHint": "Resultado guardado de {when}",
+      "cachedHintUndated": "Resultado guardado",
+      "staleHint": "El proveedor no estaba disponible, por lo que se utilizó un resultado guardado de {when}",
+      "staleHintUndated": "El proveedor no estaba disponible, por lo que se utilizó un resultado guardado"
+    },
+    "notice": {
+      "someCached": "Algunos resultados provienen de búsquedas guardadas (más antiguas: {when}).",
+      "someCachedUndated": "Algunos resultados provienen de búsquedas guardadas.",
+      "someStale": "Algunos proveedores no estaban disponibles, por lo que se mostraron los resultados guardados (más antiguo: {when}).",
+      "someStaleUndated": "Algunos proveedores no estaban disponibles, por lo que se mostraron los resultados guardados.",
+      "searchFresh": "Buscar de nuevo",
+      "searchFreshHint": "Preguntar a cada proveedor otra vez en lugar de usar respuestas guardadas"
+    },
+    "fallback": {
+      "usedSaved": "{count, plural, one {{providers} no estaba disponible, así que los resultados guardados fueron usados.} other {{providers} no estaban disponibles, así que los resultados guardados fueron usados.}}"
+    },
+    "ignoreCache": {
+      "label": "Ignorar resultados de caché",
+      "hint": "Volver a consultar a todos los proveedores en lugar de reutilizar las respuestas guardadas. Es más lento y consume más cuota de solicitudes de cada proveedor.",
+      "runHint": "Se aplica a la búsqueda que inicies aquí. Se vuelve a consultar a todos los proveedores en lugar de reutilizar las respuestas guardadas, por lo que el proceso es más lento."
     }
   },
   "metadataScore": {
@@ -9880,6 +10541,7 @@
     },
     "loadingBook": "Cargando libro…",
     "failedToLoadBook": "No se pudo cargar el libro",
+    "bookLoadTimeout": "El libro tardó demasiado en abrirse. Intenta actualizar la página.",
     "chapterNumber": "Capítulo {number}",
     "peek": {
       "badge": "Mirando a escondidas",
@@ -12206,6 +12868,7 @@
     },
     "email": {
       "providers": "Proveedores",
+      "servers": "Servidores de correo",
       "recipients": "Destinatarios",
       "groups": "Grupos",
       "templates": "Plantillas",
@@ -12219,7 +12882,8 @@
       "genre-blocklist": "Lista de bloqueo de género",
       "score": "Puntuación de confianza",
       "auto-fetch": "Búsqueda automática de libros",
-      "authors": "Recuperación automática del autor"
+      "authors": "Recuperación automática del autor",
+      "search-cache": "Buscar Caché"
     },
     "admin": {
       "users": "Usuarios",
@@ -12329,6 +12993,41 @@
     },
     "errors": {
       "generic": "Error TTS"
+    }
+  },
+  "delivery": {
+    "readAloud": {
+      "label": "Entrega de EPUB con lectura en voz alta",
+      "automatic": "Automático: prefiere el texto solamente, permitir la reserva original.",
+      "textOnly": "EPUB solo texto",
+      "original": "EPUB original con narración",
+      "hint": "Se aplica a las entregas futuras. Los archivos originales conservan la narración existente y pueden ocupar mucho más espacio. La preparación de archivos solo de texto falla si no se puede crear una copia segura.",
+      "koboHint": "Los EPUB originales omiten la conversión a KEPUB. Es posible que el firmware nativo de Kobo no reproduzca la narración, y en esa copia no estarán disponibles la sincronización precisa de la posición de lectura ni la de los resaltados.",
+      "profileHint": "Utilice perfiles OPDS separados para lectores que necesitan diferentes variantes de EPUB.",
+      "replacementTitle": "Reemplazar una copia de Kobo",
+      "bookId": "ID del libro",
+      "device": "Dispositivo",
+      "prepare": "Preparar reemplazo",
+      "offer": "He eliminado únicamente la copia del dispositivo; ofrecer la sustitución",
+      "confirm": "He instalado el reemplazo",
+      "cancel": "Cancelar reemplazo",
+      "replacementHint": "Prepara y revisa primero. Eliminar una copia del dispositivo no borra el libro de la biblioteca. Haz una copia de seguridad de las notas guardadas localmente en el dispositivo. BookOrbit conserva el progreso de lectura principal y las anotaciones del servidor. Los eventos retrasados pueden limitar la sincronización precisa.",
+      "prepared": "Reemplazado preparado: {format}, {size}. Elimine este libro solo del dispositivo seleccionado, luego ofrezca el reemplazo preparado y la sincronización.",
+      "offered": "Sustitución ofrecida. Sincroniza y descarga el archivo en el dispositivo y, después, confirma la instalación. Que la transferencia HTTP haya finalizado no garantiza que el archivo se haya instalado correctamente.",
+      "cancelled": "Reemplazo cancelado. La cancelación no restaura una copia del dispositivo eliminada o parcialmente reemplazada. Seleccione el mismo libro para preparar una descarga de recuperación.",
+      "failed": "No se pudo preparar o actualizar este reemplazo.",
+      "searchBook": "Buscar un libro",
+      "chooseBook": "Seleccionar un libro",
+      "moreResults": "Mostrar más libros",
+      "noResults": "No hay libros coincidentes.",
+      "refresh": "Actualizar estado de entrega",
+      "confirmed": "Ha confirmado la instalación. Esto registra su confirmación, no la verificación del dispositivo.",
+      "transferred": "Transferencia completada. Abra el reemplazo en el dispositivo antes de confirmar la instalación.",
+      "koreaderDefaultTitle": "Entrega de EPUB para KOReader",
+      "koreaderDefaultHint": "La configuración predeterminada se aplica a las futuras descargas en los dispositivos que utilicen estas credenciales. La configuración del dispositivo puede sobrescribirla. Las copias existentes y las descargas interrumpidas no se modifican. La opción Automático conserva las preferencias actuales de cada dispositivo.",
+      "koreaderUseDefault": "Usar credencial por defecto",
+      "koreaderSaveFailed": "No se pudo guardar la configuración de entrega de KOReader EPUB. Inténtalo de nuevo.",
+      "koreaderSaved": "Configuración de entrega de KOReader guardada."
     }
   }
 }

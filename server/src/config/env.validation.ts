@@ -79,6 +79,20 @@ const envSchema = z.object({
     .optional(),
   FILE_WRITE_DEBOUNCE_MS: z.coerce.number().int().positive().optional(),
   FILE_WRITE_MAX_CONCURRENT_WRITES: z.coerce.number().int().positive().optional(),
+  DJVU_MAX_CONCURRENT: z.coerce.number().int().positive().max(8).optional(),
+  DJVU_TIMEOUT_MS: z.coerce.number().int().positive().max(120_000).optional(),
+  DJVU_MAX_SOURCE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(512 * 1024 * 1024)
+    .optional(),
+  DJVU_CACHE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(512 * 1024 * 1024)
+    .optional(),
   AUDIOLESS_EPUB_MAX_CONCURRENT_BUILDS: z.coerce.number().int().positive().max(32).optional(),
   AUDIOLESS_EPUB_MAX_SOURCE_ENTRIES: z.coerce.number().int().positive().optional(),
   AUDIOLESS_EPUB_MAX_METADATA_BYTES: z.coerce.number().int().positive().optional(),

@@ -1,10 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsDefined, IsIn, IsInt, IsObject, IsOptional, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsDefined, IsIn, IsInt, IsObject, IsOptional, Max, Min, ValidateNested } from 'class-validator';
 import type {
   BookMetadataFetchConditions,
   BookMetadataFetchConditionsOverride,
   BookMetadataFetchConfig,
   BookMetadataFetchConfigOverride,
+  BookMetadataFetchPreviewScope,
   MetadataField,
 } from '@bookorbit/types';
 
@@ -134,6 +135,32 @@ export class PreviewCountDto {
   @IsOptional()
   @IsInt()
   libraryId?: number;
+}
+
+export const PREVIEW_MAX_LIBRARIES = 200;
+export const PREVIEW_BOOKS_MAX = 24;
+
+export class PreviewScopeDto implements BookMetadataFetchPreviewScope {
+  @IsDefined()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ConditionsDto)
+  conditions: BookMetadataFetchConditions;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(PREVIEW_MAX_LIBRARIES)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  libraryIds?: number[];
+}
+
+export class PreviewBooksDto extends PreviewScopeDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(PREVIEW_BOOKS_MAX)
+  limit?: number;
 }
 
 export class UpdateLibraryBookMetadataFetchConfigDto implements NonNullable<BookMetadataFetchConfigOverride> {

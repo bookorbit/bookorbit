@@ -48,13 +48,13 @@ export function useOnboardingTour() {
           align: 'start',
         },
       },
-      // Header - left to right
+      // The rest of the shell lives in the sidebar too, so every popover opens to its right.
       {
         element: '[data-tour="global-search"]',
         popover: {
           title: 'Search your collection',
-          description: 'Use the search bar to instantly find any book, author, or series across your library.',
-          side: 'bottom',
+          description: 'Click Search or press Cmd/Ctrl+K to find any book, author, series, or setting, jump to a library, or upload new books.',
+          side: 'right',
           align: 'start',
         },
       },
@@ -63,8 +63,8 @@ export function useOnboardingTour() {
         popover: {
           title: 'Book Dock',
           description: 'Uploaded files wait here. Review metadata, set the target library, then finalize to add them to your collection.',
-          side: 'bottom',
-          align: 'end',
+          side: 'right',
+          align: 'start',
         },
       },
       {
@@ -73,17 +73,8 @@ export function useOnboardingTour() {
           title: 'Reading statistics',
           description:
             'Explore 33+ charts covering your reading pace, genre breakdown, session patterns, top authors, and more. Your full reading history at a glance.',
-          side: 'bottom',
-          align: 'end',
-        },
-      },
-      {
-        element: '[data-tour="upload-button"]',
-        popover: {
-          title: 'Upload books',
-          description: 'Upload books directly from your browser. They land in the Book Dock for metadata review before being added to a library.',
-          side: 'bottom',
-          align: 'end',
+          side: 'right',
+          align: 'start',
         },
       },
       {
@@ -91,7 +82,7 @@ export function useOnboardingTour() {
         popover: {
           title: 'Make it yours',
           description: 'Customize your theme, accent color, and background from the appearance menu.',
-          side: 'bottom',
+          side: 'right',
           align: 'end',
         },
       },

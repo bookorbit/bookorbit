@@ -18,10 +18,11 @@ import {
   splitReadingSessionByDay,
   type ReadingDailyStatsSegment,
 } from '../../common/utils/reading-daily-stats.utils';
+import { parseKoreaderSessionId } from '../../common/utils/koreader-session-id.utils';
 import { resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, books, readingSessionSyncCursors, readingSessions, userReadingDailyStats } from '../../db/schema';
+import { bookFiles, books, koreaderSessionTombstones, readingSessionSyncCursors, readingSessions, userReadingDailyStats } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -652,6 +653,9 @@ export class ReadingSessionRepository {
       const [row] = await tx
         .select({
           id: readingSessions.id,
+          sessionId: readingSessions.sessionId,
+          source: readingSessions.source,
+          bookFileId: readingSessions.bookFileId,
           startedAt: readingSessions.startedAt,
           endedAt: readingSessions.endedAt,
           durationSeconds: readingSessions.durationSeconds,
@@ -669,6 +673,15 @@ export class ReadingSessionRepository {
       const affectedDays = getReadingSessionDayKeys({ startedAt, endedAt, durationSeconds, progressDelta: progressDelta ?? null }, timeZone);
 
       await tx.delete(readingSessions).where(eq(readingSessions.id, sessionId));
+
+      // A KOReader session is derived from page events that stay stored, so without this the next
+      // event within the session gap, or a plugin uploading its history again, re-derives it.
+      const derived = row.source === 'koreader' ? parseKoreaderSessionId(row.sessionId) : null;
+      const startTime = Math.floor(startedAt.getTime() / 1000);
+      const endTime = Math.ceil(endedAt.getTime() / 1000);
+      if (derived && row.bookFileId != null && endTime > startTime) {
+        await tx.insert(koreaderSessionTombstones).values({ userId, bookFileId: row.bookFileId, deviceKey: derived.deviceKey, startTime, endTime });
+      }
 
       await this.recomputeDailyStats(tx, userId, libraryId, affectedDays, timeZone);
 

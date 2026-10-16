@@ -41,6 +41,14 @@ function makeResponse(data: unknown, options: { ok?: boolean; status?: number } 
   } as Response
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 describe('useKoreaderBookProgress', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -139,5 +147,130 @@ describe('useKoreaderBookProgress', () => {
     const { releaseResetHold } = useKoreaderBookProgress()
 
     await expect(releaseResetHold(42, 'device-1')).resolves.toBe(false)
+  })
+
+  it('reports a network failure without refreshing or discarding the held device', async () => {
+    const progress = makeBookProgress({
+      heldByReset: [{ device: 'Kindle', deviceId: 'device-1', percentage: 42, updatedAt: '2026-01-02T00:00:00.000Z' }],
+    })
+    apiMock.mockResolvedValueOnce(makeResponse(progress)).mockRejectedValueOnce(new Error('Offline'))
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, fetchBookProgress, releaseResetHold } = useKoreaderBookProgress()
+    await fetchBookProgress(42)
+    await expect(releaseResetHold(42, 'device-1')).resolves.toBe(false)
+    expect(apiMock).toHaveBeenCalledTimes(2)
+    expect(bookProgress.value).toEqual(progress)
+  })
+
+  it('preserves the notice when the release succeeds but its refresh fails', async () => {
+    const progress = makeBookProgress({
+      heldByReset: [{ device: 'Kindle', deviceId: 'device-1', percentage: 42, updatedAt: '2026-01-02T00:00:00.000Z' }],
+    })
+    apiMock
+      .mockResolvedValueOnce(makeResponse(progress))
+      .mockResolvedValueOnce(makeResponse(null))
+      .mockResolvedValueOnce(makeResponse(null, { ok: false }))
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, fetchBookProgress, releaseResetHold } = useKoreaderBookProgress()
+    await fetchBookProgress(42)
+    await expect(releaseResetHold(42, 'device-1')).resolves.toBe(false)
+    expect(bookProgress.value).toEqual(progress)
+  })
+
+  it('does not report success while the refreshed response still holds the device', async () => {
+    const progress = makeBookProgress({
+      heldByReset: [{ device: 'Kindle', deviceId: 'device-1', percentage: 42, updatedAt: '2026-01-02T00:00:00.000Z' }],
+    })
+    apiMock.mockResolvedValue(makeResponse(progress))
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { releaseResetHold } = useKoreaderBookProgress()
+    await expect(releaseResetHold(42, 'device-1')).resolves.toBe(false)
+  })
+
+  it('keeps the latest fetch and its loading state when an older request finishes first', async () => {
+    const first = deferred<Response>()
+    const second = deferred<Response>()
+    apiMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, loading, fetchBookProgress } = useKoreaderBookProgress()
+    const olderFetch = fetchBookProgress(42)
+    const newerFetch = fetchBookProgress(43)
+    first.resolve(makeResponse(makeBookProgress()))
+    await olderFetch
+    expect(bookProgress.value).toBeNull()
+    expect(loading.value).toBe(true)
+    second.resolve(makeResponse(makeBookProgress({ bookId: 43 })))
+    await newerFetch
+    expect(bookProgress.value?.bookId).toBe(43)
+    expect(loading.value).toBe(false)
+  })
+
+  it.each(['success', 'failure'] as const)('ignores an older %s after a newer fetch completes', async (result) => {
+    const older = deferred<Response>()
+    apiMock.mockReturnValueOnce(older.promise).mockResolvedValueOnce(makeResponse(makeBookProgress({ bookId: 43 })))
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, loading, fetchBookProgress } = useKoreaderBookProgress()
+    const olderFetch = fetchBookProgress(42)
+    await fetchBookProgress(43)
+    older.resolve(result === 'success' ? makeResponse(makeBookProgress()) : makeResponse(null, { ok: false }))
+    await olderFetch
+    expect(bookProgress.value?.bookId).toBe(43)
+    expect(loading.value).toBe(false)
+  })
+
+  it('clears the previous book immediately when fetching another book', async () => {
+    const next = deferred<Response>()
+    apiMock.mockResolvedValueOnce(makeResponse(makeBookProgress())).mockReturnValueOnce(next.promise)
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, fetchBookProgress } = useKoreaderBookProgress()
+    await fetchBookProgress(42)
+    const nextFetch = fetchBookProgress(43)
+    expect(bookProgress.value).toBeNull()
+    next.resolve(makeResponse(null))
+    await nextFetch
+  })
+
+  it('does not refetch the old book when its release finishes after navigation', async () => {
+    const release = deferred<Response>()
+    apiMock
+      .mockResolvedValueOnce(makeResponse(makeBookProgress()))
+      .mockReturnValueOnce(release.promise)
+      .mockResolvedValueOnce(makeResponse(makeBookProgress({ bookId: 43 })))
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, fetchBookProgress, releaseResetHold } = useKoreaderBookProgress()
+    await fetchBookProgress(42)
+    const pendingRelease = releaseResetHold(42, 'device-1')
+    await fetchBookProgress(43)
+    release.resolve(makeResponse(null))
+    await expect(pendingRelease).resolves.toBe(true)
+    expect(bookProgress.value?.bookId).toBe(43)
+    expect(apiMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('invalidates a pending fetch when progress is cleared', async () => {
+    const pending = deferred<Response>()
+    apiMock.mockReturnValueOnce(pending.promise)
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, loading, fetchBookProgress, clearBookProgress } = useKoreaderBookProgress()
+    const fetch = fetchBookProgress(42)
+    clearBookProgress()
+    pending.resolve(makeResponse(makeBookProgress()))
+    await fetch
+    expect(bookProgress.value).toBeNull()
+    expect(loading.value).toBe(false)
+  })
+
+  it('does not refresh after permission revocation clears a pending release', async () => {
+    const pending = deferred<Response>()
+    apiMock.mockResolvedValueOnce(makeResponse(makeBookProgress())).mockReturnValueOnce(pending.promise)
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { bookProgress, fetchBookProgress, clearBookProgress, releaseResetHold } = useKoreaderBookProgress()
+    await fetchBookProgress(42)
+    const release = releaseResetHold(42, 'device-1')
+    clearBookProgress()
+    pending.resolve(makeResponse(null))
+    await expect(release).resolves.toBe(true)
+    expect(apiMock).toHaveBeenCalledTimes(2)
+    expect(bookProgress.value).toBeNull()
   })
 })

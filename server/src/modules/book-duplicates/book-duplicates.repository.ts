@@ -224,7 +224,7 @@ export class BookDuplicatesRepository {
               SELECT DISTINCT CASE
                 WHEN lower(coalesce(f.format, '')) IN ('m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac') THEN 'audiobook'
                 WHEN lower(coalesce(f.format, '')) IN ('cbz', 'cbr', 'cb7', 'cbx') THEN 'comic'
-                WHEN lower(coalesce(f.format, '')) IN ('epub', 'pdf', 'mobi', 'azw', 'azw3', 'fb2', 'kepub') THEN 'ebook'
+                WHEN lower(coalesce(f.format, '')) IN ('epub', 'pdf', 'djvu', 'mobi', 'azw', 'azw3', 'fb2', 'kepub') THEN 'ebook'
                 ELSE 'unknown'
               END AS family
               FROM book_files f
@@ -308,7 +308,7 @@ export class BookDuplicatesRepository {
               SELECT DISTINCT CASE
                 WHEN lower(coalesce(f.format, '')) IN ('m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac') THEN 'audiobook'
                 WHEN lower(coalesce(f.format, '')) IN ('cbz', 'cbr', 'cb7', 'cbx') THEN 'comic'
-                WHEN lower(coalesce(f.format, '')) IN ('epub', 'pdf', 'mobi', 'azw', 'azw3', 'fb2', 'kepub') THEN 'ebook'
+                WHEN lower(coalesce(f.format, '')) IN ('epub', 'pdf', 'djvu', 'mobi', 'azw', 'azw3', 'fb2', 'kepub') THEN 'ebook'
                 ELSE 'unknown'
               END AS family
               FROM book_files f

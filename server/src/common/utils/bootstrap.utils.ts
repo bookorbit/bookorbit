@@ -172,3 +172,17 @@ export function applyDeclaredBodyLimit(route: { config?: unknown; bodyLimit?: nu
 export function registerDeclaredBodyLimits(fastify: FastifyInstance): void {
   fastify.addHook('onRoute', applyDeclaredBodyLimit);
 }
+
+/**
+ * `@fastify/compress` reads its per-route opt-out from the route options, which Nest's
+ * `@RouteConfig({ compress: false })` cannot reach. Raw file routes need it: the plugin's default
+ * type check gzips `+xml` and `octet-stream` bodies (FB2, unknown formats) and drops Content-Length.
+ * Register before the compress plugin so this hook runs first.
+ */
+export function applyDeclaredCompressionOptOut(route: { config?: unknown; compress?: unknown }): void {
+  if ((route.config as { compress?: unknown } | undefined)?.compress === false) route.compress = false;
+}
+
+export function registerDeclaredCompressionOptOuts(fastify: FastifyInstance): void {
+  fastify.addHook('onRoute', applyDeclaredCompressionOptOut);
+}

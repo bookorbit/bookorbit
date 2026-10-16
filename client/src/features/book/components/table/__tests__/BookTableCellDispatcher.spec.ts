@@ -47,6 +47,7 @@ const baseProps = {
   isLocked: false,
   isActive: false,
   isReadOnly: false,
+  canEditMetadata: true,
   isFullyLocked: false,
   lockedFieldCount: 0,
   selectionMode: false,
@@ -102,6 +103,18 @@ describe('BookTableCellDispatcher lock row', () => {
     expect(wrapper.emitted('unlockAll')).toBeFalsy()
   })
 
+  it('disables the row lock toggle when the book sits in a library the user can only read', async () => {
+    const wrapper = mountDispatcher({ isFullyLocked: false, lockedFieldCount: 2, canEditMetadata: false })
+    const button = wrapper.get('button')
+
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.classes()).toContain('text-amber-600/90')
+
+    await button.trigger('click')
+    expect(wrapper.emitted('lockAll')).toBeFalsy()
+    expect(wrapper.emitted('unlockAll')).toBeFalsy()
+  })
+
   it('passes the comic flag to the cover cell for comic primary files', () => {
     const book = makeBook({ files: [{ id: 1, format: 'cbz', role: 'primary', sizeBytes: null }] })
     const wrapper = mountDispatcher({ book, colId: 'cover' as const, cellType: 'cover' as const })
@@ -109,8 +122,8 @@ describe('BookTableCellDispatcher lock row', () => {
     expect(wrapper.find('[data-testid="cover-cell"]').attributes('data-comic')).toBe('true')
   })
 
-  it('does not flag non-comic primary files as comics in the cover cell', () => {
-    const book = makeBook({ files: [{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }] })
+  it.each(['epub', 'djvu'])('does not flag %s primary files as comics in the cover cell', (format) => {
+    const book = makeBook({ files: [{ id: 1, format, role: 'primary', sizeBytes: null }] })
     const wrapper = mountDispatcher({ book, colId: 'cover' as const, cellType: 'cover' as const })
 
     expect(wrapper.find('[data-testid="cover-cell"]').attributes('data-comic')).toBe('false')

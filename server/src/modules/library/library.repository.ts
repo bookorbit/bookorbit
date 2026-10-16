@@ -97,11 +97,16 @@ export class LibraryRepository {
       .orderBy(libraries.id);
   }
 
-  findAccessibleIdsForUser(userId: number) {
+  findAccessibleIdsForUser(userId: number, accessLevels?: readonly AccessLevel[]) {
+    const accessJoin = and(
+      eq(schema.userLibraryAccess.libraryId, libraries.id),
+      eq(schema.userLibraryAccess.userId, userId),
+      accessLevels ? inArray(schema.userLibraryAccess.accessLevel, [...accessLevels]) : undefined,
+    );
     return this.db
       .select({ id: libraries.id })
       .from(libraries)
-      .innerJoin(schema.userLibraryAccess, and(eq(schema.userLibraryAccess.libraryId, libraries.id), eq(schema.userLibraryAccess.userId, userId)))
+      .innerJoin(schema.userLibraryAccess, accessJoin)
       .where(visibleLibraryCondition)
       .orderBy(libraries.displayOrder, libraries.name);
   }

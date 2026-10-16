@@ -2,6 +2,15 @@ import { Type } from 'class-transformer';
 import { IsBase64, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { MAX_INDEXER_RELEASE_GUID_LENGTH } from '@bookorbit/types';
 
+/** The longest base64 `.torrent` the grab takes. The 2 MiB the service accepts is about 2.7 Mi characters. */
+export const GRAB_TORRENT_BASE64_MAX_LENGTH = 4 * 1024 * 1024;
+
+/**
+ * The grab routes' body limit. Fastify's default is 1 MiB, which refused a `.torrent` over about
+ * 768 KiB with a 413 before this DTO was read, though the DTO and the service allow far more.
+ */
+export const GRAB_BODY_LIMIT_BYTES = GRAB_TORRENT_BASE64_MAX_LENGTH + 1024 * 1024;
+
 /**
  * A grab names one of three things: a release the approver picked out of the ranked list, a
  * magnet, or a .torrent file. The service enforces "exactly one", because none of them is
@@ -33,7 +42,7 @@ export class GrabBookRequestDto {
 
   @IsOptional()
   @IsBase64()
-  @MaxLength(4 * 1024 * 1024)
+  @MaxLength(GRAB_TORRENT_BASE64_MAX_LENGTH)
   torrentFileBase64?: string;
 
   @IsOptional()

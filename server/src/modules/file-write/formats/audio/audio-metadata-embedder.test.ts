@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   randomUUID: vi.fn(),
   replaceFileAtomically: vi.fn(),
+  runFfmpeg: vi.fn(),
   sharpFactory: vi.fn(),
   sharpJpeg: vi.fn(),
   sharpToBuffer: vi.fn(),
@@ -37,6 +38,11 @@ vi.mock('../shared/atomic-file-replace', () => ({
   replaceFileAtomically: mocks.replaceFileAtomically,
 }));
 
+vi.mock('./ffmpeg-runner', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./ffmpeg-runner')>()),
+  runFfmpeg: mocks.runFfmpeg,
+}));
+
 vi.mock('./mp4-freeform-tags', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./mp4-freeform-tags')>()),
   writeMp4FreeformTags: mocks.writeMp4FreeformTags,
@@ -44,6 +50,7 @@ vi.mock('./mp4-freeform-tags', async (importOriginal) => ({
 
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
 import { AudioMetadataEmbedder, testing } from './audio-metadata-embedder';
+import { FfmpegStalledError } from './ffmpeg-runner';
 
 const execFileMock = execFile as unknown as typeof mocks.execFile;
 const randomUUIDMock = randomUUID as unknown as typeof mocks.randomUUID;
@@ -65,6 +72,7 @@ describe('AudioMetadataEmbedder', () => {
         callback(null, '', '');
       },
     );
+    mocks.runFfmpeg.mockResolvedValue(undefined);
     writeFileMock.mockResolvedValue(undefined);
     unlinkMock.mockResolvedValue(undefined);
     replaceFileAtomicallyMock.mockResolvedValue(undefined);
@@ -86,7 +94,7 @@ describe('AudioMetadataEmbedder', () => {
     expect(sharpMock).toHaveBeenCalledWith(Buffer.from('raw-cover'));
     expect(mocks.sharpJpeg).toHaveBeenCalledWith({ quality: 92 });
     expect(writeFileMock).toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg', Buffer.from('jpeg-cover'));
-    expect(execFileMock).toHaveBeenCalledWith(
+    expect(mocks.runFfmpeg).toHaveBeenCalledWith(
       '/opt/bin/ffmpeg',
       expect.arrayContaining([
         '-v',
@@ -111,8 +119,6 @@ describe('AudioMetadataEmbedder', () => {
         'composer=Scott Brick',
         '/books/audio/.bookorbit-write-fixed-id.m4b',
       ]),
-      expect.objectContaining({ maxBuffer: expect.any(Number), timeout: 60_000 }),
-      expect.any(Function),
     );
     expect(replaceFileAtomicallyMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4b', '/books/audio/book.m4b');
     expect(unlinkMock).toHaveBeenCalledTimes(1);
@@ -148,7 +154,7 @@ describe('AudioMetadataEmbedder', () => {
 
     expect(sharpMock).not.toHaveBeenCalled();
     expect(writeFileMock).not.toHaveBeenCalled();
-    const args = execFileMock.mock.calls[0]![1] as string[];
+    const args = mocks.runFfmpeg.mock.calls[0]![1] as string[];
     expect(args).toEqual(expect.arrayContaining(['-metadata', 'album=Book', '/books/audio/.bookorbit-write-fixed-id.flac']));
     // Audio, existing art, and subtitles only: a copied MP4 chapter data track fails the whole write.
     expect(mapArgs(args)).toEqual(['0:a', '0:v?', '0:s?']);
@@ -162,9 +168,8 @@ describe('AudioMetadataEmbedder', () => {
 
   it('bounds the ffprobe stream check and treats a timed-out probe as having art', async () => {
     vi.stubEnv('FFPROBE_PATH', '/opt/bin/ffprobe');
-    execFileMock.mockImplementation((bin: string, _args: string[], _options: unknown, callback: (error: Error | null, stdout: string) => void) => {
-      if (bin === '/opt/bin/ffprobe') callback(Object.assign(new Error('Command failed'), { killed: true, signal: 'SIGTERM' }), '');
-      else callback(null, '');
+    execFileMock.mockImplementation((_bin: string, _args: string[], _options: unknown, callback: (error: Error | null, stdout: string) => void) => {
+      callback(Object.assign(new Error('Command failed'), { killed: true, signal: 'SIGTERM' }), '');
     });
     const embedder = new AudioMetadataEmbedder();
 
@@ -172,9 +177,8 @@ describe('AudioMetadataEmbedder', () => {
 
     const probeCall = execFileMock.mock.calls.find(([bin]) => bin === '/opt/bin/ffprobe')!;
     expect(probeCall[2]).toEqual({ timeout: 30_000 });
-    const ffmpegArgs = execFileMock.mock.calls.find(([bin]) => bin !== '/opt/bin/ffprobe')![1] as string[];
-    expect(ffmpegArgs).not.toContain('use_metadata_tags');
-    expect(ffmpegArgs).not.toContain('-f');
+    expect(ffmpegArgs()).not.toContain('use_metadata_tags');
+    expect(ffmpegArgs()).not.toContain('-f');
   });
 
   function mockProbedStreams(streams: Array<{ codec_type: string; codec_name?: string }>): void {
@@ -183,14 +187,14 @@ describe('AudioMetadataEmbedder', () => {
 
   function mockProbeOutput(stdout: string): void {
     execFileMock.mockImplementation(
-      (bin: string, _args: string[], _options: unknown, callback: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
-        callback(null, { stdout: bin === 'ffprobe' ? stdout : '', stderr: '' });
+      (_bin: string, _args: string[], _options: unknown, callback: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+        callback(null, { stdout, stderr: '' });
       },
     );
   }
 
   function ffmpegArgs(): string[] {
-    return execFileMock.mock.calls.find(([bin]) => bin === 'ffmpeg')![1] as string[];
+    return mocks.runFfmpeg.mock.calls[0]![1] as string[];
   }
 
   function mapArgs(args: string[]): string[] {
@@ -413,7 +417,8 @@ describe('AudioMetadataEmbedder', () => {
 
       await embedder.embedMetadata(`/books/audio/book.${format}`, format, { coverBytes: null, metadata: [] });
 
-      expect(execFileMock.mock.calls.map(([bin]) => bin)).toEqual(['ffmpeg']);
+      expect(execFileMock).not.toHaveBeenCalled();
+      expect(mocks.runFfmpeg).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -440,12 +445,60 @@ describe('AudioMetadataEmbedder', () => {
     expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4b');
   });
 
+  it('keeps the original file and removes the partial output when ffmpeg stalls', async () => {
+    mocks.runFfmpeg.mockRejectedValue(new FfmpegStalledError(120_000, 'SIGTERM'));
+    const embedder = new AudioMetadataEmbedder();
+
+    await expect(
+      embedder.embedMetadata('/books/audio/book.m4b', 'm4b', { coverBytes: Buffer.from('raw-cover'), metadata: [] }),
+    ).rejects.toBeInstanceOf(FfmpegStalledError);
+
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(1);
+    expect(mocks.writeMp4FreeformTags).not.toHaveBeenCalled();
+    expect(replaceFileAtomicallyMock).not.toHaveBeenCalled();
+    expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4b');
+    expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
+  });
+
+  it('retries an unprobed MP4 with the mp4 muxer when the ipod muxer refuses it', async () => {
+    mockProbeOutput('not json');
+    mocks.runFfmpeg.mockRejectedValueOnce(new Error("Tag mp4a incompatible with output codec id '86017'")).mockResolvedValueOnce(undefined);
+    const embedder = new AudioMetadataEmbedder();
+
+    await embedder.embedMetadata('/books/audio/merged.m4b', 'm4b', { coverBytes: Buffer.from('raw-cover'), metadata: [] });
+
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(2);
+    expect(mocks.runFfmpeg.mock.calls[0]![1]).not.toContain('-f');
+    expect(mocks.runFfmpeg.mock.calls[1]![1]).toEqual(expect.arrayContaining(['-f', 'mp4', '/books/audio/.bookorbit-write-fixed-id.m4b']));
+    expect(replaceFileAtomicallyMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4b', '/books/audio/merged.m4b');
+  });
+
+  it('reports the first ffmpeg failure when the mp4 retry fails as well', async () => {
+    mockProbeOutput('not json');
+    mocks.runFfmpeg.mockRejectedValueOnce(new Error('first failure')).mockRejectedValueOnce(new Error('retry failure'));
+    const embedder = new AudioMetadataEmbedder();
+
+    await expect(embedder.embedMetadata('/books/audio/merged.m4a', 'm4a', { coverBytes: null, metadata: [] })).rejects.toThrow('first failure');
+
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(2);
+    expect(replaceFileAtomicallyMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a probed MP4', 'm4b', true],
+    ['an MP3', 'mp3', false],
+  ])('does not retry a failed write of %s', async (_label, format, probed) => {
+    if (probed) mockProbedStreams([{ codec_type: 'audio', codec_name: 'aac' }]);
+    mocks.runFfmpeg.mockRejectedValue(new Error('ffmpeg failed'));
+    const embedder = new AudioMetadataEmbedder();
+
+    await expect(embedder.embedMetadata(`/books/audio/book.${format}`, format, { coverBytes: null, metadata: [] })).rejects.toThrow('ffmpeg failed');
+
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves the ffmpeg error when cleanup also fails', async () => {
-    execFileMock.mockImplementation(
-      (_bin: string, _args: string[], _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
-        callback(new Error('ffmpeg failed'), '', '');
-      },
-    );
+    mocks.runFfmpeg.mockRejectedValue(new Error('ffmpeg failed'));
     unlinkMock.mockRejectedValue(new Error('cleanup failed'));
     const embedder = new AudioMetadataEmbedder();
 

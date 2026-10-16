@@ -5,7 +5,7 @@ import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { resolveTimeZone } from '../../common/utils/timezone.utils';
+import { isDateKey, resolveTimeZone } from '../../common/utils/timezone.utils';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
 import { UserBookNoteService, type UserBookNoteDto } from '../user-book-note/user-book-note.service';
 import { BookService } from '../book/book.service';
@@ -426,7 +426,7 @@ export class KoreaderPluginService {
   }
 
   /**
-   * Status writes stay on UserBookStatusService because setManual drives reading-attempt
+   * Status writes stay on UserBookStatusService because it drives reading-attempt
    * lifecycle bookkeeping that a bulk row write would silently skip. It also projects a
    * status that can differ from the requested one, so a book written during this batch is
    * re-read only if a later entry resolves to it again.
@@ -449,7 +449,22 @@ export class KoreaderPluginService {
       if (!statusModified || statusModified <= serverDate) return false;
     }
 
-    await this.userBookStatusService.setManual(userId, bookId, mapped, state.timeZone);
+    const finishedOn =
+      mapped === 'read' && statusModified && isDateKey(statusModified) && (!existing?.startedAt || statusModified >= existing.startedAt.slice(0, 10))
+        ? statusModified
+        : undefined;
+    if (finishedOn) {
+      // KOReader supplies a calendar day, which must not shift with the reader's timezone.
+      await this.userBookStatusService.updateManual(
+        userId,
+        bookId,
+        { status: mapped, finishedAt: new Date(`${finishedOn}T00:00:00.000Z`) },
+        { endedOn: finishedOn },
+        state.timeZone,
+      );
+    } else {
+      await this.userBookStatusService.setManual(userId, bookId, mapped, state.timeZone);
+    }
     state.staleStatusBookIds.add(bookId);
     return true;
   }

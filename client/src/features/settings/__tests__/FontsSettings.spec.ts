@@ -1,16 +1,19 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { computed } from 'vue'
 import FontsSettings from '../FontsSettings.vue'
-import { makeCustomFontsMock, makeFontStore, mockFont } from './font-store-fixture'
+import FontFamilyMenu from '../fonts/components/FontFamilyMenu.vue'
+import { makeCustomFontsMock, makeFontStore, mockFont, type MockFontStore } from './font-store-fixture'
 
-// --- Mocks ---
+const apiMock = vi.hoisted(() => vi.fn<(input: string, init?: RequestInit) => Promise<{ ok: boolean; json: () => Promise<unknown> }>>())
+vi.mock('@/lib/api', () => ({ api: apiMock }))
 
 vi.mock('vue-sonner', () => ({
   toast: { success: vi.fn<() => void>(), error: vi.fn<() => void>() },
 }))
 
-vi.mock('@/features/reader/epub/composables/useCustomFonts', () => ({
+vi.mock('@/features/reader/epub/composables/useCustomFonts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/reader/epub/composables/useCustomFonts')>()),
   useCustomFonts: vi.fn<() => unknown>(),
 }))
 
@@ -18,367 +21,272 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: vi.fn<() => unknown>(),
 }))
 
-const literataFonts = [mockFont(1, 'Literata', 400), mockFont(2, 'Literata', 700)]
-const georgiaPro = mockFont(3, 'Georgia Pro')
-
-import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
+import { FontUploadError, useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { toast } from 'vue-sonner'
 
-/** Builds the user-scope store and installs it as the composable's scopeStore('user'). */
-function makeComposable(initialFonts: Parameters<typeof makeFontStore>[1] = []) {
-  const store = makeFontStore('user', initialFonts)
-  vi.mocked(useCustomFonts).mockReturnValue(makeCustomFontsMock({ user: store }) as never)
-  return store
+/** The real menus open on a pointer gesture jsdom does not raise, so their content is rendered flat. */
+const DROPDOWN_STUBS = {
+  DropdownMenu: { template: '<div><slot /></div>' },
+  DropdownMenuTrigger: { template: '<div><slot /></div>' },
+  DropdownMenuContent: { template: '<div><slot /></div>' },
+  DropdownMenuItem: { emits: ['click'], template: '<button type="button" @click="$emit(\'click\')"><slot /></button>' },
+  DropdownMenuSeparator: { template: '<hr />' },
 }
 
-function makePermissions(isDemo = false) {
-  return { isDemoRestrictedAccount: computed(() => isDemo) }
+const georgia = [mockFont(1, 'Georgia'), mockFont(2, 'Georgia', 700)]
+const inter = mockFont(4, 'Inter')
+const courgette = mockFont(3, 'Courgette')
+const bigCaslon = mockFont(5, 'Big Caslon', 500)
+
+const USAGE = {
+  fonts: [
+    { cssFamily: '__userfont_georgia', books: 2, isDefault: false },
+    { cssFamily: '__serverfont_courgette', books: 0, isDefault: true },
+  ],
+}
+
+function respond(body: unknown, ok = true) {
+  return Promise.resolve({ ok, json: () => Promise.resolve(body) })
+}
+
+let user: MockFontStore
+let customFonts: ReturnType<typeof makeCustomFontsMock>
+
+function mountPage(own = [...georgia, inter], server = [courgette, bigCaslon]): VueWrapper {
+  user = makeFontStore('user', own)
+  customFonts = makeCustomFontsMock({ user, server: makeFontStore('server', server) })
+  vi.mocked(useCustomFonts).mockReturnValue(customFonts as never)
+  return mount(FontsSettings, { attachTo: document.body, global: { stubs: DROPDOWN_STUBS } })
+}
+
+function rowsIn(wrapper: VueWrapper, section: string) {
+  return wrapper.get(`[data-testid="${section}"]`).findAll('[data-testid="font-family-row"]')
+}
+
+function rowNamed(wrapper: VueWrapper, section: string, name: string) {
+  const row = rowsIn(wrapper, section).find((candidate) => candidate.find('button').text() === name)
+  if (!row) throw new Error(`no ${section} row for ${name}`)
+  return row
+}
+
+function dialogText(): string {
+  return document.body.querySelector('[role="dialog"]')?.textContent ?? ''
+}
+
+function clickInDialog(text: string) {
+  const dialog = document.body.querySelector('[role="dialog"]')
+  const button = [...(dialog?.querySelectorAll('button') ?? [])].find((candidate) => (candidate.textContent ?? '').trim() === text)
+  if (!button) throw new Error(`no "${text}" button in the sheet`)
+  button.click()
+}
+
+/** jsdom has no DragEvent, so a drop is an Event carrying the one field the page reads. */
+function dropFiles(files: File[]) {
+  const event = new Event('drop', { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files, items: files } })
+  window.dispatchEvent(event)
 }
 
 describe('FontsSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(usePermissions).mockReturnValue(makePermissions(false) as never)
+    vi.mocked(usePermissions).mockReturnValue({ isDemoRestrictedAccount: computed(() => false) } as never)
+    apiMock.mockImplementation((url: string) => (url === '/api/v1/fonts/usage' ? respond(USAGE) : respond({}, false)))
   })
 
-  describe('empty state', () => {
-    it('shows empty state message when no fonts are loaded', async () => {
-      makeComposable()
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('No fonts uploaded yet')
-    })
-
-    it('shows quota counter as 0 / 50', async () => {
-      makeComposable()
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('0 / 50 used')
-    })
+  afterEach(() => {
+    document.body.innerHTML = ''
   })
 
-  describe('with fonts', () => {
-    it('renders font family names', async () => {
-      makeComposable([...literataFonts, georgiaPro])
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
+  it("loads the reader's fonts, the server's, their opt-outs and how they use each", async () => {
+    mountPage()
+    await flushPromises()
 
-      expect(wrapper.text()).toContain('Literata')
-      expect(wrapper.text()).toContain('Georgia Pro')
-    })
-
-    it('shows correct quota count', async () => {
-      makeComposable([...literataFonts, georgiaPro])
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('3 / 50 used')
-    })
-
-    it('shows file count per family', async () => {
-      makeComposable([...literataFonts, georgiaPro])
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('2 files')
-      expect(wrapper.text()).toContain('1 file')
-    })
+    expect(user.fetchFonts).toHaveBeenCalled()
+    expect(customFonts.fetchServerFonts).toHaveBeenCalled()
+    expect(customFonts.fetchServerFontVisibility).toHaveBeenCalled()
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/fonts/usage')
   })
 
-  describe('upload', () => {
-    it('calls uploadFont when a file is dropped', async () => {
-      const composable = makeComposable()
-      composable.uploadFont.mockResolvedValue({
-        font: literataFonts[0],
-        suggestedFamilyName: 'Literata',
-        suggestedWeight: 400,
-        suggestedStyle: 'normal',
-      })
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+  describe('your fonts', () => {
+    it('lists one row per family, in name order, against the personal cap', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      const file = new File(['data'], 'Literata.ttf', { type: 'font/ttf' })
-      const label = wrapper.find('label')
-      const dt = { files: [file] }
-      await label.trigger('drop', { preventDefault: vi.fn<() => void>(), dataTransfer: dt })
-      await flushPromises()
-
-      expect(composable.uploadFont).toHaveBeenCalledWith(file)
-      expect(toast.success).toHaveBeenCalledWith('"Literata.ttf" added')
+      expect(rowsIn(wrapper, 'own-fonts').map((row) => row.find('button').text())).toEqual(['Georgia', 'Inter'])
+      expect(rowNamed(wrapper, 'own-fonts', 'Georgia').text()).toContain('2 styles, no italics')
+      expect(wrapper.get('[data-testid="font-totals"]').text().replace(/\s+/g, ' ')).toContain('3 of 50 files')
     })
 
-    it('shows error toast when upload fails', async () => {
-      const composable = makeComposable()
-      composable.uploadFont.mockRejectedValue(new Error('File too large'))
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('says which of them the reader actually uses', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      const file = new File(['data'], 'big.ttf')
-      const label = wrapper.find('label')
-      await label.trigger('drop', { preventDefault: vi.fn<() => void>(), dataTransfer: { files: [file] } })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('big.ttf: File too large')
+      expect(rowNamed(wrapper, 'own-fonts', 'Georgia').get('[data-testid="font-family-use"]').text()).toBe('On 2 books')
+      expect(rowNamed(wrapper, 'own-fonts', 'Inter').get('[data-testid="font-family-use"]').text()).toBe('')
     })
 
-    it('dismisses an error when X is clicked', async () => {
-      const composable = makeComposable()
-      composable.uploadFont.mockRejectedValue(new Error('Oops'))
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('keeps the empty state small, since the server list still follows', async () => {
+      const wrapper = mountPage([])
       await flushPromises()
 
-      const file = new File(['data'], 'test.ttf')
-      await wrapper.find('label').trigger('drop', { preventDefault: vi.fn<() => void>(), dataTransfer: { files: [file] } })
+      const empty = wrapper.get('[data-testid="font-empty-surface"]')
+      expect(empty.text()).toContain('No fonts uploaded yet')
+      expect(empty.text()).toContain('Add fonts')
+      expect(rowsIn(wrapper, 'server-fonts')).toHaveLength(2)
+    })
+
+    it('asks before removing a family, naming the books that lose it', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      expect(wrapper.text()).toContain('test.ttf: Oops')
+      wrapper
+        .findAllComponents(FontFamilyMenu)
+        .find((menu) => menu.props('name') === 'Georgia')!
+        .vm.$emit('remove', 'Georgia')
+      await flushPromises()
 
-      const dismissBtn = wrapper.findAll('button').find((b) => b.find('svg').exists() && b.classes().some((c) => c.includes('shrink-0')))
-      await dismissBtn?.trigger('click')
+      const alert = document.body.querySelector('[role="dialog"] [role="alert"]')?.textContent ?? ''
+      expect(alert).toContain('Remove Georgia from your fonts?')
+      expect(alert).toContain('It is set on 2 of your books; they go back to their own fonts.')
+      expect(user.deleteFont).not.toHaveBeenCalled()
 
-      expect(wrapper.text()).not.toContain('test.ttf: Oops')
+      clickInDialog('Remove family')
+      await flushPromises()
+
+      expect(user.deleteFont.mock.calls).toEqual([[1], [2]])
+    })
+
+    it('renames a family through the personal route', async () => {
+      const wrapper = mountPage()
+      await flushPromises()
+      apiMock.mockImplementation((url: string) => (url === '/api/v1/fonts/families' ? respond([mockFont(4, 'Inter Display')]) : respond(USAGE)))
+      await rowNamed(wrapper, 'own-fonts', 'Inter').trigger('click')
+      await flushPromises()
+
+      const input = document.body.querySelector<HTMLInputElement>('#font-family-name')!
+      input.value = 'Inter Display'
+      input.dispatchEvent(new Event('input'))
+      await flushPromises()
+      clickInDialog('Save')
+      await flushPromises()
+
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/fonts/families', expect.objectContaining({ method: 'PATCH' }))
+      expect(toast.success).toHaveBeenCalledWith('Renamed to "Inter Display"')
+    })
+
+    it('uploads dropped files into the personal collection and explains the personal cap', async () => {
+      const wrapper = mountPage()
+      await flushPromises()
+      user.uploadFont.mockRejectedValue(new FontUploadError('Maximum of 50 fonts per user reached', 400, 'FONT_LIMIT_REACHED', { limit: 50 }))
+
+      dropFiles([new File(['x'], 'Lora-Regular.ttf')])
+      await flushPromises()
+
+      expect(user.uploadFont).toHaveBeenCalledTimes(1)
+      expect(wrapper.get('[data-testid="font-upload-entry"]').text()).toContain('You already have 50 font files.')
     })
   })
 
-  describe('delete', () => {
-    it('removes font family (optimistic) and completes silently', async () => {
-      const composable = makeComposable([...literataFonts, georgiaPro])
-      composable.deleteFont.mockResolvedValue(true)
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+  describe('server fonts', () => {
+    it('lists every server family with a switch, counting how many are shown', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Georgia Pro')
-
-      const allButtons = wrapper.findAll('button')
-      const deleteBtns = allButtons.filter((b) => b.attributes('title') === 'Delete family')
-      await deleteBtns[1]?.trigger('click')
-      await flushPromises()
-
-      expect(composable.deleteFont).toHaveBeenCalledWith(georgiaPro.id)
-      expect(composable.fonts.value.some((f) => f.familyName === 'Georgia Pro')).toBe(false)
+      const section = wrapper.get('[data-testid="server-fonts"]')
+      expect(rowsIn(wrapper, 'server-fonts').map((row) => row.find('button').text())).toEqual(['Big Caslon', 'Courgette'])
+      expect(section.findAll('button[role="switch"]')).toHaveLength(2)
+      expect(section.text()).toContain('2 of 2 shown')
     })
 
-    it('refetches and shows error toast when family delete fails', async () => {
-      const composable = makeComposable([georgiaPro])
-      composable.deleteFont.mockResolvedValue(false)
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it("shows the reader's own use of a server font, such as being their default", async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      const deleteBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Delete family')
-      await deleteBtn?.trigger('click')
-      await flushPromises()
-
-      expect(toast.error).toHaveBeenCalledWith('Failed to delete font family')
-      expect(composable.fetchFonts).toHaveBeenCalled()
+      expect(rowNamed(wrapper, 'server-fonts', 'Courgette').get('[data-testid="font-family-use"]').text()).toBe('Your default')
     })
 
-    it('removes variant (optimistic) and completes silently', async () => {
-      const composable = makeComposable([...literataFonts])
-      composable.deleteFont.mockResolvedValue(true)
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('hides a family when its switch is turned off, and marks the row', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      // Expand the Literata family
-      const toggleBtn = wrapper.find('button')
-      await toggleBtn.trigger('click')
+      await rowNamed(wrapper, 'server-fonts', 'Big Caslon').get('button[role="switch"]').trigger('click')
       await flushPromises()
 
-      const deleteVariantBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Delete variant')
-      await deleteVariantBtn?.trigger('click')
-      await flushPromises()
-
-      expect(composable.deleteFont).toHaveBeenCalledWith(literataFonts[0]!.id)
-      expect(composable.fonts.value.some((f) => f.id === literataFonts[0]!.id)).toBe(false)
+      expect(customFonts.setServerFamilyHidden).toHaveBeenCalledWith('Big Caslon', true)
+      expect(rowNamed(wrapper, 'server-fonts', 'Big Caslon').text()).toContain('Hidden')
+      expect(wrapper.get('[data-testid="server-fonts"]').text()).toContain('1 of 2 shown')
     })
 
-    it('restores variant and shows error toast when variant delete fails', async () => {
-      const composable = makeComposable([...literataFonts])
-      composable.deleteFont.mockResolvedValue(false)
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('says so when every server font is hidden', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      const toggleBtn = wrapper.find('button')
-      await toggleBtn.trigger('click')
+      for (const name of ['Big Caslon', 'Courgette']) await rowNamed(wrapper, 'server-fonts', name).get('button[role="switch"]').trigger('click')
       await flushPromises()
 
-      const deleteVariantBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Delete variant')
-      await deleteVariantBtn?.trigger('click')
-      await flushPromises()
-
-      expect(toast.error).toHaveBeenCalledWith('Failed to delete font')
-      expect(composable.fonts.value.some((f) => f.id === literataFonts[0]!.id)).toBe(true)
-    })
-  })
-
-  describe('inline family rename', () => {
-    it('shows input when pencil is clicked and saves on Enter', async () => {
-      const composable = makeComposable([georgiaPro])
-      composable.updateFont.mockResolvedValue({ ...georgiaPro, familyName: 'New Name' })
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      const pencilBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Rename family')
-      await pencilBtn?.trigger('click')
-      await flushPromises()
-
-      const textInput = wrapper.findAll('input').find((i) => i.attributes('type') !== 'file')
-      expect(textInput?.exists()).toBe(true)
-
-      await textInput!.setValue('New Name')
-      await textInput!.trigger('keydown', { key: 'Enter' })
-      await flushPromises()
-
-      expect(composable.updateFont).toHaveBeenCalledWith(3, { familyName: 'New Name' })
-      expect(toast.success).toHaveBeenCalledWith('Renamed to "New Name"')
+      expect(wrapper.text()).toContain('All server fonts are hidden.')
     })
 
-    it('cancels edit on Escape', async () => {
-      const composable = makeComposable([georgiaPro])
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('opens a server family to preview, with only its switch to change', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      const pencilBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Rename family')
-      await pencilBtn?.trigger('click')
+      await rowNamed(wrapper, 'server-fonts', 'Courgette').trigger('click')
+      await flushPromises()
 
-      const textInput = wrapper.findAll('input').find((i) => i.attributes('type') !== 'file')
-      expect(textInput?.exists()).toBe(true)
-      await textInput!.trigger('keydown', { key: 'Escape' })
+      expect(dialogText()).toContain('Show in my reader')
+      expect(dialogText()).not.toContain('Family name')
+      expect(document.body.querySelector('#font-family-name')).toBeNull()
 
-      const afterInputs = wrapper.findAll('input').filter((i) => i.attributes('type') !== 'file')
-      expect(afterInputs.length).toBe(0)
-      expect(composable.updateFont).not.toHaveBeenCalled()
+      document.body.querySelector<HTMLButtonElement>('[role="dialog"] button[role="switch"]')!.click()
+      await flushPromises()
+
+      expect(customFonts.setServerFamilyHidden).toHaveBeenCalledWith('Courgette', true)
     })
 
-    it('shows error and refetches if rename partially fails', async () => {
-      const composable = makeComposable([...literataFonts])
-      composable.updateFont.mockResolvedValueOnce({ ...literataFonts[0]!, familyName: 'New' }).mockResolvedValueOnce(null)
+    it('reports a failed save', async () => {
+      const wrapper = mountPage()
+      await flushPromises()
+      customFonts.setServerFamilyHidden.mockResolvedValueOnce(false)
 
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+      await rowNamed(wrapper, 'server-fonts', 'Courgette').get('button[role="switch"]').trigger('click')
       await flushPromises()
 
-      const pencilBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Rename family')
-      await pencilBtn?.trigger('click')
-
-      const textInput = wrapper.findAll('input').find((i) => i.attributes('type') !== 'file')
-      await textInput!.setValue('New')
-      await textInput!.trigger('keydown', { key: 'Enter' })
-      await flushPromises()
-
-      expect(toast.error).toHaveBeenCalledWith('Failed to rename font family')
-      expect(composable.fetchFonts).toHaveBeenCalled()
+      expect(toast.error).toHaveBeenCalledWith('Failed to update server font visibility')
     })
-  })
 
-  describe('variant expand', () => {
-    it('shows variant rows when family header is clicked', async () => {
-      makeComposable([...literataFonts])
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('leaves the section out when the server has no fonts', async () => {
+      const wrapper = mountPage(undefined, [])
       await flushPromises()
 
-      expect(wrapper.text()).not.toContain('Regular')
-
-      // Click the family toggle button
-      const toggleBtn = wrapper.find('button')
-      await toggleBtn.trigger('click')
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('Regular')
-      expect(wrapper.text()).toContain('Bold')
+      expect(wrapper.find('[data-testid="server-fonts"]').exists()).toBe(false)
     })
   })
 
   describe('demo restriction', () => {
     beforeEach(() => {
-      vi.mocked(usePermissions).mockReturnValue(makePermissions(true) as never)
+      vi.mocked(usePermissions).mockReturnValue({ isDemoRestrictedAccount: computed(() => true) } as never)
     })
 
-    it('shows "Not available for demo accounts" text in upload zone', async () => {
-      makeComposable()
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('offers nothing that changes the collection but still lets the reader hide server fonts', async () => {
+      const wrapper = mountPage()
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Not available for demo accounts')
+      expect(wrapper.findAll('button').some((button) => button.text() === 'Add fonts')).toBe(false)
+      expect(wrapper.findAllComponents(FontFamilyMenu)).toHaveLength(0)
+      expect(wrapper.get('[data-testid="server-fonts"]').findAll('button[role="switch"]')).toHaveLength(2)
     })
 
-    it('disables the file input', async () => {
-      makeComposable()
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+    it('ignores dropped files', async () => {
+      mountPage()
       await flushPromises()
 
-      const fileInput = wrapper.find('input[type="file"]')
-      expect(fileInput.attributes('disabled')).toBeDefined()
-    })
-
-    it('does not call uploadFont when file is dropped', async () => {
-      const composable = makeComposable()
-
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
+      dropFiles([new File(['x'], 'Test.ttf')])
       await flushPromises()
 
-      const file = new File(['data'], 'Test.ttf', { type: 'font/ttf' })
-      const label = wrapper.find('label')
-      await label.trigger('drop', { preventDefault: vi.fn<() => void>(), dataTransfer: { files: [file] } })
-      await flushPromises()
-
-      expect(composable.uploadFont).not.toHaveBeenCalled()
-      expect(toast.error).toHaveBeenCalledWith('Demo-restricted account cannot manage fonts')
-    })
-
-    it('hides Rename family and Delete family buttons', async () => {
-      makeComposable([georgiaPro])
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      const renameFamilyBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Rename family')
-      const deleteFamilyBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Delete family')
-
-      expect(renameFamilyBtn).toBeUndefined()
-      expect(deleteFamilyBtn).toBeUndefined()
-    })
-
-    it('hides Edit weight/style and Delete variant buttons when variants are expanded', async () => {
-      makeComposable([...literataFonts])
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      const toggleBtn = wrapper.find('button')
-      await toggleBtn.trigger('click')
-      await flushPromises()
-
-      const editVariantBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Edit weight/style')
-      const deleteVariantBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Delete variant')
-
-      expect(editVariantBtn).toBeUndefined()
-      expect(deleteVariantBtn).toBeUndefined()
-    })
-
-    it('still shows font families (read access is allowed)', async () => {
-      makeComposable([georgiaPro])
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('Georgia Pro')
-    })
-
-    it('still shows quota counter', async () => {
-      makeComposable([georgiaPro])
-      const wrapper = mount(FontsSettings, { attachTo: document.body })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('1 / 50 used')
+      expect(user.uploadFont).not.toHaveBeenCalled()
     })
   })
 })

@@ -61,6 +61,8 @@ export interface SettingsNavItem {
   id: string
   routeName: string
   labelKey: string
+  /** The page heading, when the short nav label would not say what the page is on its own. */
+  titleKey?: string
   descriptionKey?: string
   icon: Component
   /** Extra English search terms so the rail search finds a page by concept, not just by title. */
@@ -215,6 +217,7 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
             id: 'tts',
             routeName: 'settings-tts',
             labelKey: 'settings.common.nav.tts',
+            descriptionKey: 'settings.nav.descriptions.readerTts',
             icon: AudioLines,
             keywords: 'tts text to speech read aloud voice narration speed',
           },
@@ -320,6 +323,7 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
             id: 'metadata-auto-fetch',
             routeName: 'settings-metadata-auto-fetch',
             labelKey: 'settings.metadata.tabs.auto-fetch',
+            titleKey: 'titles.metadata.auto-fetch',
             descriptionKey: 'settings.metadata.tabSubtitles.auto-fetch',
             icon: Zap,
             keywords: 'auto fetch schedule missing fields import books conditions',
@@ -522,6 +526,7 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         id: 'admin-tts',
         routeName: 'settings-admin-tts',
         labelKey: 'settings.admin.tabs.tts',
+        descriptionKey: 'settings.nav.descriptions.adminTts',
         icon: Speech,
         keywords: 'tts text to speech provider voice engine openai kokoro',
         isVisible: anyPermission('manage_app_settings'),
@@ -575,6 +580,36 @@ export function visibleSettingsNav(context: SettingsNavContext): SettingsNavGrou
     ...group,
     items: group.items.map((item) => visibleItem(item, context)).filter((item): item is SettingsNavItem => item !== null),
   })).filter((group) => group.items.length > 0)
+}
+
+export interface SettingsNavSearchHit {
+  item: SettingsNavItem
+  group: SettingsNavGroup
+  rank: number
+}
+
+/**
+ * Matches every term against a page's label, description, keywords and group, so "sync" finds
+ * Kobo through its keywords. Leaf destinations only: a parent with children is never a target.
+ */
+export function searchSettingsNav(groups: readonly SettingsNavGroup[], query: string, translate: (key: string) => string): SettingsNavSearchHit[] {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return []
+  const leaves = groups.flatMap((group) =>
+    group.items.flatMap((item) => (item.children?.length ? item.children.map((child) => ({ item: child, group })) : [{ item, group }])),
+  )
+  return leaves
+    .map(({ item, group }) => {
+      const description = item.descriptionKey ? translate(item.descriptionKey) : ''
+      const haystack = `${translate(item.labelKey)} ${description} ${item.keywords ?? ''} ${translate(group.labelKey)}`.toLowerCase()
+      if (!terms.every((term) => haystack.includes(term))) return null
+      const label = translate(item.labelKey).toLowerCase()
+      const lead = terms[0] ?? ''
+      const rank = label.startsWith(lead) ? 0 : label.includes(lead) ? 1 : 2
+      return { item, group, rank }
+    })
+    .filter((hit): hit is SettingsNavSearchHit => hit !== null)
+    .sort((a, b) => a.rank - b.rank)
 }
 
 export interface SettingsNavMatch {

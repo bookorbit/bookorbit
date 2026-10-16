@@ -2,10 +2,19 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, Filter, Library, Rows3, Search, X } from '@lucide/vue'
+import { ChevronDown, Library, Rows3, X } from '@lucide/vue'
 
-import ViewHeader from '@/components/ViewHeader.vue'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import BrowseHeader from '@/components/browse-header/BrowseHeader.vue'
+import BrowseSearchField from '@/components/browse-header/BrowseSearchField.vue'
+import BrowseSortControl from '@/components/browse-header/BrowseSortControl.vue'
+import BrowseInlineGroup from '@/components/browse-header/BrowseInlineGroup.vue'
+import BrowseLibraryPicker from '@/components/browse-header/BrowseLibraryPicker.vue'
+import BrowseViewControls from '@/components/browse-header/BrowseViewControls.vue'
+import { barButton, barButtonOn, barDivider } from '@/components/browse-header/browse-header'
+import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { formatNumber } from '@/i18n/formatters'
+import { cn } from '@/lib/utils'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -42,14 +51,9 @@ const INITIAL_SKELETON_COUNT = 18
 
 const hydrating = ref(true)
 const suppressAutoReload = ref(false)
-const filtersOpen = ref(false)
-const mobileSearchOpen = ref(false)
 const initialLoadComplete = ref(false)
 
 const sentinel = ref<HTMLElement | null>(null)
-const mobileSearchInput = ref<HTMLInputElement | null>(null)
-const pageHeader = ref<HTMLElement | null>(null)
-const headerOffset = ref(0)
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
@@ -64,7 +68,6 @@ const grouping = ref<SeriesGrouping>(parseGrouping(storage.get<string>(GROUPING_
 const LIST_ROW_HEIGHT = 60
 
 let observer: IntersectionObserver | null = null
-let headerObserver: ResizeObserver | null = null
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const sortLabels = computed<Record<SeriesListSort, string>>(() => ({
@@ -90,6 +93,20 @@ const statusGroupLabels = computed(() => ({
 
 const isDefaultSort = computed(() => sort.value === 'name' && order.value === 'asc')
 const sortSummary = computed(() => sortLabels.value[sort.value])
+const SERIES_SORT_FIELDS: SeriesListSort[] = ['name', 'bookCount', 'lastAddedAt', 'readProgress']
+const SERIES_GROUPINGS: SeriesGrouping[] = ['none', 'letter', 'library', 'status']
+
+const statusLabels = computed<Record<CompletionStatus, string>>(() => ({
+  in_progress: t('series.status.reading'),
+  not_started: t('series.status.unread'),
+  complete: t('series.status.complete'),
+  has_gaps: t('series.status.gaps'),
+}))
+
+const libraryOptions = computed(() =>
+  libraries.value.filter((library) => library.type !== 'podcasts').map((library) => ({ id: library.id, name: library.name })),
+)
+const foldedCount = computed(() => formatNumber(total.value))
 
 const activeFilterCount = computed(() => {
   let count = 0
@@ -158,8 +175,8 @@ function setSortField(field: SeriesListSort) {
   order.value = field === 'name' ? 'asc' : 'desc'
 }
 
-function setSortOrder(direction: SortDirection) {
-  order.value = direction
+function toggleSortDirection() {
+  order.value = order.value === 'asc' ? 'desc' : 'asc'
 }
 
 function resetSort() {
@@ -167,8 +184,16 @@ function resetSort() {
   order.value = 'asc'
 }
 
-function setGrouping(value: SeriesGrouping) {
-  grouping.value = value
+function handleGroupingUpdate(value: unknown) {
+  if (value === 'none' || value === 'letter' || value === 'library' || value === 'status') grouping.value = value
+}
+
+function handleCardWidthUpdate(value: number) {
+  cardWidth.value = value
+}
+
+function handleGridGapUpdate(value: number) {
+  gridGap.value = value
 }
 
 function setViewMode(mode: SeriesViewMode) {
@@ -185,20 +210,6 @@ function setCompletionStatus(value: CompletionStatus | null) {
 
 function setLibraryId(value: number | null) {
   libraryId.value = value
-}
-
-function clearSearchQuery() {
-  q.value = ''
-}
-
-function toggleFiltersOpen() {
-  filtersOpen.value = !filtersOpen.value
-}
-
-function toggleMobileSearch() {
-  mobileSearchOpen.value = !mobileSearchOpen.value
-  if (!mobileSearchOpen.value) return
-  void nextTick(() => mobileSearchInput.value?.focus())
 }
 
 async function clearFilters() {
@@ -223,10 +234,6 @@ function loadIfSentinelVisible() {
   }
 }
 
-function measureHeaderOffset() {
-  headerOffset.value = pageHeader.value?.offsetHeight ?? 0
-}
-
 onMounted(async () => {
   q.value = typeof route.query.q === 'string' ? route.query.q : ''
   sort.value = parseSort(route.query.sort)
@@ -249,16 +256,10 @@ onMounted(async () => {
 
   await nextTick()
   if (sentinel.value) observer.observe(sentinel.value)
-  if (pageHeader.value) {
-    headerObserver = new ResizeObserver(measureHeaderOffset)
-    headerObserver.observe(pageHeader.value)
-    measureHeaderOffset()
-  }
 })
 
 onUnmounted(() => {
   observer?.disconnect()
-  headerObserver?.disconnect()
   if (searchTimer) clearTimeout(searchTimer)
 })
 
@@ -305,7 +306,6 @@ watch(gridGap, (value) => {
 
 watch(viewMode, (value) => {
   storage.set(VIEW_MODE_KEY, value)
-  void nextTick(measureHeaderOffset)
 })
 
 watch(grouping, (value) => storage.set(GROUPING_KEY, value))
@@ -315,229 +315,128 @@ defineOptions({ name: 'SeriesView' })
 
 <template>
   <section class="flex h-full flex-col">
-    <ViewHeader
+    <BrowseHeader
+      :eyebrow="t('components.browseHeader.eyebrow.browse')"
       :title="t('series.list.title')"
       icon="Library"
       fallback-icon="Library"
-      :total="total"
-      :view-mode="headerViewMode"
-      :show-selection="false"
-      :allowed-view-modes="['grid', 'list']"
-      :mobile-display-in-menu="false"
-      :show-display-controls="viewMode === 'cards'"
-      v-model:coverSize="cardWidth"
-      v-model:gridGap="gridGap"
-      :cover-size-min="CARD_WIDTH_MIN"
-      :cover-size-max="CARD_WIDTH_MAX"
-      :cover-size-step="20"
-      :grid-gap-min="GRID_GAP_MIN"
-      :grid-gap-max="GRID_GAP_MAX"
-      @update:view-mode="handleHeaderViewMode"
+      :folded-count="foldedCount"
+      :scroll-container="mainRef"
     >
-      <template #toolbar>
-        <div class="hidden h-8 w-56 items-center gap-2 rounded-lg border border-input bg-background px-2.5 lg:flex">
-          <Search :size="14" class="shrink-0 text-muted-foreground" />
-          <input
-            v-model="q"
-            type="search"
-            :placeholder="t('series.list.searchPlaceholder')"
-            :aria-label="t('series.list.searchPlaceholder')"
-            class="series-search h-full w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          />
-          <button
-            v-if="q.trim()"
-            type="button"
-            class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-            :aria-label="t('series.list.clearSearch')"
-            @click="clearSearchQuery"
-          >
-            <X :size="12" />
-          </button>
-        </div>
-
-        <button
-          type="button"
-          class="flex size-8 items-center justify-center rounded-lg border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
-          :class="mobileSearchOpen ? 'border-ring bg-primary/10 text-foreground' : ''"
-          :aria-label="t('series.list.searchPlaceholder')"
-          :aria-expanded="mobileSearchOpen"
-          @click="toggleMobileSearch"
-        >
-          <Search :size="14" />
-        </button>
-
-        <Popover>
-          <PopoverTrigger as-child>
-            <button
-              type="button"
-              class="flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm transition-colors"
-              :class="
-                !isDefaultSort
-                  ? 'border-ring bg-primary/10 text-foreground'
-                  : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-              "
-              :aria-label="t('series.list.sortBy')"
-            >
-              <ArrowUpDown :size="13" />
-              <span class="hidden xl:inline">{{ sortSummary }}</span>
-              <span aria-hidden="true">{{ order === 'asc' ? '↑' : '↓' }}</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" class="w-56 p-2">
-            <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">{{ t('series.list.sortBy') }}</div>
-            <div class="flex flex-col gap-0.5">
-              <button
-                v-for="field in ['name', 'bookCount', 'lastAddedAt', 'readProgress'] as const"
-                :key="field"
-                type="button"
-                class="flex items-center justify-between rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
-                :class="sort === field ? 'font-medium text-foreground' : 'text-muted-foreground'"
-                @click="setSortField(field)"
-              >
-                {{ sortLabels[field] }}
-                <span v-if="sort === field" class="text-xs text-primary" aria-hidden="true">{{ order === 'asc' ? '↑' : '↓' }}</span>
-              </button>
-            </div>
-            <div class="my-2 border-t border-border" />
-            <div class="flex gap-1">
-              <button
-                v-for="direction in ['asc', 'desc'] as const"
-                :key="direction"
-                type="button"
-                class="flex-1 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
-                :class="order === direction ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                @click="setSortOrder(direction)"
-              >
-                {{ direction === 'asc' ? t('series.list.ascending') : t('series.list.descending') }}
-              </button>
-            </div>
-            <template v-if="!isDefaultSort">
-              <div class="my-2 border-t border-border" />
-              <button
-                type="button"
-                class="w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                @click="resetSort"
-              >
-                {{ t('common.resetSortAria') }}
-              </button>
-            </template>
-          </PopoverContent>
-        </Popover>
-
-        <Popover>
-          <PopoverTrigger as-child>
-            <button
-              type="button"
-              class="hidden h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm transition-colors md:flex"
-              :class="
-                grouping !== 'none'
-                  ? 'border-ring bg-primary/10 text-foreground'
-                  : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-              "
-              :aria-label="t('series.grouping.label')"
-            >
-              <Rows3 :size="13" />
-              <span class="hidden xl:inline">{{ groupingLabels[grouping] }}</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" class="w-48 p-2">
-            <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">{{ t('series.grouping.label') }}</div>
-            <button
-              v-for="option in ['none', 'letter', 'library', 'status'] as const"
-              :key="option"
-              type="button"
-              class="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
-              :class="grouping === option ? 'font-medium text-foreground' : 'text-muted-foreground'"
-              @click="setGrouping(option)"
-            >
-              {{ groupingLabels[option] }}
-            </button>
-          </PopoverContent>
-        </Popover>
-
-        <button
-          type="button"
-          class="flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm transition-colors"
-          :class="
-            isFiltered || filtersOpen
-              ? 'border-ring bg-primary/10 text-foreground'
-              : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-          "
-          :aria-expanded="filtersOpen"
-          :aria-label="t('series.list.filters')"
-          @click="toggleFiltersOpen"
-        >
-          <Filter :size="13" />
-          <span class="hidden xl:inline">{{ t('series.list.filters') }}</span>
-          <span v-if="activeFilterCount > 0" class="text-xs font-semibold tabular-nums">{{ activeFilterCount }}</span>
-        </button>
+      <template #facts>
+        <span class="truncate">{{ t('components.browseHeader.facts.series', { count: total }) }}</span>
       </template>
-    </ViewHeader>
 
-    <div v-if="mobileSearchOpen" class="mb-2 flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-2.5 lg:hidden">
-      <Search :size="14" class="shrink-0 text-muted-foreground" />
-      <input
-        ref="mobileSearchInput"
-        v-model="q"
-        type="search"
-        :placeholder="t('series.list.searchPlaceholder')"
-        :aria-label="t('series.list.searchPlaceholder')"
-        class="series-search h-full w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-      />
-      <button
-        v-if="q.trim()"
-        type="button"
-        class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-        :aria-label="t('series.list.clearSearch')"
-        @click="clearSearchQuery"
-      >
-        <X :size="12" />
-      </button>
-    </div>
-
-    <main ref="mainRef" class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-2">
-      <div ref="pageHeader" class="sticky top-0 z-40 mb-3.5 border-b border-border bg-background/85 pb-2.5 pt-0.5 backdrop-blur-md">
-        <div class="flex min-w-0 flex-wrap items-center gap-2">
-          <SeriesStatusTabs :status="completionStatus" :facets="facets" @select="setCompletionStatus" />
-
-          <div v-if="filtersOpen" class="flex min-w-0 flex-wrap items-center gap-1.5 rounded-lg bg-muted p-0.5">
+      <template #bar>
+        <BrowseSearchField v-model="q" :placeholder="t('series.list.searchPlaceholder')" :active="isFiltered" @clear="clearFilters" />
+        <span :class="barDivider" aria-hidden="true" />
+        <BrowseSortControl
+          :label="sortSummary"
+          :direction="order"
+          :changed="!isDefaultSort"
+          popover-class="w-56 p-2"
+          @toggle-direction="toggleSortDirection"
+        >
+          <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">{{ t('series.list.sortBy') }}</div>
+          <div class="flex flex-col gap-0.5">
             <button
+              v-for="field in SERIES_SORT_FIELDS"
+              :key="field"
               type="button"
-              class="h-7 shrink-0 rounded-md px-2.5 text-xs transition-colors"
-              :class="libraryId === null ? 'bg-background font-semibold text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-              @click="setLibraryId(null)"
+              class="flex items-center justify-between rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+              :class="sort === field ? 'font-medium text-foreground' : 'text-muted-foreground'"
+              @click="setSortField(field)"
             >
-              {{ t('series.filters.allLibraries') }}
-            </button>
-            <button
-              v-for="library in libraries"
-              :key="library.id"
-              type="button"
-              class="h-7 min-w-0 shrink-0 rounded-md px-2.5 text-xs transition-colors"
-              :class="
-                libraryId === library.id ? 'bg-background font-semibold text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              "
-              @click="setLibraryId(library.id)"
-            >
-              <span class="truncate">{{ library.name }}</span>
+              {{ sortLabels[field] }}
+              <span v-if="sort === field" class="text-xs text-primary" aria-hidden="true">{{ order === 'asc' ? '↑' : '↓' }}</span>
             </button>
           </div>
+          <template v-if="!isDefaultSort">
+            <div class="my-2 border-t border-border" />
+            <button
+              type="button"
+              class="w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+              @click="resetSort"
+            >
+              {{ t('common.resetSortAria') }}
+            </button>
+          </template>
+        </BrowseSortControl>
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <button
+              type="button"
+              :class="cn(barButton, 'hidden md:inline-flex', grouping !== 'none' && barButtonOn)"
+              :aria-label="t('series.grouping.label')"
+            >
+              <Rows3 :size="14" :class="grouping !== 'none' ? 'text-primary' : 'text-muted-foreground'" aria-hidden="true" />
+              <span class="hidden xl:inline">{{ groupingLabels[grouping] }}</span>
+              <ChevronDown
+                :size="13"
+                class="-ms-0.5 hidden xl:block"
+                :class="grouping !== 'none' ? 'text-primary' : 'text-muted-foreground'"
+                aria-hidden="true"
+              />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" class="w-48">
+            <DropdownMenuRadioGroup :model-value="grouping" @update:model-value="handleGroupingUpdate">
+              <DropdownMenuRadioItem v-for="option in SERIES_GROUPINGS" :key="option" :value="option">{{
+                groupingLabels[option]
+              }}</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <span :class="barDivider" aria-hidden="true" />
+        <BrowseInlineGroup
+          :label="t('components.browseHeader.facets.status')"
+          :value="completionStatus === null ? null : statusLabels[completionStatus]"
+          :active="completionStatus !== null"
+          :show-label="false"
+        >
+          <SeriesStatusTabs :status="completionStatus" :facets="facets" @select="setCompletionStatus" />
+        </BrowseInlineGroup>
+        <BrowseLibraryPicker
+          v-if="libraryOptions.length > 1"
+          hide-on-phone
+          :libraries="libraryOptions"
+          :model-value="libraryId"
+          @update:model-value="setLibraryId"
+        />
+        <span :class="barDivider" aria-hidden="true" />
+        <BrowseViewControls
+          :view-mode="headerViewMode"
+          :allowed-view-modes="['grid', 'list']"
+          :show-selection="false"
+          :show-display="viewMode === 'cards'"
+          @update:view-mode="handleHeaderViewMode"
+        >
+          <template #display>
+            <ViewHeaderDisplayControls
+              view-mode="grid"
+              :cover-size="cardWidth"
+              :grid-gap="gridGap"
+              :cover-size-min="CARD_WIDTH_MIN"
+              :cover-size-max="CARD_WIDTH_MAX"
+              :cover-size-step="20"
+              :grid-gap-min="GRID_GAP_MIN"
+              :grid-gap-max="GRID_GAP_MAX"
+              @update:cover-size="handleCardWidthUpdate"
+              @update:grid-gap="handleGridGapUpdate"
+            >
+              <template #extra>
+                <div class="space-y-2 border-t border-border pt-3">
+                  <span class="text-xs text-muted-foreground">{{ t('components.browseHeader.legend') }}</span>
+                  <SeriesVolumeLegend class="flex-wrap gap-x-3 gap-y-1.5" />
+                </div>
+              </template>
+            </ViewHeaderDisplayControls>
+          </template>
+        </BrowseViewControls>
+      </template>
+    </BrowseHeader>
 
-          <button
-            v-if="isFiltered"
-            type="button"
-            class="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
-            @click="clearFilters"
-          >
-            <X :size="13" />
-            <span class="hidden sm:inline">{{ t('series.list.clear') }}</span>
-          </button>
-
-          <div class="flex-1" />
-          <SeriesVolumeLegend class="hidden xl:flex" />
-        </div>
-      </div>
-
+    <main ref="mainRef" class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-2">
       <template v-if="showSkeleton">
         <div v-if="viewMode === 'cards'" class="series-grid grid" :style="{ '--series-card-width': `${cardWidth}px`, gap: `${gridGap}px` }">
           <div v-for="n in INITIAL_SKELETON_COUNT" :key="n" class="overflow-hidden rounded-xl border border-border bg-card">
@@ -580,7 +479,7 @@ defineOptions({ name: 'SeriesView' })
           :sort="sort"
           :order="order"
           :row-height="LIST_ROW_HEIGHT"
-          :header-offset="headerOffset"
+          :header-offset="0"
           @open="openSeries"
           @sort="setSortField"
         />

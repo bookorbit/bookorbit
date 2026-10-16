@@ -19,6 +19,7 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import { useLibraryFileSync } from '@/features/library/composables/useLibraryFileSync'
 import { claimScanCompletionToasts, getSocket, useScanProgress } from '@/features/scanner/composables/useScanProgress'
+import { useLibraryScan } from '@/features/scanner/composables/useLibraryScan'
 import LibrariesToolbar from './libraries/components/LibrariesToolbar.vue'
 import LibraryLedgerCards from './libraries/components/LibraryLedgerCards.vue'
 import LibraryLedgerList from './libraries/components/LibraryLedgerList.vue'
@@ -42,6 +43,7 @@ if (!hasPermission('manage_libraries')) {
 const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
 const { handleLibraryCreated } = useLibraryCreationRedirect()
 const { subscribeLibrary, getProgress, isScanning, progressMap, isRefreshingCovers } = useScanProgress()
+const { scanLibrary, startScanRequest } = useLibraryScan()
 const { syncAll: syncAllFiles } = useLibraryFileSync()
 const overview = useLibraryOverview()
 const detail = useLibraryDetail()
@@ -96,7 +98,18 @@ onMounted(async () => {
   await fetchLibraries()
   subscribeAll()
   void overview.load()
+  openEditorFromQuery()
 })
+
+/** A library page's "Edit library" lands here with `?edit=<id>`, so its editor opens with every action wired. */
+function openEditorFromQuery() {
+  const raw = route.query.edit
+  const id = typeof raw === 'string' ? Number(raw) : NaN
+  if (!Number.isInteger(id)) return
+  const library = libraries.value.find((lib) => lib.id === id)
+  if (library) openEdit(library)
+  void router.replace({ query: { ...route.query, edit: undefined } })
+}
 
 onUnmounted(() => {
   overview.dispose()
@@ -275,25 +288,8 @@ function clearQuery() {
   query.value = ''
 }
 
-function startScan(lib: LibraryType): Promise<Response> {
-  if (lib.type === 'podcasts') {
-    return api(`/api/v1/podcast-libraries/${lib.id}/import-scan`, jsonBody('POST', { dryRun: false }))
-  }
-  return api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
-}
-
 async function scan(lib: LibraryType) {
-  try {
-    const res = await startScan(lib)
-    if (res.ok) {
-      toast.success(t('settings.admin.libraries.scanStarted', { name: lib.name }))
-      if (lib.type !== 'podcasts') subscribeLibrary(lib.id)
-    } else {
-      toast.error(t('settings.admin.libraries.scanStartFailed', { name: lib.name }))
-    }
-  } catch {
-    toast.error(t('settings.admin.libraries.scanStartFailed', { name: lib.name }))
-  }
+  await scanLibrary(lib)
 }
 
 async function refreshCovers(lib: LibraryType) {
@@ -308,7 +304,7 @@ async function refreshCovers(lib: LibraryType) {
 async function scanAll() {
   scanningAll.value = true
   try {
-    const results = await Promise.all(libraries.value.map((lib) => startScan(lib)))
+    const results = await Promise.all(libraries.value.map((lib) => startScanRequest(lib)))
     const failed = results.filter((res) => !res.ok).length
     if (failed === 0) {
       toast.success(t('settings.admin.libraries.scanStartedAll'))

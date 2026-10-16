@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { resolveLucideIcon } from '../utils/resolveLucideIcon'
 import {
   ArrowLeftRight,
   BookHeart,
+  BookMarked,
   BookOpen,
   BookX,
   Flame,
@@ -55,5 +58,17 @@ describe('resolveLucideIcon', () => {
     expect(resolveLucideIcon('smartphone')).toBe(Smartphone)
     expect(resolveLucideIcon('orbit')).toBe(Orbit)
     expect(resolveLucideIcon('arrow-left-right')).toBe(ArrowLeftRight)
+  })
+
+  it('resolves book-marked, which lucide ships only as an alias', () => {
+    expect(resolveLucideIcon('book-marked')).toBe(BookMarked)
+  })
+
+  it('resolves every icon the server seeds, so no achievement draws the fallback', () => {
+    const seed = readFileSync(resolve(process.cwd(), '../server/src/modules/achievement/seed/achievement-seed.ts'), 'utf8')
+    const names = [...new Set([...seed.matchAll(/iconName: '([^']+)'/g)].map((match) => match[1]!))]
+
+    expect(names.length).toBeGreaterThan(0)
+    expect(names.filter((name) => resolveLucideIcon(name) === HelpCircle)).toEqual([])
   })
 })

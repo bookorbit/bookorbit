@@ -67,6 +67,6 @@ describe('format labels', () => {
   it('names formats from the translated catalog', () => {
     expect(formatKeyName('epub')).toBe('EPUB e-book')
     expect(formatKeyName(READ_ALONG_FORMAT_PRIORITY)).toBe('Read-along EPUB')
-    expect(formatKeyName('djvu')).toBe('DJVU')
+    expect(formatKeyName('djvu')).toBe('DjVu document')
   })
 })

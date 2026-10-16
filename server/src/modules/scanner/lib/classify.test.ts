@@ -3,7 +3,7 @@ import { classifyFile, isPrimaryFormat, isAudioFormat, AUDIO_FORMATS, DEFAULT_FO
 // ── PRIMARY FORMATS ───────────────────────────────────────────────────────────
 
 describe('classifyFile — primary formats', () => {
-  it.each(['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2'])('classifies .%s as primary', (ext) => {
+  it.each(['epub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2', 'djvu'])('classifies .%s as primary', (ext) => {
     const result = classifyFile(`/books/Author/Book/book.${ext}`);
     expect(result).toEqual({ format: ext, role: 'content' });
   });

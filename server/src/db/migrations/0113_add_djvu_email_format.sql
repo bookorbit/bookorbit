@@ -1,0 +1,2 @@
+ALTER TABLE "email_recipients" DROP CONSTRAINT "email_recipients_preferred_format_chk";--> statement-breakpoint
+ALTER TABLE "email_recipients" ADD CONSTRAINT "email_recipients_preferred_format_chk" CHECK ("email_recipients"."preferred_format" is null or "email_recipients"."preferred_format" in ('epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'djvu'));

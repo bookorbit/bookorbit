@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import type { CustomMetadataFieldDefinition, CustomMetadataFieldType } from '@bookorbit/types'
+import { i18n } from '@/i18n'
 import { api } from '@/lib/api'
 import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
 
@@ -19,6 +20,7 @@ export function useCustomMetadataFields() {
   const { refresh: refreshActiveFields } = useActiveCustomFields()
   const fields = ref<CustomMetadataFieldDefinition[]>([])
   const loading = ref(false)
+  const loaded = ref(false)
   const creating = ref(false)
   const savingId = ref<number | null>(null)
   const archivingId = ref<number | null>(null)
@@ -34,14 +36,19 @@ export function useCustomMetadataFields() {
     [...fields.value].filter((f) => f.archivedAt).sort((a, b) => (b.archivedAt ?? '').localeCompare(a.archivedAt ?? '')),
   )
 
+  function replace(updated: CustomMetadataFieldDefinition) {
+    fields.value = fields.value.map((item) => (item.id === updated.id ? updated : item))
+  }
+
   async function loadFields(): Promise<void> {
     loading.value = true
     try {
       const res = await api('/api/v1/custom-metadata/fields?includeArchived=true')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       fields.value = (await res.json()) as CustomMetadataFieldDefinition[]
+      loaded.value = true
     } catch {
-      toast.error('Failed to load custom metadata fields')
+      toast.error(i18n.global.t('settings.metadata.customFields.toasts.loadFailed'))
     } finally {
       loading.value = false
     }
@@ -53,91 +60,94 @@ export function useCustomMetadataFields() {
       const res = await api('/api/v1/custom-metadata/fields', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, displayOrder: fields.value.length }),
+        // After the last field, not at the active count: archiving leaves gaps, and a tie sorts by label.
+        body: JSON.stringify({ ...payload, displayOrder: Math.max(-1, ...fields.value.map((field) => field.displayOrder)) + 1 }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const created = (await res.json()) as CustomMetadataFieldDefinition
-      fields.value.push(created)
-      toast.success('Custom metadata field created')
+      fields.value = [...fields.value, created]
+      toast.success(i18n.global.t('settings.metadata.customFields.toasts.created', { label: created.label }))
       void refreshActiveFields()
       return created
     } catch {
-      toast.error('Failed to create custom metadata field')
+      toast.error(i18n.global.t('settings.metadata.customFields.toasts.createFailed', { label: payload.label }))
       return null
     } finally {
       creating.value = false
     }
   }
 
-  async function saveField(fieldId: number, payload: UpdateFieldPayload): Promise<CustomMetadataFieldDefinition | null> {
-    savingId.value = fieldId
+  async function saveField(field: CustomMetadataFieldDefinition, payload: UpdateFieldPayload): Promise<CustomMetadataFieldDefinition | null> {
+    savingId.value = field.id
     try {
-      const res = await api(`/api/v1/custom-metadata/fields/${fieldId}`, {
+      const res = await api(`/api/v1/custom-metadata/fields/${field.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const updated = (await res.json()) as CustomMetadataFieldDefinition
-      fields.value = fields.value.map((item) => (item.id === updated.id ? updated : item))
-      toast.success('Custom metadata field saved')
+      replace(updated)
+      toast.success(i18n.global.t('settings.metadata.customFields.toasts.saved', { label: updated.label }))
       void refreshActiveFields()
       return updated
     } catch {
-      toast.error('Failed to save custom metadata field')
+      toast.error(i18n.global.t('settings.metadata.customFields.toasts.saveFailed', { label: field.label }))
       return null
     } finally {
       savingId.value = null
     }
   }
 
-  async function archiveField(fieldId: number): Promise<boolean> {
-    archivingId.value = fieldId
+  async function restoreField(field: CustomMetadataFieldDefinition, { quiet = false } = {}): Promise<boolean> {
+    restoringId.value = field.id
     try {
-      const res = await api(`/api/v1/custom-metadata/fields/${fieldId}`, { method: 'DELETE' })
+      const res = await api(`/api/v1/custom-metadata/fields/${field.id}/restore`, { method: 'POST' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const now = new Date().toISOString()
-      fields.value = fields.value.map((item) => (item.id === fieldId ? { ...item, archivedAt: now } : item))
-      toast.success('Custom metadata field archived')
+      fields.value = fields.value.map((item) => (item.id === field.id ? { ...item, archivedAt: null } : item))
+      if (!quiet) toast.success(i18n.global.t('settings.metadata.customFields.toasts.restored', { label: field.label }))
       void refreshActiveFields()
       return true
     } catch {
-      toast.error('Failed to archive custom metadata field')
+      toast.error(i18n.global.t('settings.metadata.customFields.toasts.restoreFailed', { label: field.label }))
+      return false
+    } finally {
+      restoringId.value = null
+    }
+  }
+
+  /** Archiving is reversible, so it runs at once and offers Undo instead of asking first. */
+  async function archiveField(field: CustomMetadataFieldDefinition): Promise<boolean> {
+    archivingId.value = field.id
+    try {
+      const res = await api(`/api/v1/custom-metadata/fields/${field.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const now = new Date().toISOString()
+      fields.value = fields.value.map((item) => (item.id === field.id ? { ...item, archivedAt: now } : item))
+      toast.success(i18n.global.t('settings.metadata.customFields.toasts.archived', { label: field.label }), {
+        action: { label: i18n.global.t('common.undo'), onClick: () => void restoreField(field, { quiet: true }) },
+      })
+      void refreshActiveFields()
+      return true
+    } catch {
+      toast.error(i18n.global.t('settings.metadata.customFields.toasts.archiveFailed', { label: field.label }))
       return false
     } finally {
       archivingId.value = null
     }
   }
 
-  async function restoreField(fieldId: number): Promise<CustomMetadataFieldDefinition | null> {
-    restoringId.value = fieldId
+  async function deleteFieldPermanently(field: CustomMetadataFieldDefinition): Promise<boolean> {
+    deletingPermanentlyId.value = field.id
     try {
-      const res = await api(`/api/v1/custom-metadata/fields/${fieldId}/restore`, { method: 'POST' })
+      const res = await api(`/api/v1/custom-metadata/fields/${field.id}/permanent`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const restored = fields.value.find((item) => item.id === fieldId)
-      fields.value = fields.value.map((item) => (item.id === fieldId ? { ...item, archivedAt: null } : item))
-      toast.success('Custom metadata field restored')
-      void refreshActiveFields()
-      return restored ? { ...restored, archivedAt: null } : null
-    } catch {
-      toast.error('Failed to restore custom metadata field')
-      return null
-    } finally {
-      restoringId.value = null
-    }
-  }
-
-  async function deleteFieldPermanently(fieldId: number): Promise<boolean> {
-    deletingPermanentlyId.value = fieldId
-    try {
-      const res = await api(`/api/v1/custom-metadata/fields/${fieldId}/permanent`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      fields.value = fields.value.filter((item) => item.id !== fieldId)
-      toast.success('Custom metadata field permanently deleted')
+      fields.value = fields.value.filter((item) => item.id !== field.id)
+      toast.success(i18n.global.t('settings.metadata.customFields.toasts.deleted', { label: field.label }))
       void refreshActiveFields()
       return true
     } catch {
-      toast.error('Failed to permanently delete custom metadata field')
+      toast.error(i18n.global.t('settings.metadata.customFields.toasts.deleteFailed', { label: field.label }))
       return false
     } finally {
       deletingPermanentlyId.value = null
@@ -159,7 +169,7 @@ export function useCustomMetadataFields() {
       void refreshActiveFields()
       return true
     } catch {
-      toast.error('Failed to reorder custom metadata fields')
+      toast.error(i18n.global.t('settings.metadata.customFields.toasts.reorderFailed'))
       await loadFields()
       return false
     } finally {
@@ -167,9 +177,20 @@ export function useCustomMetadataFields() {
     }
   }
 
+  /** The keyboard and menu path to reordering, alongside drag. */
+  async function moveField(field: CustomMetadataFieldDefinition, step: -1 | 1): Promise<boolean> {
+    const ids = activeFields.value.map((item) => item.id)
+    const from = ids.indexOf(field.id)
+    const to = from + step
+    if (from < 0 || to < 0 || to >= ids.length) return false
+    ;[ids[from], ids[to]] = [ids[to]!, ids[from]!]
+    return reorderFields(ids)
+  }
+
   return {
     fields,
     loading,
+    loaded,
     creating,
     savingId,
     archivingId,
@@ -185,5 +206,6 @@ export function useCustomMetadataFields() {
     restoreField,
     deleteFieldPermanently,
     reorderFields,
+    moveField,
   }
 }

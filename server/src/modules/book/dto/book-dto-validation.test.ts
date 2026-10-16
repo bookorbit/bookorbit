@@ -149,6 +149,17 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(SaveProgressDto, { percentage: 50, koreaderProgress: 123 })).length).toBeGreaterThan(0);
   });
 
+  it('accepts only integer page numbers that fit the reading_progress column', async () => {
+    expect((await errorsFor(SaveProgressDto, { percentage: 50 })).length).toBe(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: null })).length).toBe(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: 0 })).length).toBe(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: 2147483647 })).length).toBe(0);
+
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: 2.5 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: -1 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(SaveProgressDto, { percentage: 50, pageNumber: 2147483648 })).length).toBeGreaterThan(0);
+  });
+
   it('requires non-empty search text and bounds search limit', async () => {
     const valid = plainToInstance(SearchBooksDto, { q: 'dune', limit: '20' });
     const validErrors = await validate(valid);

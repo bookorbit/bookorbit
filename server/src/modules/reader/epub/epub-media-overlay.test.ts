@@ -105,7 +105,12 @@ describe('EPUB media overlay duration', () => {
     await rm(fixtureRoot, { recursive: true, force: true });
   });
 
-  async function writeReadAlongEpub(chapters: [Clip[], Clip[]], durationMetas: string): Promise<string> {
+  async function writeReadAlongEpub(
+    chapters: [Clip[], Clip[]],
+    durationMetas: string,
+    packageXml = opf(durationMetas),
+    smilOverrides: Partial<Record<number, string>> = {},
+  ): Promise<string> {
     const path = join(fixtureRoot, `${Math.random().toString(36).slice(2)}.epub`);
     const archive = new ZipArchive({ zlib: { level: 0 } });
     const chunks: Buffer[] = [];
@@ -116,13 +121,13 @@ describe('EPUB media overlay duration', () => {
     });
     archive.append('application/epub+zip', { name: 'mimetype', store: true });
     archive.append(CONTAINER_XML, { name: 'META-INF/container.xml' });
-    archive.append(opf(durationMetas), { name: 'OEBPS/content.opf' });
+    archive.append(packageXml, { name: 'OEBPS/content.opf' });
     for (const [index, clips] of chapters.entries()) {
       const chapter = index + 1;
       archive.append(`<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Chapter ${chapter}</p></body></html>`, {
         name: `OEBPS/chapter-${chapter}.xhtml`,
       });
-      archive.append(smil(chapter, clips), { name: `OEBPS/MediaOverlays/chapter-${chapter}.smil` });
+      archive.append(smilOverrides[chapter] ?? smil(chapter, clips), { name: `OEBPS/MediaOverlays/chapter-${chapter}.smil` });
       archive.append(Buffer.alloc(16, chapter), { name: `OEBPS/Audio/0000${chapter}.mp4` });
     }
     await archive.finalize();
@@ -135,6 +140,25 @@ describe('EPUB media overlay duration', () => {
     const [first, second] = MEASURABLE_CHAPTERS;
     return [[first[0]!, clip], second];
   }
+
+  it.each([false, true])('reads prefixed package duration metadata and narration resources with fullyPrefixed=%s', async (fullyPrefixed) => {
+    const packageXml = opf(STORYTELLER_PACKAGE_DURATION)
+      .replace('version="3.0"', 'xmlns:publication="http://www.idpf.org/2007/opf" version="3.0"')
+      .replace(/<(\/?)(package|metadata|meta|manifest|item|spine|itemref)(?=[\s>])/g, (tag, closing: string, name: string) =>
+        fullyPrefixed || name === 'metadata' || name === 'meta' ? `<${closing}publication:${name}` : tag,
+      );
+    const path = await writeReadAlongEpub(STORYTELLER_TRACK_BOUNDARY_CHAPTERS, STORYTELLER_PACKAGE_DURATION, packageXml);
+
+    const playlist = await buildEpubMediaOverlayPlaylistFromFile(path, 1, 2);
+
+    expect(playlist.durationSeconds).toBeCloseTo(STORYTELLER_PACKAGE_DURATION_SECONDS, 6);
+    expect(playlist.sections).toHaveLength(2);
+    expect(playlist.items).toHaveLength(4);
+    expect(await inspectEpubMediaOverlayFile(path)).toEqual({
+      available: true,
+      durationSeconds: expect.closeTo(STORYTELLER_PACKAGE_DURATION_SECONDS, 6),
+    });
+  });
 
   it('sums the clips when every clip can be measured, even when the package declares another total', async () => {
     const path = await writeReadAlongEpub(MEASURABLE_CHAPTERS, '<meta property="media:duration">01:00:00.00</meta>');
@@ -161,7 +185,9 @@ describe('EPUB media overlay duration', () => {
       expect.closeTo(14.51, 6),
     ]);
     expect(playlist.items[1]).toEqual(expect.objectContaining({ clipBeginSeconds: 7223.15, clipEndSeconds: 7198.408 }));
-    expect(playlist.sections.map((section) => section.durationSeconds)).toEqual([null, expect.closeTo(19.15, 6)]);
+    // The first chapter's clip cannot be measured, so its declared overlay duration stands in.
+    expect(playlist.sections.map((section) => section.durationSeconds)).toEqual([expect.closeTo(8, 6), expect.closeTo(19.15, 6)]);
+    expect(playlist.sections.map((section) => section.startSeconds)).toEqual([0, expect.closeTo(8, 6)]);
   });
 
   it('reports the declared total as the stored read-aloud capability', async () => {
@@ -271,5 +297,82 @@ describe('EPUB media overlay duration', () => {
 
     expect(playlist.items).toHaveLength(2);
     expect(playlist.durationSeconds).toBeNull();
+  });
+
+  describe('section clock', () => {
+    const UNMEASURED_LAST_CLIP = withLastClipOfChapterOne({ begin: '3.620s' });
+    const CHAPTER_TWO_SECONDS = 4.64 + 14.51;
+
+    it('takes an unmeasured section length from its overlay media:duration and starts the next section after it', async () => {
+      const path = await writeReadAlongEpub(
+        UNMEASURED_LAST_CLIP,
+        `<meta property="media:duration" refines="#chapter-1_overlay">00:00:12.50</meta>\n    ${STORYTELLER_PACKAGE_DURATION}`,
+      );
+
+      const playlist = await buildEpubMediaOverlayPlaylistFromFile(path, 1, 2);
+
+      expect(playlist.sections.map((section) => section.durationSeconds)).toEqual([12.5, expect.closeTo(CHAPTER_TWO_SECONDS, 6)]);
+      expect(playlist.sections.map((section) => section.startSeconds)).toEqual([0, 12.5]);
+      expect(playlist.items[1]?.durationSeconds).toBeNull();
+      expect(playlist.durationSeconds).toBeCloseTo(STORYTELLER_PACKAGE_DURATION_SECONDS, 6);
+    });
+
+    it('keeps counting only measured clips when the overlay declares no length', async () => {
+      const path = await writeReadAlongEpub(UNMEASURED_LAST_CLIP, STORYTELLER_PACKAGE_DURATION);
+
+      const playlist = await buildEpubMediaOverlayPlaylistFromFile(path, 1, 2);
+
+      expect(playlist.sections.map((section) => section.durationSeconds)).toEqual([null, expect.closeTo(CHAPTER_TWO_SECONDS, 6)]);
+      expect(playlist.sections.map((section) => section.startSeconds)).toEqual([0, expect.closeTo(3.62, 6)]);
+    });
+
+    it('ignores a declared overlay length shorter than the clips already measured', async () => {
+      const path = await writeReadAlongEpub(UNMEASURED_LAST_CLIP, '<meta property="media:duration" refines="#chapter-1_overlay">00:00:02</meta>');
+
+      const playlist = await buildEpubMediaOverlayPlaylistFromFile(path, 1, 2);
+
+      expect(playlist.sections[0]?.durationSeconds).toBeNull();
+      expect(playlist.sections[1]?.startSeconds).toBeCloseTo(3.62, 6);
+    });
+
+    it('prefers measured clips to a declared overlay length', async () => {
+      const path = await writeReadAlongEpub(MEASURABLE_CHAPTERS, '<meta property="media:duration" refines="#chapter-1_overlay">00:01:00</meta>');
+
+      const playlist = await buildEpubMediaOverlayPlaylistFromFile(path, 1, 2);
+
+      expect(playlist.sections.map((section) => section.durationSeconds)).toEqual([expect.closeTo(11.96, 6), expect.closeTo(CHAPTER_TWO_SECONDS, 6)]);
+      expect(playlist.sections[1]?.startSeconds).toBeCloseTo(11.96, 6);
+    });
+  });
+
+  it('keeps the reading order of a seq that interleaves par and seq children', async () => {
+    const par = (fragment: string, begin: number, audioFirst = false) => {
+      const text = `<text src="../chapter-1.xhtml#${fragment}"/>`;
+      const audio = `<audio src="../Audio/00001.mp4" clipBegin="${begin}s" clipEnd="${begin + 1}s"/>`;
+      return `<par id="${fragment}">${audioFirst ? audio + text : text + audio}</par>`;
+    };
+    const interleaved = `<smil xmlns="http://www.w3.org/ns/SMIL" version="3.0">
+  <body>
+    <seq id="chapter-1_overlay" epub:textref="../chapter-1.xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+      ${par('s1', 0)}
+      <seq id="aside">
+        ${par('s2', 1)}
+        <seq id="note">${par('s3', 2)}</seq>
+      </seq>
+      ${par('s4', 3, true)}
+      <seq id="coda">${par('s5', 4)}</seq>
+      ${par('s6', 5)}
+    </seq>
+  </body>
+</smil>`;
+    const path = await writeReadAlongEpub(MEASURABLE_CHAPTERS, '', undefined, { 1: interleaved });
+
+    const playlist = await buildEpubMediaOverlayPlaylistFromFile(path, 1, 2);
+    const chapterOne = playlist.items.filter((item) => item.sectionIndex === 0);
+
+    expect(chapterOne.map((item) => item.textFragment)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+    expect(chapterOne.map((item) => item.clipBeginSeconds)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(playlist.items.map((item) => item.index)).toEqual(playlist.items.map((_, index) => index));
+    expect(playlist.sections[0]?.durationSeconds).toBe(6);
   });
 });

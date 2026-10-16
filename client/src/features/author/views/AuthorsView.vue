@@ -3,21 +3,27 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, CheckCheck, RefreshCcw, Trash2, X } from '@lucide/vue'
+import { CheckCheck, RefreshCcw, Trash2, X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
-import ViewHeader from '@/components/ViewHeader.vue'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import BrowseHeader from '@/components/browse-header/BrowseHeader.vue'
+import BrowseSearchField from '@/components/browse-header/BrowseSearchField.vue'
+import BrowseSortControl from '@/components/browse-header/BrowseSortControl.vue'
+import BrowseInlineGroup from '@/components/browse-header/BrowseInlineGroup.vue'
+import BrowseLibraryPicker from '@/components/browse-header/BrowseLibraryPicker.vue'
+import BrowseViewControls from '@/components/browse-header/BrowseViewControls.vue'
+import { barDivider, segmentItem, segmentTrack } from '@/components/browse-header/browse-header'
+import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import JumpRail from '@/features/book/components/JumpRail.vue'
 import { bulkRefreshAuthorsMetadata, deleteAuthors, refreshAuthorMetadata } from '../api/author'
 import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
-import AuthorFilterChips from '../components/AuthorFilterChips.vue'
 import AuthorIndexRow from '../components/AuthorIndexRow.vue'
 import AuthorTile from '../components/AuthorTile.vue'
 import { useAuthorJumpRail } from '../composables/useAuthorJumpRail'
@@ -31,6 +37,7 @@ import { showCacheFallbackToast } from '@/features/metadata-cache/lib/cache-feed
 import { splitMetadataCacheUsage, usageFallbackProviders, type IgnoreCacheOptions } from '@/features/metadata-cache/lib/metadata-cache'
 import { metadataProviderLabel } from '@/features/book/lib/metadata-refresh-feedback'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
+import type { TableDensity } from '@bookorbit/types'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -39,7 +46,8 @@ const mainRef = ref<HTMLElement | null>(null)
 useScrollRestoreOnActivate(mainRef)
 const { gridGap, viewMode, authorCoverSize, authorCoverShape, authorRowDensity, authorCoverFallback, showJumpRails } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
-const { hasPermission, isDemoRestrictedAccount, isSuperuser } = usePermissions()
+const { hasPermissionInAnyLibrary } = useLibraryPermissions()
+const { isDemoRestrictedAccount, isSuperuser } = usePermissions()
 const list = useAuthorsList()
 const { items, total, loading, error, hasMore, q, sort, order, libraryId, hasPhoto, hasSortName, addedWithinDays, minBookCount, load } = list
 const { markRefreshing, clearRefreshing, isRefreshing } = useRefreshingAuthors()
@@ -66,7 +74,7 @@ const bulkRefreshConfirmButton = ref<HTMLButtonElement | null>(null)
 const pendingDeleteIds = ref<number[]>([])
 const deleteDialogOpen = ref(false)
 
-const canRefreshMetadata = computed(() => hasPermission('library_edit_metadata') && !isDemoRestrictedAccount.value)
+const canRefreshMetadata = computed(() => hasPermissionInAnyLibrary('library_edit_metadata', 'editor') && !isDemoRestrictedAccount.value)
 const canDeleteAuthors = computed(() => isSuperuser.value)
 
 /** The page offers exactly the two views the design has; `table` is not one of them. */
@@ -87,7 +95,46 @@ const sortLabels = computed<Record<AuthorListSort, string>>(() => ({
 }))
 
 const isDefaultSort = computed(() => sort.value === 'name' && order.value === 'asc')
-const sortSummary = computed(() => `${sortLabels.value[sort.value]} ${order.value === 'asc' ? '↑' : '↓'}`)
+const AUTHOR_SORT_FIELDS: AuthorListSort[] = ['name', 'sortName', 'bookCount', 'lastAddedAt', 'lastEnrichedAt']
+const AUTHOR_QUICK_FILTERS: AuthorQuickFilter[] = ['all', 'noPortrait', 'multipleBooks', 'recentlyAdded', 'noSortName']
+
+const quickFilterLabels = computed<Record<AuthorQuickFilter, string>>(() => ({
+  all: t('author.filters.chips.all'),
+  noPortrait: t('author.filters.chips.noPortrait'),
+  multipleBooks: t('author.filters.chips.multipleBooks'),
+  recentlyAdded: t('author.filters.chips.recentlyAdded'),
+  noSortName: t('author.filters.chips.noSortName'),
+}))
+
+const foldedCount = computed(() => formatNumber(total.value))
+
+function toggleSortDirection() {
+  order.value = order.value === 'asc' ? 'desc' : 'asc'
+}
+
+function handleCoverSizeUpdate(value: number) {
+  authorCoverSize.value = value
+}
+
+function handleGridGapUpdate(value: number) {
+  gridGap.value = value
+}
+
+function handleShowJumpRailsUpdate(value: boolean) {
+  showJumpRails.value = value
+}
+
+function handleCoverShapeUpdate(value: 'square' | 'circle') {
+  authorCoverShape.value = value
+}
+
+function handleRowDensityUpdate(value: TableDensity) {
+  authorRowDensity.value = value
+}
+
+function handleCoverFallbackUpdate(value: boolean) {
+  authorCoverFallback.value = value
+}
 
 /* ── quick filters ──────────────────────────────────────────────────────────
    Chips are mutually exclusive, so the filter refs are always derived from one
@@ -232,10 +279,6 @@ function openAuthor(authorId: number) {
 function setSortField(field: AuthorListSort) {
   sort.value = field
   order.value = 'asc'
-}
-
-function setSortOrder(dir: SortDirection) {
-  order.value = dir
 }
 
 function resetSort() {
@@ -511,96 +554,119 @@ defineOptions({ name: 'AuthorsView' })
 <template>
   <div class="flex h-full flex-col">
     <section class="flex min-h-0 flex-1 flex-col">
-      <ViewHeader
+      <BrowseHeader
+        :eyebrow="t('components.browseHeader.eyebrow.browse')"
         :title="t('author.list.title')"
         icon="Users"
         fallback-icon="Users"
-        :total="total"
-        searchable
-        :search-query="q"
-        :search-placeholder="t('author.list.searchPlaceholder')"
-        v-model:coverSize="authorCoverSize"
-        v-model:gridGap="gridGap"
-        v-model:viewMode="authorViewMode"
-        v-model:coverShape="authorCoverShape"
-        v-model:rowDensity="authorRowDensity"
-        v-model:coverFallback="authorCoverFallback"
-        show-cover-fallback-toggle
-        v-model:showJumpRails="showJumpRails"
-        show-jump-rail-toggle
-        :jump-rail-modes="['grid', 'list']"
-        :allowed-view-modes="['grid', 'list']"
-        :cover-size-min="72"
-        :cover-size-max="220"
-        :cover-size-step="4"
-        :selection-mode="selectionMode"
-        @update:search-query="handleSearchUpdate"
-        @toggle-selection="toggleSelectionMode"
+        :folded-count="foldedCount"
+        :scroll-container="mainRef"
       >
-        <template #toolbar>
-          <Popover>
-            <PopoverTrigger as-child>
-              <button
-                class="hidden h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors md:flex"
-                :class="
-                  !isDefaultSort
-                    ? 'border-primary/55 bg-primary/10 text-primary'
-                    : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-                "
-              >
-                <ArrowUpDown :size="13" />
-                <span class="hidden lg:inline">{{ sortSummary }}</span>
-                <span class="lg:hidden">{{ t('author.list.sortButton') }}</span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" class="w-56 p-2">
-              <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">{{ t('author.list.sortBy') }}</div>
-              <div class="flex flex-col gap-0.5">
-                <button
-                  v-for="field in ['name', 'sortName', 'bookCount', 'lastAddedAt', 'lastEnrichedAt'] as const"
-                  :key="field"
-                  class="flex items-center justify-between rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted"
-                  :class="sort === field ? 'font-medium text-foreground' : 'text-muted-foreground'"
-                  @click="setSortField(field)"
-                >
-                  {{ sortLabels[field] }}
-                  <span v-if="sort === field" class="text-xs text-primary">{{ order === 'asc' ? '↑' : '↓' }}</span>
-                </button>
-              </div>
-              <div class="my-2 border-t border-border" />
-              <div class="flex gap-1">
-                <button
-                  v-for="dir in ['asc', 'desc'] as const"
-                  :key="dir"
-                  class="flex-1 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted"
-                  :class="order === dir ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                  @click="setSortOrder(dir)"
-                >
-                  {{ dir === 'asc' ? t('author.list.ascending') : t('author.list.descending') }}
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <button
-            v-if="!isDefaultSort"
-            class="hidden size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-destructive md:flex"
-            :aria-label="t('common.resetSortAria')"
-            @click="resetSort"
-          >
-            <X :size="13" />
-          </button>
+        <template #facts>
+          <span class="truncate">{{ t('components.browseHeader.facts.authors', { count: total }) }}</span>
         </template>
-      </ViewHeader>
 
-      <AuthorFilterChips
-        class="mb-2"
-        :quick-filter="quickFilter"
-        :libraries="libraryOptions"
-        :library-id="libraryId"
-        @update:quick-filter="handleQuickFilterUpdate"
-        @update:library-id="handleLibraryUpdate"
-      />
+        <template #bar>
+          <BrowseSearchField
+            :model-value="q"
+            :placeholder="t('author.list.searchPlaceholder')"
+            :active="activeFilterCount > 0"
+            @update:model-value="handleSearchUpdate"
+            @clear="clearFilters"
+          />
+          <span :class="barDivider" aria-hidden="true" />
+          <BrowseSortControl
+            :label="sortLabels[sort]"
+            :direction="order"
+            :changed="!isDefaultSort"
+            popover-class="w-56 p-2"
+            @toggle-direction="toggleSortDirection"
+          >
+            <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">{{ t('author.list.sortBy') }}</div>
+            <div class="flex flex-col gap-0.5">
+              <button
+                v-for="field in AUTHOR_SORT_FIELDS"
+                :key="field"
+                type="button"
+                class="flex items-center justify-between rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+                :class="sort === field ? 'font-medium text-foreground' : 'text-muted-foreground'"
+                @click="setSortField(field)"
+              >
+                {{ sortLabels[field] }}
+                <span v-if="sort === field" class="text-xs text-primary" aria-hidden="true">{{ order === 'asc' ? '↑' : '↓' }}</span>
+              </button>
+            </div>
+            <template v-if="!isDefaultSort">
+              <div class="my-2 border-t border-border" />
+              <button
+                type="button"
+                class="w-full rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                @click="resetSort"
+              >
+                {{ t('common.resetSortAria') }}
+              </button>
+            </template>
+          </BrowseSortControl>
+          <span :class="barDivider" aria-hidden="true" />
+          <BrowseInlineGroup
+            :label="t('components.browseHeader.facets.show')"
+            :value="quickFilter === 'all' ? null : quickFilterLabels[quickFilter]"
+            :active="quickFilter !== 'all'"
+            :show-label="false"
+          >
+            <div :class="segmentTrack" role="group" :aria-label="t('author.filters.chips.groupLabel')">
+              <button
+                v-for="chip in AUTHOR_QUICK_FILTERS"
+                :key="chip"
+                type="button"
+                :class="segmentItem"
+                :aria-pressed="quickFilter === chip"
+                @click="handleQuickFilterUpdate(chip)"
+              >
+                {{ quickFilterLabels[chip] }}
+              </button>
+            </div>
+          </BrowseInlineGroup>
+          <BrowseLibraryPicker
+            v-if="libraryOptions.length > 1"
+            hide-on-phone
+            :libraries="libraryOptions"
+            :model-value="libraryId"
+            @update:model-value="handleLibraryUpdate"
+          />
+          <span :class="barDivider" aria-hidden="true" />
+          <BrowseViewControls
+            v-model:view-mode="authorViewMode"
+            :allowed-view-modes="['grid', 'list']"
+            :selection-mode="selectionMode"
+            @toggle-selection="toggleSelectionMode"
+          >
+            <template #display>
+              <ViewHeaderDisplayControls
+                :view-mode="authorViewMode"
+                :cover-size="authorCoverSize"
+                :grid-gap="gridGap"
+                show-jump-rail-toggle
+                :show-jump-rails="showJumpRails"
+                :jump-rail-modes="['grid', 'list']"
+                :cover-shape="authorCoverShape"
+                :row-density="authorRowDensity"
+                show-cover-fallback-toggle
+                :cover-fallback="authorCoverFallback"
+                :cover-size-min="72"
+                :cover-size-max="220"
+                :cover-size-step="4"
+                @update:cover-size="handleCoverSizeUpdate"
+                @update:grid-gap="handleGridGapUpdate"
+                @update:show-jump-rails="handleShowJumpRailsUpdate"
+                @update:cover-shape="handleCoverShapeUpdate"
+                @update:row-density="handleRowDensityUpdate"
+                @update:cover-fallback="handleCoverFallbackUpdate"
+              />
+            </template>
+          </BrowseViewControls>
+        </template>
+      </BrowseHeader>
 
       <!-- The selection bar floats over the bottom of the scroller, so the list is
            padded while it is up. Without this the last rows sit under the bar and

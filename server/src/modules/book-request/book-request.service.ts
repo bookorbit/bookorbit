@@ -1128,9 +1128,13 @@ export class BookRequestService {
       targetLibraryId = dto.targetLibraryId;
     }
 
+    // A stored folder belongs to the stored library. Rerouted elsewhere with no folder named, it
+    // would be refused as not part of the new library, and nothing the approver sends can clear it,
+    // so it is left behind and the new library's own folder is used.
+    const rerouted = targetLibraryId !== joined.request.targetLibraryId;
     // Requests made before an instance default existed carry no destination at all, and there is
     // no reason to make the approver retype one the operator has since set.
-    let carriedFolderId = dto.targetFolderId ?? joined.request.targetFolderId;
+    let carriedFolderId = dto.targetFolderId ?? (rerouted ? null : joined.request.targetFolderId);
     if (targetLibraryId === null) {
       const fallback = await this.automationSettings.resolveDestinationFor(mediaKind);
       targetLibraryId = fallback.libraryId;

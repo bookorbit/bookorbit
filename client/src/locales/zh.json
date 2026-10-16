@@ -107,6 +107,12 @@
       },
       "theme": {
         "title": "主题",
+        "style": {
+          "label": "主题风格",
+          "bookorbit": {
+            "label": "BookOrbit"
+          }
+        },
         "colorScheme": {
           "label": "配色方案",
           "hint": "浅色或深色界面"
@@ -183,7 +189,10 @@
         },
         "cornerRadius": {
           "label": "圆角半径",
-          "hint": "卡片和界面元素的圆角程度"
+          "hint": "卡片和界面元素的圆角程度",
+          "options": {
+            "default": "默认"
+          }
         },
         "surfaceBrightness": {
           "label": "表面亮度",
@@ -1570,6 +1579,7 @@
         "publishedYear": "发布年份",
         "language": "语言",
         "pageCount": "页面计数",
+        "isbn": "ISBN",
         "communityRating": "社区评分",
         "seriesName": "系列名称",
         "seriesIndex": "系列索引",
@@ -1947,6 +1957,9 @@
         "emptyHint": "添加精确值（例如 Audiobook、Adult），即可将它们从获取到的元数据中排除。",
         "removeLabel": "移除 {genre}"
       },
+      "searchCache": {
+        "retry": "重试"
+      },
       "customFields": {
         "label": "标签",
         "labelPlaceholder": "例如：原始标题",
@@ -2241,9 +2254,9 @@
         "serverFontVisibilityFailed": "服务端字体显示状态更新失败"
       },
       "bookDock": {
-        "title": "Book Dock",
+        "title": "书仓",
         "subtitle": "配置文件进入书签时的处理方式。",
-        "dropFolder": "丢弃文件夹",
+        "dropFolder": "书仓文件夹",
         "containerPath": "容器路径",
         "containerPathHint": "复制或移动书卷文件到此文件夹，它们将被书签自动提取和处理。支持子目录。",
         "changePathPrefix": "要改变这条道路，请设置",
@@ -2886,7 +2899,13 @@
             "unmatchedDismissed": "不匹配的书被拒绝",
             "dismissFailed": "关闭不匹配的书失败",
             "allDismissed": "{count, plural, =0 {丢失没有匹配的书} other {丢失#不匹配的书}}",
-            "dismissAllFailed": "关闭所有未匹配的书籍失败"
+            "dismissAllFailed": "关闭所有未匹配的书籍失败",
+            "reviewRefreshed": "待核对书籍列表已刷新",
+            "reviewRefreshFailed": "刷新待核对书籍列表失败",
+            "reviewDismissed": "已将书籍移出待核对列表",
+            "reviewDismissFailed": "将书籍移出待核对列表失败",
+            "reviewAllDismissed": "{count, plural, =0 {未将任何书籍移出待核对列表} one {已将 # 本书籍移出待核对列表} other {已将 # 本书籍移出待核对列表}}",
+            "reviewDismissAllFailed": "将所有书籍移出待核对列表失败"
           },
           "modal": {
             "linkTitle": "链接 KOReader 书",
@@ -2939,7 +2958,15 @@
           "syncedStatsNote": "已经同步的统计数据将保留在他们当前的 BookOrbit 书中。",
           "chooseDifferent": "选择不同的",
           "saving": "保存中……",
-          "confirmLink": "确认链接"
+          "confirmLink": "确认链接",
+          "reviewTitle": "KOReader 待核对书籍",
+          "reviewHint": "未能自动匹配的书籍和已取消关联的书籍会显示在此处。取消关联后，书籍仍可通过自动匹配进行同步。手动关联书籍可覆盖自动匹配结果，也可将其移出此列表。",
+          "loadingReview": "正在加载待核对书籍…",
+          "noReview": "没有待核对的 KOReader 书籍。",
+          "manualUnlinkConfirmBody": "取消与 {title} 的手动关联，并将此书移回待核对列表。如果存在自动匹配结果，后续同步将使用该结果。已同步的统计数据仍保留在当前关联的 BookOrbit 书籍中。",
+          "reviewDismissConfirmBody": "此操作会将该书移出待核对列表，但会保留自动匹配结果和现有同步数据。如果设备再次上报该哈希值且未找到匹配的书籍，它可能会重新出现在列表中。",
+          "reviewDismissAllConfirmTitle": "{count, plural, =0 {没有待核对的书籍} one {要将全部 # 本书籍移出待核对列表吗？} other {要将全部 # 本书籍移出待核对列表吗？}}",
+          "reviewDismissAllConfirmBody": "此操作会清空整个待核对书籍列表，包括其他页面上的条目，但会保留自动匹配结果和现有同步数据。如果设备再次上报某个哈希值且未找到匹配的书籍，对应书籍可能会重新出现在列表中。"
         },
         "remove": "删除",
         "removing": "正在删除……",
@@ -5716,6 +5743,9 @@
         },
         "searchDrawer": {
           "searchTitle": "搜索元数据",
+          "autoSearchOnOpen": "打开时自动搜索",
+          "autoSearchOnOpenHint": "下次打开此面板时，将根据书籍信息自动搜索。此设置会在当前浏览器中为你的账号保留。",
+          "searchOptions": "搜索选项",
           "compareTitle": "比较元数据",
           "searchSubtitle": "找到这本书的最佳提供商匹配。",
           "compareSubtitle": "查看差异并只应用你想要的东西。"
@@ -5935,6 +5965,8 @@
         "score": "评分",
         "scoreTooltip": "元数据得分 {score}/100",
         "emptyFields": "{count, plural, other {# 个空字段}}",
+        "emptyFieldsCount": "{count, plural, one {# 个空字段} other {# 个空字段}}",
+        "emptyFieldsHeading": "空白元数据字段",
         "emptyFieldsTooltip": "尚未填写：{fields}。可在线搜索查询。",
         "libraryRow": "书库",
         "primaryRow": "主要",
@@ -6036,6 +6068,12 @@
         "resume": "继续",
         "audiobook": "有声书",
         "writeTarget": "写入目标",
+        "notWritten": {
+          "formatNotSupported": "未写入：不支持此格式",
+          "formatDisabled": "未写入：已禁用此格式",
+          "fileExceedsSizeLimit": "未写入：超出大小限制",
+          "notContentFile": "未写入：非书籍内容文件"
+        },
         "enabled": "已启用",
         "disabled": "关闭",
         "notSet": "未设置",
@@ -8497,6 +8535,11 @@
       "sending": "发送中……",
       "queued": "{count, plural, =0 {没有邮件队列} other {# 电子邮件队列}}",
       "failed": "发送失败"
+    },
+    "editor": {
+      "server": {
+        "test": "测试连通性"
+      }
     }
   },
   "errors": {
@@ -8524,10 +8567,10 @@
       "description": "连接您的Hardcover帐户以同步阅读数据。",
       "connected": "已连接",
       "apiToken": "API 令牌",
-      "tokenPlaceholder": "粘贴你的Hardcover API 令牌",
+      "tokenPlaceholder": "填入您的 Hardcover API 令牌",
       "show": "显示",
       "hide": "隐藏",
-      "findTokenAt": "查找您的令牌在",
+      "findTokenAt": "前往此处查找您的令牌",
       "validateToken": "验证令牌",
       "valid": "有效({username})",
       "invalidToken": "无效的令牌",
@@ -9002,12 +9045,22 @@
         },
         "cover": {
           "title": "包括封面图像",
-          "hint": "将存储的封面写回支持的文件格式。"
+          "hint": "将存储的封面写回支持的文件格式。",
+          "mediumHint": "同时将已保存的封面写入文件。电子书文件使用电子书封面，音频文件使用有声书封面；如果未设置对应封面，则保留文件原有的封面。"
+        },
+        "allFiles": {
+          "title": "写入书籍的所有文件",
+          "hint": "同时写入这本书的其他书籍文件，例如与电子书放在一起的有声书，或同一文件夹中的 PDF。该文件夹中所有书籍格式的文件都会被写入，因此，如需排除练习册等配套文件，请将其放在单独的文件夹中。下方的格式开关和大小限制仍然适用。关闭此选项只会停止后续写入，不会撤销已写入文件的更改。"
         },
         "epub": {
           "title": "EPUB",
           "hint": "将元数据写入EPUB存档内的 OPF 文件。",
           "toggleAria": "写入 EPUB 元数据"
+        },
+        "readAlong": {
+          "title": "同步朗读 EPUB",
+          "hint": "带有同步朗读音频的 EPUB，例如 Storyteller 制作的同步朗读电子书。这类文件内含音频，因此体积较大，重写时需要更多内存。",
+          "toggleAria": "写入同步朗读 EPUB 元数据"
         },
         "fb2": {
           "title": "FictionBook (FB2)",
@@ -9032,7 +9085,9 @@
         "audio": {
           "title": "音频",
           "hint": "将存储的封面嵌入到M4B、M4A、MP3和FLAC 文件中。",
-          "toggleAria": "写入音频封面"
+          "toggleAria": "写入音频封面",
+          "tagsHint": "将书名、作者、朗读者、系列等标签写入 M4B、M4A、MP3 和 FLAC 文件。",
+          "tagsToggleAria": "写入音频元数据"
         },
         "coverAudioHint": "同时把已存储的封面写入文件。音频文件只能写入封面。",
         "audioNeedsCover": "需要开启“包含封面图片”。",
@@ -9245,6 +9300,13 @@
         "createFolder": "无法创建文件夹"
       }
     },
+    "destination": {
+      "loadFailed": "无法加载目标书库。请关闭后重新打开以重试。",
+      "noLibraries": "没有可用的书库。请创建书库，或联系管理员获取访问权限。",
+      "noFolders": "此书库没有目标文件夹。请在书库设置中添加文件夹。",
+      "unavailable": "所选书库已不可用。",
+      "selectFolder": "选择文件夹…"
+    },
     "upload": {
       "library": "书库",
       "selectLibrary": "请选择书库……",
@@ -9273,6 +9335,19 @@
     }
   },
   "metadataReminders": {
+    "title": "缺失字段提醒",
+    "navDescription": "选择需要提醒的缺失元数据字段",
+    "personal": "个人偏好设置",
+    "description": "选择书籍提醒中显示哪些缺失字段。这些偏好设置适用于整个书库，不会影响元数据评分。",
+    "sheetDescription": "无需离开当前书籍，即可选择你关注的字段。",
+    "fieldsHeading": "要检查的字段",
+    "autoSave": "更改会自动保存到你的账号。",
+    "saving": "正在保存偏好设置…",
+    "saved": "偏好设置已保存。",
+    "reset": "恢复默认设置",
+    "disabled": "未选择任何字段。缺失字段提醒已隐藏。",
+    "saveFailed": "无法保存偏好设置。已恢复之前的设置。",
+    "customize": "自定义提醒…",
     "missingHeading": "缺少元数据",
     "missingDescription": "缺少您选择要跟踪的字段。",
     "missingCount": "{count, plural, one {# 个缺少的字段} other {# 个缺少的字段}}",

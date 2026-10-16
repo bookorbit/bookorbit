@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import type { BookDetail } from '@bookorbit/types'
 import DetailsTab from '../DetailsTab.vue'
 import BookReadingActivityCard from '../../details/BookReadingActivityCard.vue'
@@ -26,8 +26,17 @@ vi.mock('@/lib/api', () => ({
   api: mocks.api,
 }))
 
+vi.mock('@/features/library/composables/useLibraries', () => ({
+  useLibraries: () => ({
+    libraries: ref([
+      { id: 1, accessLevel: 'editor' },
+      { id: 2, accessLevel: 'viewer' },
+    ]),
+  }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
-  usePermissions: () => ({ hasPermission: mocks.hasPermission }),
+  usePermissions: () => ({ hasPermission: mocks.hasPermission, isSuperuser: { value: false } }),
 }))
 
 vi.mock('@/features/auth/composables/useAuth', () => ({
@@ -672,12 +681,66 @@ describe('DetailsTab cover surface', () => {
     ])
   })
 
+  it('hands held KOReader devices to the reset hold notice and releases them for this book', async () => {
+    const heldDevice = { device: 'Kindle', deviceId: 'kindle-1', percentage: 26.67, updatedAt: '2026-10-12T00:00:00.000Z' }
+    let held = [heldDevice]
+    const baseRoute = mocks.api.getMockImplementation()!
+    mocks.api.mockImplementation(async (input, init) => {
+      const url = String(input)
+      if (url.endsWith('/reset-hold/release')) {
+        held = []
+        return { ok: true, status: 204, json: async () => ({}) } as Response
+      }
+      if (url.includes('/koreader/books/')) return response({ bookId: 12, heldByReset: held })
+      return baseRoute(input, init)
+    })
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const notice = wrapper.findComponent({ name: 'KoreaderResetHoldNotice' })
+    expect(notice.props('held')).toEqual([heldDevice])
+
+    const released = await (notice.props('release') as (deviceId: string) => Promise<boolean>)('kindle-1')
+    await flushPromises()
+
+    expect(released).toBe(true)
+    expect(mocks.api).toHaveBeenCalledWith(
+      '/api/v1/koreader/books/12/reset-hold/release',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ deviceId: 'kindle-1' }) }),
+    )
+    expect(wrapper.findComponent({ name: 'KoreaderResetHoldNotice' }).exists()).toBe(false)
+  })
+
+  it('shows no reset hold notice without the KOReader permission', async () => {
+    mocks.hasPermission.mockImplementation((permission) => permission !== 'koreader_sync')
+    const baseRoute = mocks.api.getMockImplementation()!
+    mocks.api.mockImplementation(async (input, init) => {
+      if (String(input).includes('/koreader/books/'))
+        return response({ bookId: 12, heldByReset: [{ device: 'Kindle', deviceId: 'k', percentage: 40, updatedAt: '' }] })
+      return baseRoute(input, init)
+    })
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'KoreaderResetHoldNotice' }).exists()).toBe(false)
+  })
+
   it('hides reset reading state when the user cannot edit metadata', async () => {
     mocks.hasPermission.mockReturnValue(false)
     const wrapper = mountDetails(makeBook())
     await flushPromises()
 
     expect(wrapper.findAll('button').some((button) => button.text().includes('Reset reading state'))).toBe(false)
+  })
+
+  it('keeps personal reading reset available to viewers while hiding library metadata controls', async () => {
+    mocks.hasPermission.mockImplementation((permission) => permission === 'library_edit_metadata')
+    const wrapper = mountDetails(makeBook({ libraryId: 2 }))
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((button) => button.text().includes('Reset reading state'))).toBe(true)
+    expect(wrapper.find('button[aria-label="Edit date added"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Edit cover"]').exists()).toBe(false)
   })
 
   it('edits and saves the added date inline', async () => {
