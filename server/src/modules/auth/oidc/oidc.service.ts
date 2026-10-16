@@ -40,6 +40,7 @@ export class OidcService {
   private readonly logger = new Logger(OidcService.name);
   private readonly appUrl: string;
   private readonly nativeRedirectUri: string;
+  private readonly extraRedirectUris: string[];
 
   constructor(
     private readonly providerService: OidcProviderService,
@@ -59,6 +60,7 @@ export class OidcService {
   ) {
     this.appUrl = appConfiguration.appUrl.replace(/\/$/, '');
     this.nativeRedirectUri = appConfiguration.nativeRedirectUri;
+    this.extraRedirectUris = appConfiguration.oidcExtraRedirectUris;
   }
 
   async generateState(providerSlug: string): Promise<{ state: string; authorizationEndpoint: string }> {
@@ -156,7 +158,13 @@ export class OidcService {
     const claimMapping = provider.claimMapping as OidcClaimMapping;
     const autoProvision = provider.autoProvision as OidcAutoProvision;
 
-    if (!isAllowedRedirectUri(params.redirectUri, { appUrl: this.appUrl, nativeRedirectUri: this.nativeRedirectUri })) {
+    if (
+      !isAllowedRedirectUri(params.redirectUri, {
+        appUrl: this.appUrl,
+        nativeRedirectUri: this.nativeRedirectUri,
+        extraRedirectUris: this.extraRedirectUris,
+      })
+    ) {
       throw new BadRequestException(`Redirect URI is not allowed: ${params.redirectUri}`);
     }
 
