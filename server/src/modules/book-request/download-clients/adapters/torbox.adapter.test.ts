@@ -165,6 +165,26 @@ describe('TorboxAdapter', () => {
     await expect(readFile(join(directory, 'Dune.epub'), 'utf8')).resolves.toBe('book');
   });
 
+  it('keeps a finished torrent queued while TorBox has not listed its files', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, progressPercent: 100, downloadedBytes: 4, totalBytes: 4, files: [] })]]),
+    );
+
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([
+      expect.objectContaining({ clientKey: CLIENT_KEY, state: 'queued', contentPath: null }),
+    ]);
+  });
+
+  it('completes a finished torrent once a later poll reports the files it was missing', async () => {
+    const finished = torrent({ downloadFinished: true, progressPercent: 100, downloadedBytes: 4, totalBytes: 4, files: [] });
+    api.findByHashes
+      .mockResolvedValueOnce(new Map([[CLIENT_KEY, finished]]))
+      .mockResolvedValueOnce(new Map([[CLIENT_KEY, { ...finished, files: [{ fileId: 7, name: 'Dune.epub', size: 4 }] }]]));
+
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([expect.objectContaining({ state: 'queued' })]);
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([expect.objectContaining({ state: 'completed', contentPath: null })]);
+  });
+
   it('maps explicit TorBox errors to failed statuses', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([

@@ -236,6 +236,35 @@ describe('DownloadMonitorService.tick', () => {
     expect(adapter.stage).toHaveBeenCalledWith(HASH_A, expect.anything());
   });
 
+  /**
+   * A cloud completion whose file manifest has not arrived yet reads as queued. Polling has to keep
+   * watching it rather than failing it, and the poll that does see the manifest stages it then.
+   */
+  it('keeps a queued cloud download polling until a later poll reports its files', async () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(60_000);
+    try {
+      const { service, downloads, fulfillment, adapter, imports } = makeService({ stageCapable: true, statuses: [] });
+      adapter.status
+        .mockResolvedValueOnce([status({ state: 'queued', progressPercent: 100, downloadedBytes: 1000, contentPath: null })])
+        .mockResolvedValueOnce([status({ state: 'completed', progressPercent: 100, downloadedBytes: 1000, contentPath: null })]);
+
+      await polled(service);
+      expect(downloads.updateIf).toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'queued' }));
+      expect(fulfillment.failDownload).not.toHaveBeenCalled();
+
+      now.mockReturnValue(66_000);
+      await polled(service);
+      await service.whenStagingSettles();
+
+      expect(adapter.stage).toHaveBeenCalledWith(HASH_A, expect.anything());
+      expect(imports.importDownload).not.toHaveBeenCalled();
+      expect(fulfillment.failDownload).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('imports a cloud completion once the adapter reports its staged path', async () => {
     const { service, downloads, imports } = makeService({
       stageCapable: true,

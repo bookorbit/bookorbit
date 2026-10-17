@@ -266,8 +266,11 @@ export class TorboxAdapter implements DownloadClientAdapter {
           totalBytes: job.totalBytes > 0 ? job.totalBytes : torrent.totalBytes,
         };
       }
+      // TorBox reports a torrent finished before it lists the files it holds often enough that this
+      // cannot be terminal. Report it as queued so polling continues, and stage it on the poll that
+      // does see the manifest; the stall watchdog is what gives up if it never appears.
       if (torrent.files.length === 0) {
-        return { ...base, state: 'failed', errorMessage: 'TorBox reported the download as finished but did not report which files it holds' };
+        return { ...base, state: 'queued' };
       }
 
       const staged = await this.stagedPathIfComplete(clientKey, torrent, clientId);
