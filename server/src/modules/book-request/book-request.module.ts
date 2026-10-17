@@ -35,6 +35,8 @@ import { TransmissionAdapter } from './download-clients/adapters/transmission.ad
 import { DelugeAdapter } from './download-clients/adapters/deluge.adapter';
 import { NzbgetAdapter } from './download-clients/adapters/nzbget.adapter';
 import { SabnzbdAdapter } from './download-clients/adapters/sabnzbd.adapter';
+import { TorboxAdapter } from './download-clients/adapters/torbox.adapter';
+import { TorboxApiClient } from './download-clients/adapters/torbox.api';
 import { INDEXER_ADAPTERS } from './indexers/indexer-adapter';
 import { IndexerConfigService } from './indexers/indexer-config.service';
 import { IndexerController } from './indexers/indexer.controller';
@@ -119,6 +121,8 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     DelugeAdapter,
     NzbgetAdapter,
     SabnzbdAdapter,
+    TorboxApiClient,
+    TorboxAdapter,
     {
       provide: DOWNLOAD_CLIENT_ADAPTERS,
       useFactory: (
@@ -127,8 +131,9 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
         deluge: DelugeAdapter,
         nzbget: NzbgetAdapter,
         sabnzbd: SabnzbdAdapter,
-      ) => [qbittorrent, transmission, deluge, nzbget, sabnzbd],
-      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, NzbgetAdapter, SabnzbdAdapter],
+        torbox: TorboxAdapter,
+      ) => [qbittorrent, transmission, deluge, nzbget, sabnzbd, torbox],
+      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, NzbgetAdapter, SabnzbdAdapter, TorboxAdapter],
     },
 
     IndexerRepository,

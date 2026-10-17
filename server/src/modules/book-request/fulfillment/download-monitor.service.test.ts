@@ -43,6 +43,8 @@ function makeService(
     active?: BookRequestDownloadRow[];
     statuses?: DownloadStatus[];
     statusError?: Error;
+    stageCapable?: boolean;
+    stageError?: Error;
     awaitingImport?: BookRequestDownloadRow[];
     /** The attempt left the active set between the read and the write, so every write is refused. */
     attemptSettled?: boolean;
@@ -80,6 +82,11 @@ function makeService(
   const adapter = {
     status: options.statusError ? vi.fn().mockRejectedValue(options.statusError) : vi.fn().mockResolvedValue(options.statuses ?? [status()]),
   };
+  if (options.stageCapable) {
+    (adapter as Record<string, unknown>).stage = options.stageError
+      ? vi.fn().mockRejectedValue(options.stageError)
+      : vi.fn().mockResolvedValue({ contentPath: '/app-data/client-downloads/torbox/a'.replace(/a$/, HASH_A) });
+  }
   const registry = { require: vi.fn().mockReturnValue(adapter) };
   const direct = {
     status: options.statusError ? vi.fn().mockRejectedValue(options.statusError) : vi.fn().mockResolvedValue(options.statuses ?? [status()]),
@@ -211,6 +218,105 @@ describe('DownloadMonitorService.tick', () => {
       ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
       expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }),
     );
+    expect(imports.importDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a cloud completion downloading and stages it instead of importing it', async () => {
+    const { service, downloads, imports, adapter } = makeService({
+      stageCapable: true,
+      statuses: [status({ state: 'completed', contentPath: null, progressPercent: 100, downloadedBytes: 1000 })],
+    });
+
+    await polled(service);
+    await service.whenStagingSettles();
+
+    expect(downloads.updateIf).toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'downloading' }));
+    expect(downloads.updateIf).not.toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'completed' }));
+    expect(imports.importDownload).not.toHaveBeenCalled();
+    expect(adapter.stage).toHaveBeenCalledWith(HASH_A, expect.anything());
+  });
+
+  /**
+   * A cloud completion whose file manifest has not arrived yet reads as queued. Polling has to keep
+   * watching it rather than failing it, and the poll that does see the manifest stages it then.
+   */
+  it('keeps a queued cloud download polling until a later poll reports its files', async () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(60_000);
+    try {
+      const { service, downloads, fulfillment, adapter, imports } = makeService({ stageCapable: true, statuses: [] });
+      adapter.status
+        .mockResolvedValueOnce([status({ state: 'queued', progressPercent: 100, downloadedBytes: 1000, contentPath: null })])
+        .mockResolvedValueOnce([status({ state: 'completed', progressPercent: 100, downloadedBytes: 1000, contentPath: null })]);
+
+      await polled(service);
+      expect(downloads.updateIf).toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'queued' }));
+      expect(fulfillment.failDownload).not.toHaveBeenCalled();
+
+      now.mockReturnValue(66_000);
+      await polled(service);
+      await service.whenStagingSettles();
+
+      expect(adapter.stage).toHaveBeenCalledWith(HASH_A, expect.anything());
+      expect(imports.importDownload).not.toHaveBeenCalled();
+      expect(fulfillment.failDownload).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('imports a cloud completion once the adapter reports its staged path', async () => {
+    const { service, downloads, imports } = makeService({
+      stageCapable: true,
+      statuses: [
+        status({
+          state: 'completed',
+          contentPath: '/app-data/client-downloads/torbox/a'.replace(/a$/, HASH_A),
+          progressPercent: 100,
+          downloadedBytes: 1000,
+        }),
+      ],
+    });
+
+    await polled(service);
+    await importQueue(service).waitForIdle();
+
+    expect(downloads.updateIf).toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'completed' }));
+    expect(imports.importDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries cloud staging after backoff and fails after three consecutive failures', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    try {
+      const { service, fulfillment, adapter } = makeService({
+        stageCapable: true,
+        stageError: new Error('CDN unavailable'),
+        statuses: [status({ state: 'completed', contentPath: null, progressPercent: 100, downloadedBytes: 1000 })],
+      });
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await polled(service);
+        await service.whenStagingSettles();
+        if (attempt < 2) vi.setSystemTime(Date.now() + 30_001);
+      }
+
+      expect(adapter.stage).toHaveBeenCalledTimes(3);
+      expect(fulfillment.failDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), expect.stringContaining('fetched from the cloud'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the existing completion behavior for an adapter without staging', async () => {
+    const { service, downloads, imports } = makeService({
+      statuses: [status({ state: 'completed', progressPercent: 100, downloadedBytes: 1000 })],
+    });
+
+    await polled(service);
+    await importQueue(service).waitForIdle();
+
+    expect(downloads.updateIf).toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'completed' }));
     expect(imports.importDownload).toHaveBeenCalledTimes(1);
   });
 
