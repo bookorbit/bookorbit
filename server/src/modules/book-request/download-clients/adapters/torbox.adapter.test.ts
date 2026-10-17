@@ -274,6 +274,21 @@ describe('TorboxAdapter', () => {
     await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
   });
 
+  it('requests each file by the torrent file id the listing reported', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ torrentId: 99, downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }))),
+    );
+
+    await adapter.stage(CLIENT_KEY, config());
+
+    expect(api.requestDownloadLink).toHaveBeenCalledWith(config(), 99, 7);
+  });
+
   it('rejects a release whose listed size is over the staging ceiling before fetching anything', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([

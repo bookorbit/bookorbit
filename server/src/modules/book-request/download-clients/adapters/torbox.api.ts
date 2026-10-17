@@ -76,7 +76,12 @@ export class TorboxApiClient {
     return { torrentId: numericField(record.torrent_id), hash: stringField(record.hash)?.toLowerCase() ?? null };
   }
 
-  /** Every wanted hash the account holds, found by paging `mylist` until the pages run out. */
+  /**
+   * Every wanted hash the account holds, found by paging `mylist` until the pages run out.
+   *
+   * The listing is cached for up to ten minutes by default, far longer than an active transfer
+   * stays interesting, so every page asks for fresh data instead of the default cached answer.
+   */
   async findByHashes(config: ResolvedClientConfig, hashes: ReadonlySet<string>): Promise<Map<string, TorboxTorrent>> {
     const found = new Map<string, TorboxTorrent>();
     if (hashes.size === 0) return found;
@@ -88,11 +93,15 @@ export class TorboxApiClient {
         '/v1/api/torrents/mylist',
         { method: 'GET' },
         {
+          bypass_cache: 'true',
           offset: String(page * LIST_PAGE_SIZE),
           limit: String(LIST_PAGE_SIZE),
         },
       );
-      const records = Array.isArray(data) ? data : [];
+      // `mylist` answers with a list unless an id was asked for; anything else is a contract
+      // breach that must surface as a failed read, not as an account that holds no torrents.
+      if (!Array.isArray(data)) throw new BadRequestException('TorBox answered the torrent list with something that is not a list');
+      const records = data;
       for (const entry of records) {
         if (!isRecord(entry)) continue;
         const torrent = toTorboxTorrent(entry);
