@@ -39,6 +39,10 @@ export class UpdateSettingsDto {
   storeSync?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  fullSizeCovers?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(500)

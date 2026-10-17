@@ -1266,15 +1266,38 @@ describe('BookRequestService.approve', () => {
     expect(repo.updateIf).toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ targetLibraryId: 5 }));
   });
 
-  it('refuses a folder that does not belong to the library the approver rerouted to', async () => {
+  /**
+   * The stored folder belongs to the stored library. Rerouting with no folder named used to carry
+   * it along and be refused as not part of the new library, with nothing the approver could send
+   * to clear it.
+   */
+  it('leaves the old library folder behind when the approver reroutes without naming one', async () => {
     const { service, repo } = makeService({
       repo: {
         findById: vi.fn().mockResolvedValue(joined({ targetLibraryId: 3, targetFolderId: 8 })),
         folderBelongsToLibrary: vi.fn().mockResolvedValue(false),
       },
     });
-    await expect(service.approve(10, { targetLibraryId: 5 }, approver)).rejects.toThrow(BadRequestException);
+    await service.approve(10, { targetLibraryId: 5 }, approver);
+    expect(repo.folderBelongsToLibrary).not.toHaveBeenCalled();
+    expect(repo.updateIf).toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ targetLibraryId: 5, targetFolderId: null }));
+  });
+
+  it('still refuses a named folder that does not belong to the library the approver rerouted to', async () => {
+    const { service, repo } = makeService({
+      repo: {
+        findById: vi.fn().mockResolvedValue(joined({ targetLibraryId: 3, targetFolderId: 8 })),
+        folderBelongsToLibrary: vi.fn().mockResolvedValue(false),
+      },
+    });
+    await expect(service.approve(10, { targetLibraryId: 5, targetFolderId: 8 }, approver)).rejects.toThrow(BadRequestException);
     expect(repo.updateIf).not.toHaveBeenCalled();
+  });
+
+  it('keeps the stored folder when the approver names the same library', async () => {
+    const { service, repo } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ targetLibraryId: 3, targetFolderId: 8 })) } });
+    await service.approve(10, { targetLibraryId: 3 }, approver);
+    expect(repo.updateIf).toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ targetLibraryId: 3, targetFolderId: 8 }));
   });
 
   it('keeps a folder that does belong to the destination library', async () => {

@@ -35,11 +35,11 @@ function closePopover() {
               data-tour="github-star-cta"
               variant="ghost"
               size="icon"
-              class="h-7 w-7 rounded-md text-sidebar-foreground hover:bg-(--shell-accent-wash)"
+              class="size-[26px] rounded-md text-sidebar-foreground hover:bg-(--shell-accent-wash)"
               :aria-label="t('components.appHeader.starOnGithub')"
               @click="togglePopover"
             >
-              <Star :size="16" class="fill-current text-star-highlight" aria-hidden="true" />
+              <Star :size="15" class="fill-current text-star-highlight" aria-hidden="true" />
             </Button>
           </TooltipTrigger>
           <TooltipContent :side="isRail ? 'right' : 'top'">{{ t('components.appHeader.starOnGithub') }}</TooltipContent>

@@ -453,10 +453,48 @@ describe('AudioMetadataEmbedder', () => {
       embedder.embedMetadata('/books/audio/book.m4b', 'm4b', { coverBytes: Buffer.from('raw-cover'), metadata: [] }),
     ).rejects.toBeInstanceOf(FfmpegStalledError);
 
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(1);
     expect(mocks.writeMp4FreeformTags).not.toHaveBeenCalled();
     expect(replaceFileAtomicallyMock).not.toHaveBeenCalled();
     expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4b');
     expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
+  });
+
+  it('retries an unprobed MP4 with the mp4 muxer when the ipod muxer refuses it', async () => {
+    mockProbeOutput('not json');
+    mocks.runFfmpeg.mockRejectedValueOnce(new Error("Tag mp4a incompatible with output codec id '86017'")).mockResolvedValueOnce(undefined);
+    const embedder = new AudioMetadataEmbedder();
+
+    await embedder.embedMetadata('/books/audio/merged.m4b', 'm4b', { coverBytes: Buffer.from('raw-cover'), metadata: [] });
+
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(2);
+    expect(mocks.runFfmpeg.mock.calls[0]![1]).not.toContain('-f');
+    expect(mocks.runFfmpeg.mock.calls[1]![1]).toEqual(expect.arrayContaining(['-f', 'mp4', '/books/audio/.bookorbit-write-fixed-id.m4b']));
+    expect(replaceFileAtomicallyMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4b', '/books/audio/merged.m4b');
+  });
+
+  it('reports the first ffmpeg failure when the mp4 retry fails as well', async () => {
+    mockProbeOutput('not json');
+    mocks.runFfmpeg.mockRejectedValueOnce(new Error('first failure')).mockRejectedValueOnce(new Error('retry failure'));
+    const embedder = new AudioMetadataEmbedder();
+
+    await expect(embedder.embedMetadata('/books/audio/merged.m4a', 'm4a', { coverBytes: null, metadata: [] })).rejects.toThrow('first failure');
+
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(2);
+    expect(replaceFileAtomicallyMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a probed MP4', 'm4b', true],
+    ['an MP3', 'mp3', false],
+  ])('does not retry a failed write of %s', async (_label, format, probed) => {
+    if (probed) mockProbedStreams([{ codec_type: 'audio', codec_name: 'aac' }]);
+    mocks.runFfmpeg.mockRejectedValue(new Error('ffmpeg failed'));
+    const embedder = new AudioMetadataEmbedder();
+
+    await expect(embedder.embedMetadata(`/books/audio/book.${format}`, format, { coverBytes: null, metadata: [] })).rejects.toThrow('ffmpeg failed');
+
+    expect(mocks.runFfmpeg).toHaveBeenCalledTimes(1);
   });
 
   it('preserves the ffmpeg error when cleanup also fails', async () => {

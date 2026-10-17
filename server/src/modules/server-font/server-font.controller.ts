@@ -9,6 +9,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { UpdateFontDto } from '../font/dto/update-font.dto';
+import { RenameFontFamilyDto } from '../font/dto/rename-font-family.dto';
 import { ServerFontService } from './server-font.service';
 
 const CANNOT_MANAGE = 'Demo-restricted account cannot manage server fonts';
@@ -24,6 +25,20 @@ export class ServerFontController {
   @Get()
   async list() {
     return this.serverFontService.list();
+  }
+
+  /** How readers use each family, for the administrators deciding what to keep. Counts only. */
+  @Get('usage')
+  @RequirePermission(Permission.ManageAppSettings)
+  async usage() {
+    return this.serverFontService.usage();
+  }
+
+  @Patch('families')
+  @RequirePermission(Permission.ManageAppSettings)
+  @ForbidPermission(Permission.DemoRestricted, CANNOT_MANAGE)
+  async renameFamily(@Body() dto: RenameFontFamilyDto) {
+    return this.serverFontService.renameFamily(dto.familyName, dto.newFamilyName);
   }
 
   @Post('upload')

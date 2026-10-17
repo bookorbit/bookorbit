@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
-import AuthAppearanceToolbar from './components/AuthAppearanceToolbar.vue'
+import { CircleAlert } from '@lucide/vue'
+import AuthAlert from './components/AuthAlert.vue'
+import AuthField from './components/AuthField.vue'
+import AuthPlate from './components/AuthPlate.vue'
+import AuthSubmit from './components/AuthSubmit.vue'
 import { RegisterError, useAuth } from './composables/useAuth'
 import { checkIdentityText } from './lib/identity-text'
 
@@ -65,113 +68,61 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="login-bg min-h-screen flex flex-col items-center justify-center gap-3 px-4 overflow-hidden">
-    <AuthAppearanceToolbar placement="bottom" />
-
-    <div class="login-card relative z-10 w-full max-w-md rounded-2xl p-8">
-      <div class="mb-6">
-        <h1 class="text-xl font-semibold text-foreground">{{ t('auth.register.title') }}</h1>
-        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.register.subtitle') }}</p>
-      </div>
-
-      <form class="space-y-4" @submit.prevent="handleSubmit">
-        <div class="space-y-1.5">
-          <label for="register-username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
-          <input
-            id="register-username"
-            v-model="username"
-            type="text"
-            autocomplete="username"
-            required
-            minlength="3"
-            maxlength="100"
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="register-name" class="text-sm font-medium text-foreground">{{ t('auth.fields.fullName') }}</label>
-          <input
-            id="register-name"
-            v-model="name"
-            type="text"
-            autocomplete="name"
-            required
-            maxlength="255"
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="register-email" class="text-sm font-medium text-foreground">{{ t('auth.fields.email') }}</label>
-          <input
-            id="register-email"
-            v-model="email"
-            type="email"
-            autocomplete="email"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="register-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.password') }}</label>
-          <input
-            id="register-password"
-            v-model="password"
-            type="password"
-            autocomplete="new-password"
-            required
-            minlength="8"
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-          <p class="text-xs text-muted-foreground">{{ t('auth.fields.passwordHint') }}</p>
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="register-confirm-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.confirmPassword') }}</label>
-          <input
-            id="register-confirm-password"
-            v-model="confirmPassword"
-            type="password"
-            autocomplete="new-password"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</div>
-
-        <button
-          type="submit"
+  <AuthPlate :heading="t('auth.register.title')" :description="t('auth.register.subtitle')" wide>
+    <form class="flex flex-col gap-[1.125rem]" @submit.prevent="handleSubmit">
+      <AuthAlert v-if="error" :icon="CircleAlert">{{ error }}</AuthAlert>
+      <div class="grid gap-[1.125rem] sm:grid-cols-2">
+        <AuthField
+          id="register-username"
+          v-model="username"
+          :label="t('auth.fields.username')"
+          autocomplete="username"
+          required
+          :minlength="3"
+          :maxlength="100"
           :disabled="loading"
-          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {{ loading ? t('auth.register.creatingAccount') : t('auth.register.createAccount') }}
-        </button>
-      </form>
+        />
+        <AuthField
+          id="register-name"
+          v-model="name"
+          :label="t('auth.fields.fullName')"
+          autocomplete="name"
+          required
+          :maxlength="255"
+          :disabled="loading"
+        />
+      </div>
+      <AuthField id="register-email" v-model="email" :label="t('auth.fields.email')" type="email" autocomplete="email" required :disabled="loading" />
+      <AuthField
+        id="register-password"
+        v-model="password"
+        :label="t('auth.fields.password')"
+        type="password"
+        autocomplete="new-password"
+        required
+        :minlength="8"
+        :hint="t('auth.fields.passwordHint')"
+        :disabled="loading"
+      />
+      <AuthField
+        id="register-confirm-password"
+        v-model="confirmPassword"
+        :label="t('auth.fields.confirmPassword')"
+        type="password"
+        autocomplete="new-password"
+        required
+        :disabled="loading"
+      />
+      <AuthSubmit :label="t('auth.register.createAccount')" :loading-label="t('auth.register.creatingAccount')" :loading="loading" />
+    </form>
 
-      <p class="mt-6 text-center text-sm text-muted-foreground">
-        {{ t('auth.register.haveAccount') }}
-        <RouterLink to="/login" class="text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
-          {{ t('auth.register.signIn') }}
-        </RouterLink>
-      </p>
-    </div>
-    <PublicLegalNotices />
-  </div>
+    <p class="mt-[1.375rem] text-center font-serif text-[0.9375rem] text-muted-foreground">
+      {{ t('auth.register.haveAccount') }}
+      <RouterLink
+        to="/login"
+        class="font-medium text-primary hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >{{ t('auth.register.signIn') }}</RouterLink
+      >
+    </p>
+  </AuthPlate>
 </template>
-
-<style scoped>
-.login-bg {
-  position: relative;
-}
-
-.login-card {
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--elevation-xl);
-}
-</style>

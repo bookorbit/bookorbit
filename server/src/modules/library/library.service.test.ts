@@ -1,3 +1,6 @@
+import 'reflect-metadata';
+import { plainToInstance } from 'class-transformer';
+import { UpdateLibraryDto } from './dto/update-library.dto';
 import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 vi.mock('fs/promises', () => ({
   readdir: vi.fn(),
@@ -96,6 +99,7 @@ describe('LibraryService', () => {
     removeSchedule: vi.fn(),
   };
 
+  const regexMetadata = { validate: vi.fn() };
   let service: LibraryService;
   let readingEvents: ReadingAttemptEventsService;
 
@@ -112,6 +116,7 @@ describe('LibraryService', () => {
       achievementEvents as any,
       pathPolicy as any,
       scanScheduler as any,
+      regexMetadata as any,
       readingEvents,
     );
 
@@ -202,6 +207,53 @@ describe('LibraryService', () => {
     await expect(service.findOne(111)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('rejects regex validation for podcast libraries', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'podcasts' }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
+    await expect(service.validateRegexMetadata({ config: { rules: [{ pattern: '(?<title>.+)', flags: '' }] }, libraryId: 2 })).rejects.toThrow(
+      'Regex metadata is only available for book libraries',
+    );
+  });
+
+  describe('regex configuration updates', () => {
+    const first = { pattern: '(?<title>.+)', flags: 'i' };
+    const second = { pattern: '(?<series>.+)', flags: '' };
+    const config = { rules: [first, second] };
+    beforeEach(() => {
+      libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: config }]);
+      libraryRepo.update.mockResolvedValue([{ id: 2 }]);
+      libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
+    });
+
+    it.each([null, { rules: [{ flags: 'i', pattern: first.pattern }, second] }])(
+      'does not revalidate or rewrite unchanged rules: %j',
+      async (unchanged) => {
+        libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: unchanged === null ? null : config }]);
+        await service.update(2, plainToInstance(UpdateLibraryDto, { coverAspectRatio: '1/1', regexMetadata: unchanged }));
+        expect(regexMetadata.validate).not.toHaveBeenCalled();
+        expect(libraryRepo.update).toHaveBeenCalledWith(2, { coverAspectRatio: '1/1' });
+      },
+    );
+
+    it.each([
+      null,
+      { rules: [second, first] },
+      { rules: [{ ...first, flags: 'u' }, second] },
+      { rules: [{ ...first, pattern: '(?<title>.*)' }, second] },
+    ])('validates and persists an actual change without a library grant: %j', async (changed) => {
+      await service.update(2, { regexMetadata: changed });
+      expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
+      expect(regexMetadata.validate).toHaveBeenCalledWith(changed);
+      expect(libraryRepo.update).toHaveBeenCalledWith(2, { regexMetadata: changed });
+    });
+
+    it('does not persist a change that fails validation', async () => {
+      regexMetadata.validate.mockRejectedValueOnce(new BadRequestException('Invalid regex metadata configuration'));
+      await expect(service.update(2, { regexMetadata: null })).rejects.toThrow('Invalid regex metadata configuration');
+      expect(libraryRepo.update).not.toHaveBeenCalled();
+    });
+  });
+
   it('verifyUserAccess bypasses lookup for superusers', async () => {
     await service.verifyUserAccess(1, 2, true);
     expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
@@ -217,6 +269,20 @@ describe('LibraryService', () => {
 
     await expect(service.verifyUserAccessLevel(1, 2, false, 'editor')).rejects.toThrow('Insufficient library access level');
     await expect(service.verifyUserAccessLevel(1, 2, true, 'owner')).resolves.toBeUndefined();
+  });
+
+  it.each([undefined, ['regex', 'embedded']])('preserves regex configuration with precedence %j on create', async (metadataPrecedence) => {
+    const config = { rules: [{ pattern: '(?<title>.+)', flags: '' }] };
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Regex', icon: 'BookOpen' }]);
+    libraryRepo.insertFolders.mockResolvedValue([]);
+    await service.create({ name: 'Regex', icon: 'BookOpen', folders: ['/a'], regexMetadata: config, metadataPrecedence });
+    expect(libraryRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        regexMetadata: config,
+        metadataPrecedence: metadataPrecedence ?? ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar', 'regex'],
+      }),
+    );
   });
 
   it('create applies defaults, inserts folders, and starts an async scan', async () => {
@@ -235,8 +301,26 @@ describe('LibraryService', () => {
         icon: 'BookOpen',
         displayOrder: 0,
         watch: false,
-        metadataPrecedence: ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
-        formatPriority: ['epub', 'kepub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'],
+        metadataPrecedence: ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar', 'regex'],
+        formatPriority: [
+          'epub',
+          'kepub',
+          'pdf',
+          'cbz',
+          'cbr',
+          'cb7',
+          'mobi',
+          'azw3',
+          'azw',
+          'fb2',
+          'djvu',
+          'm4b',
+          'mp3',
+          'm4a',
+          'opus',
+          'ogg',
+          'flac',
+        ],
         organizationMode: 'book_per_folder',
         coverAspectRatio: '2/3',
       }),

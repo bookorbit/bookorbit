@@ -44,6 +44,7 @@ export function makeFakeRepo() {
     findLatest: vi.fn((_tx: object, userId: number, bookId: number) =>
       Promise.resolve([...rows].reverse().find((row) => row.userId === userId && row.bookId === bookId && row.deletedAt === null)),
     ),
+    attachBackfilledSessions: vi.fn(() => Promise.resolve()),
     hasCompleted: vi.fn((_tx: object, userId: number, bookId: number) =>
       Promise.resolve(rows.some((row) => row.userId === userId && row.bookId === bookId && row.outcome === 'completed' && row.deletedAt === null)),
     ),

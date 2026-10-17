@@ -26,6 +26,7 @@ function makeSettings(overrides: Partial<KoboSyncSettings> = {}): KoboSyncSettin
     twoWayProgressSync: false,
     syncBookOrbitAnnotationsToKobo: false,
     storeSync: false,
+    fullSizeCovers: true,
     ...overrides,
   }
 }
@@ -43,6 +44,12 @@ describe('useKoboSettings', () => {
     const { settings } = await freshComposable()
 
     expect(settings.value.storeSync).toBe(false)
+  })
+
+  it('defaults full-size covers to on before any fetch resolves', async () => {
+    const { settings } = await freshComposable()
+
+    expect(settings.value.fullSizeCovers).toBe(true)
   })
 
   it('adopts the store sync flag the server reports', async () => {

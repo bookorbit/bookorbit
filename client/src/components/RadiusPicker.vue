@@ -5,9 +5,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 const themeStore = useThemeStore()
 const { t } = useI18n()
-const props = withDefaults(defineProps<{ touch?: boolean }>(), {
-  touch: false,
-})
+const props = withDefaults(
+  defineProps<{
+    touch?: boolean
+    /** Four equal tiles across the row, as on touch but at desktop height. */
+    block?: boolean
+  }>(),
+  { touch: false, block: false },
+)
 
 function selectRadius(option: RadiusOption) {
   themeStore.setRadius(option.id)
@@ -15,13 +20,16 @@ function selectRadius(option: RadiusOption) {
 </script>
 
 <template>
-  <div v-if="props.touch" class="grid grid-cols-4 gap-1.5">
+  <div v-if="props.touch || props.block" class="grid grid-cols-4 gap-1.5">
     <Tooltip v-for="option in RADIUS_OPTIONS" :key="option.id">
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="flex h-9 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :class="themeStore.radius === option.id ? 'border-primary bg-primary/8 text-primary' : 'border-border bg-muted/30 text-muted-foreground'"
+          class="flex items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="[
+            props.touch ? 'h-9' : 'h-8',
+            themeStore.radius === option.id ? 'border-primary bg-primary/8 text-primary' : 'border-border bg-muted/30 text-muted-foreground',
+          ]"
           :aria-label="t(option.descriptionKey)"
           :aria-pressed="themeStore.radius === option.id"
           @click="selectRadius(option)"

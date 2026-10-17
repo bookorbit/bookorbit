@@ -337,6 +337,23 @@ export function parseCfi(cfi: string): ParsedCfiRange | null {
   };
 }
 
+/**
+ * Orders two CFIs by reading position: negative when `a` comes first, zero when they name the same
+ * point, null when either cannot be read. Ranges compare by their start.
+ */
+export function compareCfi(a: string, b: string): number | null {
+  const left = parseCfi(a);
+  const right = parseCfi(b);
+  if (!left || !right || left.spineStep === null || right.spineStep === null) return null;
+  if (left.spineStep !== right.spineStep) return left.spineStep - right.spineStep;
+  for (let i = 0; i < Math.min(left.start.length, right.start.length); i++) {
+    const step = left.start[i].index - right.start[i].index;
+    if (step !== 0) return step;
+  }
+  if (left.start.length !== right.start.length) return left.start.length - right.start.length;
+  return (left.start[left.start.length - 1]?.offset ?? 0) - (right.start[right.start.length - 1]?.offset ?? 0);
+}
+
 export function chapterIndexFromSpineStep(spineStep: number | null): number | null {
   if (spineStep == null || spineStep % 2 !== 0 || spineStep < 2) return null;
   return spineStep / 2 - 1;

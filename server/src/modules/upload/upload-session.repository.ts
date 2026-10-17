@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, inArray, lt } from 'drizzle-orm';
+import { and, eq, inArray, lt } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -23,23 +23,25 @@ export class UploadSessionRepository {
     return row ?? null;
   }
 
-  /**
-   * Finds a session that can still be resumed under this key.
-   *
-   * Expired sessions are excluded deliberately. Idempotency exists to deduplicate a repeated
-   * `create` for work still in progress; it must not hand back a session that can no longer receive
-   * bytes. The client's key is the queue record's own id and does not change when it retries, so
-   * without this predicate a client that deliberately abandons an expired session gets the same
-   * dead one back, and its next chunk fails `assertReceiving` with the error it was retrying to
-   * escape. Retry then cannot ever succeed.
-   */
+  /** The session holding this key, whatever its state. The service decides whether it may be resumed. */
   async findByIdempotencyKey(userId: number, idempotencyKey: string) {
     const [row] = await this.db
       .select()
       .from(uploadSessions)
-      .where(and(eq(uploadSessions.userId, userId), eq(uploadSessions.idempotencyKey, idempotencyKey), gt(uploadSessions.expiresAt, new Date())))
+      .where(and(eq(uploadSessions.userId, userId), eq(uploadSessions.idempotencyKey, idempotencyKey)))
       .limit(1);
     return row ?? null;
+  }
+
+  /**
+   * Frees a dead session's key for a new session, keeping the row and its outcome. A client key
+   * never contains `#`, so the replacement cannot collide with one.
+   */
+  async releaseIdempotencyKey(id: string) {
+    await this.db
+      .update(uploadSessions)
+      .set({ idempotencyKey: `#released-${id}`, updatedAt: new Date() })
+      .where(eq(uploadSessions.id, id));
   }
 
   async update(id: string, values: Partial<Omit<UploadSessionInsert, 'id' | 'userId' | 'idempotencyKey'>>) {
@@ -73,7 +75,7 @@ export class UploadSessionRepository {
     return this.db
       .select({ id: libraries.id, name: libraries.name, allowedFormats: libraries.allowedFormats, organizationMode: libraries.organizationMode })
       .from(libraries)
-      .where(inArray(libraries.id, libraryIds));
+      .where(and(inArray(libraries.id, libraryIds), eq(libraries.type, 'books')));
   }
 
   findCapabilityFolders(libraryIds: number[]) {
@@ -102,6 +104,7 @@ export class UploadSessionRepository {
     const [row] = await this.db
       .select({
         libraryId: books.libraryId,
+        libraryType: libraries.type,
         allowedFormats: libraries.allowedFormats,
         organizationMode: libraries.organizationMode,
         // Needed by validateTarget: a book whose folder path is a file cannot receive another file,

@@ -13,7 +13,7 @@ function makeRepository() {
     repository: {
       listFields: vi.fn(),
       listEnablements: vi.fn(),
-      countValuesByField: vi.fn().mockResolvedValue([]),
+      countValuesByFieldAndLibrary: vi.fn().mockResolvedValue([]),
       findFieldById: vi.fn(),
       findFieldByKey: vi.fn(),
       createField: vi.fn(),
@@ -129,17 +129,44 @@ describe('CustomMetadataService', () => {
     ]);
   });
 
-  it('includes usage counts when listing fields', async () => {
+  it('includes usage counts per library when listing fields', async () => {
     repo.listFields.mockResolvedValue([field({ id: 7 }), field({ id: 8, key: 'mood', label: 'Mood', type: 'text' })]);
     repo.listEnablements.mockResolvedValue([{ fieldId: 7, libraryId: 2, displayOrder: 0 }]);
-    repo.countValuesByField.mockResolvedValue([{ fieldId: 7, count: 12 }]);
+    repo.countValuesByFieldAndLibrary.mockResolvedValue([
+      { fieldId: 7, libraryId: 2, count: 12 },
+      { fieldId: 7, libraryId: 4, count: 3 },
+    ]);
 
     const result = await service.listFields(false);
 
     expect(result).toEqual([
-      expect.objectContaining({ id: 7, enabledLibraryIds: [2], usageCount: 12 }),
-      expect.objectContaining({ id: 8, enabledLibraryIds: [], usageCount: 0 }),
+      expect.objectContaining({ id: 7, enabledLibraryIds: [2], usageCount: 15, usageByLibrary: { 2: 12, 4: 3 } }),
+      expect.objectContaining({ id: 8, enabledLibraryIds: [], usageCount: 0, usageByLibrary: {} }),
     ]);
+  });
+
+  it('starts a new field with no usage', async () => {
+    repo.findFieldByKey.mockResolvedValue(null);
+    repo.findLibrariesByIds.mockResolvedValue([{ id: 2 }]);
+    repo.createField.mockResolvedValue([field({ id: 9, key: 'shelf', label: 'Shelf', type: 'number' })]);
+
+    await expect(service.createField({ label: 'Shelf', type: 'number', enabledLibraryIds: [2] })).resolves.toEqual(
+      expect.objectContaining({ id: 9, enabledLibraryIds: [2], usageCount: 0, usageByLibrary: {} }),
+    );
+  });
+
+  it('reports the edited field’s usage per library after an update, counting only that field', async () => {
+    repo.findFieldById.mockResolvedValue(field({ id: 7 }));
+    repo.findLibrariesByIds.mockResolvedValue([{ id: 2 }]);
+    repo.countValuesByFieldAndLibrary.mockResolvedValue([
+      { fieldId: 7, libraryId: 2, count: 5 },
+      { fieldId: 7, libraryId: 6, count: 1 },
+    ]);
+
+    const result = await service.updateField(7, { enabledLibraryIds: [2] });
+
+    expect(repo.countValuesByFieldAndLibrary).toHaveBeenCalledWith(7);
+    expect(result).toEqual(expect.objectContaining({ enabledLibraryIds: [2], usageCount: 6, usageByLibrary: { 2: 5, 6: 1 } }));
   });
 
   it('reorders fields by setting display order to the requested index', async () => {

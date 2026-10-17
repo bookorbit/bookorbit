@@ -21,7 +21,7 @@ describe('useSeriesNextBook', () => {
 
     await load(42, 90)
 
-    expect(api).toHaveBeenCalledWith('/api/v1/series/42/books/90/next?formatGroup=cbx')
+    expect(api).toHaveBeenCalledWith('/api/v1/series/42/books/90/next?formatGroup=cbx&includeDjvu=true')
   })
 
   it('exposes the resolved next book', async () => {

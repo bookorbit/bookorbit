@@ -1,4 +1,5 @@
 import { Body, Controller, DefaultValuePipe, Get, HttpCode, HttpStatus, Param, ParseBoolPipe, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { RouteConfig } from '@nestjs/platform-fastify';
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
 import { Auditable } from '../../common/decorators/auditable.decorator';
@@ -11,7 +12,7 @@ import { RequestFulfillmentService } from './fulfillment/request-fulfillment.ser
 import { RequestImportService } from './fulfillment/request-import.service';
 import { RequestSeedService } from './fulfillment/request-seed.service';
 import { RequestVerificationService } from './fulfillment/request-verification.service';
-import { GrabBookRequestDto } from './dto/grab-book-request.dto';
+import { GRAB_BODY_LIMIT_BYTES, GrabBookRequestDto } from './dto/grab-book-request.dto';
 import { InspectBookRequestReleaseDto } from './dto/inspect-book-request-release.dto';
 import { SelectReleaseUnitDto } from './dto/select-release-unit.dto';
 import { SearchBookRequestReleasesDto } from './dto/search-book-request-releases.dto';
@@ -76,6 +77,7 @@ export class BookRequestSelfFulfilController {
   }
 
   @Post(':id/grab')
+  @RouteConfig({ bodyLimit: GRAB_BODY_LIMIT_BYTES })
   @HttpCode(HttpStatus.OK)
   @Auditable({
     action: AuditAction.BookRequestGrab,

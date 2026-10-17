@@ -12,6 +12,7 @@ export function useKoboReplacement(deviceId: Ref<number | null>, bookId: Ref<num
   const replacement = ref<Replacement | null>(null)
   const busy = ref(false)
   const failed = ref(false)
+  const alreadyOnDevice = ref(false)
   let generation = 0
   let timer: ReturnType<typeof setTimeout> | undefined
   let controller: AbortController | undefined
@@ -25,7 +26,7 @@ export function useKoboReplacement(deviceId: Ref<number | null>, bookId: Ref<num
     clearTimeout(timer)
     if (replacement.value && ['offered', 'transfer_observed'].includes(replacement.value.state)) timer = setTimeout(refresh, 3000)
   }
-  async function request(path: string, body?: unknown) {
+  async function request(path: string, body?: unknown, onRecord?: (record: Replacement | null) => void) {
     const current = ++generation
     clearTimeout(timer)
     controller?.abort()
@@ -40,7 +41,10 @@ export function useKoboReplacement(deviceId: Ref<number | null>, bookId: Ref<num
       })
       if (!response.ok) throw new Error('Replacement request failed')
       const record: Replacement | null = await response.json()
-      if (current === generation) replacement.value = record?.options.replacement ? record : null
+      if (current === generation) {
+        replacement.value = record?.options.replacement ? record : null
+        onRecord?.(record)
+      }
     } catch {
       if (current === generation && !requestController.signal.aborted) failed.value = true
     } finally {
@@ -59,15 +63,23 @@ export function useKoboReplacement(deviceId: Ref<number | null>, bookId: Ref<num
     replacement.value = null
     busy.value = false
     failed.value = false
+    alreadyOnDevice.value = false
     void refresh()
   })
   onScopeDispose(stop)
+  // The server answers with the device's current copy, not a replacement, when that copy already has these bytes.
+  function noteCopyOnDevice(record: Replacement | null) {
+    alreadyOnDevice.value = !!record && !record.options.replacement
+  }
   async function prepare(variant: ReadAloudDeliveryVariant) {
-    if (deviceId.value && bookId.value) await request(`/api/v1/kobo/devices/${deviceId.value}/books/${bookId.value}/replacement`, { variant })
+    alreadyOnDevice.value = false
+    if (deviceId.value && bookId.value)
+      await request(`/api/v1/kobo/devices/${deviceId.value}/books/${bookId.value}/replacement`, { variant }, noteCopyOnDevice)
   }
   async function transition(action: 'offer' | 'confirm' | 'cancel') {
     if (!deviceId.value || !replacement.value) return
+    alreadyOnDevice.value = false
     await request(`/api/v1/kobo/devices/${deviceId.value}/replacements/${replacement.value.id}/${action}`, {})
   }
-  return { replacement, busy, failed, prepare, transition, refresh }
+  return { replacement, busy, failed, alreadyOnDevice, prepare, transition, refresh }
 }

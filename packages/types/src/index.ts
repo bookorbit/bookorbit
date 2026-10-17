@@ -87,5 +87,7 @@ export * from "./cron";
 export * from "./tts";
 export * from "./watch-download";
 export * from "./podcast";
+export * from "./regex-metadata";
 export * from "./delivery";
+export * from "./djvu";
 export * from "./email";

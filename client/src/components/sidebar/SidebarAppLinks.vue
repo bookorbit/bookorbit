@@ -20,7 +20,7 @@ const ANDROID_LOGO_PATH =
   <div class="flex items-center group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1">
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button as-child variant="ghost" size="icon" class="h-7 w-7 rounded-md text-sidebar-foreground hover:bg-(--shell-accent-wash)">
+        <Button as-child variant="ghost" size="icon" class="size-[26px] rounded-md text-sidebar-foreground hover:bg-(--shell-accent-wash)">
           <a :href="IOS_APP_STORE_URL" target="_blank" rel="noopener noreferrer" :aria-label="t('components.sidebar.appLinks.ios')">
             <svg viewBox="0 0 24 24" class="size-[15.5px] fill-current" aria-hidden="true">
               <path :d="APPLE_LOGO_PATH" />
@@ -37,7 +37,7 @@ const ANDROID_LOGO_PATH =
           variant="ghost"
           size="icon"
           aria-disabled="true"
-          class="h-7 w-7 rounded-md text-android-highlight hover:bg-transparent aria-disabled:pointer-events-auto aria-disabled:cursor-default"
+          class="size-[26px] rounded-md text-android-highlight hover:bg-transparent aria-disabled:pointer-events-auto aria-disabled:cursor-default"
           :aria-label="t('components.sidebar.appLinks.android')"
         >
           <svg viewBox="0 0 24 24" class="size-[18px] fill-current" aria-hidden="true">

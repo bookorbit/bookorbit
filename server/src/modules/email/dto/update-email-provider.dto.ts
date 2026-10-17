@@ -1,6 +1,7 @@
+import type { EmailProviderUpdateRequest } from '@bookorbit/types';
 import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
-export class UpdateEmailProviderDto {
+export class UpdateEmailProviderDto implements EmailProviderUpdateRequest {
   @IsOptional()
   @IsString()
   @MaxLength(255)

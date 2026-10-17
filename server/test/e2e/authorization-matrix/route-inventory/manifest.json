@@ -1,13 +1,13 @@
 {
-  "totalRoutes": 649,
+  "totalRoutes": 662,
   "byPermission": {
-    "(none)": 281,
-    "Permission.ManageMetadataConfig": 38,
+    "(none)": 286,
+    "Permission.ManageMetadataConfig": 41,
     "Permission.EmailSend": 34,
     "Permission.LibraryEditMetadata": 35,
     "Permission.BookDockAccess": 17,
     "Permission.ManageAppSettings": 62,
-    "Permission.ManageLibraries": 22,
+    "Permission.ManageLibraries": 24,
     "Permission.ManageUsers": 13,
     "Permission.ManageEmail": 8,
     "Permission.KoboSync": 13,
@@ -15,7 +15,7 @@
     "Permission.DemoRestricted": 6,
     "Permission.KoreaderSync": 9,
     "Permission.OpdsAccess": 4,
-    "Permission.ViewAuditLog": 1,
+    "Permission.ViewAuditLog": 4,
     "Permission.ViewUserActivity": 6,
     "Permission.LibraryDeleteBooks": 14,
     "Permission.LibraryDownload": 4,
@@ -35,7 +35,7 @@
     "Permission.PodcastDownload": 4
   },
   "byLibraryAccess": {
-    "'viewer'": 9,
+    "'viewer'": 10,
     "'editor'": 15,
     "'owner'": 4
   },

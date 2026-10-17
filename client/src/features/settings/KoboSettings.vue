@@ -57,6 +57,7 @@ const kepubConversionLimitMb = ref(100)
 const twoWayProgressSync = ref(false)
 const syncBookOrbitAnnotationsToKobo = ref(false)
 const storeSync = ref(false)
+const fullSizeCovers = ref(true)
 const savingSettings = ref(false)
 const settingsError = ref<string | null>(null)
 const refreshingHistory = ref(false)
@@ -154,6 +155,7 @@ function applySettingsToLocal() {
   twoWayProgressSync.value = settings.value.twoWayProgressSync
   syncBookOrbitAnnotationsToKobo.value = settings.value.syncBookOrbitAnnotationsToKobo
   storeSync.value = settings.value.storeSync
+  fullSizeCovers.value = settings.value.fullSizeCovers
   readAloudDelivery.value = settings.value.readAloudDelivery ?? null
 }
 
@@ -692,6 +694,7 @@ async function saveSettings() {
       twoWayProgressSync: twoWayProgressSync.value,
       syncBookOrbitAnnotationsToKobo: syncBookOrbitAnnotationsToKobo.value,
       storeSync: storeSync.value,
+      fullSizeCovers: fullSizeCovers.value,
       ...(deliverySupported.value ? { readAloudDelivery: readAloudDelivery.value } : {}),
     })
     applySettingsToLocal()
@@ -1128,6 +1131,18 @@ function beginCreate() {
             </p>
           </div>
           <ToggleSwitch v-model="forceEnableHyphenation" />
+        </div>
+
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div class="pr-8">
+            <p class="settings-label">
+              {{ t('settings.reader.kobo.fullSizeCovers') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.kobo.fullSizeCoversHint') }}
+            </p>
+          </div>
+          <ToggleSwitch v-model="fullSizeCovers" />
         </div>
 
         <div class="px-5 py-5 bg-card space-y-5">

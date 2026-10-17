@@ -15,7 +15,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride, AddedAtSource } from '@bookorbit/types';
+import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride, AddedAtSource, RegexMetadataConfig } from '@bookorbit/types';
 
 export const libraries = pgTable(
   'libraries',
@@ -38,6 +38,7 @@ export const libraries = pgTable(
       .$type<string[]>()
       .notNull()
       .default(['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar']),
+    regexMetadata: jsonb('regex_metadata').$type<RegexMetadataConfig>(),
     formatPriority: jsonb('format_priority')
       .$type<string[]>()
       .notNull()

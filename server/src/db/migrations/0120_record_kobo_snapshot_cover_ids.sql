@@ -1,0 +1,1 @@
+ALTER TABLE "kobo_device_snapshot_books" ADD COLUMN "cover_image_id" varchar(128);

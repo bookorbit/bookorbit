@@ -42,6 +42,22 @@ export interface FontScopeStore {
   generateFontFaceCSS: () => string
 }
 
+/**
+ * A refused upload. Keeps the server's English message for older callers and adds the status and
+ * error code, so a caller can say why in the reader's language.
+ */
+export class FontUploadError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly meta?: Record<string, string | number>,
+  ) {
+    super(message)
+    this.name = 'FontUploadError'
+  }
+}
+
 export interface FontUpdate {
   familyName?: string
   weight?: number
@@ -219,7 +235,7 @@ export function useCustomFonts() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: 'Upload failed' }))
-        throw new Error(err.message || 'Upload failed')
+        throw new FontUploadError(err.message || 'Upload failed', res.status, err.errorCode, err.errorMeta)
       }
       const result: FontUploadResult = await res.json()
       const list = listFor(scope)

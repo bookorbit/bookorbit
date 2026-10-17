@@ -16,7 +16,7 @@ export function useSeriesNextBook(formatGroup: ReaderFormatGroup) {
     if (seriesId === null) return
 
     try {
-      const res = await api(`/api/v1/series/${seriesId}/books/${bookId}/next?formatGroup=${formatGroup}`)
+      const res = await api(`/api/v1/series/${seriesId}/books/${bookId}/next?formatGroup=${formatGroup}&includeDjvu=true`)
       if (!res.ok) return
 
       const data = (await res.json()) as SeriesNextBookResponse

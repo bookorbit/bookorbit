@@ -88,6 +88,8 @@ describe('fileMimeType', () => {
   it.each([
     ['epub', 'application/epub+zip'],
     ['pdf', 'application/pdf'],
+    ['djvu', 'image/vnd.djvu'],
+    ['DJVU', 'image/vnd.djvu'],
     ['mobi', 'application/x-mobipocket-ebook'],
     ['azw3', 'application/vnd.amazon.ebook'],
     ['fb2', 'application/x-fictionbook+xml'],

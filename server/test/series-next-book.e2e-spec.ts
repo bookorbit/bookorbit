@@ -94,8 +94,11 @@ describe('Series next readable book (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
   let issue10!: SeededBook;
   let unnumbered!: SeededBook;
 
-  async function requestNext(bookId: number, options: { formatGroup?: string; series?: number; token?: string } = {}) {
-    const query = options.formatGroup ? `?formatGroup=${options.formatGroup}` : '';
+  async function requestNext(bookId: number, options: { formatGroup?: string; series?: number; token?: string; includeDjvu?: boolean } = {}) {
+    const params = new URLSearchParams();
+    if (options.formatGroup) params.set('formatGroup', options.formatGroup);
+    if (options.includeDjvu) params.set('includeDjvu', 'true');
+    const query = params.size > 0 ? `?${params}` : '';
     return ctx.app.inject({
       method: 'GET',
       url: `/api/v1/series/${options.series ?? seriesId}/books/${bookId}/next${query}`,
@@ -188,6 +191,26 @@ describe('Series next readable book (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
     expect(response.json()).toEqual({
       next: expect.objectContaining({ bookId: issue2Epub.bookId, fileId: issue2Epub.fileIdsByFormat.get('epub'), format: 'epub' }),
     });
+  });
+
+  it('offers a DjVu continuation only to a caller that opts in, so released iOS builds never receive one', async () => {
+    const library = await createLibraryWithFolder(ctx, { name: `series-next-djvu-${randomUUID()}` });
+    await grantLibraryAccess(ctx, reader.userId, library.libraryId);
+    const [scanned] = await ctx.db
+      .insert(schema.bookSeries)
+      .values({ name: 'Scanned Run', normalizedName: `scanned run ${randomUUID()}` })
+      .returning({ id: schema.bookSeries.id });
+    const first = await seedBook(ctx, library, scanned!.id, { title: 'Scan 1', seriesIndex: '1', formats: ['cbz'] });
+    const djvu = await seedBook(ctx, library, scanned!.id, { title: 'Scan 2', seriesIndex: '2', formats: ['djvu'] });
+    const third = await seedBook(ctx, library, scanned!.id, { title: 'Scan 3', seriesIndex: '3', formats: ['cbz'] });
+
+    const released = await requestNext(first.bookId, { formatGroup: 'cbx', series: scanned!.id });
+    const anyFormat = await requestNext(first.bookId, { series: scanned!.id });
+    const web = await requestNext(first.bookId, { formatGroup: 'cbx', series: scanned!.id, includeDjvu: true });
+
+    expect(released.json()).toEqual({ next: expect.objectContaining({ bookId: third.bookId, format: 'cbz' }) });
+    expect(anyFormat.json()).toEqual({ next: expect.objectContaining({ bookId: third.bookId, format: 'cbz' }) });
+    expect(web.json()).toEqual({ next: expect.objectContaining({ bookId: djvu.bookId, fileId: djvu.fileIdsByFormat.get('djvu'), format: 'djvu' }) });
   });
 
   it('returns no next book when the book is not in the requested series', async () => {

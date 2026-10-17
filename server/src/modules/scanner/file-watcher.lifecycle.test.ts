@@ -37,6 +37,7 @@ function makeService(db: any = {}) {
     bufferBookMissingEvent: vi.fn(),
     bufferBooksUnavailableNotification: vi.fn(),
     bufferBooksRestoredNotification: vi.fn(),
+    refreshRegexMetadataAfterMoveAsync: vi.fn(),
   } as unknown as ScannerService;
 
   const service = new FileWatcherService(db, processor, gateway, scannerService, new SelfWriteRegistry());

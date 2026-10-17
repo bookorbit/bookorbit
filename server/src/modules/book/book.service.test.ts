@@ -8,7 +8,15 @@ import { join } from 'path';
 import type { RequestUser } from '../../common/types/request-user';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { FileWatcherService, WATCHER_DEBOUNCE_MS } from '../scanner/file-watcher.service';
-import { AUDIO_BOOK_FILE_WRITE_FIELDS, MetadataProviderKey, Permission, type BookQuery, type MetadataFetchDiagnostics } from '@bookorbit/types';
+import {
+  AUDIO_BOOK_FILE_WRITE_FIELDS,
+  BOOK_FORMATS,
+  MetadataProviderKey,
+  Permission,
+  type BookQuery,
+  type GroupRule,
+  type MetadataFetchDiagnostics,
+} from '@bookorbit/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
@@ -116,6 +124,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown; appDataPath
   const bookRepo = {
     findCards: vi.fn(),
     countWhere: vi.fn(),
+    countFormatFacets: vi.fn(),
     findPatternMetadataByBookIds: vi.fn(),
     findLibraryIdsByBookIds: vi.fn(),
     findDeletionAuditBooksByIds: vi.fn(),
@@ -5457,6 +5466,167 @@ describe('BookService', () => {
       const plan = await service.getExportFiles([1], user, 'all');
 
       expect(plan.files.map((file) => file.absolutePath)).toEqual(['/books/alpha.epub', '/books/zeta.epub']);
+    });
+  });
+
+  describe('facetsForLibrary', () => {
+    type WhereToken = { filter: GroupRule | undefined; q: string | undefined };
+
+    function makeFacetService(counts: { total?: number; libraryTotal?: number } = {}) {
+      const harness = makeService();
+      harness.queryBuilder.buildWhere.mockImplementation(((filter: GroupRule | undefined, ctx: { q?: string }) => ({ filter, q: ctx.q })) as never);
+      harness.bookRepo.countWhere.mockImplementation((where: WhereToken) =>
+        Promise.resolve(where.filter === undefined && where.q === undefined ? (counts.libraryTotal ?? 40) : (counts.total ?? 12)),
+      );
+      harness.bookRepo.countFormatFacets.mockResolvedValue([]);
+      return harness;
+    }
+
+    const formatRule = (format: string) => ({ type: 'rule' as const, field: 'format' as const, operator: 'includesAny' as const, value: [format] });
+    const unreadRule = { type: 'rule' as const, field: 'readStatus' as const, operator: 'includesAny' as const, value: ['unread'] };
+    const facetQuery = (filter: GroupRule | undefined, q?: string) =>
+      ({
+        ...(filter ? { filter } : {}),
+        ...(q !== undefined ? { q } : {}),
+        sort: [{ field: 'title', dir: 'asc' }],
+        pagination: { page: 3, size: 10 },
+        collapseSeries: true,
+      }) as BookQuery;
+
+    it('verifies access and builds every where with the listing scope, content filters and q', async () => {
+      const { service, libraryService, queryBuilder, bookRepo } = makeFacetService();
+      const user = makeUser({ id: 42, settings: { timezone: 'Europe/Berlin' } });
+      const contentFilters = { includeTagIds: [], excludeTagIds: [9], includeGenreIds: [], excludeGenreIds: [] };
+      user.contentFilters = contentFilters;
+      const filter: GroupRule = { type: 'group', join: 'AND', rules: [unreadRule] };
+
+      const result = await service.facetsForLibrary(user, 7, facetQuery(filter, 'dune'));
+
+      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
+      const scope = { accessibleLibraryIds: [7], implicitLibraryId: 7, userId: 42, timeZone: 'Europe/Berlin', contentFilters };
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(filter, { ...scope, q: 'dune' });
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(undefined, scope);
+      expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(2);
+      expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: 'dune' });
+      expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter: undefined, q: undefined });
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: 'dune' }, BOOK_FORMATS);
+      expect(result).toEqual({ total: 12, libraryTotal: 40, formats: [] });
+    });
+
+    it('leaves content filters off for superusers', async () => {
+      const { service, libraryService, queryBuilder } = makeFacetService();
+      const user = makeUser({ id: 3, isSuperuser: true });
+      user.contentFilters = { includeTagIds: [1], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [] };
+
+      await service.facetsForLibrary(user, 7, facetQuery({ type: 'group', join: 'AND', rules: [unreadRule] }));
+
+      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(3, 7, true);
+      expect(queryBuilder.buildWhere.mock.calls.length).toBeGreaterThan(0);
+      for (const [, ctx] of queryBuilder.buildWhere.mock.calls) {
+        expect((ctx as { contentFilters?: unknown }).contentFilters).toBeUndefined();
+      }
+    });
+
+    it('counts formats without root format rules under an AND root, keeping nested format rules and the rest', async () => {
+      const { service, queryBuilder, bookRepo } = makeFacetService();
+      const nested: GroupRule = { type: 'group', join: 'OR', rules: [formatRule('pdf'), unreadRule] };
+      const filter: GroupRule = { type: 'group', join: 'AND', rules: [formatRule('epub'), unreadRule, nested, formatRule('mobi')] };
+
+      await service.facetsForLibrary(makeUser(), 7, facetQuery(filter, 'dune'));
+
+      const stripped: GroupRule = { type: 'group', join: 'AND', rules: [unreadRule, nested] };
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(filter, expect.objectContaining({ q: 'dune' }));
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(stripped, expect.objectContaining({ q: 'dune' }));
+      expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: 'dune' });
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter: stripped, q: 'dune' }, BOOK_FORMATS);
+      expect(filter.rules).toHaveLength(4);
+    });
+
+    it('strips nothing under an OR root', async () => {
+      const { service, queryBuilder, bookRepo } = makeFacetService();
+      const filter: GroupRule = { type: 'group', join: 'OR', rules: [formatRule('epub'), unreadRule] };
+
+      await service.facetsForLibrary(makeUser(), 7, facetQuery(filter));
+
+      expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(2);
+      expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: undefined });
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: undefined }, BOOK_FORMATS);
+    });
+
+    it('keeps a root format exclusion, which the chips do not own', async () => {
+      const { service, bookRepo } = makeFacetService();
+      const excludePdf = { type: 'rule' as const, field: 'format' as const, operator: 'excludesAll' as const, value: ['pdf'] };
+      const filter: GroupRule = { type: 'group', join: 'AND', rules: [formatRule('epub'), excludePdf] };
+
+      await service.facetsForLibrary(makeUser(), 7, facetQuery(filter));
+
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith(
+        { filter: { type: 'group', join: 'AND', rules: [excludePdf] }, q: undefined },
+        BOOK_FORMATS,
+      );
+    });
+
+    it('keeps a nested-only format filter intact', async () => {
+      const { service, bookRepo } = makeFacetService();
+      const filter: GroupRule = {
+        type: 'group',
+        join: 'AND',
+        rules: [{ type: 'group', join: 'OR', rules: [formatRule('epub'), formatRule('pdf')] }],
+      };
+
+      await service.facetsForLibrary(makeUser(), 7, facetQuery(filter));
+
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: undefined }, BOOK_FORMATS);
+    });
+
+    it('drops the filter entirely when the only root rule is a format rule, still applying q', async () => {
+      const { service, queryBuilder, bookRepo } = makeFacetService();
+      const filter: GroupRule = { type: 'group', join: 'AND', rules: [formatRule('epub')] };
+
+      await service.facetsForLibrary(makeUser(), 7, facetQuery(filter, 'dune'));
+
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(undefined, expect.objectContaining({ q: 'dune' }));
+      expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: 'dune' });
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter: undefined, q: 'dune' }, BOOK_FORMATS);
+    });
+
+    it('sorts formats by count then name and omits empty ones', async () => {
+      const { service, bookRepo } = makeFacetService();
+      bookRepo.countFormatFacets.mockResolvedValue([
+        { format: 'pdf', count: 3 },
+        { format: 'epub', count: 7 },
+        { format: 'cbz', count: 0 },
+        { format: 'mobi', count: 3 },
+        { format: 'azw3', count: 1 },
+      ]);
+
+      const result = await service.facetsForLibrary(makeUser(), 7, facetQuery({ type: 'group', join: 'AND', rules: [unreadRule] }));
+
+      expect(result.formats).toEqual([
+        { format: 'epub', count: 7 },
+        { format: 'mobi', count: 3 },
+        { format: 'pdf', count: 3 },
+        { format: 'azw3', count: 1 },
+      ]);
+    });
+
+    it('reuses the total as the library total when neither a filter nor q narrows it', async () => {
+      const { service, queryBuilder, bookRepo } = makeFacetService({ total: 40 });
+
+      const result = await service.facetsForLibrary(makeUser(), 7, facetQuery(undefined, '   '));
+
+      expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(1);
+      expect(bookRepo.countWhere).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ total: 40, libraryTotal: 40, formats: [] });
+    });
+
+    it('refuses before querying when the user cannot see the library', async () => {
+      const { service, libraryService, bookRepo } = makeFacetService();
+      libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('No library access'));
+
+      await expect(service.facetsForLibrary(makeUser(), 7, facetQuery(undefined))).rejects.toBeInstanceOf(ForbiddenException);
+      expect(bookRepo.countWhere).not.toHaveBeenCalled();
+      expect(bookRepo.countFormatFacets).not.toHaveBeenCalled();
     });
   });
 

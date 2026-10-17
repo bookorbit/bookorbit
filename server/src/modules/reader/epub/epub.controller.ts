@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Get, Param, ParseIntPipe, Query, Req, Res } from '@nestjs/common';
+import { RouteConfig } from '@nestjs/platform-fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -19,18 +20,19 @@ export class EpubController {
     return this.epubService.getMediaOverlayPlaylist(bookId, this.parseFileId(fileId), user);
   }
 
+  /** The router has already decoded the path once; decoding it again would read a literal `%` in a name as an escape. */
   @Get(':bookId/media-overlay/file/*')
+  @RouteConfig({ compress: false })
   async getMediaOverlayFile(
     @Param('bookId', ParseIntPipe) bookId: number,
-    @Param('*') encodedPath: string,
+    @Param('*') filePath: string,
     @Query('fileId') fileId: string | undefined,
     @CurrentUser() user: RequestUser,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const filePath = this.decodePathParam(encodedPath);
     const range = typeof request.headers.range === 'string' ? request.headers.range : undefined;
-    const { data, contentType, size, status, contentRange } = await this.epubService.streamMediaOverlayFile(
+    const { body, length, contentType, size, status, contentRange } = await this.epubService.streamMediaOverlayFile(
       bookId,
       filePath,
       this.parseFileId(fileId),
@@ -41,11 +43,11 @@ export class EpubController {
     reply.code(status);
     reply.header('Content-Type', contentType);
     reply.header('Accept-Ranges', 'bytes');
-    reply.header('Content-Length', data.length);
+    reply.header('Content-Length', length);
     if (contentRange) reply.header('Content-Range', contentRange);
     if (!contentRange && size > 0) reply.header('X-Content-Length-Full', size);
     reply.header('Cache-Control', 'private, max-age=3600');
-    reply.send(data);
+    reply.send(body);
   }
 
   @Get(':bookId/file/*')

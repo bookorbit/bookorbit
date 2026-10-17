@@ -61,9 +61,7 @@ export class KoboDownloadService implements OnModuleInit {
 
   async streamBook(userId: number, bookId: number, reply: FastifyReply, deviceId?: number, deliveryId?: string) {
     if (deviceId && this.deliveries && this.selections) {
-      const record = await this.deliveries.offer(userId, deviceId, bookId);
-      if (deliveryId && record.id !== deliveryId) throw new NotFoundException('Delivery offer is no longer current');
-      const artifact = await this.deliveries.resolve(userId, deviceId, record);
+      const { record, artifact } = await this.deliveries.prepareDownload(userId, deviceId, bookId, deliveryId);
       try {
         if (record.sourceFileId !== null) await this.hashRegistration.record(record.sourceFileId, artifact.fileHash);
       } catch (error) {

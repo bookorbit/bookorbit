@@ -41,6 +41,8 @@ describe('FontController', () => {
       update: vi.fn(),
       remove: vi.fn(),
       getFileInfo: vi.fn(),
+      usage: vi.fn(),
+      renameFamily: vi.fn(),
     };
 
     controller = new FontController(fontService as unknown as FontService);
@@ -56,6 +58,27 @@ describe('FontController', () => {
 
       expect(fontService.list).toHaveBeenCalledWith(1);
       expect(result).toEqual(fonts);
+    });
+  });
+
+  describe('usage', () => {
+    it('answers for the signed-in reader only', async () => {
+      fontService.usage.mockResolvedValue({ fonts: [] });
+
+      await controller.usage(makeUser());
+
+      expect(fontService.usage).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('renameFamily', () => {
+    it('forwards both names with the signed-in reader', async () => {
+      const user = makeUser();
+      fontService.renameFamily.mockResolvedValue([]);
+
+      await controller.renameFamily({ familyName: 'Georgia', newFamilyName: 'Georgia Pro' }, user);
+
+      expect(fontService.renameFamily).toHaveBeenCalledWith(user, 'Georgia', 'Georgia Pro');
     });
   });
 
@@ -185,6 +208,17 @@ describe('FontController', () => {
         permission: Permission.DemoRestricted,
         message: 'Demo-restricted account cannot manage fonts',
       });
+    });
+
+    it('renameFamily has ForbidPermission DemoRestricted', () => {
+      expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, FontController.prototype.renameFamily)).toEqual({
+        permission: Permission.DemoRestricted,
+        message: 'Demo-restricted account cannot manage fonts',
+      });
+    });
+
+    it('usage is a read open to demo accounts too', () => {
+      expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, FontController.prototype.usage)).toBeUndefined();
     });
 
     it('list does not have ForbidPermission', () => {

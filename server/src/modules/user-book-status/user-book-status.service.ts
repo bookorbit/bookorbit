@@ -273,6 +273,7 @@ export class UserBookStatusService {
         finishThreshold: normalizedFinishThreshold,
         strongRereadEvidence: activity.strongRereadEvidence === true,
         meaningfulActivity: activity.meaningfulActivity === true,
+        timeZone,
       });
       if (updated && updated.status !== (existing?.status ?? null)) {
         this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {

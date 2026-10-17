@@ -36,6 +36,30 @@ describe('guided Kobo replacement lifecycle', () => {
     expect(api).toHaveBeenCalledTimes(calls)
   })
 
+  it('says the device already has the copy when preparing answers with the current delivery', async () => {
+    const scope = effectScope()
+    const device = ref<number | null>(null)
+    const book = ref<number | null>(null)
+    const state = scope.run(() => useKoboReplacement(device, book))!
+    vi.mocked(api).mockResolvedValueOnce(response(null))
+    device.value = 1
+    book.value = 2
+    await nextTick()
+    await flushPromises()
+    vi.mocked(api).mockResolvedValueOnce(response({ ...record('transfer_observed'), options: { replacement: false } }))
+    await state.prepare('audioless_epub')
+    expect(state.replacement.value).toBeNull()
+    expect(state.alreadyOnDevice.value).toBe(true)
+    vi.mocked(api).mockResolvedValueOnce(response(null))
+    book.value = 3
+    await nextTick()
+    expect(state.alreadyOnDevice.value).toBe(false)
+    vi.mocked(api).mockResolvedValueOnce(response(record('prepared')))
+    await state.prepare('audioless_epub')
+    expect(state.alreadyOnDevice.value).toBe(false)
+    scope.stop()
+  })
+
   it('discards stale status responses when the selected book changes', async () => {
     const scope = effectScope()
     const device = ref<number | null>(null)

@@ -1250,6 +1250,43 @@ describe('BookRepository', () => {
     expect(total).toBe(42);
   });
 
+  it('countFormatFacets counts distinct visible books per requested format through an aliased file join', async () => {
+    const db = {
+      execute: vi.fn().mockResolvedValue({
+        rows: [
+          { format: 'epub', count: '7' },
+          { format: 'pdf', count: 3 },
+        ],
+      }),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.countFormatFacets(sql`${bookMetadata.title} is not null`, ['epub', 'pdf']);
+
+    const query = new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]);
+    const normalized = query.sql.replace(/\s+/g, ' ');
+    expect(normalized).toContain('count(DISTINCT "books"."id")');
+    expect(normalized).toContain('LEFT JOIN "book_metadata" ON "book_metadata"."book_id" = "books"."id"');
+    expect(normalized).toContain('INNER JOIN "book_files" AS facet_file ON facet_file.book_id = "books"."id"');
+    expect(normalized).toContain('"book_metadata"."title" is not null');
+    expect(normalized).toContain('"books"."status" <>');
+    expect(normalized).toContain('facet_file.format IN ($2, $3)');
+    expect(normalized).toContain('GROUP BY facet_file.format');
+    expect(query.params).toEqual(['processing', 'epub', 'pdf']);
+    expect(result).toEqual([
+      { format: 'epub', count: 7 },
+      { format: 'pdf', count: 3 },
+    ]);
+  });
+
+  it('countFormatFacets skips the query when no formats are requested', async () => {
+    const db = { execute: vi.fn() };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.countFormatFacets(undefined, [])).resolves.toEqual([]);
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
   it('returns empty file lists without querying when bookIds are empty', async () => {
     const db = {
       select: vi.fn(),

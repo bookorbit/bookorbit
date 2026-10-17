@@ -1,3 +1,4 @@
+import type { CoverAspectRatio } from "./library";
 import type { MetadataField } from "./metadata-preferences";
 
 export interface BookMetadataFetchScoreCondition {
@@ -83,4 +84,60 @@ export interface BookMetadataFetchFailedPage {
   total: number;
   page: number;
   limit: number;
+}
+
+/** Every books library's override and run history, from `GET /book-metadata-fetch/config/libraries`. */
+export interface BookMetadataFetchLibraryConfigEntry extends BookMetadataFetchLibraryConfig {
+  libraryId: number;
+  libraryName: string;
+}
+
+/**
+ * Body of `POST /book-metadata-fetch/preview-breakdown` and `POST /book-metadata-fetch/preview-books`.
+ * `libraryIds` omitted means every books library.
+ */
+export interface BookMetadataFetchPreviewScope {
+  conditions: BookMetadataFetchConditions;
+  libraryIds?: number[];
+}
+
+/** Width of each `scoreBins` bucket: [0-4], [5-9], ... [95-100]. */
+export const BOOK_METADATA_FETCH_SCORE_BIN_WIDTH = 5;
+
+/**
+ * How a rule lands on a scope. Each condition is counted on its own, whether or not it is switched on,
+ * so the settings page can say what turning one on would take. `matching` honours the switches and
+ * includes books that are already queued.
+ */
+export interface BookMetadataFetchBreakdown {
+  total: number;
+  matching: number;
+  neverFetched: number;
+  lowScore: number;
+  missingAny: number;
+  missingByField: Record<MetadataField, number>;
+  /** Books whose files include audio; only they can lack narrators, duration, abridged or an audiobook cover. */
+  withAudio: number;
+  /** Scored books per 5-point bucket, lowest first; 20 entries. */
+  scoreBins: number[];
+  unscored: number;
+}
+
+export interface BookMetadataFetchPreviewBook {
+  bookId: number;
+  libraryId: number;
+  title: string | null;
+  author: string | null;
+  metadataScore: number | null;
+  neverFetched: boolean;
+  /** The rule's selected fields this book lacks. */
+  missingFields: MetadataField[];
+  hasCover: boolean;
+  coverAspectRatio: CoverAspectRatio | null;
+  coverVersion: string | null;
+}
+
+export interface BookMetadataFetchPreviewBooks {
+  items: BookMetadataFetchPreviewBook[];
+  total: number;
 }

@@ -12,7 +12,7 @@ import { KoboDownloadRepository } from '../kobo-download.repository';
 const SETTING_KEY = 'kobo_download_hash_backfill';
 const VERSION = 1;
 const EVENT = 'kobo.download_hash_backfill';
-const CACHE_FILE = /^([0-9a-f]{32})(?:-noaudio-v[1-9]\d*)?(?:-hyph)?\.kepub\.epub$/;
+const CACHE_FILE = /^([0-9a-f]{32})(?:-noaudio-v[1-9]\d*)?(?:-hyph)?(?:-hrefs)?\.kepub\.epub$/;
 
 @Injectable()
 export class KoboDownloadHashBackfillService implements OnApplicationBootstrap {

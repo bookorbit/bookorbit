@@ -37,6 +37,20 @@ export type CardInfoMode = (typeof CARD_INFO_MODES)[number];
 export const BOOK_THUMBNAIL_CLICK_ACTION = ["reader", "details"] as const;
 export type BookThumbnailClickAction = (typeof BOOK_THUMBNAIL_CLICK_ACTION)[number];
 
+/** The artwork drawn for a book that has no cover. */
+export const PLACEHOLDER_COVER_STYLES = [
+  "bauhaus",
+  "constructivist",
+  "memphis",
+  "clothbound",
+  "poster",
+  "aurora",
+  "vista",
+  "marbled",
+  "paperback",
+] as const;
+export type PlaceholderCoverStyle = (typeof PLACEHOLDER_COVER_STYLES)[number];
+
 export interface DisplayPreferences {
   portraitCoverSize: number;
   squareCoverSize: number;
@@ -65,4 +79,5 @@ export interface DisplayPreferences {
   gridCardSecondaryLabel: GridCardLabelField;
   cardInfoMode: CardInfoMode;
   thumbnailClickAction: BookThumbnailClickAction;
+  placeholderCoverStyle: PlaceholderCoverStyle;
 }

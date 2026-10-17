@@ -346,6 +346,34 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     const book = await createBook();
     await patchStatus(book.bookId, { status: 'read', startedAt: '2024-01-01', finishedAt: '2024-01-10' });
     const kobo = ctx.app.get(KoboReadingStateService);
+    const device = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/kobo/devices',
+      headers: auth(ctx.adminToken),
+      payload: { name: 'Attempt simulation Kobo' },
+    });
+    expect(device.statusCode).toBe(201);
+    const deviceId = (device.json() as { id: number }).id;
+    // The device holds this copy, so the positions it reports are its reader's, not an unknown copy's.
+    await ctx.db.insert(schema.koboDeviceDeliveries).values({
+      userId: adminUserId,
+      deviceId,
+      bookId: book.bookId,
+      sourceFileId: book.fileId,
+      metadata: {
+        artifactId: 'simulated',
+        sourceRevision: 'simulated',
+        requestedVariant: null,
+        actualVariant: 'original',
+        format: 'epub',
+        sizeBytes: 1024,
+        sha256: 'simulated',
+        fileHash: 'simulated',
+        outcome: 'original',
+      },
+      options: { hyphenate: false, converterVersion: null },
+      state: 'transfer_observed',
+    });
     await kobo.upsertState(
       adminUserId,
       book.bookId,
@@ -357,7 +385,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       1,
       98,
       false,
-      1,
+      deviceId,
     );
     await kobo.upsertState(
       adminUserId,
@@ -370,7 +398,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       1,
       98,
       false,
-      1,
+      deviceId,
     );
     const history = await listAttempts(book.bookId);
     expect(history.total).toBe(2);

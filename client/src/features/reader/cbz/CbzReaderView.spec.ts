@@ -170,6 +170,22 @@ describe('CbzReaderView', () => {
     vi.stubGlobal('cancelAnimationFrame', vi.fn<(handle: number) => void>())
   })
 
+  it('offers DjVu embedded text and recovers from a failed page image', async () => {
+    mocks.savedMode = 'paginated'
+    mocks.savedPageNumber = 1
+    mocks.pageCount = 2
+    const wrapper = shallowMount(CbzReaderView, { props: { bookId: 11, fileId: 22, source: 'djvu' } })
+    await flushPromises()
+    expect(wrapper.find('[aria-label="reader.djvu.pageText"]').exists()).toBe(true)
+    await wrapper.get('img').trigger('error')
+    expect(wrapper.text()).toContain('reader.pageImages.pageFailed')
+    const retry = wrapper.findAll('button').find((button) => button.text() === 'common.retry')!
+    await retry.trigger('click')
+    expect(wrapper.text()).not.toContain('reader.pageImages.pageFailed')
+    expect(wrapper.get('img').attributes('alt')).toBe('reader.pageImages.pageAlt')
+    wrapper.unmount()
+  })
+
   it.each(['infinite', 'long-strip'] as const)('restores %s mode by index while rendering only a bounded page window', async (mode) => {
     mocks.savedMode = mode
     const wrapper = shallowMount(CbzReaderView, {
@@ -343,6 +359,29 @@ describe('CbzReaderView', () => {
     await nextTick()
 
     expect(wrapper.findComponent(NextIssueCard).exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('keeps arrow keys turning pages after a reader button is clicked, leaving activation keys to the button', async () => {
+    mocks.savedMode = 'paginated'
+    mocks.pageCount = 5
+    mocks.savedPageNumber = 2
+    const wrapper = shallowMount(CbzReaderView, { props: { bookId: 11, fileId: 22 }, attachTo: document.body })
+    await flushPromises()
+    await nextTick()
+    const pages = () => wrapper.findAll('img').map((image) => image.attributes('src'))
+    const opened = pages()
+    const button = wrapper.get('button').element as HTMLButtonElement
+    button.focus()
+
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }))
+    await nextTick()
+    expect(pages()).toEqual(opened)
+
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    await nextTick()
+    expect(pages()).not.toEqual(opened)
 
     wrapper.unmount()
   })

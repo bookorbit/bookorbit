@@ -1928,6 +1928,28 @@ export class BookRepository {
     return Number(total);
   }
 
+  /**
+   * Books matching `where` per file format, counting a book under every format it holds a file in,
+   * the way the `format` filter matches. The joined files are aliased so a `format` rule's correlated
+   * `book_files` subquery inside `where` visibly binds to its own rows, never to this join.
+   */
+  async countFormatFacets<F extends string>(where: SQL | undefined, formats: readonly F[]): Promise<Array<{ format: F; count: number }>> {
+    if (formats.length === 0) return [];
+    const result = await this.db.execute<{ format: F; count: string | number }>(sql`
+      SELECT facet_file.format AS format, count(DISTINCT ${books.id}) AS count
+      FROM ${books}
+      LEFT JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
+      INNER JOIN ${bookFiles} AS facet_file ON facet_file.book_id = ${books.id}
+      WHERE ${this.visibleWhere(where)}
+        AND facet_file.format IN (${sql.join(
+          formats.map((format) => sql`${format}`),
+          sql`, `,
+        )})
+      GROUP BY facet_file.format
+    `);
+    return result.rows.map((row) => ({ format: row.format, count: Number(row.count) }));
+  }
+
   async findLibraryIdsByBookIds(bookIds: number[]): Promise<{ id: number; libraryId: number }[]> {
     if (bookIds.length === 0) return [];
     return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));

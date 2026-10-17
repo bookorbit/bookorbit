@@ -1,9 +1,9 @@
 import { computed, ref } from 'vue'
 import { getValidToken } from '@/lib/api'
-import type { AddBookFileResult } from '@bookorbit/types'
+import { UPLOAD_SUPPORTED_FORMATS, type AddBookFileResult } from '@bookorbit/types'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
-export const SUPPORTED_FORMATS = ['epub', 'kepub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2', 'm4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac']
+export const SUPPORTED_FORMATS: readonly string[] = UPLOAD_SUPPORTED_FORMATS
 export const SUPPORTED_FORMATS_ACCEPT = SUPPORTED_FORMATS.map((f) => `.${f}`).join(',')
 export const MAX_FILE_BYTES = 500 * 1024 * 1024
 

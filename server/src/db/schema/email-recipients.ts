@@ -34,7 +34,7 @@ export const emailRecipients = pgTable(
     check('email_recipients_device_type_chk', sql`${t.deviceType} is null or ${t.deviceType} in ('kindle', 'kobo', 'other')`),
     check(
       'email_recipients_preferred_format_chk',
-      sql`${t.preferredFormat} is null or ${t.preferredFormat} in ('epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr')`,
+      sql`${t.preferredFormat} is null or ${t.preferredFormat} in ('epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'djvu')`,
     ),
   ],
 );

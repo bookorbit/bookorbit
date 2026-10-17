@@ -46,6 +46,6 @@ export function mediaFamilyForFormat(format: string | null): 'ebook' | 'comic' |
   if (!normalized) return 'unknown';
   if (['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'].includes(normalized)) return 'audiobook';
   if (['cbz', 'cbr', 'cb7', 'cbx'].includes(normalized)) return 'comic';
-  if (['epub', 'pdf', 'mobi', 'azw', 'azw3', 'fb2', 'kepub'].includes(normalized)) return 'ebook';
+  if (['epub', 'pdf', 'djvu', 'mobi', 'azw', 'azw3', 'fb2', 'kepub'].includes(normalized)) return 'ebook';
   return 'unknown';
 }

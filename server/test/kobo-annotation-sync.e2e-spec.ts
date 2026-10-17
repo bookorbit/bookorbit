@@ -40,6 +40,19 @@ const KOBO_LOCATION = {
   },
 };
 
+const DOGEAR_LOCATION = {
+  span: {
+    startPath: 'span#kobo\\.1\\.1',
+    startChar: 0,
+    endPath: 'span#kobo\\.1\\.1',
+    endChar: 0,
+    chapterFilename: 'OPS/chapter.xhtml',
+    chapterProgress: 0,
+    chapterTitle: 'Chapter 1',
+  },
+};
+const DOGEAR_CFI = 'epubcfi(/6/2!/4/2/1:0)';
+
 const KOREADER_USERNAME = `kobo-mesh-device-${randomUUID().slice(0, 8)}`;
 const KOREADER_PASSWORD = 'KoboMeshDevicePass123';
 
@@ -522,5 +535,113 @@ describe.each(['epub', 'kepub'])('Kobo annotation sync with %s (e2e)', { timeout
     expect(served).toBeDefined();
     expect(served?.location).toMatchObject({ span: { startChar: 0, endChar: 7, chapterFilename: 'OPS/chapter.xhtml' } });
     expect((await findPositions(annotation.id)).get('cfi')).toMatchObject({ status: 'exact', pos0: FIXTURE_CFI });
+  });
+
+  async function findBookmarks() {
+    return ctx.db
+      .select()
+      .from(schema.bookmarks)
+      .where(and(eq(schema.bookmarks.userId, adminUserId), eq(schema.bookmarks.bookId, epub.bookId)));
+  }
+
+  async function findBookmarkLinks() {
+    return ctx.db.select().from(schema.koboBookmarkLinks).where(eq(schema.koboBookmarkLinks.deviceId, deviceDbId));
+  }
+
+  function dogear(id: string) {
+    return { id, type: 'dogear', highlightedText: '', location: DOGEAR_LOCATION, clientLastModifiedUtc: '2026-06-13T08:00:00Z' };
+  }
+
+  it('lands a device dogear as a bookmark and serves it back as a dogear', async () => {
+    const dogearId = randomUUID();
+    await patchAnnotations({ updatedAnnotations: [dogear(dogearId)] });
+
+    const live = (await findBookmarks()).filter((row) => row.deletedAt === null);
+    expect(live).toHaveLength(1);
+    expect(live[0]).toMatchObject({ origin: 'kobo', title: 'Chapter 1', cfi: DOGEAR_CFI });
+    expect((await findCanonicalAnnotations()).filter((row) => row.text === '' && row.deletedAt === null)).toEqual([]);
+
+    const served = (await getAnnotations()).annotations.find((row) => row.id === dogearId);
+    expect(served).toMatchObject({ type: 'dogear', highlightedText: '' });
+    expect(served).not.toHaveProperty('highlightColor');
+    expect(served?.location).toEqual(DOGEAR_LOCATION);
+  });
+
+  it('reports a bookmark deleted in BookOrbit and leaves it out of the next pull', async () => {
+    const [bookmark] = (await findBookmarks()).filter((row) => row.deletedAt === null);
+    const removed = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/books/${epub.bookId}/bookmarks/${bookmark!.id}`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(removed.statusCode).toBe(204);
+
+    expect(await checkForChanges()).toContain(contentId);
+    expect((await getAnnotations()).annotations.some((row) => row.type === 'dogear')).toBe(false);
+    expect(await findBookmarkLinks()).toEqual([]);
+    expect(await checkForChanges()).not.toContain(contentId);
+  });
+
+  it('deletes the bookmark when the device deletes its dogear', async () => {
+    const dogearId = randomUUID();
+    await patchAnnotations({ updatedAnnotations: [dogear(dogearId)] });
+    expect((await findBookmarks()).filter((row) => row.deletedAt === null)).toHaveLength(1);
+
+    await patchAnnotations({ deletedAnnotationIds: [dogearId] });
+
+    expect((await findBookmarks()).filter((row) => row.deletedAt === null)).toEqual([]);
+    expect(await findBookmarkLinks()).toEqual([]);
+  });
+
+  it('moves a dogear stored as an empty highlight to a bookmark under the same id', async () => {
+    const legacyId = randomUUID();
+    await patchAnnotations({
+      updatedAnnotations: [{ ...dogear(legacyId), type: 'highlight', highlightColor: '#C6E09E' }],
+    });
+    const legacy = (await findCanonicalAnnotations()).find((row) => row.text === '' && row.deletedAt === null);
+    expect(legacy).toBeDefined();
+
+    const served = (await getAnnotations()).annotations.find((row) => row.id === legacyId);
+
+    expect(served).toMatchObject({ type: 'dogear' });
+    expect((await findCanonicalAnnotations()).find((row) => row.id === legacy!.id)?.deletedAt).not.toBeNull();
+    expect((await findBookmarks()).filter((row) => row.deletedAt === null)).toEqual([expect.objectContaining({ origin: 'kobo', cfi: DOGEAR_CFI })]);
+    expect(await findBookmarkLinks()).toEqual([expect.objectContaining({ externalKey: legacyId })]);
+  });
+
+  it('serves a known annotation at the location the device reported when this copy cannot place it', async () => {
+    const highlightId = randomUUID();
+    await patchAnnotations({
+      updatedAnnotations: [
+        {
+          id: highlightId,
+          type: 'highlight',
+          highlightColor: '#C6E09E',
+          highlightedText: 'fixture',
+          location: KOBO_LOCATION,
+          clientLastModifiedUtc: '2026-06-14T08:00:00Z',
+        },
+      ],
+    });
+    await getAnnotations();
+    const annotation = (await findCanonicalAnnotations()).find((row) => row.deletedAt === null && row.deviceCreatedAt === '2026-06-14 08:00:00')!;
+    // Placement fails for every annotation below, so the others leave first; this one is the subject.
+    for (const other of (await findCanonicalAnnotations()).filter((row) => row.deletedAt === null && row.id !== annotation.id)) {
+      await ctx.db.update(schema.annotations).set({ deletedAt: new Date() }).where(eq(schema.annotations.id, other.id));
+    }
+    await ctx.db
+      .update(schema.annotationPositions)
+      .set({ extras: { koboLocation: KOBO_LOCATION, renditionHash: 'an-earlier-copy' } })
+      .where(and(eq(schema.annotationPositions.annotationId, annotation.id), eq(schema.annotationPositions.format, 'kobo_span')));
+    const placement = vi
+      .spyOn(ctx.app.get(KoboSpanConverterService), 'canonicalToKoboSpan')
+      .mockResolvedValue({ status: 'failed', reason: 'span_not_found', renditionHash: 'this-copy' });
+    try {
+      const served = (await getAnnotations()).annotations.find((row) => row.id === highlightId);
+
+      expect(served?.location).toEqual(KOBO_LOCATION);
+    } finally {
+      placement.mockRestore();
+    }
   });
 });

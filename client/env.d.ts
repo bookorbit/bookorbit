@@ -12,5 +12,7 @@ declare module 'vue-router' {
     permissionFallback?: string
     maxWidth?: string
     title?: string | ((to: RouteLocationNormalizedLoaded) => string)
+    /** The view opens with a PageTitleRow, which carries the phone menu and search buttons itself. */
+    titleRow?: boolean
   }
 }

@@ -113,6 +113,7 @@ const validDisplayPreferences: DisplayPreferences = {
   gridCardSecondaryLabel: 'hidden',
   cardInfoMode: 'hover-overlay',
   thumbnailClickAction: 'reader',
+  placeholderCoverStyle: 'bauhaus',
 };
 
 const validLocalePreferences: LocalePreferences = {
@@ -462,6 +463,29 @@ describe('UserPreferencesService', () => {
     await expect(service.upsertDisplayPreferences(11, withoutAction as unknown as Record<string, unknown>)).resolves.toBeUndefined();
 
     expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ thumbnailClickAction: 'reader' }));
+  });
+
+  it('upsertDisplayPreferences defaults placeholderCoverStyle to bauhaus when omitted', async () => {
+    const { placeholderCoverStyle, ...withoutStyle } = validDisplayPreferences;
+    void placeholderCoverStyle;
+    await service.upsertDisplayPreferences(11, withoutStyle as unknown as Record<string, unknown>);
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ placeholderCoverStyle: 'bauhaus' }));
+  });
+
+  it('upsertDisplayPreferences keeps a chosen placeholderCoverStyle', async () => {
+    await service.upsertDisplayPreferences(11, { ...validDisplayPreferences, placeholderCoverStyle: 'marbled' } as unknown as Record<
+      string,
+      unknown
+    >);
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ placeholderCoverStyle: 'marbled' }));
+  });
+
+  it('upsertDisplayPreferences rejects unknown placeholderCoverStyle values', async () => {
+    await expect(
+      service.upsertDisplayPreferences(11, { ...validDisplayPreferences, placeholderCoverStyle: 'lattice' } as unknown as Record<string, unknown>),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('upsertDisplayPreferences rejects invalid thumbnailClickAction values', async () => {

@@ -3,14 +3,17 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/AppSidebar.vue'
-import AppHeader from '@/components/AppHeader.vue'
+import MobileShellBar from '@/components/MobileShellBar.vue'
+import CommandPalette from '@/features/command-palette/components/CommandPalette.vue'
 import BookMetadataFetchWidget from '@/features/book-metadata-fetch/components/BookMetadataFetchWidget.vue'
 import { useAppStyleScope } from '@/composables/useAppStyleScope'
+import { useShellServices } from '@/composables/useShellServices'
 import { useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
 const themeStore = useThemeStore()
 useAppStyleScope()
+useShellServices()
 
 const BOOK_ROUTE_NAMES = new Set(['book-detail'])
 
@@ -54,11 +57,12 @@ const viewKey = computed(() => {
     <AppSidebar />
     <SidebarInset class="app-shell-inset flex flex-col h-svh overflow-hidden relative bg-transparent pb-(--shell-gap)">
       <div aria-hidden="true" class="shell-glow" />
-      <!-- 1. Global App Header: Fixed at the top, independent of views -->
-      <AppHeader />
+      <!-- No global header: the sidebar holds the shell controls. Phones get a slim bar only on
+           pages that do not open with their own title row. -->
+      <MobileShellBar />
 
       <!--
-        2. Independent View Area: Everything below the header scrolls here. The bottom padding is the
+        Independent View Area: every page scrolls here. The bottom padding is the
         floating podcast player's measured height, so scrolled-to-bottom content clears it without a
         document-level scrollbar.
       -->
@@ -74,7 +78,8 @@ const viewKey = computed(() => {
         </router-view>
       </div>
     </SidebarInset>
-    <BookMetadataFetchWidget />
+    <BookMetadataFetchWidget :hide-book-card="route.name === 'settings-metadata-auto-fetch'" />
+    <CommandPalette />
   </SidebarProvider>
 </template>
 

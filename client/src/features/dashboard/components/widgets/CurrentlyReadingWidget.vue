@@ -2,7 +2,7 @@
 import { BookOpen, Play } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { FORMAT_TO_GROUP } from '@bookorbit/types'
+import { isComicFormat } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -19,7 +19,7 @@ function goToBook(bookId: number) {
 }
 
 function isComic(fileFormat: string | null): boolean {
-  return fileFormat != null && FORMAT_TO_GROUP[fileFormat] === 'cbx'
+  return fileFormat != null && isComicFormat(fileFormat)
 }
 
 function continueReading(bookId: number, fileId: number | null, fileFormat: string | null) {

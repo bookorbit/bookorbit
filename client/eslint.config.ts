@@ -36,6 +36,7 @@ export default defineConfigWithVueTs(
       'src/components/FormSheet.vue',
       'src/features/collection/components/CollectionMembershipList.vue',
       'src/features/book/components/metadata-match/*.vue',
+      'src/components/browse-header/*.vue',
     ],
     rules: { 'vue/v-on-handler-style': ['error', ['method', 'inline']] },
   },

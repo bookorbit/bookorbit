@@ -1,6 +1,7 @@
+import type { EmailProviderCreateRequest } from '@bookorbit/types';
 import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
-export class CreateEmailProviderDto {
+export class CreateEmailProviderDto implements EmailProviderCreateRequest {
   @IsString()
   @MaxLength(255)
   name: string;

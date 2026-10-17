@@ -1,5 +1,6 @@
 vi.mock('fs/promises', () => ({ mkdir: vi.fn(), mkdtemp: vi.fn(), rename: vi.fn(), rm: vi.fn(), stat: vi.fn() }));
 vi.mock('child_process', () => ({ execFile: vi.fn() }));
+vi.mock('./kepub-href-decoding', () => ({ findDecodableHrefs: vi.fn(), writeWithDecodedHrefs: vi.fn(), restoreEncodedHrefs: vi.fn() }));
 
 import { Test } from '@nestjs/testing';
 import { storageConfig } from '../../../config/config';
@@ -7,6 +8,7 @@ import { execFile } from 'child_process';
 import { mkdir, mkdtemp, rename, rm, stat } from 'fs/promises';
 
 import { KepubConversionService } from './kepub-conversion.service';
+import { findDecodableHrefs, restoreEncodedHrefs, writeWithDecodedHrefs } from './kepub-href-decoding';
 import { KepubifyBinaryService } from './kepubify-binary.service';
 
 const execMock = vi.mocked(execFile);
@@ -36,6 +38,9 @@ describe('KepubConversionService', () => {
     vi.mocked(rename).mockResolvedValue(undefined);
     vi.mocked(rm).mockResolvedValue(undefined);
     successfulConversion();
+    vi.mocked(findDecodableHrefs).mockResolvedValue(new Map());
+    vi.mocked(writeWithDecodedHrefs).mockResolvedValue(undefined);
+    vi.mocked(restoreEncodedHrefs).mockResolvedValue(1);
     const module = await Test.createTestingModule({
       providers: [
         KepubConversionService,
@@ -136,5 +141,43 @@ describe('KepubConversionService', () => {
     expect(execMock).not.toHaveBeenCalled();
     expect(rename).not.toHaveBeenCalled();
     expect(rm).not.toHaveBeenCalled();
+  });
+
+  describe('books listing chapters by percent-encoded hrefs (#1136)', () => {
+    const decoded = new Map([['text/chapter one.xhtml', 'text/chapter%20one.xhtml']]);
+
+    it('converts them through a decoded copy, restores their hrefs, and caches them under their own key', async () => {
+      vi.mocked(findDecodableHrefs).mockResolvedValue(decoded);
+
+      await expect(service.getKepubPath(input)).resolves.toBe(`${cacheDir}/abc-hrefs.kepub.epub`);
+
+      expect(writeWithDecodedHrefs).toHaveBeenCalledWith(input.sourcePath, `${tempDir}/source.epub`, decoded);
+      expect(execMock).toHaveBeenCalledWith(
+        '/tools/kepubify',
+        ['--output', `${tempDir}/converted.kepub.epub`, `${tempDir}/source.epub`],
+        { timeout: 60_000 },
+        expect.any(Function),
+      );
+      expect(restoreEncodedHrefs).toHaveBeenCalledWith(`${tempDir}/converted.kepub.epub`, tempPath, decoded);
+      expect(rename).toHaveBeenCalledExactlyOnceWith(tempPath, `${cacheDir}/abc-hrefs.kepub.epub`);
+    });
+
+    it('inspects a source once, not on every lookup', async () => {
+      statMock.mockResolvedValue({} as never);
+
+      await service.getKepubPath(input);
+      await service.getKepubPath(input);
+
+      expect(findDecodableHrefs).toHaveBeenCalledTimes(1);
+    });
+
+    it('converts a source it cannot inspect as is, under the key it always had', async () => {
+      vi.mocked(findDecodableHrefs).mockRejectedValue(new Error('not a zip'));
+
+      await expect(service.getKepubPath(input)).resolves.toBe(`${cacheDir}/abc.kepub.epub`);
+
+      expect(writeWithDecodedHrefs).not.toHaveBeenCalled();
+      expect(execMock).toHaveBeenCalledWith('/tools/kepubify', ['--output', tempPath, input.sourcePath], { timeout: 60_000 }, expect.any(Function));
+    });
   });
 });

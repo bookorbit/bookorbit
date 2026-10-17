@@ -13,6 +13,11 @@ import BookMetadataFetchReportModal from './BookMetadataFetchReportModal.vue'
 import AuthorEnrichmentExpanded from './AuthorEnrichmentExpanded.vue'
 import AuthorEnrichmentReportModal from './AuthorEnrichmentReportModal.vue'
 
+const props = defineProps<{
+  /** Set where the page already shows the book queue, so the card does not repeat it over the page's own controls. */
+  hideBookCard?: boolean
+}>()
+
 const { status, subscribe } = useBookMetadataFetchStatus()
 const { status: authorStatus, subscribe: subscribeAuthors } = useAuthorEnrichmentStatus()
 const { hasPermission, isSuperuser } = usePermissions()
@@ -52,7 +57,7 @@ const hasAuthorStatus = computed(() => hasAuthorWork.value || authorStatus.value
 const cardUserId = computed(() => user.value?.id ?? null)
 const { dismissed: bookCardDismissed, dismiss: dismissBookCard } = useMetadataCardDismissal('books', status, hasBookWork, cardUserId)
 const { dismissed: authorCardDismissed, dismiss: dismissAuthorCard } = useMetadataCardDismissal('authors', authorStatus, hasAuthorWork, cardUserId)
-const showBookCard = computed(() => hasBookStatus.value && !bookCardDismissed.value)
+const showBookCard = computed(() => hasBookStatus.value && !bookCardDismissed.value && !props.hideBookCard)
 const showAuthorCard = computed(() => hasAuthorStatus.value && !authorCardDismissed.value)
 
 watch(hasAuthorWork, (active) => {

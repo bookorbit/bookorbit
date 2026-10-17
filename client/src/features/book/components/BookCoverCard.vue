@@ -447,6 +447,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           :image-class="isMissing ? 'brightness-50' : ''"
           :spine="!isAudiobook"
           :is-comic="isComic"
+          :authors="book.authors"
+          :subtitle="book.subtitle"
+          :series-name="book.seriesName"
+          :series-index="book.seriesIndex"
+          :genres="book.genres"
           @load="handleArtworkLoad"
           @error="handleArtworkError"
         />

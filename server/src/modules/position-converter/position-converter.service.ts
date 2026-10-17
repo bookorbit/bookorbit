@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { chapterIndexFromSpineStep, findElementById, parseCfi } from './cfi.utils';
+import { chapterIndexFromSpineStep, compareCfi, findElementById, parseCfi } from './cfi.utils';
 import { EpubDomService } from './epub-dom.service';
 import {
   CfiToXPointerResult,
@@ -126,6 +126,11 @@ export class PositionConverterService {
     const result: CfiToXPointerResult = cfiRangeToXPointer(doc, chapterIndex, params.cfi, params.text);
     if (result.status === 'failed') return { status: 'failed', reason: result.reason, chapterIndex };
     return { status: result.status, pos0: result.pos0, pos1: result.pos1, chapterIndex };
+  }
+
+  /** Orders two CFIs by reading position: negative when `a` comes first, null when either cannot be read. */
+  compareCfi(a: string, b: string): number | null {
+    return compareCfi(a, b);
   }
 
   async fragmentToPositions(params: {

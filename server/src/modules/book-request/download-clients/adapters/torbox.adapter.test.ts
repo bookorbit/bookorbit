@@ -133,10 +133,16 @@ describe('TorboxAdapter', () => {
     });
   });
 
+  it('keeps a download TorBox has not finished as in progress while its files are absent', async () => {
+    api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, torrent({ downloadPresent: false })]]));
+
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([expect.objectContaining({ clientKey: CLIENT_KEY, state: 'downloading' })]);
+  });
+
   it('maps missing downloads and API errors to failed statuses', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([
-        [CLIENT_KEY, torrent({ downloadPresent: false })],
+        [CLIENT_KEY, torrent({ downloadFinished: true, downloadPresent: false })],
         [OTHER_KEY, torrent({ hash: OTHER_KEY, state: 'error' })],
       ]),
     );

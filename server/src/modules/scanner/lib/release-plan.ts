@@ -359,7 +359,25 @@ function formatRank(format: string | null): number {
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
-const FORMAT_RANK: string[] = ['epub', 'kepub', 'azw3', 'azw', 'mobi', 'fb2', 'pdf', 'cbz', 'cbr', 'cb7', 'm4b', 'm4a', 'flac', 'opus', 'ogg', 'mp3'];
+const FORMAT_RANK: string[] = [
+  'epub',
+  'kepub',
+  'azw3',
+  'azw',
+  'mobi',
+  'fb2',
+  'pdf',
+  'djvu',
+  'cbz',
+  'cbr',
+  'cb7',
+  'm4b',
+  'm4a',
+  'flac',
+  'opus',
+  'ogg',
+  'mp3',
+];
 
 function sumSizes(files: ReleasePlanFile[]): number | null {
   let total = 0;

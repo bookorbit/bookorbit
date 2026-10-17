@@ -115,6 +115,7 @@ export const bookMetadata = pgTable(
     index('bm_language_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.language}) gin_trgm_ops`),
     index('bm_published_date_idx').on(t.publishedDate),
     index('bm_published_year_idx').on(t.publishedYear),
+    index('bm_page_count_idx').on(t.pageCount),
     index('bm_published_date_sort_idx').on(sql`coalesce(${t.publishedDate}, make_date(${t.publishedYear}, 1, 1))`),
     index('bm_series_name_index_idx').on(
       t.seriesName,

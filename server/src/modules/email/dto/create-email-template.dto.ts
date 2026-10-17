@@ -1,6 +1,7 @@
+import type { EmailTemplateCreateRequest } from '@bookorbit/types';
 import { IsString, MaxLength } from 'class-validator';
 
-export class CreateEmailTemplateDto {
+export class CreateEmailTemplateDto implements EmailTemplateCreateRequest {
   @IsString()
   @MaxLength(255)
   name: string;

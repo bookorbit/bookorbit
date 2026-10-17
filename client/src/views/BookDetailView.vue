@@ -50,6 +50,9 @@ const tab = computed(() => {
 
 const { detail, loading, notFound, fetch } = useBookDetail()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', detail.value?.libraryId, 'editor'))
+const parentLibrary = computed(() =>
+  detail.value?.libraryId != null && detail.value.libraryName ? { id: detail.value.libraryId, name: detail.value.libraryName } : null,
+)
 const pageTitle = computed(() => {
   const title = detail.value?.title?.trim()
   const base = title || (Number.isFinite(bookId.value) ? t('views.bookDetail.titleWithId', { id: bookId.value }) : t('views.bookDetail.title'))
@@ -142,7 +145,7 @@ function onCoverChanged() {
 </script>
 
 <template>
-  <BookDetailLayout :book-id="bookId" :cover-tint="coverTint" :can-edit-metadata="canEditMetadata">
+  <BookDetailLayout :book-id="bookId" :cover-tint="coverTint" :can-edit-metadata="canEditMetadata" :parent-library="parentLibrary">
     <Transition name="content" mode="out-in">
       <div v-if="detail" key="detail" class="@container/book-detail h-full">
         <!--

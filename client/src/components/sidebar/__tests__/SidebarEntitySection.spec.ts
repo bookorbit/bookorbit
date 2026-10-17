@@ -5,6 +5,7 @@ import type { SidebarCap, SidebarCappedSectionId, SidebarSectionId } from '@book
 import SidebarEntitySection from '../SidebarEntitySection.vue'
 
 const sections = reactive<Record<SidebarSectionId, { open: boolean; cap?: SidebarCap }>>({
+  reading: { open: true },
   browse: { open: true },
   libraries: { open: true, cap: 8 },
   podcasts: { open: true, cap: 8 },
@@ -139,6 +140,27 @@ describe('SidebarEntitySection', () => {
 
     it('renders no badge when the entity carries no count', () => {
       expect(rowNames(mountRow({ type: 'podcasts', bookCount: 0, podcastCount: null }))).toEqual(['Library'])
+    })
+  })
+
+  describe('activity', () => {
+    const scanning = { pct: 42, barWidth: '42%', label: '42 of 100 files' }
+    const libraries = [
+      { id: 1, displayOrder: 0, name: 'Novels', icon: null, type: 'books', bookCount: 7 },
+      { id: 2, displayOrder: 1, name: 'Comics', icon: null, type: 'books', bookCount: 3 },
+    ]
+
+    it('replaces the count with the run percentage and adds its progress line', () => {
+      const wrapper = mountSection(0, { items: libraries.slice(0, 1), activity: () => scanning })
+
+      expect(rowNames(wrapper)).toEqual(['Novels42%42 of 100 files'])
+      expect(wrapper.find('li [style]').attributes('style')).toContain('width: 42%')
+    })
+
+    it('keeps the count on rows with nothing running', () => {
+      const wrapper = mountSection(0, { items: libraries, activity: (item: { id: number }) => (item.id === 1 ? scanning : null) })
+
+      expect(rowNames(wrapper)).toEqual(['Novels42%42 of 100 files', 'Comics3'])
     })
   })
 

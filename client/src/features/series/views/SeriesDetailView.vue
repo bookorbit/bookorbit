@@ -463,9 +463,12 @@ defineOptions({ name: 'SeriesDetailView' })
 <template>
   <div class="flex h-full flex-col">
     <main ref="mainRef" class="flex-1 min-h-0 overflow-y-auto py-2">
-      <div class="mb-4">
-        <button class="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground" @click="goBack">
-          <ChevronLeft :size="16" />
+      <div class="mb-3 flex min-h-11 items-center px-1">
+        <button
+          class="inline-flex h-8 items-center gap-1 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="goBack"
+        >
+          <ChevronLeft :size="14" />
           {{ t('common.back') }}
         </button>
       </div>

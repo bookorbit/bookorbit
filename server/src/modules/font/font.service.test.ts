@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
 import { FontService } from './font.service';
 import type { FontRepository } from './font.repository';
 import type { FontStorageService } from './font.storage.service';
@@ -47,6 +47,21 @@ function makeFontRow(overrides: Partial<UserFontRow> = {}): UserFontRow {
   };
 }
 
+/** The body the global filter would send, so assertions see the error code the client reads. */
+async function rejection(promise: Promise<unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
+  const err = await promise.then(
+    () => {
+      throw new Error('expected a rejection');
+    },
+    (e: unknown) => e,
+  );
+  if (!(err instanceof HttpException)) throw err;
+  const body = err.getResponse();
+  return { status: err.getStatus(), body: typeof body === 'string' ? { message: body } : (body as Record<string, unknown>) };
+}
+
+const uniqueViolation = () => Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' });
+
 function makeTTFBuffer(): Buffer {
   return Buffer.from([0x00, 0x01, 0x00, 0x00, ...Array(100).fill(0)]);
 }
@@ -67,6 +82,10 @@ describe('FontService', () => {
       update: vi.fn(),
       delete: vi.fn(),
       deleteAllByUser: vi.fn(),
+      findByUserAndFamily: vi.fn().mockResolvedValue([]),
+      renameFamily: vi.fn(),
+      countBooksByCssFamily: vi.fn().mockResolvedValue([]),
+      findDefaultCssFamilies: vi.fn().mockResolvedValue([]),
     };
 
     storage = {
@@ -181,12 +200,34 @@ describe('FontService', () => {
       await expect(service.upload(user, buffer, 'Literata.ttf')).rejects.toThrow(ConflictException);
     });
 
+    it('names the font a duplicate already is, so the client can say which one', async () => {
+      repo.findByUserAndHash.mockResolvedValue(makeFontRow({ weight: 700, style: 'italic' }));
+
+      const { status, body } = await rejection(service.upload(makeUser(), makeTTFBuffer(), 'Literata.ttf'));
+
+      expect(status).toBe(409);
+      expect(body).toMatchObject({ errorCode: 'FONT_DUPLICATE', errorMeta: { familyName: 'Literata', weight: 700, style: 'italic' } });
+    });
+
     it('rejects when user has reached font limit', async () => {
       const user = makeUser();
       const buffer = makeTTFBuffer();
       repo.countByUser.mockResolvedValue(50);
 
       await expect(service.upload(user, buffer, 'Literata.ttf')).rejects.toThrow(BadRequestException);
+      await expect(rejection(service.upload(user, buffer, 'Literata.ttf'))).resolves.toMatchObject({
+        body: { errorCode: 'FONT_LIMIT_REACHED', errorMeta: { limit: 50 } },
+      });
+    });
+
+    it('reports a second file for the same face as a coded conflict, not a server error', async () => {
+      repo.create.mockRejectedValue(uniqueViolation());
+
+      const { status, body } = await rejection(service.upload(makeUser(), makeTTFBuffer(), 'Literata-Copy.ttf'));
+
+      expect(status).toBe(409);
+      expect(body).toMatchObject({ errorCode: 'FONT_FACE_TAKEN', errorMeta: { familyName: 'Literata', weight: 400, style: 'normal' } });
+      expect(storage.delete).toHaveBeenCalledWith(1, 'stored-uuid.ttf');
     });
 
     it('cleans up stored file if DB insert fails', async () => {
@@ -287,6 +328,76 @@ describe('FontService', () => {
       repo.findById.mockResolvedValue(makeFontRow({ userId: 1 }));
 
       await expect(service.update(user, 1, { familyName: 'X' })).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('update conflicts', () => {
+    it('reports a weight/style edit onto a taken slot as a coded conflict', async () => {
+      repo.findById.mockResolvedValue(makeFontRow());
+      repo.update.mockRejectedValue(uniqueViolation());
+
+      const { status, body } = await rejection(service.update(makeUser(), 1, { weight: 700 }));
+
+      expect(status).toBe(409);
+      expect(body).toMatchObject({ errorCode: 'FONT_FACE_TAKEN', errorMeta: { familyName: 'Literata', weight: 700, style: 'normal' } });
+    });
+  });
+
+  describe('renameFamily', () => {
+    it("renames every file of the reader's family in one call", async () => {
+      const files = [makeFontRow({ id: 1 }), makeFontRow({ id: 2, weight: 700 })];
+      repo.findByUserAndFamily.mockResolvedValue(files);
+      repo.renameFamily.mockResolvedValue(files.map((f) => ({ ...f, familyName: 'Literata Text' })));
+
+      const result = await service.renameFamily(makeUser(), 'Literata', ' Literata Text ');
+
+      expect(repo.findByUserAndFamily).toHaveBeenCalledWith(1, 'Literata');
+      expect(repo.renameFamily).toHaveBeenCalledWith(1, 'Literata', 'Literata Text');
+      expect(result.map((f) => f.familyName)).toEqual(['Literata Text', 'Literata Text']);
+    });
+
+    it("cannot reach another reader's family", async () => {
+      await expect(service.renameFamily(makeUser({ id: 2 }), 'Literata', 'Mine')).rejects.toThrow(NotFoundException);
+      expect(repo.findByUserAndFamily).toHaveBeenCalledWith(2, 'Literata');
+      expect(repo.renameFamily).not.toHaveBeenCalled();
+    });
+
+    it('skips the write when the name does not change, and refuses a blank one', async () => {
+      repo.findByUserAndFamily.mockResolvedValue([makeFontRow()]);
+
+      await service.renameFamily(makeUser(), 'Literata', 'Literata');
+      await expect(service.renameFamily(makeUser(), 'Literata', '  ')).rejects.toThrow(BadRequestException);
+      expect(repo.renameFamily).not.toHaveBeenCalled();
+    });
+
+    it('reports a merge that would clash on weight and style as a coded conflict', async () => {
+      repo.findByUserAndFamily.mockResolvedValue([makeFontRow()]);
+      repo.renameFamily.mockRejectedValue(uniqueViolation());
+
+      await expect(rejection(service.renameFamily(makeUser(), 'Literata', 'Georgia'))).resolves.toMatchObject({
+        status: 409,
+        body: { errorCode: 'FONT_FACE_TAKEN', errorMeta: { familyName: 'Georgia' } },
+      });
+    });
+  });
+
+  describe('usage', () => {
+    it("counts the reader's books per custom font and marks their default, across both scopes", async () => {
+      repo.countBooksByCssFamily.mockResolvedValue([
+        { cssFamily: '__userfont_georgia', books: 2 },
+        { cssFamily: '__serverfont_courgette', books: 1 },
+      ]);
+      repo.findDefaultCssFamilies.mockResolvedValue(['__serverfont_courgette', 'serif', '__userfont_inter']);
+
+      const { fonts } = await service.usage(7);
+
+      expect(repo.countBooksByCssFamily).toHaveBeenCalledWith(7, ['__userfont_', '__serverfont_']);
+      expect(repo.findDefaultCssFamilies).toHaveBeenCalledWith(7);
+      expect(fonts).toEqual([
+        { cssFamily: '__userfont_georgia', books: 2, isDefault: false },
+        { cssFamily: '__serverfont_courgette', books: 1, isDefault: true },
+        { cssFamily: '__userfont_inter', books: 0, isDefault: true },
+      ]);
     });
   });
 

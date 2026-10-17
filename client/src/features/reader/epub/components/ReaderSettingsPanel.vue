@@ -35,7 +35,7 @@ import { themes } from '../constants/themes'
 import { BUILTIN_READER_FONT_OPTIONS, type ReaderBuiltInFontOption } from '@/features/reader/shared/constants/font-options'
 import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display'
 import { formatNumber } from '@/i18n/formatters'
-import { FONT_WEIGHT_LABEL_KEYS, builtInVariants, closestVariant, familyVariants, isSameVariant } from '@/features/reader/shared/lib/font-variants'
+import { builtInVariants, closestVariant, familyVariants, fontVariantLabel, isSameVariant } from '@/features/reader/shared/lib/font-variants'
 import ReaderRangeField from '@/features/reader/shared/components/ReaderRangeField.vue'
 import ReaderSegmentedControl from '@/features/reader/shared/components/ReaderSegmentedControl.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -367,11 +367,7 @@ function variantUpdateFor(variants: FontVariant[]): Partial<ReaderState> {
 }
 
 function variantLabel(variant: FontNamedInstance): string {
-  const weightKey = FONT_WEIGHT_LABEL_KEYS[variant.weight]
-  const base = variant.name ?? (weightKey ? t(weightKey) : String(variant.weight))
-  // A designer's own name usually says so already; only spell it out when it does not.
-  if (variant.style !== 'italic' || /italic|oblique/i.test(base)) return base
-  return t('reader.settings.fontStyleItalicOf', { style: base })
+  return fontVariantLabel(variant, t)
 }
 
 const groupLabelClass = 'mb-2 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'

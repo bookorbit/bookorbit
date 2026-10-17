@@ -29,6 +29,7 @@ export const READER_OPENABLE_FORMATS = new Set([
   "cbz",
   "cbr",
   "cb7",
+  "djvu",
   // audio reader
   "m4b",
   "mp3",
@@ -50,6 +51,7 @@ export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {
   cbz: "cbx",
   cbr: "cbx",
   cb7: "cbx",
+  djvu: "cbx",
   m4b: "audio",
   mp3: "audio",
   m4a: "audio",
@@ -60,6 +62,16 @@ export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {
 
 export function getFormatGroup(format: string): ReaderFormatGroup {
   return FORMAT_TO_GROUP[format.toLowerCase()] ?? "epub";
+}
+
+/**
+ * Openable formats that released native clients cannot open. An answer that picks a file for a
+ * client offers one of these only to a caller that says it can open it.
+ */
+export const OPT_IN_READER_FORMATS: ReadonlySet<string> = new Set(["djvu"]);
+
+export function isOptInReaderFormat(format: string | null | undefined): boolean {
+  return OPT_IN_READER_FORMATS.has((format ?? "").toLowerCase());
 }
 
 /** Formats a given reader can open, so a caller can ask for "another file this same reader handles". */

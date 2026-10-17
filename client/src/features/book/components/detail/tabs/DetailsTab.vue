@@ -32,7 +32,7 @@ import { readingDateToDateKey } from '@/features/book/lib/reading-date'
 import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { useBookCoverAspectRatio } from '@/features/book/composables/useBookCoverAspectRatio'
-import { FORMAT_TO_GROUP, getPrimaryBookFile, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, getPrimaryBookFile, READER_OPENABLE_FORMATS, isComicFormat } from '@bookorbit/types'
 import type { BookDetail, BookKoboState, CustomMetadataBookValue, ReadAloudProgressSync, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
@@ -281,6 +281,7 @@ const {
 
 const coverSeed = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? String(props.book.id))
 const coverPlaceholderTitle = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? null)
+const coverAuthors = computed(() => props.book.authors.map((a) => a.name))
 const hasCover = computed(() => props.book.coverSource !== null)
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover', props.book.coverVersion))
@@ -364,7 +365,7 @@ const isFaceAudio = computed(() => {
   if (!props.book.covers.ebook && !props.book.covers.audio) return isPrimaryAudio.value
   return faceMedium(props.book, coverAspectRatio.value) === 'audio'
 })
-const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const isPrimaryComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 const formatEntries = computed(() => bookFormatEntries(props.book.files, props.book.formatPriority))
 const isMultiTrackAudio = computed(() => formatEntries.value.some((entry) => entry.audio && entry.files.length > 1))
 // A multi-file audiobook opens from its first track, so it is one entry in the menu.
@@ -1275,6 +1276,11 @@ watch(
                 backdrop-class="blur-lg brightness-50"
                 :spine="!isFaceAudio"
                 :is-comic="isPrimaryComic"
+                :authors="coverAuthors"
+                :subtitle="book.subtitle"
+                :series-name="book.seriesName"
+                :series-index="book.seriesIndex"
+                :genres="book.genres"
                 @load="handleCoverLoad"
                 @error="handleCoverError"
               />
@@ -1540,7 +1546,7 @@ watch(
           </template>
         </div>
 
-        <div class="mt-3 flex items-center gap-1" @mouseleave="hoverRating = null">
+        <div class="mt-3 flex flex-wrap items-center gap-x-1 gap-y-1.5" @mouseleave="hoverRating = null">
           <div class="flex items-center gap-1">
             <template v-if="canEditMetadata">
               <Tooltip v-for="star in ratingStars" :key="star">
@@ -1751,7 +1757,7 @@ watch(
           <div
             ref="genreMeasureContainer"
             aria-hidden="true"
-            class="pointer-events-none invisible absolute left-0 top-0 -z-10 flex w-full items-center gap-1.5 whitespace-nowrap"
+            class="pointer-events-none invisible absolute left-0 top-0 -z-10 flex w-full items-center gap-1.5 overflow-hidden whitespace-nowrap"
           >
             <span
               v-for="(genre, index) in book.genres"

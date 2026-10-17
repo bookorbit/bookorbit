@@ -1,6 +1,6 @@
 /**
  * Identifiers for reading sessions derived from the reading counter a Kobo reports alongside
- * its bookmark, rather than measured from the analytics events it no longer sends.
+ * its bookmark, rather than measured from the analytics events only some devices still send.
  *
  * A reading session carries no column saying where it came from beyond `source`, and `source`
  * is `kobo` for both kinds. The prefix is what lets the derivation find, and exclude itself

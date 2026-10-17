@@ -40,6 +40,7 @@ describe('Kobo cover image identity (e2e)', { timeout: 180_000 }, () => {
   let device!: KoboDevice;
   let entitlementId!: string;
   let coverIdHeldByDevice!: string;
+  let lastDeliveredAs: Array<keyof SyncEntry> = [];
 
   async function sync(syncToken?: string): Promise<{ entries: SyncEntry[]; hasMore: boolean; syncToken: string }> {
     const response = await ctx.app.inject({
@@ -79,7 +80,11 @@ describe('Kobo cover image identity (e2e)', { timeout: 180_000 }, () => {
   // A drained device is told nothing until something changes, so the id last delivered is the id
   // the device is holding. Every test compares against that rather than re-syncing for it.
   async function drainDelivered(): Promise<BookMetadata[]> {
-    const delivered = deliveredMetadata(await drainEntries());
+    const entries = await drainEntries();
+    const delivered = deliveredMetadata(entries);
+    lastDeliveredAs = entries.flatMap((entry) =>
+      (['NewEntitlement', 'ChangedProductMetadata'] as const).filter((kind) => entry[kind]?.BookMetadata.EntitlementId === entitlementId),
+    );
     const last = delivered[delivered.length - 1];
     if (last) coverIdHeldByDevice = last.CoverImageId;
     return delivered;
@@ -216,6 +221,7 @@ describe('Kobo cover image identity (e2e)', { timeout: 180_000 }, () => {
     expect(delivered[0]!.Title).toBe('Kobo Cover Identity, Revised');
     expect(delivered[0]!.Publisher?.Name).toBe('Repro Press');
     expect(delivered[0]!.CoverImageId).toBe(coverIdBefore);
+    expect(lastDeliveredAs).toEqual(['ChangedProductMetadata']);
     expect(await thumbnailStatus(coverIdBefore)).toBe(200);
   });
 
@@ -277,6 +283,8 @@ describe('Kobo cover image identity (e2e)', { timeout: 180_000 }, () => {
     const delivered = await drainDelivered();
     expect(delivered).toHaveLength(1);
     expect(delivered[0]!.CoverImageId).not.toBe(coverIdBefore);
+    // A Kobo downloads a cover only for a new entitlement; as changed metadata it would show text.
+    expect(lastDeliveredAs).toEqual(['NewEntitlement']);
 
     const [row] = await ctx.db
       .select({ coverUpdatedAt: schema.bookMetadata.coverUpdatedAt })

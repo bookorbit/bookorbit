@@ -13,6 +13,7 @@ const FAMILY_BY_FORMAT: Record<string, FormatFamily> = {
   azw3: 'kindle',
   azw: 'kindle',
   pdf: 'document',
+  djvu: 'document',
   cbz: 'comic',
   cbr: 'comic',
   cb7: 'comic',

@@ -16,6 +16,8 @@ describe('email file rules', () => {
   it('offers a Kindle only the formats Amazon takes by email', () => {
     expect(formatsFor('kindle')).toEqual(['epub', 'pdf'])
     expect(formatsFor(null)).toContain('azw3')
+    expect(formatsFor(null)).toContain('djvu')
+    expect(kindleAccepts('djvu')).toBe(false)
     expect(kindleAccepts('EPUB')).toBe(true)
     expect(kindleAccepts('mobi')).toBe(false)
   })

@@ -1,5 +1,22 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Patch, Post, Res, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import {
+  All,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -9,6 +26,8 @@ import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { KoboAnnotationExchangeService, KoboContentNotFoundException } from './services/kobo-annotation-exchange.service';
 import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
+import { KoboProxyService } from './services/kobo-proxy.service';
+import { KoboSettingsService } from './services/kobo-settings.service';
 
 @Controller(['kobo/:deviceToken', ''])
 @Public()
@@ -17,6 +36,8 @@ export class KoboReadingServicesController {
   constructor(
     private readonly exchangeService: KoboAnnotationExchangeService,
     private readonly historyService: KoboSyncHistoryService,
+    private readonly proxyService: KoboProxyService,
+    private readonly settingsService: KoboSettingsService,
   ) {}
 
   @Get('api/v3/content/:contentId/annotations')
@@ -120,8 +141,27 @@ export class KoboReadingServicesController {
     return this.exchangeService.getChangedContentIds(user.id, device.deviceId);
   }
 
-  @Get('api/UserStorage/Metadata')
-  getUserStorageMetadata() {
-    return { continuationToken: null, metadata: [] };
+  /**
+   * Notebooks sync through Kobo's own UserStorage service, which BookOrbit does not hold. With store titles
+   * on, the device is signed in to Kobo and already talks to it for its store library, so its notebook
+   * calls are relayed there too. Otherwise an empty listing keeps the device's notebook sync quiet.
+   */
+  @All('api/UserStorage/*')
+  async userStorage(
+    @CurrentUser() user: RequestUser,
+    @KoboDevice() device: KoboDeviceContext,
+    @Req() req: FastifyRequest,
+    @Res() reply: FastifyReply,
+  ) {
+    const storeSync = await this.settingsService
+      .getSettings(user.id)
+      .then((settings) => settings.storeSync)
+      .catch(() => false);
+    if (storeSync) return this.proxyService.forward(req, reply, device.deviceToken, 'readingServices');
+    if (req.method === 'GET' && req.url.split('?')[0].endsWith('/api/UserStorage/Metadata')) {
+      reply.send({ continuationToken: null, metadata: [] });
+      return;
+    }
+    throw new NotFoundException();
   }
 }

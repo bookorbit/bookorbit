@@ -1,7 +1,8 @@
+import type { EmailSendLogQuery } from '@bookorbit/types';
 import { IsIn, IsInt, IsOptional, IsPositive, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class QuerySendLogDto {
+export class QuerySendLogDto implements EmailSendLogQuery {
   @IsOptional()
   @Type(() => Number)
   @IsInt()

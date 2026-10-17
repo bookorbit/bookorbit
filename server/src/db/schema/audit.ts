@@ -12,6 +12,8 @@ export const auditLog = pgTable(
     action: varchar('action', { length: 100 }).notNull(),
     resource: varchar('resource', { length: 100 }),
     resourceId: integer('resource_id'),
+    /** The target's name when the event was written, so a deleted target can still be named. */
+    resourceLabel: varchar('resource_label', { length: 255 }),
     description: text('description').notNull(),
     ip: varchar('ip', { length: 45 }),
     meta: jsonb('meta'),
@@ -27,6 +29,7 @@ export const auditLog = pgTable(
     index('idx_audit_action').on(t.action),
     index('idx_audit_action_trgm').using('gin', t.action.op('gin_trgm_ops')),
     index('idx_audit_description_trgm').using('gin', t.description.op('gin_trgm_ops')),
+    index('idx_audit_resource_label_trgm').using('gin', t.resourceLabel.op('gin_trgm_ops')),
     index('idx_audit_meta_text_trgm').using('gin', sql`(${t.meta}::text) gin_trgm_ops`),
     index('idx_audit_ip').on(t.ip),
     index('idx_audit_created_at').on(t.createdAt),

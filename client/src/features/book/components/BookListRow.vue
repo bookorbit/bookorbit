@@ -334,6 +334,11 @@ function handleRowClick(event: MouseEvent) {
         backdrop-class="blur-md brightness-50"
         :spine="!isAudiobook"
         :is-comic="isComic"
+        :authors="book.authors"
+        :subtitle="book.subtitle"
+        :series-name="book.seriesName"
+        :series-index="book.seriesIndex"
+        :genres="book.genres"
       />
     </BookCoverSurface>
 

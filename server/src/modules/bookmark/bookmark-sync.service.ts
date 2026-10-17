@@ -35,7 +35,7 @@ export class BookmarkSyncService {
 
     const restored = await this.bookmarkRepo.restoreAtLocation(userId, bookId, location, {
       title: fields.title,
-      origin: 'koreader',
+      origin: fields.origin ?? 'koreader',
       devicePos: fields.devicePos,
       pageno: fields.pageno,
     });

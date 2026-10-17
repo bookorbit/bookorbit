@@ -65,8 +65,22 @@ describe('KoboDeviceController', () => {
     await controller.thumbnailFull('42-1778450221186', '355', '530', '80', 'False', undefined, { id: 5 } as never, reply as never);
     await controller.thumbnailSimple('42-1778450221186', '355', '530', undefined, { id: 5 } as never, reply as never);
 
-    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(1, 5, 42, undefined, reply);
-    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(2, 5, 42, undefined, reply);
+    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(
+      1,
+      5,
+      42,
+      { width: 355, height: 530, quality: 80, greyscale: false },
+      undefined,
+      reply,
+    );
+    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(
+      2,
+      5,
+      42,
+      { width: 355, height: 530, quality: 85, greyscale: false },
+      undefined,
+      reply,
+    );
     expect(reply.redirect).not.toHaveBeenCalled();
   });
 
@@ -77,9 +91,9 @@ describe('KoboDeviceController', () => {
     await controller.thumbnailFull('12', '300', '300', '80', 'false', '"etag"', { id: 5 } as never, reply as never);
     await controller.thumbnailVersioned('12', '300', '300', undefined, { id: 5 } as never, reply as never);
 
-    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(1, 5, 12, undefined, reply);
-    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(2, 5, 12, '"etag"', reply);
-    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(3, 5, 12, undefined, reply);
+    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(1, 5, 12, expect.objectContaining({ width: 300, height: 300 }), undefined, reply);
+    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(2, 5, 12, expect.objectContaining({ width: 300, height: 300 }), '"etag"', reply);
+    expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(3, 5, 12, expect.objectContaining({ width: 300, height: 300 }), undefined, reply);
     expect(proxyService.forward).not.toHaveBeenCalled();
     expect(reply.redirect).not.toHaveBeenCalled();
   });
@@ -178,7 +192,13 @@ describe('KoboDeviceController', () => {
     await controller.thumbnailSimple('kobo-cover-id', '355', '530', undefined, { id: 11 } as never, reply as never);
 
     expect(downloadService.streamBook).toHaveBeenCalledWith(11, 420, reply, undefined, undefined);
-    expect(thumbnailService.serveThumbnail).toHaveBeenCalledWith(11, 420, undefined, reply);
+    expect(thumbnailService.serveThumbnail).toHaveBeenCalledWith(
+      11,
+      420,
+      { width: 355, height: 530, quality: 85, greyscale: false },
+      undefined,
+      reply,
+    );
   });
 
   it('returns static payload endpoints and ingests analytics events', async () => {

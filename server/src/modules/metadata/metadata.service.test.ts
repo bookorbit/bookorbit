@@ -222,7 +222,7 @@ describe('MetadataService', () => {
   ) {
     return new MetadataService(
       db as never,
-      new MetadataExtractionService(),
+      new MetadataExtractionService({ extractMetadata: vi.fn(), extractCover: vi.fn() } as never),
       (overrides?.scoreService ?? { calculateAndSave: vi.fn().mockResolvedValue(undefined) }) as never,
       (overrides?.narratorService ?? { replaceForBook: vi.fn().mockResolvedValue(undefined) }) as never,
       (overrides?.comicMetadataRepository ?? { upsert: vi.fn().mockResolvedValue(undefined) }) as never,
@@ -269,6 +269,202 @@ describe('MetadataService', () => {
     });
     mockExtractEpubCover.mockResolvedValueOnce(cover);
   }
+
+  describe('regex extraction persistence', () => {
+    describe.each(['epub', 'm4b'])('%s relations', (format) => {
+      afterEach(() => vi.restoreAllMocks());
+
+      it.each([
+        { label: 'neither relation', authors: [], genres: [] },
+        { label: 'only authors', authors: [{ name: 'File Author', sortName: null }], genres: [] },
+        { label: 'only genres', authors: [], genres: ['Mystery'] },
+      ])('preserves omitted relations when the file supplies $label', async ({ authors, genres }) => {
+        const { db, updateSet } = makeDb();
+        const service = makeService(db);
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ title: 'File title', authors, genres, cover: null });
+        const replaceAuthors = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+        const replaceGenres = vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+        await service.extractAndSaveWithRegex(
+          9,
+          [{ key: 'embedded', absolutePath: `/books/file.${format}`, format }],
+          { seriesName: 'Path Series' },
+          ['regex', 'embedded'],
+        );
+        expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ title: 'File title', seriesName: 'Path Series' }));
+        if (authors.length) expect(replaceAuthors).toHaveBeenCalledWith(9, authors);
+        else expect(replaceAuthors).not.toHaveBeenCalled();
+        if (genres.length) expect(replaceGenres).toHaveBeenCalledWith(9, genres);
+        else expect(replaceGenres).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        { fileAuthors: [], precedence: ['embedded', 'regex'], expected: 'Regex Author' },
+        { fileAuthors: [{ name: 'File Author', sortName: null }], precedence: ['regex', 'embedded'], expected: 'Regex Author' },
+        { fileAuthors: [{ name: 'File Author', sortName: null }], precedence: ['embedded', 'regex'], expected: 'File Author' },
+      ])('merges authors using $precedence with $fileAuthors', async ({ fileAuthors, precedence, expected }) => {
+        const { db } = makeDb();
+        const service = makeService(db);
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ authors: fileAuthors, genres: [], cover: null });
+        const replaceAuthors = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+        const replaceGenres = vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+        await service.extractAndSaveWithRegex(
+          9,
+          [{ key: 'embedded', absolutePath: `/books/file.${format}`, format }],
+          { authors: ['Regex Author'] },
+          precedence,
+        );
+        expect(replaceAuthors).toHaveBeenCalledWith(9, [{ name: expected, sortName: null }]);
+        expect(replaceGenres).not.toHaveBeenCalled();
+      });
+
+      it('respects relation locks after merging regex and file metadata', async () => {
+        const { db } = makeDb();
+        const filter = vi.fn().mockImplementation((_bookId, dto) =>
+          Promise.resolve({
+            dto: { ...dto, authors: undefined, genres: undefined },
+            skippedFields: ['authors', 'genres'],
+          }),
+        );
+        const service = makeService(db, undefined, { bookMetadataLockService: { isFieldLocked: vi.fn(), filterAutomatedBookUpdate: filter } });
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ authors: [], genres: ['Mystery'], cover: null });
+        const replaceAuthors = vi.spyOn(service, 'replaceAuthors');
+        const replaceGenres = vi.spyOn(service, 'replaceGenres');
+        await service.extractAndSaveWithRegex(
+          9,
+          [{ key: 'embedded', absolutePath: `/books/file.${format}`, format }],
+          { authors: ['Regex Author'] },
+          ['regex', 'embedded'],
+        );
+        expect(filter).toHaveBeenCalledWith(9, expect.objectContaining({ authors: ['Regex Author'], genres: ['Mystery'] }));
+        expect(replaceAuthors).not.toHaveBeenCalled();
+        expect(replaceGenres).not.toHaveBeenCalled();
+      });
+
+      it('retains empty relation replacement for file-only extraction', async () => {
+        const { db } = makeDb();
+        const service = makeService(db);
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ authors: [], genres: [], cover: null });
+        const replaceAuthors = vi.spyOn(service, 'replaceAuthors');
+        const replaceGenres = vi.spyOn(service, 'replaceGenres');
+        await service.extractAndSave(9, `/books/file.${format}`, format);
+        expect(replaceAuthors).toHaveBeenCalledWith(9, []);
+        expect(replaceGenres).toHaveBeenCalledWith(9, []);
+        expect(db.delete).toHaveBeenCalledWith(bookAuthors);
+        expect(db.delete).toHaveBeenCalledWith(bookGenres);
+      });
+    });
+
+    describe('file extraction failures', () => {
+      const sources = [
+        { key: 'embedded', absolutePath: '/books/file.epub', format: 'epub' },
+        { key: 'opfFile', absolutePath: '/books/metadata.opf', format: 'opf' },
+      ];
+
+      afterEach(() => vi.restoreAllMocks());
+
+      it('continues to the next file source and respects its precedence over regex', async () => {
+        const { db, updateSet } = makeDb();
+        const service = makeService(db);
+        const extraction = vi
+          .spyOn(MetadataExtractionService.prototype, 'extract')
+          .mockRejectedValueOnce(new Error('unreadable file'))
+          .mockResolvedValueOnce({ title: 'OPF title', authors: [{ name: 'OPF Author', sortName: null }], genres: [], cover: null });
+        const replaceAuthors = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+
+        await service.extractAndSaveWithRegex(9, sources, { title: 'Regex title', seriesName: 'Path Series' }, ['embedded', 'opfFile', 'regex']);
+
+        expect(extraction).toHaveBeenNthCalledWith(1, '/books/file.epub', 'epub');
+        expect(extraction).toHaveBeenNthCalledWith(2, '/books/metadata.opf', 'opf');
+        expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ title: 'OPF title', seriesName: 'Path Series' }));
+        expect(replaceAuthors).toHaveBeenCalledWith(9, [{ name: 'OPF Author', sortName: null }]);
+      });
+
+      it('saves regex metadata and preserves omitted relations when every file source rejects', async () => {
+        const { db, updateSet } = makeDb();
+        const scoreService = { calculateAndSave: vi.fn().mockResolvedValue(undefined) };
+        const service = makeService(db, undefined, { scoreService });
+        const extraction = vi.spyOn(MetadataExtractionService.prototype, 'extract').mockRejectedValue(new Error('unreadable file'));
+        const replaceAuthors = vi.spyOn(service, 'replaceAuthors');
+        const replaceGenres = vi.spyOn(service, 'replaceGenres');
+
+        await service.extractAndSaveWithRegex(9, sources, { title: 'Regex title', seriesName: 'Path Series' }, ['embedded', 'regex', 'opfFile']);
+
+        expect(extraction).toHaveBeenCalledTimes(2);
+        expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ title: 'Regex title', seriesName: 'Path Series' }));
+        expect(replaceAuthors).not.toHaveBeenCalled();
+        expect(replaceGenres).not.toHaveBeenCalled();
+        expect(scoreService.calculateAndSave).toHaveBeenCalledWith(9);
+      });
+
+      it('propagates persistence failures without trying another file source or retrying the write', async () => {
+        const { db, updateSet, updateWhere } = makeDb();
+        updateWhere.mockRejectedValueOnce(new Error('database unavailable'));
+        const scoreService = { calculateAndSave: vi.fn() };
+        const service = makeService(db, undefined, { scoreService });
+        const extraction = vi
+          .spyOn(MetadataExtractionService.prototype, 'extract')
+          .mockResolvedValue({ title: 'File title', authors: [], genres: [], cover: null });
+
+        await expect(service.extractAndSaveWithRegex(9, sources, { seriesName: 'Path Series' }, ['regex', 'embedded', 'opfFile'])).rejects.toThrow(
+          'database unavailable',
+        );
+
+        expect(extraction).toHaveBeenCalledTimes(1);
+        expect(updateSet).toHaveBeenCalledTimes(1);
+        expect(scoreService.calculateAndSave).not.toHaveBeenCalled();
+      });
+    });
+
+    it('reports scoring failure after saving regex fields without rolling them back or retrying', async () => {
+      const { db, updateSet } = makeDb();
+      const scoreService = { calculateAndSave: vi.fn().mockRejectedValue(new Error('score storage unavailable')) };
+      const service = makeService(db, undefined, { scoreService });
+      await expect(service.extractAndSaveWithRegex(9, [], { title: 'Regex title' }, ['regex', 'embedded'])).rejects.toThrow(
+        'score storage unavailable',
+      );
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ title: 'Regex title' }));
+      expect(scoreService.calculateAndSave).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves existing relations when regex is the only source and supplies no authors', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      const replaceAuthors = vi.spyOn(service, 'replaceAuthors');
+      const replaceGenres = vi.spyOn(service, 'replaceGenres');
+      await service.extractAndSaveWithRegex(9, [], { seriesName: 'Path Series' }, ['regex', 'embedded']);
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ seriesName: 'Path Series' }));
+      expect(replaceAuthors).not.toHaveBeenCalled();
+      expect(replaceGenres).not.toHaveBeenCalled();
+    });
+
+    it('merges partial regex fields with file authors before enforcing field locks', async () => {
+      const { db, updateSet } = makeDb();
+      const filter = vi.fn().mockImplementation((_bookId, dto) => Promise.resolve({ dto: { ...dto, title: undefined }, skippedFields: ['title'] }));
+      const service = makeService(db, undefined, { bookMetadataLockService: { isFieldLocked: vi.fn(), filterAutomatedBookUpdate: filter } });
+      const extraction = vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({
+        title: 'Embedded title',
+        authors: [{ name: 'Embedded Author', sortName: null }],
+        genres: [],
+        cover: null,
+      });
+      const replaceAuthors = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+      vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+      await service.extractAndSaveWithRegex(
+        9,
+        [{ key: 'embedded', absolutePath: '/books/file.epub', format: 'epub' }],
+        { title: 'Regex title', seriesName: 'Path Series' },
+        ['regex', 'embedded'],
+      );
+      expect(filter).toHaveBeenCalledWith(
+        9,
+        expect.objectContaining({ title: 'Regex title', authors: ['Embedded Author'], seriesName: 'Path Series' }),
+      );
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ seriesName: 'Path Series' }));
+      expect(updateSet.mock.calls[0][0]).not.toHaveProperty('title');
+      expect(replaceAuthors).toHaveBeenCalledWith(9, [{ name: 'Embedded Author', sortName: null }]);
+      extraction.mockRestore();
+    });
+  });
 
   describe('downloadAndSaveCover', () => {
     async function image(width: number, height: number): Promise<Buffer> {

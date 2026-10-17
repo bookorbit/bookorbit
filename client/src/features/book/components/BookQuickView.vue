@@ -15,7 +15,7 @@ import { useCoverVersions } from '../composables/useCoverVersions'
 import BookFormatChip from './BookFormatChip.vue'
 import { bookFormatEntries, fileFormatKey } from '../lib/book-formats'
 import { displayPublishedDate } from '../lib/published-date'
-import { FORMAT_TO_GROUP, getPrimaryBookFile } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, getPrimaryBookFile, isComicFormat } from '@bookorbit/types'
 import { useBookCoverAspectRatio } from '../composables/useBookCoverAspectRatio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -75,6 +75,7 @@ const seriesLine = computed(() => {
 })
 
 const authorLine = computed(() => detail.value?.authors.map((a) => a.name).join(', ') ?? null)
+const coverAuthors = computed(() => detail.value?.authors.map((a) => a.name) ?? null)
 const ratingStars = [1, 2, 3, 4, 5]
 const providerLinks = computed(() => (detail.value ? createBookProviderLinks(detail.value.providerIds) : []))
 
@@ -98,7 +99,7 @@ const quickViewCoverAspectRatio = computed(() => {
 
 const primaryFile = computed(() => (detail.value ? getPrimaryBookFile(detail.value.files) : null))
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const isPrimaryComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 const formatEntries = computed(() => (detail.value ? bookFormatEntries(detail.value.files, detail.value.formatPriority) : []))
 const publishedDisplay = computed(() => (detail.value ? displayPublishedDate(detail.value.publishedDate, detail.value.publishedYear) : null))
 
@@ -214,6 +215,11 @@ function handleDelete() {
                   loading="eager"
                   :spine="!isPrimaryAudio"
                   :is-comic="isPrimaryComic"
+                  :authors="coverAuthors"
+                  :subtitle="detail.subtitle"
+                  :series-name="detail.seriesName"
+                  :series-index="detail.seriesIndex"
+                  :genres="detail.genres"
                   @load="handleCoverLoad"
                   @error="handleCoverError"
                 />

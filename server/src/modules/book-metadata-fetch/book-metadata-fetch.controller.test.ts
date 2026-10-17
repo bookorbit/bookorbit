@@ -5,12 +5,14 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orchestrator.service';
+import { BookMetadataFetchPreviewService } from './book-metadata-fetch-preview.service';
 
 describe('BookMetadataFetchController', () => {
   let configService: Mocked<BookMetadataFetchConfigService>;
   let orchestrator: Mocked<BookMetadataFetchOrchestratorService>;
   let queueRepo: Mocked<BookMetadataFetchQueueRepository>;
   let session: Mocked<BookMetadataFetchSessionService>;
+  let preview: Mocked<BookMetadataFetchPreviewService>;
   let controller: BookMetadataFetchController;
 
   beforeEach(() => {
@@ -21,6 +23,7 @@ describe('BookMetadataFetchController', () => {
       setLibraryOverride: vi.fn(),
       getEffectiveConfig: vi.fn(),
       isPaused: vi.fn(),
+      listLibraryConfigs: vi.fn(),
     } as unknown as Mocked<BookMetadataFetchConfigService>;
 
     orchestrator = {
@@ -42,7 +45,30 @@ describe('BookMetadataFetchController', () => {
       getSnapshot: vi.fn(),
     } as unknown as Mocked<BookMetadataFetchSessionService>;
 
-    controller = new BookMetadataFetchController(configService, orchestrator, queueRepo, session);
+    preview = {
+      breakdown: vi.fn(),
+      previewBooks: vi.fn(),
+    } as unknown as Mocked<BookMetadataFetchPreviewService>;
+
+    controller = new BookMetadataFetchController(configService, orchestrator, queueRepo, session, preview);
+  });
+
+  it('lists library configs and proxies the preview endpoints with their scope', async () => {
+    const conditions = {
+      neverFetched: { enabled: true },
+      scoreThreshold: { enabled: false, threshold: 60 },
+      missingFields: { enabled: true, fields: ['cover' as const] },
+    };
+    configService.listLibraryConfigs.mockResolvedValueOnce([]);
+    preview.breakdown.mockResolvedValueOnce({ total: 3 } as never);
+    preview.previewBooks.mockResolvedValueOnce({ items: [], total: 0 });
+
+    await expect(controller.listLibraryConfigs()).resolves.toEqual([]);
+    await expect(controller.previewBreakdown({ conditions, libraryIds: [2, 6] })).resolves.toEqual({ total: 3 });
+    await expect(controller.previewBooks({ conditions, limit: 6 })).resolves.toEqual({ items: [], total: 0 });
+
+    expect(preview.breakdown).toHaveBeenCalledWith({ conditions, libraryIds: [2, 6] });
+    expect(preview.previewBooks).toHaveBeenCalledWith({ conditions, libraryIds: undefined }, 6);
   });
 
   it('clamps failed-item pagination inputs to safe bounds', async () => {

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Lock, LockOpen } from '@lucide/vue'
-import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, isComicFormat, type BookCard } from '@bookorbit/types'
 import BookTableCoverCell from './BookTableCoverCell.vue'
 import BookTableTextCell from './BookTableTextCell.vue'
 import BookTableNumberCell from './BookTableNumberCell.vue'
@@ -97,7 +97,7 @@ function handleToggleAllLocks() {
 
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const isComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 </script>
 
 <template>

@@ -8,12 +8,7 @@ import { useModifierKey } from '@/composables/useModifierKey'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
 import { useSettingsNavStatus } from '../composables/useSettingsNavStatus'
-import { visibleSettingsNav, type SettingsNavGroup, type SettingsNavItem } from '../lib/settings-nav'
-interface SearchHit {
-  item: SettingsNavItem
-  group: SettingsNavGroup
-  rank: number
-}
+import { searchSettingsNav, visibleSettingsNav, type SettingsNavItem, type SettingsNavSearchHit } from '../lib/settings-nav'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -97,33 +92,7 @@ function handleRowClick(item: SettingsNavItem): void {
   if (item.children?.length) toggleBranch(item)
 }
 
-function searchText(item: SettingsNavItem, group: SettingsNavGroup): string {
-  const description = item.descriptionKey ? t(item.descriptionKey) : ''
-  return `${t(item.labelKey)} ${description} ${item.keywords ?? ''} ${t(group.labelKey)}`.toLowerCase()
-}
-
-/** Leaf destinations only: a parent with children is never a navigation target on its own. */
-const searchableItems = computed<{ item: SettingsNavItem; group: SettingsNavGroup }[]>(() =>
-  groups.value.flatMap((group) =>
-    group.items.flatMap((item) => (item.children?.length ? item.children.map((child) => ({ item: child, group })) : [{ item, group }])),
-  ),
-)
-
-const results = computed<SearchHit[]>(() => {
-  const terms = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  if (terms.length === 0) return []
-  return searchableItems.value
-    .map(({ item, group }) => {
-      const haystack = searchText(item, group)
-      if (!terms.every((term) => haystack.includes(term))) return null
-      const label = t(item.labelKey).toLowerCase()
-      const lead = terms[0] ?? ''
-      const rank = label.startsWith(lead) ? 0 : label.includes(lead) ? 1 : 2
-      return { item, group, rank }
-    })
-    .filter((hit): hit is SearchHit => hit !== null)
-    .sort((a, b) => a.rank - b.rank)
-})
+const results = computed<SettingsNavSearchHit[]>(() => searchSettingsNav(groups.value, query.value, t))
 
 const isSearching = computed(() => query.value.trim().length > 0)
 

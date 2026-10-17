@@ -139,6 +139,37 @@ describe('DeliveryArtifactService', () => {
     await expect(service.prepare(source, 'original', original.sourceRevision)).rejects.toThrow();
     await original.release();
   });
+  it('reuses a verified source hash while the file is unchanged and rehashes it after a write', async () => {
+    const path = join(directory, 'source.epub');
+    await fixture(path, false);
+    const source = { id: 9, absolutePath: path, format: 'epub' };
+    const first = await service.prepare(source, 'original');
+    await first.release();
+    const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
+    let fullReads = 0;
+    vi.mocked(open).mockImplementation(async (...args: Parameters<typeof actual.open>) => {
+      const handle = await actual.open(...args);
+      const createReadStream = handle.createReadStream.bind(handle);
+      vi.spyOn(handle, 'createReadStream').mockImplementation((options) => {
+        fullReads++;
+        return createReadStream(options);
+      });
+      return handle;
+    });
+    try {
+      const again = await service.prepare(source, 'original', first.sourceRevision);
+      expect(again.sourceRevision).toBe(first.sourceRevision);
+      await again.release();
+      expect(fullReads).toBe(0);
+
+      await writeFile(path, 'rewritten in place');
+      await expect(service.prepare(source, 'original', first.sourceRevision)).rejects.toThrow();
+      expect(fullReads).toBe(1);
+    } finally {
+      vi.mocked(open).mockImplementation(actual.open);
+    }
+  });
+
   it('detects external replacement from the recorded source stat', async () => {
     const path = join(directory, 'source.epub');
     await fixture(path, false);

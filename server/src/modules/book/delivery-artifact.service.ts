@@ -16,6 +16,7 @@ import { inspectDeliveryEpub } from './epub-delivery-validation';
 
 const DELIVERY_DETECTOR_VERSION = 'overlay-inspection-v2';
 export const DELIVERY_TRANSFORM_VERSION = 'text-only-v2';
+const MAX_REMEMBERED_REVISIONS = 4096;
 export interface DeliverySource {
   id: number;
   absolutePath: string;
@@ -44,6 +45,10 @@ export class DeliveryArtifactService {
   private readonly root: string;
   private readonly appRoot: string;
   private readonly builds = new Map<string, Promise<Omit<DeliveryArtifact, 'release'>>>();
+  // A source's SHA-256 keyed by its file signature. Every Kobo sync that converts a position resolves
+  // the delivered artifact again, and re-reading a multi-gigabyte read-along each time outlasted the
+  // device's request timeout. Any write moves the signature's change time, so a stale entry never matches.
+  private readonly revisions = new Map<string, string>();
   private readonly leased = new Map<string, number>();
   private publication: Promise<void> = Promise.resolve();
   private active = 0;
@@ -109,13 +114,16 @@ export class DeliveryArtifactService {
               (source.ino !== undefined && source.ino !== (await handle.stat({ bigint: true })).ino))
           )
             throw new ConflictException({ code: 'DELIVERY_SOURCE_CHANGED' });
-          const sourceRevision = await digestHandle(handle);
+          const revisionKey = `${source.id}:${resolvedSource}:${deliveryFileSignature(before)}`;
+          const knownRevision = this.revisions.get(revisionKey);
+          const sourceRevision = knownRevision ?? (await digestHandle(handle));
           if (
             deliveryFileSignature(before) !== deliveryFileSignature(await handle.stat()) ||
             deliveryFileSignature(before) !== deliveryFileSignature(await stat(source.absolutePath))
           ) {
             throw new ConflictException({ code: 'DELIVERY_SOURCE_CHANGED' });
           }
+          this.rememberRevision(revisionKey, sourceRevision);
           if (expectedRevision && sourceRevision !== expectedRevision) throw new ConflictException({ code: 'DELIVERY_SOURCE_CHANGED' });
           const format = source.format?.toLowerCase() ?? 'unknown';
           const transform =
@@ -174,6 +182,12 @@ export class DeliveryArtifactService {
       if (next) next();
       else this.active--;
     }
+  }
+
+  private rememberRevision(key: string, revision: string): void {
+    this.revisions.delete(key);
+    this.revisions.set(key, revision);
+    if (this.revisions.size > MAX_REMEMBERED_REVISIONS) this.revisions.delete(this.revisions.keys().next().value!);
   }
 
   private async build(

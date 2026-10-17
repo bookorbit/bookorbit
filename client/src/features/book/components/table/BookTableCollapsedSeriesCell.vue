@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight, LibraryBig } from '@lucide/vue'
-import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, isComicFormat, type BookCard } from '@bookorbit/types'
 import BookCoverSurface from '../BookCoverSurface.vue'
 import BookTableChipsCell from './BookTableChipsCell.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -27,7 +27,7 @@ const bookCount = computed(() => collapsed.value.bookCount)
 const coverIds = computed(() => collapsed.value.coverBookIds.filter((id) => id > 0).slice(0, 4))
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const isComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 const { coverUrl } = useCoverVersions()
 
 function thumbnailUrl(bookId: number): string {

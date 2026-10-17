@@ -438,6 +438,23 @@ export type BooksPage = {
   size: number;
 };
 
+export type BookFormatFacet = {
+  format: BookFormat;
+  count: number;
+};
+
+/**
+ * Counts for a library's browse header, from the same query as its listing. `total` and the
+ * format counts are books, never collapsed-series cards. A format counts every book holding a
+ * file in it, which is how the `format` filter matches, and it is counted without the root-level
+ * format rule so picking one format still shows the others.
+ */
+export type LibraryBookFacets = {
+  total: number;
+  libraryTotal: number;
+  formats: BookFormatFacet[];
+};
+
 export type BookRecommendation = {
   id: number;
   title: string | null;

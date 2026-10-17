@@ -3,6 +3,8 @@ import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+import { djvuPageFixture } from '../../../test/e2e/djvu-fixture';
+
 import { UploadValidatorService } from './upload-validator.service';
 
 describe('UploadValidatorService', () => {
@@ -125,6 +127,7 @@ describe('UploadValidatorService', () => {
       ['kepub', Buffer.from([0x50, 0x4b, 0x03, 0x04])],
       ['cbz', Buffer.from([0x50, 0x4b, 0x03, 0x04])],
       ['pdf', Buffer.from('%PDF-1.7')],
+      ['djvu', djvuPageFixture()],
       ['cbr', Buffer.from('Rar!\x1a\x07\x01')],
       ['cb7', Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])],
       [

@@ -3,21 +3,7 @@ import { computed, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
-import {
-  ArrowUpDown,
-  Bookmark,
-  BookmarkCheck,
-  BookOpen,
-  CheckSquare,
-  FileSpreadsheet,
-  Filter,
-  Layers,
-  Search,
-  SlidersHorizontal,
-  Square,
-  Telescope,
-  X,
-} from '@lucide/vue'
+import { Bookmark, BookmarkCheck, BookOpen, FileSpreadsheet, Pencil, RefreshCw, Telescope, Upload, X } from '@lucide/vue'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import VirtualBookTable from '@/features/book/components/VirtualBookTable.vue'
@@ -26,9 +12,20 @@ import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
 import BookShuffleButton from '@/features/book/components/BookShuffleButton.vue'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import ViewHeader from '@/components/ViewHeader.vue'
+import BrowseHeader from '@/components/browse-header/BrowseHeader.vue'
+import BrowseSearchField from '@/components/browse-header/BrowseSearchField.vue'
+import BrowseSortControl from '@/components/browse-header/BrowseSortControl.vue'
+import BrowseFilterControl from '@/components/browse-header/BrowseFilterControl.vue'
+import BrowseInlineGroup from '@/components/browse-header/BrowseInlineGroup.vue'
+import FormatFacetChips from '@/components/browse-header/FormatFacetChips.vue'
+import BrowseViewControls from '@/components/browse-header/BrowseViewControls.vue'
+import BrowsePageMenu from '@/components/browse-header/BrowsePageMenu.vue'
+import BrowseScanButton from '@/components/browse-header/BrowseScanButton.vue'
+import { barDivider, outlineButton } from '@/components/browse-header/browse-header'
+import { cn } from '@/lib/utils'
+import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
+import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
@@ -50,8 +47,13 @@ import { useEffectiveSeriesCollapse } from '@/features/book/composables/useEffec
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useLiveScanBooks } from '@/features/scanner/composables/useLiveScanBooks'
-import ScanProgressBar from '@/features/scanner/components/ScanProgressBar.vue'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useLibraryScan } from '@/features/scanner/composables/useLibraryScan'
+import { useFilterTokens } from '@/features/book/composables/useFilterTokens'
+import { useLibraryFacets } from '@/features/library/composables/useLibraryFacets'
+import { useLibraryHeaderFacts } from '@/features/library/composables/useLibraryHeaderFacts'
+import { sortFieldLabel } from '@/features/book/lib/filter-labels'
+import { formatBytes } from '@/lib/formatting'
+import { formatRelativeTimeFromNow } from '@/i18n/formatters'
 import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -164,9 +166,9 @@ function getFilterKey(id: number) {
 
 const savedFilter = ref<GroupRule | undefined>(undefined)
 const hasSavedFilter = computed(() => savedFilter.value !== undefined)
-const isFilterSaved = computed(() => JSON.stringify(filter.value) === JSON.stringify(savedFilter.value))
+const isFilterSaved = computed(() => filter.value !== undefined && JSON.stringify(filter.value) === JSON.stringify(savedFilter.value))
 
-const { sortModel, isDefaultSort, sortSummary, resetSort } = useViewSort(sort, 'library', libraryId)
+const { sortModel, isDefaultSort, resetSort } = useViewSort(sort, 'library', libraryId)
 const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('library', libraryId)
 
 function handleSaveCurrentView(name: string) {
@@ -309,7 +311,6 @@ function forgetSavedFilter() {
 
 const { subscribeLibrary, getProgress, isScanning } = useScanProgress()
 const { newBookIds, start: startLiveScan, stop: stopLiveScan } = useLiveScanBooks(libraryId, books)
-const scanProgress = computed(() => (libraryId.value !== null ? getProgress(libraryId.value) : undefined))
 
 watch(
   libraryId,
@@ -325,7 +326,6 @@ watch(
 )
 
 const filterOpen = ref(false)
-const mobileControlsExpanded = ref(false)
 
 const localSortModel = computed({
   get: () => sortModel.value,
@@ -338,24 +338,121 @@ function handleResetSort() {
   resetSort()
 }
 
-const activeFilterCount = computed(() => filter.value?.rules?.length ?? 0)
-const mobileControlsBadgeCount = computed(() => activeFilterCount.value + (!isDefaultSort.value ? 1 : 0))
+const { tokens: filterTokens, selectedFormats, ruleCount: filterRuleCount, removeToken: removeFilterToken, toggleFormat } = useFilterTokens(filter)
+
+const { facets } = useLibraryFacets(libraryId, filter, debouncedQuery)
+const formatFacets = computed(() => facets.value?.formats ?? [])
+const showFormatFacets = computed(() => formatFacets.value.length > 1 || selectedFormats.value.length > 0)
+const selectedFormatsLabel = computed(() => (selectedFormats.value.length > 0 ? selectedFormats.value.map((f) => f.toUpperCase()).join(', ') : null))
+const isNarrowed = computed(() => filterRuleCount.value > 0 || debouncedQuery.value.trim().length > 0)
+
+const canManageLibraries = computed(() => hasPermission('manage_libraries'))
+const canUpload = computed(() => hasPermission('library_upload'))
+const canExport = computed(() => hasPermission('library_download') && !isDemoRestrictedAccount.value)
+const hasPageMenu = computed(() => canExport.value || ((canManageLibraries.value || canUpload.value) && currentLibrary.value !== undefined))
+
+const { sizeBytes, lastScanAt } = useLibraryHeaderFacts(libraryId, canManageLibraries)
+const libraryScanning = computed(() => libraryId.value !== null && isScanning(libraryId.value))
+
+interface HeaderFact {
+  key: string
+  text: string
+}
+
+const headerFacts = computed<HeaderFact[]>(() => {
+  const facts: HeaderFact[] = []
+  const libraryTotal = facets.value?.libraryTotal ?? currentLibrary.value?.bookCount ?? null
+  if (libraryTotal !== null) {
+    if (isNarrowed.value && facets.value) {
+      facts.push({
+        key: 'count',
+        text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(facets.value.total), total: libraryTotal }),
+      })
+    } else {
+      facts.push({ key: 'count', text: t('components.browseHeader.facts.books', { count: libraryTotal }) })
+    }
+  }
+  if (sizeBytes.value !== null && sizeBytes.value > 0) facts.push({ key: 'size', text: formatBytes(sizeBytes.value) })
+  const progress = libraryId.value !== null ? getProgress(libraryId.value) : undefined
+  if (libraryScanning.value && progress && !canManageLibraries.value) {
+    facts.push({
+      key: 'scan',
+      text: t('components.browseHeader.facts.scanningProgress', { processed: formatNumber(progress.processed), total: formatNumber(progress.total) }),
+    })
+  } else if (lastScanAt.value && canManageLibraries.value && !libraryScanning.value) {
+    facts.push({ key: 'scan', text: t('components.browseHeader.facts.scanned', { time: formatRelativeTimeFromNow(lastScanAt.value) }) })
+  }
+  return facts
+})
+
+const foldedCount = computed(() => {
+  const value = isNarrowed.value && facets.value ? facets.value.total : (facets.value?.libraryTotal ?? currentLibrary.value?.bookCount)
+  return value === undefined ? undefined : formatNumber(value)
+})
+
+const sortLabel = computed(() => (sort.value[0] ? sortFieldLabel(sort.value[0].field) : ''))
+const sortDirection = computed<'asc' | 'desc'>(() => sort.value[0]?.dir ?? 'asc')
+
+function toggleSortDirection() {
+  const [first, ...rest] = sort.value
+  if (!first) return
+  localSortModel.value = [{ ...first, dir: first.dir === 'asc' ? 'desc' : 'asc' }, ...rest]
+}
 
 function clearFilters() {
   filter.value = undefined
   forgetSavedFilter()
 }
 
-function toggleMobileControls() {
-  mobileControlsExpanded.value = !mobileControlsExpanded.value
+function handleClearAll() {
+  clearFilters()
+  clearSearch()
 }
 
-function toggleFilterPanel() {
-  filterOpen.value = !filterOpen.value
+function openFilterPanel() {
+  filterOpen.value = true
 }
 
-function closeFilterPanel() {
+function openSaveAsSmartScope() {
   filterOpen.value = false
+  saveAsSmartScopeOpen.value = true
+}
+
+const uploadOpen = ref(false)
+
+function openUpload() {
+  uploadOpen.value = true
+}
+
+function closeUpload() {
+  uploadOpen.value = false
+}
+
+const { scanLibrary } = useLibraryScan()
+
+function handleMenuScan() {
+  if (currentLibrary.value) void scanLibrary(currentLibrary.value)
+}
+
+function openLibrarySettings() {
+  if (libraryId.value === null) return
+  void router.push({ name: 'settings-libraries', query: { edit: String(libraryId.value) } })
+}
+
+function openAllMatchingExport() {
+  openMetadataExport('all-matching')
+}
+
+function handleCoverSizeUpdate(value: number) {
+  coverSize.value = value
+}
+
+function handleGridGapUpdate(value: number) {
+  gridGap.value = value
+}
+
+function handleShowJumpRailsUpdate(value: boolean) {
+  showJumpRails.value = value
 }
 
 const { sentinel } = useInfiniteScrollSentinel({
@@ -576,16 +673,9 @@ function hasAddOrRemoveFields(fields: BulkEditFields): boolean {
   return [fields.authors, fields.genres, fields.tags, fields.narrators].some((f) => f && f.mode !== 'replace')
 }
 
-const collapseToggleLabel = computed(() => (effectiveCollapseEnabled.value ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')))
-const collapseToggleHint = computed(() => (selectionMode.value ? t('views.bookView.collapseLockedWhileSelecting') : collapseToggleLabel.value))
-const collapseMenuLabel = computed(() =>
-  selectionMode.value ? t('views.bookView.collapseLockedWhileSelecting') : t('views.bookView.collapseSeries'),
-)
-
-async function handleToggleCollapse() {
+async function handleCollapseSeriesUpdate(next: boolean) {
   if (selectionMode.value) return
   if (libraryId.value === null) return
-  const next = !collapseEnabledRef.value
   collapseEnabledRef.value = next
   await setPreference({ libraryId: libraryId.value }, next)
 }
@@ -596,316 +686,192 @@ defineOptions({ name: 'HomeView' })
 <template>
   <div class="flex h-full flex-col">
     <section class="flex flex-1 flex-col min-h-0">
-      <ViewHeader
+      <BrowseHeader
+        :eyebrow="t('components.browseHeader.eyebrow.library')"
         :title="title"
         :icon="libraryIcon"
         fallback-icon="BookOpen"
-        :total="total"
-        v-model:coverSize="coverSize"
-        v-model:gridGap="gridGap"
-        :show-jump-rail-toggle="true"
-        v-model:showJumpRails="showJumpRails"
-        v-model:viewMode="viewMode"
-        :selection-mode="selectionMode"
-        :searchable="true"
-        :mobile-search-in-menu="false"
-        v-model:searchQuery="searchQuery"
-        @toggle-selection="toggleSelectionMode"
+        :folded-count="foldedCount"
+        :switcher="libraryId !== null ? { kind: 'library', id: libraryId } : null"
+        :scroll-container="mainRef"
       >
-        <template #toolbar>
-          <div v-if="effectiveViewMode !== 'table'" class="hidden sm:flex items-center gap-1">
-            <Popover>
-              <PopoverTrigger as-child>
-                <button
-                  class="flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-                  :class="
-                    !isDefaultSort
-                      ? 'border-primary text-primary bg-primary/10'
-                      : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                  "
-                >
-                  <ArrowUpDown :size="13" />
-                  <span class="hidden lg:inline">{{ sortSummary }}</span>
-                  <span class="lg:hidden"
-                    >{{ t('views.bookView.sort') }}<template v-if="!isDefaultSort"> ({{ sort.length }})</template></span
-                  >
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" class="w-80 p-3">
-                <BookSortBuilder v-model="localSortModel" />
-              </PopoverContent>
-            </Popover>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="!isDefaultSort"
-                  @click="handleResetSort"
-                  :aria-label="t('common.resetSortAria')"
-                  class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <X :size="13" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ t('views.bookView.resetSort') }}</TooltipContent>
-            </Tooltip>
-          </div>
-          <BookShuffleButton v-if="randomSortActive" desktop-only compact @shuffle="reshuffle" />
-          <div class="hidden sm:block w-px h-5 bg-border shrink-0" />
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-                :class="
-                  effectiveCollapseEnabled
-                    ? 'border-primary text-primary bg-primary/10'
-                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                "
-                :aria-label="collapseToggleLabel"
-                :aria-disabled="selectionMode || undefined"
-                @click="handleToggleCollapse"
-              >
-                <Layers :size="14" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ collapseToggleHint }}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
-                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
-                :aria-label="t('views.bookView.exportMetadata')"
-                @click="openMetadataExport('all-matching')"
-              >
-                <FileSpreadsheet :size="14" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('views.bookView.exportMetadata') }}</TooltipContent>
-          </Tooltip>
-          <button
-            @click="toggleFilterPanel"
-            class="hidden sm:flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-            :class="
-              activeFilterCount > 0
-                ? 'border-primary text-primary bg-primary/10'
-                : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-            "
-          >
-            <Filter :size="13" />
-            <span>{{ t('views.bookView.filters') }}</span>
-            <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
-          </button>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                v-if="activeFilterCount > 0"
-                @click="clearFilters"
-                class="hidden sm:flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <X :size="13" />
-                {{ t('views.bookView.clear') }}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('views.bookView.clearAllFilters') }}</TooltipContent>
-          </Tooltip>
+        <template #facts>
+          <template v-for="(fact, index) in headerFacts" :key="fact.key">
+            <span v-if="index > 0" class="size-[3px] shrink-0 rounded-full bg-muted-foreground" aria-hidden="true" />
+            <span class="truncate" :class="fact.key === 'count' ? 'shrink-0' : ''">{{ fact.text }}</span>
+          </template>
+        </template>
 
-          <button
-            class="sm:hidden relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
-            :class="
-              mobileControlsExpanded
-                ? 'border-primary text-primary bg-primary/10'
-                : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-            "
-            :aria-label="t('views.bookView.showControlsAria')"
-            @click="toggleMobileControls"
-          >
-            <SlidersHorizontal :size="14" />
-            <span
-              v-if="mobileControlsBadgeCount > 0"
-              class="absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
-            >
-              {{ mobileControlsBadgeCount }}
-            </span>
+        <template #actions>
+          <BrowseScanButton v-if="canManageLibraries && currentLibrary" class="hidden md:inline-flex" :library="currentLibrary" />
+          <button v-if="canUpload && currentLibrary" type="button" :class="cn(outlineButton, 'hidden md:inline-flex')" @click="openUpload">
+            <Upload :size="14" class="text-muted-foreground" aria-hidden="true" />
+            {{ t('book.detail.addFile.upload') }}
           </button>
+          <BrowsePageMenu v-if="hasPageMenu" :name="title">
+            <DropdownMenuItem v-if="canManageLibraries && currentLibrary" class="md:hidden" @click="handleMenuScan">
+              <RefreshCw :size="14" class="mr-2" />
+              {{ t('settings.admin.libraries.scan') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="canUpload && currentLibrary" class="md:hidden" @click="openUpload">
+              <Upload :size="14" class="mr-2" />
+              {{ t('components.browseHeader.menu.upload') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="canExport" @click="openAllMatchingExport">
+              <FileSpreadsheet :size="14" class="mr-2" />
+              {{ t('views.bookView.exportMetadata') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="canManageLibraries && currentLibrary" @click="openLibrarySettings">
+              <Pencil :size="14" class="mr-2" />
+              {{ t('settings.admin.libraries.editLibrary') }}
+            </DropdownMenuItem>
+          </BrowsePageMenu>
         </template>
-        <template #mobile-menu>
-          <DropdownMenuItem :disabled="selectionMode" @click="handleToggleCollapse">
-            <CheckSquare v-if="effectiveCollapseEnabled" :size="14" class="mr-2" />
-            <Square v-else :size="14" class="mr-2" />
-            {{ collapseMenuLabel }}
-          </DropdownMenuItem>
-        </template>
-        <template v-if="effectiveViewMode === 'table'" #columns>
-          <TableColumnPanel
-            v-if="tableRef"
-            :all-columns="tableRef.allColumns"
-            :all-presets="tableRef.allPresets"
-            :saved-views="allSavedViews"
-            :table-density="tableDensity"
-            @toggle-column="handleToggleColumn"
-            @reorder-columns="handleColumnPanelReorder"
-            @apply-preset="handleApplyTablePreset"
-            @save-preset="handleSaveTablePreset"
-            @delete-preset="handleDeleteTablePreset"
-            @rename-preset="handleRenameTablePreset"
-            @duplicate-preset="handleDuplicateTablePreset"
-            @favorite-preset="handleTogglePresetFavorite"
-            @apply-view="handleApplySavedView"
-            @save-view="handleSaveCurrentView"
-            @delete-view="handleDeleteSavedView"
-            @rename-view="handleRenameSavedView"
-            @duplicate-view="handleDuplicateSavedView"
-            @favorite-view="handleToggleSavedViewFavorite"
-            @update:density="handleTableDensityChange"
-            @export-backup="handleExportTableBackup"
-            @import-backup="handleImportTableBackup"
-            @reset="handleResetColumns"
-          />
-        </template>
-      </ViewHeader>
 
-      <section v-if="mobileControlsExpanded" class="mb-3 space-y-2 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
-        <div class="flex h-9 items-center rounded-md border border-input bg-background px-2.5">
-          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground" />
-          <input
+        <template #bar>
+          <BrowseSearchField
             v-model="searchQuery"
-            type="search"
             :placeholder="t('views.bookView.searchPlaceholder')"
-            class="mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            :tokens="filterTokens"
+            :active="isNarrowed"
+            can-save-as-smart-scope
+            can-save-filter
+            :filter-saved="isFilterSaved"
+            @remove-token="removeFilterToken"
+            @clear="handleClearAll"
+            @save-as-smart-scope="openSaveAsSmartScope"
+            @save-filter="saveFilter"
+            @open-filters="openFilterPanel"
           />
-          <button v-if="searchQuery.trim()" class="ml-1 text-muted-foreground transition-colors hover:text-foreground" @click="clearSearch">
-            <X :size="12" />
-          </button>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <Popover>
-            <PopoverTrigger as-child>
-              <button
-                class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
-                :class="
-                  !isDefaultSort
-                    ? 'border-primary text-primary bg-primary/10'
-                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                "
-              >
-                <ArrowUpDown :size="13" />
-                <span>{{ t('views.bookView.sort') }}</span>
-                <span v-if="!isDefaultSort" class="rounded-full border border-primary/40 px-1 py-0.5 text-[10px] font-semibold leading-none">{{
-                  t('views.bookView.sortOn')
-                }}</span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" class="w-80 p-3">
-              <BookSortBuilder v-model="localSortModel" />
-            </PopoverContent>
-          </Popover>
-
-          <button
-            v-if="!isDefaultSort"
-            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive hover:bg-destructive/10"
-            @click="handleResetSort"
+          <span :class="barDivider" aria-hidden="true" />
+          <BrowseSortControl
+            v-if="effectiveViewMode !== 'table'"
+            :label="sortLabel"
+            :direction="sortDirection"
+            :changed="!isDefaultSort"
+            @toggle-direction="toggleSortDirection"
           >
-            <X :size="13" />
-          </button>
-
-          <BookShuffleButton v-if="randomSortActive" @shuffle="reshuffle" />
-
-          <button
-            @click="toggleFilterPanel"
-            class="flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-sm transition-colors"
-            :class="
-              activeFilterCount > 0
-                ? 'border-primary text-primary bg-primary/10'
-                : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-            "
-          >
-            <Filter :size="13" />
-            <span>{{ t('views.bookView.filters') }}</span>
-            <span v-if="activeFilterCount > 0" class="rounded-full bg-primary/10 px-1 py-0.5 text-[10px] font-semibold leading-none">
-              {{ activeFilterCount }}
-            </span>
-          </button>
-
-          <button
-            v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
-            class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            @click="openMetadataExport('all-matching')"
-          >
-            <FileSpreadsheet :size="13" />
-            <span>{{ t('views.bookView.export') }}</span>
-          </button>
-
-          <button
-            v-if="activeFilterCount > 0"
-            @click="clearFilters"
-            class="h-8 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
-          >
-            {{ t('views.bookView.clear') }}
-          </button>
-        </div>
-      </section>
-
-      <!-- Filter builder panel rendered outside <main> so it stays anchored when the list is scrolled -->
-      <div v-if="filterOpen && !libraryNotFound" class="mb-4 p-3 rounded-md border border-border bg-card">
-        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-xs font-medium text-muted-foreground sm:shrink-0">{{ t('views.library.filterRules') }}</span>
-          <div class="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:flex-nowrap">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="activeFilterCount > 0"
-                  @click="saveAsSmartScopeOpen = true"
-                  class="flex min-h-7 items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Telescope :size="13" />
-                  <span class="hidden sm:inline whitespace-nowrap">{{ t('views.library.saveAsSmartScope') }}</span>
-                  <span class="sm:hidden whitespace-nowrap">{{ t('views.library.saveScope') }}</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ t('views.library.saveAsSmartScopeTooltip') }}</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="activeFilterCount > 0"
-                  @click="saveFilter"
-                  class="flex min-h-7 items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap"
-                  :class="
-                    isFilterSaved
-                      ? 'border-primary/40 text-primary bg-primary/8'
-                      : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
-                  "
-                >
-                  <BookmarkCheck v-if="isFilterSaved" :size="13" />
-                  <Bookmark v-else :size="13" />
-                  {{ isFilterSaved ? t('views.library.saved') : t('views.library.saveFilter') }}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ isFilterSaved ? t('views.library.filterSaved') : t('views.library.saveFilterTooltip') }}</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  v-if="hasSavedFilter"
-                  @click="forgetSavedFilter"
-                  class="h-6 w-6 flex items-center justify-center rounded-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <X :size="11" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{ t('views.library.removeSavedFilter') }}</TooltipContent>
-            </Tooltip>
+            <BookSortBuilder v-model="localSortModel" />
             <button
-              class="min-h-7 whitespace-nowrap rounded-md border border-input px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              @click="closeFilterPanel"
+              v-if="!isDefaultSort"
+              type="button"
+              class="mt-3 w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              @click="handleResetSort"
             >
-              {{ t('common.close') }}
+              {{ t('views.bookView.resetSort') }}
             </button>
-          </div>
-        </div>
-        <BookFilterBuilder v-model="filter" />
-      </div>
+          </BrowseSortControl>
+          <BookShuffleButton v-if="randomSortActive" desktop-only compact @shuffle="reshuffle" />
+          <BrowseFilterControl v-model:open="filterOpen" :count="filterRuleCount">
+            <BookFilterBuilder v-model="filter" />
+            <template v-if="filterRuleCount > 0 || hasSavedFilter" #footer>
+              <button
+                v-if="filterRuleCount > 0"
+                type="button"
+                class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="filterRuleCount === 0"
+                @click="openSaveAsSmartScope"
+              >
+                <Telescope :size="13" class="text-muted-foreground" aria-hidden="true" />
+                {{ t('views.library.saveAsSmartScope') }}
+              </button>
+              <button
+                v-if="filterRuleCount > 0"
+                type="button"
+                class="inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                :class="isFilterSaved ? 'border-primary/40 bg-primary/8 text-primary' : 'border-input text-foreground hover:bg-muted'"
+                :disabled="filterRuleCount === 0"
+                @click="saveFilter"
+              >
+                <BookmarkCheck v-if="isFilterSaved" :size="13" aria-hidden="true" />
+                <Bookmark v-else :size="13" class="text-muted-foreground" aria-hidden="true" />
+                {{ isFilterSaved ? t('views.library.saved') : t('views.library.saveFilter') }}
+              </button>
+              <button
+                v-if="hasSavedFilter"
+                type="button"
+                class="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:text-destructive"
+                @click="forgetSavedFilter"
+              >
+                <X :size="12" aria-hidden="true" />
+                {{ t('views.library.removeSavedFilter') }}
+              </button>
+              <span class="flex-1" />
+              <button
+                v-if="filterRuleCount > 0"
+                type="button"
+                class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive"
+                @click="clearFilters"
+              >
+                {{ t('views.bookView.clearAllFilters') }}
+              </button>
+            </template>
+          </BrowseFilterControl>
+          <template v-if="showFormatFacets">
+            <span :class="barDivider" aria-hidden="true" />
+            <BrowseInlineGroup
+              :label="t('components.browseHeader.facets.format')"
+              :value="selectedFormatsLabel"
+              :active="selectedFormats.length > 0"
+              hide-on-phone
+            >
+              <FormatFacetChips :facets="formatFacets" :selected="selectedFormats" @toggle="toggleFormat" />
+            </BrowseInlineGroup>
+          </template>
+          <span :class="barDivider" aria-hidden="true" />
+          <BrowseViewControls
+            v-model:view-mode="viewMode"
+            :selection-mode="selectionMode"
+            :display-wide="effectiveViewMode === 'table'"
+            @toggle-selection="toggleSelectionMode"
+          >
+            <template #display>
+              <ViewHeaderDisplayControls
+                :view-mode="effectiveViewMode"
+                :cover-size="coverSize"
+                :grid-gap="gridGap"
+                show-jump-rail-toggle
+                :show-jump-rails="showJumpRails"
+                show-collapse-series
+                :collapse-series="effectiveCollapseEnabled"
+                :collapse-series-locked="selectionMode"
+                @update:cover-size="handleCoverSizeUpdate"
+                @update:grid-gap="handleGridGapUpdate"
+                @update:show-jump-rails="handleShowJumpRailsUpdate"
+                @update:collapse-series="handleCollapseSeriesUpdate"
+              >
+                <template #columns>
+                  <TableColumnPanel
+                    v-if="tableRef"
+                    :all-columns="tableRef.allColumns"
+                    :all-presets="tableRef.allPresets"
+                    :saved-views="allSavedViews"
+                    :table-density="tableDensity"
+                    @toggle-column="handleToggleColumn"
+                    @reorder-columns="handleColumnPanelReorder"
+                    @apply-preset="handleApplyTablePreset"
+                    @save-preset="handleSaveTablePreset"
+                    @delete-preset="handleDeleteTablePreset"
+                    @rename-preset="handleRenameTablePreset"
+                    @duplicate-preset="handleDuplicateTablePreset"
+                    @favorite-preset="handleTogglePresetFavorite"
+                    @apply-view="handleApplySavedView"
+                    @save-view="handleSaveCurrentView"
+                    @delete-view="handleDeleteSavedView"
+                    @rename-view="handleRenameSavedView"
+                    @duplicate-view="handleDuplicateSavedView"
+                    @favorite-view="handleToggleSavedViewFavorite"
+                    @update:density="handleTableDensityChange"
+                    @export-backup="handleExportTableBackup"
+                    @import-backup="handleImportTableBackup"
+                    @reset="handleResetColumns"
+                  />
+                </template>
+              </ViewHeaderDisplayControls>
+            </template>
+          </BrowseViewControls>
+        </template>
+      </BrowseHeader>
 
       <main ref="mainRef" :class="effectiveViewMode === 'table' ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto'">
         <EntityNotFound v-if="libraryNotFound" :entity="t('views.entity.library')" />
@@ -913,11 +879,9 @@ defineOptions({ name: 'HomeView' })
         <template v-else>
           <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
 
-          <ScanProgressBar :progress="scanProgress" class="mb-3" />
-
           <!-- Empty state: no matches with filters -->
           <div
-            v-if="booksInitialized && !loading && books.length === 0 && activeFilterCount > 0"
+            v-if="booksInitialized && !loading && books.length === 0 && filterRuleCount > 0"
             class="flex flex-col items-center justify-center py-24 gap-3 text-center"
           >
             <p class="text-sm font-medium text-foreground">{{ t('views.library.empty.noFilterMatch') }}</p>
@@ -991,7 +955,7 @@ defineOptions({ name: 'HomeView' })
             :selection-mode="selectionMode"
             :is-selected="isSelected"
             :selected-count="selectedCount"
-            :filter-active="activeFilterCount > 0"
+            :filter-active="filterRuleCount > 0"
             :initialized="booksInitialized"
             @update:sort="localSortModel = $event"
             :allow-move-to-library="true"
@@ -1129,22 +1093,8 @@ defineOptions({ name: 'HomeView' })
 
     <SaveAsSmartScopeDialog :open="saveAsSmartScopeOpen" :filter="filter" :sort="sort" @close="saveAsSmartScopeOpen = false" />
 
+    <BookUploadModal v-if="uploadOpen && libraryId !== null" :library-id="libraryId" @close="closeUpload" @uploaded="closeUpload" />
+
     <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
   </div>
 </template>
-
-<style scoped>
-.mobile-search-input::-webkit-search-decoration,
-.mobile-search-input::-webkit-search-cancel-button,
-.mobile-search-input::-webkit-search-results-button,
-.mobile-search-input::-webkit-search-results-decoration {
-  -webkit-appearance: none;
-}
-
-.mobile-search-input::-ms-clear,
-.mobile-search-input::-ms-reveal {
-  display: none;
-  width: 0;
-  height: 0;
-}
-</style>

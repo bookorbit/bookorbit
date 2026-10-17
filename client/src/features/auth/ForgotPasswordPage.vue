@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ArrowLeft, CircleAlert, Mail } from '@lucide/vue'
 import { api } from '@/lib/api'
-import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
-import AuthAppearanceToolbar from './components/AuthAppearanceToolbar.vue'
+import AuthAlert from './components/AuthAlert.vue'
+import AuthField from './components/AuthField.vue'
+import AuthPlate from './components/AuthPlate.vue'
+import AuthSubmit from './components/AuthSubmit.vue'
 
 const { t } = useI18n()
 const email = ref('')
@@ -34,61 +37,23 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="login-bg min-h-screen flex flex-col items-center justify-center gap-3 px-4 overflow-hidden">
-    <AuthAppearanceToolbar placement="bottom" />
+  <AuthPlate :heading="t('auth.forgotPassword.subtitle')">
+    <AuthAlert v-if="submitted" tone="notice" :icon="Mail">{{ t('auth.forgotPassword.submitted') }}</AuthAlert>
 
-    <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
-      <div class="text-center mb-8">
-        <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
-        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.forgotPassword.subtitle') }}</p>
-      </div>
+    <form v-else class="flex flex-col gap-[1.125rem]" @submit.prevent="handleSubmit">
+      <AuthAlert v-if="error" :icon="CircleAlert">{{ error }}</AuthAlert>
+      <AuthField id="email" v-model="email" :label="t('auth.fields.emailAddress')" type="email" autocomplete="email" required :disabled="loading" />
+      <AuthSubmit :label="t('auth.forgotPassword.sendResetLink')" :loading-label="t('auth.forgotPassword.sending')" :loading="loading" />
+    </form>
 
-      <div v-if="submitted" class="rounded-md border border-border bg-card/60 backdrop-blur-sm p-4 text-sm text-foreground">
-        {{ t('auth.forgotPassword.submitted') }}
-      </div>
-
-      <form v-else @submit.prevent="handleSubmit" class="space-y-4">
-        <div class="space-y-1.5">
-          <label for="email" class="text-sm font-medium text-foreground">{{ t('auth.fields.emailAddress') }}</label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            autocomplete="email"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
-
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {{ loading ? t('auth.forgotPassword.sending') : t('auth.forgotPassword.sendResetLink') }}
-        </button>
-      </form>
-
-      <p class="mt-4 text-center text-sm text-muted-foreground">
-        <RouterLink to="/login" class="text-primary hover:underline">{{ t('auth.backToSignIn') }}</RouterLink>
-      </p>
-    </div>
-    <PublicLegalNotices />
-  </div>
+    <p class="mt-[1.375rem] text-center font-serif text-[0.9375rem] text-muted-foreground">
+      <RouterLink
+        to="/login"
+        class="inline-flex items-center gap-1.5 font-medium text-primary hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
+        <ArrowLeft :size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+        {{ t('auth.backToSignIn') }}
+      </RouterLink>
+    </p>
+  </AuthPlate>
 </template>
-
-<style scoped>
-.login-bg {
-  position: relative;
-}
-
-.login-card {
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--elevation-xl);
-}
-</style>

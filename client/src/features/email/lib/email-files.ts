@@ -5,7 +5,7 @@ import { hasReadAlong } from '@/features/book/lib/file-capabilities'
 
 /** What Amazon's Send to Kindle takes by email since 2023, among the formats a recipient can prefer. */
 export const KINDLE_EMAIL_FORMATS = ['epub', 'pdf'] as const
-export const RECIPIENT_FORMATS = ['epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr'] as const
+export const RECIPIENT_FORMATS = ['epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'djvu'] as const
 
 const MB = 1024 * 1024
 const KINDLE_LIMIT_BYTES = 50 * MB

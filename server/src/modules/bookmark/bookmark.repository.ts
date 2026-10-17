@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookmarks, type BookmarkRow, type NewBookmark } from '../../db/schema';
+import { bookmarks, type BookmarkOrigin, type BookmarkRow, type NewBookmark } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -14,6 +14,8 @@ export interface DeviceBookmarkFields {
   title: string;
   devicePos: string;
   pageno: number | null;
+  /** The device family the bookmark came from; KOReader when omitted. */
+  origin?: BookmarkOrigin;
 }
 
 @Injectable()
@@ -175,7 +177,7 @@ export class BookmarkRepository {
         bookId,
         cfi: fields.cfi,
         title: fields.title,
-        origin: 'koreader',
+        origin: fields.origin ?? 'koreader',
         devicePos: fields.devicePos,
         pageno: fields.pageno,
       })

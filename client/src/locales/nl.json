@@ -107,9 +107,51 @@
       },
       "theme": {
         "title": "Thema",
+        "style": {
+          "label": "CSS",
+          "hint": "Het algehele uiterlijk van de app. Modus, accent, hoeken en achtergrond behouden hun instellingen.",
+          "bookorbit": {
+            "label": "Boekenorbit",
+            "description": "Tinted oppervlakken, glazen panelen en serif headings."
+          },
+          "nostalgia": {
+            "label": "Nostalgia",
+            "description": "Neutrale gronden, systeemtype, platte panelen en een top gloed."
+          }
+        },
         "colorScheme": {
           "label": "Kleurenschema",
           "hint": "Lichte of donkere interface"
+        },
+        "surfacePalette": {
+          "label": "Oppervlak",
+          "hint": "Het neutrale terrein achter panelen en kaarten.",
+          "palettes": {
+            "onyx": "Onyx",
+            "carbon": "Koolstof",
+            "neutral": "Neutraal",
+            "zinc": "Zink",
+            "iron": "IJzer",
+            "steel": "Staal",
+            "ash": "As",
+            "smoke": "Rook",
+            "charcoal": "Houtskool",
+            "slate": "Schrijfplaat",
+            "midnight-blue": "Middernacht blauw",
+            "ocean": "Oceaan",
+            "pine": "Pijn",
+            "olive": "Olijf",
+            "stone": "Steen",
+            "sepia": "Sepia",
+            "crimson": "Donkerrood",
+            "plum": "Pruim"
+          }
+        },
+        "topGlow": {
+          "label": "Top gloed",
+          "hint": "Hoe ver het accent gloed de pagina bereikt. Schuif helemaal naar links om het uit te schakelen.",
+          "value": "{value}%",
+          "off": "UIT"
         },
         "accents": {
           "grey": "Grijs",
@@ -183,7 +225,13 @@
         },
         "cornerRadius": {
           "label": "Hoekafronding",
-          "hint": "Afronding van kaarten en UI-elementen"
+          "hint": "Afronding van kaarten en UI-elementen",
+          "options": {
+            "sharp": "Scherp",
+            "default": "Standaard",
+            "rounded": "Afgerond",
+            "pill": "Pill"
+          }
         },
         "surfaceBrightness": {
           "label": "Oppervlaktehelderheid",
@@ -202,7 +250,8 @@
           "structural": "Structureel",
           "ambient": "Sfeervol",
           "refractive": "Refractief"
-        }
+        },
+        "syncSaveFailed": "Thema voorkeuren opslaan mislukt"
       },
       "storage": {
         "title": "Waar weergavevoorkeuren opslaan",
@@ -233,6 +282,21 @@
           "hint": "Kies de bron die standaard wordt geselecteerd wanneer Omslag online zoeken wordt geopend. Dit wordt in je account opgeslagen en geldt dus op elk apparaat.",
           "loadError": "Kan de standaardomslagzoeker niet laden",
           "saveError": "Kan de standaardomslagzoeker niet opslaan"
+        },
+        "placeholderStyle": {
+          "title": "Stijl plaatshouder",
+          "hint": "Boeken zonder omslagkunst worden getekend in deze stijl.",
+          "options": {
+            "bauhaus": "Bauhaus",
+            "constructivist": "Constructivist",
+            "memphis": "Memphis",
+            "clothbound": "Kladgebonden",
+            "poster": "Poster",
+            "aurora": "Aurora",
+            "vista": "Tarief",
+            "marbled": "Gemarkeerd",
+            "paperback": "Papieren"
+          }
         },
         "displayMode": {
           "title": "Weergavemodus omslag",
@@ -1216,6 +1280,11 @@
             "portrait": "2:3 portret",
             "square": "1:1 vierkant"
           },
+          "gridShape": "Raster vorm",
+          "gridShapeValue": {
+            "tall": "Hoog cellen",
+            "square": "Vierkante cellen"
+          },
           "none": "Geen",
           "allSupported": "Alles ondersteund",
           "patternCount": "{count, plural, one {# patroon} other {# patronen}}",
@@ -1518,7 +1587,132 @@
         "subtitle": "Upload lettertypen die elke gebruiker kan kiezen in de eBook-lezer, zonder zijn eigen lettertypen te uploaden.",
         "listLabel": "Serverlettertypen",
         "noFontsYet": "Nog geen serverlettertypen",
-        "noFontsHint": "Lettertypen die je hier toevoegt, verschijnen in de lezer van elke gebruiker."
+        "noFontsHint": "Lettertypen die je hier toevoegt, verschijnen in de lezer van elke gebruiker.",
+        "addFonts": "Lettertypen toevoegen",
+        "filterLabel": "Families filteren",
+        "filterPlaceholder": "Families filteren",
+        "filterClear": "Filter wissen",
+        "noMatches": "Geen families met \"{query}\"",
+        "previewLabel": "Voorbeeld tekst",
+        "previewPlaceholder": "Typ om het in elke familie te bekijken",
+        "previewSize": "Voorbeeld grootte",
+        "previewSizeOption": "{size} px",
+        "familiesUnit": "{count, plural, one {family} other {families}}",
+        "filesOfMax": "{count} van {max} bestanden",
+        "onDisk": "{size} op schijf",
+        "columns": {
+          "family": "Familie",
+          "specimen": "Specimen",
+          "styles": "Styles",
+          "readers": "Lezers"
+        },
+        "fileSummary": "{count, plural, one {# bestand} other {# bestanden}} · {size}",
+        "newBadge": "Nieuw",
+        "styles": {
+          "single": "Alleen {style}",
+          "many": "{count} styles",
+          "manyNoItalics": "{count} styles, no italics"
+        },
+        "facts": {
+          "books": "{count, plural, one {Op # boek} other {Op # boeken}}",
+          "booksDetail": "{books, plural, one {Zet op # boek} other {Zet op # boeken}} door {readers, plural, one {# lezer} other {# lezers}}",
+          "defaults": "{count, plural, one {Standaard voor # lezer} other {Standaard voor # lezers}}",
+          "hidden": "{count, plural, one {Verborgen door # lezer} other {Verborgen door # lezers}}"
+        },
+        "moreActions": "Meer voor {name}",
+        "menu": {
+          "rename": "Familie hernoemen",
+          "addFiles": "Bestanden toevoegen",
+          "remove": "Lettertypefamilie verwijderen…"
+        },
+        "footerHint": "Elke lezer ziet deze in de lettertypelijst van de lezer en kan ze verbergen onder Reader mod_Fonts.",
+        "empty": {
+          "dropHint": "of laat bestanden ergens op deze pagina vallen",
+          "tip": "Een familie leest het beste als vier bestanden: Regulier, Italiaans, Vetgedrukt en Vetgedrukt Italië. Een bestand met variabele kan voor elk gewicht staan."
+        },
+        "drop": {
+          "title": "{count, plural, one {Drop om # bestand toe te voegen voor elke lezer} other {Drop om # bestanden toe te voegen voor elke lezer}}"
+        },
+        "upload": {
+          "ariaLabel": "Bezig met uploaden",
+          "title": "{count, plural, one {Toevoegen # bestand} other {Toevoegen # bestanden}}",
+          "progress": "{done} van {total} gedaan",
+          "addedCount": "{count} toegevoegd",
+          "duplicateCount": "{count} is al hier",
+          "refusedCount": "{count} niet toegevoegd",
+          "dismiss": "Uitschakelen",
+          "newFamily": "nieuwe familie",
+          "states": {
+            "queued": "Wachten",
+            "uploading": "Uploaden",
+            "added": "Toegevoegd",
+            "duplicate": "Al op de server",
+            "refused": "Niet toegevoegd",
+            "failed": "Mislukt"
+          },
+          "reasons": {
+            "tooLarge": "Groter dan {maxMb} MB.",
+            "unsupportedType": "Geen lettertypebestand. Gebruik TTF, OTF, WOFF of WOFF2.",
+            "invalidFile": "Het bestand is beschadigd of is niet echt een lettertype.",
+            "faceTaken": "{familyName} heeft al een bestand bij dit gewicht en stijl.",
+            "limitReached": "De server bevat al {limit} lettertypebestanden.",
+            "failed": "Upload mislukt. Probeer het opnieuw."
+          }
+        },
+        "sheet": {
+          "description": "Voorbeeld bekijken, hernoemen en beheren van de bestanden van {name}",
+          "variable": "Variabele",
+          "preview": "Voorvertoning",
+          "pageColour": "Pagina kleur",
+          "papers": {
+            "app": "App oppervlak",
+            "white": "Witte pagina",
+            "sepia": "Sepia page",
+            "night": "Nacht pagina"
+          },
+          "previewHeading": "De tuin van de Live Bloemen",
+          "previewParagraph1": "Alice keek hoogst verbaasd om zich heen. “Wel, ik geloof echt dat we al die tijd onder deze boom hebben gestaan! Alles is precies zoals het was!”",
+          "previewParagraph2": "\"Nu zul je zien dat alles wat je kunt doen nodig is om op dezelfde plaats te blijven. Als je ergens anders wilt komen, moet je minstens twee keer zo snel rennen!",
+          "styles": "Styles",
+          "stylesHint": "Wat de stijlrij van de lezer biedt",
+          "singleStyleNote": "Eén stijl, dus lezers krijgen geen stijlrij. Vetgedrukt en cursieve tekst in boeken wordt vervalst door de browser van {style}.",
+          "inReader": "In de lezer",
+          "inReaderHint": "De lettertypelijst die elke lezer in Reader › Instellingen ziet, met {name} geselecteerd.",
+          "pickerLabel": "Voorbeeld van de lettertypelijst van de lezer",
+          "files": "Bestanden",
+          "filesUsed": "{count} van {max} gebruikt op deze server",
+          "fileDetail": "{summary} · Toegevoegd {date}",
+          "upright": "Rechtstreeks",
+          "italic": "Italic",
+          "fileActions": "Meer voor {name}",
+          "changeStyle": "Verander gewicht en stijl",
+          "removeFile": "Bestand verwijderen",
+          "removeFileQuestion": "Dit bestand voor elke lezer verwijderen?",
+          "weight": "Gewicht",
+          "style": "CSS",
+          "name": "Familie naam",
+          "nameHint": "Lezers kiezen lettertypen met deze naam.",
+          "nameHiddenWarning": "{count, plural, one {# lezer hid {name}} other {# lezers hid {name}}}; een nieuwe naam laat het weer aan hen zien.",
+          "nameBooksWarning": "Een nieuwe naam verstuurt {count, plural, one {Het # boek dat het gebruikt} other {Het # boek dat het gebruikt}} terug naar het eigen lettertype van het boek.",
+          "readers": "Lezers",
+          "stats": {
+            "books": "{count, plural, one {Boek gebruikt het} other {boeken gebruiken het}}",
+            "defaults": "{count, plural, one {lezer standaard} other {lezen's standaard}}",
+            "hidden": "{count, plural, one {Lees het verstopt} other {lezers hebben het verborg}}"
+          },
+          "readersPrivacy": "Tel alleen. Welke boeken en welke lezers blijven privé.",
+          "removeLabel": "Familie verwijderen",
+          "removeQuestion": "{name} verwijderen voor elke lezer?",
+          "removeConsequenceBooks": "{books, plural, one {Dit is ingesteld voor # boek} other {Dit is ingesteld voor # boeken}} door {readers, plural, one {# lezer} other {# lezers}}; die boeken schakelen terug naar het eigen lettertype van het boek.",
+          "removeConsequenceFiles": "{count, plural, one {Het bijbehorende bestand wordt van de server verwijderd.} other {Alle # bestanden worden van de server verwijderd.}}",
+          "loadFailedNote": "Deze browser kan het lettertype bestand niet laden, dus de previews tonen een fallback gezicht. De browsers van de lezers zullen het waarschijnlijk ook weigeren; probeer een andere kopie van het lettertype."
+        },
+        "toasts": {
+          "removed": "{name} verwijderd",
+          "removePartial": "{failed, plural, one {# bestand} other {# bestanden}} van {name} kon niet worden verwijderd",
+          "renameTaken": "{name} heeft al een bestand met hetzelfde gewicht en dezelfde stijl"
+        },
+        "loadFailed": "Deze browser kan niet laden"
       }
     },
     "common": {
@@ -1570,6 +1764,7 @@
         "publishedYear": "Publicatiejaar",
         "language": "Taal",
         "pageCount": "Aantal pagina's",
+        "isbn": "ISBNs",
         "communityRating": "Communitybeoordeling",
         "seriesName": "Reeksnaam",
         "seriesIndex": "Reeksnummer",
@@ -1671,6 +1866,92 @@
           "inheritFromGlobal": "Overnemen van globaal",
           "usingGlobalDefaults": "Globale standaardinstellingen worden gebruikt.",
           "saveOverride": "Overschrijving opslaan"
+        },
+        "scope": {
+          "ownSettings": "{count, plural, one {# eigen instelling} other {# eigen instellingen}}",
+          "globalIntro": "Elke bibliotheek volgt deze regel tenzij ze haar eigen regels heeft.",
+          "globalCoverage": "{libraryCount, plural, one {Geldt voor # bibliotheek} other {Geldt voor # bibliotheken}} {bookCount, plural, one {# boek} other {# boeken}}.",
+          "ownLibraries": "{names} {count, plural, one {heeft een eigen regel.} other {hebben hun eigen regels.}}",
+          "libraryFollows": "{library} volgt de mondiale regel. Verander hier alles om het zijn eigen regels te geven.",
+          "libraryOwn": "{library} heeft zijn eigen regel voor {count, plural, one {# instelling} other {# instellingen}}. Alles anders volgt de wereldregel.",
+          "lastRun": "Laatste uitvoering {when}, {count, plural, one {# boek} other {# boeken}} in de wachtrij.",
+          "neverRun": "Nog niet uitgevoerd.",
+          "useGlobalRule": "Gebruik de globale regel",
+          "loadFailed": "Instellingen automatisch ophalen kon niet worden geladen. Herlaad de pagina om het opnieuw te proberen.",
+          "saved": "Opgeslagen {scope}",
+          "saveFailed": "Kon {scope} niet opslaan. Probeer het opnieuw."
+        },
+        "run": {
+          "all": "Voer voor elke bibliotheek uit",
+          "library": "Uitvoeren voor {library}",
+          "saveFirst": "Voert de opgeslagen regel uit. Sla eerst op.",
+          "failed": "De uitvoering kon niet gestart worden. Probeer het opnieuw."
+        },
+        "onImport": {
+          "label": "Metadata voor nieuwe boeken ophalen",
+          "hint": "Scans en upload wachtrijovereenkomstige boeken onmiddellijk. Een ophalen bij het importeren vult alleen lege velden op; vergrendelde velden worden nooit gewijzigd.",
+          "follow": "Wereld volgen",
+          "on": "op",
+          "off": "UIT"
+        },
+        "columns": {
+          "books": "{count, plural, one {boek} other {boeken}}",
+          "ofTotal": "van {total}",
+          "off": "UIT",
+          "own": "Eigen",
+          "global": "Wereldwijd",
+          "useGlobal": "Gebruik globaal",
+          "globalValue": "Globale regel: {value}",
+          "on": "op",
+          "scoreBelowValue": "Score onder {threshold}",
+          "neverFetchedSplit": "{count, plural, one {# heeft nooit gehaald} other {# heeft nooit gehaald}}",
+          "fetchedBeforeSplit": "{count, plural, one {# binnengehaald voor} other {# voor}}",
+          "lowScoreLabel": "Lage vertrouwensscore",
+          "lowScoreHint": "Haal boeken op waarvan de vertrouwensscore onder de regel valt.",
+          "outOf": "/ 100",
+          "lowerThreshold": "Drempelwaarde verlagen",
+          "raiseThreshold": "Verhoog de drempel",
+          "missingHint": "Ophalen als een geselecteerd veld leeg is. Elk veld toont hoeveel boeken het ontbreekt.",
+          "audioGroup": "Boeken met audio",
+          "audioHint": "{count, plural, =0 {Geen enkel boek hier heeft audio.} one {Alleen het # boek met audio kan deze missen.} other {Alleen de # boeken met audio kunnen deze missen.}}",
+          "fieldCount": "{field}: {count, plural, one {# boek mist het} other {# boeken ontbreekt het}}"
+        },
+        "histogram": {
+          "label": "Vertrouwen score drempel",
+          "valueText": "Score onder {threshold}"
+        },
+        "preview": {
+          "title": "Wat een run zou halen",
+          "matching": "{matching, plural, one {# {total} boeken matchen} other {# van {total} boeken overeenkomen}}",
+          "showing": "{count, plural, one {Toon de minst complete} other {Toon de minst complete #}}",
+          "empty": "Geen enkel boek komt overeen met deze regel, dus een uitvoering zou niets in de wachtrij plaatsen.",
+          "unknownAuthor": "Onbekende auteur",
+          "score": "Score {score}",
+          "more": "+{count}",
+          "missing": {
+            "title": "Geen titel",
+            "subtitle": "Geen ondertitel",
+            "description": "Geen beschrijving",
+            "cover": "Geen omslag",
+            "audioCover": "Geen audiobook cover",
+            "authors": "Geen auteurs",
+            "publisher": "Geen uitgever",
+            "isbn": "Geen ISBN",
+            "publishedYear": "Geen gepubliceerd jaar",
+            "language": "Geen taal",
+            "pageCount": "Geen aantal pagina's",
+            "communityRating": "Geen community rating",
+            "seriesName": "Geen serienaam",
+            "seriesIndex": "Geen serie index",
+            "genres": "Geen genres",
+            "narrators": "Geen narrators",
+            "duration": "Geen duur",
+            "abridged": "Verbruikt niet ingesteld"
+          }
+        },
+        "queue": {
+          "progress": "{done} van {total}",
+          "failed": "{count, plural, one {# boek kon niet worden opgehaald} other {# boeken konden niet worden opgehaald}}"
         }
       },
       "providers": {
@@ -1766,7 +2047,8 @@
             "overwriteTerm": "Overschrijven:",
             "overwriteBody": "Vervangen zodra een provider gegevens heeft."
           },
-          "summary": "Providers worden van boven naar beneden geprobeerd en de eerste die een waarde retourneert, wint. De samenvoegstrategie beslist of die waarde kan vervangen wat het boek al heeft; genres kunnen ook nieuwe unieke waarden toevoegen. Stel hier standaardwaarden in en overschrijf vervolgens individuele velden per bibliotheek."
+          "summary": "Providers worden van boven naar beneden geprobeerd en de eerste die een waarde retourneert, wint. De samenvoegstrategie beslist of die waarde kan vervangen wat het boek al heeft; genres kunnen ook nieuwe unieke waarden toevoegen. Stel hier standaardwaarden in en overschrijf vervolgens individuele velden per bibliotheek.",
+          "summaryByMedium": "Providers worden van boven naar beneden geprobeerd, en de eerste met een waarde-win; geslachten in samenvoegmodus en gemeenschapsbeoordelingen combineren in plaats daarvan elke aanbieder. De samenvoegstrategie bepaalt of een waarde kan vervangen wat het boek al heeft. Audiabel, AudNexus en Libro. m alleen antwoord voor boeken met audio, leesbare EPUB's inbegrepen, dus geef ze eerst de voorkeur aan metagegevens van audioboek, zonder alleen boeken met ebook aan te raken. Omslag kunst van de verkeerde vorm vult een slot alleen als niets anders kan. Een bibliotheek overschrijft de gehele regel van het veld."
         },
         "libraryOverrides": {
           "title": "Bibliotheekoverschrijvingen",
@@ -1835,6 +2117,7 @@
         },
         "field": {
           "noProviders": "Ingeschakeld maar heeft geen providers",
+          "noUsableProvider": "Ingeschakeld, maar hier kan geen enkele provider het invullen",
           "empty": "Leeg",
           "config": "Configuratie",
           "custom": "Aangepast",
@@ -1893,7 +2176,11 @@
           "disabled": "Uitgeschakeld",
           "notConfigured": "Niet geconfigureerd",
           "disabledDetail": "{provider} is uitgeschakeld, dus het blijft in de volgorde, maar wordt overgeslagen.",
-          "notConfiguredDetail": "{provider} heeft nog geen inloggegevens, dus het blijft in de bestelling staan, maar wordt overgeslagen."
+          "notConfiguredDetail": "{provider} heeft nog geen inloggegevens, dus het blijft in de bestelling staan, maar wordt overgeslagen.",
+          "neverSupplies": "Levert nooit dit",
+          "neverSuppliesDetail": "{provider} vult dit veld nooit aan, dus het wordt hier overgeslagen.",
+          "otherShape": "Andere omslagvorm",
+          "otherShapeDetail": "{provider} heeft alleen een afdekking van de andere vorm, dus het vult dit vakje alleen als er niets anders kan."
         },
         "detail": {
           "priority": "Prioriteit provider",
@@ -1947,6 +2234,123 @@
         "emptyHint": "Voeg exacte waarden toe zoals Audioboek of Volwassen om ze uit opgehaalde metadata te houden.",
         "removeLabel": "{genre} verwijderen"
       },
+      "searchCache": {
+        "loadFailed": "Kon de zoek cache instellingen niet laden.",
+        "retry": "Opnieuw proberen",
+        "saved": "Zoekcache-instellingen opgeslagen",
+        "saveFailed": "Opslaan van cache instellingen mislukt",
+        "units": {
+          "hours": "Uren",
+          "days": "dagen"
+        },
+        "general": {
+          "title": "Opgeslagen antwoorden",
+          "enabled": "Provider antwoorden opslaan",
+          "enabledHint": "Zoeken, bulk vernieuwingen en achtergrond worden opgeslagen antwoorden hergebruikt in plaats van elke aanbieder opnieuw te vragen.",
+          "resultsTtl": "Resultaten behouden voor",
+          "resultsTtlHint": "Hoelang een antwoord met resultaten wordt hergebruikt voordat de provider opnieuw wordt gevraagd.",
+          "resultsTtlUnit": "Resultaten tijdeenheid",
+          "emptyTtl": "Houd lege antwoorden voor",
+          "emptyTtlHint": "Hoe lang een aanbieder die niets vindt niet vergeet. Alleen toepasbaar op aanbieders die gemarkeerd zijn als het cachen van lege antwoorden. 0 houdt nooit lege antwoorden.",
+          "emptyTtlUnit": "Lege antwoorden tijdeenheid",
+          "staleGrace": "Gebruik verlopen antwoorden voor",
+          "staleGraceHint": "Wanneer een aanbieder faalt, wordt een antwoord tot zijn lange periode gebruikt in plaats daarvan. 0 valt nooit terug.",
+          "staleGraceUnit": "Verlopen antwoord tijdeenheid",
+          "storage": "Opslag budget",
+          "storageHint": "De oudste antwoorden worden verwijderd zodra de opgeslagen antwoorden dit formaat passeren. Op schijf kan de tabel ongeveer 1,5 tot 2 keer het budget kosten.",
+          "storageUnit": "Mb"
+        },
+        "providers": {
+          "title": "Instellingen per provider",
+          "hint": "Laat een veld leeg om de bovenstaande waarde te gebruiken. Schakel een provider uit om er altijd om te vragen.",
+          "books": "Boeken",
+          "authors": "Auteurs",
+          "none": "Er zijn geen aanbieders beschikbaar.",
+          "globalOff": "Antwoorden opslaan is uitgeschakeld, dus deze instellingen zijn van toepassing zodra deze weer is ingeschakeld.",
+          "on": "op",
+          "off": "UIT",
+          "enabledLabel": "Sla antwoorden op van {provider}",
+          "resultsTtl": "Resultaten behouden voor",
+          "resultsTtlLabel": "Houd {provider} resultaten voor",
+          "resultsTtlUnitLabel": "Tijdeenheid voor {provider} resultaten",
+          "emptyTtl": "Houd lege antwoorden voor",
+          "emptyTtlLabel": "Houd lege {provider} antwoorden voor",
+          "emptyTtlUnitLabel": "Tijdeenheid voor lege {provider} antwoorden",
+          "noEmptyCaching": "Lege antwoorden van deze provider worden nooit opgeslagen.",
+          "notCacheable": "Antwoorden van deze provider worden nooit opgeslagen.",
+          "reset": "{provider} terugzetten naar de standaardinstellingen"
+        },
+        "validation": {
+          "required": "Voer een waarde in.",
+          "wholeNumber": "Vul een geheel nummer in.",
+          "range": "Voer een waarde in van {min} tot {max}.",
+          "tooManyOverrides": "Te veel aanbieders hebben hun eigen instellingen. Stel een aantal van hen in om op te slaan."
+        },
+        "save": {
+          "unsaved": "Niet-opgeslagen wijzigingen",
+          "invalid": "Repareer de gemarkeerde velden om op te slaan",
+          "upToDate": "Alle wijzigingen opgeslagen",
+          "discard": "Weggooien",
+          "action": "Opslaan"
+        },
+        "stats": {
+          "group": "Gebruik",
+          "title": "Opgeslagen antwoorden",
+          "refresh": "Vernieuwen",
+          "loadFailed": "Kan het cache-gebruik niet laden.",
+          "storage": "Gebruikte opslagruimte",
+          "storageUsed": "{used} van {budget}",
+          "storageHint": "Grootte van de opgeslagen antwoorden zelf. De tabel op de schijf is groter.",
+          "entries": "Opgeslagen antwoorden",
+          "emptyEntries": "Lege antwoorden",
+          "diskSize": "Tabel grootte op schijf",
+          "hitRate": "Trek tarief",
+          "requestsAvoided": "Verzoeken voorkomen",
+          "fallbacks": "Terugvallen",
+          "skippedWrites": "Overgeslagen schrijvingen",
+          "oldest": "Oudste antwoord",
+          "none": "Nog geen",
+          "countersHint": "Trek snelheid, verzoeken vermijden, terugvallen en overgeslagen geschriften tellen sinds de server voor het laatst gestart.",
+          "perProvider": "Antwoorden per provider opgeslagen",
+          "provider": "Leverancier",
+          "kind": "Type",
+          "size": "Grootte",
+          "empty": "Er is nog niets opgeslagen."
+        },
+        "clear": {
+          "group": "Onderhoud",
+          "title": "Opgeslagen antwoorden wissen",
+          "regionHint": "Providers kunnen anders antwoorden per locatie. Wis de cache nadat de server naar een andere regio of VPN is verplaatst.",
+          "action": "Verwijderen",
+          "failed": "Opgeslagen antwoorden wissen mislukt",
+          "done": "{count, plural, one {Verwijder # opgeslagen antwoord} other {Verwijderd # opgeslagen antwoorden}}",
+          "donePending": "{count, plural, one {# opgeslagen antwoord is verwijderd. De rest wordt op de achtergrond verwijderd.} other {# opgeslagen antwoorden zijn verwijderd. De rest wordt op de achtergrond verwijderd.}}",
+          "empty": {
+            "label": "Alleen lege antwoorden wissen",
+            "hint": "Vergeet dat aanbieders niets hebben gevonden, dus de zoekmachines vragen het opnieuw.",
+            "confirmTitle": "Lege antwoorden wissen?",
+            "confirmDescription": "Opgeslagen antwoorden waar een provider niets heeft gevonden. Antwoorden met resultaten worden bewaard."
+          },
+          "book": {
+            "label": "Boekenantwoorden wissen",
+            "hint": "Verwijdert alles opgeslagen van de boekaanbieders.",
+            "confirmTitle": "Boekenantwoorden wissen?",
+            "confirmDescription": "Elk opgeslagen antwoord van de boekaanbieders wordt verwijderd. De volgende zoekopdrachten vragen deze aanbieders opnieuw."
+          },
+          "author": {
+            "label": "Leeg de antwoorden van de auteur",
+            "hint": "Verwijdert alles opgeslagen van auteursaanbieders.",
+            "confirmTitle": "Antwoorden van auteur wissen?",
+            "confirmDescription": "Elk opgeslagen antwoord van auteursaanbieders wordt verwijderd. De volgende zoekopdrachten vragen deze providers opnieuw."
+          },
+          "all": {
+            "label": "Alle opgeslagen antwoorden wissen",
+            "hint": "Cache leegmaakt. Elke provider wordt opnieuw gevraagd bij de volgende zoekopdracht.",
+            "confirmTitle": "Alle opgeslagen antwoorden wissen?",
+            "confirmDescription": "De hele cache is leeggemaakt. Zoekopdrachten zullen langzamer verlopen tot het opnieuw gevuld wordt, en er is niets meer over om terug te vallen terwijl een aanbieder offline is."
+          }
+        }
+      },
       "customFields": {
         "label": "Label",
         "labelPlaceholder": "bijv. Originele titel",
@@ -1995,7 +2399,145 @@
         "selectAll": "Alles selecteren",
         "clear": "Wissen",
         "noLibraries": "Nog geen bibliotheken beschikbaar.",
-        "allLibraries": "Alle bibliotheken"
+        "allLibraries": "Alle bibliotheken",
+        "pageFacts": "{fields, plural, one {# veld} other {# velden}} {values, plural, one {# waarde opgeslagen} other {# waarden opgeslagen}}",
+        "newFieldAction": "Nieuw veld",
+        "views": {
+          "label": "Toon actieve of gearchiveerde velden",
+          "active": "actief",
+          "archived": "Gearchiveerd"
+        },
+        "columns": {
+          "order": "Bestelling",
+          "field": "Veld",
+          "type": "Type",
+          "libraries": "Bibliotheken",
+          "filled": "Gevuld",
+          "valuesKept": "Behouden waarden",
+          "archived": "Gearchiveerd",
+          "actions": "acties"
+        },
+        "orderHint": "Sleep om de ordervelden in te stellen die worden weergegeven op Bewerken Metadata, in tabelkolommen en in exports.",
+        "archivedHint": "Gearchiveerde velden zijn verborgen voor boeken, filters en exporten. Hun waarden blijven opgeslagen totdat het veld is verwijderd.",
+        "coverage": "{filled} van {total}",
+        "coverageAria": "{filled} van {total} boeken hebben een waarde",
+        "onNoLibrary": "Geen bibliotheken",
+        "onNoLibraryHint": "In geen enkele bibliotheek, dus dit veld verschijnt nergens",
+        "moreLibraries": "+{count}",
+        "noValues": "geen",
+        "rowActions": {
+          "edit": "Bewerken",
+          "editField": "Veld bewerken",
+          "moveUp": "Verplaats omhoog",
+          "moveDown": "Verplaats naar beneden",
+          "archive": "Archief",
+          "restore": "Herstellen",
+          "deletePermanently": "Permanent verwijderen…",
+          "more": "Meer acties voor {label}"
+        },
+        "toasts": {
+          "loadFailed": "Kan aangepaste velden niet laden",
+          "created": "{label} aangemaakt",
+          "createFailed": "Kon {label} niet aanmaken",
+          "saved": "{label} opgeslagen",
+          "saveFailed": "Kan {label} niet opslaan",
+          "archived": "{label} gearchiveerd",
+          "archiveFailed": "Kon {label} niet archiveren",
+          "restored": "{label} hersteld",
+          "restoreFailed": "Kan {label} niet herstellen",
+          "deleted": "{label} verwijderd",
+          "deleteFailed": "Kon {label} niet verwijderen",
+          "reorderFailed": "Kon de nieuwe bestelling niet opslaan"
+        },
+        "empty": {
+          "body": "Volg waar BookOrbit geen veld voor heeft, zoals waar een boek op je plank zit of voor wie het heeft geleend. Velden verschijnen op Metadata, in tabelkolommen en in de filters.",
+          "examples": "Start bij een voorbeeld",
+          "shelfNumber": "Shelf Nummer",
+          "acquiredOn": "Verworven op",
+          "signedCopy": "Ondertekende kopie",
+          "loanedTo": "Geleend aan"
+        },
+        "types": {
+          "text": {
+            "label": "Tekstveld",
+            "hint": "Alle woorden",
+            "example": "Eerste bedrukking, ondertekende bladplaat"
+          },
+          "url": {
+            "label": "Koppeling",
+            "hint": "Opent in een nieuw tabblad",
+            "example": "https://voorbeeld.com/boek"
+          },
+          "number": {
+            "label": "Nummer",
+            "hint": "Sorteren op waarde",
+            "example": "42"
+          },
+          "date": {
+            "label": "Datum",
+            "hint": "Een kalender dag",
+            "example": "2024-03-09"
+          },
+          "boolean": {
+            "label": "Ja / Nee",
+            "hint": "Een checkbox",
+            "example": "ja"
+          }
+        },
+        "sheet": {
+          "newTitle": "Nieuw veld",
+          "editDescription": "Bewerk de label en bibliotheken van een aangepast veld en zie waar het verschijnt.",
+          "newDescription": "Naam van een nieuw aangepast veld, kies het type en kies de bibliotheken.",
+          "archivedDescription": "Een gearchiveerd aangepast veld. Herstel het of verwijder het met de waarden.",
+          "statusFilled": "{filled} van {total, plural, one {# boek} other {# boeken}} gevuld",
+          "statusNone": "Niet in een bibliotheek",
+          "statusHidden": "{count} hidden",
+          "statusCreated": "aangemaakt {date}",
+          "labelHint": "Weergegeven op Bewerk Metadata, in tabelkolommen en in filters.",
+          "renameHint": "Hernoemen bewaart elke opgeslagen waarde en de bestandssleutel {key}.",
+          "keyHint": "Opgeslagen in bestanden en exporten als {key}, die hetzelfde blijft als je het veld hernoemt.",
+          "typeLocked": "Instellen bij aanmaken",
+          "typeLockedHint": "Het type kan later niet worden gewijzigd, daarom komen de opgeslagen waarden altijd overeen.",
+          "libraries": "Bibliotheken",
+          "books": "{count, plural, one {# boek} other {# boek}}",
+          "filledOfBooks": "{filled} van {total, plural, one {# boek} other {# boeken}}",
+          "hiddenCount": "{count} hidden",
+          "leavingNote": "{count, plural, one {# waarde in {libraries} blijft opgeslagen maar verborgen terwijl het veld daar ligt.} other {# waarden in {libraries} blijf opgeslagen maar verborgen terwijl het veld daar ligt.}} Draai hem terug wanneer hij hem terug brengt.",
+          "noLibraryWarning": "Zonder bibliotheken wordt dit veld nergens weergegeven: niet op Metadata, in filters of in exports.",
+          "appears": {
+            "title": "Waar het verschijnt",
+            "editMetadata": "Metadata bewerken",
+            "details": "Details tab",
+            "filters": "Filters",
+            "table": "Tabel en sorteer",
+            "tableBody": "Beschikbaar als kolom en een sorteeroptie",
+            "files": "Bestanden",
+            "filesWritten": "Geschreven in EPUB en FB2 bestanden in {libraries}, waar metadata naar bestanden schrijven is aan.",
+            "filesNotWritten": "Niet in bestanden opgeslagen: geen van deze bibliotheken schrijft metadata naar EPUB of FB2 bestanden.",
+            "exports": "Exporteren"
+          },
+          "archiveAction": "Archiveer veld",
+          "archiveConfirm": "Archiveer {label}?",
+          "archiveConsequence": "{count, plural, =0 {Dit veld verdwijnt uit Metadata bewerken, filters en exports. Je kunt het op elk moment vanuit Gearchiveerd herstellen.} one {Dit veld verdwijnt uit Metadata bewerken, filters en exports. # waarde blijft opgeslagen totdat het veld wordt verwijderd.} other {Dit veld verdwijnt uit Metadata bewerken, filters en exports. # waarden blijven opgeslagen totdat het veld wordt verwijderd.}}",
+          "create": "Veld aanmaken",
+          "onLibraries": "Op {count} van {total} bibliotheken",
+          "onAllLibraries": "In alle {total} bibliotheken",
+          "archivedBadge": "Gearchiveerd",
+          "archivedTitle": "Gearchiveerde {when}.",
+          "archivedBody": "{count, plural, =0 {Dit veld is verborgen voor boeken, filters en exports. Het bevat geen waarden.} one {Dit veld is verborgen voor boeken, filters en exports. # opgeslagen waarde blijft behouden en keert terug bij herstel.} other {Dit veld is verborgen voor boeken, filters en exports. # opgeslagen waarden blijven behouden en keren terug bij herstel.}}",
+          "facts": {
+            "type": "Type",
+            "libraries": "Bibliotheken",
+            "valuesKept": "Behouden waarden",
+            "fileKey": "Bestand sleutel",
+            "created": "Aangemaakt",
+            "archived": "Gearchiveerd"
+          },
+          "deleteQuestion": "Verwijder {label} voor de goed?",
+          "deleteConsequence": "{count, plural, =0 {Dit veld bevat geen waarden. Dit kan niet ongedaan worden gemaakt.} one {De # opgeslagen waarde wordt uit elk boek verwijderd. Reeds geschreven bestanden behouden hun kopie. Dit kan niet ongedaan worden gemaakt.} other {De # opgeslagen waarden worden uit elk boek verwijderd. Reeds geschreven bestanden behouden hun kopie. Dit kan niet ongedaan worden gemaakt.}}",
+          "deleteConfirmLabel": "Typ de veldnaam om te bevestigen",
+          "deleteConfirmPlaceholder": "Type {label} om te bevestigen"
+        }
       },
       "tabs": {
         "providers": "Providers",
@@ -2004,7 +2546,8 @@
         "genre-blocklist": "Genre-blokkeerlijst",
         "score": "Score",
         "auto-fetch": "Boeken",
-        "authors": "Auteurs"
+        "authors": "Auteurs",
+        "search-cache": "Zoek Cache"
       },
       "tabTitles": {
         "providers": "Providers",
@@ -2013,7 +2556,8 @@
         "genre-blocklist": "Genre-blokkeerlijst",
         "score": "Betrouwbaarheidsscore",
         "auto-fetch": "Boeken automatisch ophalen",
-        "authors": "Auteurs automatisch ophalen"
+        "authors": "Auteurs automatisch ophalen",
+        "search-cache": "Zoek Cache"
       },
       "tabSubtitles": {
         "providers": "Schakel externe metadatabronnen in en configureer hun inloggegevens.",
@@ -2022,7 +2566,8 @@
         "genre-blocklist": "Voorkom dat ongewenste genrewaarden van providers naar boeken worden geschreven.",
         "score": "Ken gewichten toe aan metadatavelden om te berekenen hoeveel vertrouwen opgehaalde resultaten verdienen.",
         "auto-fetch": "Haal automatisch omslagen, beschrijvingen en andere details op wanneer nieuwe boeken aan je bibliotheek worden toegevoegd.",
-        "authors": "Haal automatisch biografieën en profielfoto's op wanneer nieuwe auteurs in je bibliotheek verschijnen."
+        "authors": "Haal automatisch biografieën en profielfoto's op wanneer nieuwe auteurs in je bibliotheek verschijnen.",
+        "search-cache": "Hergebruik provider antwoorden zodat herhalingszoekopdrachten snel zijn en nog steeds werkt wanneer een provider offline is."
       },
       "preferences": {
         "toast": {
@@ -2238,7 +2783,25 @@
         "serverFontsHint": "Deze lettertypen zijn afkomstig van je serverbeheerder. Schakel er een uit om deze buiten je lezer te houden.",
         "serverFontsShown": "{count} van {total} getoond",
         "serverFontsAllHidden": "Alle serverlettertypen zijn verborgen. Je reader biedt alleen ingebouwde en je eigen lettertypen.",
-        "serverFontVisibilityFailed": "Kan de zichtbaarheid van het serverlettertype niet bijwerken"
+        "serverFontVisibilityFailed": "Kan de zichtbaarheid van het serverlettertype niet bijwerken",
+        "library": {
+          "columns": {
+            "use": "In gebruik"
+          },
+          "yourDefault": "Jouw standaard",
+          "hiddenBadge": "Hidden",
+          "emptyHint": "Voeg bovenstaande lettertypen toe of laat bestanden ergens op deze pagina vallen.",
+          "dropTitle": "{count, plural, one {Drop om # bestand aan je lettertypen toe te voegen} other {Drop to add # bestanden aan je lettertypes}}",
+          "limitReached": "U heeft al {limit} lettertypebestanden.",
+          "filesUsed": "{count} van jouw {max} gebruikt",
+          "nameHint": "Dit is de naam in de lettertype van uw lezer.",
+          "inReaderHint": "Je lettertypelijst in Reader › Instellingen, met {name} geselecteerd.",
+          "showInReader": "Toon in mijn lezer",
+          "showFamily": "Toon {name} in mijn lezer",
+          "removeConsequenceBooks": "{count, plural, one {Dit is ingesteld voor # van je boeken; dat boek schakelt terug naar het eigen lettertype.} other {Dit is ingesteld voor # van je boeken; deze schakelen terug naar hun eigen lettertype.}}",
+          "removeConsequenceDefault": "Het is je standaard lettertype; boeken zonder hun eigen instelling gaan terug naar de standaard boeken.",
+          "removeQuestion": "{name} uit uw lettertypen verwijderen?"
+        }
       },
       "bookDock": {
         "title": "Book Dock",
@@ -2474,7 +3037,58 @@
           "noLanguage": "Geen taal",
           "noPublisher": "Geen uitgever"
         },
-        "unknownModifier": "Onbekende modificator \"{modifier}\". Het wordt genegeerd, waardoor de waarde ongewijzigd blijft."
+        "unknownModifier": "Onbekende modificator \"{modifier}\". Het wordt genegeerd, waardoor de waarde ongewijzigd blijft.",
+        "rulesNav": "Naamgeving regels",
+        "railFoot": "Een bibliotheek zonder een eigen patroon volgt de standaard waarin het zit.",
+        "usedBy": "Gebruikt door {libraries}",
+        "followsBase": "Volgt de {base}.",
+        "copyPattern": "Kopieer patroon",
+        "recipes": "Recepten",
+        "recipesTitle": "Begin bij een recept",
+        "recipesReplace": "Vervangt het hele patroon",
+        "recipeInUse": "In gebruik",
+        "insert": "Insert",
+        "insertToolbar": "In het patroon invoegen",
+        "insertOptional": "Optioneel",
+        "insertFallback": "Fallback",
+        "insertFolder": "Map",
+        "lineHint": "Druk op {enter} om een nieuwe map te starten of type {brace} om een token te kiezen. Klik op een mappictogram om deze map over te slaan als de waarde ontbreekt.",
+        "downloadLineHint": "Downloads hebben geen mappen, dus alleen het laatste deel van het patroon wordt gebruikt.",
+        "tokenSuggestions": "Overeenkomende tokens",
+        "noTokenMatch": "Geen token komt overeen met \"{query}\".",
+        "uploadedNameKept": "Geüploade bestandsnaam bewaard",
+        "level": {
+          "folder": "Map {n}",
+          "bookFolder": "Map reserveren",
+          "file": "Bestandsnaam is vereist",
+          "skipWhenEmpty": "Sla {level} over wanneer de waarde ontbreekt",
+          "skippedWhenEmpty": "Overgeslagen wanneer de waarde ontbreekt. Klik om deze map altijd aan te maken.",
+          "alwaysCreated": "Altijd aangemaakt. Klik om deze map over te slaan als de waarde ontbreekt."
+        },
+        "result": "Resultaat",
+        "previewWith": "Voorbeeldweergave met",
+        "previewWithAria": "Voorbeeld met {title}",
+        "previewBook": {
+          "sample": "Voorbeeld boek",
+          "longTitle": "Lange titel en series",
+          "longSubtitle": "Lange ondertitel",
+          "manyAuthors": "Vijf auteurs",
+          "audiobook": "Audiobook",
+          "standalone": "Geen serie"
+        },
+        "previewingCase": "Voorbeeld: {case}",
+        "showComplete": "Toon compleet",
+        "previewStale": "Het voorbeeld vangt aan zodra het patroon is bevestigd.",
+        "noChange": "Geen verandering",
+        "tagSkipped": "overgeslagen",
+        "tagFallback": "fallback",
+        "tagBookFolder": "Boek map",
+        "tagUploadedName": "geüploade naam",
+        "tagShortened": "verkorte tot 255 bytes",
+        "tagEmptyName": "lege naam",
+        "levelSkipped": "Overgeslagen omdat {token} leeg is",
+        "levelEmptyName": "Lege map naam. Geef deze map een fallback zodat het altijd een folder heeft.",
+        "renameNote": "Boeken houden al op schijf hun paden bij. Bibliotheken die bestanden hernoemen passen dit patroon toe wanneer de volgende keer dat de details van een boek worden opgeslagen: {libraries}."
       },
       "kobo": {
         "title": "Kobo-synchronisatie",
@@ -2835,7 +3449,13 @@
             "unmatchedDismissed": "Niet-gekoppeld boek genegeerd",
             "dismissFailed": "Negeren van niet-gekoppeld boek mislukt",
             "allDismissed": "{count, plural, =0 {Geen niet-gekoppelde boeken genegeerd} one {# niet-gekoppeld boek genegeerd} other {# niet-gekoppelde boeken genegeerd}}",
-            "dismissAllFailed": "Negeren van alle niet-gekoppelde boeken mislukt"
+            "dismissAllFailed": "Negeren van alle niet-gekoppelde boeken mislukt",
+            "reviewRefreshed": "Boeken om te bekijken vernieuwd",
+            "reviewRefreshFailed": "Vernieuwen van boeken om te bekijken mislukt",
+            "reviewDismissed": "Boek verwijderd uit review",
+            "reviewDismissFailed": "Afwijzen boek uit review is mislukt",
+            "reviewAllDismissed": "{count, plural, =0 {Weg geen boeken uit de review} one {Ontsloeg # boek van beoordeling} other {Ontsloeg # boeken uit de review}}",
+            "reviewDismissAllFailed": "Niet gelukt om alle boeken uit review te verwijderen"
           },
           "modal": {
             "linkTitle": "KOReader-boek koppelen",
@@ -2888,7 +3508,15 @@
           "syncedStatsNote": "Reeds gesynchroniseerde statistieken blijven bij hun huidige BookOrbit-boek.",
           "chooseDifferent": "Andere kiezen",
           "saving": "Opslaan...",
-          "confirmLink": "Koppeling bevestigen"
+          "confirmLink": "Koppeling bevestigen",
+          "reviewTitle": "KOReader boeken te controleren",
+          "reviewHint": "Boeken zonder een automatische overeenkomst en boeken die je niet verbonden hebt verschijnen hier. Ontkoppelde boeken kunnen nog steeds synchroniseren via een automatische wedstrijd. Koppel een boek om te overschrijven die overeenkomen, of verwijder het om het te verwijderen van deze lijst.",
+          "loadingReview": "Boeken laden om te beoordelen...",
+          "noReview": "Geen KOReader boeken om te bekijken.",
+          "manualUnlinkConfirmBody": "Verwijder de handmatige link naar {title} en geef dit boek terug naar de beoordelingslijst. Toekomstige synchronisatie zal een automatische match gebruiken als deze bestaat. Al gesynchroniseerde statistieken zullen in hun huidige BookOrbit boek blijven.",
+          "reviewDismissConfirmBody": "Dit verwijdert het uit je boeken die moeten worden beoordeeld. Automatische overeenkomende en bestaande synchronisatiegegevens worden bewaard. Als een apparaat de hash opnieuw zonder match rapporteert, kan het opnieuw verschijnen.",
+          "reviewDismissAllConfirmTitle": "{count, plural, =0 {Geen boeken om te beoordelen} one {Verwijder al het # boek om te beoordelen?} other {Alle # boeken afwijzen om te beoordelen?}}",
+          "reviewDismissAllConfirmBody": "Dit wist je hele boeken om de lijst te beoordelen, inclusief items op andere pagina's. Automatische overeenkomende en bestaande synchronisatiegegevens worden bewaard. Als een apparaat een hash opnieuw rapporteert zonder een vergelijking, kan het opnieuw verschijnen."
         },
         "remove": "Verwijderen",
         "removing": "Verwijderen...",
@@ -3538,6 +4166,7 @@
     "nav": {
       "title": "Instellingen",
       "ariaLabel": "Instellingensecties",
+      "breadcrumbLabel": "Kruimelpad",
       "searchPlaceholder": "Zoekinstellingen",
       "clearSearch": "Clear search",
       "noResults": "Er komen geen instellingen overeen met {query}.",
@@ -3584,9 +4213,58 @@
         "serverFonts": "Lettertypen geïnstalleerd voor elke lezer op deze server.",
         "bookDock": "Snelle acties weergegeven op boekpagina's.",
         "auditLog": "Wie heeft wat gewijzigd, en wanneer.",
-        "requests": "Bronnen, downloadclients en wat er met een boek gebeurt zodra het is gedownload."
+        "requests": "Bronnen, downloadclients en wat er met een boek gebeurt zodra het is gedownload.",
+        "readerTts": "Lees-luide stem, snelheid en verhaal standaard.",
+        "adminTts": "Tekst-naar-spraak engines beschikbaar voor elke lezer op deze server."
       },
-      "backToApp": "Terug naar bibliotheek"
+      "backToApp": "Terug naar bibliotheek",
+      "pageDescriptions": {
+        "profile": "Uw naam, foto, tijdzone en prestatie tracking, plus uw wachtwoord en de inlog aanbieders gekoppeld aan dit account.",
+        "appearance-theme": "Kies waar je weergave-instellingen worden opgeslagen, en stel vervolgens het stijl, kleurschema, accent, hoeken, oppervlaktehelderheid en het patroon achter je bibliotheek in.",
+        "appearance-book-covers": "Hoe omslag ziet in de app: plaatshouder kunst voor boeken zonder één, hoe omslag past bij hun slots, ruggen- en hoogglans effecten en de omslag tint op de boekenpagina's.",
+        "appearance-icons": "Upload uw eigen pictogrammen om te gebruiken naast de ingebouwde set voor bibliotheken, slimme schermen en collecties.",
+        "appearance-layout": "Cover formaten en afstand voor het bibliotheekrad, de omslag getoond voor een ingeklapte ser, en hoe het auteursraster is uitgelegd.",
+        "appearance-behavior": "Wat het openen van een boek vanuit een raster of lijst doet, of series inklappen op één kaart en of Boekenverzoeken op dit account staan.",
+        "appearance-language": "De taal BookOrbit gebruikt voor menu's, labels en berichten en de regionale formaten voor data en getallen.",
+        "reader-ebook": "Standaard voor de eBook leader: of nieuwe boeken beginnen met uw instellingen, paginagrootte en kolommen, thema en typografie zoals letterlijk, grootte en spatie.",
+        "reader-pdf": "Hoe PDFs openen: pagina per pagina of een continue scroll, welke pagina een spread-tweepagina start en de standaard zoompas.",
+        "reader-comics": "Hoe comics lezen: leesmodus en richting, enkelvoudige of tweepagina's spreads, fit, handling van meerdere pagina's en ga verder naar het volgende boek in de reeks.",
+        "reader-audio": "De startsnelheid en volume voor nieuwe audioboods, en hoe ver de knoppen terug kunnen overslaan en vooruit kunnen springen.",
+        "reader-fonts": "Upload je eigen lettertypen voor de lezer, en kies welke lettertypen gedeeld worden door de serverbeheerder.",
+        "reader-general": "Waar uw lezervoorkeuren worden opgeslagen, en de standaardwaarden worden gedeeld door elke leesmodus.",
+        "tts": "Uw standaard stem en snelheid wanneer BookOrbit een boek hardop leest.",
+        "notifications": "Kies welke events u informeren van voltooide scans en metagegevens naar hernoemen, importeren en boek Dock-resultaten.",
+        "privacy": "Bepaal hoeveel leesactiviteit beheerders kunnen zien, uw gedeelde profiel bekijken en controleren wie het heeft bekeken.",
+        "restrictions": "Inhoudslimieten voor dit account, zoals leeftijdwaarderingen en verborgen inhoud, en wat ze buiten je bibliotheken houden.",
+        "libraries": "Elke bibliotheek op een oogopslag: zijn mappen, wat het bezit, hoe het wordt gescand en wanneer het voor het laatst bereikbaar is. Hier bibliotheken toevoegen, bewerken of opnieuw versturen.",
+        "metadata-providers": "Zet metadata bronnen aan of uit, voeg API sleutels of cookies toe waar een bron ze nodig heeft, en test de referenties met de live service.",
+        "metadata-field-rules": "Kies welke aanbieders het veld metadata invullen, in welke volgorde, hoe waarden worden samengevoegd en hoe genres en provider-ID's worden verzameld.",
+        "metadata-custom-fields": "Maak uw eigen metadata velden, kies hun type en de bibliotheken die ze gebruiken, en herschik of archiveer ze.",
+        "metadata-score": "Bepaal hoeveel elke metadata veld telt voor de volledigheidsscore die getoond wordt in elk boek.",
+        "metadata-auto-fetch": "Haal de metadata van het boek automatisch op wanneer boeken worden geïmporteerd of ontbrekende details ontbreken, met overrides voor elke bibliotheek.",
+        "metadata-authors": "Ophalen biografieën en foto's automatisch, kies de bronnen van de bestelling en kies welke auteurs gekwalificeerd zijn.",
+        "metadata-search-cache": "Bewaar de provider antwoorden zodat herhalingszoekopdrachten snel zijn en nog steeds werken wanneer een provider af is, en bepaal hoe lang en hoeveel wordt bewaard.",
+        "metadata-genre-blocklist": "De hier vermelde genre waarden worden van provider resultaten gehaald voordat metadata wordt geschreven, dus labels zoals Audiobook blijven buiten uw boeken.",
+        "metadata-reminders": "Kies welke ontbrekende velden worden weergegeven in boekherinneringen. Dit wijzigt alleen de herinneringen, niet de metadata scores.",
+        "file-naming": "Map en bestandsnaam patronen die worden gebruikt wanneer BookOrbit boeken op schijf hernoemt, met een voorbeeld van het resultaat en wat er gebeurt als een waarde ontbreekt.",
+        "maintenance": "Server huishouding: upload limiet, import uit het verleden, het opnieuw opbouwen van aanbevelingen, backfill prestaties en controleren op updates.",
+        "kobo": "Verbind Kobo e-lezers, kies hoe boeken, planken en het lezen van de voortgang synchronisatie en volg de recente synchronisatie van elk apparaat.",
+        "koreader": "Synchroniseer voortgang, lees activiteit en markeert met KOReader, verplaats de sync URL en plugin en beheer de apparaten die verbinden.",
+        "opds": "Schakel de OPDS catalogus in en maak accounts aan zodat apps die door derden lezen uw boeken kunnen bladeren en downloaden.",
+        "email": "Beheer de adresboeken waarnaar u wordt verzonden, zoals Kindle inboxes, ster de standaard en groep ontvangers om meerdere tegelijk te verzenden.",
+        "hardcover": "Verbind je Hardcover-account en kies wanneer je de status, voortgang en beoordelingen synchroniseert en hoe gesynchroniseerde boeken verschijnen.",
+        "readwise": "Verbind uw Readwise account om uw hoogtepunten automatisch te sturen.",
+        "storygraph": "Verbind uw StoryGraph account met behulp van uw browser sessie cookies om leesvoortgang en status te synchroniseren.",
+        "users": "Maak en beheer accounts, hun rollen, rechten en toegang tot de bibliotheek en zie welke accounts aandacht nodig hebben.",
+        "account-activity": "Zie wanneer elk account voor het laatst actief was en hoe het tekent, en open per-user lees- en sessie-inzichten.",
+        "magic-links": "Maak deelbare links die iemand zonder een wachtwoord ondertekenen en trek ze in wanneer ze niet meer nodig zijn.",
+        "oidc": "Verbind een enkele aanwijzing-provider zoals Keycloak, wijs zijn claims in kaart en beslis hoe nieuwe accounts worden gemaakt.",
+        "requests": "Waar BookOrbit zoekt naar aangevraagde boeken, welke klanten downloaden deze en wat er gebeurt als een download klaar is.",
+        "admin-tts": "De tekst-naar-spraak-motoren kunnen lezers gebruiken voor lees-aloud, de stemmen die van elk worden aangeboden en de volgorde waarin ze verschijnen.",
+        "book-dock": "De Boek Dock drop map, automatische metadata ophalen voor nieuwe bestanden, en de score waarop de bestanden zelf afgerond zijn.",
+        "server-fonts": "Upload lettertypen éénmaal voor elke lezer op deze server. Elke lezer kan er nog een verbergen.",
+        "audit-log": "Een doorzoekbare record van wie wat heeft veranderd en wanneer, filterbaar door event, persoon, beïnvloed voorwerp en datum."
+      }
     },
     "field": {
       "required": "(vereist)"
@@ -3621,6 +4299,201 @@
       "earned": "Behaald ({count})",
       "inProgress": "Bezig ({count})",
       "locked": "Vergrendeld ({count})"
+    },
+    "tiersEarnedFact": "{earned} van {total} niveaus",
+    "loading": "Prestaties laden",
+    "filters": {
+      "label": "Resultaten filteren",
+      "all": "Allemaal",
+      "earned": "Verdiend",
+      "inProgress": "In behandeling",
+      "locked": "Vergrendeld"
+    },
+    "showcase": {
+      "label": "Hoogtepunten",
+      "latest": "Laatste ontgrendeling",
+      "newToday": "{count, plural, one {# nieuw vandaag} other {# nieuw vandaag}}",
+      "secretRevealed": "Geheim onthullen",
+      "categoryAndDate": "{category} · {date}",
+      "alsoNew": "Ook nieuw",
+      "openMedal": "Open {name}",
+      "emptyTitle": "Je eerste medaille wacht op je",
+      "emptyBody": "Voltooi een boek, beoordeel één of markeer een passage, en het landt hier.",
+      "collection": "Collectie",
+      "shareOfTiers": "{percent} van elke rang",
+      "tiersEarned": "{earned} van {total} niveaus verdiend",
+      "closest": "Dichtstbijzijnde te ontgrendelen",
+      "allInProgress": "Alle {count}",
+      "tierOfSet": "Rang {tier} van {set}",
+      "nothingCounting": "Niets telt nog in een medaille."
+    },
+    "shelf": {
+      "tiers": "{earned} / {total}",
+      "progressLabel": "{category} niveaus verdiend"
+    },
+    "medal": {
+      "label": "{name}, {rarity}, {status}",
+      "tier": "Rang {tier}",
+      "allTiers": "{count, plural, one {De enige tier} other {Alle # niveaus}}",
+      "keepReading": "Blijf lezen",
+      "notStarted": "Niet gestart"
+    },
+    "progress": {
+      "generic": "{current} / {threshold}",
+      "toGo": "{count, plural, one {# om te gaan} other {# om te gaan}}"
+    },
+    "hints": {
+      "howToGetIt": "Hoe krijg je het",
+      "readingPace": "{count, plural, one {U leest # uur in de laatste {days} dagen.} other {U leest # uur in de laatste {days} dagen.}}",
+      "etaDays": "{count, plural, one {Ongeveer # dag in dit tempo.} other {Ongeveer # dagen in dit tempo.}}",
+      "etaWeeks": "{count, plural, one {Ongeveer # week in dit tempo.} other {Ongeveer # weken in dit tempo.}}",
+      "etaMonths": "{count, plural, one {Ongeveer # maand in dit tempo.} other {Ongeveer # maanden in dit tempo.}}",
+      "decadeUnread": "{count, plural, one {# boek uit de jaren {decade} wacht op je boekenplanken.} other {# boeken uit de jaren {decade} wachten op je boekenplanken.}}",
+      "centuryUnread": "{count, plural, one {# boek uit de jaren {century} wacht op je boekenplanken.} other {# boeken uit de jaren {century} wachten op je boekenplanken.}}",
+      "stalled": "{title} is {percent} gelezen en is gestart op {date}.",
+      "stalledNoProgress": "{title} werd gestart op {date}.",
+      "untitledBook": "Een boek in uitvoering",
+      "nearlyFinished": "{count, plural, one {# boek dat je aan het lezen bent, is voor meer dan {percent} gelezen.} other {# boeken die je aan het lezen bent, zijn voor meer dan {percent} gelezen.}}",
+      "unratedFinished": "{count, plural, one {# boek dat je hebt uitgelezen, heeft nog geen beoordeling.} other {# boeken die je hebt uitgelezen, hebben nog geen beoordeling.}}",
+      "shortBooks": "{count, plural, one {# boek met minder dan {pages} pagina's wacht op je boekenplanken.} other {# boeken met minder dan {pages} pagina's wachten op je boekenplanken.}}",
+      "alreadyStarted": "{count, plural, one {# wordt al gelezen.} other {# worden al gelezen.}}",
+      "longBooks": "{count, plural, one {# boek met {pages} pagina's of meer wacht op je boekenplanken.} other {# boeken met {pages} pagina's of meer wachten op je boekenplanken.}}",
+      "oldBooks": "{count, plural, one {# boek dat vóór {year} is gepubliceerd, wacht op je boekenplanken.} other {# boeken die vóór {year} zijn gepubliceerd, wachten op je boekenplanken.}}",
+      "authorUnread": "{author}: {finished, plural, one {# uitgelezen} other {# uitgelezen}}, {count, plural, one {nog # op je boekenplanken} other {nog # op je boekenplanken}}.",
+      "languageUnread": "{count, plural, one {# boek in het {language} wacht op je boekenplanken.} other {# boeken in het {language} wachten op je boekenplanken.}}",
+      "monthsRead": "{count, plural, one {Je hebt tot nu toe in # maand van {year} gelezen.} other {Je hebt tot nu toe in # maanden van {year} gelezen.}}",
+      "monthsLeft": "{count, plural, one {{months} resteert.} other {{months} resteren.}}",
+      "noLongBook": "Er is nog geen boek op uw plank met {pages} pagina's of meer.",
+      "nothingBeforeYear": "Er is niets op uw plank gepubliceerd voor {year}.",
+      "tooFewDecades": "{count, plural, one {Je boekenplanken beslaan tot nu toe slechts # decennium.} other {Je boekenplanken beslaan tot nu toe slechts # decennia.}}",
+      "tooFewCenturies": "{count, plural, one {Je boekenplanken beslaan tot nu toe slechts # eeuw.} other {Je boekenplanken beslaan tot nu toe slechts # eeuwen.}}",
+      "missedMonth": "Je hebt niet gelezen in {month}, dus {year} is buiten bereik. De telling begint opnieuw in januari.",
+      "continueReading": "Lees verder",
+      "rateFinished": "Beoordeel een voltooid boek",
+      "viewAuthor": "Bekijk auteur",
+      "openBook": "Open {title}",
+      "openUntitledBook": "Boek openen"
+    },
+    "sets": {
+      "booksFinished": "Boeken voltooid",
+      "pagesRead": "Pagina's gelezen",
+      "hoursRead": "Uren gelezen",
+      "longestBook": "Langste boek afgelopen",
+      "librarySize": "Bibliotheek grootte",
+      "annotations": "Aantekeningen",
+      "booksRated": "Boeken beoordeeld",
+      "genresFinished": "Genres voltooid",
+      "languagesFinished": "Talen voltooid",
+      "readingStreak": "Lezen reeks"
+    },
+    "units": {
+      "books": {
+        "progress": "{current} / {threshold} boeken",
+        "toGo": "{count, plural, one {# boek om te gaan} other {# boeken om te gaan}}"
+      },
+      "pages": {
+        "progress": "{current} / {threshold} pagina's",
+        "toGo": "{count, plural, one {# pagina om te gaan} other {# pagina's om te gaan}}"
+      },
+      "hours": {
+        "progress": "{current} / {threshold} uur",
+        "toGo": "{count, plural, one {# uur om te gaan} other {# uur om te gaan}}"
+      },
+      "annotations": {
+        "progress": "{current} / {threshold} aantekeningen",
+        "toGo": "{count, plural, one {# aantekening om te gaan} other {# aantekeningen te gaan}}"
+      },
+      "ratings": {
+        "progress": "{current} / {threshold} beoordelingen",
+        "toGo": "{count, plural, one {# beoordeling om te gaan} other {# beoordelingen om te gaan}}"
+      },
+      "genres": {
+        "progress": "{current} / {threshold} genres",
+        "toGo": "{count, plural, one {# genre om te gaan} other {# genres om te gaan}}"
+      },
+      "languages": {
+        "progress": "{current} / {threshold} talen",
+        "toGo": "{count, plural, one {# taal om te gaan} other {# talen om te gaan}}"
+      },
+      "days": {
+        "progress": "{current} / {threshold} dagen",
+        "toGo": "{count, plural, one {# dag om te gaan} other {# dagen om te gaan}}"
+      }
+    },
+    "moments": {
+      "nthBook": "Boek {number} was {title}",
+      "pagesAtUnlock": "{count, plural, one {# pagina} other {# pagina's}} wanneer het ontgrendeld is",
+      "hoursAtUnlock": "{count, plural, one {# uur} other {# uur}} wanneer het ontgrendeld is",
+      "titleWithPages": "{title}, {count, plural, one {# pagina} other {# pagina's}}",
+      "booksAtUnlock": "{count, plural, one {# boek} other {# boeken}} in je bibliotheek wanneer deze ontgrendeld is",
+      "annotationsAtUnlock": "{count, plural, one {# aantekening} other {# aantekeningen}} op het moment van ontgrendelen",
+      "ratingsAtUnlock": "{count, plural, one {# beoordeling} other {# beoordelingen}} wanneer het ontgrendeld is",
+      "genresAtUnlock": "{count, plural, one {# genre} other {# genres}} wanneer het ontgrendeld is",
+      "languagesAtUnlock": "{count, plural, one {# taal} other {# talen}} wanneer het ontgrendeld is",
+      "streakAtUnlock": "{count, plural, one {# dag} other {# dagen}} op rij",
+      "longSession": "Één sessie liep {duration}",
+      "durationHours": "{hours} u {minutes} min",
+      "durationMinutes": "{minutes} minuten",
+      "sessionStartedAt": "Een sessie die begon bij {time}",
+      "oneDayBook": "{title}, begin met voltooien in één dag",
+      "booksInWeek": "{count, plural, one {# boek} other {# boeken}} uitgelezen in één week",
+      "booksInMonth": "{count, plural, one {# boek} other {# boeken}} uitgelezen in {month}",
+      "booksInYear": "{count, plural, one {# boek} other {# boeken}} uitgelezen in {year}",
+      "wholeBookOneSession": "Een heel boek in één sessie",
+      "pagesInSession": "{count, plural, one {# pagina} other {# pagina's}} in één sessie",
+      "pagesInDay": "{count, plural, one {# pagina} other {# pagina's}} in één dag",
+      "slowBurn": "{title}, uitgelezen na {count, plural, one {# dag} other {# dagen}}",
+      "formatsOwned": "{count, plural, one {# formaat} other {# formaten}} op je planken",
+      "annotationsWithNote": "{count, plural, one {# aantekening} other {# aantekeningen}} met een notitie",
+      "annotationsInDay": "{count, plural, one {# aantekening} other {# aantekeningen}} in één dag",
+      "everyStar": "Elke beoordeling van één ster naar vijf",
+      "everyColour": "Elke gemarkeerde kleur gebruikt",
+      "titlePublished": "{title}, gepubliceerd {year}",
+      "booksInGenre": "{count, plural, one {# boek} other {# boek}} in één genre",
+      "firstInSeries": "{title}, van de {series} series",
+      "centuries": "Boeken van {count, plural, one {# eeuw} other {# eeuwen}}",
+      "booksBySameAuthor": "{count, plural, one {# boek} other {# boek}} door één auteur",
+      "decades": "Boeken van {count, plural, one {# decennium} other {# decennia}}",
+      "shortBooks": "{count, plural, one {# kort boek} other {# korte boek}} klaar",
+      "allSeasons": "Alle vier seizoenen {year}",
+      "consistentDays": "{count, plural, one {# dag} other {# dagen}} van 30 minuten of meer",
+      "weekendsInRow": "{count, plural, one {# weekend} other {# weeken}} op rij",
+      "weekendHours": "{count, plural, one {# uur} other {# uur}} in het weekend van {date}",
+      "categoriesCovered": "{count, plural, one {# categorie} other {# categorieën}} met een prestatie",
+      "readingSources": "{count, plural, one {# leesbron} other {# lezen bronnen}}",
+      "oneBookSources": "Eén boek gelezen uit {count, plural, one {# bron} other {# bronnen}}"
+    },
+    "records": {
+      "title": "Boek opnemen",
+      "subtitle": "De getallen achter je medailles, zoals ze stonden wanneer ze elk ontgrendeld zijn",
+      "value": "{value}",
+      "oneSession": "Één leessessie",
+      "pagesInSession": "Pagina's in één sessie",
+      "pagesInDay": "Pagina's in één dag",
+      "booksInWeek": "Boeken in één week",
+      "booksInMonth": "Boeken in {month}",
+      "booksInYear": "Boeken beëindigd in {year}",
+      "annotations": "Aantekeningen",
+      "genresFinished": "Genres voltooid",
+      "daysInRow": "Dagen achter elkaar",
+      "booksInLibrary": "Boeken in je bibliotheek"
+    },
+    "detail": {
+      "categoryTierSet": "{category} · Rang ingesteld",
+      "secretHint": "Blijf lezen om deze te onthullen.",
+      "tierOf": "Rang {earned} van {total}",
+      "current": "Stroom",
+      "noneYet": "Nog geen",
+      "progress": "Vooruitgang",
+      "allTiersEarned": "Elk niveau verdiend",
+      "tiers": "Rang",
+      "earned": "Verdiend",
+      "status": "status",
+      "hidden": "Hidden",
+      "rarity": "Zeldzaamheid",
+      "category": "categorie",
+      "theSet": "De set",
+      "theMoment": "Het moment"
     }
   },
   "adminFeature": {
@@ -4352,7 +5225,13 @@
       "user": "Gebruiker",
       "action": "Actie",
       "description": "Beschrijving",
-      "ip": "IP"
+      "ip": "IP",
+      "time": "Tijd",
+      "person": "Persoon",
+      "source": "Bron",
+      "open": "Open",
+      "network": "Netwerk",
+      "activity": "Activiteit"
     },
     "categories": {
       "authentication": "Authenticatie",
@@ -4362,7 +5241,10 @@
       "collections": "Collecties",
       "integrations": "Integraties",
       "settings": "Instellingen",
-      "other": "Overig"
+      "other": "Overig",
+      "access": "Inloggen en toegang",
+      "requests": "Verzoeken",
+      "devices": "Apparaten & e-mail"
     },
     "resourceLabels": {
       "User": "Gebruiker",
@@ -4526,10 +5408,178 @@
       "MaintenanceMissingBooksClean": "Ontbrekende boeken opgeruimd",
       "MaintenanceBrokenCoversClean": "Kapotte covers schoongemaakt",
       "MaintenanceOrphanedCoversClean": "Verweesde omslagmappen opgeschoond"
-    }
+    },
+    "views": {
+      "label": "Weergeven",
+      "changes": "Veranderingen",
+      "signins": "Aanmeldingen",
+      "security": "Beveiliging",
+      "all": "Allemaal"
+    },
+    "search": {
+      "label": "Afspraken zoeken",
+      "placeholder": "Zoek mensen, doelen of IP-adressen",
+      "placeholderShort": "Afspraken zoeken"
+    },
+    "range": {
+      "label": "Date range: {range}",
+      "today": "vandaag",
+      "7d": "Afgelopen 7 dagen",
+      "30d": "Laatste 30 dagen",
+      "all": "Alles bewaard",
+      "custom": "Aangepast bereik",
+      "from": "van",
+      "to": "tot",
+      "between": "{from} naar {to}",
+      "since": "Sinds {date}",
+      "until": "Tot {date}",
+      "sinceOldest": "Sinds {date}"
+    },
+    "filterMenu": {
+      "button": "Filters",
+      "category": "categorie",
+      "person": "Persoon",
+      "findPerson": "Zoek een persoon",
+      "noPeople": "Geen overeenkomende personen",
+      "clear": "Verwijderen",
+      "done": "Voltooid"
+    },
+    "activeFilters": {
+      "target": "{type}: {name}",
+      "clearAll": "Alles wissen"
+    },
+    "securityGroups": {
+      "label": "Type veiligheidsgebeurtenis",
+      "all": "Alles",
+      "failed": "Mislukte aanmeldingen",
+      "accounts": "Rekeningen",
+      "passwords": "Wachtwoorden",
+      "permissions": "Machtigingen",
+      "access": "Bibliotheek toegang",
+      "links": "Inlog links"
+    },
+    "day": {
+      "today": "vandaag",
+      "yesterday": "gisteren",
+      "changes": "{count, plural, one {# verander} other {# wijzigingen}}",
+      "events": "{count, plural, one {# event} other {# gebeurtenissen}}"
+    },
+    "person": {
+      "system": "Systeem",
+      "deleted": "Verwijderd account",
+      "automation": "Automatisering"
+    },
+    "source": {
+      "server": "Deze server",
+      "local": "Lokaal netwerk",
+      "internet": "Internet",
+      "job": "Achtergrond job",
+      "unknown": "Niet opgenomen"
+    },
+    "target": {
+      "none": "No target",
+      "more": "+{count}",
+      "sinceDeleted": "Sinds verwijderd",
+      "withId": "{type} #{id}"
+    },
+    "openEvent": "Open details: {event}",
+    "signIns": {
+      "signIns": "{count, plural, one {# Aanmelden} other {# aanmelden}}",
+      "signOuts": "{count, plural, one {# uitlog} other {# uitlogt}}",
+      "failed": "{count, plural, one {# mislukte pogingen} other {# mislukte pogingen}}",
+      "failedAs": "{count, plural, one {# is mislukt als {names}} other {# mislukt als {names}}}",
+      "range": "{from} - {to}",
+      "footer": "{count, plural, one {{events} Aanmelden voor evenementen, vouw in # rijen per persoon, dag en netwerk} other {{events} Meld je aan om in te loggen op # rijen per persoon, dag en per netwerk}}"
+    },
+    "pager": {
+      "label": "Pagina's",
+      "previous": "Vorige pagina",
+      "next": "Volgende pagina",
+      "page": "Pagina {page}",
+      "changes": "{from}–{to} van {count, plural, one {# verander} other {# wijziging}}",
+      "events": "{from}–{to} van {count, plural, one {# gebeurtenis} other {# # gebeurtenissen}}"
+    },
+    "drawer": {
+      "description": "Details van één auditgebeurtenis",
+      "close": "Afsluiten",
+      "subtitle": "{category} {day}, {time}",
+      "when": "Wanneer",
+      "person": "Persoon",
+      "source": "Bron",
+      "target": "Target",
+      "usernameTried": "Gebruikersnaam geprobeerd",
+      "deletedHere": "{type} verwijderd door deze gebeurtenis",
+      "deletedSince": "{type} · sinds verwijderd",
+      "inThisRow": "{count, plural, one {# event in deze rij} other {# events in deze rij}}",
+      "around": "Om dit evenement heen",
+      "aroundHint": "{name}, 40 minuten aan beide zijden",
+      "aroundEmpty": "Niets anders van {name} binnen 40 minuten.",
+      "history": "Geschiedenis",
+      "historyCount": "{count, plural, one {# event} other {# gebeurtenissen}}",
+      "historyMeta": "{name} {date}, {time}",
+      "thisEvent": "Deze gebeurtenis",
+      "raw": "Onbewerkte gebeurtenis",
+      "rawEventId": "Gebeurtenis ID",
+      "rawAction": "actie",
+      "rawTarget": "Target type",
+      "rawNote": "Server notitie",
+      "only": "Alleen {name}"
+    },
+    "facts": {
+      "format": "Formatteren",
+      "size": "Grootte",
+      "download": "downloaden",
+      "dockFile": "Dock-bestand reserveren",
+      "rejected": "Geweigerd",
+      "failed": "Mislukt",
+      "cleaned": "Opgeschoond",
+      "skipped": "Overgeslagen",
+      "remaining": "Resterend",
+      "sharingLevel": "Deel niveau",
+      "sharing": {
+        "private": "Niet gedeeld",
+        "summary": "Summary",
+        "detailed": "Gedetailleerd"
+      }
+    },
+    "retention": {
+      "button": "{count, plural, one {Kept voor # dag} other {Kept voor # dagen}}",
+      "title": "Evenementen behouden voor",
+      "days": "{count, plural, one {# dag} other {# dagen}}",
+      "hint": "Oudere gebeurtenissen worden elke nacht om middernacht verwijderd.",
+      "hintWithOldest": "Oudere gebeurtenissen worden elke nacht om middernacht verwijderd. Het oudste evenement dat wordt bijgehouden is van {date}.",
+      "readOnly": "Alleen mensen die app instellingen kunnen wijzigen kunnen dit aanpassen.",
+      "saved": "{count, plural, one {Auditgebeurtenissen worden nu # dag bewaard.} other {Auditgebeurtenissen worden nu # dagen bewaard.}}",
+      "saveFailed": "Kan niet veranderen hoe lang gebeurtenissen worden bewaard."
+    },
+    "export": {
+      "button": "Exporteren",
+      "title": "Exporteer wat getoond wordt",
+      "hint": "Gebruikt de huidige weergave, filters en datumbereik.",
+      "csv": "csv",
+      "json": "JSON",
+      "failed": "Kan het auditlogboek niet exporteren."
+    },
+    "emptyFiltered": "Geen overeenkomende afspraken gevonden met deze filters."
   },
   "auth": {
     "backToSignIn": "Terug naar inloggen",
+    "plate": {
+      "exLibris": "Ex Libris"
+    },
+    "endpaper": {
+      "change": "Verander eindpapier",
+      "options": {
+        "seigaiha": "Golven",
+        "shippo": "Gekoppelde cirkels",
+        "asanoha": "Hemp blad",
+        "quatrefoil": "Quatrefolie",
+        "ogee": "Ogee",
+        "harlequin": "Harlequin",
+        "greekKey": "Griekse sleutel",
+        "plain": "Eenvoudig"
+      }
+    },
     "themePicker": {
       "switchToLight": "Naar licht schakelen",
       "switchToDark": "Naar donker schakelen",
@@ -4547,7 +5597,10 @@
       "confirmPassword": "Wachtwoord bevestigen",
       "confirmNewPassword": "Nieuw wachtwoord bevestigen",
       "currentPassword": "Huidig wachtwoord",
-      "passwordHint": "Min. 8 tekens met hoofdletter, kleine letter en een cijfer"
+      "passwordHint": "Min. 8 tekens met hoofdletter, kleine letter en een cijfer",
+      "showPassword": "Toon wachtwoord",
+      "hidePassword": "Wachtwoord verbergen",
+      "capsLockOn": "Caps Lock is ingeschakeld"
     },
     "errors": {
       "generic": "Er is iets misgegaan. Probeer het opnieuw.",
@@ -4559,9 +5612,11 @@
       "signingIn": "Inloggen...",
       "orDivider": "of",
       "forgotPassword": "Wachtwoord vergeten?",
+      "resetPasswordAction": "Wachtwoord opnieuw instellen",
       "noAccount": "Heb je geen account?",
       "signUp": "Meld je aan",
       "registeredNotice": "Account aangemaakt. Meld je aan om door te gaan. Een beheerder moet machtigingen verlenen voordat je toegang krijgt tot de bibliotheek.",
+      "resetNotice": "Wachtwoord bijgewerkt. Log in met je nieuwe wachtwoord.",
       "errors": {
         "invalidCredentials": "Ongeldige gebruikersnaam of wachtwoord",
         "tooManyAttempts": "Te veel inlogpogingen. Wacht een minuut en probeer het opnieuw.",
@@ -4733,6 +5788,8 @@
         "selectVisible": "Zichtbare selecteren",
         "refreshMetadata": "Metadata vernieuwen",
         "refreshingMetadata": "Metadata vernieuwen...",
+        "confirmRefreshCount": "{count, plural, one {Vernieuw metadata voor # auteur?} other {Vernieuw metadata voor # auteurs?}}",
+        "refreshAction": "Vernieuwen",
         "deleteSelected": "Selectie verwijderen",
         "deleting": "Verwijderen...",
         "exitSelection": "Selectie afsluiten",
@@ -4836,6 +5893,19 @@
   },
   "book": {
     "untitled": "Naamloos",
+    "placeholder": {
+      "volume": "Vol. {number}",
+      "genre": {
+        "horror": "Afgrijzen",
+        "romance": "Romantiek",
+        "fantasy": "Fantasy",
+        "scifi": "Sci-fi",
+        "mystery": "Mysterie",
+        "classic": "Klassieke",
+        "nonfiction": "Niet-fictie",
+        "young": "Jonge lezers"
+      }
+    },
     "unknownFormat": "onbekend",
     "collapsedSeries": {
       "label": "Reeks",
@@ -4850,6 +5920,7 @@
       "audiobook": "Luisterboek"
     },
     "formats": {
+      "djvu": "DjVu document",
       "epub": "EPUB e-boek",
       "kepub": "KEPUB e-boek",
       "pdf": "PDF-document",
@@ -4892,6 +5963,10 @@
       "openAs": "Openen als {format}",
       "openReadAlong": "Lees meeleesvenster EPUB"
     },
+    "refreshMetadata": {
+      "success": "Metagegevens vernieuwd",
+      "failed": "Metadata vernieuwen mislukt"
+    },
     "coverRegeneration": {
       "failed": "Kan de omslag niet opnieuw genereren",
       "bulkInProgress": "Hoezen er weer uit halen",
@@ -4921,7 +5996,11 @@
       "exportFailed": "Exporteren mislukt",
       "audiolessEpub": "KOReader EPUB",
       "audiolessEpubHint": "Download EPUB voor KOReader met verwijderde audiobestanden",
-      "noAudio": "geen geluid"
+      "noAudio": "geen geluid",
+      "textOnlyEpub": "Uitsluitende EPUB",
+      "textOnlyEpubHint": "Download een narrationeloze EPUB terwijl de leesankers behouden worden.",
+      "originalNarrated": "Originele EPUB met verhaal",
+      "originalNarratedEpub": "Originele EPUB met verhaal"
     },
     "sort": {
       "moveUp": "Omhoog verplaatsen",
@@ -5217,7 +6296,8 @@
       },
       "header": {
         "previousBook": "Vorige boek",
-        "nextBook": "Volgende boek"
+        "nextBook": "Volgende boek",
+        "backToLibrary": "Terug naar {library}"
       },
       "tabs": {
         "details": "Details",
@@ -5665,6 +6745,9 @@
         },
         "searchDrawer": {
           "searchTitle": "Metadata zoeken",
+          "autoSearchOnOpen": "Zoek automatisch bij openen",
+          "autoSearchOnOpenHint": "Gebruikt de details van het boek de volgende keer dat dit paneel wordt geopend. Onthoud uw account in deze browser.",
+          "searchOptions": "Zoek opties",
           "compareTitle": "Metadata vergelijken",
           "searchSubtitle": "Vind de beste provider-overeenkomst voor dit boek.",
           "compareSubtitle": "Bekijk verschillen en pas alleen toe wat je wilt."
@@ -5884,6 +6967,8 @@
         "score": "Score",
         "scoreTooltip": "Metadatascore {score} van 100",
         "emptyFields": "{count, plural, one {leeg veld} other {lege velden}}",
+        "emptyFieldsCount": "{count, plural, one {# leeg veld} other {# lege velden}}",
+        "emptyFieldsHeading": "Lege metadata velden",
         "emptyFieldsTooltip": "Nog niet ingevuld: {fields}. Zoek online om ze op te zoeken.",
         "libraryRow": "Bibliotheek",
         "primaryRow": "Primair",
@@ -5985,6 +7070,12 @@
         "resume": "Hervatten",
         "audiobook": "Audioboek",
         "writeTarget": "Doel schrijven",
+        "notWritten": {
+          "formatNotSupported": "Niet geschreven: niet-ondersteund formaat",
+          "formatDisabled": "Niet geschreven: formaat uitgeschakeld",
+          "fileExceedsSizeLimit": "Niet geschreven: overschrijding maximale grootte",
+          "notContentFile": "Niet geschreven: geen boek inhoud"
+        },
         "enabled": "Ingeschakeld",
         "disabled": "Uit",
         "notSet": "niet ingesteld",
@@ -6786,6 +7877,22 @@
       "nFailed": "{count} mislukt",
       "nTotal": "{count} totaal"
     },
+    "uploadFailures": {
+      "heading": "{count, plural, one {Kan # bestand niet uploaden} other {Kan # bestanden niet uploaden}}",
+      "dismissAll": "Alles afwijzen",
+      "retry": "Probeer {name} opnieuw te uploaden",
+      "dismiss": "{name} afwijzen",
+      "reason": {
+        "unsupported": "Niet-ondersteund bestandstype: .{extension}",
+        "noExtension": "Het bestand heeft geen extensie, dus de indeling is onbekend",
+        "tooLarge": "Groter dan de {limit} upload limiet",
+        "tooLargeServer": "Groter dan de server upload limiet",
+        "tooLargeProxy": "Geweigerd als te groot voordat het BookOrbit bereikte, waarschijnlijk door een reverse proxy",
+        "storageFull": "De server heeft geen opslagruimte",
+        "network": "Kon server niet bereiken",
+        "status": "Uploaden mislukt (HTTP {status})"
+      }
+    },
     "fileList": {
       "emptyTitle": "Geen bestanden in Book Dock",
       "emptyMessageDefault": "Upload bestanden of plaats ze in de Book Dock-map",
@@ -7045,7 +8152,40 @@
       "moreOptions": "Meer opties",
       "fewerOptions": "Minder opties",
       "optionsSummary": "{formats} · notitie toegevoegd",
-      "formatToggleAria": "Liever {format}"
+      "formatToggleAria": "Liever {format}",
+      "pair": {
+        "choice": "Allebei",
+        "choiceHint": "Vraag het e-book en de audiobook samen",
+        "ebookLibraryLabel": "E-book bibliotheek",
+        "audiobookLibraryLabel": "Audiobook bibliotheek",
+        "audiobookFolderLabel": "Audiobook map",
+        "landsTogether": "Beide formaten komen als één boek in {library}.",
+        "landsSeparately": "{library} houdt één boek per bestand bij, dus elk formaat komt als een eigen boek.",
+        "landsApart": "Het e-boek en de audiobook gaan naar verschillende bibliotheken, zodat ze als twee boeken aankomen.",
+        "preferredEbookFormats": "Voorkeursindelingen voor e-books",
+        "preferredAudiobookFormats": "Gewenste audiobook indelingen",
+        "state": {
+          "owned": "In uw bibliotheek",
+          "following": "U heeft dit aangevraagd",
+          "joinable": "Aangevraagd",
+          "new": "Niet gevraagd"
+        },
+        "requestBoth": "Beide aanvragen",
+        "getBoth": "Krijg beide",
+        "chooseReleases": "Kies releases",
+        "joinBoth": "Voeg me toe aan beide",
+        "requestEbook": "E-book aanvragen",
+        "requestAudiobook": "Audiobook aanvragen",
+        "getEbook": "Krijg e-book",
+        "getAudiobook": "Audiobook verkrijgen",
+        "joinEbook": "Voeg me toe aan het e-book verzoek",
+        "joinAudiobook": "Voeg me toe aan het audiobook-verzoek",
+        "haveBoth": "In uw bibliotheek",
+        "requestedBoth": "Aangevraagd",
+        "submitted": "Verzocht het e-book en de audiobook",
+        "submittedPartlyJoined": "Aangevraagd beiden. Er was er al een onderweg, dus je bent aan dat verzoek toegevoegd",
+        "submittedJoinsBook": "Gevraagd. Het zal al aansluiten bij de kopie in uw bibliotheek"
+      }
     },
     "card": {
       "details": "Details",
@@ -7104,7 +8244,10 @@
         "forbidden": "Dat verzoek is van iemand anders.",
         "loadFailed": "Kan dat verzoek niet laden"
       },
-      "entityName": "Verzoek"
+      "entityName": "Verzoek",
+      "pairSwitchLabel": "Formaten in dit verzoek",
+      "joinsBook": "Word lid van een boek dat je hebt",
+      "joinsBookHint": "Wanneer dit arriveert wordt het toegevoegd aan het boek al in uw bibliotheek"
     },
     "actions": {
       "approve": "Goedkeuren",
@@ -7119,7 +8262,29 @@
       "grab": "Zoek een vrijgave",
       "goToBook": "Ga naar boeken",
       "retryRelease": "Probeer een andere release",
-      "leave": "Verlofaanvraag"
+      "leave": "Verlofaanvraag",
+      "pair": {
+        "approveBoth": "Keur beide goed",
+        "approveEbook": "Goedkeuren e-book",
+        "approveAudiobook": "Audiobook goedkeuren",
+        "rejectBoth": "Weiger beide",
+        "rejectEbook": "e-book afwijzen",
+        "rejectAudiobook": "Audiobook afwijzen",
+        "cancelBoth": "Annuleer beide",
+        "cancelEbook": "e-book annuleren",
+        "cancelAudiobook": "Audiobook annuleren",
+        "dismissBoth": "Negeer beide",
+        "dismissEbook": "e-book verwijderen",
+        "dismissAudiobook": "Audiobook verwijderen",
+        "restoreBoth": "Herstel beide",
+        "restoreEbook": "E-book herstellen",
+        "restoreAudiobook": "Herstel audiobook",
+        "grabEbook": "Vind een e-book release",
+        "grabAudiobook": "Vind een audiobook release",
+        "chooseReleases": "Kies releases",
+        "openEbook": "Open het e-book verzoek",
+        "openAudiobook": "Open het audiobook verzoek"
+      }
     },
     "filters": {
       "status": "Status",
@@ -7162,7 +8327,9 @@
       "left": "Je heeft dit verzoek verlaten",
       "bulkRejected": "{count, plural, one {# verzoek afgewezen} other {# verzoeken afgewezen}}",
       "bulkRejectedPartial": "{done} afgewezen, {failed} kon niet worden",
-      "importDiscarded": "Het geïmporteerde bestand is verwijderd"
+      "importDiscarded": "Het geïmporteerde bestand is verwijderd",
+      "pairApproved": "Beide goedgekeurd",
+      "pairRejected": "Beide afgewezen"
     },
     "errors": {
       "loadFailed": "Kan verzoeken niet laden",
@@ -7182,7 +8349,9 @@
       "languageChangeFailed": "Kan de verzoektaal niet wijzigen",
       "leaveFailed": "Dat verzoek kon niet worden gehonoreerd",
       "bulkRejectFailed": "Die selectie kon niet worden afgewezen",
-      "discardImportFailed": "Die import kon niet worden verwijderd"
+      "discardImportFailed": "Die import kon niet worden verwijderd",
+      "approveCompanionFailedEbook": "Deze is goedgekeurd, maar het e-book kon niet worden goedgekeurd",
+      "approveCompanionFailedAudiobook": "Deze is goedgekeurd, maar de audiobook kon niet worden goedgekeurd"
     },
     "grab": {
       "title": "Verzenden naar een downloadclient",
@@ -7228,6 +8397,18 @@
     "releases": {
       "title": "Kies een release",
       "retryTitle": "Probeer een andere release",
+      "pairTitle": "Kies releases",
+      "pair": {
+        "tabsLabel": "Formaten om releases te kiezen voor",
+        "releaseCount": "{count, plural, one {# release} other {# releases}}",
+        "searching": "Zoeken",
+        "toChoose": "Om te kiezen",
+        "sent": "Verzonden",
+        "finishedTitle": "Niets om te kiezen",
+        "finishedHint": "Beide formaten hebben hun release nu. Je kan elk volgen vanaf het verzoek.",
+        "backToRequest": "Terug naar het verzoek",
+        "done": "Voltooid"
+      },
       "subtitle": "Gerangschikt voor elke ingeschakelde indexer.",
       "summaryCount": "{count, plural, one {# vrijgave} other {# releases}}",
       "allFreeleech": "allemaal freeleech",
@@ -7517,7 +8698,8 @@
       "decidedBy": "Besloten door",
       "decisionNote": "Beslissingsnota",
       "requestNote": "Opmerking aanvragen",
-      "openDetail": "Volledige details openen"
+      "openDetail": "Volledige details openen",
+      "pairMedia": "E-boek en audiobook"
     },
     "confirm": {
       "cancelDownloadTitle": "Deze download annuleren?",
@@ -7573,7 +8755,9 @@
       "SUBMIT_DESTINATION_REQUIRED": "Je verzoeken worden goedgekeurd zodra je ze doet, dus kies de bibliotheek waarin het boek terecht moet komen",
       "SUBMIT_SELF_SERVE_LIMIT": "Voltooi of annuleer eerst enkele downloads: je kunt {limit} in één keer in de vlucht hebben",
       "SUBMIT_ON_BEHALF_FORBIDDEN": "Het is je niet toegestaan boeken voor andere mensen aan te vragen",
-      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "Voor die gebruiker kan geen boekaanvraag worden gedaan"
+      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "Voor die gebruiker kan geen boekaanvraag worden gedaan",
+      "SUBMIT_TARGET_BOOK_NOT_FOUND": "Dat boek is niet in een bibliotheek die je kunt bereiken",
+      "SUBMIT_TARGET_BOOK_HAS_MEDIUM": "Dat boek heeft al dit formaat"
     },
     "actionError": {
       "BOOK_REQUEST_NOT_PENDING": "Alleen een in behandeling zijnd verzoek ondersteunt deze actie; dit verzoek is momenteel {status}",
@@ -7659,7 +8843,22 @@
       "reviewSources": "Bronnen beoordelen"
     },
     "selfServeBadge": "Zelfbediening",
-    "selfServeBadgeHint": "Rechtstreeks gedownload door de aanvrager, zonder goedkeuringsstap"
+    "selfServeBadgeHint": "Rechtstreeks gedownload door de aanvrager, zonder goedkeuringsstap",
+    "missingFormat": {
+      "labelAudiobook": "Audiobook voor dit boek",
+      "labelEbook": "E-book voor dit boek",
+      "noAudiobook": "Nog geen audiobook",
+      "noEbook": "Nog geen e-book",
+      "requestAudiobook": "Audiobook aanvragen",
+      "requestEbook": "E-book aanvragen",
+      "requested": "Aangevraagd",
+      "requestedBySomeone": "Aangevraagd door iemand anders",
+      "ownedElsewhere": "In uw bibliotheek als een apart boek",
+      "open": "Open",
+      "viewRequest": "Bekijk verzoek",
+      "submittedAudiobook": "Aangevraagd. De audiobook zal deelnemen aan dit boek wanneer het aankomt",
+      "submittedEbook": "Aangevraagd. Het e-boek zal bij aankomst deelnemen aan dit boek"
+    }
   },
   "collection": {
     "visibleToAll": "Zichtbaar voor alle gebruikers",
@@ -7736,6 +8935,9 @@
       "uploadBooks": "Boeken uploaden",
       "appearance": "Weergave",
       "appearanceDescription": "Kies opties voor thema, accent, hoekradius, oppervlak en achtergrond.",
+      "style": "CSS",
+      "surfacePalette": "Oppervlak",
+      "topGlow": "Top gloed",
       "theme": "Thema",
       "accent": "Accent",
       "radius": "Radius",
@@ -7833,7 +9035,8 @@
       "updateTooltip": "{version}-update beschikbaar",
       "openUpdateRelease": "Open de {version}-release op GitHub",
       "zones": {
-        "browse": "Bladeren"
+        "browse": "Bladeren",
+        "reading": "Lezen"
       },
       "reorder": {
         "gripAria": "Bestel {name} opnieuw",
@@ -7864,6 +9067,8 @@
       "moreActions": "Meer acties",
       "setField": "Veld instellen",
       "refreshMetadata": "Metadata vernieuwen",
+      "refreshConfirm": "{count, plural, one {Vernieuw metadata voor # boek?} other {Vernieuw metadata voor # boeken?}}",
+      "refreshConfirmAction": "Vernieuwen",
       "reExtractCover": "Omslag opnieuw extraheren",
       "metadataLock": "Metadata vergrendelen",
       "lockAll": "Alles vergrendelen",
@@ -7924,6 +9129,69 @@
         "list": "Lijstweergave",
         "table": "Tabelweergave"
       }
+    },
+    "browseHeader": {
+      "eyebrow": {
+        "library": "Bibliotheek",
+        "smartScope": "Slim bereik",
+        "collection": "Collectie",
+        "browse": "Bladeren"
+      },
+      "facts": {
+        "books": "{count, plural, one {# boek} other {# boek}}",
+        "booksOf": "{matching} van {total, plural, one {# boek} other {# boeken}}",
+        "authors": "{count, plural, one {# auteur} other {# auteurs}}",
+        "series": "{count, plural, one {# series} other {# series}}",
+        "scanned": "Gescande {time}",
+        "scanningProgress": "Scannen van {processed} / {total}",
+        "syncsToKobo": "Kobo synchroniseren"
+      },
+      "switcher": {
+        "open": "Overschakelen van {name}",
+        "jumpTo": "Spring naar...",
+        "libraries": "Bibliotheken",
+        "smartScopes": "Slimme toepassingsgebieden",
+        "collections": "Collecties",
+        "empty": "Geen resultaten"
+      },
+      "search": {
+        "removeToken": "Filter {label} verwijderen",
+        "clearAll": "Zoek- en filters wissen",
+        "save": "Opslaan",
+        "summaryToken": "{count, plural, one {# filter} other {# filters}}"
+      },
+      "tokens": {
+        "anyOf": "Een van {count, plural, one {# regel} other {# regels}}",
+        "allOf": "Alles van {count, plural, one {# regel} other {# regels}}"
+      },
+      "sort": {
+        "sortBy": "Sorteren op {field}",
+        "ascending": "Oplopend. Overschakelen naar aflopend",
+        "descending": "Aflopend. Overschakelen naar oplopend"
+      },
+      "facets": {
+        "format": "Formatteren",
+        "rules": "Regels",
+        "show": "Weergeven",
+        "library": "Bibliotheek",
+        "status": "status",
+        "ruleCount": "{count, plural, one {# regel} other {# regels}}"
+      },
+      "menu": {
+        "more": "Meer voor {name}",
+        "editRules": "Regels bewerken",
+        "deleteSmartScope": "Verwijder Smart Scope",
+        "deleteCollection": "Collectie verwijderen",
+        "confirmDelete": "Verwijder \"{name}\"? Dit kan niet ongedaan worden gemaakt.",
+        "upload": "Upload boeken"
+      },
+      "scan": {
+        "scanning": "Scannen",
+        "started": "Scannen van {name}",
+        "finished": "Scan van {name} voltooid"
+      },
+      "viewModes": "Bekijk modus",
+      "legend": "Volume kleuren"
     },
     "iconPicker": {
       "clearSelectionAria": "Geselecteerd pictogram wissen",
@@ -8033,6 +9301,28 @@
       "discardTitle": "Wijzigingen negeren?",
       "discardDescription": "Je niet-opgeslagen wijzigingen gaan verloren.",
       "discardConfirm": "Weggooien"
+    },
+    "backgroundPicker": {
+      "none": "geen",
+      "dots": "Stippen",
+      "cross": "Doorkruisen",
+      "millimeter": "Millimeter",
+      "blueprint": "Blauwdruk",
+      "brushed": "Geborsteld",
+      "scanlines": "Scanlijnen",
+      "vinyl": "Vinyl",
+      "carbon": "Koolstof",
+      "perforated": "Geperforeerd",
+      "aurora": "Aurora",
+      "horizon": "horizon",
+      "glow": "Gloeien",
+      "mesh": "mesh",
+      "elevation": "Hoogte",
+      "prism": "Prisma",
+      "spectrum": "Spectrum",
+      "spectrum-x": "Spectrum X",
+      "spectrum-plus": "Spectrum Plus",
+      "eclipse": "Eclipse"
     }
   },
   "customIcons": {
@@ -8090,6 +9380,7 @@
     },
     "settings": {
       "title": "Dashboard aanpassen",
+      "preferencesTitle": "Voorkeuren Dashboard",
       "tabs": {
         "widgets": "Widgets",
         "shelves": "Planken"
@@ -8126,6 +9417,11 @@
         "twoColumns": "Twee kolommen",
         "twoColumnsDescription": "Toon twee planken per rij."
       },
+      "shelfSync": {
+        "label": "Synchroniseer planken over sessies",
+        "description": "Sla jezelf volgorde, zichtbaarheid, rijtellingen en lay-out op in je account. Wanneer uit, blijf instellingen in deze browser staan."
+      },
+      "saveFailed": "Kan de dashboardinstellingen niet opslaan. Controleer uw verbinding en probeer het opnieuw.",
       "libraryScope": {
         "title": "Dashboardbibliotheken",
         "description": "Kies welke bibliotheken boeken en leesgegevens bijdragen aan dit dashboard.",
@@ -8272,6 +9568,7 @@
     },
     "tabs": {
       "providers": "Providers",
+      "servers": "Mail servers",
       "recipients": "Ontvangers",
       "groups": "Groepen",
       "templates": "Sjablonen",
@@ -8440,6 +9737,306 @@
       "sending": "Versturen...",
       "queued": "{count, plural, =0 {geen e-mails in wachtrij} one {één e-mail in wachtrij} other {# e-mails in wachtrij}}",
       "failed": "Versturen mislukt"
+    },
+    "page": {
+      "addRecipient": "Ontvanger toevoegen",
+      "recipients": "Ontvangers",
+      "groups": "Groepen",
+      "newGroup": "Nieuwe groep",
+      "servers": "Mail servers",
+      "addServer": "E-mailserver toevoegen",
+      "templates": "Sjablonen",
+      "newTemplate": "Nieuwe sjabloon",
+      "noServersReadonly": "Er wordt nog geen e-mailserver met u gedeeld. Vraag een beheerder om er een toe te voegen.",
+      "roleShared": "Gedeeld met iedereen",
+      "roleSystem": "Wachtwoord reset",
+      "cantConnect": "Kan niet verbinden",
+      "builtIn": "Ingebouwd in",
+      "recipientsEmptyTitle": "Voeg de e-reader of inbox waar je boeken naar stuurt toe",
+      "recipientsEmptyBody": "Een Kindle's adres eindigt in {kindle} en wordt vermeld onder Apparaten in uw Amazon account. Een PocketBook's eindigt in {pocketbook}. Een gewone inbox werkt ook.",
+      "kindleNote": "Kindle accepteert alleen mail van goedgekeurde afzenders. Voeg {address} toe onder Persoonlijke Document Instellingen in uw Amazon account.",
+      "copyAddress": "Kopieer adres",
+      "addressCopied": "Adres gekopieerd",
+      "editServer": "{name} bewerken",
+      "editTemplate": "{name} bewerken",
+      "editGroup": "{name} bewerken",
+      "groupCount": "{count, plural, one {# recipient} other {# recipients}}",
+      "recipientsHint": "De ster wordt gekozen wanneer je verzendt.",
+      "groupsHint": "Naar meerdere ontvangers tegelijk verzenden.",
+      "groupsEmpty": "Nog geen groepen.",
+      "serversHint": "De ster verstuurt jouw boeken.",
+      "templatesHint": "Het onderwerp en de berichten die verzonden zijn bij elk boek.",
+      "kindleTemplateNote": "Een Kindle toont nooit de sjabloon: de e-mail komt altijd uit met het onderwerp {subject}.",
+      "test": "Test",
+      "testServer": "Test {name}",
+      "testOk": "{name} verbonden",
+      "testFailed": "{name} kan geen verbinding maken",
+      "defaultRecipient": "Standaard ontvanger",
+      "makeDefaultRecipient": "Maak {name} de standaard ontvanger",
+      "defaultServer": "Standaard server",
+      "makeDefaultServer": "Maak {name} de standaard server",
+      "defaultTemplate": "Standaard sjabloon",
+      "makeDefaultTemplate": "Maak {name} het standaardsjabloon",
+      "editRecipient": "{name} bewerken",
+      "serversEmptyTitle": "Nog geen mailserver",
+      "serversEmptyBody": "Boeken gaan uit via een SMTP-account. Gmail, Outlook, iCloud en Fastmail zijn één klik; elke andere server werkt ook.",
+      "needServerTitle": "Voeg een mailserver toe voordat u kunt verzenden",
+      "needServerBody": "BookOrbit stuurt boeken door een SMTP-account dat u hebt, zoals Gmail met een app-wachtwoord.",
+      "needServerAsk": "Vraag een beheerder om een e-mailserver met u te delen.",
+      "goToServers": "Ga naar de mailservers",
+      "noEncryption": "Geen versleuteling"
+    },
+    "route": {
+      "defaultSaved": "Standaard bijgewerkt"
+    },
+    "attention": {
+      "title": "Heeft aandacht nodig",
+      "count": "{count, plural, one {# item} other {# artikel}}",
+      "hide": "Verbergen",
+      "show": "Weergeven",
+      "serverDown": "{name} kan geen verbinding maken",
+      "notDelivered": "{book} heeft {recipient} niet bereikt",
+      "maybeDelivered": "{book} heeft mogelijk {recipient} niet bereikt",
+      "testedAgo": "getest {time}",
+      "editServer": "Server bewerken",
+      "editRecipient": "Ontvanger bewerken",
+      "resend": "Opnieuw"
+    },
+    "reason": {
+      "tooLarge": "{size} is meer dan {server} accepteert.",
+      "tooLargeGmail": "{size} overschrijdt de limiet van 25 MB voor bijlagen in Gmail.",
+      "tooLargeFix": "Stuur een kleinere editie, of stel de ontvanger in op alleen tekstgerichte EPUB's.",
+      "signIn": "{server} heeft de aanmelding geweigerd.",
+      "signInFix": "Controleer de gebruikersnaam en het wachtwoord op de mailserver.",
+      "unreachable": "{server} heeft niet geantwoord.",
+      "unconfirmed": "De verbinding is verbroken nadat het bericht was overhandigd, dus deze is mogelijk binnengekomen.",
+      "unconfirmedFix": "Controleer het postvak in voordat u het opnieuw verzendt, of het kan twee keer aankomen.",
+      "interrupted": "BookOrbit werd opnieuw gestart terwijl deze e-mail begon.",
+      "interruptedFix": "Controleer de inbox voordat u opnieuw verzendt.",
+      "preparation": "Het bestand kon niet worden voorbereid om te verzenden.",
+      "other": "De e-mailserver zette het uit.",
+      "server": "de mailserver",
+      "serverMessage": "Server bericht",
+      "retryAt": "Probeer nu {time}."
+    },
+    "status": {
+      "sent": "Verzonden",
+      "sending": "Verzenden",
+      "retrying": "Opnieuw proberen · {attempt} van {total}",
+      "unconfirmed": "Onbevestigd",
+      "failed": "Mislukt"
+    },
+    "recent": {
+      "moreActions": "Meer acties voor {title}",
+      "deletedBook": "Boek verwijderd",
+      "openBook": "Boek openen",
+      "resend": "Opnieuw",
+      "delete": "Invoer wissen"
+    },
+    "log": {
+      "all": "Allemaal",
+      "attention": "Heeft aandacht nodig",
+      "active": "In behandeling",
+      "book": "Boek",
+      "sentTo": "Verzonden aan",
+      "file": "Bestand",
+      "status": "status",
+      "when": "Wanneer",
+      "sentMeans": "Verstuurd betekent dat je mailserver deze geaccepteerd heeft",
+      "emptyFilter": "Op dit moment is hier niets.",
+      "loadMore": "Meer laden",
+      "showing": "Toont {shown} van {total}",
+      "emptyTitle": "Nog niets verzonden",
+      "emptyBody": "Boeken die je per e-mail ontvangt, worden hier weergegeven waar ze naartoe gingen en of de e-mailserver ze heeft overgenomen."
+    },
+    "card": {
+      "nothingSent": "Nog niets verzonden",
+      "failed": "Mislukt",
+      "retrying": "opnieuw proberen",
+      "unconfirmed": "onbevestigd",
+      "sending": "verzenden",
+      "narration": "Arratie",
+      "narrationTitle": "Lees-langs boeken houden hun verhaal"
+    },
+    "device": {
+      "kindle": "Vriendelijk",
+      "kobo": "Kobo",
+      "other": "Andere e-reader",
+      "otherShort": "E-lezer",
+      "none": "Persoon of inbox"
+    },
+    "sheet": {
+      "title": "Verstuur per e-mail",
+      "sendTo": "Verzenden naar",
+      "groups": "Groepen",
+      "templateName": "{name} sjabloon",
+      "eachFormat": "Het formaat van elke ontvanger",
+      "formatForAll": "{format} voor iedereen",
+      "file": "Bestand",
+      "mailServer": "E-mail server",
+      "template": "Sjabloon",
+      "yourDefault": "jouw standaard",
+      "emails": "{count, plural, one {# email} other {# emails}}",
+      "noOnePicked": "Niemand geselecteerd",
+      "total": "{size} in totaal",
+      "send": "{count, plural, one {Verstuur} other {Stuur # e-mails}}",
+      "noFormat": "Geen {format}, wordt {got}",
+      "readAlong": "Lees, {size}",
+      "overKindle": "{size}, de limiet van 50 MB van Kindle's",
+      "overGmail": "{size}, meer Gmail's limiet van 25 MB",
+      "kindleRejects": "Vriendelijk verwerpt {format}",
+      "blockedKindle": "{name} kan {format} niet ontvangen. Kies EPUB of PDF, of schakel deze optie uit.",
+      "books": "{count, plural, one {# boek} other {# boek}}",
+      "notReadyTitle": "E-mail is nog niet ingesteld",
+      "notReadyBody": "Voordat een boek ergens naartoe kan gaan, heeft dit account een mailserver en een ontvanger nodig.",
+      "addServer": "Een mailserver toevoegen",
+      "addServerHint": "Gmail, Outlook, iCloud, Fastmail of elk SMTP-account.",
+      "askForServer": "Vraag een beheerder om een mailserver te delen.",
+      "addRecipient": "Een ontvanger toevoegen",
+      "addRecipientHint": "Uw vriendelijke PocketBook of elke andere inbox.",
+      "openSettings": "E-mailinstellingen openen",
+      "sendingTitle": "Verzenden {title}",
+      "closeHint": "U kunt dit sluiten. Failures worden ook weergegeven in uw meldingen en in uw e-mailgeschiedenis.",
+      "openHistory": "Geschiedenis openen",
+      "done": "Voltooid",
+      "acceptedBy": "Geaccepteerd door {server} {time}",
+      "handingOver": "Overhandigen aan {server}"
+    },
+    "editor": {
+      "kindleSubject": "converteren",
+      "recipient": {
+        "newTitle": "Nieuwe ontvanger",
+        "description": "De naam, adres, apparaat en wat het ontvangt.",
+        "sectionRecipient": "Ontvanger",
+        "sectionReceives": "Wat het ontvangt",
+        "name": "naam",
+        "email": "E-mail adres",
+        "device": "Apparaat",
+        "deviceHint": "Vriendelijk wijzigt het onderwerp naar {subject} en beperkt de onderstaande formaten.",
+        "format": "Formatteren",
+        "formatPrimary": "Primair boek",
+        "formatHint": "Een boek zonder dit formaat krijgt de primaire editie.",
+        "kindleFormatHint": "Amazon accepteerde geen MOBI en AZW3 via e-mail in 2023, dus ze worden niet aangeboden voor een Kindle. Een boek zonder dit formaat krijgt de primaire editie.",
+        "kindleLegacyFormat": "Vriendelijk accepteert {format} niet meer per e-mail. Kies EPUB of PDF.",
+        "readAlong": "Lezen langs boeken",
+        "readAlongAutomatic": "Automatisch",
+        "readAlongAutomaticHint": "Tekst alleen wanneer een veilige kopie gemaakt kan worden, anders het origineel.",
+        "readAlongTextOnly": "Uitsluitende EPUB",
+        "readAlongTextOnlyHint": "Narratie verwijderd. Klein genoeg voor e-mail.",
+        "readAlongOriginal": "Origineel met verhaal",
+        "readAlongOriginalHint": "Houdt het verhaal vast. Vaak 100 MB of meer over de limieten van de meeste mailsers.",
+        "notForKindle": "Niet voor Kindle",
+        "template": "Sjabloon",
+        "templateDefault": "Uw standaard ({name})",
+        "templateKindleHint": "Genegeerd voor Kindle, deze toont nooit het bericht.",
+        "approveTitle": "Afzender in Amazon goedkeuren",
+        "approveBody": "Kindle verwijdert e-mail van onbekende adressen zonder een foutmelding te sturen. Voeg in {path} {address} toe",
+        "approvePath": "Je content en apparaten beheren › Voorkeuren › Instellingen voor persoonlijke documenten",
+        "approveNoServer": "Voeg eerst een mailserver toe om het adres te zien dat Kindle moet goedkeuren.",
+        "lastSent": "Laatste boek verzonden {time}",
+        "sendTest": "Stuur een test e-mail",
+        "testSubject": "BookOrbit test e-mail",
+        "testBody": "Dit is een test vanuit BookOrbit. Als u het kunt lezen, zullen ook de naar {name} verzonden boeken hier komen.",
+        "testSent": "Test e-mail verzonden naar {name}",
+        "testFailed": "De test e-mail ging niet: {error}",
+        "makeDefault": "Maak snel verzenden ontvanger",
+        "remove": "Ontvanger verwijderen",
+        "removeConfirm": "{name} verwijderen?",
+        "removeConsequence": "De verzendingsgeschiedenis blijft bestaan.",
+        "removeDefaultConsequence": "Het verzendt geschiedenis blijft, en snel verzenden stopt totdat je een andere ontvanger ster geeft.",
+        "required": "Naam en e-mailadres zijn vereist.",
+        "sectionLastSent": "Laatst verzonden"
+      },
+      "server": {
+        "newTitle": "Nieuwe e-mailserver",
+        "description": "De SMTP-server, de inlog en die via deze server kan verzenden.",
+        "sectionProvider": "Leverancier",
+        "sectionServer": "Server",
+        "sectionSignIn": "Log in",
+        "sectionSender": "Afzender",
+        "sectionWho": "Wie gebruikt het",
+        "presetGmail": "Gmail",
+        "presetOutlook": "Uitzicht",
+        "presetIcloud": "iCloud Mail",
+        "presetFastmail": "Snelheids",
+        "presetOther": "Andere SMTP",
+        "presetHint": "Een vooraf ingestelde vulling in de host, poort en beveiliging. Je kunt ze nog steeds veranderen.",
+        "name": "naam",
+        "host": "Hostnaam",
+        "port": "Poort",
+        "security": "Beveiliging",
+        "securityStarttls": "STARTTLS",
+        "securitySsl": "SSL/TLS",
+        "securityNone": "geen",
+        "securityHint": "STARTTLS op 587, SSL/TLS op 465. Het ene of het andere, nooit beide.",
+        "needsPassword": "Deze server heeft een wachtwoord nodig",
+        "username": "Gebruikersnaam",
+        "password": "Wachtwoord",
+        "appPassword": "App wachtwoord",
+        "passwordKeep": "Opgeslagen. Typ om te vervangen",
+        "appPasswordHint": "Gmail en iCloud hebben een app-wachtwoord nodig, niet uw accountwachtwoord.",
+        "fromName": "Afzender naam",
+        "fromAddress": "Afzender adres",
+        "fromAddressHint": "Kindle eigenaren moeten dit adres goedkeuren.",
+        "share": "Delen met iedereen",
+        "shareHint": "Andere mensen kunnen boeken via deze server verzenden zonder het wachtwoord te zien.",
+        "system": "Verzend wachtwoord reset en login links",
+        "systemHint": "De ene server gebruikt BookOrbit zelf. Alleen een supergebruiker kan dit veranderen.",
+        "verifyTls": "Verifieer het servercertificaat",
+        "verifyTlsHint": "Schakel alleen uit voor een server op je eigen netwerk met een zelfondertekend certificaat.",
+        "test": "Verbindingstest testen",
+        "testDirty": "Eerst opslaan, dan test",
+        "testOk": "Verbonden",
+        "testFailed": "Kan geen verbinding maken: {error}",
+        "remove": "Verwijder server",
+        "removeConfirm": "{name} verwijderen?",
+        "removeConsequence": "Iedereen die het deelt met verlies.",
+        "removeSystemFirst": "Schakel wachtwoordreset uit op deze server voordat u deze verwijdert.",
+        "makeDefault": "Gebruik als mijn standaard",
+        "required": "Naam en host zijn vereist."
+      },
+      "template": {
+        "newTitle": "Nieuwe sjabloon",
+        "description": "Het onderwerp en de berichten die verzonden zijn bij elk boek.",
+        "sectionTemplate": "Sjabloon",
+        "sectionInsert": "Insert",
+        "sectionPreview": "Voorvertoning",
+        "name": "naam",
+        "subject": "Onderwerp",
+        "message": "bericht",
+        "groupBook": "Boek",
+        "groupFile": "Bestand",
+        "groupOther": "anders",
+        "insertHint": "Gaat naar binnen bij de cursor, het onderwerp of het bericht. Lege waarden print niets.",
+        "insertVariable": "Insert {variable}",
+        "previewWith": "Voorbeeldweergave met",
+        "previewEmpty": "Stuur een boek één keer om een sjabloon ermee te bekijken.",
+        "previewFailed": "De preview kon niet worden weergegeven.",
+        "previewTo": "tot",
+        "builtInReadonly": "Ingebouwd. Alleen een supergebruiker kan het veranderen.",
+        "kindleNote": "Vriendelijk laat nooit een sjabloon zien: het krijgt altijd het onderwerp {subject}.",
+        "makeDefault": "Maak mijn standaard",
+        "remove": "Sjabloon verwijderen",
+        "removeConfirm": "{name} verwijderen?",
+        "removeConsequence": "Ontvangers die dit gebruiken gaan terug naar uw standaard sjabloon.",
+        "required": "Naam en onderwerp zijn verplicht.",
+        "attachment": "Bijgevoegd: {name}"
+      },
+      "group": {
+        "newTitle": "Nieuwe groep",
+        "description": "Een set van ontvangers om één boek tegelijk te verzenden.",
+        "sectionGroup": "Groeperen",
+        "sectionMembers": "leden",
+        "name": "naam",
+        "memberCount": "{count} van {total}",
+        "noRecipientsTitle": "Geen ontvangers om uit te kiezen",
+        "noRecipientsBody": "Een groep is een set van ontvangers. Voeg eerst een ontvanger toe.",
+        "remove": "Groep verwijderen",
+        "removeConfirm": "{name} verwijderen?",
+        "removeConsequence": "De ontvangers blijven aanwezig.",
+        "required": "Een groep heeft een naam nodig.",
+        "updated": "Groep bijgewerkt"
+      }
     }
   },
   "errors": {
@@ -8734,6 +10331,14 @@
           "squareTitle": "Vierkant 1:1",
           "squareHint": "Bibliotheken met alleen audioboeken",
           "slotsHint": "Bij een boek met zowel een e-boek als een luisterboek wordt de omslag weergegeven die bij deze vorm past."
+        },
+        "gridShape": {
+          "title": "Raster vorm",
+          "tallTitle": "Hoog cellen",
+          "tallHint": "Best voor ebooks of gemengde bibliotheken",
+          "squareTitle": "Vierkante cellen",
+          "squareHint": "Het beste voor audiobook bibliotheken",
+          "hint": "Elk boek toont de omslag van het primaire formaat, vierkant voor audiobook. Een omslag die niet overeenkomt met de tegel volgt de weergave-instelling."
         }
       },
       "folders": {
@@ -8930,6 +10535,68 @@
           "opfHint": "Bewaard naast het boek door Calibre",
           "swap": "Wissel de bestelling om",
           "hint": "BookOrbit gebruikt de eerste die een boek heeft en negeert de andere. Calibre bibliotheken willen meestal eerst metadata.opf."
+        },
+        "regex": {
+          "title": "Configureren regex metagegevens",
+          "sourceTitle": "Regex",
+          "description": "Voeg metadata uit van het primaire bestandspad relatief aan de bibliotheekmap. De bestandsextensie is verwijderd voor de overeenstemming. De eerste regel met bruikbare velden wint.",
+          "enable": "Regex metadata inschakelen",
+          "primaryFileHint": "Voor een boek van verschillende bestanden, zoals audiobook tracks, lezen de regels het pad van het primaire bestand.",
+          "groups": "Benoemde groepen:",
+          "valuesHint": "Gebruik auteur voor één auteur of auteurs gescheiden door puntkomma's. Datums gebruiken JJJJJ-MM-DD. Vlaggen: i negeert geval, u maakt Unicode mogelijk.",
+          "rules": "Geordende extractieregels",
+          "rule": "Regel {number}",
+          "moveUp": "Regel omhoog verplaatsen",
+          "moveDown": "Regel omlaag verplaatsen",
+          "remove": "Regel verwijderen",
+          "basePath": "Bibliotheek map",
+          "extensionHint": "De bestandsextensie wordt automatisch genegeerd. De eindanker komt overeen met de bestandsnaam zonder de extensie.",
+          "flags": "Vlaggen",
+          "add": "Regel toevoegen",
+          "examplePath": "Voorbeeld relatief bestandspad met inbegrip van extensie",
+          "examplePlaceholder": "Auteur/Series/08 - My.Book.epub",
+          "exampleTitle": "Voorbeeld met achterreferentie auteur",
+          "exampleTestPath": "Test pad (inclusief extensie)",
+          "validating": "Regels controleren…",
+          "validationSuccess": "Regelsyntaxis en groepen zijn geldig. Gebruik de voorvertoning om overeenkomsten te controleren voor een bestandspad.",
+          "validationError": "Kon de regels niet valideren. Probeer het opnieuw voordat je ze toepast.",
+          "validationRetry": "Controleer opnieuw",
+          "validationRuleCount": "Toevoegen tussen {min} en {max} regels.",
+          "preview": "Voorvertoning",
+          "previewing": "Regels testen…",
+          "previewError": "Kon de regels niet bekijken. Controleer het relatieve pad en de configuratie, en probeer het dan opnieuw.",
+          "actualInput": "Pad getest:",
+          "matched": "Overeenkomende regel {number}",
+          "noMatch": "Geen bruikbare match. Bestandsmetadata zal worden gebruikt.",
+          "scanHint": "Wijzigingen zijn van toepassing op toekomstige metadata extractie voor nieuwe of gewijzigde bestanden. Opslaan van scan of bijwerken van ongewijzigde boeken wordt niet gestart.",
+          "apply": "Toepassen op bibliotheekformulier",
+          "configure": "Configureren",
+          "enabledHint": "Velden uit relatieve paden zonder bestandsextensies halen.",
+          "disabledHint": "Uitgeschakeld. Configureer regels om in te schakelen.",
+          "moveSourceUp": "Verplaats {source} omhoog",
+          "moveSourceDown": "Verplaats {source} omlaag",
+          "diagnostics": {
+            "pattern_required": "Voer een reguliere expressie in.",
+            "pattern_too_long": "De expressie mag niet langer zijn dan {count} tekens.",
+            "invalid_flags": "Alleen i en u zijn toegestaan, hoogstens éénmaal.",
+            "invalid_pattern": "Ongeldige reguliere expressie.",
+            "missing_group": "Voeg ten minste één ondersteunde groep toe.",
+            "conflicting_authors": "Gebruik auteur of auteurs, niet beide.",
+            "invalid_value": "Een ongeldige veldwaarde is overgeslagen.",
+            "timeout": "De expressie duurde te lang. Vereenvoudig het patroon.",
+            "busy": "Alle preview-workers zijn bezig. Probeer het binnenkort opnieuw.",
+            "worker_failed": "De expressie kon niet worden geëvalueerd. Probeer het opnieuw."
+          },
+          "precedenceHint": "De eerste beschikbare bestandsbron metagegevens. Regex velden volgen deze order en ontbrekende waarden worden ingevuld vanuit de andere bron.",
+          "summary": "{format} eerst, voorkeur voor regex metadata",
+          "fields": {
+            "title": "Aanspreektitel",
+            "authors": "Auteurs",
+            "series": "Serie",
+            "seriesIndex": "Serie nummer",
+            "publishedYear": "Gepubliceerd jaar",
+            "publishedDate": "Gepubliceerde datum"
+          }
         }
       },
       "fileWrite": {
@@ -8945,12 +10612,22 @@
         },
         "cover": {
           "title": "Omslagafbeelding toevoegen",
-          "hint": "Schrijft de opgeslagen omslag terug naar ondersteunde bestandsformaten."
+          "hint": "Schrijft de opgeslagen omslag terug naar ondersteunde bestandsformaten.",
+          "mediumHint": "Schrijft de omslag ook naar het bestand. Ebook bestanden krijgen de albumhoes en audio bestanden krijgen de omslag van Audiobook; een bestand waarvan de cover ontbreekt, houdt zijn eigen omslag."
+        },
+        "allFiles": {
+          "title": "Schrijf elk bestand van een boek in",
+          "hint": "Schrijf ook in andere boekbestanden van het boek, zoals een audiobook naast zijn ebook of een PDF in dezelfde map. Elk boekformaat daar is geschreven, dus geef een bijbehorende bestand zoals een werkboek om het buiten te houden. Formateer schakelaars en limieten hieronder zijn nog steeds van toepassing. Dit uitschakelen stopt toekomstige schrijven; bestanden worden niet reeds geschreven ongedaan gemaakt."
         },
         "epub": {
           "title": "EPUB",
           "hint": "Schrijft metadata naar het OPF-bestand in het EPUB-archief.",
           "toggleAria": "EPUB-metadata schrijven"
+        },
+        "readAlong": {
+          "title": "Lezen langs EPUB",
+          "hint": "EPUB's met gesynchroniseerd verhaal, zoals Storyteller leeslijsten. Ze dragen hun audio, dus ze zijn groot en hebben meer geheugen nodig om te herschrijven.",
+          "toggleAria": "Schrijf lees-langs EPUB metadata"
         },
         "fb2": {
           "title": "Fictieboek (FB2)",
@@ -8975,7 +10652,9 @@
         "audio": {
           "title": "Audio",
           "hint": "Sluit de opgeslagen omslag in M4B-, M4A-, MP3- en FLAC-bestanden in.",
-          "toggleAria": "Audio-omslagen schrijven"
+          "toggleAria": "Audio-omslagen schrijven",
+          "tagsHint": "Schrijft tags zoals titel, auteurs, narrators en series in M4B, M4A, MP3 en FLAC bestanden.",
+          "tagsToggleAria": "Audio-metadata schrijven"
         },
         "coverAudioHint": "Schrijft de opgeslagen omslag ook naar het bestand. Audiobestanden kunnen alleen een omslag hebben.",
         "audioNeedsCover": "'Inclusief omslagafbeelding' moet zijn ingeschakeld.",
@@ -9069,6 +10748,7 @@
         "add": "Toevoegen",
         "emptyCreate": "Nog niemand anders. Mensen die je hier toevoegt, krijgen toegang zodra de bibliotheek bestaat.",
         "superusers": "Superusers hebben altijd volledige toegang.",
+        "levelsHint": "Bekijkers kunnen bladeren en lezen. Editor en eigenaren kunnen ook metadata bewerken als hun account de rechten heeft om metadata te bewerken.",
         "levelFor": "Toegangsniveau voor {name}",
         "revokeFor": "Toegang verwijderen voor {name}",
         "revokeQuestion": "Toegang verwijderen?",
@@ -9188,6 +10868,13 @@
         "createFolder": "Kan map niet aanmaken"
       }
     },
+    "destination": {
+      "loadFailed": "Kon de bestemming bibliotheken niet laden. Sluit en heropen om het opnieuw te proberen.",
+      "noLibraries": "Er zijn geen boekbibliotheken beschikbaar. Maak een bibliotheek aan of vraag een beheerder om toegang.",
+      "noFolders": "Deze bibliotheek heeft geen bestemmingsmappen. Een map toevoegen in de instellingen van de bibliotheek.",
+      "unavailable": "De geselecteerde bibliotheek is niet langer beschikbaar.",
+      "selectFolder": "Selecteer een map..."
+    },
     "upload": {
       "library": "Bibliotheek",
       "selectLibrary": "Selecteer een bibliotheek...",
@@ -9213,6 +10900,85 @@
         "title": "Sleep bestanden hierheen of klik om te bladeren",
         "hint": "{formats} - tot {size} MB per stuk"
       }
+    }
+  },
+  "metadataReminders": {
+    "title": "Missing-field herinneringen",
+    "navDescription": "Kies welke ontbrekende metadata velden u wilt zien",
+    "personal": "Uw voorkeuren",
+    "description": "Kies welke ontbrekende velden worden weergegeven in boekherinneringen. Deze voorkeuren zijn van toepassing op uw gehele bibliotheek en wijzigen geen metadata scores.",
+    "sheetDescription": "Kies de velden waar je om geeft zonder dit boek te verlaten.",
+    "fieldsHeading": "Velden om te controleren",
+    "autoSave": "Wijzigingen worden automatisch in uw account opgeslagen.",
+    "saving": "Voorkeuren opslaan...",
+    "saved": "Voorkeuren opgeslagen.",
+    "reset": "Standaardinstellingen herstellen",
+    "disabled": "Geen velden geselecteerd. Missing-field herinneringen zijn verborgen.",
+    "saveFailed": "Kon uw voorkeuren niet opslaan. Uw eerdere voorkeuren zijn hersteld.",
+    "customize": "Herinneringen aanpassen...",
+    "missingHeading": "Ontbrekende metagegevens",
+    "missingDescription": "Ontbrekende velden die u hebt gekozen om te volgen.",
+    "missingCount": "{count, plural, one {# ontbrekend veld} other {# ontbrekende velden}}",
+    "missingFields": "{count, plural, one {Het veld ontbreekt} other {ontbrekende velden}}",
+    "fields": {
+      "publisher": {
+        "label": "Uitgever",
+        "hint": "De uitgever is ingevuld."
+      },
+      "language": {
+        "label": "Taal",
+        "hint": "De taal is ingevuld."
+      },
+      "publication": {
+        "label": "Publicatie jaar",
+        "hint": "Een publicatiejaar of volledige datum is genoeg."
+      },
+      "pageCount": {
+        "label": "Aantal pagina's",
+        "hint": "Het aantal pagina's wordt ingevuld. Audio-only boeken worden overgeslagen."
+      },
+      "isbn": {
+        "label": "Internetprovider",
+        "hint": "ISBN-10 of ISBN-13 is genoeg."
+      },
+      "genres": {
+        "label": "Genres",
+        "hint": "Ten minste één genre is ingevuld."
+      },
+      "tags": {
+        "label": "Labels",
+        "hint": "Ten minste één label is ingevuld."
+      },
+      "description": {
+        "label": "Beschrijving",
+        "hint": "De beschrijving is ingevuld."
+      }
+    }
+  },
+  "metadataCache": {
+    "badge": {
+      "cached": "gecached",
+      "stale": "Verouderde",
+      "cachedHint": "Resultaat opgeslagen van {when}",
+      "cachedHintUndated": "Resultaat opgeslagen",
+      "staleHint": "De aanbieder was niet beschikbaar, dus een opgeslagen resultaat van {when} werd gebruikt",
+      "staleHintUndated": "De provider was niet beschikbaar, dus er werd een opgeslagen resultaat gebruikt"
+    },
+    "notice": {
+      "someCached": "Sommige resultaten kwamen van opgeslagen zoekopdrachten (oudheid: {when}).",
+      "someCachedUndated": "Sommige resultaten kwamen uit opgeslagen zoekopdrachten.",
+      "someStale": "Sommige providers waren niet beschikbaar, dus er werden opgeslagen resultaten weergegeven (oudheid: {when}).",
+      "someStaleUndated": "Sommige providers waren niet beschikbaar, dus opgeslagen resultaten werden getoond.",
+      "searchFresh": "Zoek nieuw",
+      "searchFreshHint": "Vraag elke provider opnieuw in plaats van opgeslagen antwoorden te gebruiken"
+    },
+    "fallback": {
+      "usedSaved": "{count, plural, one {{providers} was niet beschikbaar, daarom zijn opgeslagen resultaten gebruikt.} other {{providers} waren niet beschikbaar, daarom zijn opgeslagen resultaten gebruikt.}}"
+    },
+    "ignoreCache": {
+      "label": "Negeer gecachte resultaten",
+      "hint": "Vraag elke provider opnieuw in plaats van opgeslagen antwoorden te hergebruiken. Langzamer dan weer en gebruik meer van de aanvraagvergoeding van elke aanbieder.",
+      "runHint": "Van toepassing op de uitvoering die u hier begint. Elke provider wordt gevraagd in plaats van opgeslagen antwoorden te hergebruiken, wat langzamer is."
     }
   },
   "metadataScore": {
@@ -9655,6 +11421,22 @@
     }
   },
   "reader": {
+    "pageImages": {
+      "loadFailed": "Dit document kon niet worden geopend. Controleer uw toegang of probeer het opnieuw.",
+      "pageFailed": "Deze pagina kan niet worden geladen. Probeer opnieuw wanneer de server beschikbaar is.",
+      "pageAlt": "Pagina {page}",
+      "previousPage": "Vorige pagina",
+      "nextPage": "Volgende pagina",
+      "goToPage": "Ga naar pagina",
+      "pin": "Menu lezer vastzetten",
+      "unpin": "Losmaken menu lezer"
+    },
+    "djvu": {
+      "pageText": "Tekst ingesloten pagina",
+      "textDescription": "Tekst opgeslagen in het DjVu document. OCR kan fouten bevatten.",
+      "noText": "Deze pagina heeft geen ingesloten tekst.",
+      "textFailed": "Kan de ingesloten tekst van deze pagina niet laden."
+    },
     "retry": "Opnieuw proberen",
     "pdf": {
       "openError": "Deze PDF kan niet worden geopend",
@@ -9725,6 +11507,7 @@
     },
     "loadingBook": "Boek laden…",
     "failedToLoadBook": "Boek kon niet worden geladen",
+    "bookLoadTimeout": "Het boek heeft te lang geduurd om te openen. Probeer de pagina te vernieuwen.",
     "chapterNumber": "Hoofdstuk {number}",
     "peek": {
       "badge": "Voorproefje",
@@ -12056,6 +13839,7 @@
     },
     "email": {
       "providers": "Providers",
+      "servers": "Mail servers",
       "recipients": "Ontvangers",
       "groups": "Groepen",
       "templates": "Sjablonen",
@@ -12069,7 +13853,8 @@
       "genre-blocklist": "Genre-blokkeerlijst",
       "score": "Betrouwbaarheidsscore",
       "auto-fetch": "Boeken automatisch ophalen",
-      "authors": "Auteurs automatisch ophalen"
+      "authors": "Auteurs automatisch ophalen",
+      "search-cache": "Zoek Cache"
     },
     "admin": {
       "users": "Gebruikers",
@@ -12180,5 +13965,92 @@
     "errors": {
       "generic": "TTS fout"
     }
+  },
+  "delivery": {
+    "readAloud": {
+      "label": "Lees-voorste EPUB levering",
+      "automatic": "Automatisch: geef de voorkeur aan teksten, sta originele terugvallen.",
+      "textOnly": "Uitsluitende EPUB",
+      "original": "Originele EPUB met verhaal",
+      "hint": "Van toepassing op toekomstige leveringen. Originelen behouden bestaande verhalen en kunnen veel groter zijn. Voorbereiding alleen mislukt als een veilige kopie niet kan worden gemaakt.",
+      "koboHint": "Oorspronkelijke EPUB's bypass KEPUB-conversie. Native Kobo firmware mag narration niet afspelen en exacte positie en sync accentueren zijn niet beschikbaar voor die kopie.",
+      "profileHint": "Gebruik aparte OPDS-profielen voor lezers die verschillende EPUB-varianten nodig hebben.",
+      "replacementTitle": "Vervang een Kobo kopie",
+      "bookId": "Boek ID",
+      "device": "Apparaat",
+      "prepare": "Vervanging voorbereiden",
+      "offer": "Ik heb alleen de kopie van het apparaat verwijderd; bied de vervanging aan",
+      "confirm": "Ik heb de vervanging geïnstalleerd",
+      "cancel": "Annuleer vervanging",
+      "replacementHint": "Bereid je voor en beoordeel eerst. Het verwijderen van een kopie van het apparaat verwijdert niet het bibliotheekboek. Maak zelf een back-up van apparaatlokale notities. Boekarest behoudt canonische vooruitgang en serveraantekeningen. Vertraagde evenementen kunnen de exacte synchronisatie beperken.",
+      "prepared": "Vervanging voorbereid: {format}, {size}. Verwijder dit boek alleen van het geselecteerde apparaat en bied vervolgens de voorbereiding en synchronisatie aan.",
+      "offered": "Vervanging aangeboden. Synchroniseer en download op het apparaat, bevestig dan de installatie. Een voltooide HTTP-overdracht bewijst de installatie niet.",
+      "cancelled": "Vervanging geannuleerd. Annulering herstelt geen verwijderde of gedeeltelijk vervangen toestel. Selecteer hetzelfde boek om een hersteldownload voor te bereiden.",
+      "alreadyOnDevice": "Het apparaat heeft deze exacte kopie al, dus er is niets te vervangen.",
+      "failed": "Deze vervanging kon niet worden voorbereid of bijgewerkt.",
+      "searchBook": "Zoek naar een boek",
+      "chooseBook": "Selecteer een boek",
+      "moreResults": "Toon meer boeken",
+      "noResults": "Geen overeenkomende boeken gevonden.",
+      "refresh": "Ververs verzendstatus",
+      "confirmed": "U bevestigde installatie. Dit neemt uw bevestiging op, niet de verificatie van het apparaat.",
+      "transferred": "De overdracht is voltooid. Open de vervanging op het apparaat voordat de installatie wordt bevestigd.",
+      "koreaderDefaultTitle": "KOReader EPUB levering",
+      "koreaderDefaultHint": "De standaard is van toepassing op toekomstige downloads op apparaten die deze referenties gebruiken. Apparaatinstellingen kunnen dit overschrijven. Bestaande kopieën en onderbroken downloads blijven ongewijzigd. Automatisch behouden bestaande apparaatkeuzes.",
+      "koreaderUseDefault": "Standaard inloggegevens gebruiken",
+      "koreaderSaveFailed": "Kon de instelling voor aflevering van KOReader niet opslaan. Probeer het opnieuw.",
+      "koreaderSaved": "KOReader EPUB leveringsinstelling opgeslagen."
+    }
+  },
+  "commandPalette": {
+    "title": "Zoeken",
+    "description": "Zoek boeken, auteurs, reeksen en instellingen, spring naar een plaats of voer een actie uit.",
+    "placeholder": "Zoek boeken, auteurs of series of ga naar…",
+    "close": "Zoekopdracht sluiten",
+    "clear": "Zoekopdracht wissen",
+    "tabs": {
+      "all": "Allemaal",
+      "books": "Boeken",
+      "authors": "Auteurs",
+      "series": "Serie",
+      "settings": "Instellingen"
+    },
+    "sections": {
+      "continueReading": "Lees verder",
+      "goTo": "Ga naar",
+      "actions": "acties",
+      "books": "Boeken",
+      "authors": "Auteurs",
+      "series": "Serie",
+      "settings": "Instellingen"
+    },
+    "kinds": {
+      "author": "Auteur",
+      "series": "Serie",
+      "library": "Bibliotheek",
+      "smartScope": "Slim bereik",
+      "collection": "Collectie",
+      "page": "Pagina",
+      "setting": "Instellingen"
+    },
+    "showAllBooks": "{count, plural, one {Toon # boek} other {Toon alle # boeken}}",
+    "showAllAuthors": "{count, plural, one {Toon # auteur} other {Toon alle # auteurs}}",
+    "showAllSeries": "{count, plural, one {Toon # series} other {Toon alle # series}}",
+    "showAllSettings": "{count, plural, one {Toon # instelling} other {Toon alle # instellingen}}",
+    "actions": {
+      "lightTheme": "Overschakelen naar licht thema",
+      "darkTheme": "Overschakelen naar donker thema"
+    },
+    "hints": {
+      "navigate": "Navigate",
+      "open": "Open",
+      "filter": "Filteren",
+      "close": "Afsluiten"
+    },
+    "keys": {
+      "escape": "esc",
+      "tab": "tab"
+    },
+    "resultCount": "{count, plural, =0 {Geen resultaten} one {# resultaat} other {# resultaten}}"
   }
 }

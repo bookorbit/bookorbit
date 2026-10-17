@@ -276,6 +276,8 @@ export class ReadingAttemptService {
     finishThreshold: number;
     strongRereadEvidence: boolean;
     meaningfulActivity: boolean;
+    /** The reader's timezone, which files late sessions into the read they belong to. */
+    timeZone?: string;
   }): Promise<UserBookStatus | null> {
     let changed = false;
     const result = await this.repo.transaction<UserBookStatus | null>(async (tx) => {
@@ -284,6 +286,29 @@ export class ReadingAttemptService {
       const hasCompleted = await this.repo.hasCompleted(tx, input.userId, input.bookId);
       const isFinished = hasReachedProgressThreshold(input.progress, input.finishThreshold);
 
+      // A device that went without syncing delivers the sessions of a read only after its finished state
+      // has closed the attempt. Activity dated no later than that close is backlog, not a new read: it
+      // joins the read it falls within, and activity from before that read began joins nothing.
+      if (
+        !active &&
+        !input.strongRereadEvidence &&
+        latest?.outcome === 'completed' &&
+        latest.endedOn !== null &&
+        input.occurredOn <= latest.endedOn
+      ) {
+        if (input.timeZone && (latest.startedOn === null || input.occurredOn >= latest.startedOn)) {
+          await this.repo.attachBackfilledSessions(
+            tx,
+            input.userId,
+            input.bookId,
+            latest.id,
+            input.timeZone,
+            latest.startedOn ?? input.occurredOn,
+            latest.endedOn,
+          );
+        }
+        return null;
+      }
       if (!active && hasCompleted && !input.strongRereadEvidence && !input.meaningfulActivity) return null;
       if (!active && isFinished && !hasCompleted) {
         latest = await this.repo.create(tx, {

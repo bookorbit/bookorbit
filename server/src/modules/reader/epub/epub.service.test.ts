@@ -1,5 +1,6 @@
 vi.mock('fs/promises', () => ({ stat: vi.fn() }));
 vi.mock('unzipper', () => ({ Open: { file: vi.fn() } }));
+vi.mock('./epub-zip-entry-stream', () => ({ openEpubZipEntryRange: vi.fn() }));
 
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -8,11 +9,13 @@ import { Readable } from 'stream';
 import * as unzipper from 'unzipper';
 
 import { EpubService } from './epub.service';
+import { openEpubZipEntryRange } from './epub-zip-entry-stream';
 import { BookReadService } from '../../book/book-read.service';
 import { LibraryService } from '../../library/library.service';
 
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockOpenFile = (unzipper as any).Open.file as vi.Mock;
+const mockOpenRange = openEpubZipEntryRange as MockedFunction<typeof openEpubZipEntryRange>;
 
 interface ZipEntrySpec {
   path: string;
@@ -161,15 +164,27 @@ const SMIL_XML = `
 </smil>
 `;
 
-function makeMediaOverlayArchive(smil = SMIL_XML) {
+function makeMediaOverlayArchive(
+  smil = SMIL_XML,
+  audioEntries: ZipEntrySpec[] = [{ path: 'OPS/audio/ch1.mp3', content: Buffer.from('0123456789') }],
+) {
   return makeArchive([
     { path: 'META-INF/container.xml', content: CONTAINER_XML },
     { path: 'OPS/content.opf', content: OPF_MEDIA_OVERLAY_XML },
     { path: 'OPS/nav.xhtml', content: NAV_XHTML },
     { path: 'OPS/text/ch1.xhtml', content: '<h1>ch1</h1>' },
     { path: 'OPS/smil/ch1.smil', content: smil },
-    { path: 'OPS/audio/ch1.mp3', content: Buffer.from('0123456789') },
+    ...audioEntries,
   ]);
+}
+
+/** An overlay whose audio file is named by `href`, written into the OPF and the SMIL as given. */
+function makeNamedAudioArchive(href: string, audioEntries: ZipEntrySpec[]) {
+  const archive = makeMediaOverlayArchive(SMIL_XML.replaceAll('../audio/ch1.mp3', `../${href}`), audioEntries);
+  const opf = OPF_MEDIA_OVERLAY_XML.replace('href="audio/ch1.mp3"', `href="${href}"`);
+  const opfEntry = archive.files.find((file) => file.path === 'OPS/content.opf')!;
+  opfEntry.buffer.mockResolvedValue(Buffer.from(opf));
+  return archive;
 }
 
 function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?: boolean; lowerCasePaths?: boolean; opf?: string }) {
@@ -216,6 +231,7 @@ describe('EpubService', () => {
     bookReadService.findPrimaryFilesByBookIds.mockResolvedValue([{ format: 'epub', absolutePath: '/books/book.epub', sizeBytes: null }]);
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
     mockStat.mockResolvedValue({ mtimeMs: 100 } as Awaited<ReturnType<typeof stat>>);
+    mockOpenRange.mockImplementation(async (_path, entry, start, end) => Readable.from([(await entry.buffer()).subarray(start, end + 1)]));
   });
 
   it.each([
@@ -425,7 +441,56 @@ describe('EpubService', () => {
     expect(result.status).toBe(206);
     expect(result.contentRange).toBe('bytes 2-5/10');
     expect(result.contentType).toBe('audio/mpeg');
-    expect(result.data).toEqual(Buffer.from('2345'));
+    expect(result.size).toBe(10);
+    expect(result.length).toBe(4);
+    expect(mockOpenRange).toHaveBeenCalledWith('/books/book.epub', expect.objectContaining({ path: 'OPS/audio/ch1.mp3' }), 2, 5);
+    expect(await readStream(result.body as Readable)).toEqual(Buffer.from('2345'));
+  });
+
+  it('reads the audio as a stream rather than buffering the whole entry', async () => {
+    const archive = makeMediaOverlayArchive();
+    mockOpenFile.mockImplementation(() => Promise.resolve(archive as any));
+    mockOpenRange.mockResolvedValue(Readable.from([Buffer.from('0123456789')]));
+
+    const result = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, undefined, user);
+
+    expect(result.status).toBe(200);
+    expect(result.contentRange).toBeNull();
+    expect(result.length).toBe(10);
+    expect(mockOpenRange).toHaveBeenCalledWith('/books/book.epub', expect.objectContaining({ path: 'OPS/audio/ch1.mp3' }), 0, 9);
+    expect(archive.files.find((file) => file.path === 'OPS/audio/ch1.mp3')!.buffer).not.toHaveBeenCalled();
+  });
+
+  it('matches the requested path to the playlist exactly as the router decoded it', async () => {
+    mockOpenFile.mockImplementation(() =>
+      Promise.resolve(makeNamedAudioArchive('audio/50%25%20off.mp3', [{ path: 'OPS/audio/50% off.mp3', content: 'percent' }]) as any),
+    );
+
+    const playlist = await service.getMediaOverlayPlaylist(99, undefined, user);
+    const result = await service.streamMediaOverlayFile(99, 'OPS/audio/50% off.mp3', undefined, undefined, user);
+
+    expect(playlist.resources).toEqual([{ href: 'OPS/audio/50% off.mp3', mediaType: 'audio/mpeg', size: 7 }]);
+    expect(await readStream(result.body as Readable)).toEqual(Buffer.from('percent'));
+    // Decoding the request again is what let an escaped spelling of the name through.
+    await expect(service.streamMediaOverlayFile(99, 'OPS/audio/50%25%20off.mp3', undefined, undefined, user)).rejects.toThrow(NotFoundException);
+  });
+
+  it('serves the entry named by the href over one whose literal escape decodes to it', async () => {
+    mockOpenFile.mockImplementation(() =>
+      Promise.resolve(
+        makeNamedAudioArchive('audio/track%201.mp3', [
+          { path: 'OPS/audio/track%201.mp3', content: 'literal escape' },
+          { path: 'OPS/audio/track 1.mp3', content: 'space' },
+        ]) as any,
+      ),
+    );
+
+    const playlist = await service.getMediaOverlayPlaylist(99, undefined, user);
+    const result = await service.streamMediaOverlayFile(99, 'OPS/audio/track 1.mp3', undefined, undefined, user);
+
+    expect(playlist.resources).toEqual([{ href: 'OPS/audio/track 1.mp3', mediaType: 'audio/mpeg', size: 5 }]);
+    expect(result.size).toBe(5);
+    expect(await readStream(result.body as Readable)).toEqual(Buffer.from('space'));
   });
 
   // A player asks for many ranges of one clip. Each used to parse every SMIL in the book again.
@@ -437,7 +502,7 @@ describe('EpubService', () => {
     const second = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=2-3', user);
 
     expect(mockOpenFile.mock.calls.length - opensForFirst).toBe(1);
-    expect(second.data).toEqual(Buffer.from('23'));
+    expect(await readStream(second.body as Readable)).toEqual(Buffer.from('23'));
   });
 
   it('answers a range past the end with 416 and ignores a header it cannot read', async () => {
@@ -446,12 +511,23 @@ describe('EpubService', () => {
     const beyond = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=20-30', user);
     expect(beyond.status).toBe(416);
     expect(beyond.contentRange).toBe('bytes */10');
-    expect(beyond.data.length).toBe(0);
+    expect(beyond.length).toBe(0);
+    expect(beyond.body).toEqual(Buffer.alloc(0));
+
+    const openPastEnd = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=10-', user);
+    expect(openPastEnd.status).toBe(416);
+    expect(openPastEnd.contentRange).toBe('bytes */10');
+
+    const openTail = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=7-', user);
+    expect(openTail.status).toBe(206);
+    expect(openTail.contentRange).toBe('bytes 7-9/10');
+    expect(await readStream(openTail.body as Readable)).toEqual(Buffer.from('789'));
 
     const unreadable = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=abc', user);
     expect(unreadable.status).toBe(200);
     expect(unreadable.contentRange).toBeNull();
-    expect(unreadable.data.length).toBe(10);
+    expect(unreadable.length).toBe(10);
+    expect(await readStream(unreadable.body as Readable)).toEqual(Buffer.from('0123456789'));
   });
 
   it('rejects media-overlay file requests for non-playlist resources', async () => {

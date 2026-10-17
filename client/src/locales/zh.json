@@ -107,9 +107,51 @@
       },
       "theme": {
         "title": "主题",
+        "style": {
+          "label": "主题风格",
+          "hint": "应用程序的总体外观。模式、音调、角和背景保持其设置。",
+          "bookorbit": {
+            "label": "BookOrbit",
+            "description": "薄膜表面、玻璃板和系列标题。"
+          },
+          "nostalgia": {
+            "label": "Nostalgia",
+            "description": "中立场地、系统类型、平坦面板和顶部闪光。"
+          }
+        },
         "colorScheme": {
           "label": "配色方案",
           "hint": "浅色或深色界面"
+        },
+        "surfacePalette": {
+          "label": "表面",
+          "hint": "板块和卡片背后的中立立场。",
+          "palettes": {
+            "onyx": "Onyx",
+            "carbon": "碳类",
+            "neutral": "中性的",
+            "zinc": "锌色",
+            "iron": "铁色",
+            "steel": "钢石",
+            "ash": "阿什文",
+            "smoke": "烟雾",
+            "charcoal": "木炭类",
+            "slate": "拉特尔",
+            "midnight-blue": "午夜蓝色",
+            "ocean": "1. Ocean",
+            "pine": "豆类",
+            "olive": "橄榄色",
+            "stone": "石头",
+            "sepia": "Sepia",
+            "crimson": "克里米森文",
+            "plum": "Plum"
+          }
+        },
+        "topGlow": {
+          "label": "顶部发光",
+          "hint": "重音到达页面的距离。向左滑动以关闭它。",
+          "value": "{value}%",
+          "off": "关闭"
         },
         "accents": {
           "grey": "灰",
@@ -183,7 +225,13 @@
         },
         "cornerRadius": {
           "label": "圆角半径",
-          "hint": "卡片和界面元素的圆角程度"
+          "hint": "卡片和界面元素的圆角程度",
+          "options": {
+            "sharp": "锋利的",
+            "default": "默认",
+            "rounded": "圆角",
+            "pill": "Pill"
+          }
         },
         "surfaceBrightness": {
           "label": "表面亮度",
@@ -202,7 +250,8 @@
           "structural": "结构",
           "ambient": "氛围",
           "refractive": "折射"
-        }
+        },
+        "syncSaveFailed": "保存主题首选项失败"
       },
       "storage": {
         "title": "外观首选项的保存位置",
@@ -233,6 +282,21 @@
           "hint": "选择“在线查找封面”时使用的搜索源。此设置会保存到您的账户中，并在所有设备上生效。",
           "loadError": "加载默认封面搜索源失败",
           "saveError": "保存默认封面搜索源失败"
+        },
+        "placeholderStyle": {
+          "title": "占位符样式",
+          "hint": "这种样式绘制了没有封面艺术的书籍。",
+          "options": {
+            "bauhaus": "Bauhaus",
+            "constructivist": "建筑设计师",
+            "memphis": "Memphis",
+            "clothbound": "衣服",
+            "poster": "海报",
+            "aurora": "Aurora",
+            "vista": "维斯塔",
+            "marbled": "已标记",
+            "paperback": "回纸"
+          }
         },
         "displayMode": {
           "title": "封面显示模式",
@@ -1216,6 +1280,11 @@
             "portrait": "2:3 竖屏模式",
             "square": "1:1 正方形"
           },
+          "gridShape": "网格形状",
+          "gridShapeValue": {
+            "tall": "高亮单元格",
+            "square": "平方单元格"
+          },
           "none": "无",
           "allSupported": "所有支持的格式",
           "patternCount": "{count, plural, other {# 个模式}}",
@@ -1518,7 +1587,132 @@
         "subtitle": "上传字体后，所有用户均可在电子书阅读器内选用，无需自行上传字体。",
         "listLabel": "服务端字体",
         "noFontsYet": "暂无服务端字体",
-        "noFontsHint": "在此处添加的字体将对全部用户的阅读器生效。"
+        "noFontsHint": "在此处添加的字体将对全部用户的阅读器生效。",
+        "addFonts": "添加字体",
+        "filterLabel": "筛选品类",
+        "filterPlaceholder": "筛选品类",
+        "filterClear": "清除过滤器",
+        "noMatches": "没有匹配的家庭“{query}”",
+        "previewLabel": "预览文本",
+        "previewPlaceholder": "在每个家庭中键入预览它",
+        "previewSize": "预览大小",
+        "previewSizeOption": "{size} px",
+        "familiesUnit": "{count, plural, one {家庭} other {家庭}}",
+        "filesOfMax": "{count} 共 {max} 文件",
+        "onDisk": "{size} 在磁盘上",
+        "columns": {
+          "family": "家庭",
+          "specimen": "旁观",
+          "styles": "Styles",
+          "readers": "阅读器"
+        },
+        "fileSummary": "{count,plural,one{# 文件} other{# 文件}} · {size}",
+        "newBadge": "新的",
+        "styles": {
+          "single": "{style} 仅限",
+          "many": "{count} styles",
+          "manyNoItalics": "{count} styles, no italics"
+        },
+        "facts": {
+          "books": "{count, plural, one {在# 书上} other {在# 书上}}",
+          "booksDetail": "{books, plural, one {在# 本书上设置} other {在# 本书上设置}} 由 {readers, plural, one {# 读者} other {# 读者}}",
+          "defaults": "{count, plural, one {# 阅读器默认} other {# 阅读器默认}}",
+          "hidden": "{count, plural, one {被# 读者隐藏} other {被# 读者隐藏}}"
+        },
+        "moreActions": "更多 {name}",
+        "menu": {
+          "rename": "重命名品类",
+          "addFiles": "添加文件",
+          "remove": "删除品类…"
+        },
+        "footerHint": "每个读者在读者的字体列表中看到这些内容，并且可以在阅读器的 释义词下隐藏其中任何内容。",
+        "empty": {
+          "dropHint": "或丢弃此页面上任何地方的文件",
+          "tip": "一个家庭读起来最好为四个文件：定期文件，意大利文文件，粗体和粗体斜体。一个变量文件每个重量都可以站在一起。"
+        },
+        "drop": {
+          "title": "{count, plural, one {放下来为每个阅读者添加 # 文件} other {放下来为每个阅读者添加# 文件}}"
+        },
+        "upload": {
+          "ariaLabel": "上传进度",
+          "title": "{count, plural, one {添加# 文件} other {添加# 文件}}",
+          "progress": "{done} 共 {total} 完成",
+          "addedCount": "{count} 已添加",
+          "duplicateCount": "{count} 已经在这里",
+          "refusedCount": "{count} 未添加",
+          "dismiss": "关闭",
+          "newFamily": "新品类",
+          "states": {
+            "queued": "等待中",
+            "uploading": "上传中",
+            "added": "已添加",
+            "duplicate": "已经在服务器上",
+            "refused": "未添加",
+            "failed": "失败"
+          },
+          "reasons": {
+            "tooLarge": "大于 {maxMb} MB.",
+            "unsupportedType": "不是字体文件。使用TTF、OTF、WOFF 或 WOFF2。",
+            "invalidFile": "文件已损坏或不是字体。",
+            "faceTaken": "{familyName} 已经有此重量和样式的文件。",
+            "limitReached": "服务器已经挂载 {limit} 字体文件。",
+            "failed": "上传失败。请重试。"
+          }
+        },
+        "sheet": {
+          "description": "预览、重命名和管理 {name}",
+          "variable": "变量",
+          "preview": "预览",
+          "pageColour": "页面颜色",
+          "papers": {
+            "app": "应用表面",
+            "white": "白页",
+            "sepia": "Sepia page",
+            "night": "夜间页面"
+          },
+          "previewHeading": "实时花园。",
+          "previewParagraph1": "Alice对她感到惊奇。“为什么我相信我们整整都在这棵树下！一切都是好！”",
+          "previewParagraph2": "“现在，在这里，你们看到你们能够做的一切都在同一个地方。 如果你想要到其他地方去，你的运行速度必须至少比这快两倍！”",
+          "styles": "Styles",
+          "stylesHint": "读者样式行提供什么",
+          "singleStyleNote": "一个样式，所以读者没有样式行。书籍中的粗体和斜体文本被浏览器伪装。 {style}.",
+          "inReader": "在阅读器",
+          "inReaderHint": "每个阅读器在阅读器的 \"rader \"设置 \"字体\" 列表, 和 {name} 已选择。",
+          "pickerLabel": "预览读者字体列表",
+          "files": "文件",
+          "filesUsed": "{count} 共 {max} 用于此服务器",
+          "fileDetail": "{summary} 已添加 {date}",
+          "upright": "极限",
+          "italic": "Italic",
+          "fileActions": "更多 {name}",
+          "changeStyle": "更改重量和样式",
+          "removeFile": "删除文件",
+          "removeFileQuestion": "要删除此文件给每个读者吗？",
+          "weight": "权重",
+          "style": "样式",
+          "name": "姓氏：",
+          "nameHint": "读者用这个名称挑选字体。",
+          "nameHiddenWarning": "{count, plural, one {# 读者隐藏 {name}} other {# 读者隐藏 {name}}}一个新名称再次显示给他们。",
+          "nameBooksWarning": "一个新名称发送 {count, plural, one {使用它的# 书} other {使用它的# 书}} 返回该书自己的字体。",
+          "readers": "阅读器",
+          "stats": {
+            "books": "{count, plural, one {书籍使用它} other {书籍使用它}}",
+            "defaults": "{count, plural, one {读者默认值} other {读者默认值}}",
+            "hidden": "{count, plural, one {读者隐藏它} other {读者隐藏它}}"
+          },
+          "readersPrivacy": "只计数。哪一本书和哪个读者都是私下的。",
+          "removeLabel": "移除家庭",
+          "removeQuestion": "删除 {name} 每个读者？",
+          "removeConsequenceBooks": "{books,plural,one{设置为 # 书} other{设置为 # 书籍：}} 由 {readers,plural,one{# 阅读器} other{# 阅读器}}；这些书籍回到书本身的字体。",
+          "removeConsequenceFiles": "{count,plural,one{其文件已从服务器上删除。} other{所有的 # 文件已从服务器上删除。}}",
+          "loadFailedNote": "此浏览器无法加载字体文件，所以预览显示后退面。 读者浏览器很可能也会拒绝；请尝试不同的字体。"
+        },
+        "toasts": {
+          "removed": "{name} 已删除",
+          "removePartial": "{failed,plural,one{# 文件} other{# 文件}} 共 {name} 无法删除",
+          "renameTaken": "{name} 已经有一个重量和样式相同的文件"
+        },
+        "loadFailed": "此浏览器无法加载它"
       }
     },
     "common": {
@@ -1570,6 +1764,7 @@
         "publishedYear": "发布年份",
         "language": "语言",
         "pageCount": "页面计数",
+        "isbn": "ISBN",
         "communityRating": "社区评分",
         "seriesName": "系列名称",
         "seriesIndex": "系列索引",
@@ -1671,6 +1866,92 @@
           "inheritFromGlobal": "从全局继承的",
           "usingGlobalDefaults": "使用全局默认值。",
           "saveOverride": "保存覆盖"
+        },
+        "scope": {
+          "ownSettings": "{count, plural, one {# 自己的设置} other {# 自己的设置}}",
+          "globalIntro": "除非有自己的图书馆，否则每个图书馆都遵循这一规则。",
+          "globalCoverage": "{libraryCount,plural,one{应用到 # 媒体库} other{应用到 # 库}}, {bookCount,plural,one{# 书} other{# 书籍：}}.",
+          "ownLibraries": "{names} {count,plural,one{它有自己的规则。} other{有自己的规则。}}",
+          "libraryFollows": "{library} 遵循全球规则。在这里更改任何东西以使它能够自立。",
+          "libraryOwn": "{library} 有自己的规则 {count,plural,one{# 设置} other{# 设置}}。其他一切都遵循全球规则。",
+          "lastRun": "上次运行 {when}, 队列中 {count,plural,one{# 书} other{# 书籍：}}.",
+          "neverRun": "尚未运行。",
+          "useGlobalRule": "使用全局规则",
+          "loadFailed": "无法加载自动获取设置。重新加载页面以重试。",
+          "saved": "已保存 {scope}",
+          "saveFailed": "无法保存 {scope}。再试一次。"
+        },
+        "run": {
+          "all": "为每个库运行",
+          "library": "运行 {library}",
+          "saveFirst": "运行使用保存的规则。请先保存。",
+          "failed": "无法开始运行，请重试。"
+        },
+        "onImport": {
+          "label": "获取新书的元数据",
+          "hint": "立即扫描和上传匹配书的队列。导入时只能填充空字段，锁定字段永远不会改变。",
+          "follow": "关注全局的",
+          "on": "开启",
+          "off": "关闭"
+        },
+        "columns": {
+          "books": "{count, plural, one {book} other {books}}",
+          "ofTotal": "共 {total}",
+          "off": "关闭",
+          "own": "自己的",
+          "global": "全局范围",
+          "useGlobal": "全局使用",
+          "globalValue": "全局规则： {value}",
+          "on": "开启",
+          "scoreBelowValue": "下方得分 {threshold}",
+          "neverFetchedSplit": "{count, plural, one {# 从未获取} other {# 从未获取}}",
+          "fetchedBeforeSplit": "{count,plural,one{# 获取之前：} other{# 获取之前：}}",
+          "lowScoreLabel": "置信分低",
+          "lowScoreHint": "获取信任分低于该线的书籍。",
+          "outOf": "/ 100",
+          "lowerThreshold": "降低阈值",
+          "raiseThreshold": "提高阈值",
+          "missingHint": "获取任何选定字段为空。每个字段显示有多少书缺少它。",
+          "audioGroup": "带音频的书",
+          "audioHint": "{count, plural, =0 {这里没有音频。} one {只有带音频的# 书才会缺少音频。} other {只有带音频的# 才能缺少音频。}}",
+          "fieldCount": "{field}: {count,plural,one{# 书缺少它} other{# 书缺少它}}"
+        },
+        "histogram": {
+          "label": "置信分阈值",
+          "valueText": "下方得分 {threshold}"
+        },
+        "preview": {
+          "title": "运行会获取什么",
+          "matching": "{matching, plural, one {# {total} 书籍匹配} other {# {total} 书籍匹配}}",
+          "showing": "{count, plural, one {显示最不完整的} other {显示最不完整的}}",
+          "empty": "没有符合此规则的书籍，所以运行将不会排队任何东西。",
+          "unknownAuthor": "未知作者",
+          "score": "得分 {score}",
+          "more": "+{count}",
+          "missing": {
+            "title": "无标题",
+            "subtitle": "没有字幕",
+            "description": "无描述",
+            "cover": "无封面",
+            "audioCover": "没有音频簿封面",
+            "authors": "没有作者",
+            "publisher": "没有发布者",
+            "isbn": "没有 ISBN",
+            "publishedYear": "没有发布年份",
+            "language": "没有语言",
+            "pageCount": "没有页面计数",
+            "communityRating": "没有社区评分",
+            "seriesName": "没有系列名称",
+            "seriesIndex": "无序列索引",
+            "genres": "无流体",
+            "narrators": "无记名符",
+            "duration": "无持续时间",
+            "abridged": "桥接未设置"
+          }
+        },
+        "queue": {
+          "progress": "{done} 共 {total}",
+          "failed": "{count, plural, one {# 书无法获取} other {# 书无法获取}}"
         }
       },
       "providers": {
@@ -1766,7 +2047,8 @@
             "overwriteTerm": "覆盖：",
             "overwriteBody": "每当提供商有数据时替换。"
           },
-          "summary": "将按自上而下的顺序对各提供商依次尝试，直至确认第一个返回值的提供商停止并将其采纳。合并策略决定该值是否可以替换书籍已有的值；分类还可以追加新的唯一值。在此处设置默认值，然后针对每个书库覆盖单个字段。"
+          "summary": "将按自上而下的顺序对各提供商依次尝试，直至确认第一个返回值的提供商停止并将其采纳。合并策略决定该值是否可以替换书籍已有的值；分类还可以追加新的唯一值。在此处设置默认值，然后针对每个书库覆盖单个字段。",
+          "summaryByMedium": "提供者从上到下尝试，第一个获得价值的提供者则从上到下；合并模式中的流派和社区评级将每个提供者结合起来。 合并策略决定是否可以替换该书已经存在的内容。AudNexus和Libro。 m 只对音频和读取EPUBs的书籍作出答复，因此将它们置于首选音频簿元数据而不触碰只限于电子书的书籍。 形状错误的封面艺术只有在没有其他东西的情况下才能填充插槽。库覆盖该字段的整个规则。"
         },
         "libraryOverrides": {
           "title": "媒体库覆盖",
@@ -1835,6 +2117,7 @@
         },
         "field": {
           "noProviders": "启用但没有提供商",
+          "noUsableProvider": "启用，但这里没有提供者可以填充它",
           "empty": "空的",
           "config": "配置",
           "custom": "自定义",
@@ -1893,7 +2176,11 @@
           "disabled": "已禁用",
           "notConfigured": "未配置",
           "disabledDetail": "{provider} 已被禁用，因此它会保留在顺序中，但会被跳过。",
-          "notConfiguredDetail": "{provider} 尚无凭据，因此它会保留在顺序中，但会被跳过。"
+          "notConfiguredDetail": "{provider} 尚无凭据，因此它会保留在顺序中，但会被跳过。",
+          "neverSupplies": "永远不要供应这个",
+          "neverSuppliesDetail": "{provider} 永远不会提供这个字段，所以它在这里被跳过。",
+          "otherShape": "其他封面形状",
+          "otherShapeDetail": "{provider} 仅有另一个形状的封面，所以它只能在没有其他东西可以的情况下填充这个栏位。"
         },
         "detail": {
           "priority": "提供商优先级",
@@ -1947,6 +2234,123 @@
         "emptyHint": "添加精确值（例如 Audiobook、Adult），即可将它们从获取到的元数据中排除。",
         "removeLabel": "移除 {genre}"
       },
+      "searchCache": {
+        "loadFailed": "无法加载搜索缓存设置。",
+        "retry": "重试",
+        "saved": "搜索缓存设置",
+        "saveFailed": "保存搜索缓存设置失败",
+        "units": {
+          "hours": "小时数",
+          "days": "天"
+        },
+        "general": {
+          "title": "已保存答案",
+          "enabled": "保存提供者答案",
+          "enabledHint": "搜索、批量刷新和背景获取重用已保存的答案，而不是再次询问每个提供者。",
+          "resultsTtl": "保留结果为",
+          "resultsTtlHint": "在再次询问提供者之前，重用多长时间的答案和结果。",
+          "resultsTtlUnit": "结果时间单位",
+          "emptyTtl": "留空答案",
+          "emptyTtlHint": "想起一个提供商没有找到任何东西的时间。仅适用于标为缓存空答案的提供商。0永远不留空答案。",
+          "emptyTtlUnit": "空回答时间单位",
+          "staleGrace": "使用过期的答案",
+          "staleGraceHint": "当一个提供者失败时，使用的是其过期时间长的答案。0 永远不会退回。",
+          "staleGraceUnit": "过期回答时间单位",
+          "storage": "存储预算",
+          "storageHint": "最老的答案一旦保存过这个大小就会被删除。在磁盘上，该表可以大约比预算多1.5至2倍。",
+          "storageUnit": "MB"
+        },
+        "providers": {
+          "title": "每个提供者设置",
+          "hint": "将框留空以使用上面的值。关闭一个提供商以便随时询问它。",
+          "books": "书籍：",
+          "authors": "作者",
+          "none": "没有可用的供应商。",
+          "globalOff": "保存答案已关闭，所以这些设置将在关闭后应用。",
+          "on": "开启",
+          "off": "关闭",
+          "enabledLabel": "保存答案 {provider}",
+          "resultsTtl": "保留结果为",
+          "resultsTtlLabel": "保留 {provider} 结果为",
+          "resultsTtlUnitLabel": "时间单位 {provider} 结果",
+          "emptyTtl": "留空答案",
+          "emptyTtlLabel": "留空 {provider} 答案",
+          "emptyTtlUnitLabel": "空时间单位 {provider} 答案",
+          "noEmptyCaching": "从此提供商的空答案永远不会保存。",
+          "notCacheable": "此提供商的答案永远不会保存。",
+          "reset": "Reset {provider} 默认值"
+        },
+        "validation": {
+          "required": "输入一个值。",
+          "wholeNumber": "输入一个整数。",
+          "range": "输入一个值来自 {min} 到 {max}.",
+          "tooManyOverrides": "太多的提供者有自己的设置。重置其中一些以便保存。"
+        },
+        "save": {
+          "unsaved": "未保存的更改",
+          "invalid": "修复高亮字段以保存",
+          "upToDate": "所有更改已保存",
+          "discard": "放弃...",
+          "action": "保存"
+        },
+        "stats": {
+          "group": "用法",
+          "title": "已保存答案",
+          "refresh": "刷新",
+          "loadFailed": "无法加载缓存用法。",
+          "storage": "存储已使用",
+          "storageUsed": "{used} 共 {budget}",
+          "storageHint": "已保存答案本身的大小。磁盘上的表更大。",
+          "entries": "已保存答案",
+          "emptyEntries": "空答案",
+          "diskSize": "磁盘上的表大小",
+          "hitRate": "点击率",
+          "requestsAvoided": "避开的请求",
+          "fallbacks": "备注",
+          "skippedWrites": "已跳过的写入",
+          "oldest": "最早的答案",
+          "none": "尚无",
+          "countersHint": "自服务器上次启动以来，点击率、请求避免、回退和跳过写入计数。",
+          "perProvider": "按提供商保存答案",
+          "provider": "提供商",
+          "kind": "类型",
+          "size": "大小",
+          "empty": "尚未保存任何内容。"
+        },
+        "clear": {
+          "group": "维护费",
+          "title": "清除已保存的答案",
+          "regionHint": "提供商可以通过位置不同的回答。在将服务器移动到另一个区域或 VPN后清除缓存。",
+          "action": "清空",
+          "failed": "清除保存的答案失败",
+          "done": "{count, plural, one {移除# 保存的答案} other {移除# 保存的答案}}",
+          "donePending": "{count, plural, one {移除# 保存的答案。其余正在后台移除。} other {删除了# 保存的答案。其余的答案正在后台移除。}}",
+          "empty": {
+            "label": "仅清除空答案",
+            "hint": "忘记供应商没有发现任何东西，所以那些搜索再次询问。",
+            "confirmTitle": "清除空答案吗？",
+            "confirmDescription": "保存的答案，当一个提供商没有发现任何东西被删除时。答案和结果将被保留。"
+          },
+          "book": {
+            "label": "清除书籍答案",
+            "hint": "移除簿提供者保存的所有内容。",
+            "confirmTitle": "清除书解答？",
+            "confirmDescription": "每个已保存的书籍提供者的答案都被删除。下一次搜索再次询问那些提供者。"
+          },
+          "author": {
+            "label": "清除作者答案",
+            "hint": "删除作者保存的所有内容。",
+            "confirmTitle": "清除作者答案？",
+            "confirmDescription": "从作者提供者保存的每个答案都被删除。下一次搜索再次询问那些提供者。"
+          },
+          "all": {
+            "label": "清除所有已保存的答案",
+            "hint": "清空缓存。下次搜索时再次询问每个提供者。",
+            "confirmTitle": "清除所有已保存的答案？",
+            "confirmDescription": "整个缓存已清空。 搜索将会更慢，直到它再次填充，任何东西都不会在一个提供商下台时掉落。"
+          }
+        }
+      },
       "customFields": {
         "label": "标签",
         "labelPlaceholder": "例如：原始标题",
@@ -1995,7 +2399,145 @@
         "selectAll": "选择所有",
         "clear": "清空",
         "noLibraries": "还没有可用的库。",
-        "allLibraries": "所有库"
+        "allLibraries": "所有库",
+        "pageFacts": "{fields, plural, one {# 字段} other {# 字段}} * {values, plural, one {# 值存储} other {# 值存储}}",
+        "newFieldAction": "新建字段",
+        "views": {
+          "label": "显示活动或存档字段",
+          "active": "已启用",
+          "archived": "已存档"
+        },
+        "columns": {
+          "order": "订单",
+          "field": "字段",
+          "type": "类型",
+          "libraries": "库",
+          "filled": "填充的",
+          "valuesKept": "保留值",
+          "archived": "已存档",
+          "actions": "行动"
+        },
+        "orderHint": "拖动以设置订单字段出现在编辑元数据、表格列和导出中。",
+        "archivedHint": "存档字段从书籍、过滤器和导出中隐藏。其值一直保存到字段被删除。",
+        "coverage": "{filled} 共 {total}",
+        "coverageAria": "{filled} 共 {total} 书有一个值",
+        "onNoLibrary": "没有库",
+        "onNoLibraryHint": "没有库，所以这个字段没有任何位置",
+        "moreLibraries": "+{count}",
+        "noValues": "无",
+        "rowActions": {
+          "edit": "编辑",
+          "editField": "编辑字段",
+          "moveUp": "上移",
+          "moveDown": "向下移动",
+          "archive": "存档",
+          "restore": "恢复",
+          "deletePermanently": "永久删除…",
+          "more": "更多操作 {label}"
+        },
+        "toasts": {
+          "loadFailed": "无法加载自定义字段",
+          "created": "{label} 已创建",
+          "createFailed": "无法创建 {label}",
+          "saved": "{label} 已保存",
+          "saveFailed": "无法保存 {label}",
+          "archived": "{label} 已存档",
+          "archiveFailed": "无法存档 {label}",
+          "restored": "{label} 已恢复",
+          "restoreFailed": "无法恢复 {label}",
+          "deleted": "{label} 已删除",
+          "deleteFailed": "无法删除 {label}",
+          "reorderFailed": "无法保存新订单"
+        },
+        "empty": {
+          "body": "跟踪什么没有字段的 BookOrbit ，比如某一书在您的书架上的位置或者谁借了它。 字段出现在编辑元数据、表格列和过滤器中。",
+          "examples": "从示例开始",
+          "shelfNumber": "书架号",
+          "acquiredOn": "获得于",
+          "signedCopy": "签名副本",
+          "loanedTo": "贷款给"
+        },
+        "types": {
+          "text": {
+            "label": "文本",
+            "hint": "任意单词",
+            "example": "首次打印，签名书"
+          },
+          "url": {
+            "label": "链接",
+            "hint": "在新标签中打开",
+            "example": "https://example.com/book"
+          },
+          "number": {
+            "label": "号码",
+            "hint": "按值排序",
+            "example": "42"
+          },
+          "date": {
+            "label": "日期",
+            "hint": "日历日",
+            "example": "2024-03-09"
+          },
+          "boolean": {
+            "label": "是 / 否",
+            "hint": "复选框",
+            "example": "否"
+          }
+        },
+        "sheet": {
+          "newTitle": "新建字段",
+          "editDescription": "编辑自定义字段的标签和库，并查看它出现在哪里。",
+          "newDescription": "命名一个新的自定义字段，选择其类型并选择其库。",
+          "archivedDescription": "存档的自定义字段。恢复或删除其值。",
+          "statusFilled": "{filled} 共 {total,plural,one{# 书} other{# 书籍：}} 已填充",
+          "statusNone": "不在任何库",
+          "statusHidden": "{count} hidden",
+          "statusCreated": "已创建 {date}",
+          "labelHint": "显示在编辑元数据，显示在表列和过滤器中。",
+          "renameHint": "重命名每个存储的值和文件密钥 {key}.",
+          "keyHint": "已保存到文件并导出为 {key}，重命名字段时保持不变。",
+          "typeLocked": "创建时设置",
+          "typeLockedHint": "此类型不能稍后更改，所以存储的值总是匹配的。",
+          "libraries": "库",
+          "books": "{count, plural, one {# 书} other {# 书}}",
+          "filledOfBooks": "{filled} 共 {total,plural,one{# 书} other{# 书籍：}}",
+          "hiddenCount": "{count} hidden",
+          "leavingNote": "{count,plural,one{# 值在 {libraries} 保持存储但在字段关闭时隐藏。} other{# 值在 {libraries} 保持存储，但当字段关闭时隐藏。}} 让它重新回来使他们回来。",
+          "noLibraryWarning": "没有库，这个字段似乎没有什么地方：不在编辑元数据、过滤器或导出中。",
+          "appears": {
+            "title": "出现在何处",
+            "editMetadata": "编辑元数据",
+            "details": "Details tab",
+            "filters": "筛选器",
+            "table": "表格和排序",
+            "tableBody": "可用作为表列和排序选项",
+            "files": "文件",
+            "filesWritten": "写入 EPUB 和 FB2 文件于 {libraries}, 在文件中写入元数据.",
+            "filesNotWritten": "未写入文件: 这些库都没有 EPUB 或 FB2 文件写入元数据。",
+            "exports": "出口"
+          },
+          "archiveAction": "归档字段",
+          "archiveConfirm": "存档 {label}?",
+          "archiveConsequence": "{count,plural,one{它留下编辑元数据、过滤器和导出。 # 保存到字段删除之前的值。} other{它留下编辑元数据、过滤器和导出。 # 值保持存储直到删除字段。} =0{它留下编辑元数据、过滤器和导出。随时从存档中恢复它。}}",
+          "create": "创建字段",
+          "onLibraries": "开启 {count} 共 {total} 库",
+          "onAllLibraries": "在全部 {total} 库",
+          "archivedBadge": "已存档",
+          "archivedTitle": "已存档 {when}.",
+          "archivedBody": "{count,plural,one{此字段隐藏在书籍、过滤器和导出中。 # 存储的值被保存并恢复到还原状态。} other{此字段隐藏在书籍、过滤器和导出中。 # 存储的值被保存并恢复到还原状态。} =0{此字段隐藏在书籍、过滤器和导出中。它没有任何值。}}",
+          "facts": {
+            "type": "类型",
+            "libraries": "库",
+            "valuesKept": "保留值",
+            "fileKey": "文件密钥",
+            "created": "已创建",
+            "archived": "已存档"
+          },
+          "deleteQuestion": "删除 {label} 为好吗？",
+          "deleteConsequence": "{count, plural, =0 {它没有值。这不能撤消。} one {其存储的值已从每本书中删除。文件已经写好了他们的副本。 此操作无法撤消。} other {其存储值已从每本书中删除。 文件已经写好副本。此操作无法撤消。}}",
+          "deleteConfirmLabel": "输入字段名称以确认",
+          "deleteConfirmPlaceholder": "类型 {label} 确认"
+        }
       },
       "tabs": {
         "providers": "提供商",
@@ -2004,7 +2546,8 @@
         "genre-blocklist": "体裁屏蔽列表",
         "score": "置信评分",
         "auto-fetch": "书籍",
-        "authors": "作者"
+        "authors": "作者",
+        "search-cache": "搜索缓存"
       },
       "tabTitles": {
         "providers": "提供商",
@@ -2013,7 +2556,8 @@
         "genre-blocklist": "体裁屏蔽列表",
         "score": "自信得分",
         "auto-fetch": "书籍自动获取",
-        "authors": "作者自动获取"
+        "authors": "作者自动获取",
+        "search-cache": "搜索缓存"
       },
       "tabSubtitles": {
         "providers": "启用外部元数据源并配置他们的凭据。",
@@ -2022,7 +2566,8 @@
         "genre-blocklist": "防止不想要的提供商流派值被写入书中。",
         "score": "各元数据字段对每本书所显示完整度评分的贡献方式。",
         "auto-fetch": "当新书被添加到您的书库时，自动获取封面、描述和其他详细信息。",
-        "authors": "当新作者出现在您的库中时，自动获取个人简历和个人资料照片。"
+        "authors": "当新作者出现在您的库中时，自动获取个人简历和个人资料照片。",
+        "search-cache": "重新使用提供者答案，这样重复搜索很快，当提供者关闭时仍然有效。"
       },
       "preferences": {
         "toast": {
@@ -2238,12 +2783,30 @@
         "serverFontsHint": "这些字体由服务器管理员提供；可关闭对应字体，使其不在阅读器内展示。",
         "serverFontsShown": "当前展示 {count} 项，共 {total} 项",
         "serverFontsAllHidden": "所有服务端字体已隐藏，阅读器仅提供内置字体与您自行上传的字体。",
-        "serverFontVisibilityFailed": "服务端字体显示状态更新失败"
+        "serverFontVisibilityFailed": "服务端字体显示状态更新失败",
+        "library": {
+          "columns": {
+            "use": "正在使用"
+          },
+          "yourDefault": "您的默认",
+          "hiddenBadge": "Hidden",
+          "emptyHint": "在上面添加字体，或在此页面上的任意位置拖放文件。",
+          "dropTitle": "{count, plural, one {拖放以将 # 文件添加到您的字体} other {拖放以将# 文件添加到您的字体}}",
+          "limitReached": "您已经有 {limit} 字体文件。",
+          "filesUsed": "{count} 你的 {max} 已使用",
+          "nameHint": "这是您读者字体列表中的名称。",
+          "inReaderHint": "您在读取器中的字体列表 {name} 已选择。",
+          "showInReader": "在我的阅读器中显示",
+          "showFamily": "显示 {name} 在我的阅读器",
+          "removeConsequenceBooks": "{count,plural,one{设置为 # 这本书回到自己的字体。} other{设置为 # 他们回到自己的字体。}}",
+          "removeConsequenceDefault": "这是您的默认字体；没有自己设置的书本回到书默认值。",
+          "removeQuestion": "删除 {name} 来自您的字体吗？"
+        }
       },
       "bookDock": {
-        "title": "Book Dock",
+        "title": "书仓",
         "subtitle": "配置文件进入书签时的处理方式。",
-        "dropFolder": "丢弃文件夹",
+        "dropFolder": "书仓文件夹",
         "containerPath": "容器路径",
         "containerPathHint": "复制或移动书卷文件到此文件夹，它们将被书签自动提取和处理。支持子目录。",
         "changePathPrefix": "要改变这条道路，请设置",
@@ -2568,6 +3131,8 @@
         "syncHighlightsHint": "将在 BookOrbit 或 KOReader 中制作的划线发送到您的 Kobo。即使此功能关闭，Kobo 划线也会导入 BookOrbit。已关联的批注会双向同步编辑和删除。需要 KEPUB 交付；Kobo 上的书必须是从 BookOrbit 下载的 KEPUB。",
         "storeSync": "包含 Kobo Store标题",
         "storeSyncHint": "此功能还会将您 Kobo 账户中的书籍（包括 Kobo Plus 订阅和已购书籍）与您的 BookOrbit 书库一并投送到设备上。若未启用此功能，则只有 BookOrbit 的书籍会同步到设备。商店中的书籍直接从 Kobo 下载，不会添加到您的 BookOrbit 书库中。",
+        "fullSizeCovers": "全尺寸盖子",
+        "fullSizeCoversHint": "在您的 Kobo 屏幕分辨率上发送每张封面，所以睡眠屏幕和全屏幕封面保持锐化。 关闭此功能以便更快地发送较小的封面。只有当书封面变化时，Kobo上的封面才会改变。",
         "convertKepub": "转换为 KEPUB",
         "convertKepubHint": "以 KEPUB 发送合格的 EPUB。当进度同步或 BookOrbit到 Kobo 划线启用时，此操作将保持不变。 在下一个 Kobo 同步时，受影响的书籍将再次以 KEPUB 下载的形式提供；如果Kobo 继续打开，则删除任何旧的 EPUB 副本。",
         "forceHyphenation": "强制连线",
@@ -2886,7 +3451,13 @@
             "unmatchedDismissed": "不匹配的书被拒绝",
             "dismissFailed": "关闭不匹配的书失败",
             "allDismissed": "{count, plural, =0 {丢失没有匹配的书} other {丢失#不匹配的书}}",
-            "dismissAllFailed": "关闭所有未匹配的书籍失败"
+            "dismissAllFailed": "关闭所有未匹配的书籍失败",
+            "reviewRefreshed": "待核对书籍列表已刷新",
+            "reviewRefreshFailed": "刷新待核对书籍列表失败",
+            "reviewDismissed": "已将书籍移出待核对列表",
+            "reviewDismissFailed": "将书籍移出待核对列表失败",
+            "reviewAllDismissed": "{count, plural, =0 {未将任何书籍移出待核对列表} one {已将 # 本书籍移出待核对列表} other {已将 # 本书籍移出待核对列表}}",
+            "reviewDismissAllFailed": "将所有书籍移出待核对列表失败"
           },
           "modal": {
             "linkTitle": "链接 KOReader 书",
@@ -2939,7 +3510,15 @@
           "syncedStatsNote": "已经同步的统计数据将保留在他们当前的 BookOrbit 书中。",
           "chooseDifferent": "选择不同的",
           "saving": "保存中……",
-          "confirmLink": "确认链接"
+          "confirmLink": "确认链接",
+          "reviewTitle": "KOReader 待核对书籍",
+          "reviewHint": "未能自动匹配的书籍和已取消关联的书籍会显示在此处。取消关联后，书籍仍可通过自动匹配进行同步。手动关联书籍可覆盖自动匹配结果，也可将其移出此列表。",
+          "loadingReview": "正在加载待核对书籍…",
+          "noReview": "没有待核对的 KOReader 书籍。",
+          "manualUnlinkConfirmBody": "取消与 {title} 的手动关联，并将此书移回待核对列表。如果存在自动匹配结果，后续同步将使用该结果。已同步的统计数据仍保留在当前关联的 BookOrbit 书籍中。",
+          "reviewDismissConfirmBody": "此操作会将该书移出待核对列表，但会保留自动匹配结果和现有同步数据。如果设备再次上报该哈希值且未找到匹配的书籍，它可能会重新出现在列表中。",
+          "reviewDismissAllConfirmTitle": "{count, plural, =0 {没有待核对的书籍} one {要将全部 # 本书籍移出待核对列表吗？} other {要将全部 # 本书籍移出待核对列表吗？}}",
+          "reviewDismissAllConfirmBody": "此操作会清空整个待核对书籍列表，包括其他页面上的条目，但会保留自动匹配结果和现有同步数据。如果设备再次上报某个哈希值且未找到匹配的书籍，对应书籍可能会重新出现在列表中。"
         },
         "remove": "删除",
         "removing": "正在删除……",
@@ -3589,6 +4168,7 @@
     "nav": {
       "title": "设置",
       "ariaLabel": "设置部分",
+      "breadcrumbLabel": "面包屑导航",
       "searchPlaceholder": "搜索设置",
       "clearSearch": "清空搜索内容",
       "noResults": "没有与 {query} 匹配的设置。",
@@ -3635,9 +4215,58 @@
         "serverFonts": "在此服务器上为每个读者安装字体。",
         "bookDock": "在书页上显示快速操作。",
         "auditLog": "谁改变了什么，什么时候改变。",
-        "requests": "来源、下载客户端，以及书籍下载完成后的处理方式。"
+        "requests": "来源、下载客户端，以及书籍下载完成后的处理方式。",
+        "readerTts": "朗读语音、速度和语音默认。",
+        "adminTts": "此服务器上每个读者都可使用文字转语音引擎。"
       },
-      "backToApp": "返回图书馆"
+      "backToApp": "返回图书馆",
+      "pageDescriptions": {
+        "profile": "您的名字、照片、时区和成就跟踪，加上您的密码和与此帐户链接的登录提供商。",
+        "appearance-theme": "选择保存外观设置的位置，然后设置样式、颜色方案、重音、角、表面亮度和库背后的模式。",
+        "appearance-book-covers": "如何显示应用的外观：没有应用的占位符艺术。 封面如何适合他们的插槽、脊柱和玻璃效果以及书页上的封面素材。",
+        "appearance-icons": "上传您自己的图标，与内置库、智能范围和收藏集一起使用。",
+        "appearance-layout": "图书馆网格的封面大小和间距，折叠系列的封面，以及作者网格是如何布置的。",
+        "appearance-behavior": "从网格或列表中打开一本书是什么，不管是系列还是一张卡片，书卷请求是否出现在这个帐户中。",
+        "appearance-language": "语言书轨迹用于菜单、标签和消息，以及日期和数字的区域格式。",
+        "reader-ebook": "预设电子书阅读器：新书是否以您的设置、页面流量和列、主题以及字体大小和间距为起始。",
+        "reader-pdf": "PDF如何打开：页面或连续滚动，页面开始双页扩展，默认缩放适合。",
+        "reader-comics": "漫画如何读取：阅读模式和方向、单页或两页的光线、适合、宽页的处理，并接着进入系列中的下一本书。",
+        "reader-audio": "新音频书籍的起始速度和音量，以及跳过和跳过按钮跳过的距离。",
+        "reader-fonts": "为读者上传您自己的字体，并选择你的服务器管理员共享的字体。",
+        "reader-general": "保存您的阅读器首选项的地方，和每个阅读模式共享的默认值。",
+        "tts": "BookOrbit已读书时您的默认语音和速度。",
+        "notifications": "选择通知您的事件，从完成的扫描和元数据获取到文件重命名、导入和预览结果。",
+        "privacy": "决定您的阅读活动管理员能看到多少信息，预览您的共享个人资料，并检查谁查看过它。",
+        "restrictions": "对此帐户设置的内容限制，例如年龄评级和隐藏内容，以及它们在您的库之外保留的内容。",
+        "libraries": "每个知识库在一个视图上：它的文件夹、它持有的东西、它是如何扫描的以及它上次排名时。在这里添加、编辑或重新扫描图书馆。",
+        "metadata-providers": "打开或关闭元数据源，添加 API 密钥或源需要它们的cookie，并测试实时服务的凭据。",
+        "metadata-field-rules": "选择哪个提供商填写每个元数据字段和按什么样的顺序、如何合并值以及如何收集流派和提供者ID。",
+        "metadata-custom-fields": "创建您自己的元数据字段，选择它们的类型和使用它们的库，并重新排序或归档它们。",
+        "metadata-score": "决定每个元数据字段在每一本书显示的完整性分数中的数值。",
+        "metadata-auto-fetch": "当书籍被导入或缺少详细信息时，自动获取书籍元数据，并覆盖每个库。",
+        "metadata-authors": "自动获取作者个人简历和照片，选择订单源并决定哪些作者符合资格。",
+        "metadata-search-cache": "让提供者的回答如此频繁地搜索很快，当一个提供者下台时仍然可以工作，并控制保留多长时间和多少时间。",
+        "metadata-genre-blocklist": "这里列出的流派值在元数据写入之前会从提供商结果中删除，因此像音频簿这样的标签会停留在您的书中。",
+        "metadata-reminders": "选择缺少的字段显示在账面提醒中。这只是更改提醒，而不是元数据分数。",
+        "file-naming": "书签重命名磁盘上的书时使用的文件夹和文件名模式 预览结果以及缺少值时会发生什么情况。",
+        "maintenance": "服务器内部维护：上传大小限制，过去导入，重建建议，支持成就和检查更新。",
+        "kobo": "连接 Kobo 电子阅读器，选择书籍、书架和读取进度同步方式，并跟随每个设备最近的同步活动。",
+        "koreader": "与 KOReader 同步进度，阅读活动和高亮，获取同步 URL 和插件，并管理连接的设备。",
+        "opds": "打开OPDS目录并创建帐户，以便第三方阅读应用能够浏览和下载您的书籍。",
+        "email": "管理地址簿发送到Kindle收件箱、默认收件人以及一次发送到几个小组收件人。",
+        "hardcover": "连接您的硬封面帐户并选择何时阅读状态、进度和评级同步，以及同步书是如何出现在那里的。",
+        "readwise": "连接您的Readwise 帐户以自动将您的高亮发送到那里。",
+        "storygraph": "使用您的浏览器会话 cookie 连接您的 StoryGraph帐户以同步阅读进度和状态。",
+        "users": "创建和管理帐户，他们的角色、权限和库访问权限，查看哪些帐户需要注意。",
+        "account-activity": "查看每个帐户是最后活跃的，以及它是如何在每个用户的阅读和会话中显示的。",
+        "magic-links": "创建可以共享的链接，请在没有密码的情况下登录别人，并在不再需要密码时撤销它们。",
+        "oidc": "连接单个登录提供商，如Keycloak，映射其索赔，并决定如何创建新帐户。",
+        "requests": "当书轨迹搜索请求的书籍，下载客户端获取它们，以及下载完成后会发生什么情况。",
+        "admin-tts": "文字转语音引擎读取器可以用于读取，每个引擎提供的声音以及它们出现的顺序。",
+        "book-dock": "Book Dock 拖放文件夹，自动获取新文件的元数据，以及单独完成文件的得分。",
+        "server-fonts": "上传此服务器上每个阅读器的字体一次。每个阅读器仍然可以隐藏其中任何字体。",
+        "audit-log": "可检索的记录，按事件、人、影响物品和日期列出谁改变了什么以及何时进行过滤。"
+      }
     },
     "field": {
       "required": "（必填）"
@@ -3672,6 +4301,201 @@
       "earned": "已获取（{count} 项）",
       "inProgress": "进行中（{count} 项）",
       "locked": "未解锁（{count} 项）"
+    },
+    "tiersEarnedFact": "{earned} 共 {total} 关卡",
+    "loading": "正在加载成就",
+    "filters": {
+      "label": "过滤成就",
+      "all": "所有的",
+      "earned": "赚取的",
+      "inProgress": "进行中",
+      "locked": "已锁定"
+    },
+    "showcase": {
+      "label": "高光",
+      "latest": "最新解锁",
+      "newToday": "{count, plural, one {# 今天新增} other {# 今天新增}}",
+      "secretRevealed": "泄露的秘密信息",
+      "categoryAndDate": "{category} · {date}",
+      "alsoNew": "也是新的",
+      "openMedal": "打开 {name}",
+      "emptyTitle": "您的第一枚奖牌正在等待",
+      "emptyBody": "完成一本书，评价一本书或高亮一条通道，它在这里降落。",
+      "collection": "收藏",
+      "shareOfTiers": "{percent} 每个级别的",
+      "tiersEarned": "{earned} 共 {total} 已赚取等级",
+      "closest": "最接近解锁的",
+      "allInProgress": "所有的 {count}",
+      "tierOfSet": "层 {tier} 共 {set}",
+      "nothingCounting": "还没有任何正在给奖牌打算。"
+    },
+    "shelf": {
+      "tiers": "{earned} / {total}",
+      "progressLabel": "{category} 已赚取等级"
+    },
+    "medal": {
+      "label": "{name}, {rarity}, {status}",
+      "tier": "层 {tier}",
+      "allTiers": "{count, plural, one {唯一级别} other {所有等级}}",
+      "keepReading": "继续阅读",
+      "notStarted": "未启动"
+    },
+    "progress": {
+      "generic": "{current} / {threshold}",
+      "toGo": "{count, plural, one {# 去} other {# 去}}"
+    },
+    "hints": {
+      "howToGetIt": "如何获取它",
+      "readingPace": "{count,plural,one{您已读 # 最近一小时 {days} 天数。} other{您已读 # 最近几个小时 {days} 天数。}}",
+      "etaDays": "{count,plural,one{关于 # 这个节奏的日子。} other{关于 # 按这个速度天数。}}",
+      "etaWeeks": "{count,plural,one{关于 # 每周以这个速度.} other{关于 # 每周以这个速度.}}",
+      "etaMonths": "{count,plural,one{关于 # 这个月的速度。} other{关于 # 月份以此速度飞行。}}",
+      "decadeUnread": "{count,plural,one{# 书签来自 {decade}s 正在等候您的货架。} other{# 书目 {decade}s 正在你的架子上等待.}}",
+      "centuryUnread": "{count,plural,one{# 书签来自 {century}s 正在等候您的货架。} other{# 书目 {century}s 正在你的架子上等待.}}",
+      "stalled": "{title} 是 {percent} 读取并启动于 {date}.",
+      "stalledNoProgress": "{title} 启动于 {date}.",
+      "untitledBook": "一本正在进行中的书",
+      "nearlyFinished": "{count,plural,one{# 进行中的书是过去的 {percent}.} other{# 正在进行中的书籍是过去的 {percent}.}}",
+      "unratedFinished": "{count,plural,one{# 您完成的书还没有评分。} other{# 您完成的书籍还没有评分。}}",
+      "shortBooks": "{count,plural,one{# 书签下 {pages} 页面正在等待您的架子。} other{# 书籍正在使用 {pages} 页面正在等待您的架子。}}",
+      "alreadyStarted": "{count,plural,one{# 正在进行中。} other{# 正在进行中。}}",
+      "longBooks": "{count, plural, one {# 书 {pages} 页面或更多页面正在等待您的架子。} other {# 书籍 {pages} 页面或更多页面正在您的架子上等待。}}",
+      "oldBooks": "{count,plural,one{# 书已发布于 {year} 正在等待您的货架。} other{# 此前出版的书 {year} 正在等待你的货架。}}",
+      "authorUnread": "{author}: {finished,plural,one{# 完成} other{# 完成}}, {count,plural,one{# 更多在你的书架上} other{# 更多在你的书架上}}.",
+      "languageUnread": "{count, plural, one {#book in {language} 正在等候您的架子上。} other {# 书在 {language} 正在等待您的架子上。}}",
+      "monthsRead": "{count,plural,one{您已读 # 月 {year} 迄今。} other{您已读 # 月 {year} 迄今。}}",
+      "monthsLeft": "{count,plural,one{{months} 左侧。} other{{months} 左侧。}}",
+      "noLongBook": "您的架子上没有任何书 {pages} 页面或更多。",
+      "nothingBeforeYear": "你的书架上没有发布过任何内容 {year}.",
+      "tooFewDecades": "{count,plural,one{仅您的架子间隔 # 这种做法迄今已经十年了。} other{仅您的架子间隔 # 几十年至今。}}",
+      "tooFewCenturies": "{count, plural, one {你的架子到目前为止只长达#个世纪。} other {你的架子到目前为止只长达#个世纪。}}",
+      "missedMonth": "您没有读取于 {month}, so {year} 这是无法实现的。这个数字在1月份再次开始。",
+      "continueReading": "继续阅读",
+      "rateFinished": "评价一本完成的书",
+      "viewAuthor": "查看作者",
+      "openBook": "打开 {title}",
+      "openUntitledBook": "打开书"
+    },
+    "sets": {
+      "booksFinished": "书籍已完成",
+      "pagesRead": "读取页面",
+      "hoursRead": "读取时间",
+      "longestBook": "最长的书已完成",
+      "librarySize": "库大小",
+      "annotations": "说明",
+      "booksRated": "图书评分",
+      "genresFinished": "流派完成",
+      "languagesFinished": "语言完成",
+      "readingStreak": "正在读取串口"
+    },
+    "units": {
+      "books": {
+        "progress": "{current} / {threshold} 书籍：",
+        "toGo": "{count, plural, one {# 要去的书} other {# 要去的书}}"
+      },
+      "pages": {
+        "progress": "{current} / {threshold} 页面",
+        "toGo": "{count, plural, one {# 页面要去} other {# 页面要去}}"
+      },
+      "hours": {
+        "progress": "{current} / {threshold} 小时",
+        "toGo": "{count, plural, one {# 小时要去} other {# 小时要去}}"
+      },
+      "annotations": {
+        "progress": "{current} / {threshold} 说明",
+        "toGo": "{count,plural,one{# 注解} other{# 转到批注}}"
+      },
+      "ratings": {
+        "progress": "{current} / {threshold} 评分",
+        "toGo": "{count, plural, one {# 评级} other {# 评级应该加入}}"
+      },
+      "genres": {
+        "progress": "{current} / {threshold} genres",
+        "toGo": "{count, plural, one {# 流派} other {# 流派}}"
+      },
+      "languages": {
+        "progress": "{current} / {threshold} 语言",
+        "toGo": "{count, plural, one {# 语言可以使用} other {# 语言可以使用}}"
+      },
+      "days": {
+        "progress": "{current} / {threshold} 天",
+        "toGo": "{count, plural, one {# 天去} other {# 天去}}"
+      }
+    },
+    "moments": {
+      "nthBook": "书 {number} 是 {title}",
+      "pagesAtUnlock": "{count, plural, one {# 页面} other {# 页面}} 解锁时",
+      "hoursAtUnlock": "{count, plural, one {# 小时} other {# 小时}} 解锁时",
+      "titleWithPages": "{title}, {count,plural,one{# 页面} other{# 页面}}",
+      "booksAtUnlock": "{count, plural, one {# 书} other {# 书}} 解锁时在你的书库中",
+      "annotationsAtUnlock": "{count, plural, one {# 批注} other {# 批注}} 解锁时",
+      "ratingsAtUnlock": "{count, plural, one {# 评分} other {# 评分}} 解锁时",
+      "genresAtUnlock": "{count, plural, one {# 流派} other {# 流派}} 解锁时",
+      "languagesAtUnlock": "{count, plural, one {# 语言} other {# 语言}} 解锁时",
+      "streakAtUnlock": "{count, plural, one {#day} other {#days}}",
+      "longSession": "正在运行一个会话 {duration}",
+      "durationHours": "{hours} 小时 {minutes} 分钟",
+      "durationMinutes": "{minutes} 分钟",
+      "sessionStartedAt": "会话开始于 {time}",
+      "oneDayBook": "{title}, 开始在一天内完成",
+      "booksInWeek": "{count, plural, one {# 书} other {# 书}} 一周内完成",
+      "booksInMonth": "{count,plural,one{# 书} other{# 书籍：}} 完成于 {month}",
+      "booksInYear": "{count,plural,one{# 书} other{# 书籍：}} 完成于 {year}",
+      "wholeBookOneSession": "一本片片段中的完整书",
+      "pagesInSession": "{count, plural, one {# 页面} other {# 页面}}",
+      "pagesInDay": "{count, plural, one {# 页面} other {# 页面}} 一天内",
+      "slowBurn": "{title}, 完成于 {count,plural,one{# 天} other{# 天}}",
+      "formatsOwned": "{count, plural, one {# 格式} other {# 格式}}",
+      "annotationsWithNote": "{count, plural, one {# 批注} other {# 批注}}",
+      "annotationsInDay": "{count, plural, one {# 批注} other {# 批注}}",
+      "everyStar": "从一星到五星的每个评分",
+      "everyColour": "使用的每个高亮颜色",
+      "titlePublished": "{title}，发布 {year}",
+      "booksInGenre": "{count, plural, one {# 书} other {# 书}}",
+      "firstInSeries": "{title}，来自 {series} 系列",
+      "centuries": "来自 {count, plural, one {# 世纪} other {# 百年}}",
+      "booksBySameAuthor": "{count, plural, one {# 书} other {# 书}} 由一位作者",
+      "decades": "书籍来自 {count,plural,one{# 十年} other{# 几十年内}}",
+      "shortBooks": "{count, plural, one {# 短书} other {# 短书}}",
+      "allSeasons": "四个季数 {year}",
+      "consistentDays": "{count, plural, one {# 天} other {# 天}} 30分钟或更多",
+      "weekendsInRow": "{count, plural, one {# 周末} other {# 周末}}",
+      "weekendHours": "{count,plural,one{# 小时} other{# 小时}} 周末： {date}",
+      "categoriesCovered": "{count, plural, one {# 类别} other {# 类别}} 带有一项成就",
+      "readingSources": "{count, plural, one {# 读取源} other {# 读取源}}",
+      "oneBookSources": "一本书从 {count, plural, one {# 源} other {# 源}}"
+    },
+    "records": {
+      "title": "录制书",
+      "subtitle": "您的勋章背后的数字，当每个勋章解锁时",
+      "value": "{value}",
+      "oneSession": "一个阅读会话",
+      "pagesInSession": "一个会话中的页面",
+      "pagesInDay": "一天内的页面",
+      "booksInWeek": "一周内的书",
+      "booksInMonth": "书籍于 {month}",
+      "booksInYear": "书完成于 {year}",
+      "annotations": "说明",
+      "genresFinished": "流派完成",
+      "daysInRow": "连续天数",
+      "booksInLibrary": "您的书库中的书"
+    },
+    "detail": {
+      "categoryTierSet": "{category} · 层级设置",
+      "secretHint": "继续阅读以显示此内容。",
+      "tierOf": "层 {earned} 共 {total}",
+      "current": "当前的",
+      "noneYet": "尚无",
+      "progress": "进展情况",
+      "allTiersEarned": "每个级别都赚取了",
+      "tiers": "层级",
+      "earned": "赚取的",
+      "status": "状态",
+      "hidden": "Hidden",
+      "rarity": "稀有度",
+      "category": "类别",
+      "theSet": "集合中",
+      "theMoment": "时间"
     }
   },
   "adminFeature": {
@@ -4403,7 +5227,13 @@
       "user": "用户",
       "action": "行 动",
       "description": "描述",
-      "ip": "IP"
+      "ip": "IP",
+      "time": "时间",
+      "person": "人员",
+      "source": "来源",
+      "open": "打开",
+      "network": "网络",
+      "activity": "活动"
     },
     "categories": {
       "authentication": "认证",
@@ -4413,7 +5243,10 @@
       "collections": "收藏夹",
       "integrations": "集成",
       "settings": "设置",
-      "other": "其他"
+      "other": "其他",
+      "access": "登录和访问",
+      "requests": "请求",
+      "devices": "设备和电子邮件"
     },
     "resourceLabels": {
       "User": "用户",
@@ -4577,10 +5410,178 @@
       "MaintenanceMissingBooksClean": "清理缺失书籍",
       "MaintenanceBrokenCoversClean": "清理损坏封面",
       "MaintenanceOrphanedCoversClean": "清理孤立封面文件夹"
-    }
+    },
+    "views": {
+      "label": "显示",
+      "changes": "更改",
+      "signins": "登录",
+      "security": "安全",
+      "all": "所有的"
+    },
+    "search": {
+      "label": "搜索事件",
+      "placeholder": "搜索人员、目标或IP地址",
+      "placeholderShort": "搜索事件"
+    },
+    "range": {
+      "label": "Date range: {range}",
+      "today": "今日：",
+      "7d": "过去 7 天",
+      "30d": "过去 30 天",
+      "all": "所有内容都保留",
+      "custom": "自定义范围",
+      "from": "来自",
+      "to": "收件人",
+      "between": "{from} 到 {to}",
+      "since": "自 {date}",
+      "until": "直到： {date}",
+      "sinceOldest": "自 {date}"
+    },
+    "filterMenu": {
+      "button": "筛选器",
+      "category": "类别",
+      "person": "人员",
+      "findPerson": "查找人",
+      "noPeople": "没有匹配的人",
+      "clear": "清空",
+      "done": "完成"
+    },
+    "activeFilters": {
+      "target": "{type}: {name}",
+      "clearAll": "全部清除"
+    },
+    "securityGroups": {
+      "label": "安全事件类型",
+      "all": "全部内容",
+      "failed": "失败的登录",
+      "accounts": "账户",
+      "passwords": "密码",
+      "permissions": "权限",
+      "access": "书库访问",
+      "links": "登录链接"
+    },
+    "day": {
+      "today": "今日：",
+      "yesterday": "昨日",
+      "changes": "{count, plural, one {# 更改} other {# 更改}}",
+      "events": "{count, plural, one {# 事件} other {# 事件}}"
+    },
+    "person": {
+      "system": "系统",
+      "deleted": "已删除帐户",
+      "automation": "自动化"
+    },
+    "source": {
+      "server": "此服务器",
+      "local": "本地网络",
+      "internet": "B. Internet",
+      "job": "背景作业",
+      "unknown": "未记录"
+    },
+    "target": {
+      "none": "No target",
+      "more": "+{count}",
+      "sinceDeleted": "已删除",
+      "withId": "{type} #{id}"
+    },
+    "openEvent": "打开详细信息： {event}",
+    "signIns": {
+      "signIns": "{count, plural, one {# 登录} other {# 登录}}",
+      "signOuts": "{count, plural, one {# 签出} other {# 签出}}",
+      "failed": "{count, plural, one {# 尝试失败} other {# 尝试失败}}",
+      "failedAs": "{count,plural,one{# 失败为 {names}} other{# 失败为 {names}}}",
+      "range": "{from} – {to}",
+      "footer": "{count, plural, one {{events} 登录活动，按个人、日和网络折叠到#} other {{events} 登录事件, 按个人、日和网络折叠到 # 行}}"
+    },
+    "pager": {
+      "label": "页 次",
+      "previous": "上一页",
+      "next": "下一页",
+      "page": "页 {page}",
+      "changes": "{from}–{to} 共 {count,plural,one{# 更改} other{# 更改}}",
+      "events": "{from}–{to} 共 {count,plural,one{# 事件} other{# 事件}}"
+    },
+    "drawer": {
+      "description": "一个审计活动的详细信息",
+      "close": "关闭",
+      "subtitle": "{category} · {day}, {time}",
+      "when": "时间",
+      "person": "人员",
+      "source": "来源",
+      "target": "Target",
+      "usernameTried": "已尝试用户名",
+      "deletedHere": "{type} · 被此事件删除",
+      "deletedSince": "{type} • 已删除",
+      "inThisRow": "{count, plural, one {# 此行中的事件} other {# 此行中的事件}}",
+      "around": "围绕这个事件",
+      "aroundHint": "{name}，40分钟两边的",
+      "aroundEmpty": "没有其它内容 {name} 在 40 分钟内。",
+      "history": "历史记录",
+      "historyCount": "{count, plural, one {# 事件} other {# 事件}}",
+      "historyMeta": "{name} · {date}, {time}",
+      "thisEvent": "此事件",
+      "raw": "原始事件",
+      "rawEventId": "事件 ID",
+      "rawAction": "行 动",
+      "rawTarget": "Target type",
+      "rawNote": "服务器笔记",
+      "only": "仅限 {name}"
+    },
+    "facts": {
+      "format": "格式",
+      "size": "大小",
+      "download": "下载",
+      "dockFile": "Book Dock 文件",
+      "rejected": "已拒绝",
+      "failed": "失败",
+      "cleaned": "已清理",
+      "skipped": "跳过",
+      "remaining": "剩余时间",
+      "sharingLevel": "共享级别",
+      "sharing": {
+        "private": "未共享",
+        "summary": "Summary",
+        "detailed": "详细信息"
+      }
+    },
+    "retention": {
+      "button": "{count, plural, one {点击#天} other {点击#天}}",
+      "title": "保持事件",
+      "days": "{count, plural, one {# 天} other {# 天}}",
+      "hint": "早期事件每晚午夜都会被删除。",
+      "hintWithOldest": "早期事件每天午夜被删除。最古老的事件是 {date}.",
+      "readOnly": "只有可以更改应用设置的人才能更改此设置。",
+      "saved": "{count,plural,one{审计活动现在保持为 # 天} other{审计活动现在保持为 # 天数。}}",
+      "saveFailed": "无法更改事件保留多长时间。"
+    },
+    "export": {
+      "button": "导出",
+      "title": "导出显示内容",
+      "hint": "使用当前视图，过滤器和日期范围。",
+      "csv": "CSV",
+      "json": "JSON",
+      "failed": "无法导出审核日志。"
+    },
+    "emptyFiltered": "没有匹配这些筛选器的事件。"
   },
   "auth": {
     "backToSignIn": "返回登录",
+    "plate": {
+      "exLibris": "Ex Libris"
+    },
+    "endpaper": {
+      "change": "更改尾纸",
+      "options": {
+        "seigaiha": "波形",
+        "shippo": "链接的圈子",
+        "asanoha": "山叶叶子",
+        "quatrefoil": "Quatrefoil",
+        "ogee": "Ogee",
+        "harlequin": "Harlequin",
+        "greekKey": "希腊密钥",
+        "plain": "纯色"
+      }
+    },
     "themePicker": {
       "switchToLight": "切换为指示灯",
       "switchToDark": "切换到黑色",
@@ -4598,7 +5599,10 @@
       "confirmPassword": "确认密码",
       "confirmNewPassword": "确认新密码",
       "currentPassword": "当前密码",
-      "passwordHint": "小于8个字符，带有大写、小写和数字"
+      "passwordHint": "小于8个字符，带有大写、小写和数字",
+      "showPassword": "显示密码",
+      "hidePassword": "隐藏密码",
+      "capsLockOn": "大写锁定已开启"
     },
     "errors": {
       "generic": "出错了。请重试。",
@@ -4610,9 +5614,11 @@
       "signingIn": "登录中……",
       "orDivider": "或",
       "forgotPassword": "忘记密码？",
+      "resetPasswordAction": "重置密码",
       "noAccount": "还没有账户？",
       "signUp": "注册",
       "registeredNotice": "帐户已创建，登录以继续。需要管理员授予您权限后才能访问库。",
+      "resetNotice": "密码已更新。请使用新密码登录。",
       "errors": {
         "invalidCredentials": "无效的用户名或密码",
         "tooManyAttempts": "登录尝试次数太多。请等待一分钟后重试。",
@@ -4784,6 +5790,8 @@
         "selectVisible": "选择可见",
         "refreshMetadata": "刷新元数据",
         "refreshingMetadata": "刷新元数据中……",
+        "confirmRefreshCount": "{count, plural, one {刷新# 作者的元数据？} other {刷新# 作者的元数据？}}",
+        "refreshAction": "刷新",
         "deleteSelected": "删除选中的",
         "deleting": "删除中……",
         "exitSelection": "退出选择",
@@ -4887,6 +5895,19 @@
   },
   "book": {
     "untitled": "无标题",
+    "placeholder": {
+      "volume": "Vol. {number}",
+      "genre": {
+        "horror": "恐怖的",
+        "romance": "罗曼文",
+        "fantasy": "Fantasy",
+        "scifi": "科学-fi",
+        "mystery": "神秘的",
+        "classic": "经典",
+        "nonfiction": "非虚拟的",
+        "young": "年轻的阅读者"
+      }
+    },
     "unknownFormat": "未知",
     "collapsedSeries": {
       "label": "系列",
@@ -4901,6 +5922,7 @@
       "audiobook": "音频簿"
     },
     "formats": {
+      "djvu": "DjVu 文档",
       "epub": "EPUB 电子书",
       "kepub": "KEPUB 电子书",
       "pdf": "PDF 文档",
@@ -4943,6 +5965,10 @@
       "openAs": "以 {format} 格式打开",
       "openReadAlong": "打开跟读 EPUB"
     },
+    "refreshMetadata": {
+      "success": "元数据已刷新",
+      "failed": "元数据刷新失败"
+    },
     "coverRegeneration": {
       "failed": "无法重新生成封面",
       "bulkInProgress": "正在重新提取封面",
@@ -4972,7 +5998,11 @@
       "exportFailed": "导出失败",
       "audiolessEpub": "KOReader EPUB",
       "audiolessEpubHint": "下载移除音频文件的 KOReader EPUB",
-      "noAudio": "无音频"
+      "noAudio": "无音频",
+      "textOnlyEpub": "纯文本 EPUB",
+      "textOnlyEpubHint": "在保留阅读锚的同时下载无麻醉的 EPUB",
+      "originalNarrated": "原始EPUB 带有语句",
+      "originalNarratedEpub": "原始EPUB 带有语句"
     },
     "sort": {
       "moveUp": "上移",
@@ -5268,7 +6298,8 @@
       },
       "header": {
         "previousBook": "上一书",
-        "nextBook": "下一本书"
+        "nextBook": "下一本书",
+        "backToLibrary": "返回到 {library}"
       },
       "tabs": {
         "details": "详细信息",
@@ -5716,6 +6747,9 @@
         },
         "searchDrawer": {
           "searchTitle": "搜索元数据",
+          "autoSearchOnOpen": "打开时自动搜索",
+          "autoSearchOnOpenHint": "下次打开此面板时，将根据书籍信息自动搜索。此设置会在当前浏览器中为你的账号保留。",
+          "searchOptions": "搜索选项",
           "compareTitle": "比较元数据",
           "searchSubtitle": "找到这本书的最佳提供商匹配。",
           "compareSubtitle": "查看差异并只应用你想要的东西。"
@@ -5935,6 +6969,8 @@
         "score": "评分",
         "scoreTooltip": "元数据得分 {score}/100",
         "emptyFields": "{count, plural, other {# 个空字段}}",
+        "emptyFieldsCount": "{count, plural, one {# 个空字段} other {# 个空字段}}",
+        "emptyFieldsHeading": "空白元数据字段",
         "emptyFieldsTooltip": "尚未填写：{fields}。可在线搜索查询。",
         "libraryRow": "书库",
         "primaryRow": "主要",
@@ -6036,6 +7072,12 @@
         "resume": "继续",
         "audiobook": "有声书",
         "writeTarget": "写入目标",
+        "notWritten": {
+          "formatNotSupported": "未写入：不支持此格式",
+          "formatDisabled": "未写入：已禁用此格式",
+          "fileExceedsSizeLimit": "未写入：超出大小限制",
+          "notContentFile": "未写入：非书籍内容文件"
+        },
         "enabled": "已启用",
         "disabled": "关闭",
         "notSet": "未设置",
@@ -6837,6 +7879,22 @@
       "nFailed": "{count} 项上传失败",
       "nTotal": "共计 {count} 项"
     },
+    "uploadFailures": {
+      "heading": "{count, plural, one {无法上传# 文件} other {无法上传# 文件}}",
+      "dismissAll": "关闭所有",
+      "retry": "重试上传 {name}",
+      "dismiss": "关闭 {name}",
+      "reason": {
+        "unsupported": "不支持的文件类型：{extension}",
+        "noExtension": "该文件没有扩展名，因此其格式未知",
+        "tooLarge": "大于最大值 {limit} 上传限制",
+        "tooLargeServer": "大于服务器上传限制",
+        "tooLargeProxy": "在到达BookOrbit之前被拒绝，可能被反向代理",
+        "storageFull": "服务器存储空间不足",
+        "network": "无法连接到服务器",
+        "status": "上传失败 (HTTP {status})"
+      }
+    },
     "fileList": {
       "emptyTitle": "Book Dock 中没有文件",
       "emptyMessageDefault": "上传文件或将其拖放到书签文件夹",
@@ -7096,7 +8154,40 @@
       "moreOptions": "更多选项",
       "fewerOptions": "收起选项",
       "optionsSummary": "{formats} · 已添加备注",
-      "formatToggleAria": "优先 {format}"
+      "formatToggleAria": "优先 {format}",
+      "pair": {
+        "choice": "两者都是",
+        "choiceHint": "同时询问电子书和音频簿",
+        "ebookLibraryLabel": "电子书库",
+        "audiobookLibraryLabel": "音频书库",
+        "audiobookFolderLabel": "音频簿文件夹",
+        "landsTogether": "这两种格式都是一本书在 {library}.",
+        "landsSeparately": "{library} 每个文件都有一本书，因此每个格式都会作为自己的一本书送达。",
+        "landsApart": "电子书和音频书送往不同的图书馆，作为两本书抵达。",
+        "preferredEbookFormats": "首选电子书格式",
+        "preferredAudiobookFormats": "首选音频簿格式",
+        "state": {
+          "owned": "在您的故事书库",
+          "following": "您已请求这个",
+          "joinable": "已请求",
+          "new": "未请求"
+        },
+        "requestBoth": "同时请求",
+        "getBoth": "同时获取",
+        "chooseReleases": "选择版本",
+        "joinBoth": "将我添加到两个中",
+        "requestEbook": "请求e-book",
+        "requestAudiobook": "请求语音书",
+        "getEbook": "获取电子书",
+        "getAudiobook": "获取音频簿",
+        "joinEbook": "将我添加到电子书请求",
+        "joinAudiobook": "将我添加到音频簿请求",
+        "haveBoth": "在您的故事书库",
+        "requestedBoth": "已请求",
+        "submitted": "请求电子书和音频簿",
+        "submittedPartlyJoined": "两个请求。一个已经在进行中，所以你已被添加到该请求中",
+        "submittedJoinsBook": "已请求。它将加入已经在您的库中的副本"
+      }
     },
     "card": {
       "details": "详情",
@@ -7155,7 +8246,10 @@
         "forbidden": "那条请求属于其他人。",
         "loadFailed": "无法加载那条请求"
       },
-      "entityName": "请求"
+      "entityName": "请求",
+      "pairSwitchLabel": "此请求中的格式",
+      "joinsBook": "加入一本你拥有的书",
+      "joinsBookHint": "到达时它将被添加到已经在您的书库中的书"
     },
     "actions": {
       "approve": "批准",
@@ -7170,7 +8264,29 @@
       "grab": "查找发布",
       "goToBook": "前往书籍",
       "retryRelease": "换一个发布重试",
-      "leave": "退出请求"
+      "leave": "退出请求",
+      "pair": {
+        "approveBoth": "同时批准",
+        "approveEbook": "审批电子书",
+        "approveAudiobook": "批准音频簿",
+        "rejectBoth": "同时拒绝",
+        "rejectEbook": "拒绝e-book",
+        "rejectAudiobook": "拒绝音频簿",
+        "cancelBoth": "同时取消",
+        "cancelEbook": "取消 e-book",
+        "cancelAudiobook": "取消音频簿",
+        "dismissBoth": "两者都不存在",
+        "dismissEbook": "关闭电子书",
+        "dismissAudiobook": "忽略音频簿",
+        "restoreBoth": "同时恢复",
+        "restoreEbook": "还原电子书",
+        "restoreAudiobook": "还原音频簿",
+        "grabEbook": "查找电子书发布",
+        "grabAudiobook": "查找音频簿发布",
+        "chooseReleases": "选择版本",
+        "openEbook": "打开 e-book 请求",
+        "openAudiobook": "打开音频簿请求"
+      }
     },
     "filters": {
       "status": "状态",
@@ -7213,7 +8329,9 @@
       "left": "你已退出这条请求",
       "bulkRejected": "{count, plural, other {已拒绝 # 条请求}}",
       "bulkRejectedPartial": "已拒绝 {done} 条,{failed} 条未能拒绝",
-      "importDiscarded": "导入的文件已丢弃"
+      "importDiscarded": "导入的文件已丢弃",
+      "pairApproved": "两者均已批准",
+      "pairRejected": "两者都被拒绝"
     },
     "errors": {
       "loadFailed": "无法加载请求",
@@ -7233,7 +8351,9 @@
       "languageChangeFailed": "无法更改请求语言",
       "leaveFailed": "无法退出那条请求",
       "bulkRejectFailed": "无法拒绝该组请求",
-      "discardImportFailed": "无法丢弃那次导入"
+      "discardImportFailed": "无法丢弃那次导入",
+      "approveCompanionFailedEbook": "已批准此书，但无法批准",
+      "approveCompanionFailedAudiobook": "批准了这个内容，但音频簿不能被批准"
     },
     "grab": {
       "title": "发送到下载客户端",
@@ -7279,6 +8399,18 @@
     "releases": {
       "title": "选择一个发布",
       "retryTitle": "换一个发布重试",
+      "pairTitle": "选择发布",
+      "pair": {
+        "tabsLabel": "选择发布的格式",
+        "releaseCount": "{count, plural, one {# 释放} other {# 释放}}",
+        "searching": "搜索中",
+        "toChoose": "选择",
+        "sent": "已发送",
+        "finishedTitle": "没有可以选择的内容",
+        "finishedHint": "这两种格式现在都有版本。您可以从请求中每一种格式跟进。",
+        "backToRequest": "返回请求",
+        "done": "完成"
+      },
       "subtitle": "在所有已启用的索引器中排名。",
       "summaryCount": "{count, plural, other {# 个发布}}",
       "allFreeleech": "全部为 Freeleech",
@@ -7568,7 +8700,8 @@
       "decidedBy": "决定人",
       "decisionNote": "决定备注",
       "requestNote": "请求备注",
-      "openDetail": "打开完整详情"
+      "openDetail": "打开完整详情",
+      "pairMedia": "电子书和音频书"
     },
     "confirm": {
       "cancelDownloadTitle": "取消这次下载？",
@@ -7624,7 +8757,9 @@
       "SUBMIT_DESTINATION_REQUIRED": "你的请求会在提交时立即批准,因此请选择这本书应归入的库",
       "SUBMIT_SELF_SERVE_LIMIT": "请先完成或取消一些下载:同时进行的下载最多 {limit} 个",
       "SUBMIT_ON_BEHALF_FORBIDDEN": "你不被允许替其他人发起书籍请求",
-      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "无法为该用户发起书籍请求"
+      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "无法为该用户发起书籍请求",
+      "SUBMIT_TARGET_BOOK_NOT_FOUND": "该书不在您可以访问的书库",
+      "SUBMIT_TARGET_BOOK_HAS_MEDIUM": "该书已经有此格式"
     },
     "actionError": {
       "BOOK_REQUEST_NOT_PENDING": "只有待处理的请求支持此操作;该请求当前为{status}",
@@ -7710,7 +8845,22 @@
       "reviewSources": "检查来源设置"
     },
     "selfServeBadge": "自助获取",
-    "selfServeBadgeHint": "由请求人直接下载,无需批准环节"
+    "selfServeBadgeHint": "由请求人直接下载,无需批准环节",
+    "missingFormat": {
+      "labelAudiobook": "这本书的音频簿",
+      "labelEbook": "这本书的电子书",
+      "noAudiobook": "尚无音频簿",
+      "noEbook": "尚无电子书",
+      "requestAudiobook": "请求语音书",
+      "requestEbook": "请求e-book",
+      "requested": "已请求",
+      "requestedBySomeone": "他人请求",
+      "ownedElsewhere": "作为单独的书在您的书库中",
+      "open": "打开",
+      "viewRequest": "查看请求",
+      "submittedAudiobook": "请求。音频簿将在到达时加入此书",
+      "submittedEbook": "已请求。电子书将在到达时加入此书"
+    }
   },
   "collection": {
     "visibleToAll": "对所有用户可见",
@@ -7787,6 +8937,9 @@
       "uploadBooks": "上传书",
       "appearance": "外观",
       "appearanceDescription": "选择主题、强调色、圆角、表面和背景选项。",
+      "style": "样式",
+      "surfacePalette": "表面",
+      "topGlow": "顶部发光",
       "theme": "主题",
       "accent": "强调色",
       "radius": "圆角",
@@ -7884,7 +9037,8 @@
       "updateTooltip": "{version} 版本更新可用",
       "openUpdateRelease": "在 GitHub 上打开 {version} 版本发布页",
       "zones": {
-        "browse": "浏览"
+        "browse": "浏览",
+        "reading": "正在阅读"
       },
       "reorder": {
         "gripAria": "调整 \"{name}\" 排序",
@@ -7915,6 +9069,8 @@
       "moreActions": "更多操作",
       "setField": "设置字段",
       "refreshMetadata": "刷新元数据",
+      "refreshConfirm": "{count, plural, one {刷新# 簿的元数据？} other {刷新# 簿的元数据？}}",
+      "refreshConfirmAction": "刷新",
       "reExtractCover": "重新解压",
       "metadataLock": "元数据锁",
       "lockAll": "锁定所有",
@@ -7975,6 +9131,69 @@
         "list": "列表视图",
         "table": "表格视图"
       }
+    },
+    "browseHeader": {
+      "eyebrow": {
+        "library": "书库",
+        "smartScope": "智能范围",
+        "collection": "收藏",
+        "browse": "浏览"
+      },
+      "facts": {
+        "books": "{count, plural, one {# 书} other {# 书}}",
+        "booksOf": "{matching} 共 {total,plural,one{# 书} other{# 书籍：}}",
+        "authors": "{count, plural, one {# 作者} other {# 作者}}",
+        "series": "{count, plural, one {# 系列} other {# 系列}}",
+        "scanned": "已扫描 {time}",
+        "scanningProgress": "正在扫描 {processed} / {total}",
+        "syncsToKobo": "同步到 Kobo"
+      },
+      "switcher": {
+        "open": "切换自 {name}",
+        "jumpTo": "跳转到...",
+        "libraries": "库",
+        "smartScopes": "智能范围",
+        "collections": "A. 收款情况",
+        "empty": "没有匹配"
+      },
+      "search": {
+        "removeToken": "删除过滤器 {label}",
+        "clearAll": "清除搜索和过滤器",
+        "save": "保存",
+        "summaryToken": "{count, plural, one {# 过滤器} other {# 过滤器}}"
+      },
+      "tokens": {
+        "anyOf": "任何 {count, plural, one {# 规则} other {# 规则}}",
+        "allOf": "所有 {count, plural, one {# 规则} other {# 规则}}"
+      },
+      "sort": {
+        "sortBy": "排序方式 {field}",
+        "ascending": "转发。切换到降序排列",
+        "descending": "降序。切换到升序排列"
+      },
+      "facets": {
+        "format": "格式",
+        "rules": "规则",
+        "show": "显示",
+        "library": "书库",
+        "status": "状态",
+        "ruleCount": "{count, plural, one {# 规则} other {# 规则}}"
+      },
+      "menu": {
+        "more": "更多 {name}",
+        "editRules": "编辑规则",
+        "deleteSmartScope": "删除智能瞄准镜",
+        "deleteCollection": "删除收藏",
+        "confirmDelete": "删除\"{name}\"？这不能撤消。",
+        "upload": "上传书"
+      },
+      "scan": {
+        "scanning": "正在扫描",
+        "started": "正在扫描 {name}",
+        "finished": "扫描 {name} 完成"
+      },
+      "viewModes": "查看模式",
+      "legend": "音量颜色"
     },
     "iconPicker": {
       "clearSelectionAria": "清除选中的图标",
@@ -8084,6 +9303,28 @@
       "discardTitle": "放弃更改？",
       "discardDescription": "未保存的更改将会丢失。",
       "discardConfirm": "放弃"
+    },
+    "backgroundPicker": {
+      "none": "无",
+      "dots": "点数",
+      "cross": "十字线",
+      "millimeter": "Millimeter",
+      "blueprint": "蓝图",
+      "brushed": "笔刷的",
+      "scanlines": "扫描线",
+      "vinyl": "维尼尔",
+      "carbon": "碳类",
+      "perforated": "Perfortified",
+      "aurora": "Aurora",
+      "horizon": "地平线",
+      "glow": "发光",
+      "mesh": "网格：",
+      "elevation": "海拔高度",
+      "prism": "棱镜",
+      "spectrum": "谱图",
+      "spectrum-x": "谱图 X",
+      "spectrum-plus": "谱图",
+      "eclipse": "黄色"
     }
   },
   "customIcons": {
@@ -8329,6 +9570,7 @@
     },
     "tabs": {
       "providers": "提供商",
+      "servers": "邮件服务器",
       "recipients": "收件人",
       "groups": "群組",
       "templates": "模板",
@@ -8497,6 +9739,306 @@
       "sending": "发送中……",
       "queued": "{count, plural, =0 {没有邮件队列} other {# 电子邮件队列}}",
       "failed": "发送失败"
+    },
+    "page": {
+      "addRecipient": "添加收件人",
+      "recipients": "收件人",
+      "groups": "群組",
+      "newGroup": "新建组",
+      "servers": "邮件服务器",
+      "addServer": "添加邮件服务器",
+      "templates": "模板",
+      "newTemplate": "新模板",
+      "noServersReadonly": "尚未与您共享邮件服务器。请管理员添加一个。",
+      "roleShared": "与所有人共享",
+      "roleSystem": "密码重置",
+      "cantConnect": "无法连接",
+      "builtIn": "内置于",
+      "recipientsEmptyTitle": "添加您发送的电子阅读器或收件箱",
+      "recipientsEmptyBody": "Kindle的地址结束 {kindle} 并且列在您的亚马逊帐户中的设备下。PocketBook的结尾是在 {pocketbook}。任何普通收件箱也能起作用。",
+      "kindleNote": "Kindle 只从核准的发件人收取邮件。添加 {address} 在您的亚马逊账户中的个人文档设置之下。",
+      "copyAddress": "复制地址",
+      "addressCopied": "地址已复制",
+      "editServer": "编辑 {name}",
+      "editTemplate": "编辑 {name}",
+      "editGroup": "编辑 {name}",
+      "groupCount": "{count, plural, one {# recipient} other {# recipients}}",
+      "recipientsHint": "当您发送时选中了星标。",
+      "groupsHint": "一次发送给多个收件人。",
+      "groupsEmpty": "尚无群组。",
+      "serversHint": "有星标的的人发送您的书籍。",
+      "templatesHint": "每本书一并发送的主题和消息。",
+      "kindleTemplateNote": "Kindle永远不会显示模板：它的电子邮件总是与主题一起发送 {subject}.",
+      "test": "测试",
+      "testServer": "测试 {name}",
+      "testOk": "{name} 已连接",
+      "testFailed": "{name} 无法连接",
+      "defaultRecipient": "默认收件人",
+      "makeDefaultRecipient": "创建 {name} 默认收件人",
+      "defaultServer": "默认服务器",
+      "makeDefaultServer": "创建 {name} 默认服务器",
+      "defaultTemplate": "默认模板",
+      "makeDefaultTemplate": "创建 {name} 默认模板",
+      "editRecipient": "编辑 {name}",
+      "serversEmptyTitle": "尚无邮件服务器",
+      "serversEmptyBody": "书目通过SMTP帐户。Gmail、Outlook、iCloud和Fastmail是一个点击；任何其他服务器也可以工作。",
+      "needServerTitle": "在您可以发送之前添加邮件服务器",
+      "needServerBody": "BookOrbit通过您拥有的 SMTP 帐户发送账簿，例如带有应用程序密码的 Gmail 。",
+      "needServerAsk": "请管理员与您分享邮件服务器。",
+      "goToServers": "转到邮件服务器",
+      "noEncryption": "无加密"
+    },
+    "route": {
+      "defaultSaved": "默认更新"
+    },
+    "attention": {
+      "title": "需要关注",
+      "count": "{count, plural, one {# 项目} other {# 项目}}",
+      "hide": "隐藏",
+      "show": "显示",
+      "serverDown": "{name} 无法连接",
+      "notDelivered": "{book} 未连接 {recipient}",
+      "maybeDelivered": "{book} 可能还没有达到。 {recipient}",
+      "testedAgo": "已测试 {time}",
+      "editServer": "编辑服务器",
+      "editRecipient": "编辑收件人",
+      "resend": "重新发送"
+    },
+    "reason": {
+      "tooLarge": "{size} 大于 {server} 接受。",
+      "tooLargeGmail": "{size} 超过 Gmail 的 25 MB 附件限制。",
+      "tooLargeFix": "发送一个较小的版本，或将收件人设置为仅文本的 EPUB。",
+      "signIn": "{server} 拒绝登录。",
+      "signInFix": "检查邮件服务器上的用户名和密码。",
+      "unreachable": "{server} 没有答复。",
+      "unconfirmed": "连接在消息传递后就停止了，所以可能已经到达。",
+      "unconfirmedFix": "复活前勾选收件箱，或两次。",
+      "interrupted": "BookOrbit在这个电子邮件正在退出时重新启动。",
+      "interruptedFix": "重新发送前选取收件箱。",
+      "preparation": "无法准备发送文件。",
+      "other": "邮件服务器将其关闭。",
+      "server": "邮件服务器",
+      "serverMessage": "服务器消息",
+      "retryAt": "下次尝试 {time}."
+    },
+    "status": {
+      "sent": "已发送",
+      "sending": "正在发送",
+      "retrying": "重试 · {attempt} 共 {total}",
+      "unconfirmed": "未确认",
+      "failed": "失败"
+    },
+    "recent": {
+      "moreActions": "更多操作 {title}",
+      "deletedBook": "已删除的书",
+      "openBook": "打开书",
+      "resend": "重新发送",
+      "delete": "删除条目"
+    },
+    "log": {
+      "all": "所有的",
+      "attention": "需要关注",
+      "active": "进行中",
+      "book": "书",
+      "sentTo": "发送至",
+      "file": "文件",
+      "status": "状态",
+      "when": "时间",
+      "sentMeans": "发送意味着您的邮件服务器已接受",
+      "emptyFilter": "现在这里没有任何内容。",
+      "loadMore": "加载更多",
+      "showing": "显示 {shown} 共 {total}",
+      "emptyTitle": "尚未发送任何消息",
+      "emptyBody": "您的电子邮件在这里显示它们的去向以及邮件服务器是否拿到它们。"
+    },
+    "card": {
+      "nothingSent": "尚未发送任何消息",
+      "failed": "失败",
+      "retrying": "重试",
+      "unconfirmed": "未确认",
+      "sending": "正在发送",
+      "narration": "说明",
+      "narrationTitle": "读书中保留了他们的写作内容"
+    },
+    "device": {
+      "kindle": "Kindle",
+      "kobo": "Kobo",
+      "other": "其他电子阅读器",
+      "otherShort": "电子阅读器",
+      "none": "人员或收件箱"
+    },
+    "sheet": {
+      "title": "通过电子邮件发送",
+      "sendTo": "发送至",
+      "groups": "群組",
+      "templateName": "{name} 模版",
+      "eachFormat": "每个收件人的格式",
+      "formatForAll": "{format} 适合所有人",
+      "file": "文件",
+      "mailServer": "邮件服务器",
+      "template": "模板",
+      "yourDefault": "您的默认",
+      "emails": "{count, plural, one {# email} other {# emails}}",
+      "noOnePicked": "没有人选择",
+      "total": "{size} 总计",
+      "send": "{count, plural, one {发送} other {发送 # 电子邮件}}",
+      "noFormat": "否 {format}，获取 {got}",
+      "readAlong": "已读， {size}",
+      "overKindle": "{size}, 超过 50 MB 限制",
+      "overGmail": "{size}, 超过 Gmail的 25 MB 限制",
+      "kindleRejects": "Kindle 拒绝 {format}",
+      "blockedKindle": "{name} 无法使用 {format}。选择 EPUB 或 PDF ，或取消勾选。",
+      "books": "{count, plural, one {# 书} other {# 书}}",
+      "notReadyTitle": "电子邮件尚未设置",
+      "notReadyBody": "一本书能够去任何地方之前，该帐户需要邮件服务器和收件人。",
+      "addServer": "添加邮件服务器",
+      "addServerHint": "Gmail、Outlook、iCloud、Fastmail或任意SMTP账户。",
+      "askForServer": "请管理员共享邮件服务器。",
+      "addRecipient": "添加收件人",
+      "addRecipientHint": "您的金伯利、 PocketBook 或任何收件箱。",
+      "openSettings": "打开电子邮件设置",
+      "sendingTitle": "正在发送 {title}",
+      "closeHint": "您可以关闭这个。失败也会出现在您的通知和电子邮件历史记录中。",
+      "openHistory": "打开历史记录",
+      "done": "完成",
+      "acceptedBy": "接受者 {server} {time}",
+      "handingOver": "正在移交到 {server}"
+    },
+    "editor": {
+      "kindleSubject": "转换",
+      "recipient": {
+        "newTitle": "新收件人",
+        "description": "收件人的姓名、地址、设备和收到的信息。",
+        "sectionRecipient": "收款人",
+        "sectionReceives": "收到的内容",
+        "name": "名称",
+        "email": "电子邮件地址",
+        "device": "设备",
+        "deviceHint": "请更改主题 {subject} 并限制以下格式。",
+        "format": "格式",
+        "formatPrimary": "书主",
+        "formatHint": "一本没有这种格式的书获得其主要版本。",
+        "kindleFormatHint": "Amazon 2023年停止通过电子邮件接受MOBI和AZW3，所以他们不会被提供给金伯利。 一本没有这种格式的书获得其主要版本。",
+        "kindleLegacyFormat": "Kindle 不再接受 {format} 通过电子邮件。选择 EPUB 或 PDF",
+        "readAlong": "阅读书",
+        "readAlongAutomatic": "自动的",
+        "readAlongAutomaticHint": "只有文本可以复制，否则原文照发。",
+        "readAlongTextOnly": "纯文本 EPUB",
+        "readAlongTextOnlyHint": "缩写被剥离。小到足以发送电子邮件。",
+        "readAlongOriginal": "原文是叙述项",
+        "readAlongOriginalHint": "保持语音。通常超过 100 MB 的大多数邮件服务器限制。",
+        "notForKindle": "不是为了Kindle",
+        "template": "模板",
+        "templateDefault": "您的默认 ({name})",
+        "templateKindleHint": "Kindle被忽略，它从未显示消息。",
+        "approveTitle": "批准亚马逊发送者",
+        "approveBody": "Kindle 将电子邮件从它不知道的地址丢弃，没有退款。 {path}，添加 {address}",
+        "approvePath": "管理您的内容和设备 释义的 释义的个人文档设置",
+        "approveNoServer": "首先添加邮件服务器以查看地址Kindle必须批准。",
+        "lastSent": "最后发送的书 {time}",
+        "sendTest": "发送测试电子邮件",
+        "testSubject": "书签测试邮件",
+        "testBody": "这是一个来自BookOrbit的测试。如果你可以阅读它，书籍发送至 {name} 也将来到这里。",
+        "testSent": "测试邮件发送至 {name}",
+        "testFailed": "测试邮件没有退出： {error}",
+        "makeDefault": "快速发送收件人",
+        "remove": "删除收件人",
+        "removeConfirm": "删除 {name}?",
+        "removeConsequence": "它的发送历史保持不变。",
+        "removeDefaultConsequence": "它的发送历史保持不变，然后快速发送停止，直到你为另一个收件人标记。",
+        "required": "姓名和电子邮件地址是必需的。",
+        "sectionLastSent": "上次发送"
+      },
+      "server": {
+        "newTitle": "新邮件服务器",
+        "description": "SMTP服务器，它的登录和可以通过它发送。",
+        "sectionProvider": "提供商",
+        "sectionServer": "服务器",
+        "sectionSignIn": "登录",
+        "sectionSender": "发件人",
+        "sectionWho": "谁使用",
+        "presetGmail": "Gmail",
+        "presetOutlook": "展望",
+        "presetIcloud": "iCloud Mail",
+        "presetFastmail": "快速邮件",
+        "presetOther": "其他SMTP",
+        "presetHint": "预设在主机、 端口和安全性中。您仍然可以更改它们。",
+        "name": "名称",
+        "host": "主机",
+        "port": "端口",
+        "security": "安全",
+        "securityStarttls": "STARTTLS",
+        "securitySsl": "SSL/TLS",
+        "securityNone": "无",
+        "securityHint": "STARTTLS on 587, SSL/TLS on 465. One or othe, 绝非两者兼而有之。",
+        "needsPassword": "此服务器需要密码",
+        "username": "用户名",
+        "password": "密码",
+        "appPassword": "应用密码",
+        "passwordKeep": "保存。键入替换它",
+        "appPasswordHint": "Gmail 和 iCloud 需要应用程序密码，而不是您的帐户密码。",
+        "fromName": "发件人姓名",
+        "fromAddress": "来自地址",
+        "fromAddressHint": "Kindle 所有者必须批准此地址。",
+        "share": "与所有人分享",
+        "shareHint": "其他人可以通过此服务器发送账簿，无需看到密码。",
+        "system": "发送密码重置和登录链接",
+        "systemHint": "一个服务器 BookOrbit 本身使用。只有超级用户可以更改这个。",
+        "verifyTls": "验证服务器证书",
+        "verifyTlsHint": "仅为您自己的网络上拥有自签名证书的服务器关闭。",
+        "test": "测试连通性",
+        "testDirty": "先保存，然后测试",
+        "testOk": "已连接",
+        "testFailed": "无法连接： {error}",
+        "remove": "删除服务器",
+        "removeConfirm": "删除 {name}?",
+        "removeConsequence": "每个人都会失去它。",
+        "removeSystemFirst": "删除前关闭服务器上的密码重置。",
+        "makeDefault": "用作我的默认值",
+        "required": "名称和主机是必需的。"
+      },
+      "template": {
+        "newTitle": "新模板",
+        "description": "每本书一并发送的主题和消息。",
+        "sectionTemplate": "模板",
+        "sectionInsert": "Insert",
+        "sectionPreview": "预览",
+        "name": "名称",
+        "subject": "议 题",
+        "message": "留言",
+        "groupBook": "书",
+        "groupFile": "文件",
+        "groupOther": "其他",
+        "insertHint": "进入曲线、主题或消息。空值不打印任何东西。",
+        "insertVariable": "Insert {variable}",
+        "previewWith": "预览",
+        "previewEmpty": "发送一本书来预览一个模板。",
+        "previewFailed": "无法渲染预览。",
+        "previewTo": "收件人",
+        "builtInReadonly": "内置。只有超级用户可以更改它。",
+        "kindleNote": "Kindle 永远不会显示模板：它总是得到主题 {subject}.",
+        "makeDefault": "设为默认值",
+        "remove": "删除模板",
+        "removeConfirm": "删除 {name}?",
+        "removeConsequence": "使用它的收件人返回到您的默认模板。",
+        "required": "名称和主题是必需的。",
+        "attachment": "附件： {name}"
+      },
+      "group": {
+        "newTitle": "新建组",
+        "description": "一组收款人一次发送一本书。",
+        "sectionGroup": "组别",
+        "sectionMembers": "成员",
+        "name": "名称",
+        "memberCount": "{count} 共 {total}",
+        "noRecipientsTitle": "没有要从中挑选的收件人",
+        "noRecipientsBody": "群组是一组收件人，请先添加收件人。",
+        "remove": "删除组",
+        "removeConfirm": "删除 {name}?",
+        "removeConsequence": "其接受者留在那里。",
+        "required": "组需要名称。",
+        "updated": "群组已更新"
+      }
     }
   },
   "errors": {
@@ -8524,10 +10066,10 @@
       "description": "连接您的Hardcover帐户以同步阅读数据。",
       "connected": "已连接",
       "apiToken": "API 令牌",
-      "tokenPlaceholder": "粘贴你的Hardcover API 令牌",
+      "tokenPlaceholder": "填入您的 Hardcover API 令牌",
       "show": "显示",
       "hide": "隐藏",
-      "findTokenAt": "查找您的令牌在",
+      "findTokenAt": "前往此处查找您的令牌",
       "validateToken": "验证令牌",
       "valid": "有效({username})",
       "invalidToken": "无效的令牌",
@@ -8791,6 +10333,14 @@
           "squareTitle": "方形 1:1",
           "squareHint": "纯有声书书库",
           "slotsHint": "同时有电子书和有声书的书籍会显示适配此形状的封面。"
+        },
+        "gridShape": {
+          "title": "网格形状",
+          "tallTitle": "高亮单元格",
+          "tallHint": "最适合电子书库或混合库",
+          "squareTitle": "平方单元格",
+          "squareHint": "最好的音频书库",
+          "hint": "每一本书都显示其主格式的封面，一个音频簿的正方形。一个封面与您的封面显示设置不匹配。"
         }
       },
       "folders": {
@@ -8987,6 +10537,68 @@
           "opfHint": "由 Calibre 保存到书籍旁边",
           "swap": "调换顺序",
           "hint": "BookOrbit 使用书籍拥有的第一种来源，忽略另一种。Calibre 书库通常应将 metadata.opf 放在首位。"
+        },
+        "regex": {
+          "title": "配置正则表达式元数据",
+          "sourceTitle": "正则表达式",
+          "description": "从相对于其库文件夹的主文件路径中提取元数据。 匹配前删除文件扩展名。第一条规则与可用字段获胜。",
+          "enable": "启用正则表达式元数据",
+          "primaryFileHint": "将由多个文件制作的书，如音频记录片，规则读取主文件的路径。",
+          "groups": "命名群组：",
+          "valuesHint": "用作作者或作者用分号分隔。日期使用 YYYY-MM-DD 旗帜：i ignores case, u enablish Unicode。",
+          "rules": "有序提取规则",
+          "rule": "规 则 {number}",
+          "moveUp": "上移规则",
+          "moveDown": "向下移动规则",
+          "remove": "删除规则",
+          "basePath": "库文件夹",
+          "extensionHint": "文件扩展名自动被忽略。结束锚点与文件名匹配，而无扩展名。",
+          "flags": "标记",
+          "add": "添加规则",
+          "examplePath": "示例相对文件路径，包括扩展",
+          "examplePlaceholder": "作者 /Series/08 - My.Book.epub",
+          "exampleTitle": "作者背参照示例",
+          "exampleTestPath": "测试路径(包括扩展)",
+          "validating": "检查规则…",
+          "validationSuccess": "规则语法和组是有效的。使用预览检查文件路径匹配。",
+          "validationError": "无法验证规则。请稍后再试。",
+          "validationRetry": "再次检查",
+          "validationRuleCount": "添加到 {min} 和 {max} 规则。",
+          "preview": "预览",
+          "previewing": "测试规则…",
+          "previewError": "无法预览规则。请检查相对路径和配置，然后重试。",
+          "actualInput": "路径测试：",
+          "matched": "匹配的规则 {number}",
+          "noMatch": "没有可用匹配。文件元数据将被使用。",
+          "scanHint": "更改应用于新文件或更改文件的未来元数据提取。保存不会开始扫描或更新未改变的书籍。",
+          "apply": "应用于库表单",
+          "configure": "配置",
+          "enabledHint": "从无文件扩展名的相对路径中提取字段。",
+          "disabledHint": "禁用。配置要启用的规则。",
+          "moveSourceUp": "移动 {source} 上",
+          "moveSourceDown": "移动 {source} 向下",
+          "diagnostics": {
+            "pattern_required": "输入正则表达式。",
+            "pattern_too_long": "表达式不能超过 {count} 字符。",
+            "invalid_flags": "只允许i 和u ，最多只允许一次。",
+            "invalid_pattern": "无效的正则表达式。",
+            "missing_group": "包含至少一个支持的命名组。",
+            "conflicting_authors": "使用作者或作者，而不是两者兼用。",
+            "invalid_value": "一个无效的字段值被跳过。",
+            "timeout": "表达式过长。简化模式。",
+            "busy": "所有预览员工都忙。请稍后再试。",
+            "worker_failed": "无法评估表达式。请重试。"
+          },
+          "precedenceHint": "第一个可用的文件源提供元数据。正则表达式字段遵循此顺序，缺少的值则从另一个来源填写。",
+          "summary": "{format} 首先，正则表达式元数据首选项",
+          "fields": {
+            "title": "标题",
+            "authors": "作者",
+            "series": "系列",
+            "seriesIndex": "系列数",
+            "publishedYear": "发布年份",
+            "publishedDate": "发布日期"
+          }
         }
       },
       "fileWrite": {
@@ -9002,12 +10614,22 @@
         },
         "cover": {
           "title": "包括封面图像",
-          "hint": "将存储的封面写回支持的文件格式。"
+          "hint": "将存储的封面写回支持的文件格式。",
+          "mediumHint": "同时将已保存的封面写入文件。电子书文件使用电子书封面，音频文件使用有声书封面；如果未设置对应封面，则保留文件原有的封面。"
+        },
+        "allFiles": {
+          "title": "写入书籍的所有文件",
+          "hint": "同时写入这本书的其他书籍文件，例如与电子书放在一起的有声书，或同一文件夹中的 PDF。该文件夹中所有书籍格式的文件都会被写入，因此，如需排除练习册等配套文件，请将其放在单独的文件夹中。下方的格式开关和大小限制仍然适用。关闭此选项只会停止后续写入，不会撤销已写入文件的更改。"
         },
         "epub": {
           "title": "EPUB",
           "hint": "将元数据写入EPUB存档内的 OPF 文件。",
           "toggleAria": "写入 EPUB 元数据"
+        },
+        "readAlong": {
+          "title": "同步朗读 EPUB",
+          "hint": "带有同步朗读音频的 EPUB，例如 Storyteller 制作的同步朗读电子书。这类文件内含音频，因此体积较大，重写时需要更多内存。",
+          "toggleAria": "写入同步朗读 EPUB 元数据"
         },
         "fb2": {
           "title": "FictionBook (FB2)",
@@ -9032,7 +10654,9 @@
         "audio": {
           "title": "音频",
           "hint": "将存储的封面嵌入到M4B、M4A、MP3和FLAC 文件中。",
-          "toggleAria": "写入音频封面"
+          "toggleAria": "写入音频封面",
+          "tagsHint": "将书名、作者、朗读者、系列等标签写入 M4B、M4A、MP3 和 FLAC 文件。",
+          "tagsToggleAria": "写入音频元数据"
         },
         "coverAudioHint": "同时把已存储的封面写入文件。音频文件只能写入封面。",
         "audioNeedsCover": "需要开启“包含封面图片”。",
@@ -9126,6 +10750,7 @@
         "add": "添加",
         "emptyCreate": "还没有其他人。在此添加的人员会在书库创建后立即获得访问权限。",
         "superusers": "超级用户始终拥有完整访问权限。",
+        "levelsHint": "查看器可以浏览和阅读。编辑器和所有者也可以在他们的账户拥有编辑元数据权限时编辑元数据。",
         "levelFor": "{name} 的访问级别",
         "revokeFor": "移除 {name} 的访问权限",
         "revokeQuestion": "移除访问权限？",
@@ -9245,6 +10870,13 @@
         "createFolder": "无法创建文件夹"
       }
     },
+    "destination": {
+      "loadFailed": "无法加载目标书库。请关闭后重新打开以重试。",
+      "noLibraries": "没有可用的书库。请创建书库，或联系管理员获取访问权限。",
+      "noFolders": "此书库没有目标文件夹。请在书库设置中添加文件夹。",
+      "unavailable": "所选书库已不可用。",
+      "selectFolder": "选择文件夹…"
+    },
     "upload": {
       "library": "书库",
       "selectLibrary": "请选择书库……",
@@ -9273,6 +10905,19 @@
     }
   },
   "metadataReminders": {
+    "title": "缺失字段提醒",
+    "navDescription": "选择需要提醒的缺失元数据字段",
+    "personal": "个人偏好设置",
+    "description": "选择书籍提醒中显示哪些缺失字段。这些偏好设置适用于整个书库，不会影响元数据评分。",
+    "sheetDescription": "无需离开当前书籍，即可选择你关注的字段。",
+    "fieldsHeading": "要检查的字段",
+    "autoSave": "更改会自动保存到你的账号。",
+    "saving": "正在保存偏好设置…",
+    "saved": "偏好设置已保存。",
+    "reset": "恢复默认设置",
+    "disabled": "未选择任何字段。缺失字段提醒已隐藏。",
+    "saveFailed": "无法保存偏好设置。已恢复之前的设置。",
+    "customize": "自定义提醒…",
     "missingHeading": "缺少元数据",
     "missingDescription": "缺少您选择要跟踪的字段。",
     "missingCount": "{count, plural, one {# 个缺少的字段} other {# 个缺少的字段}}",
@@ -9310,6 +10955,32 @@
         "label": "描述",
         "hint": "描述已填写。"
       }
+    }
+  },
+  "metadataCache": {
+    "badge": {
+      "cached": "缓存的",
+      "stale": "过期的",
+      "cachedHint": "结果已保存 {when}",
+      "cachedHintUndated": "保存的结果",
+      "staleHint": "提供商不可用，所以保存的结果是 {when} 已使用",
+      "staleHintUndated": "提供商不可用，所以使用了已保存的结果"
+    },
+    "notice": {
+      "someCached": "有些结果来自保存的搜索(旧搜索： {when}).",
+      "someCachedUndated": "一些结果来自保存的搜索。",
+      "someStale": "有些提供者无法获得，因此显示了已保存的结果(最旧的： {when}).",
+      "someStaleUndated": "有些供应商没有供应，因此显示了已节省的结果。",
+      "searchFresh": "搜索新的",
+      "searchFreshHint": "再次询问每个提供商，而不是使用已保存的答案"
+    },
+    "fallback": {
+      "usedSaved": "{count,plural,one{{providers} 因此使用了节省下来的结果。} other{{providers} 因此使用了节省下来的结果。}}"
+    },
+    "ignoreCache": {
+      "label": "忽略缓存结果",
+      "hint": "再次询问每个提供者而不是重新使用已保存的答案。放慢并使用更多的每个提供者的请求津贴。",
+      "runHint": "应用于您从这里开始的运行。每个提供者都被再次询问，而不是重新使用已保存的答案，这样做比较慢。"
     }
   },
   "metadataScore": {
@@ -9752,6 +11423,22 @@
     }
   },
   "reader": {
+    "pageImages": {
+      "loadFailed": "无法打开此文档。请检查您的访问权限或再试一次。",
+      "pageFailed": "无法加载此页面。请在服务器可用时重试。",
+      "pageAlt": "页 {page}",
+      "previousPage": "上一页",
+      "nextPage": "下一页",
+      "goToPage": "转到页面",
+      "pin": "固定阅读器菜单",
+      "unpin": "取消置顶阅读器菜单"
+    },
+    "djvu": {
+      "pageText": "嵌入式页面文本",
+      "textDescription": "存储在 DjVu 文档中的文本。OCR 可能包含错误。",
+      "noText": "此页面没有嵌入文本。",
+      "textFailed": "无法加载此页面的嵌入文本。"
+    },
     "retry": "重试",
     "pdf": {
       "openError": "无法打开此 PDF",
@@ -9822,6 +11509,7 @@
     },
     "loadingBook": "正在加载书…",
     "failedToLoadBook": "加载书失败",
+    "bookLoadTimeout": "该书过长才能打开。请尝试刷新页面。",
     "chapterNumber": "第 {number} 章",
     "peek": {
       "badge": "正在潮流",
@@ -12153,6 +13841,7 @@
     },
     "email": {
       "providers": "提供商",
+      "servers": "邮件服务器",
       "recipients": "收件人",
       "groups": "群組",
       "templates": "模板",
@@ -12166,7 +13855,8 @@
       "genre-blocklist": "体裁屏蔽列表",
       "score": "自信得分",
       "auto-fetch": "书籍自动获取",
-      "authors": "作者自动获取"
+      "authors": "作者自动获取",
+      "search-cache": "搜索缓存"
     },
     "admin": {
       "users": "用户",
@@ -12277,5 +13967,92 @@
     "errors": {
       "generic": "TTS 错误"
     }
+  },
+  "delivery": {
+    "readAloud": {
+      "label": "已读的 EPUB 交付",
+      "automatic": "自动：偏好文本，允许原始回归。",
+      "textOnly": "纯文本 EPUB",
+      "original": "原始EPUB 带有语句",
+      "hint": "适用于未来的交货。原始材料保留现有的叙述，可能更大。如果无法提供安全副本，只有文本准备失败。",
+      "koboHint": "原始的 EPUBs 跳过 KEPUB 转换。原始的 Kobo 固件可能无法播放写字，且此副本的准确位置和高亮同步不可用。",
+      "profileHint": "为需要不同的 EPUB 变量的读者使用单独的 OPDS 配置文件。",
+      "replacementTitle": "替换 Kobo 副本",
+      "bookId": "书号",
+      "device": "设备",
+      "prepare": "准备替换",
+      "offer": "我只删除了设备副本；提供替换",
+      "confirm": "我安装了替换",
+      "cancel": "取消替换",
+      "replacementHint": "首先准备和审查。删除设备副本不会删除库簿。请自行备份设备本地笔记。 BookOrbit 保存规范进度和服务器注释。延迟事件可能会限制精确同步.",
+      "prepared": "已准备好替换： {format}, {size}。只从选定的设备中删除这本书，然后提供准备好的替换和同步。",
+      "offered": "替换提供。在设备上同步并下载，然后确认安装。一个已完成的 HTTP 传输不会被证明是安装。",
+      "cancelled": "替换已取消。取消不会还原已删除或部分替换的设备副本。选择同一本书来准备恢复下载。",
+      "alreadyOnDevice": "设备已经有这个准确的副本，所以没有什么可以替换的。",
+      "failed": "无法准备或更新此替换。",
+      "searchBook": "搜索一本书",
+      "chooseBook": "选择一本书",
+      "moreResults": "显示更多书",
+      "noResults": "没有找到匹配的书籍。",
+      "refresh": "刷新送货状态",
+      "confirmed": "您已确认安装。这将记录您的确认，而不是设备验证。",
+      "transferred": "传输已完成。在确认安装前打开设备上的替换。",
+      "koreaderDefaultTitle": "KOReader EPUB 交付",
+      "koreaderDefaultHint": "默认应用于使用这些凭据的设备上的未来下载。设备设置可以覆盖它。 现有副本和中断的下载保持不变。自动保存现有设备选择。",
+      "koreaderUseDefault": "使用凭证默认",
+      "koreaderSaveFailed": "无法保存 KOReader EPUB 送货设置。请重试。",
+      "koreaderSaved": "已保存 KOReader EPUB 送货设置。"
+    }
+  },
+  "commandPalette": {
+    "title": "搜索",
+    "description": "搜索书籍、作者、系列和设置，跳转到某个地方或执行操作。",
+    "placeholder": "搜索书籍、作者、系列片，或去…",
+    "close": "关闭搜索",
+    "clear": "清除搜索",
+    "tabs": {
+      "all": "所有的",
+      "books": "书籍：",
+      "authors": "作者",
+      "series": "系列",
+      "settings": "设置"
+    },
+    "sections": {
+      "continueReading": "继续阅读",
+      "goTo": "转至",
+      "actions": "行动",
+      "books": "书籍：",
+      "authors": "作者",
+      "series": "系列",
+      "settings": "设置"
+    },
+    "kinds": {
+      "author": "作者",
+      "series": "系列",
+      "library": "书库",
+      "smartScope": "智能范围",
+      "collection": "收藏",
+      "page": "页",
+      "setting": "设置"
+    },
+    "showAllBooks": "{count, plural, one {显示# 书} other {显示所有# 书}}",
+    "showAllAuthors": "{count, plural, one {显示 # 作者} other {显示所有 # 作者}}",
+    "showAllSeries": "{count, plural, one {显示#系列} other {显示所有#系列}}",
+    "showAllSettings": "{count, plural, one {显示 # 设置} other {显示所有# 设置}}",
+    "actions": {
+      "lightTheme": "切换到亮色主题",
+      "darkTheme": "切换到暗色主题"
+    },
+    "hints": {
+      "navigate": "Navigate",
+      "open": "打开",
+      "filter": "筛选器",
+      "close": "关闭"
+    },
+    "keys": {
+      "escape": "xc",
+      "tab": "tab"
+    },
+    "resultCount": "{count, plural, =0 {没有结果} one {# 结果} other {# 结果}}"
   }
 }

@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { open } from 'fs/promises';
-import { ConflictException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { ConflictException, HttpException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import type { ReadAloudDeliveryPreference } from '@bookorbit/types';
 import { DeliveryArtifactService, type DeliveryArtifact } from '../../book/delivery-artifact.service';
 import { KoboDeliveryRepository } from '../kobo-delivery.repository';
@@ -13,6 +13,30 @@ import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { computeFileHashFromHandle } from '../../../common/utils/file-hash.utils';
 
 export type KoboDeliveryRecord = NonNullable<Awaited<ReturnType<KoboDeliveryRepository['findCurrent']>>>;
+
+/** Failures meaning the source can no longer rebuild an offer's bytes, as opposed to the book being unreadable. */
+const STALE_DELIVERY_CODES = new Set(['DELIVERY_SOURCE_CHANGED', 'DELIVERY_ARTIFACT_UNAVAILABLE']);
+
+type DeliveryStanding = Pick<KoboDeliveryRecord, 'state' | 'previousId' | 'options'>;
+
+/**
+ * A replacement leaves the device's old copy in doubt until the user confirms they removed it and
+ * downloaded the new one, since a completed transfer does not prove the device switched copies.
+ */
+export function isUnconfirmedReplacement(delivery: DeliveryStanding): boolean {
+  return (Boolean(delivery.previousId) || delivery.options.replacement === true) && delivery.state !== 'user_confirmed';
+}
+
+/** Whether the device is known to hold this delivery's bytes, so the positions it reports can be trusted. */
+export function isSettledDelivery(delivery: DeliveryStanding): boolean {
+  return delivery.state === 'user_confirmed' || (delivery.state === 'transfer_observed' && !isUnconfirmedReplacement(delivery));
+}
+
+export function deliveryErrorCode(error: unknown): string | null {
+  if (!(error instanceof HttpException)) return null;
+  const response = error.getResponse();
+  return typeof response === 'object' && response !== null && 'code' in response && typeof response.code === 'string' ? response.code : null;
+}
 
 @Injectable()
 export class KoboDeliveryService {
@@ -37,12 +61,12 @@ export class KoboDeliveryService {
     const startedAt = Date.now();
     const current = await this.current(userId, deviceId, bookId);
     if (current && replacementVariant === undefined) {
-      if (['prepared', 'cancelled'].includes(current.state)) {
-        const previous = current.previousId ? await this.repository.findById(userId, deviceId, current.previousId) : null;
-        if (previous) return previous;
-        throw new ConflictException({ code: 'KOBO_REPLACEMENT_NOT_OFFERED' });
-      }
-      return current;
+      if (!['prepared', 'cancelled'].includes(current.state)) return current;
+      const previous = current.previousId ? await this.repository.findById(userId, deviceId, current.previousId) : null;
+      if (previous) return previous;
+      // A replacement prepared before this device ever received the book has no copy to stand back
+      // for, so it stops standing for the book and the book gets an ordinary first offer.
+      await this.repository.retire(userId, deviceId, current.id);
     }
     const book = await this.downloads.findBook(bookId);
     if (!book) throw new NotFoundException();
@@ -121,6 +145,59 @@ export class KoboDeliveryService {
       await conversionRelease?.();
       await artifact.release();
     }
+  }
+
+  /**
+   * The bytes a device download is served from. A download asks for the book now, so an offer whose source
+   * can no longer rebuild it, because the file changed after it was offered or stopped being the book's
+   * primary, is replaced by a fresh offer of the current primary instead of serving a stale copy or failing
+   * that book on every attempt. Pending replacements keep their guided flow.
+   */
+  async prepareDownload(
+    userId: number,
+    deviceId: number,
+    bookId: number,
+    deliveryId?: string,
+  ): Promise<{ record: KoboDeliveryRecord; artifact: DeliveryArtifact }> {
+    const record = await this.offer(userId, deviceId, bookId);
+    if (deliveryId && record.id !== deliveryId) throw new NotFoundException('Delivery offer is no longer current');
+    const replaceable = record.current && !record.options.replacement;
+    let reason: string | null = null;
+    if (replaceable) {
+      const book = await this.downloads.findBook(bookId);
+      if (book?.primaryFileId != null && record.sourceFileId !== book.primaryFileId) reason = 'PRIMARY_FILE_CHANGED';
+    }
+    if (!reason) {
+      try {
+        return { record, artifact: await this.resolve(userId, deviceId, record) };
+      } catch (error) {
+        const code = deliveryErrorCode(error);
+        if (!replaceable || !code || !STALE_DELIVERY_CODES.has(code)) throw error;
+        reason = code;
+      }
+    }
+    const startedAt = Date.now();
+    await this.repository.retire(userId, deviceId, record.id);
+    const fresh = await this.offer(userId, deviceId, bookId);
+    // The device learns the fresh offer's size and URL on its next sync either way.
+    await this.repository.reoffer(userId, deviceId, bookId);
+    if (fresh.metadata.format !== record.metadata.format) {
+      this.logger.warn(
+        `[kobo.delivery_refresh] [fail] userId=${userId} deviceId=${deviceId} bookId=${bookId} staleId=${record.id} freshId=${fresh.id} reason=${reason} durationMs=${Date.now() - startedAt} - fresh offer changes format, the device must sync before downloading`,
+      );
+      throw new ConflictException({ code: 'KOBO_DELIVERY_FORMAT_CHANGED' });
+    }
+    this.logger.log(
+      `[kobo.delivery_refresh] [end] userId=${userId} deviceId=${deviceId} bookId=${bookId} staleId=${record.id} freshId=${fresh.id} reason=${reason} durationMs=${Date.now() - startedAt} - stale offer replaced from the current file`,
+    );
+    return { record: fresh, artifact: await this.resolve(userId, deviceId, fresh) };
+  }
+
+  /** The book file a delivery was built from, while it still belongs to the book as an EPUB. */
+  async findSourceFile(record: KoboDeliveryRecord) {
+    if (record.sourceFileId === null) return null;
+    const file = await this.downloads.findPrimaryFile(record.bookId, record.sourceFileId);
+    return file && (file.format === 'epub' || file.format === 'kepub') ? file : null;
   }
 
   async resolve(userId: number, deviceId: number, record: KoboDeliveryRecord): Promise<DeliveryArtifact> {
@@ -207,7 +284,9 @@ export class KoboDeliveryService {
   async cancelReplacement(userId: number, deviceId: number, id: string) {
     const record = await this.byId(userId, deviceId, id);
     if (!record) throw new NotFoundException();
-    await this.repository.cancel(userId, deviceId, id);
+    const cancelled = await this.repository.cancel(userId, deviceId, id);
+    // The device was told about an offered replacement, so it must hear which copy stands for the book now.
+    if (cancelled && record.state === 'offered') await this.repository.reoffer(userId, deviceId, record.bookId);
     return this.byId(userId, deviceId, id);
   }
 
@@ -218,10 +297,12 @@ export class KoboDeliveryService {
     if (!['transfer_observed', 'user_confirmed'].includes(record.state))
       throw new ConflictException({ code: 'KOBO_REPLACEMENT_TRANSFER_NOT_OBSERVED' });
     await this.repository.transition(userId, deviceId, id, ['transfer_observed', 'user_confirmed'], 'user_confirmed');
+    await this.repository.adoptForDeviceReadingState(userId, deviceId, record.bookId, id);
     return this.repository.findById(userId, deviceId, id);
   }
 
   async transferObserved(userId: number, deviceId: number, record: KoboDeliveryRecord) {
-    await this.repository.transition(userId, deviceId, record.id, ['offered', 'transfer_observed'], 'transfer_observed');
+    const moved = await this.repository.transition(userId, deviceId, record.id, ['offered', 'transfer_observed'], 'transfer_observed');
+    if (moved.length && !record.options.replacement) await this.repository.adoptForDeviceReadingState(userId, deviceId, record.bookId, record.id);
   }
 }

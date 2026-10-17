@@ -1,5 +1,5 @@
 {
-  "id": "1a7b69f2-697d-4f83-a7eb-5a0580d48820",
+  "id": "c9b006eb-1457-4e6b-bdae-5a00a47e37c3",
   "prevId": "912dc0d0-ce81-45d4-aa98-cf119e87a6ae",
   "version": "7",
   "dialect": "postgresql",
@@ -14878,7 +14878,7 @@
       "checkConstraints": {
         "download_clients_adapter_type_chk": {
           "name": "download_clients_adapter_type_chk",
-          "value": "\"download_clients\".\"adapter_type\" in ('qbittorrent', 'transmission', 'deluge', 'nzbget', 'sabnzbd', 'torbox')"
+          "value": "\"download_clients\".\"adapter_type\" in ('qbittorrent', 'transmission', 'deluge', 'nzbget', 'sabnzbd')"
         },
         "download_clients_priority_range_chk": {
           "name": "download_clients_priority_range_chk",
@@ -16174,7 +16174,7 @@
         },
         "email_recipients_preferred_format_chk": {
           "name": "email_recipients_preferred_format_chk",
-          "value": "\"email_recipients\".\"preferred_format\" is null or \"email_recipients\".\"preferred_format\" in ('epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr')"
+          "value": "\"email_recipients\".\"preferred_format\" is null or \"email_recipients\".\"preferred_format\" in ('epub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'djvu')"
         }
       },
       "isRLSEnabled": false

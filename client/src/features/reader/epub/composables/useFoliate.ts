@@ -254,17 +254,6 @@ export function useFoliate(
       view.addEventListener('relocate', (e: Event) => {
         const detail = (e as CustomEvent).detail
         fraction.value = detail?.fraction ?? 0
-        if (import.meta.env.DEV) {
-          console.info('[foliate.relocate]', {
-            source: detail?.source ?? null,
-            koboLocationType: detail?.koboLocationType ?? null,
-            koboLocationValue: detail?.koboLocationValue ?? null,
-            contentSourceProgressPercent: detail?.contentSourceProgressPercent ?? null,
-            koreaderProgress: detail?.koreaderProgress ?? null,
-            fraction: detail?.fraction ?? null,
-            cfi: detail?.cfi ?? null,
-          })
-        }
         onRelocate?.(detail)
       })
 

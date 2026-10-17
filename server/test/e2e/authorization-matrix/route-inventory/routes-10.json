@@ -494,6 +494,18 @@
   {
     "file": "server/src/modules/achievement/achievement.controller.ts",
     "className": "AchievementController",
+    "methodName": "getHints",
+    "httpMethod": "GET",
+    "path": "/achievements/hints",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": ["JwtAuthGuard"]
+  },
+  {
+    "file": "server/src/modules/achievement/achievement.controller.ts",
+    "className": "AchievementController",
     "methodName": "acknowledgeCelebration",
     "httpMethod": "POST",
     "path": "/achievements/celebrations/:claimId/acknowledge",
@@ -980,6 +992,42 @@
     "permissions": [],
     "libraryAccess": [],
     "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader/djvu/djvu.controller.ts",
+    "className": "DjvuController",
+    "methodName": "getPageCount",
+    "httpMethod": "GET",
+    "path": "/djvu/files/:fileId/pages",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader/djvu/djvu.controller.ts",
+    "className": "DjvuController",
+    "methodName": "getPage",
+    "httpMethod": "GET",
+    "path": "/djvu/files/:fileId/pages/:pageIndex",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader/djvu/djvu.controller.ts",
+    "className": "DjvuController",
+    "methodName": "getPageText",
+    "httpMethod": "GET",
+    "path": "/djvu/files/:fileId/pages/:pageIndex/text",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
     "allowDefault": false,
     "useGuards": []
   }

@@ -308,6 +308,8 @@ export const readingSessions = pgTable(
     // Nullable: CBX with no percentage tracking may omit these.
     progressDelta: real('progress_delta'),
     endProgress: real('end_progress'),
+    // Counter-derived sync estimates only: the previous counter push, where the interval the estimate stands for begins.
+    syncIntervalStartedAt: timestamp('sync_interval_started_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('rs_user_session_id_uidx').on(t.userId, t.sessionId),
@@ -424,7 +426,7 @@ export const audiobookProgress = pgTable(
 export type AudiobookProgress = typeof audiobookProgress.$inferSelect;
 export type NewAudiobookProgress = typeof audiobookProgress.$inferInsert;
 
-export type BookmarkOrigin = 'web' | 'koreader';
+export type BookmarkOrigin = 'web' | 'koreader' | 'kobo';
 
 export const userBookReadAloudSyncSettings = pgTable(
   'user_book_read_aloud_sync_settings',
@@ -496,7 +498,7 @@ export const bookmarks = pgTable(
     uniqueIndex('bookmarks_user_book_pos_uidx')
       .on(t.userId, t.bookId, t.positionSeconds)
       .where(sql`${t.positionSeconds} is not null and ${t.cfi} is null and ${t.deletedAt} is null`),
-    check('bookmarks_origin_chk', sql`${t.origin} in ('web', 'koreader')`),
+    check('bookmarks_origin_chk', sql`${t.origin} in ('web', 'koreader', 'kobo')`),
   ],
 );
 

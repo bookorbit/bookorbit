@@ -100,9 +100,29 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     return queued;
   }
 
+  /** Runs every books library with its own effective rule, so a library override applies here too. */
   async triggerGlobal(ignoreCache = false): Promise<number> {
-    const config = await this.configService.getGlobalConfig();
-    const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, SCHEDULE_BATCH_SIZE, ignoreCache);
+    const startedAt = Date.now();
+    const libraryIds = await this.configService.bookLibraryIds();
+    this.logger.log(
+      `[book.metadata_fetch.run_all] [start] libraries=${libraryIds.length} ignoreCache=${ignoreCache} - metadata fetch run started for every library`,
+    );
+    let queued = 0;
+    for (const libraryId of libraryIds) {
+      const config = await this.configService.getEffectiveConfig(libraryId);
+      const libraryQueued = await this.queueRepo.scheduleEligibleBooksInBatches(
+        config,
+        'manual_trigger',
+        libraryId,
+        SCHEDULE_BATCH_SIZE,
+        ignoreCache,
+      );
+      await this.configService.recordLibraryRun(libraryId, libraryQueued);
+      queued += libraryQueued;
+    }
+    this.logger.log(
+      `[book.metadata_fetch.run_all] [end] libraries=${libraryIds.length} queued=${queued} durationMs=${Date.now() - startedAt} - metadata fetch run scheduled`,
+    );
     await this.unpauseIfNeeded();
     if (queued > 0) {
       this.session.addToTotal(queued);

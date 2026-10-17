@@ -24,7 +24,7 @@ import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { KoboAnalyticsService } from './services/kobo-analytics.service';
-import { KoboThumbnailService } from './services/kobo-thumbnail.service';
+import { KoboThumbnailService, parseKoboCoverRequest, type KoboCoverRequest } from './services/kobo-thumbnail.service';
 import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
 import type { KoboAnalyticsBody } from './kobo-analytics.types';
@@ -58,7 +58,14 @@ export class KoboDeviceController {
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
   ) {
-    await this.serveThumbnailOrRedirect(bookId, [width, height, quality, isGreyscale], ifNoneMatch, user, reply);
+    await this.serveThumbnailOrRedirect(
+      bookId,
+      [width, height, quality, isGreyscale],
+      parseKoboCoverRequest(width, height, quality, isGreyscale),
+      ifNoneMatch,
+      user,
+      reply,
+    );
   }
 
   @Get('v1/books/:bookId/thumbnail/:width/:height/false/image.jpg')
@@ -70,7 +77,7 @@ export class KoboDeviceController {
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
   ) {
-    await this.serveThumbnailOrRedirect(bookId, [width, height, 'false'], ifNoneMatch, user, reply);
+    await this.serveThumbnailOrRedirect(bookId, [width, height, 'false'], parseKoboCoverRequest(width, height), ifNoneMatch, user, reply);
   }
 
   @Get('v1/books/:bookId/:version/thumbnail/:width/:height/false/image.jpg')
@@ -82,7 +89,7 @@ export class KoboDeviceController {
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
   ) {
-    await this.serveThumbnailOrRedirect(bookId, [width, height, 'false'], ifNoneMatch, user, reply);
+    await this.serveThumbnailOrRedirect(bookId, [width, height, 'false'], parseKoboCoverRequest(width, height), ifNoneMatch, user, reply);
   }
 
   @Get('v1/books/:bookId/download')
@@ -174,13 +181,14 @@ export class KoboDeviceController {
   private async serveThumbnailOrRedirect(
     bookId: string,
     imageSegments: string[],
+    coverRequest: KoboCoverRequest | null,
     ifNoneMatch: string | undefined,
     user: RequestUser,
     reply: FastifyReply,
   ) {
     const id = await this.bookIdentityService.resolveBookIdByCoverImageId(user.id, bookId);
     if (id !== null) {
-      await this.thumbnailService.serveThumbnail(user.id, id, ifNoneMatch, reply);
+      await this.thumbnailService.serveThumbnail(user.id, id, coverRequest, ifNoneMatch, reply);
       return;
     }
 

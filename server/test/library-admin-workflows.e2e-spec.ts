@@ -4,7 +4,7 @@ import { basename, join } from 'path';
 
 import { and, eq, sql } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
-import type { AddedAtRecomputeJob } from '@bookorbit/types';
+import type { AddedAtRecomputeJob, RegexMetadataConfig } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { waitForCondition, waitForScanCompletion } from './e2e/app-harness';
@@ -140,6 +140,8 @@ async function createLibraryViaApi(
     readingThreshold: number;
     markAsFinishedPercentComplete: number;
     fileWriteEnabled: boolean;
+    regexMetadata: RegexMetadataConfig;
+    metadataPrecedence: string[];
   }>,
 ): Promise<{
   response: InjectResponse;
@@ -167,6 +169,8 @@ async function createLibraryViaApi(
       readingThreshold: input?.readingThreshold ?? 0.4,
       markAsFinishedPercentComplete: input?.markAsFinishedPercentComplete ?? 95,
       fileWriteEnabled: input?.fileWriteEnabled ?? false,
+      regexMetadata: input?.regexMetadata,
+      metadataPrecedence: input?.metadataPrecedence,
     },
   });
   expect(response.statusCode).toBe(201);
@@ -208,6 +212,66 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
 
   afterAll(async () => {
     await closeAuthorizationMatrixE2EContext(ctx);
+  });
+
+  it('protects regex preview and validates its nested request contract', async () => {
+    const payload = { config: { rules: [{ pattern: '^(?<title>.+)$', flags: '' }] }, relativePath: 'Book.epub' };
+    for (const [token, status] of [
+      [manager.accessToken, 200],
+      [noPermissionUser.accessToken, 403],
+    ] as const) {
+      const response = await ctx.app.inject({ method: 'POST', url: '/api/v1/libraries/regex-metadata/preview', headers: authHeader(token), payload });
+      expect(response.statusCode).toBe(status);
+      if (status === 200) expect(response.json()).toMatchObject({ inputPath: 'Book', metadata: { title: 'Book' } });
+    }
+    for (const bad of [
+      { ...payload, relativePath: '/private/Book.epub' },
+      { ...payload, relativePath: '../Book.epub' },
+      { ...payload, config: { rules: [{ ...payload.config.rules[0], template: '{title}' }] } },
+    ]) {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/libraries/regex-metadata/preview',
+        headers: authHeader(manager.accessToken),
+        payload: bad,
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    // Like every other library setting, regex rules need ManageLibraries and no per-library grant.
+    const library = await createLibraryWithFolder(ctx);
+    const scoped = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/libraries/regex-metadata/preview',
+      headers: authHeader(manager.accessToken),
+      payload: { ...payload, libraryId: library.libraryId },
+    });
+    expect(scoped.statusCode).toBe(200);
+    const update = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/libraries/${library.libraryId}`,
+      headers: authHeader(manager.accessToken),
+      payload: { icon: 'BookOpen', regexMetadata: payload.config },
+    });
+    expect(update.statusCode, update.body).toBe(200);
+    expect(update.json().regexMetadata).toEqual(payload.config);
+  });
+
+  it('validates regex rules without a path and enforces access and DTO boundaries', async () => {
+    const config = { rules: [{ pattern: '(?<title>.+)', flags: '' }] };
+    const request = (payload: object, token = manager.accessToken) =>
+      ctx.app.inject({ method: 'POST', url: '/api/v1/libraries/regex-metadata/validate', headers: authHeader(token), payload });
+    const valid = await request({ config });
+    expect(valid.statusCode).toBe(200);
+    expect(valid.json()).toEqual({ valid: true, diagnostics: [] });
+    const invalid = await request({ config: { rules: [{ pattern: '[', flags: '' }] } });
+    expect(invalid.statusCode).toBe(200);
+    expect(invalid.json()).toEqual({ valid: false, diagnostics: [{ code: 'invalid_pattern', ruleIndex: 0 }] });
+    expect((await request({ config }, noPermissionUser.accessToken)).statusCode).toBe(403);
+    expect((await request({ config, relativePath: 'unexpected.epub' })).statusCode).toBe(400);
+    expect((await request({ config: { rules: [{ pattern: '(?<title>.+)', flags: 'g' }] } })).statusCode).toBe(400);
+    const library = await createLibraryWithFolder(ctx);
+    expect((await request({ config, libraryId: library.libraryId })).statusCode).toBe(200);
+    expect((await request({ config, libraryId: 2_147_483_000 })).statusCode).toBe(404);
   });
 
   it.each([
@@ -301,6 +365,32 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
     const [storedLibrary] = await ctx.db.select().from(schema.libraries).where(eq(schema.libraries.id, library.libraryId));
     expect(storedLibrary).toMatchObject(savedSettings);
   });
+
+  it.each([null, { rules: [{ pattern: '(?<title>.+)', flags: '' }] }])(
+    'lets managers save regex rules and unrelated settings without a library grant: %j',
+    async (regexMetadata) => {
+      const library = await createLibraryWithFolder(ctx);
+      await ctx.db.update(schema.libraries).set({ regexMetadata }).where(eq(schema.libraries.id, library.libraryId));
+      const response = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(manager.accessToken),
+        payload: { name: `Renamed library ${library.libraryId}`, icon: 'BookOpen', regexMetadata },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json()).toMatchObject({ name: `Renamed library ${library.libraryId}`, regexMetadata });
+      const nextRegexMetadata = regexMetadata === null ? { rules: [{ pattern: '(?<title>.+)', flags: '' }] } : null;
+      const changed = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(manager.accessToken),
+        payload: { icon: 'BookOpen', regexMetadata: nextRegexMetadata },
+      });
+      expect(changed.statusCode, changed.body).toBe(200);
+      const [stored] = await ctx.db.select().from(schema.libraries).where(eq(schema.libraries.id, library.libraryId));
+      expect(stored.regexMetadata).toEqual(nextRegexMetadata);
+    },
+  );
 
   describe('date added recompute', () => {
     async function finishRecompute(libraryId: number): Promise<AddedAtRecomputeJob> {
@@ -578,6 +668,14 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
   });
 
   describe('create library and manage access', () => {
+    it.each([undefined, ['regex', 'embedded']])('creates regex rules with precedence %j', async (metadataPrecedence) => {
+      const regexMetadata = { rules: [{ pattern: '(?<title>.+)', flags: '' }] };
+      const { body: library } = await createLibraryViaApi(ctx, manager.accessToken, { regexMetadata, metadataPrecedence });
+      expect(library.regexMetadata).toEqual(regexMetadata);
+      expect(library.metadataPrecedence).toEqual(metadataPrecedence ?? ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar', 'regex']);
+      await waitForNoRunningScans(ctx, library.id);
+    });
+
     it('persists fractional finished thresholds through create and update', async () => {
       const { body: createdLibrary } = await createLibraryViaApi(ctx, manager.accessToken, {
         markAsFinishedPercentComplete: 99.95,

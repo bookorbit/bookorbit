@@ -28,3 +28,31 @@ export function ownedInOrder(order: DisplayOrderEntry[], owned: Identified[]): I
   const ownedIds = new Set(owned.map((entry) => entry.id))
   return order.filter((entry) => ownedIds.has(entry.id)).map((entry) => ({ id: entry.id }))
 }
+
+export type PersistOrder = (order: DisplayOrderEntry[]) => Promise<void>
+
+interface MediaOrderSources {
+  /** The rows the user may reorder in each medium, read at persist time. */
+  books: () => Identified[]
+  podcasts: () => Identified[]
+  reorder: PersistOrder
+}
+
+/**
+ * One persist function per medium for a list whose books and podcasts share a displayOrder run.
+ * Each keeps the other medium's current order and rewrites the whole run in one request.
+ */
+export function mediaOrderPersisters(sources: MediaOrderSources): { books: PersistOrder; podcasts: PersistOrder } {
+  return {
+    async books(order) {
+      const books = ownedInOrder(order, sources.books())
+      if (books.length === 0) return
+      await sources.reorder(mergedMediaOrder(books, sources.podcasts()))
+    },
+    async podcasts(order) {
+      const podcasts = ownedInOrder(order, sources.podcasts())
+      if (podcasts.length === 0) return
+      await sources.reorder(mergedMediaOrder(sources.books(), podcasts))
+    },
+  }
+}

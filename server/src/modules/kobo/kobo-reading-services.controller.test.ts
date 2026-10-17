@@ -1,4 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, NotFoundException } from '@nestjs/common';
 
 import { KoboReadingServicesController } from './kobo-reading-services.controller';
 import { KoboContentNotFoundException } from './services/kobo-annotation-exchange.service';
@@ -24,7 +24,14 @@ describe('KoboReadingServicesController', () => {
     recordFailure: vi.fn(),
     countsForBook: vi.fn(),
   };
-  const controller = new KoboReadingServicesController(exchangeService as never, historyService as never);
+  const proxyService = { forward: vi.fn() };
+  const settingsService = { getSettings: vi.fn() };
+  const controller = new KoboReadingServicesController(
+    exchangeService as never,
+    historyService as never,
+    proxyService as never,
+    settingsService as never,
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -159,11 +166,57 @@ describe('KoboReadingServicesController', () => {
     expect(historyService.recordFailure).not.toHaveBeenCalled();
   });
 
-  it('delegates changed content and storage metadata without history rows', async () => {
+  it('delegates changed content without history rows', async () => {
     exchangeService.getChangedContentIds.mockResolvedValue(['book-1']);
 
     await expect(controller.checkForChanges({ id: 8 } as never, { deviceId: 5 } as never)).resolves.toEqual(['book-1']);
-    expect(controller.getUserStorageMetadata()).toEqual({ continuationToken: null, metadata: [] });
     expect(historyService.recordSuccess).not.toHaveBeenCalled();
+  });
+
+  describe('notebook storage', () => {
+    const device = { deviceId: 5, deviceToken: 'token-5', userId: 8 };
+
+    it('relays notebook calls to Kobo when store titles are on', async () => {
+      settingsService.getSettings.mockResolvedValue({ storeSync: true });
+      const req = { method: 'POST', url: '/api/UserStorage/Metadata' };
+      const reply = makeReply();
+
+      await controller.userStorage({ id: 8 } as never, device as never, req as never, reply as never);
+
+      expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'token-5', 'readingServices');
+    });
+
+    it('answers an empty notebook listing and nothing else when store titles are off', async () => {
+      settingsService.getSettings.mockResolvedValue({ storeSync: false });
+      const reply = makeReply();
+
+      await controller.userStorage(
+        { id: 8 } as never,
+        device as never,
+        { method: 'GET', url: '/api/UserStorage/Metadata?x=1' } as never,
+        reply as never,
+      );
+      expect(reply.send).toHaveBeenCalledWith({ continuationToken: null, metadata: [] });
+
+      await expect(
+        controller.userStorage(
+          { id: 8 } as never,
+          device as never,
+          { method: 'POST', url: '/api/UserStorage/Metadata' } as never,
+          makeReply() as never,
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(proxyService.forward).not.toHaveBeenCalled();
+    });
+
+    it('keeps notebook sync local when the setting cannot be read', async () => {
+      settingsService.getSettings.mockRejectedValue(new Error('settings unavailable'));
+      const reply = makeReply();
+
+      await controller.userStorage({ id: 8 } as never, device as never, { method: 'GET', url: '/api/UserStorage/Metadata' } as never, reply as never);
+
+      expect(proxyService.forward).not.toHaveBeenCalled();
+      expect(reply.send).toHaveBeenCalledWith({ continuationToken: null, metadata: [] });
+    });
   });
 });

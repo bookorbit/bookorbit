@@ -65,7 +65,8 @@ describe('formatFamily', () => {
 
   it('is case insensitive and falls back for unknown extensions', () => {
     expect(formatFamily('EPUB')).toBe('ebook')
-    expect(formatFamily('djvu')).toBe('other')
+    expect(formatFamily('DJVU')).toBe('document')
+    expect(formatFamily('unknown')).toBe('other')
   })
 })
 

@@ -50,6 +50,64 @@ describe('ReadingAttemptService', () => {
     expect(fake.rows).toHaveLength(1);
   });
 
+  describe('sessions a device delivers after its finished state closed the read', () => {
+    const lateActivity = (occurredOn: string, progress = 64, strongRereadEvidence = false) =>
+      service.recordActivity({
+        userId: 1,
+        bookId: 10,
+        occurredOn,
+        origin: 'bookorbit',
+        progress,
+        finishThreshold: 98,
+        strongRereadEvidence,
+        meaningfulActivity: true,
+        timeZone: 'America/Chicago',
+      });
+    const finished = (startedOn: string | null) =>
+      fake.repo.create({}, { userId: 1, bookId: 10, startedOn, endedOn: '2026-10-17', outcome: 'completed', origin: 'kobo' });
+
+    it('files a session from within the read into it instead of opening another', async () => {
+      const read = await finished('2026-10-11');
+
+      await expect(lateActivity('2026-10-16')).resolves.toBeNull();
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.repo.attachBackfilledSessions).toHaveBeenCalledWith({}, 1, 10, read.id, 'America/Chicago', '2026-10-11', '2026-10-17');
+    });
+
+    it('does not open a second completed read when the late session is already at the finish', async () => {
+      await finished('2026-10-11');
+
+      await expect(lateActivity('2026-10-17', 100)).resolves.toBeNull();
+
+      expect(fake.rows).toHaveLength(1);
+    });
+
+    it('bounds the files it adopts by the late session itself when the read has no start', async () => {
+      const read = await finished(null);
+
+      await lateActivity('2026-10-16');
+
+      expect(fake.repo.attachBackfilledSessions).toHaveBeenCalledWith({}, 1, 10, read.id, 'America/Chicago', '2026-10-16', '2026-10-17');
+    });
+
+    it('leaves a session from before the read began unassigned without opening a read', async () => {
+      await finished('2026-10-11');
+
+      await expect(lateActivity('2026-10-02')).resolves.toBeNull();
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.repo.attachBackfilledSessions).not.toHaveBeenCalled();
+    });
+
+    it('still opens a reread from activity after the finish day', async () => {
+      await finished('2026-10-11');
+
+      await expect(lateActivity('2026-10-18')).resolves.toMatchObject({ status: 'rereading' });
+      expect(fake.rows).toHaveLength(2);
+    });
+  });
+
   it('opens a reread from a strong Kobo transition', async () => {
     await fake.repo.create(
       {},

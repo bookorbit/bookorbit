@@ -3,10 +3,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMediaQuery } from '@vueuse/core'
 import { useRouter } from 'vue-router'
+import { Highlighter } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import { downloadFromUrl } from '@/lib/download'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 import AnnotationStream from '../components/shared/AnnotationStream.vue'
 import AnnotationEntry from '../components/shared/AnnotationEntry.vue'
 import AnnotationEntryDetail from '../components/shared/AnnotationEntryDetail.vue'
@@ -207,7 +209,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-4 pt-4 pb-4 xl:h-[calc(100svh-5.25rem)] xl:min-h-0 xl:pb-0">
+  <div class="flex w-full flex-col gap-4 pt-2 pb-4 xl:h-[calc(100svh-1.5rem)] xl:min-h-0 xl:pb-0">
+    <PageTitleRow
+      class="shrink-0"
+      :eyebrow="t('components.sidebar.zones.reading')"
+      :title="t('components.appHeader.annotations')"
+      :icon="Highlighter"
+    />
+
     <div v-if="hub.error.value" role="alert" class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
       {{ t('annotations.hub.loadFailed') }}
     </div>

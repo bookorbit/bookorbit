@@ -20,10 +20,10 @@ watch(query, () => {
 })
 const { results, loading, settled, hasMore, loadMore, clear } = useGlobalSearch(query)
 onScopeDispose(clear)
-const { replacement, busy, failed, prepare, transition, refresh } = useKoboReplacement(deviceId, bookId)
+const { replacement, busy, failed, alreadyOnDevice, prepare, transition, refresh } = useKoboReplacement(deviceId, bookId)
 const locked = computed(() => busy.value || (!!replacement.value && !['cancelled', 'user_confirmed'].includes(replacement.value.state)))
 const status = computed(() => {
-  if (!replacement.value) return ''
+  if (!replacement.value) return alreadyOnDevice.value ? t('delivery.readAloud.alreadyOnDevice') : ''
   if (replacement.value.state === 'prepared')
     return t('delivery.readAloud.prepared', {
       format: replacement.value.metadata.format.toUpperCase(),

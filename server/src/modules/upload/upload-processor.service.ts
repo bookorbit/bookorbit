@@ -19,6 +19,7 @@ import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/boo
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { MetadataService } from '../metadata/metadata.service';
+import { ScannerService } from '../scanner/scanner.service';
 import { METADATA_AUDIO_FORMATS } from '../metadata/metadata-extraction.service';
 import { computeFileHash } from '../scanner/lib/hash';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
@@ -85,6 +86,7 @@ const METADATA_FORMATS = new Set([
   'cb7',
   'fb2',
   'pdf',
+  'djvu',
   'm4b',
   'm4a',
   'mp3',
@@ -103,6 +105,7 @@ export class UploadProcessorService {
     private readonly coverStore: BookCoverStore,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
+    @Optional() private readonly scanner?: ScannerService,
   ) {}
 
   /** A file joined or left these books, so their cover slots are brought back in line with it. */
@@ -403,7 +406,9 @@ export class UploadProcessorService {
         );
         return;
       }
-      await this.metadataService.extractAndSave(bookId, absolutePath, format);
+      // An upload records its own file, so no later scan would apply the library's regex rules to it.
+      const extractedWithRules = (await this.scanner?.extractMetadataWithLibraryRules(bookId)) ?? false;
+      if (!extractedWithRules) await this.metadataService.extractAndSave(bookId, absolutePath, format);
       // The embedded extractor writes the aggregate duration to book_metadata, but the
       // per-file book_files.durationSeconds the player sums is only populated here.
       if (isAudioFormat(format)) {

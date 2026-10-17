@@ -147,4 +147,78 @@ describe('AuditInterceptor', () => {
       }),
     );
   });
+
+  describe('naming a target that is about to be deleted', () => {
+    function setup(options: Record<string, unknown>, label: string | null = 'Old Shelf', body: unknown = undefined) {
+      const reflector = { get: vi.fn().mockReturnValue(options) };
+      const auditEvents = { emit: vi.fn() };
+      const order: string[] = [];
+      const targetLabels = {
+        resolveForWrite: vi.fn(() => {
+          order.push('label');
+          return Promise.resolve(label);
+        }),
+      };
+      const interceptor = new AuditInterceptor(reflector as never, auditEvents as never, targetLabels as never);
+      const next: CallHandler = {
+        handle: vi.fn(() => {
+          order.push('handler');
+          return of(body);
+        }),
+      };
+      return { interceptor, next, auditEvents, targetLabels, order };
+    }
+
+    it('reads the name before the handler runs and sends it with the event', async () => {
+      const { interceptor, next, auditEvents, targetLabels, order } = setup({
+        action: 'library.delete',
+        resource: 'library',
+        getResourceId: (req: { params: Record<string, string> }) => Number(req.params.id),
+        description: 'Deleted library #88',
+      });
+
+      await firstValueFrom(interceptor.intercept(makeContext({ ip: '::1', method: 'DELETE', params: { id: '88' } }), next), {
+        defaultValue: undefined,
+      });
+
+      expect(targetLabels.resolveForWrite).toHaveBeenCalledWith('library', 88);
+      expect(order).toEqual(['label', 'handler']);
+      expect(auditEvents.emit).toHaveBeenCalledWith(AUDIT_EVENT, expect.objectContaining({ resourceId: 88, resourceLabel: 'Old Shelf' }));
+    });
+
+    it('leaves non-deleting writes to be named when the event is stored', async () => {
+      const { interceptor, next, auditEvents, targetLabels } = setup({
+        action: 'library.update',
+        resource: 'library',
+        getResourceId: (req: { params: Record<string, string> }) => Number(req.params.id),
+        description: 'Updated library #88',
+      });
+
+      await firstValueFrom(interceptor.intercept(makeContext({ ip: '::1', method: 'PATCH', params: { id: '88' } }), next), {
+        defaultValue: undefined,
+      });
+
+      expect(targetLabels.resolveForWrite).not.toHaveBeenCalled();
+      expect(auditEvents.emit.mock.calls[0][1]).not.toHaveProperty('resourceLabel');
+    });
+
+    it('carries on without a name when the id only exists in the response', async () => {
+      const { interceptor, next, auditEvents, targetLabels } = setup(
+        {
+          action: 'collection.delete',
+          resource: 'collection',
+          getResourceId: (_req: unknown, res: { id: number }) => res.id,
+          description: 'Deleted collection',
+        },
+        'Unused',
+        { id: 5 },
+      );
+
+      await firstValueFrom(interceptor.intercept(makeContext({ ip: '::1', method: 'DELETE', params: {} }), next));
+
+      expect(targetLabels.resolveForWrite).not.toHaveBeenCalled();
+      expect(auditEvents.emit).toHaveBeenCalledWith(AUDIT_EVENT, expect.objectContaining({ resourceId: 5 }));
+      expect(auditEvents.emit.mock.calls[0][1]).not.toHaveProperty('resourceLabel');
+    });
+  });
 });

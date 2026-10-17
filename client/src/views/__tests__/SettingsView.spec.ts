@@ -45,16 +45,32 @@ describe('SettingsView shell', () => {
   })
 
   it.each([
-    ['settings-koreader', 'KOReader'],
-    ['settings-libraries', 'Libraries'],
-    ['settings-metadata-providers', 'Providers'],
-  ])('puts the %s title on the breadcrumb line without a description', (routeName, title) => {
+    [
+      'settings-koreader',
+      'KOReader',
+      'Sync progress, reading activity and highlights with KOReader, get the sync URL and plugin, and manage the devices that connect.',
+    ],
+    [
+      'settings-libraries',
+      'Libraries',
+      'Every library at a glance: its folders, what it holds, how it is scanned and when it last ran. Add, edit or rescan libraries here.',
+    ],
+    [
+      'settings-metadata-providers',
+      'Providers',
+      'Turn metadata sources on or off, add API keys or cookies where a source needs them, and test the credentials against the live service.',
+    ],
+  ])('puts the %s title on the breadcrumb line with its description below', (routeName, title, description) => {
     const wrapper = mountView(routeName)
     const heading = wrapper.get('[data-testid="settings-page-title"]')
     expect(heading.element.tagName).toBe('H2')
     expect(heading.text()).toBe(title)
     expect(wrapper.get('nav').element.contains(heading.element)).toBe(false)
-    expect(wrapper.find('.settings-subtitle').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="settings-page-description"]').text()).toBe(description)
+  })
+
+  it('leaves the description line out for a page without one', () => {
+    expect(mountView('settings-podcasts').find('[data-testid="settings-page-description"]').exists()).toBe(false)
   })
 
   it('keeps the teleport target for page header actions', () => {

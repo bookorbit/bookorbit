@@ -511,6 +511,8 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       this.scannerService.bufferBooksRestoredNotification(result.libraryId, result.bookIds);
     } else if (result.type === 'book-moved') {
       this.gateway.emitBookMoved({ libraryId: result.libraryId, bookIds: result.bookIds });
+      // The new path is already recorded, so the folder scan below cannot see the move regex rules read.
+      this.scannerService.refreshRegexMetadataAfterMoveAsync(result.bookIds);
       // A move updates the file's path and may consolidate virtual-sibling books.
       // Schedule a folder scan so upsertBook can drain any remaining siblings.
       if (type === 'create') this.scheduleFolderScan(path, libraryId);

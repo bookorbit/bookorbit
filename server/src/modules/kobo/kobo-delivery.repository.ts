@@ -52,6 +52,9 @@ export class KoboDeliveryRepository {
           throw new ConflictException({ code: 'KOBO_REPLACEMENT_ALREADY_PENDING' });
         return existing;
       }
+      // The device already holds these exact bytes. A replacement it never needs to download would stay
+      // offered, and keep every bookmark it pushes from counting, so there is nothing to replace.
+      if (replace && existing && !existing.options.replacement && existing.metadata.sha256 === values.metadata.sha256) return existing;
       if (existing) await tx.update(schema.koboDeviceDeliveries).set({ current: false }).where(eq(schema.koboDeviceDeliveries.id, existing.id));
       const [row] = await tx
         .insert(schema.koboDeviceDeliveries)
@@ -61,7 +64,12 @@ export class KoboDeliveryRepository {
     });
   }
 
-  async cancel(userId: number, deviceId: number, id: string) {
+  /**
+   * Cancels a pending replacement and returns whether it was cancelled. One the device has not fetched
+   * hands the book back to the delivery it replaced, or, when it replaced nothing, stops standing for the
+   * book so the next offer starts fresh.
+   */
+  async cancel(userId: number, deviceId: number, id: string): Promise<boolean> {
     return this.db.transaction(async (tx) => {
       const record = await tx.query.koboDeviceDeliveries.findFirst({
         where: and(
@@ -76,11 +84,12 @@ export class KoboDeliveryRepository {
         !record.options.replacement ||
         !['prepared', 'offered', 'transfer_observed', 'cancelled'].includes(record.state)
       )
-        return;
+        return false;
       await tx.execute(sql`select pg_advisory_xact_lock(${deviceId}, ${record.bookId})`);
+      const unfetched = record.state === 'prepared' || record.state === 'offered';
       const cancelled = await tx
         .update(schema.koboDeviceDeliveries)
-        .set({ state: 'cancelled', current: record.state === 'prepared' && record.previousId ? false : record.current, updatedAt: new Date() })
+        .set({ state: 'cancelled', current: unfetched ? false : record.current, updatedAt: new Date() })
         .where(
           and(
             eq(schema.koboDeviceDeliveries.id, id),
@@ -89,9 +98,44 @@ export class KoboDeliveryRepository {
           ),
         )
         .returning();
-      if (cancelled.length && record.state === 'prepared' && record.previousId)
+      if (!cancelled.length) return false;
+      if (unfetched && record.previousId)
         await tx.update(schema.koboDeviceDeliveries).set({ current: true }).where(eq(schema.koboDeviceDeliveries.id, record.previousId));
+      return true;
     });
+  }
+
+  /** Stops a delivery from standing for its book, so the next offer starts a fresh one. */
+  async retire(userId: number, deviceId: number, id: string): Promise<void> {
+    await this.db
+      .update(schema.koboDeviceDeliveries)
+      .set({ current: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.koboDeviceDeliveries.userId, userId),
+          eq(schema.koboDeviceDeliveries.deviceId, deviceId),
+          eq(schema.koboDeviceDeliveries.id, id),
+          eq(schema.koboDeviceDeliveries.current, true),
+        ),
+      );
+  }
+
+  /**
+   * Points the device's stored bookmark at a delivery it has just downloaded. Without this, a bookmark
+   * first attributed to an earlier copy keeps every later push from the new copy uncertain.
+   */
+  async adoptForDeviceReadingState(userId: number, deviceId: number, bookId: number, id: string): Promise<void> {
+    await this.db
+      .update(schema.koboDeviceReadingStates)
+      .set({ deliveryId: id, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.koboDeviceReadingStates.userId, userId),
+          eq(schema.koboDeviceReadingStates.deviceId, deviceId),
+          eq(schema.koboDeviceReadingStates.bookId, bookId),
+          sql`${schema.koboDeviceReadingStates.deliveryId} is distinct from ${id}`,
+        ),
+      );
   }
 
   transition(userId: number, deviceId: number, id: string, expected: string[], state: string) {

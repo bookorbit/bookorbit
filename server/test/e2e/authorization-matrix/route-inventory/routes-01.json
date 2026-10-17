@@ -276,6 +276,42 @@
     "useGuards": []
   },
   {
+    "file": "server/src/modules/audit/audit.controller.ts",
+    "className": "AuditController",
+    "methodName": "getSummary",
+    "httpMethod": "GET",
+    "path": "/audit-log/summary",
+    "permissions": ["Permission.ViewAuditLog"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/audit/audit.controller.ts",
+    "className": "AuditController",
+    "methodName": "getSignIns",
+    "httpMethod": "GET",
+    "path": "/audit-log/sign-ins",
+    "permissions": ["Permission.ViewAuditLog"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/audit/audit.controller.ts",
+    "className": "AuditController",
+    "methodName": "exportEvents",
+    "httpMethod": "GET",
+    "path": "/audit-log/export",
+    "permissions": ["Permission.ViewAuditLog"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
     "file": "server/src/modules/auth/auth.controller.ts",
     "className": "AuthController",
     "methodName": "register",

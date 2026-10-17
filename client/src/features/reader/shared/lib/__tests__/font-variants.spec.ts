@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import type { FontNamedInstance, UserFont } from '@bookorbit/types'
-import { builtInVariants, closestVariant, familyVariants, isSameVariant, variantKey } from '../font-variants'
+import { builtInVariants, closestVariant, familyVariants, fontVariantLabel, isSameVariant, variantKey } from '../font-variants'
 
 function makeFont(overrides: Partial<UserFont> = {}): UserFont {
   return {
@@ -139,5 +139,26 @@ describe('isSameVariant', () => {
     expect(isSameVariant({ weight: 400, style: 'normal' }, { weight: 400, style: 'normal' })).toBe(true)
     expect(isSameVariant({ weight: 400, style: 'normal' }, { weight: 400, style: 'italic' })).toBe(false)
     expect(isSameVariant({ weight: 400, style: 'normal' }, { weight: 700, style: 'normal' })).toBe(false)
+  })
+})
+
+describe('fontVariantLabel', () => {
+  const t = (key: string, named?: Record<string, unknown>) => (named ? `${key}:${JSON.stringify(named)}` : key)
+
+  it("prefers the designer's own name", () => {
+    expect(fontVariantLabel({ name: 'SemiBold', weight: 600, style: 'normal' }, t)).toBe('SemiBold')
+  })
+
+  it('falls back to the standard weight name', () => {
+    expect(fontVariantLabel({ name: null, weight: 500, style: 'normal' }, t)).toBe('settings.reader.fonts.weightMedium')
+  })
+
+  it('adds italic only when the name does not already say so', () => {
+    expect(fontVariantLabel({ name: 'Bold Italic', weight: 700, style: 'italic' }, t)).toBe('Bold Italic')
+    expect(fontVariantLabel({ name: 'Bold', weight: 700, style: 'italic' }, t)).toBe('reader.settings.fontStyleItalicOf:{"style":"Bold"}')
+  })
+
+  it('uses the raw weight when it has no standard name', () => {
+    expect(fontVariantLabel({ name: null, weight: 350, style: 'normal' }, t)).toBe('350')
   })
 })

@@ -2,16 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 
+import { LoginErrorCode } from '@bookorbit/types'
 import LoginPage from '../LoginPage.vue'
+import { LoginError } from '../composables/useAuth'
 
-const { statusState, routeState } = vi.hoisted(() => ({
-  statusState: { allowRegistration: false, passwordLoginEnabled: true },
+const { statusState, routeState, loginMock } = vi.hoisted(() => ({
+  statusState: { allowRegistration: false, passwordLoginEnabled: true, optionsFail: false },
   routeState: { query: {} as Record<string, unknown> },
+  loginMock: vi.fn<(username: string, password: string) => Promise<void>>(),
 }))
 
+// Same constructor as the real LoginError; importing the real module pulls in the router.
 vi.mock('../composables/useAuth', () => ({
-  LoginError: class LoginError extends Error {},
-  useAuth: () => ({ login: vi.fn<() => void>() }),
+  LoginError: class LoginError extends Error {
+    constructor(
+      public readonly errorCode: string | undefined,
+      public readonly retryAfterSeconds: number | undefined,
+      message: string,
+    ) {
+      super(message)
+    }
+  },
+  useAuth: () => ({ login: loginMock }),
 }))
 
 vi.mock('../composables/useOidc', () => ({
@@ -28,7 +40,10 @@ vi.mock('../composables/useLoginOptions', () => ({
     return {
       loginOptions: ref(options),
       loginOptionsError: ref(null),
-      fetchLoginOptions: vi.fn<() => Promise<typeof options>>(async () => options),
+      fetchLoginOptions: vi.fn<() => Promise<typeof options>>(async () => {
+        if (statusState.optionsFail) throw new Error('Failed to load sign-in options')
+        return options
+      }),
     }
   },
 }))
@@ -37,6 +52,7 @@ vi.mock('../composables/useSetupStatus', () => ({
   useSetupStatus: () => ({
     allowRegistration: ref(statusState.allowRegistration),
     setupStatusError: ref(null),
+    fetchSetupStatus: vi.fn<() => Promise<boolean>>(async () => false),
   }),
 }))
 
@@ -62,7 +78,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   statusState.allowRegistration = false
   statusState.passwordLoginEnabled = true
+  statusState.optionsFail = false
   routeState.query = {}
+  loginMock.mockResolvedValue(undefined)
 })
 
 describe('LoginPage sign-up affordance', () => {
@@ -127,5 +145,58 @@ describe('LoginPage post-registration notice', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+})
+
+describe('LoginPage messages', () => {
+  it('confirms a password reset', async () => {
+    routeState.query = { reset: '1' }
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.find('[role="status"]').text()).toContain('Password updated')
+  })
+
+  it('reports a failed options load with a retry even when password sign-in is off', async () => {
+    statusState.passwordLoginEnabled = false
+    statusState.optionsFail = true
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const alert = wrapper.get('[role="alert"]')
+    expect(alert.text()).toContain('Sign-in options could not be loaded')
+
+    statusState.optionsFail = false
+    await alert.get('button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('offers a password reset when the account is locked', async () => {
+    loginMock.mockRejectedValue(new LoginError(LoginErrorCode.ACCOUNT_LOCKED, 900, 'Account locked'))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const alert = wrapper.get('[role="alert"]')
+    expect(alert.text()).toContain('15 minutes')
+    const reset = alert.findAll('a').find((a) => a.attributes('href') === '/forgot-password')
+    expect(reset?.text()).toBe('Reset password')
+  })
+
+  it('marks the password field invalid after rejected credentials', async () => {
+    loginMock.mockRejectedValue(new Error('Invalid credentials'))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('Invalid username or password')
+    expect(wrapper.get('#password').attributes('aria-invalid')).toBe('true')
+    expect(wrapper.get('#password').attributes('aria-describedby')).toContain('login-error')
   })
 })

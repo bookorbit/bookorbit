@@ -50,6 +50,8 @@ describe('ServerFontController', () => {
       update: vi.fn(),
       remove: vi.fn(),
       getFileInfo: vi.fn(),
+      usage: vi.fn(),
+      renameFamily: vi.fn(),
     };
 
     controller = new ServerFontController(serverFontService as unknown as ServerFontService);
@@ -97,6 +99,25 @@ describe('ServerFontController', () => {
 
       expect(serverFontService.update).toHaveBeenCalledWith(1, { familyName: 'New Name' });
       expect(result).toEqual({ id: 1, familyName: 'New Name' });
+    });
+  });
+
+  describe('usage', () => {
+    it('returns the per-family counts', async () => {
+      const usage = { families: [{ familyName: 'Courgette', books: 2, readers: 1, defaults: 0, hidden: 0 }] };
+      serverFontService.usage.mockResolvedValue(usage);
+
+      await expect(controller.usage()).resolves.toEqual(usage);
+    });
+  });
+
+  describe('renameFamily', () => {
+    it('forwards both names', async () => {
+      serverFontService.renameFamily.mockResolvedValue([]);
+
+      await controller.renameFamily({ familyName: 'Literata', newFamilyName: 'Literata Text' });
+
+      expect(serverFontService.renameFamily).toHaveBeenCalledWith('Literata', 'Literata Text');
     });
   });
 
@@ -159,12 +180,12 @@ describe('ServerFontController', () => {
   });
 
   describe('route permissions', () => {
-    it.each([['upload'], ['update'], ['remove']] as const)('%s requires ManageAppSettings', (method) => {
+    it.each([['upload'], ['update'], ['remove'], ['usage'], ['renameFamily']] as const)('%s requires ManageAppSettings', (method) => {
       const meta = Reflect.getMetadata(PERMISSION_KEY, ServerFontController.prototype[method]) as Permission;
       expect(meta).toBe(Permission.ManageAppSettings);
     });
 
-    it.each([['upload'], ['update'], ['remove']] as const)('%s is blocked for demo-restricted accounts', (method) => {
+    it.each([['upload'], ['update'], ['remove'], ['renameFamily']] as const)('%s is blocked for demo-restricted accounts', (method) => {
       const meta = Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, ServerFontController.prototype[method]) as {
         permission: Permission;
         message?: string;

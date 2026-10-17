@@ -153,6 +153,12 @@ describe('resolveResumeModes', () => {
     expect(resolveResumeModes(files, 1)).toMatchObject({ readFileId: 1, readFileFormat: 'pdf' });
   });
 
+  it('never offers DjVu, which released iOS builds cannot open, and keeps a readable edition beside it', () => {
+    expect(resolveResumeModes([file(1, 'djvu')], 1)).toMatchObject({ readFileId: null, readFileFormat: null });
+    expect(resolveResumeModes([file(1, 'djvu'), file(2, 'cbz')], 1)).toMatchObject({ readFileId: 2, readFileFormat: 'cbz' });
+    expect(resolveResumeModes([file(1, 'm4b'), file(2, 'djvu')], 1)).toMatchObject({ readFileId: null, hasAudio: true });
+  });
+
   it("falls back to the library's best readable file when the primary is an audiobook", () => {
     const files = [file(1, 'm4b'), file(2, 'pdf'), file(3, 'mobi')];
 

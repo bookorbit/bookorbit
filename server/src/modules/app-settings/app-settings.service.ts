@@ -24,6 +24,7 @@ import {
   BOOK_DOCK_MANAGED_SETTING_KEYS,
   DEFAULT_LIBRARY_ACCESS_CONFIG,
   DEFAULT_OIDC_CONFIG,
+  MAX_AUDIT_RETENTION_DAYS,
   type OidcFullConfig,
 } from '../../common/constants/app-settings.constants';
 import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
@@ -89,6 +90,13 @@ export class AppSettingsService {
       if (isNaN(parsed) || parsed <= 0 || parsed > HARD_MAX_UPLOAD_SIZE_MB) {
         throw new BadRequestException(`Upload size limit must be an integer between 1 and ${HARD_MAX_UPLOAD_SIZE_MB}`);
       }
+    }
+    if (key === APP_SETTING_KEYS.AUDIT_RETENTION_DAYS) {
+      const days = /^\d+$/.test(value.trim()) ? parseInt(value, 10) : NaN;
+      if (!(days >= 1 && days <= MAX_AUDIT_RETENTION_DAYS)) {
+        throw new BadRequestException(`Audit retention must be a whole number of days between 1 and ${MAX_AUDIT_RETENTION_DAYS}`);
+      }
+      value = String(days);
     }
     const setting = await this.repo.updateByKey(key, value);
     if (!setting) throw new NotFoundException(`Setting '${key}' not found`);

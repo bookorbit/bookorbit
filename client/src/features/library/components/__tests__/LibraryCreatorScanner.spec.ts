@@ -63,6 +63,16 @@ describe('LibraryCreatorScanner', () => {
     expect(wrapper.emitted('update:allowedFormats')).toBeUndefined()
   })
 
+  it('allows DjVu to be selected when imports are restricted to specific formats', async () => {
+    const wrapper = mountScanner({ allowedFormats: ['pdf'] })
+    await wrapper
+      .findAll('button[aria-pressed]')
+      .find((button) => button.text() === 'DJVU')!
+      .trigger('click')
+    expect(wrapper.emitted('update:allowedFormats')).toEqual([[['pdf', 'djvu']]])
+    wrapper.unmount()
+  })
+
   it('adds skip patterns on Enter and removes them by name', async () => {
     const wrapper = mountScanner({ excludePatterns: ['**/samples/**'] })
 

@@ -51,7 +51,18 @@ function resolveHref(href: string, basePath: string): string {
 }
 
 function findInZip(files: unzipper.File[], path: string): unzipper.File | undefined {
-  const clean = normalizeZipPath(path);
+  const entry = matchZipEntry(files, normalizeZipPath(path));
+  if (entry || !path.includes('%')) return entry;
+  // Manifest hrefs are URLs, so a chapter stored as `My Chapter.xhtml` is listed as `My%20Chapter.xhtml`.
+  try {
+    const decoded = decodeURIComponent(path);
+    return decoded === path ? undefined : matchZipEntry(files, normalizeZipPath(decoded));
+  } catch {
+    return undefined;
+  }
+}
+
+function matchZipEntry(files: unzipper.File[], clean: string): unzipper.File | undefined {
   const cleanLower = clean.toLowerCase();
   let ciMatch: unzipper.File | undefined;
   for (const file of files) {

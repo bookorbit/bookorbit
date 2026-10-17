@@ -21,6 +21,7 @@ export interface KoboSyncSettings {
   syncBookOrbitAnnotationsToKobo: boolean;
   readAloudDelivery?: ReadAloudDeliveryPreference;
   storeSync: boolean;
+  fullSizeCovers: boolean;
 }
 
 export type KoboSyncHistoryEvent = "library_sync" | "book_download" | "progress_update" | "annotations_pull" | "annotations_push";
@@ -60,4 +61,5 @@ export interface UpdateKoboSyncSettingsRequest {
   syncBookOrbitAnnotationsToKobo?: boolean;
   readAloudDelivery?: ReadAloudDeliveryPreference;
   storeSync?: boolean;
+  fullSizeCovers?: boolean;
 }

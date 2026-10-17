@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import type { EmailPreferences } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
-import type { EmailPreferences } from '../../db/schema';
+import type { Unserialized } from '../../common/types/unserialized';
 import { EmailPreferencesRepository } from './email-preferences.repository';
 import { EmailProviderService } from './email-provider.service';
 import { EmailRecipientService } from './email-recipient.service';
@@ -9,8 +10,7 @@ import { EmailTemplateService } from './email-template.service';
 import { UpdateEmailPreferencesDto } from './dto/update-email-preferences.dto';
 
 /** The stored row when there is one, with every default replaced by the one sending will use. */
-export type EffectiveEmailPreferences = Pick<EmailPreferences, 'userId' | 'defaultProviderId' | 'defaultRecipientId' | 'defaultTemplateId'> &
-  Partial<Pick<EmailPreferences, 'id' | 'createdAt' | 'updatedAt'>>;
+export type EffectiveEmailPreferences = Unserialized<EmailPreferences, 'createdAt' | 'updatedAt'>;
 
 @Injectable()
 export class EmailPreferencesService {

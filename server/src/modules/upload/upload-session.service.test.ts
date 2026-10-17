@@ -7,6 +7,7 @@ import { join } from 'path';
 import { Readable } from 'stream';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
+import { uploadError } from './upload-errors';
 import { UploadSessionService } from './upload-session.service';
 import { UploadValidatorService } from './upload-validator.service';
 
@@ -26,17 +27,21 @@ describe('UploadSessionService', () => {
     await mkdir(join(root, 'upload-sessions'), { recursive: true });
     rows = new Map();
     repo = {
-      // Mirrors the repository's predicate, expiry included. Without the expiry check this fake is
-      // more permissive than the real query, and no test here could fail when a dead session is
-      // handed back under a live key.
       findByIdempotencyKey: vi.fn(
-        (userId: number, key: string) =>
-          [...rows.values()].find((row) => row.userId === userId && row.idempotencyKey === key && row.expiresAt > new Date()) ?? null,
+        (userId: number, key: string) => [...rows.values()].find((row) => row.userId === userId && row.idempotencyKey === key) ?? null,
       ),
+      // Enforces upload_sessions_user_idempotency_uidx, as Postgres does. Without it a test could
+      // pass by making a second session under a key the database would refuse.
       create: vi.fn((values: any) => {
+        if ([...rows.values()].some((row) => row.userId === values.userId && row.idempotencyKey === values.idempotencyKey)) {
+          throw new Error('duplicate key value violates unique constraint "upload_sessions_user_idempotency_uidx"');
+        }
         const row = makeRow(values);
         rows.set(row.id, row);
         return row;
+      }),
+      releaseIdempotencyKey: vi.fn((id: string) => {
+        rows.set(id, { ...rows.get(id), idempotencyKey: `#released-${id}` });
       }),
       findById: vi.fn((id: string) => rows.get(id) ?? null),
       update: vi.fn((id: string, values: any) => {
@@ -51,18 +56,30 @@ describe('UploadSessionService', () => {
       deleteTerminalBefore: vi.fn(() => undefined),
       findCapabilityLibraries: vi.fn(() => [{ id: 1, name: 'Main', allowedFormats: ['epub', 'pdf'], organizationMode: 'book_per_folder' }]),
       findCapabilityFolders: vi.fn(() => [{ id: 2, libraryId: 1, path: '/books/Main Shelf' }]),
-      findLibrary: vi.fn((id: number) => (id === 1 ? { id: 1, allowedFormats: ['epub', 'pdf'], organizationMode: 'book_per_folder' } : null)),
+      findLibrary: vi.fn((id: number) => {
+        if (id === 1) return { id: 1, type: 'books', allowedFormats: ['epub', 'pdf'], organizationMode: 'book_per_folder' };
+        if (id === 3) return { id: 3, type: 'podcasts', allowedFormats: [], organizationMode: 'book_per_folder' };
+        return null;
+      }),
       folderBelongsToLibrary: vi.fn((folderId: number, libraryId: number) => folderId === 2 && libraryId === 1),
       // Book 9's folder is a real directory; book 8's "folder" is a file, which is the shape that
       // reached `complete` and threw ENOTDIR before validateTarget checked it. See F-006.
       findBookTarget: vi.fn((id: number) => {
         if (id === 9) {
-          return { id: 9, libraryId: 1, allowedFormats: ['epub', 'pdf'], organizationMode: 'book_per_folder', folderPath: root };
+          return {
+            id: 9,
+            libraryId: 1,
+            libraryType: 'books',
+            allowedFormats: ['epub', 'pdf'],
+            organizationMode: 'book_per_folder',
+            folderPath: root,
+          };
         }
         if (id === 8) {
           return {
             id: 8,
             libraryId: 1,
+            libraryType: 'books',
             allowedFormats: ['epub', 'pdf'],
             organizationMode: 'book_per_folder',
             folderPath: join(root, 'a-book-that-is-a-file.cbz'),
@@ -140,6 +157,30 @@ describe('UploadSessionService', () => {
     expect(repo.create).toHaveBeenCalledTimes(2);
   });
 
+  it.each(['failed', 'cancelled', 'expired'])('creates a new session when the key belongs to a %s one, keeping its outcome', async (status) => {
+    const dto = createDto();
+    const first = await service.create(dto, user);
+    rows.set(first.id, { ...rows.get(first.id), status, errorCode: UploadErrorCode.ImportFailed });
+
+    // Even for different details: the dead session no longer claims the key.
+    const second = await service.create({ ...dto, sizeBytes: 11 }, user);
+
+    expect(second.id).not.toBe(first.id);
+    expect(second.status).toBe('receiving');
+    expect(rows.get(first.id)).toMatchObject({ status, errorCode: UploadErrorCode.ImportFailed, idempotencyKey: `#released-${first.id}` });
+  });
+
+  it.each(['processing', 'completed'])('hands back a %s session under its key rather than uploading twice', async (status) => {
+    const dto = createDto();
+    const first = await service.create(dto, user);
+    rows.set(first.id, { ...rows.get(first.id), status });
+
+    const second = await service.create(dto, user);
+
+    expect(second.id).toBe(first.id);
+    expect(repo.releaseIdempotencyKey).not.toHaveBeenCalled();
+  });
+
   it('rejects an existing_book target whose folder path is a file', async () => {
     await writeFile(join(root, 'a-book-that-is-a-file.cbz'), 'not a directory');
 
@@ -163,6 +204,13 @@ describe('UploadSessionService', () => {
     await service.create(dto, user);
 
     await expect(service.create({ ...dto, sizeBytes: 11 }, user)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('refuses a library that does not hold books', async () => {
+    await expect(service.create({ ...createDto(), target: { kind: 'library', libraryId: 3 } } as any, user)).rejects.toMatchObject({
+      response: { errorCode: UploadErrorCode.InvalidTarget },
+    });
+    expect(repo.create).not.toHaveBeenCalled();
   });
 
   it('enforces upload permission and library-folder ownership before creating files', async () => {
@@ -199,6 +247,76 @@ describe('UploadSessionService', () => {
       response: { errorCode: UploadErrorCode.ChecksumMismatch },
     });
     expect(await readFile(rows.get(response.id).stagingPath)).toHaveLength(0);
+  });
+
+  it('reads a chunk before taking the session lock, so a stalled chunk does not hold up the next', async () => {
+    const response = await service.create(createDto(), user);
+    const chunkPath = join(root, 'chunk');
+    await writeFile(chunkPath, '%PDF-1234');
+    storage.streamToTemp.mockImplementationOnce(() => new Promise(() => undefined)).mockResolvedValueOnce({ tempPath: chunkPath, sizeBytes: 9 });
+
+    void service.appendChunk(response.id, 0, undefined, Readable.from('stalled'), user);
+    const result = await service.appendChunk(response.id, 0, undefined, Readable.from('%PDF-1234'), user);
+
+    expect(result.receivedBytes).toBe(9);
+  });
+
+  it('refuses contents that do not match the format at the first chunk and ends the session', async () => {
+    const response = await service.create({ ...createDto(), sizeBytes: 1_024 }, user);
+    const chunkPath = join(root, 'not-a-pdf');
+    await writeFile(chunkPath, Buffer.alloc(600, 0x41));
+    storage.streamToTemp.mockResolvedValue({ tempPath: chunkPath, sizeBytes: 600 });
+
+    await expect(service.appendChunk(response.id, 0, undefined, Readable.from('ignored'), user)).rejects.toMatchObject({
+      response: { errorCode: UploadErrorCode.InvalidContent },
+    });
+    expect(rows.get(response.id)).toMatchObject({ status: 'failed', errorCode: UploadErrorCode.InvalidContent, receivedBytes: 0 });
+    expect(storage.cleanup).toHaveBeenCalledWith(rows.get(response.id).stagingPath);
+  });
+
+  it('leaves a first chunk shorter than the signature for complete to judge', async () => {
+    const response = await service.create({ ...createDto(), sizeBytes: 1_024 }, user);
+    const chunkPath = join(root, 'short');
+    await writeFile(chunkPath, 'AAAA');
+    storage.streamToTemp.mockResolvedValue({ tempPath: chunkPath, sizeBytes: 4 });
+
+    await expect(service.appendChunk(response.id, 0, undefined, Readable.from('AAAA'), user)).resolves.toMatchObject({ receivedBytes: 4 });
+  });
+
+  it('ends the session when complete refuses its contents', async () => {
+    const response = await service.create({ ...createDto(), sizeBytes: 9 }, user);
+    const row = rows.get(response.id);
+    await writeFile(row.stagingPath, 'AAAAAAAAA');
+    rows.set(response.id, { ...row, receivedBytes: 9 });
+
+    await expect(service.complete(response.id, user)).rejects.toMatchObject({ response: { errorCode: UploadErrorCode.InvalidContent } });
+    expect(rows.get(response.id)).toMatchObject({ status: 'failed', errorCode: UploadErrorCode.InvalidContent });
+  });
+
+  it('stores the code an import failed with, and never a raw exception message', async () => {
+    const conflict = await service.create({ ...createDto(), sizeBytes: 9, idempotencyKey: 'upload-key-conflict' }, user);
+    const raw = await service.create({ ...createDto(), sizeBytes: 9, idempotencyKey: 'upload-key-raw' }, user);
+    for (const id of [conflict.id, raw.id]) {
+      await writeFile(rows.get(id).stagingPath, '%PDF-1234');
+      rows.set(id, { ...rows.get(id), receivedBytes: 9 });
+    }
+    upload.uploadForSession
+      .mockRejectedValueOnce(uploadError.destinationConflict('A file named "book.pdf" already exists at the target location'))
+      .mockRejectedValueOnce(new Error("ENOTDIR: not a directory, open '/library/Some Book/book.pdf'"));
+
+    await expect(service.complete(conflict.id, user)).rejects.toMatchObject({ response: { errorCode: UploadErrorCode.DestinationConflict } });
+    await expect(service.complete(raw.id, user)).rejects.toThrow('ENOTDIR');
+
+    expect(rows.get(conflict.id)).toMatchObject({
+      status: 'failed',
+      errorCode: UploadErrorCode.DestinationConflict,
+      errorMessage: 'A file named "book.pdf" already exists at the target location',
+    });
+    expect(rows.get(raw.id)).toMatchObject({
+      status: 'failed',
+      errorCode: UploadErrorCode.ImportFailed,
+      errorMessage: 'The file could not be added',
+    });
   });
 
   it('will not complete a partial upload', async () => {

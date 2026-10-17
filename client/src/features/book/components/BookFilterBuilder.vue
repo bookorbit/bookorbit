@@ -36,6 +36,8 @@ const { t } = useI18n()
 const props = defineProps<{
   modelValue: GroupRule | undefined
   depth?: number
+  /** Deepest nesting allowed. A smart scope's page wraps this filter in the scope's own rules, so it allows one level less. */
+  maxDepth?: number
   preserveIncompleteRoot?: boolean
 }>()
 
@@ -720,7 +722,12 @@ function showValueToInput(operator: RuleOperator): boolean {
           <div class="flex items-center justify-between mb-3">
             <span class="text-[10px] font-semibold uppercase tracking-widest text-primary">{{ t('book.filter.group') }}</span>
           </div>
-          <BookFilterBuilder :model-value="node.group" :depth="(depth ?? 0) + 1" @update:model-value="onSubGroupUpdate(index, $event)" />
+          <BookFilterBuilder
+            :model-value="node.group"
+            :depth="(depth ?? 0) + 1"
+            :max-depth="maxDepth"
+            @update:model-value="onSubGroupUpdate(index, $event)"
+          />
         </div>
         <button
           @click="removeNode(index)"
@@ -741,7 +748,7 @@ function showValueToInput(operator: RuleOperator): boolean {
         {{ t('book.filter.addRule') }}
       </button>
       <button
-        v-if="(depth ?? 0) < MAX_DEPTH"
+        v-if="(depth ?? 0) < (maxDepth ?? MAX_DEPTH)"
         @click="addGroup"
         class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-primary/30 text-sm text-primary hover:text-primary hover:border-primary hover:bg-primary/5 transition-colors"
       >

@@ -22,6 +22,7 @@ describe('book duplicate normalization', () => {
 
   it('maps formats into duplicate media families', () => {
     expect(mediaFamilyForFormat('EPUB')).toBe('ebook');
+    expect(mediaFamilyForFormat('DJVU')).toBe('ebook');
     expect(mediaFamilyForFormat('cbz')).toBe('comic');
     expect(mediaFamilyForFormat('m4b')).toBe('audiobook');
     expect(mediaFamilyForFormat(null)).toBe('unknown');

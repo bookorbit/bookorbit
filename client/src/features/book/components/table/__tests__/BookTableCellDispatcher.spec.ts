@@ -122,8 +122,8 @@ describe('BookTableCellDispatcher lock row', () => {
     expect(wrapper.find('[data-testid="cover-cell"]').attributes('data-comic')).toBe('true')
   })
 
-  it('does not flag non-comic primary files as comics in the cover cell', () => {
-    const book = makeBook({ files: [{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }] })
+  it.each(['epub', 'djvu'])('does not flag %s primary files as comics in the cover cell', (format) => {
+    const book = makeBook({ files: [{ id: 1, format, role: 'primary', sizeBytes: null }] })
     const wrapper = mountDispatcher({ book, colId: 'cover' as const, cellType: 'cover' as const })
 
     expect(wrapper.find('[data-testid="cover-cell"]').attributes('data-comic')).toBe('false')

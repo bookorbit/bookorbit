@@ -16,6 +16,7 @@ import { BookMetadataFetchController } from './book-metadata-fetch.controller';
 import { BookMetadataFetchEligibilityService } from './book-metadata-fetch-eligibility.service';
 import { BookMetadataFetchGateway } from './book-metadata-fetch.gateway';
 import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orchestrator.service';
+import { BookMetadataFetchPreviewService } from './book-metadata-fetch-preview.service';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
 
@@ -44,6 +45,7 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
     BookMetadataFetchEligibilityService,
     BookMetadataFetchConfigService,
     BookMetadataFetchOrchestratorService,
+    BookMetadataFetchPreviewService,
     BookMetadataFetchGateway,
   ],
   exports: [BookMetadataFetchOrchestratorService],

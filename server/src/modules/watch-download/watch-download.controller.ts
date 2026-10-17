@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Headers, NotFoundException, Param, ParseIntPipe, Post, Res } from '@nestjs/common';
+import { RouteConfig } from '@nestjs/platform-fastify';
 import { Permission } from '@bookorbit/types';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
@@ -45,6 +46,7 @@ export class WatchDownloadController {
   }
 
   @Get('media-overlay/files/:index')
+  @RouteConfig({ compress: false })
   @Public()
   async downloadMediaOverlayFile(
     @Param('index', ParseIntPipe) index: number,
@@ -53,7 +55,7 @@ export class WatchDownloadController {
     @Res() reply: FastifyReply,
   ) {
     const resource = await this.watchDownloads.authorizeMediaOverlay(authorization, index);
-    const { data, contentType, size, status, contentRange } = await this.epubService.streamMediaOverlayFile(
+    const { body, length, contentType, size, status, contentRange } = await this.epubService.streamMediaOverlayFile(
       resource.bookId,
       resource.href,
       resource.fileId,
@@ -64,11 +66,11 @@ export class WatchDownloadController {
     reply.code(status);
     reply.header('Content-Type', contentType);
     reply.header('Accept-Ranges', 'bytes');
-    reply.header('Content-Length', data.length);
+    reply.header('Content-Length', length);
     if (contentRange) reply.header('Content-Range', contentRange);
     if (!contentRange && size > 0) reply.header('X-Content-Length-Full', size);
     reply.header('Cache-Control', 'private, no-store');
-    reply.send(data);
+    reply.send(body);
   }
 
   @Get('files/:fileId')

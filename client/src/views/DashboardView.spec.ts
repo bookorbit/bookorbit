@@ -69,7 +69,8 @@ vi.mock('@/features/onboarding/composables/useOnboardingTour', () => ({
 }))
 
 async function mountView(): Promise<VueWrapper> {
-  const wrapper = shallowMount(DashboardView)
+  // The greeting row renders its slots, so the customize control inside it is reachable.
+  const wrapper = shallowMount(DashboardView, { global: { stubs: { PageTitleRow: false } } })
   await flushPromises()
   return wrapper
 }

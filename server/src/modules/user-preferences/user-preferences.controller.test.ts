@@ -66,6 +66,7 @@ const validDisplayPreferences: DisplayPreferences = {
   gridCardSecondaryLabel: 'hidden',
   cardInfoMode: 'hover-overlay',
   thumbnailClickAction: 'reader',
+  placeholderCoverStyle: 'bauhaus',
 };
 
 const validLocalePreferences: LocalePreferences = {

@@ -2,6 +2,18 @@
   {
     "file": "server/src/modules/library/library.controller.ts",
     "className": "LibraryController",
+    "methodName": "getBookFacets",
+    "httpMethod": "POST",
+    "path": "/libraries/:id/books/facets",
+    "permissions": [],
+    "libraryAccess": ["'viewer'"],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
     "methodName": "queryJumpBuckets",
     "httpMethod": "POST",
     "path": "/libraries/:id/books/jump-buckets",

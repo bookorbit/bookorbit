@@ -1,6 +1,7 @@
+import type { EmailTemplateUpdateRequest } from '@bookorbit/types';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class UpdateEmailTemplateDto {
+export class UpdateEmailTemplateDto implements EmailTemplateUpdateRequest {
   @IsOptional()
   @IsString()
   @MaxLength(255)

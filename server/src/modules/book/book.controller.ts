@@ -79,6 +79,7 @@ const BOOK_MIME_TYPES: Record<string, string> = {
   epub: 'application/epub+zip',
   kepub: 'application/epub+zip',
   pdf: 'application/pdf',
+  djvu: 'image/vnd.djvu',
   mobi: 'application/x-mobipocket-ebook',
   azw: 'application/vnd.amazon.ebook',
   azw3: 'application/vnd.amazon.ebook',

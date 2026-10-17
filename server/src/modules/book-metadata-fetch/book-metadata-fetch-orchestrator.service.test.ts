@@ -33,6 +33,7 @@ function makeService(withGateway = true) {
   const configService = {
     getEffectiveConfig: vi.fn().mockResolvedValue(baseConfig()),
     getGlobalConfig: vi.fn().mockResolvedValue(baseConfig()),
+    bookLibraryIds: vi.fn().mockResolvedValue([1]),
     isPaused: vi.fn().mockResolvedValue(false),
     setPaused: vi.fn().mockResolvedValue(undefined),
     recordLibraryRun: vi.fn().mockResolvedValue(undefined),
@@ -139,6 +140,32 @@ describe('BookMetadataFetchOrchestratorService', () => {
     await expect(service.triggerGlobal()).resolves.toBe(0);
     expect(configService.setPaused).toHaveBeenCalledWith(false);
     expect((service as any).paused).toBe(false);
+  });
+
+  it('triggerGlobal runs each books library with its own effective rule and records its run', async () => {
+    const { service, queueRepo, configService } = makeService();
+    const ownRule = { ...baseConfig(), conditions: { ...baseConfig().conditions, scoreThreshold: { enabled: true, threshold: 75 } } };
+    configService.bookLibraryIds.mockResolvedValue([2, 6]);
+    configService.getEffectiveConfig.mockImplementation((libraryId: number) => Promise.resolve(libraryId === 6 ? ownRule : baseConfig()));
+    queueRepo.scheduleEligibleBooksInBatches.mockResolvedValueOnce(4).mockResolvedValueOnce(10);
+    vi.spyOn(service as any, 'pollOnce').mockResolvedValue(undefined);
+
+    await expect(service.triggerGlobal(true)).resolves.toBe(14);
+
+    expect(queueRepo.scheduleEligibleBooksInBatches).toHaveBeenNthCalledWith(1, baseConfig(), 'manual_trigger', 2, 1000, true);
+    expect(queueRepo.scheduleEligibleBooksInBatches).toHaveBeenNthCalledWith(2, ownRule, 'manual_trigger', 6, 1000, true);
+    expect(configService.recordLibraryRun).toHaveBeenCalledWith(2, 4);
+    expect(configService.recordLibraryRun).toHaveBeenCalledWith(6, 10);
+    expect(configService.getGlobalConfig).not.toHaveBeenCalled();
+  });
+
+  it('triggerGlobal queues nothing when there are no books libraries', async () => {
+    const { service, queueRepo, configService } = makeService();
+    configService.bookLibraryIds.mockResolvedValue([]);
+
+    await expect(service.triggerGlobal()).resolves.toBe(0);
+    expect(queueRepo.scheduleEligibleBooksInBatches).not.toHaveBeenCalled();
+    expect(configService.recordLibraryRun).not.toHaveBeenCalled();
   });
 
   it('triggerGlobal increments session and emits status when jobs are queued', async () => {

@@ -4,6 +4,7 @@ export const UPLOAD_SUPPORTED_FORMATS = [
   "epub",
   "kepub",
   "pdf",
+  "djvu",
   "mobi",
   "azw",
   "azw3",
