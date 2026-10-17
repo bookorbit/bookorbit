@@ -249,13 +249,11 @@ export class TorboxAdapter implements DownloadClientAdapter {
       contentPath: null,
     };
 
-    if (torrent.downloadFinished && torrent.downloadPresent === false) {
-      return { ...base, state: 'failed', errorMessage: 'TorBox no longer holds the files for this download' };
-    }
     if (torrent.state === 'error') {
       return { ...base, state: 'failed', errorMessage: 'TorBox reported an error for this download' };
     }
 
+    // A missing availability flag is not a terminal removal signal; staging retries the actual file fetch.
     if (torrent.downloadFinished) {
       const job = this.staging.get(clientId)?.get(clientKey);
       if (job) {

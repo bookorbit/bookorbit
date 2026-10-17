@@ -139,10 +139,36 @@ describe('TorboxAdapter', () => {
     await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([expect.objectContaining({ clientKey: CLIENT_KEY, state: 'downloading' })]);
   });
 
-  it('maps missing downloads and API errors to failed statuses', async () => {
+  it('keeps a finished torrent stageable while TorBox reports its files as absent', async () => {
+    const finished = torrent({
+      downloadFinished: true,
+      downloadPresent: false,
+      progressPercent: 100,
+      downloadedBytes: 4,
+      totalBytes: 4,
+      files: [{ fileId: 7, name: 'Dune.epub', size: 4 }],
+    });
+    api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, finished]]));
+
+    await expect(adapter.status([CLIENT_KEY], config())).resolves.toEqual([
+      expect.objectContaining({ clientKey: CLIENT_KEY, state: 'completed', contentPath: null }),
+    ]);
+
+    api.requestDownloadLink.mockResolvedValue('https://example.com/Dune.epub');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }))),
+    );
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
+    await expect(readFile(join(directory, 'Dune.epub'), 'utf8')).resolves.toBe('book');
+  });
+
+  it('maps explicit TorBox errors to failed statuses', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([
-        [CLIENT_KEY, torrent({ downloadFinished: true, downloadPresent: false })],
+        [CLIENT_KEY, torrent({ state: 'error' })],
         [OTHER_KEY, torrent({ hash: OTHER_KEY, state: 'error' })],
       ]),
     );
