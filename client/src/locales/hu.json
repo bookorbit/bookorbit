@@ -282,6 +282,21 @@
           "loadError": "Nem sikerült betölteni az alapértelmezett borítókereső szolgáltatót",
           "saveError": "Nem sikerült menteni az alapértelmezett borítókereső szolgáltatót"
         },
+        "placeholderStyle": {
+          "title": "Helyőrző stílusa",
+          "hint": "A borítókép nélküli könyvek ebben a stílusban jelennek meg.",
+          "options": {
+            "bauhaus": "Bauhaus",
+            "constructivist": "Konstruktivista",
+            "memphis": "Memphis",
+            "clothbound": "Vászonkötésű",
+            "poster": "Poszter",
+            "aurora": "Auróra",
+            "vista": "Vista",
+            "marbled": "Márványozott",
+            "paperback": "Puhafedeles"
+          }
+        },
         "displayMode": {
           "title": "Borító megjelenítési mód",
           "hint": "Azt szabályozza, hogy a valódi borítók hogyan illeszkedjenek a könyvek rekeszébe, ha eltérő képarányok vannak",
@@ -1569,7 +1584,32 @@
         "subtitle": "Tölts fel olyan betűtípusokat, amelyeket minden felhasználó kiválaszthat az e-könyv-olvasóban anélkül, hogy saját betűtípusokat kellene feltöltenie.",
         "listLabel": "Szerver betűtípusok",
         "noFontsYet": "Még nincsenek szerver betűtípusok",
-        "noFontsHint": "Az itt hozzáadott betűtípusok minden felhasználó olvasójában megjelennek."
+        "noFontsHint": "Az itt hozzáadott betűtípusok minden felhasználó olvasójában megjelennek.",
+        "addFonts": "Betűtípusok hozzáadása",
+        "filterLabel": "Betűcsaládok szűrése",
+        "filterPlaceholder": "Betűcsaládok szűrése",
+        "filterClear": "Szűrő törlése",
+        "noMatches": "Egyetlen betűcsalád sem egyezik ezzel: \"{query}\"",
+        "previewLabel": "Szöveg előnézete",
+        "previewPlaceholder": "Gépelj be valamit, hogy megtekinthesd az előnézetét az összes betűcsaládban",
+        "previewSize": "Méret előnézete",
+        "previewSizeOption": "{size} px",
+        "familiesUnit": "{count, plural, one {betűcsalád} other {betűcsalád}}",
+        "filesOfMax": "{count}/{max} fájl",
+        "onDisk": "{size} a lemezen",
+        "columns": {
+          "family": "Betűcsalád",
+          "specimen": "Betűminta",
+          "styles": "Stílusok",
+          "readers": "Olvasók"
+        },
+        "fileSummary": "{count, plural, one {# fájl} other {# fájl}} · {size}",
+        "newBadge": "Új",
+        "styles": {
+          "single": "csak a(z) {style}",
+          "many": "{count} stílus",
+          "manyNoItalics": "{count} stílus, dőlt változat nélkül"
+        }
       }
     },
     "common": {
@@ -1723,6 +1763,13 @@
           "inheritFromGlobal": "Öröklés a globálistól",
           "usingGlobalDefaults": "Globális alapértelmezett értékek használata.",
           "saveOverride": "Felülbírálás mentése"
+        },
+        "onImport": {
+          "on": "Be",
+          "off": "Ki"
+        },
+        "columns": {
+          "books": "{count, plural, one {könyv} other {könyv}}"
         }
       },
       "providers": {
