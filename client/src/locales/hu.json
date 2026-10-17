@@ -1586,19 +1586,19 @@
         "noFontsYet": "Még nincsenek szerver betűtípusok",
         "noFontsHint": "Az itt hozzáadott betűtípusok minden felhasználó olvasójában megjelennek.",
         "addFonts": "Betűtípusok hozzáadása",
-        "filterLabel": "Betűcsaládok szűrése",
-        "filterPlaceholder": "Betűcsaládok szűrése",
+        "filterLabel": "Családok szűrése",
+        "filterPlaceholder": "Családok szűrése",
         "filterClear": "Szűrő törlése",
-        "noMatches": "Egyetlen betűcsalád sem egyezik ezzel: \"{query}\"",
+        "noMatches": "Egyetlen család sem egyezik ezzel: \"{query}\"",
         "previewLabel": "Szöveg előnézete",
-        "previewPlaceholder": "Gépelj be valamit, hogy megtekinthesd az előnézetét az összes betűcsaládban",
+        "previewPlaceholder": "Gépelj be valamit, hogy megtekinthesd az előnézetét az összes családban",
         "previewSize": "Méret előnézete",
         "previewSizeOption": "{size} px",
-        "familiesUnit": "{count, plural, one {betűcsalád} other {betűcsalád}}",
+        "familiesUnit": "{count, plural, one {család} other {család}}",
         "filesOfMax": "{count}/{max} fájl",
         "onDisk": "{size} a lemezen",
         "columns": {
-          "family": "Betűcsalád",
+          "family": "Család",
           "specimen": "Betűminta",
           "styles": "Stílusok",
           "readers": "Olvasók"
@@ -1609,7 +1609,107 @@
           "single": "csak a(z) {style}",
           "many": "{count} stílus",
           "manyNoItalics": "{count} stílus, dőlt változat nélkül"
-        }
+        },
+        "facts": {
+          "books": "{count, plural, one {# könyvön} other {# könyvön}}",
+          "booksDetail": "{books, plural, one {# könyvön beállítva} other {# könyvön beállítva}} {readers, plural, one {# olvasó} other {# olvasó}} által",
+          "defaults": "{count, plural, one {# olvasó alapértelmezése} other {# olvasó alapértelmezése}}",
+          "hidden": "{count, plural, one {# olvasó által elrejtve} other {# olvasó által elrejtve}}"
+        },
+        "moreActions": "Továbbiak a következőhöz: {name}",
+        "menu": {
+          "rename": "Család átnevezése",
+          "addFiles": "Fájlok hozzáadása",
+          "remove": "Család eltávolítása…"
+        },
+        "footerHint": "Minden olvasó látja ezeket a saját betűtípuslistájában, és bármelyiket elrejtheti az Olvasó › Betűtípusok menüpont alatt.",
+        "empty": {
+          "dropHint": "vagy húzd a fájlokat a lap bármely részére",
+          "tip": "Egy család négy fájlként működik a legjobban: Normál, dőlt, félkövér és félkövér-dőlt. Egyetlen variálható fájl képes helyettesíteni az összes vastagságot."
+        },
+        "drop": {
+          "title": "{count, plural, one {Húzd ide # fájl hozzáadásához minden olvasó számára} other {Húzd ide # fájl hozzáadásához minden olvasó számára}}"
+        },
+        "upload": {
+          "ariaLabel": "Feltöltés állapota",
+          "title": "{count, plural, one {# fájl hozzáadása} other {# fájl hozzáadása}}",
+          "progress": "{done}/{total} kész",
+          "addedCount": "{count} hozzáadva",
+          "duplicateCount": "{count} már itt van",
+          "refusedCount": "{count} nem lett hozzáadva",
+          "dismiss": "Elvetés",
+          "newFamily": "új család",
+          "states": {
+            "queued": "Várakozás",
+            "uploading": "Feltöltés",
+            "added": "Hozzáadva",
+            "duplicate": "Már létezik a szerveren",
+            "refused": "Nem lett hozzáadva",
+            "failed": "Sikertelen"
+          },
+          "reasons": {
+            "tooLarge": "Nagyobb, mint {maxMb} MB.",
+            "unsupportedType": "Ez nem egy betűtípusfájl. Használj TTF, OTF, WOFF vagy WOFF2 formátumot.",
+            "invalidFile": "A fájl sérült, vagy nem valódi betűtípus.",
+            "faceTaken": "A(z) {familyName} már rendelkezik fájllal ehhez a vastagsághoz és stílushoz.",
+            "limitReached": "A szerver már tárol {limit} betűtípusfájlt.",
+            "failed": "A feltöltés sikertelen. Próbáld újra."
+          }
+        },
+        "sheet": {
+          "description": "A(z) {name} fájljainak előnézete, átnevezése és kezelése",
+          "variable": "Változó",
+          "preview": "Előnézet",
+          "pageColour": "Oldalszín",
+          "papers": {
+            "app": "Alkalmazás felülete",
+            "white": "Fehér oldal",
+            "sepia": "Szépia oldal",
+            "night": "Éjszakai oldal"
+          },
+          "previewHeading": "Az élő virágok kertje",
+          "previewParagraph1": "Alice nagy ámulattal nézett körül. \"Nini, hiszen tiszta meggyőződésem, hogy mindvégig ez alatt a fa alatt voltunk! Minden pontosan ugyanúgy van, mint azelőtt!\"",
+          "previewParagraph2": "„Ebben a világban, mint látod, tiszta erőből kell rohannod, ha egyenest egy helyben akarsz maradni. Ha pedig el akarsz jutni valahová, akkor legalább kétszer olyan gyorsan kell futnod!\"",
+          "styles": "Stílusok",
+          "stylesHint": "Mit kínál az olvasó Stílus sora",
+          "singleStyleNote": "Egyetlen stílus, így az olvasók nem kapnak Stílus sort. A könyvekben lévő félkövér és dőlt szövegeket a böngésző generálja a(z) {style} változatból.",
+          "inReader": "Az olvasóban",
+          "inReaderHint": "A betűtípuslista, amelyet minden olvasó megkap az Olvasó › Beállítások menüben, a(z) {name} lehetőséggel kiválasztva.",
+          "pickerLabel": "Az olvasói betűtípuslista előnézete",
+          "files": "Fájlok",
+          "filesUsed": "{count}/{max} használatban ezen a szerveren",
+          "fileDetail": "{summary} · Hozzáadva {date}",
+          "upright": "Álló",
+          "italic": "Dőlt",
+          "fileActions": "Továbbiak a következőhöz: {name}",
+          "changeStyle": "Vastagság és stílus módosítása",
+          "removeFile": "Fájl eltávolítása",
+          "removeFileQuestion": "Eltávolítod ezt a fájlt minden olvasó számára?",
+          "weight": "Vastagság",
+          "style": "Stílus",
+          "name": "Család neve",
+          "nameHint": "Az olvasók ezen a néven választják ki a betűtípusokat.",
+          "nameHiddenWarning": "{count, plural, one {# olvasó elrejtette ezt: {name}} other {#olvasó elrejtette ezt: {name}}}; egy új névvel újra látható lesz számukra.",
+          "nameBooksWarning": "Egy új név miatt {count, plural, one {az a(z) # könyv, amely ezt használja} other {az a(z) # könyv, amely ezt használja}}, visszaáll a könyv saját betűtípusára.",
+          "readers": "Olvasók",
+          "stats": {
+            "books": "{count, plural, one {könyv használja} other {könyv használja}}",
+            "defaults": "{count, plural, one {olvasó alapértelmezése} other {olvasó alapértelmezése}}",
+            "hidden": "{count, plural, one {olvasó elrejtette} other {olvasó elrejtette}}"
+          },
+          "readersPrivacy": "Kizárólag darabszámok. Az, hogy mely könyvekről és mely olvasókról van szó, privát marad számukra.",
+          "removeLabel": "Család eltávolítása",
+          "removeQuestion": "Eltávolítod a(z) {name} elemet minden olvasó számára?",
+          "removeConsequenceBooks": "{books, plural, one {# könyvön beállítva} other {# könyvön beállítva}} {readers, plural, one {# olvasó} other {# olvasó}} által; azok a könyvek visszaállnak a saját betűtípusukra.",
+          "removeConsequenceFiles": "{count, plural, one {A fájlja törölve lett a szerverről.} other {Mind a(z) # fájl törölve lett a szerverről.}}",
+          "loadFailedNote": "Ez a böngésző nem tudta betölteni a betűtípusfájlt, így az előnézetekben egy helyettesítő betűkészlet jelenik meg. Az olvasók böngészői is nagy valószínűséggel el fogják utasítani; próbálkozz a betűtípus egy másik példányával."
+        },
+        "toasts": {
+          "removed": "{name} eltávolítva",
+          "removePartial": "A(z) {name} {failed, plural, one {# fájlját} other {# fájlját}} nem sikerült eltávolítani",
+          "renameTaken": "A(z) {name} már rendelkezik egy fájllal ugyanezzel a vastagsággal és stílussal"
+        },
+        "loadFailed": "A böngésző nem tudja betölteni"
       }
     },
     "common": {
@@ -1764,12 +1864,91 @@
           "usingGlobalDefaults": "Globális alapértelmezett értékek használata.",
           "saveOverride": "Felülbírálás mentése"
         },
+        "scope": {
+          "ownSettings": "{count, plural, one {# saját beállítás} other {# saját beállítás}}",
+          "globalIntro": "Minden könyvtár ezt a szabályt követi, kivéve, ha van sajátja.",
+          "globalCoverage": "{libraryCount, plural, one {# könyvtárra érvényes} other {# könyvtárra érvényes}}, {bookCount, plural, one {# könyv} other {# könyv}}.",
+          "ownLibraries": "A(z) {names} {count, plural, one {saját szabályt követ.} other {saját szabályt követ.}}",
+          "libraryFollows": "A(z) {library} a globális szabályt követi. Módosíts itt bármit, ha egyedi szabályt szeretnél hozzárendelni.",
+          "libraryOwn": "A(z) {library} saját szabállyal rendelkezik {count, plural, other {# beállításhoz} one {# beállításhoz}}. Minden más a globális szabályt követi.",
+          "lastRun": "Legutóbbi futás {when}, sorba állítva {count, plural, one {# könyv} other {# könyv}}.",
+          "neverRun": "Még nem futott.",
+          "useGlobalRule": "Globális szabály használata",
+          "loadFailed": "Az automatikus lekérési beállításokat nem sikerült betölteni. Frissítsd az oldalt az újrapróbáláshoz.",
+          "saved": "{scope} elmentve",
+          "saveFailed": "A(z) {scope} mentése nem sikerült. Próbáld újra."
+        },
+        "run": {
+          "all": "Futtatás minden könyvtárra",
+          "library": "Futtatás erre: {library}",
+          "saveFirst": "A futtatások a mentett szabályt használják. Előbb ments.",
+          "failed": "A futtatást nem sikerült elindítani. Próbáld újra."
+        },
         "onImport": {
+          "label": "Metaadatok lekérése az új könyvekhez",
+          "hint": "A keresések és a feltöltések azonnal sorba állítják az egyező könyveket. Az importáláskori lekérés kizárólag az üres mezőket tölti ki; a zárolt mezők sosem módosulnak.",
+          "follow": "Globális követése",
           "on": "Be",
           "off": "Ki"
         },
         "columns": {
-          "books": "{count, plural, one {könyv} other {könyv}}"
+          "books": "{count, plural, one {könyv} other {könyv}}",
+          "ofTotal": "/{total}",
+          "off": "Ki",
+          "own": "Saját",
+          "global": "Globális",
+          "useGlobal": "Globális használata",
+          "globalValue": "Globális szabály: {value}",
+          "on": "Be",
+          "scoreBelowValue": "A pontszám alacsonyabb, mint {threshold}",
+          "neverFetchedSplit": "{count, plural, one {# sosem lett lekérve} other {# sosem lett lekérve}}",
+          "fetchedBeforeSplit": "{count, plural, one {# korábban már le lett kérve} other {# korábban már le lett kérve}}",
+          "lowScoreLabel": "Alacsony megbízhatósági pontszám",
+          "lowScoreHint": "A határérték alatti pontszámú könyvek lekérése.",
+          "outOf": "/ 100",
+          "lowerThreshold": "Csökkentsd a határértéket",
+          "raiseThreshold": "Növeld a határértéket",
+          "missingHint": "Lekérés, ha bármelyik kijelölt mező üres. Minden mező mutatja, hogy hány könyvből hiányzik az adott adat.",
+          "audioGroup": "Könyvek hanggal",
+          "audioHint": "{count, plural, =0 {Az itt lévők közül egyik sem tartalmaz hangot.} one {Kizárólag a(z) # hanggal rendelkező könyvből hiányozhatnak ezek.} other {Kizárólag a(z) # hanggal rendelkezőből hiányozhatnak ezek.}}",
+          "fieldCount": "{field}: {count, plural, one {# könyvből hiányzik} other {# könyvből hiányzik}}"
+        },
+        "histogram": {
+          "label": "Megbízhatósági pontszám határértéke",
+          "valueText": "A pontszám alacsonyabb, mint {threshold}"
+        },
+        "preview": {
+          "title": "Mit kérne le a futtatás",
+          "matching": "{matching, plural, one {#/{total} könyv egyezik} other {#/{total} könyv egyezik}}",
+          "showing": "{count, plural, one {a leginkább hiányos megjelenítése} other {a(z) # leginkább hiányos megjelenítése}}",
+          "empty": "Egyetlen könyv sem felel meg ennek a szabálynak, így a futtatás semmit sem állítana sorba.",
+          "unknownAuthor": "Ismeretlen szerző",
+          "score": "Pontszám {score}",
+          "more": "+{count}",
+          "missing": {
+            "title": "Nincs cím",
+            "subtitle": "Nincs alcím",
+            "description": "Nincs leírás",
+            "cover": "Nincs borító",
+            "audioCover": "Nincs hangoskönyv-borító",
+            "authors": "Nincsenek szerzők",
+            "publisher": "Nincs kiadó",
+            "isbn": "Nincs ISBN",
+            "publishedYear": "Nincs kiadás éve",
+            "language": "Nincs nyelv",
+            "pageCount": "Nincs oldalszám",
+            "communityRating": "Nincs közösségi értékelés",
+            "seriesName": "Nincs sorozat neve",
+            "seriesIndex": "Nincs sorozatindex",
+            "genres": "Nincsenek zsánerek",
+            "narrators": "Nincsenek felolvasók",
+            "duration": "Nincs időtartam",
+            "abridged": "Rövidített státusz nincs beállítva"
+          }
+        },
+        "queue": {
+          "progress": "{done}/{total}",
+          "failed": "{count, plural, one {# könyvet nem sikerült lekérni} other {# könyvet nem sikerült lekérni}}"
         }
       },
       "providers": {
@@ -2031,7 +2210,7 @@
             "libraryDescription": "Ez eltávolítja a {scope} összes felülírását, így ismét örökli a globális szabályokat, és azonnal mentésre kerül."
           },
           "removeProvider": {
-            "title": "Eltávolítja a(z) {provider} elemet minden mezőből?",
+            "title": "Eltávolítod a(z) {provider} elemet minden mezőből?",
             "description": "Ez kiveszi a(z) {provider} paramétert a {scope} minden mezőjének szolgáltatói sorrendjéből. Semmi sem kerül mentésre, amíg a Mentés gombra nem kattintasz."
           }
         }
@@ -2217,7 +2396,12 @@
         "selectAll": "Összes kiválasztása",
         "clear": "Törlés",
         "noLibraries": "Még nincsenek elérhető könyvtárak.",
-        "allLibraries": "Összes könyvtár"
+        "allLibraries": "Összes könyvtár",
+        "pageFacts": "{fields, plural, one {# mező} other {# mező}} · {values, plural, one {# érték tárolva} other {# érték tárolva}}",
+        "newFieldAction": "Új mező",
+        "views": {
+          "label": "Aktív vagy archivált mezők megjelenítése"
+        }
       },
       "tabs": {
         "providers": "Szolgáltatók",
