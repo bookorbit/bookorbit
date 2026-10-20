@@ -181,6 +181,8 @@ export const authors = pgTable(
     influences: text('influences').array(),
     metadataProvider: varchar('metadata_provider', { length: 50 }),
     metadataProviderId: varchar('metadata_provider_id', { length: 128 }),
+    /** Set when a user chose this provider match; enrichment then looks the id up instead of searching by name. */
+    metadataProviderPinned: boolean('metadata_provider_pinned').notNull().default(false),
     lastEnrichedAt: timestamp('last_enriched_at', { withTimezone: true }),
   },
   (t) => [

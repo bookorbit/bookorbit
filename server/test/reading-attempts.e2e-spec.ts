@@ -74,7 +74,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
   }
 
   beforeAll(async () => {
-    ctx = await createE2EContext();
+    ctx = await createE2EContext({ isolateAppData: true });
     const [admin] = await ctx.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.username, 'scanner-e2e-admin')).limit(1);
     adminUserId = admin.id;
     const library = await seedLibrary(ctx.db, { rootPath: E2E_ROOT, mode: 'book_per_file', watch: false });
@@ -221,6 +221,55 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(response.json()).toMatchObject({ status: 'rereading' });
     const [progress] = await ctx.db.select().from(schema.readingProgress).where(eq(schema.readingProgress.bookFileId, book.fileId));
     expect(progress.percentage).toBe(100);
+  });
+
+  // A reread on a book never finished here records the read it implies as an undated completed attempt,
+  // created after the read in progress. Taken as the latest by id, its missing dates replaced the dates
+  // of that read once finished, the next time a session landed; a past read added later did the same.
+  it('4a. keeps the latest read dates over an undated earlier read and a past read added later', async () => {
+    const book = await createBook();
+    await patchStatus(book.bookId, { status: 'reading', startedAt: '2026-08-17' });
+    const reread = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${book.bookId}/reading-attempts/start-reread`,
+      headers: auth(ctx.adminToken),
+      payload: { resetProgress: false },
+    });
+    expect(reread.json()).toMatchObject({ status: 'rereading' });
+    await patchStatus(book.bookId, { status: 'read', finishedAt: '2026-10-17' });
+    const bookDates = async () => {
+      const [row] = await ctx.db
+        .select()
+        .from(schema.userBookStatus)
+        .where(and(eq(schema.userBookStatus.userId, adminUserId), eq(schema.userBookStatus.bookId, book.bookId)));
+      return { status: row?.status, startedOn: row?.startedAt?.toISOString().slice(0, 10), finishedOn: row?.finishedAt?.toISOString().slice(0, 10) };
+    };
+    const finished = { status: 'read', startedOn: '2026-08-17', finishedOn: '2026-10-17' };
+    expect(await bookDates()).toEqual(finished);
+
+    const session = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/files/${book.fileId}/sessions`,
+      headers: auth(ctx.adminToken),
+      payload: {
+        sessionId: `reread-dates-${book.bookId}`,
+        startedAt: '2026-10-17T18:12:00.000Z',
+        endedAt: '2026-10-17T18:19:30.000Z',
+        durationSeconds: 450,
+        endProgress: 100,
+      },
+    });
+    expect(session.statusCode).toBe(204);
+    expect(await bookDates()).toEqual(finished);
+
+    const past = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${book.bookId}/reading-attempts`,
+      headers: auth(ctx.adminToken),
+      payload: { startedOn: '2019-03-01', endedOn: '2019-03-20', outcome: 'completed' },
+    });
+    expect(past.statusCode).toBe(201);
+    expect(await bookDates()).toEqual(finished);
   });
 
   it('5. adds and edits partial historical attempts without duplicating them', async () => {

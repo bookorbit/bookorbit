@@ -54,21 +54,35 @@ describe('series book media groups', () => {
   it('groups a book by every media kind it contains regardless of its primary file', () => {
     const book = makeBook('epub', {
       files: [
-        { id: 1, format: 'mp3', role: 'secondary', sizeBytes: null },
+        { id: 1, format: 'mp3', role: 'content', sizeBytes: null },
         { id: 2, format: 'epub', role: 'primary', sizeBytes: null },
-        { id: 3, format: 'cbz', role: 'secondary', sizeBytes: null },
+        { id: 3, format: 'cbz', role: 'content', sizeBytes: null },
       ],
     })
 
     expect(getSeriesBookMediaGroupKeys(book)).toEqual(['books', 'audiobooks', 'comics'])
   })
 
+  it('ignores cover, supplement and metadata files when grouping an audiobook', () => {
+    const book = makeBook(undefined, {
+      files: [
+        { id: 1, format: 'mp3', role: 'primary', sizeBytes: null },
+        { id: 2, format: 'jpg', role: 'supplement', sizeBytes: null },
+        { id: 3, format: 'jpg', role: 'cover', sizeBytes: null },
+        { id: 4, format: 'nfo', role: 'metadata', sizeBytes: null },
+        { id: 5, format: 'cue', role: 'supplement', sizeBytes: null },
+      ],
+    })
+
+    expect(getSeriesBookMediaGroupKeys(book)).toEqual(['audiobooks'])
+  })
+
   it('does not add a book to the same group more than once', () => {
     const book = makeBook(undefined, {
       files: [
         { id: 1, format: 'mp3', role: 'primary', sizeBytes: null },
-        { id: 2, format: 'm4b', role: 'secondary', sizeBytes: null },
-        { id: 3, format: ' M4A ', role: 'secondary', sizeBytes: null },
+        { id: 2, format: 'm4b', role: 'content', sizeBytes: null },
+        { id: 3, format: ' M4A ', role: 'content', sizeBytes: null },
       ],
     })
 
@@ -90,15 +104,15 @@ describe('series book media groups', () => {
         id: 3,
         files: [
           { id: 30, format: 'epub', role: 'primary', sizeBytes: null },
-          { id: 31, format: 'm4b', role: 'secondary', sizeBytes: null },
+          { id: 31, format: 'm4b', role: 'content', sizeBytes: null },
         ],
       }),
       makeBook('pdf', {
         id: 4,
         files: [
           { id: 40, format: 'pdf', role: 'primary', sizeBytes: null },
-          { id: 41, format: 'flac', role: 'secondary', sizeBytes: null },
-          { id: 42, format: 'cbr', role: 'secondary', sizeBytes: null },
+          { id: 41, format: 'flac', role: 'content', sizeBytes: null },
+          { id: 42, format: 'cbr', role: 'content', sizeBytes: null },
         ],
       }),
       makeBook(undefined, { id: 5 }),

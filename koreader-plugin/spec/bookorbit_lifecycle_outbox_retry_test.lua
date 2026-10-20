@@ -82,6 +82,14 @@ assertEqual(outbox:isDrainable(outbox:readLatestMetadata(follower.id), now + 61)
     "backoff expires")
 assertEqual(retried.next_attempt_at, now + 60, "first retry uses the base delay")
 
+-- Nothing else wakes a backing-off entry, so the drain needs to know when to look
+-- again. The parked entry never counts: it waits for a sync the reader asks for.
+assertEqual(outbox:nextRetryAt(), now + 60, "the backing-off entry's retry time is reported")
+local saved_now = now
+now = now + 61
+assertEqual(outbox:nextRetryAt(), nil, "an entry that is drainable again needs no wake-up")
+now = saved_now
+
 -- A fresh snapshot supersedes the failures, so the entry becomes drainable
 -- again while remote changes that still need applying are carried over.
 now = now + 1

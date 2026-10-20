@@ -360,10 +360,12 @@ export function koboSpanPointToCanonical(
 ): SpanPointToCanonicalResult {
   const aligned = kepubDoc.index.collapsed === epubDoc.index.collapsed;
   const span = spanIndex.byId.get(spanId);
-  if (!span || span.collapsedStart < 0) return { status: 'failed', reason: 'span_not_found' };
+  // A chapter with no spans at all is one the Kobo can only bookmark by its start (see cfiPointToKoboSpanPoint).
+  const chapterStart = !span && spanIndex.ordered.length === 0;
+  if (!chapterStart && (!span || span.collapsedStart < 0)) return { status: 'failed', reason: 'span_not_found' };
 
-  let cp = span.collapsedStart;
-  let status: 'exact' | 'repaired' = span.synthetic ? 'repaired' : 'exact';
+  let cp = span?.collapsedStart ?? 0;
+  let status: 'exact' | 'repaired' = chapterStart || span?.synthetic ? 'repaired' : 'exact';
   if (!aligned) {
     if (kepubDoc.index.collapsedCpLength === 0) return { status: 'failed', reason: 'kepub_text_mismatch' };
     cp = Math.round((cp * epubDoc.index.collapsedCpLength) / kepubDoc.index.collapsedCpLength);
@@ -412,10 +414,11 @@ export function cfiPointToKoboSpanPoint(
     cp = cfiPointToCollapsedCp(kepubDoc, cfi);
     if (cp != null && !aligned) status = 'repaired';
   }
-  if (cp == null) return { status: 'failed', reason: 'unresolvable_structure' };
-
   const spans = spanIndex.ordered;
-  if (spans.length === 0) return { status: 'failed', reason: 'span_not_found' };
+  // A Kobo bookmarks a chapter it has no span for, such as an image-only page, as `kobo.1.1` and
+  // reopens it at that chapter's start. Doing the same when the point cannot be placed keeps the
+  // reader in the right chapter; a bookmark without a location sends it back to the start of the book.
+  if (cp == null || spans.length === 0) return { status: 'repaired', spanId: spans[0]?.id ?? 'kobo.1.1', chapterFraction: 0 };
   const span = spans.find((s) => s.collapsedEnd > cp!) ?? spans[spans.length - 1];
 
   const chapterFraction = kepubDoc.index.collapsedCpLength > 0 ? Math.max(0, Math.min(1, cp / kepubDoc.index.collapsedCpLength)) : 0;

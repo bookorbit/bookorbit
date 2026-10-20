@@ -121,3 +121,44 @@ assertEqual(handled_event.payload.nb_highlights_added, 1, "event increments high
 assertEqual(handled_event.payload.index_modified, 1, "event carries inserted index")
 
 print("bookorbit_annotations_live_apply_test.lua: ok")
+
+local existing = ui.annotation.annotations[1]
+local old_pos0, old_pos1 = existing.pos0, existing.pos1
+ui.document.getTextFromXPointers = function(_, pos0)
+    return pos0 == '/body/DocFragment[2]/p[1]/text().0' and 'moved selection' or 'fresh web highlight'
+end
+applied = BookOrbitAnnotations.applyLive(ui, {
+    edit = {{
+        serverId = 42, version = 4, datetime = existing.datetime,
+        text = 'moved selection', note = 'moved on another device',
+        pos0 = '/body/DocFragment[2]/p[1]/text().0',
+        pos1 = '/body/DocFragment[2]/p[1]/text().15',
+    }},
+})
+assertEqual(applied[1].verified, true, 'a moved edit verifies its new range')
+assertEqual(existing.pos0, '/body/DocFragment[2]/p[1]/text().0', 'a moved edit updates the rendered start')
+assertEqual(existing.text, 'moved selection', 'a moved edit updates the quote')
+
+ui.document.isXPointerInDocument = function() return false end
+local previous_note = existing.note
+applied = BookOrbitAnnotations.applyLive(ui, {
+    add = {{
+        serverId = 42, version = 5, datetime = existing.datetime, posFormat = 'xpointer',
+        text = 'unresolvable selection', note = 'must remain pending', pos0 = old_pos0, pos1 = old_pos1,
+    }},
+})
+assertEqual(applied[1].status, 'failed', 'an existing identity still needs range verification')
+assertEqual(existing.note, previous_note, 'a failed redelivery preserves the applied annotation')
+
+ui.document.findAllText = function()
+    return {
+        { start = '/body/DocFragment[1]/p[1]/text().0', ['end'] = '/body/DocFragment[1]/p[1]/text().9' },
+        { start = '/body/DocFragment[2]/p[1]/text().0', ['end'] = '/body/DocFragment[2]/p[1]/text().9' },
+    }
+end
+applied = BookOrbitAnnotations.applyLive(ui, {
+    add = {{ serverId = 99, version = 1, datetime = '2026-07-09 09:00:00', posFormat = 'xpointer',
+        text = 'repeated text', pos0 = '/invalid', pos1 = '/invalid' }},
+})
+assertEqual(applied[1].status, 'failed', 'repeated text without a trustworthy location stays pending')
+assertEqual(#ui.annotation.annotations, 1, 'ambiguous repair never draws a guessed passage')

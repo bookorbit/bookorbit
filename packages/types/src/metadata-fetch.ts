@@ -150,6 +150,13 @@ export interface MetadataProviderInfo {
  */
 export const METADATA_PROVIDER_STATUS_EVENT = "provider-status";
 
+/**
+ * The most ranked candidates one provider may contribute to a metadata search stream. A search for
+ * one book's match keeps the server's small default; a search that browses, such as finding a book
+ * to request, asks for up to this many with `resultsPerProvider`.
+ */
+export const METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER = 20;
+
 /** Why a provider stopped before finishing, so an interrupted search is not read as an empty one. */
 export type MetadataProviderSearchOutcome = "timeout" | "throttled" | "failed";
 

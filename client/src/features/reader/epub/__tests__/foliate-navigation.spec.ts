@@ -354,13 +354,59 @@ describe('Foliate navigation', () => {
       view.addEventListener('relocate', relocate)
       renderer.dispatchEvent(new CustomEvent('relocate', { detail: { index: 0, range, fraction: 0.5 } }))
       const detail = (relocate.mock.calls[0]![0] as CustomEvent).detail
-      expect(detail.cfi).toBe('epubcfi(/6/2!/4/2[book-columns]/2[book-inner]/4/1:4)')
+      expect(detail.cfi).toBe('epubcfi(/6/2!/4/2[book-columns]/2[book-inner]/4/1:0)')
       expect(detail.koreaderProgress).toBeNull()
       expect(detail.range).toBe(range)
       expect(range.startContainer).toBe(doc.querySelector('#anchor'))
       expect(range.collapsed).toBe(false)
     } finally {
       createElement.mockRestore()
+    }
+  })
+
+  it('keeps the reader selection while narration moves on, and follows the voice once it is gone', async () => {
+    document.body.innerHTML = '<p><span id="s1">First sentence.</span> <span id="s2">Second sentence.</span></p>'
+    const originalCreateElement = document.createElement.bind(document)
+    const goTo = vi.fn<() => Promise<void>>(() => Promise.resolve())
+    const renderer = Object.assign(originalCreateElement('div'), {
+      open: vi.fn<() => void>(),
+      goTo,
+      getContents: () => [{ index: 0, doc: document }],
+    })
+    const overlay = new EventTarget()
+    const createElement = vi
+      .spyOn(document, 'createElement')
+      .mockImplementation((name: string) => (name === 'foliate-paginator' ? renderer : originalCreateElement(name)))
+    const highlight = async (id: string) => {
+      overlay.dispatchEvent(new CustomEvent('highlight', { detail: { text: `chapter.xhtml#${id}` } }))
+      await Promise.resolve()
+    }
+    try {
+      const view = new View()
+      await view.open({
+        sections: [{ id: 'chapter.xhtml', mediaOverlay: {} }],
+        media: { activeClass: 'narrating' },
+        getMediaOverlay: () => overlay,
+        resolveHref: (href: string) => ({ index: 0, anchor: (doc: Document) => doc.getElementById(href.split('#')[1]!) }),
+      } as never)
+      const selection = window.getSelection()!
+      const range = document.createRange()
+      range.selectNodeContents(document.getElementById('s1')!)
+      selection.removeAllRanges()
+      selection.addRange(range)
+
+      await highlight('s2')
+      expect(goTo).not.toHaveBeenCalled()
+      expect(selection.toString()).toBe('First sentence.')
+      expect(document.getElementById('s2')!.classList.contains('narrating')).toBe(true)
+
+      selection.removeAllRanges()
+      await highlight('s1')
+      expect(goTo).toHaveBeenCalledTimes(1)
+    } finally {
+      createElement.mockRestore()
+      window.getSelection()?.removeAllRanges()
+      document.body.innerHTML = ''
     }
   })
 
@@ -379,7 +425,25 @@ describe('Foliate navigation', () => {
     expect(getReadingProgressRange(range)?.startOffset).toBe(2)
   })
 
-  it('uses the text endpoint and retains source layout wrappers when the range starts on a container', () => {
+  it('keeps the first visible text when a page range starts at an inline container', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML = '<p><span id="first">First visible sentence.</span></p><p>Last visible sentence.</p>'
+    const first = doc.querySelector('span')!.firstChild!
+    const last = doc.querySelector('p:last-child')!.firstChild!
+    const range = doc.createRange()
+    range.setStart(doc.querySelector('p')!, 0)
+    range.setEnd(last, 8)
+
+    const point = getReadingProgressRange(range)
+    expect(point?.startContainer).toBe(first)
+    expect(point?.startOffset).toBe(0)
+    expect(point?.collapsed).toBe(true)
+    expect(range.startContainer).toBe(doc.querySelector('p'))
+    expect(range.endContainer).toBe(last)
+    expect(range.collapsed).toBe(false)
+  })
+
+  it('finds the first following text and retains source wrappers after an empty anchor', () => {
     const doc = document.implementation.createHTMLDocument('chapter')
     doc.body.innerHTML =
       '<div id="book-columns"><div id="book-inner"><div id="filepos48449"></div><p><span id="kobo.10.6">Middle text</span></p></div></div>'
@@ -393,7 +457,7 @@ describe('Foliate navigation', () => {
     range.setEnd(text, 6)
 
     expect(getReadingProgressRange(range)?.startContainer).toBe(text)
-    expect(getReadingProgressRange(range)?.startOffset).toBe(6)
+    expect(getReadingProgressRange(range)?.startOffset).toBe(0)
     expect(range.startContainer).toBe(start)
   })
 
@@ -456,7 +520,7 @@ describe('Foliate navigation', () => {
     expect(getReadingProgressRange(null)).toBeNull()
   })
 
-  it('uses the selected text point for KoboSpan instead of the first span in a wide range', () => {
+  it('uses the first visible KoboSpan when a page starts at an empty anchor', () => {
     const doc = document.implementation.createHTMLDocument('chapter')
     doc.body.innerHTML =
       '<div id="filepos48449"></div><p><span class="koboSpan" id="kobo.1.1">Start</span></p><p><span class="koboSpan" id="kobo.10.6">Middle text</span></p>'
@@ -469,6 +533,6 @@ describe('Foliate navigation', () => {
     range.setStart(start, 0)
     range.setEnd(text, 6)
 
-    expect(getKoboSpanValue(range)).toBe('kobo.10.6')
+    expect(getKoboSpanValue(range)).toBe('kobo.1.1')
   })
 })

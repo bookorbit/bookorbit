@@ -73,7 +73,7 @@ export class KoreaderStatsService {
             if (error instanceof HttpException) return null;
             throw error;
           });
-          if (explicitFile?.role === 'content' && explicitFile.fileHash?.toLowerCase() === hash) {
+          if (explicitFile?.role === 'content' && (explicitFile.fileHash?.toLowerCase() === hash || match?.bookFileId === explicitFile.id)) {
             match = {
               bookFileId: explicitFile.id,
               bookId: explicitFile.bookId,

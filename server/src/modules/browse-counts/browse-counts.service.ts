@@ -29,7 +29,7 @@ export class BrowseCountsService {
       const [authors, series, annotations] = await Promise.all([
         this.authorsService.countAll(user),
         this.seriesService.countAll(user),
-        this.annotationHubService.countActive(user.id),
+        this.annotationHubService.countActive(user),
       ]);
       return { authors, series, annotations };
     });

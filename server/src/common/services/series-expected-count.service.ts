@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lt, ne, or } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { MetadataCandidate } from '@bookorbit/types';
@@ -75,11 +75,17 @@ export class SeriesExpectedCountService {
    * stating the length outright, and failures propagate so a save cannot silently do nothing.
    *
    * The row is shared, so this changes the total every user sees for the series.
+   *
+   * `previousSeriesIds` are the series the book was in before the save, the only rows whose total
+   * an editor showed. Both editors send null for a row added during the edit, which means "not
+   * given", so a null only clears one of these. An unchanged total is left alone, so re-saving a
+   * provider's total keeps its source.
    */
   async setManual(
     seriesName: string | null | undefined,
     expectedBookCount: number | null,
     executor: ExpectedCountExecutor = this.db,
+    options: { previousSeriesIds?: ReadonlySet<number> } = {},
   ): Promise<boolean> {
     const displayName = this.seriesIdentity.normalizeDisplayName(seriesName);
     if (!displayName) return false;
@@ -88,6 +94,10 @@ export class SeriesExpectedCountService {
     if (seriesId == null) return false;
 
     const total = expectedBookCount === null ? null : (normalizeSeriesTotalBooks(expectedBookCount) ?? null);
+    if (total === null && options.previousSeriesIds && !options.previousSeriesIds.has(seriesId)) return true;
+
+    const changed =
+      total === null ? isNotNull(bookSeries.expectedBookCount) : or(isNull(bookSeries.expectedBookCount), ne(bookSeries.expectedBookCount, total));
     await executor
       .update(bookSeries)
       .set({
@@ -95,7 +105,7 @@ export class SeriesExpectedCountService {
         expectedBookCountSource: total === null ? null : MANUAL_SERIES_TOTAL_SOURCE,
         expectedBookCountUpdatedAt: new Date(),
       })
-      .where(eq(bookSeries.id, seriesId));
+      .where(and(eq(bookSeries.id, seriesId), changed));
 
     return true;
   }

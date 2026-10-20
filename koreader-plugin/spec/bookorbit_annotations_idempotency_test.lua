@@ -70,7 +70,10 @@ end
 local handled_event
 local ui = {
     rolling = true,
-    document = {},
+    document = {
+        isXPointerInDocument = function() return true end,
+        getTextFromXPointers = function() return "same highlight" end,
+    },
     annotation = {
         annotations = {
             {
@@ -95,6 +98,7 @@ local ui = {
     end,
 }
 
+ui.annotation.annotations[1].bookorbit_pending_verification = true
 local applied, deleted, touched = BookOrbitAnnotations.applyLive(ui, {
     add = {
         {
@@ -118,6 +122,7 @@ assertEqual(ui.annotation.annotations[1].color, "blue", "live redelivery updates
 assertEqual(ui.annotation.annotations[1].note, "new note", "live redelivery updates note")
 assertEqual(applied[1].status, "applied", "live redelivery is acked")
 assertEqual(applied[1].verified, true, "live redelivery is verified")
+assertEqual(ui.annotation.annotations[1].bookorbit_pending_verification, nil, "live verification retires the sidecar upload guard")
 assertEqual(applied[1].pageno, 4, "live redelivery acks existing page")
 assertEqual(#deleted, 0, "live redelivery has no deletes")
 assertEqual(touched, 1, "live redelivery touches existing item")
@@ -165,6 +170,7 @@ assertEqual(sidecar_annotations[1].color, "green", "sidecar fallback updates col
 assertEqual(sidecar_annotations[1].note, "new sidecar note", "sidecar fallback updates note")
 assertEqual(applied[1].status, "applied", "sidecar redelivery is acked")
 assertEqual(applied[1].verified, false, "sidecar redelivery stays unverified")
+assertEqual(sidecar_annotations[1].bookorbit_pending_verification, true, "sidecar writes remain excluded from device uploads")
 assertEqual(#deleted, 0, "sidecar redelivery has no deletes")
 assertEqual(touched, 1, "sidecar redelivery touches existing item")
 assertEqual(saved_annotations, sidecar_annotations, "sidecar redelivery saves annotations")

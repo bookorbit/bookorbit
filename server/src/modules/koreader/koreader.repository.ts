@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ReadAloudDeliveryPreference } from '@bookorbit/types';
@@ -8,8 +8,8 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
-type ResolvedBookFileByHash = { id: number; bookId: number; libraryId: number; format: string | null };
-type ResolvedBookFileByHashes = { bookFileId: number; bookId: number; libraryId: number; format: string | null };
+type ResolvedBookFileByHash = { id: number; bookId: number; libraryId: number; format: string | null; progressCompatible?: boolean };
+type ResolvedBookFileByHashes = { bookFileId: number; bookId: number; libraryId: number; format: string | null; progressCompatible?: boolean };
 type KoreaderUnmatchedSource = 'current_file' | 'file' | 'statistics';
 type KoreaderUnmatchedCandidate = {
   hash: string;
@@ -27,6 +27,18 @@ type KoreaderHashLinkMetadata = {
 };
 
 type HashedResolvedBookFile = ResolvedBookFileByHashes & { hash: string | null };
+
+function compatibleProgressHash(hash: string | SQLWrapper) {
+  return sql<boolean>`coalesce(${schema.bookFiles.fileHash} = ${hash}, false) or exists (
+    select 1 from ${schema.bookFileHashHistory} delivered_hash
+    where delivered_hash.book_file_id = ${schema.bookFiles.id} and delivered_hash.file_hash = ${hash}
+      and delivered_hash.reason = 'kobo_download' and not exists (
+        select 1 from ${schema.bookFileHashHistory} source_change
+        where source_change.book_file_id = delivered_hash.book_file_id
+          and source_change.reason <> 'kobo_download' and source_change.created_at >= delivered_hash.created_at
+      )
+  )`;
+}
 
 function resolveUniqueBook<T extends { bookId: number }>(rows: T[]): T | null {
   const first = rows[0];
@@ -52,6 +64,7 @@ function addUnambiguousHashMatches(rows: HashedResolvedBookFile[], result: Map<s
         bookId: resolved.bookId,
         libraryId: resolved.libraryId,
         format: resolved.format,
+        ...(resolved.progressCompatible === false ? { progressCompatible: false } : {}),
       });
     }
   }
@@ -67,6 +80,10 @@ export interface ReadingProgressUpsert {
   xpointer?: string | null;
   /** 1-based page for paged formats; null for reflowable and audio. */
   pageNumber?: number | null;
+  /** When the device read to this position; the write's own time when it does not say. */
+  readAt?: Date;
+  /** When the reading happened, for last_read_at; defaults to readAt. Never moves the stored value back. */
+  lastReadAt?: Date;
 }
 
 export interface DeviceProgressUpsert {
@@ -90,6 +107,15 @@ export class KoreaderRepository {
     return this.db.query.koreaderUsers.findFirst({
       where: eq(schema.koreaderUsers.userId, userId),
     });
+  }
+
+  async findKoreaderCatalogPreferences(userId: number): Promise<{ hideAudioOnlyBooks: boolean } | undefined> {
+    const [row] = await this.db
+      .select({ hideAudioOnlyBooks: schema.koreaderUsers.hideAudioOnlyBooks })
+      .from(schema.koreaderUsers)
+      .where(eq(schema.koreaderUsers.userId, userId))
+      .limit(1);
+    return row;
   }
 
   async findKoreaderUserByUsername(username: string) {
@@ -192,6 +218,7 @@ export class KoreaderRepository {
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
         format: schema.bookFiles.format,
+        progressCompatible: compatibleProgressHash(schema.bookFileHashHistory.fileHash),
       })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
@@ -202,7 +229,7 @@ export class KoreaderRepository {
 
     // A delivered variant can collide with another book's current hash. Both sources must
     // agree before a device's progress can be assigned, even when a current hash exists.
-    const candidates = [...byFileHash];
+    const candidates: ResolvedBookFileByHash[] = [...byFileHash];
     for (const row of byFileHashHistory) {
       if (!candidates.some((candidate) => candidate.id === row.id)) candidates.push(row);
     }
@@ -211,7 +238,9 @@ export class KoreaderRepository {
       if (manual) return manual;
     }
     const resolved = resolveUniqueBook(candidates);
-    return resolved;
+    return resolved?.progressCompatible === true
+      ? { id: resolved.id, bookId: resolved.bookId, libraryId: resolved.libraryId, format: resolved.format }
+      : resolved;
   }
 
   async resolveBookFilesByHashes(
@@ -245,6 +274,7 @@ export class KoreaderRepository {
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
         format: schema.bookFiles.format,
+        progressCompatible: compatibleProgressHash(schema.bookFileHashHistory.fileHash),
       })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
@@ -268,6 +298,7 @@ export class KoreaderRepository {
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
         format: schema.bookFiles.format,
+        progressCompatible: compatibleProgressHash(schema.koreaderBookHashLinks.hash),
       })
       .from(schema.koreaderBookHashLinks)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.koreaderBookHashLinks.bookFileId))
@@ -275,7 +306,13 @@ export class KoreaderRepository {
       .where(and(eq(schema.koreaderBookHashLinks.userId, userId), inArray(schema.koreaderBookHashLinks.hash, hashes), libraryFilter));
 
     for (const row of manualLinks) {
-      result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, format: row.format });
+      result.set(row.hash, {
+        bookFileId: row.bookFileId,
+        bookId: row.bookId,
+        libraryId: row.libraryId,
+        format: row.format,
+        ...(row.progressCompatible === false ? { progressCompatible: false } : {}),
+      });
     }
 
     return result;
@@ -288,14 +325,22 @@ export class KoreaderRepository {
   ): Promise<ResolvedBookFileByHash | null> {
     const libraryFilter = accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined;
     const [byManualLink] = await this.db
-      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId, format: schema.bookFiles.format })
+      .select({
+        id: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        format: schema.bookFiles.format,
+        progressCompatible: compatibleProgressHash(hash),
+      })
       .from(schema.koreaderBookHashLinks)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.koreaderBookHashLinks.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
       .where(and(eq(schema.koreaderBookHashLinks.userId, userId), eq(schema.koreaderBookHashLinks.hash, hash), libraryFilter))
       .limit(1);
 
-    return byManualLink ?? null;
+    if (!byManualLink) return null;
+    const { progressCompatible, ...file } = byManualLink;
+    return progressCompatible === false ? { ...file, progressCompatible: false } : file;
   }
 
   async upsertUnmatchedBooks(userId: number, candidates: KoreaderUnmatchedCandidate[], deviceId?: string): Promise<void> {
@@ -686,11 +731,11 @@ export class KoreaderRepository {
   }
 
   async upsertReadingProgress(entry: ReadingProgressUpsert) {
-    const { bookFileId, userId, percentage, cfi = null, xpointer = null, pageNumber = null } = entry;
+    const { bookFileId, userId, percentage, cfi = null, xpointer = null, pageNumber = null, readAt = new Date(), lastReadAt = readAt } = entry;
 
     await this.db
       .insert(schema.readingProgress)
-      .values({ bookFileId, userId, percentage, cfi, pageNumber, koreaderProgress: xpointer })
+      .values({ bookFileId, userId, percentage, cfi, pageNumber, koreaderProgress: xpointer, textUpdatedAt: readAt, lastReadAt })
       .onConflictDoUpdate({
         target: [schema.readingProgress.bookFileId, schema.readingProgress.userId],
         // Deliberately do NOT update updatedAt here. reading_progress.updatedAt must only
@@ -711,7 +756,12 @@ export class KoreaderRepository {
           koboLocationType: null,
           koboLocationValue: null,
           koboContentSourceProgressPercent: null,
+          textUpdatedAt: readAt,
           updatedAt: sql`"reading_progress"."updated_at"`,
+          // The device's reading time, not the write's: a sweep pushes a whole shelf at once and
+          // an offline book arrives on reconnection, so the write's own time ranked them all as
+          // just read. Held to the stored value so an older push never sinks a newer read elsewhere.
+          lastReadAt: sql`greatest("reading_progress"."last_read_at", ${lastReadAt.toISOString()}::timestamptz)`,
         },
       });
   }
@@ -1039,40 +1089,52 @@ export class KoreaderRepository {
   }
 
   async removeDevice(userId: number, deviceId: string): Promise<number> {
+    const renditionIds = renditionIdsForDevice(userId, deviceId);
     return this.db.transaction(async (tx) => {
-      const [deletedProgress, deletedSweep, deletedPageStats, deletedUnmatchedDeviceLinks, deletedDeviceSettings, deletedAnnotationSyncState] =
-        await Promise.all([
-          tx
-            .delete(schema.koreaderDeviceProgress)
-            .where(and(eq(schema.koreaderDeviceProgress.userId, userId), eq(schema.koreaderDeviceProgress.deviceId, deviceId)))
-            .returning({ id: schema.koreaderDeviceProgress.id }),
-          tx
-            .delete(schema.koreaderDeviceSweeps)
-            .where(and(eq(schema.koreaderDeviceSweeps.userId, userId), eq(schema.koreaderDeviceSweeps.deviceId, deviceId)))
-            .returning({ deviceId: schema.koreaderDeviceSweeps.deviceId }),
-          tx
-            .delete(schema.koreaderPageStats)
-            .where(and(eq(schema.koreaderPageStats.userId, userId), eq(schema.koreaderPageStats.deviceId, deviceId)))
-            .returning({ id: schema.koreaderPageStats.id }),
-          tx
-            .delete(schema.koreaderUnmatchedBookDevices)
-            .where(and(eq(schema.koreaderUnmatchedBookDevices.userId, userId), eq(schema.koreaderUnmatchedBookDevices.deviceId, deviceId)))
-            .returning({ hash: schema.koreaderUnmatchedBookDevices.hash }),
-          tx
-            .delete(schema.koreaderDeviceSettings)
-            .where(and(eq(schema.koreaderDeviceSettings.userId, userId), eq(schema.koreaderDeviceSettings.deviceId, deviceId)))
-            .returning({ deviceId: schema.koreaderDeviceSettings.deviceId }),
-          tx
-            .delete(schema.annotationSyncState)
-            .where(
-              and(
-                eq(schema.annotationSyncState.userId, userId),
-                eq(schema.annotationSyncState.source, 'koreader'),
-                eq(schema.annotationSyncState.deviceId, deviceId),
-              ),
-            )
-            .returning({ id: schema.annotationSyncState.id }),
-        ]);
+      const [
+        deletedProgress,
+        deletedSweep,
+        deletedPageStats,
+        deletedUnmatchedDeviceLinks,
+        deletedDeviceSettings,
+        deletedAnnotationSyncState,
+        deletedBookmarkLinks,
+      ] = await Promise.all([
+        tx
+          .delete(schema.koreaderDeviceProgress)
+          .where(and(eq(schema.koreaderDeviceProgress.userId, userId), eq(schema.koreaderDeviceProgress.deviceId, deviceId)))
+          .returning({ id: schema.koreaderDeviceProgress.id }),
+        tx
+          .delete(schema.koreaderDeviceSweeps)
+          .where(and(eq(schema.koreaderDeviceSweeps.userId, userId), eq(schema.koreaderDeviceSweeps.deviceId, deviceId)))
+          .returning({ deviceId: schema.koreaderDeviceSweeps.deviceId }),
+        tx
+          .delete(schema.koreaderPageStats)
+          .where(and(eq(schema.koreaderPageStats.userId, userId), eq(schema.koreaderPageStats.deviceId, deviceId)))
+          .returning({ id: schema.koreaderPageStats.id }),
+        tx
+          .delete(schema.koreaderUnmatchedBookDevices)
+          .where(and(eq(schema.koreaderUnmatchedBookDevices.userId, userId), eq(schema.koreaderUnmatchedBookDevices.deviceId, deviceId)))
+          .returning({ hash: schema.koreaderUnmatchedBookDevices.hash }),
+        tx
+          .delete(schema.koreaderDeviceSettings)
+          .where(and(eq(schema.koreaderDeviceSettings.userId, userId), eq(schema.koreaderDeviceSettings.deviceId, deviceId)))
+          .returning({ deviceId: schema.koreaderDeviceSettings.deviceId }),
+        tx
+          .delete(schema.annotationSyncState)
+          .where(
+            and(
+              eq(schema.annotationSyncState.userId, userId),
+              eq(schema.annotationSyncState.source, 'koreader'),
+              or(eq(schema.annotationSyncState.deviceId, deviceId), inArray(schema.annotationSyncState.deviceId, renditionIds)),
+            ),
+          )
+          .returning({ id: schema.annotationSyncState.id }),
+        tx
+          .delete(schema.koreaderBookmarkLinks)
+          .where(and(eq(schema.koreaderBookmarkLinks.userId, userId), inArray(schema.koreaderBookmarkLinks.deviceId, renditionIds)))
+          .returning({ id: schema.koreaderBookmarkLinks.id }),
+      ]);
 
       await tx
         .delete(schema.koreaderDeviceDeliverySettings)
@@ -1117,6 +1179,7 @@ export class KoreaderRepository {
         deletedUnmatchedDeviceLinks.length +
         deletedDeviceSettings.length +
         deletedAnnotationSyncState.length +
+        deletedBookmarkLinks.length +
         deletedUnmatchedBooks.length
       );
     });
@@ -1165,4 +1228,43 @@ export class KoreaderRepository {
       .limit(1);
     return row?.id ?? null;
   }
+}
+
+/**
+ * Every rendition id this device can have exchanged under. Exchanges key their rows by
+ * `exchangeDeviceId(deviceId, hash)`, a one-way digest, and nothing records which hashes a device
+ * used, so the ids are rebuilt from every hash an exchange could have matched for the user's
+ * KOReader-synced books (file, hash history and manual links, as `resolveBookFilesByHashes` reads
+ * them). Device ids are `[A-Za-z0-9-]` and hashes hex, so the JSON text needs no escaping.
+ */
+function renditionIdsForDevice(userId: number, deviceId: string): SQL {
+  return sql`(with synced_books as (
+      select ${schema.annotations.bookId} as book_id
+      from ${schema.annotationSyncState}
+      inner join ${schema.annotations} on ${schema.annotations.id} = ${schema.annotationSyncState.annotationId}
+      where ${schema.annotationSyncState.userId} = ${userId}
+        and ${schema.annotationSyncState.source} = 'koreader'
+        and ${schema.annotationSyncState.deviceId} like 'rendition:%'
+      union
+      select ${schema.bookmarks.bookId}
+      from ${schema.koreaderBookmarkLinks}
+      inner join ${schema.bookmarks} on ${schema.bookmarks.id} = ${schema.koreaderBookmarkLinks.bookmarkId}
+      where ${schema.koreaderBookmarkLinks.userId} = ${userId}
+    ),
+    hashes as (
+      select ${schema.bookFiles.fileHash} as hash
+      from ${schema.bookFiles}
+      where ${schema.bookFiles.bookId} in (select book_id from synced_books) and ${schema.bookFiles.fileHash} is not null
+      union
+      select ${schema.bookFileHashHistory.fileHash}
+      from ${schema.bookFileHashHistory}
+      inner join ${schema.bookFiles} on ${schema.bookFiles.id} = ${schema.bookFileHashHistory.bookFileId}
+      where ${schema.bookFiles.bookId} in (select book_id from synced_books)
+      union
+      select ${schema.koreaderBookHashLinks.hash}
+      from ${schema.koreaderBookHashLinks}
+      where ${schema.koreaderBookHashLinks.userId} = ${userId}
+    )
+    select 'rendition:' || encode(sha256(convert_to('["' || ${deviceId}::text || '","' || lower(hash) || '"]', 'UTF8')), 'hex')
+    from hashes)`;
 }

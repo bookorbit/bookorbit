@@ -23,13 +23,17 @@ function review(overrides: Partial<BookRequestReview> = {}): BookRequestReview {
     files: [{ fileName: 'fablehaven-01.m4b', fileSize: 402_000_000, format: 'm4b', role: 'content' }],
     totalSizeBytes: 402_000_000,
     canFile: true,
+    heldOnRequest: false,
+    releaseInfoUrl: null,
+    edition: null,
+    hasCover: false,
     ...overrides,
   }
 }
 
-function render(overrides: Partial<BookRequestReview> = {}, props: { canManage?: boolean; busy?: boolean } = {}) {
+function render(overrides: Partial<BookRequestReview> = {}, props: { canManage?: boolean; busy?: boolean; coverUrl?: string | null } = {}) {
   return mount(RequestReviewPanel, {
-    props: { review: review(overrides), canManage: props.canManage ?? true, busy: props.busy ?? false },
+    props: { review: review(overrides), canManage: props.canManage ?? true, busy: props.busy ?? false, coverUrl: props.coverUrl ?? null },
     global: { stubs: { RouterLink: RouterLinkStub } },
   })
 }
@@ -116,5 +120,76 @@ describe('RequestReviewPanel', () => {
     expect(wrapper.text()).toContain('Import checking is off')
     expect(wrapper.find('dl').exists()).toBe(false)
     expect(wrapper.text()).toContain('fablehaven-01.m4b')
+  })
+  describe('a review the sender asked for', () => {
+    const passed = {
+      score: 96,
+      threshold: 70,
+      passed: true,
+      reason: 'above_threshold' as const,
+      rows: [{ field: 'title' as const, requested: 'Fablehaven', imported: 'Fablehaven', verdict: 'match' as const }],
+    }
+
+    it('says why it is waiting and offers to file it without calling that an override', () => {
+      const wrapper = render({ heldOnRequest: true, verification: passed })
+
+      expect(wrapper.text()).toContain('sent to be checked before filing')
+      expect(wrapper.text()).toContain('scored 96')
+      const file = wrapper.findAll('button').find((button) => button.text() === 'File it')
+      expect(file).toBeDefined()
+      expect(wrapper.text()).not.toContain('File it anyway')
+    })
+
+    it('still calls filing an override when the import also failed its check', () => {
+      expect(render({ heldOnRequest: true }).text()).toContain('File it anyway')
+    })
+  })
+
+  it('links the page of the release the import came from', () => {
+    const link = render({ releaseInfoUrl: 'https://tracker.example.com/t/42' }).get('a[href="https://tracker.example.com/t/42"]')
+
+    expect(link.text()).toContain('Open the release page')
+    expect(link.attributes('rel')).toBe('noopener noreferrer')
+    expect(link.attributes('target')).toBe('_blank')
+  })
+
+  it('lists only the edition facts the file states, beside the cover it carried', () => {
+    const wrapper = render(
+      {
+        edition: {
+          publisher: 'Brilliance Audio',
+          publishedDate: '2007',
+          language: 'en',
+          pageCount: null,
+          isbn10: null,
+          narrators: ['E.B. Stevens'],
+          durationSeconds: 9 * 3600 + 30 * 60,
+          abridged: false,
+          chapterCount: 12,
+        },
+      },
+      { coverUrl: '/api/v1/admin/book-requests/7/review/cover?entry=100' },
+    )
+    const facts = wrapper.get('dl.grid-cols-\\[auto_minmax\\(0\\,1fr\\)\\]')
+
+    expect(facts.text()).toContain('PublisherBrilliance Audio')
+    expect(facts.text()).toContain('Narrated byE.B. Stevens')
+    expect(facts.text()).toContain('VersionUnabridged')
+    expect(facts.text()).toContain('Chapters12')
+    expect(facts.text()).not.toContain('Pages')
+    expect(wrapper.get('img').attributes('alt')).toBe('Cover found in the imported file')
+  })
+
+  it('draws no edition section for a file that states nothing and carries no cover', () => {
+    expect(render().text()).not.toContain('What the file says it is')
+  })
+
+  it('drops a cover that will not load and keeps the facts', async () => {
+    const wrapper = render({ edition: null }, { coverUrl: '/api/v1/admin/book-requests/7/review/cover?entry=100' })
+
+    await wrapper.get('img').trigger('error')
+
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('What the file says it is')
   })
 })

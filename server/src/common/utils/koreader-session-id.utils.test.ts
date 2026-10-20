@@ -11,15 +11,20 @@ import {
 const DEVICE_ID = 'abcdef12-3456-7890-abcd-ef1234567890';
 
 describe('koreader session ids', () => {
-  it('keeps the first eight characters of the device id as its key', () => {
-    expect(koreaderSessionDeviceKey(DEVICE_ID)).toBe('abcdef12');
-    expect(koreaderSessionDeviceKey('dev')).toBe('dev');
+  it('uses the complete device identity as its key', () => {
+    expect(koreaderSessionDeviceKey(DEVICE_ID)).toBe('v2-b0a45058c4b94c71d047d1b1e532f5c9');
+    expect(koreaderSessionDeviceKey('dev')).toMatch(/^v2-[a-f0-9]{32}$/);
+  });
+
+  it('keeps distinct devices with a shared prefix separate', () => {
+    expect(koreaderSessionDeviceKey('same-key-A')).not.toBe(koreaderSessionDeviceKey('same-key-B'));
+    expect(parseKoreaderSessionId('kor:abcdef12:42:1780000000')).toEqual({ deviceKey: 'abcdef12', bookFileId: 42, clusterStartEpoch: 1780000000 });
   });
 
   it('builds prefixes that nest inside each other', () => {
-    expect(buildDeviceSessionIdPrefix(DEVICE_ID)).toBe('kor:abcdef12:');
-    expect(buildSessionIdPrefix(DEVICE_ID, 42)).toBe('kor:abcdef12:42:');
-    expect(buildSessionId(DEVICE_ID, 42, 1_780_000_000)).toBe('kor:abcdef12:42:1780000000');
+    expect(buildDeviceSessionIdPrefix(DEVICE_ID)).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:');
+    expect(buildSessionIdPrefix(DEVICE_ID, 42)).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:42:');
+    expect(buildSessionId(DEVICE_ID, 42, 1_780_000_000)).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:42:1780000000');
   });
 
   it.each([

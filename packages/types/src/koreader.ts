@@ -1,11 +1,14 @@
 import type { ReadAloudDeliveryPreference, ReadAloudDeliveryVariant, DeliveryArtifactMetadata } from "./delivery";
 import type { HighlightOfTheDayWidgetData, ReadingGoalWidgetData, ReadingStreakWidgetData } from "./dashboard";
 import type { SeriesIndex } from "./series-index";
+import type { AchievementRarity } from "./achievement";
 
 export interface KoreaderCredentials {
   readAloudDelivery?: ReadAloudDeliveryPreference;
   username: string;
   syncEnabled: boolean;
+  /** When true the plugin catalog leaves out books whose only content files are audio. */
+  hideAudioOnlyBooks: boolean;
   createdAt: string;
 }
 
@@ -158,6 +161,7 @@ export interface UpdateKoreaderCredentialsPayload {
   username?: string;
   password?: string;
   syncEnabled?: boolean;
+  hideAudioOnlyBooks?: boolean;
 }
 
 export interface TestKoreaderConnectionResult {
@@ -184,6 +188,45 @@ export type KoreaderCatalogSettableReadStatus = "unread" | "want_to_read" | "rea
 export interface KoreaderCatalogSeriesSummary {
   total: number;
   finished: number;
+  /** Books of the series in the reading bucket. Absent from servers that predate it. */
+  reading?: number;
+}
+
+// Requested only once the server advertises the catalogListsV2 capability: an
+// older server rejects the parameters as unknown.
+export type KoreaderCatalogSectionSort = "name" | "name_desc" | "books";
+
+export type KoreaderCatalogSectionFilter = "reading" | "finished";
+
+export type KoreaderCatalogMemberState = "finished" | "reading" | "unread";
+
+export interface KoreaderCatalogPreviewBook {
+  id: number;
+  title: string;
+  hasCover: boolean;
+  thumbnailUrl: string | null;
+  seriesIndex: SeriesIndex | null;
+  progressPercentage: number | null;
+  readStatus: string | null;
+  lastReadAt: string | null;
+  addedAt: string;
+  updatedAt: string;
+}
+
+/** `key` is "A" to "Z" or "#"; `index` is the 0-based offset of the first entry with that key in the list's current order. */
+export interface KoreaderCatalogJumpBucket {
+  key: string;
+  index: number;
+}
+
+export interface KoreaderCatalogAuthorSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  birthYear: number | null;
+  deathYear: number | null;
+  hasPhoto: boolean;
+  photoUrl: string | null;
 }
 
 export interface KoreaderCatalogEntry {
@@ -196,6 +239,19 @@ export interface KoreaderCatalogEntry {
   seriesId?: number;
   href?: string;
   booksHref?: string;
+  // List-page extras. Optional so a plugin reading an older server renders plain rows.
+  authorId?: number;
+  hasPhoto?: boolean;
+  photoUrl?: string | null;
+  previewBooks?: KoreaderCatalogPreviewBook[];
+  readingCount?: number;
+  finishedCount?: number;
+  seriesName?: string | null;
+  authorNames?: string[];
+  memberStates?: KoreaderCatalogMemberState[];
+  expectedCount?: number | null;
+  /** Jump-bucket key of this entry's sort key, identical to the key its bucket carries. */
+  letter?: string;
 }
 
 export interface KoreaderCatalogFile {
@@ -211,6 +267,12 @@ export interface KoreaderCatalogFile {
   role: string;
   downloadVariant: "original" | "audioless_epub";
   sizeBytes: number | null;
+  /**
+   * The stored file's size, for display. sizeBytes is the size of what the
+   * download will be and stays null for a variant built on request; this lets
+   * a reader see roughly how big a plain EPUB is. Absent from older servers.
+   */
+  sourceSizeBytes?: number | null;
   durationSeconds: number | null;
   downloadUrl: string;
   devicePath: string;
@@ -240,6 +302,8 @@ export interface KoreaderCatalogBookListItem {
   detailUrl: string;
   addedAt: string;
   updatedAt: string;
+  /** Only on the dashboard's finishedThisYear entries: the reader's local day the book was finished. */
+  finishedOn?: string | null;
 }
 
 export type KoreaderCatalogRelatedSectionId = "series" | "author" | "similar";
@@ -255,6 +319,14 @@ export interface KoreaderCatalogRelatedBook {
   updatedAt: string | null;
   isAudiobook?: boolean;
   isComic?: boolean;
+}
+
+/** One book of the series, for the detail page's series path. */
+export interface KoreaderCatalogSeriesMember {
+  id: number;
+  title: string | null;
+  seriesIndex: SeriesIndex | null;
+  readStatus: string | null;
 }
 
 export interface KoreaderCatalogRelatedSection {
@@ -282,6 +354,12 @@ export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
   progress: KoreaderCatalogProgress | null;
   files: KoreaderCatalogFile[];
   relatedSections: KoreaderCatalogRelatedSection[];
+  /**
+   * Every book of the series the reader can see, this one included, with its
+   * read status. The series related section stays capped for its covers; this
+   * list is not. Absent from servers that predate it.
+   */
+  seriesMembers?: KoreaderCatalogSeriesMember[];
 }
 
 export interface KoreaderCatalogPage<T> {
@@ -289,6 +367,8 @@ export interface KoreaderCatalogPage<T> {
   total: number;
   page: number;
   size: number;
+  // The first item's position, echoed when the request paged by offset.
+  offset?: number;
   hasNext: boolean;
   hasPrevious: boolean;
   nextUrl: string | null;
@@ -296,6 +376,10 @@ export interface KoreaderCatalogPage<T> {
   // Present when the page is scoped to a single series, summarising
   // read-through progress across the whole series.
   seriesSummary?: KoreaderCatalogSeriesSummary | null;
+  // Sent only for `buckets=1` on a title or author sort.
+  buckets?: KoreaderCatalogJumpBucket[];
+  // Present when the page is filtered by author; null when no visible author has that name.
+  authorSummary?: KoreaderCatalogAuthorSummary | null;
 }
 
 export interface KoreaderCatalogSectionResponse {
@@ -303,11 +387,19 @@ export interface KoreaderCatalogSectionResponse {
   items: KoreaderCatalogEntry[];
   // Pagination is only emitted for large sections (authors, series).
   page?: number;
+  // The first entry's position, echoed when the request paged by offset.
+  offset?: number;
   hasNext?: boolean;
   hasPrevious?: boolean;
   nextUrl?: string | null;
   previousUrl?: string | null;
   query?: string | null;
+  total?: number;
+  size?: number;
+  // Sent for the name sorts only; the count sort has no letter order to jump through.
+  buckets?: KoreaderCatalogJumpBucket[];
+  sort?: KoreaderCatalogSectionSort;
+  filter?: KoreaderCatalogSectionFilter | null;
 }
 
 // The dashboard row below Continue reading is user-selectable. "random"
@@ -349,6 +441,47 @@ export interface KoreaderCatalogBrowseCounts {
   smartScopes: number;
 }
 
+// Minutes read per local day in the reader's time zone, oldest first and
+// ending today. Feeds the KOReader dashboard's year heatmap and week chart.
+export interface KoreaderReadingYear {
+  startDate: string;
+  minutes: number[];
+}
+
+// The book read most in the four weeks around this day a year ago.
+export interface KoreaderYearAgo {
+  book: KoreaderCatalogBookListItem;
+  minutes: number;
+  days: number;
+  endProgress: number | null;
+  firstDay: string;
+  lastDay: string;
+}
+
+// One badge as the device board's Next badge widget draws it. groupKey names a
+// tiered family (hours_read, pages_read, books_finished, ...) so a client can
+// tell what the progress counts; it is null for one-off badges.
+export interface KoreaderAchievementBadge {
+  key: string;
+  groupKey: string | null;
+  name: string;
+  description: string;
+  rarity: AchievementRarity;
+  iconName: string;
+  threshold: number | null;
+  currentProgress: number | null;
+  awardedAt: string | null;
+}
+
+// The reader's badges at a glance: how many are earned, the unearned badge
+// with the most progress, and the badge earned most recently.
+export interface KoreaderAchievementSummary {
+  earned: number;
+  total: number;
+  next: KoreaderAchievementBadge | null;
+  latest: KoreaderAchievementBadge | null;
+}
+
 export interface KoreaderCatalogDashboardResponse {
   generatedAt: string;
   username: string;
@@ -365,6 +498,13 @@ export interface KoreaderCatalogDashboardResponse {
   readingGoal: ReadingGoalWidgetData;
   readingStreak: ReadingStreakWidgetData;
   highlightOfTheDay: HighlightOfTheDayWidgetData | null;
+  // Optional so plugins and servers predating them keep working.
+  readingYear?: KoreaderReadingYear;
+  yearAgo?: KoreaderYearAgo | null;
+  // Books finished this local year, most recently finished first.
+  finishedThisYear?: KoreaderCatalogBookListItem[];
+  // Null when the reader has turned achievements off.
+  achievements?: KoreaderAchievementSummary | null;
 }
 
 export interface KoreaderCatalogDiscoverResponse {
@@ -420,7 +560,14 @@ export interface KoreaderCatalogManifestPage {
 }
 
 export type KoreaderPluginCapability =
-  "catalogBulkManifest" | "catalogDashboardSections" | "bookmarkSync" | "readAloudDeliveryVariants" | "readAloudDeliverySettings";
+  | "catalogBulkManifest"
+  | "catalogDashboardSections"
+  | "bookmarkSync"
+  | "readAloudDeliveryVariants"
+  | "readAloudDeliverySettings"
+  | "catalogListsV2"
+  | "sidecarState"
+  | "annotationPendingBooks";
 
 export interface KoreaderPluginVersionInfo {
   pluginVersion: string;

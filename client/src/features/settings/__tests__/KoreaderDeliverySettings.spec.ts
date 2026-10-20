@@ -17,7 +17,7 @@ const device: KoreaderDeviceInfo = {
 function createWrapper() {
   return mount(KoreaderDeliverySettings, {
     props: {
-      credentials: { username: 'reader', syncEnabled: true, createdAt: '', readAloudDelivery: 'audioless_epub' },
+      credentials: { username: 'reader', syncEnabled: true, hideAudioOnlyBooks: true, createdAt: '', readAloudDelivery: 'audioless_epub' },
       devices: [device],
       sweeps: [],
     },

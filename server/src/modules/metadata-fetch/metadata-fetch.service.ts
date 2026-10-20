@@ -275,8 +275,9 @@ export class MetadataFetchService {
 
   private async searchAndRankProvider(run: ProviderRun): Promise<RankedCandidate[]> {
     const { params } = run;
+    const limit = params.resultsPerProvider;
     const primary = await run.search(params);
-    const primaryRanked = filterAndRank(primary.value ?? [], params);
+    const primaryRanked = filterAndRank(primary.value ?? [], params, limit);
     if (primaryRanked.length > 0 || primary.stopped) return withCacheInfo(primaryRanked, primary);
 
     const hasIsbn = hasText(params.isbn);
@@ -284,14 +285,14 @@ export class MetadataFetchService {
     if (hasIsbn && hasFallbackTerms) {
       const fallbackParams: MetadataSearchParams = { ...params, isbn: undefined };
       const fallback = await run.search(fallbackParams);
-      const fallbackRanked = filterAndRank(fallback.value ?? [], fallbackParams);
+      const fallbackRanked = filterAndRank(fallback.value ?? [], fallbackParams, limit);
       if (fallbackRanked.length > 0 || fallback.stopped) return withCacheInfo(fallbackRanked, fallback);
     }
 
     if (params.maxCandidatesPerProvider === undefined && hasText(params.title) && hasText(params.author)) {
       const titleOnlyParams: MetadataSearchParams = { ...params, author: undefined, isbn: undefined };
       const titleOnly = await run.search(titleOnlyParams);
-      return withCacheInfo(filterAndRank(titleOnly.value ?? [], titleOnlyParams), titleOnly);
+      return withCacheInfo(filterAndRank(titleOnly.value ?? [], titleOnlyParams, limit), titleOnly);
     }
 
     return [];

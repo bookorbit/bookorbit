@@ -1806,6 +1806,17 @@ describe('seriesStatusRuleToSql', () => {
     expect(text).toContain("'skimmed'");
   });
 
+  it('isUpNext offers only volumes with no read status, unread or want to read, gated after the window', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'isUpNext' }) as never, USER_CTX) as any;
+    const text = collectSqlText(getRuleSql(where)).join(' ').replaceAll(/\s+/g, ' ').toLowerCase();
+    const gate = "and (o.read_status is null or o.read_status in ('unread', 'want_to_read'))";
+
+    expect(text).toContain('ubs.status as read_status');
+    expect(text.indexOf(gate)).toBeGreaterThan(text.indexOf('from ordered o'));
+    expect(text.split(gate)).toHaveLength(2);
+  });
+
   it('requires an authenticated user', () => {
     const { builder } = makeBuilder();
     expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'isUpNext' }) as never, BASE_CTX)).toThrow(
@@ -1890,8 +1901,13 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
     expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'title', dir: 'desc' }], 1)).toBe('sort_title DESC NULLS LAST, r.id ASC');
   });
 
-  it('generates sort_title for series field', () => {
-    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'series', dir: 'asc' }], 1)).toBe('sort_title ASC NULLS LAST, r.id ASC');
+  it('orders series stacks before standalone books, then by title, in both directions', () => {
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'series', dir: 'asc' }], 1)).toBe(
+      'sort_series ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC',
+    );
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'series', dir: 'desc' }], 1)).toBe(
+      'sort_series DESC NULLS LAST, sort_title DESC NULLS LAST, r.id ASC',
+    );
   });
 
   it('generates sort_added_at for addedAt field', () => {
@@ -1923,7 +1939,7 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
       1,
     );
     expect(result).toContain("split_part(series_index::text, '.', 1)::numeric");
-    expect(result).toContain('series_index COLLATE "C" ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
+    expect(result).toContain('series_index COLLATE "C" ASC NULLS LAST, sort_series ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('generates user-scoped subquery for readProgress', () => {

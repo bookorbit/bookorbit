@@ -99,6 +99,16 @@ export class KoreaderCatalogController {
     return this.catalogService.streamThumbnail(user, bookId, reply, ifNoneMatch);
   }
 
+  @Get('authors/:authorId/photo')
+  authorPhoto(
+    @CurrentUser() user: RequestUser,
+    @Param('authorId', ParseIntPipe) authorId: number,
+    @Res() reply: FastifyReply,
+    @Headers('if-none-match') ifNoneMatch?: string,
+  ) {
+    return this.catalogService.streamAuthorPhoto(user, authorId, reply, ifNoneMatch);
+  }
+
   @Get('files/:fileId/download')
   download(
     @CurrentUser() user: RequestUser,

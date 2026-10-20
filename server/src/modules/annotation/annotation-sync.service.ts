@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import type { AnnotationRow, AnnotationSyncStateRow } from '../../db/schema';
+import type { AnnotationDeviceContent, AnnotationRow, AnnotationSyncStateRow } from '../../db/schema';
 import type { AnnotationPositionFormat, AnnotationStyle, AnnotationSyncSource } from './annotation.constants';
 import {
   applyDeviceColor,
@@ -13,6 +13,8 @@ import {
   styleFromDrawer,
 } from './annotation-style-map';
 import { AnnotationSyncRepository, type DbTx } from './annotation-sync.repository';
+import { normalizeAnnotationNote } from './annotation-note.utils';
+import { canonicalDeviceView, type DeviceContentField, incomingDeviceView, deviceHoldsView } from './annotation-device-view';
 import {
   ACHIEVEMENT_EVENT_ANNOTATION_CREATED,
   AchievementEventsService,
@@ -21,6 +23,13 @@ import {
 
 const INGEST_EVENT = 'annotation.sync_ingest';
 const INGEST_EMIT_EVENT = 'annotation.sync_event';
+const LOST_COPY_MIN_APPLIED = 2;
+/**
+ * The clock a Kobo is served `clientLastModifiedUtc` from: 1 is the last content change as a real UTC instant. Earlier
+ * acks were of a device wall time labelled UTC, which the firmware could rank below its own edit and ignore, so an
+ * edited row acked before this clock is offered to the device once more.
+ */
+export const KOBO_SERVED_CLOCK = 1;
 
 export interface IncomingDeviceAnnotation {
   /**
@@ -31,6 +40,11 @@ export interface IncomingDeviceAnnotation {
   datetime: string;
   sourceCreatedAt?: Date | null;
   datetimeUpdated?: string | null;
+  /**
+   * Real time of the device's last edit, when its clock can be placed (KOReader reports its clock,
+   * Kobo sends UTC). When present, edits are judged on it rather than on the device strings.
+   */
+  editedAt?: Date | null;
   drawer?: string;
   color?: string | null;
   /** Palette the incoming color belongs to; picks the projection mapping. */
@@ -53,6 +67,8 @@ export interface IngestParams {
   bookId: number;
   bookFileId: number;
   annotations: IncomingDeviceAnnotation[];
+  /** Keys of everything the device still holds, when it sent its complete set. */
+  presentKeys?: string[];
 }
 
 export interface IngestResult {
@@ -69,6 +85,17 @@ export function buildAnnotationKey(deviceCreatedAt: string, pos0: string): strin
 
 function keyOf(incoming: IncomingDeviceAnnotation): string {
   return incoming.externalKey ?? buildAnnotationKey(incoming.datetime, incoming.pos0);
+}
+
+interface ContentOutcome {
+  /** Set when canonical changed; the device holds that version only when nothing it sent was refused. */
+  newVersion: number | null;
+  /** What the device holds now, in its own terms. */
+  deviceView: AnnotationDeviceContent;
+  /** A field the device changed lost to a later edit elsewhere, so canonical has to go back to it. */
+  refused: boolean;
+  /** The device's copy matches canonical after this upload. */
+  inSync: boolean;
 }
 
 /** Other position formats that go stale when this device format moves. */
@@ -99,8 +126,10 @@ export class AnnotationSyncService {
 
     try {
       await this.syncRepo.transaction(async (tx) => {
-        for (const incoming of this.dedupeByKey(params.annotations)) {
-          await this.ingestOne(params, incoming, result, createdIds, tx);
+        const incomingAll = this.dedupeByKey(params.annotations);
+        const present = new Set(params.presentKeys ?? incomingAll.map(keyOf));
+        for (const incoming of incomingAll) {
+          await this.ingestOne(params, incoming, result, createdIds, present, tx);
         }
       });
       // Emit only after the tx commits so listeners (e.g. Readwise flush that queries
@@ -150,10 +179,12 @@ export class AnnotationSyncService {
     incoming: IncomingDeviceAnnotation,
     result: IngestResult,
     createdIds: number[],
+    present: Set<string>,
     tx: DbTx,
   ): Promise<void> {
     const { userId, source, deviceId, bookId, bookFileId } = params;
     const key = keyOf(incoming);
+    const incomingView = incomingDeviceView(source, incoming);
 
     const deviceState = await this.syncRepo.findStateByDeviceKey(userId, source, deviceId, bookId, key, tx);
     if (deviceState) {
@@ -165,14 +196,18 @@ export class AnnotationSyncService {
         return;
       }
       await this.backfillSourceCreatedAt(annotation, incoming, source, tx);
-      const changed = await this.applyIncomingContent(annotation, incoming, bookFileId, tx);
-      if (changed) {
-        await this.syncRepo.updateState(deviceState.id, { lastAppliedVersion: changed.newVersion }, tx);
-        result.updated += 1;
-      } else {
-        await this.syncRepo.touchState(deviceState.id, tx);
-        result.unchanged += 1;
+      const outcome = await this.applyIncomingContent(annotation, incoming, bookFileId, source, deviceState.deviceContent ?? null, tx);
+      const holdsNewVersion = outcome.newVersion !== null && deviceState.lastAppliedVersion !== 0 && outcome.inSync;
+      await this.syncRepo.updateState(
+        deviceState.id,
+        { deviceContent: outcome.deviceView, ...(holdsNewVersion ? { lastAppliedVersion: outcome.newVersion! } : {}) },
+        tx,
+      );
+      // The device counts as current and nothing moved the version, so it would keep the edit it lost.
+      if (outcome.refused && outcome.newVersion === null && deviceState.lastAppliedVersion >= annotation.version) {
+        await this.syncRepo.bumpVersion(annotation.id, tx);
       }
+      result[outcome.newVersion !== null ? 'updated' : 'unchanged'] += 1;
       return;
     }
 
@@ -204,12 +239,13 @@ export class AnnotationSyncService {
           externalKey: key,
           externalCreatedAt: incoming.datetime,
           lastAppliedVersion: crossDevice.annotation.version,
+          deviceContent: incomingView,
         },
         tx,
       );
-      const changed = await this.applyIncomingContent(crossDevice.annotation, incoming, bookFileId, tx);
-      if (changed) {
-        await this.syncRepo.updateState(state.id, { lastAppliedVersion: changed.newVersion }, tx);
+      const outcome = await this.applyIncomingContent(crossDevice.annotation, incoming, bookFileId, source, null, tx);
+      if (outcome.newVersion !== null) {
+        await this.syncRepo.updateState(state.id, { lastAppliedVersion: outcome.newVersion }, tx);
         result.updated += 1;
       } else {
         result.unchanged += 1;
@@ -223,7 +259,10 @@ export class AnnotationSyncService {
       ? []
       : await this.syncRepo.findCanonicalByDeviceDatetime(userId, bookId, incoming.datetime, incoming.posFormat, tx);
     const exact = byDatetime.find((c) => c.position?.pos0 === incoming.pos0);
-    const candidate = exact ?? (byDatetime.length === 1 ? byDatetime[0] : undefined);
+    // A highlight made in the same second as another one still on the device is a new
+    // highlight, not that one moved.
+    const movable = byDatetime.filter((c) => !c.position?.pos0 || !present.has(buildAnnotationKey(incoming.datetime, c.position.pos0)));
+    const candidate = exact ?? (byDatetime.length === 1 && movable.length === 1 ? movable[0] : undefined);
     if (candidate) {
       const { annotation, position } = candidate;
       if (annotation.deletedAt) {
@@ -268,14 +307,15 @@ export class AnnotationSyncService {
           externalKey: key,
           externalCreatedAt: incoming.datetime,
           lastAppliedVersion: version,
+          deviceContent: incomingView,
         },
         tx,
       );
-      const changed = await this.applyIncomingContent({ ...annotation, version }, incoming, bookFileId, tx);
-      if (changed) {
-        await this.syncRepo.updateState(state.id, { lastAppliedVersion: changed.newVersion }, tx);
+      const outcome = await this.applyIncomingContent({ ...annotation, version }, incoming, bookFileId, source, null, tx);
+      if (outcome.newVersion !== null) {
+        await this.syncRepo.updateState(state.id, { lastAppliedVersion: outcome.newVersion }, tx);
       }
-      result[isMove ? 'moved' : changed ? 'updated' : 'unchanged'] += 1;
+      result[isMove ? 'moved' : outcome.newVersion !== null ? 'updated' : 'unchanged'] += 1;
       return;
     }
 
@@ -286,7 +326,7 @@ export class AnnotationSyncService {
         text: incoming.text ?? '',
         color: incoming.colorSpace === 'kobo' ? hexFromKoboColor(incoming.color) : hexFromKoreaderColor(incoming.color),
         style: incoming.style ?? styleFromDrawer(incoming.drawer),
-        note: incoming.note ?? null,
+        note: normalizeAnnotationNote(incoming.note),
         chapterTitle: incoming.chapter ?? null,
         origin: source,
         version: 1,
@@ -308,6 +348,7 @@ export class AnnotationSyncService {
         externalKey: key,
         externalCreatedAt: incoming.datetime,
         lastAppliedVersion: 1,
+        deviceContent: incomingView,
       },
       tx,
     );
@@ -326,29 +367,71 @@ export class AnnotationSyncService {
   }
 
   /**
-   * Applies device content only when the device actually made a new edit since the last
-   * one we ingested (device-clock comparison, no cross-clock skew). Style and color use
-   * the projection rule: a device echo of the projected view never overwrites canonical.
+   * Applies a device copy field by field. With the device's last confirmed view on file, a field
+   * it did not change keeps the canonical value, a field only the device changed is taken, and a
+   * field both sides changed goes to the later edit. Without that view (rows synced before it was
+   * kept) the whole copy is judged by edit time as before. Edit time is the real time when the
+   * device reports one (Kobo UTC, KOReader through its clock); otherwise the device's own strings
+   * are compared. Style and color use the projection rule: a device echo of the projected view
+   * never overwrites canonical.
    */
   private async applyIncomingContent(
     annotation: AnnotationRow,
     incoming: IncomingDeviceAnnotation,
     bookFileId: number,
+    source: AnnotationSyncSource,
+    confirmed: AnnotationDeviceContent | null,
     tx: DbTx,
-  ): Promise<{ newVersion: number } | null> {
+  ): Promise<ContentOutcome> {
     const storedEffective = annotation.deviceUpdatedAt ?? annotation.deviceCreatedAt ?? '';
     const incomingEffective = incoming.datetimeUpdated ?? incoming.datetime;
-    const hasNewEdit = incomingEffective > storedEffective;
+    const hasNewEdit = incoming.editedAt
+      ? incoming.editedAt.getTime() > (annotation.contentUpdatedAt ?? annotation.createdAt).getTime()
+      : incomingEffective > storedEffective;
 
+    const deviceView = incomingDeviceView(source, incoming);
+    const canonicalView = canonicalDeviceView(source, annotation);
+    let refused = false;
+    const takes = (field: DeviceContentField): boolean => {
+      if (!confirmed) return hasNewEdit;
+      if (field !== 'note' && deviceView[field] === null) return false;
+      if (deviceView[field] === confirmed[field]) return false;
+      if (canonicalView[field] === confirmed[field] || hasNewEdit) return true;
+      refused = true;
+      return false;
+    };
+
+    const patch: Partial<Pick<AnnotationRow, 'text' | 'note' | 'color' | 'style' | 'chapterTitle'>> = {};
+    if (takes('note')) {
+      const nextNote = normalizeAnnotationNote(incoming.note);
+      if (nextNote !== annotation.note) patch.note = nextNote;
+    }
+    if (takes('style')) {
+      const nextStyle = applyDeviceStyle(annotation.style as Parameters<typeof applyDeviceStyle>[0], incoming.drawer);
+      if (nextStyle !== annotation.style) patch.style = nextStyle;
+    }
+    if (takes('color')) {
+      const nextColor =
+        incoming.colorSpace === 'kobo' ? applyKoboDeviceColor(annotation.color, incoming.color) : applyDeviceColor(annotation.color, incoming.color);
+      if (nextColor !== annotation.color) patch.color = nextColor;
+    }
     const position = await this.syncRepo.findDevicePosition(annotation.id, incoming.posFormat, tx);
     // pos0 can only change under UUID identity; with the datetime|pos0 key a changed
     // pos0 is a different key and lands in the move path instead.
     const pos0Changed = incoming.externalKey != null && position != null && position.pos0 !== incoming.pos0;
     const pos1Changed = position != null && (position.pos1 ?? null) !== (incoming.pos1 ?? null);
     const posChanged = pos0Changed || pos1Changed;
-    const pagenoChanged = incoming.pageno != null && (position?.extras as { pageno?: number } | null)?.pageno !== incoming.pageno && position != null;
 
-    if (!hasNewEdit && !posChanged) {
+    // The text is what the range covers, so a moved range brings its text whatever its edit time.
+    if (hasNewEdit || posChanged) {
+      const nextText = incoming.text ?? '';
+      if (nextText !== annotation.text) patch.text = nextText;
+      if ((incoming.chapter ?? null) !== annotation.chapterTitle && incoming.chapter != null) patch.chapterTitle = incoming.chapter;
+    }
+    const pagenoChanged = incoming.pageno != null && (position?.extras as { pageno?: number } | null)?.pageno !== incoming.pageno && position != null;
+    const hasContentChanges = Object.keys(patch).length > 0;
+
+    if (!hasContentChanges && !posChanged && !hasNewEdit) {
       if (pagenoChanged) {
         await this.syncRepo.updatePosition(
           annotation.id,
@@ -357,21 +440,7 @@ export class AnnotationSyncService {
           tx,
         );
       }
-      return null;
-    }
-
-    const patch: Partial<Pick<AnnotationRow, 'text' | 'note' | 'color' | 'style' | 'chapterTitle'>> = {};
-    if (hasNewEdit) {
-      const nextText = incoming.text ?? '';
-      const nextNote = incoming.note ?? null;
-      const nextStyle = applyDeviceStyle(annotation.style as Parameters<typeof applyDeviceStyle>[0], incoming.drawer);
-      const nextColor =
-        incoming.colorSpace === 'kobo' ? applyKoboDeviceColor(annotation.color, incoming.color) : applyDeviceColor(annotation.color, incoming.color);
-      if (nextText !== annotation.text) patch.text = nextText;
-      if (nextNote !== annotation.note) patch.note = nextNote;
-      if (nextStyle !== annotation.style) patch.style = nextStyle;
-      if (nextColor !== annotation.color) patch.color = nextColor;
-      if ((incoming.chapter ?? null) !== annotation.chapterTitle && incoming.chapter != null) patch.chapterTitle = incoming.chapter;
+      return { newVersion: null, deviceView, refused, inSync: deviceHoldsView(deviceView, canonicalView) };
     }
 
     if (posChanged || pagenoChanged) {
@@ -382,7 +451,11 @@ export class AnnotationSyncService {
           ...(pos0Changed ? { pos0: incoming.pos0, status: 'exact' as const } : {}),
           pos1: incoming.pos1 ?? null,
           bookFileId,
-          ...(incoming.pageno != null ? { extras: { ...(position?.extras ?? {}), pageno: incoming.pageno } } : {}),
+          ...(posChanged && incoming.posFormat === 'kobo_span'
+            ? { extras: this.movedKoboSpanExtras(position?.extras ?? null, incoming) }
+            : incoming.pageno != null
+              ? { extras: { ...(position?.extras ?? {}), pageno: incoming.pageno } }
+              : {}),
         },
         tx,
       );
@@ -393,7 +466,6 @@ export class AnnotationSyncService {
       }
     }
 
-    const hasContentChanges = Object.keys(patch).length > 0;
     if (!hasContentChanges && !posChanged) {
       // A bumped device timestamp without content changes (e.g. the echo of an edit we
       // pushed down) is bookkeeping only and must not bump the version, or the same
@@ -401,15 +473,36 @@ export class AnnotationSyncService {
       if (hasNewEdit) {
         await this.syncRepo.setDeviceUpdatedAtSilent(annotation.id, incoming.datetimeUpdated ?? null, tx);
       }
-      return null;
+      return { newVersion: null, deviceView, refused, inSync: deviceHoldsView(deviceView, canonicalView) };
     }
 
+    // A field taken from an older edit (nothing else touched it since) must not move the
+    // content time back, or a genuinely later edit would then look older than it.
+    const editedAt = incoming.editedAt ?? new Date();
+    const contentUpdatedAt =
+      annotation.contentUpdatedAt && annotation.contentUpdatedAt.getTime() > editedAt.getTime() ? annotation.contentUpdatedAt : editedAt;
     const newVersion = await this.syncRepo.applyContentPatch(
       annotation.id,
-      { ...patch, ...(hasNewEdit ? { deviceUpdatedAt: incoming.datetimeUpdated ?? null } : {}) },
+      {
+        ...patch,
+        ...(hasNewEdit ? { deviceUpdatedAt: incoming.datetimeUpdated ?? null } : {}),
+        ...(hasContentChanges ? { contentUpdatedAt } : {}),
+      },
       tx,
     );
-    return { newVersion };
+    return { newVersion, deviceView, refused, inSync: deviceHoldsView(deviceView, canonicalDeviceView(source, { ...annotation, ...patch })) };
+  }
+
+  /**
+   * A moved Kobo span carries the device's new location, which the canonical positions are rebuilt
+   * from. The served-span markers (rendition, source cfi) describe the old range, so they go until
+   * that conversion stamps them again.
+   */
+  private movedKoboSpanExtras(previous: unknown, incoming: IncomingDeviceAnnotation): Record<string, unknown> {
+    const kept = { ...((previous ?? {}) as Record<string, unknown>) };
+    delete kept.renditionHash;
+    delete kept.sourceCfi;
+    return { ...kept, ...(this.buildPositionExtras(incoming) ?? {}) };
   }
 
   private buildPositionExtras(incoming: IncomingDeviceAnnotation): Record<string, unknown> | null {
@@ -485,10 +578,19 @@ export class AnnotationSyncService {
     deviceId: string;
     entries: { annotationId: number; version: number; externalKey: string; externalCreatedAt: string | null }[];
     tombstoneStateIds: number[];
+    /** An earlier response acknowledged late: a version the device already acknowledged stays. */
+    keepNewerVersion?: boolean;
   }): Promise<void> {
     if (params.entries.length === 0 && params.tombstoneStateIds.length === 0) return;
     await this.syncRepo.transaction(async (tx) => {
+      const contents = await this.syncRepo.findContentByIds(
+        params.userId,
+        params.entries.map((entry) => entry.annotationId),
+        tx,
+      );
+      const contentById = new Map(contents.map((row) => [row.id, row]));
       for (const entry of params.entries) {
+        const content = contentById.get(entry.annotationId);
         await this.syncRepo.insertState(
           {
             annotationId: entry.annotationId,
@@ -498,8 +600,11 @@ export class AnnotationSyncService {
             externalKey: entry.externalKey,
             externalCreatedAt: entry.externalCreatedAt,
             lastAppliedVersion: entry.version,
+            deviceContent: content && content.version === entry.version ? canonicalDeviceView(params.source, content) : null,
+            servedClock: params.source === 'kobo' ? KOBO_SERVED_CLOCK : 0,
           },
           tx,
+          { keepNewerVersion: params.keepNewerVersion },
         );
       }
       for (const stateId of params.tombstoneStateIds) {
@@ -513,9 +618,30 @@ export class AnnotationSyncService {
    * annotation has never been served (Kobo ids are store-global, so every device of the
    * user must see the same id).
    */
-  async ensureExternalKey(annotationId: number, source: AnnotationSyncSource, mint: () => string): Promise<string> {
-    const existing = await this.syncRepo.findExternalKeyForAnnotation(annotationId, source);
-    return existing ?? mint();
+  async reserveExternalKey(params: {
+    annotationId: number;
+    userId: number;
+    source: AnnotationSyncSource;
+    deviceId: string;
+    externalCreatedAt: string | null;
+  }): Promise<string> {
+    return this.syncRepo.transaction(async (tx) => {
+      await this.syncRepo.lockAnnotationForSync(params.annotationId, tx);
+      const externalKey = (await this.syncRepo.findExternalKeyForAnnotation(params.annotationId, params.source, tx)) ?? randomUUID();
+      await this.syncRepo.insertStateIfMissing(
+        {
+          annotationId: params.annotationId,
+          userId: params.userId,
+          source: params.source,
+          deviceId: params.deviceId,
+          externalKey,
+          externalCreatedAt: params.externalCreatedAt,
+          lastAppliedVersion: 0,
+        },
+        tx,
+      );
+      return externalKey;
+    });
   }
 
   async listActiveForBook(userId: number, bookId: number): Promise<AnnotationRow[]> {
@@ -541,7 +667,7 @@ export class AnnotationSyncService {
   }
 
   async listPendingKoboChangeBookIds(userId: number, deviceId: string, opts: { includeAllOrigins: boolean; resolverVersion: number }) {
-    return this.syncRepo.findBookIdsWithPendingKoboChanges(userId, deviceId, opts);
+    return this.syncRepo.findBookIdsWithPendingKoboChanges(userId, deviceId, { ...opts, servedClock: KOBO_SERVED_CLOCK });
   }
 
   async setDeviceIdentity(annotationId: number, deviceCreatedAt: string): Promise<void> {
@@ -581,6 +707,13 @@ export class AnnotationSyncService {
       );
       for (const { state, annotation } of states) {
         if (annotation.deletedAt) continue;
+        if (state.deleteAckedAt) {
+          // The device removed this row and said so, and it is live again: a restore that kept the
+          // state. Its absence is that old delete, so re-offer the row as a fresh add instead.
+          await this.syncRepo.deleteState(state.id, tx);
+          continue;
+        }
+        if (state.lastAppliedVersion === 0) continue;
         if (present.has(state.externalKey)) continue;
         if (state.externalCreatedAt && presentDatetimes.has(state.externalCreatedAt)) continue;
         await this.syncRepo.softDeleteById(annotation.id, tx);
@@ -597,7 +730,49 @@ export class AnnotationSyncService {
     return deletedCount;
   }
 
+  /**
+   * A complete key set that keeps none of the rows this device had applied is a lost or
+   * replaced copy of the book (a re-download, a deleted sidecar), not a delete of
+   * everything. Devices that cannot say so themselves are judged by this rule, which
+   * needs at least two applied rows so deleting a book's only highlight still works.
+   */
+  async isLostDeviceCopy(params: {
+    userId: number;
+    source: AnnotationSyncSource;
+    deviceId: string;
+    bookId: number;
+    presentKeys: DeviceKeyEntry[];
+  }): Promise<boolean> {
+    const present = new Set(params.presentKeys.map((entry) => entry.k));
+    const presentDatetimes = new Set(params.presentKeys.map((entry) => entry.dt));
+    const states = await this.syncRepo.findStatesForDeviceBook(params.userId, params.source, params.deviceId, params.bookId);
+    const applied = states.filter(({ state, annotation }) => !annotation.deletedAt && state.lastAppliedVersion > 0);
+    if (applied.length < LOST_COPY_MIN_APPLIED) return false;
+    return applied.every(
+      ({ state }) => !present.has(state.externalKey) && !(state.externalCreatedAt && presentDatetimes.has(state.externalCreatedAt)),
+    );
+  }
+
+  /**
+   * Offers every live row this device had applied again, as idempotent adds, by marking
+   * its states unapplied. Unapplied states are also exempt from deletion detection, so
+   * nothing is deleted while the copy is being refilled.
+   */
+  async reofferDeviceCopy(params: { userId: number; source: AnnotationSyncSource; deviceId: string; bookId: number }): Promise<number> {
+    return this.syncRepo.resetAppliedVersionsForDeviceBook(params.userId, params.source, params.deviceId, params.bookId);
+  }
+
   /** Pending changes for a device and book, capped at limit entries across all kinds. */
+  findPendingDeviceBooks(
+    userId: number,
+    source: AnnotationSyncSource,
+    pairs: { deviceId: string; bookId: number }[],
+    devicePositionFormat: AnnotationPositionFormat,
+    converterVersion: number,
+  ): Promise<Set<string>> {
+    return this.syncRepo.findPendingDeviceBooks(userId, source, pairs, devicePositionFormat, converterVersion);
+  }
+
   async computePushDown(userId: number, source: AnnotationSyncSource, deviceId: string, bookId: number, limit: number): Promise<PushDownSets> {
     const deletesRaw = await this.syncRepo.findDeleteCandidates(userId, source, deviceId, bookId, limit + 1);
     const deletes = deletesRaw.slice(0, limit);
@@ -686,6 +861,7 @@ export class AnnotationSyncService {
     source: AnnotationSyncSource;
     deviceId: string;
     bookFileId: number;
+    bookId: number;
     applied: AckAppliedEntry[];
     deleted: AckDeletedEntry[];
     converterVersion: number;
@@ -696,16 +872,16 @@ export class AnnotationSyncService {
     await this.syncRepo.transaction(async (tx) => {
       for (const entry of params.applied) {
         const annotation = await this.syncRepo.findAnnotationById(entry.serverId, userId, tx);
-        if (!annotation) continue;
+        if (!annotation || annotation.bookId !== params.bookId) continue;
+        if (entry.version !== annotation.version) continue;
 
         if (entry.status === 'failed') {
-          await this.syncRepo.updatePosition(annotation.id, 'xpointer', { status: 'failed' }, tx);
           acked += 1;
           continue;
         }
 
-        let versionForState = entry.version;
-        if (entry.corrected && entry.pos0) {
+        let versionForState = entry.verified === false ? 0 : entry.version;
+        if (entry.corrected && entry.pos0 && entry.verified !== false) {
           await this.syncRepo.upsertPosition(
             {
               annotationId: annotation.id,
@@ -721,7 +897,7 @@ export class AnnotationSyncService {
             tx,
           );
           versionForState = await this.syncRepo.bumpVersion(annotation.id, tx);
-        } else if (entry.verified) {
+        } else if (entry.verified && entry.version === annotation.version) {
           await this.syncRepo.updatePosition(annotation.id, 'xpointer', { status: 'exact' }, tx);
         }
 
@@ -736,10 +912,11 @@ export class AnnotationSyncService {
             externalKey,
             externalCreatedAt: annotation.deviceCreatedAt ?? null,
             lastAppliedVersion: versionForState,
+            deviceContent: canonicalDeviceView(source, annotation),
           },
           tx,
         );
-        if (entry.datetimeUpdated !== undefined) {
+        if (entry.datetimeUpdated !== undefined && entry.version === annotation.version && entry.verified !== false) {
           await this.syncRepo.setDeviceUpdatedAtSilent(annotation.id, entry.datetimeUpdated, tx);
         }
         acked += 1;

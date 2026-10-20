@@ -1085,14 +1085,17 @@ export class UserStatisticsRepository {
     isSuperuser: boolean,
     filterLibraryIds?: number[],
     days = 365,
+    timeZone = 'UTC',
   ): Promise<UserSessionArchetypePoint[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
+    const resolvedTimeZone = resolveTimeZone(timeZone, 'UTC');
 
-    const hourExpr = sql<number>`extract(hour from ${readingSessions.startedAt}) + extract(minute from ${readingSessions.startedAt}) / 60.0`;
+    const localStartedAt = sql`(${readingSessions.startedAt} AT TIME ZONE ${resolvedTimeZone})`;
+    const hourExpr = sql<number>`extract(hour from ${localStartedAt}) + extract(minute from ${localStartedAt}) / 60.0`;
     const durationExpr = sql<number>`${readingSessions.durationSeconds} / 60.0`;
-    const dowExpr = sql<number>`extract(dow from ${readingSessions.startedAt})::int`;
+    const dowExpr = sql<number>`extract(dow from ${localStartedAt})::int`;
 
     const rows = await this.db
       .select({ hour: hourExpr, durationMinutes: durationExpr, dayOfWeek: dowExpr })

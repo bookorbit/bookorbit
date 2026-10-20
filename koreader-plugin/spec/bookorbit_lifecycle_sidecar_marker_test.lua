@@ -62,6 +62,11 @@ package.loaded["bookorbit_sidecar"] = {
     sidecarMtime = function() return sidecar_mtime end,
     needsStatePull = function() return false end,
     markStatePulled = function() end,
+    isMarked = function() return nil end,
+    readMarked = function() return false end,
+    sidecarState = function() return nil end,
+    markLive = function() return false end,
+    markFile = function() return false end,
 }
 
 local book

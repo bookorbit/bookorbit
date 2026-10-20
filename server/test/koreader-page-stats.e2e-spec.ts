@@ -4,13 +4,16 @@ import { join } from 'path';
 import { and, asc, eq, gte, like } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
-import { buildSessionId, buildSessionIdPrefix } from '../src/common/utils/koreader-session-id.utils';
+import { Permission } from '@bookorbit/types';
+import { buildSessionId, buildSessionIdPrefix, koreaderSessionDeviceKey } from '../src/common/utils/koreader-session-id.utils';
 import { KOREADER_SESSION_GAP_SECONDS, deriveKoreaderSessions, type KoreaderPageEvent } from '../src/modules/koreader/koreader-stats.util';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
   closeReaderStateIsolationE2EContext,
   createLibraryWithFolder,
+  createUserAndLogin,
+  grantLibraryAccess,
   createReaderStateIsolationE2EContext,
   locateBookByAbsolutePath,
   triggerAndWaitForLibraryScan,
@@ -43,18 +46,19 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
   let epub!: LocatedBookFile;
   let epubPath!: string;
   let fileHash!: string;
+  let ownerId!: number;
 
   function deviceHeaders(): Record<string, string> {
     return { 'x-auth-user': KOREADER_USERNAME, 'x-auth-key': KOREADER_PASSWORD };
   }
 
-  async function uploadPageStats(events: KoreaderPageEvent[], bookFileId?: number) {
+  async function uploadPageStats(events: KoreaderPageEvent[], bookFileId?: number, deviceId = DEVICE_ID) {
     const response = await ctx.app.inject({
       method: 'POST',
       url: '/api/v1/koreader/plugin/page-stats',
       headers: deviceHeaders(),
       payload: {
-        deviceId: DEVICE_ID,
+        deviceId,
         deviceModel: 'E2E',
         pluginVersion: '0.4.0',
         books: [{ hash: fileHash, bookFileId, events }],
@@ -156,6 +160,11 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
       payload: { username: KOREADER_USERNAME, password: KOREADER_PASSWORD },
     });
     expect([200, 201]).toContain(credentials.statusCode);
+    const [credential] = await ctx.db
+      .select({ userId: schema.koreaderUsers.userId })
+      .from(schema.koreaderUsers)
+      .where(eq(schema.koreaderUsers.username, KOREADER_USERNAME));
+    ownerId = credential!.userId;
   }, 180_000);
 
   afterAll(async () => {
@@ -173,6 +182,117 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     }
 
     expect(comparable(await storedSessions())).toEqual(expectedSessions(history));
+  });
+
+  it('keeps devices with the same eight-character prefix independent across retry and deletion', async () => {
+    const base = BASE_EPOCH + 1_000_000;
+    const deviceA = 'shared-prefix-device-A';
+    const deviceB = 'shared-prefix-device-B';
+    const eventsA = [{ page: 1, startTime: base, durationSeconds: 40, totalPages: TOTAL_PAGES }];
+    const eventsB = [{ page: 2, startTime: base, durationSeconds: 70, totalPages: TOTAL_PAGES }];
+    await uploadPageStats(eventsA, undefined, deviceA);
+    await uploadPageStats(eventsB, undefined, deviceB);
+    const rows = await ctx.db
+      .select()
+      .from(schema.readingSessions)
+      .where(and(eq(schema.readingSessions.bookFileId, epub.bookFileId), eq(schema.readingSessions.startedAt, new Date(base * 1000))));
+    expect(rows.map((row) => row.durationSeconds).sort((a, b) => a - b)).toEqual([40, 70]);
+    await deleteSessionFromLog(rows.find((row) => row.sessionId === buildSessionId(deviceA, epub.bookFileId, base))!.id);
+    await uploadPageStats([{ ...eventsB[0]!, page: 3, startTime: base + 80 }], undefined, deviceB);
+    expect((await uploadPageStats(eventsA, undefined, deviceA)).results[0]!.duplicates).toBe(1);
+    const surviving = await ctx.db
+      .select()
+      .from(schema.readingSessions)
+      .where(and(eq(schema.readingSessions.bookFileId, epub.bookFileId), eq(schema.readingSessions.startedAt, new Date(base * 1000))));
+    expect(surviving.map((row) => row.sessionId)).toEqual([buildSessionId(deviceB, epub.bookFileId, base)]);
+  });
+
+  it('upgrades a conflated legacy session from complete raw device clusters without double counting', async () => {
+    const base = BASE_EPOCH + 2_000_000;
+    const devices = ['legacy-prefix-A', 'legacy-prefix-B'];
+    await ctx.db.insert(schema.koreaderPageStats).values(
+      devices.map((deviceId, index) => ({
+        userId: ownerId,
+        bookFileId: epub.bookFileId,
+        deviceId,
+        page: 1,
+        startTime: base,
+        durationSeconds: 40 + index * 30,
+        totalPages: TOTAL_PAGES,
+      })),
+    );
+    await ctx.db.insert(schema.readingSessions).values({
+      userId: ownerId,
+      bookFileId: epub.bookFileId,
+      bookId: epub.bookId,
+      source: 'koreader',
+      sessionId: `kor:legacy-p:${epub.bookFileId}:${base}`,
+      startedAt: new Date(base * 1000),
+      endedAt: new Date((base + 70) * 1000),
+      durationSeconds: 70,
+    });
+    await uploadPageStats([{ page: 2, startTime: base + 80, durationSeconds: 40, totalPages: TOTAL_PAGES }], undefined, devices[0]);
+    const rows = await ctx.db
+      .select()
+      .from(schema.readingSessions)
+      .where(and(eq(schema.readingSessions.bookFileId, epub.bookFileId), eq(schema.readingSessions.startedAt, new Date(base * 1000))));
+    expect(rows.map((row) => row.sessionId).sort()).toEqual(devices.map((device) => buildSessionId(device, epub.bookFileId, base)).sort());
+    expect(rows.map((row) => row.durationSeconds).sort((a, b) => a - b)).toEqual([70, 80]);
+  });
+
+  it('scopes canonical status and page-time uploads to the authenticated reader', async () => {
+    const reader = await createUserAndLogin(ctx, { permissions: [Permission.KoreaderSync] });
+    const username = `stats-isolation-${randomUUID().slice(0, 8)}`;
+    const credentials = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/credentials',
+      headers: authHeader(reader.accessToken),
+      payload: { username, password: KOREADER_PASSWORD },
+    });
+    expect(credentials.statusCode).toBe(201);
+    const headers = { 'x-auth-user': username, 'x-auth-key': KOREADER_PASSWORD };
+    const device = { deviceId: 'isolation-device', deviceModel: 'E2E', pluginVersion: '1.7.0' };
+    const denied = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/book-states',
+      headers,
+      payload: { ...device, books: [{ hash: fileHash, status: 'complete', rating: 1 }] },
+    });
+    expect(denied.statusCode).toBe(201);
+    expect(denied.json()).toEqual({ results: [], unmatched: [fileHash] });
+    const deniedStats = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/page-stats',
+      headers,
+      payload: { ...device, books: [{ hash: fileHash, bookFileId: epub.bookFileId, events: cluster(BASE_EPOCH + 3_000_000, 1, 1) }] },
+    });
+    expect(deniedStats.statusCode).toBe(201);
+    expect(deniedStats.json()).toEqual({ results: [], unmatched: [fileHash] });
+    await grantLibraryAccess(ctx, reader.userId, library.libraryId);
+    const empty = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/book-states',
+      headers,
+      payload: { ...device, books: [{ hash: fileHash }] },
+    });
+    expect(empty.json().results[0]).toMatchObject({ statusSet: false, ratingSet: false, reviewNoteSet: false });
+    const adminBefore = await ctx.db
+      .select()
+      .from(schema.userBookStatus)
+      .where(and(eq(schema.userBookStatus.userId, ownerId), eq(schema.userBookStatus.bookId, epub.bookId)));
+    const own = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/book-states',
+      headers,
+      payload: { ...device, books: [{ hash: fileHash, status: 'complete', rating: 1 }] },
+    });
+    expect(own.json().results[0]).toMatchObject({ status: 'complete', statusSet: true, rating: 1 });
+    expect(
+      await ctx.db
+        .select()
+        .from(schema.userBookStatus)
+        .where(and(eq(schema.userBookStatus.userId, ownerId), eq(schema.userBookStatus.bookId, epub.bookId))),
+    ).toEqual(adminBefore);
   });
 
   it('merges two stored sessions when a later batch fills the gap between them', async () => {
@@ -294,7 +414,7 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     await deleteSessionFromLog(derived!.id);
     expect(await sessionsBetween(base, base + 86_400)).toEqual([]);
     expect(await tombstonesFor(base)).toEqual([
-      { deviceKey: DEVICE_ID.slice(0, 8), startTime: base, endTime: sitting.at(-1)!.startTime + sitting.at(-1)!.durationSeconds },
+      { deviceKey: koreaderSessionDeviceKey(DEVICE_ID), startTime: base, endTime: sitting.at(-1)!.startTime + sitting.at(-1)!.durationSeconds },
     ]);
 
     // Ten minutes after the deleted sitting ended: close enough that derivation used to merge the

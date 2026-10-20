@@ -6,9 +6,11 @@ import { useAuthorMetadataPreview } from './useAuthorMetadataPreview'
 type CandidateHandler = (candidate: AuthorMetadataCandidate, cache: MetadataCandidateCacheInfo | null) => void
 
 const streamMock = vi.hoisted(() => vi.fn<(params: Record<string, unknown>, onCandidate: CandidateHandler, signal?: AbortSignal) => Promise<void>>())
+const lookupMock = vi.hoisted(() => vi.fn<(typeof import('../api/author'))['lookupAuthorMetadata']>())
 
 vi.mock('../api/author', () => ({
   streamAuthorMetadataCandidates: streamMock,
+  lookupAuthorMetadata: lookupMock,
 }))
 
 function candidate(overrides: Partial<AuthorMetadataCandidate> = {}): AuthorMetadataCandidate {
@@ -18,6 +20,33 @@ function candidate(overrides: Partial<AuthorMetadataCandidate> = {}): AuthorMeta
 describe('useAuthorMetadataPreview', () => {
   beforeEach(() => {
     streamMock.mockReset()
+    lookupMock.mockReset()
+  })
+
+  it('previews the pinned person by id instead of searching by name', async () => {
+    const cache = { fetchedAt: '2026-09-01T00:00:00.000Z', stale: false }
+    lookupMock.mockResolvedValue({ candidate: candidate({ providerId: '2222', description: 'Scottish novelist.' }), cache })
+
+    const state = useAuthorMetadataPreview(ref('John Reid'), ref({ provider: 'goodreads', providerId: '2222' }))
+    await state.load()
+    await state.loadFresh()
+
+    expect(streamMock).not.toHaveBeenCalled()
+    expect(lookupMock.mock.calls[0]![0]).toEqual({ provider: 'goodreads', providerId: '2222' })
+    expect(lookupMock.mock.calls[1]![1]).toEqual(expect.objectContaining({ cache: 'refresh' }))
+    expect(state.preview.value?.description).toBe('Scottish novelist.')
+    expect(state.previewCache.value).toEqual(cache)
+    expect(state.searched.value).toBe(true)
+  })
+
+  it('shows no preview when the pinned id matches nobody', async () => {
+    lookupMock.mockResolvedValue(null)
+
+    const state = useAuthorMetadataPreview(ref('John Reid'), ref({ provider: 'goodreads', providerId: '2222' }))
+    await state.load()
+
+    expect(state.preview.value).toBeNull()
+    expect(state.searched.value).toBe(true)
   })
 
   it('tracks which candidates the cache answered for and which one the preview shows', async () => {

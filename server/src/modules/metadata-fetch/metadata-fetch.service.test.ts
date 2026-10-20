@@ -303,6 +303,27 @@ describe('MetadataFetchService', () => {
     expect(audible.search).toHaveBeenNthCalledWith(3, expect.objectContaining({ title: 'Confessor', author: undefined, isbn: undefined }));
   });
 
+  it('keeps five ranked candidates per provider unless the search asks for more', async () => {
+    const books = Array.from({ length: 12 }, (_, index) => ({
+      ...candidate(MetadataProviderKey.OPEN_LIBRARY, `ol${index}`, `Discworld ${index}`),
+      authors: ['Terry Pratchett'],
+    }));
+    const openLibrary: MetadataProvider = {
+      key: MetadataProviderKey.OPEN_LIBRARY,
+      label: 'OpenLibrary',
+      identifiable: false,
+      search: vi.fn().mockResolvedValue(books),
+    };
+    registry.select.mockReturnValue([openLibrary]);
+
+    const matching = await firstValueFrom(service.search({ author: 'Terry Pratchett' }).pipe(candidatesOnly(), toArray()));
+    const browsing = await firstValueFrom(service.search({ author: 'Terry Pratchett', resultsPerProvider: 20 }).pipe(candidatesOnly(), toArray()));
+
+    expect(matching).toHaveLength(5);
+    expect(browsing).toHaveLength(12);
+    expect(openLibrary.search).toHaveBeenLastCalledWith(expect.objectContaining({ resultsPerProvider: 20 }));
+  });
+
   it('does not use title-only fallback for capped automated searches', async () => {
     const audible: MetadataProvider = {
       key: MetadataProviderKey.AUDIBLE,

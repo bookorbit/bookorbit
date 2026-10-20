@@ -266,6 +266,28 @@ describe('RequestSearchPanel provider sources', () => {
     ]
   })
 
+  it('asks every provider for a browsing page of results', async () => {
+    const wrapper = await render()
+    await wrapper.find('#request-author').setValue('Terry Pratchett')
+    await wrapper.find('form').trigger('submit')
+
+    expect(state.search).toHaveBeenLastCalledWith({ title: undefined, author: 'Terry Pratchett', mediaKind: 'ebook', resultsPerProvider: 20 })
+  })
+
+  it('searches for an author alone when their name on a result is pressed', async () => {
+    const scrollIntoView = vi.fn<() => void>()
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+    const wrapper = await render()
+    await wrapper.find('#request-title').setValue('One Dark Window')
+
+    await wrapper.find('button[aria-label="Show books by Rachel Gillig"]').trigger('click')
+
+    expect((wrapper.find('#request-title').element as HTMLInputElement).value).toBe('')
+    expect((wrapper.find('#request-author').element as HTMLInputElement).value).toBe('Rachel Gillig')
+    expect(state.search).toHaveBeenLastCalledWith({ title: undefined, author: 'Rachel Gillig', mediaKind: 'ebook', resultsPerProvider: 20 })
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+  })
+
   it('shows every contributing provider as an icon or initials badge', async () => {
     const wrapper = await render()
     const sources = wrapper.get('[role="img"]')
@@ -683,6 +705,92 @@ describe('RequestSearchPanel free-text fallback', () => {
 
     const wrapper = await typeTitle(await render())
     expect(wrapper.text()).not.toContain(ACTION)
+  })
+
+  describe('for a requester whose requests go to an approver', () => {
+    const REQUEST_ANYWAY = 'Request anyway'
+
+    beforeEach(() => {
+      state.hasPermission.mockImplementation((permission: string) => permission === Permission.BookRequestAccess)
+    })
+
+    async function requestAnyway(wrapper: Awaited<ReturnType<typeof render>>) {
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === REQUEST_ANYWAY)!
+        .trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+
+    it('offers the typed title as a request once a provider search comes back empty', async () => {
+      const wrapper = await typeTitle(await render())
+
+      expect(wrapper.text()).toContain(REQUEST_ANYWAY)
+      expect(wrapper.text()).toContain('A note for the approver under More options helps them find the right book.')
+    })
+
+    it('does not offer it before a search has been run', async () => {
+      state.hasSearched.value = false
+
+      const wrapper = await typeTitle(await render())
+      expect(wrapper.text()).not.toContain(REQUEST_ANYWAY)
+    })
+
+    it('leaves out the approver for a requester whose requests approve themselves', async () => {
+      state.hasPermission.mockImplementation(
+        (permission: string) => permission === Permission.BookRequestAccess || permission === Permission.BookRequestAutoApprove,
+      )
+
+      const wrapper = await typeTitle(await render())
+      expect(wrapper.text()).toContain(REQUEST_ANYWAY)
+      expect(wrapper.text()).not.toContain('approver under More options')
+    })
+
+    it('says what the queue already has, before anything is created', async () => {
+      state.checkFreeText.mockResolvedValue({ ownedBookId: null, existingRequestId: 5, alreadySubscribed: false })
+
+      const wrapper = await typeTitle(await render())
+      await settleHint(wrapper)
+
+      expect(wrapper.text()).toContain('Already requested by someone else')
+      expect(state.submitFreeText).not.toHaveBeenCalled()
+    })
+
+    it('sends it with the note to the approver and stays on the search', async () => {
+      state.submitFreeText.mockResolvedValue({ request: { id: 32, userId: 7, status: 'pending' }, subscribed: false })
+
+      const wrapper = await typeTitle(await render())
+      await wrapper.find('#request-note').setValue('The 1998 paperback')
+      await requestAnyway(wrapper)
+
+      expect(state.submitFreeText).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'An Untracked Novel' }),
+        expect.objectContaining({ selfServe: false, note: 'The 1998 paperback' }),
+      )
+      expect(state.push).not.toHaveBeenCalled()
+      expect(wrapper.emitted('submitted')).toHaveLength(1)
+    })
+
+    it('requests both media as typed in pair mode', async () => {
+      state.pairMode.value = true
+      state.submitPairFreeText.mockResolvedValue({
+        ebook: { request: { id: 40, userId: 7, status: 'pending' }, subscribed: false },
+        audiobook: { request: { id: 41, userId: 7, status: 'pending' }, subscribed: false },
+      })
+
+      try {
+        const wrapper = await typeTitle(await render())
+        await requestAnyway(wrapper)
+
+        expect(state.submitPairFreeText).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'An Untracked Novel' }),
+          expect.objectContaining({ selfServe: false }),
+        )
+        expect(state.push).not.toHaveBeenCalled()
+      } finally {
+        state.pairMode.value = false
+      }
+    })
   })
 
   it('does not offer it before a search has been run', async () => {

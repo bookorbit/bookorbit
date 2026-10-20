@@ -54,7 +54,12 @@ end
 
 local touch = false
 package.loaded["device"] = {
-    screen = { scaleBySize = function(_, value) return value end },
+    screen = {
+        scaleBySize = function(_, value) return value end,
+        getWidth = function() return 600 end,
+        getHeight = function() return 800 end,
+        getDPI = function() return 167 end,
+    },
     hasDPad = function() return true end,
     isTouchDevice = function() return touch end,
 }
@@ -109,7 +114,7 @@ local function read(path)
 end
 
 local plugin_dir = "koreader-plugin/bookorbit.koplugin/"
-for _, name in ipairs({ "bookorbit_catalog_widgets.lua", "bookorbit_catalog_detail.lua" }) do
+for _, name in ipairs({ "bookorbit_catalog_widgets.lua" }) do
     local source = read(plugin_dir .. name)
     local roots, wrapped = 0, 0
     for assignment in source:gmatch("self%[1%] = ([%w_.]+)") do
@@ -121,5 +126,21 @@ for _, name in ipairs({ "bookorbit_catalog_widgets.lua", "bookorbit_catalog_deta
     assertEqual(roots > 0, true, name .. " defines widget roots")
     assertEqual(wrapped, roots, "every widget root in " .. name .. " draws a focus cursor")
 end
+
+-- The detail page builds every control through one helper, region(), which
+-- must wrap what it draws in the focus frame; the only other region is the
+-- device status in the header, which takes no taps and joins no focus row.
+local view = read(plugin_dir .. "bookorbit_detail_view.lua")
+local regions, focusable_regions = 0, 0
+for line in view:gmatch("[^\n]+") do
+    if line:find("Region:new{", 1, true) then
+        regions = regions + 1
+        if line:find("CatalogWidgets.focusable(", 1, true) then focusable_regions = focusable_regions + 1 end
+    end
+end
+assertEqual(regions, 2, "the detail view builds regions in exactly two places")
+assertEqual(focusable_regions, 1, "and the tappable one draws a focus cursor")
+assertEqual(view:find("primary_region[1] = CatalogWidgets.focusable(", 1, true) ~= nil, true,
+    "a button redrawn in place keeps its focus frame")
 
 print("bookorbit_focus_highlight_test.lua: ok")

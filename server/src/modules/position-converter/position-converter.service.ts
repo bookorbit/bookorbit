@@ -100,7 +100,7 @@ export class PositionConverterService {
    * Converts a collapsed point CFI to a single xpointer. Dogears have no highlighted
    * text to repair against, so this is structural only: it resolves or it fails.
    */
-  async cfiPointToXpointer(params: { bookFileId: number; cfi: string }): Promise<CfiToXPointerOutcome> {
+  async cfiPointToXpointer(params: { bookFileId: number; cfi: string; sourceBookFileId?: number }): Promise<CfiToXPointerOutcome> {
     const parsed = parseCfi(params.cfi);
     if (!parsed) return { status: 'failed', reason: 'unparsable_cfi' };
     const chapterIndex = chapterIndexFromSpineStep(parsed.spineStep);
@@ -108,6 +108,15 @@ export class PositionConverterService {
 
     const doc = await this.epubDom.getChapter(params.bookFileId, chapterIndex);
     if (!doc) return { status: 'failed', reason: 'chapter_unavailable', chapterIndex };
+
+    if (params.sourceBookFileId != null && params.sourceBookFileId !== params.bookFileId) {
+      const source = await this.epubDom.getChapter(params.sourceBookFileId, chapterIndex);
+      const point = source ? cfiPointToCollapsedCp(source, params.cfi) : null;
+      const mapped = source && point != null ? this.mapEquivalentChapterPoint(source, doc, point) : null;
+      if (mapped == null) return { status: 'failed', reason: 'chapter_text_mismatch', chapterIndex };
+      const pos = collapsedPointToXPointer(doc, chapterIndex, mapped);
+      return pos ? { status: 'repaired', pos0: pos, chapterIndex } : { status: 'failed', reason: 'unresolvable_structure', chapterIndex };
+    }
 
     const pos = cfiPointToXPointer(doc, chapterIndex, params.cfi);
     if (!pos) return { status: 'failed', reason: 'unresolvable_structure', chapterIndex };

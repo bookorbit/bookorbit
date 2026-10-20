@@ -166,7 +166,8 @@ export function getBookMediaKind(format: string | null | undefined): BookMediaKi
 }
 
 export function getBookMediaProfile(files: readonly BookMediaFile[]): BookMediaProfile {
-  const mediaKinds = files.map((file) => getBookMediaKind(file.format));
+  // Covers and sidecars such as a folder image or an .nfo fall through getBookMediaKind as "ebook".
+  const mediaKinds = files.filter((file) => file.role === "content" || file.role === "primary").map((file) => getBookMediaKind(file.format));
   return {
     primaryMediaKind: getBookMediaKind(getPrimaryBookFile(files)?.format),
     hasEbook: mediaKinds.includes("ebook"),

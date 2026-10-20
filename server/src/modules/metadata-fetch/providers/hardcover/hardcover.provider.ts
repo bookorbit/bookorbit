@@ -7,7 +7,9 @@ import type { ProviderCacheSpec } from '../../../../common/provider-cache/provid
 import { candidateHasNormalizedIsbn, normalizeMetadataIsbn } from '../../isbn-match';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { pickSearchInputs, providerCacheContext } from '../provider-cache';
+import { pickSearchInputs, providerCacheContext, widenedPageSize } from '../provider-cache';
+import { PROVIDER_LIMITS } from '../provider-constants';
+import { searchPageSize } from '../provider-utils';
 import { HardcoverClient } from './hardcover.client';
 import { mapBookWithEditions, mapSearchDocument } from './hardcover.mapper';
 import { HardcoverBookWithEditions, HardcoverSearchDocument } from './hardcover.types';
@@ -44,7 +46,7 @@ export class HardcoverProvider implements IdentifiableProvider {
   private readonly logger = new Logger(HardcoverProvider.name);
 
   readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
-    version: 1,
+    version: 2,
     trustEmpty: true,
     context: async () => {
       const { enabled, apiKey } = (await this.providerConfig.getConfig()).hardcover;
@@ -55,6 +57,7 @@ export class HardcoverProvider implements IdentifiableProvider {
       inputs: {
         ...pickSearchInputs(params, ['title', 'author', 'isbn', 'hardcoverEditionId']),
         isAudiobook: editionMedium(params) === 'audio',
+        pageSize: widenedPageSize(params, PROVIDER_LIMITS.DEFAULT_SEARCH_RESULTS),
       },
     }),
     describeLookup: (providerId, params) => ({
@@ -88,20 +91,24 @@ export class HardcoverProvider implements IdentifiableProvider {
       }
     }
 
-    if (!params.title) return [];
+    const pageSize = searchPageSize(params, PROVIDER_LIMITS.DEFAULT_SEARCH_RESULTS);
+
+    // An author alone is a browsing search for what they wrote. After a missed ISBN it is not: the
+    // caller retries without the ISBN when it wants that.
+    if (!params.title) {
+      if (!params.author || params.isbn) return [];
+      return (await this.client.searchBooksByAuthor(params.author, apiKey, signal, pageSize)).map(mapDocument);
+    }
+
+    const searchDocuments = async (query: string) => (await this.client.searchBooks(query, apiKey, signal, pageSize)).map(mapDocument);
 
     if (params.author) {
-      const docs = signal
-        ? await this.client.searchBooks(`${params.title} ${params.author}`, apiKey, signal)
-        : await this.client.searchBooks(`${params.title} ${params.author}`, apiKey);
-      if (docs.length > 0) {
-        return docs.map(mapDocument);
-      }
+      const candidates = await searchDocuments(`${params.title} ${params.author}`);
+      if (candidates.length > 0) return candidates;
       this.logger.debug(`Hardcover: no results for title+author, retrying with title only`);
     }
 
-    const docs = signal ? await this.client.searchBooks(params.title, apiKey, signal) : await this.client.searchBooks(params.title, apiKey);
-    return docs.map(mapDocument);
+    return searchDocuments(params.title);
   }
 
   async lookupById(providerId: string, signal?: AbortSignal, params?: MetadataSearchParams): Promise<MetadataCandidate | null> {

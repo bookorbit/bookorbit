@@ -531,6 +531,18 @@
   {
     "file": "server/src/modules/book-request/book-request-admin.controller.ts",
     "className": "BookRequestAdminController",
+    "methodName": "getReviewCover",
+    "httpMethod": "GET",
+    "path": "/admin/book-requests/:id/review/cover",
+    "permissions": ["Permission.ManageBookRequests"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-request/book-request-admin.controller.ts",
+    "className": "BookRequestAdminController",
     "methodName": "forceFile",
     "httpMethod": "POST",
     "path": "/admin/book-requests/:id/force-file",
@@ -1050,6 +1062,18 @@
     "methodName": "getReview",
     "httpMethod": "GET",
     "path": "/book-request-fulfilment/:id/review",
+    "permissions": ["Permission.BookRequestAccess", "Permission.BookRequestSelfFulfill"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-request/book-request-self-fulfil.controller.ts",
+    "className": "BookRequestSelfFulfilController",
+    "methodName": "getReviewCover",
+    "httpMethod": "GET",
+    "path": "/book-request-fulfilment/:id/review/cover",
     "permissions": ["Permission.BookRequestAccess", "Permission.BookRequestSelfFulfill"],
     "libraryAccess": [],
     "isPublic": false,

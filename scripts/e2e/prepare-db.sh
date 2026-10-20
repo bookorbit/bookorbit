@@ -10,4 +10,4 @@ echo "Preparing dedicated e2e database..."
 DATABASE_URL="$E2E_DATABASE_URL" pnpm --filter server e2e:db:prepare
 
 echo "Applying migrations to e2e database..."
-DATABASE_URL="$E2E_DATABASE_URL" pnpm --filter server e2e:db:migrate
+DATABASE_URL="$E2E_DATABASE_URL" pnpm --filter server db:migrate

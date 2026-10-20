@@ -1,6 +1,14 @@
 import { ref } from 'vue'
 import type { AuthUser, AuthResponse } from '@bookorbit/types'
-import { api, fetchWithAuthProxyRecovery, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
+import {
+  api,
+  fetchWithAuthProxyRecovery,
+  isServerUnavailableStatus,
+  NetworkError,
+  refreshAccessToken,
+  setAccessToken,
+  setOnAuthFailure,
+} from '@/lib/api'
 import router from '@/router'
 import { cancelPendingDisplaySettingsSync, initDisplaySettingsSync, loadDisplaySettingsFromServer } from '@/composables/useDisplaySettingsSync'
 import { cancelPendingThemeSync, initThemeSync, loadFromServer } from '@/composables/useThemeSync'
@@ -17,6 +25,9 @@ import { resetBookRequestSummary } from '@/features/book-requests/composables/us
 import { clearReleaseSearchCache } from '@/features/book-requests/composables/useReleasePicker'
 
 const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
+/** `unreachable` is no answer about the session at all, which is not the same as having none. */
+export type SessionOutcome = 'authenticated' | 'anonymous' | 'unreachable'
 
 const user = ref<AuthUser | null>(null)
 const isLoading = ref(false)
@@ -81,7 +92,7 @@ setOnAuthFailure(() => {
 
 async function me(): Promise<void> {
   const res = await api('/api/v1/auth/me')
-  if (!res.ok) throw new Error('Failed to load user')
+  if (!res.ok) throw isServerUnavailableStatus(res.status) ? new NetworkError(`me answered ${res.status}`) : new Error('Failed to load user')
   user.value = await res.json()
 }
 
@@ -121,21 +132,26 @@ export class LoginError extends Error {
 }
 
 export function useAuth() {
-  async function init(): Promise<void> {
+  async function init(): Promise<SessionOutcome> {
     isLoading.value = true
+    let outcome: SessionOutcome = 'authenticated'
     try {
       await refreshAccessToken()
       await me()
       await hydratePreferences()
       startSessionRefresh()
-    } catch {
-      // no valid session
+    } catch (reason) {
+      if (!user.value) outcome = reason instanceof NetworkError ? 'unreachable' : 'anonymous'
     } finally {
-      initThemeSync()
-      initDisplaySettingsSync()
-      initLocaleSync()
+      // An unreachable server is asked again, so the syncs start once, with whichever answer comes back.
+      if (outcome !== 'unreachable') {
+        initThemeSync()
+        initDisplaySettingsSync()
+        initLocaleSync()
+      }
       isLoading.value = false
     }
+    return outcome
   }
 
   async function login(username: string, password: string): Promise<void> {

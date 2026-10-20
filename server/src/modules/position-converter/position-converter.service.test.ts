@@ -33,6 +33,27 @@ function makeService(chapters: Record<number, ReturnType<typeof parseChapterDocu
 }
 
 describe('PositionConverterService cross-edition read-aloud positions', () => {
+  it('maps an interior dogear offset between equivalent chapters with different spans', async () => {
+    const { service } = makeService({ 1: SOURCE_CHAPTER, 2: STORYTELLER_CHAPTER });
+    const source = await service.xpointerPointToCfi({ bookFileId: 1, pos: '/body/DocFragment[1]/body/p/text().22' });
+    const mapped = await service.cfiPointToXpointer({ bookFileId: 2, sourceBookFileId: 1, cfi: source.cfi! });
+
+    expect(mapped).toEqual(expect.objectContaining({ status: 'repaired', chapterIndex: 0, pos0: expect.stringContaining('/span[2]/text().') }));
+    const targetCfi = await service.xpointerPointToCfi({ bookFileId: 2, pos: mapped.pos0! });
+    const roundTrip = await service.cfiPointToXpointer({ bookFileId: 1, sourceBookFileId: 2, cfi: targetCfi.cfi! });
+    expect(roundTrip.pos0).toBe('/body/DocFragment[1]/body/p/text().22');
+  });
+
+  it('keeps a dogear unresolved when the destination chapter text differs', async () => {
+    const { service } = makeService({ 1: SOURCE_CHAPTER, 2: DIFFERENT_CHAPTER });
+
+    await expect(service.cfiPointToXpointer({ bookFileId: 2, sourceBookFileId: 1, cfi: 'epubcfi(/6/2!/4/2/1:22)' })).resolves.toEqual({
+      status: 'failed',
+      reason: 'chapter_text_mismatch',
+      chapterIndex: 0,
+    });
+  });
+
   it('resolves a Storyteller fragment directly in the Storyteller EPUB', async () => {
     const { service } = makeService({ 1: STORYTELLER_CHAPTER });
 

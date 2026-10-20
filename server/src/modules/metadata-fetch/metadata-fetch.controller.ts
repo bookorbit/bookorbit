@@ -122,6 +122,7 @@ export class MetadataFetchController {
       isAudiobook,
       includeAudiobookProviders: isAudiobook || providerKeys.some(servesOnlyAudiobooks),
       validateCoverPlaceholders: true,
+      resultsPerProvider: dto.resultsPerProvider,
     };
 
     const genreOptions = preferences.options?.genres;

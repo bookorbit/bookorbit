@@ -1203,9 +1203,12 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
   async getSessionArchetypes(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserSessionArchetypePoint[]> {
     const days = query.days ?? SESSION_ARCHETYPES_DEFAULT_DAYS;
-    const key = this.buildUserCacheKey('session-archetypes', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    const key = this.buildUserCacheKey('session-archetypes', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days, timeZone });
     this.readingAttemptEvents.flushPendingChanges(user.id);
-    return this.cache.get(String(user.id), key, () => this.repo.getSessionArchetypePoints(user.id, user.isSuperuser, query.libraryIds, days));
+    return this.cache.get(String(user.id), key, () =>
+      this.repo.getSessionArchetypePoints(user.id, user.isSuperuser, query.libraryIds, days, timeZone),
+    );
   }
 
   async getGenreReadingTime(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserGenreReadingTimeItem[]> {

@@ -1,9 +1,12 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 import { READ_ALOUD_DELIVERY_VARIANTS, type ReadAloudDeliveryVariant, KOREADER_DASHBOARD_SECTION_TYPES } from '@bookorbit/types';
+import { MAX_OFFSET_ROWS } from '../../../common/constants/pagination.constants';
 import type {
   KoreaderCatalogReadStatusFilter,
+  KoreaderCatalogSectionFilter,
+  KoreaderCatalogSectionSort,
   KoreaderCatalogSettableReadStatus,
   KoreaderCatalogSort,
   KoreaderCatalogSortOrder,
@@ -24,6 +27,10 @@ export const KOREADER_CATALOG_SORT_ORDERS = ['asc', 'desc'] as const satisfies r
 
 export const KOREADER_CATALOG_READ_STATUS_FILTERS = ['unread', 'reading', 'finished'] as const satisfies readonly KoreaderCatalogReadStatusFilter[];
 
+export const KOREADER_CATALOG_SECTION_SORTS = ['name', 'name_desc', 'books'] as const satisfies readonly KoreaderCatalogSectionSort[];
+
+export const KOREADER_CATALOG_SECTION_FILTERS = ['reading', 'finished'] as const satisfies readonly KoreaderCatalogSectionFilter[];
+
 export const KOREADER_CATALOG_SETTABLE_READ_STATUSES = [
   'unread',
   'want_to_read',
@@ -32,6 +39,12 @@ export const KOREADER_CATALOG_SETTABLE_READ_STATUSES = [
   'read',
   'abandoned',
 ] as const satisfies readonly KoreaderCatalogSettableReadStatus[];
+
+function parseQueryBoolean(value: unknown): unknown {
+  if (value === true || value === 'true' || value === '1') return true;
+  if (value === false || value === 'false' || value === '0') return false;
+  return value;
+}
 
 function parseIdList(value: unknown): number[] | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -55,6 +68,16 @@ export class KoreaderCatalogBooksQueryDto {
   @IsInt()
   @Min(1)
   page?: number = 1;
+
+  // Starts the page at any entry instead of a multiple of size, so a reader
+  // keeps the same first book when the page size changes. Wins over page.
+  // Sent only to a server advertising catalogListsV2.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_OFFSET_ROWS)
+  offset?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -123,6 +146,13 @@ export class KoreaderCatalogBooksQueryDto {
   @IsInt()
   @Min(1)
   seriesId?: number;
+
+  // Jump buckets cost a pass over the whole filtered set, so they are computed
+  // only on request and only for the title and author sorts.
+  @IsOptional()
+  @Transform(({ value }) => parseQueryBoolean(value))
+  @IsBoolean()
+  buckets?: boolean;
 }
 
 // Bulk download enumeration. Deliberately not a subclass of the list query:
@@ -233,10 +263,33 @@ export class KoreaderCatalogSectionQueryDto {
   @Min(1)
   page?: number = 1;
 
+  // As on the books list: the first entry of the page, winning over page.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_OFFSET_ROWS)
+  offset?: number;
+
   @IsOptional()
   @IsString()
   @MaxLength(128)
   q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  size?: number;
+
+  @IsOptional()
+  @IsIn(KOREADER_CATALOG_SECTION_SORTS)
+  sort?: KoreaderCatalogSectionSort;
+
+  @IsOptional()
+  @IsIn(KOREADER_CATALOG_SECTION_FILTERS)
+  filter?: KoreaderCatalogSectionFilter;
 }
 
 export class KoreaderCatalogBookDetailQueryDto {

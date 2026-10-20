@@ -103,6 +103,16 @@ export const bookRequestDownloads = pgTable(
     releaseSeeders: integer('release_seeders'),
     releaseFormat: varchar('release_format', { length: 20 }),
     freeleech: boolean('freeleech').notNull().default(false),
+    /**
+     * The release's page on its source, already vetted for credentials, kept so the person
+     * reviewing what landed can compare it against what the source said it was.
+     */
+    releaseInfoUrl: text('release_info_url'),
+    /**
+     * Whoever sent this release asked to look at the import before it is filed, so it waits in
+     * review whatever its verification score.
+     */
+    holdForReview: boolean('hold_for_review').notNull().default(false),
 
     /**
      * Null for an attempt that was refused before anything was handed over: a tracker that would

@@ -306,6 +306,20 @@ describe('AuthorMetadataFetchService', () => {
     await expect(service.lookupById('audnexus', '42')).resolves.toBeNull();
   });
 
+  it('lookupByIdDetailed reports a provider failure apart from an id that matched nobody', async () => {
+    const lookupById = vi
+      .fn()
+      .mockRejectedValueOnce(new AuthorMetadataProviderError('HTTP 503', { httpStatus: 503, transient: true }))
+      .mockResolvedValueOnce(null);
+    registry.find.mockReturnValue({ key: 'audnexus', label: 'Audnexus', identifiable: true, search: vi.fn(), lookupById });
+
+    await expect(service.lookupByIdDetailed('audnexus', '42')).resolves.toMatchObject({
+      candidate: null,
+      failure: { provider: 'audnexus', message: 'HTTP 503', httpStatus: 503, transient: true },
+    });
+    await expect(service.lookupByIdDetailed('audnexus', '43')).resolves.toMatchObject({ candidate: null, failure: null });
+  });
+
   describe('cache integration', () => {
     function cachedProvider(spec = cacheSpec()) {
       return {

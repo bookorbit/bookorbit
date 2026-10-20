@@ -142,6 +142,14 @@ assertEqual(BookOrbitApi.normalizeServerUrl("https://bookorbit.example.com"),
     "https://bookorbit.example.com/api/v1", "origin-only server URL is normalized")
 assertEqual(BookOrbitApi.normalizeServerUrl("https://bookorbit.example.com/api/v1/koreader"),
     "https://bookorbit.example.com/api/v1", "stock sync URL is normalized")
+assertEqual(BookOrbitApi.normalizeServerUrl("  http://127.0.0.1:6262/api/v1/  "),
+    "http://127.0.0.1:6262/api/v1", "local server URL trims whitespace and trailing slash")
+assertEqual(BookOrbitApi.normalizeServerUrl("https://[::1]:443/library"),
+    "https://[::1]:443/library/api/v1", "IPv6 and deployment subpath remain supported")
+for _, value in ipairs({ "not a url", "https://", "ftp://bookorbit.example.com", "http://host:0",
+        "http://host:65536", "https://user:secret@host", "https://host?token=test", "https://host#part" }) do
+    assertEqual(BookOrbitApi.normalizeServerUrl(value), nil, "malformed server URL is rejected")
+end
 
 local decoded, err = BookOrbitApi.decodeResponse({ "" })
 assertEqual(type(decoded), "table", "empty body decodes to table")
@@ -160,6 +168,17 @@ local client = BookOrbitApi.new{
     username = "reader",
     userkey = "secret",
 }
+
+local filtered_client = BookOrbitApi.new{ server_url = "https://bookorbit.example.com" }
+local captured_path
+filtered_client.request = function(_, method, path) captured_path = path end
+local local_query = { ids = "1,2", sort = "title", on_device_filter = true }
+filtered_client:catalogBooks(local_query)
+assertEqual(captured_path:find("on_device_filter", 1, true), nil, "local device context never reaches server validation")
+assertEqual(captured_path:find("ids=1,2", 1, true) ~= nil, true, "device IDs remain in request")
+assertEqual(local_query.on_device_filter, true, "request does not mutate local context")
+filtered_client:catalogManifest(local_query)
+assertEqual(captured_path:find("on_device_filter", 1, true), nil, "bulk manifest also excludes local device context")
 
 local loopback_client = BookOrbitApi.new{
     server_url = "http://localhost:3000/api/v1",

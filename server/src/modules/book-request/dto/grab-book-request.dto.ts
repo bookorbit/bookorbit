@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBase64, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBase64, IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { MAX_INDEXER_RELEASE_GUID_LENGTH } from '@bookorbit/types';
 
 /** The longest base64 `.torrent` the grab takes. The 2 MiB the service accepts is about 2.7 Mi characters. */
@@ -55,4 +55,12 @@ export class GrabBookRequestDto {
   @IsInt()
   @Min(1)
   downloadClientId?: number;
+
+  /**
+   * Wait in review once the download lands, whatever the verification score. Advertised as the
+   * `book-request-review-hold` server feature, because a server older than the field rejects it.
+   */
+  @IsOptional()
+  @IsBoolean()
+  holdForReview?: boolean;
 }

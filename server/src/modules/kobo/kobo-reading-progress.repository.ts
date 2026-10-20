@@ -39,6 +39,8 @@ export class KoboReadingProgressRepository {
         koboContentSourceProgressPercent: schema.readingProgress.koboContentSourceProgressPercent,
         mediaOverlayFragment: schema.readingProgress.mediaOverlayFragment,
         mediaOverlaySectionIndex: schema.readingProgress.mediaOverlaySectionIndex,
+        textUpdatedAt: schema.readingProgress.textUpdatedAt,
+        narrationUpdatedAt: schema.readingProgress.narrationUpdatedAt,
         updatedAt: schema.readingProgress.updatedAt,
       })
       .from(schema.readingProgress)
@@ -78,6 +80,50 @@ export class KoboReadingProgressRepository {
         lastReadAt: sql`"reading_progress"."last_read_at"`,
       })
       .where(and(eq(schema.readingProgress.userId, userId), eq(schema.readingProgress.bookFileId, fileId)));
+  }
+
+  async findFinishThreshold(bookId: number): Promise<number | null> {
+    const [row] = await this.db
+      .select({ threshold: schema.libraries.markAsFinishedPercentComplete })
+      .from(schema.books)
+      .innerJoin(schema.libraries, eq(schema.libraries.id, schema.books.libraryId))
+      .where(eq(schema.books.id, bookId))
+      .limit(1);
+    return row?.threshold ?? null;
+  }
+
+  async findKnownPosition(userId: number, deviceId: number, bookId: number) {
+    const [known] = await this.db
+      .select({
+        locationSource: schema.koboKnownPositions.locationSource,
+        locationValue: schema.koboKnownPositions.locationValue,
+        positionSetAt: schema.koboKnownPositions.positionSetAt,
+      })
+      .from(schema.koboKnownPositions)
+      .where(
+        and(
+          eq(schema.koboKnownPositions.userId, userId),
+          eq(schema.koboKnownPositions.deviceId, deviceId),
+          eq(schema.koboKnownPositions.bookId, bookId),
+        ),
+      )
+      .limit(1);
+    return known ?? null;
+  }
+
+  async recordKnownPosition(
+    userId: number,
+    deviceId: number,
+    bookId: number,
+    position: { locationSource: string; locationValue: string; positionSetAt: Date },
+  ) {
+    await this.db
+      .insert(schema.koboKnownPositions)
+      .values({ userId, deviceId, bookId, ...position })
+      .onConflictDoUpdate({
+        target: [schema.koboKnownPositions.userId, schema.koboKnownPositions.deviceId, schema.koboKnownPositions.bookId],
+        set: { ...position, updatedAt: sql`now()` },
+      });
   }
 
   async markDeviceBookUnsynced(userId: number, deviceId: number, bookId: number) {

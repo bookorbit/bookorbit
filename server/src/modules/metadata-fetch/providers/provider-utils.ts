@@ -16,6 +16,13 @@ export function normalizeMaxCandidates(value: number | undefined, maxResults: nu
   return Math.min(rounded, maxResults);
 }
 
+/** How many records one search request asks for: the provider's own page, widened when a browsing search wants more. */
+export function searchPageSize(params: MetadataSearchParams, defaultSize: number): number {
+  const wanted = params.resultsPerProvider;
+  if (wanted === undefined || !Number.isFinite(wanted)) return defaultSize;
+  return Math.max(defaultSize, Math.floor(wanted));
+}
+
 export function buildRequestSignal(timeoutMs: number, parentSignal?: AbortSignal): AbortSignal {
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   if (!parentSignal) return timeoutSignal;

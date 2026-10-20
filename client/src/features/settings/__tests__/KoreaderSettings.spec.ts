@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import KoreaderSettings from '../KoreaderSettings.vue'
 import type { BookCard, KoreaderCredentials, KoreaderManualHashLink, KoreaderSyncStatus, KoreaderUnmatchedBook } from '@bookorbit/types'
 import { copyToClipboard } from '@/lib/clipboard'
+import { toast } from 'vue-sonner'
 
 const routerState = vi.hoisted(() => ({
   currentQuery: {} as Record<string, string>,
@@ -78,6 +79,7 @@ function makeCredentials(overrides: Partial<KoreaderCredentials> = {}): Koreader
   return {
     username: 'reader-user',
     syncEnabled: true,
+    hideAudioOnlyBooks: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
@@ -316,7 +318,7 @@ describe('KoreaderSettings', () => {
     expect(koreaderMock.createCredentials).toHaveBeenCalledWith({ username: 'new-reader', password: 'secret1' })
   })
 
-  it('renders configured status, setup, device, activity, guide, and danger sections', async () => {
+  it('renders configured status, plugin library, setup, device, activity, guide, and danger sections', async () => {
     const status = makeSyncStatus()
     koreaderMock.credentials.value = status.credentials
     koreaderMock.syncStatus.value = status
@@ -326,6 +328,7 @@ describe('KoreaderSettings', () => {
 
     expect(wrapper.findAll('.settings-group-label').map((label) => label.text())).toEqual([
       'KOReader Status',
+      'Plugin Library',
       'Setup',
       'Devices',
       'Plugin Activity',
@@ -560,6 +563,47 @@ describe('KoreaderSettings', () => {
     await deleteButtons[deleteButtons.length - 1]!.trigger('click')
 
     expect(koreaderMock.deleteCredentials).toHaveBeenCalledTimes(1)
+  })
+
+  it('names the audiobook-only switch and saves the reader turning it off', async () => {
+    const status = makeSyncStatus()
+    koreaderMock.credentials.value = status.credentials
+    koreaderMock.syncStatus.value = status
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const toggle = wrapper.get('[aria-labelledby="koreader-hide-audio-only-label"]')
+    expect(toggle.attributes('role')).toBe('switch')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+    expect(wrapper.get('#koreader-hide-audio-only-label').text()).toBe('Hide audiobook-only books')
+    expect(wrapper.find(`#${toggle.attributes('aria-describedby')}`).exists()).toBe(true)
+
+    await toggle.trigger('click')
+    await flushPromises()
+
+    expect(koreaderMock.updateCredentials).toHaveBeenCalledWith({ hideAudioOnlyBooks: false })
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Audiobook-only books shown in the plugin')
+    expect(toggle.attributes('disabled')).toBeUndefined()
+  })
+
+  it('reports a failed audiobook-only switch and lets the reader try again', async () => {
+    const status = makeSyncStatus()
+    koreaderMock.credentials.value = { ...status.credentials!, hideAudioOnlyBooks: false }
+    koreaderMock.syncStatus.value = status
+    koreaderMock.updateCredentials.mockRejectedValueOnce(new Error('offline'))
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const toggle = wrapper.get('[aria-labelledby="koreader-hide-audio-only-label"]')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+    await toggle.trigger('click')
+    await flushPromises()
+
+    expect(koreaderMock.updateCredentials).toHaveBeenCalledWith({ hideAudioOnlyBooks: true })
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to update the plugin library setting')
+    expect(toggle.attributes('disabled')).toBeUndefined()
   })
 
   it('opens the unmatched link dialog and submits the selected BookOrbit book', async () => {

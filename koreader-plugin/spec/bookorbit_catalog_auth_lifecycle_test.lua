@@ -77,6 +77,8 @@ local function newPlugin()
             server_url = "https://old.example/api/v1",
             username = "old-user",
             userkey = "old-key",
+            catalog_dashboard_cache = { displayName = "Previous account" },
+            catalog_detail_cache = { previous = {} },
         },
         apiOpts = function(self, background_requests)
             return {
@@ -106,6 +108,8 @@ local menu = { updateItems = function() menu_updates = menu_updates + 1 end }
 plugin:doLogin("new-user", "new-password", menu)
 assertEqual(plugin.settings.username, "new-user", "successful login stores the username")
 assertEqual(plugin.settings.userkey, "md5:new-password", "successful login stores the derived key")
+assertEqual(plugin.settings.catalog_dashboard_cache, nil, "account switch discards the previous dashboard")
+assertEqual(plugin.settings.catalog_detail_cache, nil, "account switch discards previous details")
 assertEqual(#applied_api, 1, "successful login rebinds the active catalog")
 assertEqual(applied_api[1].username, "new-user", "catalog receives the new username")
 assertEqual(applied_api[1].userkey, "md5:new-password", "catalog receives the new key")
@@ -115,14 +119,18 @@ assertEqual(menu_updates, 1, "successful login refreshes the account menu")
 assertEqual(ignored_input[1], true, "login suppresses input while authenticating")
 assertEqual(ignored_input[2], false, "login restores input after authenticating")
 
+plugin.settings.catalog_dashboard_cache = { displayName = "Signed-out account" }
 plugin:logout(menu)
+assertEqual(plugin.settings.catalog_dashboard_cache, nil, "logout discards the cached dashboard")
 assertEqual(plugin.settings.userkey, nil, "logout clears the stored key")
 assertEqual(#applied_api, 2, "logout rebinds the active catalog")
 assertEqual(applied_api[2].userkey, nil, "logout invalidates the catalog client key")
 assertEqual(refreshCount(), 1, "logout does not issue an authenticated refresh")
 assertEqual(menu_updates, 2, "logout refreshes the account menu")
 
+plugin.settings.catalog_dashboard_cache = { displayName = "Previous server" }
 plugin:applyServerAddress("https://new.example/api/v1")
+assertEqual(plugin.settings.catalog_dashboard_cache, nil, "server change discards the previous dashboard")
 assertEqual(plugin.settings.server_url, "https://new.example/api/v1", "server change updates settings")
 assertEqual(#applied_api, 3, "server change rebinds the active catalog")
 assertEqual(applied_api[3].server_url, "https://new.example/api/v1", "catalog receives the new server")
@@ -138,6 +146,7 @@ auth_result = nil
 plugin:doLogin("rejected-user", "wrong-password")
 assertEqual(plugin.settings.username, "old-user", "failed login preserves the previous username")
 assertEqual(plugin.settings.userkey, "old-key", "failed login preserves the previous key")
+assertEqual(plugin.settings.catalog_dashboard_cache.displayName, "Previous account", "failed login preserves the current account cache")
 assertEqual(#applied_api, 0, "failed login does not replace the catalog client")
 assertEqual(refreshCount(), 0, "failed login does not refresh the catalog")
 assertEqual(shown[#shown].text, "Login failed. Create or check your KOReader credentials in BookOrbit web settings.",

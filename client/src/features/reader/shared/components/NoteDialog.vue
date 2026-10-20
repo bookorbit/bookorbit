@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 const { t } = useI18n()
 
@@ -14,12 +17,16 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-function handleBackdropClick() {
-  if (!props.saving) emit('cancel')
+function handleOpenChange(open: boolean) {
+  if (!open && !props.saving) emit('cancel')
 }
 
-function handleInput(event: Event) {
-  emit('update:modelValue', (event.target as HTMLTextAreaElement).value)
+function handleDismissWhileSaving(event: Event) {
+  if (props.saving) event.preventDefault()
+}
+
+function handleInput(value: string) {
+  emit('update:modelValue', value)
 }
 
 function handleCancel() {
@@ -32,37 +39,36 @@ function handleSave() {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-scrim p-4" @click.self="handleBackdropClick">
-      <div class="bg-card text-card-foreground rounded-lg shadow-2xl p-4 w-full max-w-sm flex flex-col gap-3">
-        <p class="text-sm font-medium">{{ t('reader.note.title') }}</p>
-        <p class="text-xs text-muted-foreground line-clamp-2 italic">"{{ selectedText }}"</p>
-        <textarea
-          :value="modelValue"
+  <DialogRoot :open="true" @update:open="handleOpenChange">
+    <DialogPortal>
+      <DialogOverlay class="fixed inset-0 z-[70] bg-scrim" data-testid="note-dialog-overlay" />
+      <DialogContent
+        aria-modal="true"
+        class="fixed left-1/2 top-1/2 z-[70] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-lg bg-card p-4 text-card-foreground shadow-2xl focus-visible:outline-none"
+        @escape-key-down="handleDismissWhileSaving"
+        @pointer-down-outside="handleDismissWhileSaving"
+        @interact-outside="handleDismissWhileSaving"
+      >
+        <DialogTitle class="text-sm font-medium">{{ t('reader.note.title') }}</DialogTitle>
+        <DialogDescription class="line-clamp-2 text-xs italic text-muted-foreground">"{{ selectedText }}"</DialogDescription>
+        <Textarea
+          :modelValue="modelValue"
           :disabled="props.saving"
-          @input="handleInput"
-          class="w-full rounded-lg border border-border bg-background text-foreground text-sm p-2 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-          rows="4"
+          :aria-label="t('reader.note.title')"
           :placeholder="t('reader.note.placeholder')"
-          autofocus
+          class="resize-none"
+          rows="4"
+          @update:modelValue="handleInput"
         />
-        <div class="flex gap-2 justify-end">
-          <button
-            class="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
-            :disabled="props.saving"
-            @click="handleCancel"
-          >
+        <div class="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" :disabled="props.saving" @click="handleCancel">
             {{ t('common.cancel') }}
-          </button>
-          <button
-            class="px-3 py-1.5 rounded-lg text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            :disabled="props.saving"
-            @click="handleSave"
-          >
+          </Button>
+          <Button size="sm" :disabled="props.saving" @click="handleSave">
             {{ t('common.save') }}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
-  </Teleport>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>

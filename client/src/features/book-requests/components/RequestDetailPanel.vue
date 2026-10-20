@@ -46,6 +46,7 @@ import { prefetchRequestAttempts } from '../composables/useRequestAttempts'
 import { prefetchSeedStatus } from '../composables/useRequestSeedStatus'
 import { REQUEST_DRAWER } from '../requestDrawerContext'
 import { canCancelRequest, canDeleteRequest, canDismissRequest, canLeaveRequest, cancelStopsATransfer } from '../requestActions'
+import { requestBookCoverSources } from '../requestBookCover'
 import { requestMediaIcon } from '../requestMedia'
 import { requestFailureText } from '../requestOutcome'
 import { localizedRequestActionFailure } from '../requestActionFailure'
@@ -83,7 +84,7 @@ const { load: loadDefaultDestination, defaultFor: instanceDefaultFor, resolveDes
 const { progressByRequest, onRequestsChanged, pruneSettledProgress } = useBookRequestProgress()
 const actions = useBookRequestActions(canManageFn)
 const picker = useFulfilmentPicker()
-const { review, fetchReview, reset: resetReview } = useRequestReview(canManageFn)
+const { review, coverUrl: reviewCoverUrl, fetchReview, reset: resetReview } = useRequestReview(canManageFn)
 
 const decisionNote = ref('')
 /**
@@ -117,6 +118,7 @@ const canFulfilThis = computed(
 const busy = computed(() => actions.isPending(request.value?.id))
 const mediaIcon = computed(() => requestMediaIcon(request.value?.mediaKind ?? 'ebook'))
 const authorLine = computed(() => request.value?.authors.join(', ') ?? '')
+const bookCoverSources = computed(() => (request.value ? requestBookCoverSources(request.value) : []))
 /** Non-empty only while an attempt is held because its release turned out to hold several books. */
 const releaseUnits = computed(() => request.value?.download?.releaseUnits ?? [])
 const isHeld = computed(() => request.value?.status === 'needs_review')
@@ -126,7 +128,9 @@ const isHeld = computed(() => request.value?.status === 'needs_review')
  * stays. It also stays for every ordinary failure, which has no panel at all.
  */
 const failureText = computed(() => (request.value ? requestFailureText(request.value, (key, named) => t(key, named)) : null))
-const showFailureReason = computed(() => failureText.value != null && !(isHeld.value && review.value?.verification != null))
+const showFailureReason = computed(
+  () => failureText.value != null && !(isHeld.value && (review.value?.verification != null || review.value?.heldOnRequest === true)),
+)
 /** Only a request that stopped badly earns the destructive treatment; a hand-back is information. */
 const failureIsAlarming = computed(() => request.value?.status === 'failed' || request.value?.status === 'needs_review')
 /** Whoever is going to say it, the transfer line is not the one that should say it twice. */
@@ -679,7 +683,13 @@ function dockFileMeta(file: BookDockFile): string {
         <RequestPairSwitch v-if="companion" :request="request" :companion="companion" :progress-by-request="progressByRequest" />
 
         <header class="flex items-start gap-4">
-          <RequestCover :src="request.coverUrl" :media-kind="request.mediaKind" class="h-[105px] w-[70px] shadow-sm" :icon-size="24" />
+          <RequestCover
+            :src="request.coverUrl"
+            :fallback-sources="bookCoverSources"
+            :media-kind="request.mediaKind"
+            class="h-[105px] w-[70px] shadow-sm"
+            :icon-size="24"
+          />
 
           <div class="min-w-0 flex-1 space-y-1.5">
             <h2 class="text-lg leading-snug font-semibold tracking-tight text-foreground">{{ request.title }}</h2>
@@ -769,6 +779,7 @@ function dockFileMeta(file: BookDockFile): string {
           <RequestReviewPanel
             v-if="isHeld && review"
             :review="review"
+            :cover-url="reviewCoverUrl"
             :can-manage="canFulfilThis"
             :busy="busy"
             @file="handleFileAnyway"

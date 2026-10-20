@@ -341,6 +341,16 @@ describe('MetadataFetchController', () => {
     expect(service.search).toHaveBeenCalledWith(expect.anything(), expect.anything(), { directive: { policy: 'refresh', allowFallback: true } });
   });
 
+  it('passes a browsing search its per-provider result count, and leaves a match search on the default', async () => {
+    service.search.mockReturnValue(of());
+
+    await firstValueFrom((await controller.stream({ author: 'Terry Pratchett', resultsPerProvider: 20 }, user)).pipe(toArray()));
+    await firstValueFrom((await controller.stream({ title: 'Dune' }, user)).pipe(toArray()));
+
+    expect(service.search).toHaveBeenNthCalledWith(1, expect.objectContaining({ resultsPerProvider: 20 }), expect.anything(), expect.anything());
+    expect(service.search.mock.calls[1][0].resultsPerProvider).toBeUndefined();
+  });
+
   it('does not treat the prefilled book title as a query the user typed', async () => {
     service.getStoredProviderContext.mockResolvedValue({
       libraryId: 5,

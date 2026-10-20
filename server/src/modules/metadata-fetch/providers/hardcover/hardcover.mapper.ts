@@ -22,6 +22,20 @@ function parseDate(releaseYear: number | undefined | null, releaseDate: string |
   return year === undefined || year === publishedYearFromDateKey(publishedDate) ? publishedDate : undefined;
 }
 
+type HardcoverSeries = NonNullable<NonNullable<HardcoverBookWithEditions['featured_book_series']>['series']>;
+
+/**
+ * The number of the last released main book. Split parts and novellas sit at fractions after the
+ * book they follow, so the integer part names it. primary_books_count caps a stray high number.
+ */
+function releasedSeriesTotal(series: HardcoverSeries | undefined): number | undefined {
+  const position = series?.latest_released?.[0]?.position;
+  if (typeof position !== 'number' || !Number.isFinite(position)) return undefined;
+  const released = Math.floor(position);
+  const cap = normalizeSeriesTotalBooks(series?.primary_books_count);
+  return normalizeSeriesTotalBooks(cap === undefined ? released : Math.min(released, cap));
+}
+
 function extractAuthorsFromContributors(contributors: HardcoverCachedContributor[] | undefined): string[] {
   if (!contributors) return [];
   return contributors
@@ -197,7 +211,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     ...(genres ? { genres } : {}),
     seriesName: book.featured_book_series?.series?.name,
     seriesIndex: parseSeriesIndex(book.featured_book_series?.position) ?? undefined,
-    seriesTotalBooks: normalizeSeriesTotalBooks(book.featured_book_series?.series?.books_count),
+    seriesTotalBooks: releasedSeriesTotal(book.featured_book_series?.series),
     coverUrl: edition.image?.url ?? book.image?.url,
     ...editionCover(edition, book),
     sourceUrl: `https://hardcover.app/books/${book.slug}`,

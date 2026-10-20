@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Bookmark, BookOpen, Highlighter, Pin, PinOff, Trash2, TriangleAlert, X } from '@lucide/vue'
+import { Bookmark, BookOpen, Highlighter, Pencil, Pin, PinOff, Trash2, TriangleAlert, X } from '@lucide/vue'
 import { ANNOTATION_COLOR_FILTER_OPTIONS } from '@bookorbit/types'
 import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
 import { stripFragment, findNearestCfi, formatCfiLocation, formatDate, getCfiSortKey } from '../utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import BookmarkEditDialog from './BookmarkEditDialog.vue'
 
 const { t } = useI18n()
 
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   navigateAnnotation: [cfi: string]
   navigateAnnotationChapter: [chapterIndex: number]
   deleteBookmark: [id: number]
+  editBookmark: [id: number, title: string, note: string | null]
   deleteAnnotation: [id: number]
   toggleExpand: [href: string]
   togglePinned: []
@@ -218,6 +220,22 @@ function deleteBookmark(id: number) {
   emit('deleteBookmark', id)
 }
 
+const editingBookmark = ref<BookmarkType | null>(null)
+
+function editBookmark(bookmark: BookmarkType) {
+  editingBookmark.value = bookmark
+}
+
+function handleBookmarkEditSave(title: string, note: string | null) {
+  const bookmark = editingBookmark.value
+  editingBookmark.value = null
+  if (bookmark) emit('editBookmark', bookmark.id, title, note)
+}
+
+function handleBookmarkEditCancel() {
+  editingBookmark.value = null
+}
+
 function deleteAnnotation(id: number) {
   emit('deleteAnnotation', id)
 }
@@ -336,6 +354,7 @@ function togglePinned() {
                   <Bookmark :size="14" class="mt-0.5 shrink-0 text-muted-foreground" />
                   <div class="flex-1 min-w-0">
                     <p class="text-[13px] font-medium leading-snug truncate">{{ bm.title || t('reader.sidebar.bookmarkFallback') }}</p>
+                    <p v-if="bm.note" class="text-xs text-foreground mt-0.5 line-clamp-2 whitespace-pre-line">{{ bm.note }}</p>
                     <p class="text-[11px] text-muted-foreground mt-0.5">{{ getBookmarkContextLine(bm) }}</p>
                     <p class="text-[11px] text-muted-foreground mt-0.5">{{ formatDate(bm.createdAt) }}</p>
                   </div>
@@ -344,7 +363,21 @@ function togglePinned() {
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-destructive transition-all shrink-0"
+                      class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-foreground transition-all shrink-0"
+                      :aria-label="t('reader.sidebar.editBookmark')"
+                      @click.stop="editBookmark(bm)"
+                    >
+                      <Pencil :size="13" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ t('reader.sidebar.editBookmark') }}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <button
+                      type="button"
+                      class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 flex items-center justify-center w-6 h-6 rounded-xs text-muted-foreground hover:text-destructive transition-all shrink-0"
+                      :aria-label="t('reader.sidebar.deleteBookmark')"
                       @click.stop="deleteBookmark(bm.id)"
                     >
                       <Trash2 :size="13" />
@@ -413,7 +446,7 @@ function togglePinned() {
                   <button type="button" class="flex flex-1 min-w-0 items-start gap-2 text-left cursor-pointer" @click="navigateAnnotation(ann)">
                     <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: ann.color }" />
                     <div class="flex-1 min-w-0">
-                      <p class="text-[13px] leading-relaxed line-clamp-3">{{ ann.text }}</p>
+                      <p class="text-[13px] leading-relaxed line-clamp-3 whitespace-pre-line">{{ ann.text }}</p>
                       <p class="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                         <Tooltip v-if="isApproximateAnnotation(ann)">
                           <TooltipTrigger as-child>
@@ -448,6 +481,13 @@ function togglePinned() {
       </div>
     </div>
     <div v-if="!pinned" class="flex-1" data-reader-sidebar-backdrop @click="closeSidebar" />
+    <BookmarkEditDialog
+      v-if="editingBookmark"
+      :title="editingBookmark.title"
+      :note="editingBookmark.note ?? null"
+      @save="handleBookmarkEditSave"
+      @cancel="handleBookmarkEditCancel"
+    />
   </div>
 </template>
 

@@ -4,10 +4,11 @@ import { BadRequestException } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { of } from 'rxjs';
-import { Permission } from '@bookorbit/types';
+import { AuditAction, Permission } from '@bookorbit/types';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
+import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthorsController } from './authors.controller';
 import { BulkRefreshAuthorsMetadataDto } from './dto/bulk-refresh-authors-metadata.dto';
@@ -95,6 +96,8 @@ function makeController() {
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     refreshEnrichment: vi.fn(),
+    pinMetadataMatch: vi.fn(),
+    unpinMetadataMatch: vi.fn(),
     update: vi.fn(),
     merge: vi.fn(),
     delete: vi.fn(),
@@ -376,6 +379,26 @@ describe('AuthorsController', () => {
       affectedBookCount: 3,
     });
     await expect(controller.delete(user, { authorIds: [2] })).resolves.toEqual({ deletedAuthorIds: [2], affectedBookCount: 3 });
+  });
+
+  it('delegates metadata match pin and unpin, gated and audited like an author edit', async () => {
+    const { controller, authorsService } = makeController();
+    const user = makeUser();
+    const dto = { provider: 'goodreads', providerId: '4567' } as never;
+    authorsService.pinMetadataMatch.mockResolvedValue({ id: 9, metadataProviderPinned: true });
+    authorsService.unpinMetadataMatch.mockResolvedValue({ id: 9, metadataProviderPinned: false });
+
+    await expect(controller.pinMetadataMatch(user, 9, dto)).resolves.toEqual({ id: 9, metadataProviderPinned: true });
+    expect(authorsService.pinMetadataMatch).toHaveBeenCalledWith(user, 9, dto);
+    await expect(controller.unpinMetadataMatch(user, 9)).resolves.toEqual({ id: 9, metadataProviderPinned: false });
+    expect(authorsService.unpinMetadataMatch).toHaveBeenCalledWith(user, 9);
+
+    for (const handler of [AuthorsController.prototype.pinMetadataMatch, AuthorsController.prototype.unpinMetadataMatch]) {
+      expect(Reflect.getMetadata(PERMISSION_KEY, handler)).toBe(Permission.LibraryEditMetadata);
+      const audit = Reflect.getMetadata(AUDITABLE_KEY, handler) as { action: string; getResourceId: (req: unknown) => number };
+      expect(audit.action).toBe(AuditAction.AuthorUpdate);
+      expect(audit.getResourceId({ params: { id: '9' } })).toBe(9);
+    }
   });
 
   it('delegates delete image endpoint to AuthorsService', async () => {

@@ -104,6 +104,24 @@ describe('NewznabAdapter', () => {
     });
   });
 
+  it('reads the details page the feed publishes in comments', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        feed(`<item>
+          <title>Dune EPUB</title>
+          <guid isPermaLink="false">release-guid</guid>
+          <link>https://indexer.example.com/api?t=get&amp;id=release-guid&amp;apikey=secret-key</link>
+          <comments>https://indexer.example.com/details/release-guid#comments</comments>
+        </item>`),
+      ),
+    );
+
+    const [release] = await new NewznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+
+    // Raw here: the search service vets it, which is where the anchor and any key are dealt with.
+    expect(release?.infoUrl).toBe('https://indexer.example.com/details/release-guid#comments');
+  });
+
   it('falls back to title and author for a search without an ISBN', async () => {
     fetchMock.mockResolvedValue(new Response(feed('')));
 

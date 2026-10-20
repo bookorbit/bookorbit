@@ -6,6 +6,7 @@ import type { ReadingAttempt, ReadingAttemptOutcome } from '@bookorbit/types'
 import { READING_ATTEMPT_OUTCOMES } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import type { ReadingAttemptDraft } from '@/features/book/composables/useReadingAttempts'
+import { compareReadingOrder } from '@/features/book/lib/reading-attempt-order'
 
 const props = defineProps<{
   attempts: ReadingAttempt[]
@@ -33,12 +34,12 @@ const localError = ref<string | null>(null)
 
 /** Oldest first, so "attempt 2" means the second one the reader started. */
 const ordinalById = computed(() => {
-  const ordered = [...props.attempts].sort((left, right) => left.id - right.id)
+  const ordered = [...props.attempts].sort(compareReadingOrder)
   return new Map(ordered.map((attempt, index) => [attempt.id, index + 1]))
 })
 
 /** Newest first: the attempt in progress is the one worth seeing without scrolling. */
-const ordered = computed(() => [...props.attempts].sort((left, right) => right.id - left.id))
+const ordered = computed(() => [...props.attempts].sort((left, right) => compareReadingOrder(right, left)))
 
 const outcomeOptions = computed(() =>
   READING_ATTEMPT_OUTCOMES.map((outcome) => ({ value: outcome, label: t(`book.detail.readingLog.attempts.outcome.${outcome}`) })),

@@ -7,6 +7,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_ANNOTATION_CREATED } from '../achievement/achievement-events.service';
 import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_STYLE } from './annotation.constants';
+import { normalizeAnnotationNote } from './annotation-note.utils';
 import { AnnotationConversionService } from './annotation-conversion.service';
 import { AnnotationRepository, type AnnotationFilters, type AnnotationSort } from './annotation.repository';
 import { AnnotationResponseDto } from './dto/annotation-response.dto';
@@ -25,15 +26,25 @@ export class AnnotationService {
     private readonly conversionService: AnnotationConversionService,
   ) {}
 
-  async getAnnotations(bookId: number, user: RequestUser): Promise<AnnotationResponseDto[]> {
+  async getAnnotations(bookId: number, user: RequestUser, readerFileId?: number): Promise<AnnotationResponseDto[]> {
     await this.bookService.verifyBookAccess(bookId, user);
+    if (readerFileId != null) {
+      const file = await this.bookService.verifyFileAccess(readerFileId, user);
+      if (file.bookId !== bookId) throw new BadRequestException('The selected file does not belong to this book');
+    }
     await this.conversionService.ensureCfiPositionsForBook(user.id, bookId);
     const rows = await this.annotationRepo.findByBookId(bookId, user.id);
-    return rows.map((row) => AnnotationResponseDto.from(row));
+    const readerRows = readerFileId != null ? await this.conversionService.projectReaderPositions(rows, readerFileId) : rows;
+    return readerRows.map((row) => AnnotationResponseDto.from(row));
   }
 
   async getAnnotationsPaginated(bookId: number, user: RequestUser, query: AnnotationQueryDto): Promise<AnnotationListResponse> {
     await this.bookService.verifyBookAccess(bookId, user);
+    if (query.readerFileId != null) {
+      const file = await this.bookService.verifyFileAccess(query.readerFileId, user);
+      if (file.bookId !== bookId) throw new BadRequestException('The selected file does not belong to this book');
+      await this.conversionService.ensureCfiPositionsForBook(user.id, bookId, 100);
+    }
     if (query.bookFileId != null) {
       const file = await this.bookService.verifyFileAccess(query.bookFileId, user);
       if (file.bookId !== bookId) throw new BadRequestException('The selected file does not belong to this book');
@@ -50,8 +61,10 @@ export class AnnotationService {
       this.annotationRepo.getDistinctChapters(bookId, user.id),
     ]);
 
+    const readerItems = query.readerFileId != null ? await this.conversionService.projectReaderPositions(items, query.readerFileId) : items;
+
     return {
-      items: items.map((row) => {
+      items: readerItems.map((row) => {
         const dto = AnnotationResponseDto.from(row);
         return {
           id: dto.id,
@@ -101,7 +114,7 @@ export class AnnotationService {
         text: dto.text,
         color: dto.color ?? DEFAULT_ANNOTATION_COLOR,
         style: dto.style ?? DEFAULT_ANNOTATION_STYLE,
-        note: dto.note ?? null,
+        note: normalizeAnnotationNote(dto.note),
         chapterTitle: dto.chapterTitle ?? null,
       };
       const row = dto.pdf
@@ -131,7 +144,7 @@ export class AnnotationService {
   async updateAnnotation(bookId: number, annotationId: number, user: RequestUser, dto: UpdateAnnotationDto): Promise<AnnotationResponseDto> {
     await this.bookService.verifyBookAccess(bookId, user);
     const content = {
-      ...(dto.note !== undefined && { note: dto.note }),
+      ...(dto.note !== undefined && { note: normalizeAnnotationNote(dto.note) }),
       ...(dto.color !== undefined && { color: dto.color }),
       ...(dto.style !== undefined && { style: dto.style }),
     };

@@ -29,6 +29,8 @@ export interface SearchParams {
   providers?: MetadataProviderKey[]
   /** `refresh` skips saved answers and asks every provider live. */
   cache?: MetadataCacheRequestPolicy
+  /** Ranked results each provider may return, for a search that browses rather than matches one book. */
+  resultsPerProvider?: number
 }
 
 export function useMetadataSearch() {
@@ -83,6 +85,7 @@ export function useMetadataSearch() {
     const requestedProviders = params.providers ?? (selectedProviders.value.length ? selectedProviders.value : onlyProvider ? [onlyProvider.key] : [])
     if (requestedProviders.length) query.set('providers', requestedProviders.join(','))
     if (params.cache === METADATA_CACHE_REFRESH) query.set('cache', METADATA_CACHE_REFRESH)
+    if (params.resultsPerProvider != null) query.set('resultsPerProvider', String(params.resultsPerProvider))
     return query
   }
 

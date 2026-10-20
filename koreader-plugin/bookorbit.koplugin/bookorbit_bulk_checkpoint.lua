@@ -69,6 +69,7 @@ function Checkpoint:load()
     if type(record) ~= "table" or record.version ~= VERSION then return nil end
     if type(record.source_key) ~= "string" or record.source_key == "" then return nil end
     record.completed = type(record.completed) == "table" and record.completed or {}
+    record.linked_paths = type(record.linked_paths) == "table" and record.linked_paths or {}
     record.counts = type(record.counts) == "table" and record.counts or {}
     record.failures = type(record.failures) == "table" and record.failures or {}
     return record
@@ -105,6 +106,7 @@ function Checkpoint:save(record)
         page_number = record.page_number,
         processed = record.processed,
         completed = boundedCompleted(record.completed),
+        linked_paths = boundedCompleted(record.linked_paths),
         counts = record.counts,
         failures = boundedFailures(record.failures),
         updated_at = self.now(),

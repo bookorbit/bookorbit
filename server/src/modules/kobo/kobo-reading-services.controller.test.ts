@@ -16,6 +16,7 @@ describe('KoboReadingServicesController', () => {
   const exchangeService = {
     getContentAnnotations: vi.fn(),
     markServedSeen: vi.fn(),
+    rememberServe: vi.fn(),
     patchContentAnnotations: vi.fn(),
     getChangedContentIds: vi.fn(),
   };
@@ -69,7 +70,8 @@ describe('KoboReadingServicesController', () => {
     );
     expect(historyService.countsForBook).toHaveBeenCalledWith(8, 42, { served: 1, tombstones: 1, notModified: false });
     expect(reply.header).toHaveBeenCalledWith('ETag', '"abc"');
-    expect(reply.raw.once).toHaveBeenCalledWith('finish', expect.any(Function));
+    expect(exchangeService.markServedSeen).not.toHaveBeenCalled();
+    expect(exchangeService.rememberServe).toHaveBeenCalledWith(8, 5, 42, '"abc"', servedAck);
     expect(reply.send).toHaveBeenCalledWith(response);
   });
 
@@ -94,6 +96,7 @@ describe('KoboReadingServicesController', () => {
     );
     expect(reply.status).toHaveBeenCalledWith(HttpStatus.NOT_MODIFIED);
     expect(reply.send).toHaveBeenCalledWith();
+    expect(exchangeService.markServedSeen).toHaveBeenCalledWith(8, 5, { entries: [], tombstoneStateIds: [] });
   });
 
   it('records failed annotation pulls before rethrowing', async () => {
@@ -168,8 +171,10 @@ describe('KoboReadingServicesController', () => {
 
   it('delegates changed content without history rows', async () => {
     exchangeService.getChangedContentIds.mockResolvedValue(['book-1']);
+    const body = [{ ContentId: 'book-1', etag: 'W/"1"' }];
 
-    await expect(controller.checkForChanges({ id: 8 } as never, { deviceId: 5 } as never)).resolves.toEqual(['book-1']);
+    await expect(controller.checkForChanges(body, { id: 8 } as never, { deviceId: 5 } as never)).resolves.toEqual(['book-1']);
+    expect(exchangeService.getChangedContentIds).toHaveBeenCalledWith(8, 5, body);
     expect(historyService.recordSuccess).not.toHaveBeenCalled();
   });
 

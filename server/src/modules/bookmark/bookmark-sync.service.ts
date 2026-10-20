@@ -27,7 +27,12 @@ export class BookmarkSyncService {
    * Lands one device bookmark at its CFI. A live row at that location is reused, a
    * tombstoned one is restored, and only an unoccupied location inserts.
    */
-  async upsertFromDevice(userId: number, bookId: number, fields: DeviceBookmarkFields): Promise<DeviceBookmarkUpsertResult | null> {
+  async upsertFromDevice(
+    userId: number,
+    bookId: number,
+    fields: DeviceBookmarkFields,
+    opts: { keepTitle?: boolean } = {},
+  ): Promise<DeviceBookmarkUpsertResult | null> {
     const location = { cfi: fields.cfi, positionSeconds: null };
 
     const created = await this.bookmarkRepo.createFromDevice(userId, bookId, fields);
@@ -38,19 +43,48 @@ export class BookmarkSyncService {
       origin: fields.origin ?? 'koreader',
       devicePos: fields.devicePos,
       pageno: fields.pageno,
+      bookFileId: fields.bookFileId,
+      ...(fields.note !== undefined ? { note: fields.note } : {}),
     });
     if (restored) return { row: restored, outcome: 'restored' };
 
     const existing = await this.bookmarkRepo.findLiveByLocation(userId, bookId, location);
-    return existing ? { row: existing, outcome: 'matched' } : null;
+    if (existing?.bookFileId == null && existing && fields.bookFileId != null) {
+      await this.bookmarkRepo.captureSourceFile(userId, existing.id, fields.cfi, fields.bookFileId);
+    }
+    if (!existing) return null;
+    // A device whose dogears carry no title of their own (Kobo) names a match by its chapter, which
+    // must not replace a title someone chose.
+    const patch = {
+      ...(!opts.keepTitle && existing.title !== fields.title ? { title: fields.title } : {}),
+      ...(fields.note != null && existing.note !== fields.note ? { note: fields.note } : {}),
+    };
+    if (Object.keys(patch).length > 0) {
+      const updated = await this.bookmarkRepo.updateFromDevice(userId, existing.id, patch);
+      return updated ? { row: updated, outcome: 'matched' } : null;
+    }
+    return { row: existing, outcome: 'matched' };
+  }
+
+  /** A device's note edit on a bookmark it already holds; older than the row's last change, it is an echo and ignored. */
+  applyDeviceNote(userId: number, bookmarkId: number, note: string | null, editedAt: Date) {
+    return this.bookmarkRepo.applyDeviceNote(userId, bookmarkId, note?.trim() ? note : null, editedAt);
   }
 
   /**
-   * Device-side rename. The device wins, including over a rename made through the API: the
-   * exchange never pushes a rename down, so a device re-uploading its own title is all it knows.
+   * Device-side rename. Callers apply it only once the device has acknowledged the current server
+   * version, so a rename made elsewhere and still on its way down is not undone by a stale title.
    */
   applyDeviceEdit(userId: number, bookmarkId: number, values: { title?: string; devicePos?: string; pageno?: number | null }) {
     return this.bookmarkRepo.updateFromDevice(userId, bookmarkId, values);
+  }
+
+  captureSourceFile(userId: number, bookmarkId: number, cfi: string, bookFileId: number) {
+    return this.bookmarkRepo.captureSourceFile(userId, bookmarkId, cfi, bookFileId);
+  }
+
+  captureSourceFileById(userId: number, bookmarkId: number, bookFileId: number) {
+    return this.bookmarkRepo.captureSourceFileById(userId, bookmarkId, bookFileId);
   }
 
   tombstone(userId: number, bookmarkIds: number[]): Promise<number> {

@@ -1,10 +1,13 @@
-import { Body, Controller, DefaultValuePipe, Get, HttpCode, HttpStatus, Param, ParseBoolPipe, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Get, HttpCode, HttpStatus, Param, ParseBoolPipe, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
 import { RouteConfig } from '@nestjs/platform-fastify';
+import type { FastifyReply } from 'fastify';
+import { createReadStream } from 'fs';
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookRequestService } from './book-request.service';
 import { DownloadClientConfigService } from './download-clients/download-client-config.service';
@@ -107,6 +110,15 @@ export class BookRequestSelfFulfilController {
   async getReview(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     await this.service.assertCanFulfil(id, user);
     return this.verification.getReview(id);
+  }
+
+  @Get(':id/review/cover')
+  async getReviewCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    await this.service.assertCanFulfil(id, user);
+    const coverPath = await this.verification.getReviewCoverPath(id);
+    reply.header('Content-Type', imageContentTypeFromPath(coverPath));
+    reply.header('Cache-Control', 'private, no-cache');
+    return reply.send(createReadStream(coverPath));
   }
 
   /**

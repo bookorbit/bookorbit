@@ -112,4 +112,23 @@ rows = plugin:diagnosticsRows()
 assertEqual(hasRow(rows, "Retry highlight sync"), false, "two-way-off diagnostics hides highlight retry")
 assertEqual(hasRow(rows, "Retry open-book match"), true, "two-way-off diagnostics keeps match retry")
 
+-- The Technical details page draws the same facts as titled sections, with
+-- the actions apart from them.
+local d = plugin:diagnosticsSections()
+local titles = {}
+for _, section in ipairs(d.sections) do table.insert(titles, section.title) end
+assertEqual(table.concat(titles, ","), "This device,Account,Last results,Library,Sync,Highlights", "logged-in sections in reading order")
+local kinds = {}
+for _, action in ipairs(d.actions) do table.insert(kinds, action.kind) end
+assertEqual(table.concat(kinds, ","), "retry-match,recheck,test,check-update", "reader actions without two-way sync")
+
+package.loaded["device"].model = "Kobo_monza"
+d = plugin:diagnosticsSections()
+assertEqual(d.sections[1].rows[1][2], "Kobo Libra Colour (Kobo_monza)", "the device is named as sold, with the model id kept for bug reports")
+
+plugin = newPlugin(false)
+d = plugin:diagnosticsSections()
+assertEqual(#d.sections, 2, "signed out, only the device and the account")
+assertEqual(#d.actions, 0, "and nothing to run without credentials")
+
 print("bookorbit_diagnostics_rows_test.lua: ok")

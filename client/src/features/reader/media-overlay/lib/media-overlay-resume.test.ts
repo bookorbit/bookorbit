@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EpubMediaOverlayPlaylist } from '@bookorbit/types'
-import { mediaOverlayItemFragment, resolveMediaOverlayResume } from './media-overlay-resume'
+import { mediaOverlayFragmentSeconds, mediaOverlayItemFragment, resolveMediaOverlayResume } from './media-overlay-resume'
 
 function makePlaylist(): EpubMediaOverlayPlaylist {
   return {
@@ -97,5 +97,22 @@ describe('media-overlay resume', () => {
         positionSeconds: 15,
       }),
     ).toEqual({ section: 1, fragment: 'OPS/ch2.xhtml#s1' })
+  })
+})
+
+describe('mediaOverlayFragmentSeconds', () => {
+  it('places a sentence where the narration reaches it', () => {
+    expect(mediaOverlayFragmentSeconds(makePlaylist(), 'OPS/ch1.xhtml#s1', 0)).toBe(0)
+    expect(mediaOverlayFragmentSeconds(makePlaylist(), 'OPS/ch1.xhtml#s2', 0)).toBe(4)
+    expect(mediaOverlayFragmentSeconds(makePlaylist(), 'OPS/ch2.xhtml#s1', 1)).toBe(12)
+  })
+
+  it('tells same-named sentences apart by their section', () => {
+    expect(mediaOverlayFragmentSeconds(makePlaylist(), 'OPS/ch2.xhtml#s1', null)).toBe(12)
+    expect(mediaOverlayFragmentSeconds(makePlaylist(), 'OPS/ch1.xhtml#s1', 1)).toBeNull()
+  })
+
+  it('places nothing it cannot find', () => {
+    expect(mediaOverlayFragmentSeconds(makePlaylist(), 'OPS/ch9.xhtml#s1', null)).toBeNull()
   })
 })

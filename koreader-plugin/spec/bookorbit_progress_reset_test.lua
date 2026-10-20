@@ -15,11 +15,21 @@ package.loaded["ffi/util"] = {
 }
 
 local confirm_boxes = {}
-package.loaded["ui/widget/confirmbox"] = {
-    new = function(_, opts)
-        table.insert(confirm_boxes, opts)
-        return opts
+local shown_texts = {}
+-- The prompt is the This book sheet; its Jump and Stay stand in for a
+-- confirm box's OK and Cancel.
+package.loaded["bookorbit_book_sheet"] = {
+    openPrompt = function(_plugin, prompt)
+        table.insert(confirm_boxes, {
+            prompt = prompt,
+            ok_callback = prompt.on_jump,
+            cancel_callback = prompt.on_stay or function() end,
+        })
     end,
+}
+package.loaded["bookorbit_toast"] = {
+    show = function(text) if shown_texts then table.insert(shown_texts, text) end end,
+    error = function(text) if shown_texts then table.insert(shown_texts, text) end end,
 }
 package.loaded["device"] = { model = "Kobo Libra" }
 
@@ -40,7 +50,6 @@ package.loaded["ui/network/manager"] = {
     willRerunWhenConnected = function() return false end,
 }
 
-local shown_texts = {}
 package.loaded["ui/uimanager"] = {
     show = function(_, message)
         table.insert(shown_texts, message.text)
@@ -200,5 +209,30 @@ assertEqual(reconciled, true, "declining recovery prevents fresh-copy progress f
 local same_position = makePlugin(restored_body, { local_percent = 0.75, local_progress = restored_body.progress })
 same_position:getProgress(false, true)
 assertEqual(#events, 0, "same-position explicit pull remains idempotent")
+
+for _, interactive in ipairs({ false, true }) do
+    local position = { local_progress = "/body/DocFragment[6]/body" }
+    local moving = makePlugin(restored_body, position)
+    moving.settings.sync_forward = moving.SYNC_STRATEGY.SILENT
+    moving.newClient = function()
+        return { getProgress = function()
+            position.local_progress = "/body/DocFragment[13]/body"
+            return restored_body
+        end }
+    end
+    moving:getProgress(false, interactive)
+    assertEqual(#events, 0, "late pull cannot undo navigation during the request")
+    assertEqual(#confirm_boxes, 0, "late pull cannot prompt for an obsolete local position")
+
+    local replaced = makePlugin(restored_body)
+    replaced.newClient = function()
+        return { getProgress = function()
+            replaced.ui.document = nil
+            return restored_body
+        end }
+    end
+    replaced:getProgress(false, interactive)
+    assertEqual(#events, 0, "late pull cannot navigate a closed document")
+end
 
 print("bookorbit_progress_reset_test.lua: ok")

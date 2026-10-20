@@ -57,8 +57,8 @@ function CatalogFocus:customFocusKey()
     return nil
 end
 
--- The custom pages rebuild their whole widget tree on every refresh - a shelf
--- page turn, a Discover reroll, a status change - which throws away the widget
+-- The custom pages rebuild their whole widget tree on every refresh - a board
+-- page turn, a shuffle, a status change - which throws away the widget
 -- the cursor was sitting on. Menu's own bookkeeping cannot put it back: it
 -- derives a position from the selected item number over a uniform grid, and
 -- these pages are rows of unequal width whose first row is a cluster of header

@@ -18,17 +18,17 @@ export class AnnotationHubController {
 
   @Get()
   list(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubQueryDto) {
-    return this.hubService.list(user.id, query);
+    return this.hubService.list(user, query);
   }
 
   @Get('overview')
   overview(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubQueryDto) {
-    return this.hubService.overview(user.id, query);
+    return this.hubService.overview(user, query);
   }
 
   @Get('books')
   listBooks(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubBooksQueryDto) {
-    return this.hubService.listBooks(user.id, {
+    return this.hubService.listBooks(user, {
       status: query.status ?? 'active',
       q: query.q,
       limit: query.limit,
@@ -39,18 +39,18 @@ export class AnnotationHubController {
   @Post('bulk')
   @HttpCode(200)
   bulk(@CurrentUser() user: RequestUser, @Body() dto: AnnotationBulkDto) {
-    return this.hubService.bulk(user.id, dto);
+    return this.hubService.bulk(user, dto);
   }
 
   @Post(':annotationId/restore')
   @HttpCode(200)
   restore(@CurrentUser() user: RequestUser, @Param('annotationId', ParseIntPipe) annotationId: number) {
-    return this.hubService.restore(user.id, annotationId);
+    return this.hubService.restore(user, annotationId);
   }
 
   @Get(':annotationId/sync-detail')
   syncDetail(@CurrentUser() user: RequestUser, @Param('annotationId', ParseIntPipe) annotationId: number) {
-    return this.hubService.syncDetail(user.id, annotationId);
+    return this.hubService.syncDetail(user, annotationId);
   }
 
   @Post(':annotationId/positions/retry')
@@ -60,18 +60,18 @@ export class AnnotationHubController {
     @Param('annotationId', ParseIntPipe) annotationId: number,
     @Body() dto: AnnotationPositionRetryDto,
   ) {
-    return this.hubService.retryPosition(user.id, annotationId, dto.format);
+    return this.hubService.retryPosition(user, annotationId, dto.format);
   }
 
   @Delete(':annotationId')
   @HttpCode(204)
   async purge(@CurrentUser() user: RequestUser, @Param('annotationId', ParseIntPipe) annotationId: number) {
-    await this.hubService.purge(user.id, annotationId);
+    await this.hubService.purge(user, annotationId);
   }
 
   @Get('export')
   async export(@CurrentUser() user: RequestUser, @Query() query: AnnotationExportQueryDto, @Res() reply: FastifyReply) {
-    const result = await this.hubService.export(user.id, query, query.bookId ? `book-${query.bookId}` : 'library');
+    const result = await this.hubService.export(user, query, query.bookId ? `book-${query.bookId}` : 'library');
     return reply
       .header('Content-Type', result.contentType)
       .header('Content-Disposition', `attachment; filename="${result.filename}"`)

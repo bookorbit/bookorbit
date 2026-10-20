@@ -284,11 +284,55 @@ describe('SeriesExpectedCountService', () => {
       await service.setManual('Dune', 2);
 
       expect(set).toHaveBeenCalledWith(expect.objectContaining({ expectedBookCount: 2 }));
-      // No comparison on the stored total: a person stating the length outright must win
+      // No ordering on the stored total: a person stating the length outright must win
       // in both directions, which is the escape hatch for a wrong automated maximum.
       const operators = sqlOperators(where.mock.calls[0]?.[0]);
       expect(operators).not.toContain(' < ');
-      expect(operators).not.toContain(' <> ');
+      expect(operators).not.toContain(' > ');
+    });
+
+    it('leaves an unchanged total alone, so re-saving a provider total keeps its source', async () => {
+      const identity = makeSeriesIdentity({ dune: 101 });
+      const { db, where } = makeDb();
+      const service = new SeriesExpectedCountService(db, identity as never);
+
+      await service.setManual('Dune', 6);
+      await service.setManual('Dune', null);
+
+      const setOperators = sqlOperators(where.mock.calls[0]?.[0]);
+      expect(setOperators).toContain(' <> ');
+      expect(setOperators).toContain(' is null');
+      expect(sqlOperators(where.mock.calls[1]?.[0])).toContain(' is not null');
+    });
+
+    it('ignores an empty total on a series the book was not already in, since no total was shown for it', async () => {
+      const identity = makeSeriesIdentity({ dune: 101, 'children of dune': 102 });
+      const { db, update } = makeDb();
+      const service = new SeriesExpectedCountService(db, identity as never);
+
+      await expect(service.setManual('Children of Dune', null, undefined, { previousSeriesIds: new Set([101]) })).resolves.toBe(true);
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('still clears a total the editor showed for a series the book was already in', async () => {
+      const identity = makeSeriesIdentity({ dune: 101 });
+      const { db, set } = makeDb();
+      const service = new SeriesExpectedCountService(db, identity as never);
+
+      await service.setManual('Dune', null, undefined, { previousSeriesIds: new Set([101]) });
+
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ expectedBookCount: null, expectedBookCountSource: null }));
+    });
+
+    it('applies a typed total on a newly added series', async () => {
+      const identity = makeSeriesIdentity({ dune: 101, 'children of dune': 102 });
+      const { db, set } = makeDb();
+      const service = new SeriesExpectedCountService(db, identity as never);
+
+      await service.setManual('Children of Dune', 3, undefined, { previousSeriesIds: new Set([101]) });
+
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ expectedBookCount: 3, expectedBookCountSource: MANUAL_SERIES_TOTAL_SOURCE }));
     });
 
     it('reports false without writing when the series is unknown or unnamed', async () => {

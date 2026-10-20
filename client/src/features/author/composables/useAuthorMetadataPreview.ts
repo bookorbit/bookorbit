@@ -2,14 +2,16 @@ import { computed, ref, shallowRef, type Ref } from 'vue'
 
 import type { AuthorMetadataCandidate, MetadataCandidateCacheInfo } from '@bookorbit/types'
 import { METADATA_CACHE_REFRESH, summarizeCandidateCache } from '@/features/metadata-cache/lib/metadata-cache'
-import { streamAuthorMetadataCandidates } from '../api/author'
+import { lookupAuthorMetadata, streamAuthorMetadataCandidates } from '../api/author'
+import type { AuthorProviderReference } from '../lib/author-metadata-match'
 
 export interface AuthorMetadataPreviewLoadOptions {
   /** Skips saved answers and asks every provider live. */
   fresh?: boolean
 }
 
-export function useAuthorMetadataPreview(authorName: Ref<string>) {
+/** A pinned author previews its pinned person; a name search could show the wrong one. */
+export function useAuthorMetadataPreview(authorName: Ref<string>, pinnedMatch?: Ref<AuthorProviderReference | null>) {
   const preview = ref<AuthorMetadataCandidate | null>(null)
   /** Set when the metadata cache answered for the candidate shown as the preview. */
   const previewCache = ref<MetadataCandidateCacheInfo | null>(null)
@@ -57,6 +59,20 @@ export function useAuthorMetadataPreview(authorName: Ref<string>) {
 
     try {
       clearPreview()
+      const pinned = pinnedMatch?.value
+      if (pinned) {
+        const result = await lookupAuthorMetadata(pinned, {
+          ...(options.fresh ? { cache: METADATA_CACHE_REFRESH } : {}),
+          signal: abortController.signal,
+        })
+        if (seq !== requestSeq) return
+        if (result) {
+          candidateCaches.value = [result.cache]
+          showCandidate(result.candidate, result.cache)
+        }
+        searched.value = true
+        return
+      }
       await streamAuthorMetadataCandidates(
         {
           q: name,

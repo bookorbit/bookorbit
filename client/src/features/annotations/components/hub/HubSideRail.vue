@@ -7,6 +7,7 @@ import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubOverview } from '@bookor
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import AnnotationBookThumb from '../AnnotationBookThumb.vue'
 import AnnotationActivitySpark from '../shared/AnnotationActivitySpark.vue'
+import { annotationSourceKey } from '@/features/annotations/lib/source-label'
 
 const props = defineProps<{
   overview: AnnotationHubOverview
@@ -44,7 +45,7 @@ function colorName(hex: string): string {
 }
 
 function deviceLabel(device: AnnotationHubOverview['devices'][number]): string {
-  return device.deviceName ?? t(`annotations.sources.${device.source}`)
+  return device.deviceName ?? t(annotationSourceKey(device.source))
 }
 
 function handleReview() {
@@ -68,6 +69,7 @@ function handleOpenTrash() {
         class="ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[11px] font-semibold transition-colors"
         :class="trashOpen ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
         :aria-pressed="trashOpen"
+        :aria-label="t('annotations.hub.trashToggle', { count: overview.trashed })"
         @click="handleOpenTrash"
       >
         <Trash2 :size="12" />
@@ -136,7 +138,7 @@ function handleOpenTrash() {
             @click="emit('toggleOrigin', entry.origin)"
           >
             <span class="size-1.5 rounded-full" :style="{ backgroundColor: `var(--pill-${entry.origin})` }" />
-            {{ t(`annotations.sources.${entry.origin}`) }}
+            {{ t(annotationSourceKey(entry.origin)) }}
             <b class="font-semibold text-foreground">{{ formatNumber(entry.count) }}</b>
           </button>
         </div>

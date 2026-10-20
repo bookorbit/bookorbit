@@ -1,6 +1,6 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 
-import { KoboDeliveryService, isSettledDelivery, isUnconfirmedReplacement } from './kobo-delivery.service';
+import { KoboDeliveryService, isSettledDelivery, isUnconfirmedReplacement, type KoboDeliveryRecord } from './kobo-delivery.service';
 import { DeliveryArtifactService } from '../../book/delivery-artifact.service';
 import { KepubContext } from '../../position-converter/kobo-span-converter.service';
 import { BookReadService } from '../../book/book-read.service';
@@ -30,6 +30,8 @@ export type KepubContextResult =
  */
 @Injectable()
 export class KoboKepubContextService {
+  private readonly logger = new Logger(KoboKepubContextService.name);
+
   constructor(
     private readonly bookReadService: BookReadService,
     private readonly koboSettingsService: KoboSettingsService,
@@ -122,7 +124,7 @@ export class KoboKepubContextService {
         };
         return { ok: true, file, settings, ctx, release: artifact.release };
       } catch {
-        return { ok: false, reason: 'historical_artifact_unavailable', settings };
+        return (await this.cachedDeliveredContext(bookId, record, settings)) ?? { ok: false, reason: 'historical_artifact_unavailable', settings };
       }
     }
     const file = await this.resolveReaderFile(bookId);
@@ -179,5 +181,28 @@ export class KoboKepubContextService {
     const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
     if (file.sizeBytes && file.sizeBytes > limitBytes) return 'kepub_too_large';
     return null;
+  }
+
+  /**
+   * After the book file changes, the device still holds the KEPUB it downloaded. While that exact
+   * conversion is cached, positions keep resolving against it instead of the book losing precise sync.
+   */
+  private async cachedDeliveredContext(bookId: number, record: KoboDeliveryRecord, settings: KoboSettings): Promise<KepubContextResult | null> {
+    if (record.metadata.format !== 'kepub' || !record.metadata.sha256) return null;
+    const file = await this.resolveReaderFile(bookId);
+    if (!file || file.id !== record.sourceFileId) return null;
+    const cached = await this.kepubConversionService.acquireCachedByDigest(bookId, record.metadata.sha256);
+    if (!cached) return null;
+    await this.deliveries?.rememberContentDigest(record, cached.path);
+    this.logger.log(
+      `[kobo.kepub_context] [end] bookId=${bookId} deliveryId=${record.id} source=cached_delivered_artifact - source changed after delivery; using the copy the device holds`,
+    );
+    const ctx = {
+      kepubPath: cached.path,
+      fileHash: record.metadata.sha256,
+      hyphenate: record.options.hyphenate,
+      kepubifyVersion: record.options.converterVersion ?? 'native-kepub',
+    };
+    return { ok: true, file, settings, ctx, release: cached.release };
   }
 }

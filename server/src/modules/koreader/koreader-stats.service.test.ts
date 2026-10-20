@@ -150,6 +150,17 @@ describe('KoreaderStatsService', () => {
     expect(result.unmatched).toEqual([]);
   });
 
+  it('accepts a verified rendition hash for its accessible explicit source file', async () => {
+    koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(new Map([[HASH_A, { bookFileId: 11, bookId: 21, libraryId: 1 }]]));
+    bookService.verifyFileAccess.mockResolvedValue({ id: 11, bookId: 21, libraryId: 1, format: 'epub', role: 'content', fileHash: HASH_B });
+    const result = await service.uploadPageStats(
+      makeUser(),
+      makeDto([{ hash: HASH_A, bookFileId: 11, events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }] }]),
+    );
+    expect(result.unmatched).toEqual([]);
+    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 11, bookId: 21 }));
+  });
+
   it('refuses an explicit statistics target whose server hash does not match', async () => {
     bookService.verifyFileAccess.mockResolvedValue({
       id: 11,

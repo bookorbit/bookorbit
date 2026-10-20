@@ -151,6 +151,27 @@ describe('KOReader bulk manifest at scale (e2e)', { timeout: 600_000 }, () => {
     expect(row?.inaccessible).toBe(0);
   });
 
+  it('continues a cursor without gaps when the match token changes during enumeration', async () => {
+    const first = await fetchManifestPage(null);
+    expect(first.nextCursor).toBeTruthy();
+    const [file] = await ctx.db
+      .select({ id: schema.bookFiles.id })
+      .from(schema.bookFiles)
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .where(eq(schema.books.libraryId, library.libraryId))
+      .limit(1);
+    await ctx.db
+      .update(schema.bookFiles)
+      .set({ updatedAt: new Date(Date.now() + 1000) })
+      .where(eq(schema.bookFiles.id, file!.id));
+    const second = await fetchManifestPage(first.nextCursor);
+    expect(second.manifestVersion).not.toBe(first.manifestVersion);
+    expect(second.restartRequired).toBe(false);
+    expect(second.items).toHaveLength(PAGE_SIZE);
+    expect(second.items[0]!.id).toBeGreaterThan(first.items.at(-1)!.id);
+    expect(new Set([...first.items, ...second.items].map((item) => item.id)).size).toBe(2 * PAGE_SIZE);
+  });
+
   it('serves a late keyset page from an index rather than a sequential scan', async () => {
     const [midpoint] = await ctx.db
       .select({ id: schema.books.id })

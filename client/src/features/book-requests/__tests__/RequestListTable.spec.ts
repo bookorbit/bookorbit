@@ -106,6 +106,18 @@ describe('RequestListTable', () => {
 
     expect(titleButton?.text()).toBe(LONG_TITLE)
   })
+
+  // A format asked for from a book's page carries no art, and used to show a blank placeholder.
+  it('falls back to the cover of the book a format request joins', () => {
+    const wrapper = render(request({ status: 'approved', matchedBookId: null, targetBookId: 434, coverUrl: null }))
+    const covers = wrapper.findAllComponents({ name: 'RequestCover' })
+
+    expect(covers.length).toBeGreaterThan(0)
+    for (const cover of covers) {
+      expect(cover.props('src')).toBeNull()
+      expect(cover.props('fallbackSources')).toEqual(['/api/v1/books/434/thumbnail?medium=audio'])
+    }
+  })
 })
 
 describe('RequestListTable pairs', () => {

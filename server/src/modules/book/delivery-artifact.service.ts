@@ -14,8 +14,8 @@ import { FileLockService } from '../file-write/file-lock.service';
 import { DeliveryArtifactRepository } from './delivery-artifact.repository';
 import { inspectDeliveryEpub } from './epub-delivery-validation';
 
-const DELIVERY_DETECTOR_VERSION = 'overlay-inspection-v2';
-export const DELIVERY_TRANSFORM_VERSION = 'text-only-v2';
+const DELIVERY_DETECTOR_VERSION = 'overlay-inspection-v3';
+export const DELIVERY_TRANSFORM_VERSION = 'text-only-v3';
 const MAX_REMEMBERED_REVISIONS = 4096;
 export interface DeliverySource {
   id: number;

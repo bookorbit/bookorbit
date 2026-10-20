@@ -21,6 +21,9 @@ import { usePageTitle } from '@/composables/usePageTitle'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import AuthorHeader from '../components/AuthorHeader.vue'
 import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
+import AuthorFactsFields from '../components/AuthorFactsFields.vue'
+import AuthorMatchSheet from '../components/AuthorMatchSheet.vue'
+import { authorFactsDraft, authorFactsPayload, sameFactsDraft, type AuthorFactsDraft, type AuthorFactsField } from '../lib/author-facts'
 import {
   deleteAuthorImage,
   deleteAuthors,
@@ -80,6 +83,11 @@ watch(
   { immediate: true },
 )
 const authorName = computed(() => author.value?.name ?? '')
+const pinnedMatch = computed(() => {
+  const value = author.value
+  if (!value?.metadataProviderPinned || !value.metadataProvider || !value.metadataProviderId) return null
+  return { provider: value.metadataProvider, providerId: value.metadataProviderId }
+})
 const pageTitle = computed(() => {
   if (author.value?.name) return t('author.detail.pageTitleNamed', { name: author.value.name })
   return Number.isFinite(authorId.value) ? t('author.detail.pageTitleId', { id: authorId.value }) : t('author.detail.pageTitle')
@@ -95,7 +103,7 @@ const {
   cancel: cancelMetadataPreview,
   load: loadMetadataPreview,
   loadFresh: loadFreshMetadataPreview,
-} = useAuthorMetadataPreview(authorName)
+} = useAuthorMetadataPreview(authorName, pinnedMatch)
 
 const canUpdate = computed(() => hasPermissionInAnyLibrary('library_edit_metadata', 'editor'))
 const canMerge = computed(() => isSuperuser.value)
@@ -116,13 +124,21 @@ const authorImageInput = ref<HTMLInputElement | null>(null)
 const draftName = ref('')
 const draftSortName = ref('')
 const draftDescription = ref('')
-const seededDrafts = ref<{ name: string; sortName: string; description: string } | null>(null)
+const draftFacts = ref<AuthorFactsDraft>(authorFactsDraft(null))
+const invalidFacts = ref<AuthorFactsField[]>([])
+const seededDrafts = ref<{ name: string; sortName: string; description: string; facts: AuthorFactsDraft } | null>(null)
 const authorImageBusy = computed(() => uploadingImage.value || removingImage.value)
+const matchSheetOpen = ref(false)
 
 const draftsDirty = computed(() => {
   const seeded = seededDrafts.value
   if (!seeded) return false
-  return draftName.value !== seeded.name || draftSortName.value !== seeded.sortName || draftDescription.value !== seeded.description
+  return (
+    draftName.value !== seeded.name ||
+    draftSortName.value !== seeded.sortName ||
+    draftDescription.value !== seeded.description ||
+    !sameFactsDraft(draftFacts.value, seeded.facts)
+  )
 })
 
 const mergeQuery = ref('')
@@ -187,10 +203,13 @@ function seedDrafts(value: AuthorDetail | null) {
     name: value?.name ?? '',
     sortName: value?.sortName ?? '',
     description: value?.description ?? '',
+    facts: authorFactsDraft(value),
   }
   draftName.value = seeded.name
   draftSortName.value = seeded.sortName
   draftDescription.value = seeded.description
+  draftFacts.value = authorFactsDraft(value)
+  invalidFacts.value = []
   seededDrafts.value = seeded
 }
 
@@ -204,6 +223,16 @@ watch(
     seedDrafts(value)
   },
   { immediate: true },
+)
+
+// After a failed save, re-check as the user types so a corrected field loses its error at once.
+watch(
+  draftFacts,
+  (draft) => {
+    if (invalidFacts.value.length === 0 || !seededDrafts.value) return
+    invalidFacts.value = authorFactsPayload(draft, seededDrafts.value.facts).invalid
+  },
+  { deep: true },
 )
 
 function goBack() {
@@ -268,12 +297,17 @@ async function saveAuthorEdits() {
     return
   }
 
+  const facts = authorFactsPayload(draftFacts.value, seededDrafts.value?.facts ?? authorFactsDraft(author.value))
+  invalidFacts.value = facts.invalid
+  if (facts.invalid.length > 0) return
+
   savingEdit.value = true
   try {
     const updated = await updateAuthor(author.value.id, {
       name,
       sortName: draftSortName.value.trim() || null,
       description: draftDescription.value.trim() || null,
+      ...facts.payload,
     })
     author.value = updated
     seedDrafts(updated)
@@ -468,6 +502,20 @@ function searchMetadataPreviewFresh() {
   void loadFreshMetadataPreview()
 }
 
+function openMatchSheet() {
+  matchSheetOpen.value = true
+}
+
+function closeMatchSheet() {
+  matchSheetOpen.value = false
+}
+
+async function handleMatchUpdated(updated: AuthorDetail) {
+  author.value = updated
+  seedDrafts(updated)
+  await loadMetadataPreview()
+}
+
 onMounted(async () => {
   await fetchLibraries()
   await Promise.all([loadAuthor(), loadBooks(true)])
@@ -566,8 +614,10 @@ defineOptions({ name: 'AuthorDetailView' })
           @merge="toggleMerge"
           @refresh="refreshMetadata"
           @search-fresh="searchMetadataPreviewFresh"
+          @find-match="openMatchSheet"
           @delete="confirmDeleteOpen = true"
         />
+        <AuthorMatchSheet v-if="author && matchSheetOpen && canUpdate" :author="author" @close="closeMatchSheet" @updated="handleMatchUpdated" />
 
         <div v-if="metadataPreviewError" class="mt-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           {{ t('author.detail.previewError') }}
@@ -589,6 +639,7 @@ defineOptions({ name: 'AuthorDetailView' })
               {{ t('author.detail.edit.description') }}
               <textarea v-model="draftDescription" rows="3" class="mt-1 w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm" />
             </label>
+            <AuthorFactsFields v-model="draftFacts" :invalid="invalidFacts" />
             <div class="space-y-1.5">
               <p class="text-xs text-muted-foreground">{{ t('author.detail.edit.image') }}</p>
               <input ref="authorImageInput" type="file" accept="image/*" class="hidden" :disabled="authorImageBusy" @change="onAuthorImageSelected" />

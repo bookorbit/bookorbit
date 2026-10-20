@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, exists, or, sql } from 'drizzle-orm';
+import { type SQL, and, count, eq, exists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules } from '@bookorbit/types';
 
@@ -22,7 +22,8 @@ export class OpdsCollectionRepository {
       .limit(1);
   }
 
-  findVisibleForUser(userId: number, isSuperuser: boolean, contentFilters?: ContentFilterRules) {
+  // bookClauses narrow which member books a collection's count includes, never which collections list.
+  findVisibleForUser(userId: number, isSuperuser: boolean, contentFilters?: ContentFilterRules, bookClauses: SQL[] = []) {
     const libraryAccess = isSuperuser
       ? undefined
       : exists(
@@ -37,7 +38,7 @@ export class OpdsCollectionRepository {
       .select({ id: collections.id, name: collections.name, bookCount: sql<number>`count(${books.id})::int` })
       .from(collections)
       .leftJoin(collectionBooks, eq(collectionBooks.collectionId, collections.id))
-      .leftJoin(books, and(eq(books.id, collectionBooks.bookId), eq(books.status, 'present'), libraryAccess, ...filterClauses))
+      .leftJoin(books, and(eq(books.id, collectionBooks.bookId), eq(books.status, 'present'), libraryAccess, ...filterClauses, ...bookClauses))
       .where(this.visibleForUser(userId))
       .groupBy(collections.id)
       .orderBy(collections.name);

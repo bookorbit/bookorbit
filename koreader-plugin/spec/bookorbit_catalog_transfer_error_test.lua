@@ -29,7 +29,7 @@ end
 
 assertEqual(
     CatalogUtil.transferErrorText("unsafe_destination"),
-    "The download destination is outside the selected folder.",
+    "The download destination is outside the selected folder or contains a symbolic link.",
     "unsafe destinations are reported as local path failures"
 )
 assertEqual(
@@ -38,5 +38,14 @@ assertEqual(
     "temporary directory failures are reported as local filesystem failures"
 )
 assertEqual(CatalogUtil.transferErrorText("network_error"), nil, "network errors keep the existing connection message")
+assertEqual(CatalogUtil.transferErrorText("hash_mismatch"),
+    "The downloaded file failed its integrity check. Retry the download. The previous file was kept.",
+    "fingerprint failures explain safe retry")
+assertEqual(CatalogUtil.transferErrorText("size_mismatch"),
+    "The download was incomplete. Retry the download. The previous file was kept.",
+    "length failures explain safe retry")
+assertEqual(CatalogUtil.transferErrorText("response_too_large"),
+    "The download exceeded its expected size. The previous file was kept.",
+    "oversized responses explain preserved files")
 
 print("bookorbit_catalog_transfer_error_test.lua: ok")

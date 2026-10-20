@@ -456,6 +456,25 @@ describe('UserStatisticsService', () => {
     expect(repo.getPeakReadingHours).toHaveBeenCalledWith(123, false, [2], 30, 'Australia/Brisbane');
   });
 
+  it('passes the resolved user timezone to session archetypes and caches per timezone', async () => {
+    const repo = {
+      getSessionArchetypePoints: vi.fn().mockResolvedValue([]),
+    };
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService());
+
+    await service.getSessionArchetypes({ id: 123, isSuperuser: false, settings: { timezone: 'Australia/Brisbane' } } as any, { libraryIds: [2] });
+    await service.getSessionArchetypes({ id: 123, isSuperuser: false, settings: { timezone: 'Australia/Brisbane' } } as any, { libraryIds: [2] });
+    await service.getSessionArchetypes({ id: 123, isSuperuser: false, settings: { timezone: 'America/New_York' } } as any, { libraryIds: [2] });
+    await service.getSessionArchetypes({ id: 123, isSuperuser: false, settings: { timezone: 'Not/AZone' } } as any, { libraryIds: [2] });
+    await service.getSessionArchetypes({ id: 123, isSuperuser: false } as any, { libraryIds: [2] });
+
+    expect(repo.getSessionArchetypePoints.mock.calls).toEqual([
+      [123, false, [2], 365, 'Australia/Brisbane'],
+      [123, false, [2], 365, 'America/New_York'],
+      [123, false, [2], 365, 'UTC'],
+    ]);
+  });
+
   it('returns all weekday buckets for favorite reading days', async () => {
     const repo = {
       getFavoriteReadingDays: vi.fn().mockResolvedValue([

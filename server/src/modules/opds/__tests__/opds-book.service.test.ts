@@ -1,8 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
-import { bookSeries, bookSeriesMemberships } from '../../../db/schema';
-import { OpdsBookService } from '../opds-book.service';
+import { authors, bookSeries, bookSeriesMemberships } from '../../../db/schema';
+import { OpdsBookService, readStatusBucket } from '../opds-book.service';
 import { OpdsCollectionRepository } from '../opds-collection.repository';
 
 type BookPageResult = { entries: unknown[]; total: number };
@@ -26,7 +28,7 @@ function makeChain(result: unknown, fields?: Record<string, unknown>) {
     chain[key] = { key };
   }
 
-  const methods = ['from', 'leftJoin', 'innerJoin', 'where', 'groupBy', 'orderBy', 'limit', 'offset', '$dynamic', 'as'] as const;
+  const methods = ['from', 'leftJoin', 'innerJoin', 'where', 'groupBy', 'having', 'orderBy', 'limit', 'offset', '$dynamic', 'as'] as const;
   for (const method of methods) {
     chain[method] = vi.fn().mockReturnValue(chain);
   }
@@ -37,16 +39,39 @@ function makeChain(result: unknown, fields?: Record<string, unknown>) {
   return chain;
 }
 
-function makeDb(selectQueue: unknown[] = []) {
+function makeDb(selectQueue: unknown[] = [], distinctOnQueue: unknown[] = []) {
   const queue = [...selectQueue];
+  const distinctQueue = [...distinctOnQueue];
 
   return {
     select: vi.fn((fields?: Record<string, unknown>) => makeChain(queue.shift() ?? [], fields)),
+    selectDistinctOn: vi.fn((_on: unknown, fields?: Record<string, unknown>) => makeChain(distinctQueue.shift() ?? [], fields)),
   };
 }
 
-function makeService(selectQueue: unknown[] = [], queryBuilderOverrides: Record<string, unknown> = {}) {
-  const db = makeDb(selectQueue);
+const dialect = new PgDialect();
+
+function renderSql(fragment: unknown): { sql: string; params: unknown[] } {
+  const value = fragment && typeof fragment === 'object' && 'getSQL' in fragment ? (fragment as { getSQL(): SQL }).getSQL() : (fragment as SQL);
+  return dialect.sqlToQuery(value);
+}
+
+type ChainMock = Record<string, ReturnType<typeof vi.fn>>;
+
+function selectChains(db: ReturnType<typeof makeDb>): ChainMock[] {
+  return db.select.mock.results.map((result) => result.value as ChainMock);
+}
+
+function selectFields(db: ReturnType<typeof makeDb>, index: number): Record<string, unknown> {
+  return db.select.mock.calls[index]![0] as Record<string, unknown>;
+}
+
+function orderText(chain: ChainMock): string {
+  return (chain.orderBy.mock.calls[0] as unknown[]).map((clause) => renderSql(clause).sql).join(', ');
+}
+
+function makeService(selectQueue: unknown[] = [], queryBuilderOverrides: Record<string, unknown> = {}, distinctOnQueue: unknown[] = []) {
+  const db = makeDb(selectQueue, distinctOnQueue);
   const queryBuilder = {
     buildWhere: vi.fn().mockReturnValue(undefined),
     ...queryBuilderOverrides,
@@ -259,7 +284,7 @@ describe('OpdsBookService', () => {
     const listSpy = vi.spyOn(collectionRepository, 'findVisibleForUser').mockResolvedValue([{ id: 4, name: 'Favorites', bookCount: 1 }]);
     const countSpy = vi.spyOn(collectionRepository, 'countVisibleForUser').mockResolvedValue(3);
     await expect(service.getUserCollections(8, false, filters)).resolves.toEqual([{ id: 4, name: 'Favorites', bookCount: 1 }]);
-    expect(listSpy).toHaveBeenCalledWith(8, false, filters);
+    expect(listSpy).toHaveBeenCalledWith(8, false, filters, []);
     await expect(service.countUserCollections(8)).resolves.toBe(3);
     expect(countSpy).toHaveBeenCalledWith(8);
   });
@@ -473,22 +498,355 @@ describe('OpdsBookService', () => {
 
   it('returns paged distinct series from membership rows with stable ids', async () => {
     const { service, db } = makeService([
+      [],
       [
-        { id: 1, name: 'Dune', bookCount: 6 },
-        { id: 2, name: 'World of Warcraft', bookCount: 9 },
+        { id: 1, name: 'Dune', expectedCount: null, letter: 'D', bookCount: 6, readingCount: 0, finishedCount: 0 },
+        { id: 2, name: 'World of Warcraft', expectedCount: null, letter: 'W', bookCount: 9, readingCount: 0, finishedCount: 0 },
       ],
+      [{ key: 'D', index: 0, count: 2 }],
     ]);
     vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
 
     await expect(service.getDistinctSeriesPage(7, { q: 'war', limit: 1, offset: 0 })).resolves.toEqual({
-      items: [{ id: 1, name: 'Dune', bookCount: 6 }],
+      items: [
+        {
+          id: 1,
+          name: 'Dune',
+          expectedCount: null,
+          letter: 'D',
+          bookCount: 6,
+          readingCount: 0,
+          finishedCount: 0,
+          authorNames: [],
+          memberStates: [],
+          previews: [],
+        },
+      ],
       hasNext: true,
+      total: 2,
+      buckets: [{ key: 'D', index: 0 }],
     });
 
-    const chain = (db.select as ReturnType<typeof vi.fn>).mock.results.at(-1)!.value as Record<string, ReturnType<typeof vi.fn>>;
+    const chain = selectChains(db)[1]!;
     expect(chain.from).toHaveBeenCalledWith(bookSeries);
     expect(chain.innerJoin).toHaveBeenCalledWith(bookSeriesMemberships, expect.anything());
     expect(collectValues(chain.where.mock.calls[0]?.[0])).toEqual(expect.arrayContaining([1, '%war%']));
+    expect(orderText(chain)).toBe('"book_series"."name" ASC, "book_series"."id" ASC');
+  });
+
+  describe('catalog list pages', () => {
+    const at = new Date('2026-04-15T00:00:00.000Z');
+
+    function authorPage(rows: unknown[], summary: unknown[] = [], previews: unknown[] = [], seriesNames: unknown[] = []) {
+      return makeService([[], rows, summary, [], previews], {}, [seriesNames]);
+    }
+
+    it('orders authors by the sort name, falling back to the display name, then name and id so offsets are stable', async () => {
+      const { service, db } = authorPage([]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      await service.getDistinctAuthorsPage(7, { limit: 12, offset: 24 });
+
+      const page = selectChains(db)[1]!;
+      expect(orderText(page)).toBe(
+        'lower(public.bookorbit_unaccent(btrim(COALESCE(NULLIF(BTRIM("authors"."sort_name"), \'\'), "authors"."name")))) ASC, "authors"."name" ASC, "authors"."id" ASC',
+      );
+      expect(page.groupBy).toHaveBeenCalledWith(authors.id);
+      expect(page.limit).toHaveBeenCalledWith(13);
+      expect(page.offset).toHaveBeenCalledWith(24);
+    });
+
+    it.each([
+      [
+        'name_desc',
+        'lower(public.bookorbit_unaccent(btrim(COALESCE(NULLIF(BTRIM("authors"."sort_name"), \'\'), "authors"."name")))) DESC, "authors"."name" DESC, "authors"."id" ASC',
+      ],
+      [
+        'books',
+        'count(DISTINCT "books"."id") DESC, lower(public.bookorbit_unaccent(btrim(COALESCE(NULLIF(BTRIM("authors"."sort_name"), \'\'), "authors"."name")))) ASC, "authors"."name" ASC, "authors"."id" ASC',
+      ],
+    ] as const)('orders authors for sort=%s', async (sort, expected) => {
+      const { service, db } = authorPage([]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      await service.getDistinctAuthorsPage(7, { limit: 12, offset: 0, sort });
+
+      expect(orderText(selectChains(db)[1]!)).toBe(expected);
+    });
+
+    it('numbers the jump buckets with the same order the page uses and keys them by the same letter as each row', async () => {
+      const { service, db } = authorPage([]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      await service.getDistinctAuthorsPage(7, { limit: 12, offset: 0, sort: 'name_desc' });
+
+      const ranked = selectFields(db, 0) as { letter: { getSQL(): SQL }; rn: { getSQL(): SQL } };
+      const pageFields = selectFields(db, 1) as { letter: SQL };
+      const pageOrder = orderText(selectChains(db)[1]!);
+      expect(renderSql(ranked.rn).sql).toContain(`row_number() OVER (ORDER BY ${pageOrder})`);
+      expect(renderSql(ranked.letter).sql).toBe(renderSql(pageFields.letter).sql);
+      expect(renderSql(pageFields.letter).sql).toContain("~ '^[A-Z]$'");
+      expect(renderSql(pageFields.letter).sql).toContain('public.bookorbit_unaccent');
+    });
+
+    it('limits the reading and finished filters to authors with a book in that bucket', async () => {
+      for (const [filter, statuses] of [
+        ['reading', ['reading', 'rereading', 'on_hold']],
+        ['finished', ['read', 'skimmed', 'abandoned']],
+      ] as const) {
+        const { service, db } = authorPage([]);
+        vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+        await service.getDistinctAuthorsPage(7, { limit: 12, offset: 0, filter });
+
+        const having = renderSql(selectChains(db)[1]!.having.mock.calls[0]![0]);
+        expect(having.sql).toMatch(/^count\(DISTINCT "books"."id"\) FILTER \(WHERE "user_book_status"."status" IN \(\$\d+, \$\d+, \$\d+\)\) > 0$/);
+        expect(having.params).toEqual([...statuses]);
+        // The count query numbers the same filtered rows.
+        expect(selectChains(db)[0]!.having.mock.calls[0]![0]).toBe(selectChains(db)[1]!.having.mock.calls[0]![0]);
+      }
+    });
+
+    it('attaches the top series and preview books to each author and sums the bucket counts into the total', async () => {
+      const { service } = authorPage(
+        [
+          { id: 1, name: 'Frank Herbert', hasPhoto: true, letter: 'H', bookCount: 3, readingCount: 1, finishedCount: 1 },
+          { id: 2, name: 'Iain Banks', hasPhoto: false, letter: 'B', bookCount: 1, readingCount: 0, finishedCount: 0 },
+          { id: 3, name: 'next page', hasPhoto: false, letter: 'N', bookCount: 1, readingCount: 0, finishedCount: 0 },
+        ],
+        [
+          { key: 'B', index: 0, count: 4 },
+          { key: 'H', index: 4, count: 2 },
+        ],
+        [
+          { groupId: 1, id: 10, title: 'Dune', folderPath: '/lib/dune', coverSource: 'extracted', seriesIndex: '1', addedAt: at, updatedAt: at },
+          { groupId: 1, id: 11, title: null, folderPath: '/lib/Dune Messiah', coverSource: null, seriesIndex: null, addedAt: at, updatedAt: at },
+        ],
+        [{ authorId: 1, name: 'Dune' }],
+      );
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      const result = await service.getDistinctAuthorsPage(7, { limit: 2, offset: 0 });
+
+      expect(result.hasNext).toBe(true);
+      expect(result.total).toBe(6);
+      expect(result.buckets).toEqual([
+        { key: 'B', index: 0 },
+        { key: 'H', index: 4 },
+      ]);
+      expect(result.items).toEqual([
+        expect.objectContaining({
+          id: 1,
+          seriesName: 'Dune',
+          previews: [
+            { id: 10, title: 'Dune', hasCover: true, seriesIndex: '1', addedAt: at, updatedAt: at },
+            { id: 11, title: 'Dune Messiah', hasCover: false, seriesIndex: null, addedAt: at, updatedAt: at },
+          ],
+        }),
+        expect.objectContaining({ id: 2, seriesName: null, previews: [] }),
+      ]);
+    });
+
+    it('ranks author previews in progress first, then finished, then newest, three per author in one query', async () => {
+      const { service, db } = authorPage([
+        { id: 1, name: 'Frank Herbert', hasPhoto: false, letter: 'H', bookCount: 9, readingCount: 0, finishedCount: 0 },
+      ]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      await service.getDistinctAuthorsPage(7, { limit: 12, offset: 0 });
+
+      const ranked = selectFields(db, 3) as { rn: { getSQL(): SQL } };
+      const rn = renderSql(ranked.rn).sql;
+      expect(rn).toContain('PARTITION BY "book_authors"."author_id"');
+      expect(rn).toMatch(
+        /ORDER BY CASE WHEN .* THEN 0 WHEN .* THEN 1 ELSE 2 END, CASE[\s\S]*"reading_progress"[\s\S]*"books"."added_at"[\s\S]*END DESC NULLS LAST, "books"."id" DESC/,
+      );
+      const outer = renderSql(selectChains(db)[4]!.where.mock.calls[0]![0]);
+      expect(outer.sql).toMatch(/ <= \$2$/);
+      expect(outer.params[1]).toBe(3);
+    });
+
+    it('caps series member states at forty in series order and takes the first three as previews', async () => {
+      const members = Array.from({ length: 5 }, (_, index) => ({
+        seriesId: 31,
+        id: 100 + index,
+        seriesIndex: String(index + 1),
+        status: ['read', 'reading', null, 'on_hold', 'want_to_read'][index],
+        title: `Book ${index + 1}`,
+        folderPath: `/lib/${index}`,
+        coverSource: 'extracted',
+        addedAt: at,
+        updatedAt: at,
+        firstAuthor: ['J.K. Rowling', 'J.K. Rowling', 'Jack Thorne', 'John Tiffany', null][index],
+      }));
+      const { service, db } = makeService([
+        [],
+        [{ id: 31, name: 'Harry Potter', expectedCount: 7, letter: 'H', bookCount: 5, readingCount: 2, finishedCount: 1 }],
+        [{ key: 'H', index: 0, count: 1 }],
+        [],
+        members,
+      ]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      const result = await service.getDistinctSeriesPage(7, { limit: 12, offset: 0 });
+
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          expectedCount: 7,
+          authorNames: ['J.K. Rowling', 'Jack Thorne'],
+          memberStates: ['finished', 'reading', 'unread', 'reading', 'unread'],
+          previews: [
+            expect.objectContaining({ id: 100, seriesIndex: '1' }),
+            expect.objectContaining({ id: 101, seriesIndex: '2' }),
+            expect.objectContaining({ id: 102, seriesIndex: '3' }),
+          ],
+        }),
+      );
+      const ranked = selectFields(db, 3) as { rn: { getSQL(): SQL } };
+      expect(renderSql(ranked.rn).sql).toContain(
+        'PARTITION BY "book_series_memberships"."series_id" ORDER BY CASE WHEN "book_series_memberships"."series_index" IS NULL',
+      );
+      expect(renderSql(ranked.rn).sql).toContain('"book_metadata"."title" ASC NULLS LAST, "books"."id" ASC');
+      const outer = renderSql(selectChains(db)[4]!.where.mock.calls[0]![0]);
+      expect(outer.sql).toMatch(/ <= \$2$/);
+      expect(outer.params[1]).toBe(40);
+    });
+
+    it.each([
+      [
+        'reading',
+        /^\(count\(DISTINCT "books"."id"\) FILTER .* > 0 OR \(count\(DISTINCT "books"."id"\) FILTER .* > 0 AND count\(DISTINCT "books"."id"\) FILTER .* < count\(DISTINCT "books"."id"\)\)\)$/,
+      ],
+      ['finished', /^count\(DISTINCT "books"."id"\) FILTER .* = count\(DISTINCT "books"."id"\)$/],
+    ] as const)('filters series to %s', async (filter, pattern) => {
+      const { service, db } = makeService();
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      await service.getDistinctSeriesPage(7, { limit: 12, offset: 0, filter });
+
+      expect(renderSql(selectChains(db)[1]!.having.mock.calls[0]![0]).sql).toMatch(pattern);
+    });
+
+    it('returns an empty page when the reader can reach no library', async () => {
+      const { service, db } = makeService();
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValue([]);
+
+      await expect(service.getDistinctAuthorsPage(7, { limit: 12, offset: 0 })).resolves.toEqual({
+        items: [],
+        hasNext: false,
+        total: 0,
+        buckets: [],
+      });
+      await expect(service.getDistinctSeriesPage(7, { limit: 12, offset: 0 })).resolves.toEqual({ items: [], hasNext: false, total: 0, buckets: [] });
+      expect(db.select).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('book summaries and buckets', () => {
+    it('counts a scope with reading and finished buckets and takes the newest books as previews', async () => {
+      const at = new Date('2026-04-15T00:00:00.000Z');
+      const { service, db } = makeService([
+        [{ total: 12, reading: 3, finished: 4 }],
+        [{ id: 9, title: 'Dune', folderPath: '/lib/dune', coverSource: null, seriesIndex: null, addedAt: at, updatedAt: at }],
+      ]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      await expect(service.summarizeBooks(7, { libraryId: 1 }, 3)).resolves.toEqual({
+        total: 12,
+        reading: 3,
+        finished: 4,
+        previews: [{ id: 9, title: 'Dune', hasCover: false, seriesIndex: null, addedAt: at, updatedAt: at }],
+      });
+      const [counts, previews] = selectChains(db);
+      expect(collectValues(counts!.where.mock.calls[0]![0])).toEqual(expect.arrayContaining([1, 'present']));
+      expect(previews!.where.mock.calls[0]![0]).toBe(counts!.where.mock.calls[0]![0]);
+      expect(orderText(previews!)).toBe('"books"."added_at" DESC, "books"."id" ASC');
+      expect(previews!.limit).toHaveBeenCalledWith(3);
+    });
+
+    it('skips the preview query when no previews are wanted and returns zeros for an empty scope', async () => {
+      const { service, db } = makeService([[{ total: 2, reading: 0, finished: 1 }]]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]).mockResolvedValueOnce([]);
+
+      await expect(service.summarizeBooks(7, { seriesId: 4 }, 0)).resolves.toEqual({ total: 2, reading: 0, finished: 1, previews: [] });
+      expect(db.select).toHaveBeenCalledTimes(1);
+      await expect(service.summarizeBooks(7, { seriesId: 4 }, 3)).resolves.toEqual({ total: 0, reading: 0, finished: 0, previews: [] });
+    });
+
+    it.each([
+      ['title_asc', '"book_metadata"."title"', '"book_metadata"."title" ASC NULLS LAST, "books"."id" ASC'],
+      ['title_desc', '"book_metadata"."title"', '"book_metadata"."title" DESC NULLS LAST, "books"."id" ASC'],
+      [
+        'author_asc',
+        '"books"."primary_author_sort_name"',
+        '"books"."primary_author_sort_name" ASC NULLS LAST, "book_metadata"."title" ASC NULLS LAST, "books"."id" ASC',
+      ],
+      [
+        'author_desc',
+        '"books"."primary_author_sort_name"',
+        '"books"."primary_author_sort_name" DESC NULLS LAST, "book_metadata"."title" ASC NULLS LAST, "books"."id" ASC',
+      ],
+    ] as const)('numbers %s book buckets with the page order', async (sortOrder, key, order) => {
+      const { service, db } = makeService([
+        [],
+        [
+          { key: 'A', index: 0, count: 2 },
+          { key: 'B', index: 2, count: 1 },
+        ],
+      ]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+      await expect(service.getBookJumpBuckets(7, sortOrder, { libraryId: 1 })).resolves.toEqual([
+        { key: 'A', index: 0 },
+        { key: 'B', index: 2 },
+      ]);
+      const ranked = selectFields(db, 0) as { letter: { getSQL(): SQL }; rn: { getSQL(): SQL } };
+      expect(renderSql(ranked.letter).sql).toContain(`btrim(${key})`);
+      expect(renderSql(ranked.rn).sql).toBe(`(row_number() OVER (ORDER BY ${order}) - 1)::int`);
+      expect(orderText(selectChains(db)[1]!)).toMatch(/^min\(/);
+    });
+
+    it('sorts books by author on the primary author sort key the web uses', async () => {
+      const { service, db } = makeService([[], [{ total: 0 }]]);
+
+      await testable(service).paginatedBookQuery({ kind: 'where' }, 'author_asc', 1, 25, 7);
+
+      const page = selectChains(db)[0]!;
+      expect(orderText(page)).toBe('"books"."primary_author_sort_name" ASC NULLS LAST, "book_metadata"."title" ASC NULLS LAST, "books"."id" ASC');
+      expect(page.groupBy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findVisibleAuthor', () => {
+    it('finds an author only through a present book in a reachable library', async () => {
+      const row = { id: 134, name: 'J.K. Rowling', description: null, birthYear: 1965, deathYear: null, hasPhoto: true };
+      const { service, db } = makeService([[], [row]]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1, 2]);
+
+      await expect(service.findVisibleAuthor(7, { id: 134 }, false, EMPTY_CONTENT_FILTER_RULES)).resolves.toEqual(row);
+
+      const visibleBook = selectChains(db)[0]!;
+      expect(collectValues(visibleBook.where.mock.calls[0]![0])).toEqual(expect.arrayContaining([1, 2, 'present']));
+      const where = renderSql(selectChains(db)[1]!.where.mock.calls[0]![0]);
+      expect(where.sql).toMatch(/^\("authors"."id" = \$1 and exists \(/);
+      expect(where.params[0]).toBe(134);
+    });
+
+    it('looks an author up by exact name and returns null when nothing is visible', async () => {
+      const { service, db } = makeService([[], []]);
+      vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]).mockResolvedValueOnce([]);
+
+      await expect(service.findVisibleAuthor(7, { name: 'Nobody' })).resolves.toBeNull();
+      expect(renderSql(selectChains(db)[1]!.where.mock.calls[0]![0]).params[0]).toBe('Nobody');
+      await expect(service.findVisibleAuthor(7, { id: 1 })).resolves.toBeNull();
+      expect(db.select).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('maps read statuses onto the reading, finished and unread buckets the read-status filter uses', () => {
+    expect(['reading', 'rereading', 'on_hold'].map(readStatusBucket)).toEqual(['reading', 'reading', 'reading']);
+    expect(['read', 'skimmed', 'abandoned'].map(readStatusBucket)).toEqual(['finished', 'finished', 'finished']);
+    expect(['unread', 'want_to_read', null, undefined].map(readStatusBucket)).toEqual(['unread', 'unread', 'unread', 'unread']);
   });
 
   it('short-circuits when an empty id filter is supplied', async () => {
@@ -515,6 +873,8 @@ describe('OpdsBookService', () => {
       'updated_asc',
       'recently_read',
       'recently_read_asc',
+      'last_read',
+      'last_read_asc',
       'title_asc',
       'title_desc',
       'author_asc',
@@ -524,7 +884,8 @@ describe('OpdsBookService', () => {
     ] as const;
 
     for (const sortOrder of sortOrders) {
-      const { service, db } = makeService([[], [{ total: 0 }]]);
+      // last_read builds its aggregate subquery first.
+      const { service, db } = makeService(sortOrder.startsWith('last_read') ? [[], [], [{ total: 0 }]] : [[], [{ total: 0 }]]);
       await testable(service).paginatedBookQuery({ kind: 'where' }, sortOrder, 1, 25, 7);
 
       const chains = (db.select as ReturnType<typeof vi.fn>).mock.results.map((r) => r.value as Record<string, unknown>);
@@ -538,6 +899,19 @@ describe('OpdsBookService', () => {
 
       expect(hasIdTiebreaker, `sort order "${sortOrder}" is missing books.id tiebreaker`).toBe(true);
     }
+  });
+
+  it('sorts last_read by when this reader last opened each book, joined as one aggregate', async () => {
+    const { service, db } = makeService([[], [], [{ total: 0 }]]);
+    await testable(service).paginatedBookQuery({ kind: 'where' }, 'last_read', 1, 25, 7);
+
+    const [aggregate, ids] = selectChains(db);
+    expect(Object.keys(selectFields(db, 0))).toEqual(['bookId', 'lastReadAt']);
+    expect(aggregate.groupBy).toHaveBeenCalledTimes(1);
+    expect(collectValues(aggregate.where.mock.calls[0])).toContain(7);
+    // Metadata, the reader's status and the aggregate.
+    expect(ids.leftJoin).toHaveBeenCalledTimes(3);
+    expect(orderText(ids)).toMatch(/DESC NULLS LAST, "user_book_status"."updated_at" DESC NULLS LAST, "books"."id" ASC$/);
   });
 
   it('maps metadata, authors, and files into ordered OPDS entries', async () => {

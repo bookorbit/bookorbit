@@ -25,6 +25,17 @@ describe('book media profile', () => {
     expect(getBookMediaProfile(files).primaryMediaKind).toBe('audiobook')
   })
 
+  it('derives media capabilities from content files only', () => {
+    const files = [file(1, 'm4b', 'primary'), file(2, 'jpg', 'supplement'), file(3, 'jpg', 'cover'), file(4, 'nfo', 'metadata')]
+
+    expect(getBookMediaProfile(files)).toEqual({
+      primaryMediaKind: 'audiobook',
+      hasEbook: false,
+      hasAudio: true,
+      hasComic: false,
+    })
+  })
+
   it.each([
     [' EPUB ', 'ebook'],
     ['m4A', 'audiobook'],

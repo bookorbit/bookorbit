@@ -1030,5 +1030,17 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/koreader/koreader-catalog.controller.ts",
+    "className": "KoreaderCatalogController",
+    "methodName": "authorPhoto",
+    "httpMethod": "GET",
+    "path": "/koreader/plugin/catalog/authors/:authorId/photo",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": ["KoreaderAuthGuard"]
   }
 ]

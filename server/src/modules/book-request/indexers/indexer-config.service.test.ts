@@ -3,6 +3,7 @@ import { DEFAULT_INDEXER_CATEGORIES, INDEXER_COLORS } from '@bookorbit/types';
 
 import type { RequestIndexerManagerRow, RequestIndexerRow } from '../../../db/schema';
 import { IndexerConfigService } from './indexer-config.service';
+import { PluginIndexerAdapter } from './plugins/plugin-host';
 
 function indexerRow(overrides: Partial<RequestIndexerRow> = {}): RequestIndexerRow {
   return {
@@ -491,6 +492,41 @@ describe('IndexerConfigService', () => {
     adapter.forget.mockClear();
     await service.update(9, { enabled: false });
     expect(adapter.forget).not.toHaveBeenCalled();
+  });
+
+  /** A plugin's in-memory session otherwise outranks the stored credential until the process restarts. */
+  it('drops a plugin-backed session when its connection details change', async () => {
+    const forget = vi.fn();
+    const adapter = new PluginIndexerAdapter(
+      {
+        apiVersion: 1,
+        type: 'demo-tracker',
+        label: 'Demo Tracker',
+        requiresCredential: true,
+        credentialKind: 'sessionId',
+        mediaKinds: ['ebook'],
+        usesCategories: false,
+        seedsBack: true,
+        search: () => Promise.resolve([]),
+        test: () => Promise.resolve({ success: true }),
+        fetchTorrentFile: () => Promise.resolve(new Uint8Array()),
+        forget,
+      },
+      {} as never,
+    );
+    const { service } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(indexerRow({ adapterType: 'demo-tracker' })) },
+      registry: { require: vi.fn().mockReturnValue(adapter), find: vi.fn().mockReturnValue(adapter) },
+    });
+
+    await service.update(9, { credential: 'a-new-session' });
+    await service.update(9, { baseUrl: 'http://203.0.113.11:9117' });
+    await service.update(9, { allowPrivateAddress: true });
+    expect(forget.mock.calls).toEqual([[9], [9], [9]]);
+
+    forget.mockClear();
+    await service.update(9, { name: 'renamed', enabled: false });
+    expect(forget).not.toHaveBeenCalled();
   });
 
   it('falls back to the adapter default categories for a medium left blank', async () => {

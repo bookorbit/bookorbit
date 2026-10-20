@@ -11,12 +11,16 @@ import type {
   AnnotationPositionInfo,
   AnnotationSyncDetail,
 } from '@bookorbit/types';
+import { ANNOTATION_PURGE_PENDING_DEVICE_SYNC } from '@bookorbit/types';
+import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { BookService } from '../book/book.service';
+import { LibraryService } from '../library/library.service';
 import { foldActivityWeeks, longestQuietWeeks } from './annotation-stats.utils';
 import { AnnotationConversionService } from './annotation-conversion.service';
 import { AnnotationExportService, type AnnotationExportFormat, type AnnotationExportResult } from './annotation-export.service';
 import { AnnotationSyncRepository } from './annotation-sync.repository';
-import { AnnotationRepository, type HubAnnotationRow, type HubFilters, type HubSort } from './annotation.repository';
+import { AnnotationRepository, type HubAccess, type HubAnnotationRow, type HubFilters, type HubSort } from './annotation.repository';
 import { DevicePositionRebuilderRegistry } from './device-position-rebuilder';
 import type { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto } from './dto/annotation-hub.dto';
 
@@ -42,12 +46,29 @@ export class AnnotationHubService {
     private readonly syncRepo: AnnotationSyncRepository,
     private readonly conversionService: AnnotationConversionService,
     private readonly rebuilderRegistry: DevicePositionRebuilderRegistry,
+    private readonly libraryService: LibraryService,
+    private readonly bookService: BookService,
   ) {}
 
-  async list(userId: number, query: AnnotationHubQueryDto): Promise<AnnotationHubResponse> {
+  // Highlights on books the user can no longer open (library access revoked, content rules) stay
+  // stored but leave the hub, as they leave the Notebook; they come back with the access.
+  private async access(user: RequestUser): Promise<HubAccess> {
+    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    return { libraryIds, contentFilters: user.isSuperuser ? undefined : user.contentFilters };
+  }
+
+  private async findAccessible(user: RequestUser, annotationId: number) {
+    const annotation = await this.syncRepo.findAnnotationById(annotationId, user.id);
+    if (!annotation) throw new NotFoundException(`Annotation ${annotationId} not found`);
+    await this.bookService.verifyBookAccess(annotation.bookId, user);
+    return annotation;
+  }
+
+  async list(user: RequestUser, query: AnnotationHubQueryDto): Promise<AnnotationHubResponse> {
+    const userId = user.id;
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
-    const filters = this.buildFilters(query);
+    const filters = { ...this.buildFilters(query), access: await this.access(user) };
     const [{ items, total }, statsRow] = await Promise.all([
       this.annotationRepo.findHubPaginated(userId, filters, this.buildSort(query), page, pageSize),
       this.annotationRepo.getHubStats(userId, filters),
@@ -67,8 +88,8 @@ export class AnnotationHubService {
   }
 
   /** Total annotations the hub lists by default; trashed rows are excluded. */
-  async countActive(userId: number): Promise<number> {
-    return this.annotationRepo.countHub(userId, { status: 'active' });
+  async countActive(user: RequestUser): Promise<number> {
+    return this.annotationRepo.countHub(user.id, { status: 'active', access: await this.access(user) });
   }
 
   /**
@@ -76,8 +97,10 @@ export class AnnotationHubService {
    * `list`: the stream is an infinite scroll, and recomputing six aggregates over every
    * annotation a user owns on each page of it is the one cost this page cannot carry.
    */
-  async overview(userId: number, query: AnnotationHubQueryDto): Promise<AnnotationHubOverview> {
-    const filters = this.buildFilters(query);
+  async overview(user: RequestUser, query: AnnotationHubQueryDto): Promise<AnnotationHubOverview> {
+    const userId = user.id;
+    const access = await this.access(user);
+    const filters = { ...this.buildFilters(query), access };
     const now = new Date();
     const since = new Date(now.getTime() - ACTIVITY_WINDOW_DAYS * DAY_MS);
     const [total, statsRow, colorRows, needsReview, trashed, shelfRows, weekRows, deviceRows] = await Promise.all([
@@ -85,10 +108,10 @@ export class AnnotationHubService {
       this.annotationRepo.getHubStats(userId, filters),
       this.annotationRepo.getHubColorBreakdown(userId, filters),
       this.annotationRepo.countHubNeedsReview(userId, filters),
-      this.annotationRepo.countHubTrashed(userId),
-      this.annotationRepo.findHubBookFacets(userId, { status: filters.status, limit: SHELF_LIMIT, order: 'count' }),
+      this.annotationRepo.countHubTrashed(userId, access),
+      this.annotationRepo.findHubBookFacets(userId, { status: filters.status, limit: SHELF_LIMIT, order: 'count', access }),
       this.annotationRepo.getHubActivityWeeks(userId, filters, since),
-      this.annotationRepo.getHubDeviceSummary(userId),
+      this.annotationRepo.getHubDeviceSummary(userId, access),
     ]);
 
     const weeks = foldActivityWeeks(weekRows);
@@ -127,30 +150,34 @@ export class AnnotationHubService {
   }
 
   async listBooks(
-    userId: number,
+    user: RequestUser,
     params: { status: 'active' | 'trashed'; q?: string; limit?: number; selectedId?: number },
   ): Promise<AnnotationHubBookFacet[]> {
+    const userId = user.id;
+    const access = await this.access(user);
     const limit = params.limit ?? DEFAULT_BOOK_FACET_LIMIT;
-    const rows = await this.annotationRepo.findHubBookFacets(userId, { status: params.status, q: params.q, limit });
+    const rows = await this.annotationRepo.findHubBookFacets(userId, { status: params.status, q: params.q, limit, access });
     const facets = rows.map(toBookFacet);
     if (params.selectedId && !facets.some((facet) => facet.bookId === params.selectedId)) {
-      const selected = await this.annotationRepo.findHubBookFacet(userId, params.status, params.selectedId);
+      const selected = await this.annotationRepo.findHubBookFacet(userId, params.status, params.selectedId, access);
       if (selected) facets.unshift(toBookFacet(selected));
     }
     return facets;
   }
 
-  async bulk(userId: number, dto: AnnotationBulkDto): Promise<{ affected: number }> {
+  async bulk(user: RequestUser, dto: AnnotationBulkDto): Promise<{ affected: number }> {
+    const userId = user.id;
     const startedAtMs = Date.now();
+    const access = await this.access(user);
     let affected: number;
     if (dto.action === 'trash') {
-      affected = await this.annotationRepo.bulkSetDeleted(userId, dto.ids, true);
+      affected = await this.annotationRepo.bulkTrash(userId, dto.ids, access);
     } else if (dto.action === 'restore') {
-      affected = await this.annotationRepo.bulkSetDeleted(userId, dto.ids, false);
+      affected = await this.annotationRepo.bulkRestore(userId, dto.ids, access);
     } else if (dto.action === 'star' || dto.action === 'unstar') {
-      affected = await this.annotationRepo.bulkSetStarred(userId, dto.ids, dto.action === 'star');
+      affected = await this.annotationRepo.bulkSetStarred(userId, dto.ids, dto.action === 'star', access);
     } else {
-      affected = await this.annotationRepo.bulkRestyle(userId, dto.ids, { color: dto.color, style: dto.style });
+      affected = await this.annotationRepo.bulkRestyle(userId, dto.ids, { color: dto.color, style: dto.style }, access);
     }
     this.logger.log(
       `[${BULK_EVENT}] [end] userId=${userId} action=${dto.action} requested=${dto.ids.length} affected=${affected} durationMs=${Date.now() - startedAtMs} - bulk annotation action applied`,
@@ -158,7 +185,9 @@ export class AnnotationHubService {
     return { affected };
   }
 
-  async restore(userId: number, annotationId: number): Promise<AnnotationHubItem> {
+  async restore(user: RequestUser, annotationId: number): Promise<AnnotationHubItem> {
+    const userId = user.id;
+    await this.findAccessible(user, annotationId);
     const restored = await this.annotationRepo.restore(annotationId, userId);
     if (!restored) throw new NotFoundException(`Annotation ${annotationId} not found in trash`);
     const row = await this.annotationRepo.findHubById(userId, annotationId);
@@ -179,26 +208,31 @@ export class AnnotationHubService {
   }
 
   /** Hard delete; blocked until every synced device acknowledged the deletion. */
-  async purge(userId: number, annotationId: number): Promise<void> {
-    const result = await this.annotationRepo.purge(annotationId, userId);
+  async purge(user: RequestUser, annotationId: number): Promise<void> {
+    await this.findAccessible(user, annotationId);
+    const result = await this.annotationRepo.purge(annotationId, user.id);
     if (result === 'not_found') throw new NotFoundException(`Annotation ${annotationId} not found in trash`);
     if (result === 'pending_device_sync') {
-      throw new ConflictException('This annotation is still queued for deletion on a synced device. Sync the device first or keep it in trash.');
+      throw new ConflictException({
+        errorCode: ANNOTATION_PURGE_PENDING_DEVICE_SYNC,
+        message: 'This annotation is still queued for deletion on a synced device. Sync the device first or keep it in trash.',
+      });
     }
   }
 
-  async export(userId: number, query: AnnotationExportQueryDto, scopeLabel: string): Promise<AnnotationExportResult> {
+  async export(user: RequestUser, query: AnnotationExportQueryDto, scopeLabel: string): Promise<AnnotationExportResult> {
+    const userId = user.id;
     const format: AnnotationExportFormat = query.format ?? 'md';
-    const rows = await this.annotationRepo.findHubAll(userId, this.buildFilters(query));
+    const rows = await this.annotationRepo.findHubAll(userId, { ...this.buildFilters(query), access: await this.access(user) });
     this.logger.log(
       `[annotation.export] [end] userId=${userId} format=${format} rows=${rows.length} scope="${sanitizeLogValue(scopeLabel)}" - annotations exported`,
     );
     return this.exportService.export(rows, format, scopeLabel);
   }
 
-  async syncDetail(userId: number, annotationId: number): Promise<AnnotationSyncDetail> {
-    const annotation = await this.syncRepo.findAnnotationById(annotationId, userId);
-    if (!annotation) throw new NotFoundException(`Annotation ${annotationId} not found`);
+  async syncDetail(user: RequestUser, annotationId: number): Promise<AnnotationSyncDetail> {
+    const userId = user.id;
+    const annotation = await this.findAccessible(user, annotationId);
 
     const [positionRows, stateRows] = await Promise.all([
       this.syncRepo.findPositionsByAnnotationIds([annotationId], ['cfi', 'xpointer', 'pdf', 'kobo_span']),
@@ -235,9 +269,9 @@ export class AnnotationHubService {
    * cfi from an xpointer and has nothing to work from when that failed too. Formats
    * with no usable source recompute on that device type's next sync.
    */
-  async retryPosition(userId: number, annotationId: number, format: AnnotationPositionFormat): Promise<AnnotationSyncDetail> {
-    const annotation = await this.syncRepo.findAnnotationById(annotationId, userId);
-    if (!annotation) throw new NotFoundException(`Annotation ${annotationId} not found`);
+  async retryPosition(user: RequestUser, annotationId: number, format: AnnotationPositionFormat): Promise<AnnotationSyncDetail> {
+    const userId = user.id;
+    const annotation = await this.findAccessible(user, annotationId);
 
     await this.syncRepo.updatePosition(annotationId, format, { status: 'pending', converterVersion: null });
 
@@ -252,7 +286,7 @@ export class AnnotationHubService {
     this.logger.log(
       `[${RETRY_EVENT}] [end] userId=${userId} annotationId=${annotationId} format=${format} rebuilt=${rebuilt} converted=${converted} - position retry applied`,
     );
-    return this.syncDetail(userId, annotationId);
+    return this.syncDetail(user, annotationId);
   }
 
   private toHubItem(row: HubAnnotationRow): AnnotationHubItem {

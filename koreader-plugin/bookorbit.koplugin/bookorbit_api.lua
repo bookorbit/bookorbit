@@ -183,9 +183,11 @@ BookOrbitApi.decodeResponse = decodeResponse
 -- Normalizes a user-entered server address to the API base, e.g.
 -- "https://books.example.com/" -> "https://books.example.com/api/v1".
 function BookOrbitApi.normalizeServerUrl(input)
-    if not input then return nil end
+    if type(input) ~= "string" then return nil end
     local url = util.trim(input)
-    if url == "" then return nil end
+    if url == "" or url:find("[%s%c%?#]") then return nil end
+    local parsed = parseHttpUrl(url)
+    if not parsed or parsed.port < 1 or parsed.port > 65535 then return nil end
     url = url:gsub("/+$", "")
     url = url:gsub("/api/v1/koreader$", "/api/v1")
     if not url:match("/api/v1$") then
@@ -386,7 +388,7 @@ function BookOrbitApi:query(path, params)
 
     local keys = {}
     for key, value in pairs(params) do
-        if value ~= nil and value ~= "" then
+        if key ~= "on_device_filter" and value ~= nil and value ~= "" then
             table.insert(keys, key)
         end
     end
@@ -640,6 +642,10 @@ function BookOrbitApi:exchangeAnnotations(books)
     return self:request("POST", "/koreader/plugin/annotations/exchange", self:withDevice({ books = books }))
 end
 
+function BookOrbitApi:annotationPendingBooks(hashes)
+    return self:request("POST", "/koreader/plugin/annotations/pending", self:withDevice({ hashes = hashes }))
+end
+
 function BookOrbitApi:exchangeAck(books)
     return self:request("POST", "/koreader/plugin/annotations/exchange-ack", self:withDevice({ books = books }))
 end
@@ -742,6 +748,14 @@ function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path, opts)
     opts.accept = "image/jpeg,image/*"
     opts.expect_content_type = "image/"
     return self:download("/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/thumbnail", local_path, opts)
+end
+
+-- An author's portrait, from servers advertising catalogListsV2.
+function BookOrbitApi:downloadCatalogAuthorPhoto(author_id, local_path, opts)
+    opts = opts or {}
+    opts.accept = "image/jpeg,image/*"
+    opts.expect_content_type = "image/"
+    return self:download("/koreader/plugin/catalog/authors/" .. tostring(author_id) .. "/photo", local_path, opts)
 end
 
 -- Plugin self-update endpoints

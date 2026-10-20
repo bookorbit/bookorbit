@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { api } from '@/lib/api'
 import { fulfilmentBase } from '../fulfilmentBase'
 import type { BookRequestReview } from '@bookorbit/types'
@@ -44,6 +44,16 @@ export function useRequestReview(canManage: () => boolean) {
     }
   }
 
+  /**
+   * Keyed on the dock entry as well as the request: discarding an import and grabbing another
+   * leaves the request id unchanged, and the browser would otherwise keep showing the first cover.
+   */
+  const coverUrl = computed(() => {
+    const current = review.value
+    if (!current?.hasCover || current.bookDockFileId === null) return null
+    return `${basePath()}/${current.requestId}/review/cover?entry=${current.bookDockFileId}`
+  })
+
   function reset(): void {
     generation++
     review.value = null
@@ -51,5 +61,5 @@ export function useRequestReview(canManage: () => boolean) {
     failed.value = false
   }
 
-  return { review, loading, failed, fetchReview, reset }
+  return { review, coverUrl, loading, failed, fetchReview, reset }
 }

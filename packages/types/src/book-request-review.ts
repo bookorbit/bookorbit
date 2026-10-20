@@ -33,6 +33,26 @@ export interface BookRequestVerification {
   rows: BookRequestVerificationRow[];
 }
 
+/**
+ * What the imported file says about itself, for telling one edition from another. The comparison
+ * is about the work, and two editions of one work agree on its title and author.
+ *
+ * Read from the file's own metadata only, never from what a provider matched it to: a provider
+ * match is itself a guess at the edition, and this is what an approver checks that guess against.
+ */
+export interface BookRequestReviewEdition {
+  publisher: string | null;
+  /** As the file states it, which may be a year, a month or a full date. Shown, never parsed. */
+  publishedDate: string | null;
+  language: string | null;
+  pageCount: number | null;
+  isbn10: string | null;
+  narrators: string[];
+  durationSeconds: number | null;
+  abridged: boolean | null;
+  chapterCount: number | null;
+}
+
 /** One file of the imported entry. Names only: a dock path is a server path and never leaves. */
 export type BookRequestReviewFile = Pick<BookDockUnitFile, "fileName" | "fileSize" | "format" | "role">;
 
@@ -58,4 +78,15 @@ export interface BookRequestReview {
   totalSizeBytes: number | null;
   /** False when the request has no library to be filed into, which force-filing cannot invent. */
   canFile: boolean;
+  /**
+   * Whoever sent the release asked to look at the import before it was filed, so it is held
+   * whatever the score says. Absent on servers older than the `book-request-review-hold` feature.
+   */
+  heldOnRequest: boolean;
+  /** The page of the release this import came from, where its source published one. */
+  releaseInfoUrl: string | null;
+  /** Null once the dock entry is gone, and on a file that states none of it. */
+  edition: BookRequestReviewEdition | null;
+  /** Whether `.../review/cover` will answer with the cover found in the imported file. */
+  hasCover: boolean;
 }

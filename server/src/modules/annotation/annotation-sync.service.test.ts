@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ACHIEVEMENT_EVENT_ANNOTATION_CREATED, AchievementEventsService } from '../achievement/achievement-events.service';
 import type { AnnotationSyncRepository } from './annotation-sync.repository';
-import { AnnotationSyncService, buildAnnotationKey, type IncomingDeviceAnnotation } from './annotation-sync.service';
+import { AnnotationSyncService, KOBO_SERVED_CLOCK, buildAnnotationKey, type IncomingDeviceAnnotation } from './annotation-sync.service';
+import { koboColorFromHex } from './annotation-style-map';
 
 const USER_ID = 7;
 const BOOK_ID = 20;
@@ -94,9 +95,12 @@ function makeRepo(): RepoMock {
     findStateByDeviceKey: vi.fn().mockResolvedValue(null),
     findStateByKeyAnyDevice: vi.fn().mockResolvedValue(null),
     findAnnotationById: vi.fn().mockResolvedValue(null),
+    findContentByIds: vi.fn().mockResolvedValue([]),
     findDevicePosition: vi.fn().mockResolvedValue(null),
     findCanonicalByDeviceDatetime: vi.fn().mockResolvedValue([]),
     insertState: vi.fn().mockImplementation((state: Record<string, unknown>) => Promise.resolve(makeStateRow(state))),
+    lockAnnotationForSync: vi.fn().mockResolvedValue(undefined),
+    insertStateIfMissing: vi.fn().mockResolvedValue(undefined),
     updateState: vi.fn().mockResolvedValue(undefined),
     touchState: vi.fn().mockResolvedValue(undefined),
     createCanonical: vi.fn().mockImplementation((annotation: Record<string, unknown>) => Promise.resolve(makeAnnotationRow(annotation))),
@@ -104,6 +108,7 @@ function makeRepo(): RepoMock {
     updatePosition: vi.fn().mockResolvedValue(undefined),
     markPositionPending: vi.fn().mockResolvedValue(undefined),
     findStatesForDeviceBook: vi.fn().mockResolvedValue([]),
+    resetAppliedVersionsForDeviceBook: vi.fn().mockResolvedValue(0),
     findAddCandidates: vi.fn().mockResolvedValue([]),
     findEditCandidates: vi.fn().mockResolvedValue([]),
     findDeleteCandidates: vi.fn().mockResolvedValue([]),
@@ -116,6 +121,7 @@ function makeRepo(): RepoMock {
     bumpVersion: vi.fn().mockResolvedValue(5),
     softDeleteById: vi.fn().mockResolvedValue(undefined),
     setDeleteAcked: vi.fn().mockResolvedValue(undefined),
+    deleteState: vi.fn().mockResolvedValue(undefined),
     findStateByAnnotationAndDevice: vi.fn().mockResolvedValue(null),
     upsertPosition: vi.fn().mockResolvedValue(undefined),
     findPositionsByAnnotationIds: vi.fn().mockResolvedValue([]),
@@ -194,6 +200,12 @@ describe('AnnotationSyncService', () => {
         extras: { pageno: 12 },
       });
       expect(state).toMatchObject({ source: 'koreader', deviceId: DEVICE_ID, lastAppliedVersion: 1 });
+    });
+
+    it('stores a whitespace-only device note as no note', async () => {
+      await ingest(service, [makeIncoming({ note: '   ' })]);
+
+      expect(repo.createCanonical.mock.calls[0][0]).toMatchObject({ note: null });
     });
 
     it('dedupes identical keys within one batch', async () => {
@@ -293,7 +305,7 @@ describe('AnnotationSyncService', () => {
   });
 
   describe('device-key match path', () => {
-    it('treats a re-upload with no new edit as unchanged and only touches state', async () => {
+    it('treats a re-upload with no new edit as unchanged and only records what the device holds', async () => {
       repo.findStateByDeviceKey.mockResolvedValue(makeStateRow());
       repo.findAnnotationById.mockResolvedValue(makeAnnotationRow());
       repo.findDevicePosition.mockResolvedValue(makePositionRow());
@@ -302,7 +314,7 @@ describe('AnnotationSyncService', () => {
 
       expect(result).toMatchObject({ unchanged: 1, updated: 0, created: 0 });
       expect(repo.setSourceCreatedAtSilent).toHaveBeenCalledWith(100, new Date('2026-06-02T03:14:03.000Z'), TX);
-      expect(repo.touchState).toHaveBeenCalled();
+      expect(repo.updateState).toHaveBeenCalledWith(900, { deviceContent: expect.any(Object) }, TX);
       expect(repo.applyContentPatch).not.toHaveBeenCalled();
     });
 
@@ -332,7 +344,52 @@ describe('AnnotationSyncService', () => {
       // projection: underscore echoes squiggly, yellow echoes #FACC15 - neither overwrites
       expect(patch).not.toHaveProperty('style');
       expect(patch).not.toHaveProperty('color');
-      expect(repo.updateState).toHaveBeenCalledWith(900, { lastAppliedVersion: 2 }, TX);
+      expect(repo.updateState).toHaveBeenCalledWith(900, { deviceContent: expect.any(Object), lastAppliedVersion: 2 }, TX);
+    });
+
+    it('clears a stored note when a device edit sends only whitespace', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow());
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ note: 'old note' }));
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+
+      await ingest(service, [makeIncoming({ datetimeUpdated: '2026-06-02 08:00:00', note: ' \n ' })]);
+
+      expect(repo.applyContentPatch.mock.calls[0][1]).toMatchObject({ note: null });
+    });
+
+    it('applies a device edit made after the last content change even when its device time sorts earlier', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow());
+      repo.findAnnotationById.mockResolvedValue(
+        makeAnnotationRow({
+          origin: 'kobo',
+          color: '#4ADE80',
+          deviceCreatedAt: '2026-06-02 03:29:51',
+          deviceUpdatedAt: '2026-06-02 03:29:51',
+          createdAt: new Date('2026-06-02T03:29:56Z'),
+        }),
+      );
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+      const editedAt = new Date('2026-06-02T03:55:47Z');
+
+      const result = await ingest(service, [makeIncoming({ datetimeUpdated: '2026-06-01 21:55:47', editedAt, color: 'red' })]);
+
+      expect(result.updated).toBe(1);
+      const patch = repo.applyContentPatch.mock.calls[0][1] as Record<string, unknown>;
+      expect(patch).toHaveProperty('color');
+      expect(patch).toMatchObject({ contentUpdatedAt: editedAt, deviceUpdatedAt: '2026-06-01 21:55:47' });
+    });
+
+    it('ignores a device edit made before the last content change from another client', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow());
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ note: 'web note', contentUpdatedAt: new Date('2026-06-02T08:00:00Z') }));
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+
+      const result = await ingest(service, [
+        makeIncoming({ datetimeUpdated: '2026-06-02 09:00:00', editedAt: new Date('2026-06-02T07:00:00Z'), note: 'older device note' }),
+      ]);
+
+      expect(result.unchanged).toBe(1);
+      expect(repo.applyContentPatch).not.toHaveBeenCalled();
     });
 
     it('updates pos1 and marks the cfi position pending on highlight extension with same pos0', async () => {
@@ -350,6 +407,17 @@ describe('AnnotationSyncService', () => {
         TX,
       );
       expect(repo.markPositionPending).toHaveBeenCalledWith(100, 'cfi', TX);
+    });
+
+    it('does not treat a re-uploaded sidecar edit as live position verification', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow({ lastAppliedVersion: 0 }));
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow());
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+
+      const result = await ingest(service, [makeIncoming({ datetimeUpdated: '2026-06-02 08:00:00', note: 'sidecar edit' })]);
+
+      expect(result.updated).toBe(1);
+      expect(repo.updateState.mock.calls[0][1]).not.toHaveProperty('lastAppliedVersion');
     });
 
     it('skips tombstoned annotations without resurrecting them', async () => {
@@ -422,6 +490,38 @@ describe('AnnotationSyncService', () => {
       expect(repo.createCanonical).not.toHaveBeenCalled();
     });
 
+    it('creates a highlight made in the same second as one still on the device instead of moving that one', async () => {
+      const first = makePositionRow();
+      repo.findCanonicalByDeviceDatetime.mockResolvedValue([{ annotation: makeAnnotationRow(), position: first }]);
+      const second = makeIncoming({ pos0: '/body/DocFragment[8]/body/p[19]/text().260', pos1: '/body/DocFragment[8]/body/p[19]/text().311' });
+
+      const result = await service.ingestDeviceAnnotations({
+        userId: USER_ID,
+        source: 'koreader',
+        deviceId: DEVICE_ID,
+        bookId: BOOK_ID,
+        bookFileId: BOOK_FILE_ID,
+        annotations: [second],
+        presentKeys: [buildAnnotationKey(second.datetime, first.pos0!), buildAnnotationKey(second.datetime, second.pos0)],
+      });
+
+      expect(result).toMatchObject({ created: 1, moved: 0 });
+      expect(repo.updatePosition).not.toHaveBeenCalled();
+    });
+
+    it('reads two same-second highlights in one upload as two highlights', async () => {
+      const first = makeIncoming();
+      const second = makeIncoming({ pos0: '/body/DocFragment[8]/body/p[19]/text().260', pos1: '/body/DocFragment[8]/body/p[19]/text().311' });
+      repo.findCanonicalByDeviceDatetime
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ annotation: makeAnnotationRow(), position: makePositionRow({ pos0: first.pos0 }) }]);
+
+      const result = await ingest(service, [first, second]);
+
+      expect(result).toMatchObject({ created: 2, moved: 0 });
+      expect(repo.updatePosition).not.toHaveBeenCalled();
+    });
+
     it('creates a new annotation when multiple same-datetime candidates are ambiguous', async () => {
       repo.findCanonicalByDeviceDatetime.mockResolvedValue([
         { annotation: makeAnnotationRow({ id: 100 }), position: makePositionRow({ pos0: '/a' }) },
@@ -432,6 +532,110 @@ describe('AnnotationSyncService', () => {
 
       expect(result.created).toBe(1);
       expect(repo.createCanonical).toHaveBeenCalled();
+    });
+  });
+
+  describe('field merge against what the device last held', () => {
+    const KOREADER_HELD = { note: 'base', color: 'yellow', style: 'lighten' };
+    const EARLIER = new Date('2026-06-02T10:00:00Z');
+    const LATER = new Date('2026-06-02T11:00:00Z');
+
+    function withHeld(held: Record<string, unknown>, annotation: Record<string, unknown>) {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow({ lastAppliedVersion: 3, deviceContent: held }));
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ version: 3, note: 'base', ...annotation }));
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+      repo.applyContentPatch.mockResolvedValue(4);
+    }
+
+    it('keeps a color changed elsewhere when the device changed only the note, even from an older edit', async () => {
+      withHeld(KOREADER_HELD, { color: '#38BDF8', contentUpdatedAt: LATER });
+
+      const result = await ingest(service, [makeIncoming({ note: 'device note', color: 'yellow', editedAt: EARLIER })]);
+
+      expect(result.updated).toBe(1);
+      const patch = repo.applyContentPatch.mock.calls[0][1];
+      expect(patch).toMatchObject({ note: 'device note', contentUpdatedAt: LATER });
+      expect(patch).not.toHaveProperty('color');
+      // The device still shows its old color, so it stays behind until the new version reaches it.
+      expect(repo.updateState).toHaveBeenCalledWith(900, { deviceContent: expect.objectContaining({ note: 'device note' }) }, TX);
+      expect(repo.bumpVersion).not.toHaveBeenCalled();
+    });
+
+    it('keeps a note changed elsewhere when the Kobo changed only the color', async () => {
+      const yellow = koboColorFromHex('#FACC15');
+      const blue = koboColorFromHex('#38BDF8');
+      repo.findStateByDeviceKey.mockResolvedValue(
+        makeStateRow({ source: 'kobo', lastAppliedVersion: 3, deviceContent: { note: 'base', color: yellow, style: null } }),
+      );
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ version: 3, note: 'note from KOReader', contentUpdatedAt: LATER }));
+      repo.findDevicePosition.mockResolvedValue(null);
+      repo.applyContentPatch.mockResolvedValue(4);
+
+      const result = await service.ingestDeviceAnnotations({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        bookId: BOOK_ID,
+        bookFileId: BOOK_FILE_ID,
+        annotations: [
+          makeIncoming({
+            externalKey: 'uuid-1',
+            colorSpace: 'kobo',
+            color: blue,
+            drawer: undefined,
+            note: 'base',
+            editedAt: EARLIER,
+            posFormat: 'kobo_span',
+          }),
+        ],
+      });
+
+      expect(result.updated).toBe(1);
+      const patch = repo.applyContentPatch.mock.calls[0][1];
+      expect(patch).toMatchObject({ color: '#38BDF8' });
+      expect(patch).not.toHaveProperty('note');
+    });
+
+    it('gives a field both sides changed to the later edit and sends canonical back to the device', async () => {
+      withHeld(KOREADER_HELD, { note: 'web note, later', contentUpdatedAt: LATER });
+
+      const result = await ingest(service, [makeIncoming({ note: 'device note, earlier', editedAt: EARLIER })]);
+
+      expect(result.unchanged).toBe(1);
+      expect(repo.applyContentPatch).not.toHaveBeenCalled();
+      expect(repo.bumpVersion).toHaveBeenCalledWith(100, TX);
+      expect(repo.updateState.mock.calls[0][1]).not.toHaveProperty('lastAppliedVersion');
+    });
+
+    it('takes a clashing field when the device edit is the later one', async () => {
+      withHeld(KOREADER_HELD, { note: 'web note, earlier', contentUpdatedAt: EARLIER });
+
+      const result = await ingest(service, [makeIncoming({ note: 'device note, later', editedAt: LATER })]);
+
+      expect(result.updated).toBe(1);
+      expect(repo.applyContentPatch.mock.calls[0][1]).toMatchObject({ note: 'device note, later' });
+      expect(repo.bumpVersion).not.toHaveBeenCalled();
+    });
+
+    it("does not let a recolor carry the device's stale note over a later web note", async () => {
+      withHeld(KOREADER_HELD, { note: 'web note', contentUpdatedAt: EARLIER });
+
+      const result = await ingest(service, [makeIncoming({ note: 'base', color: 'red', editedAt: LATER })]);
+
+      expect(result.updated).toBe(1);
+      const patch = repo.applyContentPatch.mock.calls[0][1];
+      expect(patch).toMatchObject({ color: '#F87171' });
+      expect(patch).not.toHaveProperty('note');
+    });
+
+    it('treats a re-sent copy of what the device held as no edit, whatever its timestamp', async () => {
+      withHeld(KOREADER_HELD, { note: 'web note', color: '#38BDF8', contentUpdatedAt: EARLIER });
+
+      const result = await ingest(service, [makeIncoming({ note: 'base', color: 'yellow', editedAt: LATER })]);
+
+      expect(result.unchanged).toBe(1);
+      expect(repo.applyContentPatch).not.toHaveBeenCalled();
+      expect(repo.bumpVersion).not.toHaveBeenCalled();
     });
   });
 
@@ -484,6 +688,14 @@ describe('AnnotationSyncService', () => {
       expect(repo.softDeleteById).not.toHaveBeenCalled();
     });
 
+    it('does not infer deletion from a sidecar entry that was never verified', async () => {
+      repo.findStatesForDeviceBook.mockResolvedValue([{ state: makeStateRow({ lastAppliedVersion: 0 }), annotation: makeAnnotationRow() }]);
+
+      expect(await detect([])).toBe(0);
+      expect(repo.softDeleteById).not.toHaveBeenCalled();
+      expect(repo.setDeleteAcked).not.toHaveBeenCalled();
+    });
+
     it('treats a known datetime under a changed key as a move, not a delete', async () => {
       repo.findStatesForDeviceBook.mockResolvedValue([{ state: makeStateRow(), annotation: makeAnnotationRow() }]);
 
@@ -500,6 +712,70 @@ describe('AnnotationSyncService', () => {
 
       expect(deleted).toBe(0);
     });
+
+    // D-13: a restore that left the device's delete ack in place must not be undone by that
+    // device's next complete key set.
+    it('re-offers a live row whose delete this device already acked instead of deleting it again', async () => {
+      const state = makeStateRow({ deleteAckedAt: new Date('2026-10-18T20:41:22Z') });
+      repo.findStatesForDeviceBook.mockResolvedValue([{ state, annotation: makeAnnotationRow() }]);
+
+      const deleted = await detect([]);
+
+      expect(deleted).toBe(0);
+      expect(repo.softDeleteById).not.toHaveBeenCalled();
+      expect(repo.deleteState).toHaveBeenCalledWith(state.id, TX);
+    });
+  });
+
+  describe('isLostDeviceCopy', () => {
+    const judge = (presentKeys: { k: string; dt: string }[]) =>
+      service.isLostDeviceCopy({ userId: USER_ID, source: 'koreader', deviceId: DEVICE_ID, bookId: BOOK_ID, presentKeys });
+    const applied = [
+      { state: makeStateRow(), annotation: makeAnnotationRow() },
+      {
+        state: makeStateRow({ id: 901, annotationId: 101, externalKey: 'e'.repeat(32), externalCreatedAt: '2026-06-02 08:00:00' }),
+        annotation: makeAnnotationRow({ id: 101 }),
+      },
+    ];
+
+    it('reads a complete set that keeps none of the applied rows as a lost copy', async () => {
+      repo.findStatesForDeviceBook.mockResolvedValue(applied);
+
+      expect(await judge([])).toBe(true);
+      expect(await judge([{ k: 'f'.repeat(32), dt: '2026-06-09 10:00:00' }])).toBe(true);
+    });
+
+    it('is not a lost copy while any applied row is still there, by key or by datetime', async () => {
+      repo.findStatesForDeviceBook.mockResolvedValue(applied);
+
+      expect(await judge([{ k: 'e'.repeat(32), dt: '2026-06-09 10:00:00' }])).toBe(false);
+      expect(await judge([{ k: 'f'.repeat(32), dt: '2026-06-02 08:00:00' }])).toBe(false);
+    });
+
+    it('needs two applied rows, so deleting a book’s only highlight still deletes it', async () => {
+      repo.findStatesForDeviceBook.mockResolvedValue([applied[0]]);
+
+      expect(await judge([])).toBe(false);
+    });
+
+    it('counts only live rows the device had applied', async () => {
+      repo.findStatesForDeviceBook.mockResolvedValue([
+        applied[0],
+        { state: applied[1].state, annotation: makeAnnotationRow({ id: 101, deletedAt: new Date() }) },
+        { state: makeStateRow({ id: 902, annotationId: 102, lastAppliedVersion: 0 }), annotation: makeAnnotationRow({ id: 102 }) },
+      ]);
+
+      expect(await judge([])).toBe(false);
+    });
+  });
+
+  it('re-offers a lost copy by marking its applied rows unapplied', async () => {
+    repo.resetAppliedVersionsForDeviceBook.mockResolvedValue(59);
+
+    const reoffered = await service.reofferDeviceCopy({ userId: USER_ID, source: 'koreader', deviceId: DEVICE_ID, bookId: BOOK_ID });
+
+    expect(reoffered).toBe(59);
+    expect(repo.resetAppliedVersionsForDeviceBook).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID);
   });
 
   describe('computePushDown', () => {
@@ -624,6 +900,7 @@ describe('AnnotationSyncService', () => {
         source: 'koreader',
         deviceId: DEVICE_ID,
         bookFileId: BOOK_FILE_ID,
+        bookId: BOOK_ID,
         applied: applied as never,
         deleted,
         converterVersion: 1,
@@ -637,9 +914,50 @@ describe('AnnotationSyncService', () => {
 
       expect(result.acked).toBe(1);
       expect(repo.updatePosition).toHaveBeenCalledWith(100, 'xpointer', { status: 'exact' }, TX);
-      expect(repo.insertState).toHaveBeenCalledWith(expect.objectContaining({ lastAppliedVersion: 3, deviceId: DEVICE_ID }), TX);
+      expect(repo.insertState).toHaveBeenCalledWith(
+        expect.objectContaining({ lastAppliedVersion: 3, deviceId: DEVICE_ID, deviceContent: { note: null, color: 'yellow', style: 'lighten' } }),
+        TX,
+      );
       expect(repo.setDeviceUpdatedAtSilent).toHaveBeenCalledWith(100, '2026-06-08 10:00:00', TX);
       expect(repo.bumpVersion).not.toHaveBeenCalled();
+    });
+
+    it('ignores an acknowledgement routed through a different book', async () => {
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ bookId: BOOK_ID + 1 }));
+
+      expect(await ack([{ serverId: 100, version: 1, status: 'failed' }])).toEqual({ acked: 0 });
+      expect(repo.updatePosition).not.toHaveBeenCalled();
+      expect(repo.insertState).not.toHaveBeenCalled();
+    });
+
+    it('leaves an unverified sidecar apply pending for verification when the book opens', async () => {
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ version: 3 }));
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+
+      expect(await ack([{ serverId: 100, version: 3, status: 'applied', verified: false }])).toEqual({ acked: 1 });
+      expect(repo.insertState).toHaveBeenCalledWith(expect.objectContaining({ lastAppliedVersion: 0 }), TX);
+      expect(repo.updatePosition).not.toHaveBeenCalled();
+    });
+
+    it('does not overwrite a newer selection with a delayed corrected acknowledgement', async () => {
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ version: 3 }));
+
+      expect(await ack([{ serverId: 100, version: 2, status: 'applied', verified: true, corrected: true, pos0: '/old' }])).toEqual({ acked: 0 });
+      expect(repo.upsertPosition).not.toHaveBeenCalled();
+      expect(repo.bumpVersion).not.toHaveBeenCalled();
+      expect(repo.insertState).not.toHaveBeenCalled();
+    });
+
+    it('ignores an older apply without recreating retired links or changing the newer edit timestamp', async () => {
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ version: 3 }));
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+
+      expect(await ack([{ serverId: 100, version: 2, status: 'applied', verified: true, datetimeUpdated: '2026-06-01 10:00:00' }])).toEqual({
+        acked: 0,
+      });
+      expect(repo.insertState).not.toHaveBeenCalled();
+      expect(repo.updatePosition).not.toHaveBeenCalled();
+      expect(repo.setDeviceUpdatedAtSilent).not.toHaveBeenCalled();
     });
 
     it('stores corrected positions, rewrites the key and bumps the version for other devices', async () => {
@@ -674,13 +992,13 @@ describe('AnnotationSyncService', () => {
       );
     });
 
-    it('marks the position failed without creating device state on a failed apply', async () => {
-      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow());
+    it('keeps a failed device apply pending without poisoning canonical positions', async () => {
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ version: 3 }));
 
       const result = await ack([{ serverId: 100, version: 3, status: 'failed' }]);
 
       expect(result.acked).toBe(1);
-      expect(repo.updatePosition).toHaveBeenCalledWith(100, 'xpointer', { status: 'failed' }, TX);
+      expect(repo.updatePosition).not.toHaveBeenCalled();
       expect(repo.insertState).not.toHaveBeenCalled();
     });
 
@@ -777,6 +1095,50 @@ describe('AnnotationSyncService', () => {
       expect(repo.markPositionPending).toHaveBeenCalledWith(100, 'xpointer', TX);
     });
 
+    // D-12: the canonical positions are rebuilt from the stored kobo_span's location, so a moved
+    // span must carry the device's new location, not the one that was served.
+    it('stores the device location with a moved kobo span and drops the served-range markers', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow({ externalKey: KOBO_UUID, source: 'kobo', deviceId: '42' }));
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ origin: 'koreader', color: '#FACC15' }));
+      repo.findDevicePosition.mockResolvedValue(
+        makePositionRow({
+          format: 'kobo_span',
+          pos0: 'kobo.3.1:0',
+          pos1: 'kobo.4.1:30',
+          extras: {
+            koboLocation: { span: { endPath: 'span#kobo\\.4\\.1' } },
+            renditionHash: 'served',
+            sourceCfi: 'epubcfi(/6/4!/4/2,/1:0,/3:30)',
+            chapterIndex: 1,
+          },
+        }),
+      );
+
+      await ingestKobo([makeKoboIncoming({ datetimeUpdated: '2026-06-02 08:00:00', text: 'shorter' })]);
+
+      const [, format, patch] = repo.updatePosition.mock.calls[0];
+      expect(format).toBe('kobo_span');
+      expect(patch).toMatchObject({ pos1: 'kobo.3.1:16' });
+      expect(patch.extras).toEqual({ chapterIndex: 1, koboLocation: { span: { startPath: 'span#kobo\\.3\\.1' } } });
+      expect(repo.markPositionPending).toHaveBeenCalledWith(100, 'cfi', TX);
+      expect(repo.markPositionPending).toHaveBeenCalledWith(100, 'xpointer', TX);
+      expect(repo.applyContentPatch.mock.calls[0][1]).toMatchObject({ text: 'shorter' });
+    });
+
+    it('takes the text of a moved range even when the device edit is older than the last canonical edit', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow({ externalKey: KOBO_UUID, source: 'kobo', deviceId: '42' }));
+      repo.findAnnotationById.mockResolvedValue(
+        makeAnnotationRow({ origin: 'web', text: 'highlighted text and more', contentUpdatedAt: new Date('2030-01-01T00:00:00Z') }),
+      );
+      repo.findDevicePosition.mockResolvedValue(makePositionRow({ format: 'kobo_span', pos0: 'kobo.3.1:0', pos1: 'kobo.3.1:25' }));
+
+      const result = await ingestKobo([makeKoboIncoming({ editedAt: new Date('2026-06-01T21:14:03Z') })]);
+
+      expect(result.updated).toBe(1);
+      expect(repo.applyContentPatch.mock.calls[0][1]).toMatchObject({ text: 'highlighted text' });
+      expect(repo.updatePosition.mock.calls[0][2]).toMatchObject({ pos1: 'kobo.3.1:16' });
+    });
+
     it('keeps the canonical color when the device echoes the projected kobo color', async () => {
       repo.findStateByDeviceKey.mockResolvedValue(makeStateRow({ externalKey: KOBO_UUID, source: 'kobo', deviceId: '42' }));
       repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ origin: 'web', color: '#FB923C' }));
@@ -854,11 +1216,78 @@ describe('AnnotationSyncService', () => {
       });
 
       expect(repo.insertState).toHaveBeenCalledWith(
-        expect.objectContaining({ annotationId: 100, lastAppliedVersion: 4, externalKey: 'uuid-1', deviceId: '42' }),
+        expect.objectContaining({ annotationId: 100, lastAppliedVersion: 4, externalKey: 'uuid-1', deviceId: '42', servedClock: KOBO_SERVED_CLOCK }),
         TX,
+        { keepNewerVersion: undefined },
       );
       expect(repo.setDeleteAcked).toHaveBeenCalledWith(901, TX);
       expect(repo.setDeleteAcked).toHaveBeenCalledWith(902, TX);
+    });
+
+    it('records no Kobo served clock on a KOReader ack', async () => {
+      await service.markServedApplied({
+        userId: USER_ID,
+        source: 'koreader',
+        deviceId: 'rendition:abc',
+        entries: [{ annotationId: 100, version: 4, externalKey: 'k-1', externalCreatedAt: null }],
+        tombstoneStateIds: [],
+      });
+
+      expect(repo.insertState).toHaveBeenCalledWith(expect.objectContaining({ annotationId: 100, servedClock: 0 }), TX, {
+        keepNewerVersion: undefined,
+      });
+    });
+
+    it('asks for Kobo books with rows acked under an older served clock', async () => {
+      await service.listPendingKoboChangeBookIds(USER_ID, '42', { includeAllOrigins: true, resolverVersion: 3 });
+
+      expect(repo.findBookIdsWithPendingKoboChanges).toHaveBeenCalledWith(USER_ID, '42', {
+        includeAllOrigins: true,
+        resolverVersion: 3,
+        servedClock: KOBO_SERVED_CLOCK,
+      });
+    });
+
+    it('records what the Kobo now holds when the served version is still current', async () => {
+      repo.findContentByIds.mockResolvedValue([
+        { id: 100, version: 4, note: 'served note', color: '#38BDF8', style: 'highlight' },
+        { id: 101, version: 6, note: null, color: '#FACC15', style: 'highlight' },
+      ]);
+
+      await service.markServedApplied({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        entries: [
+          { annotationId: 100, version: 4, externalKey: 'uuid-1', externalCreatedAt: null },
+          { annotationId: 101, version: 5, externalKey: 'uuid-2', externalCreatedAt: null },
+        ],
+        tombstoneStateIds: [],
+      });
+
+      expect(repo.insertState).toHaveBeenCalledWith(
+        expect.objectContaining({ annotationId: 100, deviceContent: { note: 'served note', color: koboColorFromHex('#38BDF8'), style: null } }),
+        TX,
+        { keepNewerVersion: undefined },
+      );
+      expect(repo.insertState).toHaveBeenCalledWith(expect.objectContaining({ annotationId: 101, deviceContent: null }), TX, {
+        keepNewerVersion: undefined,
+      });
+    });
+
+    it('keeps a newer acknowledged version when an earlier response is acknowledged late', async () => {
+      await service.markServedApplied({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        entries: [{ annotationId: 100, version: 4, externalKey: 'uuid-1', externalCreatedAt: null }],
+        tombstoneStateIds: [],
+        keepNewerVersion: true,
+      });
+
+      expect(repo.insertState).toHaveBeenCalledWith(expect.objectContaining({ annotationId: 100, lastAppliedVersion: 4 }), TX, {
+        keepNewerVersion: true,
+      });
     });
 
     it('does nothing on empty input', async () => {
@@ -867,14 +1296,38 @@ describe('AnnotationSyncService', () => {
     });
   });
 
-  describe('ensureExternalKey', () => {
-    it('returns the existing key when one device already holds it', async () => {
+  describe('reserveExternalKey', () => {
+    it('reserves the existing key for a new device without acknowledging a version', async () => {
       repo.findExternalKeyForAnnotation.mockResolvedValue('existing-uuid');
-      expect(await service.ensureExternalKey(100, 'kobo', () => 'minted')).toBe('existing-uuid');
+      await expect(
+        service.reserveExternalKey({
+          annotationId: 100,
+          userId: USER_ID,
+          source: 'kobo',
+          deviceId: '42',
+          externalCreatedAt: '2026-06-01 21:14:03',
+        }),
+      ).resolves.toBe('existing-uuid');
+
+      expect(repo.lockAnnotationForSync).toHaveBeenCalledWith(100, TX);
+      expect(repo.findExternalKeyForAnnotation).toHaveBeenCalledWith(100, 'kobo', TX);
+      expect(repo.insertStateIfMissing).toHaveBeenCalledWith(
+        expect.objectContaining({ externalKey: 'existing-uuid', deviceId: '42', lastAppliedVersion: 0 }),
+        TX,
+      );
     });
 
-    it('mints a new key otherwise', async () => {
-      expect(await service.ensureExternalKey(100, 'kobo', () => 'minted')).toBe('minted');
+    it('mints and reserves a key when no device holds one', async () => {
+      const key = await service.reserveExternalKey({
+        annotationId: 100,
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        externalCreatedAt: null,
+      });
+
+      expect(key).toMatch(/^[0-9a-f-]{36}$/);
+      expect(repo.insertStateIfMissing).toHaveBeenCalledWith(expect.objectContaining({ externalKey: key, lastAppliedVersion: 0 }), TX);
     });
   });
 });

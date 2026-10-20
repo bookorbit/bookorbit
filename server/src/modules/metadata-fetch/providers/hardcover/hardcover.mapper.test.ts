@@ -35,7 +35,10 @@ const baseBook: HardcoverBookWithEditions = {
       { tag: 'Fiction', count: 8 },
     ],
   },
-  featured_book_series: { series: { name: 'The Kingkiller Chronicle', books_count: 3 }, position: 1 },
+  featured_book_series: {
+    series: { name: 'The Kingkiller Chronicle', primary_books_count: 3, latest_released: [{ position: 2 }] },
+    position: 1,
+  },
   rating: 4.42,
   ratings_count: 12345,
   pages: 662,
@@ -299,7 +302,7 @@ describe('mapBookWithEditions', () => {
       genres: ['Fantasy', 'Fiction'],
       seriesName: 'The Kingkiller Chronicle',
       seriesIndex: '1',
-      seriesTotalBooks: 3,
+      seriesTotalBooks: 2,
       communityRating: 4.42,
       communityRatingCount: 12345,
       coverUrl: 'https://assets.hardcover.app/edition-cover.jpg',
@@ -314,22 +317,45 @@ describe('mapBookWithEditions', () => {
   });
 
   describe('series total books', () => {
-    function withBooksCount(booksCount: unknown): HardcoverBookWithEditions {
+    function withSeries(series: { primary_books_count?: unknown; latest_released?: unknown }): HardcoverBookWithEditions {
       return {
         ...baseBook,
         featured_book_series: {
-          series: { name: 'The Kingkiller Chronicle', books_count: booksCount as number | undefined },
+          series: { name: 'Red Rising Saga', ...series } as NonNullable<HardcoverBookWithEditions['featured_book_series']>['series'],
           position: 1,
         },
       };
     }
 
-    it('maps the series book count Hardcover already returns', () => {
-      expect(mapBookWithEditions(withBooksCount(7))[0].seriesTotalBooks).toBe(7);
+    function totalFor(series: { primary_books_count?: unknown; latest_released?: unknown }): number | undefined {
+      return mapBookWithEditions(withSeries(series))[0].seriesTotalBooks;
+    }
+
+    it('is the number of the last released main book, not every entry Hardcover lists', () => {
+      expect(totalFor({ primary_books_count: 7, latest_released: [{ position: 6 }] })).toBe(6);
     });
 
-    it('is undefined when Hardcover omits the count', () => {
-      expect(mapBookWithEditions(withBooksCount(undefined))[0].seriesTotalBooks).toBeUndefined();
+    it('names the book a released split part or novella follows', () => {
+      expect(totalFor({ primary_books_count: 10, latest_released: [{ position: 5.2 }] })).toBe(5);
+    });
+
+    it('caps a stray high number at the count of main books', () => {
+      expect(totalFor({ primary_books_count: 14, latest_released: [{ position: 36 }] })).toBe(14);
+    });
+
+    it('uses the released number alone when Hardcover has no main book count', () => {
+      expect(totalFor({ primary_books_count: null, latest_released: [{ position: 4 }] })).toBe(4);
+      expect(totalFor({ primary_books_count: 0, latest_released: [{ position: 4 }] })).toBe(4);
+    });
+
+    it('is undefined when no numbered book has been released', () => {
+      expect(totalFor({ primary_books_count: 3, latest_released: [] })).toBeUndefined();
+      expect(totalFor({ primary_books_count: 3 })).toBeUndefined();
+      expect(totalFor({ primary_books_count: 3, latest_released: [{ position: null }] })).toBeUndefined();
+    });
+
+    it('is undefined when only a prequel numbered below one has been released', () => {
+      expect(totalFor({ primary_books_count: 3, latest_released: [{ position: 0.5 }] })).toBeUndefined();
     });
 
     it('is undefined when the series itself is absent', () => {
@@ -337,10 +363,11 @@ describe('mapBookWithEditions', () => {
       expect(mapBookWithEditions(book)[0].seriesTotalBooks).toBeUndefined();
     });
 
-    it('rejects an out-of-range count rather than trusting the payload', () => {
-      expect(mapBookWithEditions(withBooksCount(0))[0].seriesTotalBooks).toBeUndefined();
-      expect(mapBookWithEditions(withBooksCount(-4))[0].seriesTotalBooks).toBeUndefined();
-      expect(mapBookWithEditions(withBooksCount(10_001))[0].seriesTotalBooks).toBeUndefined();
+    it('rejects an unusable number rather than trusting the payload', () => {
+      expect(totalFor({ latest_released: [{ position: -4 }] })).toBeUndefined();
+      expect(totalFor({ latest_released: [{ position: 10_001 }] })).toBeUndefined();
+      expect(totalFor({ latest_released: [{ position: '6' }] })).toBeUndefined();
+      expect(totalFor({ latest_released: [{ position: Number.NaN }] })).toBeUndefined();
     });
   });
 

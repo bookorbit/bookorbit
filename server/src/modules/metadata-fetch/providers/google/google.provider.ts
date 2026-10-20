@@ -9,14 +9,15 @@ import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { pickSearchInputs, providerCacheContext } from '../provider-cache';
+import { pickSearchInputs, providerCacheContext, widenedPageSize } from '../provider-cache';
 import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
-import { buildRequestSignal } from '../provider-utils';
+import { buildRequestSignal, searchPageSize } from '../provider-utils';
 import { GoogleCoverValidator } from './google-cover-validator';
 import { mapGoogleVolume } from './google.mapper';
 import { GoogleBooksResponse, GoogleVolumeItem } from './google.types';
 
 const BASE_URL = 'https://www.googleapis.com/books/v1';
+const SEARCH_PAGE_SIZE = 10;
 
 interface GoogleErrorBody {
   error?: unknown;
@@ -43,7 +44,10 @@ export class GoogleProvider implements IdentifiableProvider {
     },
     // The query is the ISBN alone whenever one is given; title and author only matter without it.
     describeSearch: (params) => ({
-      inputs: params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author']),
+      inputs: {
+        ...(params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author'])),
+        pageSize: widenedPageSize(params, SEARCH_PAGE_SIZE),
+      },
       coverValidation: params.validateCoverPlaceholders ?? false,
     }),
     describeLookup: (providerId) => ({ inputs: { id: providerId } }),
@@ -56,7 +60,7 @@ export class GoogleProvider implements IdentifiableProvider {
     if (!enabled || !apiKey.trim()) return [];
     const query = this.buildQuery(params);
     if (!query) return [];
-    return this.fetchVolumes(query, apiKey, params.validateCoverPlaceholders ?? false, params.signal);
+    return this.fetchVolumes(query, apiKey, searchPageSize(params, SEARCH_PAGE_SIZE), params.validateCoverPlaceholders ?? false, params.signal);
   }
 
   async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
@@ -102,8 +106,14 @@ export class GoogleProvider implements IdentifiableProvider {
     return parts.length ? parts.join(' ') : null;
   }
 
-  private async fetchVolumes(query: string, apiKey: string, validateCoverPlaceholders: boolean, signal?: AbortSignal): Promise<MetadataCandidate[]> {
-    const url = this.buildUrl('/volumes', { q: query, maxResults: '10', printType: 'books' }, apiKey);
+  private async fetchVolumes(
+    query: string,
+    apiKey: string,
+    pageSize: number,
+    validateCoverPlaceholders: boolean,
+    signal?: AbortSignal,
+  ): Promise<MetadataCandidate[]> {
+    const url = this.buildUrl('/volumes', { q: query, maxResults: String(pageSize), printType: 'books' }, apiKey);
     const startedAt = Date.now();
     const safeQuery = sanitizeLogValue(query);
     this.logger.log(`[google] [start] op=search query="${safeQuery}"`);

@@ -35,6 +35,8 @@ export type AuthorDetail = AuthorSummary & {
   influences: string[];
   metadataProvider: AuthorMetadataProviderKey | null;
   metadataProviderId: string | null;
+  /** True when a user chose the provider match; refreshes then look that id up instead of searching by name. */
+  metadataProviderPinned: boolean;
 };
 
 export type AuthorsPage = {

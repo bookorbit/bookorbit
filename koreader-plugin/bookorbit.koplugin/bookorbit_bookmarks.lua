@@ -178,6 +178,14 @@ function BookOrbitBookmarks.applyLive(ui, to_apply)
     for _, entry in ipairs(to_apply.add or {}) do
         local existing_index, existing = findByPos(annotations, entry.pos)
         if existing_index then
+            local old_chapter, old_text, old_note, old_pageno = existing.chapter, existing.text, existing.note, existing.pageno
+            applyTitleFields(existing, entry.title, chapterForPos(ui, entry.pos))
+            if type(entry.pageno) == "number" then existing.pageno = entry.pageno end
+            if existing.chapter ~= old_chapter or existing.text ~= old_text
+                    or existing.note ~= old_note or existing.pageno ~= old_pageno then
+                touched = touched + 1
+                ui:handleEvent(Event:new("AnnotationsModified", { existing, index_modified = existing_index }))
+            end
             table.insert(applied, ackExisting(entry, existing))
         else
             local ok, resolves = pcall(document.isXPointerInDocument, document, entry.pos)
@@ -228,6 +236,13 @@ function BookOrbitBookmarks.applySidecar(file, to_apply)
     for _, entry in ipairs(to_apply.add or {}) do
         local existing_index, existing = findByPos(annotations, entry.pos)
         if existing_index then
+            local old_chapter, old_text, old_note, old_pageno = existing.chapter, existing.text, existing.note, existing.pageno
+            applyTitleFields(existing, entry.title, existing.chapter)
+            if type(entry.pageno) == "number" then existing.pageno = entry.pageno end
+            if existing.chapter ~= old_chapter or existing.text ~= old_text
+                    or existing.note ~= old_note or existing.pageno ~= old_pageno then
+                touched = touched + 1
+            end
             table.insert(applied, ackExisting(entry, existing))
         else
             -- No document is loaded, so the position cannot be verified and no
@@ -290,8 +305,13 @@ function BookOrbitBookmarks.exchangeBook(opts)
     if not book then return nil, "unmatched" end
 
     local bookmarks = opts.bookmarks or {}
-    local keys = BookOrbitBookmarks.collectKeys(bookmarks)
-    local keys_complete = #keys <= MAX_KEYS_PER_BOOK
+    local keys = BookOrbitBookmarks.collectKeys(opts.key_bookmarks or bookmarks)
+    local keys_complete = opts.keys_complete ~= false and #keys <= MAX_KEYS_PER_BOOK
+    if opts.file and opts.state.hasOtherCopy and opts.state:hasOtherCopy(opts.digest, opts.file) then
+        keys_complete = false
+    end
+    local sidecar_state
+    sidecar_state, keys_complete = BookOrbitSidecar.resolveExchangeState(opts.client, opts.sidecar_state, keys_complete)
     if not keys_complete then keys = {} end
 
     local result = { uploaded = 0, applied = 0, deleted = 0, failed = 0, had_errors = false }
@@ -311,6 +331,7 @@ function BookOrbitBookmarks.exchangeBook(opts)
                 hash = opts.digest,
                 keys = first_request and keys or {},
                 keysComplete = first_request and keys_complete or false,
+                sidecarState = first_request and sidecar_state or nil,
                 changes = chunk,
             },
         })
@@ -419,8 +440,10 @@ function BookOrbitBookmarks.exchangeOpenBook(opts)
         digest = opts.digest,
         bookmarks = bookmarks,
         bm_signature = signature,
+        sidecar_state = opts.sidecar_state,
         apply_mode = "live",
         ui = ui,
+        file = ui.document.file,
     })
 end
 

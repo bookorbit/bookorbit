@@ -73,6 +73,35 @@ describe('useSidebarPrefs', () => {
     })
   })
 
+  describe('parseSidebarLayout', () => {
+    it.each([undefined, null, 'nonsense', 42, []])('falls back to the stock layout for %s', async (raw) => {
+      const { parseSidebarLayout } = await loadModule()
+
+      expect(parseSidebarLayout(raw)).toEqual({ hidden: [], groupOrder: [], rowOrder: {} })
+    })
+
+    it('keeps string ids only, once each', async () => {
+      const { parseSidebarLayout } = await loadModule()
+
+      expect(
+        parseSidebarLayout({
+          hidden: ['series', 7, null, 'series', '', 'annotations'],
+          groupOrder: 'reading',
+          rowOrder: { browse: ['series', 'authors', false], reading: 'statistics' },
+        }),
+      ).toEqual({ hidden: ['series', 'annotations'], groupOrder: [], rowOrder: { browse: ['series', 'authors'], reading: [] } })
+    })
+
+    it('bounds what it keeps from an oversized payload', async () => {
+      const { parseSidebarLayout } = await loadModule()
+
+      const parsed = parseSidebarLayout({ hidden: Array.from({ length: 500 }, (_, index) => `row-${index}`).concat('x'.repeat(65)) })
+
+      expect(parsed.hidden).toHaveLength(200)
+      expect(parsed.hidden).not.toContain('x'.repeat(65))
+    })
+  })
+
   describe('clampCap', () => {
     it.each([5, 8, 12, 20, 'all'])('keeps the allowed cap %s', async (cap) => {
       const { clampCap } = await loadModule()
@@ -152,11 +181,42 @@ describe('useSidebarPrefs', () => {
                   podcastCollections: { open: true, cap: 8 },
                 },
               },
+              sidebarLayout: { hidden: [], groupOrder: [], rowOrder: {} },
             },
           }),
         }),
       )
       vi.useRealTimers()
+    })
+
+    it('persists a layout change in its own settings key', async () => {
+      vi.useFakeTimers()
+      const { useSidebarPrefs } = await loadModule()
+      const { layout } = useSidebarPrefs()
+      await nextTick()
+
+      layout.hidden = ['series']
+      layout.groupOrder = ['reading', 'browse']
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(apiMock).toHaveBeenCalledTimes(1)
+      const [, init] = apiMock.mock.calls[0] as [string, { body: string }]
+      const body = JSON.parse(init.body)
+      expect(body.settings.sidebarLayout).toEqual({ hidden: ['series'], groupOrder: ['reading', 'browse'], rowOrder: {} })
+      vi.useRealTimers()
+    })
+
+    it('hydrates the layout from the signed-in user settings', async () => {
+      user.value = {
+        id: 7,
+        settings: { sidebarLayout: { hidden: ['annotations'], groupOrder: ['reading'], rowOrder: { browse: ['series', 'authors'] } } },
+      }
+
+      const { useSidebarPrefs } = await loadModule()
+      const { layout } = useSidebarPrefs()
+      await nextTick()
+
+      expect(layout).toEqual({ hidden: ['annotations'], groupOrder: ['reading'], rowOrder: { browse: ['series', 'authors'] } })
     })
 
     it('rejects a cap outside the allowed set', async () => {

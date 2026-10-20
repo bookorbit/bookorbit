@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   layoutReadyListener: null as ((event: LayoutReadyEvent) => void) | null,
   pageChangeListener: null as ((event: PageChangeEvent) => void) | null,
   totalPages: 10,
-  scrollToPage: vi.fn<(options: { pageNumber: number }) => void>(),
+  scrollToPage: vi.fn<(options: { pageNumber: number; behavior?: ScrollBehavior }) => void>(),
 }))
 
 vi.mock('@embedpdf/plugin-scroll/vue', async () => {
@@ -21,7 +21,7 @@ vi.mock('@embedpdf/plugin-scroll/vue', async () => {
       state: ref({ currentPage: 1, totalPages: mocks.totalPages }),
       provides: ref({
         // EmbedPDF reports the target page synchronously when a programmatic page change starts.
-        scrollToPage: (options: { pageNumber: number }) => {
+        scrollToPage: (options: { pageNumber: number; behavior?: ScrollBehavior }) => {
           mocks.scrollToPage(options)
           mocks.pageChangeListener?.({ documentId: 'document-1', pageNumber: options.pageNumber, totalPages: mocks.totalPages })
         },
@@ -123,6 +123,15 @@ describe('PdfReaderContent', () => {
     // Page 1 is where the document already is, so the reader only scrolls for a later page.
     expect(mocks.scrollToPage.mock.calls[0]?.[0].pageNumber ?? 1).toBe(expected)
     expect(mocks.scrollToPage.mock.calls.length).toBeLessThanOrEqual(1)
+  })
+
+  it('restores the opening page with an instant scroll', () => {
+    mountContent(7)
+    layoutReady()
+
+    // A smooth scroll that has not started is cancelled by the fit zoom's refit on the first
+    // viewport resize, which leaves the reader on page 1.
+    expect(mocks.scrollToPage).toHaveBeenCalledExactlyOnceWith({ pageNumber: 7, behavior: 'instant' })
   })
 
   it('marks the opening page as restored and later turns as moves', () => {

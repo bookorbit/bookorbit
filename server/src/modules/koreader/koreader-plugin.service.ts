@@ -23,11 +23,22 @@ const UNMATCHED_SOURCE_RANK = { statistics: 0, file: 1, current_file: 2 } as con
 const STATUS_WRITE_CONCURRENCY = 8;
 
 type MatchCheckBookCandidate = NonNullable<MatchCheckDto['books']>[number];
-type ResolvedBookFile = { bookFileId: number; bookId: number; libraryId: number; format: string | null };
+type ResolvedBookFile = { bookFileId: number; bookId: number; libraryId: number; format: string | null; progressCompatible?: boolean };
 
 const DEVICE_STATUS_TO_READ_STATUS: Record<string, ReadStatus> = {
   reading: 'reading',
   complete: 'read',
+  abandoned: 'abandoned',
+};
+
+const READ_STATUS_TO_DEVICE_STATUS: Record<ReadStatus, string> = {
+  unread: 'reading',
+  want_to_read: 'reading',
+  reading: 'reading',
+  rereading: 'reading',
+  read: 'complete',
+  skimmed: 'complete',
+  on_hold: 'abandoned',
   abandoned: 'abandoned',
 };
 
@@ -40,6 +51,9 @@ export interface BookStatesUploadResult {
   results: {
     hash: string;
     statusApplied: boolean;
+    status: string | null;
+    statusSet: boolean;
+    statusUpdatedAt: string | null;
     ratingApplied: boolean;
     reviewApplied: boolean;
     rating: number | null;
@@ -70,7 +84,6 @@ interface ReviewApplyResult {
  */
 interface BookStateBatch {
   statuses: Map<number, UserBookStatus>;
-  staleStatusBookIds: Set<number>;
   ratings: Map<number, { rating: number | null; updatedAt: Date }>;
   notes: Map<number, UserBookNoteDto>;
   ratingWrites: Map<number, number | null>;
@@ -169,7 +182,6 @@ export class KoreaderPluginService {
 
       const state: BookStateBatch = {
         statuses,
-        staleStatusBookIds: new Set<number>(),
         ratings,
         notes,
         ratingWrites: new Map<number, number | null>(),
@@ -235,7 +247,13 @@ export class KoreaderPluginService {
         }
 
         entries.push({
-          bookFile: { id: match.bookFileId, bookId: match.bookId, libraryId: match.libraryId, format: match.format },
+          bookFile: {
+            id: match.bookFileId,
+            bookId: match.bookId,
+            libraryId: match.libraryId,
+            format: match.format,
+            ...(match.progressCompatible === false ? { progressCompatible: false } : {}),
+          },
           percentage: item.percentage,
           progress: item.progress,
           timestamp: item.timestamp,
@@ -393,7 +411,7 @@ export class KoreaderPluginService {
       statusApplied = await this.applyStatus(userId, bookId, book.status, state, book.statusModified);
     }
 
-    const hasRatingField = Object.prototype.hasOwnProperty.call(book, 'rating');
+    const hasRatingField = book.rating !== undefined;
     let ratingResult: RatingApplyResult;
     if (hasRatingField || book.ratingCleared === true) {
       ratingResult = this.applyRating(bookId, hasRatingField ? (book.rating ?? null) : null, state, book.statusModified);
@@ -402,7 +420,7 @@ export class KoreaderPluginService {
       ratingResult = { applied: false, rating: current?.rating ?? null, updatedAt: current?.updatedAt ?? null };
     }
 
-    const hasReviewField = Object.prototype.hasOwnProperty.call(book, 'reviewNote');
+    const hasReviewField = book.reviewNote !== undefined;
     let reviewResult: ReviewApplyResult;
     if (hasReviewField || book.reviewCleared === true) {
       reviewResult = this.applyReview(bookId, hasReviewField ? (book.reviewNote ?? null) : null, state, book.reviewModified ?? book.statusModified);
@@ -411,9 +429,15 @@ export class KoreaderPluginService {
       reviewResult = { applied: false, note: current?.note ?? null, updatedAt: current?.updatedAt ?? null };
     }
 
+    const status = state.statuses.get(bookId);
+    const deviceStatus = status ? READ_STATUS_TO_DEVICE_STATUS[status.status] : null;
+
     return {
       hash,
       statusApplied,
+      status: deviceStatus,
+      statusSet: status != null,
+      statusUpdatedAt: status?.updatedAt ?? null,
       ratingApplied: ratingResult.applied,
       reviewApplied: reviewResult.applied,
       rating: ratingResult.rating,
@@ -426,20 +450,14 @@ export class KoreaderPluginService {
   }
 
   /**
-   * Status writes stay on UserBookStatusService because it drives reading-attempt
+   * Status writes stay on UserBookStatusService because updateManual drives reading-attempt
    * lifecycle bookkeeping that a bulk row write would silently skip. It also projects a
    * status that can differ from the requested one, so a book written during this batch is
-   * re-read only if a later entry resolves to it again.
+   * returned directly so the response carries the projected canonical status.
    */
   private async applyStatus(userId: number, bookId: number, deviceStatus: string, state: BookStateBatch, statusModified?: string): Promise<boolean> {
     const mapped = DEVICE_STATUS_TO_READ_STATUS[deviceStatus];
     if (!mapped) return false;
-
-    if (state.staleStatusBookIds.delete(bookId)) {
-      const refreshed = await this.userBookStatusService.findOne(userId, bookId);
-      if (refreshed) state.statuses.set(bookId, refreshed);
-      else state.statuses.delete(bookId);
-    }
 
     const existing = state.statuses.get(bookId);
     if (existing) {
@@ -453,19 +471,17 @@ export class KoreaderPluginService {
       mapped === 'read' && statusModified && isDateKey(statusModified) && (!existing?.startedAt || statusModified >= existing.startedAt.slice(0, 10))
         ? statusModified
         : undefined;
-    if (finishedOn) {
-      // KOReader supplies a calendar day, which must not shift with the reader's timezone.
-      await this.userBookStatusService.updateManual(
-        userId,
-        bookId,
-        { status: mapped, finishedAt: new Date(`${finishedOn}T00:00:00.000Z`) },
-        { endedOn: finishedOn },
-        state.timeZone,
-      );
-    } else {
-      await this.userBookStatusService.setManual(userId, bookId, mapped, state.timeZone);
-    }
-    state.staleStatusBookIds.add(bookId);
+    // KOReader supplies a calendar day, which must not shift with the reader's timezone.
+    const canonical = finishedOn
+      ? await this.userBookStatusService.updateManual(
+          userId,
+          bookId,
+          { status: mapped, finishedAt: new Date(`${finishedOn}T00:00:00.000Z`) },
+          { endedOn: finishedOn },
+          state.timeZone,
+        )
+      : await this.userBookStatusService.updateManual(userId, bookId, { status: mapped }, undefined, state.timeZone);
+    state.statuses.set(bookId, canonical);
     return true;
   }
 

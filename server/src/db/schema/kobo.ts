@@ -10,6 +10,7 @@ import {
   primaryKey,
   real,
   serial,
+  text,
   timestamp,
   unique,
   uuid,
@@ -273,7 +274,15 @@ export const koboDeviceDeliveries = pgTable(
       .references(() => books.id, { onDelete: 'cascade' }),
     sourceFileId: integer('source_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
     metadata: jsonb('metadata').$type<import('@bookorbit/types').DeliveryArtifactMetadata>().notNull(),
-    options: jsonb('options').$type<{ hyphenate: boolean; converterVersion: string | null; replacement?: boolean }>().notNull(),
+    options: jsonb('options')
+      .$type<{
+        hyphenate: boolean;
+        converterVersion: string | null;
+        replacement?: boolean;
+        // kepubify writes entries in no fixed order, so a rebuild of the same conversion is recognised by this, not by sha256.
+        kepubContentDigest?: string;
+      }>()
+      .notNull(),
     state: varchar('state', { length: 32 }).notNull().default('offered'),
     previousId: uuid('previous_id'),
     current: boolean('current').notNull().default(true),
@@ -324,6 +333,37 @@ export const koboDeviceReadingStates = pgTable(
 );
 
 /**
+ * The place each Kobo is known to hold in a book: the one BookOrbit last sent it, or the last move
+ * it pushed, with when the shared position behind it was set. A Kobo pushes its bookmark back each
+ * time the book is closed, moved or not, stamped with the close; without this, that untouched place
+ * looked newer than a device that read on meanwhile and was saved over it.
+ */
+export const koboKnownPositions = pgTable(
+  'kobo_known_positions',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: integer('device_id').notNull(),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    locationSource: varchar('location_source', { length: 4096 }).notNull(),
+    locationValue: varchar('location_value', { length: 255 }).notNull(),
+    positionSetAt: timestamp('position_set_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.deviceId, table.bookId] }),
+    foreignKey({
+      columns: [table.deviceId, table.userId],
+      foreignColumns: [koboDevices.id, koboDevices.userId],
+      name: 'kobo_known_positions_owner_fk',
+    }).onDelete('cascade'),
+  ],
+);
+
+/**
  * One row per (bookmark, Kobo device): a bookmark the device holds as a dogear, under the
  * annotation id it gave it, with the location it reported. The device reconciles its annotations
  * against the set it is served, so this keeps the dogear served back as a dogear, and lets a
@@ -345,6 +385,7 @@ export const koboBookmarkLinks = pgTable(
       .references(() => books.id, { onDelete: 'cascade' }),
     externalKey: varchar('external_key', { length: 64 }).notNull(),
     location: jsonb('location').notNull(),
+    appliedAt: timestamp('applied_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -365,3 +406,43 @@ export const koboBookmarkLinks = pgTable(
 
 export type KoboBookmarkLink = typeof koboBookmarkLinks.$inferSelect;
 export type NewKoboBookmarkLink = typeof koboBookmarkLinks.$inferInsert;
+
+/** What one annotations response covered, acknowledged once the device reports that response's ETag. */
+export interface KoboServedAckPlan {
+  entries: { annotationId: number; version: number; externalKey: string; externalCreatedAt: string | null }[];
+  tombstoneStateIds: number[];
+  /** Live bookmarks included in this response, acknowledged when Kobo reports this ETag. */
+  bookmarkIds?: number[];
+  /** Bookmarks deleted in BookOrbit and left out of this response, which the device deletes. */
+  removedBookmarkIds?: number[];
+}
+
+/**
+ * The last annotations response sent to a Kobo for a book. The device reports a response's ETag
+ * once it has applied it, but a book that changed since has a different current ETag, so the
+ * acknowledgement is matched against this row instead of waiting for the book to go quiet.
+ */
+export const koboAnnotationServes = pgTable(
+  'kobo_annotation_serves',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: integer('device_id').notNull(),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    etag: text('etag').notNull(),
+    plan: jsonb('plan').$type<KoboServedAckPlan>().notNull(),
+    servedAt: timestamp('served_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.deviceId, table.userId],
+      foreignColumns: [koboDevices.id, koboDevices.userId],
+      name: 'kobo_annotation_serves_owner_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('kobo_annotation_serves_device_book_uidx').on(table.deviceId, table.bookId),
+  ],
+);

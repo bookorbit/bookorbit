@@ -14,6 +14,7 @@ import { ListAuthorMetadataDto } from './list-author-metadata.dto';
 import { ListAuthorsDto } from './list-authors.dto';
 import { LookupAuthorMetadataDto } from './lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './merge-authors.dto';
+import { PinAuthorMetadataMatchDto } from './pin-author-metadata-match.dto';
 import { PreviewAuthorEnrichmentCountDto } from './preview-author-enrichment-count.dto';
 import { UpdateAuthorDto } from './update-author.dto';
 
@@ -118,6 +119,45 @@ describe('Authors DTO validation', () => {
     expect((await errorsFor(LookupAuthorMetadataDto, { provider: 'invalid', id: 'abc' })).length).toBeGreaterThan(0);
     expect((await errorsFor(LookupAuthorMetadataDto, { provider: AuthorMetadataProviderKey.AUDNEXUS, id: '' })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateAuthorDto, { name: 'x'.repeat(501) })).length).toBeGreaterThan(0);
+  });
+
+  it('accepts author facts and clearing them with null', async () => {
+    expect(
+      (
+        await errorsFor(UpdateAuthorDto, {
+          website: 'https://johnreid.example/about',
+          birthDate: '1965-03-14',
+          birthYear: 1965,
+          deathDate: null,
+          deathYear: null,
+          genres: ['Thriller', 'Military fiction'],
+          influences: ['Alistair MacLean'],
+        })
+      ).length,
+    ).toBe(0);
+    expect((await errorsFor(UpdateAuthorDto, { website: null, birthDate: null, genres: null, influences: null })).length).toBe(0);
+    expect((await errorsFor(UpdateAuthorDto, { birthYear: -800 })).length).toBe(0);
+  });
+
+  it('rejects unsafe or malformed author facts', async () => {
+    expect((await errorsFor(UpdateAuthorDto, { website: 'javascript:alert(1)' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { website: 'johnreid.example' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { website: 'ftp://johnreid.example' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { birthDate: '14/03/1965' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { birthYear: 1965.5 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { deathYear: 10_000 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { genres: 'Thriller' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { genres: Array.from({ length: 51 }, (_, i) => `g${i}`) })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { influences: ['x'.repeat(501)] })).length).toBeGreaterThan(0);
+  });
+
+  it('validates a metadata match pin', async () => {
+    expect((await errorsFor(PinAuthorMetadataMatchDto, { provider: AuthorMetadataProviderKey.GOODREADS, providerId: '12345' })).length).toBe(0);
+    expect((await errorsFor(PinAuthorMetadataMatchDto, { provider: 'openlibrary', providerId: '12345' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(PinAuthorMetadataMatchDto, { provider: AuthorMetadataProviderKey.GOODREADS, providerId: '' })).length).toBeGreaterThan(0);
+    expect(
+      (await errorsFor(PinAuthorMetadataMatchDto, { provider: AuthorMetadataProviderKey.AUDNEXUS, providerId: 'B'.repeat(129) })).length,
+    ).toBeGreaterThan(0);
   });
 
   it('requires enrichment preview conditions and boolean flags', async () => {

@@ -419,6 +419,48 @@ describe('point conversions for reading position', () => {
     expect(point.cp).toBe(after.collapsedStart);
   });
 
+  // A Kobo bookmarks a chapter it has no spans for as `kobo.1.1` and opens it at that chapter's
+  // start; without a location it would open the book at its cover.
+  const IMAGE_ONLY = `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title></head>
+<body><div><p><img id="next-reads_img" src="next.jpg" alt=""/></p></div></body></html>`;
+
+  it('keeps a point on an image-only page in its chapter', () => {
+    const { epubDoc, kepubDoc, spanIndex } = docs(IMAGE_ONLY, IMAGE_ONLY);
+
+    expect(cfiPointToKoboSpanPoint(epubDoc, kepubDoc, spanIndex, 'epubcfi(/6/2!/4/2/2/2[next-reads_img])')).toEqual({
+      status: 'repaired',
+      spanId: 'kobo.1.1',
+      chapterFraction: 0,
+    });
+  });
+
+  it('keeps a point in a chapter the kepub left without spans in its chapter', () => {
+    const { epubDoc, kepubDoc, spanIndex } = docs(EPUB_CHAPTER, EPUB_CHAPTER);
+
+    expect(cfiPointToKoboSpanPoint(epubDoc, kepubDoc, spanIndex, 'epubcfi(/6/2!/4/4/1:3)')).toMatchObject({ status: 'repaired', spanId: 'kobo.1.1' });
+  });
+
+  it('places a point it cannot resolve at the chapter’s first span rather than nowhere', () => {
+    const { epubDoc, kepubDoc, spanIndex } = docs(EPUB_CHAPTER, KEPUB_CHAPTER);
+
+    expect(cfiPointToKoboSpanPoint(epubDoc, kepubDoc, spanIndex, 'epubcfi(/6/2!/4/98/7:0)')).toEqual({
+      status: 'repaired',
+      spanId: 'kobo.1.1',
+      chapterFraction: 0,
+    });
+  });
+
+  it('reads a Kobo chapter-start bookmark in a chapter without spans as that chapter’s start', () => {
+    const { epubDoc, kepubDoc, spanIndex } = docs(EPUB_CHAPTER, EPUB_CHAPTER);
+    const point = koboSpanPointToCanonical(epubDoc, kepubDoc, spanIndex, 0, 'kobo.1.1');
+
+    expect(point.status).toBe('repaired');
+    if (point.status === 'failed') return;
+    expect(point.cp).toBe(0);
+    expect(point.xpointer).toContain('/body/DocFragment[1]/');
+  });
+
   it('fails for unknown span ids', () => {
     const { epubDoc, kepubDoc, spanIndex } = docs(EPUB_CHAPTER, KEPUB_CHAPTER);
     expect(koboSpanPointToCanonical(epubDoc, kepubDoc, spanIndex, 0, 'kobo.99.99')).toEqual({ status: 'failed', reason: 'span_not_found' });

@@ -20,9 +20,13 @@ import {
 } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { ContentFilterRules } from '@bookorbit/types';
+
 import { DB } from '../../db';
+import type { DbTx } from './annotation-sync.repository';
 import { foldActivityRows, foldChapterRows } from './annotation-stats.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import * as schema from '../../db/schema';
 import {
   annotationPositions,
@@ -39,8 +43,17 @@ import {
 
 type Db = NodePgDatabase<typeof schema>;
 
+// Revoking a Kobo deletes its sync rows; this covers rows from devices revoked before it did, which
+// can never acknowledge anything again.
+const syncedByLiveDevice = or(
+  sql`${annotationSyncState.source} <> 'kobo'`,
+  sql`exists (select 1 from ${schema.koboDevices} where ${schema.koboDevices.userId} = ${annotationSyncState.userId} and ${schema.koboDevices.id}::text = ${annotationSyncState.deviceId})`,
+)!;
+
 export type AnnotationWithCfi = AnnotationRow & {
   cfi: string | null;
+  /** The file the stored CFI belongs to; null for CFIs stored before positions recorded one. */
+  cfiFileId?: number | null;
   cfiStatus: string | null;
   cfiExtras: Record<string, unknown> | null;
   jumpFileId: number | null;
@@ -64,7 +77,14 @@ function starredAtValue(starred: boolean): SQL<Date> | null {
   return starred ? sql<Date>`coalesce(${annotations.starredAt}, now())` : null;
 }
 
+/** The books the caller can still open: library access plus content rules, as book routes check them. */
+export interface HubAccess {
+  libraryIds: number[];
+  contentFilters?: ContentFilterRules;
+}
+
 export interface HubFilters {
+  access?: HubAccess;
   bookId?: number;
   colors?: string[];
   styles?: string[];
@@ -167,6 +187,7 @@ export class AnnotationRepository {
       .select({
         ...getTableColumns(annotations),
         cfi: annotationPositions.pos0,
+        cfiFileId: annotationPositions.bookFileId,
         cfiStatus: annotationPositions.status,
         cfiExtras: annotationPositions.extras,
         jumpFileId: sql<
@@ -387,6 +408,7 @@ export class AnnotationRepository {
       .set({
         ...data,
         ...(bumpVersion && { version: sql`${annotations.version} + 1` }),
+        ...(contentChanged && { contentUpdatedAt: sql`now()` }),
         ...(options.starred !== undefined && { starredAt: starredAtValue(options.starred) }),
         updatedAt: sql`now()`,
       })
@@ -406,12 +428,49 @@ export class AnnotationRepository {
   }
 
   async restore(annotationId: number, userId: number): Promise<AnnotationRow | null> {
-    const [row] = await this.db
-      .update(annotations)
-      .set({ deletedAt: null, version: sql`${annotations.version} + 1`, updatedAt: sql`now()` })
-      .where(and(eq(annotations.id, annotationId), eq(annotations.userId, userId), isNotNull(annotations.deletedAt)))
-      .returning();
-    return row ?? null;
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(annotations)
+        .set({ deletedAt: null, version: sql`${annotations.version} + 1`, updatedAt: sql`now()` })
+        .where(and(eq(annotations.id, annotationId), eq(annotations.userId, userId), isNotNull(annotations.deletedAt)))
+        .returning();
+      if (!row) return null;
+      await this.forgetKoreaderStates([annotationId], userId, tx);
+      return row;
+    });
+  }
+
+  /** Restores trashed rows exactly like {@link restore}, one transaction for the batch. */
+  async bulkRestore(userId: number, ids: number[], access?: HubAccess): Promise<number> {
+    if (ids.length === 0) return 0;
+    return this.db.transaction(async (tx) => {
+      const restored = await tx
+        .update(annotations)
+        .set({ deletedAt: null, version: sql`${annotations.version} + 1`, updatedAt: sql`now()` })
+        .where(and(inArray(annotations.id, ids), eq(annotations.userId, userId), isNotNull(annotations.deletedAt), ...this.hubAccessSql(access)))
+        .returning({ id: annotations.id });
+      await this.forgetKoreaderStates(
+        restored.map((row) => row.id),
+        userId,
+        tx,
+      );
+      return restored.length;
+    });
+  }
+
+  // A device may have removed the highlight even when its delete ack was lost. Re-deliver the
+  // restored identity before accepting another absence as a deletion.
+  private async forgetKoreaderStates(annotationIds: number[], userId: number, tx: DbTx): Promise<void> {
+    if (annotationIds.length === 0) return;
+    await tx
+      .delete(annotationSyncState)
+      .where(
+        and(
+          inArray(annotationSyncState.annotationId, annotationIds),
+          eq(annotationSyncState.userId, userId),
+          eq(annotationSyncState.source, 'koreader'),
+        ),
+      );
   }
 
   /**
@@ -430,7 +489,7 @@ export class AnnotationRepository {
             this.db
               .select({ one: sql`1` })
               .from(annotationSyncState)
-              .where(and(eq(annotationSyncState.annotationId, annotations.id), isNull(annotationSyncState.deleteAckedAt))),
+              .where(and(eq(annotationSyncState.annotationId, annotations.id), isNull(annotationSyncState.deleteAckedAt), syncedByLiveDevice)),
           ),
         ),
       )
@@ -492,14 +551,14 @@ export class AnnotationRepository {
     return Number(row?.total ?? 0);
   }
 
-  async findHubById(userId: number, annotationId: number): Promise<HubAnnotationRow | null> {
+  async findHubById(userId: number, annotationId: number, access?: HubAccess): Promise<HubAnnotationRow | null> {
     const [row] = await this.db
       .select(this.hubColumns())
       .from(annotations)
       .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
       .leftJoin(books, eq(books.id, annotations.bookId))
-      .where(and(eq(annotations.id, annotationId), eq(annotations.userId, userId)))
+      .where(and(eq(annotations.id, annotationId), eq(annotations.userId, userId), ...this.hubAccessSql(access)))
       .limit(1);
     return (row as HubAnnotationRow | undefined) ?? null;
   }
@@ -562,11 +621,11 @@ export class AnnotationRepository {
   }
 
   /** The whole trash, deliberately ignoring the caller's status filter. */
-  async countHubTrashed(userId: number): Promise<number> {
+  async countHubTrashed(userId: number, access?: HubAccess): Promise<number> {
     const [row] = await this.db
       .select({ total: count() })
       .from(annotations)
-      .where(and(eq(annotations.userId, userId), isNotNull(annotations.deletedAt)));
+      .where(and(eq(annotations.userId, userId), isNotNull(annotations.deletedAt), ...this.hubAccessSql(access)));
     return Number(row?.total ?? 0);
   }
 
@@ -593,7 +652,7 @@ export class AnnotationRepository {
    * counts rows the device has not acknowledged at the canonical version, which is what
    * makes "did my Kobo's highlights arrive" a question this page can answer at all.
    */
-  async getHubDeviceSummary(userId: number) {
+  async getHubDeviceSummary(userId: number, access?: HubAccess) {
     return this.db
       .select({
         source: annotationSyncState.source,
@@ -604,7 +663,7 @@ export class AnnotationRepository {
       })
       .from(annotationSyncState)
       .innerJoin(annotations, eq(annotations.id, annotationSyncState.annotationId))
-      .where(eq(annotationSyncState.userId, userId))
+      .where(and(eq(annotationSyncState.userId, userId), syncedByLiveDevice, ...this.hubAccessSql(access)))
       .groupBy(annotationSyncState.source, annotationSyncState.deviceId)
       .orderBy(desc(max(annotationSyncState.lastSyncedAt)));
   }
@@ -619,10 +678,14 @@ export class AnnotationRepository {
    * `recent` is what the filter combobox wants: the books you just marked, first.
    * `count` is what the hub's shelf wants: the books you have marked most.
    */
-  async findHubBookFacets(userId: number, params: { status: 'active' | 'trashed'; q?: string; limit: number; order?: 'recent' | 'count' }) {
+  async findHubBookFacets(
+    userId: number,
+    params: { status: 'active' | 'trashed'; q?: string; limit: number; order?: 'recent' | 'count'; access?: HubAccess },
+  ) {
     const conditions: SQL[] = [
       eq(annotations.userId, userId),
       params.status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt),
+      ...this.hubAccessSql(params.access),
     ];
     const term = params.q?.trim();
     if (term) {
@@ -649,7 +712,7 @@ export class AnnotationRepository {
       .limit(params.limit);
   }
 
-  async findHubBookFacet(userId: number, status: 'active' | 'trashed', bookId: number) {
+  async findHubBookFacet(userId: number, status: 'active' | 'trashed', bookId: number, access?: HubAccess) {
     const rows = await this.db
       .select({
         bookId: annotations.bookId,
@@ -664,6 +727,7 @@ export class AnnotationRepository {
           eq(annotations.userId, userId),
           eq(annotations.bookId, bookId),
           status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt),
+          ...this.hubAccessSql(access),
         ),
       )
       .groupBy(annotations.bookId, bookMetadata.title)
@@ -671,24 +735,19 @@ export class AnnotationRepository {
     return rows[0] ?? null;
   }
 
-  async bulkSetDeleted(userId: number, ids: number[], deleted: boolean): Promise<number> {
+  /** Restoring goes through {@link bulkRestore}, which also resets device sync state. */
+  async bulkTrash(userId: number, ids: number[], access?: HubAccess): Promise<number> {
     if (ids.length === 0) return 0;
     const result = await this.db
       .update(annotations)
-      .set({
-        deletedAt: deleted ? sql`now()` : null,
-        version: sql`${annotations.version} + 1`,
-        updatedAt: sql`now()`,
-      })
-      .where(
-        and(inArray(annotations.id, ids), eq(annotations.userId, userId), deleted ? isNull(annotations.deletedAt) : isNotNull(annotations.deletedAt)),
-      )
+      .set({ deletedAt: sql`now()`, version: sql`${annotations.version} + 1`, updatedAt: sql`now()` })
+      .where(and(inArray(annotations.id, ids), eq(annotations.userId, userId), isNull(annotations.deletedAt), ...this.hubAccessSql(access)))
       .returning({ id: annotations.id });
     return result.length;
   }
 
   /** Active rows only, and only those whose star actually changes; never bumps the version. */
-  async bulkSetStarred(userId: number, ids: number[], starred: boolean): Promise<number> {
+  async bulkSetStarred(userId: number, ids: number[], starred: boolean, access?: HubAccess): Promise<number> {
     if (ids.length === 0) return 0;
     const result = await this.db
       .update(annotations)
@@ -699,24 +758,36 @@ export class AnnotationRepository {
           eq(annotations.userId, userId),
           isNull(annotations.deletedAt),
           starred ? isNull(annotations.starredAt) : isNotNull(annotations.starredAt),
+          ...this.hubAccessSql(access),
         ),
       )
       .returning({ id: annotations.id });
     return result.length;
   }
 
-  async bulkRestyle(userId: number, ids: number[], patch: { color?: string; style?: string }): Promise<number> {
+  async bulkRestyle(userId: number, ids: number[], patch: { color?: string; style?: string }, access?: HubAccess): Promise<number> {
     if (ids.length === 0 || (patch.color === undefined && patch.style === undefined)) return 0;
     const result = await this.db
       .update(annotations)
-      .set({ ...patch, version: sql`${annotations.version} + 1`, updatedAt: sql`now()` })
-      .where(and(inArray(annotations.id, ids), eq(annotations.userId, userId), isNull(annotations.deletedAt)))
+      .set({ ...patch, version: sql`${annotations.version} + 1`, contentUpdatedAt: sql`now()`, updatedAt: sql`now()` })
+      .where(and(inArray(annotations.id, ids), eq(annotations.userId, userId), isNull(annotations.deletedAt), ...this.hubAccessSql(access)))
       .returning({ id: annotations.id });
     return result.length;
   }
 
+  // An EXISTS on the book, not a join, for the same reason as buildHubConditions' needsReview.
+  private hubAccessSql(access: HubAccess | undefined): SQL[] {
+    if (!access) return [];
+    if (access.libraryIds.length === 0) return [sql`false`];
+    const bookRules = [
+      inArray(books.libraryId, access.libraryIds),
+      ...(access.contentFilters ? buildContentFilterClauses(access.contentFilters, this.db) : []),
+    ];
+    return [sql`exists (select 1 from ${books} where ${books.id} = ${annotations.bookId} and ${and(...bookRules)})`];
+  }
+
   private buildHubConditions(userId: number, filters: HubFilters): SQL[] {
-    const conditions: SQL[] = [eq(annotations.userId, userId)];
+    const conditions: SQL[] = [eq(annotations.userId, userId), ...this.hubAccessSql(filters.access)];
     conditions.push(filters.status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt));
     if (filters.bookId !== undefined) conditions.push(eq(annotations.bookId, filters.bookId));
     if (filters.colors && filters.colors.length > 0) conditions.push(inArray(annotations.color, filters.colors));

@@ -59,7 +59,7 @@ describe('BookmarkSyncService', () => {
         10,
         5,
         { cfi: 'epubcfi(/6/2)', positionSeconds: null },
-        { title: 'Chapter 1', origin: 'koreader', devicePos: '/body/DocFragment[2]', pageno: 12 },
+        { title: 'Chapter 1', origin: 'koreader', devicePos: '/body/DocFragment[2]', pageno: 12, bookFileId: undefined },
       );
       expect(repo.findLiveByLocation).not.toHaveBeenCalled();
     });

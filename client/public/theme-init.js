@@ -24,9 +24,9 @@
 
   var root = document.documentElement
   var theme = readStoredValue('theme', 'system')
-  var accent = readStoredValue('accent', 'blue')
+  var accent = readStoredValue('accent', 'teal')
   var radius = readStoredValue('radius', 'default')
-  var style = readStoredValue('style', 'bookorbit')
+  var style = readStoredValue('style', 'nostalgia')
   var surfacePalette = readStoredValue('surfacePalette', 'steel')
   var rawReach = localStorage.getItem('glowReach')
   var storedReach = rawReach === null ? 50 : Number(rawReach)

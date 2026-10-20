@@ -47,6 +47,7 @@ export type AuthorDetailRow = AuthorSummaryRow & {
   influences: string[] | null;
   metadataProvider: string | null;
   metadataProviderId: string | null;
+  metadataProviderPinned: boolean;
 };
 
 export type AuthorEnrichmentRow = AuthorSummaryRow & {
@@ -58,6 +59,9 @@ export type AuthorEnrichmentRow = AuthorSummaryRow & {
   website: string | null;
   genres: string[] | null;
   influences: string[] | null;
+  metadataProvider: string | null;
+  metadataProviderId: string | null;
+  metadataProviderPinned: boolean;
 };
 
 @Injectable()
@@ -188,6 +192,7 @@ export class AuthorsRepository {
         influences: authors.influences,
         metadataProvider: authors.metadataProvider,
         metadataProviderId: authors.metadataProviderId,
+        metadataProviderPinned: authors.metadataProviderPinned,
         bookCount: sql<number>`count(distinct ${books.id})::int`,
         lastAddedAt: max(books.addedAt),
       })
@@ -209,6 +214,7 @@ export class AuthorsRepository {
         authors.influences,
         authors.metadataProvider,
         authors.metadataProviderId,
+        authors.metadataProviderPinned,
       )
       .limit(1);
 
@@ -230,6 +236,9 @@ export class AuthorsRepository {
         website: authors.website,
         genres: authors.genres,
         influences: authors.influences,
+        metadataProvider: authors.metadataProvider,
+        metadataProviderId: authors.metadataProviderId,
+        metadataProviderPinned: authors.metadataProviderPinned,
         bookCount: sql<number>`count(distinct ${books.id})::int`,
         lastAddedAt: max(books.addedAt),
       })
@@ -250,6 +259,9 @@ export class AuthorsRepository {
         authors.website,
         authors.genres,
         authors.influences,
+        authors.metadataProvider,
+        authors.metadataProviderId,
+        authors.metadataProviderPinned,
       )
       .limit(1);
     return row ?? null;
@@ -333,6 +345,7 @@ export class AuthorsRepository {
       influences: string[] | null;
       metadataProvider: string | null;
       metadataProviderId: string | null;
+      metadataProviderPinned: boolean;
       lastEnrichedAt: Date | null;
     }>,
   ) {

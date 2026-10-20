@@ -176,6 +176,7 @@ describe('useThemeStore', () => {
     beforeEach(() => {
       const colorScheme = createColorSchemeQuery(false)
       stubColorScheme(colorScheme.query)
+      localStorage.setItem('style', '"bookorbit"')
       document.documentElement.style.removeProperty('--shell-surface-opacity')
     })
 
@@ -229,13 +230,14 @@ describe('useThemeStore', () => {
       document.documentElement.removeAttribute('data-surface')
     })
 
-    it('starts on the BookOrbit style with the steel palette', () => {
+    it('starts on the Nostalgia style with the teal accent and steel palette', () => {
       setActivePinia(createPinia())
       const store = useThemeStore()
 
-      expect(store.style).toBe('bookorbit')
+      expect(store.style).toBe('nostalgia')
+      expect(store.accent).toBe('teal')
       expect(store.surfacePalette).toBe('steel')
-      expect(document.documentElement.getAttribute('data-style')).toBe('bookorbit')
+      expect(document.documentElement.getAttribute('data-style')).toBe('nostalgia')
       expect(document.documentElement.getAttribute('data-surface')).toBe('steel')
     })
 
@@ -259,7 +261,7 @@ describe('useThemeStore', () => {
       setActivePinia(createPinia())
       const store = useThemeStore()
 
-      expect(store.style).toBe('bookorbit')
+      expect(store.style).toBe('nostalgia')
       expect(store.surfacePalette).toBe('steel')
     })
 
@@ -296,12 +298,13 @@ describe('useThemeStore', () => {
       setActivePinia(createPinia())
       const store = useThemeStore()
 
-      expect(store.styleDefinition.controls.surfacePalette).toBe(false)
-      store.setStyle('nostalgia')
       expect(store.styleDefinition.controls.surfacePalette).toBe(true)
+      store.setStyle('bookorbit')
+      expect(store.styleDefinition.controls.surfacePalette).toBe(false)
     })
 
     it('changes the appearance key only for settings that change token values', () => {
+      localStorage.setItem('style', '"bookorbit"')
       setActivePinia(createPinia())
       const store = useThemeStore()
       const initial = store.appearanceKey
@@ -322,6 +325,7 @@ describe('useThemeStore', () => {
     })
 
     it('paints the pinned brightness and opacity under Nostalgia and keeps the stored ones', async () => {
+      localStorage.setItem('style', '"bookorbit"')
       localStorage.setItem('brightness', '80')
       localStorage.setItem('surfaceOpacity', '85')
       setActivePinia(createPinia())
@@ -362,6 +366,7 @@ describe('useThemeStore', () => {
     })
 
     it('drops the background pattern under Nostalgia and restores the stored one after', () => {
+      localStorage.setItem('style', '"bookorbit"')
       localStorage.setItem('background', '"aurora"')
       setActivePinia(createPinia())
       const store = useThemeStore()

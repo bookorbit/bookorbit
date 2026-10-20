@@ -7,6 +7,7 @@ import { toReadingSessionSourceBucket, READING_SESSION_SOURCE_BUCKET_LABELS } fr
 import { formatDate } from '@/i18n/formatters'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 import { buildReadingCheckpointRoute } from '@/lib/reading-checkpoint'
+import { compareReadingOrder } from '@/features/book/lib/reading-attempt-order'
 
 const props = defineProps<{
   bookId: number
@@ -141,7 +142,7 @@ function positionBar(session: BookReadingSession) {
 
 const attemptById = computed(() => new Map(props.attempts.map((attempt) => [attempt.id, attempt])))
 const attemptOrdinalById = computed(() => {
-  const ordered = [...props.attempts].sort((left, right) => left.id - right.id)
+  const ordered = [...props.attempts].sort(compareReadingOrder)
   return new Map(ordered.map((attempt, index) => [attempt.id, index + 1]))
 })
 

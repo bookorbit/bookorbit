@@ -79,18 +79,12 @@ export class KoboReadingServicesController {
     }
     reply.header('ETag', result.etag);
 
-    // This Kobo firmware never echoes our ETag back (it always sends If-None-Match: W/"0" and drives
-    // sync via checkforchanges), so the 304 path is never reached. Mark the content seen once the
-    // response is flushed on both 200 and 304, otherwise checkforchanges reports every annotated book
-    // as changed on every sync and the device never converges (downloads run detached and never apply).
-    reply.raw.once('finish', () => {
-      void this.exchangeService.markServedSeen(user.id, device.deviceId, result.servedAck).catch(() => undefined);
-    });
-
     if (result.notModified) {
+      await this.exchangeService.markServedSeen(user.id, device.deviceId, result.servedAck);
       reply.status(HttpStatus.NOT_MODIFIED).send();
       return;
     }
+    await this.exchangeService.rememberServe(user.id, device.deviceId, result.bookId, result.etag, result.servedAck);
     reply.send(result.response);
   }
 
@@ -137,8 +131,8 @@ export class KoboReadingServicesController {
 
   @Post('api/v3/content/checkforchanges')
   @HttpCode(HttpStatus.OK)
-  async checkForChanges(@CurrentUser() user: RequestUser, @KoboDevice() device: KoboDeviceContext) {
-    return this.exchangeService.getChangedContentIds(user.id, device.deviceId);
+  async checkForChanges(@Body() body: unknown, @CurrentUser() user: RequestUser, @KoboDevice() device: KoboDeviceContext) {
+    return this.exchangeService.getChangedContentIds(user.id, device.deviceId, body);
   }
 
   /**

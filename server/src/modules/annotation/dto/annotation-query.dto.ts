@@ -9,6 +9,12 @@ export class AnnotationQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  readerFileId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   bookFileId?: number;
 
   @IsOptional()

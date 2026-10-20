@@ -29,6 +29,9 @@ export interface MetadataSearchParams {
   // Hint for providers to cap deep candidate exploration in non-interactive flows
   // (e.g. auto-fill/background refresh where there is no manual candidate picking).
   maxCandidatesPerProvider?: number;
+  // How many ranked candidates each provider contributes. Browsing searches ask for more than matching
+  // one book needs; providers that can return that many from one request widen their page to match.
+  resultsPerProvider?: number;
   // Automatic pipelines must not select a ComicVine run from equally plausible volume matches.
   requireUnambiguousMatch?: boolean;
   // Interactive result lists can afford bounded cover checks. Bulk metadata pipelines must not

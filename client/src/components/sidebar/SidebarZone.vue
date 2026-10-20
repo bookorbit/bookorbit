@@ -33,6 +33,7 @@ function handleToggle() {
       :is-open="isOpen"
       :content-id="contentId"
       :collapsible="!alwaysOpen"
+      :can-customize="!alwaysOpen"
       @toggle="handleToggle"
     />
     <p v-else-if="label" class="mb-0.5 px-2 pt-1.5 pb-1 sidebar-section-label group-data-[collapsible=icon]:hidden">

@@ -312,6 +312,11 @@ export interface GrabBookRequestPayload {
   torrentFileBase64?: string;
   torrentFileName?: string;
   downloadClientId?: number;
+  /**
+   * Wait in review once the download lands rather than being filed on a passing score. Send only
+   * to a server advertising `book-request-review-hold`: an older one rejects the unknown field.
+   */
+  holdForReview?: boolean;
 }
 
 /**

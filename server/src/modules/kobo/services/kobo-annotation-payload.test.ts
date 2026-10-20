@@ -39,4 +39,33 @@ describe('kobo annotation payload', () => {
     });
     expect(served).not.toHaveProperty('highlightColor');
   });
+
+  it('serves a bookmark with a note as the note the device makes of a dogear', () => {
+    const served = toKoboReadingServiceDogear({
+      externalKey: 'dogear-1',
+      clientLastModifiedUtc: '2026-10-18T06:44:08Z',
+      location,
+      note: 'Asb08',
+    });
+
+    expect(served).toEqual({
+      attachments: {},
+      clientLastModifiedUtc: '2026-10-18T06:44:08Z',
+      context: null,
+      highlightColor: '#F6F3B3',
+      highlightedText: '',
+      id: 'dogear-1',
+      location,
+      noteText: 'Asb08',
+      type: 'note',
+    });
+  });
+
+  it('serves a blank bookmark note as a plain dogear', () => {
+    expect(
+      toKoboReadingServiceDogear({ externalKey: 'dogear-1', clientLastModifiedUtc: '2026-10-18T06:44:08Z', location, note: '  ' }),
+    ).toMatchObject({
+      type: 'dogear',
+    });
+  });
 });

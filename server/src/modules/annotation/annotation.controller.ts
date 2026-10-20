@@ -16,7 +16,7 @@ export class AnnotationController {
     if (query.page != null) {
       return this.annotationService.getAnnotationsPaginated(bookId, user, query);
     }
-    return this.annotationService.getAnnotations(bookId, user);
+    return this.annotationService.getAnnotations(bookId, user, query.readerFileId);
   }
 
   @Post()

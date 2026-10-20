@@ -120,6 +120,31 @@ describe('SendBookDialog', () => {
     expect(mockState.sendBook).toHaveBeenCalledWith({ bookIds: [12], recipientIds: [10], providerId: 3, templateId: undefined, fileId: undefined })
   })
 
+  it('picks the only recipient when nobody starred one', async () => {
+    recipients.value = recipients.value.slice(0, 1)
+    groups.value = []
+    preferences.value = null
+    mountSheet()
+    await flushPromises()
+
+    expect(recipientRow('Kindle Paperwhite').getAttribute('aria-checked')).toBe('true')
+
+    buttonByText('Send').click()
+    await flushPromises()
+
+    expect(mockState.sendBook).toHaveBeenCalledWith(expect.objectContaining({ recipientIds: [10], providerId: 3 }))
+  })
+
+  it('leaves the choice open when several recipients exist and none is starred', async () => {
+    preferences.value = null
+    mountSheet()
+    await flushPromises()
+
+    expect(recipientRow('Kindle Paperwhite').getAttribute('aria-checked')).toBe('false')
+    expect(recipientRow('Ana Beck').getAttribute('aria-checked')).toBe('false')
+    expect(buttonByText('Send').disabled).toBe(true)
+  })
+
   it('says what a recipient gets only when it differs from the rest', async () => {
     mountSheet()
     await flushPromises()

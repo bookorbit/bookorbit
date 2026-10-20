@@ -1,6 +1,7 @@
 --[[--
 Pins the BookOrbit menu entry onto the first page of the Tools menu, right
-below calibre, by maintaining user menu-order override files.
+below calibre, and puts BookOrbit's icon in KOReader's menu bar just before
+the main menu, by maintaining user menu-order override files.
 
 KOReader merges <settings_dir>/<prefix>_menu_order.lua over the bundled order
 tables per top-level key, so the generated files must carry the complete tools
@@ -16,10 +17,13 @@ local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
 local util = require("util")
 
-local MARKER = "-- bookorbit-menu-pin v2 (generated; delete this file to reset menu order)"
+local MARKER = "-- bookorbit-menu-pin v3 (generated; delete this file to reset menu order)"
 local OLD_MARKERS = {
     "-- bookorbit-sync-pin v1 (generated; delete this file to reset menu order)",
+    "-- bookorbit-menu-pin v2 (generated; delete this file to reset menu order)",
 }
+local TAB_ID = "bookorbit_tab"
+local BUTTONS = "KOMenu:menu_buttons"
 local MENU_ID = "bookorbit"
 local OLD_MENU_IDS = {
     "bookorbit_browse",
@@ -33,6 +37,9 @@ local PREFIXES = {
 
 local BookOrbitMenuPin = {
     done = false,
+    -- Whether BookOrbit's icon belongs in the menu bar; set from the
+    -- plugin's setting before ensure or refresh runs.
+    tab = true,
 }
 
 local function removeId(tools, menu_id)
@@ -69,21 +76,46 @@ local function normalizeBookOrbitIds(tools)
     table.insert(tools, insert_at + 1, MENU_ID)
 end
 
-local function desiredTools(order_module)
+-- The menu bar with BookOrbit's tab just before the main menu (the last
+-- button), or without it.
+local function normalizeButtons(buttons, with_tab)
+    removeId(buttons, TAB_ID)
+    if not with_tab then return end
+    local insert_at = #buttons + 1
+    for i, id in ipairs(buttons) do
+        if id == "main" then
+            insert_at = i
+            break
+        end
+    end
+    table.insert(buttons, insert_at, TAB_ID)
+end
+BookOrbitMenuPin.normalizeButtons = normalizeButtons
+
+local function copyList(list)
+    local out = {}
+    for _, id in ipairs(list) do table.insert(out, id) end
+    return out
+end
+
+local function desiredOrder(order_module)
     local bundled = require(order_module)
     if type(bundled) ~= "table" or type(bundled.tools) ~= "table" then
         return nil
     end
-    local tools = {}
-    for _, id in ipairs(bundled.tools) do
-        table.insert(tools, id)
+    local order = { tools = copyList(bundled.tools) }
+    normalizeBookOrbitIds(order.tools)
+    if type(bundled[BUTTONS]) == "table" then
+        order[BUTTONS] = copyList(bundled[BUTTONS])
+        normalizeButtons(order[BUTTONS], BookOrbitMenuPin.tab)
+        -- MenuSorter treats a button as a tab only when it has an order list.
+        if BookOrbitMenuPin.tab then order[TAB_ID] = {} end
     end
-    normalizeBookOrbitIds(tools)
-    return tools
+    return order
 end
 
-local function serializeOurs(tools)
-    return MARKER .. "\nreturn " .. dump({ tools = tools }, nil, true) .. "\n"
+local function serializeOurs(order)
+    return MARKER .. "\nreturn " .. dump(order, nil, true) .. "\n"
 end
 
 local function isGeneratedByUs(existing)
@@ -99,13 +131,13 @@ local function isGeneratedByUs(existing)
 end
 
 local function ensureOne(prefix, order_module)
-    local tools = desiredTools(order_module)
-    if not tools then return end
+    local order = desiredOrder(order_module)
+    if not order then return end
 
     local path = DataStorage:getSettingsDir() .. "/" .. prefix .. "_menu_order.lua"
 
     if not lfs.attributes(path) then
-        local ok, err = util.writeToFile(serializeOurs(tools), path, true)
+        local ok, err = util.writeToFile(serializeOurs(order), path, true)
         if not ok then
             logger.warn("BookOrbit: cannot write menu order file", path, err)
         end
@@ -119,7 +151,7 @@ local function ensureOne(prefix, order_module)
     end
 
     if isGeneratedByUs(existing) then
-        local content = serializeOurs(tools)
+        local content = serializeOurs(order)
         if content ~= existing then
             local ok, err = util.writeToFile(content, path, true)
             if not ok then
@@ -138,23 +170,42 @@ local function ensureOne(prefix, order_module)
     if type(user.tools) == "table" then
         normalizeBookOrbitIds(user.tools)
     else
-        user.tools = tools
+        user.tools = order.tools
     end
+    -- A hand-kept menu bar keeps its own order; only BookOrbit's tab moves.
+    if type(user[BUTTONS]) == "table" then
+        normalizeButtons(user[BUTTONS], BookOrbitMenuPin.tab)
+    elseif order[BUTTONS] then
+        user[BUTTONS] = order[BUTTONS]
+    end
+    user[TAB_ID] = BookOrbitMenuPin.tab and {} or nil
     local ok, err = util.writeToFile(dump(user, nil, true), path, true, true)
     if not ok then
         logger.warn("BookOrbit: cannot update user menu order file", path, err)
     end
 end
 
-function BookOrbitMenuPin.ensure()
-    if BookOrbitMenuPin.done then return end
-    BookOrbitMenuPin.done = true
+local function ensureAll()
     for _, entry in ipairs(PREFIXES) do
         local ok, err = pcall(ensureOne, entry.prefix, entry.order_module)
         if not ok then
             logger.warn("BookOrbit: menu pin failed for", entry.prefix, err)
         end
     end
+end
+
+function BookOrbitMenuPin.ensure(with_tab)
+    if BookOrbitMenuPin.done then return end
+    BookOrbitMenuPin.done = true
+    if with_tab ~= nil then BookOrbitMenuPin.tab = with_tab end
+    ensureAll()
+end
+
+-- Rewrites both order files after the menu bar setting changes.
+function BookOrbitMenuPin.refresh(with_tab)
+    BookOrbitMenuPin.tab = with_tab ~= false
+    BookOrbitMenuPin.done = true
+    ensureAll()
 end
 
 return BookOrbitMenuPin

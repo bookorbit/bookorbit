@@ -343,7 +343,10 @@ watch(
       restoredInitialPage.value = true
       if (page > 1) {
         restoringPage = page
-        scroll.value?.scrollToPage({ pageNumber: page })
+        // Instant, because a fit zoom refits on the first viewport resize (a classic scrollbar
+        // appearing) from the current offset, which cancels a smooth scroll that has not started
+        // and strands the reader on page 1, so the next scroll saves page 1 over the position.
+        scroll.value?.scrollToPage({ pageNumber: page, behavior: 'instant' })
       }
     })
     const unsubscribePage = capability.onPageChange((event) => {

@@ -8,6 +8,7 @@ import { readBoundedBytes, ResponseTooLargeError } from '../../../../common/util
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { safeFetch } from '../../../../common/utils/safe-fetch';
 import { ensureSafeUrl, PrivateAddressException } from '../../../../common/utils/ssrf.utils';
+import { publicReleaseGuid } from '../release-guid';
 import { buildSearchText } from '../search-text';
 import {
   IndexerSearchException,
@@ -41,6 +42,8 @@ interface NewznabItem {
   title?: string;
   guid?: unknown;
   link?: string;
+  /** The release's details page, which the Newznab spec points at its comment thread. */
+  comments?: unknown;
   size?: string | number;
   pubDate?: string;
   category?: string | string[];
@@ -295,6 +298,7 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
       const sourceGuid = readGuid(item);
       if (!withinBound(sourceGuid) || !withinBound(link) || !link || !/^https?:/i.test(link)) return [];
       const guid = publicReleaseGuid(indexerId, sourceGuid ?? link);
+      const infoUrl = readText(item.comments);
       const publishedAt = parseDate(item.pubDate);
       const fileCount = toNumber(attrs.get('files'));
       const format = attrs.get('format');
@@ -303,6 +307,7 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
           indexerId,
           guid,
           title,
+          ...(infoUrl && withinBound(infoUrl) ? { infoUrl } : {}),
           downloadUrl: link,
           sizeBytes: toNumber(attrs.get('size') ?? item.size ?? enclosure?.['@_length']),
           seeders: null,
@@ -332,20 +337,19 @@ function attrMap(item: NewznabItem): Map<string, string> {
 }
 
 function readGuid(item: NewznabItem): string | undefined {
-  if (typeof item.guid === 'string' && item.guid.trim()) return item.guid.trim();
-  if (typeof item.guid === 'number') return String(item.guid);
-  if (item.guid && typeof item.guid === 'object') {
-    const text = (item.guid as { '#text'?: unknown })['#text'];
+  return readText(item.guid);
+}
+
+/** An element's text, whether the parser handed it over bare or as `{ '#text', ...attributes }`. */
+function readText(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number') return String(value);
+  if (value && typeof value === 'object') {
+    const text = (value as { '#text'?: unknown })['#text'];
     if (typeof text === 'string' && text.trim()) return text.trim();
     if (typeof text === 'number') return String(text);
   }
   return undefined;
-}
-
-/** A URL-shaped GUID can carry the API key, so expose only a stable opaque identifier for it. */
-function publicReleaseGuid(indexerId: number, value: string): string {
-  if (!/^https?:/i.test(value)) return value;
-  return createHash('sha256').update(String(indexerId)).update('\0release\0').update(value).digest('hex');
 }
 
 function withinBound(value: string | undefined): boolean {

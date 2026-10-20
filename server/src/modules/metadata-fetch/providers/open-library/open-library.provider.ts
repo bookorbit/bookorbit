@@ -8,13 +8,14 @@ import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { pickSearchInputs, providerCacheContext } from '../provider-cache';
+import { pickSearchInputs, providerCacheContext, widenedPageSize } from '../provider-cache';
 import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
-import { buildRequestSignal } from '../provider-utils';
+import { buildRequestSignal, searchPageSize } from '../provider-utils';
 import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
 import { OpenLibraryDoc, OpenLibrarySearchResponse, OpenLibraryWork } from './open-library.types';
 
 const BASE_URL = 'https://openlibrary.org';
+const SEARCH_PAGE_SIZE = 10;
 const SEARCH_FIELDS =
   'key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,number_of_pages_median,subject,ratings_average,ratings_count';
 
@@ -34,7 +35,12 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     authoritativeLookupStatuses: [404],
     context: async () => providerCacheContext((await this.providerConfig.getConfig()).openLibrary.enabled),
     // The ISBN alone forms the query whenever one is given; title and author only matter without it.
-    describeSearch: (params) => ({ inputs: params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author']) }),
+    describeSearch: (params) => ({
+      inputs: {
+        ...(params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author'])),
+        pageSize: widenedPageSize(params, SEARCH_PAGE_SIZE),
+      },
+    }),
     describeLookup: (providerId) => ({ inputs: { id: providerId } }),
   };
 
@@ -46,7 +52,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     const query = this.buildSearchParams(params);
     if (!query) return [];
 
-    query.set('limit', '10');
+    query.set('limit', String(searchPageSize(params, SEARCH_PAGE_SIZE)));
     query.set('fields', SEARCH_FIELDS);
 
     const url = `${BASE_URL}/search.json?${query}`;
@@ -120,15 +126,13 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   }
 
   private buildSearchParams(params: MetadataSearchParams): URLSearchParams | null {
-    if (!params.isbn && !params.title) return null;
+    if (params.isbn) return new URLSearchParams({ isbn: params.isbn });
+    if (!params.title && !params.author) return null;
 
+    // An author alone is a browsing search: every work Open Library files under that name.
     const query = new URLSearchParams();
-    if (params.isbn) {
-      query.set('isbn', params.isbn);
-    } else {
-      query.set('title', params.title!);
-      if (params.author) query.set('author', params.author);
-    }
+    if (params.title) query.set('title', params.title);
+    if (params.author) query.set('author', params.author);
     return query;
   }
 

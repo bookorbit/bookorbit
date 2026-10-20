@@ -69,6 +69,19 @@ state:flush()
 assert(loadfile(state_path)().global.marker == "second", "new generation is published")
 assert(loadfile(state_path .. ".old")().global.marker == "first", "previous generation is retained")
 
+local first_copy, other_copy = temp_root .. "/first.epub", temp_root .. "/second.epub"
+assert(io.open(first_copy, "wb")):close()
+assert(io.open(other_copy, "wb")):close()
+state:rememberFile(first_copy, "same")
+assert(not state:hasOtherCopy("same", first_copy), "a unique local file permits complete-key deletion checks")
+state:rememberFile(other_copy, "same")
+assert(state:hasOtherCopy("same", first_copy), "newly discovered copies invalidate the digest index")
+state:repairFileIdentity(other_copy, "same", "different")
+assert(not state:hasOtherCopy("same", first_copy), "changed file identities remove false duplicate matches")
+state:rememberFile(other_copy, "same")
+os.remove(other_copy)
+assert(not state:hasOtherCopy("same", first_copy), "missing historical paths do not disable deletion checks")
+
 os.execute("rm -rf '" .. temp_root .. "'")
 
 print("bookorbit_state_atomic_flush_test.lua: ok")

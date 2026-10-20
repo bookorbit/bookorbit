@@ -8,6 +8,8 @@ vi.mock('@bookorbit/types', async (importOriginal) => {
   };
 });
 import type { BookQuery } from '@bookorbit/types';
+import { sql, type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { SmartScope } from '../../db/schema/smart-scopes';
@@ -912,6 +914,28 @@ describe('SmartScopeService', () => {
       pagination: { page: 0, size: 20 },
     });
     expect(bookService.executeBooksQuery).not.toHaveBeenCalled();
+  });
+
+  it('executeSmartScopeBookIds adds the audiobook-only exclusion to the scope filter when asked', async () => {
+    const { service, smartScopeRepo, libraryService, queryBuilder, bookService } = makeService();
+    smartScopeRepo.findById.mockResolvedValue([
+      makeSmartScope({
+        id: 5,
+        userId: 12,
+        filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'test' }] },
+      }),
+    ]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([9]);
+    queryBuilder.buildWhere.mockReturnValue(sql`scope_rule`);
+    bookService.executeBookIdsQuery.mockResolvedValue([]);
+
+    await service.executeSmartScopeBookIds(5, makeUser({ id: 12 }), 20, undefined, { excludeAudioOnly: true });
+    await service.executeSmartScopeBookIds(5, makeUser({ id: 12 }), 20);
+
+    const narrowed = new PgDialect().sqlToQuery(bookService.executeBookIdsQuery.mock.calls[0]![1] as SQL).sql;
+    expect(narrowed).toContain('scope_rule');
+    expect(narrowed).toContain('"audio_only_content_file"');
+    expect(new PgDialect().sqlToQuery(bookService.executeBookIdsQuery.mock.calls[1]![1] as SQL).sql).toBe('scope_rule');
   });
 
   it('executeSmartScopeBookIds intersects a caller-provided restriction with accessible libraries', async () => {

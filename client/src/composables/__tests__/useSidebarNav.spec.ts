@@ -158,6 +158,15 @@ describe('sidebar nav registry', () => {
     expect(resolveNavEntry(entry('book-dock'), makeContext(), makeRoute('dashboard'), 'Book Dock').badge).toBeNull()
   })
 
+  it('marks only the rows that count work waiting on the user as returning when hidden', () => {
+    expect(SIDEBAR_NAV_REGISTRY.filter((candidate) => candidate.returnsWithWork).map((candidate) => candidate.id)).toEqual([
+      'book-dock',
+      'book-requests',
+    ])
+    expect(resolveNavEntry(entry('book-dock'), makeContext(), makeRoute('dashboard'), 'Book Dock').returnsWithWork).toBe(true)
+    expect(resolveNavEntry(entry('series'), makeContext(), makeRoute('dashboard'), 'Series').returnsWithWork).toBe(false)
+  })
+
   it('exposes the Requests badge only when requests are outstanding', () => {
     const context = makeContext({
       permissions: ['book_request_access'],

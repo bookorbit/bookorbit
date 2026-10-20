@@ -44,6 +44,7 @@ import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
 import { ListAuthorLettersDto, ListAuthorsDto } from './dto/list-authors.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
+import { PinAuthorMetadataMatchDto } from './dto/pin-author-metadata-match.dto';
 import { PreviewAuthorEnrichmentCountDto } from './dto/preview-author-enrichment-count.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
 import { AuthorsService } from './authors.service';
@@ -304,6 +305,30 @@ export class AuthorsController {
   @RequirePermission(Permission.LibraryEditMetadata)
   refreshEnrichment(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
     return this.authorsService.refreshEnrichment(user, id);
+  }
+
+  @Put(':id/metadata-match')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.AuthorUpdate,
+    resource: AuditResource.Author,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Pinned the metadata match for author #${req.params['id']}`,
+  })
+  pinMetadataMatch(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Body() dto: PinAuthorMetadataMatchDto) {
+    return this.authorsService.pinMetadataMatch(user, id, dto);
+  }
+
+  @Delete(':id/metadata-match')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.AuthorUpdate,
+    resource: AuditResource.Author,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Unpinned the metadata match for author #${req.params['id']}`,
+  })
+  unpinMetadataMatch(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
+    return this.authorsService.unpinMetadataMatch(user, id);
   }
 
   @Patch(':id')

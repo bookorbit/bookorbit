@@ -43,6 +43,7 @@ end
 
 function Transfer.ensureTempDir(root)
     local dir = Transfer.tempDir(root)
+    if not Transfer.isInsideRoot(root, dir) then return nil end
     if lfs.attributes(dir, "mode") == "directory" then return dir end
     util.makePath(dir)
     if lfs.attributes(dir, "mode") ~= "directory" then return nil end
@@ -63,6 +64,14 @@ function Transfer.isInsideRoot(root, path)
     for segment in normalized_path:gmatch("[^/]+") do
         if segment == ".." then return false end
     end
+    -- The configured root may itself be a link, but descendants must not
+    -- redirect staging or publication outside that authorized directory.
+    local current = normalized_root == "/" and "" or normalized_root
+    local relative = normalized_path:sub(#current + 2)
+    for segment in relative:gmatch("[^/]+") do
+        current = current .. "/" .. segment
+        if lfs.symlinkattributes(current, "mode") == "link" then return false end
+    end
     return true
 end
 
@@ -71,6 +80,7 @@ end
 function Transfer.sweepStale(root, opts)
     opts = opts or {}
     local dir = Transfer.tempDir(root)
+    if not Transfer.isInsideRoot(root, dir) then return 0 end
     if lfs.attributes(dir, "mode") ~= "directory" then return 0 end
     local now = opts.now or os.time()
     local max_age = opts.max_age or STALE_TEMP_AGE
@@ -120,6 +130,9 @@ function Transfer.run(opts)
     local base = string.format("bo_%d_%d", opts.generation or 0, os.time())
     local temp_path = dir .. "/" .. base .. ".part"
     local progress_path = dir .. "/" .. base .. ".progress"
+    if not Transfer.isInsideRoot(root, temp_path) or not Transfer.isInsideRoot(root, progress_path) then
+        return nil, "unsafe_destination"
+    end
 
     local state = {
         progress_path = progress_path,
@@ -175,10 +188,10 @@ function Transfer.run(opts)
         if digest ~= expected_hash then util.removeFile(completed_path); return nil, "hash_mismatch" end
     end
 
-    local renamed, rename_err = os.rename(completed_path, opts.destination)
+    local renamed = os.rename(completed_path, opts.destination)
     if not renamed then
         util.removeFile(completed_path)
-        return nil, tostring(rename_err or "publish_failed")
+        return nil, "publish_failed"
     end
     return true, nil, type(result) == "table" and result or {}
 end

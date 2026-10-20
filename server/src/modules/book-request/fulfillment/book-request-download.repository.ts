@@ -20,6 +20,7 @@ import {
   type BookRequestDownloadRow,
   type NewBookRequestDownloadRow,
 } from '../../../db/schema';
+import { publicReleaseGuid } from '../indexers/release-guid';
 
 /** Newest first, and bounded: an attempt list is something a person reads, not a full history. */
 const MAX_ATTEMPTS_PER_REQUEST = 20;
@@ -345,6 +346,10 @@ export class BookRequestDownloadRepository {
       // A hand-pasted magnet has neither, and there is nothing about it to match a release on.
       if (row.indexerId === null || row.releaseGuid === null) continue;
       keys.add(`${row.indexerId}:${row.releaseGuid}`);
+      // Torznab attempts made before its guids were digested stored the raw value, which a search
+      // now reports digested. Without the second key a retry would pick the release that just failed.
+      const digested = publicReleaseGuid(row.indexerId, row.releaseGuid);
+      if (digested !== row.releaseGuid) keys.add(`${row.indexerId}:${digested}`);
     }
     return keys;
   }

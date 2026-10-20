@@ -1,8 +1,6 @@
 -- Single and bulk downloads write to one destination, KOReader's own
--- download_dir, so both dialogs have to offer the same chooser and see each
--- other's choice. The bulk popup previously only reported the folder in its
--- confirmation text, which left the setting reachable from the single-book
--- dialog alone.
+-- download_dir, so both sheets have to offer the same chooser and see each
+-- other's choice.
 
 local shown = {}
 local next_ticks = {}
@@ -56,7 +54,9 @@ package.loaded["ffi/util"] = {
         end))
     end,
 }
-package.loaded["gettext"] = function(text) return text end
+package.loaded["gettext"] = setmetatable({
+    ngettext = function(one, many, count) return count == 1 and one or many end,
+}, { __call = function(_, text) return text end })
 package.loaded["bookorbit_state_manager"] = {}
 package.loaded["bookorbit_download_transfer"] = {}
 package.loaded["bookorbit_bulk_checkpoint"] = { MAX_FAILURES = 8 }
@@ -77,6 +77,16 @@ package.loaded["ui/downloadmgr"] = {
     end,
 }
 
+-- The bulk sheet is drawn elsewhere; here it records what it was opened with
+-- and offers its Folder row the way the sheet does.
+local plans = {}
+package.loaded["bookorbit_bulk_sheet"] = {
+    openPlan = function(catalog, plan)
+        table.insert(plans, plan)
+        return { catalog = catalog, plan = plan }
+    end,
+}
+
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
 local BulkDownload = require("bookorbit_catalog_bulk_download")
@@ -90,13 +100,14 @@ end
 
 local stored = { download_dir = "/mnt/onboard/Books" }
 local saved = {}
+local persisted_dir
 G_reader_settings = {
     readSetting = function(_, key) return stored[key] end,
     saveSetting = function(_, key, value)
         stored[key] = value
         table.insert(saved, { key = key, value = value })
     end,
-    flush = function() end,
+    flush = function() persisted_dir = stored.download_dir end,
 }
 
 local Catalog = {}
@@ -106,28 +117,16 @@ Catalog.settings = {}
 Catalog.client = { server_url = "http://localhost", username = "test" }
 Catalog:initBulkDownloadState()
 
-local function findButton(dialog, prefix)
-    for _, row in ipairs(dialog.buttons or {}) do
-        for _, button in ipairs(row) do
-            if button.text and button.text:sub(1, #prefix) == prefix then return button end
-        end
-    end
-    return nil
-end
-
--- The bulk settings popup offers the folder alongside the other two knobs.
+-- The bulk settings sheet offers the folder alongside the other knobs.
 Catalog:showBulkDownloadSettings()
-local settings_dialog = shown[#shown]
-assertEqual(settings_dialog.title, "Download settings", "the settings popup opened")
+assertEqual(#plans, 1, "the settings sheet opened")
+assertEqual(plans[1].settings_only, true, "it opens as settings, with nothing to download")
+assertEqual(Catalog:getCurrentDownloadDir(), "/mnt/onboard/Books", "the sheet's Folder row reports the current folder")
 
-local folder_button = findButton(settings_dialog, "Folder:")
-assertEqual(folder_button ~= nil, true, "the folder is offered as a button")
-assertEqual(folder_button.text, "Folder: /mnt/onboard/Books", "the button reports the current folder")
-assertEqual(findButton(settings_dialog, "Format:") ~= nil, true, "the format knob is still offered")
-assertEqual(findButton(settings_dialog, "Existing files:") ~= nil, true, "the existing-files knob is still offered")
-
--- Choosing a folder writes the one setting the download path is built from.
-folder_button.callback()
+-- Its Folder row runs the shared chooser and redraws the sheet once the
+-- choice is saved.
+local redrawn = 0
+Catalog:chooseDownloadDir(function() redrawn = redrawn + 1 end)
 assertEqual(chooser.opened, 1, "the chooser opened")
 assertEqual(chooser.start_dir, "/mnt/onboard/Books", "the chooser starts at the current folder")
 
@@ -135,20 +134,14 @@ chooser.confirm("/mnt/onboard/Books/BookOrbit")
 assertEqual(#saved, 1, "one setting was written")
 assertEqual(saved[1].key, "download_dir", "the shared download_dir is what changed")
 assertEqual(saved[1].value, "/mnt/onboard/Books/BookOrbit", "the chosen path was stored")
+assertEqual(persisted_dir, stored.download_dir, "the chosen folder is durable before the sheet redraws")
 
--- The popup reopens on the next tick so the new folder is visible without the
--- user having to find their way back into the menu.
-assertEqual(#next_ticks, 1, "the caller was scheduled to reopen")
+assertEqual(#next_ticks, 1, "the sheet was scheduled to redraw")
 next_ticks[1]()
-assertEqual(findButton(shown[#shown], "Folder:").text, "Folder: /mnt/onboard/Books/BookOrbit",
-    "the reopened popup shows the new folder")
+assertEqual(redrawn, 1, "the sheet redraws with the new folder")
 
--- The same choice is what a bulk run then downloads into, and what its
--- confirmation reports.
+-- The same choice is what a bulk run then downloads into.
 assertEqual(Catalog:getCurrentDownloadDir(), "/mnt/onboard/Books/BookOrbit", "bulk downloads follow the choice")
-local title = Catalog:bulkConfirmationTitle({ total = 3, label = "Current page" })
-assertEqual(title:find("Folder: /mnt/onboard/Books/BookOrbit", 1, true) ~= nil, true,
-    "the confirmation reports the chosen folder")
 
 -- An over-long path keeps the end, which is the part that says where the files
 -- actually land; truncating the other way would leave every folder looking the
@@ -160,5 +153,24 @@ assertEqual(#short, 24, "the label is bounded")
 assertEqual(short:sub(1, 3), "...", "the truncation is marked")
 assertEqual(deep:sub(-10), short:sub(-10), "the tail of the path survives")
 assertEqual(CatalogUtil.shortPath("/short", 24), "/short", "a short path is left alone")
+
+local file = assert(io.open("koreader-plugin/bookorbit.koplugin/bookorbit_main_menu.lua"))
+local source = file:read("*a")
+file:close()
+local block = assert(source:match("(function MainMenu:chooseDownloadFolder.-)\n%-%- %-%-+ shortcut"))
+local MainMenu = {}
+local chunk = assert(loadstring(block))
+setfenv(chunk, setmetatable({ MainMenu = MainMenu, UIManager = package.loaded["ui/uimanager"] }, { __index = _G }))
+chunk()
+local returned = false
+MainMenu:chooseDownloadFolder(nil, function()
+    assertEqual(persisted_dir, "/path/to/library/downloads", "direct Settings chooser persists before returning")
+    returned = true
+end)
+chooser.confirm("/path/to/library/downloads")
+assertEqual(persisted_dir, stored.download_dir, "the fallback chooser also persists immediately")
+assertEqual(returned, false, "the fallback waits until the chooser closes before returning")
+next_ticks[#next_ticks]()
+assertEqual(returned, true, "direct Settings receives the saved folder")
 
 print("bookorbit_download_folder_test.lua: ok")

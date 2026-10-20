@@ -91,6 +91,7 @@ package.loaded["bookorbit_highlight_summary"] = {
 
 local state_payload
 package.loaded["bookorbit_sidecar"] = {
+    extract = function() return nil end,
     -- Mirrors the real contract: a bare hash payload is the pull request, and
     -- nothing at all goes out when neither side changed and no pull is forced.
     buildStatePayload = function(hash, _, _, force_pull)
@@ -102,6 +103,11 @@ package.loaded["bookorbit_sidecar"] = {
     markStatePulled = function() end,
     stateFromServerResult = function() return nil end,
     rememberUploadedState = function() end,
+    isMarked = function() return nil end,
+    readMarked = function() return false end,
+    sidecarState = function() return nil end,
+    markLive = function() return false end,
+    markFile = function() return false end,
 }
 
 local book

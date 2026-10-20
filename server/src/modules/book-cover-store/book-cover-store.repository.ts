@@ -35,7 +35,7 @@ const AUDIO_FORMAT_SQL = sql.join(
   sql`, `,
 );
 
-type OuterBookId = number | typeof books.id | typeof bookMetadata.bookId;
+type OuterBookId = number | typeof books.id | typeof bookMetadata.bookId | typeof bookCovers.bookId;
 
 /**
  * Drizzle leaves a column unqualified when the outer query reads a single table, and inside these

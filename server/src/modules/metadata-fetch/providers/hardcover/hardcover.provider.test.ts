@@ -59,6 +59,7 @@ describe('HardcoverProvider', () => {
           useValue: {
             searchByIsbn: vi.fn().mockResolvedValue([]),
             searchBooks: vi.fn().mockResolvedValue([]),
+            searchBooksByAuthor: vi.fn().mockResolvedValue([]),
             lookupBySlug: vi.fn().mockResolvedValue(null),
           },
         },
@@ -189,7 +190,7 @@ describe('HardcoverProvider', () => {
 
       await provider.search({ title: 'The Name of the Wind', author: 'Patrick Rothfuss' });
 
-      expect(client.searchBooks).toHaveBeenCalledWith('The Name of the Wind Patrick Rothfuss', 'test-key');
+      expect(client.searchBooks).toHaveBeenCalledWith('The Name of the Wind Patrick Rothfuss', 'test-key', undefined, 10);
     });
 
     it('retries with title only when title+author returns no results', async () => {
@@ -198,8 +199,8 @@ describe('HardcoverProvider', () => {
       const results = await provider.search({ title: 'The Name of the Wind', author: 'Patrick Rothfuss' });
 
       expect(client.searchBooks).toHaveBeenCalledTimes(2);
-      expect(client.searchBooks).toHaveBeenNthCalledWith(1, 'The Name of the Wind Patrick Rothfuss', 'test-key');
-      expect(client.searchBooks).toHaveBeenNthCalledWith(2, 'The Name of the Wind', 'test-key');
+      expect(client.searchBooks).toHaveBeenNthCalledWith(1, 'The Name of the Wind Patrick Rothfuss', 'test-key', undefined, 10);
+      expect(client.searchBooks).toHaveBeenNthCalledWith(2, 'The Name of the Wind', 'test-key', undefined, 10);
       expect(results).toHaveLength(1);
     });
 
@@ -209,7 +210,7 @@ describe('HardcoverProvider', () => {
       await provider.search({ title: 'The Name of the Wind' });
 
       expect(client.searchBooks).toHaveBeenCalledTimes(1);
-      expect(client.searchBooks).toHaveBeenCalledWith('The Name of the Wind', 'test-key');
+      expect(client.searchBooks).toHaveBeenCalledWith('The Name of the Wind', 'test-key', undefined, 10);
     });
 
     it('returns empty array when title search returns nothing', async () => {
@@ -224,7 +225,37 @@ describe('HardcoverProvider', () => {
 
       await provider.search({ title: 'Test' });
 
-      expect(client.searchBooks).toHaveBeenCalledWith('Test', 'my-secret-key');
+      expect(client.searchBooks).toHaveBeenCalledWith('Test', 'my-secret-key', undefined, 10);
+    });
+
+    it('browses by author name when no title is given', async () => {
+      vi.spyOn(client, 'searchBooksByAuthor').mockResolvedValue([mockDocument]);
+
+      const results = await provider.search({ author: 'Terry Pratchett' });
+
+      expect(client.searchBooksByAuthor).toHaveBeenCalledWith('Terry Pratchett', 'test-key', undefined, 10);
+      expect(client.searchBooks).not.toHaveBeenCalled();
+      expect(results).toHaveLength(1);
+    });
+
+    it('does not browse by author after an ISBN search finds nothing', async () => {
+      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([]);
+      vi.spyOn(client, 'searchBooksByAuthor');
+
+      expect(await provider.search({ isbn: '9780756404079', author: 'Patrick Rothfuss' })).toEqual([]);
+      expect(client.searchBooksByAuthor).not.toHaveBeenCalled();
+      expect(client.searchBooks).not.toHaveBeenCalled();
+    });
+
+    it('widens the page when a browsing search asks for more results', async () => {
+      vi.spyOn(client, 'searchBooks').mockResolvedValue([mockDocument]);
+      vi.spyOn(client, 'searchBooksByAuthor').mockResolvedValue([mockDocument]);
+
+      await provider.search({ author: 'Terry Pratchett', resultsPerProvider: 20 });
+      await provider.search({ title: 'Mort', resultsPerProvider: 20 });
+
+      expect(client.searchBooksByAuthor).toHaveBeenCalledWith('Terry Pratchett', 'test-key', undefined, 20);
+      expect(client.searchBooks).toHaveBeenCalledWith('Mort', 'test-key', undefined, 20);
     });
   });
 
