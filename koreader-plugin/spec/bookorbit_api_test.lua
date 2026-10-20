@@ -498,4 +498,67 @@ assertEqual(http_client:getProxy(), nil,
 
 G_reader_settings = nil
 
+-- Custom HTTP headers tests
+local custom_headers_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    custom_headers = {
+        { name = "CF-Access-Client-Id", value = "my-client-id" },
+        { name = "CF-Access-Client-Secret", value = "my-client-secret" },
+    },
+}
+
+mock_http_body = "{\"ok\":true}"
+mock_http_code = 200
+body, err = custom_headers_client:auth()
+assertEqual(body.ok, true, "custom headers request succeeds")
+assertEqual(last_request_headers["CF-Access-Client-Id"], "my-client-id",
+    "custom header CF-Access-Client-Id is sent")
+assertEqual(last_request_headers["CF-Access-Client-Secret"], "my-client-secret",
+    "custom header CF-Access-Client-Secret is sent")
+assertEqual(last_request_headers["x-auth-user"], "reader",
+    "built-in auth headers are preserved alongside custom headers")
+
+local extra_override_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    custom_headers = {
+        { name = "x-custom", value = "base-value" },
+    },
+}
+extra_override_client:getPluginVersion()
+assertEqual(last_request_headers["x-custom"], "base-value",
+    "custom header is present when no extra_headers override it")
+
+local malformed_headers_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    custom_headers = {
+        { name = "", value = "ignored" },
+        { name = nil, value = "ignored" },
+        { name = "X-Valid", value = "kept" },
+        { name = "X-No-Value" },
+        { value = "orphan" },
+    },
+}
+malformed_headers_client:auth()
+assertEqual(last_request_headers["X-Valid"], "kept",
+    "valid custom header survives alongside malformed entries")
+assertEqual(last_request_headers[""], nil,
+    "empty-name custom header is skipped")
+assertEqual(last_request_headers["X-No-Value"], nil,
+    "custom header with nil value is skipped")
+
+local no_custom_headers_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+}
+no_custom_headers_client:auth()
+assertEqual(last_request_headers["x-auth-user"], "reader",
+    "a client without custom_headers still sends auth headers")
+
 print("bookorbit_api_test.lua: ok")

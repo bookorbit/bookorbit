@@ -115,6 +115,7 @@ BookOrbit.default_settings = {
     catalog_dashboard_cache = nil,
     catalog_detail_cache = nil,
     update_check_last_at = 0,
+    custom_headers = {},
 }
 
 function BookOrbit:init()
@@ -248,6 +249,7 @@ function BookOrbit:apiOpts(background_requests)
         device_model = Device.model,
         plugin_version = PLUGIN_VERSION,
         background_requests = background_requests == true,
+        custom_headers = self.settings.custom_headers,
     }
 end
 

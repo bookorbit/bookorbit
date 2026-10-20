@@ -610,6 +610,20 @@ function MainMenu:addToMainMenu(menu_items)
                 end,
             },
             {
+                text_func = function()
+                    local count = #(self.settings.custom_headers or {})
+                    if count > 0 then
+                        return T(_("Custom HTTP headers (%1)"), count)
+                    end
+                    return _("Custom HTTP headers")
+                end,
+                keep_menu_open = true,
+                help_text = _([[Extra HTTP headers attached to every request KOReader sends to BookOrbit. Useful for authenticating through a reverse proxy or zero-trust gateway (e.g. Cloudflare Access).]]),
+                callback = function()
+                    self:manageCustomHeaders()
+                end,
+            },
+            {
                 text = _("Diagnostics"),
                 callback = function()
                     self:showDiagnostics()
@@ -835,6 +849,151 @@ function MainMenu:logout(menu)
     self.settings.userkey = nil
     self:refreshActiveCatalogApi(false)
     if menu then menu:updateItems() end
+end
+
+function MainMenu:manageCustomHeaders()
+    local headers = self.settings.custom_headers or {}
+
+    local kv_pairs = {}
+    for index, entry in ipairs(headers) do
+        table.insert(kv_pairs, {
+            entry.name or "",
+            entry.value or "",
+            callback = function()
+                self:editCustomHeader(index)
+            end,
+        })
+    end
+    if #kv_pairs == 0 then
+        table.insert(kv_pairs, { _("No custom headers configured"), "" })
+    end
+
+    table.insert(kv_pairs, "----------------------------")
+    table.insert(kv_pairs, {
+        _("Add header"),
+        "+",
+        callback = function()
+            self:addCustomHeader()
+        end,
+    })
+
+    local KeyValuePage = require("ui/widget/keyvaluepage")
+    UIManager:show(KeyValuePage:new{
+        title = _("Custom HTTP headers"),
+        kv_pairs = kv_pairs,
+        value_overflow_align = "right",
+    })
+end
+
+function MainMenu:addCustomHeader()
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("Add custom HTTP header"),
+        fields = {
+            {
+                hint = _("Header name"),
+            },
+            {
+                hint = _("Header value"),
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Add"),
+                    is_enter_default = true,
+                    callback = function()
+                        local name, value = unpack(dialog:getFields())
+                        name = util.trim(name or "")
+                        value = value or ""
+                        if name == "" then
+                            UIManager:show(InfoMessage:new{ text = _("Header name must not be empty."), timeout = 2 })
+                            return
+                        end
+                        UIManager:close(dialog)
+                        if not self.settings.custom_headers then
+                            self.settings.custom_headers = {}
+                        end
+                        table.insert(self.settings.custom_headers, { name = name, value = value })
+                        self:refreshActiveCatalogApi(false)
+                        G_reader_settings:flush()
+                        self:manageCustomHeaders()
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
+function MainMenu:editCustomHeader(index)
+    local headers = self.settings.custom_headers or {}
+    local entry = headers[index]
+    if not entry then return end
+
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("Edit custom HTTP header"),
+        fields = {
+            {
+                text = entry.name or "",
+                hint = _("Header name"),
+            },
+            {
+                text = entry.value or "",
+                hint = _("Header value"),
+            },
+        },
+        buttons = {
+            {
+                {
+                    text = _("Delete"),
+                    callback = function()
+                        UIManager:close(dialog)
+                        table.remove(self.settings.custom_headers, index)
+                        self:refreshActiveCatalogApi(false)
+                        G_reader_settings:flush()
+                        self:manageCustomHeaders()
+                    end,
+                },
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+                {
+                    text = _("Save"),
+                    is_enter_default = true,
+                    callback = function()
+                        local name, value = unpack(dialog:getFields())
+                        name = util.trim(name or "")
+                        value = value or ""
+                        if name == "" then
+                            UIManager:show(InfoMessage:new{ text = _("Header name must not be empty."), timeout = 2 })
+                            return
+                        end
+                        UIManager:close(dialog)
+                        self.settings.custom_headers[index] = { name = name, value = value }
+                        self:refreshActiveCatalogApi(false)
+                        G_reader_settings:flush()
+                        self:manageCustomHeaders()
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
 end
 
 function MainMenu.install(BookOrbit)

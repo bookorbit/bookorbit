@@ -205,6 +205,7 @@ function BookOrbitApi.new(opts)
         plugin_version = opts.plugin_version,
         background_requests = opts.background_requests == true,
         proxy = opts.proxy,
+        custom_headers = opts.custom_headers,
     }, BookOrbitApi)
 end
 
@@ -267,6 +268,12 @@ function BookOrbitApi:requestBlocking(method, path, body, extra_headers)
             ["x-auth-key"] = self.userkey,
         },
     }
+
+    for _, entry in ipairs(self.custom_headers or {}) do
+        if type(entry.name) == "string" and entry.name ~= "" and type(entry.value) == "string" then
+            request.headers[entry.name] = entry.value
+        end
+    end
 
     for name, value in pairs(extra_headers or {}) do
         request.headers[name] = value
@@ -463,6 +470,12 @@ function BookOrbitApi:downloadBlocking(path, local_path, opts)
                 ["x-auth-key"] = self.userkey,
             },
         }
+
+        for _, entry in ipairs(self.custom_headers or {}) do
+            if type(entry.name) == "string" and entry.name ~= "" and type(entry.value) == "string" then
+                request.headers[entry.name] = entry.value
+            end
+        end
 
         request.proxy = self:getProxy(current_url)
 
