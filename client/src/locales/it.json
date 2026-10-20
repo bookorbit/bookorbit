@@ -3131,6 +3131,8 @@
         "syncHighlightsHint": "Invia i momenti salienti realizzati in BookOrbit o KOReader al tuo Kobo. I momenti salienti di Kobo vengono importati in BookOrbit anche quando è disattivato. Le annotazioni collegate sincronizzano le modifiche e le eliminazioni in entrambi i modi. Richiede la consegna KEPUB; il libro su Kobo deve essere il KEPUB scaricato da BookOrbit.",
         "storeSync": "Includi i titoli del negozio Kobo",
         "storeSyncHint": "Consegna anche libri dal tuo account Kobo, incluso Kobo Plus e acquisti, accanto alla tua libreria BookOrbit. Senza questo, solo i libri BookOrbit raggiungono il dispositivo. I titoli del negozio vengono scaricati direttamente da Kobo e non vengono aggiunti alla tua libreria BookOrbit.",
+        "fullSizeCovers": "Copertine a grandezza naturale",
+        "fullSizeCoversHint": "Invia ogni copertina alla risoluzione dello schermo del tuo Kobo, così le immagini in standby e le copertine a schermo intero rimangono nitide. Disattiva questa opzione per inviare copertine più piccole e velocizzare la sincronizzazione. Una copertina già presente sul Kobo viene aggiornata solo quando cambia quella del libro.",
         "convertKepub": "Converti in KEPUB",
         "convertKepubHint": "Invia EPUB idonei come KEPUB. Rimane attivo quando la sincronizzazione dei progressi o le evidenziazioni BookOrbit-to-Kobo sono abilitate. Alla successiva sincronizzazione Kobo, i libri interessati verranno nuovamente offerti come download KEPUB; rimuovi qualsiasi vecchia copia EPUB se Kobo continua ad aprirla.",
         "forceHyphenation": "Forza la sillabazione",

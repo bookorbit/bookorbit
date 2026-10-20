@@ -1,121 +1,173 @@
 {
   "common": {
-    "resetSortAria": "Obnovit pořadí na výchozí",
+    "resetSortAria": "Obnovit řazení na výchozí",
     "save": "Uložit",
     "cancel": "Zrušit",
-    "delete": "Vymazat",
+    "delete": "Odstranit",
     "edit": "Upravit",
     "close": "Zavřít",
     "confirm": "Potvrdit",
-    "loading": "Načítám...",
+    "loading": "Načítání…",
     "search": "Hledat",
     "back": "Zpět",
     "next": "Další",
     "previous": "Předchozí",
     "retry": "Opakovat",
     "yes": "Ano",
-    "no": "Ne"
+    "no": "Ne",
+    "show": "Zobrazit",
+    "hide": "Skrýt",
+    "undo": "Vrátit zpět",
+    "pagination": {
+      "label": "Stránkování",
+      "pageOf": "Strana {page} z {totalPages}",
+      "previousPage": "Předchozí strana",
+      "nextPage": "Další strana",
+      "goToPage": "Přejít na stranu {page}"
+    }
   },
   "settings": {
     "privacySharing": {
       "title": "Soukromí a sdílení",
-      "subtitle": "Určuje, zda administrátoři mohou vidět identifikovatelné shrnutí vaší aktivity při čtení.",
-      "levelLegend": "Úroveň sdílení postřehů",
+      "subtitle": "Určuje, zda správci mohou vidět identifikovatelný souhrn vaší čtenářské aktivity.",
+      "levelLegend": "Úroveň sdílení přehledů o čtení",
       "current": "Aktuální nastavení",
       "levels": {
         "private": {
           "title": "Soukromé",
-          "description": "Pouze vy můžete vidět statistiky čtení."
+          "description": "Pouze vy můžete vidět své statistiky čtení."
         },
         "summary": {
-          "title": "Sdílet shrnutí",
-          "description": "Sdílejte agregátní návyky bez knihových titulů, autorů, seriálů nebo narkotiků."
+          "title": "Sdílet souhrn",
+          "description": "Sdílet souhrnné návyky bez názvů knih, autorů, sérií nebo vypravěčů."
         },
         "detailed": {
           "title": "Sdílet podrobné přehledy",
-          "description": "Také sdílejte nejnovější a špičkové knihy, autory, seriály, žánry a narkotiky."
+          "description": "Sdílet také nedávné a nejlepší knihy, autory, seriály, žánry a vypravěče."
         }
       },
       "fields": {
         "frequency": "Četnost čtení a aktivní dny",
-        "completion": "Souhrnné knihy zahájeny a dokončeny",
-        "formats": "Rozložení formátu",
+        "completion": "Souhrn započatých a dokončených knih",
+        "formats": "Rozdělení formátů",
         "genres": "Široké rozdělení žánrů",
-        "trend": "Souhrnný trend čtení",
+        "trend": "Souhrn trendu čtení",
         "books": "Názvy aktuálních, nedávných a nejčtenějších knih",
         "authors": "Nejlepší autoři",
         "series": "Nejlepší série",
-        "narrators": "Nejlepší narratři"
+        "narrators": "Nejlepší vypravěči"
       },
       "confirm": {
         "shareTitle": "Povolit {level}?",
         "shareDescription": "Správci s oprávněním budou moci vidět následující informace.",
-        "stopTitle": "Zastavit sdílení čtení postřehů?",
-        "stopDescription": "Přístup administrátora bude zablokován okamžitě. Existující záznamy o přístupu zůstávají ve vaší historii.",
-        "recordedNotice": "Každé zobrazení profilu správce je zaznamenáno a zobrazeno v historii přístupu."
+        "stopTitle": "Zastavit sdílení přehledů o čtení?",
+        "stopDescription": "Přístup správce bude okamžitě zablokován. Stávající záznamy o přístupu zůstanou ve vaší historii.",
+        "recordedNotice": "Každé zobrazení profilu správce se zaznamenává a objeví se ve vaší historii přístupů."
       },
       "preview": {
-        "title": "Náhled sdíleného profilu",
+        "title": "Náhled vašeho sdíleného profilu",
         "description": "Podívejte se na informace, které jsou v současné době dostupné autorizovaným správcům.",
         "action": "Načíst náhled",
         "readingTime": "Čas čtení",
         "activeDays": "Aktivní dny",
-        "started": "Knihy zahájeny",
-        "completed": "Knihy dokončeny",
+        "started": "Započaté knihy",
+        "completed": "Dokončené knihy",
         "topBooks": "Nejlepší knihy"
       },
       "history": {
         "title": "Historie přístupu k profilu",
-        "description": "Nedávné zobrazení správce vašeho sdíleného profilu.",
-        "empty": "Žádný administrátor neviděl váš sdílený profil.",
-        "paginationLabel": "Historie přístupu k profilům"
+        "description": "Nedávná zobrazení správce vašeho sdíleného profilu.",
+        "empty": "Žádný správce neviděl váš sdílený profil čtení.",
+        "paginationLabel": "Stránky s historií přístupů k profilům"
       },
-      "durationMinutes": "{count, plural, one {# min} few {# minut} many {# minut} other {# minut}}",
-      "durationHours": "{count, plural, one {# hodina} few {# hodin} many {# hodin} other {# hodin}}",
-      "unknownTitle": "Nepojmenovaná kniha",
+      "durationMinutes": "{count, plural, one {# minuta} few {# minuty} many {# minut} other {# minut}}",
+      "durationHours": "{count, plural, one {# hodina} few {# hodiny} many {# hodin} other {# hodin}}",
+      "unknownTitle": "Kniha bez názvu",
       "errors": {
         "load": "Nepodařilo se načíst nastavení sdílení.",
-        "save": "Aktualizace nastavení sdílení se nezdařila.",
+        "save": "Nepodařilo se aktualizovat nastavení sdílení.",
         "preview": "Nepodařilo se načíst náhled sdíleného profilu."
       }
     },
     "appearance": {
       "language": {
         "title": "Jazyk",
-        "description": "Vyberte jazyk používaný v celém rozhraní.",
-        "label": "Jazyk rozhraní",
+        "description": "Zvolte jazyk používaný v celém uživatelském rozhraní.",
+        "label": "Jazyk",
         "loadError": "Nepodařilo se načíst vybraný jazyk",
         "saveError": "Nepodařilo se uložit předvolby jazyka"
       },
       "pageTitle": "Zobrazení",
-      "pageSubtitle": "Ovládání témat, obalů, rozvržení a způsobu zobrazení knihovny.",
-      "mobileSummary": "Motiv: {theme} • Akcent: {accent} • Pozadí: {background}",
+      "pageSubtitle": "Upravuje motivy, obálky, rozvržení a způsob zobrazení vaší knihovny.",
+      "mobileSummary": "Motiv: {theme} • Zvýraznění: {accent} • Pozadí: {background}",
       "themeMode": {
         "light": "Světlý",
         "dark": "Tmavý",
         "system": "Systém"
       },
       "theme": {
-        "title": "Téma",
+        "title": "Motiv",
+        "style": {
+          "label": "Styl",
+          "hint": "Celkový vzhled aplikace. Režim, zvýraznění, rohy a pozadí si zachovávají svá nastavení.",
+          "bookorbit": {
+            "label": "BookOrbit",
+            "description": "Barevné plochy, skleněné panely a nadpisy s patkovým písmem."
+          },
+          "nostalgia": {
+            "label": "Nostalgie",
+            "description": "Neutrální podklad, systémový typ, ploché panely a horní osvětlení."
+          }
+        },
         "colorScheme": {
           "label": "Barevné schéma",
           "hint": "Světlé nebo tmavé rozhraní"
         },
+        "surfacePalette": {
+          "label": "Povrch",
+          "hint": "Neutrální podklad za panely a kartami.",
+          "palettes": {
+            "onyx": "Onyx",
+            "carbon": "Křemík",
+            "neutral": "Neutrální",
+            "zinc": "Zinek",
+            "iron": "Železo",
+            "steel": "Ocel",
+            "ash": "Popel",
+            "smoke": "Kouř",
+            "charcoal": "Dřevěné uhlí",
+            "slate": "Břidlice",
+            "midnight-blue": "Půlnoční modrá",
+            "ocean": "Oceán",
+            "pine": "Borovice",
+            "olive": "Olivová",
+            "stone": "Kámen",
+            "sepia": "Sépiová",
+            "crimson": "Purpurová",
+            "plum": "Švestkově modrá"
+          }
+        },
+        "topGlow": {
+          "label": "Horní záře",
+          "hint": "Jak daleko se zvýrazňující záře dostane dolů na stránku. Posunutím doleva ji vypněte.",
+          "value": "{value} %",
+          "off": "Vypnuto"
+        },
         "accents": {
-          "grey": "Šedý",
-          "scarlet": "Scarlet",
-          "vermilion": "Vermilion",
-          "rose": "Celer bulvový",
-          "copper": "Měď",
+          "grey": "Šedá",
+          "scarlet": "Šarlatová",
+          "vermilion": "Rumělková",
+          "rose": "Růžová",
+          "copper": "Měděná",
           "orange": "Oranžová",
-          "chartreuse": "Chartreuse",
-          "marigold": "Marigold",
+          "chartreuse": "Brandy",
+          "marigold": "Námořní",
           "wasabi": "Wasabi",
-          "amber": "Jantarový",
-          "malachite": "Malachit",
+          "amber": "Jantarová",
+          "malachite": "Malachitová",
           "yellow": "Žlutá",
           "viridian": "Viridian",
-          "turquoise": "Turquoise",
+          "turquoise": "Tyrkysová",
           "lime": "Světle zelená",
           "green": "Zelená",
           "acid-green": "Kyselá zelená",
@@ -123,196 +175,240 @@
           "teal": "Modrozelený",
           "electric-blue": "Elektrická modrá",
           "cyan": "Azurová",
-          "jade": "Jade",
-          "ultramarine": "Ultramarine",
+          "jade": "Nefritová",
+          "ultramarine": "Ultramarinová",
           "iris": "Iris",
           "purple": "Fialová",
           "blue": "Modrá",
           "indigo": "Indigo",
           "violet": "Fialové",
-          "amethyst": "Amethyst",
-          "fuchsia": "Fuchsia",
-          "raspberry": "Maliny",
+          "amethyst": "Ametystová",
+          "fuchsia": "Fuchsiová",
+          "raspberry": "Malinová",
           "pink": "Růžová",
-          "white": "Bílý",
-          "rosewater": "Rosewater",
-          "salmon": "Losos obecný",
-          "coral": "Korál",
-          "sand": "Písek",
-          "peach": "Okoun",
-          "pear": "Hrušky",
-          "flax": "Len",
-          "sprout": "Sprout",
+          "white": "Bílá",
+          "rosewater": "Růžová voda",
+          "salmon": "Lososová",
+          "coral": "Korálová",
+          "sand": "Písková",
+          "peach": "Broskvová",
+          "pear": "Hrušková",
+          "flax": "Lněná",
+          "sprout": "Výhonek",
           "butter": "Máslo",
           "aloe": "Aloe",
-          "lemon": "Citrusové plody",
+          "lemon": "Citronová",
           "foam": "Pěnová",
-          "aqua": "Aqua",
-          "celadon": "Celadon",
-          "sage": "Celerová nať",
-          "pistachio": "Pistachio",
-          "mint": "Med a další včelařské produkty",
-          "seafoam": "Námořní olej",
-          "baby-blue": "Modrá pro kojence",
-          "powder": "Prášek",
+          "aqua": "Vodová",
+          "celadon": "Keladonová",
+          "sage": "Šalvějová",
+          "pistachio": "Pistáciová",
+          "mint": "Mátová",
+          "seafoam": "Mořská pěna",
+          "baby-blue": "Dětsky modrá",
+          "powder": "Prášková",
           "sea-glass": "Mořské sklo",
-          "bluebell": "Bluebell",
-          "cornflower": "Kukuřice",
-          "thistle": "Stříbrný",
-          "periwinkle": "Periwinkle",
-          "wisteria": "Wisteria",
-          "lavender": "Lavender",
+          "bluebell": "Hyacintová",
+          "cornflower": "Chrpová",
+          "thistle": "Stříbrná",
+          "periwinkle": "Barvínková",
+          "wisteria": "Visteriová",
+          "lavender": "Levandulová",
           "mauve": "Mauve",
-          "orchid": "Orchid",
-          "rose-quartz": "Křemen",
-          "blush": "Vyprázdnit"
+          "orchid": "Orchideová",
+          "rose-quartz": "Růženínová",
+          "blush": "Červeň"
         },
         "accentColor": {
           "label": "Barva zvýraznění"
         },
         "cornerRadius": {
-          "label": "Corner radius",
-          "hint": "Zaoblení karet a prvků UI"
+          "label": "Poloměr rohu",
+          "hint": "Zaoblení karet a prvků uživatelského rozhraní",
+          "options": {
+            "sharp": "Ostré",
+            "default": "Výchozí",
+            "rounded": "Zaoblené",
+            "pill": "Kulaté"
+          }
         },
         "surfaceBrightness": {
           "label": "Jas povrchu",
-          "hint": "Zesvětlený tmavý režim",
-          "reset": "Reset"
+          "hint": "Zesvětlit prvky v tmavém režimu",
+          "reset": "Obnovit"
         },
         "libraryBackground": {
           "title": "Pozadí knihovny",
           "pattern": {
             "label": "Vzor pozadí",
-            "hint": "Za mřížkou se zobrazí gesto"
+            "hint": "Vzor zobrazený za mřížkou knih"
           }
         },
         "backgroundGroups": {
           "fundamental": "Základní",
           "structural": "Struktura",
           "ambient": "Ambientní",
-          "refractive": "Žáruvzdorný"
-        }
+          "refractive": "Zářivka"
+        },
+        "syncSaveFailed": "Nepodařilo se uložit předvolby motivu"
       },
       "storage": {
-        "title": "Kde uložit nastavení vzhledu",
+        "title": "Kam uložit předvolby vzhledu",
         "active": "Aktivní",
-        "notAvailable": "Není k dispozici",
+        "notAvailable": "Nedostupné",
         "device": {
           "title": "Pouze toto zařízení",
-          "description": "Nastavení zůstávají ve vašem prohlížeči. Nejlepší je, pokud chcete jiný vzhled na různých zařízeních."
+          "description": "Předvolby zůstávají ve vašem prohlížeči. Nejlepší, pokud chcete jiný vzhled na různých zařízeních."
         },
         "account": {
           "title": "Můj účet",
-          "description": "Předvolby jsou uloženy do vašeho účtu. Nejlepší pokud chcete stejný vzhled na každém zařízení."
+          "description": "Předvolby jsou uloženy do vašeho účtu. Nejlepší, pokud chcete stejný vzhled na všech zařízeních."
         },
         "toasts": {
           "synced": "Předvolby budou nyní synchronizovány",
-          "local": "Nastavení zůstanou na tomto zařízení"
+          "local": "Předvolby zůstanou na tomto zařízení"
         },
         "errors": {
-          "demoRestricted": "Demo omezený účet nemůže změnit režim úložiště motivu",
-          "update": "Nepodařilo se aktualizovat režim úložiště",
-          "generic": "Došlo k chybě při aktualizaci režimu úložiště"
+          "demoRestricted": "Účet s omezením demo nemůže měnit režim ukládání motivů",
+          "update": "Nepodařilo se aktualizovat režim ukládání",
+          "generic": "Došlo k chybě při aktualizaci režimu ukládání"
         }
       },
       "bookCovers": {
-        "title": "Oblíbené knihy",
+        "title": "Obálky knih",
+        "coverSearch": {
+          "label": "Výchozí poskytovatel vyhledávání obálek",
+          "hint": "Zvolte vybraný zdroj při otevření Najít obal online. Uloženo do vašeho účtu, takže se použije na všech zařízeních.",
+          "loadError": "Nepodařilo se načíst výchozího poskytovatele vyhledávání obálek",
+          "saveError": "Nepodařilo se uložit výchozího poskytovatele vyhledávání obálek"
+        },
+        "placeholderStyle": {
+          "title": "Zástupný styl",
+          "hint": "Knihy bez obálky jsou vykresleny v tomto stylu.",
+          "options": {
+            "bauhaus": "Bauhaus",
+            "constructivist": "Konstrukce",
+            "memphis": "Memfis",
+            "clothbound": "Oblečení",
+            "poster": "Plakát",
+            "aurora": "Polární záře",
+            "vista": "Vista",
+            "marbled": "Mramorovaný",
+            "paperback": "Měkká vazba"
+          }
+        },
         "displayMode": {
-          "title": "Režim titulní obrazovky",
-          "hint": "Určuje, jak se reálné obaly vejde do záložních slotů, když se poměr stran liší",
+          "title": "Režim zobrazení obálky",
+          "hint": "Určuje, jak se skutečné obálky vejdou do knižních slotů, když se liší poměry stran",
           "blurredFit": {
-            "label": "Přizpůsobit rozostření",
-            "hint": "Zobrazit celý obal s rozostřeným vyplněním za ním"
+            "label": "Přizpůsobit rozostřením",
+            "hint": "Zobrazit celou obálku s rozostřenou výplní za ní"
           },
           "fillCrop": {
             "label": "Vyplnit kartu",
-            "hint": "Vyplnit celý slot oříznutím okrajů, pokud se poměr stran liší"
+            "hint": "Vyplnit celý slot oříznutím okrajů, když se liší poměry stran"
           },
           "naturalBottom": {
-            "label": "Přirozené dno",
-            "hint": "Udržujte původní poměr krycí vrstvy a ukotvte krycí kryt ke spodní části"
+            "label": "Přirozená spodní část",
+            "hint": "Ponechat původní poměr stran obálky a ukotvit obálku ke spodní části"
           }
         },
         "spine": {
-          "title": "Překrytí páteře",
-          "hint": "Přidá stylizovaný efekt páteře a lesku k pokrytí karet",
+          "title": "Překrytí hřbetu knihy",
+          "hint": "Přidá karám obalů stylizovaný efekt hřbetu a lesku",
           "off": {
             "label": "Vypnuto",
-            "hint": "Žádné páteře/leskové účinky na kryty"
+            "hint": "Žádné efekty hřbetu nebo lesku na obálkách"
           },
           "subtle": {
-            "label": "Jemný",
-            "hint": "Lehká páteř a střih, blíže k výchozímu vzhledu"
+            "label": "Jemné",
+            "hint": "Lehký hřbet a lesk, blíže k výchozímu vzhledu"
           },
           "strong": {
-            "label": "Silný",
-            "hint": "Výraznější ošetření páteře a lesku"
+            "label": "Silné",
+            "hint": "Výraznější úprava hřbetu a lesku"
           }
         },
         "showSpineOnComics": {
-          "label": "Zobrazit páteř na komiksu",
-          "hint": "Použít páteř a efekt lesku na komické obklady (cbz, cbr, cb7)"
+          "label": "Zobrazit hřbet na komiksech",
+          "hint": "Použít efekt hřbetu a lesku na obálky komiksů (cbz, cbr, cb7)"
+        },
+        "detailCoverTint": {
+          "title": "Odstín obálky s podrobnostmi o knize",
+          "hint": "Barva vzorku z obálky se postupně vytrácí za ilustrací a názvem na stránce s podrobnostmi o knize",
+          "off": {
+            "label": "Vypnuto",
+            "hint": "Jednoduché pozadí karty"
+          },
+          "single": {
+            "label": "Jedna barva",
+            "hint": "Pouze dominantní barva obálky"
+          },
+          "duotone": {
+            "label": "Dvě barvy",
+            "hint": "Přidá barvu zvýraznění obálky, pokud má nějakou výraznou"
+          }
         },
         "shadow": {
-          "title": "Síla stínu",
-          "hint": "Řídící hloubka pod krytem napříč mřížkou, seznamem, tabulkou a náhledy na nástěnku",
+          "title": "Síla stínu obálky",
+          "hint": "Určuje hloubku pod obálkami naříč mřížkou, seznamem, tabulkou a náhledy na nástěnce",
           "default": {
             "label": "Výchozí",
-            "hint": "Nadmořská výška a hloubka proudu"
+            "hint": "Aktuální výška a hloubka"
           },
           "strong": {
-            "label": "Silný",
-            "hint": "Těžší stín pod kryty"
+            "label": "Silná",
+            "hint": "Těžší stín pod obálkami připomínající polici"
           }
         },
         "overlays": {
-          "title": "Překrytí kartou",
-          "hint": "Vyberte metadata zobrazená přímo na obálkových kartách",
+          "title": "Překrytí karet",
+          "hint": "Zvolte metadata zobrazená přímo na kartách obálek knih",
           "progressBar": {
             "label": "Ukazatel průběhu",
             "hint": "Tenká barevná čára podél dolního okraje"
           },
           "format": {
             "label": "Formát souboru",
-            "hint": "Barevně kódovaný EPUB, PDF, CBZ odznak vpravo doole"
+            "hint": "Barevně odlišená ikona EPUB, PDF, CBZ vpravo dole"
           },
           "rating": {
             "label": "Hodnocení",
-            "hint": "Ukazatel hodnocení hvězdičky v levém dolním rohu"
+            "hint": "Ukazatel hodnocení hvězdičkami vlevo dole"
           },
           "readStatus": {
-            "label": "Číst status",
-            "hint": "Barva ikony zobrazující aktuální stav čtení v levém horním rohu"
+            "label": "Stav čtení",
+            "hint": "Barevná ikona zobrazující aktuální stav čtení vlevo nahoře"
           },
           "seriesPosition": {
             "label": "Číslo série",
-            "hint": "Odznak zobrazující knihovou pozici v sérii vpravo nahoře (např. #3, #1.5)"
+            "hint": "Ikona zobrazující pořadí knihy v sérii vpravo nahoře (např. #3, #1,5)"
           },
           "lockStatus": {
             "label": "Stav zámku",
-            "hint": "Ikona zámku metadat v pravém horním rohu - oranžová při uzamčení zelená, když je odemčeno"
+            "hint": "Ikona zámku metadat vpravo nahoře - oranžová při uzamčení, zelená při odemčení"
           }
         }
       },
       "layout": {
-        "coverSize": "Velikost obalu",
-        "gridSpacing": "Vzdálenost v souřadnicové síti",
+        "coverSize": "Velikost obálky",
+        "gridSpacing": "Rozestup mřížky",
         "gridLayout": {
           "title": "Rozložení mřížky knihovny"
         },
         "coverSizeBehavior": {
-          "label": "Chování velikosti obalu",
-          "hint": "Určuje, zda jsou na výšku a rozestup mřížek sdíleny napříč všemi zobrazeními, nebo zda jsou udržovány pro zobrazení",
-          "perViewHint": "Režim prohlížení: upravte velikost obálky a mezery z každého zobrazení displeje.",
+          "label": "Chování velikosti obálky",
+          "hint": "Určuje, zda se formáty na výšku nebo čtvrec a rozestup mřížky sdílejí napříč všemi zobrazeními, nebo ponechají podle zobrazení",
+          "perViewHint": "Režim podle zobrazení: upravit velikost obálky a mezery z každého zobrazení displeje.",
           "syncAll": "Synchronizovat všechna zobrazení",
-          "perView": "Velikost zobrazení"
+          "perView": "Velikosti podle zobrazení"
         },
         "portraitCoverSize": {
-          "label": "Velikost obalu v režimu na výšku",
+          "label": "Velikost obálky na výšku",
           "hint": "Používá se pro knihovny a zobrazení na výšku"
         },
         "squareCoverSize": {
-          "label": "Velikost čtverečního obalu",
+          "label": "Velikost čtvercové obálky",
           "hint": "Používá se pro čtvercové knihovny a zobrazení"
         },
         "portraitGridSpacing": {
@@ -320,52 +416,52 @@
           "hint": "Mezera mezi obálkami na výšku"
         },
         "squareGridSpacing": {
-          "label": "Rozestup mezi čtverečními mřížkami",
-          "hint": "Mezera mezi čtverečními kryty"
+          "label": "Rozestup čtvercových mřížek",
+          "hint": "Mezera mezi čtvercovými obálkami"
         },
         "cardInfoMode": {
-          "label": "Režim informací o kartě",
-          "hint": "Kde zobrazit název knihy a autora na mřížkových kartách",
-          "onHover": "Při přejetí prstem",
-          "belowCover": "Pod krytem",
+          "label": "Režim informací na kartě",
+          "hint": "Kde zobrazit název knihy a autora na kartách v mřížce",
+          "onHover": "Při najetí",
+          "belowCover": "Pod obálkou",
           "off": "Vypnuto"
         },
         "primaryCardLabel": {
-          "label": "Štítek primární karty",
-          "hint": "Text zobrazený pod každým obálkou knihy (první řádek)"
+          "label": "Primární popisek karty",
+          "hint": "Text zobrazený pod každou obálkou knihy (první řádek)"
         },
         "secondaryCardLabel": {
-          "label": "Štítek druhé karty",
-          "hint": "Dodatečný text pod primárním štítkem (druhý řádek)"
+          "label": "Sekundární popisek karty",
+          "hint": "Dodatečný text pod primárním popiskem (druhý řádek)"
         },
         "labelField": {
-          "hidden": "Hidden",
+          "hidden": "Skryto",
           "bookTitle": "Název knihy",
           "seriesTitle": "Název série",
-          "seriesTitlePosition": "Název série + pozice",
+          "seriesTitlePosition": "Název série a pořadí",
           "author": "Autor"
         },
         "seriesDisplay": {
           "title": "Zobrazení série",
           "collapsedCover": {
-            "label": "Sbalený obal série",
-            "hint": "Vyberte, který obal se zobrazí, když se série sbalí v tabulce knihy"
+            "label": "Sbalené obálky série",
+            "hint": "Zvolte, kterou obálku zobrazit, když jsou série sbaleny v mřížce knih"
           },
-          "stack": "Zásobník",
+          "stack": "Stoh",
           "mosaic": "Mozaika",
           "first": "První",
-          "latest": "Nejnovější",
-          "firstUnread": "První nepřečtené"
+          "latest": "Poslední",
+          "firstUnread": "První nepřečtená"
         },
         "authorGrid": {
           "title": "Mřížka autora",
           "coverSize": {
-            "label": "Velikost obalu",
-            "hint": "Šířka autora pokrývá mřížku"
+            "label": "Velikost obálky",
+            "hint": "Šířka obálek autorů v mřížce"
           },
           "coverShape": {
-            "label": "Krycí tvar",
-            "hint": "Tvar autora pokrývá mřížku"
+            "label": "Tvar obálky",
+            "hint": "Tvar obálek autorů v mřížce"
           },
           "circle": "Kruh",
           "square": "Čtverec"
@@ -374,86 +470,92 @@
           "title": "Zobrazení seznamu a tabulek"
         },
         "zebraStriping": {
-          "label": "Proužek zebry",
-          "hint": "Alternativní barvy pozadí řádku pro snazší skenování"
+          "label": "Zebrový vzor",
+          "hint": "Střídavé barvy pozadí řádku pro snazší přehlednost"
         }
       },
       "behavior": {
         "title": "Chování knihovny",
         "thumbnailClicks": {
-          "label": "Thumbnail clicks",
-          "hint": "Vyberte si, co se stane při otevření knihy z mřížky a zobrazení seznamu",
-          "readFirst": "Čtěte první",
+          "label": "Kliknutí na náhled",
+          "hint": "Zvolte, co se stane při otevření knihy ze zobrazení mřížky a seznamu",
+          "readFirst": "Nejprve číst",
           "readFirstHint": "Otevřít čtečku, když existuje čitelný soubor",
           "openDetails": "Otevřít podrobnosti",
-          "openDetailsHint": "Přejít na stránku s podrobnostmi z tabulky a seznamu náhledů"
+          "openDetailsHint": "Přejít na stránku s podrobnostmi z náhledů v mřížce a seznamu"
         },
         "filterPreview": {
-          "label": "Zobrazit náhled filtru ve výchozím nastavení",
+          "label": "Zobrazit filtrovaný náhled ve výchozím nastavení",
           "hint": "Rozbalit aktivní filtr a seřadit shrnutí při otevření smartScope"
         },
         "collapseSeries": {
           "label": "Sbalit série ve výchozím nastavení",
-          "hint": "Skupinové knihy ve stejné sérii do jedné karty v knihovně a ve sbírce"
+          "hint": "Skupiny knih ve stejné sérii do jedné karty v zobrazeních knihovny a sbírky"
+        },
+        "bookRequests": {
+          "label": "Zobrazit žádosti o knihy",
+          "hint": "Zobrazit stránky s žádostmi, výzvami a nastaveními v tomto účtu. Stávající žádosti dál běží i po skrytí.",
+          "saveFailed": "Nelze aktualizovat viditelnost Žádostí o knihy"
         }
       },
       "icons": {
         "title": "Vlastní ikony",
         "uploadIcons": "Nahrát ikony",
-        "uploadedCount": "{count, plural, =0 {Žádné ikony nebyly nahrány} one {Ikona byla nahrána} few {# ikon byl nahrán} many {# ikon byl nahrán} other {# ikon byl nahrán}}",
+        "uploadedCount": "{count, plural, =0 {žádné ikony nebyly nahrány} one {# ikona byla nahrána} few {# ikony byl nahrány} many {# ikon bylo nahráno} other {# ikon bylo nahráno}}",
         "searchPlaceholder": "Hledat ikony",
         "sort": {
           "newest": "Nejnovější",
           "name": "Název"
         },
-        "selectedCount": "{count, plural, one {# vybráno} few {# vybráno} many {# vybráno} other {# vybráno}}",
+        "selectedCount": "{count, plural, one {# vybrána} few {# vybrány} many {# vybráno} other {# vybráno}}",
         "clear": "Vyčistit",
         "deleteSelected": "Odstranit vybrané",
-        "loading": "Načítám ikony...",
-        "emptySearch": "Hledání neodpovídají žádné ikony.",
-        "emptyNoIcons": "Žádné vlastní ikony zatím nebyly nahrány.",
+        "loading": "Načítání ikon...",
+        "emptySearch": "Vašemu hledání neodpovídají žádné ikony.",
+        "emptyNoIcons": "Zatím nebyly nahrány žádné vlastní ikony.",
         "namePlaceholder": "Název",
-        "checkingUsage": "Kontrola používání...",
+        "checkingUsage": "Kontrola využití...",
         "usedBy": "Použito {count}",
         "notUsedYet": "Dosud nevyužito",
         "rename": "Přejmenovat",
         "replace": "Nahradit",
         "usage": {
-          "libraries": "{count, plural, =0 {žádné knihovny} one {# knihovna} few {# knihoven} many {# knihoven} other {# knihoven}}",
-          "collections": "{count, plural, =0 {žádné kolekce} one {# kolekce} few {# kolekcí} many {# kolekcí} other {# kolekcí}}",
-          "smartScopes": "{count, plural, =0 {žádné chytré rozsahy} one {# chytrý rozsah} few {# chytré rozsahy} many {# chytré rozsahy} other {# chytré rozsahy}}"
+          "libraries": "{count, plural, =0 {žádné knihovny} one {# knihovna} few {# knihovny} many {# knihoven} other {# knihoven}}",
+          "collections": "{count, plural, =0 {žádné sbírky} one {# sbírka} few {# sbírky} many {# sbírek} other {# sbírek}}",
+          "smartScopes": "{count, plural, =0 {žádné chytré rozsahy} one {# chytrý rozsah} few {# chytré rozsahy} many {# chytrých rozsahů} other {# chytrých rozsahů}}"
         },
         "confirm": {
-          "deleteOne": "Smazat \"{name}\"? Existující použití se vrátí do výchozí ikony.",
-          "deleteMany": "{count, plural, =0 {Delete no icons?} one {Delete # icon? Existing uses will fall back to their default icon.} few {Delete # icons? Existing uses will fall back to their default icon.} many {Delete # icons? Existing uses will fall back to their default icon.} other {Delete # icons? Existing uses will fall back to their default icon.}}"
+          "deleteOne": "Odstranit \"{name}\"? Existující použití se vrátí k výchozí ikoně.",
+          "deleteMany": "{count, plural, =0 {Neodstraňovat žádné ikony?} one {Odstranit # ikonu? Existující použití se vrátí k výchozí ikoně.} few {Odstranit # ikony? Existující použití se vrátí k výchozí ikoně.} many {Odstranit # ikon? Existující použití se vrátí k výchozí ikoně.} other {Odstranit # ikon? Existující použití se vrátí k výchozí ikoně.}}"
         },
         "toasts": {
           "saved": "Ikona uložena",
           "updated": "Ikona aktualizována",
           "deleted": "Ikona odstraněna",
-          "bulkDeleted": "{count, plural, =0 {Nebyly smazány žádné ikony} one {Smazána ikona #} few {Smazána # ikon} many {Smazána # ikon} other {Smazána # ikon}}",
-          "bulkDeletePartial": "Smazáno {deleted}, {failed} se nezdařilo"
+          "bulkDeleted": "{count, plural, =0 {Nebyly odstraněny žádné ikony} one {Odstraněna # ikona #} few {Odstraněny # ikony} many {Odstraněno # ikon} other {Odstraněno # ikon}}",
+          "bulkDeletePartial": "Odstraněnao {deleted}, {failed} se nezdařilo"
         },
         "errors": {
           "load": "Nepodařilo se načíst ikony",
-          "save": "Ikonu se nepodařilo uložit",
-          "replace": "Nahrazení ikony selhalo",
+          "save": "Nepodařilo se uložit ikonu",
+          "replace": "Nepodařilo se nahradit ikonu",
           "delete": "Nepodařilo se odstranit ikonu",
-          "bulkDelete": "Odstranění ikon se nezdařilo"
+          "bulkDelete": "Nepodařilo se odstranit ikony"
         }
       },
       "tabs": {
-        "theme": "Téma",
-        "book-covers": "Oblíbené knihy",
+        "theme": "Motiv",
+        "book-covers": "Obálky knih",
         "icons": "Ikony",
         "layout": "Rozložení",
-        "behavior": "Chování"
+        "behavior": "Chování",
+        "language": "Jazyk"
       }
     },
     "account": {
       "title": "Účet",
-      "subtitle": "Správa nastavení Vašeho osobního profilu.",
-      "subtitleAll": "Spravujte nastavení profilu a oznámení.",
+      "subtitle": "Spravujte nastavení svého osobního profilu.",
+      "subtitleAll": "Spravujte svůj profil a nastavení oznámení.",
       "tabs": {
         "profile": "Profil",
         "privacy": "Soukromí a sdílení",
@@ -461,19 +563,19 @@
         "restrictions": "Omezení"
       },
       "demoRestricted": {
-        "cannotEdit": "Demo omezený účet nemůže upravovat nastavení účtu",
-        "notice": "Demo omezený účet: úprava profilu, hesla, avataru a propojených identit je zakázána."
+        "cannotEdit": "Ǔčet s mozením demo nemůže upravovat nastavení účtu",
+        "notice": "Účet s omezením demo: úprava profilu, hesla, avataru a propojených identit je zakázána."
       },
       "feedback": {
         "unsavedChanges": "Neuložené změny",
         "discard": "Zahodit"
       },
       "profile": {
-        "securityHeading": "Profil & Zabezpečení",
+        "securityHeading": "Profil a zabezpečení",
         "username": "Uživatelské jméno",
         "fullName": "Celé jméno",
-        "email": "E-mailová adresa",
-        "emailHint": "Kontaktujte administrátora pro změnu vaší e-mailové adresy.",
+        "email": "E-mail",
+        "emailHint": "Pro změnu vaší e-mailové adresy se obraťte na správce.",
         "save": "Uložit profil",
         "saving": "Ukládání...",
         "changePassword": "Změnit heslo",
@@ -481,28 +583,28 @@
         "accountTypeOidc": "OIDC / SSO",
         "accountTypeShared": "Sdíleno",
         "accountTypeLocal": "Místní",
-        "nameRequired": "Název je povinný",
-        "updateFailed": "Aktualizace profilu se nezdařila",
+        "nameRequired": "Jméno je povinné",
+        "updateFailed": "Nepodařilo se aktualizovat profil",
         "updated": "Profil byl aktualizován",
         "usernameHint": "Vaše uživatelské jméno nelze změnit.",
         "passwordHint": "Změňte heslo, které používáte pro přihlášení.",
-        "passwordHintOidc": "Vaše heslo je spravováno poskytovatelem identity.",
+        "passwordHintOidc": "Vaše heslo je spravováno vaším poskytovatelem identity.",
         "passwordHintShared": "Sdílené účty se přihlašují prostřednictvím magického odkazu a nemají žádné heslo."
       },
       "readingPreferences": {
         "title": "Předvolby čtení",
-        "timezoneHint": "Časové pásmo se používá pro časově citlivé úspěchy, jako je raný pták a celý noc.",
-        "timezone": "Timezone",
+        "timezoneHint": "Časové pásmo se používá pro úspěchy, u nichž záleží na čase, jako je Ranní ptáče a Vzhůru celou noc.",
+        "timezone": "Časové pásmo",
         "save": "Uložit předvolby",
         "enableAchievements": "Povolit úspěchy",
-        "enableAchievementsHint": "Sledovat průběh úspěchu a zobrazit rozhraní související s úspěchem. Spravujte oznámení samostatně v oznámeních.",
+        "enableAchievementsHint": "Sledovat průběh plnění úspěchů a zobrazit rozhraní související s úspěchy. Spravujte oznámení o úspěších samostatně v Oznámení.",
         "achievementsEnabled": "Úspěchy povoleny",
         "achievementsDisabled": "Úspěchy zakázány",
-        "achievementsSaveFailed": "Aktualizace nastavení úspěchu se nezdařila"
+        "achievementsSaveFailed": "Nepodařilo se aktualizovat předvolby úspěchů"
       },
       "preferences": {
         "saveFailed": "Nepodařilo se uložit předvolby",
-        "saved": "Nastavení uloženo"
+        "saved": "Předvolby uloženy"
       },
       "avatar": {
         "title": "Profilový obrázek",
@@ -510,58 +612,58 @@
         "formatHint": "PNG/JPEG/WEBP až do {size} MB",
         "upload": "Nahrát obrázek",
         "replace": "Nahradit obrázek",
-        "uploading": "Nahrávám...",
-        "remove": "Odstranit obrázek",
+        "uploading": "Nahrávání...",
+        "remove": "Odebrat obrázek",
         "removing": "Odebírání...",
-        "updated": "Profil obrázek byl aktualizován",
+        "updated": "Profilový obrázek byl aktualizován",
         "uploadFailed": "Nepodařilo se nahrát profilový obrázek",
-        "removed": "Profilový obrázek odstraněn",
-        "removeFailed": "Nepodařilo se odstranit profilový obrázek",
+        "removed": "Profilový obrázek odebrán",
+        "removeFailed": "Nepodařilo se odebrat profilový obrázek",
         "removeConfirm": {
-          "title": "Odstranit profilový obrázek?",
-          "description": "Váš avatar bude odstraněn a nahrazen iniciálami.",
+          "title": "Odebrat profilový obrázek?",
+          "description": "Váš avatar bude odebrán a nahrazen iniciálami.",
           "confirm": "Odebrat"
         }
       },
       "connectedAccounts": {
-        "title": "Připojené účty",
+        "title": "Propojené účty",
         "unlink": "Odpojit",
         "unlinking": "Odpojování...",
         "linkAdditional": "Propojit další poskytovatele:",
-        "linkProvider": "Odkaz {provider}",
+        "linkProvider": "Propojit {provider}",
         "redirecting": "Přesměrování...",
         "noneConfigured": "Nejsou nakonfigurováni žádní poskytovatelé OIDC. Požádejte správce o nastavení SSO.",
-        "linkStateFailed": "Nepodařilo se vygenerovat stav odkazu",
-        "startLinkFailed": "Nepodařilo se spustit odkaz OIDC",
-        "unlinkFailed": "Nepodařilo se odpojit odkaz",
+        "linkStateFailed": "Nepodařilo se vygenerovat stav propojení",
+        "startLinkFailed": "Nepodařilo se spustit propojení OIDC",
+        "unlinkFailed": "Nepodařilo se odpojit",
         "unlinked": "Identita odpojena",
         "unlinkIdentityFailed": "Nepodařilo se odpojit identitu",
         "unlinkDialog": {
-          "title": "Odpojit {provider} identitu?",
-          "description": "Zadejte své heslo pro potvrzení. Již se nebudete moci přihlásit s tímto poskytovatelem.",
+          "title": "Odpojit identitu {provider}?",
+          "description": "Zadejte své heslo pro potvrzení. Již se nebudete moci přihlásit pomocí tohoto poskytovatelem.",
           "currentPassword": "Aktuální heslo"
         },
         "description": "Přihlaste se pomocí externího poskytovatele identity propojeného s tímto účtem.",
         "unlinkAria": "Odpojit {provider}"
       },
       "tour": {
-        "title": "Navštívená trasa",
+        "title": "Prohlídka s průvodcem",
         "description": "Přehrajte si průvodce, který zvýrazňuje klíčové funkce aplikace.",
-        "action": "Zopakujte prohlídku"
+        "action": "Zopakovat prohlídku"
       },
       "restrictions": {
         "none": {
           "title": "Žádná omezení obsahu",
           "description": "Váš účet má plný přístup ke všem obsahům v přiřazených knihovnách."
         },
-        "banner": "Váš účet má omezení obsahu aplikované administrátorem. Některé knihy nemusí být viditelné pro vás.",
+        "banner": "Váš účet má omezení obsahu nastavené správcem. Některé knihy se vám nemusí zobrazovat.",
         "allowedTags": {
           "title": "Povolené štítky",
-          "description": "Zobrazují se pouze knihy, které mají alespoň jeden z těchto štítků."
+          "description": "Zobrazují se vám pouze knihy, které mají alespoň jeden z těchto štítků."
         },
         "blockedTags": {
           "title": "Blokované štítky",
-          "description": "Knihy s kterýmkoliv z těchto štítků jsou před vámi skryty."
+          "description": "Knihy s kterýmkoliv z těchto štítků jsou vám skryté."
         },
         "allowedGenres": {
           "title": "Povolené žánry",
@@ -569,18 +671,18 @@
         },
         "blockedGenres": {
           "title": "Blokované žánry",
-          "description": "Knihy s kterýmkoli z těchto žánrů jsou před vámi skryty."
+          "description": "Knihy s kterýmkoli z těchto žánrů jsou vám skryté."
         }
       },
       "groups": {
         "profile": "Profil",
         "preferences": "Předvolby",
-        "security": "Zabezpečení & přístup"
+        "security": "Zabezpečení a přístup"
       }
     },
     "magicLinks": {
-      "title": "Kouzelné odkazy",
-      "subtitle": "Vytvořit sdílené přihlašovací odkazy pro sdílené účty.",
+      "title": "Magické odkazy",
+      "subtitle": "Vytvořit sdílené odkazy pro přihlášení ke sdíleným účtům.",
       "createLink": "Vytvořit odkaz",
       "noSharedAccounts": "Nenalezeny žádné sdílené účty",
       "noSharedAccountsHint": "Vytvořte si nejprve sdílený účet z {usersPage} pro generování magických odkazů.",
@@ -593,16 +695,16 @@
       "noExpiry": "Bez vypršení platnosti",
       "expired": "Vypršela platnost",
       "expiresOn": "Vyprší {date}",
-      "revokedOn": "Zrušeno {date}",
+      "revokedOn": "Odvoláno {date}",
       "expiredOn": "Vypršela platnost {date}",
-      "usesCount": "{count, plural, =0 {no uses} one {Jedno použijte} few {# používá} many {# používá} other {# používá}}",
+      "usesCount": "{count, plural, =0 {žádné použití} one {jedno použití} few {# použití} many {# použití} other {# použití}}",
       "copied": "Zkopírováno!",
       "copyLink": "Kopírovat odkaz",
       "pause": "Pozastavit",
       "resume": "Pokračovat",
-      "revoke": "Revoke",
-      "revoking": "Odmítávám...",
-      "emptyState": "Zatím nebyly vytvořeny žádné kouzelné odkazy. Klikněte na \"{action}\" pro generování URL pro sdílené přihlášení.",
+      "revoke": "Odvolat",
+      "revoking": "Odvolávání...",
+      "emptyState": "Zatím nebyly vytvořeny žádné magické odkazy. Klikněte na \"{action}\" pro vygenerování sdílené přihlašovací URL.",
       "columns": {
         "label": "Popisek",
         "account": "Účet",
@@ -616,7 +718,7 @@
       },
       "createDialog": {
         "title": "Vytvořit magický odkaz",
-        "description": "Vygenerovat sdílenou přihlašovací URL adresu pro sdílený účet.",
+        "description": "Vygenerovat sdílenou přihlašovací adresu URL pro sdílený účet.",
         "sharedAccount": "Sdílený účet",
         "selectAccount": "Vyberte sdílený účet",
         "label": "Popisek",
@@ -627,38 +729,39 @@
         "creating": "Vytváření..."
       },
       "revokeDialog": {
-        "title": "Zrušit kouzelný odkaz?",
-        "description": "Toto okamžitě zruší platnost odkazu a ukončí všechny aktivní relace propojeného účtu."
+        "title": "Odvolat magický odkaz?",
+        "description": "Toto okamžitě zruší platnost odkazu a ukončí všechny aktivní relace pro propojený účet."
       },
       "errors": {
-        "create": "Vytvoření se nezdařilo",
-        "copy": "Kopírování magického odkazu se nezdařilo",
+        "create": "Nepodařilo se vytvořit",
+        "copy": "Nepodařilo se zkopírovat magický odkaz",
         "update": "Nepodařilo se aktualizovat magický odkaz",
-        "revoke": "Nepodařilo se zrušit"
+        "revoke": "Nepodařilo se odvolat"
       },
       "usersPage": "Uživatelská stránka",
-      "emptyTitle": "Zatím nebyly vytvořeny žádné kouzelné odkazy",
-      "emptyHint": "Klepněte na tlačítko \"{action}\" pro generování URL pro sdílené přihlášení.",
+      "emptyTitle": "Zatím nebyly vytvořeny žádné magické odkazy",
+      "emptyHint": "Klepněte na \"{action}\" pro vygenerování sdílené přihlašovací URL.",
       "noActiveTitle": "Žádné aktivní magické odkazy",
-      "noActiveHint": "Všechny generované kouzelné odkazy na tuto stránku vypršely nebo byly zrušeny.",
+      "noActiveHint": "Všechny vygenerované magické odkazy pro tuto stránku vypršely nebo byly odvolány.",
       "copyLinkAria": "Kopírovat odkaz pro {label}",
       "pauseAria": "Pozastavit {label}",
-      "revokeAria": "Revoke {label}",
+      "resumeAria": "Obnovit {label}",
+      "revokeAria": "Odvolat {label}",
       "lastUsedLabel": "Naposledy použité {date}"
     },
     "oidc": {
       "title": "OIDC / SSO",
-      "subtitle": "Správa poskytovatelů OpenID připojení pro jediné přihlášení.",
+      "subtitle": "Správa poskytovatelů OpenID Connect pro jednotné přihlášení.",
       "providers": "Poskytovatelé",
       "addProvider": "Přidat poskytovatele",
       "editProvider": "Upravit poskytovatele",
-      "configureNew": "Nastavení nového OIDC poskytovatele.",
+      "configureNew": "Nastavit nového poskytovatele OIDC.",
       "editing": "Úprava {slug}",
       "enabled": "Povoleno",
       "disabled": "Zakázáno",
       "empty": {
         "title": "Zatím žádní poskytovatelé",
-        "description": "Přidejte OIDC poskytovatele pro povolení jediného přihlášení pro vaše uživatele."
+        "description": "Přidejte poskytovatele OIDC pro povolení jednotného přihlášení pro vaše uživatele."
       },
       "form": {
         "status": "Stav",
@@ -666,7 +769,7 @@
         "enableProviderHint": "Zobrazit tohoto poskytovatele na přihlašovací stránce.",
         "identity": "Identita poskytovatele",
         "slug": "URL adresa",
-        "slugHint": "Jedinečný identifikátor (malá písmena, pomlčky). Nelze změnit později.",
+        "slugHint": "Jedinečný identifikátor (malá písmena, pomlčky). Nelze později změnit.",
         "displayName": "Zobrazované jméno",
         "displayNameHint": "Zobrazeno na tlačítku přihlášení.",
         "iconUrl": "URL ikony",
@@ -675,28 +778,28 @@
         "connection": "Připojení",
         "issuerUri": "URI vydavatele",
         "issuerUriHint": "Základní URL adresa poskytovatele.",
-        "test": "Zkouška",
+        "test": "Otestovat",
         "testing": "Testování...",
         "clientId": "ID klienta",
         "clientSecret": "Tajný klíč klienta",
         "clientSecretPlaceholder": "Ponechte prázdné pro zachování existujících",
-        "scopes": "Rozsah",
-        "claimMapping": "Přijmout mapování",
+        "scopes": "Rozsahy",
+        "claimMapping": "Mapování nároků",
         "previewClaims": "Náhled nároků",
         "redirecting": "Přesměrování...",
-        "mappedClaims": "Mapované nároky",
-        "rawClaims": "Surová tvrzení",
-        "usernameClaim": "Žádost o uživatelské jméno",
+        "mappedClaims": "Zmapované nároky",
+        "rawClaims": "Surové nároky",
+        "usernameClaim": "Nárok na uživatelské jméno",
         "nameClaim": "Nárok na jméno",
-        "emailClaim": "Emailová reklamace",
-        "groupsClaim": "Tvrzení skupin",
+        "emailClaim": "Nárok na e-mail",
+        "groupsClaim": "Nárok na skupiny",
         "autoProvisioning": "Automatické poskytování",
         "autoProvisionUsers": "Uživatelé automatického poskytování",
         "autoProvisionUsersHint": "Pokud uživatel neexistuje, vytvořte účty při prvním OIDC přihlášení.",
         "allowLocalLinking": "Povolit propojení místního účtu",
-        "allowLocalLinkingHint": "Propojit OIDC identitu s existujícím lokálním účtem pomocí uživatelského jména.",
+        "allowLocalLinkingHint": "Propojit OIDC identitu s existujícím lokálním účtem pomocí shody uživatelského jména.",
         "defaultPermissions": "Výchozí oprávnění",
-        "defaultPermissionsHint": "Oprávnění udělená novým uživatelům na prvním OIDC přihlášení.",
+        "defaultPermissionsHint": "Oprávnění udělená novým uživatelům při prvním OIDC přihlášení.",
         "createProvider": "Vytvořit poskytovatele",
         "saveChanges": "Uložit změny",
         "saving": "Ukládání...",
@@ -706,90 +809,95 @@
       "test": {
         "connected": "Připojeno - {issuer}",
         "connectionFailed": "Připojení se nezdařilo",
+        "privateIssuerAddress": "URL vydavatele směřuje na adresu v soukromé nebo lokální síti, proto server odmítl navázat spojení. Pro povolení nastavte na serveru BookOrbit proměnnou OIDC_ALLOW_LOCAL_ISSUERS=true.",
+        "tlsCertificateUntrusted": "BookOrbit nemohl ověřit certifikát TLS poskytovatele OIDC. Pokud poskytovatel používá soukromou certifikační autoritu, připojte jeho balíček PEM CA, nastavte proměnnou NODE_EXTRA_CA_CERTS na cestu k tomuto balíčku uvnitř kontejneru a restartujte BookOrbit.",
         "hide": "Skrýt",
-        "details": "Detaily",
+        "details": "Podrobnosti",
         "supported": "podporováno",
-        "notSupported": "není podporováno"
+        "notSupported": "nepodporováno"
       },
       "groupMappings": {
-        "title": "Skupinové mapování",
-        "noPermission": "Bez oprávnění",
-        "empty": "Nejsou nakonfigurovány žádné mapování skupin.",
+        "title": "Mapování skupin",
+        "noPermission": "Žádná oprávnění",
+        "empty": "Nejsou nakonfigurována žádná mapování skupin.",
         "addMapping": "Přidat mapování",
-        "claimPlaceholder": "Pohledávka OIDC skupiny (např. správci)",
+        "claimPlaceholder": "Nárok skupiny OIDC (např. správci)",
         "add": "Přidat",
         "adding": "Přidávání..."
       },
       "toasts": {
         "providerCreated": "Poskytovatel byl vytvořen",
-        "providerSaved": "Poskytovatel uložen",
-        "providerDeleted": "Poskytovatel smazán",
+        "providerSaved": "Poskytovatel byl uložen",
+        "providerDeleted": "Poskytovatel byl odstraněn",
         "mappingAdded": "Přidáno mapování skupin",
-        "mappingRemoved": "Mapování skupin bylo odstraněno"
+        "mappingRemoved": "Odebráno mapování skupin"
       },
       "errors": {
         "loadProvider": "Nepodařilo se načíst poskytovatele",
         "createProvider": "Nepodařilo se vytvořit poskytovatele",
-        "save": "Uložení se nezdařilo",
-        "delete": "Odstranění se nezdařilo",
+        "save": "Nepodařilo se uložit",
+        "delete": "Nepodařilo se odstranit",
         "deleteProvider": "Nepodařilo se odstranit poskytovatele",
-        "requestFailed": "Požadavek se nezdařil",
+        "requestFailed": "Žádost se nezdařila",
         "previewState": "Nepodařilo se vygenerovat stav náhledu",
         "startPreview": "Nepodařilo se spustit náhled",
-        "addMapping": "Přidání mapování se nezdařilo",
-        "removeMapping": "Nepodařilo se odstranit mapování skupiny"
+        "addMapping": "Nepodařilo se přidat mapování",
+        "removeMapping": "Nepodařilo se odebrat mapování skupiny"
       }
     },
     "admin": {
-      "title": "Admin",
+      "title": "Správce",
       "subtitle": "Správa uživatelů a nastavení ověřování.",
       "system": {
         "title": "Systém",
-        "subtitle": "Organizace souborů, požití a nastavení údržby."
+        "subtitle": "Nastavení organizace, načítání a údržby souborů."
       },
       "maintenance": {
         "title": "Údržba",
-        "subtitle": "Spravovat úkoly na pozadí, systémové indexy a údržbu.",
+        "subtitle": "Spravovat úkoly na pozadí, systémové indexy a operace údržby.",
         "importGroup": "Importovat",
         "recommendationsGroup": "Doporučení",
         "achievementsGroup": "Úspěchy",
         "updatesGroup": "Aktualizace",
         "bookloreImportConfigured": "Import Booklore nakonfigurován",
+        "importLibraryData": "Importovat data knihovny",
+        "migrationConfigured": "Zdroj migrace nakonfigurován",
         "migrationRunning": "Probíhá migrace",
         "migrationCompleted": "Migrace dokončena",
         "migrationFailed": "Migrace selhala",
-        "importDescription": "Jednorázový import knih, metadat a čtení pokroku z předchozí instalace Booklore.",
-        "configuredDescription": "Zdroj: {name}. Zatím žádný migrační běh - pokračujte v nastavení pro spuštění importu.",
-        "runningDescription": "Fáze: {stage} - začal {started}",
+        "importDescription": "Jednorázový import knih, metadat a průběhu čtení z předchozí instalace Booklore.",
+        "migrationDescription": "Jednorázový import knih, metadat a průběhu čtení z jiné knihovní aplikace.",
+        "configuredDescription": "Zdroj: {name}. Zatím nebyla spuštěna žádná migrace - pokračujte v nastavení pro spuštění importu.",
+        "runningDescription": "Fáze: {stage} - spuštěno {started}",
         "completedDescription": "Z {name} - dokončeno {date}",
-        "migrationErrorGeneric": "Došlo k chybě během migrace.",
+        "migrationErrorGeneric": "Během migrace došlo k chybě.",
         "stageInitializing": "inicializace",
         "recently": "v poslední době",
-        "getStarted": "Začněte",
+        "getStarted": "Začít",
         "continueSetup": "Pokračovat v nastavení",
-        "viewDetails": "Zobrazit detaily",
-        "refreshRecommendationIndex": "Aktualizovat index doporučení",
-        "refreshRecommendationHint": "Aktualizujte doporučený modul o nejnovější změny knihovny. Tento proces běží na pozadí.",
-        "booksQueuedForProcessing": "{count, plural, =0 {žádné knihy ve frontě ke zpracování} one {Kniha ve frontě pro zpracování} few {# knih ve frontě ke zpracování} many {# knih ve frontě ke zpracování} other {# knih ve frontě ke zpracování}}",
+        "viewDetails": "Zobrazit podrobnosti",
+        "refreshRecommendationIndex": "Obnovit index doporučení",
+        "refreshRecommendationHint": "Aktualizovat modul doporučení podle nejnovějších změn v knihovně. Tento proces probíhá na pozadí.",
+        "booksQueuedForProcessing": "{count, plural, =0 {žádné knihy ve frontě ke zpracování} one {# kniha ve frontě pro zpracování} few {# knihy ve frontě ke zpracování} many {# knih ve frontě ke zpracování} other {# knih ve frontě ke zpracování}}",
         "run": "Spustit",
-        "running": "Běhání...",
-        "backfillAchievements": "Úspěchy nevyplňování",
+        "running": "Spouštění...",
+        "backfillAchievements": "Zpětně doplnit úspěchy",
         "backfillAchievementsHint": "Přehodnotit úspěchy všech uživatelů.",
-        "backfillResult": "Zpracovaní uživatelé {users}; uděleno {awards} ocenění.",
-        "runBackfill": "Spustit Backfill",
+        "backfillResult": "Zpracováno {users} uživatelů; uděleno {awards} ocenění.",
+        "runBackfill": "Spustit zpětné doplnění",
         "checkForUpdates": "Zkontrolovat aktualizace",
-        "checkForUpdatesHint": "Automaticky zkontrolovat GitHub pro nové vydání při startu a zobrazit indikátor v postranním panelu, pokud je k dispozici.",
+        "checkForUpdatesHint": "Automaticky kontrolovat GitHub pro nové vydání při spuštění a zobrazit indikátor v postranním panelu, pokud je k dispozici.",
         "updateChecksEnabled": "Kontroly aktualizací povoleny",
-        "updateChecksDisabled": "Kontrola aktualizací zakázána",
+        "updateChecksDisabled": "Kontroly aktualizací zakázány",
         "updateSettingFailed": "Nepodařilo se aktualizovat nastavení",
-        "booksQueuedForEmbedding": "{count, plural, =0 {Žádné knihy ve frontě pro vložení} one {Kniha ve frontě pro vložení} few {# knih ve frontě pro vložení} many {# knih ve frontě pro vložení} other {# knih ve frontě pro vložení}}",
+        "booksQueuedForEmbedding": "{count, plural, =0 {žádné knihy ve frontě pro vložení} one {# kniha ve frontě pro vložení} few {# knihy ve frontě pro vložení} many {# knih ve frontě pro vložení} other {# knih ve frontě pro vložení}}",
         "failed": "Selhalo",
         "unknownError": "Neznámá chyba",
-        "rebuildEmbeddingsFailed": "Obnovení vložení se nezdařilo: {error}",
-        "achievementBackfillConfirm": "Spustit zpětné vyplnění úspěchů pro všechny uživatele? Může to chvíli trvat.",
-        "achievementBackfillComplete": "Doplnění úspěchů dokončeno: {count} uděleno",
-        "backfillRunFailed": "Nepodařilo se spustit zpětné vyplnění",
-        "achievementBackfillFailed": "Spuštění úspěchu selhalo: {error}",
+        "rebuildEmbeddingsFailed": "Nepodařilo se obnovit vložení: {error}",
+        "achievementBackfillConfirm": "Spustit zpětné doplnění úspěchů pro všechny úspěchy u všech uživatelů? Může to chvíli trvat.",
+        "achievementBackfillComplete": "Zpětné doplnění úspěchů dokončeno: {count} ocenění uděleno",
+        "backfillRunFailed": "Nepodařilo se spustit zpětné doplnění",
+        "achievementBackfillFailed": "Nepodařilo se spustit zpětné doplnění úspěchů: {error}",
         "uploadsGroup": "Nahrávání",
         "maxUploadSize": "Maximální limit velikosti nahrávaného souboru",
         "maxUploadSizeHint": "Nastavte maximální limit velikosti pro nahrávání souborů napříč systémem.",
@@ -799,15 +907,16 @@
       },
       "migration": {
         "title": "Migrace",
-        "subtitle": "Jednorázový import Booklore: připojte zdroj, uživatele mapy, suchý běh, spustit migraci a exportovat zprávu.",
+        "subtitle": "Jednorázový import z Booklore: připojit zdroj, namapovat uživatele, provést simulaci, spustit migraci a exportovat zprávu.",
+        "genericSubtitle": "Jednorázový import knihovny: připojit zdroj, namapovat uživatele, provést simulaci, spustit migraci a exportovat zprávu.",
         "progress": "Průběh",
-        "stepSourceConnection": "Zdrojové připojení",
-        "stepUserPathMapping": "Uživatelská & Cesta mapování",
-        "stepDryRun": "Surový běh",
-        "stepDryRunTitle": "Suchý běh",
+        "stepSourceConnection": "Připojení zdroje",
+        "stepUserPathMapping": "Mapování uživatele a cesty",
+        "stepDryRun": "Simulace",
+        "stepDryRunTitle": "Simulace",
         "stepRunMigration": "Spustit migraci",
-        "stepReport": "Nahlásit",
-        "stepReportTitle": "Přehled migrace",
+        "stepReport": "Zpráva",
+        "stepReportTitle": "Zpráva o migraci",
         "subtitleSource": "Konfigurace připojení k databázi na zdrojovou instanci Booklore.",
         "subtitleMappings": "Mapovat zdrojové uživatele pro cílové uživatele a přeložit cesty k souborům.",
         "subtitleDryRun": "Zobrazit náhled, co bude importováno před spuštěním živé migrace.",

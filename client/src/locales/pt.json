@@ -438,7 +438,7 @@
         "labelField": {
           "hidden": "Oculto",
           "bookTitle": "Título do livro",
-          "seriesTitle": "Título da série",
+          "seriesTitle": "Título do programa",
           "seriesTitlePosition": "Título da série + posição",
           "author": "Autor"
         },
@@ -2177,7 +2177,7 @@
           "notConfigured": "Não configurado",
           "disabledDetail": "{provider} está desligado, então ele permanece na ordem mas é ignorado.",
           "notConfiguredDetail": "{provider} ainda não tem credenciais e, portanto, permanece no pedido, mas é ignorado.",
-          "neverSupplies": "Nunca suplique isso",
+          "neverSupplies": "Nunca abastece isso",
           "neverSuppliesDetail": "{provider} nunca fornece este campo, então ele é ignorado aqui.",
           "otherShape": "Outra forma de capa",
           "otherShapeDetail": "{provider} só tem capas da outra forma, então ele preenche este slot apenas quando nada mais puder."
@@ -3131,6 +3131,8 @@
         "syncHighlightsHint": "Envie os destaques feitos no BookOrbit ou no KOReader para o seu Kobo. Os destaques do Kobo são importados para o BookOrbit mesmo com esta opção desativada. Anotações vinculadas sincronizam edições e exclusões nos dois sentidos. Requer envio de KEPUB; o livro no Kobo deve ser o KEPUB baixado do BookOrbit.",
         "storeSync": "Incluir títulos da loja Kobo",
         "storeSyncHint": "Também entregue livros da sua conta Kobo, incluindo Kobo Plus e compras, juntamente com a sua biblioteca BookOrbit. Sem isso, apenas os livros da BookOrbit chegam ao dispositivo. Os títulos da loja são baixados diretamente do Kobo e não são adicionados à sua biblioteca da BookOrbit.",
+        "fullSizeCovers": "Capas de tamanho total",
+        "fullSizeCoversHint": "Envie cada capa para a resolução de tela de seu Kobo, para que as telas de sono e as coberturas de tela cheia permaneçam nítidos. Desative esta opção para enviar capas menores que sincronizam mais rápido. Uma capa já está em um Kobo só muda quando as capas do livro forem alteradas.",
         "convertKepub": "Converter para KEPUB",
         "convertKepubHint": "Enviar EPUBs elegíveis como KEPUB. Esta opção permanece ativa quando a sincronização de progresso ou os destaques do BookOrbit para o Kobo estão ativados. Na próxima sincronização do Kobo, os livros afetados serão oferecidos novamente como downloads KEPUB; remova qualquer cópia EPUB antiga se o Kobo continuar abrindo ela.",
         "forceHyphenation": "Forçar hifenização",
@@ -4054,7 +4056,7 @@
           "autoRetryHint": "Quando um download automático falha, a próxima melhor opção é tentada em vez de cancelar a solicitação. Isso abrange fontes que se recusam a transferir o arquivo e downloads interrompidos pelo caminho. Aplica-se apenas a releases escolhidos pelo próprio BookOrbit: itens selecionados manualmente por um aprovador permanecem em estado de falha aguardando ação do usuário.",
           "maxAttempts": "Tentativas por pedido",
           "maxAttemptsHint": "Cada release que o BookOrbit envia a um cliente de download para esta solicitação conta para este limite: a primeira tentativa automática, qualquer release tentado após a recusa de uma fonte e qualquer nova tentativa após falha no download. Defina como 1 para interromper após a primeira tentativa.",
-          "autoSearch": "Continue procurando por pedidos nada foi encontrado para",
+          "autoSearch": "Continue procurando por solicitações que nada foi encontrado para",
           "autoSearchShort": "Uma solicitação aprovada que não corresponde é procurada novamente mais tarde.",
           "autoSearchHint": "Uma solicitação é pesquisada apenas uma vez ao ser aprovada. Se nenhum release adequado for encontrado ou o livro ainda não tiver sido lançado, a solicitação permanecerá como aprovada e não será buscada novamente. Ative esta opção para que o BookOrbit continue verificando periodicamente, encontrando inclusive lançamentos futuros. Esta função só é executada com os downloads automáticos ativos, evitando consultas desnecessárias que apenas consumiriam tráfego dos seus indexadores.",
           "autoSearchEnabledToast": "As solicitações serão buscadas novamente",
@@ -4388,7 +4390,7 @@
     },
     "units": {
       "books": {
-        "progress": "{current} / {threshold} livros",
+        "progress": "{current} / {threshold} para ",
         "toGo": "{count, plural, one {# reservas para ir} other {# livros para ir}}"
       },
       "pages": {
@@ -6873,7 +6875,7 @@
           "kind": {
             "fill": "Preencher vazio",
             "change": "Diferenças",
-            "same": "O mesmo",
+            "same": "Igual",
             "missing": "Não informado"
           },
           "minor": {
@@ -12402,7 +12404,7 @@
         "noIsbn": "Não definido",
         "notStarted": "Não iniciado",
         "outOfHundred": "/100",
-        "percentRead": "{percent} lido",
+        "percentRead": "{percent} lido(s)",
         "fileCount": "{count, plural, one {# arquivo} other {# arquivos}}"
       },
       "initial": {
