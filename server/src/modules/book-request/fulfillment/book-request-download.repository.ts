@@ -163,6 +163,24 @@ export class BookRequestDownloadRepository {
   }
 
   /**
+   * Active direct transfers whose source is the given indexer. The delete path refuses to remove a
+   * source while one of these is in flight, because `ON DELETE SET NULL` would otherwise strip the
+   * routing provenance a resumed transfer needs.
+   */
+  async findActiveDirectByIndexer(indexerId: number): Promise<BookRequestDownloadRow[]> {
+    return this.db
+      .select()
+      .from(bookRequestDownloads)
+      .where(
+        and(
+          eq(bookRequestDownloads.source, 'direct_url'),
+          eq(bookRequestDownloads.indexerId, indexerId),
+          inArray(bookRequestDownloads.status, [...ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES]),
+        ),
+      );
+  }
+
+  /**
    * Finished downloads that never claimed a Book Dock row, which means the import never started.
    * Once a row has one, retrying would link the file a second time, so a crash after that point is
    * left to the watchdog rather than replayed.
