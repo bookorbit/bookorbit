@@ -32,6 +32,8 @@ export const koreaderUsers = pgTable(
     passwordMd5: varchar('password_md5', { length: 32 }),
     syncEnabled: boolean('sync_enabled').notNull().default(true),
     readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
+    // KOReader cannot play audio, so the plugin catalog leaves out books whose only content files are audio.
+    hideAudioOnlyBooks: boolean('hide_audio_only_books').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -10,12 +10,15 @@ type Db = NodePgDatabase<typeof schema>;
 
 /** What a device-originated bookmark carries beyond the shared location/title pair. */
 export interface DeviceBookmarkFields {
+  bookFileId?: number;
   cfi: string;
   title: string;
   devicePos: string;
   pageno: number | null;
   /** The device family the bookmark came from; KOReader when omitted. */
   origin?: BookmarkOrigin;
+  /** Set only by devices that keep a note apart from the title (Kobo). */
+  note?: string | null;
 }
 
 @Injectable()
@@ -62,10 +65,17 @@ export class BookmarkRepository {
     return null;
   }
 
-  async create(userId: number, bookId: number, data: Pick<NewBookmark, 'cfi' | 'title' | 'positionSeconds'>) {
+  async create(userId: number, bookId: number, data: Pick<NewBookmark, 'cfi' | 'title' | 'positionSeconds' | 'bookFileId'>) {
     const [row] = await this.db
       .insert(bookmarks)
-      .values({ userId, bookId, cfi: data.cfi ?? null, title: data.title, positionSeconds: data.positionSeconds ?? null })
+      .values({
+        userId,
+        bookId,
+        bookFileId: data.bookFileId ?? null,
+        cfi: data.cfi ?? null,
+        title: data.title,
+        positionSeconds: data.positionSeconds ?? null,
+      })
       .onConflictDoNothing()
       .returning();
     return row ?? null;
@@ -80,7 +90,7 @@ export class BookmarkRepository {
     userId: number,
     bookId: number,
     data: Pick<NewBookmark, 'cfi' | 'positionSeconds'>,
-    values: Pick<NewBookmark, 'title' | 'origin' | 'devicePos' | 'pageno'>,
+    values: Pick<NewBookmark, 'title' | 'origin' | 'devicePos' | 'pageno' | 'bookFileId'> & { note?: string | null },
   ): Promise<BookmarkRow | null> {
     const location =
       data.cfi != null
@@ -97,6 +107,8 @@ export class BookmarkRepository {
         origin: values.origin ?? 'web',
         devicePos: values.devicePos ?? null,
         pageno: values.pageno ?? null,
+        bookFileId: values.bookFileId ?? null,
+        ...(values.note !== undefined ? { note: values.note } : {}),
         deletedAt: null,
       })
       .where(and(eq(bookmarks.userId, userId), eq(bookmarks.bookId, bookId), location, isNotNull(bookmarks.deletedAt)))
@@ -169,6 +181,28 @@ export class BookmarkRepository {
       .limit(limit);
   }
 
+  /**
+   * The EPUB a client read when it saved a CFI without naming the file: the book's only EPUB, else the
+   * one the user read last, which is the one the client is on while it adds the bookmark.
+   */
+  async findLikelySourceFileId(userId: number, bookId: number): Promise<number | null> {
+    const epubs = await this.db
+      .select({ id: schema.bookFiles.id })
+      .from(schema.bookFiles)
+      .where(and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.format, 'epub')))
+      .limit(2);
+    if (epubs.length <= 1) return epubs[0]?.id ?? null;
+
+    const [lastRead] = await this.db
+      .select({ id: schema.readingProgress.bookFileId })
+      .from(schema.readingProgress)
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.readingProgress.bookFileId))
+      .where(and(eq(schema.readingProgress.userId, userId), eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.format, 'epub')))
+      .orderBy(desc(schema.readingProgress.lastReadAt))
+      .limit(1);
+    return lastRead?.id ?? null;
+  }
+
   async createFromDevice(userId: number, bookId: number, fields: DeviceBookmarkFields): Promise<BookmarkRow | null> {
     const [row] = await this.db
       .insert(bookmarks)
@@ -180,21 +214,57 @@ export class BookmarkRepository {
         origin: fields.origin ?? 'koreader',
         devicePos: fields.devicePos,
         pageno: fields.pageno,
+        bookFileId: fields.bookFileId ?? null,
+        note: fields.note ?? null,
       })
       .onConflictDoNothing()
       .returning();
     return row ?? null;
   }
 
+  // Bookkeeping, not an edit: updated_at is the content clock that device pushes and Kobo ETags compare,
+  // so it keeps its value instead of taking the $onUpdateFn stamp.
+  async captureSourceFile(userId: number, bookmarkId: number, cfi: string, bookFileId: number): Promise<void> {
+    await this.db
+      .update(bookmarks)
+      .set({ bookFileId, updatedAt: sql`${bookmarks.updatedAt}` })
+      .where(and(eq(bookmarks.id, bookmarkId), eq(bookmarks.userId, userId), eq(bookmarks.cfi, cfi), isNull(bookmarks.bookFileId)));
+  }
+
+  async captureSourceFileById(userId: number, bookmarkId: number, bookFileId: number): Promise<void> {
+    await this.db
+      .update(bookmarks)
+      .set({ bookFileId, updatedAt: sql`${bookmarks.updatedAt}` })
+      .where(and(eq(bookmarks.id, bookmarkId), eq(bookmarks.userId, userId), isNull(bookmarks.bookFileId)));
+  }
+
   async updateFromDevice(
     userId: number,
     bookmarkId: number,
-    values: Partial<Pick<NewBookmark, 'title' | 'devicePos' | 'pageno'>>,
+    values: Partial<Pick<NewBookmark, 'title' | 'devicePos' | 'pageno' | 'note'>>,
   ): Promise<BookmarkRow | null> {
     const [row] = await this.db
       .update(bookmarks)
       .set(values)
       .where(and(eq(bookmarks.id, bookmarkId), eq(bookmarks.userId, userId), isNull(bookmarks.deletedAt)))
+      .returning();
+    return row ?? null;
+  }
+
+  /** Sets a device's note only when the device edited it after the row last changed, so an echo never wins. */
+  async applyDeviceNote(userId: number, bookmarkId: number, note: string | null, editedAt: Date): Promise<BookmarkRow | null> {
+    const [row] = await this.db
+      .update(bookmarks)
+      .set({ note })
+      .where(
+        and(
+          eq(bookmarks.id, bookmarkId),
+          eq(bookmarks.userId, userId),
+          isNull(bookmarks.deletedAt),
+          lt(bookmarks.updatedAt, editedAt),
+          sql`${bookmarks.note} is distinct from ${note}`,
+        ),
+      )
       .returning();
     return row ?? null;
   }

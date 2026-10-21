@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type { ReadingAttempt, ReadingAttemptListResponse, ReadingAttemptOutcome, UserBookStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { compareReadingOrder } from '@/features/book/lib/reading-attempt-order'
 
 export type ReadingAttemptDraft = {
   startedOn: string | null
@@ -25,7 +26,7 @@ export function useReadingAttempts(bookIdRef: Ref<number>) {
   const byId = computed(() => new Map(attempts.value.map((attempt) => [attempt.id, attempt])))
   /** Oldest first, so "attempt 2" means the second one the reader started. */
   const ordinalById = computed(() => {
-    const ordered = [...attempts.value].sort((left, right) => left.id - right.id)
+    const ordered = [...attempts.value].sort(compareReadingOrder)
     return new Map(ordered.map((attempt, index) => [attempt.id, index + 1]))
   })
 

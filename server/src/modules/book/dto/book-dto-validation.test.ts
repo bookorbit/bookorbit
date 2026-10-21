@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { ValidationPipe } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MetadataProviderKey } from '@bookorbit/types';
@@ -22,6 +23,7 @@ import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
 import { UpsertAudioProgressDto } from './upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './update-book-metadata.dto';
+import { UpdateBookMetadataAndLocksDto } from './update-book-metadata-and-locks.dto';
 import { UpdateBookAddedAtDto } from './update-book-added-at.dto';
 import { UpdatePersonalNoteDto } from './update-personal-note.dto';
 import { UpdateRatingDto } from './update-rating.dto';
@@ -258,6 +260,54 @@ describe('Book DTO validation', () => {
 
     expect(error?.property).toBe('amazonId');
     expect(Object.values(error?.constraints ?? {}).join(' ')).toBe('amazonId must be shorter than or equal to 20 characters');
+  });
+
+  // Issue #1624: identifiers pasted from Amazon carry hyphens and invisible characters.
+  it('cleans pasted identifiers before validating them instead of rejecting them', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+
+    const result = (await pipe.transform(
+      {
+        metadata: {
+          isbn13: '978-3426226223',
+          isbn10: '\u200B0-8044-2957-x',
+          amazonId: '\u200BB00X47ZVXM',
+          audibleId: ' b002v0qk4c\u200E',
+          googleBooksId: '\u00A0zyTC-Al_FPjgYC\uFEFF',
+          hardcoverId: 'the-name-of-the-wind ',
+        },
+        lockedFields: [],
+      },
+      { type: 'body', metatype: UpdateBookMetadataAndLocksDto, data: undefined },
+    )) as UpdateBookMetadataAndLocksDto;
+
+    expect(result.metadata).toEqual({
+      isbn13: '9783426226223',
+      isbn10: '080442957X',
+      amazonId: 'B00X47ZVXM',
+      audibleId: 'B002V0QK4C',
+      googleBooksId: 'zyTC-Al_FPjgYC',
+      hardcoverId: 'the-name-of-the-wind',
+    });
+  });
+
+  it('rejects an identifier that is still too long once cleaned, without truncating it', async () => {
+    const dto = plainToInstance(UpdateBookMetadataDto, { isbn13: '978-3426226223-1', isbn10: '0-306-40615-22' });
+    const errors = await validate(dto);
+
+    expect(dto.isbn13).toBe('97834262262231');
+    expect(dto.isbn10).toBe('03064061522');
+    expect(errors.map((error) => error.property).sort()).toEqual(['isbn10', 'isbn13']);
+  });
+
+  it('leaves cleared and non-string identifiers to the existing validators', async () => {
+    const cleared = plainToInstance(UpdateBookMetadataDto, { isbn13: null, amazonId: '', goodreadsId: ' \u200B ' });
+    expect(await validate(cleared)).toHaveLength(0);
+    expect(cleared).toMatchObject({ isbn13: null, amazonId: '', goodreadsId: '' });
+
+    const [error] = await errorsFor(UpdateBookMetadataDto, { isbn13: 9783426226223 });
+    expect(error?.property).toBe('isbn13');
+    expect(error?.constraints).toHaveProperty('isString');
   });
 
   it('normalizes a zero page count to null and validates other page count values', async () => {

@@ -1,6 +1,5 @@
-package.loaded["gettext"] = function(text)
-    return text
-end
+-- The old four-slot setting is still read once, so shelves picked through a
+-- catalog list carry over onto the widget board.
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
@@ -33,17 +32,13 @@ assertEqual(DashboardSections.normalizeEntry({ type = "not-a-source" }).type, "r
 assertEqual(DashboardSections.normalizeEntry({ type = "smart-scope" }).type, "random", "an obsolete pseudo-source degrades to Discover")
 assertEqual(DashboardSections.normalizeEntry({ type = "authors" }).type, "random", "an unselected catalog type degrades to Discover")
 
--- Server-composed sources and the highlight card are first-class slot types.
-assertEqual(DashboardSections.normalizeEntry({ type = "want-to-read" }).type, "want-to-read", "Want to read is a supported source again")
+-- Server-composed sources and the highlight card were slot types too.
+assertEqual(DashboardSections.normalizeEntry({ type = "want-to-read" }).type, "want-to-read", "Want to read was a slot source")
 assertEqual(DashboardSections.normalizeEntry({ type = "up-next-in-series" }).type, "up-next-in-series", "Up next in series is a supported source")
-assertEqual(DashboardSections.normalizeEntry({ type = "highlight" }).type, "highlight", "the highlight card is a supported slot")
-assertEqual(DashboardSections.isBookSource("want-to-read"), true, "Want to read renders as a shelf")
-assertEqual(DashboardSections.isBookSource("up-next-in-series"), true, "Up next in series renders as a shelf")
-assertEqual(DashboardSections.isBookSource("highlight"), false, "the highlight card has its own renderer")
+assertEqual(DashboardSections.normalizeEntry({ type = "highlight" }).type, "highlight", "the highlight card was a slot")
 assertEqual(DashboardSections.usesSectionEndpoint("want-to-read"), true, "Want to read is served by the section endpoint")
 assertEqual(DashboardSections.usesSectionEndpoint("up-next-in-series"), true, "Up next in series is served by the section endpoint")
 assertEqual(DashboardSections.usesSectionEndpoint("recently-added"), false, "catalog-books sources skip the section endpoint")
-assertEqual(DashboardSections.label("highlight"), "Highlight of the day", "the highlight slot is labelled for the picker")
 
 local normalized_author = DashboardSections.normalizeEntry(author_source)
 assertEqual(normalized_author.type, "authors", "a selected author source is kept")
@@ -106,26 +101,6 @@ assertEqual(repeated[2].type, "stats", "a second Stats slot is retained")
 assertEqual(repeated[3].type, "browse", "a Browse slot is retained")
 assertEqual(repeated[4].type, "browse", "a repeated Browse slot is retained")
 
-local stored = DashboardSections.storeAt({
-    [DashboardSections.SETTING_KEY] = defaults,
-}, 2, author_source)
-assertEqual(stored[2].type, "authors", "storeAt updates the requested slot")
-assertEqual(stored[1].type, "stats", "storeAt leaves other slots unchanged")
-assertNotSame(stored[2].params, author_source.params, "storeAt does not retain caller-owned parameter tables")
-assertEqual(stored.schemaVersion, DashboardSections.SCHEMA_VERSION, "storeAt persists the current schema marker")
-
-local clamped = DashboardSections.storeAt({
-    [DashboardSections.SETTING_KEY] = { { type = "stats" }, schemaVersion = DashboardSections.SCHEMA_VERSION },
-}, 9, { type = "recently-added" })
-assertEqual(#clamped, DashboardSections.SLOT_COUNT, "storeAt never grows beyond the supported slot count")
-assertEqual(clamped[4].type, "recently-added", "an oversized index is constrained to the last slot")
-
-assertEqual(DashboardSections.signature({ type = "recently-added" }), "recently-added", "a source signs as itself")
-assertEqual(DashboardSections.signature(author_source), "authors:author=Ursula K. Le Guin:sort=title", "catalog signatures include stable allowed filters")
-assertEqual(DashboardSections.headerText(author_source), "Ursula K. Le Guin", "a selected shelf is titled by its entry")
-assertEqual(DashboardSections.headerText({ type = "authors", sourceName = "" }), "Authors", "an empty source name falls back to the source label")
-assertEqual(DashboardSections.isBookSource("authors"), true, "a selected author is a book shelf source")
-assertEqual(DashboardSections.isBookSource("browse"), false, "Browse is not a book shelf source")
 assertEqual(DashboardSections.isCatalogSelector("series"), true, "Series requires one more selection level")
 assertEqual(DashboardSections.isCatalogSelector("random"), false, "Discover is directly selectable")
 

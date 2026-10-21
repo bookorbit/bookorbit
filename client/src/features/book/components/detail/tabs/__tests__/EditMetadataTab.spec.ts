@@ -225,6 +225,42 @@ describe('EditMetadataTab cover tiles', () => {
     expect(body.metadata).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' })
   })
 
+  // Issue #1624: identifiers pasted from Amazon carry hyphens and invisible characters.
+  it('saves pasted identifiers cleaned instead of truncated', async () => {
+    vi.mocked(api).mockImplementation(async (url, init) => {
+      if (init?.method === 'PATCH') return json({ book: savedBook, write: null, libraryAutoWriteEnabled: false })
+      if (String(url).includes('/metadata-fetch/providers')) return json([{ key: 'amazon' }, { key: 'google' }, { key: 'audible' }])
+      return json({})
+    })
+    const wrapper = mountTab(makeBook())
+    await flushPromises()
+
+    const isbn13 = wrapper.get<HTMLInputElement>('[data-field="isbn13"] input')
+    const isbn10 = wrapper.get<HTMLInputElement>('[data-field="isbn10"] input')
+    expect(isbn13.attributes('maxlength')).toBeUndefined()
+    expect(isbn10.attributes('maxlength')).toBeUndefined()
+
+    await isbn13.setValue('978-3426226223')
+    await isbn10.setValue('\u200B0-8044-2957-x')
+    await wrapper.get('#provider-id-amazonId').setValue('\u200BB00X47ZVXM')
+    await wrapper.get('#provider-id-audibleId').setValue(' b002v0qk4c ')
+    await wrapper.get('#provider-id-googleBooksId').setValue('zyTC-Al_FPjgYC\u200E')
+
+    expect(isbn13.element.value).toBe('9783426226223')
+    expect(isbn10.element.value).toBe('080442957X')
+
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+    const body = JSON.parse(patchCalls()[0]![1]!.body as string)
+    expect(body.metadata).toMatchObject({
+      isbn13: '9783426226223',
+      isbn10: '080442957X',
+      amazonId: 'B00X47ZVXM',
+      audibleId: 'B002V0QK4C',
+      googleBooksId: 'zyTC-Al_FPjgYC',
+    })
+  })
+
   it('warns when auto-fill used saved results for a provider that was unavailable', async () => {
     vi.mocked(toast.warning).mockClear()
     vi.mocked(api).mockImplementation(async (url) => {

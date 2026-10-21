@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { parseCustomRuleFieldId, parseCustomSortFieldId, parseSeriesIndex } from '@bookorbit/types';
+import { READ_ALONG_FORMAT_PRIORITY, parseCustomRuleFieldId, parseCustomSortFieldId, parseSeriesIndex } from '@bookorbit/types';
 import type {
   CommunityRatingProvider,
   ContentFilterRules,
@@ -391,6 +391,7 @@ export class BookQueryBuilder {
       case 'before':
       case 'after':
       case 'withinLast':
+      case 'moreThanAgo':
         return this.dateExprRuleToSql(sql`${bookCustomMetadataValues.valueDate}`, operator, value as string, valueTo, timeZone, 'custom metadata');
       case 'isTrue':
         return eq(bookCustomMetadataValues.valueBoolean, true);
@@ -660,13 +661,23 @@ export class BookQueryBuilder {
       return sql`exists (${sq})`;
     };
 
+    const matchesFormats = (): SQL | undefined => {
+      if (!values?.length) return undefined;
+      const physicalFormats = values.filter((value) => value !== READ_ALONG_FORMAT_PRIORITY);
+      const clauses: SQL[] = [];
+      if (physicalFormats.length > 0) clauses.push(inArray(bookFiles.format, physicalFormats));
+      if (values.includes(READ_ALONG_FORMAT_PRIORITY)) {
+        clauses.push(and(eq(bookFiles.format, 'epub'), eq(bookFiles.mediaOverlayAvailable, true))!);
+      }
+      return or(...clauses);
+    };
+    const match = matchesFormats();
+
     switch (operator) {
       case 'includesAny':
-        if (!values?.length) return sql`1 = 0`;
-        return existsFormat(inArray(bookFiles.format, values));
+        return match ? existsFormat(match) : sql`1 = 0`;
       case 'excludesAll':
-        if (!values?.length) return sql`1 = 1`;
-        return not(existsFormat(inArray(bookFiles.format, values)));
+        return match ? not(existsFormat(match)) : sql`1 = 1`;
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for format field`);
     }
@@ -685,6 +696,12 @@ export class BookQueryBuilder {
         this.assertNumber(days, operator, 'value');
         if (days! < 0) throw new BadRequestException(`Operator '${operator}' requires a non-negative value`);
         return sql`${books.addedAt} >= NOW() - (${days} * INTERVAL '1 day')`;
+      }
+      case 'moreThanAgo': {
+        const days = typeof value === 'string' ? Number(value) : value;
+        this.assertNumber(days, operator, 'value');
+        if (days! < 0) throw new BadRequestException(`Operator '${operator}' requires a non-negative value`);
+        return sql`${books.addedAt} < NOW() - (${days} * INTERVAL '1 day')`;
       }
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for date field`);
@@ -720,6 +737,14 @@ export class BookQueryBuilder {
         const wholeDays = Math.floor(days!);
         const shiftDays = wholeDays > 0 ? wholeDays - 1 : 0;
         return sql`${dateExpr} >= (timezone(${timeZone}, now())::date - ${shiftDays}::int)`;
+      }
+      case 'moreThanAgo': {
+        const days = typeof value === 'string' ? Number(value) : value;
+        this.assertNumber(days, operator, 'value');
+        if (days! < 0) throw new BadRequestException(`Operator '${operator}' requires a non-negative value`);
+        const wholeDays = Math.floor(days!);
+        const shiftDays = wholeDays > 0 ? wholeDays - 1 : 0;
+        return sql`${dateExpr} < (timezone(${timeZone}, now())::date - ${shiftDays}::int)`;
       }
       case 'isEmpty':
         return sql`${dateExpr} is null`;
@@ -765,6 +790,14 @@ export class BookQueryBuilder {
         const wholeDays = Math.floor(days!);
         const shiftDays = wholeDays > 0 ? wholeDays - 1 : 0;
         return sql`${dateExpr} >= (timezone(${timeZone}, now())::date - ${shiftDays}::int)`;
+      }
+      case 'moreThanAgo': {
+        const days = typeof value === 'string' ? Number(value) : value;
+        this.assertNumber(days, operator, 'value');
+        if (days! < 0) throw new BadRequestException(`Operator '${operator}' requires a non-negative value`);
+        const wholeDays = Math.floor(days!);
+        const shiftDays = wholeDays > 0 ? wholeDays - 1 : 0;
+        return sql`${dateExpr} < (timezone(${timeZone}, now())::date - ${shiftDays}::int)`;
       }
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for ${fieldLabel} field`);
@@ -877,7 +910,9 @@ export class BookQueryBuilder {
   /**
    * Set membership against the same window-function pipeline as the "Up Next in Series" shelf
    * (DashboardRepository.findUpNextInSeriesBookIds): per (library, series), the next unstarted book
-   * whose immediately preceding entry is finished. Implemented as a subquery (not a per-row predicate)
+   * whose immediately preceding entry is finished and whose read status is unset, unread or want to
+   * read. The status gate applies to candidates only, so an abandoned volume ends the series rather
+   * than letting the volume after it through. Implemented as a subquery (not a per-row predicate)
    * so results match the shelf exactly. Keep the merged-progress / completion definitions in sync with
    * that repository. Library scoping is omitted here because the window partitions by library already;
    * the surrounding query restricts to the user's accessible libraries.
@@ -904,6 +939,7 @@ export class BookQueryBuilder {
           m.series_index as series_index,
           b.added_at as added_at,
           ${mergedProgress} as current_progress,
+          ubs.status as read_status,
           case when ${isCompleted} then true else false end as is_completed
         from ${books} b
         inner join ${bookMetadata} m on m.book_id = b.id
@@ -922,6 +958,7 @@ export class BookQueryBuilder {
           s.added_at,
           s.is_completed,
           s.current_progress,
+          s.read_status,
           lag(s.is_completed) over (
             partition by s.library_id, s.series_id
             order by ${seriesIndexSortKey(sql.raw('s.series_index'))} asc,
@@ -932,6 +969,7 @@ export class BookQueryBuilder {
       select distinct on (o.library_id, o.series_id) o.id
       from ordered o
       where o.previous_is_completed = true and o.is_completed = false and o.current_progress = 0
+        and (o.read_status is null or o.read_status in ('unread', 'want_to_read'))
       order by o.library_id, o.series_id, ${seriesIndexSortKey(sql.raw('o.series_index'))} asc,
         o.series_index collate "C" asc, o.added_at asc, o.id asc
     )`;
@@ -1130,7 +1168,12 @@ export class BookQueryBuilder {
       }
       switch (field) {
         case 'title':
+          parts.push(`sort_title ${D} NULLS LAST`);
+          break;
+        // sort_series is NULL for standalone books, so series stacks lead in both directions
+        // and the standalones that follow are ordered by title.
         case 'series':
+          parts.push(`sort_series ${D} NULLS LAST`);
           parts.push(`sort_title ${D} NULLS LAST`);
           break;
         case 'addedAt':

@@ -7,6 +7,7 @@ import { formatNumber } from '@/i18n/formatters'
 import AnnotationActivitySpark from '@/features/annotations/components/shared/AnnotationActivitySpark.vue'
 import { busiestWeek, foldDaysIntoWeeks, longestQuietWeeks } from '@/features/book/lib/highlight-activity'
 import type { HighlightGroup } from '@/features/book/lib/highlight-groups'
+import { annotationSourceKey } from '@/features/annotations/lib/source-label'
 
 const props = defineProps<{
   stats: AnnotationStats
@@ -124,7 +125,7 @@ function handleReview() {
             class="inline-flex h-6 items-center gap-1.5 text-[11.5px] text-muted-foreground"
           >
             <span class="size-1.5 rounded-full" :style="{ backgroundColor: `var(--pill-${entry.origin})` }" />
-            {{ t(`annotations.sources.${entry.origin}`) }}
+            {{ t(annotationSourceKey(entry.origin)) }}
             <b class="font-semibold text-foreground">{{ formatNumber(entry.count) }}</b>
           </span>
         </div>

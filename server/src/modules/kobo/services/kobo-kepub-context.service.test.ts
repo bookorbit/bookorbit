@@ -87,6 +87,45 @@ describe('KoboKepubContextService', () => {
     });
   });
 
+  it('keeps placing positions on the copy the device holds after the book file changed, while it is cached', async () => {
+    const { file, binary } = makeContext('epub');
+    const reader = { findPrimaryReaderFilesByBookIds: vi.fn().mockResolvedValue([file]) };
+    const release = vi.fn().mockResolvedValue(undefined);
+    const conversion = {
+      getKepubPath: vi.fn(),
+      acquireCachedByDigest: vi.fn().mockResolvedValueOnce({ path: '/cache/delivered.kepub.epub', release }).mockResolvedValueOnce(null),
+    };
+    const deliveries = {
+      current: vi.fn().mockResolvedValue({
+        id: 'copy',
+        state: 'transfer_observed',
+        previousId: null,
+        sourceFileId: 12,
+        options: { hyphenate: false, converterVersion: 'v1' },
+        metadata: { format: 'kepub', sha256: 'delivered-sha' },
+      }),
+      resolve: vi.fn().mockRejectedValue(new Error('source changed')),
+      rememberContentDigest: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new KoboKepubContextService(
+      reader as never,
+      { getSettings: vi.fn().mockResolvedValue({ convertToKepub: true }) } as never,
+      conversion as never,
+      binary as never,
+      deliveries as never,
+    );
+
+    await expect(service.resolveForBook(7, 3, 11)).resolves.toMatchObject({
+      ok: true,
+      file: { id: 12 },
+      ctx: { kepubPath: '/cache/delivered.kepub.epub', fileHash: 'delivered-sha', hyphenate: false, kepubifyVersion: 'v1' },
+      release,
+    });
+    expect(conversion.acquireCachedByDigest).toHaveBeenCalledWith(3, 'delivered-sha');
+    expect(deliveries.rememberContentDigest).toHaveBeenCalledWith(expect.objectContaining({ id: 'copy' }), '/cache/delivered.kepub.epub');
+    await expect(service.resolveForBook(7, 3, 11)).resolves.toMatchObject({ ok: false, reason: 'historical_artifact_unavailable' });
+  });
+
   it('resolves a first delivery the device has not downloaded yet only for a bookmark sent to it', async () => {
     const { file, conversion, binary } = makeContext('epub');
     const offered = {

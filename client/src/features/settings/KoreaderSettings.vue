@@ -176,6 +176,7 @@ onUnmounted(() => {
 const syncUrl = computed(() => new URL('/api/v1/koreader', getSyncUrl()).toString())
 const { supported: deliverySupported } = useReadAloudDelivery('koreader-delivery-settings')
 const newReadAloudDelivery = ref<ReadAloudDeliveryPreference>('audioless_epub')
+const savingHideAudioOnlyBooks = ref(false)
 
 const hasCredentials = computed(() => !!credentials.value)
 const activeDevices = computed(() => (syncStatus.value?.devices ?? []).filter((device) => device.retiredAt === null))
@@ -419,6 +420,18 @@ async function handleToggleSync(newValue: boolean) {
     toast.success(newValue ? t('settings.reader.koreader.syncEnabled') : t('settings.reader.koreader.syncDisabled'))
   } catch {
     toast.error(t('settings.reader.koreader.toggleSyncFailed'))
+  }
+}
+
+async function handleToggleHideAudioOnlyBooks(newValue: boolean) {
+  savingHideAudioOnlyBooks.value = true
+  try {
+    await updateCredentials({ hideAudioOnlyBooks: newValue })
+    toast.success(newValue ? t('settings.reader.koreader.audioOnlyBooksHidden') : t('settings.reader.koreader.audioOnlyBooksShown'))
+  } catch {
+    toast.error(t('settings.reader.koreader.toggleAudioOnlyBooksFailed'))
+  } finally {
+    savingHideAudioOnlyBooks.value = false
   }
 }
 
@@ -866,6 +879,32 @@ async function handleDownloadPlugin() {
                   {{ formatDate(credentials?.createdAt) }}
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-8">
+          <p class="settings-group-label">
+            {{ t('settings.reader.koreader.pluginLibrary') }}
+          </p>
+          <div class="settings-card">
+            <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
+              <div class="min-w-0">
+                <p id="koreader-hide-audio-only-label" class="settings-label">
+                  {{ t('settings.reader.koreader.hideAudioOnlyBooks') }}
+                </p>
+                <p id="koreader-hide-audio-only-hint" class="settings-hint">
+                  {{ t('settings.reader.koreader.hideAudioOnlyBooksHint') }}
+                </p>
+              </div>
+              <ToggleSwitch
+                :model-value="credentials?.hideAudioOnlyBooks ?? true"
+                :disabled="savingHideAudioOnlyBooks"
+                aria-labelledby="koreader-hide-audio-only-label"
+                aria-describedby="koreader-hide-audio-only-hint"
+                class="self-start md:self-auto"
+                @update:model-value="handleToggleHideAudioOnlyBooks"
+              />
             </div>
           </div>
         </div>

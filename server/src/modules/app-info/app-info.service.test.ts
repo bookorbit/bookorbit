@@ -100,7 +100,15 @@ describe('AppInfoService', () => {
       const info = await service.getAppInfo();
       expect(info.features).toEqual([...SERVER_FEATURES]);
       expect(info.features).toEqual(
-        expect.arrayContaining(['annotation-stars', 'annotation-color-names', 'annotation-trash', 'book-journal', 'bookmark-edit']),
+        expect.arrayContaining([
+          'annotation-stars',
+          'annotation-color-names',
+          'annotation-trash',
+          'book-journal',
+          'bookmark-edit',
+          'author-metadata-match',
+          'read-along-filter',
+        ]),
       );
     });
 

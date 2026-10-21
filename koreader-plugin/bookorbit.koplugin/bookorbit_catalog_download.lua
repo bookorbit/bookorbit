@@ -6,12 +6,6 @@ catalog controller. Downloads stay foreground with live byte/percent progress
 (a deliberate user action), unlike navigation which runs off the UI thread.
 ]]
 
-local BD = require("ui/bidi")
-local ButtonDialog = require("ui/widget/buttondialog")
-local ConfirmBox = require("ui/widget/confirmbox")
-local InfoMessage = require("ui/widget/infomessage")
-local InputDialog = require("ui/widget/inputdialog")
-local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
@@ -21,8 +15,12 @@ local _ = require("gettext")
 
 local BookOrbitStateManager = require("bookorbit_state_manager")
 local CatalogUtil = require("bookorbit_catalog_util")
+local DownloadRoot = require("bookorbit_download_root")
 local Transfer = require("bookorbit_download_transfer")
 local Delivery = require("bookorbit_delivery")
+local DownloadSheet = setmetatable({}, { __index = function(_t, key) return require("bookorbit_download_sheet")[key] end })
+-- Loaded on first use: specs load this module without KOReader's widgets.
+local Toast = setmetatable({}, { __index = function(_t, key) return require("bookorbit_toast")[key] end })
 
 local formatBytes = CatalogUtil.formatBytes
 local safeFilenameBase = CatalogUtil.safeFilenameBase
@@ -102,19 +100,15 @@ function CatalogDownload.install(Catalog)
     function Catalog:changeDownloadVariant(detail, file, use_default)
         local variant = file.downloadVariant == "original" and "audioless_epub" or "original"
         if use_default then variant = nil end
-        self:runConnected(function()
-            local selected, err = self:fetchDeliveryBook(detail.id, variant, _("Loading EPUB variant..."))
-            if not selected then self:showRetry(err, function() self:changeDownloadVariant(detail, file, use_default) end); return end
-            for _, candidate in ipairs(selected.files or {}) do
-                if candidate.id == file.id then self:showDownloadDialog(selected, candidate); return end
-            end
-        end)
+        DownloadSheet.open(self, detail, { file = file, variant = variant })
     end
+
+    -- A book with several files: the download sheet lists them. One file
+    -- opens or downloads straight away.
     function Catalog:showFileChoices(detail)
         local files = self:supportedFiles(detail)
-
         if #files == 0 then
-            UIManager:show(InfoMessage:new{ text = _("No KOReader-supported file found."), timeout = 3 })
+            Toast.error(_("No file this reader can open"))
             return
         end
         if #files == 1 then
@@ -126,37 +120,11 @@ function CatalogDownload.install(Catalog)
             end
             return
         end
-
-        local dialog
-        local buttons = {}
-        local open_tpl = _("Open - %1")
-        local download_tpl = _("Download - %1")
-        for index, file in ipairs(files) do
-            local path = self:onDeviceFilePath(file)
-            local label = self:fileLabel(file, false)
-            table.insert(buttons, {
-                {
-                    text = path and T(open_tpl, label) or T(download_tpl, label),
-                    callback = function()
-                        UIManager:close(dialog)
-                        if path then
-                            self:openDownloadedFile(path)
-                        else
-                            self:downloadDefaultFile(detail, file)
-                        end
-                    end,
-                },
-            })
-        end
-        dialog = ButtonDialog:new{
-            title = _("Choose file"),
-            buttons = buttons,
-        }
-        UIManager:show(dialog)
+        DownloadSheet.open(self, detail)
     end
 
     function Catalog:getCurrentDownloadDir()
-        return G_reader_settings:readSetting("download_dir") or G_reader_settings:readSetting("lastdir")
+        return DownloadRoot.get()
     end
 
     -- Single and bulk downloads share one destination, KOReader's own
@@ -171,6 +139,7 @@ function CatalogDownload.install(Catalog)
                     self._manager.ui.folder_shortcuts:updateShortcut("download_dir", path)
                 end
                 G_reader_settings:saveSetting("download_dir", path)
+                G_reader_settings:flush()
                 if on_chosen then
                     UIManager:nextTick(function()
                         on_chosen(path)
@@ -202,148 +171,23 @@ function CatalogDownload.install(Catalog)
     end
 
     function Catalog:showDownloadOptions(detail)
-        local files = self:supportedFiles(detail)
-
-        if #files == 0 then
-            UIManager:show(InfoMessage:new{ text = _("No KOReader-supported file found."), timeout = 3 })
-            return
-        end
-        if #files == 1 then
-            self:showDownloadDialog(detail, files[1])
-            return
-        end
-
-        local dialog
-        local buttons = {}
-        for index, file in ipairs(files) do
-            local label = self:fileLabel(file, false)
-            table.insert(buttons, {
-                {
-                    text = T(_("Options - %1"), label),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:showDownloadDialog(detail, file)
-                    end,
-                },
-            })
-        end
-        dialog = ButtonDialog:new{
-            title = _("Download options"),
-            buttons = buttons,
-        }
-        UIManager:show(dialog)
+        DownloadSheet.open(self, detail)
     end
 
     function Catalog:showDownloadDialog(detail, file, initial_filename_override)
-        local filename = initial_filename_override or safeFilenameBase(detail)
-        local filetype = string.lower(file.format or "bin")
-        local filename_overridden = initial_filename_override ~= nil
-
-        local folder
-        folder, filename = self:getLocalDownloadPreview(filename, filetype, file.devicePath, filename_overridden)
-
-        local function createTitle(path, name)
-            return T(_("Download folder:\n%1\n\nDownload filename:\n%2\n\nDownload file type:\n%3"),
-                BD.dirpath(path), name, string.upper(filetype))
-        end
-
-        local dialog
-        dialog = ButtonDialog:new{
-            title = createTitle(folder, filename),
-            buttons = {
-                {
-                    {
-                        text = _("Download"),
-                        callback = function()
-                            UIManager:close(dialog)
-                            local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath, filename_overridden)
-                            self:checkDownloadFile(local_path, detail, file)
-                        end,
-                    },
-                },
-                {
-                    {
-                        text = file.downloadVariant == "original" and _("Use text-only EPUB")
-                            or (file.sourceMediaOverlayAvailable and _("Use original EPUB with narration") or _("Use original EPUB")),
-                        enabled = filetype == "epub",
-                        callback = function() UIManager:close(dialog); self:changeDownloadVariant(detail, file) end,
-                    },
-                },
-                {
-                    {
-                        text = _("Use BookOrbit default"),
-                        enabled = filetype == "epub",
-                        callback = function() UIManager:close(dialog); self:changeDownloadVariant(detail, file, true) end,
-                    },
-                },
-                {
-                    {
-                        text = _("Choose folder"),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:chooseDownloadDir(function()
-                                self:showDownloadDialog(detail, file, filename_overridden and filename or nil)
-                            end)
-                        end,
-                    },
-                    {
-                        text = _("Change filename"),
-                        callback = function()
-                            local input_dialog
-                            input_dialog = InputDialog:new{
-                                title = _("Enter filename"),
-                                input = filename,
-                                buttons = {
-                                    {
-                                        {
-                                            text = _("Cancel"),
-                                            id = "close",
-                                            callback = function()
-                                                UIManager:close(input_dialog)
-                                            end,
-                                        },
-                                        {
-                                            text = _("Set filename"),
-                                            is_enter_default = true,
-                                            callback = function()
-                                                local value = util.trim(input_dialog:getInputText() or "")
-                                                if value ~= "" then
-                                                    filename_overridden = true
-                                                    folder, filename = self:getLocalDownloadPreview(value, filetype, file.devicePath, true)
-                                                end
-                                                UIManager:close(input_dialog)
-                                                dialog:setTitle(createTitle(folder, filename))
-                                            end,
-                                        },
-                                    },
-                                },
-                            }
-                            UIManager:show(input_dialog)
-                            input_dialog:onShowKeyboard()
-                        end,
-                    },
-                },
-            },
-        }
-        UIManager:show(dialog)
+        DownloadSheet.open(self, detail, { file = file, filename = initial_filename_override })
     end
 
+    -- A file already at the path opens the download sheet, which says so and
+    -- asks before replacing it.
     function Catalog:checkDownloadFile(local_path, detail, file)
-        local function download()
-            UIManager:nextTick(function()
-                self:downloadFile(local_path, detail, file)
-            end)
-        end
-
         if lfs.attributes(local_path) then
-            UIManager:show(ConfirmBox:new{
-                text = T(_("The file %1 already exists. Replacing it can invalidate its reading position and highlights. The previous file stays intact until the download finishes. Continue?"), BD.filepath(local_path)),
-                ok_text = _("Overwrite"),
-                ok_callback = download,
-            })
-        else
-            download()
+            DownloadSheet.open(self, detail, { file = file })
+            return
         end
+        UIManager:nextTick(function()
+            self:downloadFile(local_path, detail, file)
+        end)
     end
 
     -- Cancelling bumps the generation. The child keeps running until its socket
@@ -363,55 +207,37 @@ function CatalogDownload.install(Catalog)
             math.floor(received / (256 * 1024))
     end
 
-    function Catalog:downloadFile(local_path, detail, file)
-        local filename = local_path:match("[^/]+$") or safeFilenameBase(detail)
+    -- ui: the download sheet's reporter. Without one, a download started
+    -- from the book's own page fills that page's button; anywhere else the
+    -- download sheet opens to show it.
+    function Catalog:downloadFile(local_path, detail, file, ui)
         local total = file.sizeBytes
         local root = self:getCurrentDownloadDir()
         local generation = self:nextDownloadGeneration()
         Transfer.sweepStale(root)
 
-        local dialog
-        local function closeDialog()
-            if not dialog then return end
-            UIManager:close(dialog)
-            dialog = nil
-        end
-        local function showStatus(text)
-            if dialog then
-                dialog:setTitle(text)
-            else
-                dialog = ButtonDialog:new{
-                    title = text,
-                    buttons = {
-                        {
-                            {
-                                text = _("Cancel"),
-                                callback = function()
-                                    self:nextDownloadGeneration()
-                                    closeDialog()
-                                    UIManager:show(InfoMessage:new{ text = _("Download cancelled."), timeout = 2 })
-                                end,
-                            },
-                        },
-                    },
-                }
-                UIManager:show(dialog)
-            end
-            UIManager:forceRePaint()
+        local in_button = not ui and self.detailShowDownloadProgress ~= nil and self:detailShowDownloadProgress(detail, 0, total) == true
+        if not ui and not in_button then
+            local sheet = DownloadSheet.open(self, detail, { file = file, progress = true })
+            ui = sheet and DownloadSheet.reporter(sheet) or nil
         end
 
         local last_bucket = -1
         local function onProgress(received)
             -- A poll that lands after cancellation must not resurrect the
-            -- dialog the user just dismissed.
+            -- progress the user just dismissed.
             if self.download_generation ~= generation then return end
-            local text, bucket = self:downloadProgressText(filename, received or 0, total)
+            local bucket = select(2, self:downloadProgressText("", received or 0, total))
             if bucket == last_bucket then return end
             last_bucket = bucket
-            showStatus(text)
+            if in_button then
+                -- The page moved on: the download goes on, and says when it is done.
+                if not self:detailShowDownloadProgress(detail, received or 0, total) then in_button = false end
+                return
+            end
+            if ui then ui.progress(received or 0, total) end
         end
 
-        showStatus(T(_("Downloading:\n%1"), filename))
         self:runOffThread(function()
             local ok, err = Transfer.run{
                 root = root,
@@ -430,10 +256,31 @@ function CatalogDownload.install(Catalog)
                     return self.client:downloadCatalogFile(file.id, local_path, download_opts)
                 end,
             }
-            closeDialog()
+            if in_button then self:detailShowDownloadProgress(detail, nil, nil, true) end
             if not ok then
+                if ui then return ui.finished(false, err) end
                 if err == "cancelled" then return end
                 self:showRetry(err, function()
+                    if err == 409 and file.selection then
+                        return self:runConnected(function()
+                            local selected, refresh_err = self:fetchDeliveryBook(detail.id, file.requestedVariant or file.downloadVariant)
+                            if not selected then
+                                if refresh_err ~= "cancelled" then self:showWriteError(refresh_err) end
+                                return
+                            end
+                            for _, candidate in ipairs(selected.files or {}) do
+                                if candidate.id == file.id then
+                                    if self.current_context and self.current_context.detail
+                                            and self.current_context.detail.id == detail.id then
+                                        self.current_context.detail = selected
+                                        self:refreshDetailView()
+                                    end
+                                    return self:checkDownloadFile(local_path, selected, candidate)
+                                end
+                            end
+                            self:showWriteError(404)
+                        end)
+                    end
                     self:downloadFile(local_path, detail, file)
                 end)
                 return
@@ -456,7 +303,13 @@ function CatalogDownload.install(Catalog)
                     self:updateItems()
                 end
             end
-            self:showDownloadedDialog(local_path, linked)
+            if ui then return ui.finished(true, nil, local_path, linked) end
+            -- The page itself turns to Start reading; a short note is enough.
+            if self.detailMode and self:detailMode() and not linked then
+                self:refreshOnDevice()
+                self:refreshDetailView()
+            end
+            Toast.show(_("Downloaded"))
         end)
     end
 
@@ -497,22 +350,12 @@ function CatalogDownload.install(Catalog)
         return false
     end
 
-    function Catalog:showDownloadedDialog(local_path, linked)
-        local message = linked and _("File saved and linked for BookOrbit progress sync:\n%1\n\nOpen now?")
-            or _("File saved:\n%1\n\nOpen now?")
-        UIManager:nextTick(function()
-            UIManager:show(ConfirmBox:new{
-                text = T(message, BD.filepath(local_path)),
-                ok_text = _("Open now"),
-                cancel_text = _("Close"),
-                ok_callback = function()
-                    self:openDownloadedFile(local_path)
-                end,
-            })
-        end)
-    end
-
     function Catalog:openDownloadedFile(local_path)
+        if type(local_path) ~= "string" or lfs.attributes(local_path, "mode") ~= "file" then
+            self:updateItems(nil, true)
+            Toast.error(_("This book is not on this device. Connect to BookOrbit to download it."))
+            return
+        end
         if self.close_callback then
             self.close_callback()
         else
@@ -525,7 +368,7 @@ function CatalogDownload.install(Catalog)
                 self._manager.ui:openFile(local_path)
             end
         else
-            Notification:notify(T(_("Downloaded to %1"), local_path))
+            Toast.show(_("Downloaded"))
         end
     end
 end

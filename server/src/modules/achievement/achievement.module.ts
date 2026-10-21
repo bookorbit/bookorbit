@@ -38,7 +38,7 @@ import { DevicesEvaluator } from './evaluators/devices.evaluator';
     RatingEvaluator,
     DevicesEvaluator,
   ],
-  exports: [AchievementEventsService],
+  exports: [AchievementEventsService, AchievementService],
 })
 export class AchievementModule {
   constructor(

@@ -12,6 +12,7 @@ export * from "./metadata-preferences";
 export * from "./custom-metadata";
 export * from "./custom-icon";
 export * from "./metadata-lock";
+export * from "./identifier-input";
 export * from "./dashboard";
 export * from "./book";
 export * from "./book-duplicates";

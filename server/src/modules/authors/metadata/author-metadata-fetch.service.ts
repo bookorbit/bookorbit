@@ -57,6 +57,8 @@ export type AuthorMetadataSearchResult = AuthorMetadataFetchProvenance & {
 
 export type AuthorMetadataLookupResult = AuthorMetadataFetchProvenance & {
   candidate: AuthorMetadataSearchCandidateEvent | null;
+  /** Set when the provider failed, so a caller can tell an outage from an id that matched nobody. */
+  failure: AuthorMetadataFetchFailure | null;
 };
 
 export type AuthorMetadataCollectResult = AuthorMetadataFetchProvenance & {
@@ -206,12 +208,13 @@ export class AuthorMetadataFetchService {
     options?: LookupOptions,
   ): Promise<AuthorMetadataLookupResult> {
     const provider = this.registry.find(key);
-    if (!provider || !isIdentifiableAuthorProvider(provider)) return { candidate: null, ...summarize([]) };
+    if (!provider || !isIdentifiableAuthorProvider(provider)) return { candidate: null, failure: null, ...summarize([]) };
 
     const run = await this.startRun(provider, options?.directive ?? DEFAULT_CACHE_DIRECTIVE);
     const outcome = await run.lookup(canonicalId(providerId) ?? '', { name: '', region: canonicalAuthorRegion(region) });
-    const candidate = outcome.ok && outcome.value ? withCache(outcome.value, outcome.cache) : null;
-    return { candidate, ...summarize([run]) };
+    if (!outcome.ok) return { candidate: null, failure: this.toFailure(key, outcome.error), ...summarize([run]) };
+    const candidate = outcome.value ? withCache(outcome.value, outcome.cache) : null;
+    return { candidate, failure: null, ...summarize([run]) };
   }
 
   /** The per-operation deadline; today's provider timeout, now enforced by the executor. */

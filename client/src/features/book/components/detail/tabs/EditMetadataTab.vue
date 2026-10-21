@@ -20,6 +20,7 @@ import type { BookCommunityRating, BookDetail, BookMetadataLockField, CoverMediu
 import {
   BOOK_FILE_WRITE_FIELD_LABELS,
   FORMAT_TO_GROUP,
+  IDENTIFIER_INPUT_KIND_BY_FIELD,
   getPrimaryBookFile,
   isValidSeriesIndex,
   parseSeriesIndex,
@@ -30,6 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { api } from '@/lib/api'
 import { metadataScoreColor } from '@/lib/metadata-score-color'
 import ChipInput from '@/components/ui/ChipInput.vue'
+import IdentifierInput from '@/components/ui/IdentifierInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
 import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
 import MetadataFieldLabel from './MetadataFieldLabel.vue'
@@ -1257,7 +1259,7 @@ function handleCoverChanged(medium: CoverMedium | null) {
                   :is-updating="isUpdatingLock"
                   @toggle="handleLockToggle"
                 >
-                  <input v-model="form.isbn13" maxlength="13" :class="controlClass(!form.isbn13, true)" :disabled="isLocked('isbn13')" />
+                  <IdentifierInput v-model="form.isbn13" kind="isbn" :class="controlClass(!form.isbn13, true)" :disabled="isLocked('isbn13')" />
                 </MetadataFieldLabel>
 
                 <MetadataFieldLabel
@@ -1268,7 +1270,7 @@ function handleCoverChanged(medium: CoverMedium | null) {
                   :is-updating="isUpdatingLock"
                   @toggle="handleLockToggle"
                 >
-                  <input v-model="form.isbn10" maxlength="10" :class="controlClass(!form.isbn10, true)" :disabled="isLocked('isbn10')" />
+                  <IdentifierInput v-model="form.isbn10" kind="isbn" :class="controlClass(!form.isbn10, true)" :disabled="isLocked('isbn10')" />
                 </MetadataFieldLabel>
 
                 <MetadataFieldLabel
@@ -1368,9 +1370,10 @@ function handleCoverChanged(medium: CoverMedium | null) {
                     >
                       {{ label }}
                     </label>
-                    <input
+                    <IdentifierInput
                       :id="`provider-id-${field}`"
                       v-model="form[field]"
+                      :kind="IDENTIFIER_INPUT_KIND_BY_FIELD[field]"
                       class="h-8 min-w-0 flex-1 rounded-xs border border-transparent bg-transparent px-1.5 font-mono text-xs transition-shadow outline-none hover:border-input focus:border-input focus:bg-background focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-7"
                       :disabled="isLocked(field)"
                     />

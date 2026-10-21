@@ -17,7 +17,7 @@ describe('BrowseCountsService', () => {
     const { service, annotationHubService } = makeService();
 
     await expect(service.getCounts(reqUser())).resolves.toEqual({ authors: 1234, series: 312, annotations: 18000 });
-    expect(annotationHubService.countActive).toHaveBeenCalledWith(7);
+    expect(annotationHubService.countActive).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }));
   });
 
   it('serves repeat requests from the cache instead of re-querying', async () => {

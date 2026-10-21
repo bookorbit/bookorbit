@@ -24,6 +24,7 @@ import {
   isBookRequestFulfiller,
   isGrabbableBookRequestStatus,
   MAX_BOOK_REQUEST_SEARCH_ISBNS,
+  METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER,
   Permission,
 } from '@bookorbit/types'
 import type {
@@ -120,6 +121,8 @@ const FORMATS_BY_MEDIA = BOOK_REQUEST_FORMATS_BY_MEDIA_KIND
 
 const title = ref('')
 const author = ref('')
+const searchCard = ref<HTMLElement | null>(null)
+const authorInput = ref<HTMLInputElement | null>(null)
 const language = ref<string | null>(null)
 /**
  * A preference, not a filter: a release in another format still appears, it simply scores lower.
@@ -259,7 +262,22 @@ async function runSearch() {
     title: title.value.trim() || undefined,
     author: author.value.trim() || undefined,
     ...(pairMode.value ? { mediaKinds: [...BOOK_REQUEST_MEDIA_KINDS] } : { mediaKind: mediaKind.value }),
+    // Looking for something to request is browsing, so an author's search should show their books, not a best match.
+    resultsPerProvider: METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER,
   })
+}
+
+/**
+ * An author on a result is a way to see more of their books: the search becomes that author alone.
+ * The list the name sat in is replaced, so the query comes into view, and keyboard focus moves to it.
+ * A tap leaves focus alone, since focusing a field would open the on-screen keyboard over the results.
+ */
+async function searchAuthor(name: string, event: MouseEvent) {
+  title.value = ''
+  author.value = name
+  searchCard.value?.scrollIntoView({ block: 'nearest' })
+  if (event.detail === 0) authorInput.value?.focus({ preventScroll: true })
+  await runSearch()
 }
 
 const showCacheNotice = computed(() => hasSearched.value && cacheSummary.value.cachedCount > 0)
@@ -568,21 +586,29 @@ function pairMediumLabel(kind: BookRequestMediaKind): string {
 }
 
 /**
- * Only once a provider search has come back empty, and only for somebody who will pick the release
- * themselves. An approver handed a row that says nothing but a typed string has no way to tell
- * whether it is the book that was meant.
+ * Only once a provider search has come back empty. Somebody who picks the release themselves goes
+ * straight to the indexers with what they typed. Anyone else may still request it as typed: the
+ * provider catalogues are not the limit of what an indexer has, and the note for the approver is
+ * where they say which book they mean, since the row carries no cover or ISBN to tell by.
  */
 const canSearchIndexersManually = computed(() => selfFulfils.value && hasSearched.value && title.value.trim() !== '')
 const showFreeTextOption = computed(() => canSearchIndexersManually.value && groups.value.length === 0)
 const showManualSearchOverride = computed(() => canSearchIndexersManually.value && groups.value.length > 0)
+const showRequestAnyway = computed(() => !selfFulfils.value && hasSearched.value && title.value.trim() !== '' && groups.value.length === 0)
+const offersTypedRequest = computed(() => showFreeTextOption.value || showRequestAnyway.value)
 
 const freeTextBusy = ref(false)
 const freeTextNotice = ref<string | null>(null)
 
-/** One sentence either way: the indexer fallback is a longer answer to the same question. */
-const noResultsHint = computed(() =>
-  showFreeTextOption.value ? t('bookRequests.search.noResultsIndexerHint', { title: title.value.trim() }) : t('bookRequests.search.noResultsHint'),
-)
+/** One sentence either way: the typed-request fallback is a longer answer to the same question. */
+const noResultsHint = computed(() => {
+  const typed = { title: title.value.trim() }
+  if (showFreeTextOption.value) return t('bookRequests.search.noResultsIndexerHint', typed)
+  if (showRequestAnyway.value) {
+    return autoApproves.value ? t('bookRequests.search.noResultsRequestAutoHint', typed) : t('bookRequests.search.noResultsRequestHint', typed)
+  }
+  return t('bookRequests.search.noResultsHint')
+})
 
 /**
  * What the library and the queue already know about the typed text, shown before anything is
@@ -598,11 +624,11 @@ const FREE_TEXT_HINT_DEBOUNCE_MS = 350
 let hintHandle: ReturnType<typeof setTimeout> | null = null
 let hintGeneration = 0
 
-watch([showFreeTextOption, title, author, mediaKind], () => {
+watch([offersTypedRequest, title, author, mediaKind], () => {
   freeTextNotice.value = null
   hintGeneration++
   if (hintHandle !== null) clearTimeout(hintHandle)
-  if (!showFreeTextOption.value) return
+  if (!offersTypedRequest.value) return
 
   const generation = hintGeneration
   hintHandle = setTimeout(async () => {
@@ -650,19 +676,24 @@ function releasesQuery(searchIsbn?: string | null): LocationQuery {
   return searchIsbn ? { ...carried, isbn: searchIsbn } : { ...carried, search: 'title-author' }
 }
 
-async function startFreeTextSearch() {
+/**
+ * Requests what was typed, with no provider record behind it. A self-fulfiller goes on to pick the
+ * release; anyone else leaves it to the approver, or to automation when their requests auto-approve,
+ * both of which search the indexers by the same title and author.
+ */
+async function submitTypedRequest(selfServe: boolean) {
   freeTextBusy.value = true
   try {
     if (pairMode.value) {
       const pair = await submitPairFreeText(
         { title: title.value, author: author.value },
-        { language: language.value, selfServe: true, note: note.value.trim() || null, ...pairHalves() },
+        { language: language.value, selfServe, note: note.value.trim() || null, ...pairHalves() },
       )
       if (!pair) {
         toast.error(submitFailureText(lastFailure.value, t) ?? t('bookRequests.search.submitFailed'))
         return
       }
-      await afterPairSubmit(pair, true)
+      await afterPairSubmit(pair, selfServe)
       return
     }
 
@@ -672,7 +703,7 @@ async function startFreeTextSearch() {
         targetLibraryId: targetLibraryId.value,
         targetFolderId: targetFolderId.value,
         language: language.value,
-        selfServe: true,
+        selfServe,
         ...requestExtras(),
       },
     )
@@ -680,10 +711,18 @@ async function startFreeTextSearch() {
       toast.error(submitFailureText(lastFailure.value, t) ?? t('bookRequests.search.submitFailed'))
       return
     }
-    await afterSubmit(result, true)
+    await afterSubmit(result, selfServe)
   } finally {
     freeTextBusy.value = false
   }
+}
+
+async function startFreeTextSearch() {
+  await submitTypedRequest(true)
+}
+
+async function requestAnyway() {
+  await submitTypedRequest(false)
 }
 
 async function requestGroup(group: CandidateGroup) {
@@ -842,7 +881,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
         because a transparent input reads as a caption, and the secondary controls sit in a strip
         attached to the same card rather than floating on their own line below it.
       -->
-      <div class="overflow-hidden rounded-xl border border-border bg-card">
+      <div ref="searchCard" class="overflow-hidden rounded-xl border border-border bg-card">
         <div class="flex flex-col gap-2.5 p-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div
             class="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-3 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/40 sm:w-auto sm:min-w-[13rem] sm:flex-[2]"
@@ -865,6 +904,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
             <label for="request-author" class="sr-only">{{ t('bookRequests.search.authorLabel') }}</label>
             <input
               id="request-author"
+              ref="authorInput"
               v-model="author"
               type="text"
               class="h-full w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
@@ -1098,9 +1138,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
     <!--
       One card, on the same edges as the search card above it. The escape hatch is the answer to an
       empty search rather than a second notice about it, so it shares this block instead of adding a
-      second one indented to its own left edge. It is offered only to somebody who can fulfil the
-      request themselves: without the picker on the other side it would create a request an approver
-      could not identify.
+      second one indented to its own left edge.
     -->
     <div
       v-else-if="hasSearched && groups.length === 0"
@@ -1122,6 +1160,16 @@ function mediaIconFor(kind: BookRequestMediaKind) {
         @click="startFreeTextSearch"
       >
         {{ t('bookRequests.search.freeTextAction') }}
+      </Button>
+      <Button
+        v-else-if="showRequestAnyway"
+        variant="outline"
+        size="sm"
+        class="w-full shrink-0 sm:w-auto"
+        :disabled="freeTextBusy || freeTextDestinationMissing"
+        @click="requestAnyway"
+      >
+        {{ t('bookRequests.search.requestAnywayAction') }}
       </Button>
     </div>
 
@@ -1162,7 +1210,20 @@ function mediaIconFor(kind: BookRequestMediaKind) {
 
         <div class="min-w-0 flex-1 space-y-1">
           <p class="truncate text-[15px] font-semibold text-foreground">{{ group.title }}</p>
-          <p v-if="group.authors.length" class="truncate text-sm text-muted-foreground">{{ group.authors.join(', ') }}</p>
+          <p v-if="group.authors.length" class="truncate text-sm text-muted-foreground">
+            <template v-for="(name, index) in group.authors" :key="name">
+              <span v-if="index > 0">, </span>
+              <button
+                type="button"
+                class="inline rounded-sm underline decoration-border underline-offset-2 transition-colors hover:text-foreground hover:decoration-current focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
+                :title="t('bookRequests.search.searchAuthor', { author: name })"
+                :aria-label="t('bookRequests.search.searchAuthor', { author: name })"
+                @click="searchAuthor(name, $event)"
+              >
+                {{ name }}
+              </button>
+            </template>
+          </p>
 
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span class="tabular-nums">{{ group.publishedYear ?? t('bookRequests.search.yearUnknown') }}</span>

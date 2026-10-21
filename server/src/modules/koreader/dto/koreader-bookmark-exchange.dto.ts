@@ -14,6 +14,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { SIDECAR_STATES, type SidecarState } from './koreader-exchange.dto';
 import { PluginDeviceDto } from './koreader-plugin.dto';
 
 const MD5_HEX = /^[0-9a-f]{32}$/i;
@@ -78,6 +79,11 @@ export class BookmarkExchangeBookDto {
   /** False when the device chunk-capped the key list; deletion detection is skipped then. */
   @IsBoolean()
   keysComplete!: boolean;
+
+  /** Same meaning as on the highlight exchange: a 'new' sidecar deletes nothing and gets every dogear back. */
+  @IsOptional()
+  @IsIn(SIDECAR_STATES)
+  sidecarState?: SidecarState;
 
   @IsArray()
   @ArrayMaxSize(BOOKMARK_EXCHANGE_MAX_CHANGES)

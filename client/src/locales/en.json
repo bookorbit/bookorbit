@@ -3407,6 +3407,12 @@
         "syncEnabled": "KOReader sync enabled",
         "syncDisabled": "KOReader sync disabled",
         "toggleSyncFailed": "Failed to toggle sync",
+        "pluginLibrary": "Plugin Library",
+        "hideAudioOnlyBooks": "Hide audiobook-only books",
+        "hideAudioOnlyBooksHint": "KOReader cannot play audio, so books with only audio files stay out of the plugin's lists, search and downloads, as does a library holding nothing else. Books that also have an ebook still show.",
+        "audioOnlyBooksHidden": "Audiobook-only books hidden in the plugin",
+        "audioOnlyBooksShown": "Audiobook-only books shown in the plugin",
+        "toggleAudioOnlyBooksFailed": "Failed to update the plugin library setting",
         "syncUrlCopied": "Sync URL copied to clipboard",
         "syncUrlCopyFailed": "Failed to copy sync URL",
         "statusRefreshed": "Sync status refreshed",
@@ -5075,7 +5081,8 @@
         "bulkRestored": "{count, plural, =0 {Restored no annotations} one {Restored # annotation} other {Restored # annotations}}",
         "bulkRecolored": "{count, plural, =0 {Recolored no annotations} one {Recolored # annotation} other {Recolored # annotations}}",
         "bulkRestyled": "{count, plural, =0 {Restyled no annotations} one {Restyled # annotation} other {Restyled # annotations}}",
-        "noteSaved": "Note saved"
+        "noteSaved": "Note saved",
+        "purgePendingDeviceSync": "A synced device still has to remove this annotation. Sync that device, then delete it forever."
       },
       "railTitle": "{marks} marks · {books} books",
       "lastTwelveMonths": "Last 12 months",
@@ -5120,10 +5127,16 @@
       },
       "activitySummary": "{count, plural, one {# highlight between {from} and {to}} other {# highlights between {from} and {to}}}",
       "book": "Book",
-      "needsReview": "Needs review"
+      "needsReview": "Needs review",
+      "trashToggle": "{count, plural, one {Trash, # annotation} other {Trash, # annotations}}",
+      "purgeDialog": {
+        "title": "Delete forever?",
+        "description": "This annotation and its note are removed for good. It cannot be restored from the trash."
+      }
     },
     "sources": {
       "web": "Web",
+      "bookorbit": "BookOrbit",
       "koreader": "KOReader",
       "kobo": "Kobo"
     },
@@ -5718,6 +5731,12 @@
       "errors": {
         "noToken": "No token provided"
       }
+    },
+    "reconnect": {
+      "heading": "Waiting for the server",
+      "description": "BookOrbit can't reach its server right now. This page continues on its own as soon as the server answers.",
+      "retry": "Try again now",
+      "retrying": "Trying again..."
     }
   },
   "author": {
@@ -5758,7 +5777,10 @@
       "died": "Died",
       "website": "Website",
       "genres": "Genres",
-      "influences": "Influences"
+      "influences": "Influences",
+      "findMatch": "Find the Right Author",
+      "source": "Source",
+      "pinned": "Pinned"
     },
     "list": {
       "title": "Authors",
@@ -5830,7 +5852,17 @@
         "removing": "Removing...",
         "removeImage": "Remove image",
         "imageHint": "PNG/JPEG/WEBP/GIF/BMP up to {size} MB",
-        "saving": "Saving..."
+        "saving": "Saving...",
+        "website": "Website",
+        "websitePlaceholder": "https://example.com",
+        "websiteInvalid": "Enter a web address such as example.com.",
+        "born": "Born",
+        "died": "Died",
+        "lifeDatePlaceholder": "1965 or 1965-03-14",
+        "lifeDateHint": "Born and died take a year, or a full date as year-month-day.",
+        "lifeDateInvalid": "Enter a year or a real date as year-month-day.",
+        "genres": "Genres",
+        "influences": "Influences"
       },
       "merge": {
         "searchPlaceholder": "Search authors to merge into this author",
@@ -5895,6 +5927,56 @@
       "actionsFor": "Actions for {name}",
       "refreshing": "Refreshing metadata for {name}",
       "deleting": "Deleting {name}"
+    },
+    "match": {
+      "title": "Find the right author",
+      "description": "Pick the person behind {name}, from a name search or a pasted Goodreads or Audible link.",
+      "search": {
+        "label": "Name",
+        "submit": "Search"
+      },
+      "reference": {
+        "label": "Goodreads or Audible link or ID",
+        "placeholder": "goodreads.com/author/show/12345",
+        "submit": "Look up",
+        "unrecognised": "Paste a Goodreads or Audible author link, a Goodreads ID or an Audible ASIN.",
+        "notFound": "No author has that ID.",
+        "failed": "The lookup failed. Try again in a moment."
+      },
+      "results": {
+        "label": "Matches",
+        "count": "{count, plural, =0 {No matches} one {# match} other {# matches}}",
+        "searching": "Searching...",
+        "empty": "No authors found. Try another spelling or paste a link.",
+        "failed": "The search failed. Try again in a moment.",
+        "current": "Current",
+        "born": "Born {year}",
+        "lifeSpan": "{born}–{died}"
+      },
+      "detail": {
+        "empty": "Pick a match to see who it is.",
+        "loading": "Loading details...",
+        "noBio": "No biography.",
+        "viewOn": "View on {provider}",
+        "back": "Back to matches",
+        "use": "Use this author",
+        "unpin": "Unpin",
+        "pinnedHint": "Pinned: refreshes look this author up by ID instead of searching by name.",
+        "currentHint": "The author is matched to this person now. Use it to pin the match."
+      },
+      "confirm": {
+        "title": "Use this {provider} author?",
+        "description": "The bio, photo, dates, website, genres and influences are replaced with this author's, and later refreshes keep to this person.",
+        "confirm": "Use this author"
+      },
+      "toast": {
+        "pinned": "Now matched to {name} on {provider}",
+        "unpinned": "Unpinned. Refreshes search by name again.",
+        "notFound": "{provider} has no author with that ID any more.",
+        "providerDown": "{provider} could not be reached. Try again in a moment.",
+        "failed": "Could not use this author.",
+        "unpinFailed": "Could not unpin the match."
+      }
     }
   },
   "book": {
@@ -6102,6 +6184,7 @@
         "before": "before",
         "after": "after",
         "withinLast": "within last",
+        "moreThanAgo": "more than",
         "isMissing": "is missing",
         "isPresent": "is present",
         "isUnread": "is unread",
@@ -6124,6 +6207,7 @@
       "withinLastPlaceholder": "e.g. 7",
       "unit": {
         "days": "days",
+        "daysAgo": "days ago",
         "weeks": "weeks",
         "months": "months",
         "megabytes": "MB"
@@ -6467,6 +6551,13 @@
             "unavailable": "Unavailable",
             "epubCopiesOnly": "EPUB copies only"
           },
+          "chip": {
+            "enabled": "Synced",
+            "partial": "Partly synced",
+            "disabled": "Sync off",
+            "unavailable": "Sync issue"
+          },
+          "chipAria": "Read-aloud progress sync: {status}",
           "enabledDescription": "Audiobook, web reader, Kobo, and KOReader positions stay in sync.",
           "disabledDescription": "Each format keeps its own reading position.",
           "epubCopiesDescription": "Web reader, Kobo, and KOReader positions stay in sync across the EPUB copies. Add matching audiobook files to sync the audiobook too.",
@@ -8102,6 +8193,10 @@
       "noResultsHint": "Try a different title or author.",
       "noResultsIndexerHint": "Try a different title or author, or search the indexers for \"{title}\" and pick a release yourself.",
       "freeTextAction": "Search indexers",
+      "noResultsRequestHint": "Try a different title or author, or request \"{title}\" as typed. A note for the approver under More options helps them find the right book.",
+      "noResultsRequestAutoHint": "Try a different title or author, or request \"{title}\" as typed.",
+      "requestAnywayAction": "Request anyway",
+      "searchAuthor": "Show books by {author}",
       "manualSearchAction": "Search indexers manually",
       "yearUnknown": "Year unknown",
       "sourceCount": "{count, plural, one {# source} other {# sources}}",
@@ -8483,6 +8578,8 @@
         "clientUnavailable": "Your download client did not answer an earlier release"
       },
       "singleFileNote": "A release can be one book in several formats, an audiobook in parts, or an archive - all of those import as a single book. A release holding several separate books asks you which one to keep.",
+      "holdForReview": "Review the download before it is filed",
+      "releasePageLabel": "{title}, release page on {indexer}",
       "searching": "Searching indexers...",
       "refresh": "Search again",
       "cached": "Showing the last search. Search again for fresh results.",
@@ -8800,6 +8897,7 @@
       "scoreShort": "The imported file scored {score} against this request, below the {threshold} needed to file it automatically.",
       "scoreClears": "The imported file scored {score}, which clears the {threshold} needed to file it automatically.",
       "verificationOff": "Import checking is off, so this file was never scored against the request.",
+      "heldOnRequest": "This release was sent to be checked before filing, so it is waiting for you.",
       "reason": {
         "isbn_match": "Its ISBN is the one that was requested.",
         "above_threshold": "It looks like the book that was asked for.",
@@ -8819,8 +8917,24 @@
       },
       "requested": "Requested",
       "imported": "Imported",
+      "releasePage": "Open the release page",
       "absent": "Neither the request nor the file has one.",
       "notSet": "Not set",
+      "editionTitle": "What the file says it is",
+      "edition": {
+        "publisher": "Publisher",
+        "published": "Published",
+        "language": "Language",
+        "pages": "Pages",
+        "isbn10": "ISBN-10",
+        "narrators": "Narrated by",
+        "length": "Length",
+        "version": "Version",
+        "chapters": "Chapters"
+      },
+      "abridged": "Abridged",
+      "unabridged": "Unabridged",
+      "importedCover": "Cover found in the imported file",
       "filesTitle": "What landed",
       "fileCount": "{count, plural, one {# file} other {# files}}",
       "role": {
@@ -8830,6 +8944,8 @@
       },
       "fileAnyway": "File it anyway",
       "fileAnywayHint": "Files this into the destination library and marks the request available, exactly as a passing score would have.",
+      "fileIt": "File it",
+      "fileItHint": "Files this into the destination library and marks the request available.",
       "noDestination": "This request has no destination library with a folder in it, so there is nowhere to file the book yet.",
       "openDock": "Open the Book Dock",
       "missingEntry": "The file this request was held over is no longer in the Book Dock. It was filed or discarded by hand, so there is nothing left here to review.",
@@ -9051,6 +9167,19 @@
         "dropped": "{name} dropped at position {position} of {total}",
         "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
         "filteredHint": "Clear the filter to reorder"
+      },
+      "customize": {
+        "open": "Customize sidebar",
+        "title": "Customize sidebar",
+        "hint": "Drag to reorder. Hidden pages stay in Search.",
+        "reset": "Reset to default",
+        "done": "Done",
+        "resetDone": "Sidebar reset to default",
+        "showInSidebar": "Show {name} in the sidebar",
+        "show": "Show",
+        "hide": "Hide",
+        "alwaysShown": "{name} is always shown",
+        "returnsWithWork": "Shows when work is waiting"
       },
       "podcastImportProgress": "{processed} / {total} files",
       "podcastImportCounting": "Counting files…",
@@ -11521,7 +11650,21 @@
     },
     "toast": {
       "linkedHighlightError": "Could not open the linked highlight position",
-      "resumed": "Resumed at {pct}% - {label}"
+      "resumed": "Resumed at {pct}% - {label}",
+      "newerPositionError": "Could not open your newer place",
+      "highlightSaveFailed": "Could not save the highlight",
+      "noteSaveFailed": "Could not save the note",
+      "highlightDeleteFailed": "Could not delete the highlight",
+      "bookmarkSaveFailed": "Could not add the bookmark",
+      "bookmarkDeleteFailed": "Could not remove the bookmark",
+      "bookmarkUpdateFailed": "Could not save the bookmark",
+      "marksLoadFailed": "Could not load your highlights and bookmarks"
+    },
+    "newerPositionDialog": {
+      "title": "Continue from another device?",
+      "description": "This book was read to {remote} on another device while it was open here at {local}.",
+      "follow": "Go to {pct}",
+      "stay": "Stay at {pct}"
     },
     "header": {
       "goBack": "Go back",
@@ -11663,6 +11806,7 @@
       "allChapters": "All chapters",
       "notesOnly": "Notes only",
       "deleteBookmark": "Delete bookmark",
+      "editBookmark": "Edit bookmark",
       "deleteHighlight": "Delete highlight",
       "approximatePosition": "Synced from device; exact position unavailable, jumps to the chapter",
       "sort": {
@@ -11678,6 +11822,7 @@
       "translate": "Translate",
       "define": "Define",
       "deleteAnnotation": "Delete annotation",
+      "readFromHere": "Read from here",
       "apply": "Apply",
       "color": "Highlight color: {color}",
       "style": "Highlight style: {style}",
@@ -11828,6 +11973,12 @@
       "hideControls": "Hide controls",
       "stop": "Stop narration",
       "error": "Narration playback error"
+    },
+    "bookmarkEdit": {
+      "title": "Edit bookmark",
+      "titleLabel": "Title",
+      "noteLabel": "Note",
+      "notePlaceholder": "Optional note"
     }
   },
   "scanner": {

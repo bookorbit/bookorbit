@@ -59,18 +59,30 @@ describe('useBookmarks', () => {
     expect(store.bookmarks.value).toEqual([])
   })
 
+  it('requests bookmark positions for the selected reader and records the source on creation', async () => {
+    apiMock.mockResolvedValueOnce(response(true, []))
+    apiMock.mockResolvedValueOnce(response(true, makeBookmark(1, 'epubcfi(/6/2)')))
+    const store = useBookmarks()
+
+    await store.load(7, 42)
+    await store.toggle(7, 'epubcfi(/6/2)', 'Chapter', 42)
+
+    expect(apiMock.mock.calls[0]![0]).toBe('/api/v1/books/7/bookmarks?readerFileId=42')
+    expect(JSON.parse(String(apiMock.mock.calls[1]![1]!.body))).toEqual({ cfi: 'epubcfi(/6/2)', title: 'Chapter', bookFileId: 42 })
+  })
+
   it('creates bookmark on toggle when CFI does not exist', async () => {
     const created = makeBookmark(21, 'epubcfi(/6/10)', 'Chapter 2')
     apiMock.mockResolvedValueOnce(response(true, created))
 
     const store = useBookmarks()
 
-    await store.toggle(7, created.cfi, created.title)
+    await store.toggle(7, created.cfi!, created.title)
 
     const [url, req] = apiMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/v1/books/7/bookmarks')
     expect(req.method).toBe('POST')
-    expect(JSON.parse(String(req.body))).toEqual({ cfi: created.cfi, title: created.title })
+    expect(JSON.parse(String(req.body))).toEqual({ cfi: created.cfi!, title: created.title })
     expect(store.bookmarks.value).toEqual([created])
   })
 
@@ -81,7 +93,7 @@ describe('useBookmarks', () => {
     const store = useBookmarks()
     store.bookmarks.value = [existing, makeBookmark(11, 'epubcfi(/6/12)')]
 
-    await store.toggle(7, existing.cfi, existing.title)
+    await store.toggle(7, existing.cfi!, existing.title)
 
     expect(apiMock).toHaveBeenCalledWith('/api/v1/books/7/bookmarks/10', { method: 'DELETE' })
     expect(store.bookmarks.value.map((b) => b.id)).toEqual([11])
@@ -93,9 +105,47 @@ describe('useBookmarks', () => {
     const store = useBookmarks()
     store.bookmarks.value = [makeBookmark(1, 'epubcfi(/6/2)')]
 
-    await store.remove(7, 1)
+    expect(await store.remove(7, 1)).toBe(false)
 
     expect(store.bookmarks.value).toHaveLength(1)
+  })
+
+  it('reports a bookmark that could not be added', async () => {
+    apiMock.mockRejectedValueOnce(new Error('offline'))
+
+    const store = useBookmarks()
+
+    expect(await store.toggle(7, 'epubcfi(/6/2)', 'Chapter')).toBe(false)
+    expect(store.bookmarks.value).toHaveLength(0)
+  })
+
+  it('renames a bookmark and sets its note in one request', async () => {
+    apiMock.mockResolvedValueOnce(response(true, { ...makeBookmark(1, 'epubcfi(/6/2)', 'Renamed'), note: 'Why it matters' }))
+
+    const store = useBookmarks()
+    store.bookmarks.value = [makeBookmark(1, 'epubcfi(/6/2)'), makeBookmark(2, 'epubcfi(/6/4)')]
+
+    expect(await store.update(7, 1, { title: 'Renamed', note: 'Why it matters' })).toBe(true)
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/books/7/bookmarks/1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Renamed', note: 'Why it matters' }),
+    })
+    expect(store.bookmarks.value.map((b) => [b.title, b.note ?? null])).toEqual([
+      ['Renamed', 'Why it matters'],
+      ['Bookmark 2', null],
+    ])
+  })
+
+  it('leaves the bookmark as it was when a rename fails', async () => {
+    apiMock.mockResolvedValueOnce(response(false))
+
+    const store = useBookmarks()
+    store.bookmarks.value = [makeBookmark(1, 'epubcfi(/6/2)')]
+
+    expect(await store.update(7, 1, { title: 'Renamed', note: null })).toBe(false)
+    expect(store.bookmarks.value[0]!.title).toBe('Bookmark 1')
   })
 
   it('tracks whether current CFI is bookmarked', () => {

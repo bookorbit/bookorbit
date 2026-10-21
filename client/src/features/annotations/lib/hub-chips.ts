@@ -1,4 +1,5 @@
 import { ANNOTATION_COLOR_FILTER_OPTIONS, ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
+import { annotationSourceKey } from '@/features/annotations/lib/source-label'
 
 export interface HubChip {
   id: string
@@ -40,7 +41,7 @@ export function buildHubChips(state: HubChipState, t: Translate, formatDay: (val
   }
 
   if (state.originFilter && state.originFilter !== 'all') {
-    chips.push({ id: 'origin', label: t(`annotations.sources.${state.originFilter}`) })
+    chips.push({ id: 'origin', label: t(annotationSourceKey(state.originFilter)) })
   }
 
   if (state.dateFrom || state.dateTo) {

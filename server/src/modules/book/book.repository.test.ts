@@ -1268,11 +1268,13 @@ describe('BookRepository', () => {
     expect(normalized).toContain('count(DISTINCT "books"."id")');
     expect(normalized).toContain('LEFT JOIN "book_metadata" ON "book_metadata"."book_id" = "books"."id"');
     expect(normalized).toContain('INNER JOIN "book_files" AS facet_file ON facet_file.book_id = "books"."id"');
+    expect(normalized).toContain('CROSS JOIN LATERAL');
+    expect(normalized).toContain("facet_file.format = 'epub' AND facet_file.media_overlay_available = true");
     expect(normalized).toContain('"book_metadata"."title" is not null');
     expect(normalized).toContain('"books"."status" <>');
-    expect(normalized).toContain('facet_file.format IN ($2, $3)');
-    expect(normalized).toContain('GROUP BY facet_file.format');
-    expect(query.params).toEqual(['processing', 'epub', 'pdf']);
+    expect(normalized).toContain('facet_key.format IN ($3, $4)');
+    expect(normalized).toContain('GROUP BY facet_key.format');
+    expect(query.params).toEqual(['epub:readalong', 'processing', 'epub', 'pdf']);
     expect(result).toEqual([
       { format: 'epub', count: 7 },
       { format: 'pdf', count: 3 },

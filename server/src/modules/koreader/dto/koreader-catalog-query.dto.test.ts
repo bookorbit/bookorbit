@@ -5,7 +5,9 @@ import { validate } from 'class-validator';
 
 import {
   KOREADER_CATALOG_SETTABLE_READ_STATUSES,
+  KoreaderCatalogBooksQueryDto,
   KoreaderCatalogDashboardQueryDto,
+  KoreaderCatalogSectionQueryDto,
   KoreaderCatalogSetReadStatusDto,
 } from './koreader-catalog-query.dto';
 
@@ -54,6 +56,82 @@ describe('KoreaderCatalogSetReadStatusDto', () => {
     for (const status of ['rereading', 'skimmed', 'Unread', 'none', '', null, undefined]) {
       const dto = plainToInstance(KoreaderCatalogSetReadStatusDto, { status });
       await expect(validate(dto), String(status)).resolves.not.toHaveLength(0);
+    }
+  });
+});
+
+// Sent only by plugins that saw the catalogListsV2 capability; an older plugin
+// sends none of them and must keep its original defaults.
+describe('KoreaderCatalogSectionQueryDto', () => {
+  it('keeps the legacy request free of the list parameters', async () => {
+    const dto = plainToInstance(KoreaderCatalogSectionQueryDto, { page: '2', q: 'her' });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toEqual({ page: 2, q: 'her' });
+  });
+
+  it('accepts size, sort and filter', async () => {
+    const dto = plainToInstance(KoreaderCatalogSectionQueryDto, { size: '12', sort: 'name_desc', filter: 'finished' });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toEqual(expect.objectContaining({ size: 12, sort: 'name_desc', filter: 'finished' }));
+    for (const sort of ['name', 'name_desc', 'books']) {
+      await expect(validate(plainToInstance(KoreaderCatalogSectionQueryDto, { sort })), sort).resolves.toHaveLength(0);
+    }
+  });
+
+  it('rejects sizes outside 1..100 and unknown sorts or filters', async () => {
+    for (const query of [
+      { size: '0' },
+      { size: '101' },
+      { size: '1.5' },
+      { sort: 'title' },
+      { sort: 'Name' },
+      { filter: 'unread' },
+      { filter: '' },
+    ]) {
+      await expect(validate(plainToInstance(KoreaderCatalogSectionQueryDto, query)), JSON.stringify(query)).resolves.not.toHaveLength(0);
+    }
+  });
+});
+
+describe('KoreaderCatalogBooksQueryDto buckets flag', () => {
+  it.each([
+    ['1', true],
+    ['true', true],
+    ['0', false],
+    ['false', false],
+  ])('parses buckets=%s', async (value, expected) => {
+    const dto = plainToInstance(KoreaderCatalogBooksQueryDto, { buckets: value });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.buckets).toBe(expected);
+  });
+
+  it('leaves the flag unset when absent and rejects anything else', async () => {
+    const absent = plainToInstance(KoreaderCatalogBooksQueryDto, {});
+    expect(absent.buckets).toBeUndefined();
+    await expect(validate(absent)).resolves.toHaveLength(0);
+    await expect(validate(plainToInstance(KoreaderCatalogBooksQueryDto, { buckets: 'yes' }))).resolves.not.toHaveLength(0);
+  });
+});
+
+describe('offset paging', () => {
+  it('accepts an offset of zero or more on books and sections', async () => {
+    for (const Dto of [KoreaderCatalogBooksQueryDto, KoreaderCatalogSectionQueryDto]) {
+      const dto = plainToInstance(Dto, { offset: '44', size: '12' });
+      await expect(validate(dto), Dto.name).resolves.toHaveLength(0);
+      expect(dto.offset).toBe(44);
+      await expect(validate(plainToInstance(Dto, { offset: '0' })), Dto.name).resolves.toHaveLength(0);
+    }
+  });
+
+  it('leaves offset unset when absent and rejects negative, fractional or too deep offsets', async () => {
+    expect(plainToInstance(KoreaderCatalogBooksQueryDto, {}).offset).toBeUndefined();
+    for (const Dto of [KoreaderCatalogBooksQueryDto, KoreaderCatalogSectionQueryDto]) {
+      for (const offset of ['-1', '1.5', 'x', '50001']) {
+        await expect(validate(plainToInstance(Dto, { offset })), `${Dto.name} ${offset}`).resolves.not.toHaveLength(0);
+      }
     }
   });
 });

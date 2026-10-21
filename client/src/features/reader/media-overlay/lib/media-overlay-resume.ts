@@ -74,3 +74,16 @@ export function resolveMediaOverlayResume(playlist: EpubMediaOverlayPlaylist, st
 
   return null
 }
+
+/** Where the sentence `fragment` names starts in the narration, in seconds, or null when it is not in it. */
+export function mediaOverlayFragmentSeconds(playlist: EpubMediaOverlayPlaylist, fragment: string, sectionIndex: number | null): number | null {
+  let elapsed = 0
+  for (const item of playlist.items) {
+    const itemFragment = mediaOverlayItemFragment(item)
+    if (itemFragment && sameFragment(itemFragment, fragment) && (sectionIndex === null || item.sectionIndex === sectionIndex)) return elapsed
+    const duration = item.durationSeconds
+    if (duration == null || !Number.isFinite(duration) || duration < 0) return null
+    elapsed += duration
+  }
+  return null
+}

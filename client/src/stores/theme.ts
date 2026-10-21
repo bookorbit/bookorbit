@@ -143,7 +143,7 @@ export const useThemeStore = defineStore('theme', () => {
 
   /** A style dresses the app shell only; sign-in pages and readers always paint as BookOrbit. */
   const styleScopeActive = ref(isAppShellPath(window.location.pathname))
-  const appliedStyle = computed<Style>(() => (styleScopeActive.value ? style.value : DEFAULT_STYLE))
+  const appliedStyle = computed<Style>(() => (styleScopeActive.value ? style.value : 'bookorbit'))
   const appliedStyleDefinition = computed(() => getThemeStyle(appliedStyle.value))
   const styleDefinition = computed(() => getThemeStyle(style.value))
   const appearanceControls = computed(() => getAppearanceControls(style.value))

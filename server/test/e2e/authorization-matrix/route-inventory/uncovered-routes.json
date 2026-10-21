@@ -242,6 +242,7 @@
   "POST /koreader/plugin/annotations",
   "POST /koreader/plugin/annotations/exchange",
   "POST /koreader/plugin/annotations/exchange-ack",
+  "POST /koreader/plugin/annotations/pending",
   "POST /koreader/plugin/book-states",
   "POST /koreader/plugin/bookmarks/exchange",
   "POST /koreader/plugin/bookmarks/exchange-ack",

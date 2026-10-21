@@ -187,12 +187,14 @@ assertEqual(added_items[2].note, "My own label", "a title that is not the chapte
 assertEqual(applied[3].status, "failed", "an unresolvable position fails instead of landing")
 assertTrue(dirty_calls > 0, "the screen is refreshed after a change")
 
--- An entry already present locally is acked with the local identity, not re-added.
+-- An entry already present locally is updated and acked with the local identity, not re-added.
 local before_count = #annotations
-local applied_again = BookOrbitBookmarks.applyLive(ui, {
-    add = { { serverId = 1, pos = "/body/DocFragment[7]", title = "Chapter Seven" } },
+local applied_again, _, updated_touched = BookOrbitBookmarks.applyLive(ui, {
+    add = { { serverId = 1, pos = "/body/DocFragment[7]", title = "Renamed elsewhere" } },
 })
 assertEqual(#annotations, before_count, "an already present position is not duplicated")
+assertEqual(updated_touched, 1, "an existing dogear title is updated")
+assertEqual(annotations[1].note, "Renamed elsewhere", "the updated title becomes the dogear note")
 assertEqual(applied_again[1].key, "2026-07-01 09:00:00|/body/DocFragment[7]", "the existing identity is acked")
 
 -- Delete by the identity the server was acked with.
@@ -227,6 +229,16 @@ assertEqual(sidecar_store[2].note, "From the web", "a closed book has no toc, so
 assertEqual(sidecar_store[2].pageno, 12, "the server pageno is kept")
 assertTrue(sidecar_flags.annotations_externally_modified, "KOReader is asked to re-validate on open")
 assertTrue(sidecar_flags.flushed, "the sidecar was flushed")
+
+sidecar_flags = {}
+local s_updated, _, s_update_touched = BookOrbitBookmarks.applySidecar("/books/one.epub", {
+    add = { { serverId = 5, pos = "/body/DocFragment[6]", title = "Renamed while closed", pageno = 13 } },
+})
+assertEqual(#s_updated, 1, "an existing sidecar dogear is acked")
+assertEqual(s_update_touched, 1, "an existing sidecar dogear title is updated")
+assertEqual(sidecar_store[2].note, "Renamed while closed", "the sidecar keeps the server title")
+assertEqual(sidecar_store[2].pageno, 13, "the sidecar refreshes the page number")
+assertTrue(sidecar_flags.flushed, "an updated sidecar is flushed")
 
 -- A highlight must never be touched by the bookmark exchange.
 assertEqual(sidecar_store[1].drawer, "lighten", "the highlight survived the dogear delete")

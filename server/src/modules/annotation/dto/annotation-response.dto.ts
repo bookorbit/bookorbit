@@ -36,7 +36,7 @@ export class AnnotationResponseDto {
     dto.chapterTitle = row.chapterTitle ?? null;
     dto.origin = row.origin;
     dto.pdf = parsePdfPosition(row);
-    dto.positionStatus = resolvePositionStatus(row);
+    dto.positionStatus = resolvePositionStatus(row, dto.pdf);
     const chapterIndex = (row.cfiExtras as { chapterIndex?: number } | null)?.chapterIndex;
     dto.chapterIndex = typeof chapterIndex === 'number' ? chapterIndex : null;
     dto.highlightedAt = row.sourceCreatedAt ?? row.createdAt;
@@ -47,10 +47,13 @@ export class AnnotationResponseDto {
   }
 }
 
-function resolvePositionStatus(row: AnnotationWithCfi): string | null {
+// A device's PDF point (KOReader's page, x and y) is stored as exact for that device, but carries no
+// geometry the web PDF reader can draw, so it is not reported as an exact place.
+function resolvePositionStatus(row: AnnotationWithCfi, pdf: AnnotationPdfPosition | null): string | null {
   if (row.cfi != null || row.cfiStatus != null) return row.cfiStatus ?? 'exact';
-  if (row.pdfPos0 != null || row.pdfStatus != null) return row.pdfStatus ?? 'exact';
-  return null;
+  if (row.pdfPos0 == null && row.pdfStatus == null) return null;
+  const status = row.pdfStatus ?? 'exact';
+  return pdf == null && status === 'exact' ? null : status;
 }
 
 function parsePdfPosition(row: AnnotationWithCfi): AnnotationPdfPosition | null {

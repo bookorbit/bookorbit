@@ -10,7 +10,7 @@ import { SelfWriteRegistry } from '../../common/services/self-write-registry.ser
 import { FileWatcherService, WATCHER_DEBOUNCE_MS } from '../scanner/file-watcher.service';
 import {
   AUDIO_BOOK_FILE_WRITE_FIELDS,
-  BOOK_FORMATS,
+  BOOK_FILTER_FORMATS,
   MetadataProviderKey,
   Permission,
   type BookQuery,
@@ -120,7 +120,16 @@ function makeMetadataFetchDiagnostics(overrides: Partial<MetadataFetchDiagnostic
   };
 }
 
-function makeService(overrides: { bookMetadataLockService?: unknown; appDataPath?: string } = {}) {
+function makeService(
+  overrides: {
+    bookMetadataLockService?: unknown;
+    appDataPath?: string;
+    audiobookEbookProgressSync?: unknown;
+    positionConverter?: unknown;
+    seriesMemberships?: unknown;
+    seriesExpectedCount?: unknown;
+  } = {},
+) {
   const bookRepo = {
     findCards: vi.fn(),
     countWhere: vi.fn(),
@@ -326,12 +335,15 @@ function makeService(overrides: { bookMetadataLockService?: unknown; appDataPath
     fileWriteService as never,
     fileRenameService as never,
     achievementEvents as never,
-    undefined,
-    undefined,
-    undefined,
+    overrides.seriesMemberships as never,
+    overrides.seriesExpectedCount as never,
+    overrides.audiobookEbookProgressSync as never,
     undefined,
     undefined,
     readingEvents,
+    undefined,
+    undefined,
+    overrides.positionConverter as never,
   );
 
   return {
@@ -1880,6 +1892,41 @@ describe('BookService', () => {
       );
     });
 
+    it('updateMetadata tells the total writer which series the book was already in before replacing them', async () => {
+      const calls: string[] = [];
+      const seriesMemberships = {
+        findByBookId: vi.fn(() => {
+          calls.push('find');
+          return Promise.resolve([{ seriesId: 31, seriesName: 'Harry Potter', seriesIndex: '1', displayOrder: 0, expectedBookCount: 7 }]);
+        }),
+        replaceForBook: vi.fn(() => {
+          calls.push('replace');
+          return Promise.resolve([]);
+        }),
+      };
+      const seriesExpectedCount = { setManual: vi.fn().mockResolvedValue(true) };
+      const { service } = makeService({ seriesMemberships, seriesExpectedCount });
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(
+        5,
+        {
+          seriesMemberships: [
+            { seriesName: 'Harry Potter', seriesIndex: '1', expectedBookCount: 7 },
+            { seriesName: 'Hogwarts Library', seriesIndex: null, expectedBookCount: null },
+          ],
+        },
+        user,
+      );
+
+      expect(calls).toEqual(['find', 'replace']);
+      const options = { previousSeriesIds: new Set([31]) };
+      expect(seriesExpectedCount.setManual).toHaveBeenNthCalledWith(1, 'Harry Potter', 7, expect.anything(), options);
+      expect(seriesExpectedCount.setManual).toHaveBeenNthCalledWith(2, 'Hogwarts Library', null, expect.anything(), options);
+    });
+
     it('updateMetadata with empty communityRatings clears all existing ratings', async () => {
       const { service, bookRepo } = makeService();
       const user = makeUser();
@@ -3391,6 +3438,110 @@ describe('BookService', () => {
         expect(percentage).toBe(3);
       });
 
+      const readAlongFile = {
+        id: 8,
+        bookId: 11,
+        libraryId: 2,
+        absolutePath: '/books/b.epub',
+        format: 'epub',
+        mediaOverlayAvailable: true,
+        mediaOverlayDurationSeconds: 1000,
+      };
+
+      // A phone listening from the start after a reset sent the 85% its store had kept from before.
+      it('takes the percentage from the narration position when the client figure is far from it', async () => {
+        const { service, bookRepo, user } = narrationSetup(0);
+        bookRepo.findFileById.mockResolvedValue(readAlongFile);
+
+        await service.saveProgress(user.id, 8, { percentage: 85.62, source: 'narration', positionSeconds: 8.5 } as never, user);
+
+        const [, , , , percentage, , , , , , , , , narration] = bookRepo.upsertProgress.mock.calls[0] as unknown[];
+        expect(percentage).toBeCloseTo(0.85, 5);
+        expect(narration).toEqual({ percentage: expect.closeTo(0.85, 5), updatedAt: expect.any(Date) });
+        expect(bookRepo.syncKoboReadingStateFromProgress).toHaveBeenCalledWith(user.id, 8, expect.closeTo(0.85, 5), null, null, null, null);
+      });
+
+      it('keeps a client figure within a few points of the narration position', async () => {
+        const { service, bookRepo, user } = narrationSetup(0);
+        bookRepo.findFileById.mockResolvedValue(readAlongFile);
+
+        await service.saveProgress(user.id, 8, { percentage: 52, source: 'narration', positionSeconds: 500 } as never, user);
+
+        const [, , , , percentage] = bookRepo.upsertProgress.mock.calls[0] as unknown[];
+        expect(percentage).toBe(52);
+      });
+
+      describe('by the narrated sentence', () => {
+        const sentenceSetup = (sentenceCfi: string) => {
+          const positionConverter = {
+            fragmentToPositions: vi.fn().mockResolvedValue({ status: 'exact', cfi: sentenceCfi, chapterIndex: 19 }),
+          };
+          const audiobookEbookProgressSync = {
+            syncFromEbookProgress: vi.fn().mockResolvedValue(false),
+            advanceNarrationToText: vi.fn().mockResolvedValue(false),
+          };
+          const made = makeService({ positionConverter, audiobookEbookProgressSync });
+          const user = makeUser({ permissions: [Permission.KoboSync] });
+          made.bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
+          made.bookRepo.upsertProgress.mockResolvedValue(undefined);
+          made.bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(false);
+          made.bookRepo.findProgress.mockResolvedValue({ percentage: 32, cfi: 'epubcfi(/6/40!/4/20/1:0)', pageNumber: null });
+          made.libraryService.verifyUserAccess.mockResolvedValue(undefined);
+          made.libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
+          return { ...made, user, positionConverter, audiobookEbookProgressSync };
+        };
+        const narrated = (percentage: number) =>
+          ({
+            percentage,
+            source: 'narration',
+            positionSeconds: 900,
+            mediaOverlayFragment: 'split_019.html#s160',
+            mediaOverlaySectionIndex: 19,
+          }) as never;
+
+        // A narration percentage can hold still across a page or more; the sentence cannot.
+        it('moves the page to a sentence past it, even when the percentage has not moved', async () => {
+          const { service, bookRepo, user, positionConverter } = sentenceSetup('epubcfi(/6/40!/4/76/18[s160]/1:0)');
+
+          await service.saveProgress(user.id, 8, narrated(30), user);
+
+          expect(positionConverter.fragmentToPositions).toHaveBeenCalledWith({ bookFileId: 8, chapterIndex: 19, fragment: 's160' });
+          const [, , cfi, , percentage, , , , , , , , , , textUpdatedAt] = bookRepo.upsertProgress.mock.calls[0] as unknown[];
+          expect(cfi).toBe('epubcfi(/6/40!/4/76/18[s160]/1:0)');
+          expect(percentage).toBe(32);
+          expect(textUpdatedAt).toEqual(expect.any(Date));
+        });
+
+        it('keeps the page when the sentence is behind it, even when the percentage is ahead', async () => {
+          const { service, bookRepo, user } = sentenceSetup('epubcfi(/6/40!/4/2/1:0)');
+
+          await service.saveProgress(user.id, 8, narrated(40), user);
+
+          const [, , cfi, , percentage, , , , , , , , , , textUpdatedAt] = bookRepo.upsertProgress.mock.calls[0] as unknown[];
+          expect(cfi).toBe('epubcfi(/6/40!/4/20/1:0)');
+          expect(percentage).toBe(32);
+          expect(textUpdatedAt).toBeNull();
+        });
+
+        it('carries the narration marker along after a text write, and not after a narration one', async () => {
+          const { service, user, audiobookEbookProgressSync } = sentenceSetup('epubcfi(/6/40!/4/2/1:0)');
+
+          await service.saveProgress(user.id, 8, narrated(40), user);
+          expect(audiobookEbookProgressSync.advanceNarrationToText).not.toHaveBeenCalled();
+
+          await service.saveProgress(user.id, 8, { percentage: 35, cfi: 'epubcfi(/6/40!/4/30/1:0)', source: 'text' } as never, user);
+          expect(audiobookEbookProgressSync.advanceNarrationToText).toHaveBeenCalledWith({
+            userId: user.id,
+            bookId: 11,
+            bookFileId: 8,
+            percentage: 35,
+            cfi: 'epubcfi(/6/40!/4/30/1:0)',
+            koreaderProgress: null,
+            sourceUpdatedAt: expect.any(Date),
+          });
+        });
+      });
+
       // Turning back a page is reading, and the text write is the one that speaks for it.
       it('still lets a text write move the position backwards', async () => {
         const { service, bookRepo, user } = narrationSetup(32);
@@ -3436,6 +3587,50 @@ describe('BookService', () => {
 
       expect(service.verifyFileAccess).toHaveBeenCalledWith(88, user);
       expect(bookRepo.clearFileProgress).toHaveBeenCalledWith(user.id, 88);
+    });
+
+    it('leaves the cleared file narration at its start once the rows are gone', async () => {
+      const audiobookEbookProgressSync = { startNarrationAfterReset: vi.fn().mockResolvedValue(undefined) };
+      const { service, bookRepo } = makeService({ audiobookEbookProgressSync });
+      const user = makeUser({ id: 12 });
+      vi.spyOn(service, 'verifyFileAccess').mockResolvedValue({
+        id: 88,
+        absolutePath: '/books/sample.epub',
+        format: 'epub',
+        bookId: 77,
+        libraryId: 5,
+      });
+
+      await service.clearFileProgress(user.id, 88, user);
+
+      expect(audiobookEbookProgressSync.startNarrationAfterReset).toHaveBeenCalledWith({
+        userId: 12,
+        bookId: 77,
+        fileIds: [88],
+        resetAt: expect.any(Date),
+      });
+      expect(bookRepo.clearFileProgress.mock.invocationCallOrder[0]).toBeLessThan(
+        audiobookEbookProgressSync.startNarrationAfterReset.mock.invocationCallOrder[0]!,
+      );
+    });
+  });
+
+  describe('clearBookProgressForReread', () => {
+    it('leaves every read-along narration at its start once the rows are gone', async () => {
+      const audiobookEbookProgressSync = { startNarrationAfterReset: vi.fn().mockResolvedValue(undefined) };
+      const { service, bookRepo } = makeService({ audiobookEbookProgressSync });
+      Object.assign(bookRepo, { clearBookProgress: vi.fn().mockResolvedValue(undefined) });
+      const user = makeUser({ id: 12 });
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined as never);
+
+      await service.clearBookProgressForReread(user.id, 77, user);
+
+      const clearBookProgress = (bookRepo as unknown as { clearBookProgress: ReturnType<typeof vi.fn> }).clearBookProgress;
+      expect(clearBookProgress).toHaveBeenCalledWith(12, 77);
+      expect(audiobookEbookProgressSync.startNarrationAfterReset).toHaveBeenCalledWith({ userId: 12, bookId: 77, resetAt: expect.any(Date) });
+      expect(clearBookProgress.mock.invocationCallOrder[0]).toBeLessThan(
+        audiobookEbookProgressSync.startNarrationAfterReset.mock.invocationCallOrder[0]!,
+      );
     });
   });
 
@@ -5509,7 +5704,7 @@ describe('BookService', () => {
       expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(2);
       expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: 'dune' });
       expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter: undefined, q: undefined });
-      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: 'dune' }, BOOK_FORMATS);
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: 'dune' }, BOOK_FILTER_FORMATS);
       expect(result).toEqual({ total: 12, libraryTotal: 40, formats: [] });
     });
 
@@ -5538,7 +5733,7 @@ describe('BookService', () => {
       expect(queryBuilder.buildWhere).toHaveBeenCalledWith(filter, expect.objectContaining({ q: 'dune' }));
       expect(queryBuilder.buildWhere).toHaveBeenCalledWith(stripped, expect.objectContaining({ q: 'dune' }));
       expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: 'dune' });
-      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter: stripped, q: 'dune' }, BOOK_FORMATS);
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter: stripped, q: 'dune' }, BOOK_FILTER_FORMATS);
       expect(filter.rules).toHaveLength(4);
     });
 
@@ -5550,7 +5745,7 @@ describe('BookService', () => {
 
       expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(2);
       expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: undefined });
-      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: undefined }, BOOK_FORMATS);
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: undefined }, BOOK_FILTER_FORMATS);
     });
 
     it('keeps a root format exclusion, which the chips do not own', async () => {
@@ -5562,7 +5757,7 @@ describe('BookService', () => {
 
       expect(bookRepo.countFormatFacets).toHaveBeenCalledWith(
         { filter: { type: 'group', join: 'AND', rules: [excludePdf] }, q: undefined },
-        BOOK_FORMATS,
+        BOOK_FILTER_FORMATS,
       );
     });
 
@@ -5576,7 +5771,7 @@ describe('BookService', () => {
 
       await service.facetsForLibrary(makeUser(), 7, facetQuery(filter));
 
-      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: undefined }, BOOK_FORMATS);
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter, q: undefined }, BOOK_FILTER_FORMATS);
     });
 
     it('drops the filter entirely when the only root rule is a format rule, still applying q', async () => {
@@ -5587,12 +5782,13 @@ describe('BookService', () => {
 
       expect(queryBuilder.buildWhere).toHaveBeenCalledWith(undefined, expect.objectContaining({ q: 'dune' }));
       expect(bookRepo.countWhere).toHaveBeenCalledWith({ filter, q: 'dune' });
-      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter: undefined, q: 'dune' }, BOOK_FORMATS);
+      expect(bookRepo.countFormatFacets).toHaveBeenCalledWith({ filter: undefined, q: 'dune' }, BOOK_FILTER_FORMATS);
     });
 
     it('sorts formats by count then name and omits empty ones', async () => {
       const { service, bookRepo } = makeFacetService();
       bookRepo.countFormatFacets.mockResolvedValue([
+        { format: 'epub:readalong', count: 4 },
         { format: 'pdf', count: 3 },
         { format: 'epub', count: 7 },
         { format: 'cbz', count: 0 },
@@ -5604,6 +5800,7 @@ describe('BookService', () => {
 
       expect(result.formats).toEqual([
         { format: 'epub', count: 7 },
+        { format: 'epub:readalong', count: 4 },
         { format: 'mobi', count: 3 },
         { format: 'pdf', count: 3 },
         { format: 'azw3', count: 1 },

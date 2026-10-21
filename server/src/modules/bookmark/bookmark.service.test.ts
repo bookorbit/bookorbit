@@ -48,16 +48,43 @@ function makeService() {
     softDelete: vi.fn(),
     findLive: vi.fn().mockResolvedValue(null),
     update: vi.fn().mockResolvedValue(null),
+    findLikelySourceFileId: vi.fn().mockResolvedValue(null),
+    captureSourceFile: vi.fn().mockResolvedValue(undefined),
   };
   const bookService = {
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
+    verifyFileAccess: vi.fn().mockResolvedValue({ bookId: 5 }),
   };
-  const service = new BookmarkService(bookmarkRepo as never, bookService as never);
-  return { service, bookmarkRepo, bookService };
+  const positionConverter = { cfiPointToXpointer: vi.fn(), xpointerPointToCfi: vi.fn() };
+  const service = new BookmarkService(bookmarkRepo as never, bookService as never, positionConverter as never);
+  return { service, bookmarkRepo, bookService, positionConverter };
 }
 
 describe('BookmarkService', () => {
   describe('getBookmarks', () => {
+    it('projects a bookmark for its selected reader without changing its canonical CFI', async () => {
+      const { service, bookmarkRepo, positionConverter } = makeService();
+      const row = makeBookmarkRow({ bookFileId: 11 });
+      bookmarkRepo.findByBookId.mockResolvedValue([row]);
+      positionConverter.cfiPointToXpointer.mockResolvedValue({ status: 'repaired', pos0: '/body/DocFragment[1]/body/p/span/text().2' });
+      positionConverter.xpointerPointToCfi.mockResolvedValue({ status: 'exact', cfi: 'epubcfi(/6/2!/4/2/2/1:2)' });
+
+      const result = await service.getBookmarks(5, makeUser(), 12);
+
+      expect(result[0]!.cfi).toBe('epubcfi(/6/2!/4/2/2/1:2)');
+      expect(positionConverter.cfiPointToXpointer).toHaveBeenCalledWith({ bookFileId: 12, sourceBookFileId: 11, cfi: row.cfi });
+      expect(row.cfi).toBe('epubcfi(/6/4!/4/2/1:0)');
+    });
+
+    it('preserves an unknown-source legacy bookmark without guessing its reader position', async () => {
+      const { service, bookmarkRepo, positionConverter } = makeService();
+      bookmarkRepo.findByBookId.mockResolvedValue([makeBookmarkRow({ bookFileId: null })]);
+
+      expect((await service.getBookmarks(5, makeUser(), 12))[0]!.cfi).toBeNull();
+      expect((await service.getBookmarks(5, makeUser()))[0]!.cfi).toBe('epubcfi(/6/4!/4/2/1:0)');
+      expect(positionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
+    });
+
     it('verifies access and returns mapped response DTOs', async () => {
       const { service, bookmarkRepo, bookService } = makeService();
       const user = makeUser();
@@ -100,6 +127,29 @@ describe('BookmarkService', () => {
       expect(result.id).toBe(existing.id);
     });
 
+    it('ties a bookmark saved without its file to the EPUB the reader is on', async () => {
+      const { service, bookmarkRepo } = makeService();
+      bookmarkRepo.findLiveByLocation.mockResolvedValue(null);
+      bookmarkRepo.findLikelySourceFileId.mockResolvedValue(31);
+      bookmarkRepo.create.mockResolvedValue(makeBookmarkRow({ id: 13, bookFileId: 31 }));
+
+      await service.createBookmark(5, makeUser(), { title: 'Chapter 16', cfi: 'epubcfi(/6/46!/4,/2,/4/14/3:37)' });
+
+      expect(bookmarkRepo.findLikelySourceFileId).toHaveBeenCalledWith(1, 5);
+      expect(bookmarkRepo.create).toHaveBeenCalledWith(1, 5, expect.objectContaining({ bookFileId: 31 }));
+    });
+
+    it('keeps the file a client names instead of inferring one', async () => {
+      const { service, bookmarkRepo } = makeService();
+      bookmarkRepo.findLiveByLocation.mockResolvedValue(null);
+      bookmarkRepo.create.mockResolvedValue(makeBookmarkRow({ id: 14, bookFileId: 11 }));
+
+      await service.createBookmark(5, makeUser(), { title: 'Chapter 2', cfi: 'epubcfi(/6/8)', bookFileId: 11 });
+
+      expect(bookmarkRepo.findLikelySourceFileId).not.toHaveBeenCalled();
+      expect(bookmarkRepo.create).toHaveBeenCalledWith(1, 5, expect.objectContaining({ bookFileId: 11 }));
+    });
+
     it('creates and maps a bookmark when no duplicate exists', async () => {
       const { service, bookmarkRepo } = makeService();
       const createdRow = makeBookmarkRow({ id: 12, title: 'Chapter 2' });
@@ -108,7 +158,7 @@ describe('BookmarkService', () => {
 
       const result = await service.createBookmark(5, makeUser(), { title: 'Chapter 2', cfi: 'epubcfi(/6/8)' });
 
-      expect(bookmarkRepo.create).toHaveBeenCalledWith(1, 5, { cfi: 'epubcfi(/6/8)', title: 'Chapter 2', positionSeconds: null });
+      expect(bookmarkRepo.create).toHaveBeenCalledWith(1, 5, { cfi: 'epubcfi(/6/8)', title: 'Chapter 2', positionSeconds: null, bookFileId: null });
       expect(result).toBeInstanceOf(BookmarkResponseDto);
       expect(result.id).toBe(12);
       expect(result.cfi).toBe('epubcfi(/6/4!/4/2/1:0)');
@@ -140,7 +190,7 @@ describe('BookmarkService', () => {
         1,
         5,
         { cfi: 'epubcfi(/6/4!/4/2/1:0)', positionSeconds: null },
-        { title: 'Chapter 1', origin: 'web', devicePos: null, pageno: null },
+        { title: 'Chapter 1', origin: 'web', devicePos: null, pageno: null, bookFileId: null },
       );
       expect(result.id).toBe(14);
     });

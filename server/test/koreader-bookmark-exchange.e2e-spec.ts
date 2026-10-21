@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
@@ -28,6 +28,7 @@ interface BookmarkBookPayload {
   hash: string;
   keys: { k: string; dt: string }[];
   keysComplete: boolean;
+  sidecarState?: 'known' | 'new';
   changes: Record<string, unknown>[];
 }
 
@@ -150,6 +151,7 @@ describe('KOReader bookmark exchange (e2e)', { timeout: 120_000 }, () => {
     });
     expect(response.statusCode).toBe(200);
     expect((response.json() as { capabilities: string[] }).capabilities).toContain('bookmarkSync');
+    expect((response.json() as { capabilities: string[] }).capabilities).toContain('sidecarState');
   });
 
   it('converts a device dogear into a web bookmark and pushes nothing back at that device', async () => {
@@ -244,7 +246,7 @@ describe('KOReader bookmark exchange (e2e)', { timeout: 120_000 }, () => {
       method: 'POST',
       url: `/api/v1/books/${epub.bookId}/bookmarks`,
       headers: authHeader(ctx.adminToken),
-      payload: { cfi: WEB_POINT_CFI, title: 'Chapter One' },
+      payload: { cfi: WEB_POINT_CFI, bookFileId: epub.bookFileId, title: 'Chapter One' },
     });
     expect(created.statusCode).toBe(201);
     webBookmarkId = (created.json() as { id: number }).id;
@@ -304,8 +306,11 @@ describe('KOReader bookmark exchange (e2e)', { timeout: 120_000 }, () => {
     const restored = await exchange([
       {
         hash: fileHash,
-        keys: [],
-        keysComplete: false,
+        keys: [
+          { k: createHash('md5').update(`2026-06-04 12:00:00|${FIXTURE_XPOINTER}`).digest('hex'), dt: '2026-06-04 12:00:00' },
+          { k: createHash('md5').update('2026-06-03 09:00:00|/body/DocFragment[1]/body/p/text().3').digest('hex'), dt: '2026-06-03 09:00:00' },
+        ],
+        keysComplete: true,
         changes: [{ datetime: '2026-06-04 12:00:00', pos: FIXTURE_XPOINTER, pageno: 1, chapter: 'Chapter One' }],
       },
     ]);
@@ -347,8 +352,32 @@ describe('KOReader bookmark exchange (e2e)', { timeout: 120_000 }, () => {
     expect(await listWebBookmarks()).toHaveLength(2);
   });
 
-  it('tombstones bookmarks the device no longer reports once the key set is complete', async () => {
+  it('re-offers every dogear when an older plugin reports none of them, deleting nothing', async () => {
+    // A re-downloaded book has a new, empty sidecar; older plugins still send its list as complete.
     const result = await exchange([{ hash: fileHash, keys: [], keysComplete: true, changes: [] }]);
+
+    expect(result.results[0].deviceDeleted).toBe(0);
+    expect(await listWebBookmarks()).toHaveLength(2);
+    const reoffered = result.results[0].toApply.add;
+    expect(reoffered.map((entry) => entry.serverId).sort((a, b) => a - b)).toEqual([deviceBookmarkId, webBookmarkId].sort((a, b) => a - b));
+
+    const ack = await exchangeAck([
+      {
+        hash: fileHash,
+        applied: reoffered.map((entry, index) => ({
+          serverId: entry.serverId,
+          status: 'applied',
+          datetime: `2026-06-04 09:00:0${index}`,
+          pos: entry.pos,
+        })),
+        deleted: [],
+      },
+    ]);
+    expect(ack.results[0].acked).toBe(2);
+  });
+
+  it('tombstones bookmarks a known sidecar no longer reports once the key set is complete', async () => {
+    const result = await exchange([{ hash: fileHash, keys: [], keysComplete: true, sidecarState: 'known', changes: [] }]);
 
     // Both this device's links are gone from its key set, so both bookmarks are deleted.
     expect(result.results[0].deviceDeleted).toBe(2);

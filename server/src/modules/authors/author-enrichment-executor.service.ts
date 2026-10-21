@@ -52,6 +52,14 @@ type AuthorEnrichmentOutcome =
 
 export type AuthorEnrichmentExecutionResult = AuthorEnrichmentOutcome & AuthorEnrichmentProvenance;
 
+export type AuthorMatchApplyResult =
+  | { kind: 'applied'; imageUpdated: boolean; fieldsUpdated: AuthorMetadataField[]; downloads: number }
+  | Omit<Extract<AuthorEnrichmentOutcome, { kind: 'failed' }>, 'descriptionUpdated' | 'imageUpdated' | 'fieldsUpdated'>;
+
+type PinnedMatch = { provider: AuthorMetadataProviderKey; providerId: string };
+
+const AUTHOR_PROVIDER_KEYS = new Set<string>(Object.values(AuthorMetadataProviderKey));
+
 type AuthorUpdate = Parameters<AuthorsRepository['updateAuthorById']>[1];
 
 type SkipReason = 'author_not_found' | 'orphaned' | 'provider_disabled' | 'no_match';
@@ -80,11 +88,12 @@ export class AuthorEnrichmentExecutorService {
     const providerOrder = this.providersInUse(params.preferences);
     if (providerOrder.length === 0) return this.skipped('provider_disabled');
 
-    const { candidates, failures, outboundRequests, cacheServed } = await this.authorMetadataFetchService.collectByProvider(
-      { name: author.name, region: 'us', limit: 1 },
-      providerOrder,
-      directive,
-    );
+    const pinned = this.pinnedMatch(author);
+    if (pinned && !providerOrder.includes(pinned.provider)) return this.skipped('provider_disabled');
+
+    const { candidates, failures, outboundRequests, cacheServed } = pinned
+      ? await this.collectPinned(pinned, directive)
+      : await this.authorMetadataFetchService.collectByProvider({ name: author.name, region: 'us', limit: 1 }, providerOrder, directive);
     const provenance: AuthorEnrichmentProvenance = { outboundRequests, cacheServed };
 
     if (candidates.size === 0) {
@@ -105,6 +114,90 @@ export class AuthorEnrichmentExecutorService {
     }
 
     return this.applyCandidates(author, params.preferences, candidates, provenance);
+  }
+
+  /**
+   * Makes the author exactly the chosen person. Every enabled field takes the candidate's value and
+   * is cleared where the candidate has none, so nothing from an earlier, wrong match survives. The
+   * portrait is fetched before anything is written, so a failed download leaves the author as it was.
+   */
+  async applyMatch(
+    author: AuthorEnrichmentRow,
+    preferences: AuthorMetadataPreferences,
+    candidate: AuthorMetadataCandidate,
+  ): Promise<AuthorMatchApplyResult> {
+    const update: AuthorUpdate = {};
+    const fieldsUpdated: AuthorMetadataField[] = [];
+    let imageUpdated = false;
+    let downloads = 0;
+
+    if (preferences.fields.photo?.enabled) {
+      if (candidate.imageUrl) {
+        downloads += 1;
+        try {
+          imageUpdated = await this.authorImageStorage.saveFromUrl(author.id, candidate.imageUrl);
+          if (!imageUpdated) {
+            return {
+              kind: 'failed',
+              message: 'Failed to save author image',
+              provider: candidate.provider,
+              httpStatus: null,
+              retryAfterMs: null,
+              transient: false,
+            };
+          }
+        } catch (error) {
+          const storageError = error instanceof AuthorImageStorageError ? error : null;
+          return {
+            kind: 'failed',
+            message: storageError?.message ?? (error instanceof Error ? error.message : 'Failed to save author image'),
+            provider: candidate.provider,
+            httpStatus: storageError?.httpStatus ?? null,
+            retryAfterMs: storageError?.retryAfterMs ?? null,
+            transient: storageError?.transient ?? true,
+          };
+        }
+      } else if (author.hasPhoto) {
+        await this.authorImageStorage.deleteAuthorDir(author.id);
+        imageUpdated = true;
+      }
+      if (imageUpdated) fieldsUpdated.push('photo');
+    }
+
+    for (const field of ALL_AUTHOR_METADATA_FIELDS) {
+      if (field === 'photo' || !preferences.fields[field]?.enabled) continue;
+      const values = this.extractField(field, candidate, 'overwrite');
+      if (!values) continue;
+      Object.assign(update, values);
+      fieldsUpdated.push(field);
+    }
+
+    update.metadataProvider = candidate.provider;
+    update.metadataProviderId = candidate.providerId;
+    update.metadataProviderPinned = true;
+    update.hasPhoto = !!(await this.authorImageStorage.getThumbnailPath(author.id));
+    update.lastEnrichedAt = new Date();
+    await this.authorsRepo.updateAuthorById(author.id, update);
+
+    return { kind: 'applied', imageUpdated, fieldsUpdated, downloads };
+  }
+
+  private pinnedMatch(author: AuthorEnrichmentRow): PinnedMatch | null {
+    if (!author.metadataProviderPinned || !author.metadataProviderId) return null;
+    if (!author.metadataProvider || !AUTHOR_PROVIDER_KEYS.has(author.metadataProvider)) return null;
+    return { provider: author.metadataProvider as AuthorMetadataProviderKey, providerId: author.metadataProviderId };
+  }
+
+  /** A pinned author is looked up by id alone: a name search is what found the wrong person. */
+  private async collectPinned(pinned: PinnedMatch, directive: CacheDirective) {
+    const { candidate, failure, cacheServed, outboundRequests } = await this.authorMetadataFetchService.lookupByIdDetailed(
+      pinned.provider,
+      pinned.providerId,
+      'us',
+      { directive },
+    );
+    const candidates = new Map<AuthorMetadataProviderKey, AuthorMetadataCandidate>(candidate ? [[pinned.provider, candidate]] : []);
+    return { candidates, failures: failure ? [failure] : [], cacheServed, outboundRequests };
   }
 
   private async applyCandidates(
@@ -143,7 +236,7 @@ export class AuthorEnrichmentExecutorService {
     }
 
     const attribution = winners.get('description') ?? winners.get('photo') ?? [...winners.values()][0] ?? null;
-    if (attribution) {
+    if (attribution && !author.metadataProviderPinned) {
       const candidate = candidates.get(attribution);
       update.metadataProvider = attribution;
       update.metadataProviderId = candidate?.providerId ?? null;

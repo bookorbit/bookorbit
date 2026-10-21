@@ -63,6 +63,7 @@ describe('EmailProviderService', () => {
     repo = {
       findAllForUser: vi.fn().mockResolvedValue([mockProvider]),
       findById: vi.fn().mockResolvedValue([mockProvider]),
+      findSharedDefault: vi.fn().mockResolvedValue([]),
       insert: vi.fn().mockResolvedValue([mockProvider]),
       update: vi.fn().mockResolvedValue([mockProvider]),
       delete: vi.fn(),
@@ -198,6 +199,34 @@ describe('EmailProviderService', () => {
     it('should return provider with plain password', async () => {
       const result = await service.getProviderWithDecryptedPassword(10, mockUser);
       expect(result.plainPassword).toBe('decrypted');
+    });
+  });
+
+  describe('getSharedDefaultWithDecryptedPassword', () => {
+    it('returns the shared default with its decrypted password', async () => {
+      (repo.findSharedDefault as vi.Mock).mockResolvedValue([{ ...mockProvider, id: 22, userId: 9, isShared: true, isDefault: true }]);
+
+      const result = await service.getSharedDefaultWithDecryptedPassword();
+
+      expect(repo.findSharedDefault).toHaveBeenCalledOnce();
+      expect(encryption.decrypt).toHaveBeenCalledWith('encrypted');
+      expect(result).toMatchObject({ id: 22, plainPassword: 'decrypted' });
+    });
+
+    it('returns null without decrypting when no shared default exists', async () => {
+      const result = await service.getSharedDefaultWithDecryptedPassword();
+
+      expect(result).toBeNull();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('preserves a missing password as null', async () => {
+      (repo.findSharedDefault as vi.Mock).mockResolvedValue([{ ...mockProvider, passwordEnc: null, isShared: true, isDefault: true }]);
+
+      const result = await service.getSharedDefaultWithDecryptedPassword();
+
+      expect(result?.plainPassword).toBeNull();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
     });
   });
 

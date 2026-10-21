@@ -85,6 +85,7 @@ function release(overrides: Partial<ReleaseCandidateItem> = {}): ReleaseCandidat
     indexerName: 'MyAnonaMouse',
     guid: 'g1',
     title: 'Spark of the Everflame',
+    infoUrl: null,
     sizeBytes: 3_100_000,
     seeders: 506,
     leechers: 2,
@@ -669,6 +670,70 @@ describe('ReleasePickerPanel', () => {
     // The other source was never asked, so nothing has been established about it.
     expect(rowFor('libgen-1').text()).not.toContain('turned down')
     expect(grabButton(rowFor('libgen-1')).attributes('disabled')).toBeUndefined()
+  })
+
+  describe('the release page', () => {
+    it("links the release title to its source's page, out of this instance's referrer", async () => {
+      const wrapper = await render({ ...MIXED, releases: [release({ infoUrl: 'https://tracker.example.com/t/42' })], indexers: [status()] })
+
+      const link = releaseRows(wrapper)[0]!.get('a[href="https://tracker.example.com/t/42"]')
+      expect(link.attributes('target')).toBe('_blank')
+      expect(link.attributes('rel')).toBe('noopener noreferrer')
+      // The visible title leads the accessible name, which also says where the link goes.
+      expect(link.attributes('aria-label')).toMatch(/^.+, release page on MyAnonaMouse$/)
+    })
+
+    it('leaves the title as plain text when the source published no page', async () => {
+      const wrapper = await render({ ...MIXED, releases: [release({ infoUrl: null })], indexers: [status()] })
+
+      expect(releaseRows(wrapper)[0]!.find('a').exists()).toBe(false)
+    })
+  })
+
+  describe('reviewing before filing', () => {
+    function grabBodies(): Array<Record<string, unknown>> {
+      return api.mock.calls.filter(([input]) => input.includes('/grab')).map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>)
+    }
+
+    async function renderGrabbable() {
+      api.mockImplementation((input: string) => {
+        if (input.includes('/releases/inspect')) return respond(READY_INSPECTION)
+        if (input.includes('/releases')) return respond({ ...MIXED, releases: [release()], indexers: [status()] })
+        if (input.includes('download-clients')) return respond([])
+        if (input.includes('/grab')) return respond(request({ status: 'grabbed' }))
+        return respond(request())
+      })
+      const wrapper = mount(ReleasePickerPanel, { global: { stubs: { RouterLink: RouterLinkStub } } })
+      await flushPromises()
+      return wrapper
+    }
+
+    function sendButton(wrapper: VueWrapper) {
+      return releaseRows(wrapper)[0]!
+        .findAll('button')
+        .find((button) => /Download release|Send/.test(button.text()))!
+    }
+
+    it('asks the server to hold the import when the approver ticks the box', async () => {
+      const wrapper = await renderGrabbable()
+
+      await wrapper.get('input[type="checkbox"]').setValue(true)
+      await sendButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(grabBodies()).toEqual([expect.objectContaining({ releaseGuid: 'g1', holdForReview: true })])
+    })
+
+    /** An older server rejects a field it does not know, so an unticked grab must not send it at all. */
+    it('sends nothing new when the box is left alone', async () => {
+      const wrapper = await renderGrabbable()
+
+      await sendButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(grabBodies()).toHaveLength(1)
+      expect(grabBodies()[0]).not.toHaveProperty('holdForReview')
+    })
   })
 
   it('still reports an unknown count on a swarm source', async () => {

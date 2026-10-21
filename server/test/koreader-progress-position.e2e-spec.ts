@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { rename } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
@@ -275,6 +276,36 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
     await expect(readerProgress(epub.bookFileId)).resolves.toEqual(expect.objectContaining({ percentage: 20, cfi: 'epubcfi(/6/2!/4/2/1:1)' }));
   });
 
+  it('recovers from a future device clock after the clock is corrected', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await syncFromDevice(epubHash, 0.75, '/body/DocFragment[1]/body/p/text().4', now + 86400);
+    await syncFromDevice(epubHash, 0.2, '/body/DocFragment[1]/body/p/text().1', Math.floor(Date.now() / 1000));
+
+    await expect(readerProgress(epub.bookFileId)).resolves.toEqual(expect.objectContaining({ percentage: 20 }));
+    const pull = await ctx.app.inject({ method: 'GET', url: `/api/v1/koreader/syncs/progress/${epubHash}`, headers: deviceHeaders() });
+    expect(pull.json()).toEqual(expect.objectContaining({ percentage: 0.2 }));
+    expect(pull.json().timestamp).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
+  });
+
+  it('preserves the newest pull position after duplicate and delayed bulk updates', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const send = (items: { hash: string; percentage: number; progress: string; timestamp: number }[]) =>
+      ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/koreader/plugin/progress',
+        headers: deviceHeaders(),
+        payload: { deviceId: DEVICE_ID, deviceModel: 'Regression device', pluginVersion: '1.7.0', items },
+      });
+    const newest = { hash: epubHash, percentage: 0.6, progress: '/body/DocFragment[1]/body/p/text().3', timestamp: now };
+    const delayed = { ...newest, percentage: 0.1, progress: '/body/DocFragment[1]/body/p/text().1', timestamp: now - 60 };
+    expect((await send([newest, delayed, { ...delayed, timestamp: now - 30 }])).statusCode).toBe(201);
+    expect((await send([delayed])).statusCode).toBe(201);
+
+    await expect(readerProgress(epub.bookFileId)).resolves.toEqual(expect.objectContaining({ percentage: 60 }));
+    const pull = await ctx.app.inject({ method: 'GET', url: `/api/v1/koreader/syncs/progress/${epubHash}`, headers: deviceHeaders() });
+    expect(pull.json()).toEqual(expect.objectContaining({ percentage: 0.6, progress: newest.progress }));
+  });
+
   it('serves percentage fallback for an unresolvable reader position', async () => {
     await ctx.db
       .update(schema.koreaderDeviceProgress)
@@ -423,5 +454,103 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
     } finally {
       await ctx.db.update(schema.bookFiles).set({ fileHash: epubHash }).where(eq(schema.bookFiles.id, epub.bookFileId));
     }
+  });
+  it('falls back safely for replaced sources and their historical deliveries after rescan', async () => {
+    const path = await createEpubFixture(library.folderPath, 'replacement/Source.epub', { title: 'Before replacement' });
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const file = await locateBookByAbsolutePath(ctx, path);
+    const oldHash = await fileHashFor(file.bookFileId);
+    const derivativeHash = 'd'.repeat(32);
+    const point = '/body/DocFragment[1]/body/p/text().3';
+    await ctx.db.insert(schema.bookFileHashHistory).values([
+      { bookFileId: file.bookFileId, fileHash: oldHash, reason: 'kobo_download' },
+      { bookFileId: file.bookFileId, fileHash: derivativeHash, reason: 'kobo_download' },
+    ]);
+    await syncFromDevice(oldHash, 0.4, point);
+    expect((await storedProgress(file.bookFileId))?.cfi).toBeTruthy();
+
+    const replacement = await createEpubFixture(library.folderPath, 'replacement/Replacement.epub', {
+      title: 'Replacement with different content identity',
+    });
+    await rename(replacement, path);
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const newHash = await fileHashFor(file.bookFileId);
+    expect(newHash).not.toBe(oldHash);
+    expect(await storedProgress(file.bookFileId)).toEqual(expect.objectContaining({ percentage: 40, cfi: null, koreaderProgress: null }));
+
+    for (const hash of [oldHash, derivativeHash]) {
+      await syncFromDevice(hash, 0.5, point);
+      expect(await storedProgress(file.bookFileId)).toEqual(expect.objectContaining({ percentage: 50, cfi: null, koreaderProgress: null }));
+    }
+    const bulk = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/progress',
+      headers: deviceHeaders(),
+      payload: {
+        deviceId: DEVICE_ID,
+        deviceModel: 'Regression device',
+        pluginVersion: '1.7.0',
+        items: [{ hash: derivativeHash, percentage: 0.6, progress: point }],
+      },
+    });
+    expect(bulk.statusCode).toBe(201);
+    expect(await storedProgress(file.bookFileId)).toEqual(expect.objectContaining({ percentage: 60, cfi: null, koreaderProgress: null }));
+
+    await syncFromDevice(newHash, 0.7, point);
+    expect((await storedProgress(file.bookFileId))?.cfi).toBeTruthy();
+    for (const hash of [oldHash, derivativeHash]) {
+      const pull = await ctx.app.inject({ method: 'GET', url: `/api/v1/koreader/syncs/progress/${hash}`, headers: deviceHeaders() });
+      expect(pull.statusCode).toBe(200);
+      expect(pull.json()).toEqual(expect.objectContaining({ percentage: 0.7, progress: null }));
+    }
+  });
+
+  // Regression: a sweep pushes the device's whole shelf at once, and every book in it was ranked
+  // as read the moment it arrived, so sorting by last read came out in processing order.
+  it('ranks swept books by when the device read them, and never below a newer read elsewhere', async () => {
+    const [olderPath, newerPath] = await Promise.all([
+      createEpubFixture(library.folderPath, 'last-read/Older.epub', { title: `Last Read Older ${randomUUID()}`, uid: `urn:uuid:${randomUUID()}` }),
+      createEpubFixture(library.folderPath, 'last-read/Newer.epub', { title: `Last Read Newer ${randomUUID()}`, uid: `urn:uuid:${randomUUID()}` }),
+    ]);
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const older = await locateBookByAbsolutePath(ctx, olderPath);
+    const newer = await locateBookByAbsolutePath(ctx, newerPath);
+    const lastReadAt = async (bookFileId: number) => {
+      const [row] = await ctx.db
+        .select({ lastReadAt: schema.readingProgress.lastReadAt })
+        .from(schema.readingProgress)
+        .where(eq(schema.readingProgress.bookFileId, bookFileId));
+      return row?.lastReadAt.getTime();
+    };
+    const now = Math.floor(Date.now() / 1000);
+    const olderReadAt = now - 30 * 86400;
+    const newerReadAt = now - 2 * 86400;
+
+    const sweep = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/progress',
+      headers: deviceHeaders(),
+      payload: {
+        deviceId: DEVICE_ID,
+        deviceModel: 'Regression device',
+        pluginVersion: '1.7.0',
+        items: [
+          { hash: await fileHashFor(older.bookFileId), percentage: 0.4, timestamp: olderReadAt },
+          { hash: await fileHashFor(newer.bookFileId), percentage: 0.3, timestamp: newerReadAt },
+        ],
+      },
+    });
+    expect(sweep.statusCode).toBe(201);
+    expect(await lastReadAt(older.bookFileId)).toBe(olderReadAt * 1000);
+    expect(await lastReadAt(newer.bookFileId)).toBe(newerReadAt * 1000);
+
+    await saveFromWebReader(older.bookFileId, { percentage: 45 });
+    const webReadAt = await lastReadAt(older.bookFileId);
+    expect(webReadAt).toBeGreaterThanOrEqual(now * 1000);
+
+    // Read further offline an hour ago and pushed late: the page is taken, the newer web read stays the last one.
+    await syncFromDevice(await fileHashFor(older.bookFileId), 0.7, undefined, now - 3600);
+    expect((await storedProgress(older.bookFileId))?.percentage).toBeCloseTo(70, 5);
+    expect(await lastReadAt(older.bookFileId)).toBe(webReadAt);
   });
 });

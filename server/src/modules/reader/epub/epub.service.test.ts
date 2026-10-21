@@ -8,7 +8,7 @@ import { stat } from 'fs/promises';
 import { Readable } from 'stream';
 import * as unzipper from 'unzipper';
 
-import { EpubService } from './epub.service';
+import { EpubService, chapterTitleForHref } from './epub.service';
 import { openEpubZipEntryRange } from './epub-zip-entry-stream';
 import { BookReadService } from '../../book/book-read.service';
 import { LibraryService } from '../../library/library.service';
@@ -659,5 +659,40 @@ describe('EpubService', () => {
 
     expect(cache.size).toBe(49);
     expect(cache.has('book-0')).toBe(false);
+  });
+});
+
+describe('chapterTitleForHref', () => {
+  const spine = ['OEBPS/part-1.html', 'OEBPS/part-1-text.html', 'OEBPS/part-2.html', 'OEBPS/part-2-text.html', 'OEBPS/notes.html'].map(
+    (href, index) => ({ idref: `s${index}`, href, mediaType: 'application/xhtml+xml', linear: true }),
+  );
+  const toc = {
+    label: 'Table of Contents',
+    children: [
+      { label: 'part 1', href: 'OEBPS/part-1.html' },
+      {
+        label: 'part 2',
+        href: 'OEBPS/part-2.html',
+        children: [
+          { label: 'A letter', href: 'OEBPS/part-2-text.html#letter-1' },
+          { label: 'Another letter', href: 'OEBPS/part-2-text.html#letter-2' },
+        ],
+      },
+    ],
+  };
+
+  it('names a file the contents does not list by the nearest entry before it', () => {
+    expect(chapterTitleForHref({ spine, toc }, 'part-1-text.html')).toBe('part 1');
+    expect(chapterTitleForHref({ spine, toc }, 'OEBPS/notes.html')).toBe('Another letter');
+  });
+
+  it('uses the first entry of a listed file, matching a path relative to the package', () => {
+    expect(chapterTitleForHref({ spine, toc }, 'part-2-text.html')).toBe('A letter');
+    expect(chapterTitleForHref({ spine, toc }, 'part-2.html#top')).toBe('part 2');
+  });
+
+  it('gives nothing for a file outside the spine or a book without contents', () => {
+    expect(chapterTitleForHref({ spine, toc }, 'OEBPS/missing.html')).toBeNull();
+    expect(chapterTitleForHref({ spine, toc: null }, 'part-1-text.html')).toBeNull();
   });
 });

@@ -2,8 +2,9 @@
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X, Loader2 } from '@lucide/vue'
-import { isValidSeriesIndex, type BookDockBulkEditResult, type BookDockMetadata } from '@bookorbit/types'
+import { isValidSeriesIndex, type BookDockBulkEditResult, type BookDockMetadata, type IdentifierInputKind } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import IdentifierInput from '@/components/ui/IdentifierInput.vue'
 
 const { t } = useI18n()
 
@@ -29,18 +30,21 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const result = ref<BookDockBulkEditResult | null>(null)
 
-const FIELDS = computed<{ key: keyof BookDockMetadata; label: string; type: 'text' | 'number' | 'array' }[]>(() => [
+const FIELDS = computed<{ key: keyof BookDockMetadata; label: string; type: 'text' | 'number' | 'array'; identifier?: IdentifierInputKind }[]>(() => [
   { key: 'title', label: t('bookDock.field.title'), type: 'text' },
   { key: 'authors', label: t('bookDock.field.authors'), type: 'array' },
   { key: 'publisher', label: t('bookDock.field.publisher'), type: 'text' },
   { key: 'publishedYear', label: t('bookDock.field.year'), type: 'number' },
   { key: 'language', label: t('bookDock.field.language'), type: 'text' },
-  { key: 'isbn13', label: t('bookDock.field.isbn13'), type: 'text' },
-  { key: 'isbn10', label: t('bookDock.field.isbn10'), type: 'text' },
+  { key: 'isbn13', label: t('bookDock.field.isbn13'), type: 'text', identifier: 'isbn' },
+  { key: 'isbn10', label: t('bookDock.field.isbn10'), type: 'text', identifier: 'isbn' },
   { key: 'seriesName', label: t('bookDock.field.series'), type: 'text' },
   { key: 'seriesIndex', label: t('bookDock.field.seriesIndex'), type: 'text' },
   { key: 'genres', label: t('bookDock.field.genres'), type: 'array' },
 ])
+
+const FIELD_INPUT_CLASS =
+  'w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring disabled:opacity-40'
 
 const enabledFields = reactive<Set<string>>(new Set())
 const values = reactive<Record<string, string>>({})
@@ -141,11 +145,19 @@ function handleClose() {
               />
               <label class="flex-1">
                 <span class="text-xs font-medium text-muted-foreground block mb-0.5">{{ f.label }}</span>
+                <IdentifierInput
+                  v-if="f.identifier"
+                  v-model="values[f.key]"
+                  :kind="f.identifier"
+                  :disabled="!enabledFields.has(f.key)"
+                  :class="FIELD_INPUT_CLASS"
+                />
                 <input
+                  v-else
                   v-model="values[f.key]"
                   :disabled="!enabledFields.has(f.key)"
                   :placeholder="f.type === 'array' ? t('bookDock.commaSeparated') : ''"
-                  class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
+                  :class="FIELD_INPUT_CLASS"
                 />
               </label>
             </div>

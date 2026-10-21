@@ -67,6 +67,12 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
    * called yet while the inspections run.
    */
   const grabbing = ref(false)
+  /**
+   * Whether whatever this picker sends waits in review once it lands, whatever its score. One
+   * choice for the visit rather than one per row: the doubt it answers is about the request, and
+   * a magnet pasted by hand is just as likely to be the wrong edition as a ranked release.
+   */
+  const holdForReview = ref(false)
 
   function openManual() {
     manualOpen.value = true
@@ -84,7 +90,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
   /** A sent release leaves nothing to pick, so the drawer pops back to the request it belongs to, unless told otherwise. */
   async function sendGrab(body: GrabBookRequestPayload, delivery: DownloadDelivery) {
     if (!request.value) return
-    const outcome = await grab(request.value.id, body)
+    const outcome = await grab(request.value.id, holdForReview.value ? { ...body, holdForReview: true } : body)
     if (!outcome.item) {
       rememberRefusal(body, delivery, outcome.errorCode)
       toast.error(t('bookRequests.errors.grabFailed'), outcome.reason ? { description: outcome.reason } : undefined)
@@ -150,5 +156,18 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     return key ? t(`bookRequests.releases.refused.${key}`) : null
   }
 
-  return { manualOpen, grabbing, refusals, openManual, closeManual, forgetRefusals, submitGrab, handleGrab, handleManualGrab, isRefused, refusalText }
+  return {
+    manualOpen,
+    grabbing,
+    holdForReview,
+    refusals,
+    openManual,
+    closeManual,
+    forgetRefusals,
+    submitGrab,
+    handleGrab,
+    handleManualGrab,
+    isRefused,
+    refusalText,
+  }
 }

@@ -106,14 +106,21 @@ watch(
     loaded.value = false
     await Promise.all([fetchRecipients(), fetchGroups(), fetchProviders(), fetchTemplates(), fetchPreferences()].map((p) => p.catch(() => undefined)))
     loaded.value = true
-    const defaultRecipient = preferences.value?.defaultRecipientId
-    selectedIds.value = defaultRecipient && recipients.value.some((r) => r.id === defaultRecipient) ? [defaultRecipient] : []
+    selectedIds.value = initialRecipientIds()
     providerId.value = preferences.value?.defaultProviderId ?? providers.value[0]?.id ?? null
   },
   { immediate: true },
 )
 
 onBeforeUnmount(stopPolling)
+
+/** The starred recipient, or the only one when nobody starred it: creating a recipient never makes it the default. */
+function initialRecipientIds(): number[] {
+  const defaultId = preferences.value?.defaultRecipientId
+  if (defaultId && recipients.value.some((r) => r.id === defaultId)) return [defaultId]
+  const [only, ...rest] = recipients.value
+  return only && rest.length === 0 ? [only.id] : []
+}
 
 /** What each picked recipient gets, and the line a row shows when that differs from the rest. */
 function exceptionFor(recipient: EmailRecipient): { text: string; warn: boolean } | null {

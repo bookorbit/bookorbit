@@ -50,6 +50,7 @@ describe('EmailProviderResolver', () => {
           provide: EmailProviderService,
           useValue: {
             getProviderWithDecryptedPassword: vi.fn(),
+            getSharedDefaultWithDecryptedPassword: vi.fn(),
           },
         },
         {
@@ -79,6 +80,8 @@ describe('EmailProviderResolver', () => {
       expect(result.config.fromName).toBe('BookOrbit Bot');
       expect(result.config.fromAddress).toBe('bot@example.com');
       expect(result.config.tlsRejectUnauthorized).toBe(true);
+      expect(preferencesService.getForUser).not.toHaveBeenCalled();
+      expect(providerService.getSharedDefaultWithDecryptedPassword).not.toHaveBeenCalled();
     });
 
     it('should include tlsRejectUnauthorized=false in resolved config when provider has it disabled', async () => {
@@ -97,13 +100,49 @@ describe('EmailProviderResolver', () => {
 
       expect(preferencesService.getForUser).toHaveBeenCalledWith(mockUser.id);
       expect(providerService.getProviderWithDecryptedPassword).toHaveBeenCalledWith(20, mockUser);
+      expect(providerService.getSharedDefaultWithDecryptedPassword).not.toHaveBeenCalled();
       expect(result.providerId).toBe(20);
     });
 
-    it('should throw BadRequestException if no provider is requested and no default is set', async () => {
+    it('should resolve from the shared default if the user has no provider preference', async () => {
       (preferencesService.getForUser as vi.Mock).mockResolvedValue(null);
+      (providerService.getSharedDefaultWithDecryptedPassword as vi.Mock).mockResolvedValue({
+        ...mockProvider,
+        id: 30,
+        isShared: true,
+        isDefault: true,
+      });
 
-      await expect(resolver.resolve(mockUser, null)).rejects.toThrow(BadRequestException);
+      const result = await resolver.resolve(mockUser, null);
+
+      expect(providerService.getSharedDefaultWithDecryptedPassword).toHaveBeenCalledOnce();
+      expect(providerService.getProviderWithDecryptedPassword).not.toHaveBeenCalled();
+      expect(result.providerId).toBe(30);
+      expect(result.config.password).toBe('decrypted-password');
+    });
+
+    it('should resolve from the shared default if other preferences exist without a provider preference', async () => {
+      (preferencesService.getForUser as vi.Mock).mockResolvedValue({ defaultProviderId: null, defaultRecipientId: 40, defaultTemplateId: 50 });
+      (providerService.getSharedDefaultWithDecryptedPassword as vi.Mock).mockResolvedValue({
+        ...mockProvider,
+        id: 31,
+        isShared: true,
+        isDefault: true,
+      });
+
+      const result = await resolver.resolve(mockUser);
+
+      expect(providerService.getSharedDefaultWithDecryptedPassword).toHaveBeenCalledOnce();
+      expect(result.providerId).toBe(31);
+    });
+
+    it('should throw BadRequestException if no requested, preferred, or shared default provider exists', async () => {
+      (preferencesService.getForUser as vi.Mock).mockResolvedValue(null);
+      (providerService.getSharedDefaultWithDecryptedPassword as vi.Mock).mockResolvedValue(null);
+
+      await expect(resolver.resolve(mockUser, null)).rejects.toThrow(
+        new BadRequestException('No email provider configured. Add a provider in email settings.'),
+      );
     });
 
     it('should throw BadRequestException if requested provider is missing', async () => {

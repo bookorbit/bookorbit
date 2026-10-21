@@ -10,12 +10,16 @@ export async function recordBookFileHashHistory(
 ): Promise<void> {
   // Registration and invalidation commit together. Duplicate deliveries do not invalidate caches.
   // Selecting the source also lets recovery discard entries for files that were deleted.
+  const conflict =
+    reason === 'kobo_download'
+      ? sql`do nothing`
+      : sql`do update set reason = excluded.reason, created_at = now() where excluded.reason <> 'kobo_download'`;
   await db.execute(sql`
     with registered as (
       insert into ${schema.bookFileHashHistory} (book_file_id, file_hash, reason)
       select ${schema.bookFiles.id}, ${fileHash}, ${reason}
       from ${schema.bookFiles} where ${schema.bookFiles.id} = ${bookFileId}
-      on conflict (book_file_id, file_hash) do nothing
+      on conflict (book_file_id, file_hash) ${conflict}
       returning book_file_id
     )
     update ${schema.libraries}

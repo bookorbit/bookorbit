@@ -48,9 +48,19 @@ describe('AnnotationController', () => {
 
     const result = await controller.getAnnotations(15, user, query);
 
-    expect(annotationService.getAnnotations).toHaveBeenCalledWith(15, user);
+    expect(annotationService.getAnnotations).toHaveBeenCalledWith(15, user, undefined);
     expect(annotationService.getAnnotationsPaginated).not.toHaveBeenCalled();
     expect(result).toEqual(expected);
+  });
+
+  it('passes the reader file to the unpaged list so positions come back for that file', async () => {
+    const { controller, annotationService } = makeController();
+    annotationService.getAnnotations.mockResolvedValue([]);
+    const user = makeUser();
+
+    await controller.getAnnotations(15, user, { readerFileId: 1074 });
+
+    expect(annotationService.getAnnotations).toHaveBeenCalledWith(15, user, 1074);
   });
 
   it('delegates getAnnotationsPaginated when page param is present', async () => {

@@ -1,14 +1,16 @@
+import { createHash } from 'crypto';
+
 /**
  * Identity of a reading session derived from KOReader page events:
  * `kor:<device key>:<book file id>:<cluster start>`. Derivation builds it and the session delete
  * path reads it back, so both sides share one definition of the format.
  */
 
-const KOREADER_SESSION_ID_PATTERN = /^kor:([A-Za-z0-9-]{1,8}):([1-9]\d*):(\d+)$/;
+const KOREADER_SESSION_ID_PATTERN = /^kor:([A-Za-z0-9-]{1,8}|v2-[a-f0-9]{32}):([1-9]\d*):(\d+)$/;
 
-/** The part of a device id a session id keeps. Two devices sharing it share session identities. */
+/** Hash the complete identity; the legacy eight-character key could conflate distinct devices. */
 export function koreaderSessionDeviceKey(deviceId: string): string {
-  return deviceId.slice(0, 8);
+  return `v2-${createHash('sha256').update(deviceId).digest('hex').slice(0, 32)}`;
 }
 
 /** Everything one device's derived sessions share, across every book it has read. */

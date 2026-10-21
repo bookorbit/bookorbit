@@ -93,6 +93,42 @@ describe('DashboardService', () => {
     vi.clearAllMocks();
   });
 
+  it('selects shelf ids for other clients with their narrowing, inside the clamped limit', async () => {
+    const { service, dashboardRepo, libraryService } = makeService();
+    const user = makeUser({ id: 8 });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([10]);
+    dashboardRepo.findUpNextInSeriesBookIds.mockResolvedValue([4, 2]);
+    dashboardRepo.findRecentlyAddedBookIds.mockResolvedValue([5]);
+
+    await expect(service.getScrollerBookIds(ScrollerType.UP_NEXT_IN_SERIES, user, 500, { excludeAudioOnly: true })).resolves.toEqual([4, 2]);
+    await expect(service.getScrollerBookIds(ScrollerType.RECENTLY_ADDED, user, 12)).resolves.toEqual([5]);
+
+    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([10], 8, 50, EMPTY_CONTENT_FILTER_RULES, { excludeAudioOnly: true });
+    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([10], 12, EMPTY_CONTENT_FILTER_RULES, {});
+  });
+
+  it('selects smart-scope shelf ids through the id-only scope query with the narrowing', async () => {
+    const { service, libraryService, smartScopeService } = makeService();
+    const user = makeUser({ id: 8, settings: { dashboardConfig: { libraryIds: [11] } } });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([10, 11]);
+    smartScopeService.executeSmartScopeBookIds.mockResolvedValue([7, 3]);
+
+    await expect(service.getSmartScopeBookIds(5, user, 12, { excludeAudioOnly: true })).resolves.toEqual([7, 3]);
+
+    expect(smartScopeService.executeSmartScopeBookIds).toHaveBeenCalledWith(5, user, 12, [11], { excludeAudioOnly: true });
+    expect(smartScopeService.executeSmartScope).not.toHaveBeenCalled();
+  });
+
+  it('selects nothing for a smart scope that does not hold books', async () => {
+    const { service, libraryService, smartScopeService } = makeService();
+    smartScopeService.findOne.mockResolvedValue({ mediaType: 'podcasts' });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([10]);
+
+    await expect(service.getSmartScopeBookIds(5, makeUser(), 12)).resolves.toEqual([]);
+
+    expect(smartScopeService.executeSmartScopeBookIds).not.toHaveBeenCalled();
+  });
+
   it('rejects smartScope scroller calls when smartScopeId is missing or invalid', async () => {
     const { service, smartScopeService } = makeService();
 
@@ -124,7 +160,7 @@ describe('DashboardService', () => {
 
     await service.getScroller(ScrollerType.RECENTLY_ADDED, user, 20);
 
-    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([200], 20, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([200], 20, EMPTY_CONTENT_FILTER_RULES, {});
   });
 
   it('returns empty list when user has no accessible libraries', async () => {
@@ -160,7 +196,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.RECENTLY_ADDED, user, 0);
 
-    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([100, 200], 1, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([100, 200], 1, EMPTY_CONTENT_FILTER_RULES, {});
     expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([9, 3], 5);
     expect(dashboardRepo.countBooksAddedThisMonth).toHaveBeenCalledWith([100, 200], EMPTY_CONTENT_FILTER_RULES);
     expect(result.books.map((card) => card.id)).toEqual([9, 3]);
@@ -179,7 +215,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.CONTINUE_READING, user, 500);
 
-    expect(dashboardRepo.findContinueReadingBookIds).toHaveBeenCalledWith([301], 9, 50, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findContinueReadingBookIds).toHaveBeenCalledWith([301], 9, 50, EMPTY_CONTENT_FILTER_RULES, {});
     expect(dashboardRepo.countContinueReadingBooks).toHaveBeenCalledWith([301], 9, EMPTY_CONTENT_FILTER_RULES);
     expect(result.books.map((card) => card.id)).toEqual([4]);
     expect(result.total).toBe(37);
@@ -194,7 +230,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.CONTINUE_LISTENING, user, 500);
 
-    expect(dashboardRepo.findContinueListeningBookIds).toHaveBeenCalledWith([302, 303], 14, 50, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findContinueListeningBookIds).toHaveBeenCalledWith([302, 303], 14, 50, EMPTY_CONTENT_FILTER_RULES, {});
     expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([6], 14);
     expect(result.books.map((card) => card.id)).toEqual([6]);
   });
@@ -208,7 +244,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.WANT_TO_READ, user, 7);
 
-    expect(dashboardRepo.findWantToReadBookIds).toHaveBeenCalledWith([404], 21, 7, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findWantToReadBookIds).toHaveBeenCalledWith([404], 21, 7, EMPTY_CONTENT_FILTER_RULES, {});
     expect(result.books.map((card) => card.id)).toEqual([31, 22]);
   });
 
@@ -221,7 +257,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.UP_NEXT_IN_SERIES, user, 25);
 
-    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([707], 11, 25, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([707], 11, 25, EMPTY_CONTENT_FILTER_RULES, {});
     expect(result.books.map((card) => card.id)).toEqual([19, 8]);
     // The recursive CTE is not worth materialising twice, so this shelf never reports a total.
     expect(result.total).toBeNull();
@@ -236,7 +272,7 @@ describe('DashboardService', () => {
 
     await service.getScroller(ScrollerType.UP_NEXT_IN_SERIES, superuser, 20);
 
-    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([1], 17, 20, undefined);
+    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([1], 17, 20, undefined, {});
   });
 
   it('clamps up-next-in-series limit to minimum of 1', async () => {
@@ -248,7 +284,7 @@ describe('DashboardService', () => {
 
     await service.getScroller(ScrollerType.UP_NEXT_IN_SERIES, user, 0);
 
-    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([91], 18, 1, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([91], 18, 1, EMPTY_CONTENT_FILTER_RULES, {});
   });
 
   it('routes random requests to repository and skips card fetch when no ids are returned', async () => {
@@ -258,7 +294,7 @@ describe('DashboardService', () => {
 
     const result = await service.getScroller(ScrollerType.RANDOM, makeUser({ id: 3 }), 20);
 
-    expect(dashboardRepo.findRandomBookIds).toHaveBeenCalledWith([901], 3, 20, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findRandomBookIds).toHaveBeenCalledWith([901], 3, 20, EMPTY_CONTENT_FILTER_RULES, {});
     // Null, not zero. Sizing the pool this shelf samples would anti-join the whole library, so it
     // declines to answer rather than reporting an empty row as an empty library.
     expect(result).toEqual({ books: [], total: null });
@@ -309,7 +345,7 @@ describe('DashboardService', () => {
     );
 
     expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledOnce();
-    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([11], 20, EMPTY_CONTENT_FILTER_RULES);
+    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([11], 20, EMPTY_CONTENT_FILTER_RULES, {});
     expect(smartScopeService.executeSmartScopeBookIds).toHaveBeenCalledWith(7, user, 20, [11]);
     expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
   });

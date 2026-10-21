@@ -20,6 +20,7 @@ const author: AuthorDetail = {
   influences: [],
   metadataProvider: null,
   metadataProviderId: null,
+  metadataProviderPinned: false,
 }
 
 describe('AuthorHeader', () => {
@@ -78,5 +79,47 @@ describe('fresh metadata lookup', () => {
         .find(freshButton)
         .exists(),
     ).toBe(false)
+  })
+})
+
+describe('provider source and website', () => {
+  it('links the matched provider page and marks a pinned match', () => {
+    const wrapper = mount(AuthorHeader, {
+      props: { author: { ...author, metadataProvider: 'goodreads', metadataProviderId: '2222', metadataProviderPinned: true } },
+    })
+
+    const source = wrapper.get('[data-testid="author-source"]')
+    expect(source.get('a').attributes('href')).toBe('https://www.goodreads.com/author/show/2222')
+    expect(source.text()).toContain('Goodreads')
+    expect(source.findAll('span').some((span) => span.classes().includes('text-primary'))).toBe(true)
+  })
+
+  it('shows no pinned label for a match enrichment chose', () => {
+    const wrapper = mount(AuthorHeader, {
+      props: { author: { ...author, metadataProvider: 'audnexus', metadataProviderId: 'B001H6UH2C' } },
+    })
+
+    const source = wrapper.get('[data-testid="author-source"]')
+    expect(source.get('a').attributes('href')).toBe('https://www.audible.com/author/B001H6UH2C')
+    expect(source.findAll('span').some((span) => span.classes().includes('text-primary'))).toBe(false)
+  })
+
+  it('shows influences when they are the only author fact', () => {
+    const wrapper = mount(AuthorHeader, { props: { author: { ...author, influences: ['Alistair MacLean'] } } })
+
+    expect(wrapper.text()).toContain('Alistair MacLean')
+  })
+
+  it('renders a website that is not http(s) as text, never as a link', () => {
+    const wrapper = mount(AuthorHeader, { props: { author: { ...author, website: 'javascript:alert(1)' } } })
+
+    expect(wrapper.text()).toContain('javascript:alert(1)')
+    expect(wrapper.findAll('a').some((link) => link.attributes('href')?.startsWith('javascript:'))).toBe(false)
+  })
+
+  it('links an http(s) website', () => {
+    const wrapper = mount(AuthorHeader, { props: { author: { ...author, website: 'https://johnreid.example' } } })
+
+    expect(wrapper.findAll('a').some((link) => link.attributes('href') === 'https://johnreid.example')).toBe(true)
   })
 })

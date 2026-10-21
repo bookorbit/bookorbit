@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { execFile } from 'child_process';
+import { createReadStream } from 'fs';
 import { mkdir, mkdtemp, rename, rm, stat, opendir, lstat, realpath } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -16,6 +17,13 @@ const execFileAsync = promisify(execFile);
 const KEPUBIFY_TIMEOUT_MS = 60_000;
 const AUDIOLESS_EPUB_CACHE_VERSION = 1;
 const HREF_DECODING_MEMO_LIMIT = 256;
+const CACHED_DIGEST_SCAN_LIMIT = 16;
+
+async function sha256OfFile(path: string): Promise<string> {
+  const digest = createHash('sha256');
+  for await (const chunk of createReadStream(path)) digest.update(chunk);
+  return digest.digest('hex');
+}
 
 interface KepubConversionInput {
   sourcePath: string;
@@ -51,7 +59,36 @@ export class KepubConversionService {
   }
 
   async acquireKepub(input: KepubConversionInput): Promise<{ path: string; release: () => Promise<void> }> {
-    const path = await this.getKepubPath(input);
+    return this.lease(await this.getKepubPath(input));
+  }
+
+  /**
+   * Leases a conversion of this book already in the cache by its exact digest, without its source.
+   * A device keeps the copy it downloaded after the book file changes, and positions on it only
+   * make sense against those bytes.
+   */
+  async acquireCachedByDigest(bookId: number, sha256: string): Promise<{ path: string; release: () => Promise<void> } | null> {
+    const cacheDir = join(this.kepubCachePath, String(bookId));
+    try {
+      if (
+        (await realpath(this.kepubCachePath)) !== join(await realpath(this.appDataPath), '.kepub-cache') ||
+        (await lstat(cacheDir)).isSymbolicLink()
+      )
+        return null;
+      let checked = 0;
+      for await (const entry of await opendir(cacheDir)) {
+        if (!entry.isFile() || !entry.name.endsWith('.kepub.epub')) continue;
+        if (++checked > CACHED_DIGEST_SCAN_LIMIT) break;
+        const path = join(cacheDir, entry.name);
+        if ((await sha256OfFile(path)) === sha256) return this.lease(path);
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  private lease(path: string): { path: string; release: () => Promise<void> } {
     this.leases.set(path, (this.leases.get(path) ?? 0) + 1);
     let released = false;
     return {

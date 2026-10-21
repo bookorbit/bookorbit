@@ -120,6 +120,7 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
             class="viewer-btn"
             :class="isBookmarked ? '!text-primary' : ''"
             :aria-label="t('reader.header.toggleBookmark')"
+            :aria-pressed="isBookmarked"
             @click="emit('toggleBookmark')"
           >
             <BookmarkCheck v-if="isBookmarked" :size="18" />

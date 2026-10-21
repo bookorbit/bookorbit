@@ -41,6 +41,7 @@ import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
 import { ListAuthorLettersDto, ListAuthorsDto } from './dto/list-authors.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
+import { PinAuthorMetadataMatchDto } from './dto/pin-author-metadata-match.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
 import { AuthorMetadataFetchService } from './metadata/author-metadata-fetch.service';
 
@@ -54,6 +55,47 @@ type EnrichmentRefreshOutcome = {
   outboundRequests: number;
   cacheServed: MetadataCacheServedProvider[];
 };
+
+type LifeDateUpdate = { date?: string | null; year?: number | null };
+
+/** A full date carries its own year, and a year sent on its own clears a date that may name another. */
+function resolveLifeDate(
+  field: string,
+  hasDate: boolean,
+  date: string | null | undefined,
+  hasYear: boolean,
+  year: number | null | undefined,
+): LifeDateUpdate {
+  if (hasDate && date) {
+    if (!isCalendarDate(date)) throw new BadRequestException(`${field} is not a calendar date`);
+    return { date, year: Number(date.slice(0, 4)) };
+  }
+  if (hasDate) return hasYear ? { date: null, year: year ?? null } : { date: null };
+  if (hasYear) return { date: null, year: year ?? null };
+  return {};
+}
+
+function isCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split('-').map(Number);
+  if (year < 1) return false;
+  // setUTCFullYear, because Date.UTC reads years below 100 as 19xx.
+  const parsed = new Date(0);
+  parsed.setUTCFullYear(year, month - 1, day);
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
+function normalizeAuthorList(values: string[] | null | undefined): string[] | null {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values ?? []) {
+    const trimmed = value.trim();
+    const key = trimmed.toLocaleLowerCase();
+    if (!trimmed || seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result.length > 0 ? result : null;
+}
 
 @Injectable()
 export class AuthorsService {
@@ -337,6 +379,26 @@ export class AuthorsService {
         values.description = dto.description?.trim() || null;
       }
 
+      if ('website' in dto) {
+        values.website = dto.website?.trim() || null;
+      }
+
+      const birth = resolveLifeDate('birthDate', 'birthDate' in dto, dto.birthDate, 'birthYear' in dto, dto.birthYear);
+      if (birth.date !== undefined) values.birthDate = birth.date;
+      if (birth.year !== undefined) values.birthYear = birth.year;
+
+      const death = resolveLifeDate('deathDate', 'deathDate' in dto, dto.deathDate, 'deathYear' in dto, dto.deathYear);
+      if (death.date !== undefined) values.deathDate = death.date;
+      if (death.year !== undefined) values.deathYear = death.year;
+
+      if ('genres' in dto) {
+        values.genres = normalizeAuthorList(dto.genres);
+      }
+
+      if ('influences' in dto) {
+        values.influences = normalizeAuthorList(dto.influences);
+      }
+
       const fieldNames = Object.keys(values);
       if (fieldNames.length === 0) {
         const detail = await this.findOne(user, authorId);
@@ -464,6 +526,57 @@ export class AuthorsService {
       );
       throw err;
     }
+  }
+
+  /** Points the author at one provider's person, replacing its metadata, and keeps refreshes on that id. */
+  async pinMetadataMatch(user: RequestUser, authorId: number, dto: PinAuthorMetadataMatchDto): Promise<AuthorRefreshResult> {
+    const event = 'author.pin_metadata_match';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] userId=${user.id} authorId=${authorId} provider=${dto.provider} providerId=${JSON.stringify(dto.providerId)} - author metadata match pin started`,
+    );
+    try {
+      await this.assertMutationAccess(user, [authorId]);
+      const author = await this.authorsRepo.findByIdForEnrichment(authorId);
+      if (!author) throw new NotFoundException('Author not found');
+
+      const lookup = await this.authorMetadataFetchService.lookupByIdDetailed(dto.provider, dto.providerId, 'us', {
+        directive: SINGLE_REFRESH_CACHE_DIRECTIVE,
+      });
+      if (lookup.failure) {
+        if (lookup.failure.httpStatus === 404) throw new NotFoundException(`No ${dto.provider} author has that id`);
+        throw new ServiceUnavailableException(`Author lookup failed for provider ${dto.provider}: ${lookup.failure.message}`);
+      }
+      if (!lookup.candidate) throw new NotFoundException(`No ${dto.provider} author has that id`);
+
+      const preferences = await this.metadataPreferences.getPreferences();
+      const applied = await this.enrichmentExecutor.applyMatch(author, preferences, lookup.candidate);
+      if (applied.kind === 'failed') {
+        throw new ServiceUnavailableException(`Author image download failed for provider ${dto.provider}: ${applied.message}`);
+      }
+
+      const detail = await this.findOne(user, authorId);
+      const fallbackProviders = lookup.cacheServed.filter((served) => served.source === 'fallback');
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} authorId=${authorId} provider=${dto.provider} durationMs=${Date.now() - startedAt} fields=${applied.fieldsUpdated.join(',') || 'none'} imageUpdated=${applied.imageUpdated} cacheFallbacks=${fallbackProviders.length} - author metadata match pin completed`,
+      );
+      return fallbackProviders.length > 0 ? { ...detail, metadataCache: { fallbackProviders } } : detail;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} authorId=${authorId} provider=${dto.provider} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - author metadata match pin failed`,
+      );
+      throw err;
+    }
+  }
+
+  /** Lets refreshes search by name again; the metadata and the provider id stay as they are. */
+  async unpinMetadataMatch(user: RequestUser, authorId: number): Promise<AuthorDetail> {
+    await this.assertMutationAccess(user, [authorId]);
+    const updated = await this.authorsRepo.updateAuthorById(authorId, { metadataProviderPinned: false });
+    if (!updated) throw new NotFoundException('Author not found');
+    return this.findOne(user, authorId);
   }
 
   async getThumbnailPath(user: RequestUser, authorId: number): Promise<string | null> {
@@ -680,6 +793,7 @@ export class AuthorsService {
       influences: row.influences ?? [],
       metadataProvider: (row.metadataProvider as AuthorDetail['metadataProvider']) ?? null,
       metadataProviderId: row.metadataProviderId,
+      metadataProviderPinned: row.metadataProviderPinned,
     };
   }
 

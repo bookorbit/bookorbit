@@ -4,6 +4,7 @@ import { type AnnotationPosition } from '../../db/schema';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { PositionConverterService } from '../position-converter/position-converter.service';
 import { AnnotationPositionRepository } from './annotation-position.repository';
+import type { AnnotationWithCfi } from './annotation.repository';
 import { AnnotationSyncService } from './annotation-sync.service';
 
 const EVENT = 'annotation.cfi_backfill';
@@ -22,6 +23,33 @@ export class AnnotationConversionService {
     private readonly positionConverter: PositionConverterService,
     private readonly annotationSync: AnnotationSyncService,
   ) {}
+
+  async projectReaderPositions(rows: AnnotationWithCfi[], bookFileId: number): Promise<AnnotationWithCfi[]> {
+    const projected: AnnotationWithCfi[] = [];
+    for (const row of rows) {
+      if (!row.cfi || !row.text) {
+        projected.push({ ...row, cfi: null });
+        continue;
+      }
+      if (row.cfiFileId === bookFileId) {
+        projected.push(row);
+        continue;
+      }
+      const range = await this.positionConverter.cfiToXpointer({ bookFileId, cfi: row.cfi, text: row.text });
+      const target =
+        range.status !== 'failed' && range.pos0 && range.pos1
+          ? await this.positionConverter.xpointerToCfi({ bookFileId, pos0: range.pos0, pos1: range.pos1, text: row.text })
+          : null;
+      projected.push({
+        ...row,
+        cfi: target?.cfi ?? null,
+        cfiStatus: target?.cfi ? (range.status === 'repaired' ? 'repaired' : target.status) : 'failed',
+        cfiExtras: { chapterIndex: target?.chapterIndex ?? range.chapterIndex ?? null },
+        jumpFileId: target?.cfi ? bookFileId : row.jumpFileId,
+      });
+    }
+    return projected;
+  }
 
   async ensureCfiPositionsForBook(userId: number, bookId: number, limit = 25): Promise<number> {
     const startedAtMs = Date.now();

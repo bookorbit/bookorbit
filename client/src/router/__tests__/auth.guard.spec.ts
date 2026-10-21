@@ -4,10 +4,15 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { registerAuthGuard } from '../guards/auth.guard'
 
-const { authState, statusState, openChangePasswordMock } = vi.hoisted(() => ({
+const { authState, statusState, sessionGate, openChangePasswordMock } = vi.hoisted(() => ({
   authState: { user: null as Record<string, unknown> | null },
   statusState: { needsSetup: false, allowRegistration: false, passwordLoginEnabled: true },
+  sessionGate: { resolved: Promise.resolve() },
   openChangePasswordMock: vi.fn<(force: boolean) => void>(),
+}))
+
+vi.mock('@/features/auth/composables/useSessionBootstrap', () => ({
+  whenSessionResolved: () => sessionGate.resolved,
 }))
 
 vi.mock('@/features/auth/composables/useAuth', () => ({
@@ -67,6 +72,27 @@ beforeEach(() => {
   statusState.needsSetup = false
   statusState.allowRegistration = false
   statusState.passwordLoginEnabled = true
+  sessionGate.resolved = Promise.resolve()
+})
+
+describe('auth guard: unreachable server at boot', () => {
+  it('waits for the session instead of reading "no answer yet" as signed out', async () => {
+    let release!: () => void
+    sessionGate.resolved = new Promise((resolve) => {
+      release = resolve
+    })
+    const router = makeRouter()
+
+    const navigation = router.push('/requests')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(router.currentRoute.value.name).toBeUndefined()
+
+    authState.user = { id: 1, isDefaultPassword: false, permissions: [], settings: {} }
+    release()
+    await navigation
+
+    expect(router.currentRoute.value.name).toBe('book-requests')
+  })
 })
 
 describe('auth guard: hidden book requests', () => {

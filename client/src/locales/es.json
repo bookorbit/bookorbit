@@ -283,6 +283,19 @@
           "loadError": "Error al cargar el proveedor de búsqueda de portadas por defecto",
           "saveError": "Error al guardar el proveedor de búsqueda de portadas por defecto"
         },
+        "placeholderStyle": {
+          "options": {
+            "bauhaus": "Bauhaus",
+            "constructivist": "Constructivista",
+            "memphis": "Memphis",
+            "clothbound": "Ropa",
+            "poster": "Poster",
+            "aurora": "Aurora",
+            "vista": "Vista",
+            "marbled": "Marmoleada",
+            "paperback": "Tapa blanda"
+          }
+        },
         "displayMode": {
           "title": "Modo de visualización de portada",
           "hint": "Controla cómo encajan las portadas reales dentro de las ranuras para libros cuando las relaciones de aspecto difieren",
@@ -1184,7 +1197,7 @@
         "sortLabel": "Ordenar",
         "noMatchesTitle": "Ninguna biblioteca coincide con ese filtro",
         "noMatchesHint": "Nada coincide con \"{query}\" por nombre o ruta de la carpeta.",
-        "totalLibraries": "{count, plural, one {# librería} other {# librerías}}",
+        "totalLibraries": "{count, plural, one {# biblioteca} other {# bibliotecas}}",
         "neverScanned": "Nunca escaneado",
         "neverScannedHint": "Ejecutar un escaneo para indexar sus carpetas",
         "scanFailedAt": "Error: {time}",
@@ -1290,7 +1303,7 @@
           "at": "{preset} · {time}",
           "weeklyAt": "{preset} · {day} {time}"
         },
-        "librariesUnit": "{count, plural, one {librería} other {librerías}}",
+        "librariesUnit": "{count, plural, one {biblioteca} other {bibliotecas}}",
         "foldersUnit": "{count, plural, one {carpeta} other {carpetas}}",
         "copyPath": "Copiar ruta",
         "pathCopied": "Ruta copiada",
@@ -1572,7 +1585,17 @@
         "subtitle": "Sube fuentes que cada usuario puede elegir en el lector de libros electrónicos, sin subir las suyas.",
         "listLabel": "Fuentes del servidor",
         "noFontsYet": "Aún no hay fuentes del servidor",
-        "noFontsHint": "Las fuentes que añadas aquí aparecen en el lector de cada usuario."
+        "noFontsHint": "Las fuentes que añadas aquí aparecen en el lector de cada usuario.",
+        "addFonts": "Agregar fuentes",
+        "filterLabel": "Filtrar familias",
+        "filterClear": "Borrar filtro",
+        "noMatches": "Ninguna familia coincide con “{query}”",
+        "previewLabel": "Previsualizar etiqueta",
+        "previewSize": "Tamaño de vista previa",
+        "menu": {
+          "remove": "Eliminar familia..."
+        },
+        "footerHint": "Cada lector las ve en la lista de fuentes del lector y puede ocultar cualquiera de ellas bajo Lector › Fuentes."
       }
     },
     "common": {
@@ -1742,7 +1765,7 @@
         "hardcoverEnableHint": "Ejecute la prueba con el token actual para desbloquear el interruptor de habilitación.",
         "searchPlaceholder": "Filtrar fuentes",
         "sourcesEnabled": "{enabled} de {total} fuentes habilitadas.",
-        "groupEnabled": "{enabled} de {total} activadas.",
+        "groupEnabled": "Activadas: {enabled} de {total}",
         "unsavedChanges": "{count, plural, one {# cambio sin guardar} other {# cambios sin guardar}}",
         "noMatches": "Ninguna fuente coincide con este filtro.",
         "clearFilters": "Limpiar filtros",
@@ -2173,7 +2196,10 @@
         "selectAll": "Seleccionar todo",
         "clear": "Borrar",
         "noLibraries": "Aún no hay bibliotecas disponibles.",
-        "allLibraries": "Todas las bibliotecas"
+        "allLibraries": "Todas las bibliotecas",
+        "sheet": {
+          "books": "{count, plural, one {# libro} other {# libros}}"
+        }
       },
       "tabs": {
         "providers": "Proveedores",
@@ -2399,8 +2425,8 @@
         "variableRange": "Variable {min}-{max}",
         "variableStyles": "{count, plural, one {# estilo} other {# estilos}}",
         "weightThin": "Delgado",
-        "weightExtraLight": "Luz adicional",
-        "weightLight": "Luz",
+        "weightExtraLight": "Extra fina",
+        "weightLight": "Fina",
         "weightRegular": "Regular",
         "weightMedium": "Medio",
         "weightSemiBold": "Semi negrita",
@@ -3167,8 +3193,8 @@
         "server": "Servidor",
         "catalogServer": "OPDS Servidor de catálogo",
         "catalogServerHint": "Permitir que los clientes OPDS busquen y descarguen libros",
-        "endpoint": "Punto final",
-        "accounts": "OPDS Cuentas",
+        "endpoint": "Punto de acceso/endpoint",
+        "accounts": "Cuentas OPDS",
         "add": "Añadir",
         "addAccount": "Agregar cuenta",
         "username": "Nombre de usuario",
@@ -3184,7 +3210,7 @@
         "hideDetails": "Ocultar detalles",
         "showDetails": "Mostrar detalles",
         "copyUsername": "Copiar nombre de usuario",
-        "notes": "OPDS Notas",
+        "notes": "Nota sobre OPDS",
         "notesBody": "Utilice cuentas OPDS en aplicaciones de lectura. Mantenga las credenciales privadas y rote las contraseñas si se comparten accidentalmente.",
         "deleteConfirmTitle": "¿Eliminar la cuenta OPDS?",
         "deleteConfirmBody": "Eliminar \"{username}\". Esta acción no se puede deshacer.",
@@ -3578,7 +3604,7 @@
             "credential": "Credencial",
             "credentialRequired": "Requerido",
             "credentialNone": "Ninguno",
-            "trustWarning": "Un plugin se ejecuta dentro de BookOrbit con su acceso a su base de datos, archivos de librería y clave de cifrado. Instale uno solo desde una fuente en la que confíe y léelo antes.",
+            "trustWarning": "Un plugin se ejecuta dentro de BookOrbit con su acceso a su base de datos, archivos de biblioteca y clave de cifrado. Instale uno solo desde una fuente en la que confíe y léelo antes.",
             "sectionTitle": "Plugin",
             "removeUnusedWarning": "El plugin se eliminará permanentemente del servidor."
           },
@@ -3785,7 +3811,7 @@
       "title": "Configuración",
       "ariaLabel": "Configuración de secciones",
       "breadcrumbLabel": "Miga de pan",
-      "searchPlaceholder": "Ajustes de búsqueda",
+      "searchPlaceholder": "Buscar ajustes",
       "clearSearch": "Borrar búsqueda",
       "noResults": "No hay ajustes que coincidan con {query}.",
       "shortcutHint": "Presiona {shortcut} para saltar a cualquier ajuste",
@@ -3868,6 +3894,9 @@
       "earned": "Obtenido ({count})",
       "inProgress": "En curso ({count})",
       "locked": "Bloqueado ({count})"
+    },
+    "hints": {
+      "continueReading": "Continuar leyendo"
     }
   },
   "adminFeature": {
@@ -4109,7 +4138,7 @@
       "sectionsLabel": "Ajustes de la cuenta",
       "sections": {
         "profile": "Perfil",
-        "libraries": "Librerías",
+        "libraries": "Bibliotecas",
         "permissions": "Permisos",
         "restrictions": "Restricciones"
       },
@@ -4745,7 +4774,7 @@
       "EntityManagerMerge": "Fusionar entidades",
       "EntityManagerRename": "Cambiar nombre de entidad",
       "EntityManagerDelete": "Eliminar entidad",
-      "EntityManagerSplit": "Entidad dividida",
+      "EntityManagerSplit": "Dividir entidad",
       "EntityManagerDismiss": "Descartar duplicado",
       "EntityManagerUndismiss": "Restaurar duplicado descartado",
       "AppSettingsUpdate": "Actualizar la configuración de la aplicación",
@@ -5125,7 +5154,7 @@
       "continueReading": "Continuar leyendo",
       "startListening": "Empezar a escuchar",
       "continueListening": "Continuar escuchando",
-      "peek": "Vistazo",
+      "peek": "Hojear",
       "quickView": "Vista rápida",
       "details": "Detalles",
       "bookDetails": "Detalles del libro",
@@ -5191,8 +5220,8 @@
         "title": "Título",
         "series": "Serie",
         "seriesIndex": "Serie #",
-        "addedAt": "Fecha añadida",
-        "updatedAt": "Fecha Actualizada",
+        "addedAt": "Fecha de adición",
+        "updatedAt": "Fecha de actualización",
         "publishedDate": "Fecha de publicación",
         "publishedYear": "Año de publicación",
         "pageCount": "Recuento de páginas",
@@ -5218,8 +5247,8 @@
     },
     "filter": {
       "match": "Coincidencia",
-      "all": "TODOS",
-      "any": "CUALQUIER",
+      "all": "TODAS",
+      "any": "CUALQUIERA",
       "ofFollowingRules": "de las siguientes reglas",
       "fields": {
         "title": "Título",
@@ -5308,8 +5337,8 @@
       },
       "scoreRangePlaceholder": "0-100",
       "fileSizePlaceholder": "por ej. 10",
-      "fileSizeValueAria": "Tamaño del archivo primario en megabytes",
-      "fileSizeMaximumAria": "Tamaño máximo de archivo primario en megabytes",
+      "fileSizeValueAria": "Tamaño del archivo principal en megabytes",
+      "fileSizeMaximumAria": "Tamaño máximo del archivo principal en megabytes",
       "valuePlaceholder": "valor",
       "maxPlaceholder": "máximo",
       "to": "a",
@@ -5432,7 +5461,7 @@
       "description": "Obtenga una vista previa de los detalles del libro y ejecute acciones rápidas.",
       "openIn": "Abrir en {provider}",
       "pages": "{count, plural, =0 {# página} one {# página} other {# paginas} many {# paginas}}",
-      "primaryFile": "Archivo primario",
+      "primaryFile": "Archivo principal",
       "fileNumber": "Archivo #{id}",
       "showLess": "Mostrar menos",
       "showMore": "Mostrar más",
@@ -5549,8 +5578,8 @@
         "lockCover": "Tapa de bloqueo",
         "fileTab": "Archivo",
         "urlTab": "URL",
-        "chooseImage": "Elige imagen...",
-        "findCoverOnline": "Encuentra portada en línea",
+        "chooseImage": "Elegir imagen...",
+        "findCoverOnline": "Encontrar portada en línea",
         "saving": "Guardando...",
         "saveCover": "Guardar portada",
         "revertToOriginal": "Volver al original",
@@ -5609,13 +5638,13 @@
         "chooseFormat": "Elige formato",
         "audiobook": "Audiolibro",
         "primary": "Principal",
-        "peek": "Vistazo",
+        "peek": "Hojear",
         "sendViaEmail": "Enviar por correo electrónico",
         "personalReview": {
-          "title": "Opinión personal",
+          "title": "Reseña personal",
           "toggleAria": "Alternar revisión personal",
           "editAria": "Editar reseña personal",
-          "placeholder": "Revisión privada",
+          "placeholder": "Reseña privada",
           "clearAria": "Borrar reseña personal",
           "cancelEditAria": "Cancelar edición de reseña personal"
         },
@@ -5673,9 +5702,9 @@
         "saving": "Guardando...",
         "cancelDateStartedEdit": "Cancelar fecha de inicio editar",
         "editDateStarted": "Editar fecha de inicio",
-        "dateFinished": "Fecha finalizada",
+        "dateFinished": "Fecha de finalización",
         "cancelDateFinishedEdit": "Cancelar fecha de finalización de la edición",
-        "editDateFinished": "Editar fecha finalizada",
+        "editDateFinished": "Editar fecha de finalización",
         "customMetadata": "Metadatos personalizados",
         "synopsis": "Sinopsis",
         "noDescription": "No hay descripción disponible.",
@@ -5717,7 +5746,7 @@
         "durationM": "{minutes}m",
         "durationHm": "{hours} h {minutes}m",
         "yourReview": "Tu reseña",
-        "reviewNotWritten": "No escrito aún",
+        "reviewNotWritten": "Sin escribir",
         "writeReview": "Escribe",
         "collections": "Colecciones",
         "noCollections": "Ninguno",
@@ -5793,7 +5822,7 @@
         "publisherLabel": "Editor",
         "languageLabel": "Idioma",
         "yearLabel": "Año",
-        "pageCountLabel": "Conteo de páginas",
+        "pageCountLabel": "Número de páginas",
         "isbn13Label": "ISBN-13",
         "isbn10Label": "ISBN-10",
         "durationLabel": "Duración (es)",
@@ -6216,7 +6245,7 @@
         "primary": "Principal",
         "read": "Leer",
         "play": "Reproducir",
-        "peek": "Vistazo",
+        "peek": "Hojear",
         "download": "Descargar",
         "moreActions": "Más acciones",
         "rename": "Cambiar nombre",
@@ -6675,7 +6704,7 @@
           "firstRead": "Primera lectura",
           "lastRead": "Última lectura",
           "dateStarted": "Fecha de inicio",
-          "dateFinished": "Fecha finalizada",
+          "dateFinished": "Fecha de finalización",
           "addSession": "Agregar sesión"
         },
         "journey": {
@@ -6846,7 +6875,7 @@
         "readFormat": "Leer {format}",
         "playFormat": "Reproducir {format}",
         "primary": "Principal",
-        "peekFormat": "Vistazo {format}",
+        "peekFormat": "Hojear {format}",
         "chooseFormat": "Elige el formato para leer o reproducir",
         "fileFallback": "ARCHIVO"
       },
@@ -6871,7 +6900,7 @@
       "continue": "Continuar",
       "back": "Volver",
       "confirm": "{count, plural, one {Mueve # libro} many {Mueve # libros} other {Mueve # libros}}",
-      "action": "Mover a la biblioteca",
+      "action": "Mover a biblioteca",
       "review": {
         "ready": "{count} listos",
         "collisions": "{count, plural, one {# conflicto de nombres} many {# conflictos de nombres} other {# conflictos de nombres}}",
@@ -6899,7 +6928,7 @@
         "no_source_access": "No puedes editar la biblioteca en la que está este libro",
         "pattern_unresolved": "La biblioteca de destino no tiene patrón de nomenclatura utilizable",
         "path_too_long": "La ruta de destino es demasiado larga",
-        "path_outside_target_root": "La ruta de destino cae fuera de la carpeta de librerías"
+        "path_outside_target_root": "La ruta de destino cae fuera de la carpeta de las bibliotecas"
       },
       "warning": {
         "accessLoss": "{user} dejará de ver {count} de estos libros",
@@ -8039,7 +8068,7 @@
   },
   "collection": {
     "visibleToAll": "Visible para todos los usuarios",
-    "visibleToAllHint": "Todos los usuarios pueden ver esta colección, pero solo usted puede cambiar sus libros",
+    "visibleToAllHint": "Todos los usuarios pueden ver esta colección, pero solo tú puedes cambiar sus libros",
     "dialog": {
       "name": "Nombre",
       "icon": "Icono",
@@ -8330,7 +8359,7 @@
       "unmute": "Unmute"
     },
     "themePicker": {
-      "light": "Luz",
+      "light": "Claro",
       "dark": "Oscuro",
       "system": "Sistema"
     },
@@ -8389,7 +8418,7 @@
       "bookCount": "Libros: {count}",
       "showCount": "Shows: {count}",
       "librariesEmptyHint": "Crea una biblioteca para empezar a añadir libros.",
-      "podcastLibrariesEmptyHint": "Crear una librería de pódcast para comenzar a seguir los espectáculos.",
+      "podcastLibrariesEmptyHint": "Crea una biblioteca de pódcast para comenzar a seguir los programas.",
       "smartScopesEmptyHint": "Los Alcances Inteligentes guardan un conjunto de filtros que usas a menudo.",
       "collectionsEmptyHint": "Las colecciones agrupan libros que eliges manualmente."
     },
@@ -8514,7 +8543,7 @@
       },
       "shelfNames": {
         "recentlyAdded": "Agregado recientemente",
-        "continueReading": "Seguir leyendo",
+        "continueReading": "Continuar leyendo",
         "continueListening": "Continuar escuchando",
         "continuePodcasts": "Continuar Podcasts",
         "wantToRead": "Quiero Leer",
@@ -8540,7 +8569,7 @@
         "description": "Selecciona qué bibliotecas aportan libros y datos de lectura a este panel.",
         "allLibraries": "Todas las bibliotecas accesibles",
         "summaryNone": "Ninguna biblioteca seleccionada",
-        "summaryCount": "{count, plural, one {# librería} other {# librerías}}",
+        "summaryCount": "{count, plural, one {# biblioteca} other {# bibliotecas}}",
         "required": "Seleccione al menos una biblioteca."
       },
       "shelfRows": {
@@ -9567,7 +9596,7 @@
           "failureSample": "Libro {bookId}: {reason}",
           "failureReasons": {
             "file_unavailable": "No se ha podido leer un archivo de contenido.",
-            "unsafe_path": "Un archivo de contenido está fuera de su carpeta de librerías permitida.",
+            "unsafe_path": "Un archivo de contenido está fuera de su carpeta de biblioteca permitida.",
             "database_error": "Error al actualizar la base de datos."
           }
         },
@@ -9633,7 +9662,7 @@
           "reset": "Restablecer orden",
           "first": "Primera elección",
           "notImported": "No importado",
-          "notHeld": "{count, plural, one {# formato que esta librería no mantiene su lugar predeterminado después de estos.} other {# formatos de esta biblioteca no mantienen su orden predeterminado después de estos.}}",
+          "notHeld": "{count, plural, one {# formato que esta biblioteca no mantiene su lugar predeterminado después de estos.} other {# formatos de esta biblioteca no mantienen su orden predeterminado después de estos.}}",
           "moreBelow": "{count, plural, one {# más formato sigue en este pedido.} other {# más formatos siguen en este orden.}}",
           "showingAll": "Mostrar todos los formatos.",
           "showAll": "Mostrar todo {count}",
@@ -9646,7 +9675,7 @@
           "opfTitle": "archivo metadata.opf",
           "opfHint": "Guardado junto al libro por Calibre",
           "swap": "Intercambiar el orden",
-          "hint": "BookOrbit utiliza el primero que tiene un libro e ignora el otro. Las librerías Calibre normalmente quieren metadata.opf primero."
+          "hint": "BookOrbit utiliza el primero que tiene un libro e ignora el otro. Las biblioteca Calibre normalmente quieren metadata.opf primero."
         }
       },
       "fileWrite": {
@@ -10096,7 +10125,7 @@
       "saveAndValidate": "Guardar y validar",
       "validatedWithWarnings": "Fuente validada con advertencias.",
       "types": {
-        "booklore": "Librería",
+        "booklore": "Booklore",
         "grimmory": "Grimmory",
         "audiobookshelf": "Audiobookshelf",
         "calibreWebAutomated": "Calibre-web automatizado"
@@ -10148,7 +10177,7 @@
         "snapshotTitle": "Modo de instantánea detenido",
         "stoppedWarning": "Detén el proceso automatizado de Calibre-Web antes de copiar ambas bases de datos. BookOrbit no puede verificar que las dos instantáneas se hayan copiado exactamente en el mismo instante.",
         "importRootGuidance": "Ambos archivos snapshot deben ser rutas de servidor legibles debajo del directorio MIGRATION_IMPORT_ROOT.",
-        "logicalRootGuidance": "El mapeo de rutas de libros utiliza la raíz lógica de librería Calibre almacenada en app.db, no la carpeta host que contiene estas instantáneas de base de datos.",
+        "logicalRootGuidance": "El mapeo de rutas de libros utiliza la raíz lógica de biblioteca Calibre almacenada en app.db, no la carpeta host que contiene estas instantáneas de base de datos.",
         "compatibilityNote": "El comportamiento del esquema se ha verificado con Calibre-Web Automated v4.0.6. Sus bases de datos no exponen una versión de lanzamiento de la aplicación que sea fiable."
       },
       "mediaPath": {
@@ -10619,7 +10648,7 @@
       "readingFlow": "Flujo de lectura",
       "flow": {
         "paginated": "Páginas",
-        "scrolled": "Desplazar"
+        "scrolled": "Desplazamiento"
       },
       "pageSpreads": "Extensiones de página",
       "pageSpreadsHint": "Elige cómo se emparejan las páginas de este EPUB basado en imágenes.",
@@ -10671,7 +10700,7 @@
         "highlights": "Lo más destacado",
         "toc": "Tabla de contenidos",
         "tocShort": "TOC",
-        "marksShort": "marcas",
+        "marksShort": "Marcadores",
         "notesShort": "Notas"
       },
       "pin": "Fijar barra lateral",
@@ -11100,7 +11129,7 @@
       "loadError": "No se pudieron cargar los datos",
       "emptyTitle": "Aún no hay datos",
       "emptyDescription": "No hay datos disponibles para este gráfico",
-      "unknownField": "{count, plural, =0 {no hay datos para este campo} one {# El libro no tiene datos para este campo.} other {# Los libros no tienen datos para este campo.} many {# Los libros no tienen datos para este campo.}}"
+      "unknownField": "{count, plural, =0 {no hay datos para este campo} one {# libro no tiene datos para este campo} other {# libros no tienen datos para este campo} many {# libros no tienen datos para este campo}}"
     },
     "breakdown": {
       "ariaLabel": "Desglosar por fuente o formato"
@@ -11124,7 +11153,7 @@
         "title": "Distribución de formato"
       },
       "formatShareOverTime": {
-        "title": "Compartir formato a lo largo del tiempo"
+        "title": "Distribución de formato a lo largo del tiempo"
       },
       "genreCooccurrence": {
         "title": "Co-ocurrencia de género"
@@ -11136,7 +11165,7 @@
         "title": "Distribución de idiomas"
       },
       "largestBooks": {
-        "title": "Los 50 libros más importantes"
+        "title": "Los 50 libros más grandes"
       },
       "libraryIntegrity": {
         "title": "Integridad de la biblioteca"
@@ -11157,7 +11186,7 @@
         "title": "Distribución del recuento de páginas"
       },
       "publicationDecade": {
-        "title": "Década de Publicaciones"
+        "title": "Década de publicaciones"
       },
       "publicationYearTimeline": {
         "title": "Cronología del año de publicación"
@@ -11497,7 +11526,7 @@
         "match": "Coincidencia",
         "book": "Libro",
         "copies": "Copias",
-        "libraries": "Librerías",
+        "libraries": "Bibliotecas",
         "frees": "Libres",
         "keeping": "Manteniendo"
       },
@@ -11684,7 +11713,7 @@
         "confirm": "¿Estás seguro de que deseas eliminar {name}?"
       },
       "splitModal": {
-        "title": "Entidad dividida",
+        "title": "Dividir entidad",
         "splitting": "Dividiendo",
         "newNames": "Nuevos nombres (min 2)",
         "namePlaceholder": "Introduce el nombre...",
@@ -12543,7 +12572,7 @@
       "artworkHint": "PNG, JPEG, WebP, GIF o AVIF hasta 10 MB. El diseño personalizado reemplaza la imagen del feed en todas partes.",
       "artworkUrlLabel": "Dirección de la imagen",
       "artworkUrlPlaceholder": "https://ejemplo.com/artwork.png",
-      "chooseImage": "Elige imagen",
+      "chooseImage": "Elegir imagen",
       "useImage": "Usa esta imagen",
       "removeCustomArtwork": "Eliminar diseño personalizado",
       "lockField": "Bloquear {field} contra refrescos del feed",
@@ -12666,7 +12695,7 @@
       "playbackSaveFailed": "Error al guardar los ajustes de reproducción del podcast",
       "libraryTitle": "Biblioteca por defecto y almacenamiento",
       "libraryDescription": "Elija una biblioteca de podcast para ver sus límites de almacenamiento y el comportamiento de actualización predeterminado.",
-      "library": "Librería Podcast",
+      "library": "Biblioteca de Podcast",
       "noLibraries": "Aún no tienes acceso a una biblioteca de podcast.",
       "loadingLibrary": "Cargando ajustes de la biblioteca...",
       "readOnlyLibrary": "Solo los propietarios de la biblioteca que tengan permiso para conservar podcasts pueden cambiar esta configuración.",
@@ -12815,7 +12844,7 @@
   "titles": {
     "dashboard": "Panel",
     "libraries": "Bibliotecas",
-    "podcastLibraries": "Librerías de Podcast",
+    "podcastLibraries": "Bibliotecas de Podcast",
     "podcastScope": "Lista de reproducción inteligente",
     "podcastCollection": "Colección de Podcast",
     "opds": "OPDS",
@@ -13028,6 +13057,11 @@
       "koreaderUseDefault": "Usar credencial por defecto",
       "koreaderSaveFailed": "No se pudo guardar la configuración de entrega de KOReader EPUB. Inténtalo de nuevo.",
       "koreaderSaved": "Configuración de entrega de KOReader guardada."
+    }
+  },
+  "commandPalette": {
+    "sections": {
+      "continueReading": "Continuar leyendo"
     }
   }
 }

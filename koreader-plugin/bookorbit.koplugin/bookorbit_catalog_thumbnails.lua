@@ -76,10 +76,12 @@ local function normalizedBookId(book)
     return string.format("%.0f", id)
 end
 
+-- Author portraits share the cache under their own prefix: an author id and
+-- a book id may be the same number.
 local function memoKey(book)
     local id = normalizedBookId(book)
     if not id then return nil end
-    return id .. "_" .. coverToken(book)
+    return (book.author_photo and "a" or "") .. id .. "_" .. coverToken(book)
 end
 
 local function newQueue()
@@ -377,7 +379,7 @@ function CatalogThumbnails:downloadThumbnailBatch(batch, generation)
                 temp = self.thumbnail_temp_dir .. "/"
                     .. self.thumbnail_cache_session_id .. "_" .. generation .. "_" .. key .. ".part"
             end
-            jobs[#jobs + 1] = { id = book.id, key = key, path = path, temp = temp }
+            jobs[#jobs + 1] = { id = book.id, key = key, path = path, temp = temp, author_photo = book.author_photo == true }
         end
     end
     if #jobs == 0 then return {} end
@@ -386,7 +388,8 @@ function CatalogThumbnails:downloadThumbnailBatch(batch, generation)
     local completed, result = client:runInSubprocess(function()
         local outcome = {}
         for _, job in ipairs(jobs) do
-            local ok, err = client:downloadCatalogThumbnail(job.id, job.path, {
+            local download = job.author_photo and client.downloadCatalogAuthorPhoto or client.downloadCatalogThumbnail
+            local ok, err = download(client, job.id, job.path, {
                 temp_path = job.temp,
                 max_bytes = THUMBNAIL_MAX_BYTES,
                 background = false,
@@ -552,21 +555,26 @@ end
 -- Fetches the next page's book list off the UI thread and warms its covers.
 -- Only local link state gates this: a background prefetch must never prompt
 -- the user to connect.
-function CatalogThumbnails:prefetchNextPage(query, next_page)
-    if not next_page then return end
+-- next_offset, when the list pages by offset, names the next page instead.
+function CatalogThumbnails:prefetchNextPage(query, next_page, next_offset)
+    if not next_page and not next_offset then return end
     local generation = self.thumbnail_generation
     UIManager:scheduleIn(PREFETCH_PAGE_DELAY, function()
         if generation ~= self.thumbnail_generation then return end
         if not NetworkMgr:isConnected() then return end
         Trapper:wrap(function()
             local q = cloneParams(query)
-            q.page = next_page
+            q.page = next_page or q.page
+            q.offset = next_offset
+            -- The same page number paging will send, so the saved copy matches.
+            if next_offset and tonumber(q.size) then q.page = math.floor(next_offset / tonumber(q.size)) + 1 end
             local completed, result = self.client:runInSubprocess(function()
                 return self.client:catalogBooks(q)
             end)
             if not completed or generation ~= self.thumbnail_generation then return end
             local body = result and result.body
             if body and body.items then
+                if self.listSavePage then self:listSavePage(q, body) end
                 self:prefetchThumbnails(body.items, generation)
             end
         end)

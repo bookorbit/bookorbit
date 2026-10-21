@@ -134,6 +134,20 @@ describe('useCommandPaletteResults', () => {
     vi.useRealTimers()
   })
 
+  it('offers Customize sidebar as an action that opens sidebar edit mode', async () => {
+    const { useSidebarCustomizeMode } = await import('@/composables/useSidebarCustomizeMode')
+    const { isCustomizing, stopCustomizing } = useSidebarCustomizeMode()
+    stopCustomizing()
+    const { sections } = setup()
+
+    const action = sections.value.find((section) => section.id === 'actions')?.items.find((item) => item.key === 'action:customize-sidebar')
+    expect(action?.kind === 'action' && action.label).toBe('components.sidebar.customize.open')
+    if (action?.kind === 'action') action.run()
+
+    expect(isCustomizing.value).toBe(true)
+    stopCustomizing()
+  })
+
   it('opens on continue reading, the book libraries and the actions', async () => {
     const { isOpen, sections } = setup()
 

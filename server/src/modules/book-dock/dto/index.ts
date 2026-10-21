@@ -22,6 +22,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MetadataProviderKey, SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type SeriesIndex } from '@bookorbit/types';
+import { NormalizeIdentifier } from '../../../common/decorators/normalize-identifier.decorator';
 
 @ValidatorConstraint({ name: 'hasCompleteDefaultDestination', async: false })
 class HasCompleteDefaultDestinationConstraint implements ValidatorConstraintInterface {
@@ -86,8 +87,8 @@ export class BookDockMetadataFieldsDto {
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() @MaxLength(500) publisher?: string | null;
   @IsOptional() @IsString() @MaxLength(100) language?: string | null;
-  @IsOptional() @IsString() @MaxLength(10) isbn10?: string | null;
-  @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(10) isbn10?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
   @IsOptional() @IsString() @MaxLength(500) seriesName?: string | null;
   @IsOptional() @IsString() coverUrl?: string;
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) publishedDate?: string | null;
@@ -110,20 +111,20 @@ export class BookDockMetadataFieldsDto {
   @ValidateNested({ each: true })
   @Type(() => BookDockCommunityRatingDto)
   communityRatings?: BookDockCommunityRatingDto[] | null;
-  @IsOptional() @IsString() @MaxLength(50) googleBooksId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) goodreadsId?: string | null;
-  @IsOptional() @IsString() @MaxLength(20) amazonId?: string | null;
-  @IsOptional() @IsString() @MaxLength(255) hardcoverId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) hardcoverEditionId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) openLibraryId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) itunesId?: string | null;
-  @IsOptional() @IsString() @MaxLength(20) audibleId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) librofmId?: string | null;
-  @IsOptional() @IsString() @MaxLength(255) koboId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) comicvineId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) ranobedbId?: string | null;
-  @IsOptional() @IsString() @MaxLength(512) lubimyczytacId?: string | null;
-  @IsOptional() @IsString() @MaxLength(20) aladinId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) googleBooksId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) goodreadsId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(20) amazonId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(255) hardcoverId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) hardcoverEditionId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) openLibraryId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) itunesId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(20) audibleId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) librofmId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(255) koboId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) comicvineId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) ranobedbId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(512) lubimyczytacId?: string | null;
+  @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(20) aladinId?: string | null;
   @IsOptional() @ValidateNested() @Type(() => BookDockComicMetadataDto) comicMetadata?: BookDockComicMetadataDto | null;
 }
 

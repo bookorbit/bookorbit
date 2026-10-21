@@ -99,6 +99,12 @@ export interface PluginReleaseCandidate {
   downloadUrl?: string;
   magnet?: string;
   infoHash?: string;
+  /**
+   * The release's page on the source, for an approver to read before sending it. An http(s) URL
+   * that needs no credential: the host drops one carrying the indexer's credential or a key-like
+   * query parameter rather than showing it. Ignored by hosts older than the field.
+   */
+  infoUrl?: string;
   sizeBytes: number | null;
   /**
    * Null means the source reported no swarm counts, which must not be read as zero: the
@@ -246,4 +252,11 @@ export interface IndexerPlugin {
   resolveFile?(release: PluginReleaseCandidate, config: PluginIndexerConfig, host: PluginHost, signal: AbortSignal): Promise<PluginReleaseFile>;
   /** Sources whose session expires on its own clock, called on a schedule while enabled. */
   keepalive?(config: PluginIndexerConfig, host: PluginHost): Promise<void>;
+  /**
+   * Drop anything held in memory for this indexer, such as a live session. Called when an operator
+   * changes its base URL, credential or private-address setting, so the next call starts from the
+   * stored config. Not awaited, and a failure is logged rather than reported. Never called by hosts
+   * older than the hook.
+   */
+  forget?(indexerId: number): void | Promise<void>;
 }

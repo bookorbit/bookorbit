@@ -1,11 +1,13 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
+  asc: vi.fn((value: unknown) => ({ op: 'asc', value })),
+  desc: vi.fn((value: unknown) => ({ op: 'desc', value })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 
 import { emailProviders } from '../../db/schema';
 import { EmailProviderRepository } from './email-provider.repository';
@@ -20,6 +22,7 @@ describe('EmailProviderRepository', () => {
     };
     selectBuilder.from.mockReturnValue(selectBuilder);
     selectBuilder.where.mockReturnValue(selectBuilder);
+    selectBuilder.orderBy.mockReturnValue(selectBuilder);
 
     const insertBuilder = { values: vi.fn(), returning: vi.fn() };
     insertBuilder.values.mockReturnValue(insertBuilder);
@@ -64,6 +67,25 @@ describe('EmailProviderRepository', () => {
     void repo.findById(8);
 
     expect(eq).toHaveBeenCalledWith(emailProviders.id, 8);
+    expect(selectBuilder.limit).toHaveBeenCalledWith(1);
+  });
+
+  it('findSharedDefault only returns shared defaults with deterministic precedence', () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new EmailProviderRepository(db as never);
+
+    void repo.findSharedDefault();
+
+    expect(and).toHaveBeenCalledWith(
+      { op: 'eq', left: emailProviders.isShared, right: true },
+      { op: 'eq', left: emailProviders.isDefault, right: true },
+    );
+    expect(desc).toHaveBeenCalledWith(emailProviders.isSystemProvider);
+    expect(asc).toHaveBeenCalledWith(emailProviders.id);
+    expect(selectBuilder.orderBy).toHaveBeenCalledWith(
+      { op: 'desc', value: emailProviders.isSystemProvider },
+      { op: 'asc', value: emailProviders.id },
+    );
     expect(selectBuilder.limit).toHaveBeenCalledWith(1);
   });
 

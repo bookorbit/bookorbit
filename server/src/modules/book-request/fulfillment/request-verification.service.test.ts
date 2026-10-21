@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { NotificationType, type BookDockMetadata } from '@bookorbit/types';
 
 import type { BookRequestDownloadRow } from '../../../db/schema';
@@ -122,7 +123,7 @@ describe('verifyAgainstRequest with an operator-set threshold', () => {
  * handler: one file, one score, two operator settings, two outcomes.
  */
 describe('RequestVerificationService against the configured threshold', () => {
-  function makeService(threshold: number, verificationEnabled = true, overrides: { requestSettled?: boolean } = {}) {
+  function makeService(threshold: number, verificationEnabled = true, overrides: { requestSettled?: boolean; holdForReview?: boolean } = {}) {
     const events = { on: vi.fn() };
     const dockRepo = {
       findById: vi.fn().mockResolvedValue({ id: 100, fetchedMetadata: metadata({ authors: ['F. Herbert'] }), embeddedMetadata: null }),
@@ -130,7 +131,13 @@ describe('RequestVerificationService against the configured threshold', () => {
     const dock = { discardFile: vi.fn().mockResolvedValue(undefined) };
     const finalizeService = { finalizeManagedFile: vi.fn().mockResolvedValue({ success: true, bookId: 55 }) };
     const downloads = {
-      findByBookDockFileId: vi.fn().mockResolvedValue({ id: 11, requestId: 7, status: 'importing', bookDockFileId: 100 } as BookRequestDownloadRow),
+      findByBookDockFileId: vi.fn().mockResolvedValue({
+        id: 11,
+        requestId: 7,
+        status: 'importing',
+        bookDockFileId: 100,
+        holdForReview: overrides.holdForReview ?? false,
+      } as BookRequestDownloadRow),
       update: vi.fn().mockResolvedValue(undefined),
       updateIf: vi.fn().mockImplementation((id: number, _expected: unknown, patch: Record<string, unknown>) => Promise.resolve({ id, ...patch })),
     };
@@ -236,6 +243,41 @@ describe('RequestVerificationService against the configured threshold', () => {
       expect.objectContaining({ status: 'available', matchedBookId: 55 }),
     );
     expect(fulfillment.holdForReview).not.toHaveBeenCalled();
+  });
+
+  it('holds a passing import when the person who sent it asked to look first', async () => {
+    const { ingest, finalizeService, fulfillment } = makeService(70, true, { holdForReview: true });
+
+    await ingest();
+
+    expect(finalizeService.finalizeManagedFile).not.toHaveBeenCalled();
+    expect(fulfillment.holdForReview).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 11 }),
+      expect.objectContaining({ id: 7 }),
+      expect.stringContaining('reviewed'),
+    );
+  });
+
+  it('holds an import the sender asked to review even with checking switched off', async () => {
+    const { ingest, finalizeService, fulfillment } = makeService(70, false, { holdForReview: true });
+
+    await ingest();
+
+    expect(finalizeService.finalizeManagedFile).not.toHaveBeenCalled();
+    expect(fulfillment.holdForReview).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: 7 }),
+      expect.stringContaining('reviewed'),
+    );
+  });
+
+  it('holds a failing import for its score rather than for the request to look', async () => {
+    const { ingest, fulfillment } = makeService(95, true, { holdForReview: true });
+
+    await ingest();
+
+    expect(fulfillment.holdForReview).toHaveBeenCalledTimes(1);
+    expect(fulfillment.holdForReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 7 }), expect.stringContaining('scored'));
   });
 });
 
@@ -475,6 +517,77 @@ describe('RequestVerificationService review surface', () => {
     const review = await service.getReview(7);
 
     expect(review).toMatchObject({ bookDockFileId: null, verification: null, files: [], canFile: false });
+  });
+
+  it('says whether the sender asked for the review, and links the release it came from', async () => {
+    const { service } = makeService({ downloadRow: { holdForReview: true, releaseInfoUrl: 'https://tracker.example.com/details/1' } });
+
+    expect(await service.getReview(7)).toMatchObject({ heldOnRequest: true, releaseInfoUrl: 'https://tracker.example.com/details/1' });
+  });
+
+  it('keeps the release link once the dock entry is gone, since the source still describes it', async () => {
+    const { service } = makeService({
+      requestRow: { bookDockFileId: null },
+      downloadRow: { bookDockFileId: null, releaseInfoUrl: 'https://tracker.example.com/details/1' },
+    });
+
+    expect(await service.getReview(7)).toMatchObject({
+      bookDockFileId: null,
+      releaseInfoUrl: 'https://tracker.example.com/details/1',
+      edition: null,
+      hasCover: false,
+    });
+  });
+
+  /** A provider match is itself a guess at the edition, which is what these facts exist to check. */
+  it("states the edition from the file's own metadata, never from the provider match", async () => {
+    const { service } = makeService({
+      dockRow: {
+        id: 100,
+        fileName: 'dune.m4b',
+        fileSize: 1024,
+        format: 'm4b',
+        unitDirectory: null,
+        coverPath: '/data/dock/covers/100.jpg',
+        fetchedMetadata: metadata({ publisher: 'Provider Press', pageCount: 900 }),
+        embeddedMetadata: {
+          publisher: ' Macmillan Audio ',
+          publishedYear: 2007,
+          language: 'en',
+          narrators: ['Scott Brick', ' '],
+          durationSeconds: 75_600,
+          abridged: false,
+          chapters: [{ title: 'One' }, { title: 'Two' }],
+        },
+      },
+    });
+
+    const review = await service.getReview(7);
+
+    expect(review.edition).toEqual({
+      publisher: 'Macmillan Audio',
+      publishedDate: '2007',
+      language: 'en',
+      pageCount: null,
+      isbn10: null,
+      narrators: ['Scott Brick'],
+      durationSeconds: 75_600,
+      abridged: false,
+      chapterCount: 2,
+    });
+    expect(review.hasCover).toBe(true);
+  });
+
+  it('reports no edition for a file that states none of it', async () => {
+    const { service } = makeService();
+
+    expect(await service.getReview(7)).toMatchObject({ edition: null, hasCover: false, heldOnRequest: false, releaseInfoUrl: null });
+  });
+
+  it('answers no cover for a held import without one', async () => {
+    const { service } = makeService();
+
+    await expect(service.getReviewCoverPath(7)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('finds the entry through the attempt when only the request lost its pointer', async () => {

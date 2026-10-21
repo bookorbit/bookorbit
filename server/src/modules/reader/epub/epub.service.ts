@@ -304,6 +304,37 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
   return { containerPath: opfPath, rootPath, spine, manifest, optionalFiles, toc, metadata, coverPath };
 }
 
+/**
+ * The contents title for the spine item holding `chapterHref`: its own entry, else the nearest entry before it in
+ * reading order, as a reader shows it. Within one file only the first entry can be placed without the text offset.
+ */
+export function chapterTitleForHref(info: Pick<EpubBookInfo, 'spine' | 'toc'>, chapterHref: string): string | null {
+  const wanted = normalizeZipPath(chapterHref.split('#')[0]);
+  if (!wanted) return null;
+  const spineIndexOf = (href: string) => {
+    const path = normalizeZipPath(href.split('#')[0]);
+    return info.spine.findIndex((item) => {
+      const spinePath = normalizeZipPath(item.href);
+      return spinePath === path || spinePath.endsWith(`/${path}`) || path.endsWith(`/${spinePath}`);
+    });
+  };
+  const target = spineIndexOf(wanted);
+  if (target < 0) return null;
+  let best: { label: string; spineIndex: number } | null = null;
+  const visit = (items: EpubTocItem[] | undefined) => {
+    for (const item of items ?? []) {
+      const spineIndex = item.href ? spineIndexOf(item.href) : -1;
+      const label = item.label.trim();
+      if (label && spineIndex >= 0 && spineIndex <= target) {
+        if (!best || spineIndex > best.spineIndex || (spineIndex === best.spineIndex && spineIndex < target)) best = { label, spineIndex };
+      }
+      visit(item.children);
+    }
+  };
+  visit(info.toc?.children);
+  return (best as { label: string } | null)?.label ?? null;
+}
+
 @Injectable()
 export class EpubService {
   private readonly logger = new Logger(EpubService.name);
@@ -317,6 +348,15 @@ export class EpubService {
   async getBookInfo(bookId: number, fileId: number | undefined, user: RequestUser): Promise<EpubBookInfo> {
     const epubPath = await this.resolveEpubPath(bookId, fileId, user);
     return (await this.getCachedEntry(epubPath)).info;
+  }
+
+  /** The contents title for a chapter file of a book file the caller already resolved, or null when it cannot be read. */
+  async chapterTitleForFile(absolutePath: string, chapterHref: string): Promise<string | null> {
+    try {
+      return chapterTitleForHref((await this.getCachedEntry(absolutePath)).info, chapterHref);
+    } catch {
+      return null;
+    }
   }
 
   async getMediaOverlayPlaylist(bookId: number, fileId: number | undefined, user: RequestUser): Promise<EpubMediaOverlayPlaylist> {

@@ -111,6 +111,7 @@ function mountSheet(file: BookDockFile) {
         MetadataMatchWorkspace: WorkspaceStub,
         BookDockStatusBadge: true,
         BookDestinationFields: false,
+        IdentifierInput: false,
       },
     },
   })
@@ -202,6 +203,28 @@ describe('BookDockFileSheet', () => {
 
       expect(input.element.value).toBe('5.10')
       expect(mocks.saveMetadata).toHaveBeenLastCalledWith(1, expect.objectContaining({ seriesIndex: '5.10' }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('autosaves pasted ISBNs cleaned instead of sending values the server would refuse', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountSheet(makeFile())
+      const input = (name: string) =>
+        wrapper
+          .findAll('label')
+          .find((item) => item.text().includes(name))!
+          .get<HTMLInputElement>('input')
+
+      await input('ISBN-13').setValue('978-3426226223')
+      await input('ISBN-10').setValue('\u200B0-8044-2957-x')
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(input('ISBN-13').element.value).toBe('9783426226223')
+      expect(input('ISBN-10').element.value).toBe('080442957X')
+      expect(mocks.saveMetadata).toHaveBeenLastCalledWith(1, expect.objectContaining({ isbn13: '9783426226223', isbn10: '080442957X' }))
     } finally {
       vi.useRealTimers()
     }

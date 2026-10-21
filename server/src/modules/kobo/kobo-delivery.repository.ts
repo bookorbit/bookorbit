@@ -35,6 +35,19 @@ export class KoboDeliveryRepository {
     });
   }
 
+  async setKepubContentDigest(userId: number, deviceId: number, id: string, digest: string): Promise<void> {
+    await this.db
+      .update(schema.koboDeviceDeliveries)
+      .set({ options: sql`${schema.koboDeviceDeliveries.options} || ${JSON.stringify({ kepubContentDigest: digest })}::jsonb` })
+      .where(
+        and(
+          eq(schema.koboDeviceDeliveries.userId, userId),
+          eq(schema.koboDeviceDeliveries.deviceId, deviceId),
+          eq(schema.koboDeviceDeliveries.id, id),
+        ),
+      );
+  }
+
   async offer(values: typeof schema.koboDeviceDeliveries.$inferInsert, replace = false) {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(${values.deviceId}, ${values.bookId})`);
@@ -54,7 +67,14 @@ export class KoboDeliveryRepository {
       }
       // The device already holds these exact bytes. A replacement it never needs to download would stay
       // offered, and keep every bookmark it pushes from counting, so there is nothing to replace.
-      if (replace && existing && !existing.options.replacement && existing.metadata.sha256 === values.metadata.sha256) return existing;
+      if (
+        replace &&
+        existing &&
+        !existing.options.replacement &&
+        (existing.metadata.sha256 === values.metadata.sha256 ||
+          (existing.options.kepubContentDigest !== undefined && existing.options.kepubContentDigest === values.options.kepubContentDigest))
+      )
+        return existing;
       if (existing) await tx.update(schema.koboDeviceDeliveries).set({ current: false }).where(eq(schema.koboDeviceDeliveries.id, existing.id));
       const [row] = await tx
         .insert(schema.koboDeviceDeliveries)

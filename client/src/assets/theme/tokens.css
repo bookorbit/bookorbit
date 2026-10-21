@@ -67,6 +67,11 @@
   --volume-unread: oklch(0.855 var(--tint-c-surface) var(--tint-h));
   --volume-missing: oklch(0.58 0.22 27);
 
+  /* Read-aloud sync meter: the text and audio tracks drawn in the sync pill. Fills only, so they
+     have to separate from each other and from the card, not clear text contrast. */
+  --sync-meter-text: oklch(0.6 0.15 235);
+  --sync-meter-audio: oklch(0.62 0.21 355);
+
   /* Metadata score ramp: red at 0, through orange and yellow, to green at 100. Consumers
      interpolate between these four with color-mix in oklch, so the whole spectrum follows
      from four tokens. Tuned per theme like every other text colour here: on a light card the
@@ -401,6 +406,8 @@
   --volume-reading: oklch(0.78 0.14 75);
   --volume-unread: oklch(0.315 var(--tint-c-surface) var(--tint-h));
   --volume-missing: oklch(0.7 0.19 25);
+  --sync-meter-text: oklch(0.74 0.14 230);
+  --sync-meter-audio: oklch(0.72 0.18 350);
 
   /* Lifted the way the pills are, with the yellow middle highest so the ramp holds an even
      weight across the spectrum on a dark card */

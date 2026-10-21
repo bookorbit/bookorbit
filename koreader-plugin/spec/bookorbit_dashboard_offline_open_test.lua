@@ -10,7 +10,10 @@ package.loaded["ffi/util"] = {
         return text
     end,
 }
-package.loaded["ui/uimanager"] = {}
+package.loaded["ui/uimanager"] = {
+    nextTick = function(_, callback) callback() end,
+    tickAfterNext = function(_, callback) callback() end,
+}
 package.loaded["device"] = { model = "test-device" }
 package.loaded["ui/widget/infomessage"] = { new = function(_, opts) return opts end }
 package.loaded["ui/widget/inputdialog"] = {}
@@ -85,8 +88,8 @@ MainMenu.install(plugin)
 for name, fn in pairs(env.BookOrbit) do
     plugin[name] = fn
 end
-plugin.settingsMenu = function()
-    return {}
+plugin.promptLogin = function()
+    prompted_login = prompted_login + 1
 end
 plugin.openCatalogBrowser = function(_, prefer_cached_dashboard)
     table.insert(opened, prefer_cached_dashboard)
@@ -98,10 +101,10 @@ local function openDashboardMenuItem()
     for _, item in ipairs(menu_items.bookorbit.sub_item_table) do
         if item.id == "open_dashboard" then return item end
     end
-    error("the BookOrbit menu has an Open dashboard item")
+    error("the BookOrbit menu has an Open BookOrbit item")
 end
 
--- Tools > BookOrbit > Open dashboard while offline.
+-- Tools > BookOrbit > Open BookOrbit while offline.
 openDashboardMenuItem().callback()
 assertEqual(#opened, 1, "the menu opens the dashboard while offline")
 assertEqual(opened[1], false, "the menu open is explicit, so its refresh may ask for a connection")
@@ -122,7 +125,7 @@ assertEqual(#opened, 1, "the auto-open opens the dashboard")
 assertEqual(opened[1], true, "the auto-open prefers the cached dashboard")
 assertEqual(waits, 0, "the auto-open does not wait for a connection")
 
--- Logged out, nothing opens and the user is told to log in.
+-- Logged out, nothing opens and the user is asked to sign in.
 opened = {}
 plugin.settings = {}
 plugin:browseCatalog()

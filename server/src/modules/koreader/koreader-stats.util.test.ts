@@ -82,10 +82,10 @@ describe('computeClusterMetrics', () => {
 
   it('builds deterministic session ids that fit varchar(64)', () => {
     const session = computeClusterMetrics([event(1000)], DEVICE_ID, FILE_ID);
-    expect(session.sessionId).toBe('kor:abcdef12:42:1000');
+    expect(session.sessionId).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:42:1000');
 
     const longest = buildSessionId(DEVICE_ID, 2147483647, 2147483647);
-    expect(longest).toBe('kor:abcdef12:2147483647:2147483647');
+    expect(longest).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:2147483647:2147483647');
     expect(longest.length).toBeLessThanOrEqual(64);
   });
 });
@@ -112,7 +112,7 @@ describe('deriveKoreaderSessions', () => {
   });
 
   it('builds a prefix that scopes ids per device and file', () => {
-    expect(buildSessionIdPrefix(DEVICE_ID, FILE_ID)).toBe('kor:abcdef12:42:');
+    expect(buildSessionIdPrefix(DEVICE_ID, FILE_ID)).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:42:');
   });
 });
 

@@ -411,6 +411,12 @@ export interface ReleaseCandidateItem {
   indexerName: string;
   guid: string;
   title: string;
+  /**
+   * The release's own page on its source, where the source publishes one: the description, file
+   * list and comments an approver checks an edition against. Never a download link, and never a
+   * link carrying a credential: one that might is dropped on the server rather than shown.
+   */
+  infoUrl: string | null;
   sizeBytes: number | null;
   /** Null where the indexer did not report a swarm count at all, which is not the same as zero. */
   seeders: number | null;

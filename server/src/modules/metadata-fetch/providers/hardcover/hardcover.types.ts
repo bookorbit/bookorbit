@@ -56,7 +56,8 @@ export interface HardcoverBookWithEditions {
   featured_book_series?: {
     series?: {
       name?: string;
-      books_count?: number;
+      primary_books_count?: number | null;
+      latest_released?: { position?: number | null }[];
     };
     position?: number | null;
   };

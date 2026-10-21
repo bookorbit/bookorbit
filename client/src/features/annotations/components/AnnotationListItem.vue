@@ -263,9 +263,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
     </Tooltip>
 
     <div class="flex flex-1 min-w-0 flex-col self-stretch">
-      <p class="text-sm leading-relaxed text-foreground" :class="quoteClampClass">
-        {{ annotation.text }}
-      </p>
+      <p class="whitespace-pre-line text-sm leading-relaxed text-foreground" :class="quoteClampClass">{{ annotation.text }}</p>
 
       <button
         v-if="isLong"

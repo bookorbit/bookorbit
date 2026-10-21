@@ -63,20 +63,28 @@ export function toKoboReadingServiceAnnotation(row: ServeAnnotation): KoboReadin
   };
 }
 
-/** A bookmark, served back as the dogear the device created: no text and no colour, as it uploads one. */
+/**
+ * A bookmark, served back as the dogear the device created: no text and no colour, as it uploads one.
+ * One with a note goes in the shape the device uploads after a note is added: a "note" with the
+ * default colour and still no text.
+ */
 export function toKoboReadingServiceDogear(row: {
   externalKey: string;
   clientLastModifiedUtc: string;
   location: unknown;
+  note?: string | null;
 }): KoboReadingServiceAnnotation {
+  const note = row.note?.trim() ? row.note : null;
   return {
     attachments: {},
     clientLastModifiedUtc: row.clientLastModifiedUtc,
     context: null,
+    ...(note ? { highlightColor: koboColorFromHex(null) } : {}),
     highlightedText: '',
     id: row.externalKey,
     location: row.location,
-    type: 'dogear',
+    ...(note ? { noteText: note } : {}),
+    type: note ? 'note' : 'dogear',
   };
 }
 

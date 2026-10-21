@@ -7,6 +7,7 @@ the live in-memory annotation list and summary table instead of sidecar data
 matter which path uploaded them.
 ]]
 
+local BookOrbitCapabilities = require("bookorbit_capabilities")
 local DocSettings = require("docsettings")
 local BookList = require("ui/widget/booklist")
 local lfs = require("libs/libkoreader-lfs")
@@ -25,6 +26,63 @@ local ALLOWED_STATUSES = {
 }
 
 local BookOrbitSidecar = {}
+
+-- Written into a sidecar once it has been through a complete exchange. A sidecar
+-- without it is new to the server (a re-download, a deleted .sdr), and its empty
+-- key list must not read as "the reader deleted everything".
+BookOrbitSidecar.EXCHANGE_MARKER = "bookorbit_exchanged_at"
+
+function BookOrbitSidecar.isMarked(doc_settings)
+    if not doc_settings then return nil end
+    return doc_settings:readSetting(BookOrbitSidecar.EXCHANGE_MARKER) ~= nil
+end
+
+function BookOrbitSidecar.readMarked(file)
+    if not file or not DocSettings:hasSidecarFile(file) then return false end
+    return BookOrbitSidecar.isMarked(DocSettings:open(file))
+end
+
+-- The open book's settings are flushed by KOReader itself.
+function BookOrbitSidecar.markLive(doc_settings, now)
+    if not doc_settings or BookOrbitSidecar.isMarked(doc_settings) then return false end
+    doc_settings:saveSetting(BookOrbitSidecar.EXCHANGE_MARKER, now or os.time())
+    return true
+end
+
+function BookOrbitSidecar.markFile(file, now)
+    if not file or lfs.attributes(file, "mode") ~= "file" then return false end
+    local doc_settings = DocSettings:open(file)
+    if BookOrbitSidecar.isMarked(doc_settings) then return false end
+    doc_settings:saveSetting(BookOrbitSidecar.EXCHANGE_MARKER, now or os.time())
+    doc_settings:flush()
+    return true
+end
+
+-- What the exchange tells the server about this sidecar: "known" once marked,
+-- "new" when unmarked and holding no highlight or dogear at all, nil (let the
+-- server judge from its key set) when unmarked but holding entries, as every
+-- sidecar written before the marker existed does.
+function BookOrbitSidecar.sidecarState(marked, local_count)
+    if marked == nil then return nil end
+    if marked then return "known" end
+    if (local_count or 0) == 0 then return "new" end
+    return nil
+end
+
+BookOrbitSidecar.SIDECAR_CAPABILITY = "sidecarState"
+
+-- Only a server that advertises sidecarState accepts the field. An older one
+-- would read a new sidecar's empty key list as "everything was deleted", so
+-- there the list goes out as incomplete instead and nothing is deleted.
+function BookOrbitSidecar.resolveExchangeState(client, sidecar_state, keys_complete)
+    if sidecar_state == nil then return nil, keys_complete end
+    if client and client.getPluginVersion
+            and BookOrbitCapabilities.supports(client, BookOrbitSidecar.SIDECAR_CAPABILITY) == true then
+        return sidecar_state, keys_complete
+    end
+    if sidecar_state == "new" then return nil, false end
+    return nil, keys_complete
+end
 
 function BookOrbitSidecar.sidecarMtime(file)
     local sidecar_file = DocSettings:findSidecarFile(file)
@@ -59,16 +117,18 @@ local function serializePos(pos)
     end
     return nil
 end
+BookOrbitSidecar.serializePos = serializePos
 
 -- Order-independent change signal for one normalized entry. Count plus max
 -- datetime cannot see a delete-plus-add that leaves both unchanged, so every
 -- entry contributes a hash of its identity fields. Positions can be kilobytes
 -- long, so only their length and both ends are sampled: this signal decides
 -- whether an unchanged book may skip an exchange, never what gets uploaded.
+-- The note is hashed whole because rewriting it leaves every timestamp alone.
 local function entryHash(entry)
     local pos0 = entry.pos0 or ""
     local key = entry.datetime .. "|" .. #pos0 .. "|" .. pos0:sub(1, 24) .. "|" .. pos0:sub(-24)
-        .. "|" .. (entry.datetimeUpdated or "")
+        .. "|" .. (entry.datetimeUpdated or "") .. "|" .. (entry.note or "")
     local hash = 5381
     for index = 1, #key do
         hash = (hash * 33 + key:byte(index)) % 4294967296
@@ -85,7 +145,7 @@ function BookOrbitSidecar.normalizeAnnotations(raw)
     local sum, mix = 0, 0
     for _, a in ipairs(raw or {}) do
         -- drawer == nil marks a position-only bookmark; those are skipped in v1.
-        if ALLOWED_DRAWERS[a.drawer] and isDeviceDatetime(a.datetime) then
+        if not a.bookorbit_pending_verification and ALLOWED_DRAWERS[a.drawer] and isDeviceDatetime(a.datetime) then
             local pos0, pos_format = serializePos(a.pos0)
             if pos0 then
                 local pos1 = serializePos(a.pos1)
@@ -195,11 +255,15 @@ end
 
 function BookOrbitSidecar.stateFromServerResult(result)
     if type(result) ~= "table" then return nil end
+    local has_status = result.statusSet == true and ALLOWED_STATUSES[result.status] == true
     local has_rating = type(result.ratingSet) == "boolean"
     local has_review = type(result.reviewNoteSet) == "boolean"
-    if not has_rating and not has_review then return nil end
+    if not has_status and not has_rating and not has_review then return nil end
 
     local state = {
+        status_known = has_status,
+        status = has_status and result.status or nil,
+        status_modified = has_status and dateKey(result.statusUpdatedAt) or nil,
         rating_known = has_rating,
         rating = has_rating and result.ratingSet and type(result.rating) == "number" and math.floor(result.rating) or nil,
         review_known = has_review,
@@ -211,6 +275,11 @@ end
 
 function BookOrbitSidecar.rememberServerState(book, state)
     if not book or not state then return end
+    if state.status_known then
+        book.statusSyncedKnown = true
+        book.statusSynced = state.status
+        book.statusSyncedModified = state.status_modified
+    end
     if state.rating_known then
         book.ratingSyncedKnown = true
         book.ratingSynced = state.rating
@@ -223,6 +292,11 @@ end
 
 function BookOrbitSidecar.rememberUploadedState(book, summary, payload)
     if not book or not payload then return end
+    if payload.status then
+        book.statusSyncedKnown = true
+        book.statusSynced = payload.status
+        book.statusSyncedModified = payload.statusModified
+    end
     if payload.rating ~= nil or payload.ratingCleared then
         book.ratingSyncedKnown = true
         book.ratingSynced = summary.rating
@@ -235,7 +309,8 @@ end
 
 function BookOrbitSidecar.buildStatePayload(hash, book, summary, force_pull)
     local status_changed = summary.status ~= nil
-        and (summary.status_modified or "") ~= (book.statusSyncedModified or "")
+        and (book.statusSyncedKnown ~= true
+            or summary.status ~= book.statusSynced)
 
     local rating_known = book.ratingSyncedKnown == true or book.ratingSynced ~= nil
     local rating_changed = false
@@ -304,6 +379,10 @@ local function applySummary(doc_settings, state)
     if not doc_settings or not state then return false end
     local summary = doc_settings:readSetting("summary") or {}
     local touched = false
+    if state.status_known and summary.status ~= state.status then
+        summary.status = state.status
+        touched = true
+    end
     if state.rating_known and summary.rating ~= state.rating then
         summary.rating = state.rating
         touched = true
@@ -313,7 +392,7 @@ local function applySummary(doc_settings, state)
         touched = true
     end
     if touched then
-        summary.modified = state.modified or os.date("%Y-%m-%d", os.time())
+        summary.modified = maxDateKey(state.status_modified, state.modified) or os.date("%Y-%m-%d", os.time())
         doc_settings:saveSetting("summary", summary)
     end
     return touched
@@ -322,8 +401,9 @@ end
 function BookOrbitSidecar.applyServerStateLive(ui, state)
     if not ui or not ui.doc_settings then return false end
     local touched = applySummary(ui.doc_settings, state)
-    if touched and ui.document and ui.document.file and state.rating_known then
-        BookList.setBookInfoCacheProperty(ui.document.file, "rating", state.rating)
+    if touched and ui.document and ui.document.file then
+        if state.status_known then BookList.setBookInfoCacheProperty(ui.document.file, "status", state.status) end
+        if state.rating_known then BookList.setBookInfoCacheProperty(ui.document.file, "rating", state.rating) end
     end
     return touched
 end
@@ -334,9 +414,8 @@ function BookOrbitSidecar.applyServerStateSidecar(file, state)
     local touched = applySummary(doc_settings, state)
     if touched then
         doc_settings:flush()
-        if state.rating_known then
-            BookList.setBookInfoCacheProperty(file, "rating", state.rating)
-        end
+        if state.status_known then BookList.setBookInfoCacheProperty(file, "status", state.status) end
+        if state.rating_known then BookList.setBookInfoCacheProperty(file, "rating", state.rating) end
     end
     return touched
 end
@@ -374,6 +453,7 @@ function BookOrbitSidecar.extract(file)
         bookmarks_count = #bookmarks,
         bookmarks_max_datetime = bm_max_datetime,
         bookmarks_signature = bm_signature,
+        marked = BookOrbitSidecar.isMarked(doc_settings),
     }
 end
 

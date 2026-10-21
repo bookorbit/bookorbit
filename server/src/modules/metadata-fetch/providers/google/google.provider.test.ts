@@ -98,6 +98,16 @@ describe('GoogleProvider', () => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('q=isbn%3A1234567890'), expect.any(Object));
     });
 
+    it('asks for a page of ten unless a browsing search wants more', async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ items: [] }) });
+
+      await provider.search({ author: 'Terry Pratchett' });
+      await provider.search({ author: 'Terry Pratchett', resultsPerProvider: 20 });
+
+      const pageSizes = vi.mocked(global.fetch).mock.calls.map(([url]) => new URL(url as string).searchParams.get('maxResults'));
+      expect(pageSizes).toEqual(['10', '20']);
+    });
+
     it('should return empty array on fetch error', async () => {
       global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
 

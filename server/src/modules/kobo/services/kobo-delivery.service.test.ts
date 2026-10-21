@@ -1,5 +1,12 @@
+import { createHash } from 'crypto';
+import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { describe, expect, it, vi } from 'vitest';
+import { ZipArchive } from 'archiver';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { kepubContentDigest } from './kepub-content-digest';
 
 import {
   KoboDeliveryService,
@@ -298,5 +305,126 @@ describe('KoboDeliveryService.confirm', () => {
 
     expect(repository.transition).toHaveBeenCalledWith(1, 2, 'replacement', ['transfer_observed', 'user_confirmed'], 'user_confirmed');
     expect(repository.adoptForDeviceReadingState).toHaveBeenCalledWith(1, 2, 3, 'replacement');
+  });
+});
+
+describe('KoboDeliveryService.resolve with a rebuilt KEPUB', () => {
+  let root: string;
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'bookorbit-delivery-resolve-'));
+  });
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  const chapter = (text: string): [string, string] => ['OEBPS/chapter.xhtml', `<p><span class="koboSpan" id="kobo.1.1">${text}</span></p>`];
+  const BASE: [string, string][] = [
+    ['mimetype', 'application/epub+zip'],
+    ['META-INF/container.xml', '<container/>'],
+    ['OEBPS/content.opf', '<package/>'],
+  ];
+
+  async function writeKepub(name: string, entries: [string, string][]): Promise<string> {
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+    const chunks: Buffer[] = [];
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const complete = new Promise<void>((resolve, reject) => {
+      archive.on('end', resolve);
+      archive.on('error', reject);
+    });
+    for (const [entry, body] of entries) archive.append(body, { name: entry, store: entry === 'mimetype' });
+    await archive.finalize();
+    await complete;
+    const path = join(root, name);
+    await writeFile(path, Buffer.concat(chunks));
+    return path;
+  }
+
+  async function sha256Of(path: string): Promise<string> {
+    return createHash('sha256')
+      .update(await readFile(path))
+      .digest('hex');
+  }
+
+  function makeResolver(convertedPath: string, converterVersion = 'v4-dev') {
+    const repository = { assertDevice: vi.fn().mockResolvedValue(undefined), setKepubContentDigest: vi.fn().mockResolvedValue(undefined) };
+    const downloads = {
+      findPrimaryFile: vi.fn().mockResolvedValue({ id: 4, absolutePath: '/library/book.epub', format: 'epub', mediaOverlayAvailable: true }),
+    };
+    const access = { assertBookAccessible: vi.fn().mockResolvedValue(undefined) };
+    const artifactRelease = vi.fn().mockResolvedValue(undefined);
+    const artifacts = {
+      prepare: vi
+        .fn()
+        .mockResolvedValue({ path: '/cache/stripped.epub', sha256: 'stripped-sha', actualVariant: 'audioless_epub', release: artifactRelease }),
+    };
+    const conversion = { acquireKepub: vi.fn().mockResolvedValue({ path: convertedPath, release: vi.fn().mockResolvedValue(undefined) }) };
+    const binary = { getVersion: vi.fn().mockResolvedValue(converterVersion) };
+    const service = new KoboDeliveryService(
+      repository as never,
+      downloads as never,
+      access as never,
+      {} as never,
+      artifacts as never,
+      conversion as never,
+      binary as never,
+    );
+    return { service, repository, conversion };
+  }
+
+  function kepubRecord(sha256: string, options: Partial<KoboDeliveryRecord['options']> = {}): KoboDeliveryRecord {
+    return record({
+      metadata: { ...record().metadata, format: 'kepub', actualVariant: 'audioless_epub', sha256 },
+      options: { hyphenate: false, converterVersion: 'v4-dev', ...options },
+    });
+  }
+
+  it('accepts a rebuild that holds the delivered conversion in another entry order, under the delivered sha', async () => {
+    const delivered = await writeKepub('delivered.kepub.epub', [...BASE, chapter('One.')]);
+    const rebuilt = await writeKepub('rebuilt.kepub.epub', [BASE[0], chapter('One.'), BASE[2], BASE[1]]);
+    const deliveredSha = await sha256Of(delivered);
+    expect(await sha256Of(rebuilt)).not.toBe(deliveredSha);
+    const { service } = makeResolver(rebuilt);
+
+    const artifact = await service.resolve(1, 2, kepubRecord(deliveredSha, { kepubContentDigest: await kepubContentDigest(delivered) }));
+
+    expect(artifact.path).toBe(rebuilt);
+    expect(artifact.sha256).toBe(deliveredSha);
+  });
+
+  it('refuses a rebuild whose text differs from the delivered conversion', async () => {
+    const delivered = await writeKepub('delivered.kepub.epub', [...BASE, chapter('One.')]);
+    const different = await writeKepub('different.kepub.epub', [...BASE, chapter('Two.')]);
+    const { service } = makeResolver(different);
+
+    await expect(
+      service.resolve(1, 2, kepubRecord(await sha256Of(delivered), { kepubContentDigest: await kepubContentDigest(delivered) })),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('refuses a rebuild of a delivery made before digests were kept, and records one when the exact copy resolves', async () => {
+    const delivered = await writeKepub('delivered.kepub.epub', [...BASE, chapter('One.')]);
+    const rebuilt = await writeKepub('rebuilt.kepub.epub', [BASE[0], chapter('One.'), BASE[2], BASE[1]]);
+    const legacy = kepubRecord(await sha256Of(delivered));
+
+    await expect(makeResolver(rebuilt).service.resolve(1, 2, legacy)).rejects.toBeInstanceOf(ConflictException);
+
+    const exact = makeResolver(delivered);
+    await exact.service.resolve(1, 2, legacy);
+    expect(exact.repository.setKepubContentDigest).toHaveBeenCalledWith(1, 2, 'stale', await kepubContentDigest(delivered));
+  });
+
+  it('tries another converter version only when a digest can confirm the content', async () => {
+    const delivered = await writeKepub('delivered.kepub.epub', [...BASE, chapter('One.')]);
+    const deliveredSha = await sha256Of(delivered);
+
+    const withoutDigest = makeResolver(delivered, 'v4.0.4');
+    await expect(withoutDigest.service.resolve(1, 2, kepubRecord(deliveredSha))).rejects.toBeInstanceOf(ConflictException);
+    expect(withoutDigest.conversion.acquireKepub).not.toHaveBeenCalled();
+
+    const withDigest = makeResolver(delivered, 'v4.0.4');
+    await expect(
+      withDigest.service.resolve(1, 2, kepubRecord(deliveredSha, { kepubContentDigest: await kepubContentDigest(delivered) })),
+    ).resolves.toMatchObject({ sha256: deliveredSha });
   });
 });

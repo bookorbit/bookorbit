@@ -70,6 +70,19 @@ export class KoboDeviceService {
 
     if (!device) throw new NotFoundException('Device not found');
 
-    await this.db.delete(schema.koboDevices).where(and(eq(schema.koboDevices.id, deviceId), eq(schema.koboDevices.userId, userId)));
+    // annotation_sync_state holds the device id as text with no foreign key, so it does not cascade;
+    // left behind, its unacknowledged deletes would block purging those annotations for good.
+    await this.db.transaction(async (tx) => {
+      await tx
+        .delete(schema.annotationSyncState)
+        .where(
+          and(
+            eq(schema.annotationSyncState.userId, userId),
+            eq(schema.annotationSyncState.source, 'kobo'),
+            eq(schema.annotationSyncState.deviceId, String(deviceId)),
+          ),
+        );
+      await tx.delete(schema.koboDevices).where(and(eq(schema.koboDevices.id, deviceId), eq(schema.koboDevices.userId, userId)));
+    });
   }
 }

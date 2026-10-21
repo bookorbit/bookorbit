@@ -9,7 +9,7 @@ import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { SmartScopeService } from '../smart-scope/smart-scope.service';
 import { LibraryService } from '../library/library.service';
-import { DashboardRepository } from './dashboard.repository';
+import { DashboardRepository, type ScrollerSelectionOptions } from './dashboard.repository';
 import { resolveDashboardLibraryIds } from './dashboard-library-scope';
 import { DASHBOARD_SCROLLER_MAX_LIMIT, type DashboardScrollerBatchDto, type DashboardScrollerBatchItemDto } from './dto/dashboard-scroller-batch.dto';
 import { ScrollerType } from './dto/scroller-type.enum';
@@ -165,24 +165,39 @@ export class DashboardService {
 
   // Book-id selection without web card assembly lets other clients shape the
   // same rows. Smart scopes stay separate because they have their own access path.
-  async getScrollerBookIds(type: Exclude<ScrollerType, 'smart-scope'>, user: RequestUser, limit: number): Promise<number[]> {
-    return this.findScrollerBookIds(type, user, Math.min(Math.max(1, limit), DASHBOARD_SCROLLER_MAX_LIMIT));
+  async getScrollerBookIds(
+    type: Exclude<ScrollerType, 'smart-scope'>,
+    user: RequestUser,
+    limit: number,
+    options: ScrollerSelectionOptions = {},
+  ): Promise<number[]> {
+    const accessibleLibraryIds = resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
+    return this.findScrollerBookIdsForLibraries(
+      type,
+      user,
+      Math.min(Math.max(1, limit), DASHBOARD_SCROLLER_MAX_LIMIT),
+      accessibleLibraryIds,
+      options,
+    );
   }
 
-  async getSmartScopeBookIds(smartScopeId: number | undefined, user: RequestUser, limit: number): Promise<number[]> {
+  async getSmartScopeBookIds(
+    smartScopeId: number | undefined,
+    user: RequestUser,
+    limit: number,
+    options: ScrollerSelectionOptions = {},
+  ): Promise<number[]> {
     const resolvedSmartScopeId = this.assertSmartScopeId(smartScopeId);
     const scope = await this.smartScopeService.findOne(resolvedSmartScopeId, user);
     if (scope.mediaType !== 'books') return [];
     const accessibleLibraryIds = resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
-    const result = await this.smartScopeService.executeSmartScope(
+    return this.smartScopeService.executeSmartScopeBookIds(
       resolvedSmartScopeId,
       user,
-      0,
       Math.min(Math.max(1, limit), DASHBOARD_SCROLLER_MAX_LIMIT),
-      undefined,
       accessibleLibraryIds,
+      options,
     );
-    return result.items.map((item) => item.id);
   }
 
   private assertSmartScopeId(smartScopeId?: number): number {
@@ -192,33 +207,29 @@ export class DashboardService {
     return smartScopeId;
   }
 
-  private async findScrollerBookIds(type: Exclude<ScrollerType, 'smart-scope'>, user: RequestUser, clampedLimit: number): Promise<number[]> {
-    const accessibleLibraryIds = resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
-    return this.findScrollerBookIdsForLibraries(type, user, clampedLimit, accessibleLibraryIds);
-  }
-
   private async findScrollerBookIdsForLibraries(
     type: Exclude<ScrollerType, 'smart-scope'>,
     user: RequestUser,
     clampedLimit: number,
     accessibleLibraryIds: number[],
+    options: ScrollerSelectionOptions = {},
   ): Promise<number[]> {
     if (accessibleLibraryIds.length === 0) return [];
 
     const contentFilters = user.isSuperuser ? undefined : user.contentFilters;
     switch (type) {
       case ScrollerType.RECENTLY_ADDED:
-        return this.dashboardRepo.findRecentlyAddedBookIds(accessibleLibraryIds, clampedLimit, contentFilters);
+        return this.dashboardRepo.findRecentlyAddedBookIds(accessibleLibraryIds, clampedLimit, contentFilters, options);
       case ScrollerType.CONTINUE_READING:
-        return this.dashboardRepo.findContinueReadingBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
+        return this.dashboardRepo.findContinueReadingBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters, options);
       case ScrollerType.CONTINUE_LISTENING:
-        return this.dashboardRepo.findContinueListeningBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
+        return this.dashboardRepo.findContinueListeningBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters, options);
       case ScrollerType.WANT_TO_READ:
-        return this.dashboardRepo.findWantToReadBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
+        return this.dashboardRepo.findWantToReadBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters, options);
       case ScrollerType.UP_NEXT_IN_SERIES:
-        return this.dashboardRepo.findUpNextInSeriesBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
+        return this.dashboardRepo.findUpNextInSeriesBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters, options);
       case ScrollerType.RANDOM:
-        return this.dashboardRepo.findRandomBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
+        return this.dashboardRepo.findRandomBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters, options);
     }
   }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import type { GroupRule, Rule } from '@bookorbit/types'
+import { READ_ALONG_FORMAT_PRIORITY } from '@bookorbit/types'
 import { useFilterTokens } from '../useFilterTokens'
 import { ruleToTokenParts } from '../../lib/filter-labels'
 
@@ -95,6 +96,11 @@ describe('ruleToTokenParts', () => {
       value: 'Want to Read',
     })
     expect(ruleToTokenParts(epub)).toEqual({ field: 'Format', operator: 'is', value: 'EPUB' })
+    expect(ruleToTokenParts({ ...epub, value: [READ_ALONG_FORMAT_PRIORITY] })).toEqual({
+      field: 'Format',
+      operator: 'is',
+      value: 'Read-along EPUB',
+    })
   })
 
   it('keeps the full operator when several values are picked', () => {

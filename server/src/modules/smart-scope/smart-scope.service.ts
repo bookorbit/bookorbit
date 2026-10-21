@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
-import type { SQL } from 'drizzle-orm';
+import { and, type SQL } from 'drizzle-orm';
 
 import type {
   BookQuery,
@@ -14,6 +14,7 @@ import type {
 } from '@bookorbit/types';
 import { APP_FEATURES, PODCAST_PLAYLIST_MAX_SAVED } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { excludeAudioOnlyBooks } from '../../common/utils/audio-only-book-sql.utils';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -340,11 +341,18 @@ export class SmartScopeService {
     );
   }
 
-  async executeSmartScopeBookIds(id: number, user: RequestUser, size: number, libraryIdsRestriction?: readonly number[]): Promise<number[]> {
+  async executeSmartScopeBookIds(
+    id: number,
+    user: RequestUser,
+    size: number,
+    libraryIdsRestriction?: readonly number[],
+    options: { excludeAudioOnly?: boolean } = {},
+  ): Promise<number[]> {
     const query: BookQuery = { sort: [], pagination: { page: 0, size } };
     const prepared = await this.prepareBooksQuery(id, user, query, libraryIdsRestriction);
     if (!prepared) return [];
-    return this.bookService.executeBookIdsQuery(user.id, prepared.where, prepared.effectiveQuery);
+    const where = options.excludeAudioOnly ? and(prepared.where, excludeAudioOnlyBooks()) : prepared.where;
+    return this.bookService.executeBookIdsQuery(user.id, where, prepared.effectiveQuery);
   }
 
   async queryBooks(id: number, user: RequestUser, query: BookQuery, libraryIdsRestriction?: readonly number[]): Promise<BooksPage> {

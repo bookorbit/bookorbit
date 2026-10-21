@@ -3,6 +3,7 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { useSetupStatus } from '@/features/auth/composables/useSetupStatus'
 import { useLoginOptions } from '@/features/auth/composables/useLoginOptions'
+import { whenSessionResolved } from '@/features/auth/composables/useSessionBootstrap'
 
 const PASSWORD_ONLY_PUBLIC_PATHS = new Set(['/forgot-password', '/reset-password'])
 
@@ -12,6 +13,8 @@ function permissionFallback(name: string | undefined) {
 
 export function registerAuthGuard(router: Router): void {
   router.beforeEach(async (to) => {
+    // No user while the server is unreachable means "not known yet", not "signed out".
+    await whenSessionResolved()
     const { fetchSetupStatus } = useSetupStatus()
     const { fetchLoginOptions, loginOptions } = useLoginOptions()
     let requiresSetup = false

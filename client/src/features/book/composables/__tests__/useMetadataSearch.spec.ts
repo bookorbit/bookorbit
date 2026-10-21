@@ -152,6 +152,23 @@ describe('useMetadataSearch', () => {
     expect(state.isStreaming.value).toBe(false)
   })
 
+  it('asks for more results per provider only when the search says so, and keeps asking on a fresh search', async () => {
+    apiMock.mockResolvedValue({ ok: false })
+
+    const scope = effectScope()
+    const state = scope.run(() => useMetadataSearch())!
+    await state.search({ author: 'Terry Pratchett', resultsPerProvider: 20 })
+    await state.searchFresh()
+    await state.search({ title: 'Dune' })
+    scope.stop()
+
+    expect(apiMock.mock.calls.map(([input]) => String(input))).toEqual([
+      '/api/v1/metadata-fetch/stream?author=Terry+Pratchett&resultsPerProvider=20',
+      '/api/v1/metadata-fetch/stream?author=Terry+Pratchett&cache=refresh&resultsPerProvider=20',
+      '/api/v1/metadata-fetch/stream?title=Dune',
+    ])
+  })
+
   it('requests the sole available provider when no provider filter is selected', async () => {
     apiMock.mockResolvedValue({ ok: false })
 

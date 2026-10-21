@@ -4,6 +4,7 @@ import { defineComponent, ref } from 'vue'
 import type { BookDetail } from '@bookorbit/types'
 import DetailsTab from '../DetailsTab.vue'
 import BookReadingActivityCard from '../../details/BookReadingActivityCard.vue'
+import ReadAloudSyncMeter from '../../details/ReadAloudSyncMeter.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useProviderLinkSettings } from '@/features/book/composables/useProviderLinkSettings'
 
@@ -447,6 +448,44 @@ describe('DetailsTab cover surface', () => {
     expect(activityCard.classes().some((className) => className.includes('min-h-0'))).toBe(false)
   })
 
+  it('lists the three most recent reading sessions', () => {
+    const sessions = Array.from({ length: 5 }, (_, index) => ({
+      id: index + 1,
+      bookFileId: 101,
+      startedAt: `2026-01-0${index + 1}T10:00:00.000Z`,
+      endedAt: `2026-01-0${index + 1}T10:30:00.000Z`,
+      durationSeconds: 1800,
+      progressDelta: 5,
+      endProgress: (index + 1) * 10,
+      format: 'epub',
+      source: null,
+      attemptId: null,
+    }))
+    const wrapper = shallowMount(BookReadingActivityCard, {
+      props: {
+        stats: {
+          totalSessions: 5,
+          totalSeconds: 9000,
+          avgDurationSeconds: 1800,
+          firstSessionAt: sessions[0]!.startedAt,
+          lastSessionAt: sessions[4]!.startedAt,
+          dailySummary: [],
+          paceProgressDelta: 0,
+          paceDurationSeconds: 0,
+          progressSummary: [],
+          latestEndProgress: 50,
+          bySource: [],
+          longestSessionSeconds: 1800,
+          longestSessionAt: sessions[0]!.startedAt,
+          backtrackCount: 0,
+        },
+        sessions,
+      },
+    })
+
+    expect(wrapper.findAll('li')).toHaveLength(3)
+  })
+
   it('summarizes pending Kobo sync state for each affected device', async () => {
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)
@@ -861,6 +900,11 @@ describe('DetailsTab cover surface', () => {
     const wrapper = mountDetails(book)
     await flushPromises()
 
+    const trigger = wrapper.get('[data-test="read-aloud-sync-trigger"]')
+    expect(trigger.text()).toBe('Synced')
+    expect(trigger.attributes('aria-label')).toBe('Read-aloud progress sync: Synced')
+    expect(wrapper.getComponent(ReadAloudSyncMeter).props()).toEqual({ aligned: true, muted: false })
+    expect(wrapper.find('[data-test="read-aloud-sync-attention"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('Enabled')
     await wrapper.get('[data-test="read-aloud-sync-toggle"]').trigger('click')
     await flushPromises()
@@ -871,6 +915,8 @@ describe('DetailsTab cover surface', () => {
       body: JSON.stringify({ mode: 'disabled' }),
     })
     expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('Disabled')
+    expect(wrapper.get('[data-test="read-aloud-sync-trigger"]').text()).toBe('Sync off')
+    expect(wrapper.getComponent(ReadAloudSyncMeter).props()).toEqual({ aligned: false, muted: true })
     expect(wrapper.emitted('saved')).toEqual([[updated]])
   })
 
@@ -904,6 +950,8 @@ describe('DetailsTab cover surface', () => {
     const wrapper = mountDetails(book)
     await flushPromises()
 
+    expect(wrapper.get('[data-test="read-aloud-sync-trigger"]').text()).toBe('Sync issue')
+    expect(wrapper.find('[data-test="read-aloud-sync-attention"]').exists()).toBe(true)
     expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('audiobook 1h 6m, read-along EPUB 1h')
     mocks.api.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) } as Response)
     await wrapper.get('[data-test="read-aloud-sync-toggle"]').trigger('click')
@@ -945,6 +993,8 @@ describe('DetailsTab cover surface', () => {
       expect(panel).toContain('EPUB copies only')
       expect(panel).toContain('Web reader, Kobo, and KOReader positions stay in sync across the EPUB copies.')
       expect(panel).not.toContain('Unavailable')
+      expect(wrapper.get('[data-test="read-aloud-sync-trigger"]').text()).toBe('Synced')
+      expect(wrapper.find('[data-test="read-aloud-sync-attention"]').exists()).toBe(false)
       // A missing audiobook is already what the description asks for, so there is nothing to add.
       expect(wrapper.find('[data-test="read-aloud-sync-audiobook-note"]').exists()).toBe(false)
     })
@@ -957,17 +1007,51 @@ describe('DetailsTab cover surface', () => {
       await flushPromises()
 
       expect(wrapper.get('[data-test="read-aloud-sync"]').text()).toContain('EPUB copies only')
+      expect(wrapper.get('[data-test="read-aloud-sync-trigger"]').text()).toBe('Partly synced')
+      expect(wrapper.getComponent(ReadAloudSyncMeter).props()).toEqual({ aligned: false, muted: false })
       expect(wrapper.get('[data-test="read-aloud-sync-audiobook-note"]').text()).toContain('audiobook 1h 6m, read-along EPUB 1h')
+      expect(wrapper.find('[data-test="read-aloud-sync-attention"]').exists()).toBe(true)
     })
 
-    it('still reports a lone read-along EPUB without an audiobook as unavailable', async () => {
+    it('shows no sync control for a lone read-along EPUB, which has nothing to sync with', async () => {
       const wrapper = mountDetails(makeBook({ files: [readAlongEpub], readAloudSync: unavailable('no_audio_files', null) }))
       await flushPromises()
 
-      const panel = wrapper.get('[data-test="read-aloud-sync"]').text()
-      expect(panel).toContain('Unavailable')
-      expect(panel).toContain('Matching standalone audiobook files are required.')
-      expect(panel).not.toContain('EPUB copies only')
+      expect(wrapper.find('[data-test="read-aloud-sync-trigger"]').exists()).toBe(false)
+      expect(wrapper.find('[data-test="read-aloud-sync"]').exists()).toBe(false)
     })
+  })
+
+  it('shows no sync control for an audiobook without a read-along EPUB', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        files: [
+          {
+            id: 102,
+            format: 'm4b',
+            role: 'primary',
+            sizeBytes: 5000,
+            absolutePath: '/books/audio.m4b',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            filename: 'audio.m4b',
+            durationSeconds: 3600,
+          },
+        ],
+        readAloudSync: {
+          mode: 'auto',
+          state: 'unavailable',
+          unavailableReason: 'no_media_overlay_epub',
+          overlayFileId: null,
+          audioDurationSeconds: 3600,
+          overlayDurationSeconds: null,
+          durationDifferenceSeconds: null,
+          durationDifferenceRatio: null,
+          koreaderDownloadAvailable: false,
+        },
+      }),
+    )
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="read-aloud-sync-trigger"]').exists()).toBe(false)
   })
 })

@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  Max,
   Min,
   IsOptional,
   IsString,
@@ -17,7 +18,12 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-import { CONCRETE_BOOK_MEDIA_KINDS, METADATA_CACHE_REQUEST_POLICIES, MetadataProviderKey } from '@bookorbit/types';
+import {
+  CONCRETE_BOOK_MEDIA_KINDS,
+  METADATA_CACHE_REQUEST_POLICIES,
+  METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER,
+  MetadataProviderKey,
+} from '@bookorbit/types';
 import type { ConcreteBookMediaKind, MetadataCacheRequestPolicy } from '@bookorbit/types';
 
 @ValidatorConstraint({ name: 'atLeastOneSearchTerm', async: false })
@@ -131,4 +137,16 @@ export class MetadataSearchDto {
   @IsOptional()
   @IsIn(METADATA_CACHE_REQUEST_POLICIES)
   cache?: MetadataCacheRequestPolicy;
+
+  /**
+   * How many ranked candidates each provider may contribute, for a search that browses rather than
+   * matches one book. Absent keeps the matching default. Clients must only send it to servers
+   * advertising the `metadata-search-results-per-provider` feature.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER)
+  resultsPerProvider?: number;
 }

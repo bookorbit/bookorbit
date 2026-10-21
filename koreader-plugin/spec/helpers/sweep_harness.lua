@@ -115,6 +115,13 @@ local function installClient(handle)
             table.insert(handle.calls.legacy_annotations, books)
             return { unmatched = {} }
         end,
+        getPluginVersion = function()
+            return { capabilities = responses.capabilities or {} }
+        end,
+        annotationPendingBooks = function(_, hashes)
+            table.insert(handle.calls.pending, hashes)
+            return { pending = responses.pending or {} }
+        end,
         sweepComplete = function()
             handle.calls.sweep_complete = handle.calls.sweep_complete + 1
             return { libraryVersion = responses.library_version }
@@ -134,6 +141,8 @@ opts:
 - match_error: HTTP or transport error returned by match-check
 - page_stats_response: function returning the server response for an upload
 - sidecar: overrides for the BookOrbitSidecar stub
+- capabilities: what the server's plugin version answer advertises
+- pending: hashes the server reports as having changes for this device
 ]]
 function SweepHarness.install(opts)
     opts = opts or {}
@@ -156,6 +165,8 @@ function SweepHarness.install(opts)
             matches = opts.matches or {},
             match_error = opts.match_error,
             page_stats = opts.page_stats_response,
+            capabilities = opts.capabilities,
+            pending = opts.pending,
         },
         calls = {
             match = {},
@@ -165,6 +176,7 @@ function SweepHarness.install(opts)
             progress = {},
             legacy_annotations = {},
             annotation_exchanges = {},
+            pending = {},
             sweep_complete = 0,
             event_queries = 0,
             latest_event_queries = 0,
@@ -248,6 +260,27 @@ function SweepHarness.install(opts)
             return fields
         end,
     }
+    -- The sync sheet and the pills are drawn elsewhere: the run's result is
+    -- what they were given, its title and notes as one text.
+    local function resultText(result)
+        local lines = { result.title }
+        if result.sub then table.insert(lines, result.sub) end
+        for _i, note in ipairs(result.notes or {}) do table.insert(lines, note) end
+        return table.concat(lines, "\n")
+    end
+    package.loaded["bookorbit_sync_sheet"] = {
+        open = function()
+            local sheet = { progress = nil }
+            handle.dialog = sheet
+            function sheet:progressed(status, done, total) self.progress = { status = status, done = done, total = total } end
+            function sheet:finished(result) handle.shown = { text = resultText(result), result = result } end
+            return sheet
+        end,
+    }
+    package.loaded["bookorbit_toast"] = {
+        show = function(text) handle.shown = { text = text } end,
+        error = function(text) handle.shown = { text = text } end,
+    }
 
     local sidecar = {
         sidecarMtime = function() return nil end,
@@ -258,6 +291,8 @@ function SweepHarness.install(opts)
         rememberServerState = function() end,
         markStatePulled = function() end,
         rememberUploadedState = function() end,
+        sidecarState = function() return nil end,
+        markFile = function() return false end,
     }
     for key, value in pairs(opts.sidecar or {}) do
         sidecar[key] = value

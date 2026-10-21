@@ -142,7 +142,7 @@ describe('BookmarkRepository', () => {
 
       const result = await repo.create(10, 5, { cfi: null, title: '00:00:15', positionSeconds: 15 });
 
-      expect(db._insert.values).toHaveBeenCalledWith({ userId: 10, bookId: 5, cfi: null, title: '00:00:15', positionSeconds: 15 });
+      expect(db._insert.values).toHaveBeenCalledWith({ userId: 10, bookId: 5, bookFileId: null, cfi: null, title: '00:00:15', positionSeconds: 15 });
       expect(db._values.onConflictDoNothing).toHaveBeenCalledTimes(1);
       expect(result).toEqual(row);
     });
@@ -173,6 +173,7 @@ describe('BookmarkRepository', () => {
       expect(db._update.set).toHaveBeenCalledWith({
         title: 'Chapter 1',
         origin: 'koreader',
+        bookFileId: null,
         devicePos: '/body/DocFragment[2]',
         pageno: 12,
         deletedAt: null,
@@ -254,6 +255,19 @@ describe('BookmarkRepository', () => {
       expect(compiled.params).toEqual([1, 5, 10]);
     });
 
+    it.each([
+      ['captureSourceFile', (repo: BookmarkRepository) => repo.captureSourceFile(10, 1, 'epubcfi(/6/2)', 77)],
+      ['captureSourceFileById', (repo: BookmarkRepository) => repo.captureSourceFileById(10, 1, 77)],
+    ])('%s records the source file without moving updatedAt', async (_name, capture) => {
+      const { repo, db } = makeRepository();
+
+      await capture(repo);
+
+      const [set] = db._update.set.mock.calls[0] as [{ bookFileId: number; updatedAt: SQL }];
+      expect(set.bookFileId).toBe(77);
+      expect(new PgDialect().sqlToQuery(set.updatedAt).sql).toBe('"bookmarks"."updated_at"');
+    });
+
     it('returns null from update for a missing, tombstoned or foreign bookmark', async () => {
       const { repo } = makeRepository();
       await expect(repo.update(5, 99, 10, { note: null })).resolves.toBeNull();
@@ -288,11 +302,13 @@ describe('BookmarkRepository', () => {
       expect(db._insert.values).toHaveBeenCalledWith({
         userId: 10,
         bookId: 5,
+        bookFileId: null,
         cfi: 'epubcfi(/6/2)',
         title: 'Chapter 1',
         origin: 'koreader',
         devicePos: '/body/DocFragment[2]/body/p[3]/text().0',
         pageno: 12,
+        note: null,
       });
       expect(result).toEqual(row);
     });

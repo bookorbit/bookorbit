@@ -17,6 +17,7 @@ import {
   SERIES_INDEX_MAX_LENGTH,
 } from '@bookorbit/types'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
+import IdentifierInput from '@/components/ui/IdentifierInput.vue'
 import MetadataMatchWorkspace from '@/features/book/components/metadata-match/MetadataMatchWorkspace.vue'
 import type { MetadataQuery } from '@/features/book/components/metadata-match/MetadataMatchQuery.vue'
 import { useBookDockDetail } from '../composables/useBookDockDetail'
@@ -574,16 +575,18 @@ onMounted(() => {
             </label>
             <label>
               <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.isbn13') }}</span>
-              <input
+              <IdentifierInput
                 v-model="form.isbn13"
+                kind="isbn"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring"
                 @input="onFieldChange"
               />
             </label>
             <label>
               <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.isbn10') }}</span>
-              <input
+              <IdentifierInput
                 v-model="form.isbn10"
+                kind="isbn"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring"
                 @input="onFieldChange"
               />

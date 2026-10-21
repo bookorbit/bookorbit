@@ -38,6 +38,10 @@ export class UpdateKoreaderUserDto {
   @IsBoolean()
   @IsOptional()
   syncEnabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  hideAudioOnlyBooks?: boolean;
 }
 
 export class TestConnectionDto {

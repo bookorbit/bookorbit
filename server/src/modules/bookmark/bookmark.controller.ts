@@ -1,18 +1,21 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookmarkService } from './bookmark.service';
 import { CreateBookmarkDto } from './dto/create-bookmark.dto';
 import { UpdateBookmarkDto } from './dto/update-bookmark.dto';
+import { BookmarkQueryDto } from './dto/bookmark-query.dto';
 
 @Controller('books/:bookId/bookmarks')
 export class BookmarkController {
   constructor(private readonly bookmarkService: BookmarkService) {}
 
   @Get()
-  getBookmarks(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
-    return this.bookmarkService.getBookmarks(bookId, user);
+  getBookmarks(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser, @Query() query: BookmarkQueryDto = {}) {
+    return query.readerFileId == null
+      ? this.bookmarkService.getBookmarks(bookId, user)
+      : this.bookmarkService.getBookmarks(bookId, user, query.readerFileId);
   }
 
   @Post()

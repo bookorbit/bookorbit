@@ -323,6 +323,9 @@ describe('AnnotationRepository', () => {
       const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
       expect(setCall).toMatchObject({ deletedAt: null });
       expect(setCall).toHaveProperty('version');
+      expect(db.transaction).toHaveBeenCalledOnce();
+      expect(db.delete).toHaveBeenCalledOnce();
+      expect(compileSql([db._queries[1].where.mock.calls[0][0]])).toContain('"source" =');
       expect(result).toEqual(restored);
     });
 
@@ -333,6 +336,7 @@ describe('AnnotationRepository', () => {
       const result = await repo.restore(1, 10);
 
       expect(result).toBeNull();
+      expect(db.delete).not.toHaveBeenCalled();
     });
   });
 
@@ -751,12 +755,12 @@ describe('AnnotationRepository', () => {
     });
   });
 
-  describe('bulkSetDeleted', () => {
+  describe('bulkTrash', () => {
     it('returns 0 for an empty id list without querying', async () => {
       const db = makeDb();
       const repo = await makeRepository(db);
 
-      expect(await repo.bulkSetDeleted(10, [], true)).toBe(0);
+      expect(await repo.bulkTrash(10, [])).toBe(0);
       expect(db.update).not.toHaveBeenCalled();
     });
 
@@ -764,22 +768,46 @@ describe('AnnotationRepository', () => {
       const db = makeDb([{ id: 1 }, { id: 2 }]);
       const repo = await makeRepository(db);
 
-      const affected = await repo.bulkSetDeleted(10, [1, 2], true);
+      const affected = await repo.bulkTrash(10, [1, 2]);
 
       expect(affected).toBe(2);
       expect(db._queries[0].set.mock.calls[0][0]).toHaveProperty('deletedAt');
     });
+  });
 
-    it('restores when deleted is false', async () => {
-      const db = makeDb([{ id: 1 }]);
+  describe('bulkRestore', () => {
+    it('returns 0 for an empty id list without querying', async () => {
+      const db = makeDb();
       const repo = await makeRepository(db);
 
-      const affected = await repo.bulkSetDeleted(10, [1], false);
+      expect(await repo.bulkRestore(10, [])).toBe(0);
+      expect(db.transaction).not.toHaveBeenCalled();
+    });
 
-      expect(affected).toBe(1);
-      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({
-        deletedAt: null,
-      });
+    // D-13: KOReader keeps its delete-acked state otherwise, and its next exchange reads the
+    // restored rows' absence as fresh deletes.
+    it('restores the rows and drops their KOReader sync state in one transaction, like a single restore', async () => {
+      const db = makeDb([{ id: 1 }, { id: 2 }]);
+      const repo = await makeRepository(db);
+
+      const affected = await repo.bulkRestore(10, [1, 2, 3]);
+
+      expect(affected).toBe(2);
+      expect(db.transaction).toHaveBeenCalledOnce();
+      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({ deletedAt: null });
+      expect(db._queries[0].set.mock.calls[0][0]).toHaveProperty('version');
+      expect(db.delete).toHaveBeenCalledOnce();
+      const stateFilter = compileSql([db._queries[1].where.mock.calls[0][0]]);
+      expect(stateFilter).toContain('"source" =');
+      expect(stateFilter).toContain('"annotation_id" in');
+    });
+
+    it('touches no sync state when nothing was in the trash', async () => {
+      const db = makeDb([]);
+      const repo = await makeRepository(db);
+
+      expect(await repo.bulkRestore(10, [1])).toBe(0);
+      expect(db.delete).not.toHaveBeenCalled();
     });
   });
 

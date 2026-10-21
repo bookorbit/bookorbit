@@ -37,7 +37,7 @@ import { basename, dirname, extname, join, relative } from 'path';
 import { tmpdir } from 'os';
 
 import {
-  BOOK_FORMATS,
+  BOOK_FILTER_FORMATS,
   BOOK_METADATA_LOCK_FIELDS,
   DEFAULT_DOWNLOAD_PATTERN,
   COVER_MEDIA,
@@ -134,6 +134,8 @@ import type { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { READING_DATE_ERROR_CODES } from '../user-book-status/user-book-status.constants';
 import { inspectEpubMediaOverlayFields, mediaOverlayCapabilityFromFields } from '../reader/epub/epub-media-overlay-capability';
 import { computeFileHash } from '../scanner/lib/hash';
+import { compareCfi } from '../position-converter/cfi.utils';
+import { PositionConverterService } from '../position-converter/position-converter.service';
 
 type SeriesCollapseQueryOptions = {
   seriesSelectionFilter: GroupRule | undefined;
@@ -163,6 +165,7 @@ export type ExportScope = 'primary' | 'all' | 'audio';
 
 const READ_ALOUD_MAX_DURATION_DIFF_RATIO = 0.05;
 const READ_ALOUD_MAX_DURATION_DIFF_SECONDS = 300;
+const NARRATION_PERCENT_TOLERANCE = 5;
 
 export type BulkEditFieldResult = { updated: number; skippedLocked: number };
 export type BulkEditMetadataResult = {
@@ -334,6 +337,7 @@ export class BookService {
     @Optional() private readonly readingAttemptEvents?: ReadingAttemptEventsService,
     @Optional() private readonly deliverySelection?: DeliverySelectionService,
     @Optional() private readonly metadataExtraction?: MetadataExtractionService,
+    @Optional() private readonly positionConverter?: PositionConverterService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -1156,7 +1160,7 @@ export class BookService {
     const [total, libraryTotal, formatCounts] = await Promise.all([
       this.bookRepo.countWhere(where),
       narrowed ? this.bookRepo.countWhere(this.queryBuilder.buildWhere(undefined, scope)) : null,
-      this.bookRepo.countFormatFacets(formatWhere, BOOK_FORMATS),
+      this.bookRepo.countFormatFacets(formatWhere, BOOK_FILTER_FORMATS),
     ]);
     const formats = formatCounts.filter((facet) => facet.count > 0).sort((a, b) => b.count - a.count || a.format.localeCompare(b.format));
 
@@ -1961,11 +1965,13 @@ export class BookService {
       }
 
       if (dto.seriesMemberships !== undefined) {
+        const previous = (await this.seriesMemberships?.findByBookId(id, tx)) ?? [];
+        const totalOptions = { previousSeriesIds: new Set(previous.map((membership) => membership.seriesId)) };
         await this.seriesMemberships?.replaceForBook(id, dto.seriesMemberships, tx);
         // After replaceForBook, because it is what creates any series row the editor named.
         for (const membership of dto.seriesMemberships ?? []) {
           if (membership.expectedBookCount === undefined) continue;
-          await this.seriesExpectedCount?.setManual(membership.seriesName, membership.expectedBookCount ?? null, tx);
+          await this.seriesExpectedCount?.setManual(membership.seriesName, membership.expectedBookCount ?? null, tx, totalOptions);
         }
       }
       this.throwIfMetadataUpdateFailpoint('afterSeriesMembershipsReplace');
@@ -2350,22 +2356,66 @@ export class BookService {
    * page back to it. The audiobook-to-ebook sync deliberately does not come through here, since
    * moving the text position is that feature's whole purpose and it has its own setting.
    */
-  private resolveTextPosition(dto: SaveProgressDto, previous: { percentage: number; cfi: string | null; pageNumber: number | null } | null) {
+  private async resolveTextPosition(
+    fileId: number,
+    dto: SaveProgressDto,
+    previous: { percentage: number; cfi: string | null; pageNumber: number | null } | null,
+  ) {
     if (dto.source !== 'narration') {
       return { percentage: dto.percentage, cfi: dto.cfi ?? null, pageNumber: dto.pageNumber ?? null, moved: true };
     }
     const stored = previous?.percentage ?? 0;
+    // The sentence being narrated is where a listener is, to the sentence. A narration percentage is
+    // too coarse to tell (it can hold still across a page or more) and the page a client reports is
+    // its own page start, so a phone, a Kobo or KOReader opened pages behind what was heard.
+    const sentence = await this.narratedSentenceCfi(fileId, dto);
+    const order = sentence && previous?.cfi ? compareCfi(sentence, previous.cfi) : sentence ? 1 : null;
+    if (sentence && order !== null) {
+      return order > 0
+        ? { percentage: Math.max(stored, dto.percentage), cfi: sentence, pageNumber: previous?.pageNumber ?? null, moved: true }
+        : { percentage: stored, cfi: previous?.cfi ?? null, pageNumber: previous?.pageNumber ?? null, moved: false };
+    }
     if (dto.percentage > stored) {
       return { percentage: dto.percentage, cfi: dto.cfi ?? previous?.cfi ?? null, pageNumber: previous?.pageNumber ?? null, moved: true };
     }
     return { percentage: stored, cfi: previous?.cfi ?? null, pageNumber: previous?.pageNumber ?? null, moved: false };
   }
 
-  async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
+  private async narratedSentenceCfi(fileId: number, dto: SaveProgressDto): Promise<string | null> {
+    const fragment = dto.mediaOverlayFragment?.slice(dto.mediaOverlayFragment.lastIndexOf('#') + 1);
+    if (!this.positionConverter || !fragment || typeof dto.mediaOverlaySectionIndex !== 'number') return null;
+    try {
+      const outcome = await this.positionConverter.fragmentToPositions({ bookFileId: fileId, chapterIndex: dto.mediaOverlaySectionIndex, fragment });
+      return outcome.status === 'failed' ? null : (outcome.cfi ?? null);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * A narration write's percentage, checked against where its position sits in the narration. The
+   * iOS store keeps its percentage forward-only beside the player, so a phone listening from the
+   * start after a reset sent its old 85% with it, and every device showed 85%. A client's figure
+   * within a few points stands, since its total for the narration can differ a little from ours.
+   */
+  private withNarrationPercentage(
+    file: { mediaOverlayAvailable?: boolean | null; mediaOverlayDurationSeconds?: number | null },
+    dto: SaveProgressDto,
+  ): SaveProgressDto {
+    const total = file.mediaOverlayDurationSeconds;
+    const position = dto.positionSeconds;
+    if (dto.source !== 'narration' || file.mediaOverlayAvailable !== true || typeof position !== 'number' || !Number.isFinite(position)) return dto;
+    if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0) return dto;
+    const narrated = Math.min(100, Math.max(0, (position / total) * 100));
+    return Math.abs(narrated - dto.percentage) > NARRATION_PERCENT_TOLERANCE ? { ...dto, percentage: narrated } : dto;
+  }
+
+  async saveProgress(userId: number, fileId: number, request: SaveProgressDto, user: RequestUser) {
     const file = await this.verifyFileAccess(fileId, user);
+    const dto = this.withNarrationPercentage(file, request);
     const previous = await this.bookRepo.findProgress(userId, fileId);
     const now = new Date();
-    const text = this.resolveTextPosition(dto, previous ?? null);
+    const text = await this.resolveTextPosition(fileId, dto, previous ?? null);
     await this.bookRepo.upsertProgress(
       userId,
       fileId,
@@ -2409,12 +2459,23 @@ export class BookService {
       percentage: text.percentage,
       cfi: text.cfi,
       koreaderProgress: dto.koreaderProgress ?? null,
-      positionSeconds: dto.positionSeconds ?? null,
-      mediaOverlayFragment: dto.mediaOverlayFragment ?? null,
-      mediaOverlaySectionIndex: dto.mediaOverlaySectionIndex ?? null,
+      positionSeconds: dto.source === 'text' ? null : (dto.positionSeconds ?? null),
+      mediaOverlayFragment: dto.source === 'text' ? null : (dto.mediaOverlayFragment ?? null),
+      mediaOverlaySectionIndex: dto.source === 'text' ? null : (dto.mediaOverlaySectionIndex ?? null),
       sourceUpdatedAt: now,
       syncSiblingEpubs: text.moved,
     });
+    if (dto.source !== 'narration') {
+      await this.audiobookEbookProgressSync?.advanceNarrationToText({
+        userId,
+        bookId: file.bookId,
+        bookFileId: fileId,
+        percentage: text.percentage,
+        cfi: text.cfi,
+        koreaderProgress: text.cfi ? null : (dto.koreaderProgress ?? null),
+        sourceUpdatedAt: now,
+      });
+    }
     const strongRereadEvidence = previous != null && previous.percentage - text.percentage >= 10;
     await this.autoUpdateReadStatusForProgress(userId, file, text.percentage, {
       origin: 'bookorbit',
@@ -2451,16 +2512,29 @@ export class BookService {
       sourceUpdatedAt: locators.sourceUpdatedAt,
       syncSiblingEpubs: locators.syncSiblingEpubs,
     });
+    await this.audiobookEbookProgressSync?.advanceNarrationToText({
+      userId,
+      bookId,
+      bookFileId,
+      percentage,
+      cfi: locators.cfi ?? null,
+      koreaderProgress: locators.koreaderProgress ?? null,
+      sourceUpdatedAt: locators.sourceUpdatedAt,
+    });
   }
 
   async clearFileProgress(userId: number, fileId: number, user: RequestUser): Promise<void> {
-    await this.verifyFileAccess(fileId, user);
+    const file = await this.verifyFileAccess(fileId, user);
+    const resetAt = new Date();
     await this.bookRepo.clearFileProgress(userId, fileId);
+    await this.audiobookEbookProgressSync?.startNarrationAfterReset({ userId, bookId: file.bookId, fileIds: [fileId], resetAt });
   }
 
   async clearBookProgressForReread(userId: number, bookId: number, user: RequestUser): Promise<void> {
     await this.verifyBookAccess(bookId, user);
+    const resetAt = new Date();
     await this.bookRepo.clearBookProgress(userId, bookId);
+    await this.audiobookEbookProgressSync?.startNarrationAfterReset({ userId, bookId, resetAt });
   }
 
   async setReadStatus(bookId: number, dto: SetStatusDto, user: RequestUser): Promise<UserBookStatus> {

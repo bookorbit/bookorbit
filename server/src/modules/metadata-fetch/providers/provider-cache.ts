@@ -1,7 +1,7 @@
 import { canonicalJson } from '../../../common/provider-cache/canonicalize';
 import type { ProviderCacheContext } from '../../../common/provider-cache/provider-cache-spec';
 import { MetadataSearchParams } from './metadata-search-params';
-import { allowsAudiobookProviders } from './provider-utils';
+import { allowsAudiobookProviders, searchPageSize } from './provider-utils';
 
 /**
  * Shared pieces of each provider's cache declaration. Keep key inputs conservative: every value the
@@ -24,6 +24,15 @@ export function pickSearchInputs(params: MetadataSearchParams, fields: readonly 
 /** Audiobook-only providers answer nothing unless asked for audiobooks, so the gate is part of the key. */
 export function audiobookGate(params: MetadataSearchParams): boolean {
   return allowsAudiobookProviders(params);
+}
+
+/**
+ * A widened page holds records the default one does not, so its size is part of the key. The default
+ * size stays out of it, which keeps every answer stored before pages could widen addressable.
+ */
+export function widenedPageSize(params: MetadataSearchParams, defaultSize: number): number | undefined {
+  const size = searchPageSize(params, defaultSize);
+  return size === defaultSize ? undefined : size;
 }
 
 /** Absent means the provider's own default (its largest), matching how providers read the cap. */

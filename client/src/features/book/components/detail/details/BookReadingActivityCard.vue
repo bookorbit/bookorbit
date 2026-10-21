@@ -13,7 +13,7 @@ const props = withDefaults(
     /** Recent sessions listed under the summary. 0 hides the list entirely. */
     sessionRows?: number
   }>(),
-  { sessions: () => [], loading: false, sessionRows: 4 },
+  { sessions: () => [], loading: false, sessionRows: 3 },
 )
 
 const { t } = useI18n()

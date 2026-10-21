@@ -11,7 +11,7 @@ import { useBrowseCounts } from '@/composables/useBrowseCounts'
 import { useMediaMode } from '@/composables/useMediaMode'
 import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
 
-/** Reading renders after the entity sections; the rest sit above them in this order. */
+/** `primary` is pinned on top; useSidebarLayout places the others among the list sections in the user's order. */
 export const SIDEBAR_ZONE_IDS = ['primary', 'browse', 'reading'] as const
 export type SidebarZoneId = (typeof SIDEBAR_ZONE_IDS)[number]
 
@@ -46,6 +46,8 @@ export interface SidebarNavEntry {
   permission?: string | string[]
   visible?: (context: NavContext) => boolean
   badge?: (context: NavContext) => SidebarNavBadge | null
+  /** A hidden row comes back while its accent badge counts work waiting on the user. */
+  returnsWithWork?: boolean
   tourId?: string
 }
 
@@ -56,6 +58,7 @@ export interface ResolvedSidebarNavEntry {
   to: RouteLocationRaw
   isActive: boolean
   badge: SidebarNavBadge | null
+  returnsWithWork: boolean
   tourId?: string
 }
 
@@ -128,6 +131,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     isActive: (route) => route.name === 'book-dock',
     permission: 'book_dock_access',
     badge: (context) => (context.bookDockTotal > 0 ? { value: context.bookDockTotal, tone: 'accent' } : null),
+    returnsWithWork: true,
     tourId: 'book-dock-btn',
   },
   {
@@ -143,6 +147,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     visible: (context) => context.showBookRequests !== false,
     badge: (context) =>
       context.outstandingRequestTotal > 0 ? { value: context.outstandingRequestTotal, label: context.outstandingRequestLabel, tone: 'accent' } : null,
+    returnsWithWork: true,
   },
   {
     id: 'tools',
@@ -217,6 +222,7 @@ export function resolveNavEntry(entry: SidebarNavEntry, context: NavContext, rou
     to: typeof entry.to === 'function' ? entry.to(context) : entry.to,
     isActive: entry.isActive(route),
     badge: entry.badge ? entry.badge(context) : null,
+    returnsWithWork: entry.returnsWithWork === true,
     tourId: entry.tourId,
   } satisfies ResolvedSidebarNavEntry
 }

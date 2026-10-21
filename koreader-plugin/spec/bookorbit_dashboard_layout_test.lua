@@ -1,90 +1,54 @@
--- Proves the dashboard's vertical budget: that shelves are measured at the
--- height their cover cards actually need, that a page too tight for the
--- configured slots drops the stats strip before any shelf, and that nothing is
--- laid out past the available height.
+-- Proves the widget board's layout rules: the grid each screen width gets,
+-- dense packing, that every starter page fits every supported screen, how
+-- boards are stored, and that editing can never keep a page that does not fit.
 
-package.loaded["document/documentregistry"] = { hasProvider = function() return true end }
-package.loaded["util"] = {
-    fixUtf8 = function(value) return value end,
-    urlEncode = function(value) return value end,
-}
-package.loaded["ffi/util"] = { template = function(value) return value end }
-package.loaded["gettext"] = function(text) return text end
-
-local function widgetClass(height)
-    return {
-        new = function(_, opts)
-            opts = opts or {}
-            if not opts.getSize then
-                function opts:getSize()
-                    return { w = 100, h = self.width or height or 20 }
-                end
-            end
-            return opts
-        end,
-    }
+package.loaded["gettext"] = function(text)
+    return text
 end
-
-package.loaded["ffi/blitbuffer"] = { COLOR_DARK_GRAY = 1, COLOR_LIGHT_GRAY = 2 }
-package.loaded["ui/widget/button"] = widgetClass()
-package.loaded["ui/widget/container/centercontainer"] = widgetClass()
-package.loaded["ui/font"] = { getFace = function() return {} end }
-package.loaded["ui/geometry"] = widgetClass()
-package.loaded["ui/widget/horizontalgroup"] = widgetClass(0)
-package.loaded["ui/widget/horizontalspan"] = widgetClass(0)
-package.loaded["ui/widget/infomessage"] = widgetClass()
-package.loaded["ui/widget/linewidget"] = widgetClass()
-package.loaded["ui/network/manager"] = { isConnected = function() return true end }
-package.loaded["device"] = { screen = { scaleBySize = function(_, value) return value end } }
-package.loaded["ui/size"] = {
-    line = { thin = 1 },
-    padding = { large = 8 },
-    span = { horizontal_default = 4, vertical_default = 4 },
-}
-package.loaded["ui/widget/textboxwidget"] = widgetClass()
-package.loaded["ui/widget/textwidget"] = widgetClass()
-package.loaded["ui/uimanager"] = { show = function() end }
-package.loaded["ui/widget/verticalgroup"] = widgetClass(0)
-package.loaded["ui/widget/verticalspan"] = widgetClass()
-package.loaded["bookorbit_stats_reader"] = {
-    getReadingSummary = function()
-        return { today_seconds = 600, week_seconds = 3600, streak_days = 3 }
+package.loaded["ffi/util"] = {
+    template = function(text, ...)
+        local values = { ... }
+        return (text:gsub("%%(%d+)", function(index)
+            return tostring(values[tonumber(index)])
+        end))
     end,
 }
+local shown = {}
+package.loaded["ui/uimanager"] = {
+    show = function(_, widget)
+        table.insert(shown, widget)
+    end,
+}
+package.loaded["ui/widget/infomessage"] = { new = function(_, opts) return opts end }
+-- Refusals are told in BookOrbit's pill; record them like a shown widget.
+package.loaded["bookorbit_toast"] = {
+    show = function(text) table.insert(shown, { text = text }) end,
+    error = function(text) table.insert(shown, { text = text }) end,
+}
 
-local HEADER_HEIGHT = 20
-local HEADER_ROW_HEIGHT = 14
-local STATUS_LINE_HEIGHT = 16
-local HIGHLIGHT_CARD_HEIGHT = 64
-
-package.loaded["bookorbit_catalog_widgets"] = {
-    DashboardCoverCard = widgetClass(),
-    DashboardHeroCard = widgetClass(),
-    DashboardHighlightCard = widgetClass(),
-    DashboardBrowseRow = widgetClass(),
-    DashboardIconButton = widgetClass(),
-    assetIconFile = function() return nil end,
-    dashboardSectionHeaderRowHeight = function() return HEADER_ROW_HEIGHT end,
-    buildDashboardSectionHeader = function()
-        return { getSize = function() return { w = 100, h = HEADER_HEIGHT } end }
-    end,
-    buildStatusLabel = function()
-        return { getSize = function() return { w = 100, h = STATUS_LINE_HEIGHT } end }
-    end,
-    dashboardHighlightCardHeight = function()
-        return HIGHLIGHT_CARD_HEIGHT
-    end,
-    coverCardHeight = function(card_w)
-        return card_w + 20
-    end,
-    dashboardHeroHeightForCoverCard = function(card_w)
-        return card_w + 24
-    end,
+-- The real metrics module over a stubbed screen, so each device below is
+-- measured in board units exactly as it is on the device.
+local screen = { w = 600, h = 800, dpi = 167 }
+package.loaded["ffi/blitbuffer"] = setmetatable({}, { __index = function() return 0 end })
+local last_face_size
+package.loaded["ui/font"] = { getFace = function(_, _, size) last_face_size = size return {} end }
+package.loaded["device"] = {
+    screen = {
+        getWidth = function() return screen.w end,
+        getHeight = function() return screen.h end,
+        getDPI = function() return screen.dpi end,
+        scaleBySize = function(_, value)
+            return math.ceil(value * math.min(screen.w, screen.h) / 600)
+        end,
+    },
 }
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
-local CatalogDashboard = require("bookorbit_catalog_dashboard")
+local BoardMetrics = require("bookorbit_board_metrics")
+local BoardLayout = require("bookorbit_board_layout")
+local BoardStore = require("bookorbit_board_store")
+local BoardEdit = require("bookorbit_board_edit")
 local DashboardSections = require("bookorbit_dashboard_sections")
 
 local function assertEqual(actual, expected, label)
@@ -93,174 +57,408 @@ local function assertEqual(actual, expected, label)
     end
 end
 
-local STATS_HEIGHT = 60
+local function px(value) return value end
 
-local function books(count)
-    local list = {}
-    for id = 1, count do list[id] = { id = id } end
-    return list
+assertEqual(BoardMetrics.get().scale, 1.05, "metrics start at the default size before settings load")
+
+-- Size codes adapt to the column count: on a two-column board W is M and XL
+-- is L.
+local cw, rh = BoardLayout.sizeDims("W", 2)
+assertEqual(cw .. "x" .. rh, "2x1", "W on two columns is M")
+cw, rh = BoardLayout.sizeDims("XL", 6)
+assertEqual(cw .. "x" .. rh, "6x2", "XL spans six columns")
+cw, rh = BoardLayout.sizeDims("L", 4)
+assertEqual(cw .. "x" .. rh, "2x2", "L is two by two")
+
+assertEqual(BoardLayout.columnsFor(559), 2, "a phone-width screen gets two columns")
+assertEqual(BoardLayout.columnsFor(560), 4, "an e-reader width gets four columns")
+assertEqual(BoardLayout.columnsFor(899), 4, "four columns up to tablet width")
+assertEqual(BoardLayout.columnsFor(900), 6, "a landscape tablet gets six columns")
+
+-- The last column absorbs the rounding remainder, so a row of tiles always
+-- ends exactly on the right margin.
+for _, width in ipairs({ 600, 601, 637, 1001 }) do
+    local g = BoardLayout.geometry(px, width, 900, width)
+    local x, total = 0, 0
+    while x < g.cols do
+        total = total + BoardLayout.spanWidth(g, x, 1) + (x + 1 < g.cols and g.gap or 0)
+        x = x + 1
+    end
+    assertEqual(total, g.w, "single tiles across a " .. width .. "px row fill it")
+    assertEqual(BoardLayout.spanWidth(g, 0, g.cols), g.w, "a full-width tile spans the grid at " .. width .. "px")
 end
 
-local function newCatalog(opts)
-    local slots = {}
-    for index = 1, DashboardSections.SLOT_COUNT do
-        slots[index] = { type = opts.sections[index].type, books = books(opts.books or 12) }
-    end
-    local catalog = {
-        settings = {
-            [DashboardSections.SETTING_KEY] = {
-                opts.sections[1], opts.sections[2], opts.sections[3], opts.sections[4],
-                schemaVersion = DashboardSections.SCHEMA_VERSION,
-            },
-        },
-        available_height = opts.avail,
-        content_w = opts.content_w or 500,
-        content_inset = 0,
-        item_group = {},
-        layout = {},
-        current_context = {
-            kind = "dashboard",
-            dashboard = { continueReading = books(4), dashboardSlots = slots },
-        },
-        shelves = {},
-        headers = {},
-    }
-    for name, fn in pairs(CatalogDashboard) do
-        if name ~= "install" then catalog[name] = fn end
-    end
-    function catalog:prepareCustomUpdate() return nil end
-    function catalog:finishCustomUpdate() end
-    function catalog:ensureOnDeviceCurrent() end
-    function catalog:isOnDevice() return false end
-    function catalog:onDeviceCount() return 0 end
-    function catalog:readStatusLabel() return nil end
-    function catalog:buildDashboardStatsStrip()
-        return { getSize = function() return { w = 100, h = STATS_HEIGHT } end }
-    end
+-- Packing is first-fit and dense: a later small widget fills a hole left
+-- beside an earlier wide one.
+local packed = BoardLayout.pack({
+    { type = "a", cw = 3, rh = 1 },
+    { type = "b", cw = 2, rh = 1 },
+    { type = "c", cw = 1, rh = 1 },
+}, 4)
+assertEqual(packed.placed[3].x .. "," .. packed.placed[3].y, "3,0", "the small widget fills the first-row hole")
+assertEqual(packed.rows, 2, "two rows are used")
+assertEqual(packed.holes, 2, "the half-empty last row counts as two holes")
+assertEqual(BoardLayout.pack({ { cw = 9, rh = 1 } }, 4).placed[1].cw, 4, "a widget wider than the grid is clamped")
 
-    local addHeader = catalog.addDashboardHeader
-    function catalog:addDashboardHeader(text, controls)
-        table.insert(self.headers, text)
-        return addHeader(self, text, controls)
+-- A page with more rows than fit drops widgets from its end; a page with room
+-- takes extras that leave no new hole.
+local g = BoardLayout.geometry(px, 600, 800, 600)
+local base = {}
+for _ = 1, 12 do table.insert(base, { type = "s", cw = 4, rh = 1 }) end
+local fitted = BoardLayout.fitPage(g, base, {})
+assertEqual(fitted.row_h >= g.min_row, true, "a crowded page keeps rows at least the minimum height")
+assertEqual(#fitted.placed < 12, true, "a crowded page drops widgets from its end")
+fitted = BoardLayout.fitPage(g, { { type = "a", cw = 4, rh = 1 } }, { { type = "extra", cw = 4, rh = 1 } })
+assertEqual(#fitted.placed, 2, "a roomy page takes an extra")
+assertEqual(fitted.row_h <= g.max_row, true, "rows never grow past the maximum height")
+
+-- Every starter page of every layout fits every class of screen KOReader runs
+-- on, upright and turned, with and without a frontlight: rows stay between
+-- the minimum and maximum height and the grid never runs past its space.
+local DEVICES = {
+    { "Kindle 4", 600, 800, 167 },
+    { "Kobo Mini", 600, 800, 200 },
+    { "Kobo Clara", 1072, 1448, 300 },
+    { "Kobo Libra", 1264, 1680, 300 },
+    { "Palma", 824, 1648, 300 },
+    { "Kobo Elipsa", 1404, 1872, 227 },
+    { "Kindle Scribe", 1860, 2480, 300 },
+    { "phone", 1080, 2400, 420 },
+    { "small phone", 720, 1280, 320 },
+    { "tablet", 1600, 2560, 320 },
+}
+local checked = 0
+for _, device in ipairs(DEVICES) do
+    for _, turned in ipairs({ false, true }) do
+        screen.w, screen.h, screen.dpi = device[2], device[3], device[4]
+        if turned then screen.w, screen.h = screen.h, screen.w end
+        for _, ui_scale in ipairs(BoardMetrics.UI_SCALES) do
+            BoardMetrics.setUserScale(ui_scale)
+            local m = BoardMetrics.refresh()
+            local sg = BoardLayout.geometry(BoardMetrics.px, m.w, m.h, m.W)
+            for _, preset in ipairs(BoardStore.PRESETS) do
+                for _, has_light in ipairs({ true, false }) do
+                    for page_index, page in ipairs(BoardStore.starterPages(sg.cols, preset, has_light, m.w > m.h)) do
+                        local label = string.format("%s page %d on %s%s at %.1fx",
+                            preset, page_index, device[1], turned and " turned" or "", ui_scale)
+                        local result = BoardLayout.fitPage(sg, page.base, page.extras)
+                        assertEqual(result.row_h >= sg.min_row, true, label .. " keeps rows tall enough")
+                        assertEqual(result.grid_h <= sg.avail, true, label .. " fits the screen")
+                        for _, item in ipairs(result.placed) do
+                            assertEqual(item.x + item.cw <= sg.cols, true,
+                                label .. " keeps " .. item.type .. " inside the grid")
+                        end
+                        checked = checked + 1
+                    end
+                end
+            end
+        end
     end
-    local addGrid = catalog.addDashboardCoverGrid
-    function catalog:addDashboardCoverGrid(section_id, list, height, with_progress, with_caption, cols, card_w, page, rows)
-        table.insert(self.shelves, { id = section_id, height = height, cols = cols, card_w = card_w })
-        return addGrid(self, section_id, list, height, with_progress, with_caption, cols, card_w, page, rows)
+end
+assertEqual(checked, #DEVICES * 2 * #BoardMetrics.UI_SCALES * 3 * 2 * BoardStore.PAGE_COUNT,
+    "every starter page was checked at every interface size")
+screen.w, screen.h, screen.dpi = 600, 800, 167
+BoardMetrics.setUserScale(1)
+BoardMetrics.refresh()
+
+BoardMetrics.setUserScale(1.2)
+local scaled = BoardMetrics.refresh()
+assertEqual(scaled.scale, 1.2, "the selected interface size is retained")
+BoardMetrics.face(10)
+assertEqual(last_face_size, 10 * scaled.adj * scaled.scale, "the selected interface size scales fonts")
+BoardMetrics.namedFace("cfont", 11)
+assertEqual(last_face_size, 11 * scaled.adj * scaled.scale, "named KOReader fonts use the same interface scale")
+assertEqual(BoardMetrics.normalizeUserScale(1.149999), 1.15, "minor numeric drift is normalized")
+assertEqual(BoardMetrics.normalizeUserScale(1.25), 1.2, "the retired interface size migrates to the supported maximum")
+assertEqual(BoardMetrics.normalizeUserScale("1.25"), 1.2, "the retired persisted string size migrates")
+assertEqual(BoardMetrics.DEFAULT_UI_SCALE, 1.05, "the default interface size is 1.05x")
+assertEqual(BoardMetrics.normalizeUserScale(nil), 1.05, "missing preferences use the default size")
+assertEqual(BoardMetrics.normalizeUserScale("invalid"), 1.05, "invalid preferences use the default size")
+assertEqual(BoardMetrics.normalizeUserScale(1.17), 1.05, "unsupported interface sizes fall back safely")
+assertEqual(BoardMetrics.normalizeUserScale(1), 1, "an explicit saved 1.0x preference is preserved")
+BoardMetrics.setUserScale(1)
+BoardMetrics.refresh()
+
+-- Each page has one job: no widget appears on two pages, on any screen
+-- layout, with or without a frontlight.
+for _, cols in ipairs({ 2, 4, 6 }) do
+    for _, landscape in ipairs({ false, true }) do
+        for _, has_light in ipairs({ true, false }) do
+            local seen = {}
+            for _, page in ipairs(BoardStore.starterPages(cols, "reader", has_light, landscape)) do
+                for _, list in ipairs({ page.base, page.extras }) do
+                    for _, item in ipairs(list) do
+                        local key = item.type .. ":" .. tostring(item.props and (item.props.source or item.props.link) or "")
+                        assertEqual(seen[key] == nil or seen[key] == page.id, true,
+                            key .. " appears on both " .. tostring(seen[key]) .. " and " .. page.id .. " (" .. cols .. " columns)")
+                        seen[key] = page.id
+                    end
+                end
+            end
+        end
     end
+end
+
+-- The Stats and Library starters keep the same pages and only change which of
+-- the first three comes first; Decor is always last.
+local function ids(pages)
+    local out = {}
+    for i, page in ipairs(pages) do out[i] = page.id end
+    return table.concat(out, ",")
+end
+assertEqual(ids(BoardStore.starterPages(4, "reader", true)), "home,insights,library,decor", "Reader opens on Home")
+assertEqual(ids(BoardStore.starterPages(4, "stats", true)), "insights,home,library,decor", "Stats opens on Insights")
+assertEqual(ids(BoardStore.starterPages(4, "library", true)), "library,home,insights,decor", "Library opens on Library")
+assertEqual(table.concat(BoardStore.pageNames(BoardStore.starterPages(4, "stats", true)), ","), "Insights,Home,Library,Decor",
+    "page names follow the pages")
+
+-- A device without a frontlight never gets the Light widget.
+for _, cols in ipairs({ 2, 4, 6 }) do
+    for _, preset in ipairs(BoardStore.PRESETS) do
+        for _, page in ipairs(BoardStore.starterPages(cols, preset, false)) do
+            for _, list in ipairs({ page.base, page.extras }) do
+                for _, item in ipairs(list) do
+                    assertEqual(item.type ~= "light", true, preset .. " on " .. cols .. " columns has no Light without a frontlight")
+                end
+            end
+        end
+    end
+end
+
+-- A shelf is never one row tall, in a starter layout or as a size the editor
+-- offers: a single row leaves covers too small to recognise.
+for _, cols in ipairs({ 2, 4, 6 }) do
+    for _, preset in ipairs(BoardStore.PRESETS) do
+        for _, page in ipairs(BoardStore.starterPages(cols, preset, true)) do
+            for _, list in ipairs({ page.base, page.extras }) do
+                for _, item in ipairs(list) do
+                    if item.type == "shelf" then
+                        assertEqual(item.rh >= 2, true, preset .. " on " .. cols .. " columns keeps its shelves two rows tall")
+                    end
+                end
+            end
+        end
+    end
+end
+for _, entry in ipairs(BoardEdit.LIBRARY) do
+    if entry.type == "shelf" then
+        for _, code in ipairs(entry.sizes) do
+            local _cw, size_rh = BoardLayout.sizeDims(code, 4)
+            assertEqual(size_rh >= 2, true, entry.name() .. " offers no one-row size")
+        end
+    end
+end
+
+-- Storage: anything unusable reads as the default Reader board.
+local state = BoardStore.read({})
+assertEqual(state.preset .. "/" .. state.tiles .. "/" .. tostring(state.started), "reader/outline/false", "no setting reads as the default")
+state = BoardStore.read({ [BoardStore.SETTING_KEY] = { version = 1, preset = "nope", tiles = "neon", started = true } })
+assertEqual(state.preset .. "/" .. state.tiles, "reader/outline", "unknown values fall back")
+assertEqual(state.started, true, "a valid started flag survives")
+state = BoardStore.read({ [BoardStore.SETTING_KEY] = { version = 99, preset = "stats" } })
+assertEqual(state.preset, "reader", "a setting from another version is not trusted")
+
+-- Custom pages are kept per column count; other counts still get the starter.
+local settings = {}
+settings[BoardStore.SETTING_KEY] = BoardStore.withPreset(settings, "stats")
+settings[BoardStore.SETTING_KEY] = BoardStore.withCustomPages(settings, 4, {
+    { items = { { type = "clock", cw = 1, rh = 1 } } },
+})
+local pages, custom = BoardStore.pages(settings, 4, true)
+assertEqual(custom, true, "four columns use the reader's pages")
+assertEqual(pages[1].base[1].type, "clock", "the stored widget is drawn")
+assertEqual(#pages[2].base, 0, "a page the reader emptied stays empty")
+pages, custom = BoardStore.pages(settings, 2, true)
+assertEqual(custom, false, "two columns still use the starter layout")
+settings[BoardStore.SETTING_KEY] = BoardStore.withPreset(settings, "library")
+assertEqual(next(BoardStore.read(settings).custom), nil, "a new layout replaces the reader's pages")
+
+-- Portrait and landscape can share a column count but not a height, so each
+-- keeps its own pages.
+settings = {}
+settings[BoardStore.SETTING_KEY] = BoardStore.withCustomPages(settings, 4, {
+    { items = { { type = "clock", cw = 1, rh = 1 } } },
+}, true)
+pages, custom = BoardStore.pages(settings, 4, true, true)
+assertEqual(custom and pages[1].base[1].type, "clock", "landscape reads its own pages")
+pages, custom = BoardStore.pages(settings, 4, true, false)
+assertEqual(custom, false, "portrait keeps the starter layout")
+
+-- A saved page keeps which page it is, so a Stats board stays named right.
+settings = {}
+settings[BoardStore.SETTING_KEY] = BoardStore.withCustomPages(settings, 4, {
+    { id = "insights", items = {} }, { id = "home", items = {} }, { id = "library", items = {} },
+})
+pages = BoardStore.pages(settings, 4, true)
+assertEqual(ids(pages), "insights,home,library,decor", "saved pages keep their ids")
+-- A board saved before the Decor page existed gets it as it starts, and a
+-- Decor page the reader emptied stays empty.
+assertEqual(#pages[4].base > 0, true, "a three-page board gains the starter Decor page")
+settings[BoardStore.SETTING_KEY] = BoardStore.withCustomPages(settings, 4, {
+    { id = "insights", items = {} }, { id = "home", items = {} }, { id = "library", items = {} }, { id = "decor", items = {} },
+})
+pages = BoardStore.pages(settings, 4, true)
+assertEqual(#pages[4].base, 0, "an emptied Decor page stays empty")
+settings[BoardStore.SETTING_KEY] = BoardStore.withCustomPages(settings, 4, { { items = {} } })
+assertEqual(BoardStore.pages(settings, 4, true)[1].id, "home", "pages saved before ids default by position")
+
+-- Pages saved before shelves had a two-row minimum read back with two-row shelves.
+settings = {}
+settings[BoardStore.SETTING_KEY] = BoardStore.withCustomPages(settings, 4, {
+    { items = { { type = "shelf", cw = 4, rh = 1, props = { source = "random" } } } },
+})
+pages = BoardStore.pages(settings, 4, true)
+assertEqual(pages[1].base[1].rh, 2, "a stored one-row shelf is drawn two rows tall")
+assertEqual(BoardStore.read(settings).custom["4"].pages[1].items[1].rh, 1, "the stored setting itself is left alone")
+
+-- A shelf's key is its source plus its filter, in a stable order.
+assertEqual(BoardStore.shelfKey({ source = "random" }), "random", "a plain shelf keys by source")
+assertEqual(BoardStore.shelfKey({ source = "authors", params = { sort = "title", author = "Le Guin" } }),
+    "authors:author=Le Guin:sort=title", "filters are keyed in sorted order")
+assertEqual(BoardStore.shelfKey(nil), "random", "a shelf without props is Discover")
+
+-- Editing, on a four-column board.
+local function newCatalog(opts)
+    opts = opts or {}
+    local catalog = {
+        settings = opts.settings or {},
+        inner_dimen = { w = opts.w or 600, h = opts.h or 800 },
+        current_context = { kind = "dashboard", board_page = 1, dashboard = { boardShelves = {}, boardNames = {} } },
+        redraws = 0,
+        fetches = 0,
+    }
+    for name, fn in pairs(BoardEdit) do
+        if type(fn) == "function" and name:match("^board") then catalog[name] = fn end
+    end
+    function catalog:menuChromeHeight() return 0, 0 end
+    function catalog:dashboardMode() return true end
+    function catalog:updateItems() self.redraws = self.redraws + 1 end
+    function catalog:persistSetting(key, value) self.settings[key] = value end
+    function catalog:boardHasLight() return true end
+    function catalog:boardPages(cols) return BoardStore.pages(self.settings, cols, true) end
+    function catalog:boardPage() return self.current_context.board_page end
+    function catalog:boardSources() return {}, {} end
+    function catalog:loadDashboardRoot() self.fetches = self.fetches + 1 end
     return catalog
 end
 
-local DEFAULTS = {
-    { type = "stats" }, { type = "continue-reading" }, { type = "random" }, { type = "browse" },
-}
-local FOUR_SHELVES = {
-    { type = "random" }, { type = "recently-added" }, { type = "in-progress" }, { type = "random" },
-}
+local catalog = newCatalog()
+catalog:boardEnterEdit()
+local edit = catalog.board_edit
+local eg = catalog:boardGeometry()
+local items = edit.pages[1].items
+local fitted_home = BoardLayout.fitPage(eg, BoardStore.starterPages(eg.cols, "reader", true)[1].base,
+    BoardStore.starterPages(eg.cols, "reader", true)[1].extras)
+assertEqual(#items, #fitted_home.placed, "editing starts from the starter page as drawn")
 
--- A roomy page renders every configured slot, and each shelf is exactly as tall
--- as its cover cards need to be.
-local catalog = newCatalog{ sections = DEFAULTS, avail = 800 }
-catalog:updateDashboardItems()
-assertEqual(#catalog.shelves, 1, "the default dashboard renders its one shelf")
-assertEqual(#catalog.headers, 3, "Continue reading, the shelf and Browse each get a header")
-assertEqual(catalog.shelves[1].height, catalog.shelves[1].card_w + 20, "a roomy shelf is drawn in aspect")
-assertEqual(catalog.shelves[1].cols, 6, "a roomy shelf keeps its natural slot count")
-assertEqual(catalog.dash_used <= 800, true, "a roomy page stays inside the available height")
+-- Earlier and Later swap neighbours.
+local first, second = items[1].type, items[2].type
+catalog:boardEditRun({ kind = "edit-select", index = 1 })
+catalog:boardEditRun({ kind = "edit-move", delta = 1 })
+assertEqual(items[1].type .. "," .. items[2].type, second .. "," .. first, "Later swaps with the next widget")
+assertEqual(edit.selected, 2, "the selection follows the moved widget")
 
--- Four shelves share the page and stay in aspect: the cards get narrower rather
--- than being squashed to fit.
-catalog = newCatalog{ sections = FOUR_SHELVES, avail = 600 }
-catalog:updateDashboardItems()
-assertEqual(#catalog.shelves, 4, "four configured shelves all render")
-for _, shelf in ipairs(catalog.shelves) do
-    assertEqual(shelf.height, shelf.card_w + 20, "every shelf is drawn in aspect")
+-- A size that would overflow the page is refused and the widget keeps its size.
+shown = {}
+local before = items[2].cw .. "x" .. items[2].rh
+while catalog:boardPageFits(eg, items) do
+    table.insert(items, { type = "week", cw = 4, rh = 1 })
 end
-assertEqual(catalog.shelves[1].cols, 6, "a crowded page still stops at the column cap")
-assertEqual(catalog.dash_used <= 600, true, "four shelves stay inside the available height")
+table.remove(items)
+assertEqual(catalog:boardPageFits(eg, items), true, "the page is filled to its limit")
+catalog:boardEditRun({ kind = "edit-size", code = "XL" })
+assertEqual(items[2].cw .. "x" .. items[2].rh, before, "an overflowing size is refused")
+assertEqual(#shown, 1, "the reader is told why")
+assertEqual(catalog:boardPageFits(eg, items), true, "the page still fits")
 
--- Too tight for everything: the stats strip goes before any shelf does.
-catalog = newCatalog{ sections = DEFAULTS, avail = 450 }
-catalog:updateDashboardItems()
-assertEqual(#catalog.shelves, 1, "the shelf survives a tight page")
-assertEqual(catalog.headers[1], "Continue reading", "the stats strip is dropped first")
-assertEqual(catalog.dash_used <= 450, true, "dropping stats brings the page back inside its height")
+-- Adding to a full page is refused rather than squeezing the page.
+shown = {}
+local count = #items
+catalog:boardEditRun({ kind = "sheet-add", entry = BoardEdit.entryFor({ type = "heatmap" }) })
+assertEqual(#items, count, "a widget that cannot fit is not added")
+assertEqual(#shown, 1, "the reader is told the page is full")
 
--- Tighter still: shelves go from the bottom up, and the native slots stay.
-catalog = newCatalog{ sections = FOUR_SHELVES, avail = 260 }
-catalog:updateDashboardItems()
-assertEqual(#catalog.shelves < 4, true, "an impossible page drops shelves from the bottom")
-assertEqual(catalog.shelves[1].id, "section1", "the first configured shelf is the last to go")
-assertEqual(catalog.dash_used <= 260, true, "dropping shelves brings the page back inside its height")
+-- Moving to another page lands on the next page and leaves this one.
+catalog:boardEditRun({ kind = "edit-select", index = 1 })
+local moved = items[1]
+local target_count = #edit.pages[2].items
+catalog:boardEditRun({ kind = "edit-page" })
+local dest = edit.pages[2].items
+if dest[#dest] == moved then
+    assertEqual(#dest, target_count + 1, "the widget lands on the next page")
+    assertEqual(items[1] ~= moved, true, "and leaves this one")
+else
+    assertEqual(#dest, target_count, "a full next page refuses the widget")
+end
 
--- A slot waiting on a refresh renders its placeholder rather than the books
--- cached for the previous choice.
-catalog = newCatalog{ sections = DEFAULTS, avail = 800 }
-catalog.current_context.section_stale = { [3] = true }
-catalog:updateDashboardItems()
-assertEqual(#catalog.shelves, 0, "a pending shelf renders no cover grid")
-assertEqual(catalog.headers[2], "Discover", "a pending shelf still shows its header")
+-- Removing frees the room, and leaving edit mode stores the pages for this
+-- column count and redraws once.
+catalog:boardEditRun({ kind = "edit-remove", index = 1 })
+assertEqual(edit.changed, true, "the board knows it was changed")
+catalog:boardEditRun({ kind = "edit-done" })
+assertEqual(catalog.board_edit, nil, "edit mode ends")
+local stored = BoardStore.read(catalog.settings).custom[tostring(eg.cols)]
+assertEqual(type(stored) == "table" and #stored.pages, BoardStore.PAGE_COUNT, "every page is stored for this column count")
+assertEqual(catalog.fetches, 0, "nothing is fetched when the cache already holds what the board shows")
 
--- A stale (cached) dashboard announces itself with a status line that takes
--- part in the vertical budget.
-catalog = newCatalog{ sections = DEFAULTS, avail = 800 }
-catalog.current_context.stale = true
-catalog:updateDashboardItems()
-assertEqual(catalog.dash_used <= 800, true, "the status line stays inside the available height")
-local without_status = newCatalog{ sections = DEFAULTS, avail = 800 }
-without_status:updateDashboardItems()
-assertEqual(catalog.dash_used, without_status.dash_used, "budget accounting is unchanged aside from the trailing spacer")
+-- A saved page that no longer fits this screen opens in the editor as it is
+-- drawn, so every change can still be checked against the page.
+local crowded = {}
+for _ = 1, 12 do table.insert(crowded, { type = "week", cw = 4, rh = 1 }) end
+catalog = newCatalog()
+catalog.settings[BoardStore.SETTING_KEY] = BoardStore.withCustomPages(catalog.settings, eg.cols, { { items = crowded } })
+catalog:boardEnterEdit()
+assertEqual(#catalog.board_edit.pages[1].items < 12, true, "the editor drops what the screen cannot show")
+assertEqual(catalog:boardPageFits(eg, catalog.board_edit.pages[1].items), true, "the edited page fits")
 
--- The Highlight of the day slot renders its measured card and drops after
--- stats but before any shelf when the page gets tight.
-local WITH_HIGHLIGHT = {
-    { type = "stats" }, { type = "continue-reading" }, { type = "highlight" }, { type = "random" },
+-- Leaving without a change stores nothing.
+catalog = newCatalog()
+catalog:boardEnterEdit()
+catalog:boardEditRun({ kind = "edit-done" })
+assertEqual(next(BoardStore.read(catalog.settings).custom), nil, "an untouched board keeps the starter layout")
+
+-- A shelf the board now shows but the cache lacks is fetched after the redraw.
+catalog = newCatalog()
+function catalog:boardSources() return { ["want-to-read"] = { source = "want-to-read" } }, {} end
+catalog:boardRefreshIfMissing()
+assertEqual(catalog.redraws, 1, "the board redraws first")
+assertEqual(catalog.fetches, 1, "the missing shelf is fetched")
+catalog.current_context.dashboard.boardShelves["want-to-read"] = {}
+catalog:boardRefreshIfMissing()
+assertEqual(catalog.fetches, 1, "a shelf the cache holds, even empty, is not fetched again")
+
+-- Shelves picked on the old four-slot dashboard join the board once it has
+-- started, and the old setting is dropped so this happens once.
+local legacy = {
+    { type = "stats" },
+    { type = "continue-reading" },
+    { type = "authors", sourceName = "Le Guin", params = { author = "Le Guin" } },
+    { type = "browse" },
+    schemaVersion = DashboardSections.SCHEMA_VERSION,
 }
-catalog = newCatalog{ sections = WITH_HIGHLIGHT, avail = 800 }
-catalog.current_context.dashboard.highlightOfTheDay = { text = "quote", bookId = 7 }
-catalog:updateDashboardItems()
-assertEqual(catalog.headers[2], "Highlight of the day", "the highlight slot renders its header")
-assertEqual(#catalog.shelves, 1, "the shelf renders alongside the highlight card")
-assertEqual(catalog.dash_used <= 800, true, "the highlight card stays inside the available height")
-
-catalog = newCatalog{ sections = WITH_HIGHLIGHT, avail = 340 }
-catalog.current_context.dashboard.highlightOfTheDay = { text = "quote", bookId = 7 }
-catalog:updateDashboardItems()
-local saw_highlight = false
-for _, header in ipairs(catalog.headers) do
-    if header == "Highlight of the day" then saw_highlight = true end
+catalog = newCatalog({ settings = { [DashboardSections.SETTING_KEY] = legacy } })
+assertEqual(catalog:boardMigrateLegacyShelves(), false, "nothing moves before the board has started")
+assertEqual(catalog.settings[DashboardSections.SETTING_KEY] ~= nil, true, "the old setting waits for the start")
+catalog.settings[BoardStore.SETTING_KEY] = BoardStore.withPreset(catalog.settings, "reader")
+assertEqual(catalog:boardMigrateLegacyShelves(), true, "the migration runs once the board has started")
+assertEqual(catalog.settings[DashboardSections.SETTING_KEY], nil, "the old setting is dropped")
+local found
+for _, page in ipairs(BoardStore.read(catalog.settings).custom[tostring(eg.cols)].pages) do
+    for _, item in ipairs(page.items) do
+        if item.type == "shelf" and item.props.source == "authors" then found = item end
+    end
 end
-assertEqual(saw_highlight, false, "a tight page drops the highlight card after stats, before shelves")
-assertEqual(#catalog.shelves, 1, "the shelf survives the tight page")
+assertEqual(found and found.props.title, "Le Guin", "the picked author became a shelf")
+assertEqual(found and found.props.params.author, "Le Guin", "the shelf keeps its filter")
+assertEqual(catalog:boardMigrateLegacyShelves(), false, "the migration does not run twice")
 
--- Header controls are built at the header's label-row height, so a section
--- carrying chevrons or a reroll button is exactly as tall as a bare one. That
--- is what keeps the single measured header height the budget uses honest, and
--- what stops the controls from floating above the label.
-catalog = newCatalog{ sections = DEFAULTS, avail = 800 }
-local prev_control, next_control = catalog:buildDashboardHeaderNav("section3", 2, 4)
-local reroll_control = catalog:buildDashboardRerollButton(3)
-for label, control in pairs({ prev = prev_control, next = next_control, reroll = reroll_control }) do
-    assertEqual(control.dimen.h, HEADER_ROW_HEIGHT, label .. " control fills the header row exactly")
-    assertEqual(control.dimen.w, HEADER_ROW_HEIGHT, label .. " control is square")
-    assertEqual(control.tap_padding_v > 0, true, label .. " control takes taps from the gap around it")
+assertEqual(BoardLayout.editBarTop(0, 300, 104, 24, 1300), 324, "sparse page toolbar stays below its first tile")
+assertEqual(BoardLayout.editBarTop(1000, 250, 104, 24, 1300), 872, "bottom tile toolbar fits above")
+assertEqual(BoardLayout.editBarTop(0, 250, 104, 24, 300), 0, "toolbar cannot escape above the grid")
+for _, source in ipairs({ "libraries", "collections", "smart-scopes", "authors", "series" }) do
+    local picked_entry = BoardEdit.entryFor({ type = "shelf", props = { source = source, params = { id = 1 } } })
+    assertEqual(picked_entry and picked_entry.pick, true, "picked " .. source .. " shelf retains its library entry")
+    assertEqual(table.concat(picked_entry.sizes, ","), "XL,L", "picked shelf retains both advertised sizes")
 end
-assertEqual(prev_control.enabled, true, "a page-2 back chevron is live")
-assertEqual(catalog:buildDashboardHeaderNav("section3", 1, 4).enabled, false,
-    "the back chevron is disabled on the first page")
-
--- Page turns record each section's band and narrow the refresh to it.
-catalog = newCatalog{ sections = DEFAULTS, avail = 800 }
-catalog.dimen = { x = 0, y = 0, w = 520, h = 900 }
-function catalog:menuChromeHeight() return 30, 40 end
-catalog.dash_refresh_section = "section3"
-catalog:updateDashboardItems()
-local band = catalog.dash_section_bands["section3"]
-assertEqual(band ~= nil and band.h > 0, true, "the shelf records its rendered band")
-local region = catalog.custom_refresh_region
-assertEqual(region ~= nil, true, "a page turn narrows the refresh to the changed band")
-assertEqual(region.y, 30 + band.y - 4, "the refresh band sits below the title bar with its padding")
-assertEqual(region.h, band.h + 8, "the refresh band covers the section plus padding")
-assertEqual(catalog.dash_refresh_section, nil, "the page-turn hint is consumed by the rebuild")
 
 print("bookorbit_dashboard_layout_test.lua: ok")

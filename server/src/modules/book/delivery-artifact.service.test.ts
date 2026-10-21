@@ -221,7 +221,7 @@ describe('DeliveryArtifactService', () => {
     vi.mocked(repository.findInspection).mockResolvedValue({
       bookFileId: 9,
       sourceRevision: original.sourceRevision,
-      detectorVersion: 'overlay-inspection-v2',
+      detectorVersion: 'overlay-inspection-v3',
       state: 'failed',
       retryAt: new Date(Date.now() + 60_000),
       checkedAt: new Date(),

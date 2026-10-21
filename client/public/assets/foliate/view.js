@@ -17,6 +17,17 @@ const getElementForNode = (node) => {
 const getRangePoint = (range) => {
   if (!range) return null
   if (range.startContainer?.nodeType === 3) return { node: range.startContainer, offset: range.startOffset }
+  const doc = range.startContainer?.ownerDocument
+  const walker = doc?.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT)
+  if (walker) {
+    walker.currentNode = range.startContainer.childNodes[range.startOffset] ?? range.startContainer
+    let node = walker.currentNode
+    while (node) {
+      if (node.nodeType === 3 && node.textContent.trim() && range.intersectsNode(node)) return { node, offset: 0 }
+      node = walker.nextNode()
+      if (node && range.comparePoint(node, 0) > 0) break
+    }
+  }
   if (range.endContainer?.nodeType === 3) return { node: range.endContainer, offset: range.endOffset }
   return { node: range.startContainer, offset: range.startOffset }
 }
@@ -313,6 +324,13 @@ const languageInfo = (lang) => {
   }
 }
 
+/** Whether the reader holds a non-empty text selection in any loaded section. */
+export const holdsTextSelection = (renderer) =>
+  (renderer?.getContents?.() ?? []).some(({ doc }) => {
+    const selection = doc?.defaultView?.getSelection?.()
+    return Boolean(selection && selection.rangeCount > 0 && !selection.isCollapsed)
+  })
+
 export class View extends HTMLElement {
   #root = this.attachShadow({ mode: 'closed' })
   #sectionProgress
@@ -380,13 +398,19 @@ export class View extends HTMLElement {
       let lastActive
       this.mediaOverlay.addEventListener('highlight', (e) => {
         const resolved = this.resolveNavigation(e.detail.text)
-        this.renderer.goTo(resolved).then(() => {
-          const { doc } = this.renderer.getContents().find((x) => (x.index = resolved.index))
-          const el = resolved.anchor(doc)
+        const mark = () => {
+          const content = this.renderer.getContents().find((x) => x.index === resolved.index)
+          if (!content) return
+          const el = resolved.anchor(content.doc)
+          if (!el) return
           el.classList.add(activeClass)
           if (playbackActiveClass) el.ownerDocument.documentElement.classList.add(playbackActiveClass)
           lastActive = new WeakRef(el)
-        })
+        }
+        // BookOrbit: following the voice relocates the page, and every relocation collapses the selection,
+        // so a reader selecting text keeps it; the sentence is still marked wherever it is laid out.
+        if (holdsTextSelection(this.renderer)) mark()
+        else this.renderer.goTo(resolved).then(mark)
       })
       this.mediaOverlay.addEventListener('unhighlight', () => {
         const el = lastActive?.deref()
@@ -447,6 +471,7 @@ export class View extends HTMLElement {
     const koreaderProgress = null
     this.lastLocation = {
       ...progress,
+      reason,
       tocItem,
       pageItem,
       cfi,

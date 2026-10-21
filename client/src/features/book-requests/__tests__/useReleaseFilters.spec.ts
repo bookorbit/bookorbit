@@ -11,6 +11,7 @@ function release(overrides: Partial<ReleaseCandidateItem> = {}): ReleaseCandidat
     indexerName: 'jackett',
     guid: 'g1',
     title: 'Dune',
+    infoUrl: null,
     sizeBytes: null,
     seeders: null,
     leechers: null,

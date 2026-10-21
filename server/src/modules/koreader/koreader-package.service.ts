@@ -32,6 +32,9 @@ const SERVER_CAPABILITIES: readonly KoreaderPluginCapability[] = [
   'bookmarkSync',
   'readAloudDeliveryVariants',
   'readAloudDeliverySettings',
+  'catalogListsV2',
+  'sidecarState',
+  'annotationPendingBooks',
 ];
 
 @Injectable()

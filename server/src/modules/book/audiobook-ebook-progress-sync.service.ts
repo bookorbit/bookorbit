@@ -11,6 +11,10 @@ import { BookRepository } from './book.repository';
 
 const EVENT = 'book.audio_ebook_progress_sync';
 const REVERSE_EVENT = 'book.ebook_audio_progress_sync';
+const NARRATION_EVENT = 'book.narration_marker_advance';
+// About a page of narration at normal speed: a page on a phone or an e-reader reads aloud in one to
+// one and a half minutes, so a page start further back than this is a page the reader went back to.
+const NARRATION_PAGE_SECONDS = 120;
 const PLAYLIST_CACHE_MAX = 12;
 const MAX_DURATION_DIFF_RATIO = 0.05;
 const MAX_DURATION_DIFF_SECONDS = 300;
@@ -185,6 +189,102 @@ export class AudiobookEbookProgressSyncService {
         } errorClass=${errorClass} error="${errorMessage}" - ebook to audiobook progress sync failed`,
       );
       return false;
+    }
+  }
+
+  /**
+   * Moves a read-along file's narration marker to a newer text position, so listening resumes on
+   * the page a reader last reached on any device. Forward always. Back only to a page well behind
+   * it: a page usually starts behind the sentence being narrated on it, and turning to that page
+   * must not replay what was already heard, but a reader who went back chapters or pages takes the
+   * narration along. A file never narrated has no marker to protect, so its first one is the
+   * sentence the reader reached.
+   */
+  async advanceNarrationToText(params: {
+    userId: number;
+    bookId: number;
+    bookFileId: number;
+    percentage: number;
+    cfi?: string | null;
+    koreaderProgress?: string | null;
+    sourceUpdatedAt?: Date;
+  }): Promise<boolean> {
+    if (!params.cfi && !params.koreaderProgress) return false;
+    const startedAt = Date.now();
+    try {
+      const syncFiles = await this.bookRepo.findAudioEbookProgressSyncFiles(params.bookId);
+      const file = syncFiles?.files.find((candidate) => candidate.id === params.bookFileId);
+      if (!file || file.format?.toLowerCase() !== 'epub' || file.mediaOverlayAvailable !== true) return false;
+
+      const sourceUpdatedAt = params.sourceUpdatedAt ?? new Date();
+      const progress = await this.bookRepo.findProgress(params.userId, params.bookFileId);
+      if (!progress || (progress.narrationUpdatedAt && progress.narrationUpdatedAt.getTime() >= sourceUpdatedAt.getTime())) return false;
+
+      const playlist = await this.getPlaylist(file, params.bookId);
+      const nearest = await this.nearestNarratedFragment(file.id, file.id, playlist, params.cfi ?? null, params.koreaderProgress ?? null);
+      if (!nearest) return false;
+      const reached = playlist.items.findIndex(
+        (item) => item.textFragment === nearest.fragment && (nearest.chapterIndex == null || item.sectionIndex === nearest.chapterIndex),
+      );
+      const item = playlist.items[reached];
+      if (!item) return false;
+      const marker = this.markerItemIndex(playlist, progress);
+      if (marker !== null && reached <= marker && !this.isWellBehind(playlist, reached, marker)) return false;
+
+      return await this.bookRepo.advanceNarrationMarker({
+        userId: params.userId,
+        fileId: file.id,
+        mediaOverlayFragment: this.itemFragment(item),
+        mediaOverlaySectionIndex: item.sectionIndex,
+        percentage: params.percentage,
+        sourceUpdatedAt,
+      });
+    } catch (error: unknown) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `[${NARRATION_EVENT}] [fail] userId=${params.userId} bookId=${params.bookId} bookFileId=${params.bookFileId} durationMs=${
+          Date.now() - startedAt
+        } errorClass=${errorClass} error="${errorMessage}" - narration marker advance failed`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Leaves each read-along file's narration marker on its first sentence after a reset, stamped
+   * with the reset. A player paused before the reset still holds its old place, and with no marker
+   * on the server it had nothing newer to weigh that against: it resumed there and wrote it back,
+   * undoing the reset on every device. A newer marker makes it ask first, released builds included.
+   */
+  async startNarrationAfterReset(params: { userId: number; bookId: number; fileIds?: number[]; resetAt: Date }): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      const syncFiles = await this.bookRepo.findAudioEbookProgressSyncFiles(params.bookId);
+      const readAlongs = (syncFiles?.files ?? []).filter(
+        (file) =>
+          file.format?.toLowerCase() === 'epub' && file.mediaOverlayAvailable === true && (!params.fileIds || params.fileIds.includes(file.id)),
+      );
+      for (const file of readAlongs) {
+        const playlist = await this.getPlaylist(file, params.bookId);
+        const first = playlist.items.find((item) => item.textFragment);
+        if (!first) continue;
+        await this.bookRepo.startNarrationAfterReset({
+          userId: params.userId,
+          fileId: file.id,
+          mediaOverlayFragment: this.itemFragment(first),
+          mediaOverlaySectionIndex: first.sectionIndex,
+          resetAt: params.resetAt,
+        });
+      }
+    } catch (error: unknown) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `[${NARRATION_EVENT}] [fail] userId=${params.userId} bookId=${params.bookId} durationMs=${
+          Date.now() - startedAt
+        } errorClass=${errorClass} error="${errorMessage}" - narration marker not placed after reset`,
+      );
     }
   }
 
@@ -421,23 +521,84 @@ export class AudiobookEbookProgressSyncService {
       if (match) return match.startSeconds;
     }
 
-    if (params.cfi || params.koreaderProgress) {
-      const candidates = playlist.items
-        .filter((item): item is EpubMediaOverlayPlaylistItem & { textFragment: string } => !!item.textFragment)
-        .map((item) => ({ chapterIndex: item.sectionIndex, fragment: item.textFragment }));
-      const nearest = await this.positionConverter.nearestFragmentForPosition({
-        bookFileId: ebookFile.id,
-        cfi: params.cfi ?? null,
-        xpointer: params.koreaderProgress ?? null,
-        candidates,
-        sourceBookFileId: overlaySourceFileId,
-      });
-      if (nearest.status !== 'failed' && nearest.fragment) {
-        const match = this.findItemStartByFragmentId(playlist, nearest.fragment, nearest.chapterIndex ?? null);
-        if (match) return match.startSeconds;
-      }
+    const nearest = await this.nearestNarratedFragment(
+      ebookFile.id,
+      overlaySourceFileId,
+      playlist,
+      params.cfi ?? null,
+      params.koreaderProgress ?? null,
+    );
+    if (nearest) {
+      const match = this.findItemStartByFragmentId(playlist, nearest.fragment, nearest.chapterIndex);
+      if (match) return match.startSeconds;
     }
 
+    return null;
+  }
+
+  /**
+   * The narrated sentence a text position falls in: the last one that starts at or before it. A
+   * position in a section nobody narrates, such as the cover or the front matter, takes the first
+   * sentence after it, or the last one before it when nothing after is narrated. Without that, a
+   * reader back on the cover left the narration wherever it had been, however far ahead.
+   */
+  private async nearestNarratedFragment(
+    ebookFileId: number,
+    overlaySourceFileId: number,
+    playlist: EpubMediaOverlayPlaylist,
+    cfi: string | null,
+    xpointer: string | null,
+  ): Promise<{ fragment: string; chapterIndex: number | null } | null> {
+    if (!cfi && !xpointer) return null;
+    const candidates = playlist.items
+      .filter((item): item is EpubMediaOverlayPlaylistItem & { textFragment: string } => !!item.textFragment)
+      .map((item) => ({ chapterIndex: item.sectionIndex, fragment: item.textFragment }));
+    const nearest = await this.positionConverter.nearestFragmentForPosition({
+      bookFileId: ebookFileId,
+      cfi,
+      xpointer,
+      candidates,
+      sourceBookFileId: overlaySourceFileId,
+    });
+    if (nearest.status !== 'failed' && nearest.fragment) return { fragment: nearest.fragment, chapterIndex: nearest.chapterIndex ?? null };
+    if (nearest.reason !== 'no_candidate_fragments' || nearest.chapterIndex == null) return null;
+    const section = nearest.chapterIndex;
+    const adjacent =
+      candidates.find((candidate) => candidate.chapterIndex > section) ?? candidates.findLast((candidate) => candidate.chapterIndex < section);
+    return adjacent ? { fragment: adjacent.fragment, chapterIndex: adjacent.chapterIndex } : null;
+  }
+
+  /**
+   * Whether a sentence lies further behind another than a page reaches: in an earlier section,
+   * which a page never spans, or more narration back than a page holds on a phone or an e-reader.
+   */
+  private isWellBehind(playlist: EpubMediaOverlayPlaylist, sentence: number, from: number): boolean {
+    const behind = playlist.items[sentence];
+    const ahead = playlist.items[from];
+    if (!behind || !ahead || sentence >= from) return false;
+    if (behind.sectionIndex !== ahead.sectionIndex) return true;
+    let between = 0;
+    for (let index = sentence; index < from; index += 1) {
+      const duration = playlist.items[index]?.durationSeconds;
+      if (this.isPositiveFinite(duration)) between += duration;
+    }
+    return between > NARRATION_PAGE_SECONDS;
+  }
+
+  /** Where in the playlist a stored marker sits, by its sentence first and its seconds after. */
+  private markerItemIndex(
+    playlist: EpubMediaOverlayPlaylist,
+    marker: { positionSeconds: number | null; mediaOverlayFragment: string | null; mediaOverlaySectionIndex: number | null },
+  ): number | null {
+    const fragment = marker.mediaOverlayFragment;
+    if (fragment) {
+      const index = playlist.items.findIndex((item) => this.itemMatchesFragment(item, fragment, marker.mediaOverlaySectionIndex));
+      if (index >= 0) return index;
+    }
+    if (this.isNonNegativeFinite(marker.positionSeconds)) {
+      const item = this.findItemBySeconds(playlist, marker.positionSeconds);
+      if (item) return playlist.items.indexOf(item);
+    }
     return null;
   }
 

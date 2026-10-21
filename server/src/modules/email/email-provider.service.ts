@@ -162,6 +162,13 @@ export class EmailProviderService {
     return { ...provider, plainPassword };
   }
 
+  async getSharedDefaultWithDecryptedPassword(): Promise<(EmailProvider & { plainPassword: string | null }) | null> {
+    const [provider] = await this.repo.findSharedDefault();
+    if (!provider) return null;
+    const plainPassword = provider.passwordEnc ? this.encryption.decrypt(provider.passwordEnc) : null;
+    return { ...provider, plainPassword };
+  }
+
   private async getOwned(id: number, user: RequestUser): Promise<EmailProvider> {
     const [provider] = await this.repo.findById(id);
     if (!provider) throw new NotFoundException('Provider not found');

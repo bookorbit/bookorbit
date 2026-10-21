@@ -20,6 +20,7 @@ import type { AnnotationHubItem, AnnotationItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import { formatChipStyle } from '@/features/book/lib/format-colors'
 import AnnotationBookThumb from '../AnnotationBookThumb.vue'
+import { annotationSourceKey } from '@/features/annotations/lib/source-label'
 
 type EntryAnnotation = AnnotationItem | AnnotationHubItem
 
@@ -154,7 +155,7 @@ function handlePurge() {
 
     <!-- WHAT -->
     <div class="col-start-3 min-w-0" :class="stacked ? 'row-start-2' : 'row-start-1'">
-      <p class="text-foreground" :class="quoteClass">{{ annotation.text }}</p>
+      <p class="whitespace-pre-line text-foreground" :class="quoteClass">{{ annotation.text }}</p>
       <div v-if="annotation.note" class="mt-2 border-l-2 border-primary pl-2.5">
         <span class="mb-0.5 block text-[8.5px] font-bold uppercase tracking-[0.13em] text-primary">{{ t('annotations.hub.noteLabel') }}</span>
         <p class="text-[11.5px] leading-relaxed text-foreground">{{ annotation.note }}</p>
@@ -268,7 +269,7 @@ function handlePurge() {
           </span>
           <span v-if="locationLabel" class="shrink-0 text-[10px] font-semibold leading-[14px] text-muted-foreground">{{ locationLabel }}</span>
           <span class="inline-flex shrink-0 items-center gap-1 text-[10px] leading-[14px]" :style="{ color: `var(--pill-${annotation.origin})` }">
-            {{ t(`annotations.sources.${annotation.origin}`) }}
+            {{ t(annotationSourceKey(annotation.origin)) }}
           </span>
           <span
             v-if="format"

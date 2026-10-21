@@ -33,6 +33,9 @@ function makeHubRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const USER = { id: 10, isSuperuser: false, contentFilters: undefined } as never;
+const ACCESS = { libraryIds: [3], contentFilters: undefined };
+
 function makeService(rebuilderRegistered = false) {
   const annotationRepo = {
     findHubPaginated: vi.fn().mockResolvedValue({ items: [makeHubRow()], total: 1 }),
@@ -40,7 +43,8 @@ function makeService(rebuilderRegistered = false) {
     findHubAll: vi.fn().mockResolvedValue([makeHubRow()]),
     findHubBookFacets: vi.fn().mockResolvedValue([{ bookId: 5, bookTitle: 'A Book', author: 'An Author', count: 3 }]),
     findHubBookFacet: vi.fn().mockResolvedValue(null),
-    bulkSetDeleted: vi.fn().mockResolvedValue(2),
+    bulkTrash: vi.fn().mockResolvedValue(2),
+    bulkRestore: vi.fn().mockResolvedValue(1),
     bulkRestyle: vi.fn().mockResolvedValue(2),
     bulkSetStarred: vi.fn().mockResolvedValue(2),
     restore: vi.fn().mockResolvedValue(makeHubRow({ deletedAt: null })),
@@ -68,14 +72,18 @@ function makeService(rebuilderRegistered = false) {
   const rebuilder = { rebuildCanonicalPositions: vi.fn().mockResolvedValue({ rebuilt: true }) };
   const rebuilderRegistry = new DevicePositionRebuilderRegistry();
   if (rebuilderRegistered) rebuilderRegistry.register(rebuilder);
+  const libraryService = { findAccessibleLibraryIds: vi.fn().mockResolvedValue([3]) };
+  const bookService = { verifyBookAccess: vi.fn().mockResolvedValue(undefined) };
   const service = new AnnotationHubService(
     annotationRepo as never,
     exportService as never,
     syncRepo as never,
     conversionService as never,
     rebuilderRegistry,
+    libraryService as never,
+    bookService as never,
   );
-  return { service, annotationRepo, exportService, syncRepo, conversionService, rebuilder, rebuilderRegistry };
+  return { service, annotationRepo, exportService, syncRepo, conversionService, rebuilder, rebuilderRegistry, libraryService, bookService };
 }
 
 describe('AnnotationHubService', () => {
@@ -83,8 +91,8 @@ describe('AnnotationHubService', () => {
     it('counts the annotations the hub lists by default, excluding the trash', async () => {
       const { service, annotationRepo } = makeService();
 
-      await expect(service.countActive(10)).resolves.toBe(18000);
-      expect(annotationRepo.countHub).toHaveBeenCalledWith(10, { status: 'active' });
+      await expect(service.countActive(USER)).resolves.toBe(18000);
+      expect(annotationRepo.countHub).toHaveBeenCalledWith(10, { status: 'active', access: ACCESS });
     });
   });
 
@@ -96,7 +104,7 @@ describe('AnnotationHubService', () => {
         total: 2,
       });
 
-      const result = await service.list(10, {});
+      const result = await service.list(USER, {});
 
       expect(result.items.map((item) => item.starredAt)).toEqual(['2026-02-02T02:02:02.000Z', null]);
     });
@@ -104,7 +112,7 @@ describe('AnnotationHubService', () => {
     it('maps the date range to Date objects and the notes-only flag into repository filters', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.list(10, {
+      await service.list(USER, {
         hasNote: true,
         dateFrom: '2026-01-01T00:00:00.000Z',
         dateTo: '2026-01-31T23:59:59.999Z',
@@ -129,7 +137,7 @@ describe('AnnotationHubService', () => {
     it('omits the date range and notes-only filter when not provided', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.list(10, {});
+      await service.list(USER, {});
 
       const filters = annotationRepo.findHubPaginated.mock.calls[0][1];
       expect(filters.hasNote).toBeUndefined();
@@ -140,7 +148,7 @@ describe('AnnotationHubService', () => {
     it('treats hasNote=false as no filter', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.list(10, { hasNote: false });
+      await service.list(USER, { hasNote: false });
 
       expect(annotationRepo.findHubPaginated.mock.calls[0][1].hasNote).toBeUndefined();
     });
@@ -148,7 +156,7 @@ describe('AnnotationHubService', () => {
     it('passes the book sort through to the repository', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.list(10, { sortBy: 'book', sortDir: 'asc' });
+      await service.list(USER, { sortBy: 'book', sortDir: 'asc' });
 
       expect(annotationRepo.findHubPaginated.mock.calls[0][2]).toEqual({ by: 'book', dir: 'asc' });
     });
@@ -156,7 +164,7 @@ describe('AnnotationHubService', () => {
     it('splits comma-separated colors, styles and origins into arrays', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.list(10, { colors: '#FACC15, #4ADE80', styles: 'highlight,underline', origins: 'web , koreader' });
+      await service.list(USER, { colors: '#FACC15, #4ADE80', styles: 'highlight,underline', origins: 'web , koreader' });
 
       const filters = annotationRepo.findHubPaginated.mock.calls[0][1];
       expect(filters.colors).toEqual(['#FACC15', '#4ADE80']);
@@ -167,7 +175,7 @@ describe('AnnotationHubService', () => {
     it('drops filter values that are empty after splitting', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.list(10, { colors: ' , , ' });
+      await service.list(USER, { colors: ' , , ' });
 
       expect(annotationRepo.findHubPaginated.mock.calls[0][1].colors).toBeUndefined();
     });
@@ -179,7 +187,7 @@ describe('AnnotationHubService', () => {
         total: 1,
       });
 
-      const result = await service.list(10, {});
+      const result = await service.list(USER, {});
 
       expect(result.items[0].positionStatus).toBeNull();
       expect(result.items[0].chapterIndex).toBeNull();
@@ -189,7 +197,7 @@ describe('AnnotationHubService', () => {
     it('returns mapped items and computed stats', async () => {
       const { service } = makeService();
 
-      const result = await service.list(10, {});
+      const result = await service.list(USER, {});
 
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
@@ -215,7 +223,7 @@ describe('AnnotationHubService', () => {
         total: 1,
       });
 
-      const result = await service.list(10, {});
+      const result = await service.list(USER, {});
 
       expect(result.items[0]).toMatchObject({ cfi: null, jumpFileId: 9, jumpFileFormat: 'pdf', pageno: 4 });
     });
@@ -233,7 +241,7 @@ describe('AnnotationHubService', () => {
         total: 1,
       });
 
-      const result = await service.list(10, {});
+      const result = await service.list(USER, {});
 
       expect(result.items[0]).toMatchObject({
         highlightedAt: '2026-01-15T16:30:00.000Z',
@@ -246,27 +254,27 @@ describe('AnnotationHubService', () => {
     it('maps book facets and forwards the default limit', async () => {
       const { service, annotationRepo } = makeService();
 
-      const facets = await service.listBooks(10, { status: 'active' });
+      const facets = await service.listBooks(USER, { status: 'active' });
 
-      expect(annotationRepo.findHubBookFacets).toHaveBeenCalledWith(10, { status: 'active', q: undefined, limit: 20 });
+      expect(annotationRepo.findHubBookFacets).toHaveBeenCalledWith(10, { status: 'active', q: undefined, limit: 20, access: ACCESS });
       expect(facets).toEqual([{ bookId: 5, bookTitle: 'A Book', author: 'An Author', count: 3 }]);
     });
 
     it('forwards the search term and a custom limit', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.listBooks(10, { status: 'trashed', q: 'dune', limit: 5 });
+      await service.listBooks(USER, { status: 'trashed', q: 'dune', limit: 5 });
 
-      expect(annotationRepo.findHubBookFacets).toHaveBeenCalledWith(10, { status: 'trashed', q: 'dune', limit: 5 });
+      expect(annotationRepo.findHubBookFacets).toHaveBeenCalledWith(10, { status: 'trashed', q: 'dune', limit: 5, access: ACCESS });
     });
 
     it('pins the selected book at the top when it is outside the returned facets', async () => {
       const { service, annotationRepo } = makeService();
       annotationRepo.findHubBookFacet.mockResolvedValue({ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 });
 
-      const facets = await service.listBooks(10, { status: 'active', selectedId: 99 });
+      const facets = await service.listBooks(USER, { status: 'active', selectedId: 99 });
 
-      expect(annotationRepo.findHubBookFacet).toHaveBeenCalledWith(10, 'active', 99);
+      expect(annotationRepo.findHubBookFacet).toHaveBeenCalledWith(10, 'active', 99, ACCESS);
       expect(facets[0]).toEqual({ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 });
       expect(facets).toHaveLength(2);
     });
@@ -274,7 +282,7 @@ describe('AnnotationHubService', () => {
     it('does not re-fetch or duplicate the selected book when it is already present', async () => {
       const { service, annotationRepo } = makeService();
 
-      const facets = await service.listBooks(10, { status: 'active', selectedId: 5 });
+      const facets = await service.listBooks(USER, { status: 'active', selectedId: 5 });
 
       expect(annotationRepo.findHubBookFacet).not.toHaveBeenCalled();
       expect(facets).toHaveLength(1);
@@ -285,37 +293,39 @@ describe('AnnotationHubService', () => {
     it('trashes the given ids', async () => {
       const { service, annotationRepo } = makeService();
 
-      const result = await service.bulk(10, { ids: [1, 2], action: 'trash' });
+      const result = await service.bulk(USER, { ids: [1, 2], action: 'trash' });
 
-      expect(annotationRepo.bulkSetDeleted).toHaveBeenCalledWith(10, [1, 2], true);
+      expect(annotationRepo.bulkTrash).toHaveBeenCalledWith(10, [1, 2], ACCESS);
       expect(result).toEqual({ affected: 2 });
     });
 
-    it('restores the given ids', async () => {
+    it('restores the given ids through the restore that resets device sync state', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.bulk(10, { ids: [1], action: 'restore' });
+      expect(await service.bulk(USER, { ids: [1], action: 'restore' })).toEqual({ affected: 1 });
 
-      expect(annotationRepo.bulkSetDeleted).toHaveBeenCalledWith(10, [1], false);
+      expect(annotationRepo.bulkRestore).toHaveBeenCalledWith(10, [1], ACCESS);
+      expect(annotationRepo.bulkTrash).not.toHaveBeenCalled();
     });
 
     it('restyles the given ids with color and style', async () => {
       const { service, annotationRepo } = makeService();
 
-      await service.bulk(10, { ids: [1], action: 'restyle', color: '#38BDF8', style: 'underline' });
+      await service.bulk(USER, { ids: [1], action: 'restyle', color: '#38BDF8', style: 'underline' });
 
-      expect(annotationRepo.bulkRestyle).toHaveBeenCalledWith(10, [1], { color: '#38BDF8', style: 'underline' });
+      expect(annotationRepo.bulkRestyle).toHaveBeenCalledWith(10, [1], { color: '#38BDF8', style: 'underline' }, ACCESS);
     });
 
     it('stars and unstars the given ids without touching deletion or style', async () => {
       const { service, annotationRepo } = makeService();
 
-      expect(await service.bulk(10, { ids: [1, 2], action: 'star' })).toEqual({ affected: 2 });
-      await service.bulk(10, { ids: [3], action: 'unstar' });
+      expect(await service.bulk(USER, { ids: [1, 2], action: 'star' })).toEqual({ affected: 2 });
+      await service.bulk(USER, { ids: [3], action: 'unstar' });
 
-      expect(annotationRepo.bulkSetStarred).toHaveBeenNthCalledWith(1, 10, [1, 2], true);
-      expect(annotationRepo.bulkSetStarred).toHaveBeenNthCalledWith(2, 10, [3], false);
-      expect(annotationRepo.bulkSetDeleted).not.toHaveBeenCalled();
+      expect(annotationRepo.bulkSetStarred).toHaveBeenNthCalledWith(1, 10, [1, 2], true, ACCESS);
+      expect(annotationRepo.bulkSetStarred).toHaveBeenNthCalledWith(2, 10, [3], false, ACCESS);
+      expect(annotationRepo.bulkTrash).not.toHaveBeenCalled();
+      expect(annotationRepo.bulkRestore).not.toHaveBeenCalled();
       expect(annotationRepo.bulkRestyle).not.toHaveBeenCalled();
     });
   });
@@ -324,7 +334,7 @@ describe('AnnotationHubService', () => {
     it('restores and returns the refreshed hub item', async () => {
       const { service } = makeService();
 
-      const result = await service.restore(10, 1);
+      const result = await service.restore(USER, 1);
 
       expect(result).toMatchObject({ id: 1, bookId: 5 });
     });
@@ -333,14 +343,14 @@ describe('AnnotationHubService', () => {
       const { service, annotationRepo } = makeService();
       annotationRepo.restore.mockResolvedValueOnce(null);
 
-      await expect(service.restore(10, 1)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.restore(USER, 1)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('falls back to the restored row when the hub re-read misses', async () => {
       const { service, annotationRepo } = makeService();
       annotationRepo.findHubById.mockResolvedValueOnce(null);
 
-      const result = await service.restore(10, 1);
+      const result = await service.restore(USER, 1);
 
       expect(result).toMatchObject({ id: 1, cfi: null });
     });
@@ -350,21 +360,27 @@ describe('AnnotationHubService', () => {
     it('resolves when the annotation is purged', async () => {
       const { service } = makeService();
 
-      await expect(service.purge(10, 1)).resolves.toBeUndefined();
+      await expect(service.purge(USER, 1)).resolves.toBeUndefined();
     });
 
     it('throws ConflictException when a device still has it queued', async () => {
       const { service, annotationRepo } = makeService();
       annotationRepo.purge.mockResolvedValueOnce('pending_device_sync');
 
-      await expect(service.purge(10, 1)).rejects.toBeInstanceOf(ConflictException);
+      const error = await service.purge(USER, 1).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        errorCode: 'ANNOTATION_PURGE_PENDING_DEVICE_SYNC',
+        message: expect.stringContaining('still queued for deletion'),
+      });
     });
 
     it('throws NotFoundException when nothing matched', async () => {
       const { service, annotationRepo } = makeService();
       annotationRepo.purge.mockResolvedValueOnce('not_found');
 
-      await expect(service.purge(10, 1)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.purge(USER, 1)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -372,7 +388,7 @@ describe('AnnotationHubService', () => {
     it('returns positions and per-device sync info with kobo display names', async () => {
       const { service } = makeService();
 
-      const detail = await service.syncDetail(10, 1);
+      const detail = await service.syncDetail(USER, 1);
 
       expect(detail.annotationId).toBe(1);
       expect(detail.version).toBe(3);
@@ -399,7 +415,7 @@ describe('AnnotationHubService', () => {
         },
       ]);
 
-      const detail = await service.syncDetail(10, 1);
+      const detail = await service.syncDetail(USER, 1);
 
       expect(detail.devices[0].upToDate).toBe(true);
       expect(detail.devices[0].deleteAckedAt).toBe('2026-01-06T00:00:00.000Z');
@@ -410,7 +426,16 @@ describe('AnnotationHubService', () => {
       const { service, syncRepo } = makeService();
       syncRepo.findAnnotationById.mockResolvedValueOnce(null);
 
-      await expect(service.syncDetail(10, 99)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.syncDetail(USER, 99)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('answers not found for a highlight on a book the user can no longer open', async () => {
+      const { service, bookService, syncRepo } = makeService();
+      bookService.verifyBookAccess.mockRejectedValueOnce(new NotFoundException('Book 5 not found'));
+
+      await expect(service.syncDetail(USER, 1)).rejects.toBeInstanceOf(NotFoundException);
+      expect(bookService.verifyBookAccess).toHaveBeenCalledWith(5, USER);
+      expect(syncRepo.findStatesByAnnotation).not.toHaveBeenCalled();
     });
   });
 
@@ -418,7 +443,7 @@ describe('AnnotationHubService', () => {
     it('marks the cfi position pending and recomputes it immediately', async () => {
       const { service, syncRepo, conversionService } = makeService();
 
-      await service.retryPosition(10, 1, 'cfi');
+      await service.retryPosition(USER, 1, 'cfi');
 
       expect(syncRepo.updatePosition).toHaveBeenCalledWith(1, 'cfi', { status: 'pending', converterVersion: null });
       expect(conversionService.ensureCfiPositionsForBook).toHaveBeenCalledWith(10, 5);
@@ -427,7 +452,7 @@ describe('AnnotationHubService', () => {
     it('does not run the cfi backfill for an xpointer retry', async () => {
       const { service, conversionService } = makeService();
 
-      await service.retryPosition(10, 1, 'xpointer');
+      await service.retryPosition(USER, 1, 'xpointer');
 
       expect(conversionService.ensureCfiPositionsForBook).not.toHaveBeenCalled();
     });
@@ -435,7 +460,7 @@ describe('AnnotationHubService', () => {
     it('rebuilds from the device position instead of the cfi backfill when one is available', async () => {
       const { service, rebuilder, conversionService } = makeService(true);
 
-      await service.retryPosition(10, 1, 'cfi');
+      await service.retryPosition(USER, 1, 'cfi');
 
       expect(rebuilder.rebuildCanonicalPositions).toHaveBeenCalledWith(10, { id: 1, bookId: 5, text: 'selected text' });
       expect(conversionService.ensureCfiPositionsForBook).not.toHaveBeenCalled();
@@ -445,7 +470,7 @@ describe('AnnotationHubService', () => {
       const { service, rebuilder, conversionService } = makeService(true);
       rebuilder.rebuildCanonicalPositions.mockResolvedValueOnce({ rebuilt: false, reason: 'no_kobo_span_position' });
 
-      await service.retryPosition(10, 1, 'cfi');
+      await service.retryPosition(USER, 1, 'cfi');
 
       expect(conversionService.ensureCfiPositionsForBook).toHaveBeenCalledWith(10, 5);
     });
@@ -453,7 +478,7 @@ describe('AnnotationHubService', () => {
     it('rebuilds an xpointer position, which the cfi backfill can never produce', async () => {
       const { service, rebuilder, syncRepo } = makeService(true);
 
-      await service.retryPosition(10, 1, 'xpointer');
+      await service.retryPosition(USER, 1, 'xpointer');
 
       expect(syncRepo.updatePosition).toHaveBeenCalledWith(1, 'xpointer', { status: 'pending', converterVersion: null });
       expect(rebuilder.rebuildCanonicalPositions).toHaveBeenCalledWith(10, { id: 1, bookId: 5, text: 'selected text' });
@@ -462,7 +487,7 @@ describe('AnnotationHubService', () => {
     it('leaves a device-native format to its own next sync', async () => {
       const { service, rebuilder, conversionService } = makeService(true);
 
-      await service.retryPosition(10, 1, 'kobo_span');
+      await service.retryPosition(USER, 1, 'kobo_span');
 
       expect(rebuilder.rebuildCanonicalPositions).not.toHaveBeenCalled();
       expect(conversionService.ensureCfiPositionsForBook).not.toHaveBeenCalled();
@@ -472,7 +497,7 @@ describe('AnnotationHubService', () => {
       const { service, syncRepo } = makeService();
       syncRepo.findAnnotationById.mockResolvedValueOnce(null);
 
-      await expect(service.retryPosition(10, 99, 'cfi')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.retryPosition(USER, 99, 'cfi')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -480,7 +505,7 @@ describe('AnnotationHubService', () => {
     it('forwards the notes-only and date filters to the repository and the export service', async () => {
       const { service, annotationRepo, exportService } = makeService();
 
-      const result = await service.export(10, { hasNote: true, dateFrom: '2026-01-01T00:00:00.000Z', format: 'csv' }, 'library');
+      const result = await service.export(USER, { hasNote: true, dateFrom: '2026-01-01T00:00:00.000Z', format: 'csv' }, 'library');
 
       const filters = annotationRepo.findHubAll.mock.calls[0][1];
       expect(filters.hasNote).toBe(true);
@@ -492,7 +517,7 @@ describe('AnnotationHubService', () => {
     it('defaults the export format to markdown when omitted', async () => {
       const { service, exportService } = makeService();
 
-      await service.export(10, {}, 'library');
+      await service.export(USER, {}, 'library');
 
       expect(exportService.export.mock.calls[0][1]).toBe('md');
     });

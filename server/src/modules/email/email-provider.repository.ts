@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -22,6 +22,15 @@ export class EmailProviderRepository {
 
   findById(id: number) {
     return this.db.select().from(emailProviders).where(eq(emailProviders.id, id)).limit(1);
+  }
+
+  findSharedDefault() {
+    return this.db
+      .select()
+      .from(emailProviders)
+      .where(and(eq(emailProviders.isShared, true), eq(emailProviders.isDefault, true)))
+      .orderBy(desc(emailProviders.isSystemProvider), asc(emailProviders.id))
+      .limit(1);
   }
 
   insert(values: typeof emailProviders.$inferInsert) {

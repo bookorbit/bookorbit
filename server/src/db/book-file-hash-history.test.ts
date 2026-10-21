@@ -11,13 +11,15 @@ import {
 const HASH = 'a'.repeat(32);
 
 describe('hash identity revision writes', () => {
-  it('commits insertion and scoped invalidation in one statement and bumps only newly inserted identities', async () => {
+  it('commits registration and source-replacement invalidation in one statement', async () => {
     const { db, queries } = createCapturingDb();
     await recordBookFileHashHistory(db, 22, HASH, 'external_change');
     expect(queries).toHaveLength(1);
     const query = queries[0]!;
     expect(query.sql).toContain('with registered as');
-    expect(query.sql).toContain('on conflict (book_file_id, file_hash) do nothing');
+    expect(query.sql).toContain('on conflict (book_file_id, file_hash) do update');
+    expect(query.sql).toContain("where excluded.reason <> 'kobo_download'");
+    expect(query.sql).toContain('set reason = excluded.reason, created_at = now()');
     expect(query.sql).toContain('returning book_file_id');
     expect(query.sql).toContain('update "libraries"');
     expect(query.sql).toContain('koreader_hash_revision = koreader_hash_revision + 1');

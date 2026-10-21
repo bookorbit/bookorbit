@@ -14,6 +14,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
 import {
   AnnotationExchangeAckDto,
   AnnotationExchangeDto,
+  AnnotationPendingDto,
   AnnotationsUploadDto,
   BookStatesUploadDto,
   BookmarkExchangeAckDto,
@@ -56,6 +57,11 @@ export class KoreaderPluginController {
   @Post('annotations/exchange')
   exchangeAnnotations(@CurrentUser() user: RequestUser, @Body() dto: AnnotationExchangeDto) {
     return this.annotationExchangeService.exchange(user, dto);
+  }
+
+  @Post('annotations/pending')
+  pendingAnnotationBooks(@CurrentUser() user: RequestUser, @Body() dto: AnnotationPendingDto) {
+    return this.annotationExchangeService.pendingBooks(user, dto);
   }
 
   @Post('annotations/exchange-ack')

@@ -1033,19 +1033,20 @@ describe('KoreaderRepository', () => {
         .mockResolvedValueOnce([{ hash: 'a'.repeat(32) }]) // unmatched-book device links
         .mockResolvedValueOnce([]) // device settings
         .mockResolvedValueOnce([{ id: 8 }, { id: 9 }]) // annotation sync state
+        .mockResolvedValueOnce([{ id: 11 }]) // bookmark links under the device's rendition ids
         .mockResolvedValueOnce([{ hash: 'a'.repeat(32) }]); // orphaned unmatched books cleanup
       const txDeleteBuilder = { where: vi.fn().mockReturnValue({ returning }) };
       const txSelectBuilder = { from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue('SUBQUERY') }) };
       const tx = { delete: vi.fn().mockReturnValue(txDeleteBuilder), select: vi.fn().mockReturnValue(txSelectBuilder) };
       db.transaction.mockImplementation(async (handler: (client: typeof tx) => Promise<number>) => handler(tx));
 
-      await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(8);
+      await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(9);
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
       // Delivery configuration and retirement markers are cleared without changing the data-row count.
-      expect(tx.delete).toHaveBeenCalledTimes(9);
-      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(9);
-      expect(returning).toHaveBeenCalledTimes(7);
+      expect(tx.delete).toHaveBeenCalledTimes(10);
+      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(10);
+      expect(returning).toHaveBeenCalledTimes(8);
       expect(tx.select).toHaveBeenCalledTimes(1);
 
       const annotationStateFilter = txDeleteBuilder.where.mock.calls[5]![0] as SQL;
@@ -1053,7 +1054,10 @@ describe('KoreaderRepository', () => {
       expect(annotationStateQuery.sql).toContain('"annotation_sync_state"."user_id" = $1');
       expect(annotationStateQuery.sql).toContain('"annotation_sync_state"."source" = $2');
       expect(annotationStateQuery.sql).toContain('"annotation_sync_state"."device_id" = $3');
-      expect(annotationStateQuery.params).toEqual([42, 'koreader', 'device-1']);
+      expect(annotationStateQuery.sql).toContain(`'rendition:' || encode(sha256(`);
+      expect(annotationStateQuery.params.slice(0, 3)).toEqual([42, 'koreader', 'device-1']);
+      const bookmarkLinkQuery = new PgDialect().sqlToQuery(txDeleteBuilder.where.mock.calls[6]![0] as SQL);
+      expect(bookmarkLinkQuery.sql).toContain('"koreader_bookmark_links"."device_id" in (with synced_books');
     });
 
     it('removeDevice skips the orphaned unmatched-book cleanup when the device had no unmatched-book links', async () => {
@@ -1064,14 +1068,15 @@ describe('KoreaderRepository', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]) // no unmatched-book device links removed
         .mockResolvedValueOnce([]) // no device settings removed
-        .mockResolvedValueOnce([]); // no annotation sync state removed
+        .mockResolvedValueOnce([]) // no annotation sync state removed
+        .mockResolvedValueOnce([]); // no bookmark links removed
       const txDeleteBuilder = { where: vi.fn().mockReturnValue({ returning }) };
       const tx = { delete: vi.fn().mockReturnValue(txDeleteBuilder), select: vi.fn() };
       db.transaction.mockImplementation(async (handler: (client: typeof tx) => Promise<number>) => handler(tx));
 
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(1);
 
-      expect(tx.delete).toHaveBeenCalledTimes(8);
+      expect(tx.delete).toHaveBeenCalledTimes(9);
       expect(tx.select).not.toHaveBeenCalled();
     });
 
@@ -1254,6 +1259,16 @@ describe('KoreaderRepository', () => {
       expect(conflictSet(onConflictDoUpdate)).toEqual(expect.objectContaining({ pageNumber: 117, cfi: null, koreaderProgress: '117' }));
     });
 
+    it('stamps the text position with when the device read to it', async () => {
+      const { onConflictDoUpdate, values } = mockUpsertChain();
+      const readAt = new Date('2026-10-17T06:44:16.000Z');
+
+      await repo.upsertReadingProgress({ bookFileId: 44, userId: 12, percentage: 30, readAt });
+
+      expect(values).toHaveBeenCalledWith(expect.objectContaining({ textUpdatedAt: readAt }));
+      expect(conflictSet(onConflictDoUpdate)).toEqual(expect.objectContaining({ textUpdatedAt: readAt }));
+    });
+
     it('persists a reflowable position without touching the page column', async () => {
       const { onConflictDoUpdate, values } = mockUpsertChain();
 
@@ -1281,46 +1296,79 @@ describe('KoreaderRepository', () => {
     // freezes on purpose so it stays a "last local write" marker. A KOReader-only reader therefore
     // kept the timestamp of their first ever sync forever and the sort looked random.
     describe('last-read timestamps in the compiled SQL', () => {
-      async function compileUpsert() {
+      type Query = { sql: string; params: unknown[] };
+
+      async function compileUpsert(timing: { readAt?: Date; lastReadAt?: Date } = {}) {
         const { db: capturingDb, queries } = createCapturingDb();
         const capturingRepo = new KoreaderRepository(capturingDb as never);
 
-        await capturingRepo.upsertReadingProgress({ bookFileId: 44, userId: 12, percentage: 41.25 });
+        await capturingRepo.upsertReadingProgress({ bookFileId: 44, userId: 12, percentage: 41.25, ...timing });
 
         expect(queries).toHaveLength(1);
         return queries[0]!;
       }
 
-      function stampedLastReadAt({ sql: text, params }: { sql: string; params: unknown[] }) {
-        const match = /"last_read_at" = \$(\d+)/.exec(text);
-        expect(match).not.toBeNull();
-        return new Date(String(params[Number(match![1]) - 1])).getTime();
+      function paramTime({ params }: Query, placeholder: string | undefined) {
+        expect(placeholder).toMatch(/^\$\d+$/);
+        return new Date(String(params[Number(placeholder!.slice(1)) - 1])).getTime();
       }
 
-      it('freezes updated_at but advances last_read_at on conflict', async () => {
+      function insertedTime(query: Query, column: string) {
+        const match = /^insert into "reading_progress" \(([^)]*)\) values \(([^)]*)\)/.exec(query.sql);
+        expect(match).not.toBeNull();
+        const columns = match![1]!.split(', ');
+        return paramTime(query, match![2]!.split(', ')[columns.indexOf(`"${column}"`)]);
+      }
+
+      function conflictLastReadAt(query: Query) {
+        const match = /"last_read_at" = greatest\("reading_progress"\."last_read_at", (\$\d+)::timestamptz\)/.exec(query.sql);
+        expect(match).not.toBeNull();
+        return paramTime(query, match![1]);
+      }
+
+      function conflictTextUpdatedAt(query: Query) {
+        return paramTime(query, /"text_updated_at" = (\$\d+)/.exec(query.sql)?.[1]);
+      }
+
+      it('freezes updated_at and only ever advances last_read_at on conflict', async () => {
         const query = await compileUpsert();
 
         expect(query.sql).toContain('"updated_at" = "reading_progress"."updated_at"');
-        expect(query.sql).toMatch(/"last_read_at" = \$\d+/);
-        expect(query.sql).not.toMatch(/"last_read_at" = "reading_progress"\."last_read_at"/);
-        expect(stampedLastReadAt(query)).not.toBeNaN();
+        expect(conflictLastReadAt(query)).not.toBeNaN();
       });
 
-      it('stamps last_read_at close to now rather than reusing a stored value', async () => {
+      // Regression: a sweep pushes a device's whole shelf at once, and stamping each
+      // write with the server's clock ranked every book in it as read in the same few seconds.
+      it('stamps last_read_at with when the device read, not when the push arrived', async () => {
+        const readAt = new Date('2026-03-04T21:15:00.000Z');
+
+        const query = await compileUpsert({ readAt });
+
+        expect(insertedTime(query, 'last_read_at')).toBe(readAt.getTime());
+        expect(conflictLastReadAt(query)).toBe(readAt.getTime());
+      });
+
+      it('keeps the reading time for last_read_at when the text position is stamped later', async () => {
+        const readAt = new Date('2026-10-17T06:44:16.000Z');
+        const lastReadAt = new Date('2026-10-10T17:00:00.000Z');
+
+        const query = await compileUpsert({ readAt, lastReadAt });
+
+        expect(insertedTime(query, 'last_read_at')).toBe(lastReadAt.getTime());
+        expect(conflictLastReadAt(query)).toBe(lastReadAt.getTime());
+        expect(insertedTime(query, 'text_updated_at')).toBe(readAt.getTime());
+        expect(conflictTextUpdatedAt(query)).toBe(readAt.getTime());
+      });
+
+      it("falls back to the write's own time when the device gives none", async () => {
         const before = Date.now();
         const query = await compileUpsert();
         const after = Date.now();
 
-        const stamped = stampedLastReadAt(query);
-        expect(stamped).toBeGreaterThanOrEqual(before);
-        expect(stamped).toBeLessThanOrEqual(after);
-      });
-
-      it('lets the insert branch default last_read_at instead of leaving it unset', async () => {
-        const { sql: text } = await compileUpsert();
-
-        expect(text).toContain('"last_read_at"');
-        expect(text.indexOf('"last_read_at"')).toBeLessThan(text.indexOf('on conflict'));
+        for (const stamped of [insertedTime(query, 'last_read_at'), conflictLastReadAt(query)]) {
+          expect(stamped).toBeGreaterThanOrEqual(before);
+          expect(stamped).toBeLessThanOrEqual(after);
+        }
       });
     });
   });

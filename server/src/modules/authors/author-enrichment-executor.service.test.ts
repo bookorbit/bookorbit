@@ -40,8 +40,8 @@ describe('AuthorEnrichmentExecutorService', () => {
     findByIdForEnrichment: vi.fn(),
     updateAuthorById: vi.fn(),
   };
-  const metadataFetch = { collectByProvider: vi.fn() };
-  const imageStorage = { saveFromUrl: vi.fn(), getThumbnailPath: vi.fn() };
+  const metadataFetch = { collectByProvider: vi.fn(), lookupByIdDetailed: vi.fn() };
+  const imageStorage = { saveFromUrl: vi.fn(), getThumbnailPath: vi.fn(), deleteAuthorDir: vi.fn() };
 
   let service: AuthorEnrichmentExecutorService;
 
@@ -243,6 +243,189 @@ describe('AuthorEnrichmentExecutorService', () => {
     expect(imageStorage.saveFromUrl).toHaveBeenCalledWith(5, 'https://img.example/goodreads.jpg');
     expect(result).toMatchObject({ kind: 'done', imageUpdated: true });
     expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(5, expect.objectContaining({ hasPhoto: true }));
+  });
+
+  describe('pinned match', () => {
+    const PINNED_ROW = {
+      id: 5,
+      name: 'Jane Doe',
+      description: null,
+      hasPhoto: false,
+      bookCount: 3,
+      metadataProvider: AuthorMetadataProviderKey.GOODREADS,
+      metadataProviderId: '4242',
+      metadataProviderPinned: true,
+    };
+
+    beforeEach(() => {
+      authorsRepo.findByIdForEnrichment.mockResolvedValue(PINNED_ROW);
+      metadataFetch.lookupByIdDetailed.mockResolvedValue({ candidate: GOODREADS, failure: null, cacheServed: [], outboundRequests: 1 });
+    });
+
+    it('looks the pinned id up instead of searching by name', async () => {
+      const result = await service.execute({ authorId: 5, preferences: prefs() }, { policy: 'default', allowFallback: true });
+
+      expect(metadataFetch.collectByProvider).not.toHaveBeenCalled();
+      expect(metadataFetch.lookupByIdDetailed).toHaveBeenCalledWith(AuthorMetadataProviderKey.GOODREADS, '4242', 'us', {
+        directive: { policy: 'default', allowFallback: true },
+      });
+      expect(result).toMatchObject({ kind: 'done', provider: AuthorMetadataProviderKey.GOODREADS, descriptionUpdated: true });
+      expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(5, expect.objectContaining({ description: 'Goodreads bio' }));
+    });
+
+    it('never rewrites the pinned provider id', async () => {
+      metadataFetch.lookupByIdDetailed.mockResolvedValue({
+        candidate: { ...GOODREADS, providerId: '4242.Jane_Doe' },
+        failure: null,
+        cacheServed: [],
+        outboundRequests: 1,
+      });
+
+      await service.execute({ authorId: 5, preferences: prefs() });
+
+      const update = authorsRepo.updateAuthorById.mock.calls[0][1];
+      expect(update).not.toHaveProperty('metadataProvider');
+      expect(update).not.toHaveProperty('metadataProviderId');
+    });
+
+    it('keeps the pin and reports no_match when the id now matches nobody', async () => {
+      metadataFetch.lookupByIdDetailed.mockResolvedValue({ candidate: null, failure: null, cacheServed: [], outboundRequests: 1 });
+
+      const result = await service.execute({ authorId: 5, preferences: prefs() });
+
+      expect(result).toMatchObject({ kind: 'skipped', reason: 'no_match', outboundRequests: 1 });
+      expect(authorsRepo.updateAuthorById).not.toHaveBeenCalled();
+    });
+
+    it('reports a failed lookup as a failure so the queue retries', async () => {
+      metadataFetch.lookupByIdDetailed.mockResolvedValue({
+        candidate: null,
+        failure: { provider: AuthorMetadataProviderKey.GOODREADS, message: 'HTTP 429', httpStatus: 429, retryAfterMs: 5000, transient: true },
+        cacheServed: [],
+        outboundRequests: 1,
+      });
+
+      const result = await service.execute({ authorId: 5, preferences: prefs() });
+
+      expect(result).toMatchObject({ kind: 'failed', httpStatus: 429, retryAfterMs: 5000, transient: true });
+    });
+
+    it('skips when the pinned provider is no longer used by any field', async () => {
+      const preferences = prefs();
+      for (const field of Object.keys(preferences.fields) as AuthorMetadataField[]) {
+        preferences.fields[field].providers = [AuthorMetadataProviderKey.AUDNEXUS];
+      }
+
+      const result = await service.execute({ authorId: 5, preferences });
+
+      expect(result).toMatchObject({ kind: 'skipped', reason: 'provider_disabled' });
+      expect(metadataFetch.lookupByIdDetailed).not.toHaveBeenCalled();
+      expect(metadataFetch.collectByProvider).not.toHaveBeenCalled();
+    });
+
+    it('searches by name again once unpinned', async () => {
+      authorsRepo.findByIdForEnrichment.mockResolvedValue({ ...PINNED_ROW, metadataProviderPinned: false });
+
+      await service.execute({ authorId: 5, preferences: prefs() });
+
+      expect(metadataFetch.lookupByIdDetailed).not.toHaveBeenCalled();
+      expect(metadataFetch.collectByProvider).toHaveBeenCalled();
+    });
+  });
+
+  describe('applyMatch', () => {
+    const WRONG_PERSON_ROW = {
+      id: 5,
+      name: 'John Reid',
+      description: 'American journalist.',
+      hasPhoto: true,
+      birthDate: '1950-01-01',
+      birthYear: 1950,
+      deathDate: null,
+      deathYear: null,
+      website: 'https://wrong.example',
+      genres: ['Journalism'],
+      influences: null,
+      bookCount: 2,
+      metadataProvider: AuthorMetadataProviderKey.GOODREADS,
+      metadataProviderId: '1111',
+      metadataProviderPinned: false,
+    };
+
+    it('replaces every enabled field, clears what the match lacks and pins it', async () => {
+      const match = {
+        provider: AuthorMetadataProviderKey.GOODREADS,
+        providerId: '2222',
+        name: 'John Reid',
+        description: 'Scottish novelist.',
+        genres: ['Thriller'],
+      };
+
+      const result = await service.applyMatch(WRONG_PERSON_ROW as never, prefs(), match);
+
+      expect(imageStorage.deleteAuthorDir).toHaveBeenCalledWith(5);
+      expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(5, {
+        description: 'Scottish novelist.',
+        birthDate: null,
+        birthYear: null,
+        deathDate: null,
+        deathYear: null,
+        website: null,
+        genres: ['Thriller'],
+        influences: null,
+        metadataProvider: AuthorMetadataProviderKey.GOODREADS,
+        metadataProviderId: '2222',
+        metadataProviderPinned: true,
+        hasPhoto: true,
+        lastEnrichedAt: expect.any(Date),
+      });
+      expect(result).toMatchObject({ kind: 'applied', imageUpdated: true, downloads: 0 });
+    });
+
+    it('stores the match portrait and leaves disabled fields alone', async () => {
+      const result = await service.applyMatch(WRONG_PERSON_ROW as never, prefs({ website: { enabled: false } }), GOODREADS);
+
+      expect(imageStorage.saveFromUrl).toHaveBeenCalledWith(5, 'https://img.example/goodreads.jpg');
+      expect(imageStorage.deleteAuthorDir).not.toHaveBeenCalled();
+      expect(authorsRepo.updateAuthorById.mock.calls[0][1]).not.toHaveProperty('website');
+      expect(result).toMatchObject({ kind: 'applied', imageUpdated: true, downloads: 1 });
+      expect((result as { fieldsUpdated: string[] }).fieldsUpdated).toContain('photo');
+    });
+
+    it('clears fields an Audnexus match cannot supply', async () => {
+      await service.applyMatch(WRONG_PERSON_ROW as never, prefs(), AUDNEXUS);
+
+      expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({
+          description: 'Audnexus bio',
+          birthYear: null,
+          website: null,
+          genres: null,
+          metadataProvider: AuthorMetadataProviderKey.AUDNEXUS,
+          metadataProviderId: 'A1',
+        }),
+      );
+    });
+
+    it('writes nothing when the portrait download fails', async () => {
+      imageStorage.saveFromUrl.mockRejectedValue(new AuthorImageStorageError('rate limited', { httpStatus: 429, transient: true }));
+
+      const result = await service.applyMatch(WRONG_PERSON_ROW as never, prefs(), GOODREADS);
+
+      expect(result).toMatchObject({ kind: 'failed', message: 'rate limited', httpStatus: 429, transient: true });
+      expect(authorsRepo.updateAuthorById).not.toHaveBeenCalled();
+    });
+
+    it('leaves the existing match untouched when the portrait cannot be stored', async () => {
+      imageStorage.saveFromUrl.mockResolvedValue(false);
+
+      const result = await service.applyMatch(WRONG_PERSON_ROW as never, prefs(), GOODREADS);
+
+      expect(result).toMatchObject({ kind: 'failed', message: 'Failed to save author image', transient: false });
+      expect(imageStorage.deleteAuthorDir).not.toHaveBeenCalled();
+      expect(authorsRepo.updateAuthorById).not.toHaveBeenCalled();
+    });
   });
 
   describe('metadata cache', () => {

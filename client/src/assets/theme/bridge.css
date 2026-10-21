@@ -42,6 +42,8 @@
   --color-volume-reading: var(--volume-reading);
   --color-volume-unread: var(--volume-unread);
   --color-volume-missing: var(--volume-missing);
+  --color-sync-meter-text: var(--sync-meter-text);
+  --color-sync-meter-audio: var(--sync-meter-audio);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

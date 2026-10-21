@@ -18,6 +18,29 @@ export const SERVER_FEATURES = [
   "read-aloud-delivery",
   "koreader-delivery-settings",
   "server-connection-identity",
+  /** `GET /books/:id/annotations` and `/bookmarks` accept `readerFileId` and return positions for that file. */
+  "reader-file-positions",
+  /**
+   * `POST .../grab` accepts `holdForReview`, release candidates carry `infoUrl`, and a held
+   * review reports `heldOnRequest`, `releaseInfoUrl`, `edition` and `hasCover` with a cover route.
+   */
+  "book-request-review-hold",
+  /**
+   * `PATCH /authors/:id` accepts `website`, `birthDate`, `birthYear`, `deathDate`, `deathYear`,
+   * `genres` and `influences`, and `PUT`/`DELETE /authors/:id/metadata-match` pin or unpin the
+   * provider match.
+   */
+  "author-metadata-match",
+  /**
+   * `GET /metadata-fetch/stream` accepts `resultsPerProvider` (up to
+   * `METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER`), and Open Library and Hardcover answer a search that
+   * names an author but no title.
+   */
+  "metadata-search-results-per-provider",
+  /** Book and custom date filters accept the `moreThanAgo` rolling-boundary operator. */
+  "relative-date-ranges",
+  /** The `format` book filter accepts `epub:readalong` for EPUBs with media overlays. */
+  "read-along-filter",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

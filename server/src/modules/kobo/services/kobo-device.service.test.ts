@@ -1,5 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
+import * as schema from '../../../db/schema';
 import { KoboDeviceService } from './kobo-device.service';
 
 function makeSelectChain(orderByResult: unknown[] = [], limitResult: unknown[] = []) {
@@ -29,7 +32,7 @@ function makeDb() {
   const deleteWhere = vi.fn().mockResolvedValue(undefined);
   const del = vi.fn().mockReturnValue({ where: deleteWhere });
 
-  return {
+  const db = {
     select: vi.fn(),
     insert,
     insertValues,
@@ -40,7 +43,10 @@ function makeDb() {
     updateReturning,
     delete: del,
     deleteWhere,
+    transaction: vi.fn(),
   };
+  db.transaction.mockImplementation(async (handler: (tx: typeof db) => Promise<void>) => handler(db));
+  return db;
 }
 
 describe('KoboDeviceService', () => {
@@ -112,7 +118,9 @@ describe('KoboDeviceService', () => {
     expect(db.deleteWhere).not.toHaveBeenCalled();
 
     await expect(service.revokeDevice(8, 7)).resolves.toBeUndefined();
-    expect(db.delete).toHaveBeenCalledTimes(1);
-    expect(db.deleteWhere).toHaveBeenCalledTimes(1);
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.delete.mock.calls.map(([table]) => table)).toEqual([schema.annotationSyncState, schema.koboDevices]);
+    const stateFilter = new PgDialect().sqlToQuery(db.deleteWhere.mock.calls[0]![0] as SQL);
+    expect(stateFilter.params).toEqual([8, 'kobo', '7']);
   });
 });

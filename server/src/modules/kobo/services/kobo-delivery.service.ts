@@ -11,6 +11,7 @@ import { KepubConversionService } from './kepub-conversion.service';
 import { KepubifyBinaryService } from './kepubify-binary.service';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { computeFileHashFromHandle } from '../../../common/utils/file-hash.utils';
+import { kepubContentDigest } from './kepub-content-digest';
 
 export type KoboDeliveryRecord = NonNullable<Awaited<ReturnType<KoboDeliveryRepository['findCurrent']>>>;
 
@@ -87,6 +88,7 @@ export class KoboDeliveryService {
       policy,
     );
     let converterVersion: string | null = null;
+    let contentDigest: string | undefined;
     let conversionRelease: (() => Promise<void>) | undefined;
     try {
       if (file.format === 'kepub') artifact.format = 'kepub';
@@ -119,8 +121,10 @@ export class KoboDeliveryService {
           } finally {
             await handle.close();
           }
+          contentDigest = await kepubContentDigest(converted.path);
         } catch (error) {
           converterVersion = null;
+          contentDigest = undefined;
           this.logger.warn(
             `[kobo.delivery] [fail] userId=${userId} deviceId=${deviceId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - conversion failed, offering prepared EPUB`,
           );
@@ -136,7 +140,12 @@ export class KoboDeliveryService {
           bookId,
           sourceFileId: file.id,
           metadata,
-          options: { hyphenate: settings.forceEnableHyphenation, converterVersion, replacement: replacementVariant !== undefined },
+          options: {
+            hyphenate: settings.forceEnableHyphenation,
+            converterVersion,
+            replacement: replacementVariant !== undefined,
+            ...(contentDigest ? { kepubContentDigest: contentDigest } : {}),
+          },
           state: replacementVariant === undefined ? 'offered' : 'prepared',
         },
         replacementVariant !== undefined,
@@ -222,7 +231,8 @@ export class KoboDeliveryService {
     let conversionRelease: (() => Promise<void>) | undefined;
     try {
       if (record.metadata.format === 'kepub' && file.format !== 'kepub') {
-        if ((await this.binary.getVersion()) !== record.options.converterVersion)
+        // Another converter may still write the same content, which the digest can confirm; without one it cannot be told.
+        if ((await this.binary.getVersion()) !== record.options.converterVersion && !record.options.kepubContentDigest)
           throw new ConflictException({ code: 'DELIVERY_ARTIFACT_UNAVAILABLE' });
         const converted = await this.conversion.acquireKepub({
           sourcePath: artifact.path,
@@ -243,7 +253,11 @@ export class KoboDeliveryService {
           await handle.close();
         }
       }
-      if (artifact.sha256 !== record.metadata.sha256) throw new ConflictException({ code: 'DELIVERY_ARTIFACT_UNAVAILABLE' });
+      if (artifact.sha256 !== record.metadata.sha256) {
+        if (!(await this.holdsDeliveredContent(record, artifact.path))) throw new ConflictException({ code: 'DELIVERY_ARTIFACT_UNAVAILABLE' });
+      } else if (record.metadata.format === 'kepub' && file.format !== 'kepub' && !record.options.kepubContentDigest) {
+        await this.rememberContentDigest(record, artifact.path);
+      }
       return {
         ...artifact,
         ...record.metadata,
@@ -256,6 +270,37 @@ export class KoboDeliveryService {
       await conversionRelease?.();
       await artifact.release();
       throw error;
+    }
+  }
+
+  /**
+   * Whether a rebuilt KEPUB is the conversion the device holds. kepubify orders archive entries differently on every
+   * run, so a cache eviction otherwise ends precise sync for the book until it is delivered again.
+   */
+  private async holdsDeliveredContent(record: KoboDeliveryRecord, path: string): Promise<boolean> {
+    const expected = record.options.kepubContentDigest;
+    if (record.metadata.format !== 'kepub' || !expected) return false;
+    try {
+      return (await kepubContentDigest(path)) === expected;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Records the content digest of the exact copy a delivery made before digests were kept, so a later rebuild of it
+   * can be recognised once the cached copy is evicted.
+   */
+  async rememberContentDigest(record: KoboDeliveryRecord, path: string): Promise<void> {
+    if (record.metadata.format !== 'kepub' || record.options.kepubContentDigest) return;
+    try {
+      const digest = await kepubContentDigest(path);
+      await this.repository.setKepubContentDigest(record.userId, record.deviceId, record.id, digest);
+      record.options = { ...record.options, kepubContentDigest: digest };
+    } catch (error) {
+      this.logger.warn(
+        `[kobo.delivery_digest] [fail] userId=${record.userId} deviceId=${record.deviceId} bookId=${record.bookId} deliveryId=${record.id} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - content digest not recorded`,
+      );
     }
   }
 

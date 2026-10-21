@@ -262,6 +262,8 @@ export class UploadService {
       const ino = fileStat.ino;
       const relPath = relative(bookRow.libraryFolderPath, destination);
       const mediaOverlayFields = await this.inspectMediaOverlayFields(destination, format);
+      // The transaction callback cannot see the narrowing of the outer `let`.
+      const absolutePath = destination;
 
       const { inserted, isPrimary, finalStatus } = await this.db.transaction(async (tx) => {
         const [lockedBook] = await tx
@@ -283,7 +285,7 @@ export class UploadService {
           .values({
             bookId,
             libraryFolderId: bookRow.libraryFolderId,
-            absolutePath: destination,
+            absolutePath,
             relPath,
             ino,
             sizeBytes,

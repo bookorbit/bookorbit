@@ -51,7 +51,7 @@ import { useLibraryScan } from '@/features/scanner/composables/useLibraryScan'
 import { useFilterTokens } from '@/features/book/composables/useFilterTokens'
 import { useLibraryFacets } from '@/features/library/composables/useLibraryFacets'
 import { useLibraryHeaderFacts } from '@/features/library/composables/useLibraryHeaderFacts'
-import { sortFieldLabel } from '@/features/book/lib/filter-labels'
+import { formatFilterValueLabel, sortFieldLabel } from '@/features/book/lib/filter-labels'
 import { formatBytes } from '@/lib/formatting'
 import { formatRelativeTimeFromNow } from '@/i18n/formatters'
 import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
@@ -343,7 +343,7 @@ const { tokens: filterTokens, selectedFormats, ruleCount: filterRuleCount, remov
 const { facets } = useLibraryFacets(libraryId, filter, debouncedQuery)
 const formatFacets = computed(() => facets.value?.formats ?? [])
 const showFormatFacets = computed(() => formatFacets.value.length > 1 || selectedFormats.value.length > 0)
-const selectedFormatsLabel = computed(() => (selectedFormats.value.length > 0 ? selectedFormats.value.map((f) => f.toUpperCase()).join(', ') : null))
+const selectedFormatsLabel = computed(() => (selectedFormats.value.length > 0 ? selectedFormats.value.map(formatFilterValueLabel).join(', ') : null))
 const isNarrowed = computed(() => filterRuleCount.value > 0 || debouncedQuery.value.trim().length > 0)
 
 const canManageLibraries = computed(() => hasPermission('manage_libraries'))

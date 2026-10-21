@@ -44,9 +44,35 @@ describe('OpenLibraryProvider', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return empty array if no isbn or title provided', async () => {
-      const result = await provider.search({ author: 'Test' });
+    it('should return empty array if no isbn, title or author provided', async () => {
+      global.fetch = vi.fn();
+      const result = await provider.search({});
       expect(result).toEqual([]);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should browse by author when no title is given', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ docs: [{ key: '/works/OL2W', title: 'Mort', author_name: ['Terry Pratchett'] }] }),
+      });
+
+      const result = await provider.search({ author: 'Terry Pratchett' });
+
+      const url = new URL(vi.mocked(global.fetch).mock.calls[0][0] as string);
+      expect(url.searchParams.get('author')).toBe('Terry Pratchett');
+      expect(url.searchParams.has('title')).toBe(false);
+      expect(url.searchParams.get('limit')).toBe('10');
+      expect(result.map((candidate) => candidate.title)).toEqual(['Mort']);
+    });
+
+    it('should widen the page when a browsing search asks for more results', async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ docs: [] }) });
+
+      await provider.search({ author: 'Terry Pratchett', resultsPerProvider: 20 });
+
+      const url = new URL(vi.mocked(global.fetch).mock.calls[0][0] as string);
+      expect(url.searchParams.get('limit')).toBe('20');
     });
 
     it('should fetch from openlibrary and return mapped docs', async () => {

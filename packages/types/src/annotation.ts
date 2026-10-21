@@ -238,6 +238,9 @@ export interface AnnotationHubBookFacet {
 export const ANNOTATION_BULK_ACTIONS = ["trash", "restore", "restyle", "star", "unstar"] as const;
 export type AnnotationBulkAction = (typeof ANNOTATION_BULK_ACTIONS)[number];
 
+/** `errorCode` on the 409 from `DELETE /annotations/:id` while a synced device has not acknowledged the deletion. */
+export const ANNOTATION_PURGE_PENDING_DEVICE_SYNC = "ANNOTATION_PURGE_PENDING_DEVICE_SYNC";
+
 export const ANNOTATION_COLOR_NAME_MAX_ENTRIES = 32;
 export const ANNOTATION_COLOR_NAME_MAX_LENGTH = 40;
 

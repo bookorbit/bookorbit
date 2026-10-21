@@ -109,7 +109,7 @@ async function createContext(role: AccessLevel | null = 'viewer') {
     [BookEmbedderService, { embedBook: vi.fn().mockResolvedValue(undefined) }],
     [MetadataScoreService, score],
     [AchievementEventsService, { emit: vi.fn() }],
-    [AudiobookEbookProgressSyncService, { syncFromEbookProgress: vi.fn() }],
+    [AudiobookEbookProgressSyncService, { syncFromEbookProgress: vi.fn(), advanceNarrationToText: vi.fn() }],
     [UserBookStatusService, { autoUpdate: vi.fn(), findOne: vi.fn() }],
     [ConfigService, { get: vi.fn().mockReturnValue(tmpdir()) }],
     [LibraryRepository, libraryRepo],

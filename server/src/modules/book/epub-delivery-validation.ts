@@ -136,6 +136,34 @@ export async function inspectDeliveryEpub(zip: unzipper.CentralDirectory, maxEnt
     const { audio, text } = overlaySources(smilDoc);
     if (!audio.length || !text.length) return invalid('Incomplete media overlay');
     for (const href of [...audio, ...text]) if (!entries.has(resolve(href, smilKey))) return invalid('Missing overlay resource');
+    const textTargets = new Map<string, Set<string>>();
+    for (const href of text) {
+      const key = resolve(href, smilKey);
+      const encodedFragment = href.split('#')[1];
+      if (!encodedFragment) continue;
+      let fragment: string;
+      try {
+        fragment = decodeURIComponent(encodedFragment);
+      } catch {
+        return invalid('Invalid overlay fragment');
+      }
+      const targets = textTargets.get(key) ?? new Set<string>();
+      targets.add(fragment);
+      textTargets.set(key, targets);
+    }
+    for (const [key, targets] of textTargets) {
+      const { doc: textDoc } = await xml(key);
+      const pending: unknown[] = [textDoc];
+      while (pending.length && targets.size) {
+        const node = pending.pop();
+        if (!node || typeof node !== 'object') continue;
+        for (const [name, value] of Object.entries(node)) {
+          if (name === '@_id' && typeof value === 'string') targets.delete(value);
+          else if (!name.startsWith('@_')) pending.push(value);
+        }
+      }
+      if (targets.size) return invalid('Missing overlay text target');
+    }
     for (const href of audio) overlayAudio.add(resolve(href, smilKey));
   }
   if ([...overlayAudio].some((key) => !audioPaths.has(key))) return invalid('Undeclared overlay audio is unsupported');

@@ -852,8 +852,36 @@
     {
       "idx": 121,
       "version": "7",
-      "when": 1792243560331,
-      "tag": "0121_torbox_download_client",
+      "when": 1792444043652,
+      "tag": "0121_add_device_annotation_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1792511452628,
+      "tag": "0122_add_release_info_url_and_review_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1792512356419,
+      "tag": "0123_add_koreader_hide_audio_only_books",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1792516862510,
+      "tag": "0124_add_author_metadata_provider_pinned",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1792576114687,
+      "tag": "0125_torbox_download_client",
       "breakpoints": true
     }
   ]

@@ -8,6 +8,7 @@ import { formatPercent, formatRelativeFromNow } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import type { RequestListDensity } from '../composables/useRequestListDensity'
 import { canBulkActRequest } from '../requestActions'
+import { requestBookCoverSources } from '../requestBookCover'
 import { requestMediaColor, requestMediaIcon } from '../requestMedia'
 import { orderedHalves, rowRequests } from '../requestPair'
 import { requestFailureText, requestOutcome } from '../requestOutcome'
@@ -257,6 +258,11 @@ function halfCover(row: BookRequestItem, kind: 'ebook' | 'audiobook'): string | 
   return rowRequests(row).find((request) => request.mediaKind === kind)?.coverUrl ?? null
 }
 
+function halfBookCovers(row: BookRequestItem, kind: 'ebook' | 'audiobook'): string[] {
+  const half = rowRequests(row).find((request) => request.mediaKind === kind)
+  return half ? requestBookCoverSources(half) : []
+}
+
 /** The book either half landed as, so a pair that has partly arrived still links somewhere real. */
 function landedBookId(row: BookRequestItem): number | null {
   return rowRequests(row).find((request) => request.status === 'available' && request.matchedBookId !== null)?.matchedBookId ?? null
@@ -389,12 +395,15 @@ function rowDismissed(row: BookRequestItem): boolean {
                 v-if="isPair(request)"
                 :ebook-src="halfCover(request, 'ebook')"
                 :audio-src="halfCover(request, 'audiobook')"
+                :ebook-fallbacks="halfBookCovers(request, 'ebook')"
+                :audio-fallbacks="halfBookCovers(request, 'audiobook')"
                 :class="isCompact ? 'me-1 h-8 w-[22px]' : 'me-1.5 h-[46px] w-8'"
                 :icon-size="isCompact ? 11 : 14"
               />
               <RequestCover
                 v-else
                 :src="request.coverUrl"
+                :fallback-sources="requestBookCoverSources(request)"
                 :media-kind="request.mediaKind"
                 :class="isCompact ? 'h-8 w-[22px]' : 'h-[46px] w-8'"
                 :icon-size="isCompact ? 11 : 14"
@@ -622,10 +631,19 @@ function rowDismissed(row: BookRequestItem): boolean {
             v-if="isPair(request)"
             :ebook-src="halfCover(request, 'ebook')"
             :audio-src="halfCover(request, 'audiobook')"
+            :ebook-fallbacks="halfBookCovers(request, 'ebook')"
+            :audio-fallbacks="halfBookCovers(request, 'audiobook')"
             class="me-1.5 h-[54px] w-9"
             :icon-size="16"
           />
-          <RequestCover v-else :src="request.coverUrl" :media-kind="request.mediaKind" class="h-[54px] w-9" :icon-size="16" />
+          <RequestCover
+            v-else
+            :src="request.coverUrl"
+            :fallback-sources="requestBookCoverSources(request)"
+            :media-kind="request.mediaKind"
+            class="h-[54px] w-9"
+            :icon-size="16"
+          />
 
           <div class="min-w-0 flex-1 space-y-1.5">
             <div class="flex min-w-0 items-center gap-2">

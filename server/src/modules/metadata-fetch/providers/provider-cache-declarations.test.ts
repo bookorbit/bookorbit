@@ -118,6 +118,7 @@ type Mutation =
   | 'titleIsExplicitQuery'
   | 'validateCoverPlaceholders'
   | 'maxCandidatesPerProvider'
+  | 'resultsPerProvider'
   | 'requireUnambiguousMatch'
   | 'hardcoverEditionId'
   | 'isAudiobook'
@@ -133,6 +134,7 @@ const MUTATIONS: Record<Mutation, (params: MetadataSearchParams) => MetadataSear
   titleIsExplicitQuery: (params) => ({ ...params, titleIsExplicitQuery: true }),
   validateCoverPlaceholders: (params) => ({ ...params, validateCoverPlaceholders: false }),
   maxCandidatesPerProvider: (params) => ({ ...params, maxCandidatesPerProvider: 1 }),
+  resultsPerProvider: (params) => ({ ...params, resultsPerProvider: 20 }),
   requireUnambiguousMatch: (params) => ({ ...params, requireUnambiguousMatch: true }),
   hardcoverEditionId: (params) => ({ ...params, hardcoverEditionId: '99' }),
   // Leaves the audiobook gate on, since includeAudiobookProviders is set.
@@ -166,7 +168,7 @@ const CASES: DeclarationCase[] = [
     key: MetadataProviderKey.GOOGLE,
     withIsbn: ISBN_ONLY,
     withoutIsbn: TITLE_AUTHOR,
-    searchReads: ['validateCoverPlaceholders'],
+    searchReads: ['validateCoverPlaceholders', 'resultsPerProvider'],
     honoursMax: false,
     lookup: LOOKUP_ID,
     fingerprint: {},
@@ -246,7 +248,7 @@ const CASES: DeclarationCase[] = [
     key: MetadataProviderKey.HARDCOVER,
     withIsbn: { ...TITLE_AUTHOR, ...ISBN_ONLY, isAudiobook: true, hardcoverEditionId: '42' },
     withoutIsbn: { ...TITLE_AUTHOR, isAudiobook: true, hardcoverEditionId: '42' },
-    searchReads: ['isAudiobook', 'hardcoverEditionId'],
+    searchReads: ['isAudiobook', 'hardcoverEditionId', 'resultsPerProvider'],
     honoursMax: false,
     lookup: {
       inputs: { id: 'provider-id', isAudiobook: true, hardcoverEditionId: '42', isbn: '9780441172719' },
@@ -267,7 +269,7 @@ const CASES: DeclarationCase[] = [
     key: MetadataProviderKey.OPEN_LIBRARY,
     withIsbn: ISBN_ONLY,
     withoutIsbn: TITLE_AUTHOR,
-    searchReads: [],
+    searchReads: ['resultsPerProvider'],
     honoursMax: false,
     lookup: LOOKUP_ID,
     fingerprint: {},
@@ -326,7 +328,11 @@ describe('provider cache declarations', () => {
 
   describe.each(CASES)('$key', (testCase) => {
     it('declares the current mapping version', () => {
-      expect(specOf(testCase.key).version).toBe(testCase.key === MetadataProviderKey.COMICVINE ? 2 : 1);
+      const bumped: Partial<Record<MetadataProviderKey, number>> = {
+        [MetadataProviderKey.COMICVINE]: 2,
+        [MetadataProviderKey.HARDCOVER]: 2,
+      };
+      expect(specOf(testCase.key).version).toBe(bumped[testCase.key] ?? 1);
     });
 
     it('keys a search on the fields it reads', () => {
@@ -405,6 +411,18 @@ describe('provider cache declarations', () => {
   });
 
   describe('special cases', () => {
+    it.each([MetadataProviderKey.GOOGLE, MetadataProviderKey.HARDCOVER, MetadataProviderKey.OPEN_LIBRARY])(
+      'keys %s on a widened page only, so a default-sized answer keeps its key',
+      (key) => {
+        const spec = specOf(key);
+        const pageSize = (resultsPerProvider: number | undefined) => spec.describeSearch({ ...WITHOUT_ISBN, resultsPerProvider })?.inputs.pageSize;
+        expect(pageSize(undefined)).toBeUndefined();
+        expect(pageSize(5)).toBeUndefined();
+        expect(pageSize(10)).toBeUndefined();
+        expect(pageSize(20)).toBe(20);
+      },
+    );
+
     it('keys iTunes searches on an absent medium as an ebook, but keeps lookups tri-state', () => {
       const spec = specOf(MetadataProviderKey.ITUNES);
       const absent = { ...WITHOUT_ISBN, isAudiobook: undefined };

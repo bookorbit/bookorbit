@@ -1,7 +1,10 @@
 import { ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Annotation } from '../useAnnotations'
 import { useReaderAnnotationActions } from '../useReaderAnnotationActions'
+
+const toastError = vi.hoisted(() => vi.fn<(message: string) => void>())
+vi.mock('vue-sonner', () => ({ toast: { error: toastError } }))
 
 function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
   return {
@@ -28,6 +31,8 @@ function makeHarness(initialAnnotations: Annotation[] = []) {
   const annotationItems = ref<Annotation[]>(initialAnnotations)
   const create = vi.fn<() => Promise<Annotation | null>>()
   const update = vi.fn<() => Promise<Annotation | null>>()
+  const remove = vi.fn<() => Promise<boolean>>()
+  const deleteAnnotation = vi.fn<(cfi: string) => void>()
   const addAnnotation = vi.fn<(cfi: string, color: string, style: string) => void>()
   const redrawAnnotation = vi.fn<(cfi: string, color: string, style: string) => void>()
 
@@ -53,16 +58,22 @@ function makeHarness(initialAnnotations: Annotation[] = []) {
       annotations: annotationItems,
       create,
       update,
+      remove,
     },
     selection,
     addAnnotation,
     redrawAnnotation,
+    deleteAnnotation,
   })
 
-  return { actions, annotationItems, create, update, addAnnotation, redrawAnnotation, selection }
+  return { actions, annotationItems, create, update, remove, addAnnotation, redrawAnnotation, deleteAnnotation, selection }
 }
 
 describe('useReaderAnnotationActions', () => {
+  beforeEach(() => {
+    toastError.mockClear()
+  })
+
   it('creates and draws a new highlight when the selection does not overlap an existing annotation', async () => {
     const created = makeAnnotation({ id: 99, color: '#38BDF8', style: 'underline' })
     const { actions, create, update, addAnnotation, redrawAnnotation, selection } = makeHarness()
@@ -145,5 +156,69 @@ describe('useReaderAnnotationActions', () => {
     expect(selection.openNoteDialog).toHaveBeenCalledWith('old note')
     expect(selection.noteText.value).toBe('old note')
     expect(selection.showNoteDialog.value).toBe(true)
+  })
+
+  it('sends one request when a note is saved twice before the first answer', async () => {
+    const existing = makeAnnotation({ id: 42 })
+    const { actions, update, selection } = makeHarness([existing])
+    selection.overlappingAnnotationId.value = 42
+    let answer: (value: Annotation | null) => void = () => {}
+    update.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+
+    const first = actions.handleSaveNote('note')
+    expect(actions.isSaving.value).toBe(true)
+    await actions.handleSaveNote('note')
+    answer(makeAnnotation({ id: 42, note: 'note' }))
+    await first
+
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(actions.isSaving.value).toBe(false)
+  })
+
+  it('keeps the note dialog and its text open when the save fails', async () => {
+    const { actions, create, selection } = makeHarness()
+    selection.showNoteDialog.value = true
+    selection.noteText.value = 'unsaved words'
+    create.mockResolvedValueOnce(null)
+
+    await actions.handleSaveNote('unsaved words')
+
+    expect(toastError).toHaveBeenCalledWith('Could not save the note')
+    expect(selection.showNoteDialog.value).toBe(true)
+    expect(selection.noteText.value).toBe('unsaved words')
+  })
+
+  it('tells the reader when a highlight could not be saved', async () => {
+    const { actions, create, addAnnotation, selection } = makeHarness()
+    create.mockResolvedValueOnce(null)
+
+    await actions.handleHighlight('#38BDF8', 'underline')
+
+    expect(toastError).toHaveBeenCalledWith('Could not save the highlight')
+    expect(addAnnotation).not.toHaveBeenCalled()
+    expect(selection.dismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('erases a highlight from the page only after the server deleted it', async () => {
+    const existing = makeAnnotation({ id: 42 })
+    const { actions, remove, deleteAnnotation } = makeHarness([existing])
+    remove.mockResolvedValueOnce(true)
+
+    await actions.handleDeleteAnnotation(42)
+
+    expect(remove).toHaveBeenCalledWith(9, 42)
+    expect(deleteAnnotation).toHaveBeenCalledWith(existing.cfi)
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('keeps a highlight on the page when its delete fails', async () => {
+    const existing = makeAnnotation({ id: 42 })
+    const { actions, remove, deleteAnnotation } = makeHarness([existing])
+    remove.mockResolvedValueOnce(false)
+
+    await actions.handleDeleteAnnotation(42)
+
+    expect(deleteAnnotation).not.toHaveBeenCalled()
+    expect(toastError).toHaveBeenCalledWith('Could not delete the highlight')
   })
 })

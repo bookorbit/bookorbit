@@ -135,6 +135,27 @@ describe('IndexerSearchService', () => {
     expect(result.indexers[0]).toMatchObject({ ok: true, count: 2, filtered: 1 });
   });
 
+  it('hands the picker a vetted page link and drops one carrying the indexer credential', async () => {
+    const adapter = {
+      search: vi
+        .fn()
+        .mockResolvedValue([
+          release({ guid: 'safe', infoUrl: 'https://tracker.example.com/details/1#comments' }),
+          release({ guid: 'keyed', infoUrl: 'https://tracker.example.com/details/2?ref=stored-credential' }),
+          release({ guid: 'scripted', infoUrl: 'javascript:alert(1)' }),
+          release({ guid: 'none' }),
+        ]),
+    };
+    const { service } = makeService([indexer({ adapterType: pluginType('example-plugin'), credential: 'stored-credential' })], {
+      'example-plugin': adapter,
+    });
+
+    const result = await service.search(request());
+
+    const pages = Object.fromEntries(result.releases.map((item) => [item.guid, item.infoUrl]));
+    expect(pages).toEqual({ safe: 'https://tracker.example.com/details/1', keyed: null, scripted: null, none: null });
+  });
+
   /** The picker for an old comic request says why, rather than asking every tracker for nothing. */
   it('refuses to search for a request made for the retired comic medium', async () => {
     const search = vi.fn();

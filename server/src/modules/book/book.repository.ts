@@ -1,6 +1,6 @@
 import { recordBookFileHashHistory, deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
-import { SQL, and, asc, count, eq, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, eq, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -15,7 +15,7 @@ import type {
   TemporalJumpBucketUnit,
 } from '@bookorbit/types';
 import type { UnscopedBookRecommendation } from '@bookorbit/types';
-import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
+import { READ_ALONG_FORMAT_PRIORITY, isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
@@ -98,6 +98,7 @@ type CollapsedRawRow = {
   publisher: string | null;
   page_count: number | null;
   sort_title: string | null;
+  sort_series: string | null;
   sort_added_at: string | null;
   book_count: string | null;
   read_count: string | null;
@@ -239,8 +240,10 @@ function collapsedDiscreteSourceParts(field: SortField, userId: number): Collaps
 
   switch (field) {
     case 'title':
-    case 'series':
       return direct(sql.raw('r.sort_title'));
+    // Standalone books have no series letter, matching the flat rail.
+    case 'series':
+      return direct(sql.raw('r.sort_series'));
     case 'author':
       return direct(sql.raw('r.author_sort_name'));
     case 'publisher':
@@ -1079,6 +1082,7 @@ export class BookRepository {
           base.metadata_score,
           base.primary_author_sort_name AS author_sort_name,
           COALESCE(base.norm_series, lower(base.title)) AS sort_title,
+          base.norm_series AS sort_series,
           COALESCE(sa.latest_added_at, base.added_at) AS sort_added_at,
           COALESCE(sa.first_collection_position, base.collection_position) AS sort_collection_position,
           sa.book_count,
@@ -1311,6 +1315,7 @@ export class BookRepository {
           ubr.rating,
           base.primary_author_sort_name AS author_sort_name,
           COALESCE(base.norm_series, lower(base.title)) AS sort_title,
+          base.norm_series AS sort_series,
           COALESCE(sl.latest_added_at, base.added_at) AS sort_added_at
           ${source.representativeExtraSelect}
         FROM base_rows base
@@ -1593,6 +1598,7 @@ export class BookRepository {
         sizeBytes: bookFiles.sizeBytes,
         durationSeconds: bookFiles.durationSeconds,
         mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+        mediaOverlayDurationSeconds: bookFiles.mediaOverlayDurationSeconds,
       })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
@@ -1614,7 +1620,7 @@ export class BookRepository {
       absolutePath?: string;
       relPath?: string | null;
       sizeBytes?: number;
-      mediaOverlayAvailable?: boolean | null;
+      mediaOverlayAvailable?: boolean;
       mediaOverlayDurationSeconds?: number | null;
       mediaOverlayCheckedAt?: Date | null;
     },
@@ -1694,6 +1700,7 @@ export class BookRepository {
         koboContentSourceProgressPercent: readingProgress.koboContentSourceProgressPercent,
         koreaderProgress: readingProgress.koreaderProgress,
         updatedAt: readingProgress.updatedAt,
+        lastReadAt: readingProgress.lastReadAt,
       })
       .from(bookFiles)
       .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
@@ -1710,6 +1717,7 @@ export class BookRepository {
         percentage: readingProgress.percentage,
         koreaderProgress: readingProgress.koreaderProgress,
         updatedAt: readingProgress.updatedAt,
+        lastReadAt: readingProgress.lastReadAt,
       })
       .from(bookFiles)
       .innerJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
@@ -1936,16 +1944,22 @@ export class BookRepository {
   async countFormatFacets<F extends string>(where: SQL | undefined, formats: readonly F[]): Promise<Array<{ format: F; count: number }>> {
     if (formats.length === 0) return [];
     const result = await this.db.execute<{ format: F; count: string | number }>(sql`
-      SELECT facet_file.format AS format, count(DISTINCT ${books.id}) AS count
+      SELECT facet_key.format AS format, count(DISTINCT ${books.id}) AS count
       FROM ${books}
       LEFT JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
       INNER JOIN ${bookFiles} AS facet_file ON facet_file.book_id = ${books.id}
+      CROSS JOIN LATERAL (
+        SELECT facet_file.format AS format
+        UNION ALL
+        SELECT ${READ_ALONG_FORMAT_PRIORITY}
+        WHERE facet_file.format = 'epub' AND facet_file.media_overlay_available = true
+      ) AS facet_key
       WHERE ${this.visibleWhere(where)}
-        AND facet_file.format IN (${sql.join(
+        AND facet_key.format IN (${sql.join(
           formats.map((format) => sql`${format}`),
           sql`, `,
         )})
-      GROUP BY facet_file.format
+      GROUP BY facet_key.format
     `);
     return result.rows.map((row) => ({ format: row.format, count: Number(row.count) }));
   }
@@ -2150,7 +2164,7 @@ export class BookRepository {
       absolutePath: string;
       format: string | null;
       sizeBytes: number | null;
-      sortOrder: number;
+      sortOrder: number | null;
       mediaOverlayAvailable: boolean;
     }[]
   > {
@@ -2554,6 +2568,72 @@ export class BookRepository {
       .delete(koreaderProgressResets)
       .where(and(eq(koreaderProgressResets.userId, params.userId), eq(koreaderProgressResets.bookFileId, params.fileId)));
     return true;
+  }
+
+  /**
+   * Moves the narration marker to a sentence a text position reached, unless narration was saved
+   * at or after `sourceUpdatedAt`. Seconds are cleared so every client resumes from the sentence.
+   * The row's own stamps stay, as for a Kobo location: the marker followed the reader, it did not
+   * read anything itself.
+   */
+  async advanceNarrationMarker(params: {
+    userId: number;
+    fileId: number;
+    mediaOverlayFragment: string;
+    mediaOverlaySectionIndex: number;
+    percentage: number;
+    sourceUpdatedAt: Date;
+  }): Promise<boolean> {
+    const rows = await this.db
+      .update(readingProgress)
+      .set({
+        positionSeconds: null,
+        mediaOverlayFragment: params.mediaOverlayFragment,
+        mediaOverlaySectionIndex: params.mediaOverlaySectionIndex,
+        narrationPercentage: this.clampProgressPercentage(params.percentage),
+        narrationUpdatedAt: params.sourceUpdatedAt,
+        updatedAt: sql`"reading_progress"."updated_at"`,
+        lastReadAt: sql`"reading_progress"."last_read_at"`,
+      })
+      .where(
+        and(
+          eq(readingProgress.userId, params.userId),
+          eq(readingProgress.bookFileId, params.fileId),
+          or(isNull(readingProgress.narrationUpdatedAt), lt(readingProgress.narrationUpdatedAt, params.sourceUpdatedAt)),
+        ),
+      )
+      .returning({ fileId: readingProgress.bookFileId });
+    return rows.length > 0;
+  }
+
+  /**
+   * The row a reset leaves on a read-along: the text at the start and the narration marker on the
+   * first narrated sentence, both stamped with the reset. A write that landed since the reset wins.
+   */
+  async startNarrationAfterReset(params: {
+    userId: number;
+    fileId: number;
+    mediaOverlayFragment: string;
+    mediaOverlaySectionIndex: number;
+    resetAt: Date;
+  }): Promise<boolean> {
+    const rows = await this.db
+      .insert(readingProgress)
+      .values({
+        userId: params.userId,
+        bookFileId: params.fileId,
+        percentage: 0,
+        mediaOverlayFragment: params.mediaOverlayFragment,
+        mediaOverlaySectionIndex: params.mediaOverlaySectionIndex,
+        narrationPercentage: 0,
+        narrationUpdatedAt: params.resetAt,
+        textUpdatedAt: params.resetAt,
+        updatedAt: params.resetAt,
+        lastReadAt: params.resetAt,
+      })
+      .onConflictDoNothing()
+      .returning({ fileId: readingProgress.bookFileId });
+    return rows.length > 0;
   }
 
   async syncKoboReadingStateFromProgress(

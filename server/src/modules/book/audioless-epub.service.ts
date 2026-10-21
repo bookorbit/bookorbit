@@ -250,6 +250,10 @@ export class AudiolessEpubService {
     const patchedOpf = this.stripMediaOverlayFromOpf(parsedOpf, opfPath, removeEntryPaths);
 
     const archive = new ZipArchive({ zlib: { level: 6 } });
+    const activeStreams = new Set<Transform>();
+    archive.once('error', () => {
+      for (const stream of activeStreams) stream.destroy();
+    });
     let removedEntries = 0;
     let sanitizedEntries = 0;
     let inflatedBytes = Buffer.byteLength(patchedOpf);
@@ -288,9 +292,10 @@ export class AudiolessEpubService {
         source.destroy();
         archive.emit('error', error);
       });
-      archive.once('error', () => {
+      activeStreams.add(bound);
+      bound.once('close', () => {
+        activeStreams.delete(bound);
         source.destroy();
-        bound.destroy();
       });
       archive.append(source.pipe(bound), { name: entryName, date: ZIP_ENTRY_DATE });
     }

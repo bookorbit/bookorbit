@@ -269,6 +269,20 @@ function Outbox:nextEntry(opts)
     end
 end
 
+-- Earliest time an entry that is backing off becomes drainable again; nil when
+-- none is waiting. Parked entries only move on a sync the reader asks for.
+function Outbox:nextRetryAt()
+    local now = self.now()
+    local earliest
+    for _, metadata in ipairs(self:listMetadata()) do
+        local at = metadata.next_attempt_at
+        if at and at > now and not self:isBlocked(metadata) and (earliest == nil or at < earliest) then
+            earliest = at
+        end
+    end
+    return earliest
+end
+
 function Outbox:status()
     local scan = self:scan()
     local count = 0
