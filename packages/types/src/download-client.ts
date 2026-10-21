@@ -6,7 +6,7 @@ import type { IndexerColor, ReleaseUnitChoice } from "./indexer";
  * deliberately absent: it has no address, no credentials and nothing to choose, so making it a
  * configurable client type would only ask an operator to create a record of nothing.
  */
-export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "nzbget", "sabnzbd"] as const;
+export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "nzbget", "sabnzbd", "torbox"] as const;
 export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
 
 /**
@@ -22,6 +22,7 @@ export const DOWNLOAD_CLIENT_DELIVERY: Record<DownloadClientType, DownloadDelive
   deluge: "torrent",
   nzbget: "usenet",
   sabnzbd: "usenet",
+  torbox: "torrent",
 };
 
 export type DownloadClientCredentialKind = "usernamePassword" | "apiKey";
@@ -33,6 +34,20 @@ export const DOWNLOAD_CLIENT_CREDENTIAL_KIND: Record<DownloadClientType, Downloa
   deluge: "usernamePassword",
   nzbget: "usernamePassword",
   sabnzbd: "apiKey",
+  torbox: "apiKey",
+};
+
+/**
+ * A cloud client fetches finished files into BookOrbit's own staging root instead of exposing a
+ * filesystem the import could map, so it needs no path mappings and the form hides them.
+ */
+export const DOWNLOAD_CLIENT_STAGES_LOCALLY: Record<DownloadClientType, boolean> = {
+  qbittorrent: false,
+  transmission: false,
+  deluge: false,
+  nzbget: false,
+  sabnzbd: false,
+  torbox: true,
 };
 
 export interface DownloadClientPathMapping {
@@ -161,6 +176,18 @@ export interface CreateDownloadClientPayload {
 }
 
 export type UpdateDownloadClientPayload = Partial<Omit<CreateDownloadClientPayload, "adapterType">>;
+
+/**
+ * What the settings form sends to check a credential before anything is saved: enough to reach a
+ * client and nothing persisted, so an operator finds out their API key is wrong while they are
+ * still looking at the field they typed it into.
+ */
+export interface ValidateDownloadClientPayload {
+  adapterType: DownloadClientType;
+  baseUrl: string;
+  username?: string | null;
+  password?: string | null;
+}
 
 export interface DownloadClientTestResult {
   success: boolean;

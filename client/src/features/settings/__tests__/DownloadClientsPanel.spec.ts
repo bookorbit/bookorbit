@@ -130,6 +130,7 @@ describe('DownloadClientsPanel', () => {
       'deluge',
       'nzbget',
       'sabnzbd',
+      'torbox',
     ])
     expect(sheet().querySelector('#download-client-name')).toBeNull()
 
@@ -152,6 +153,7 @@ describe('DownloadClientsPanel', () => {
 
     expect(sheet().querySelector('#download-client-username')).toBeNull()
     expect(sheet().querySelector('label[for="download-client-password"]')?.textContent).toContain('API key')
+    expect(sheet().textContent).toContain('Found in SABnzbd under Config > General')
 
     typeInto('#download-client-name', 'SAB')
     typeInto('#download-client-url', 'http://sabnzbd:8080')
@@ -166,6 +168,83 @@ describe('DownloadClientsPanel', () => {
     await flushPromises()
     const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'POST')
     expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({ adapterType: 'sabnzbd', password: 'secret-key', username: '' })
+  })
+
+  it('offers TorBox in the type choices and prefills its URL', async () => {
+    const wrapper = await mountPanel()
+    await clickInPanel(wrapper, 'Add client')
+
+    const torbox = sheet().querySelector<HTMLInputElement>('input[name="download-client-type"][value="torbox"]')
+    expect(torbox).not.toBeNull()
+    torbox?.click()
+    clickInSheet('Continue')
+    await flushPromises()
+
+    expect(sheet().querySelector<HTMLInputElement>('#download-client-url')?.value).toBe('https://api.torbox.app')
+    expect(sheet().textContent).toContain('Can be found at https://torbox.app/settings?section=account')
+    expect(sheet().textContent).not.toContain('SABnzbd under Config')
+  })
+
+  it('hides path mappings and saves a TorBox client without mappings', async () => {
+    const wrapper = await mountPanel()
+    await clickInPanel(wrapper, 'Add client')
+
+    const torbox = sheet().querySelector<HTMLInputElement>('input[name="download-client-type"][value="torbox"]')
+    if (torbox === null) throw new Error('no TorBox client option')
+    torbox.click()
+    clickInSheet('Continue')
+    await flushPromises()
+
+    expect(sheet().querySelector('#mapping-remote-0')).toBeNull()
+    typeInto('#download-client-name', 'TorBox')
+    typeInto('#download-client-password', 'api-key')
+    clickInSheet('Save')
+    await flushPromises()
+
+    const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'POST')
+    const body = JSON.parse(String(saveCall?.[1]?.body))
+    expect(body).toMatchObject({ adapterType: 'torbox', pathMappings: [] })
+  })
+
+  it('validates a typed TorBox key inline and renders success or failure', async () => {
+    const wrapper = await mountPanel()
+    await clickInPanel(wrapper, 'Add client')
+
+    const torbox = sheet().querySelector<HTMLInputElement>('input[name="download-client-type"][value="torbox"]')
+    if (torbox === null) throw new Error('no TorBox client option')
+    torbox.click()
+    clickInSheet('Continue')
+    await flushPromises()
+
+    expect([...sheet().querySelectorAll('button')].some((button) => button.textContent?.includes('Validate key'))).toBe(false)
+    typeInto('#download-client-password', 'typed-key')
+    await flushPromises()
+    expect([...sheet().querySelectorAll('button')].some((button) => button.textContent?.includes('Validate key'))).toBe(true)
+
+    apiMock.mockImplementation((url: string, init?: RequestInit) =>
+      Promise.resolve(
+        String(url).endsWith('/validate') && init?.method === 'POST'
+          ? response({ success: true, version: 'v1' })
+          : response({ clients: [], encryptionConfigured: true }),
+      ),
+    )
+    clickInSheet('Validate key')
+    await flushPromises()
+
+    const validateCall = apiMock.mock.calls.find(([url, init]) => String(url).endsWith('/validate') && init?.method === 'POST')
+    expect(JSON.parse(String(validateCall?.[1]?.body))).toMatchObject({ adapterType: 'torbox', password: 'typed-key' })
+    expect(sheet().textContent).toContain('Connected to TorBox')
+
+    apiMock.mockImplementation((url: string, init?: RequestInit) =>
+      Promise.resolve(
+        String(url).endsWith('/validate') && init?.method === 'POST'
+          ? response({ success: false, error: 'invalid TorBox key' })
+          : response({ clients: [], encryptionConfigured: true }),
+      ),
+    )
+    clickInSheet('Validate key')
+    await flushPromises()
+    expect(sheet().textContent).toContain('invalid TorBox key')
   })
 
   it('keeps the stored SABnzbd API key when saving an unrelated edit', async () => {

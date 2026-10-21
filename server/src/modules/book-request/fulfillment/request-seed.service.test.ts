@@ -45,7 +45,10 @@ function makeService(
     update: vi.fn().mockResolvedValue(undefined),
     updateIf: vi.fn().mockResolvedValue({ id: 7 }),
   };
-  const clients = { resolveConfig: vi.fn().mockResolvedValue({ id: 4, adapterType: 'qbittorrent' }) };
+  const clients = {
+    resolveConfig: vi.fn().mockResolvedValue({ id: 4, adapterType: 'qbittorrent' }),
+    stagesLocally: vi.fn().mockResolvedValue(false),
+  };
   const adapter = {
     status: vi.fn().mockResolvedValue(
       options.status ?? [
@@ -63,7 +66,13 @@ function makeService(
 
   // The real removal service, not a double: these tests are about what reaches the download
   // client, and a stubbed remover would assert only that the seed service called a mock.
-  const removal = new DownloadRemovalService(downloads as never, clients as never, registry as never);
+  const removal = new DownloadRemovalService(
+    downloads as never,
+    clients as never,
+    registry as never,
+    { remove: vi.fn() } as never,
+    { getOrThrow: () => '/tmp/bookorbit-test' } as never,
+  );
 
   const service = new RequestSeedService(
     downloads as never,
