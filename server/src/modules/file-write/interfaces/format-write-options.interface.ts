@@ -7,4 +7,9 @@ export interface FormatWriteOptions {
   trackTotal?: number;
   trackTitle?: string;
   isMultiTrackAudio?: boolean;
+  /**
+   * The file is one of several audio files whose relationship is unknown: tracks of one recording,
+   * or complete alternative editions. Its own title and track tags are left as they are.
+   */
+  preserveTrackIdentity?: boolean;
 }

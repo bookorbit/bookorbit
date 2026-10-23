@@ -2,6 +2,11 @@ import { MetadataProviderKey, ProviderConfigurations } from '@bookorbit/types';
 import { firstValueFrom, toArray } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { MetadataCacheConfigService } from '../../../metadata-cache/metadata-cache-config.service';
+import type { MetadataCacheRepository } from '../../../metadata-cache/metadata-cache.repository';
+import type { MetadataCacheAccessTracker, MetadataCacheBudget, MetadataCacheCounterService } from '../../../metadata-cache/metadata-cache-state';
+import type { MetadataCacheSweeper } from '../../../metadata-cache/metadata-cache-sweeper.service';
+import { ProviderOperationExecutor } from '../../../metadata-cache/provider-operation-executor.service';
 import * as fetchWithThrottleModule from '../../fetch-with-throttle';
 import { MetadataFetchRepository } from '../../metadata-fetch.repository';
 import { MetadataFetchService } from '../../metadata-fetch.service';
@@ -129,6 +134,8 @@ interface HarnessOptions {
   issueDetailMs?: number;
   // Volumes and issue details ComicVine answers with HTTP 420, its throttle response.
   throttledVolumeIds?: number[];
+  failedVolumeIds?: number[];
+  slowVolumeIds?: number[];
   throttledDetailIds?: string[];
 }
 
@@ -181,8 +188,12 @@ function buildHarness(options: HarnessOptions = {}): Harness {
       const volumeId = Number(/volume:(\d+)/.exec(filter)?.[1]);
       const issueNumber = /issue_number:([^,]+)/.exec(filter)?.[1] ?? '';
       probedVolumeIds.push(volumeId);
-      return respondAfter(ISSUE_PROBE_MS, () =>
-        options.throttledVolumeIds?.includes(volumeId) ? throttledResponse() : okResponse(issues[`${volumeId}#${issueNumber}`] ?? []),
+      return respondAfter(options.slowVolumeIds?.includes(volumeId) ? 30_000 : ISSUE_PROBE_MS, () =>
+        options.throttledVolumeIds?.includes(volumeId)
+          ? throttledResponse()
+          : options.failedVolumeIds?.includes(volumeId)
+            ? ({ ok: true, status: 200, json: () => Promise.resolve({ status_code: 100, error: 'Unavailable', results: [] }) } as Response)
+            : okResponse(issues[`${volumeId}#${issueNumber}`] ?? []),
       );
     }
 
@@ -206,9 +217,26 @@ function buildHarness(options: HarnessOptions = {}): Harness {
     { getConfig: () => Promise.resolve(providerConfig) } as unknown as ProviderConfigService,
     throttleTracker,
   );
-  const service = new MetadataFetchService(new ProviderRegistry([provider]), new ProviderThrottleTracker(), {} as MetadataFetchRepository);
+  const service = new MetadataFetchService(
+    new ProviderRegistry([provider]),
+    new ProviderThrottleTracker(),
+    {} as MetadataFetchRepository,
+    uncachedExecutor(),
+  );
 
   return { provider, service, throttleTracker, requestUrls, probedVolumeIds, detailVolumeIds, detailIssueIds, abortedPaths };
+}
+
+// Cache settings never load, so every call goes straight to the provider as it did before the cache.
+function uncachedExecutor(): ProviderOperationExecutor {
+  return new ProviderOperationExecutor(
+    { snapshot: () => Promise.reject(new Error('cache settings unavailable')) } as unknown as MetadataCacheConfigService,
+    {} as MetadataCacheRepository,
+    { increment: () => undefined, uncacheable: () => undefined } as unknown as MetadataCacheCounterService,
+    {} as MetadataCacheBudget,
+    {} as MetadataCacheAccessTracker,
+    {} as MetadataCacheSweeper,
+  );
 }
 
 async function runToCompletion<T>(work: Promise<T>): Promise<{ value: T; elapsedMs: number }> {
@@ -231,6 +259,110 @@ describe('ComicVine search budget', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  const generationXVolumes = [
+    { ...volume(47374, 'Generation X', '1997', 13), publisher: { id: 1, name: 'Panini France' } },
+    { ...volume(5300, 'Generation X', '1994', 77), publisher: { id: 2, name: 'Marvel' } },
+  ];
+  const generationXIssues = {
+    '47374#1': [{ ...issue(325232, 47374, 'Generation X', '1'), name: null }],
+    '5300#1': [{ ...issue(39935, 5300, 'Generation X', '1'), name: 'Third Genesis' }],
+  };
+
+  it.each(['Generation X #1', 'Generation X #01'])('surfaces both reported runs through the real search service for %s', async (title) => {
+    const harness = buildHarness({ volumes: generationXVolumes, issues: generationXIssues });
+    const { value: candidates } = await runToCompletion(
+      firstValueFrom(harness.service.searchCandidates({ title }, [MetadataProviderKey.COMICVINE]).pipe(toArray())),
+    );
+
+    expect(harness.probedVolumeIds).toEqual([47374, 5300]);
+    expect(candidates.map((candidate) => candidate.providerId)).toEqual(['325232', '39935']);
+    expect(candidates.map((candidate) => candidate.publisher)).toEqual(['Panini France', 'Marvel']);
+  });
+
+  it('does not silently choose the reported reprint in an automatic one-result search', async () => {
+    const harness = buildHarness({ volumes: generationXVolumes, issues: generationXIssues });
+    const { value: candidates } = await runToCompletion(
+      firstValueFrom(
+        harness.service
+          .searchCandidates({ title: 'Generation X #01', maxCandidatesPerProvider: 1, requireUnambiguousMatch: true }, [
+            MetadataProviderKey.COMICVINE,
+          ])
+          .pipe(toArray()),
+      ),
+    );
+
+    expect(harness.probedVolumeIds).toEqual([47374, 5300]);
+    expect(candidates).toEqual([]);
+  });
+
+  it.each([true, false])('keeps deadline-limited matching safe when automatic matching is %s', async (automatic) => {
+    const volumes = Array.from({ length: 4 }, (_, i) => volume(1000 + i, 'Generation X', '2020', 10));
+    const harness = buildHarness({
+      volumes,
+      issues: { '1000#1': [issue(900001, 1000, 'Generation X', '1')] },
+      slowVolumeIds: [1003],
+    });
+    const { value: candidates, elapsedMs } = await runToCompletion(
+      firstValueFrom(
+        harness.service
+          .searchCandidates({ title: 'Generation X #1', requireUnambiguousMatch: automatic }, [MetadataProviderKey.COMICVINE])
+          .pipe(toArray()),
+      ),
+    );
+
+    expect(harness.probedVolumeIds).toEqual([1000, 1001, 1002, 1003]);
+    expect(harness.abortedPaths).toContain('/api/issues/');
+    expect(candidates).toHaveLength(automatic ? 0 : 1);
+    expect(elapsedMs).toBeLessThan(PROVIDER_TIMEOUT_MS.SCRAPE);
+  });
+
+  it('does not mistake a swallowed API failure for a competing run having no issue', async () => {
+    const harness = buildHarness({
+      volumes: generationXVolumes,
+      issues: { '47374#1': generationXIssues['47374#1'] },
+      failedVolumeIds: [5300],
+    });
+    const { value: candidates } = await runToCompletion(
+      firstValueFrom(
+        harness.service
+          .searchCandidates({ title: 'Generation X #1', requireUnambiguousMatch: true }, [MetadataProviderKey.COMICVINE])
+          .pipe(toArray()),
+      ),
+    );
+
+    expect(candidates).toEqual([]);
+    expect(harness.probedVolumeIds).toEqual([47374, 5300]);
+  });
+
+  it('refreshes a previously selected original directly despite same-titled reprints', async () => {
+    const harness = buildHarness({
+      volumes: generationXVolumes,
+      issues: generationXIssues,
+      issueDetails: { '39935': generationXIssues['5300#1'][0] },
+      volumeDetails: { 5300: generationXVolumes[1] },
+    });
+    const { value: candidates } = await runToCompletion(
+      firstValueFrom(
+        harness.service
+          .searchCandidates(
+            {
+              title: 'Generation X #01',
+              existingProviderIds: { [MetadataProviderKey.COMICVINE]: '39935' },
+              maxCandidatesPerProvider: 1,
+              requireUnambiguousMatch: true,
+            },
+            [MetadataProviderKey.COMICVINE],
+          )
+          .pipe(toArray()),
+      ),
+    );
+
+    expect(candidates.map((candidate) => candidate.providerId)).toEqual(['39935']);
+    expect(candidates[0]?.publisher).toBe('Marvel');
+    expect(harness.probedVolumeIds).toEqual([]);
+    expect(harness.detailIssueIds).toEqual(['39935']);
   });
 
   it('keeps its own budget under the timeout that aborts it', () => {

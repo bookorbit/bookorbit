@@ -21,8 +21,8 @@ const trendColors = { up: 'text-green-500', down: 'text-red-400', stable: 'text-
 
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col items-center justify-center gap-3">
-      <div class="h-8 w-16 animate-pulse rounded bg-muted" />
-      <div class="h-3 w-20 animate-pulse rounded bg-muted" />
+      <div class="h-8 w-16 animate-pulse rounded-xs bg-muted" />
+      <div class="h-3 w-20 animate-pulse rounded-xs bg-muted" />
     </div>
 
     <!-- Error -->

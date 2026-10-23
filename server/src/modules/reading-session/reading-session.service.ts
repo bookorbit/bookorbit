@@ -127,7 +127,7 @@ export class ReadingSessionService {
         durationSeconds: result.durationSeconds,
         startedAt,
         endedAt: params.endedAt,
-        progressDelta: params.progressDelta,
+        progressDelta: result.progressDelta,
         endProgress: params.endProgress,
         timezone: params.timeZone,
       });
@@ -219,6 +219,7 @@ export class ReadingSessionService {
         format,
         source: 'manual',
         attemptId: created.attemptId,
+        sessionType: 'read',
       };
     } catch (error) {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';

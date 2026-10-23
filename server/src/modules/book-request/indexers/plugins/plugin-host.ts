@@ -8,6 +8,7 @@ import type {
   PluginRequestInit,
   PluginSearchFailure,
 } from '@bookorbit/plugin-api';
+import { isBookRequestMediaKind } from '@bookorbit/types';
 import type { BookRequestMediaKind, IndexerAdapterType, IndexerSettingsField, ReleaseAudioInfo } from '@bookorbit/types';
 
 import { boundedResponse } from '../../../../common/utils/bounded-response';
@@ -87,7 +88,8 @@ export class PluginIndexerAdapter implements IndexerAdapter {
     this.type = plugin.type as IndexerAdapterType;
     this.label = plugin.label;
     this.requiresCredential = plugin.requiresCredential;
-    this.mediaKinds = plugin.mediaKinds as readonly BookRequestMediaKind[];
+    // An older plugin can still list the retired `comic`; it is never searched for, so it is dropped.
+    this.mediaKinds = plugin.mediaKinds.filter(isBookRequestMediaKind);
     this.supportsIsbnSearch = plugin.supportsIsbnSearch === true;
     this.settingsFields = plugin.settingsFields ?? [];
     this.logger = new Logger(`plugin:${plugin.type}`);
@@ -148,6 +150,26 @@ export class PluginIndexerAdapter implements IndexerAdapter {
     return async (config: ResolvedIndexerConfig): Promise<void> => {
       await this.guard(config, () => this.plugin.keepalive!(toPluginConfig(config), this.host(config)));
     };
+  }
+
+  /**
+   * Runs after the operator's change has already been saved, so nothing a plugin does here may fail
+   * that save: a throw or a rejection is logged and dropped.
+   */
+  forget(indexerId: number): void {
+    if (typeof this.plugin.forget !== 'function') return;
+    try {
+      void Promise.resolve(this.plugin.forget(indexerId)).catch((error: unknown) => this.warnForgetFailed(indexerId, error));
+    } catch (error) {
+      this.warnForgetFailed(indexerId, error);
+    }
+  }
+
+  private warnForgetFailed(indexerId: number, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.warn(
+      `[request_indexer.plugin] [fail] indexerId=${indexerId} type=${this.type} error="${sanitizeLogValue(message)}" - the plugin threw while forgetting its session`,
+    );
   }
 
   /**
@@ -306,6 +328,7 @@ function sanitizeCandidate(raw: PluginReleaseCandidate, indexerId: number): Rele
     guid,
     title,
     ...optional('bookTitle', text(raw.bookTitle, MAX_PLUGIN_TEXT_LENGTH)),
+    ...optional('infoUrl', text(raw.infoUrl, MAX_PLUGIN_URL_LENGTH)),
     ...optional('downloadUrl', text(raw.downloadUrl, MAX_PLUGIN_URL_LENGTH)),
     ...optional('magnet', text(raw.magnet, MAX_PLUGIN_URL_LENGTH)),
     ...optional('infoHash', text(raw.infoHash, MAX_PLUGIN_TEXT_LENGTH)),
@@ -398,7 +421,6 @@ function toPluginConfig(config: ResolvedIndexerConfig): PluginIndexerConfig {
     categories: {
       ebook: [...config.categories.ebook],
       audiobook: [...config.categories.audiobook],
-      comic: [...config.categories.comic],
     },
     settings: config.settings ? structuredClone(config.settings as Record<string, unknown>) : null,
   };

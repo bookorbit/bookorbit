@@ -1,24 +1,31 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
+  gt: vi.fn((left: unknown, right: unknown) => ({ op: 'gt', left, right })),
+  gte: vi.fn((left: unknown, right: unknown) => ({ op: 'gte', left, right })),
+  desc: vi.fn((column: unknown) => ({ op: 'desc', column })),
+  count: vi.fn((expression?: unknown) => ({ op: 'count', expression })),
+  getTableColumns: vi.fn(() => ({ id: 'id-column' })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
 import { eq, sql } from 'drizzle-orm';
 
-import { emailSendLog } from '../../db/schema';
+import { bookFiles, bookMetadata, emailSendLog } from '../../db/schema';
 import { EmailSendLogRepository } from './email-send-log.repository';
 
 describe('EmailSendLogRepository', () => {
   const makeDb = () => {
     const selectBuilder = {
       from: vi.fn(),
+      leftJoin: vi.fn(),
       where: vi.fn(),
       orderBy: vi.fn(),
       limit: vi.fn(),
       offset: vi.fn(),
     };
     selectBuilder.from.mockReturnValue(selectBuilder);
+    selectBuilder.leftJoin.mockReturnValue(selectBuilder);
     selectBuilder.where.mockReturnValue(selectBuilder);
     selectBuilder.orderBy.mockReturnValue(selectBuilder);
     selectBuilder.limit.mockReturnValue(selectBuilder);
@@ -66,13 +73,13 @@ describe('EmailSendLogRepository', () => {
     const repo = new EmailSendLogRepository(db as never);
 
     void repo.findForUser(9, 20, 40);
-    expect(selectBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: emailSendLog.userId, right: 9 });
+    expect(selectBuilder.where).toHaveBeenCalledWith({ op: 'and', clauses: [{ op: 'eq', left: emailSendLog.userId, right: 9 }] });
     expect(selectBuilder.limit).toHaveBeenCalledWith(20);
     expect(selectBuilder.offset).toHaveBeenCalledWith(40);
 
     // The book filter is additive: ownership still constrains the query, so one user cannot read
     // another's sends by naming a book id.
-    void repo.findForUser(9, 20, 0, 965);
+    void repo.findForUser(9, 20, 0, { bookId: 965 });
     expect(selectBuilder.where).toHaveBeenLastCalledWith({
       op: 'and',
       clauses: [
@@ -81,9 +88,50 @@ describe('EmailSendLogRepository', () => {
       ],
     });
 
+    void repo.findForUser(9, 20, 0, { status: 'failed' });
+    expect(selectBuilder.where).toHaveBeenLastCalledWith({
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: emailSendLog.userId, right: 9 },
+        { op: 'eq', left: emailSendLog.status, right: 'failed' },
+      ],
+    });
+
     void repo.findAll(10, 0);
     expect(selectBuilder.offset).toHaveBeenLastCalledWith(0);
     expect(sql).toHaveBeenCalledWith(expect.any(Array), emailSendLog.createdAt);
+  });
+
+  it('joins the book title and the sent file onto user rows', () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new EmailSendLogRepository(db as never);
+
+    void repo.findForUser(9, 20, 0);
+
+    expect(db.select).toHaveBeenCalledWith(
+      expect.objectContaining({ bookTitle: bookMetadata.title, fileFormat: bookFiles.format, fileSizeBytes: bookFiles.sizeBytes }),
+    );
+    expect(selectBuilder.leftJoin).toHaveBeenCalledWith(bookMetadata, { op: 'eq', left: bookMetadata.bookId, right: emailSendLog.bookId });
+    expect(selectBuilder.leftJoin).toHaveBeenCalledWith(bookFiles, { op: 'eq', left: bookFiles.id, right: emailSendLog.bookFileId });
+  });
+
+  it('finds failures since a moment, scoped to the user, skipping any a later send replaced', () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new EmailSendLogRepository(db as never);
+    const since = new Date('2026-10-05T20:00:00Z');
+
+    void repo.findUnresolvedFailures(9, since, 20);
+
+    const where = selectBuilder.where.mock.lastCall?.[0] as { op: string; clauses: Array<Record<string, unknown>> };
+    expect(where.op).toBe('and');
+    expect(where.clauses.slice(0, 3)).toEqual([
+      { op: 'eq', left: emailSendLog.userId, right: 9 },
+      { op: 'eq', left: emailSendLog.status, right: 'failed' },
+      { op: 'gte', left: emailSendLog.createdAt, right: since },
+    ]);
+    expect(String(where.clauses[3].text)).toContain('not exists');
+    expect(String(where.clauses[3].text)).toContain('later.created_at >');
+    expect(selectBuilder.limit).toHaveBeenLastCalledWith(20);
   });
 
   it('findPending scopes to pending status', () => {
@@ -93,10 +141,13 @@ describe('EmailSendLogRepository', () => {
     void repo.findPending();
 
     expect(eq).toHaveBeenCalledWith(emailSendLog.status, 'pending');
+    expect(selectBuilder.limit).toHaveBeenCalledWith(100);
     expect(selectBuilder.where).toHaveBeenCalledWith({
-      op: 'eq',
-      left: emailSendLog.status,
-      right: 'pending',
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: emailSendLog.status, right: 'pending' },
+        { op: 'gt', left: emailSendLog.id, right: 0 },
+      ],
     });
   });
 
@@ -149,7 +200,8 @@ describe('EmailSendLogRepository', () => {
     expect(updateBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: emailSendLog.id, right: 33 });
     expect(updateBuilder.set).toHaveBeenCalledWith({
       status: 'failed',
-      errorMessage: 'Server restarted before send completed. Use resend to retry.',
+      errorMessage: 'Server restarted before send completed. SMTP acceptance may be unknown. Review before resending.',
+      failureCode: 'SEND_INTERRUPTED',
       nextRetryAt: null,
       updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
     });

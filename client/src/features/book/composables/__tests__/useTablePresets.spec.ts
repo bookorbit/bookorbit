@@ -18,6 +18,7 @@ vi.stubGlobal('localStorage', {
 
 import { useTablePresets } from '../useTablePresets'
 import type { ColumnId } from '../useTableColumns'
+import { stubInsecureOriginCrypto, UUID_V4 } from '@/lib/__tests__/insecure-origin'
 
 const allColumnIds = ['cover', 'title', 'authors', 'language', 'actions'] as ColumnId[]
 
@@ -193,5 +194,25 @@ describe('useTablePresets', () => {
     mockStorage['bookorbit:tablePresets:library'] = 'not json'
     const presets = useTablePresets('library', allColumnIds)
     expect(presets.customPresets.value).toHaveLength(0)
+  })
+
+  /** A self-hosted install opened over plain HTTP has no `crypto.randomUUID`. */
+  it('creates distinct preset ids on a plain-HTTP origin', () => {
+    const insecure = stubInsecureOriginCrypto()
+    try {
+      const presets = useTablePresets('library', allColumnIds)
+      const layout = { columnOrder: [...allColumnIds], hiddenColumns: [], columnWidths: {} }
+
+      presets.savePreset('Saved', layout)
+      presets.duplicatePreset('default')
+      presets.importPresets([{ id: 'custom_import', name: 'Imported', layout }])
+
+      const ids = presets.customPresets.value.map((preset) => preset.id)
+      expect(presets.customPresets.value.map((preset) => preset.name)).toEqual(['Saved', 'Default Copy', 'Imported'])
+      expect(ids.every((id) => UUID_V4.test(id.replace(/^custom_/, '')))).toBe(true)
+      expect(new Set(ids).size).toBe(3)
+    } finally {
+      insecure.restore()
+    }
   })
 })

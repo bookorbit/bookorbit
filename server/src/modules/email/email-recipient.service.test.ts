@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmailRecipientService } from './email-recipient.service';
 import { EmailRecipientRepository } from './email-recipient.repository';
 import { EmailTemplateService } from './email-template.service';
+import { EmailPreferencesRepository } from './email-preferences.repository';
+import { EmailSendLogRepository } from './email-send-log.repository';
 import type { RequestUser } from '../../common/types/request-user';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
@@ -10,6 +12,7 @@ describe('EmailRecipientService', () => {
   let service: EmailRecipientService;
   let repo: EmailRecipientRepository;
   let templateService: EmailTemplateService;
+  let preferences: EmailPreferencesRepository;
 
   const mockUser: RequestUser = {
     id: 1,
@@ -43,8 +46,15 @@ describe('EmailRecipientService', () => {
             insert: vi.fn().mockResolvedValue([mockRecipient]),
             update: vi.fn().mockResolvedValue([mockRecipient]),
             delete: vi.fn(),
-            clearDefault: vi.fn(),
-            setDefault: vi.fn().mockResolvedValue([mockRecipient]),
+          },
+        },
+        { provide: EmailPreferencesRepository, useValue: { setDefaults: vi.fn().mockResolvedValue({}) } },
+        {
+          provide: EmailSendLogRepository,
+          useValue: {
+            findLastSendPerRecipient: vi
+              .fn()
+              .mockResolvedValue([{ recipientId: 10, bookId: 487, bookTitle: 'Verity', status: 'sent', createdAt: '2026-10-12T20:01:00.000Z' }]),
           },
         },
         {
@@ -59,12 +69,22 @@ describe('EmailRecipientService', () => {
     service = module.get<EmailRecipientService>(EmailRecipientService);
     repo = module.get<EmailRecipientRepository>(EmailRecipientRepository);
     templateService = module.get<EmailTemplateService>(EmailTemplateService);
+    preferences = module.get<EmailPreferencesRepository>(EmailPreferencesRepository);
   });
 
   it('should find all for user', async () => {
     const result = await service.findAll(mockUser);
     expect(result).toHaveLength(1);
     expect(repo.findAllForUser).toHaveBeenCalledWith(1);
+  });
+
+  it('attaches the last send to each recipient, and null to one that never got anything', async () => {
+    (repo.findAllForUser as vi.Mock).mockResolvedValue([mockRecipient, { ...mockRecipient, id: 11, email: 'other@test.com' }]);
+
+    const result = await service.findAll(mockUser);
+
+    expect(result[0].lastSend).toEqual({ bookId: 487, bookTitle: 'Verity', status: 'sent', createdAt: '2026-10-12T20:01:00.000Z' });
+    expect(result[1].lastSend).toBeNull();
   });
 
   it('should find one', async () => {
@@ -111,9 +131,9 @@ describe('EmailRecipientService', () => {
     expect(repo.delete).toHaveBeenCalledWith(10, 1);
   });
 
-  it('should set default recipient', async () => {
+  it('sets the default recipient through the preference that quick send reads', async () => {
     const result = await service.setDefault(10, mockUser);
-    expect(repo.setDefault).toHaveBeenCalledWith(10, 1);
+    expect(preferences.setDefaults).toHaveBeenCalledWith(1, { defaultRecipientId: 10 });
     expect(result.id).toBe(10);
   });
 
@@ -128,8 +148,9 @@ describe('EmailRecipientService', () => {
   });
 
   it('should throw NotFoundException on setDefault if not exists', async () => {
-    (repo.setDefault as vi.Mock).mockResolvedValue([]);
+    (repo.findByIds as vi.Mock).mockResolvedValue([]);
     await expect(service.setDefault(10, mockUser)).rejects.toThrow(NotFoundException);
+    expect(preferences.setDefaults).not.toHaveBeenCalled();
   });
 
   it('should get owned recipients by ids', async () => {

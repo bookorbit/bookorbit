@@ -3,6 +3,8 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
 
+import { providerRequestKey, recordProviderRequest, recordProviderRequestError } from '../../../../common/provider-cache/provider-call-context';
+
 const execFile = promisify(execFileCallback);
 
 const MAX_STDOUT_BYTES = 16 * 1024 * 1024;
@@ -151,6 +153,18 @@ export class KoboCloudscraperUnavailableError extends KoboCloudscraperError {
 }
 
 export async function fetchKoboHtmlWithCloudscraper(url: string, options: KoboCloudscraperFetchOptions): Promise<KoboCloudscraperFetchResult> {
+  const requestKey = providerRequestKey(url);
+  try {
+    const result = await runCloudscraper(url, options);
+    recordProviderRequest(requestKey, { kind: 'status', status: result.status });
+    return result;
+  } catch (error) {
+    recordProviderRequestError(requestKey, error);
+    throw error;
+  }
+}
+
+async function runCloudscraper(url: string, options: KoboCloudscraperFetchOptions): Promise<KoboCloudscraperFetchResult> {
   const deadlineSec = Math.max(1, Math.floor((options.timeoutMs - DEADLINE_BUFFER_MS) / 1000));
   const payload = JSON.stringify({
     url,

@@ -158,7 +158,7 @@ onUnmounted(() => search.value?.stopSearch())
         <button
           v-if="query"
           type="button"
-          class="absolute end-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          class="absolute end-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           :aria-label="t('reader.pdf.sidebar.clearSearch')"
           @click="handleClear"
         >

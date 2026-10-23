@@ -7,11 +7,28 @@ function makeGateway() {
   const jwtService = { verify: vi.fn() };
   const authService = { validateSessionUser: vi.fn() };
   const scanJobStore = { get: vi.fn(), isRunning: vi.fn() };
+  const scannerRepository = { hasLibraryAccess: vi.fn().mockResolvedValue(false) };
   const achievementEvents = new AchievementEventsService();
   const appConfiguration = { appUrl: 'http://localhost:6263' };
-  const gateway = new ScanGateway(jwtService as any, authService as any, scanJobStore as any, achievementEvents, appConfiguration as any);
-  return { gateway, jwtService, authService, scanJobStore, achievementEvents };
+  const gateway = new ScanGateway(
+    jwtService as any,
+    authService as any,
+    scanJobStore as any,
+    scannerRepository as any,
+    achievementEvents,
+    appConfiguration as any,
+  );
+  return { gateway, jwtService, authService, scanJobStore, scannerRepository, achievementEvents };
 }
+
+const reader = { id: 42, username: 'reader', isSuperuser: false };
+const admin = { id: 1, username: 'admin', isSuperuser: true };
+
+function subscriber(user?: object) {
+  return { id: 'sock-sub', data: user ? { user } : {}, join: vi.fn().mockResolvedValue(undefined), emit: vi.fn() } as any;
+}
+
+const runningScan = { jobId: 9, processed: 50, total: 200, added: 10, updated: 5, missing: 2 };
 
 function mockServer() {
   const emit = vi.fn();
@@ -190,25 +207,24 @@ describe('subscription lifecycle', () => {
     expect(() => gateway.afterInit({} as any)).not.toThrow();
   });
 
-  it('logs disconnects and emits an in-flight progress snapshot on subscribe', () => {
-    const { gateway, scanJobStore } = makeGateway();
-    scanJobStore.get.mockReturnValue({
-      jobId: 9,
-      processed: 50,
-      total: 200,
-      added: 10,
-      updated: 5,
-      missing: 2,
-    });
-    const join = vi.fn();
-    const emit = vi.fn();
-    const client = { join, emit } as any;
+  it('logs disconnects without throwing', () => {
+    const { gateway } = makeGateway();
+    expect(() => gateway.handleDisconnect({ id: 'sock-3' } as any)).not.toThrow();
+  });
+});
 
-    gateway.handleSubscribeLibrary(client, 88);
-    gateway.handleDisconnect({ id: 'sock-3' } as any);
+describe('subscribe:library', () => {
+  it('joins the room and sends the in-flight scan snapshot to a user with access to the library', async () => {
+    const { gateway, scanJobStore, scannerRepository } = makeGateway();
+    scannerRepository.hasLibraryAccess.mockResolvedValue(true);
+    scanJobStore.get.mockReturnValue(runningScan);
+    const client = subscriber(reader);
 
-    expect(join).toHaveBeenCalledWith('library:88');
-    expect(emit).toHaveBeenCalledWith('scan:progress', {
+    await gateway.handleSubscribeLibrary(client, 88);
+
+    expect(scannerRepository.hasLibraryAccess).toHaveBeenCalledWith(42, 88);
+    expect(client.join).toHaveBeenCalledWith('library:88');
+    expect(client.emit).toHaveBeenCalledWith('scan:progress', {
       jobId: 9,
       libraryId: 88,
       status: 'running',
@@ -220,17 +236,99 @@ describe('subscription lifecycle', () => {
     });
   });
 
-  it('subscribes without emitting progress when no scan entry exists', () => {
-    const { gateway, scanJobStore } = makeGateway();
+  it('subscribes without emitting progress when no scan entry exists', async () => {
+    const { gateway, scanJobStore, scannerRepository } = makeGateway();
+    scannerRepository.hasLibraryAccess.mockResolvedValue(true);
     scanJobStore.get.mockReturnValue(undefined);
-    const join = vi.fn();
-    const emit = vi.fn();
-    const client = { join, emit } as any;
+    const client = subscriber(reader);
 
-    gateway.handleSubscribeLibrary(client, 7);
+    await gateway.handleSubscribeLibrary(client, 7);
 
-    expect(join).toHaveBeenCalledWith('library:7');
-    expect(emit).not.toHaveBeenCalled();
+    expect(client.join).toHaveBeenCalledWith('library:7');
+    expect(client.emit).not.toHaveBeenCalled();
+  });
+
+  it('lets a superuser into any library without an access row', async () => {
+    const { gateway, scannerRepository } = makeGateway();
+    const client = subscriber(admin);
+
+    await gateway.handleSubscribeLibrary(client, 5);
+
+    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(client.join).toHaveBeenCalledWith('library:5');
+  });
+
+  it('keeps a user out of a library they cannot read, so its book cards and scan counts never reach them', async () => {
+    const { gateway, scanJobStore, scannerRepository } = makeGateway();
+    scannerRepository.hasLibraryAccess.mockResolvedValue(false);
+    scanJobStore.get.mockReturnValue(runningScan);
+    const client = subscriber(reader);
+
+    await gateway.handleSubscribeLibrary(client, 3);
+
+    expect(scannerRepository.hasLibraryAccess).toHaveBeenCalledWith(42, 3);
+    expect(client.join).not.toHaveBeenCalled();
+    expect(client.emit).not.toHaveBeenCalled();
+  });
+
+  it('ignores a socket that never authenticated', async () => {
+    const { gateway, scanJobStore, scannerRepository } = makeGateway();
+    scanJobStore.get.mockReturnValue(runningScan);
+    const client = subscriber();
+
+    await gateway.handleSubscribeLibrary(client, 3);
+
+    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(client.join).not.toHaveBeenCalled();
+    expect(client.emit).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, '7', null, undefined, { id: 7 }])('ignores the malformed library id %s without querying', async (libraryId) => {
+    const { gateway, scannerRepository } = makeGateway();
+    const client = subscriber(admin);
+
+    await gateway.handleSubscribeLibrary(client, libraryId as never);
+
+    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(client.join).not.toHaveBeenCalled();
+  });
+
+  it('holds a subscription that arrives mid-handshake until the token check finishes, then honours it', async () => {
+    const { gateway, jwtService, authService, scannerRepository } = makeGateway();
+    jwtService.verify.mockReturnValue({ sub: 42, ver: 3, sid: 11 });
+    let finishSessionCheck!: (user: object) => void;
+    authService.validateSessionUser.mockReturnValue(new Promise((done) => (finishSessionCheck = done)));
+    scannerRepository.hasLibraryAccess.mockResolvedValue(true);
+    const client = { ...subscriber(), handshake: { auth: { token: 'valid' } }, disconnect: vi.fn() } as any;
+
+    const connected = gateway.handleConnection(client);
+    const subscribed = gateway.handleSubscribeLibrary(client, 88);
+    await Promise.resolve();
+    expect(client.join).not.toHaveBeenCalledWith('library:88');
+
+    finishSessionCheck(reader);
+    await Promise.all([connected, subscribed]);
+
+    expect(client.join).toHaveBeenCalledWith('user:42');
+    expect(client.join).toHaveBeenCalledWith('library:88');
+    expect(client.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('drops a subscription that arrives mid-handshake when the handshake is refused', async () => {
+    const { gateway, jwtService, authService, scannerRepository } = makeGateway();
+    jwtService.verify.mockReturnValue({ sub: 42, ver: 3, sid: 11 });
+    let finishSessionCheck!: (user: object | null) => void;
+    authService.validateSessionUser.mockReturnValue(new Promise((done) => (finishSessionCheck = done)));
+    const client = { ...subscriber(), handshake: { auth: { token: 'revoked' } }, disconnect: vi.fn() } as any;
+
+    const connected = gateway.handleConnection(client);
+    const subscribed = gateway.handleSubscribeLibrary(client, 88);
+    finishSessionCheck(null);
+    await Promise.all([connected, subscribed]);
+
+    expect(client.disconnect).toHaveBeenCalledTimes(1);
+    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(client.join).not.toHaveBeenCalled();
   });
 });
 

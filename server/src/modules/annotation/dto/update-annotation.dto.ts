@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 import { ANNOTATION_STYLES } from '../annotation.constants';
 
@@ -16,4 +16,9 @@ export class UpdateAnnotationDto {
   @IsOptional()
   @IsIn(ANNOTATION_STYLES)
   style?: string;
+
+  /** Server-only metadata: toggling it alone does not bump the version devices sync from. */
+  @ValidateIf((o: UpdateAnnotationDto) => o.starred !== undefined)
+  @IsBoolean()
+  starred?: boolean;
 }

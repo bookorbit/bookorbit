@@ -4,11 +4,12 @@ import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Gauge } from '@lucide/vue'
 
-import { readCssColor } from '@/lib/echarts'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { useMetadataFreshnessGauge } from '../../composables/useMetadataFreshnessGauge'
 import ChartCard from '../ChartCard.vue'
 
 const { t } = useI18n()
+const chartTokens = useChartTokens()
 
 const { data, loading, error } = useMetadataFreshnessGauge()
 const option = shallowRef({})
@@ -38,7 +39,7 @@ watchEffect(() => {
     option.value = {}
     return
   }
-  const foreground = readCssColor('--foreground')
+  const foreground = chartTokens.value.color('--foreground')
   const activeColor = scoreColor(data.value.freshnessScore)
 
   option.value = {

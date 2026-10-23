@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const FREE_DICT_URL = 'https://api.dictionaryapi.dev/api/v2/entries/en/hello'
 const WIKTIONARY_EN_URL = 'https://en.wiktionary.org/api/rest_v1/page/definition/hello'
-const WIKTIONARY_FR_URL = 'https://fr.wiktionary.org/api/rest_v1/page/definition/bonjour'
+const WIKTIONARY_FR_URL = 'https://en.wiktionary.org/api/rest_v1/page/definition/bonjour'
 
 function makeFreeDictResponse(word = 'hello', overrides: Record<string, unknown> = {}) {
   return [
@@ -86,6 +86,7 @@ describe('useDictionary', () => {
   /** Serves a fixed set of Wiktionary pages by word, 404ing anything else. */
   function serveWiktionary(pages: Record<string, unknown>) {
     fetchMock.mockImplementation(async (input) => {
+      if (new URL(String(input)).hostname !== 'en.wiktionary.org') return mockStatus(501)
       const word = decodeURIComponent(String(input).split('/definition/')[1] ?? '')
       return word in pages ? mockOk(pages[word]) : mockStatus(404)
     })
@@ -289,6 +290,66 @@ describe('useDictionary', () => {
     expect(result!.entries.length).toBeGreaterThan(0)
   })
 
+  it.each(['pt', 'pt-BR', 'pt-PT', 'por', 'Portuguese', ' PT-br '])(
+    'Non-English: resolves Portuguese metadata %s through the English host and only the pt section',
+    async (lang) => {
+      serveWiktionary({
+        nada: {
+          en: [{ partOfSpeech: 'Noun', definitions: [{ definition: 'English sense.' }] }],
+          es: [{ partOfSpeech: 'Pronoun', definitions: [{ definition: 'Spanish sense.' }] }],
+          pt: [
+            { partOfSpeech: 'Pronoun', definitions: [{ definition: '<a href="/wiki/nothing">nothing</a>', examples: ['Não há <b>nada</b> aqui.'] }] },
+          ],
+        },
+      })
+      const { lookup } = await load()
+
+      expect(await lookup('nada', lang)).toEqual({
+        word: 'nada',
+        phonetic: null,
+        audioUrl: null,
+        provider: 'wiktionary',
+        entries: [{ partOfSpeech: 'Pronoun', sourceWord: 'nada', definitions: [{ definition: 'nothing', example: 'Não há nada aqui.' }] }],
+      })
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith('https://en.wiktionary.org/api/rest_v1/page/definition/nada')
+    },
+  )
+
+  it('Non-English: follows inflection pointers on the English host while preserving the requested language', async () => {
+    serveWiktionary({
+      gatos: {
+        en: [{ partOfSpeech: 'Noun', definitions: [{ definition: 'Unrelated English sense.' }] }],
+        pt: [{ partOfSpeech: 'Noun', definitions: [{ definition: 'plural of gato' }] }],
+      },
+      gato: {
+        es: [{ partOfSpeech: 'Noun', definitions: [{ definition: 'Unrelated Spanish sense.' }] }],
+        pt: [{ partOfSpeech: 'Noun', definitions: [{ definition: 'A cat.' }] }],
+      },
+    })
+    const { lookup } = await load()
+    const result = await lookup('gatos', 'pt-BR')
+
+    expect(result!.entries).toEqual([
+      { partOfSpeech: 'Noun', sourceWord: 'gatos', definitions: [{ definition: 'plural of gato', example: null }] },
+      { partOfSpeech: 'Noun', sourceWord: 'gato', definitions: [{ definition: 'A cat.', example: null }] },
+    ])
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'https://en.wiktionary.org/api/rest_v1/page/definition/gatos',
+      'https://en.wiktionary.org/api/rest_v1/page/definition/gato',
+    ])
+  })
+
+  it('Non-English: trims and encodes Unicode and URL delimiters in the word', async () => {
+    const word = 'coração/ação?#'
+    serveWiktionary({ [word]: { pt: [{ partOfSpeech: 'Noun', definitions: [{ definition: 'A Portuguese sense.' }] }] } })
+    const { lookup } = await load()
+
+    expect((await lookup(`  ${word}  `, 'pt'))!.word).toBe(word)
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      'https://en.wiktionary.org/api/rest_v1/page/definition/cora%C3%A7%C3%A3o%2Fa%C3%A7%C3%A3o%3F%23',
+    )
+  })
+
   it('Non-English: returns null when Wiktionary returns 404', async () => {
     fetchMock.mockResolvedValueOnce(mockStatus(404))
     const { lookup } = await load()
@@ -296,10 +357,10 @@ describe('useDictionary', () => {
     expect(result).toBeNull()
   })
 
-  it('Non-English: throws when Wiktionary returns server error', async () => {
-    fetchMock.mockResolvedValueOnce(mockStatus(500))
+  it.each([429, 500, 501])('Non-English: throws when Wiktionary returns HTTP %s', async (status) => {
+    fetchMock.mockResolvedValueOnce(mockStatus(status))
     const { lookup } = await load()
-    await expect(lookup('xyz', 'de')).rejects.toThrow('Wiktionary API error: 500')
+    await expect(lookup('xyz', 'de')).rejects.toThrow(`Wiktionary API error: ${status}`)
   })
 
   // -------------------------------------------------------------------------
@@ -537,9 +598,6 @@ describe('useDictionary', () => {
   })
 
   it('pointer: leaves non-English inflection glosses alone', async () => {
-    // fr.wiktionary writes its glosses in French ("pluriel de chat"). Pointer
-    // detection is deliberately English-only, so these are shown as-is rather
-    // than guessed at. Non-English lookups still benefit from language filtering.
     fetchMock.mockResolvedValueOnce(mockOk({ fr: [{ partOfSpeech: 'Nom', definitions: [{ definition: 'pluriel de chat', examples: [] }] }] }))
     const { lookup } = await load()
     const result = await lookup('chats', 'fr')
@@ -943,7 +1001,7 @@ describe('useDictionary', () => {
     fetchMock.mockResolvedValueOnce(mockOk(makeWiktionaryResponse('fr')))
     const { lookup } = await load()
     await lookup('bonjour', 'fr-FR')
-    expect(fetchMock.mock.calls[0]![0]).toContain('fr.wiktionary.org')
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(WIKTIONARY_FR_URL)
   })
 
   it('lang normalization: empty string defaults to English (Free Dictionary)', async () => {

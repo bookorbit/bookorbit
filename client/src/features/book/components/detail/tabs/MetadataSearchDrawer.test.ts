@@ -23,6 +23,11 @@ vi.mock('../../../composables/useCoverVersions', () => ({
   }),
 }))
 
+vi.mock('../../../composables/useMetadataSearchPreferences', async () => {
+  const { ref } = await vi.importActual<typeof import('vue')>('vue')
+  return { useMetadataSearchPreferences: () => ({ autoSearchOnOpen: ref(true) }) }
+})
+
 vi.mock('../../../composables/useMetadataSearch', async () => {
   const vue = await vi.importActual<typeof import('vue')>('vue')
 
@@ -148,6 +153,12 @@ describe('MetadataSearchDrawer', () => {
     await flushPromises()
 
     expect(metadataSearchMocks.search).not.toHaveBeenCalled()
+  })
+
+  it('uses ISBN-10 when ISBN-13 is empty', async () => {
+    mountDrawer([], { isbn13: ' ', isbn10: '0306406152' } as Partial<BookDetail>)
+    await flushPromises()
+    expect(metadataSearchMocks.search).toHaveBeenCalledWith(expect.objectContaining({ isbn: '0306406152' }))
   })
 
   it('filters sources and retries one without re-running the whole search', async () => {

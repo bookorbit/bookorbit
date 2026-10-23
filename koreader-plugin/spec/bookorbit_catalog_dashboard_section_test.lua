@@ -1,96 +1,38 @@
--- Proves the configurable dashboard slots: what each shelf costs in requests,
--- how a failing or repeated source is handled, how shelves are measured, and
--- how a cached body fetched for a different configuration is treated.
+-- Proves what a dashboard refresh fetches for the widget board: one request
+-- for the body, one per distinct shelf the board shows, name lists only when a
+-- link widget draws them, and how a failing or unsupported source degrades.
 
 local connected = true
 
-package.loaded["document/documentregistry"] = {
-    hasProvider = function()
-        return true
-    end,
-}
-package.loaded["util"] = {
-    fixUtf8 = function(value)
-        return value
-    end,
-    urlEncode = function(value)
-        return value
-    end,
-}
-package.loaded["ffi/util"] = {
-    template = function(value)
-        return value
-    end,
-}
 package.loaded["gettext"] = function(text)
     return text
 end
-
-local function widgetClass()
-    return {
-        new = function(_, opts)
-            opts = opts or {}
-            if not opts.getSize then
-                function opts:getSize()
-                    return { w = 100, h = 20 }
-                end
-            end
-            return opts
-        end,
-    }
-end
-
-package.loaded["ffi/blitbuffer"] = { COLOR_DARK_GRAY = 1, COLOR_LIGHT_GRAY = 2 }
-package.loaded["ui/widget/button"] = widgetClass()
-package.loaded["ui/widget/container/centercontainer"] = widgetClass()
-package.loaded["ui/font"] = {
-    getFace = function()
-        return {}
+package.loaded["ui/widget/infomessage"] = {
+    new = function(_, opts)
+        return opts or {}
     end,
 }
-package.loaded["ui/geometry"] = widgetClass()
-package.loaded["ui/widget/horizontalgroup"] = widgetClass()
-package.loaded["ui/widget/horizontalspan"] = widgetClass()
-package.loaded["ui/widget/infomessage"] = widgetClass()
-package.loaded["ui/widget/linewidget"] = widgetClass()
 package.loaded["ui/network/manager"] = {
     isConnected = function()
         return connected
     end,
 }
-package.loaded["device"] = {
-    screen = {
-        scaleBySize = function(_, value)
-            return value
-        end,
-    },
-}
-package.loaded["ui/size"] = {
-    line = { thin = 1 },
-    padding = { large = 8 },
-    span = { horizontal_default = 4, vertical_default = 4 },
-}
-package.loaded["ui/widget/textboxwidget"] = widgetClass()
-package.loaded["ui/widget/textwidget"] = widgetClass()
+local shown = {}
 package.loaded["ui/uimanager"] = {
-    show = function() end,
-}
-package.loaded["ui/widget/verticalgroup"] = widgetClass()
-package.loaded["ui/widget/verticalspan"] = widgetClass()
-package.loaded["bookorbit_stats_reader"] = {}
-package.loaded["bookorbit_catalog_widgets"] = {
-    DashboardCoverCard = widgetClass(),
-    DashboardHeroCard = widgetClass(),
-    DashboardBrowseRow = widgetClass(),
-    DashboardIconButton = widgetClass(),
-    coverCardHeight = function(card_w)
-        return card_w + 20
+    show = function(_, widget)
+        table.insert(shown, widget)
     end,
+}
+-- Messages are BookOrbit's pills; record them like any other shown widget.
+package.loaded["bookorbit_toast"] = {
+    show = function(text) table.insert(shown, { text = text }) end,
+    error = function(text) table.insert(shown, { text = text }) end,
 }
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
 local CatalogDashboard = require("bookorbit_catalog_dashboard")
+local Capabilities = require("bookorbit_capabilities")
 local DashboardSections = require("bookorbit_dashboard_sections")
 
 local function assertEqual(actual, expected, label)
@@ -99,8 +41,6 @@ local function assertEqual(actual, expected, label)
     end
 end
 
-local author_source = { type = "authors", sourceName = "Ursula K. Le Guin", params = { author = "Ursula K. Le Guin", sort = "title" } }
-
 local requests
 local last_books_params
 
@@ -108,50 +48,48 @@ local function newCatalog(opts)
     opts = opts or {}
     requests = {}
     last_books_params = nil
-    local stored_sections = opts.sections
-    if opts.section then
-        stored_sections = { opts.section, schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION }
-    end
     local catalog = {
         title = "BookOrbit",
-        settings = {
-            catalog_dashboard_cache = opts.cache,
-            catalog_dashboard_cache_section = opts.cache_section,
-            [DashboardSections.SETTING_KEY] = stored_sections,
-        },
+        settings = { catalog_dashboard_cache = opts.cache },
         client = {
-            server_url = opts.server_url or "https://example.test",
+            server_url = "https://example.test",
             username = "reader",
-            catalogDashboard = function(_, section)
+            catalogDashboard = function()
                 table.insert(requests, "dashboard")
-                assertEqual(section, nil, "the dashboard body is requested without a section parameter")
-                local body = { continueReading = {} }
-                if not opts.omit_discover then body.discover = {} end
+                if opts.dashboard_error then return nil, opts.dashboard_error end
+                local body = { continueReading = { { id = 1 } }, finishedThisYear = opts.finished }
+                if not opts.omit_discover then body.discover = { { id = 2 } } end
                 return body
             end,
             catalogBooks = function(_, params)
                 table.insert(requests, "books:" .. tostring(params.sort))
                 last_books_params = params
-                if opts.catalog_books_error and opts.catalog_books_error[params.sort] then
-                    return nil, opts.catalog_books_error[params.sort]
+                if opts.books_error and opts.books_error[params.sort] then
+                    return nil, opts.books_error[params.sort]
                 end
                 local ids = { recently_added = 11, recently_read = 12, title = 13 }
-                return { items = { { id = ids[params.sort] or 9 } }, page = 1, size = params.size, total = 1 }
+                return { items = { { id = ids[params.sort] or 9 } } }
             end,
             catalogDiscover = function()
                 table.insert(requests, "discover")
-                if opts.discover_error then return nil, opts.discover_error end
                 return { discover = { { id = 14 } } }
             end,
             catalogDashboardSection = function(_, section_type)
                 table.insert(requests, "section:" .. tostring(section_type))
-                if opts.section_endpoint_error then return nil, opts.section_endpoint_error end
+                if opts.section_error then return nil, opts.section_error end
                 return { section = { type = section_type, books = { { id = 21 } } } }
+            end,
+            catalogSection = function(_, section, params)
+                table.insert(requests, "names:" .. section .. ":" .. tostring(params.size))
+                return { items = { { title = "Autumn Reads" }, { title = 7 } } }
             end,
         },
     }
     for name, fn in pairs(CatalogDashboard) do
         if name ~= "install" then catalog[name] = fn end
+    end
+    function catalog:boardSources()
+        return opts.sources or {}, opts.names or {}
     end
     function catalog:persistSetting(key, value)
         self.settings[key] = value
@@ -159,227 +97,151 @@ local function newCatalog(opts)
     function catalog:fetch(_, fn)
         return fn()
     end
+    function catalog:rootItems()
+        return { { kind = "root-entry" } }
+    end
+    function catalog:showServerError(err)
+        self.server_error = err
+    end
     return catalog
 end
 
--- The default dashboard is one request: Discover is served from the body that
--- was already fetched, and no capability is probed.
+local function count(prefix)
+    local n = 0
+    for _, request in ipairs(requests) do
+        if request:find(prefix, 1, true) == 1 then n = n + 1 end
+    end
+    return n
+end
+
+-- A board with no shelves or name lists costs one request.
 local catalog = newCatalog{}
-catalog:dashboardRoot()
-assertEqual(#requests, 1, "the default dashboard costs a single request")
-assertEqual(requests[1], "dashboard", "the default dashboard only fetches the dashboard body")
+local _, context = catalog:dashboardRoot()
+assertEqual(#requests, 1, "a board without shelves costs a single request")
+assertEqual(context.kind, "dashboard", "the body opens the dashboard")
+assertEqual(next(context.dashboard.boardShelves), nil, "no shelves are stored when the board shows none")
+assertEqual(catalog.settings.catalog_dashboard_cache, context.dashboard, "the body is cached for offline opens")
 
--- Grid books are stored by slot.
-assertEqual(CatalogDashboard.dashboardSlotBooks({ dashboardSlots = { [3] = { books = { { id = 2 } } } } }, 3)[1].id, 2,
-    "a grid slot exposes its own books")
-assertEqual(#CatalogDashboard.dashboardSlotBooks(nil, 3), 0, "no body yields no books")
-
--- Grid geometry is computed from the measured content width and native slot
--- count rather than from source-text constants.
-catalog = newCatalog{}
-catalog.content_w = 500
-catalog.dash_inner_gap = 9
-local slots, card_w, grid_h = catalog:sectionRowMetrics(12, 6)
-assertEqual(slots, 6, "a wide dashboard budgets six cover slots, the column cap")
-assertEqual(card_w, 78, "cover width subtracts only the five inter-card gaps")
-assertEqual(grid_h, 98, "grid height follows the measured cover-card height")
-
-catalog.content_w = 320
-slots, card_w, grid_h = catalog:sectionRowMetrics(12, 6)
-assertEqual(slots, 4, "slot count shrinks until the minimum cover width fits")
-assertEqual(card_w, 75, "the narrower grid recomputes its card width")
-assertEqual(grid_h, 95, "the narrower grid recomputes its card height")
-
--- A shelf under a height budget gets more, narrower cards. The row height is
--- always the height those cards need, so covers are never drawn out of aspect.
-catalog.content_w = 500
-slots, card_w, grid_h = catalog:shelfRowMetrics(12, 6, 999)
-assertEqual(slots, 6, "a shelf with room to spare keeps its natural row")
-assertEqual(grid_h, 98, "an unconstrained shelf keeps its natural height")
-
-slots, card_w, grid_h = catalog:shelfRowMetrics(12, 6, 100)
-assertEqual(slots, 6, "a tight shelf fits more cards per row")
-assertEqual(card_w, 78, "the extra card makes every card narrower")
-assertEqual(grid_h, card_w + 20, "the row height is the height the narrower card needs")
-
-slots, card_w, grid_h = catalog:shelfRowMetrics(12, 6, 1)
-assertEqual(card_w, 78, "cards never shrink past their minimum width")
-assertEqual(grid_h, card_w + 20, "an impossible budget still yields an in-aspect row")
-
--- Thumbnail prefetching sees every configured grid slot, including all twelve
--- prefetched items per shelf.
-local twelve = {}
-for id = 1, 12 do twelve[id] = { id = id + 10 } end
-local prefetch = CatalogDashboard.dashboardBooks({
-    continueReading = { { id = 1 } },
-    dashboardSlots = {
-        [1] = { type = "recently-added", books = twelve },
-        [2] = { type = "want-to-read", books = { { id = 30 }, { id = 31 } } },
-    },
-})
-assertEqual(#prefetch, 15, "prefetching covers Continue reading and every grid slot")
-
--- Real book shelves use the ordinary catalog books endpoint and request twelve
--- items, including filters selected through the existing catalog lists.
+-- Discover and In progress come from the body already fetched; other shelves
+-- cost one request each and are stored under their shelf key.
 catalog = newCatalog{
-    sections = {
-        { type = "recently-added" },
-        author_source,
-        schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION,
+    sources = {
+        random = { source = "random" },
+        ["in-progress"] = { source = "in-progress" },
+        ["recently-added"] = { source = "recently-added" },
+        ["authors:author=Le Guin"] = { source = "authors", params = { author = "Le Guin", sort = "title" } },
     },
 }
-local _, refreshed = catalog:dashboardRoot()
-assertEqual(refreshed.dashboard.dashboardSlots[1].type, "stats", "slot 1 keeps its native Stats renderer")
-assertEqual(refreshed.dashboard.dashboardSlots[2].type, "continue-reading", "slot 2 keeps its native Continue reading renderer")
-assertEqual(refreshed.dashboard.dashboardSlots[3].type, "recently-added", "the first old row migrates to slot 3")
-assertEqual(refreshed.dashboard.dashboardSlots[3].books[1].id, 11, "Recently added loads from catalog books")
-assertEqual(refreshed.dashboard.dashboardSlots[4].books[1].id, 13, "the selected author loads independently")
-assertEqual(catalog.settings.catalog_dashboard_cache_section,
-    "stats|continue-reading|recently-added|authors:author=Ursula K. Le Guin:sort=title",
-    "the cache records the selected catalog filter")
-assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the full four-slot configuration")
+_, context = catalog:dashboardRoot()
+local shelves = context.dashboard.boardShelves
+assertEqual(#requests, 3, "two catalog shelves cost two requests beside the body")
+assertEqual(count("discover"), 0, "Discover is served from the body")
+assertEqual(shelves.random[1].id, 2, "Discover holds the body's list")
+assertEqual(shelves["in-progress"][1].id, 1, "In progress holds Continue reading")
+assertEqual(shelves["recently-added"][1].id, 11, "Recently added loads from catalog books")
+assertEqual(shelves["authors:author=Le Guin"][1].id, 13, "a picked author loads with its filter")
 assertEqual(last_books_params.size, 12, "a shelf requests a full page of books")
-assertEqual(last_books_params.page, 1, "a shelf always requests its first page")
+assertEqual(last_books_params.page, 1, "a shelf requests its first page")
 
--- Slots pointing at the same source share one request rather than fetching the
--- same books twice.
+-- Pick back up is the in-progress list oldest first; Finished this year comes
+-- with the dashboard body and costs no request.
 catalog = newCatalog{
-    sections = {
-        { type = "random" },
-        { type = "recently-added" },
-        { type = "recently-added" },
-        { type = "random" },
-        schemaVersion = DashboardSections.SCHEMA_VERSION,
+    finished = { { id = 40 } },
+    sources = { ["pick-back-up"] = { source = "pick-back-up" }, finished = { source = "finished" } },
+}
+_, context = catalog:dashboardRoot()
+assertEqual(#requests, 2, "only Pick back up costs a request")
+assertEqual(last_books_params.readStatus, "reading", "Pick back up lists books in progress")
+assertEqual(last_books_params.sort .. " " .. last_books_params.order, "recently_read asc", "oldest read first")
+assertEqual(context.dashboard.boardShelves.finished[1].id, 40, "finished books come from the body")
+catalog = newCatalog{ sources = { finished = { source = "finished" } } }
+_, context = catalog:dashboardRoot()
+assertEqual(#context.dashboard.boardShelves.finished, 0, "an older server leaves the shelf empty")
+
+-- Without a preloaded list, Discover falls back to the dedicated endpoint.
+catalog = newCatalog{ omit_discover = true, sources = { random = { source = "random" } } }
+_, context = catalog:dashboardRoot()
+assertEqual(requests[2], "discover", "a missing discover list falls back to catalogDiscover")
+assertEqual(context.dashboard.boardShelves.random[1].id, 14, "the fallback fills the Discover shelf")
+
+-- A failed shelf is drawn empty; the rest of the board still loads.
+catalog = newCatalog{
+    books_error = { recently_added = 500 },
+    sources = {
+        ["recently-added"] = { source = "recently-added" },
+        ["authors:author=Le Guin"] = { source = "authors", params = { author = "Le Guin" } },
     },
 }
-local _, deduped = catalog:dashboardRoot()
-assertEqual(#requests, 2, "four shelves over two sources cost two requests")
-assertEqual(requests[2], "books:recently_added", "the repeated source is fetched once")
-assertEqual(deduped.dashboard.dashboardSlots[3].books[1].id, 11, "the repeated shelf still gets its books")
-assertEqual(deduped.dashboard.dashboardSlots[1].books, deduped.dashboard.dashboardSlots[4].books,
-    "two Discover slots render the same fetched list")
+_, context = catalog:dashboardRoot()
+assertEqual(#context.dashboard.boardShelves["recently-added"], 0, "the failed shelf degrades to an empty list")
+assertEqual(context.dashboard.boardShelves["authors:author=Le Guin"][1].id, 9, "later shelves continue loading")
 
--- Discover falls back to the dedicated endpoint when the dashboard payload does
--- not include a preloaded discover list.
-catalog = newCatalog{ omit_discover = true }
-local _, discovered = catalog:dashboardRoot()
-assertEqual(discovered.dashboard.dashboardSlots[3].books[1].id, 14,
-    "a missing dashboard discover list falls back to catalogDiscover")
-assertEqual(requests[2], "discover", "the dedicated discover endpoint is requested")
+-- Name lists are fetched only when a link widget draws them, four at most, and
+-- keep only string titles.
+catalog = newCatalog{ names = { collections = true } }
+_, context = catalog:dashboardRoot()
+assertEqual(requests[2], "names:collections:4", "the collections link fetches four names")
+assertEqual(count("names:"), 1, "SmartScope names are not fetched when no link shows them")
+assertEqual(#context.dashboard.boardNames.collections, 1, "non-string titles are dropped")
 
--- A failed shelf request only empties that shelf; the dashboard and later slots
--- remain available.
-catalog = newCatalog{
-    sections = {
-        { type = "stats" },
-        { type = "recently-added" },
-        { type = "in-progress" },
-        { type = "browse" },
-        schemaVersion = DashboardSections.SCHEMA_VERSION,
-    },
-    catalog_books_error = { recently_added = 500 },
-}
-local _, partial = catalog:dashboardRoot()
-assertEqual(partial.dashboard ~= nil, true, "one shelf failure does not discard the dashboard")
-assertEqual(#partial.dashboard.dashboardSlots[2].books, 0, "the failed shelf degrades to an empty list")
-assertEqual(partial.dashboard.dashboardSlots[3].books[1].id, 12, "later shelves continue loading")
-
--- Server-composed sources go through the dashboard-section endpoint; distinct
--- sources cost one request each and land in their slots.
-local Capabilities = require("bookorbit_capabilities")
+-- Server-composed shelves go through the section endpoint. A confirmed 404
+-- empties the shelf and records the missing capability, so later refreshes
+-- skip the endpoint entirely.
 Capabilities.reset()
 catalog = newCatalog{
-    sections = {
-        { type = "stats" },
-        { type = "want-to-read" },
-        { type = "up-next-in-series" },
-        { type = "browse" },
-        schemaVersion = DashboardSections.SCHEMA_VERSION,
+    sources = {
+        ["want-to-read"] = { source = "want-to-read" },
+        ["up-next-in-series"] = { source = "up-next-in-series" },
     },
 }
-local _, server_sections = catalog:dashboardRoot()
-assertEqual(requests[2], "section:want-to-read", "Want to read fetches through the section endpoint")
-assertEqual(requests[3], "section:up-next-in-series", "Up next in series fetches through the section endpoint")
-assertEqual(server_sections.dashboard.dashboardSlots[2].books[1].id, 21, "the section endpoint's books land in the slot")
+_, context = catalog:dashboardRoot()
+assertEqual(count("section:"), 2, "each server-composed shelf costs one request")
+assertEqual(context.dashboard.boardShelves["want-to-read"][1].id, 21, "the section's books land in the shelf")
 
--- A 404 from the section endpoint downgrades the capability: the shelf
--- degrades to empty, and later fetches skip the endpoint entirely.
 Capabilities.reset()
-catalog = newCatalog{
-    sections = {
-        { type = "stats" },
-        { type = "want-to-read" },
-        { type = "random" },
-        { type = "browse" },
-        schemaVersion = DashboardSections.SCHEMA_VERSION,
-    },
-    section_endpoint_error = 404,
-}
-local _, downgraded = catalog:dashboardRoot()
-assertEqual(#downgraded.dashboard.dashboardSlots[2].books, 0, "an unsupported section degrades to an empty shelf")
+catalog = newCatalog{ section_error = 404, sources = { ["want-to-read"] = { source = "want-to-read" } } }
+_, context = catalog:dashboardRoot()
+assertEqual(#context.dashboard.boardShelves["want-to-read"], 0, "an unsupported section degrades to an empty shelf")
 assertEqual(Capabilities.cached(catalog.client)[DashboardSections.SECTION_ENDPOINT_CAPABILITY], false,
     "a confirmed 404 records the missing capability")
 requests = {}
 catalog:dashboardRoot()
-local section_requests = 0
-for _, request in ipairs(requests) do
-    if request:find("^section:") then section_requests = section_requests + 1 end
-end
-assertEqual(section_requests, 0, "a known-missing capability skips the section endpoint")
+assertEqual(count("section:"), 0, "a known-missing capability skips the section endpoint")
 Capabilities.reset()
 
--- A cached body fetched for another four-slot configuration is still shown, but
--- its grid shelves are marked pending until the refresh lands.
-catalog = newCatalog{
-    section = { type = "recently-added" },
-    cache = { continueReading = {}, dashboardSlots = {} },
-    cache_section = "stats|continue-reading|random|browse",
-}
-local _, cached_context = catalog:initialDashboardContext()
-assertEqual(cached_context.dashboard ~= nil, true, "the rest of the cached dashboard is still shown")
-assertEqual(cached_context.section_stale[3], true, "a cache from another slot configuration marks grid slots pending")
+-- A refresh that is no longer current stops before fetching more shelves.
+catalog = newCatalog{ sources = { ["recently-added"] = { source = "recently-added" } } }
+local items
+items, context = catalog:dashboardRoot({ is_current = function() return false end })
+assertEqual(items, nil, "a superseded refresh returns nothing")
+assertEqual(context, "cancelled", "a superseded refresh reports it was cancelled")
+assertEqual(count("books:"), 0, "a superseded refresh fetches no shelves")
 
-catalog = newCatalog{
-    section = { type = "recently-added" },
-    cache = { continueReading = {}, dashboardSlots = {} },
-    cache_section = "stats|continue-reading|recently-added|browse",
-}
-local _, matching_context = catalog:initialDashboardContext()
-assertEqual(matching_context.section_stale, nil, "a cache from the same four-slot configuration is used as is")
+-- A server without the dashboard falls back to the catalog root.
+shown = {}
+catalog = newCatalog{ dashboard_error = 404 }
+items, context = catalog:dashboardRoot()
+assertEqual(context.kind, "root", "an unsupported dashboard opens the catalog root")
+assertEqual(#shown, 1, "the reader is told why")
 
--- Only a random row offers a reshuffle; every other source has an order the
--- server chose.
-catalog = newCatalog{}
-assertEqual(catalog:dashboardSectionSupportsReroll({ type = "random" }), true, "Discover can be rerolled")
-assertEqual(catalog:dashboardSectionSupportsReroll({ type = "recently-added" }), false, "an ordered source cannot be rerolled")
+-- A failed refresh keeps the cached body; without one the board says so.
+catalog = newCatalog{ dashboard_error = 500, cache = { continueReading = {} } }
+_, context = catalog:dashboardRoot()
+assertEqual(context.dashboard, catalog.settings.catalog_dashboard_cache, "a failed refresh keeps the cache")
+assertEqual(context.stale, true, "the cached body is marked stale")
+catalog = newCatalog{ dashboard_error = 500 }
+_, context = catalog:dashboardRoot()
+assertEqual(context.unavailable, true, "without a cache the board shows it could not load")
+assertEqual(catalog.server_error, 500, "the server error is reported")
 
--- Choosing a new slot source persists it and marks all cached grid shelves
--- pending until the refresh lands.
-catalog = newCatalog{}
-catalog.current_context = { kind = "dashboard", dashboard = { continueReading = {}, dashboardSlots = {} } }
-local refreshes = 0
-function catalog:dashboardMode() return true end
-function catalog:updateItems() end
-function catalog:refreshCurrent() refreshes = refreshes + 1 end
-catalog:setDashboardSection(author_source, 3)
-assertEqual(catalog.settings[DashboardSections.SETTING_KEY][3].type, "authors", "the new slot choice is persisted")
-assertEqual(catalog.current_context.section_stale[3], true, "only the changed dashboard slot is marked pending")
-assertEqual(refreshes, 1, "choosing a slot source refreshes the dashboard")
-
--- Re-picking the current slot source is a no-op rather than a needless refresh.
-catalog:setDashboardSection(author_source, 3)
-assertEqual(refreshes, 1, "re-picking the same slot source does not refresh")
-
--- Restoring the defaults rewrites every slot but still refreshes once, and
--- marks the pending slots as the renderer expects to read them.
-catalog:setDashboardSections(DashboardSections.normalize(nil))
-assertEqual(catalog.settings[DashboardSections.SETTING_KEY][3].type, "random", "the reset restores the default slot sources")
-assertEqual(refreshes, 2, "a reset refreshes the dashboard once, not once per slot")
-for index = 1, DashboardSections.SLOT_COUNT do
-    assertEqual(catalog.current_context.section_stale[index], true, "a reset marks every slot pending")
-end
-
-catalog:setDashboardSections(DashboardSections.normalize(nil))
-assertEqual(refreshes, 2, "resetting an already-default dashboard does not refresh")
+-- Every book the board can draw is prefetched once, whichever list it is in.
+local books = CatalogDashboard.dashboardBooks({
+    continueReading = { { id = 1 } },
+    boardShelves = { random = { { id = 2 }, { id = 1 } }, recent = { { id = 3 } } },
+    discover = { { id = 2 } },
+    yearAgo = { book = { id = 4 } },
+})
+assertEqual(#books, 4, "books shared between lists are prefetched once")
+assertEqual(#CatalogDashboard.dashboardBooks(nil), 0, "no body yields no books")
 
 print("bookorbit_catalog_dashboard_section_test.lua: ok")

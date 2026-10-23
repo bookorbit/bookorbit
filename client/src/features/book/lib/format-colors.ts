@@ -67,10 +67,13 @@ export function formatChipStyle(format: string | null | undefined, variant: Form
     const fill = getFormatColor(format)
     return { borderColor: fill, backgroundColor: fill }
   }
+  // The mixes, the fill lightness and the ink are style tokens, so a style can make the chip solid without a
+  // variant. Unset, --format-chip-fill-l falls back to the colour's own lightness.
   const color = formatColorVar(format)
+  const tone = `oklch(from ${color} var(--format-chip-fill-l, l) c h)`
   return {
-    color,
-    borderColor: `color-mix(in oklch, ${color} 40%, transparent)`,
-    backgroundColor: `color-mix(in oklch, ${color} 10%, transparent)`,
+    color: `var(--format-chip-ink, ${color})`,
+    borderColor: `color-mix(in oklch, ${tone} var(--format-chip-border), transparent)`,
+    backgroundColor: `color-mix(in oklch, ${tone} var(--format-chip-fill), transparent)`,
   }
 }

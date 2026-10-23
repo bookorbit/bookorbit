@@ -1,3 +1,4 @@
+import { deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -30,6 +31,7 @@ export interface BookRenameData {
     subtitle: string | null;
     publisher: string | null;
     language: string | null;
+    isbn10: string | null;
     isbn13: string | null;
     publishedYear: number | null;
     seriesName: string | null;
@@ -44,6 +46,14 @@ export interface BookFilePathUpdate {
   absolutePath: string;
   relPath: string | null;
 }
+
+export interface FolderOwner {
+  bookId: number;
+  title: string | null;
+  primaryAuthor: string | null;
+}
+
+const FOLDER_OWNER_BATCH_SIZE = 500;
 
 @Injectable()
 export class FileRenameRepository {
@@ -70,6 +80,7 @@ export class FileRenameRepository {
         subtitle: bookMetadata.subtitle,
         publisher: bookMetadata.publisher,
         language: bookMetadata.language,
+        isbn10: bookMetadata.isbn10,
         isbn13: bookMetadata.isbn13,
         publishedYear: bookMetadata.publishedYear,
         seriesName: bookMetadata.seriesName,
@@ -121,6 +132,7 @@ export class FileRenameRepository {
         subtitle: row.subtitle,
         publisher: row.publisher,
         language: row.language,
+        isbn10: row.isbn10,
         isbn13: row.isbn13,
         publishedYear: row.publishedYear,
         seriesName: row.seriesName,
@@ -164,22 +176,42 @@ export class FileRenameRepository {
     });
   }
 
-  async findBookByExactFolderPath(
-    libraryId: number,
-    folderPath: string,
-  ): Promise<Pick<typeof books.$inferSelect, 'id' | 'folderPath' | 'primaryFileId' | 'status'> | null> {
-    const [row] = await this.db
-      .select({
-        id: books.id,
-        folderPath: books.folderPath,
-        primaryFileId: books.primaryFileId,
-        status: books.status,
-      })
-      .from(books)
-      .where(and(eq(books.libraryId, libraryId), eq(books.folderPath, folderPath)))
-      .limit(1);
+  /** The book that holds each folder, keyed by folder path. Folders no book holds are absent. */
+  async findFolderOwners(libraryId: number, folderPaths: string[]): Promise<Map<string, FolderOwner>> {
+    const owners = new Map<string, FolderOwner>();
+    const uniquePaths = [...new Set(folderPaths)];
 
-    return row ?? null;
+    for (let i = 0; i < uniquePaths.length; i += FOLDER_OWNER_BATCH_SIZE) {
+      const batch = uniquePaths.slice(i, i + FOLDER_OWNER_BATCH_SIZE);
+      const rows = await this.db
+        .select({ bookId: books.id, folderPath: books.folderPath, title: bookMetadata.title })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(and(eq(books.libraryId, libraryId), inArray(books.folderPath, batch)));
+      if (rows.length === 0) continue;
+
+      const ownerIds = rows.map((row) => row.bookId);
+      const authorRows = await this.db
+        .select({ bookId: bookAuthors.bookId, name: authors.name })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(inArray(bookAuthors.bookId, ownerIds))
+        .orderBy(asc(bookAuthors.bookId), asc(bookAuthors.displayOrder));
+      const primaryAuthorByBookId = new Map<number, string>();
+      for (const author of authorRows) {
+        if (!primaryAuthorByBookId.has(author.bookId)) primaryAuthorByBookId.set(author.bookId, author.name);
+      }
+
+      for (const row of rows) {
+        owners.set(row.folderPath, {
+          bookId: row.bookId,
+          title: row.title ?? null,
+          primaryAuthor: primaryAuthorByBookId.get(row.bookId) ?? null,
+        });
+      }
+    }
+
+    return owners;
   }
 
   async applyExistingFolderMerge(input: {
@@ -213,7 +245,7 @@ export class FileRenameRepository {
           .where(eq(bookFiles.id, update.id));
       }
 
-      await tx.delete(books).where(eq(books.id, input.sourceBookId));
+      await deleteBooksWithHashInvalidation(tx, eq(books.id, input.sourceBookId));
 
       await tx
         .update(books)

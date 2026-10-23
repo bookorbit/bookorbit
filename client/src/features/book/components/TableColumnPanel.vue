@@ -148,14 +148,14 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
         <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.columnPanel.presets') }}</div>
         <div class="flex items-center gap-1">
           <button
-            class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            class="rounded-xs p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             :title="t('book.columnPanel.exportBackup')"
             @click="emit('export-backup')"
           >
             <Download :size="12" />
           </button>
           <button
-            class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            class="rounded-xs p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             :title="t('book.columnPanel.importBackup')"
             @click="handleImportBackupClick"
           >
@@ -168,14 +168,14 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
         <div
           v-for="preset in allPresets"
           :key="preset.id"
-          class="flex items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-accent"
+          class="flex items-center gap-2 rounded-xs px-2 py-1 text-xs transition-colors hover:bg-accent"
         >
           <button class="min-w-0 flex-1 text-left" @click="emit('apply-preset', preset)">
             <span class="truncate">{{ preset.name }}</span>
           </button>
           <button
             v-if="!preset.isBuiltIn"
-            class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+            class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-foreground"
             :class="preset.favorite ? 'text-primary' : ''"
             @click="emit('favorite-preset', preset.id)"
           >
@@ -183,14 +183,14 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
           </button>
           <button
             v-if="!preset.isBuiltIn"
-            class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+            class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-foreground"
             @click="emit('duplicate-preset', preset.id)"
           >
             <Copy :size="11" />
           </button>
           <button
             v-if="!preset.isBuiltIn"
-            class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+            class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-foreground"
             @click="handleRenamePreset(preset)"
           >
             {{ t('book.columnPanel.rename') }}
@@ -198,7 +198,7 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
           <span v-if="preset.isBuiltIn" class="text-[10px] text-muted-foreground">{{ t('book.columnPanel.builtIn') }}</span>
           <button
             v-if="!preset.isBuiltIn"
-            class="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
+            class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-destructive"
             @click="emit('delete-preset', preset.id)"
           >
             <X :size="11" />
@@ -223,24 +223,24 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
     <div class="space-y-2 rounded-md border border-border/60 p-2">
       <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.columnPanel.savedViews') }}</div>
       <div v-if="savedViews.length > 0" class="space-y-1">
-        <div v-for="view in savedViews" :key="view.id" class="flex items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-accent">
+        <div v-for="view in savedViews" :key="view.id" class="flex items-center gap-2 rounded-xs px-2 py-1 text-xs transition-colors hover:bg-accent">
           <button class="min-w-0 flex-1 text-left" @click="emit('apply-view', view)">
             <span class="truncate">{{ view.name }}</span>
           </button>
           <button
-            class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+            class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-foreground"
             :class="view.favorite ? 'text-primary' : ''"
             @click="emit('favorite-view', view.id)"
           >
             <Star :size="11" :class="view.favorite ? 'fill-current' : ''" />
           </button>
-          <button class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground" @click="emit('duplicate-view', view.id)">
+          <button class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-foreground" @click="emit('duplicate-view', view.id)">
             <Copy :size="11" />
           </button>
-          <button class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground" @click="handleRenameView(view)">
+          <button class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-foreground" @click="handleRenameView(view)">
             {{ t('book.columnPanel.rename') }}
           </button>
-          <button class="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive" @click="emit('delete-view', view.id)">
+          <button class="rounded-xs p-1 text-muted-foreground hover:bg-background hover:text-destructive" @click="emit('delete-view', view.id)">
             <X :size="11" />
           </button>
         </div>
@@ -262,7 +262,7 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
     </div>
 
     <div class="space-y-1 rounded-md border border-border/60 p-2">
-      <label v-for="col in allColumns" :key="col.id" class="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-accent">
+      <label v-for="col in allColumns" :key="col.id" class="flex items-center gap-2 rounded-xs px-1.5 py-1 text-xs hover:bg-accent">
         <input type="checkbox" :checked="col.visible" class="accent-primary" @change="emit('toggle-column', col.id)" />
         <span class="flex-1">{{ columnLabel(col) }}</span>
         <span v-if="pinBadge(col)" class="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{{ pinBadge(col) }}</span>

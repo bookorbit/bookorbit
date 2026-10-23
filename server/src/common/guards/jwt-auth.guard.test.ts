@@ -27,8 +27,9 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   };
 }
 
-function makeContext() {
+function makeContext(type: 'http' | 'ws' = 'http') {
   return {
+    getType: () => type,
     getHandler: vi.fn(),
     getClass: vi.fn(),
     switchToHttp: () => ({
@@ -38,6 +39,32 @@ function makeContext() {
 }
 
 describe('JwtAuthGuard', () => {
+  /** The passport half of the guard, which reads a bearer token from HTTP headers. */
+  const passportCanActivate = () => vi.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype) as { canActivate: () => unknown }, 'canActivate');
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('lets gateway messages through without asking passport, which would read headers a socket does not have', () => {
+    const passport = passportCanActivate().mockReturnValue(false);
+    const reflector = { getAllAndOverride: vi.fn() };
+    const guard = new JwtAuthGuard(reflector as never);
+
+    expect(guard.canActivate(makeContext('ws'))).toBe(true);
+    expect(passport).not.toHaveBeenCalled();
+  });
+
+  it('still authenticates every non-public HTTP request through passport', () => {
+    const passport = passportCanActivate().mockReturnValue(false);
+    const reflector = { getAllAndOverride: vi.fn().mockReturnValue(undefined) };
+    const guard = new JwtAuthGuard(reflector as never);
+    const context = makeContext('http');
+
+    expect(guard.canActivate(context)).toBe(false);
+    expect(passport).toHaveBeenCalledWith(context);
+  });
+
   it('returns true in canActivate for @Public routes', () => {
     const reflector = {
       getAllAndOverride: vi.fn((key: string) => {

@@ -51,7 +51,7 @@ function handleRestore(dismissal: BookDuplicateDismissal): void {
         <span class="shrink-0 text-muted-foreground">{{ formatDate(new Date(dismissal.createdAt)) }}</span>
         <button
           type="button"
-          class="grid size-6 shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          class="grid size-6 shrink-0 place-items-center rounded-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           :aria-label="t('tools.bookDuplicates.dismissed.restore')"
           @click="handleRestore(dismissal)"
         >

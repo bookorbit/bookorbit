@@ -36,6 +36,8 @@ const { t } = useI18n()
 const props = defineProps<{
   modelValue: GroupRule | undefined
   depth?: number
+  /** Deepest nesting allowed. A smart scope's page wraps this filter in the scope's own rules, so it allows one level less. */
+  maxDepth?: number
   preserveIncompleteRoot?: boolean
 }>()
 
@@ -72,6 +74,7 @@ const NO_VALUE_OPERATORS: RuleOperator[] = [
 ]
 const BETWEEN_OPERATORS: RuleOperator[] = ['between']
 const COLLECTION_OPERATORS: RuleOperator[] = ['includesAny', 'includesAll', 'excludesAll']
+const RELATIVE_DAY_OPERATORS: RuleOperator[] = ['withinLast', 'moreThanAgo']
 
 const SCORE_PRESETS = [
   { label: 'outstanding', gte: 90 },
@@ -213,9 +216,10 @@ function parseValue(field: RuleField, operator: RuleOperator, raw: string, chips
   if (NO_VALUE_OPERATORS.includes(operator)) return undefined
   if (COLLECTION_OPERATORS.includes(operator)) return chips
   if (isNumericField(field)) return raw === '' ? undefined : field === 'fileSize' ? Math.round(Number(raw) * BYTES_PER_MIB) : Number(raw)
-  if (isDateField(field) && operator === 'withinLast') {
+  if (isDateField(field) && RELATIVE_DAY_OPERATORS.includes(operator)) {
     if (raw === '') return undefined
     const n = Number(raw)
+    if (operator === 'moreThanAgo') return n
     const multiplier = unit === 'weeks' ? 7 : unit === 'months' ? 30 : 1
     return n * multiplier
   }
@@ -404,7 +408,7 @@ function removeStatusChip(index: number, status: string) {
 
 function valueInputType(field: RuleField, operator: RuleOperator): string {
   if (NO_VALUE_OPERATORS.includes(operator)) return 'none'
-  if (isDateField(field)) return operator === 'withinLast' ? 'number' : 'date'
+  if (isDateField(field)) return RELATIVE_DAY_OPERATORS.includes(operator) ? 'number' : 'date'
   if (field === 'seriesIndex') return 'text'
   if (isNumericField(field)) return 'number'
   return 'text'
@@ -524,7 +528,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             <span
               v-for="libraryName in node.rule.valueChips"
               :key="libraryName"
-              class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
+              class="flex items-center gap-1 h-5 px-1.5 rounded-xs bg-primary/15 text-primary text-xs font-medium shrink-0"
             >
               {{ libraryName }}
               <button type="button" class="text-primary hover:text-primary leading-none" @click="removeLibraryChip(index, libraryName)">
@@ -562,7 +566,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             <span
               v-for="status in node.rule.valueChips"
               :key="status"
-              class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
+              class="flex items-center gap-1 h-5 px-1.5 rounded-xs bg-primary/15 text-primary text-xs font-medium shrink-0"
             >
               {{ READ_STATUS_LABELS[status] ?? status }}
               <button type="button" class="text-primary hover:text-primary leading-none" @click="removeStatusChip(index, status)">
@@ -577,8 +581,8 @@ function showValueToInput(operator: RuleOperator): boolean {
             </select>
           </div>
         </template>
-        <!-- withinLast: number + unit selector -->
-        <template v-else-if="node.rule.operator === 'withinLast'">
+        <!-- Relative date: numeric day count, with convenience units for withinLast. -->
+        <template v-else-if="RELATIVE_DAY_OPERATORS.includes(node.rule.operator)">
           <input
             v-model="node.rule.value"
             type="number"
@@ -588,6 +592,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             @input="emitUpdate"
           />
           <select
+            v-if="node.rule.operator === 'withinLast'"
             v-model="node.rule.valueUnit"
             class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
             @change="emitUpdate"
@@ -596,6 +601,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             <option value="weeks">{{ t('book.filter.unit.weeks') }}</option>
             <option value="months">{{ t('book.filter.unit.months') }}</option>
           </select>
+          <span v-else class="text-sm text-muted-foreground">{{ t('book.filter.unit.daysAgo') }}</span>
         </template>
         <!-- Text typeahead: publisher, series, language -->
         <FilterTextTypeahead
@@ -720,7 +726,12 @@ function showValueToInput(operator: RuleOperator): boolean {
           <div class="flex items-center justify-between mb-3">
             <span class="text-[10px] font-semibold uppercase tracking-widest text-primary">{{ t('book.filter.group') }}</span>
           </div>
-          <BookFilterBuilder :model-value="node.group" :depth="(depth ?? 0) + 1" @update:model-value="onSubGroupUpdate(index, $event)" />
+          <BookFilterBuilder
+            :model-value="node.group"
+            :depth="(depth ?? 0) + 1"
+            :max-depth="maxDepth"
+            @update:model-value="onSubGroupUpdate(index, $event)"
+          />
         </div>
         <button
           @click="removeNode(index)"
@@ -741,7 +752,7 @@ function showValueToInput(operator: RuleOperator): boolean {
         {{ t('book.filter.addRule') }}
       </button>
       <button
-        v-if="(depth ?? 0) < MAX_DEPTH"
+        v-if="(depth ?? 0) < (maxDepth ?? MAX_DEPTH)"
         @click="addGroup"
         class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-primary/30 text-sm text-primary hover:text-primary hover:border-primary hover:bg-primary/5 transition-colors"
       >

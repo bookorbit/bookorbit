@@ -39,6 +39,8 @@ describe('EmailSendLogService', () => {
             markSent: vi.fn().mockResolvedValue([{ ...mockLog, status: 'sent' }]),
             markFailed: vi.fn(),
             findForUser: vi.fn().mockResolvedValue([mockLog]),
+            countForUser: vi.fn().mockResolvedValue({ total: 3, failed: 1, pending: 0 }),
+            findUnresolvedFailures: vi.fn().mockResolvedValue([]),
             findAll: vi.fn().mockResolvedValue([mockLog]),
             findById: vi.fn().mockResolvedValue([mockLog]),
             delete: vi.fn(),
@@ -62,6 +64,16 @@ describe('EmailSendLogService', () => {
       expect(repo.markAbandoned).toHaveBeenCalledWith(101);
     });
 
+    it('recovers interrupted sends in bounded keyset batches', async () => {
+      vi.mocked(repo.findPending)
+        .mockResolvedValueOnce(Array.from({ length: 100 }, (_, index) => ({ id: index + 1 })) as never)
+        .mockResolvedValueOnce([{ id: 101 }] as never);
+      await service.onApplicationBootstrap();
+      expect(repo.findPending).toHaveBeenNthCalledWith(1, 0);
+      expect(repo.findPending).toHaveBeenNthCalledWith(2, 100);
+      expect(repo.markAbandoned).toHaveBeenCalledTimes(101);
+    });
+
     it('should do nothing if no pending entries', async () => {
       (repo.findPending as vi.Mock).mockResolvedValue([]);
       await service.onApplicationBootstrap();
@@ -72,13 +84,36 @@ describe('EmailSendLogService', () => {
   describe('findForUser', () => {
     it('should find for user with pagination', async () => {
       const result = await service.findForUser(mockUser, 1, 10);
-      expect(repo.findForUser).toHaveBeenCalledWith(1, 10, 10, undefined);
+      expect(repo.findForUser).toHaveBeenCalledWith(1, 10, 10, {});
       expect(result).toHaveLength(1);
     });
 
     it('should pass the book filter through', async () => {
-      await service.findForUser(mockUser, 0, 20, 965);
-      expect(repo.findForUser).toHaveBeenCalledWith(1, 20, 0, 965);
+      await service.findForUser(mockUser, 0, 20, { bookId: 965 });
+      expect(repo.findForUser).toHaveBeenCalledWith(1, 20, 0, { bookId: 965 });
+    });
+
+    it('should pass the status filter through', async () => {
+      await service.findForUser(mockUser, 0, 20, { status: 'failed' });
+      expect(repo.findForUser).toHaveBeenCalledWith(1, 20, 0, { status: 'failed' });
+    });
+  });
+
+  describe('summary and attention', () => {
+    it("counts the caller's log", async () => {
+      expect(await service.summary(mockUser)).toEqual({ total: 3, failed: 1, pending: 0 });
+      expect(repo.countForUser).toHaveBeenCalledWith(1);
+    });
+
+    it('asks for unresolved failures from the last seven days', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-12T20:00:00Z'));
+      try {
+        await service.findAttention(mockUser);
+        expect(repo.findUnresolvedFailures).toHaveBeenCalledWith(1, new Date('2026-10-05T20:00:00Z'), 20);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

@@ -5,15 +5,14 @@ import VChart from 'vue-echarts'
 import { Tag } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 
-import { useThemeStore } from '@/stores/theme'
-import { getThemePalette, readCssColor } from '@/lib/echarts'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { useUserGenreReadingTime } from '../../composables/useUserGenreReadingTime'
 import ChartCard from '../ChartCard.vue'
 import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_GENRES = 2
 
-const themeStore = useThemeStore()
+const chartTokens = useChartTokens()
 const { t } = useI18n()
 
 const { data, loading, error } = useUserGenreReadingTime()
@@ -28,8 +27,8 @@ watchEffect(() => {
   option.value = {}
   if (isEmpty.value || !hasEnoughData.value || !data.value.length) return
 
-  const palette = getThemePalette(themeStore.resolvedTheme, themeStore.accent, 0.8, 0.8)
-  const background = readCssColor('--background')
+  const palette = chartTokens.value.palette(0.8, 0.8)
+  const background = chartTokens.value.color('--background')
   const bySourceByGenre = new Map(data.value.map((item) => [item.genre, item.bySource]))
 
   option.value = {

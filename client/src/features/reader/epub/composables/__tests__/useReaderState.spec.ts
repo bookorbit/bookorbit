@@ -171,6 +171,17 @@ describe('useReaderState', () => {
     expect(css).toContain('hyphens: none;')
   })
 
+  it('sets the publisher font-size scale on the root beside the reader text size', () => {
+    const state = useReaderState()
+    state.setFontSize(20)
+
+    const rootRule = state.generateCSS().match(/html \{[^}]*font-size: 20px;[^}]*\}/)?.[0] ?? ''
+
+    expect(rootRule).toContain('--bookorbit-font-scale: 1.25;')
+    expect(rootRule).toContain('--bookorbit-font-medium: 20px;')
+    expect(rootRule).toContain('--bookorbit-font-small: 16.25px;')
+  })
+
   it('overrides a more specific publisher line height on body text', () => {
     const state = useReaderState()
     state.setLineHeight(3)

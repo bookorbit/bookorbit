@@ -116,7 +116,7 @@ useModal({
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="mr-1 flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+                class="mr-1 flex size-7 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
                 :disabled="!canGoUp"
                 :aria-label="t('library.folderPicker.parentFolder')"
                 @click="goUp"
@@ -130,7 +130,7 @@ useModal({
             <ChevronRight v-if="index > 0" :size="12" class="shrink-0 text-muted-foreground" />
             <button
               type="button"
-              class="shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-xs transition-colors"
+              class="shrink-0 whitespace-nowrap rounded-xs px-1.5 py-0.5 text-xs transition-colors"
               :class="
                 index === breadcrumbs.length - 1
                   ? 'bg-background font-medium text-foreground shadow-xs'
@@ -260,7 +260,7 @@ useModal({
               <template #default="{ item: entry }">
                 <div class="flex h-10 items-stretch border-b border-border/60 px-1.5 sm:px-2">
                   <label
-                    class="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded px-2 transition-colors hover:bg-muted/50"
+                    class="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-xs px-2 transition-colors hover:bg-muted/50"
                     :class="isSelectionDisabled(entry.path) ? 'cursor-not-allowed opacity-60' : ''"
                   >
                     <input
@@ -283,7 +283,7 @@ useModal({
                   </label>
                   <button
                     type="button"
-                    class="flex size-10 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    class="flex size-10 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     :aria-label="t('library.folderPicker.openFolderAria', { name: entry.name })"
                     @click="navigate(entry.path)"
                   >

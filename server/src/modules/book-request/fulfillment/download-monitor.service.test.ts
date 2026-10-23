@@ -521,6 +521,99 @@ describe('DownloadMonitorService.tick', () => {
       expect(fulfillment.failDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), expect.stringContaining(REFUSED));
     });
 
+    it.each([
+      'timed out',
+      'Connection timed out',
+      'Tracker gave HTTP response code 503',
+      'Tracker gave HTTP response code 429',
+      'Could not resolve host',
+      'Connection refused',
+      'Network is unreachable',
+      'An unknown tracker error',
+    ])('keeps polling a stalled download after a transient or unclassified error: %s', async (trackerError) => {
+      const { service, fulfillment, downloads } = makeService({
+        statuses: [status({ downloadedBytes: 0, progressPercent: 0, trackerError })],
+      });
+
+      await polled(service);
+
+      expect(fulfillment.failDownload).not.toHaveBeenCalled();
+      expect(downloads.updateIf).toHaveBeenCalledWith(
+        11,
+        ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
+        expect.objectContaining({ status: 'downloading', downloadedBytes: 0 }),
+      );
+    });
+
+    it.each([
+      'Invalid passkey',
+      'Unregistered torrent',
+      'Torrent not found',
+      'Tracker gave HTTP response code 401',
+      'Tracker gave HTTP response code 403',
+      'HTTP 403 Forbidden',
+      'Access denied',
+      'Denied',
+    ])('still fails an explicit tracker rejection after the grace period: %s', async (trackerError) => {
+      const { service, fulfillment } = makeService({
+        statuses: [status({ downloadedBytes: 0, progressPercent: 0, trackerError })],
+      });
+
+      await polled(service);
+
+      expect(fulfillment.failDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), expect.stringContaining(trackerError));
+    });
+
+    it('imports a torrent that starts and completes after a tracker timeout beyond the grace period', async () => {
+      const { service, fulfillment, downloads, adapter, imports } = makeService({
+        active: [row({ downloadedBytes: 0, progressPercent: 0 })],
+      });
+      downloads.findActive.mockImplementation(async () => {
+        const latest = await downloads.findById(11);
+        return latest && ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES.includes(latest.status) ? [latest] : [];
+      });
+      fulfillment.failDownload.mockImplementation(async () => {
+        await downloads.update(11, { status: 'failed' });
+      });
+      adapter.status
+        .mockResolvedValueOnce([status({ downloadedBytes: 0, progressPercent: 0, trackerError: 'timed out' })])
+        .mockResolvedValueOnce([status({ downloadedBytes: 500, progressPercent: 50 })])
+        .mockResolvedValueOnce([status({ state: 'completed', downloadedBytes: 1000, progressPercent: 100 })]);
+      const now = vi.spyOn(Date, 'now');
+      const startedAt = new Date().getTime();
+
+      try {
+        now.mockReturnValue(startedAt);
+        await polled(service);
+        now.mockReturnValue(startedAt + 5_000);
+        await polled(service);
+        now.mockReturnValue(startedAt + 10_000);
+        await polled(service);
+        await importQueue(service).waitForIdle();
+
+        expect(fulfillment.failDownload).not.toHaveBeenCalled();
+        expect(adapter.status).toHaveBeenCalledTimes(3);
+        expect(imports.importDownload).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ id: 11, status: 'completed', progressPercent: 100, downloadedBytes: 1000 }),
+        );
+      } finally {
+        now.mockRestore();
+        service.onModuleDestroy();
+      }
+    });
+
+    it('imports completed content despite a stale tracker rejection and reset byte counters', async () => {
+      const { service, fulfillment, imports } = makeService({
+        statuses: [status({ state: 'completed', downloadedBytes: 0, progressPercent: 100, trackerError: REFUSED })],
+      });
+
+      await polled(service);
+      await importQueue(service).waitForIdle();
+
+      expect(fulfillment.failDownload).not.toHaveBeenCalled();
+      expect(imports.importDownload).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 11, status: 'completed' }));
+    });
+
     /** A tracker restart looks identical for the first few seconds, and costs nobody a download. */
     it('gives a freshly grabbed torrent a grace window first', async () => {
       const now = new Date();

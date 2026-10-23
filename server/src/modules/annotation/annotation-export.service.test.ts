@@ -54,6 +54,16 @@ describe('AnnotationExportService', () => {
     expect(result.content).toContain('koreader');
   });
 
+  it('quotes each paragraph of a multi-paragraph highlight without the source indentation', () => {
+    const rows = [makeRow({ text: 'Oh, the laundry.\n\t\t\tOh, the laundry.\r\n                  Again.', note: '\tfirst\n\n   second' })];
+
+    const result = service.export(rows, 'md', 'book-20');
+
+    expect(result.content).toContain('> Oh, the laundry.\n>\n> Oh, the laundry.\n>\n> Again.');
+    expect(result.content).toContain('Note: first\n\nsecond');
+    expect(result.content).not.toMatch(/\t|> {2}/);
+  });
+
   it('escapes CSV fields containing quotes, commas and newlines', () => {
     const rows = [makeRow({ text: 'He said "hi", twice\nand left', note: 'plain' })];
 

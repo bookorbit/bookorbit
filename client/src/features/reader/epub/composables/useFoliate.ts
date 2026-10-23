@@ -1,12 +1,18 @@
 import { onUnmounted, ref } from 'vue'
 import { api, getAccessToken } from '@/lib/api'
+import { i18n } from '@/i18n'
 import { useFoliateAnnotations } from './useFoliateAnnotations'
 import { useFoliateSelection } from './useFoliateSelection'
 import { useFoliateInput } from './useFoliateInput'
 import { ensureMediaOverlayActiveClass } from '../../media-overlay/lib/media-overlay-highlight'
+import { scalePublisherFontSizes } from '../lib/publisher-font-sizes'
 import type { EpubBookInfo, EpubReaderSettings } from '@bookorbit/types'
 
 export interface RelocateDetail {
+  /** Why the view moved: a user's `page`/`snap`/`scroll`, a programmatic `navigation`, or an `anchor` relayout. */
+  reason?: string
+  /** The view is still opening the book at its starting position. */
+  restoring?: boolean
   cfi?: string | null
   fraction?: number
   index?: number
@@ -89,7 +95,6 @@ export interface FoliateOpenOptions extends EpubOpenOptions {
   fallbackFraction?: number
   mediaOverlayFragment?: string | null
   mediaOverlaySectionIndex?: number | null
-  preferMediaOverlay?: boolean
 }
 
 export function useFoliate(
@@ -253,18 +258,7 @@ export function useFoliate(
       view.addEventListener('relocate', (e: Event) => {
         const detail = (e as CustomEvent).detail
         fraction.value = detail?.fraction ?? 0
-        if (import.meta.env.DEV) {
-          console.info('[foliate.relocate]', {
-            source: detail?.source ?? null,
-            koboLocationType: detail?.koboLocationType ?? null,
-            koboLocationValue: detail?.koboLocationValue ?? null,
-            contentSourceProgressPercent: detail?.contentSourceProgressPercent ?? null,
-            koreaderProgress: detail?.koreaderProgress ?? null,
-            fraction: detail?.fraction ?? null,
-            cfi: detail?.cfi ?? null,
-          })
-        }
-        onRelocate?.(detail)
+        onRelocate?.(initialNavigationPending ? { ...detail, restoring: true } : detail)
       })
 
       view.addEventListener('error', (e: Event) => {
@@ -277,7 +271,7 @@ export function useFoliate(
 
       loadTimeoutId = setTimeout(() => {
         if (loading.value) {
-          error.value = 'Could not open the book. Your browser may not fully support the reader. Try refreshing or using a different browser.'
+          error.value = i18n.global.t('reader.bookLoadTimeout')
           loading.value = false
         }
       }, 30_000)
@@ -307,6 +301,7 @@ export function useFoliate(
         applyEpubOpenOptions(book, options)
         shouldRestoreByFraction = isFixedLayoutBook(book)
         isFixedLayout.value = shouldRestoreByFraction
+        if (!shouldRestoreByFraction) scalePublisherFontSizes(book)
         await view.open(book as never)
       } else {
         const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip'
@@ -330,9 +325,6 @@ export function useFoliate(
       }
 
       let didNavigate = false
-      if (options.preferMediaOverlay && options.mediaOverlayFragment) {
-        didNavigate = await navigateTo(options.mediaOverlayFragment)
-      }
       if (!didNavigate && options.cfi && !shouldRestoreByFraction) {
         didNavigate = await navigateTo(options.cfi)
       }
@@ -345,6 +337,9 @@ export function useFoliate(
             didNavigate = false
           }
         }
+      }
+      if (!didNavigate && options.fallbackFraction === 0) {
+        didNavigate = await navigateTo(0)
       }
       if (!didNavigate && options.mediaOverlayFragment) {
         didNavigate = await navigateTo(options.mediaOverlayFragment)
@@ -360,7 +355,7 @@ export function useFoliate(
     } catch (e) {
       console.error('[useFoliate]', e)
       clearTimeout(loadTimeoutId)
-      error.value = e instanceof Error ? e.message : 'Failed to open book'
+      error.value = e instanceof Error && e.message ? e.message : i18n.global.t('reader.failedToLoadBook')
       loading.value = false
     }
   }

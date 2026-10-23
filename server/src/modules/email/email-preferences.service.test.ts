@@ -31,7 +31,7 @@ describe('EmailPreferencesService', () => {
     contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
-  const mockPrefs = { userId: 1, defaultProviderId: 10, defaultRecipientId: 20 };
+  const mockPrefs = { id: 1, userId: 1, defaultProviderId: 10, defaultRecipientId: 20, defaultTemplateId: 30 };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -41,7 +41,8 @@ describe('EmailPreferencesService', () => {
           provide: EmailPreferencesRepository,
           useValue: {
             findByUserId: vi.fn().mockResolvedValue([mockPrefs]),
-            upsert: vi.fn().mockResolvedValue([mockPrefs]),
+            findFlaggedDefaults: vi.fn().mockResolvedValue({ providerId: null, recipientId: null, templateId: null }),
+            setDefaults: vi.fn().mockResolvedValue(mockPrefs),
           },
         },
         {
@@ -66,24 +67,45 @@ describe('EmailPreferencesService', () => {
     templateService = module.get<EmailTemplateService>(EmailTemplateService);
   });
 
-  it('should find for user', async () => {
+  it('returns the stored defaults without looking at the flags', async () => {
     const result = await service.findForUser(mockUser);
-    expect(result.defaultProviderId).toBe(10);
+    expect(result).toEqual(mockPrefs);
+    expect(repo.findFlaggedDefaults).not.toHaveBeenCalled();
   });
 
-  it('should return default object if not found', async () => {
+  it('returns empty defaults when the account has neither a row nor flags', async () => {
     (repo.findByUserId as vi.Mock).mockResolvedValue([]);
     const result = await service.findForUser(mockUser);
-    expect(result.userId).toBe(1);
-    expect(result.defaultProviderId).toBeNull();
+    expect(result).toEqual({ userId: 1, defaultProviderId: null, defaultRecipientId: null, defaultTemplateId: null });
+    expect(await service.getForUser(1)).toBeNull();
   });
 
-  it('should upsert preferences', async () => {
+  it('falls back to rows still flagged isDefault, so star-only accounts keep their defaults', async () => {
+    (repo.findByUserId as vi.Mock).mockResolvedValue([]);
+    (repo.findFlaggedDefaults as vi.Mock).mockResolvedValue({ providerId: 4, recipientId: 5, templateId: null });
+
+    expect(await service.getForUser(1)).toEqual({ userId: 1, defaultProviderId: 4, defaultRecipientId: 5, defaultTemplateId: null });
+  });
+
+  it('fills only the empty fields from the flags', async () => {
+    (repo.findByUserId as vi.Mock).mockResolvedValue([{ ...mockPrefs, defaultRecipientId: null }]);
+    (repo.findFlaggedDefaults as vi.Mock).mockResolvedValue({ providerId: 99, recipientId: 7, templateId: 98 });
+
+    expect(await service.getForUser(1)).toEqual({ ...mockPrefs, defaultRecipientId: 7 });
+  });
+
+  it('writes the defaults through setDefaults, which also moves the flags', async () => {
     const dto = { defaultProviderId: 99 };
     const result = await service.upsert(dto, mockUser);
-    expect(repo.upsert).toHaveBeenCalledWith(1, dto);
     expect(providerService.findOne).toHaveBeenCalledWith(99, mockUser);
+    expect(repo.setDefaults).toHaveBeenCalledWith(1, dto);
     expect(result.defaultProviderId).toBe(10);
+  });
+
+  it('clears a default without validating anything', async () => {
+    await service.upsert({ defaultRecipientId: null }, mockUser);
+    expect(recipientService.getOwnedById).not.toHaveBeenCalled();
+    expect(repo.setDefaults).toHaveBeenCalledWith(1, { defaultRecipientId: null });
   });
 
   it('should validate recipient ownership when defaultRecipientId is provided', async () => {
@@ -96,8 +118,9 @@ describe('EmailPreferencesService', () => {
     expect(templateService.findOne).toHaveBeenCalledWith(66, mockUser);
   });
 
-  it('should get for user by id', async () => {
-    const result = await service.getForUser(1);
-    expect(result?.defaultProviderId).toBe(10);
+  it('does not write when validation fails', async () => {
+    (providerService.findOne as vi.Mock).mockRejectedValue(new Error('No access to this provider'));
+    await expect(service.upsert({ defaultProviderId: 3 }, mockUser)).rejects.toThrow('No access to this provider');
+    expect(repo.setDefaults).not.toHaveBeenCalled();
   });
 });

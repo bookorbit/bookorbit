@@ -1,5 +1,6 @@
 import { MetadataCandidate } from '@bookorbit/types';
 
+import { markProviderTruncated } from '../../../common/provider-cache/provider-call-context';
 import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
 import { ProviderThrottleError } from '../provider-throttle.error';
 import { MetadataSearchParams } from './metadata-search-params';
@@ -13,6 +14,13 @@ export function normalizeMaxCandidates(value: number | undefined, maxResults: nu
   const rounded = Math.floor(value);
   if (rounded < 1) return 1;
   return Math.min(rounded, maxResults);
+}
+
+/** How many records one search request asks for: the provider's own page, widened when a browsing search wants more. */
+export function searchPageSize(params: MetadataSearchParams, defaultSize: number): number {
+  const wanted = params.resultsPerProvider;
+  if (wanted === undefined || !Number.isFinite(wanted)) return defaultSize;
+  return Math.max(defaultSize, Math.floor(wanted));
 }
 
 export function buildRequestSignal(timeoutMs: number, parentSignal?: AbortSignal): AbortSignal {
@@ -39,13 +47,23 @@ export interface SearchDeadline {
 export function createSearchDeadline(budgetMs: number, parentSignal?: AbortSignal): SearchDeadline {
   const at = Date.now() + budgetMs;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), budgetMs);
+  // Runs in the caller's async context, so the metadata cache learns this search was cut short.
+  const timer = setTimeout(() => {
+    markProviderTruncated();
+    controller.abort();
+  }, budgetMs);
   const signal = parentSignal ? AbortSignal.any([parentSignal, controller.signal]) : controller.signal;
 
   return {
     at,
     signal,
-    expired: () => Date.now() >= at,
+    // A caller can see the budget spent before the timer has fired and then dispose of it, so the
+    // check itself has to report the truncation too.
+    expired: () => {
+      const spent = Date.now() >= at;
+      if (spent) markProviderTruncated();
+      return spent;
+    },
     dispose: () => clearTimeout(timer),
   };
 }

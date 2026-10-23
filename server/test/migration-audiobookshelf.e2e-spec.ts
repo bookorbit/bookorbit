@@ -169,7 +169,7 @@ describe('Migration Audiobookshelf live and backup (e2e)', { timeout: 300_000 },
     expect(started.statusCode).toBe(201);
     expect(started.body.state).toBe('running');
     const finished = await waitForMigrationToFinish(ctx, started.body.id);
-    expect(finished.progress.run.state).toBe('completed');
+    expect(finished.progress.run).toMatchObject({ state: 'completed', errorMessage: null });
     expect(finished.report.run.state).toBe('completed');
     expect(finished.report.totals.failed).toBe(0);
     expect(finished.report.totals.unresolved).toBeGreaterThanOrEqual(1);
@@ -367,8 +367,9 @@ describe('Migration Audiobookshelf live and backup (e2e)', { timeout: 300_000 },
     const theoMap = statusRows.find((row) => row.userId === scenario.targetUsers.theo.id && row.bookId === scenario.targetBooks.map.bookId);
     const theoBrass = statusRows.find((row) => row.userId === scenario.targetUsers.theo.id && row.bookId === scenario.targetBooks.brass.bookId);
     expect(theoMap).toMatchObject({ status: 'read', source: 'manual' });
+    expect(theoMap?.startedAt?.toISOString()).toBe(scenario.expected.theoMapStartedAt);
     expect(theoMap?.finishedAt?.toISOString()).toBe(scenario.expected.theoMapFinishedAt);
-    expect(theoBrass).toMatchObject({ status: 'read', source: 'manual' });
+    expect(theoBrass).toMatchObject({ status: 'read', source: 'manual', startedAt: null });
     expect(theoBrass?.finishedAt?.toISOString()).toBe(scenario.expected.theoBrassFinishedAt);
 
     const bookmarkRows = await ctx.db.select().from(schema.bookmarks).where(eq(schema.bookmarks.userId, scenario.targetUsers.maya.id));

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 
+import { MetadataCacheModule } from '../metadata-cache/metadata-cache.module';
 import { MetadataPreferencesModule } from '../metadata-preferences/metadata-preferences.module';
+import { BookProviderCacheRegistrar } from './book-provider-cache.registrar';
 import { METADATA_PROVIDERS } from './constants';
 import { MetadataFetchController } from './metadata-fetch.controller';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
@@ -48,7 +50,7 @@ const PROVIDER_CLASSES = [
 ];
 
 @Module({
-  imports: [MetadataPreferencesModule],
+  imports: [MetadataPreferencesModule, MetadataCacheModule],
   providers: [
     ...PROVIDER_CLASSES,
     {
@@ -65,6 +67,7 @@ const PROVIDER_CLASSES = [
     MetadataFetchRepository,
     MetadataFetchService,
     MetadataFetchPipeline,
+    BookProviderCacheRegistrar,
   ],
   controllers: [MetadataFetchController],
   exports: [MetadataFetchService, MetadataFetchPipeline, ProviderRegistry, ProviderThrottleTracker],

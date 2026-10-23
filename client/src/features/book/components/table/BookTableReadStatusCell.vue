@@ -66,7 +66,7 @@ function handleTab(e: KeyboardEvent) {
       <DropdownMenuTrigger as-child :disabled="isReadOnly">
         <button
           type="button"
-          class="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-xs transition-colors"
+          class="flex w-full items-center gap-1.5 rounded-xs px-1 py-0.5 text-xs transition-colors"
           :class="[currentColor, isReadOnly ? 'cursor-default' : 'hover:bg-primary/5 cursor-pointer']"
         >
           <component :is="CurrentIcon" :size="12" />

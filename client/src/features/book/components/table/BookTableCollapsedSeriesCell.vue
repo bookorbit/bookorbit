@@ -2,14 +2,16 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight, LibraryBig } from '@lucide/vue'
-import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, isComicFormat, type BookCard } from '@bookorbit/types'
 import BookCoverSurface from '../BookCoverSurface.vue'
+import BookTableChipsCell from './BookTableChipsCell.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
 const props = defineProps<{
   book: BookCard
   colId: string
+  linkFn?: (chip: string) => string | null
 }>()
 
 const emit = defineEmits<{
@@ -25,7 +27,7 @@ const bookCount = computed(() => collapsed.value.bookCount)
 const coverIds = computed(() => collapsed.value.coverBookIds.filter((id) => id > 0).slice(0, 4))
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const isComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 const { coverUrl } = useCoverVersions()
 
 function thumbnailUrl(bookId: number): string {
@@ -94,6 +96,8 @@ function handleOpenSeries() {
       >&middot; {{ t('book.table.series.readOfCount', { read: readCount, total: bookCount }) }}</span
     >
   </div>
+
+  <BookTableChipsCell v-else-if="colId === 'authors'" :value="book.authors" :is-active="false" is-read-only :link-fn="linkFn" />
 
   <div v-else-if="colId === 'actions'" class="flex h-full w-6 items-center justify-center">
     <Tooltip>

@@ -164,6 +164,11 @@ describe('ruleToParts', () => {
     expect(ruleToParts(rule)).toEqual({ field: 'Added Date', operator: 'within last', value: '7 days' })
   })
 
+  it('renders moreThanAgo rules as a day age', () => {
+    const rule: Rule = { type: 'rule', field: 'finishedAt', operator: 'moreThanAgo', value: 30 }
+    expect(ruleToParts(rule)).toEqual({ field: 'Date Finished', operator: 'more than', value: '30 days ago' })
+  })
+
   it('joins array values with commas', () => {
     const rule: Rule = { type: 'rule', field: 'author', operator: 'includesAny', value: ['Tolkien', 'Le Guin'] }
     expect(ruleToParts(rule)).toEqual({ field: 'Author', operator: 'includes any of', value: 'Tolkien, Le Guin' })

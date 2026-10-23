@@ -94,7 +94,7 @@ describe('KoreaderController', () => {
     const user = { id: 7 } as never;
 
     await expect(controller.createCredentials(user, { username: 'reader', password: 'secret1' } as never)).resolves.toEqual({ success: true });
-    expect(koreaderService.createCredentials).toHaveBeenCalledWith(7, 'reader', 'secret1');
+    expect(koreaderService.createCredentials).toHaveBeenCalledWith(7, 'reader', 'secret1', undefined);
 
     await expect(controller.updateCredentials(user, { syncEnabled: false } as never)).resolves.toEqual({ success: true });
     expect(koreaderService.updateCredentials).toHaveBeenCalledWith(7, { syncEnabled: false });

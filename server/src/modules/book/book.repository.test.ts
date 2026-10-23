@@ -163,6 +163,7 @@ describe('BookRepository', () => {
     const stateDeleteWhere = vi.fn().mockResolvedValue(undefined);
     const bookDeleteWhere = vi.fn().mockResolvedValue(undefined);
     const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
       update: vi.fn().mockReturnValue({ set: updateSet }),
       delete: vi.fn().mockReturnValueOnce({ where: stateDeleteWhere }).mockReturnValueOnce({ where: bookDeleteWhere }),
@@ -174,7 +175,8 @@ describe('BookRepository', () => {
 
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(tx.update).toHaveBeenCalledTimes(1);
-    expect(tx.delete).toHaveBeenCalledTimes(2);
+    expect(tx.delete).toHaveBeenCalledTimes(1);
+    expect(tx.execute).toHaveBeenCalledTimes(1);
     const invalidationQuery = new PgDialect().sqlToQuery(stateDeleteWhere.mock.calls[0]![0]);
     expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."library_folder_id" = $1');
     expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."dir_path" in');
@@ -188,6 +190,7 @@ describe('BookRepository', () => {
     const updateWhere = vi.fn().mockResolvedValue(undefined);
     const stateDeleteWhere = vi.fn().mockRejectedValue(new Error('invalidation failed'));
     const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
       update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: updateWhere }) }),
       delete: vi.fn().mockReturnValue({ where: stateDeleteWhere }),
@@ -209,6 +212,7 @@ describe('BookRepository', () => {
     const bookSelect = makeSelectChain('for', bookRows);
     const folderSelect = makeSelectChain('for', [{ id: 7 }]);
     const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
       update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
       delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
@@ -218,7 +222,8 @@ describe('BookRepository', () => {
 
     await repo.deleteByIdsAndInvalidateScanState(bookRows.map((row) => row.id));
 
-    expect(tx.delete).toHaveBeenCalledTimes(3);
+    expect(tx.delete).toHaveBeenCalledTimes(2);
+    expect(tx.execute).toHaveBeenCalledTimes(1);
   });
 
   it('findCards loads card rows and related collections for the current user', async () => {
@@ -752,6 +757,58 @@ describe('BookRepository', () => {
     expect(resetWhere).toHaveBeenCalledOnce();
   });
 
+  it('moves the narration stamp with a bridged marker', async () => {
+    const returning = vi.fn().mockResolvedValue([{ fileId: 20 }]);
+    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    const db = {
+      insert: vi.fn().mockReturnValue({ values }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const repo = new BookRepository(db as never);
+    const sourceUpdatedAt = new Date('2026-10-13T12:00:00.000Z');
+    const base = {
+      userId: 7,
+      fileId: 20,
+      cfi: 'epubcfi(/6/4)',
+      percentage: 42,
+      mediaOverlayFragment: 'OPS/chapter.xhtml#p2',
+      mediaOverlaySectionIndex: 1,
+      koreaderProgress: null,
+      sourceUpdatedAt,
+    };
+
+    await repo.upsertSyncedEpubProgressIfNewer({ ...base, positionSeconds: 120 });
+    const stamp = { narrationPercentage: 42, narrationUpdatedAt: sourceUpdatedAt };
+    expect(values).toHaveBeenLastCalledWith(expect.objectContaining(stamp));
+    expect(onConflictDoUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ set: expect.objectContaining(stamp) }));
+
+    await repo.upsertSyncedEpubProgressIfNewer({ ...base, positionSeconds: null });
+    expect(values.mock.lastCall![0]).not.toHaveProperty('narrationUpdatedAt');
+    expect(onConflictDoUpdate.mock.lastCall![0].set).not.toHaveProperty('narrationUpdatedAt');
+  });
+
+  it('keeps the stored narration marker when a write leaves it out, and clears it on an explicit null', async () => {
+    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    const db = {
+      insert: vi.fn().mockReturnValue({ values }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', null, 40);
+    const kept = onConflictDoUpdate.mock.lastCall![0].set;
+    expect(kept).not.toHaveProperty('positionSeconds');
+    expect(kept).not.toHaveProperty('mediaOverlayFragment');
+    expect(kept).not.toHaveProperty('mediaOverlaySectionIndex');
+
+    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', null, 40, null, null, null);
+    expect(onConflictDoUpdate.mock.lastCall![0].set).toEqual(
+      expect.objectContaining({ positionSeconds: null, mediaOverlayFragment: null, mediaOverlaySectionIndex: null }),
+    );
+  });
+
   it('clears a stale narration marker when bridging to a copy without media overlays', async () => {
     const returning = vi.fn().mockResolvedValue([{ fileId: 20 }]);
     const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
@@ -943,6 +1000,7 @@ describe('BookRepository', () => {
     const updateWhere = vi.fn().mockResolvedValue(undefined);
     const updateBuilder = { set: vi.fn().mockReturnValue({ where: updateWhere }) };
     const db = {
+      execute: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockReturnValue(deleteBuilder),
       update: vi.fn().mockReturnValue(updateBuilder),
     };
@@ -950,8 +1008,8 @@ describe('BookRepository', () => {
 
     await repo.deleteByIds([10, 11]);
     await repo.updateMetadataFields(10, { title: 'Updated' });
-    expect(db.delete).toHaveBeenCalledTimes(1);
-    expect(deleteWhere).toHaveBeenCalledTimes(1);
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]).sql).toContain('delete from "books"');
     expect(db.update).toHaveBeenCalledTimes(2);
     expect(updateBuilder.set).toHaveBeenNthCalledWith(1, { title: 'Updated' });
     expect(updateBuilder.set).toHaveBeenNthCalledWith(2, expect.objectContaining({ updatedAt: expect.any(Date) }));
@@ -1192,6 +1250,45 @@ describe('BookRepository', () => {
     expect(total).toBe(42);
   });
 
+  it('countFormatFacets counts distinct visible books per requested format through an aliased file join', async () => {
+    const db = {
+      execute: vi.fn().mockResolvedValue({
+        rows: [
+          { format: 'epub', count: '7' },
+          { format: 'pdf', count: 3 },
+        ],
+      }),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.countFormatFacets(sql`${bookMetadata.title} is not null`, ['epub', 'pdf']);
+
+    const query = new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]);
+    const normalized = query.sql.replace(/\s+/g, ' ');
+    expect(normalized).toContain('count(DISTINCT "books"."id")');
+    expect(normalized).toContain('LEFT JOIN "book_metadata" ON "book_metadata"."book_id" = "books"."id"');
+    expect(normalized).toContain('INNER JOIN "book_files" AS facet_file ON facet_file.book_id = "books"."id"');
+    expect(normalized).toContain('CROSS JOIN LATERAL');
+    expect(normalized).toContain("facet_file.format = 'epub' AND facet_file.media_overlay_available = true");
+    expect(normalized).toContain('"book_metadata"."title" is not null');
+    expect(normalized).toContain('"books"."status" <>');
+    expect(normalized).toContain('facet_key.format IN ($3, $4)');
+    expect(normalized).toContain('GROUP BY facet_key.format');
+    expect(query.params).toEqual(['epub:readalong', 'processing', 'epub', 'pdf']);
+    expect(result).toEqual([
+      { format: 'epub', count: 7 },
+      { format: 'pdf', count: 3 },
+    ]);
+  });
+
+  it('countFormatFacets skips the query when no formats are requested', async () => {
+    const db = { execute: vi.fn() };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.countFormatFacets(undefined, [])).resolves.toEqual([]);
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
   it('returns empty file lists without querying when bookIds are empty', async () => {
     const db = {
       select: vi.fn(),
@@ -1262,12 +1359,12 @@ describe('BookRepository', () => {
     );
   });
 
-  it('syncs primary EPUB progress into Kobo reading state and marks snapshot row pending', async () => {
+  it.each(['epub', 'kepub'])('syncs primary %s progress into Kobo reading state and marks snapshot row pending', async (format) => {
     const insertChain = makeInsertChain();
     const db = {
       select: vi
         .fn()
-        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format, markAsFinishedPercentComplete: 98 }]))
         .mockReturnValueOnce(
           makeSelectChain('limit', [
             {

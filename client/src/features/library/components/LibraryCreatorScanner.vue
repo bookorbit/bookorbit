@@ -37,7 +37,7 @@ const ADDED_AT_SOURCES: AddedAtSource[] = ['imported', 'file_modified', 'file_cr
 const FORMAT_GROUPS: { id: 'ebook' | 'kindle' | 'document' | 'comic' | 'audio'; formats: string[] }[] = [
   { id: 'ebook', formats: ['epub', 'kepub', 'fb2'] },
   { id: 'kindle', formats: ['mobi', 'azw3', 'azw'] },
-  { id: 'document', formats: ['pdf'] },
+  { id: 'document', formats: ['pdf', 'djvu'] },
   { id: 'comic', formats: ['cbz', 'cbr', 'cb7'] },
   { id: 'audio', formats: ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'] },
 ]
@@ -294,7 +294,7 @@ async function confirmRecompute() {
           {{ pattern }}
           <button
             type="button"
-            class="flex size-4.5 items-center justify-center rounded text-foreground hover:bg-muted hover:text-destructive"
+            class="flex size-4.5 items-center justify-center rounded-xs text-foreground hover:bg-muted hover:text-destructive"
             :aria-label="t('library.creator.scanner.skip.remove', { pattern })"
             @click="removePattern(pattern)"
           >

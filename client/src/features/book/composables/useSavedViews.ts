@@ -1,5 +1,6 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { storage } from '@/services/storage'
+import { createUuid } from '@/lib/uuid'
 import type { GroupRule, SortSpec, TableLayoutState, TableViewType } from '@bookorbit/types'
 
 /**
@@ -85,7 +86,7 @@ function createSnapshot(input: SaveSavedViewInput): SavedView | null {
   const trimmedName = input.name.trim()
   if (!trimmedName) return null
   return {
-    id: `saved_view_${crypto.randomUUID()}`,
+    id: `saved_view_${createUuid()}`,
     name: trimmedName,
     layout: cloneLayout(input.layout),
     sort: input.sort ? [...input.sort] : [],
@@ -133,7 +134,7 @@ export function useSavedViews(viewType: TableViewType, scopeId: Readonly<Ref<num
       ...savedViews.value,
       {
         ...existing,
-        id: `saved_view_${crypto.randomUUID()}`,
+        id: `saved_view_${createUuid()}`,
         name: `${existing.name} Copy`,
         layout: cloneLayout(existing.layout),
         sort: [...existing.sort],
@@ -149,7 +150,7 @@ export function useSavedViews(viewType: TableViewType, scopeId: Readonly<Ref<num
   function importViews(views: SavedView[]): number {
     const valid = views.filter(isValidSavedView).map((view) => ({
       ...view,
-      id: `saved_view_${crypto.randomUUID()}`,
+      id: `saved_view_${createUuid()}`,
       layout: cloneLayout(view.layout),
       sort: [...view.sort],
       filter: cloneFilter(view.filter),

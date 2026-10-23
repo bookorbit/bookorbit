@@ -1,0 +1,1 @@
+ALTER TABLE "authors" ADD COLUMN "metadata_provider_pinned" boolean DEFAULT false NOT NULL;

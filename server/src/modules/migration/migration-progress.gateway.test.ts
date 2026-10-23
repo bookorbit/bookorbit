@@ -179,6 +179,38 @@ describe('MigrationProgressGateway', () => {
     expect(client.emit).not.toHaveBeenCalled();
   });
 
+  it('holds a subscription that arrives mid-handshake until the session check finishes', async () => {
+    const { gateway, jwtService, authService, repo } = makeGateway();
+    jwtService.verify.mockReturnValue({ sub: 7, ver: 1, sid: 3 });
+    let finishSessionCheck!: (user: RequestUser) => void;
+    authService.validateSessionUser.mockReturnValue(new Promise((done) => (finishSessionCheck = done)));
+    repo.findRunById.mockResolvedValue(null);
+    const client = makeClient();
+
+    const connected = gateway.handleConnection(client as never);
+    const subscribed = gateway.handleSubscribeRun(client as never, 12);
+    await Promise.resolve();
+    expect(client.join).not.toHaveBeenCalled();
+
+    finishSessionCheck(makeUser({ permissions: [Permission.ManageAppSettings] }));
+    await Promise.all([connected, subscribed]);
+
+    expect(client.join).toHaveBeenCalledWith('run:12');
+    expect(client.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('drops a mid-handshake subscription from a user the handshake turns away', async () => {
+    const { gateway, jwtService, authService } = makeGateway();
+    jwtService.verify.mockReturnValue({ sub: 7, ver: 1, sid: 3 });
+    authService.validateSessionUser.mockResolvedValue(makeUser());
+    const client = makeClient();
+
+    await Promise.all([gateway.handleConnection(client as never), gateway.handleSubscribeRun(client as never, 12)]);
+
+    expect(client.disconnect).toHaveBeenCalledTimes(1);
+    expect(client.join).not.toHaveBeenCalled();
+  });
+
   it('emits progress updates to room-scoped subscribers', () => {
     const { gateway } = makeGateway();
     const emit = vi.fn();

@@ -1,5 +1,19 @@
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
-import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -8,6 +22,8 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { RenameDeviceDto } from './dto/rename-device.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
+import { KoboReplacementDto } from './dto/kobo-replacement.dto';
+import { KoboDeliveryService } from './services/kobo-delivery.service';
 import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
 import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
@@ -19,6 +35,7 @@ export class KoboUserController {
     private readonly deviceService: KoboDeviceService,
     private readonly settingsService: KoboSettingsService,
     private readonly historyService: KoboSyncHistoryService,
+    private readonly deliveries: KoboDeliveryService,
   ) {}
 
   @Get('devices')
@@ -68,6 +85,41 @@ export class KoboUserController {
   @Patch('settings')
   updateSettings(@Body() dto: UpdateSettingsDto, @CurrentUser() user: RequestUser) {
     return this.settingsService.updateSettings(user.id, dto);
+  }
+
+  @Get('devices/:id/books/:bookId/delivery')
+  getDelivery(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) deviceId: number, @Param('bookId', ParseIntPipe) bookId: number) {
+    return this.deliveries.current(user.id, deviceId, bookId);
+  }
+
+  @Get('devices/:id/replacements/:deliveryId')
+  getReplacement(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) deviceId: number, @Param('deliveryId', ParseUUIDPipe) id: string) {
+    return this.deliveries.byId(user.id, deviceId, id);
+  }
+
+  @Post('devices/:id/books/:bookId/replacement')
+  prepareReplacement(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseIntPipe) deviceId: number,
+    @Param('bookId', ParseIntPipe) bookId: number,
+    @Body() body: KoboReplacementDto,
+  ) {
+    return this.deliveries.beginReplacement(user.id, deviceId, bookId, body.variant);
+  }
+
+  @Post('devices/:id/replacements/:deliveryId/offer')
+  offerReplacement(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) deviceId: number, @Param('deliveryId', ParseUUIDPipe) id: string) {
+    return this.deliveries.offerReplacement(user.id, deviceId, id);
+  }
+
+  @Post('devices/:id/replacements/:deliveryId/confirm')
+  confirmReplacement(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) deviceId: number, @Param('deliveryId', ParseUUIDPipe) id: string) {
+    return this.deliveries.confirm(user.id, deviceId, id);
+  }
+
+  @Post('devices/:id/replacements/:deliveryId/cancel')
+  cancelReplacement(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) deviceId: number, @Param('deliveryId', ParseUUIDPipe) id: string) {
+    return this.deliveries.cancelReplacement(user.id, deviceId, id);
   }
 
   @Get('history')

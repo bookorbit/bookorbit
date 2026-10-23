@@ -332,7 +332,7 @@ function usageSummary(usage: CustomIconUsage): string {
           <div class="flex h-9 items-center rounded-md border border-input bg-background p-0.5 text-xs">
             <button
               type="button"
-              class="h-8 rounded px-2.5 font-medium transition-colors"
+              class="h-8 rounded-xs px-2.5 font-medium transition-colors"
               :class="sort === 'newest' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="setSort('newest')"
             >
@@ -340,7 +340,7 @@ function usageSummary(usage: CustomIconUsage): string {
             </button>
             <button
               type="button"
-              class="h-8 rounded px-2.5 font-medium transition-colors"
+              class="h-8 rounded-xs px-2.5 font-medium transition-colors"
               :class="sort === 'name' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="setSort('name')"
             >
@@ -401,7 +401,7 @@ function usageSummary(usage: CustomIconUsage): string {
               <button
                 v-if="canManageIcons"
                 type="button"
-                class="absolute left-1.5 top-1.5 flex size-5 items-center justify-center rounded border bg-background/90 transition-opacity"
+                class="absolute left-1.5 top-1.5 flex size-5 items-center justify-center rounded-xs border bg-background/90 transition-opacity"
                 :class="
                   selected.has(icon.slug)
                     ? 'border-primary bg-primary text-primary-foreground opacity-100'

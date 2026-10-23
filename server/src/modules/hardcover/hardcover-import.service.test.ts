@@ -1,6 +1,9 @@
+import { READING_ATTEMPT_CHANGED, ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
+import type { ReadingAttemptService } from '../user-book-status/reading-attempt.service';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { buildHardcoverMatchBasis } from './hardcover-id.utils';
 import { HardcoverImportService } from './hardcover-import.service';
 
 const mockRepo = {
@@ -32,13 +35,14 @@ const user = {
   contentFilters: { includeTagIds: [], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [] },
 };
 
-function makeService() {
+function makeService(attempts?: ReadingAttemptService) {
   return new HardcoverImportService(
     mockRepo as never,
     mockClient as never,
     mockSettingsService as never,
     mockLibraryService as never,
     mockUserBookStatusService as never,
+    attempts,
   );
 }
 
@@ -505,6 +509,8 @@ describe('HardcoverImportService', () => {
         hardcoverUserBookId: 1000,
         hardcoverReadId: 501,
         matchMethod: 'isbn',
+        // Recorded so the first sync does not second-guess a link the import just made.
+        matchBasis: buildHardcoverMatchBasis(localBook()),
         lastSyncedStatus: 'read',
         lastSyncedProgress: null,
       }),
@@ -901,5 +907,46 @@ describe('HardcoverImportService', () => {
     mockSettingsService.getTokenForUser.mockRejectedValue('settings unavailable');
 
     await expect(makeService().previewImport(user as never)).rejects.toBe('settings unavailable');
+  });
+  it('coalesces Hardcover reads and projections across the whole import, including partial failures', async () => {
+    const events = new ReadingAttemptEventsService();
+    const listener = vi.fn();
+    events.on(READING_ATTEMPT_CHANGED, listener);
+    const coalesce = vi.spyOn(events, 'coalesceChanges');
+    const attempts = {
+      coalesceChanges: (operation: () => Promise<unknown>) => events.coalesceChanges(operation),
+      importExternalRead: vi.fn(() => {
+        events.notifyChanged(7);
+        return Promise.resolve();
+      }),
+    };
+    const service = makeService(attempts as never);
+    const preview = await service.previewImport(user as never);
+    vi.spyOn(service as any, 'buildPreview').mockResolvedValue({
+      preview: {
+        ...preview,
+        rows: Array.from({ length: 121 }, (_, index) => ({
+          ...preview.rows[0],
+          hardcoverUserBookId: 1000 + index,
+          localBookId: 42 + index,
+          hardcoverReads: [
+            { id: index * 2 + 1, startedAt: null, finishedAt: '2026-01-15' },
+            { id: index * 2 + 2, startedAt: null, finishedAt: '2026-01-16' },
+          ],
+        })),
+      },
+      matchBasisByBookId: new Map(),
+    });
+    mockUserBookStatusService.updateManual.mockImplementation(() => {
+      events.notifyChanged(7);
+      return Promise.resolve();
+    });
+    mockRepo.upsertBookState.mockRejectedValueOnce(new Error('State write failed'));
+    const result = await service.applyImport(user as never);
+    expect(result).toMatchObject({ applied: 120, failed: 1 });
+    expect(attempts.importExternalRead).toHaveBeenCalledTimes(242);
+    expect(coalesce).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ userId: 7 });
+    expect(listener.mock.calls.every(([payload]) => payload.userId === 7)).toBe(true);
   });
 });

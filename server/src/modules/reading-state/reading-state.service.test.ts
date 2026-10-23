@@ -3,6 +3,7 @@ import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
+import { READING_ATTEMPT_CHANGED, ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 import { ReadingStateRepository, type ResetReadingStateResult } from './reading-state.repository';
 import { ReadingStateService } from './reading-state.service';
 
@@ -51,11 +52,13 @@ function makeService() {
   const repo = {
     resetBookReadingState: vi.fn().mockResolvedValue(makeResult()),
   };
+  const events = new ReadingAttemptEventsService();
 
   return {
-    service: new ReadingStateService(bookService as unknown as BookService, repo as unknown as ReadingStateRepository),
+    service: new ReadingStateService(bookService as unknown as BookService, repo as unknown as ReadingStateRepository, events),
     bookService,
     repo,
+    events,
   };
 }
 
@@ -86,7 +89,9 @@ describe('ReadingStateService', () => {
   });
 
   it('propagates access failures, skips the repository, and emits a sanitized failure log', async () => {
-    const { service, bookService, repo } = makeService();
+    const { service, bookService, repo, events } = makeService();
+    const changed = vi.fn();
+    events.on(READING_ATTEMPT_CHANGED, changed);
     const warnSpy = vi.spyOn(Logger.prototype, 'warn');
     const error = new ForbiddenException('cannot reset "another user"\nstate');
     bookService.verifyBookAccess.mockRejectedValue(error);
@@ -94,6 +99,34 @@ describe('ReadingStateService', () => {
     await expect(service.resetBookReadingState(42, makeUser())).rejects.toThrow(error);
 
     expect(repo.resetBookReadingState).not.toHaveBeenCalled();
+    expect(changed).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('error="cannot reset \\"another user\\" state" - reset reading state failed'));
+  });
+
+  it('notifies dashboard caches only after the reading-state reset commits', async () => {
+    const { service, repo, events } = makeService();
+    const changed = vi.fn();
+    events.on(READING_ATTEMPT_CHANGED, changed);
+    let completeReset!: (result: ResetReadingStateResult) => void;
+    repo.resetBookReadingState.mockReturnValueOnce(
+      new Promise<ResetReadingStateResult>((resolve) => {
+        completeReset = resolve;
+      }),
+    );
+    const pending = service.resetBookReadingState(42, makeUser());
+    await vi.waitFor(() => expect(repo.resetBookReadingState).toHaveBeenCalledOnce());
+    expect(changed).not.toHaveBeenCalled();
+    completeReset(makeResult());
+    await pending;
+    expect(changed).toHaveBeenCalledExactlyOnceWith({ userId: 7 });
+  });
+
+  it('does not invalidate dashboard caches when the reset transaction fails', async () => {
+    const { service, repo, events } = makeService();
+    const changed = vi.fn();
+    events.on(READING_ATTEMPT_CHANGED, changed);
+    repo.resetBookReadingState.mockRejectedValueOnce(new Error('Reset rolled back'));
+    await expect(service.resetBookReadingState(42, makeUser())).rejects.toThrow('Reset rolled back');
+    expect(changed).not.toHaveBeenCalled();
   });
 });

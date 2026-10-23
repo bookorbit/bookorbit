@@ -2,16 +2,20 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { markProviderDegraded, markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { pickSearchInputs, providerCacheContext, widenedPageSize } from '../provider-cache';
 import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
-import { buildRequestSignal } from '../provider-utils';
+import { buildRequestSignal, searchPageSize } from '../provider-utils';
 import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
 import { OpenLibraryDoc, OpenLibrarySearchResponse, OpenLibraryWork } from './open-library.types';
 
 const BASE_URL = 'https://openlibrary.org';
+const SEARCH_PAGE_SIZE = 10;
 const SEARCH_FIELDS =
   'key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,number_of_pages_median,subject,ratings_average,ratings_count';
 
@@ -24,6 +28,22 @@ export class OpenLibraryProvider implements IdentifiableProvider {
 
   private readonly logger = new Logger(OpenLibraryProvider.name);
 
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: true,
+    // The works endpoint answers an unknown id with 404.
+    authoritativeLookupStatuses: [404],
+    context: async () => providerCacheContext((await this.providerConfig.getConfig()).openLibrary.enabled),
+    // The ISBN alone forms the query whenever one is given; title and author only matter without it.
+    describeSearch: (params) => ({
+      inputs: {
+        ...(params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author'])),
+        pageSize: widenedPageSize(params, SEARCH_PAGE_SIZE),
+      },
+    }),
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
+
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
@@ -32,7 +52,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     const query = this.buildSearchParams(params);
     if (!query) return [];
 
-    query.set('limit', '10');
+    query.set('limit', String(searchPageSize(params, SEARCH_PAGE_SIZE)));
     query.set('fields', SEARCH_FIELDS);
 
     const url = `${BASE_URL}/search.json?${query}`;
@@ -53,6 +73,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       if (err instanceof ProviderThrottleError) {
         this.logger.warn(`[open-library] [fail] op=search durationMs=${Date.now() - startedAt} message="throttled"`);
       } else {
+        markProviderFailed('open-library.search: unusable response');
         this.logger.warn(
           `[open-library] [fail] op=search durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
         );
@@ -95,6 +116,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       if (err instanceof ProviderThrottleError) {
         this.logger.warn(`[open-library] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
       } else {
+        markProviderFailed('open-library.lookup: unusable response');
         this.logger.warn(
           `[open-library] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
         );
@@ -104,15 +126,13 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   }
 
   private buildSearchParams(params: MetadataSearchParams): URLSearchParams | null {
-    if (!params.isbn && !params.title) return null;
+    if (params.isbn) return new URLSearchParams({ isbn: params.isbn });
+    if (!params.title && !params.author) return null;
 
+    // An author alone is a browsing search: every work Open Library files under that name.
     const query = new URLSearchParams();
-    if (params.isbn) {
-      query.set('isbn', params.isbn);
-    } else {
-      query.set('title', params.title!);
-      if (params.author) query.set('author', params.author);
-    }
+    if (params.title) query.set('title', params.title);
+    if (params.author) query.set('author', params.author);
     return query;
   }
 
@@ -128,6 +148,8 @@ export class OpenLibraryProvider implements IdentifiableProvider {
     try {
       const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
+        // A lookup treats a 404 as an answer, so a failed genre fallback must not pass as one.
+        markProviderDegraded('open-library.lookup: genre fallback failed');
         this.logger.warn(
           `[open-library] [fail] op=lookup-genres providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
         );
@@ -135,6 +157,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
       }
 
       const body = (await res.json()) as Partial<OpenLibrarySearchResponse>;
+      if (!Array.isArray(body.docs)) markProviderFailed('open-library.lookup: genre fallback without docs');
       if (!Array.isArray(body.docs) || body.docs.length === 0) {
         this.logger.log(
           `[open-library] [end] op=lookup-genres providerId="${providerId}" status=${res.status} resultCount=0 durationMs=${Date.now() - startedAt}`,
@@ -154,6 +177,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
           `[open-library] [fail] op=lookup-genres providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`,
         );
       } else {
+        markProviderFailed('open-library.lookup: genre fallback unusable');
         this.logger.warn(
           `[open-library] [fail] op=lookup-genres providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
         );

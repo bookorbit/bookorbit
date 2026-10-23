@@ -20,6 +20,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookService } from '../book/book.service';
 import type { BookCoverSlotRow } from '../book-cover-store/book-cover-store.repository';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
+import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 import { LibraryService } from '../library/library.service';
 import { CoverSweepStore, type SweepRecord } from './cover-sweep.store';
 import {
@@ -49,6 +50,7 @@ export class MissingResourcesService {
     private readonly bookService: BookService,
     config: ConfigService,
     private readonly coverStore: BookCoverStore,
+    private readonly readingAttemptEvents: ReadingAttemptEventsService,
   ) {
     this.coversRoot = join(config.get<string>('storage.appDataPath')!, 'covers');
   }
@@ -140,11 +142,13 @@ export class MissingResourcesService {
     this.logger.log(`[${event}] [start] userId=${user.id} requested=${requestedIds.length} targets=${targets.length} - missing book cleanup started`);
     try {
       let cleaned = 0;
-      for (let index = 0; index < targets.length; index += DELETE_BATCH_SIZE) {
-        const batch = targets.slice(index, index + DELETE_BATCH_SIZE);
-        const result = await this.bookService.deleteBooks(batch, user);
-        cleaned += result.total;
-      }
+      await this.readingAttemptEvents.coalesceChanges(async () => {
+        for (let index = 0; index < targets.length; index += DELETE_BATCH_SIZE) {
+          const batch = targets.slice(index, index + DELETE_BATCH_SIZE);
+          const result = await this.bookService.deleteBooks(batch, user);
+          cleaned += result.total;
+        }
+      });
       const remaining = await this.repo.countMissingBooks(libraryIds);
       this.logger.log(
         `[${event}] [end] userId=${user.id} requested=${requestedIds.length} cleaned=${cleaned} remaining=${remaining} durationMs=${Date.now() - startedAt} - missing book cleanup completed`,

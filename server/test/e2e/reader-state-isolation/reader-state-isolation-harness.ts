@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { hash } from 'bcryptjs';
 import fastifyCookie from '@fastify/cookie';
+import fastifyMultipart from '@fastify/multipart';
 import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -65,7 +66,9 @@ export function authHeader(token: string): Record<string, string> {
   return { authorization: `Bearer ${token}` };
 }
 
-export async function createReaderStateIsolationE2EContext(): Promise<ReaderStateIsolationE2EContext> {
+export async function createReaderStateIsolationE2EContext(
+  options: { realMetadata?: boolean; multipart?: boolean } = {},
+): Promise<ReaderStateIsolationE2EContext> {
   const fixture = await createReaderStateIsolationFixtureRoot();
   const envSnapshot: EnvSnapshot = {
     appDataPath: process.env.APP_DATA_PATH,
@@ -73,12 +76,11 @@ export async function createReaderStateIsolationE2EContext(): Promise<ReaderStat
 
   process.env.APP_DATA_PATH = fixture.booksPath;
 
-  const moduleFixture = await Test.createTestingModule({
+  const builder = Test.createTestingModule({
     imports: [AppModule],
-  })
-    .overrideProvider(MetadataService)
-    .useValue(makeMetadataNoopMock())
-    .compile();
+  });
+  if (!options.realMetadata) builder.overrideProvider(MetadataService).useValue(makeMetadataNoopMock());
+  const moduleFixture = await builder.compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');
@@ -91,6 +93,7 @@ export async function createReaderStateIsolationE2EContext(): Promise<ReaderStat
   );
   app.useGlobalFilters(new GlobalExceptionFilter());
   await app.register(fastifyCookie as never);
+  if (options.multipart) await app.register(fastifyMultipart as never);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 

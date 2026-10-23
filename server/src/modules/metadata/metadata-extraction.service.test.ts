@@ -4,6 +4,8 @@ import type { ParsedBookData } from './extractors/format-extractor.interface';
 import { MetadataExtractionService } from './metadata-extraction.service';
 
 const mocks = vi.hoisted(() => ({
+  djvu: vi.fn(),
+  djvuCover: vi.fn(),
   audio: vi.fn(),
   cover: vi.fn(),
   comic: {
@@ -124,7 +126,7 @@ describe('MetadataExtractionService', () => {
     ['ogg', mocks.audio],
     ['flac', mocks.audio],
   ])('routes %s through its canonical extractor', async (format, extractor) => {
-    const service = new MetadataExtractionService();
+    const service = new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never);
 
     await expect(service.extract(`/books/book.${format}`, format)).resolves.toBe(extracted);
 
@@ -133,7 +135,7 @@ describe('MetadataExtractionService', () => {
   });
 
   it('returns null for unsupported formats without invoking an extractor', async () => {
-    const service = new MetadataExtractionService();
+    const service = new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never);
 
     await expect(service.extract('/books/book.txt', 'txt')).resolves.toBeNull();
 
@@ -142,8 +144,44 @@ describe('MetadataExtractionService', () => {
     expect(mocks.audio).not.toHaveBeenCalled();
   });
 
+  it('extracts DjVu page count and first-page cover with a filename title fallback', async () => {
+    const service = new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never);
+    const cover = Buffer.from('djvu-cover');
+    mocks.djvu.mockResolvedValue({ pageCount: 57, cover });
+    await expect(service.extract('/books/DjVuLibre_Book_(2007).djvu', 'djvu')).resolves.toEqual({
+      title: 'DjVuLibre Book',
+      publishedYear: 2007,
+      authors: [],
+      genres: [],
+      pageCount: 57,
+      cover,
+    });
+    expect(service.supports('djvu')).toBe(true);
+    expect(mocks.djvu).toHaveBeenCalledWith('/books/DjVuLibre_Book_(2007).djvu');
+    mocks.djvuCover.mockResolvedValue(cover);
+    await expect(service.extractEmbeddedCover('/books/book.djvu', 'DJVU')).resolves.toEqual(cover);
+  });
+
+  it('reads DjVu details for the file view without rendering a cover', async () => {
+    const readPageCount = vi.fn().mockResolvedValue(12);
+    const service = new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover, readPageCount } as never);
+    await expect(service.extractDjvuDetails('/books/Scanned_Atlas_(1998).djvu')).resolves.toEqual({
+      title: 'Scanned Atlas',
+      publishedYear: 1998,
+      pageCount: 12,
+    });
+    expect(readPageCount).toHaveBeenCalledWith('/books/Scanned_Atlas_(1998).djvu');
+    expect(mocks.djvu).not.toHaveBeenCalled();
+  });
+
+  it('propagates bounded DjVu decoder failures to the import failure handler', async () => {
+    const service = new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never);
+    mocks.djvu.mockRejectedValue(new Error('Decoder unavailable'));
+    await expect(service.extract('/books/book.djvu', 'djvu')).rejects.toThrow('Decoder unavailable');
+  });
+
   it('preserves null extraction results and propagates extractor failures', async () => {
-    const service = new MetadataExtractionService();
+    const service = new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never);
     mocks.epub.mockResolvedValueOnce(null);
     mocks.pdf.mockRejectedValueOnce(new Error('pdf failed'));
 
@@ -152,7 +190,7 @@ describe('MetadataExtractionService', () => {
   });
 
   it('uses the shared cover fallback only when canonical metadata is unavailable', async () => {
-    const service = new MetadataExtractionService();
+    const service = new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never);
     mocks.epub.mockResolvedValueOnce(null);
     mocks.cover.mockResolvedValueOnce(Buffer.from('fallback-cover'));
 
@@ -171,7 +209,7 @@ describe('MetadataExtractionService', () => {
 
   it('enables PDF cover extraction and sanitizes parser warnings', () => {
     const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    new MetadataExtractionService();
+    new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never);
 
     expect(mocks.pdfOptions?.extractCover).toBe(true);
     mocks.pdfOptions?.onWarning?.({
@@ -203,25 +241,50 @@ describe('MetadataExtractionService.detectFixedLayout', () => {
   it('reads the declaration for an epub', async () => {
     mocks.epubFixedLayout.mockResolvedValue(true);
 
-    await expect(new MetadataExtractionService().detectFixedLayout('/books/manga.epub', 'epub')).resolves.toBe(true);
+    await expect(
+      new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never).detectFixedLayout(
+        '/books/manga.epub',
+        'epub',
+      ),
+    ).resolves.toBe(true);
     expect(mocks.epubFixedLayout).toHaveBeenCalledWith('/books/manga.epub');
   });
 
   it('reads the declaration for a kepub, which carries the same OPF', async () => {
     mocks.epubFixedLayout.mockResolvedValue(true);
 
-    await expect(new MetadataExtractionService().detectFixedLayout('/books/manga.kepub', 'kepub')).resolves.toBe(true);
+    await expect(
+      new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never).detectFixedLayout(
+        '/books/manga.kepub',
+        'kepub',
+      ),
+    ).resolves.toBe(true);
   });
 
   it('passes a reflowable answer through unchanged', async () => {
     mocks.epubFixedLayout.mockResolvedValue(false);
 
-    await expect(new MetadataExtractionService().detectFixedLayout('/books/novel.epub', 'epub')).resolves.toBe(false);
+    await expect(
+      new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never).detectFixedLayout(
+        '/books/novel.epub',
+        'epub',
+      ),
+    ).resolves.toBe(false);
   });
 
   it('returns null without touching the filesystem for a format that cannot declare a layout', async () => {
-    await expect(new MetadataExtractionService().detectFixedLayout('/books/comic.cbz', 'cbz')).resolves.toBeNull();
-    await expect(new MetadataExtractionService().detectFixedLayout('/books/scan.pdf', 'pdf')).resolves.toBeNull();
+    await expect(
+      new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never).detectFixedLayout(
+        '/books/comic.cbz',
+        'cbz',
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      new MetadataExtractionService({ extractMetadata: mocks.djvu, extractCover: mocks.djvuCover } as never).detectFixedLayout(
+        '/books/scan.pdf',
+        'pdf',
+      ),
+    ).resolves.toBeNull();
     expect(mocks.epubFixedLayout).not.toHaveBeenCalled();
   });
 });

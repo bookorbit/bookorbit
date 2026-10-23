@@ -29,7 +29,7 @@ const CH2 = `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>2</title></head>
 <body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">Second chapter text.</span></p></div></div></body></html>`;
 
-async function buildKepub(path: string): Promise<void> {
+async function buildKepub(path: string, opf = CONTENT_OPF, chapterNames = ['OEBPS/text/ch1.xhtml', 'OEBPS/text/ch2.xhtml']): Promise<void> {
   const archive = new ZipArchive({ zlib: { level: 0 } });
   const chunks: Buffer[] = [];
   archive.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -39,9 +39,9 @@ async function buildKepub(path: string): Promise<void> {
   });
   archive.append('application/epub+zip', { name: 'mimetype', store: true });
   archive.append(CONTAINER_XML, { name: 'META-INF/container.xml' });
-  archive.append(CONTENT_OPF, { name: 'OEBPS/content.opf' });
-  archive.append(CH1, { name: 'OEBPS/text/ch1.xhtml' });
-  archive.append(CH2, { name: 'OEBPS/text/ch2.xhtml' });
+  archive.append(opf, { name: 'OEBPS/content.opf' });
+  archive.append(CH1, { name: chapterNames[0] });
+  archive.append(CH2, { name: chapterNames[1] });
   await archive.finalize();
   await done;
   await writeFile(path, Buffer.concat(chunks));
@@ -87,5 +87,39 @@ describe('KepubDomService', () => {
   it('returns null for missing files', async () => {
     const service = new KepubDomService();
     expect(await service.getSpine(join(dir, 'nope.kepub.epub'))).toBeNull();
+  });
+});
+
+// A chapter stored as `chapter one.xhtml` is listed, and reported by the Kobo, as `chapter%20one.xhtml` (#1136).
+describe('KepubDomService with percent-encoded manifest hrefs', () => {
+  let dir: string;
+  let kepubPath: string;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'bookorbit-kepub-encoded-'));
+    kepubPath = join(dir, 'encoded.kepub.epub');
+    await buildKepub(
+      kepubPath,
+      CONTENT_OPF.replace('text/ch1.xhtml', 'text/chapter%20one.xhtml').replace('text/ch2.xhtml', 'text/notes%20%26%20more.xhtml'),
+      ['OEBPS/text/chapter one.xhtml', 'OEBPS/text/notes & more.xhtml'],
+    );
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('loads a chapter whose stored name only matches its href once decoded', async () => {
+    const doc = await new KepubDomService().getChapterByIndex(kepubPath, 1);
+
+    expect(doc?.index.collapsed).toBe('Second chapter text.');
+  });
+
+  it('matches the chapter the Kobo reports, encoded or not', async () => {
+    const service = new KepubDomService();
+
+    expect(await service.findChapterIndexByFilename(kepubPath, 'OEBPS/text/chapter%20one.xhtml')).toBe(0);
+    expect(await service.findChapterIndexByFilename(kepubPath, 'OEBPS/text/chapter one.xhtml')).toBe(0);
+    expect(await service.findChapterIndexByFilename(kepubPath, 'OEBPS/text/notes%20%26%20more.xhtml')).toBe(1);
   });
 });

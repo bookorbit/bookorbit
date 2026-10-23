@@ -1,5 +1,5 @@
 {
-  "id": "bbfc8361-6181-4b14-8652-a6032d18e0a4",
+  "id": "83654d7f-8cfb-42e4-8a28-774fa4f7a102",
   "prevId": "75fcd920-9917-42ba-b01c-f7baccc37d6c",
   "version": "7",
   "dialect": "postgresql",
@@ -6711,18 +6711,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "mangabaka_id": {
-          "name": "mangabaka_id",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mangabaka_series_id": {
-          "name": "mangabaka_series_id",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "chapters": {
           "name": "chapters",
           "type": "jsonb",
@@ -8429,6 +8417,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "starred_at": {
+          "name": "starred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -8803,6 +8797,200 @@
         "audiobook_progress_revision_positive_chk": {
           "name": "audiobook_progress_revision_positive_chk",
           "value": "\"audiobook_progress\".\"revision\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.book_journal_entries": {
+      "name": "book_journal_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quote": {
+          "name": "quote",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chapter_title": {
+          "name": "chapter_title",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position_percent": {
+          "name": "position_percent",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cfi": {
+          "name": "cfi",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position_seconds": {
+          "name": "position_seconds",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "book_journal_entries_user_client_id_uidx": {
+          "name": "book_journal_entries_user_client_id_uidx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "book_journal_entries_user_book_created_active_idx": {
+          "name": "book_journal_entries_user_book_created_active_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"book_journal_entries\".\"deleted_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "book_journal_entries_book_id_idx": {
+          "name": "book_journal_entries_book_id_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "book_journal_entries_user_id_users_id_fk": {
+          "name": "book_journal_entries_user_id_users_id_fk",
+          "tableFrom": "book_journal_entries",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "book_journal_entries_book_id_books_id_fk": {
+          "name": "book_journal_entries_book_id_books_id_fk",
+          "tableFrom": "book_journal_entries",
+          "tableTo": "books",
+          "columnsFrom": ["book_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "book_journal_entries_body_length_chk": {
+          "name": "book_journal_entries_body_length_chk",
+          "value": "char_length(\"book_journal_entries\".\"body\") between 1 and 10000"
+        },
+        "book_journal_entries_quote_length_chk": {
+          "name": "book_journal_entries_quote_length_chk",
+          "value": "\"book_journal_entries\".\"quote\" is null or char_length(\"book_journal_entries\".\"quote\") <= 5000"
+        },
+        "book_journal_entries_position_percent_range_chk": {
+          "name": "book_journal_entries_position_percent_range_chk",
+          "value": "\"book_journal_entries\".\"position_percent\" is null or (\"book_journal_entries\".\"position_percent\" >= 0 and \"book_journal_entries\".\"position_percent\" <= 100)"
+        },
+        "book_journal_entries_position_seconds_nonnegative_chk": {
+          "name": "book_journal_entries_position_seconds_nonnegative_chk",
+          "value": "\"book_journal_entries\".\"position_seconds\" is null or \"book_journal_entries\".\"position_seconds\" >= 0"
         }
       },
       "isRLSEnabled": false

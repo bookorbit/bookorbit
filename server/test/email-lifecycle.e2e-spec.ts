@@ -365,6 +365,21 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
   });
 
   describe('recipients/groups/preferences ownership and conflicts', () => {
+    it('persists DjVu format preferences for ordinary recipients', async () => {
+      const created = await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', {
+        name: 'DjVu documents',
+        email: 'djvu-reader@example.com',
+        deviceType: 'other',
+        preferredFormat: 'djvu',
+      });
+      expect(created.statusCode).toBe(201);
+      const recipient = created.json() as { id: number; preferredFormat: string };
+      expect(recipient.preferredFormat).toBe('djvu');
+      const loaded = await apiAs(senderOnly, 'GET', `/api/v1/email/recipients/${recipient.id}`);
+      expect(loaded.statusCode).toBe(200);
+      expect(loaded.json()).toMatchObject({ preferredFormat: 'djvu', deviceType: 'other' });
+    });
+
     it('enforces recipient ownership and duplicate-email conflicts', async () => {
       const recipientResponse = await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', {
         name: 'Sender Kindle',
@@ -765,6 +780,152 @@ describe('Email lifecycle (e2e)', { timeout: 180_000 }, () => {
 
       const senderDeleteResendLog = await apiAs(senderOnly, 'DELETE', `/api/v1/email/log/${resendLogId}`);
       expect(senderDeleteResendLog.statusCode).toBe(204);
+    });
+  });
+
+  describe('outbox page contracts', () => {
+    it('makes a starred provider and recipient the defaults that quick send uses', async () => {
+      const providerResponse = await apiAs(superManager, 'POST', '/api/v1/email/providers', buildProviderPayload(ctx, 'starred-provider'));
+      expect(providerResponse.statusCode).toBe(201);
+      const provider = providerResponse.json() as { id: number };
+      const recipientResponse = await apiAs(superManager, 'POST', '/api/v1/email/recipients', { name: 'Starred', email: 'starred@example.com' });
+      expect(recipientResponse.statusCode).toBe(201);
+      const recipient = recipientResponse.json() as { id: number };
+
+      expect((await apiAs(superManager, 'PATCH', `/api/v1/email/providers/${provider.id}/default`)).statusCode).toBe(200);
+      expect((await apiAs(superManager, 'PATCH', `/api/v1/email/recipients/${recipient.id}/default`)).statusCode).toBe(200);
+
+      const preferences = await apiAs(superManager, 'GET', '/api/v1/email/preferences');
+      expect(preferences.json()).toMatchObject({ defaultProviderId: provider.id, defaultRecipientId: recipient.id });
+
+      const quickSend = await apiAs(superManager, 'POST', `/api/v1/email/send/quick/${book.bookId}`);
+      expect(quickSend.statusCode).toBe(202);
+      const [message] = await ctx.smtpSink.waitForMessages(1);
+      expect(message.envelopeTo).toContain('starred@example.com');
+      await waitForCondition(async () => {
+        const listed = (await apiAs(superManager, 'GET', '/api/v1/email/recipients')).json() as Array<{
+          id: number;
+          lastSend: { bookTitle: string; status: string } | null;
+        }>;
+        const lastSend = listed.find((r) => r.id === recipient.id)?.lastSend;
+        if (lastSend?.status !== 'sent' || lastSend.bookTitle !== 'Email Lifecycle Book')
+          throw new Error(`Unexpected lastSend ${JSON.stringify(lastSend)}`);
+      }, 10_000);
+
+      // Choosing a default through preferences moves the legacy flag, so the two never disagree again.
+      const otherRecipient = (
+        await apiAs(superManager, 'POST', '/api/v1/email/recipients', { name: 'Other', email: 'other@example.com' })
+      ).json() as { id: number };
+      expect((await apiAs(superManager, 'PUT', '/api/v1/email/preferences', { defaultRecipientId: otherRecipient.id })).statusCode).toBe(200);
+      const recipients = (await apiAs(superManager, 'GET', '/api/v1/email/recipients')).json() as Array<{ id: number; isDefault: boolean }>;
+      expect(recipients.find((r) => r.id === otherRecipient.id)?.isDefault).toBe(true);
+      expect(recipients.find((r) => r.id === recipient.id)?.isDefault).toBe(false);
+    });
+
+    it('lists an unresolved failure with its book until a later send replaces it', async () => {
+      const failingProvider = (
+        await apiAs(superManager, 'POST', '/api/v1/email/providers', {
+          ...buildProviderPayload(ctx, 'attention-provider'),
+          host: '127.0.0.1',
+          port: 1,
+        })
+      ).json() as { id: number };
+      expect((await apiAs(superManager, 'PATCH', `/api/v1/email/providers/${failingProvider.id}/share`)).statusCode).toBe(200);
+      const recipient = (
+        await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', { name: 'Attention', email: 'attention@example.com' })
+      ).json() as {
+        id: number;
+      };
+
+      const send = await apiAs(senderOnly, 'POST', '/api/v1/email/send', {
+        bookIds: [book.bookId],
+        recipientIds: [recipient.id],
+        providerId: failingProvider.id,
+      });
+      expect(send.statusCode).toBe(202);
+      let failedId = 0;
+      await waitForCondition(async () => {
+        const latest = await latestLogForUser(senderOnly.userId);
+        if (!latest || latest.attemptCount < 1) throw new Error('First attempt has not failed yet');
+        failedId = latest.id;
+      }, 15_000);
+      // The retry schedule takes two and a half minutes to give up, so settle the row the way the
+      // last attempt would.
+      await ctx.db.update(schema.emailSendLog).set({ status: 'failed', nextRetryAt: null }).where(eq(schema.emailSendLog.id, failedId));
+
+      const attention = (await apiAs(senderOnly, 'GET', '/api/v1/email/log/attention')).json() as Array<Record<string, unknown>>;
+      expect(attention).toHaveLength(1);
+      expect(attention[0]).toMatchObject({ id: failedId, bookTitle: 'Email Lifecycle Book', fileFormat: 'epub', status: 'failed' });
+      expect(attention[0].fileSizeBytes).toEqual(expect.any(Number));
+      expect((await apiAs(senderOnly, 'GET', '/api/v1/email/log/summary')).json()).toEqual({ total: 1, failed: 1, pending: 0 });
+      expect((await apiAs(foreignSender, 'GET', '/api/v1/email/log/attention')).json()).toEqual([]);
+      expect(attention[0]).toHaveProperty('bookAuthors');
+
+      // The recipient filter returns this recipient's sends, and nothing for someone else's recipient.
+      const forRecipient = (await apiAs(senderOnly, 'GET', `/api/v1/email/log?recipientId=${recipient.id}`)).json() as Array<{ id: number }>;
+      expect(forRecipient.map((row) => row.id)).toEqual([failedId]);
+      expect((await apiAs(foreignSender, 'GET', `/api/v1/email/log?recipientId=${recipient.id}`)).json()).toEqual([]);
+
+      await apiAs(superManager, 'PUT', `/api/v1/email/providers/${failingProvider.id}`, {
+        host: ctx.smtpSink.getHost(),
+        port: ctx.smtpSink.getPort(),
+        auth: false,
+        ssl: false,
+        startTls: false,
+      });
+      expect((await apiAs(senderOnly, 'POST', `/api/v1/email/log/${failedId}/resend`)).statusCode).toBe(202);
+      await ctx.smtpSink.waitForMessages(1);
+      await waitForCondition(async () => {
+        const latest = await latestLogForUser(senderOnly.userId);
+        if (latest?.status !== 'sent') throw new Error('Resend not settled yet');
+      }, 15_000);
+
+      expect((await apiAs(senderOnly, 'GET', '/api/v1/email/log/attention')).json()).toEqual([]);
+      expect((await apiAs(senderOnly, 'GET', '/api/v1/email/log/summary')).json()).toEqual({ total: 2, failed: 1, pending: 0 });
+      const failedOnly = (await apiAs(senderOnly, 'GET', '/api/v1/email/log?status=failed')).json() as Array<{ id: number }>;
+      expect(failedOnly.map((entry) => entry.id)).toEqual([failedId]);
+      expectError(await apiAs(senderOnly, 'GET', '/api/v1/email/log?status=queued'), 400);
+    });
+
+    it('previews unsaved template text against a book the caller can read', async () => {
+      const preview = await apiAs(senderOnly, 'POST', '/api/v1/email/templates/preview', {
+        subject: 'Pick: {{title}}',
+        bodyText: 'The {{format}} is attached.',
+        bookId: book.bookId,
+      });
+      expect(preview.statusCode).toBe(200);
+      expect(preview.json()).toMatchObject({
+        subject: 'Pick: Email Lifecycle Book',
+        bodyText: 'The EPUB is attached.',
+        attachment: { format: 'epub' },
+      });
+      expect((preview.json() as { attachment: { fileName: string } }).attachment.fileName).not.toContain('/');
+
+      const denied = await apiAs(senderNoLibrary, 'POST', '/api/v1/email/templates/preview', { subject: 'S', bodyText: 'B', bookId: book.bookId });
+      expect(denied.statusCode).toBe(403);
+    });
+
+    it('sends a plain test email to an inbox and refuses a Kindle', async () => {
+      const provider = (await apiAs(superManager, 'POST', '/api/v1/email/providers', buildProviderPayload(ctx, 'test-mail-provider'))).json() as {
+        id: number;
+      };
+      expect((await apiAs(superManager, 'PATCH', `/api/v1/email/providers/${provider.id}/share`)).statusCode).toBe(200);
+      expect((await apiAs(senderOnly, 'PUT', '/api/v1/email/preferences', { defaultProviderId: provider.id })).statusCode).toBe(200);
+      const inbox = (await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', { name: 'Inbox', email: 'test-inbox@example.com' })).json() as {
+        id: number;
+      };
+      const kindle = (
+        await apiAs(senderOnly, 'POST', '/api/v1/email/recipients', { name: 'Kindle', email: 'reader_1@kindle.com', deviceType: 'kindle' })
+      ).json() as { id: number };
+
+      const sent = await apiAs(senderOnly, 'POST', `/api/v1/email/recipients/${inbox.id}/test`, { subject: 'BookOrbit test', text: 'It works.' });
+      expect(sent.statusCode).toBe(200);
+      expect(sent.json()).toEqual({ success: true });
+      const [message] = await ctx.smtpSink.waitForMessages(1);
+      expect(extractSmtpHeader(message.raw, 'Subject')).toBe('BookOrbit test');
+
+      expectError(await apiAs(senderOnly, 'POST', `/api/v1/email/recipients/${kindle.id}/test`, { subject: 'S', text: 'T' }), 400);
+      expectError(await apiAs(foreignSender, 'POST', `/api/v1/email/recipients/${inbox.id}/test`, { subject: 'S', text: 'T' }), 403);
     });
   });
 

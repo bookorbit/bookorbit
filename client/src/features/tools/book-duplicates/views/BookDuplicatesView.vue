@@ -283,7 +283,7 @@ function handleKeydown(event: KeyboardEvent): void {
             <input type="checkbox" class="peer sr-only" :checked="duplicates.allVisibleSelected.value" @change="handleToggleAll" />
             <span class="sr-only">{{ t('tools.bookDuplicates.selectAll') }}</span>
             <span
-              class="grid size-4 place-items-center rounded border peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
+              class="grid size-4 place-items-center rounded-xs border peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
               :class="duplicates.allVisibleSelected.value ? 'border-primary bg-primary' : 'border-muted-foreground/50'"
               aria-hidden="true"
             />

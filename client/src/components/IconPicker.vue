@@ -305,7 +305,7 @@ onUnmounted(() => {
     <button
       v-if="modelValue && !hideText"
       type="button"
-      class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0 focus-visible:outline-none"
+      class="h-5 w-5 flex items-center justify-center rounded-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 focus-visible:outline-none"
       :aria-label="t('components.iconPicker.clearSelectionAria')"
       @click="clearValue"
     >

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { TtsCaptionedSpeech, TtsChapterText, TtsEffectivePreferences, TtsUserPreferences, TtsVoice } from '@bookorbit/types';
+import type { TtsBookPreferences, TtsCaptionedSpeech, TtsChapterText, TtsEffectivePreferences, TtsUserPreferences, TtsVoice } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import type { StaticVoice } from '../../db/schema';
 import { BookService } from '../book/book.service';
@@ -46,10 +46,18 @@ export class TtsService {
 
   // ---- Synthesis ----
 
-  async synthesize(dto: SynthesizeDto): Promise<Buffer> {
+  async synthesize(dto: SynthesizeDto, signal?: AbortSignal): Promise<Buffer> {
     const resolved = await this.resolveProvider(dto.providerId);
     const voiceId = await this.resolveSynthesisVoiceId(dto.providerId, dto.voiceId, resolved);
-    return this.synthesisService.synthesize(resolved.provider, dto.providerId, voiceId, dto.speed, dto.text, dto.format ?? DEFAULT_TTS_AUDIO_FORMAT);
+    return this.synthesisService.synthesize(
+      resolved.provider,
+      dto.providerId,
+      voiceId,
+      dto.speed,
+      dto.text,
+      dto.format ?? DEFAULT_TTS_AUDIO_FORMAT,
+      signal,
+    );
   }
 
   /**
@@ -81,7 +89,11 @@ export class TtsService {
   }
 
   private async getVoicesForProvider(providerId: string): Promise<TtsVoice[]> {
-    const dbProvider = await this.ttsRepo.findProviderById(Number(providerId));
+    const numId = Number(providerId);
+    if (!Number.isSafeInteger(numId) || numId <= 0 || numId > 2147483647) {
+      throw new NotFoundException(`TTS provider ${providerId} not found or disabled`);
+    }
+    const dbProvider = await this.ttsRepo.findProviderById(numId);
     if (!dbProvider || !dbProvider.enabled) throw new NotFoundException(`TTS provider ${providerId} not found or disabled`);
     const provider = this.providerFactory.getOpenAiProvider(dbProvider);
     return provider.listVoices();
@@ -120,10 +132,12 @@ export class TtsService {
   }
 
   async saveUserPreferences(userId: number, dto: UpdateTtsPreferencesDto): Promise<TtsUserPreferences> {
+    const providerId = dto.providerId !== undefined ? await this.providerIdForWrite(dto.providerId) : undefined;
     const row = await this.ttsRepo.upsertUserPreferences(userId, {
-      ...(dto.providerId !== undefined && { providerId: this.providerIdToInt(dto.providerId) }),
+      ...(providerId !== undefined && { providerId }),
       ...(dto.voiceId !== undefined && { voiceId: dto.voiceId }),
-      ...(dto.speed !== undefined && { speed: dto.speed }),
+      // The account's speed cannot be empty, so a null leaves it as it is.
+      ...(dto.speed != null && { speed: dto.speed }),
     });
     return {
       providerId: row.providerId != null ? String(row.providerId) : null,
@@ -159,13 +173,22 @@ export class TtsService {
     };
   }
 
-  async saveBookPreferences(userId: number, bookId: number, dto: UpdateTtsPreferencesDto, user: RequestUser) {
+  async saveBookPreferences(userId: number, bookId: number, dto: UpdateTtsPreferencesDto, user: RequestUser): Promise<TtsBookPreferences> {
     await this.bookService.verifyBookAccess(bookId, user);
-    return this.ttsRepo.upsertBookPreferences(userId, bookId, {
-      ...(dto.providerId !== undefined && { providerId: this.providerIdToInt(dto.providerId) }),
+    const providerId = dto.providerId !== undefined ? await this.providerIdForWrite(dto.providerId) : undefined;
+    const row = await this.ttsRepo.upsertBookPreferences(userId, bookId, {
+      ...(providerId !== undefined && { providerId }),
       ...(dto.voiceId !== undefined && { voiceId: dto.voiceId }),
       ...(dto.speed !== undefined && { speed: dto.speed }),
     });
+    // The documented shape, as the account's route answers, rather than the raw row with its
+    // numeric provider id.
+    return {
+      providerId: row.providerId != null ? String(row.providerId) : null,
+      voiceId: row.voiceId ?? null,
+      speed: row.speed ?? null,
+      bookId: row.bookId,
+    };
   }
 
   async deleteBookPreferences(userId: number, bookId: number, user: RequestUser) {
@@ -177,7 +200,8 @@ export class TtsService {
 
   async getPosition(userId: number, bookFileId: number, user: RequestUser) {
     await this.bookService.verifyFileAccess(bookFileId, user);
-    return this.ttsRepo.findPosition(userId, bookFileId);
+    // Nothing saved answers JSON null; an undefined result went out as an empty 200 body.
+    return (await this.ttsRepo.findPosition(userId, bookFileId)) ?? null;
   }
 
   async savePosition(userId: number, bookFileId: number, dto: SaveTtsPositionDto, user: RequestUser) {
@@ -269,9 +293,17 @@ export class TtsService {
     return dbProvider ? curatedVoiceIds(dbProvider.staticVoices) : null;
   }
 
-  private providerIdToInt(providerId: string | undefined): number | null {
+  /**
+   * The provider a preference write names. Empty or non-numeric names none, as before; a number
+   * must be a provider that exists, or the write was a database error rather than a 400.
+   */
+  private async providerIdForWrite(providerId: string | null): Promise<number | null> {
     if (!providerId) return null;
     const n = Number(providerId);
-    return isNaN(n) ? null : n;
+    if (isNaN(n)) return null;
+    if (!Number.isSafeInteger(n) || n <= 0 || n > 2147483647 || !(await this.ttsRepo.findProviderById(n))) {
+      throw new BadRequestException(`Unknown TTS provider: ${providerId}`);
+    }
+    return n;
   }
 }

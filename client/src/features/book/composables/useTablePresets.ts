@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { watchDebounced } from '@vueuse/core'
 import { storage } from '@/services/storage'
+import { createUuid } from '@/lib/uuid'
 import { cloneTableLayout, validateTableLayout, type SortSpec, type TableLayoutState, type TableViewType } from '@bookorbit/types'
 
 /**
@@ -107,7 +108,7 @@ export function useTablePresets(viewType: TableViewType, allColumnIds: string[])
   function savePreset(name: string, layout: TableLayoutState, sort?: SortSpec[]): void {
     const trimmedName = name.trim()
     if (!trimmedName) return
-    const id = `custom_${crypto.randomUUID()}`
+    const id = `custom_${createUuid()}`
     const preset: TablePreset = { id, name: trimmedName, layout: cloneTableLayout(layout) }
     if (sort && sort.length > 0) preset.sort = [...sort]
     customPresets.value = [...customPresets.value, preset]
@@ -128,7 +129,7 @@ export function useTablePresets(viewType: TableViewType, allColumnIds: string[])
     if (!existing) return
     const duplicate: TablePreset = {
       ...existing,
-      id: `custom_${crypto.randomUUID()}`,
+      id: `custom_${createUuid()}`,
       name: `${existing.name} Copy`,
       isBuiltIn: false,
       layout: cloneTableLayout(existing.layout),
@@ -153,7 +154,7 @@ export function useTablePresets(viewType: TableViewType, allColumnIds: string[])
       .filter((preset) => isValidPreset(preset, allColumnIds) && !preset.isBuiltIn)
       .map((preset) => ({
         ...preset,
-        id: `custom_${crypto.randomUUID()}`,
+        id: `custom_${createUuid()}`,
         layout: cloneTableLayout(preset.layout),
         sort: preset.sort ? [...preset.sort] : undefined,
       }))

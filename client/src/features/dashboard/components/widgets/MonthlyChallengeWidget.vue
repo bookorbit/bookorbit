@@ -18,7 +18,7 @@ const { t } = useI18n()
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col items-center justify-center gap-3">
       <div class="h-10 w-10 animate-pulse rounded-full bg-muted" />
-      <div class="h-3 w-24 animate-pulse rounded bg-muted" />
+      <div class="h-3 w-24 animate-pulse rounded-xs bg-muted" />
       <div class="h-2 w-full animate-pulse rounded-full bg-muted" />
     </div>
 

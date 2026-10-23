@@ -43,7 +43,7 @@ function handleToggle(id: number): void {
       <label class="flex items-center gap-2 text-sm text-muted-foreground">
         <input
           type="checkbox"
-          class="rounded accent-primary"
+          class="rounded-xs accent-primary"
           :checked="allOnPageSelected || selectAllMatching"
           :disabled="disabled || items.length === 0"
           @change="handleTogglePage"

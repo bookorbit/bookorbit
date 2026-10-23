@@ -1,11 +1,13 @@
 import { Logger } from '@nestjs/common';
 
+import * as schema from '../../../db/schema';
+import { KoboReadingProgressRepository } from '../kobo-reading-progress.repository';
 import { KoboReadingStateService } from './kobo-reading-state.service';
 import { createCapturingDb } from '../../../common/test-utils/capture-sql-db';
 import { ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
 
 function makeInsertChain() {
-  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const onConflictDoUpdate = vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([{ id: 1 }]) });
   const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
   return { values, onConflictDoUpdate };
 }
@@ -31,11 +33,14 @@ function makeUpdateChain() {
 }
 
 function makeDb() {
+  const readingStates = { findFirst: vi.fn() };
+  const deviceStates = { findFirst: vi.fn((...args) => readingStates.findFirst(...args)) };
   return {
     query: {
       books: { findFirst: vi.fn() },
       koboLibrarySnapshots: { findFirst: vi.fn() },
-      koboReadingStates: { findFirst: vi.fn() },
+      koboReadingStates: readingStates,
+      koboDeviceReadingStates: deviceStates,
     },
     select: vi.fn(() => makeSelectChain([])),
     insert: vi.fn(),
@@ -60,14 +65,28 @@ describe('KoboReadingStateService', () => {
   const bookAccessService = { assertBookAccessible: vi.fn() };
   const userBookStatusService = { autoUpdate: vi.fn() };
   const bookIdentityService = { ensureForBook: vi.fn() };
-  const progressBridge = { koboBookmarkToCanonical: vi.fn(), cfiToKoboBookmark: vi.fn() };
+  const progressBridge = {
+    koboBookmarkToCanonical: vi.fn(),
+    cfiToKoboBookmark: vi.fn(),
+    narrationToKoboBookmark: vi.fn(),
+    comparePositions: vi.fn(),
+  };
   const settingsService = { getSettings: vi.fn() };
   const achievementEvents = { emit: vi.fn() };
   const analyticsResolver = { resolveBookFileId: vi.fn() };
   const readingSessions = { recordCumulativeSyncedSession: vi.fn() };
   const bookService = { syncAudioProgressForExternalEbookProgress: vi.fn() };
+  const knownPositions = {
+    find: vi.fn<KoboReadingProgressRepository['findKnownPosition']>(),
+    record: vi.fn<KoboReadingProgressRepository['recordKnownPosition']>(),
+  };
+  const finishThreshold = vi.fn<KoboReadingProgressRepository['findFinishThreshold']>();
 
-  function makeService(db: ReturnType<typeof makeDb>) {
+  function makeService(db: ReturnType<typeof makeDb>, deliveries?: { current: ReturnType<typeof vi.fn> }) {
+    const progressRepository = new KoboReadingProgressRepository(db as never);
+    vi.spyOn(progressRepository, 'findKnownPosition').mockImplementation(knownPositions.find);
+    vi.spyOn(progressRepository, 'recordKnownPosition').mockImplementation(knownPositions.record);
+    vi.spyOn(progressRepository, 'findFinishThreshold').mockImplementation(finishThreshold);
     return new KoboReadingStateService(
       db as never,
       bookAccessService as never,
@@ -79,6 +98,8 @@ describe('KoboReadingStateService', () => {
       analyticsResolver as never,
       readingSessions as never,
       bookService as never,
+      progressRepository,
+      deliveries as never,
     );
   }
 
@@ -92,6 +113,9 @@ describe('KoboReadingStateService', () => {
     analyticsResolver.resolveBookFileId.mockResolvedValue({ kind: 'resolved', bookFileId: 53 });
     readingSessions.recordCumulativeSyncedSession.mockResolvedValue({ kind: 'baseline' });
     bookService.syncAudioProgressForExternalEbookProgress.mockResolvedValue(undefined);
+    knownPositions.find.mockResolvedValue(null);
+    knownPositions.record.mockResolvedValue(undefined);
+    finishThreshold.mockResolvedValue(null);
     bookIdentityService.ensureForBook.mockImplementation((_userId: number, bookId: number) => ({
       bookId,
       entitlementId: `entitlement-${bookId}`,
@@ -132,7 +156,7 @@ describe('KoboReadingStateService', () => {
 
     await makeService(db).upsertState(3, 12, { CurrentBookmark: { LastModified: '2026-01-02T00:00:00.000Z', ProgressPercent: 42 } }, 1, 99, true, 30);
 
-    expect(db.query.koboReadingStates.findFirst).toHaveBeenCalledTimes(1);
+    expect(db.query.koboReadingStates.findFirst).toHaveBeenCalledTimes(2);
     expect(settingsService.getSettings).not.toHaveBeenCalled();
     expect(progressBridge.cfiToKoboBookmark).not.toHaveBeenCalled();
   });
@@ -310,7 +334,7 @@ describe('KoboReadingStateService', () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();
     const progressInsert = makeInsertChain();
-    db.insert.mockReturnValueOnce(stateInsert).mockReturnValueOnce(progressInsert);
+    db.insert.mockReturnValueOnce(progressInsert).mockReturnValueOnce(stateInsert).mockReturnValueOnce(stateInsert);
     db.select
       .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
       .mockReturnValueOnce(makeSelectChain([{ percentage: 20, cfi: null, updatedAt: new Date('2025-12-31T00:00:00.000Z') }]));
@@ -359,6 +383,8 @@ describe('KoboReadingStateService', () => {
         koboLocationType: 'KoboSpan',
         koboLocationValue: 'kobo.25.1',
         koboContentSourceProgressPercent: 12.25,
+        // A page turn on the Kobo is a text move; clients compare it with the narration stamp.
+        textUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
       }),
     );
     expect(db.execute).toHaveBeenCalledTimes(1);
@@ -395,7 +421,7 @@ describe('KoboReadingStateService', () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();
     const progressInsert = makeInsertChain();
-    db.insert.mockReturnValueOnce(stateInsert).mockReturnValueOnce(progressInsert);
+    db.insert.mockReturnValueOnce(progressInsert).mockReturnValueOnce(stateInsert).mockReturnValueOnce(stateInsert);
     db.select
       .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
       .mockReturnValueOnce(makeSelectChain([{ percentage: 20, cfi: null, updatedAt: new Date('2025-12-31T00:00:00.000Z') }]));
@@ -487,7 +513,7 @@ describe('KoboReadingStateService', () => {
 
     await makeService(db).upsertState(1, 6, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00.000Z', ProgressPercent: 60 } }, 1, 99, true, 77);
 
-    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(db.insert).toHaveBeenCalledTimes(2);
     expect(bookService.syncAudioProgressForExternalEbookProgress).not.toHaveBeenCalled();
   });
 
@@ -528,6 +554,119 @@ describe('KoboReadingStateService', () => {
     });
   });
 
+  // A Kobo pushes its bookmark back whenever the book is closed, restamped with the close whether
+  // or not a page turned. The place it was sent at a reread came back stamped after the phone that
+  // finished the book meanwhile, so the finish was undone and the echo opened another read.
+  describe('a Kobo returning the place it already held', () => {
+    const sent = { locationSource: 'OEBPS/ch1.xhtml', locationValue: 'kobo.1.1', positionSetAt: new Date('2026-10-17T19:49:45.000Z') };
+    const finishedOnKobo = {
+      entitlementId: '44',
+      lastModifiedKobo: '2026-10-17T18:16:41Z',
+      currentBookmark: {
+        LastModified: '2026-10-17T18:16:41Z',
+        ProgressPercent: 100,
+        Location: { Source: 'OEBPS/titlepage.xhtml', Type: 'KoboSpan', Value: 'kobo.1.1' },
+      },
+      statusInfo: { Status: 'Finished', LastModified: '2026-10-17T18:16:41Z' },
+    };
+    const pushAt = (value: string) => ({
+      CurrentBookmark: {
+        LastModified: '2026-10-17T19:54:46Z',
+        ProgressPercent: 2,
+        Location: { Source: 'OEBPS/ch1.xhtml', Type: 'KoboSpan', Value: value },
+      },
+      StatusInfo: { Status: 'Reading', LastModified: '2026-10-17T19:54:46Z' },
+    });
+    const hubSetAt = (at: string) => ({
+      cfi: 'epubcfi(/6/34!/4/52/2[s161]/1:0)',
+      percentage: 99.87,
+      textUpdatedAt: new Date(at),
+      narrationUpdatedAt: new Date(at),
+      updatedAt: new Date(at),
+    });
+
+    function makeDbWithHub(hub: Record<string, unknown>, lookups: number) {
+      const db = makeDb();
+      db.query.books.findFirst.mockResolvedValue({ id: 44 });
+      db.query.koboDeviceReadingStates.findFirst.mockResolvedValue(finishedOnKobo);
+      db.query.koboReadingStates.findFirst.mockResolvedValue(null);
+      for (let i = 0; i < lookups; i++) {
+        db.select.mockReturnValueOnce(makeSelectChain([{ fileId: 55 }])).mockReturnValueOnce(makeSelectChain([hub]));
+      }
+      db.insert.mockImplementation(() => makeInsertChain());
+      return db;
+    }
+
+    it('keeps the place another device reached since, and opens no new read', async () => {
+      knownPositions.find.mockResolvedValue(sent);
+      const db = makeDbWithHub(hubSetAt('2026-10-17T19:53:34.000Z'), 1);
+
+      await makeService(db).upsertState(1, 44, pushAt('kobo.1.1'), 1, 98, true, 77);
+
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(db.insert).toHaveBeenCalledWith(schema.koboDeviceReadingStates);
+      expect(bookService.syncAudioProgressForExternalEbookProgress).not.toHaveBeenCalled();
+      expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+      expect(knownPositions.record).not.toHaveBeenCalled();
+      // So the Kobo is sent the newer place on its next sync.
+      expect(db.execute).toHaveBeenCalled();
+    });
+
+    // A Kobo fetches the newer place before it delivers a close made earlier, so the place sent was
+    // already the new one when the untouched page it had pushed before came back with the close.
+    it('keeps the place reached elsewhere when the Kobo repeats its own last push after fetching it', async () => {
+      knownPositions.find.mockResolvedValue({
+        locationSource: 'OEBPS/ch17.xhtml',
+        locationValue: 'kobo.26.1',
+        positionSetAt: new Date('2026-10-17T20:55:09.000Z'),
+      });
+      const db = makeDbWithHub(hubSetAt('2026-10-17T20:55:09.000Z'), 1);
+      db.query.koboDeviceReadingStates.findFirst.mockResolvedValue({
+        ...finishedOnKobo,
+        lastModifiedKobo: '2026-10-17T20:54:30Z',
+        currentBookmark: {
+          LastModified: '2026-10-17T20:54:30Z',
+          ProgressPercent: 2,
+          Location: { Source: 'OEBPS/ch1.xhtml', Type: 'KoboSpan', Value: 'kobo.1.1' },
+        },
+        statusInfo: { Status: 'Reading', LastModified: '2026-10-17T20:54:30Z' },
+      });
+      const closed = pushAt('kobo.1.1');
+      closed.CurrentBookmark.LastModified = '2026-10-17T20:57:55Z';
+
+      await makeService(db).upsertState(1, 44, closed, 1, 98, true, 77);
+
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(db.insert).toHaveBeenCalledWith(schema.koboDeviceReadingStates);
+      expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+    });
+
+    it('takes the place when nothing moved the book since it was sent', async () => {
+      knownPositions.find.mockResolvedValue(sent);
+      const db = makeDbWithHub(hubSetAt('2026-10-17T19:40:00.000Z'), 2);
+
+      await makeService(db).upsertState(1, 44, pushAt('kobo.1.1'), 1, 98, true, 77);
+
+      expect(db.insert).toHaveBeenCalledWith(schema.readingProgress);
+      expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(1, 44, 2, 1, 98, expect.anything());
+      expect(knownPositions.record).toHaveBeenCalledWith(1, 77, 44, {
+        locationSource: 'OEBPS/ch1.xhtml',
+        locationValue: 'kobo.1.1',
+        positionSetAt: new Date('2026-10-17T19:54:46Z'),
+      });
+    });
+
+    it('takes a place the Kobo moved to, newest first as before', async () => {
+      knownPositions.find.mockResolvedValue(sent);
+      const db = makeDbWithHub(hubSetAt('2026-10-17T19:53:34.000Z'), 1);
+
+      await makeService(db).upsertState(1, 44, pushAt('kobo.40.1'), 1, 98, true, 77);
+
+      expect(db.insert).toHaveBeenCalledWith(schema.readingProgress);
+      expect(knownPositions.record).toHaveBeenCalledWith(1, 77, 44, expect.objectContaining({ locationValue: 'kobo.40.1' }));
+    });
+  });
+
   describe('getRawState hub bookmark refresh', () => {
     const storedState = {
       entitlementId: '44',
@@ -557,6 +696,100 @@ describe('KoboReadingStateService', () => {
       return { db, updateChain };
     }
 
+    it('includes native KEPUB in the scoped primary-file lookup for hub bookmark delivery', async () => {
+      const { db } = makeRefreshableDb();
+      const capture = createCapturingDb();
+      db.select = capture.db.select.bind(capture.db) as never;
+      await makeService(db).getRawState(1, 44);
+      expect(capture.queries).toHaveLength(1);
+      expect(capture.queries[0]!.params).toEqual([44, 'epub', 'kepub', 1]);
+    });
+
+    it('finishes the book on the Kobo when another reader carried it to the end', async () => {
+      const db = makeDb();
+      db.update = vi.fn(() => makeUpdateChain()) as never;
+      db.query.books.findFirst.mockResolvedValue({ id: 44 });
+      db.query.koboReadingStates.findFirst.mockResolvedValue(storedState);
+      db.select
+        .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
+        .mockReturnValueOnce(makeSelectChain([{ cfi: 'epubcfi(/6/142!/4/2/2/2[next-reads_img])', percentage: 100, koboLocationValue: null }]));
+      settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: true });
+      progressBridge.cfiToKoboBookmark.mockResolvedValue({ source: 'OEBPS/next-reads.xhtml', value: 'kobo.1.1', contentSourceProgressPercent: 0 });
+
+      const state = (await makeService(db).getRawState(1, 44)) as Record<string, Record<string, unknown>>;
+
+      expect(state.StatusInfo).toMatchObject({ Status: 'Finished' });
+      expect(state.CurrentBookmark).toMatchObject({ ProgressPercent: 100, Location: { Source: 'OEBPS/next-reads.xhtml', Value: 'kobo.1.1' } });
+    });
+
+    it('leaves a book that is still being read as Reading', async () => {
+      const { db } = makeRefreshableDb();
+
+      const state = (await makeService(db).getRawState(1, 44)) as Record<string, Record<string, unknown>>;
+
+      expect(state.StatusInfo).toEqual({ Status: 'Reading' });
+    });
+
+    // A Kobo with its own row was served the status it last reported, so a book marked read in
+    // BookOrbit afterwards stayed Reading on it.
+    it('serves a status BookOrbit set after the Kobo last reported one', async () => {
+      const db = makeDb();
+      db.query.books.findFirst.mockResolvedValue({ id: 44 });
+      db.query.koboDeviceReadingStates.findFirst.mockResolvedValue({
+        ...storedState,
+        statusInfo: { Status: 'Reading', LastModified: '2026-10-17T20:12:35Z', TimesStartedReading: 1 },
+      });
+      db.query.koboReadingStates.findFirst.mockResolvedValue({ statusInfo: { Status: 'Finished', LastModified: '2026-10-17T20:26:17.150Z' } });
+
+      const state = (await makeService(db).getRawState(1, 44, 77)) as Record<string, Record<string, unknown>>;
+
+      expect(state.StatusInfo).toEqual({ Status: 'Finished', LastModified: '2026-10-17T20:26:17.150Z', TimesStartedReading: 1 });
+    });
+
+    it('keeps a status the Kobo reported after the one BookOrbit set', async () => {
+      const db = makeDb();
+      db.query.books.findFirst.mockResolvedValue({ id: 44 });
+      db.query.koboDeviceReadingStates.findFirst.mockResolvedValue({
+        ...storedState,
+        statusInfo: { Status: 'Finished', LastModified: '2026-10-17T20:30:00Z' },
+      });
+      db.query.koboReadingStates.findFirst.mockResolvedValue({ statusInfo: { Status: 'Reading', LastModified: '2026-10-17T20:26:17.150Z' } });
+
+      const state = (await makeService(db).getRawState(1, 44, 77)) as Record<string, Record<string, unknown>>;
+
+      expect(state.StatusInfo).toEqual({ Status: 'Finished', LastModified: '2026-10-17T20:30:00Z' });
+    });
+
+    // A read-along ends on its last sentence, short of 100%. BookOrbit called the book read by the
+    // library's finish mark, while the Kobo, finished only at 100%, kept it as Reading.
+    it('finishes the book on the Kobo once another device carried it past the library finish mark', async () => {
+      const db = makeDb();
+      db.update = vi.fn(() => makeUpdateChain()) as never;
+      db.query.books.findFirst.mockResolvedValue({ id: 44 });
+      db.query.koboDeviceReadingStates.findFirst.mockResolvedValue(storedState);
+      db.select
+        .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
+        .mockReturnValueOnce(makeSelectChain([{ cfi: 'epubcfi(/6/34!/4/52/2[s161]/1:0)', percentage: 99.89, koboLocationValue: null }]));
+      settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: true });
+      progressBridge.cfiToKoboBookmark.mockResolvedValue({ source: 'OEBPS/ch17.xhtml', value: 'kobo.26.1', contentSourceProgressPercent: 99.8 });
+      finishThreshold.mockResolvedValue(98);
+
+      const state = (await makeService(db).getRawState(1, 44, 77)) as Record<string, Record<string, unknown>>;
+
+      expect(state.StatusInfo).toMatchObject({ Status: 'Finished', LastModified: state.LastModified });
+      expect(state.CurrentBookmark).toMatchObject({ ProgressPercent: 99.89, Location: { Value: 'kobo.26.1' } });
+    });
+
+    it('keeps a book short of the library finish mark as Reading', async () => {
+      const { db } = makeRefreshableDb();
+      finishThreshold.mockResolvedValue(98);
+
+      const state = (await makeService(db).getRawState(1, 44)) as Record<string, Record<string, unknown>>;
+
+      expect(state.StatusInfo).toEqual({ Status: 'Reading' });
+      expect(finishThreshold).toHaveBeenCalledWith(44);
+    });
+
     it('replaces the device Location with one computed from the hub position', async () => {
       const { db, updateChain } = makeRefreshableDb();
 
@@ -568,6 +801,38 @@ describe('KoboReadingStateService', () => {
         Location: { Source: 'OEBPS/ch7.xhtml', Type: 'KoboSpan', Value: 'kobo.31.1' },
       });
       expect(updateChain.set).toHaveBeenCalledWith(expect.objectContaining({ currentBookmark: state.CurrentBookmark }));
+    });
+
+    it('places a read-along narration marker on the device when the saved progress has no text position', async () => {
+      const db = makeDb();
+      db.update = vi.fn(() => makeUpdateChain()) as never;
+      db.query.books.findFirst.mockResolvedValue({ id: 44 });
+      db.query.koboReadingStates.findFirst.mockResolvedValue(storedState);
+      db.select
+        .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
+        .mockReturnValueOnce(
+          makeSelectChain([
+            { cfi: null, percentage: 70, koboLocationValue: null, mediaOverlayFragment: 'OEBPS/ch6.xhtml#s161', mediaOverlaySectionIndex: 9 },
+          ]),
+        );
+      settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: true });
+      progressBridge.narrationToKoboBookmark.mockResolvedValue({ source: 'OEBPS/ch6.xhtml', value: 'kobo.43.3', contentSourceProgressPercent: 61.9 });
+
+      const state = (await makeService(db).getRawState(1, 44)) as Record<string, Record<string, unknown>>;
+
+      expect(progressBridge.narrationToKoboBookmark).toHaveBeenCalledWith(
+        1,
+        44,
+        55,
+        { fragment: 'OEBPS/ch6.xhtml#s161', sectionIndex: 9 },
+        undefined,
+      );
+      expect(progressBridge.cfiToKoboBookmark).not.toHaveBeenCalled();
+      expect(state.CurrentBookmark).toMatchObject({
+        ProgressPercent: 70,
+        ContentSourceProgressPercent: 61.9,
+        Location: { Source: 'OEBPS/ch6.xhtml', Type: 'KoboSpan', Value: 'kobo.43.3' },
+      });
     });
 
     // A Kobo clock running ahead is stored verbatim on the device push. Stamping the refresh at
@@ -590,6 +855,45 @@ describe('KoboReadingStateService', () => {
       expect(updateChain.set).toHaveBeenCalledWith(
         expect.objectContaining({ lastModifiedKobo: state.LastModified, priorityTimestamp: state.LastModified }),
       );
+    });
+
+    // A Kobo told to follow the hub fetches the bookmark again before it pushes. A request-time
+    // stamp was newer on every fetch, so it asked to follow again, without end.
+    it('serves an unmoved hub position to a device with the same stamp on every fetch', async () => {
+      const db = makeDb();
+      db.query.books.findFirst.mockResolvedValue({ id: 44 });
+      db.query.koboDeviceReadingStates.findFirst.mockResolvedValue(storedState);
+      let call = 0;
+      db.select.mockImplementation(() =>
+        makeSelectChain(
+          ++call % 2 === 1
+            ? [{ fileId: 55 }]
+            : [
+                {
+                  cfi: 'epubcfi(/6/8!/4/2/2/1:0)',
+                  percentage: 79,
+                  koboLocationValue: null,
+                  textUpdatedAt: new Date('2026-08-17T09:30:00.000Z'),
+                  updatedAt: new Date('2026-08-17T10:15:00.000Z'),
+                },
+              ],
+        ),
+      );
+      settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: true });
+      progressBridge.cfiToKoboBookmark.mockResolvedValue({ source: 'OEBPS/ch7.xhtml', value: 'kobo.31.1', contentSourceProgressPercent: 12.5 });
+      const service = makeService(db);
+
+      const first = (await service.getRawState(1, 44, 77)) as Record<string, string | Record<string, unknown>>;
+      const second = (await service.getRawState(1, 44, 77)) as Record<string, string | Record<string, unknown>>;
+
+      expect(first.CurrentBookmark).toMatchObject({ LastModified: '2026-08-17T09:30:00.000Z', Location: { Value: 'kobo.31.1' } });
+      expect(first.LastModified).toBe('2026-08-17T09:30:00.000Z');
+      expect(second).toEqual(first);
+      expect(knownPositions.record).toHaveBeenCalledWith(1, 77, 44, {
+        locationSource: 'OEBPS/ch7.xhtml',
+        locationValue: 'kobo.31.1',
+        positionSetAt: new Date('2026-08-17T09:30:00.000Z'),
+      });
     });
 
     it('serves the stored bookmark and warns when the refresh throws', async () => {
@@ -636,21 +940,275 @@ describe('KoboReadingStateService', () => {
   // count as a read event. lastReadAt advances by default, so this path has to opt out.
   it('leaves both timestamps untouched when stamping a bookmark location', async () => {
     const { db, queries } = createCapturingDb();
-    const service = makeService(db as never);
-
-    await (
-      service as unknown as {
-        stampProgressLocation: (
-          userId: number,
-          fileId: number,
-          point: { source: string; value: string; contentSourceProgressPercent: number | null },
-        ) => Promise<void>;
-      }
-    ).stampProgressLocation(7, 44, { source: 'OEBPS/ch1.xhtml', value: 'kobo.3.1', contentSourceProgressPercent: 12 });
+    await new KoboReadingProgressRepository(db as never).stampLocation(7, 44, {
+      source: 'OEBPS/ch1.xhtml',
+      value: 'kobo.3.1',
+      contentSourceProgressPercent: 12,
+    });
 
     expect(queries).toHaveLength(1);
     expect(queries[0]!.sql).toContain('"updated_at" = "reading_progress"."updated_at"');
     expect(queries[0]!.sql).toContain('"last_read_at" = "reading_progress"."last_read_at"');
+  });
+  describe('Storyteller delivery progress protection', () => {
+    const savedCfi = 'epubcfi(/6/2!/4/2/1:3)';
+    const previousAt = '2026-01-01T00:00:00Z';
+    const incomingAt = '2026-01-02T00:00:00Z';
+    function resetDb(percentage = 61) {
+      const db = makeDb();
+      const insert = makeInsertChain();
+      db.insert.mockReturnValue(insert);
+      db.query.books.findFirst.mockResolvedValue({ id: 5 });
+      db.query.koboReadingStates.findFirst.mockResolvedValue({
+        deliveryId: 'old',
+        currentBookmark: { ProgressPercent: 61, LastModified: previousAt },
+      });
+      let call = 0;
+      db.select.mockImplementation(() =>
+        makeSelectChain(
+          ++call % 2 === 1
+            ? [{ fileId: 55 }]
+            : [
+                {
+                  percentage,
+                  cfi: savedCfi,
+                  koreaderProgress: '/body/DocFragment[1]/body/p[1]/text().3',
+                  updatedAt: new Date(previousAt),
+                },
+              ],
+        ),
+      );
+      return { db, insert };
+    }
+    const resetPayload = { CurrentBookmark: { ProgressPercent: 0, LastModified: incomingAt } };
+    it.each(['offered', 'transfer_observed', 'cancelled'])('retains canonical progress and raw events during %s replacement', async (state) => {
+      const { db, insert } = resetDb();
+      const deliveries = { current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state, options: { replacement: true } }) };
+      await expect(makeService(db, deliveries).upsertState(1, 5, resetPayload, 1, 99, true, 77)).resolves.toEqual(ACK('entitlement-5', 'Success'));
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(insert.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 77,
+          deliveryId: 'old',
+          currentBookmark: resetPayload.CurrentBookmark,
+        }),
+      );
+      expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+      expect(bookService.syncAudioProgressForExternalEbookProgress).not.toHaveBeenCalled();
+      expect(achievementEvents.emit).not.toHaveBeenCalled();
+      expect(db.execute).toHaveBeenCalledTimes(1);
+    });
+    it('does not accept an initial zero echo for an unknown device copy', async () => {
+      const { db } = resetDb();
+      await makeService(db, { current: vi.fn().mockResolvedValue(null) }).upsertState(1, 5, resetPayload, 1, 99, true, 77);
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+    });
+    it('protects repeated initialization zero events even after the initial transfer is observed', async () => {
+      const { db, insert } = resetDb();
+      db.query.koboReadingStates.findFirst.mockResolvedValue({
+        deliveryId: 'old',
+        currentBookmark: { ProgressPercent: 0, LastModified: previousAt },
+      });
+      const service = makeService(db, { current: vi.fn().mockResolvedValue({ id: 'old', state: 'transfer_observed', options: {} }) });
+      await service.upsertState(1, 5, resetPayload, 1, 99, true, 77);
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 77, currentBookmark: resetPayload.CurrentBookmark }));
+      settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: true });
+      await expect(service.getRawState(1, 5, 77)).resolves.toMatchObject({
+        CurrentBookmark: { ProgressPercent: 61 },
+        StatusInfo: { Status: 'Reading', TimesStartedReading: 1 },
+      });
+      expect(db.update).not.toHaveBeenCalled();
+      await service.upsertState(1, 5, { CurrentBookmark: { ProgressPercent: 0, LastModified: '2026-01-03T00:00:00Z' } }, 1, 99, true, 77);
+      expect(db.insert).toHaveBeenCalledTimes(2);
+      expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+    });
+    it.each([0, 20])('allows deliberate backwards reading to %s on a known unchanged copy', async (percentage) => {
+      const { db, insert } = resetDb();
+      await makeService(db, { current: vi.fn().mockResolvedValue({ id: 'old', state: 'transfer_observed', options: {} }) }).upsertState(
+        1,
+        5,
+        { CurrentBookmark: { ProgressPercent: percentage, LastModified: incomingAt } },
+        1,
+        99,
+        true,
+        77,
+      );
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55, percentage, cfi: null }));
+      expect(userBookStatusService.autoUpdate).toHaveBeenCalled();
+    });
+    it('keeps a device copy built from a file that stopped being primary on that file', async () => {
+      const { db, insert } = resetDb();
+      const queue = [[{ fileId: 55 }], [{ id: 66 }], [{ percentage: 61, cfi: savedCfi, updatedAt: new Date(previousAt) }]];
+      db.select.mockImplementation(() => makeSelectChain(queue.shift() ?? []));
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'old', state: 'transfer_observed', options: {}, sourceFileId: 66 }),
+      }).upsertState(1, 5, { CurrentBookmark: { ProgressPercent: 70, LastModified: incomingAt } }, 1, 99, true, 77);
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 66, percentage: 70 }));
+      expect(insert.values).not.toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55 }));
+      expect(bookService.syncAudioProgressForExternalEbookProgress).toHaveBeenCalledWith(1, 5, 66, 70, expect.anything());
+    });
+    it('keeps the previous copy attributable while replacement is only prepared', async () => {
+      const { db, insert } = resetDb();
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state: 'prepared', options: { replacement: true } }),
+      }).upsertState(1, 5, resetPayload, 1, 99, true, 77);
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55, percentage: 0 }));
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 77, deliveryId: 'old' }));
+    });
+    it('permits a replacement to echo a deliberate reset already saved in BookOrbit', async () => {
+      const { db, insert } = resetDb(0);
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state: 'user_confirmed', options: { replacement: true } }),
+      }).upsertState(1, 5, resetPayload, 1, 99, true, 77);
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55, percentage: 0, cfi: savedCfi }));
+      expect(db.insert).toHaveBeenCalledTimes(3);
+    });
+    it('accepts forward percentage progress without decoding an ambiguous replacement location', async () => {
+      const { db, insert } = resetDb();
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state: 'transfer_observed', options: { replacement: true } }),
+      }).upsertState(
+        1,
+        5,
+        {
+          CurrentBookmark: {
+            ProgressPercent: 65,
+            LastModified: incomingAt,
+            Location: { Type: 'KoboSpan', Source: 'chapter.xhtml', Value: 'kobo.1.1' },
+          },
+        },
+        1,
+        99,
+        true,
+        77,
+      );
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55, percentage: 65, koboLocationValue: null }));
+      expect(progressBridge.koboBookmarkToCanonical).not.toHaveBeenCalled();
+    });
+    it('still holds saved progress against a backwards push from a confirmed replacement', async () => {
+      const { db, insert } = resetDb();
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state: 'user_confirmed', options: { replacement: true } }),
+      }).upsertState(1, 5, { CurrentBookmark: { ProgressPercent: 3, LastModified: incomingAt } }, 1, 99, true, 77);
+      expect(insert.values).not.toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55 }));
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 77, deliveryId: 'new' }));
+      expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+    });
+    it.each([
+      ['accepts', 1, 58],
+      ['holds back', -1, 61],
+    ])('%s a confirmed replacement push whose position is later or earlier than its lower percentage suggests', async (_label, order, saved) => {
+      const { db, insert } = resetDb();
+      progressBridge.koboBookmarkToCanonical.mockResolvedValue({ cfi: 'epubcfi(/6/4!/4/2/1:0)', xpointer: '/body/p[2]' });
+      progressBridge.comparePositions.mockReturnValue(order);
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state: 'user_confirmed', options: { replacement: true } }),
+      }).upsertState(
+        1,
+        5,
+        {
+          CurrentBookmark: {
+            ProgressPercent: 58,
+            LastModified: incomingAt,
+            Location: { Type: 'KoboSpan', Source: 'chapter.xhtml', Value: 'kobo.43.4' },
+          },
+        },
+        1,
+        99,
+        true,
+        77,
+      );
+      expect(progressBridge.comparePositions).toHaveBeenCalledWith('epubcfi(/6/4!/4/2/1:0)', savedCfi);
+      if (saved === 58)
+        expect(insert.values).toHaveBeenCalledWith(
+          expect.objectContaining({ bookFileId: 55, percentage: 58, cfi: 'epubcfi(/6/4!/4/2/1:0)', koboLocationValue: 'kobo.43.4' }),
+        );
+      else expect(insert.values).not.toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55 }));
+    });
+    it('trusts a confirmed replacement, even while the device bookmark still names the copy it replaced', async () => {
+      const { db, insert } = resetDb();
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state: 'user_confirmed', options: { replacement: true } }),
+      }).upsertState(
+        1,
+        5,
+        {
+          CurrentBookmark: {
+            ProgressPercent: 65,
+            LastModified: incomingAt,
+            Location: { Type: 'KoboSpan', Source: 'chapter.xhtml', Value: 'kobo.1.1' },
+          },
+        },
+        1,
+        99,
+        true,
+        77,
+      );
+      expect(progressBridge.koboBookmarkToCanonical).toHaveBeenCalledWith(1, 5, 'chapter.xhtml', 'kobo.1.1', 77);
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 55, percentage: 65, koboLocationValue: 'kobo.1.1' }));
+      expect(insert.values).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 77, deliveryId: 'new' }));
+    });
+    it('acknowledges an equal-percent echo without reopening a synced device', async () => {
+      const { db } = resetDb();
+      await makeService(db, { current: vi.fn().mockResolvedValue({ id: 'new', state: 'offered', options: {} }) }).upsertState(
+        1,
+        5,
+        { CurrentBookmark: { ProgressPercent: 61, LastModified: previousAt } },
+        1,
+        99,
+        true,
+        77,
+      );
+      expect(db.execute).not.toHaveBeenCalled();
+      expect(bookService.syncAudioProgressForExternalEbookProgress).not.toHaveBeenCalled();
+    });
+    it('does not propagate a backwards event if a concurrent canonical update wins the atomic write', async () => {
+      const { db, insert } = resetDb(20);
+      const rejected = makeInsertChain();
+      rejected.onConflictDoUpdate.mockReturnValue({ returning: vi.fn().mockResolvedValue([]) });
+      db.insert.mockReturnValueOnce(rejected).mockReturnValue(insert);
+      db.select
+        .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
+        .mockReturnValueOnce(makeSelectChain([{ percentage: 20 }]))
+        .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
+        .mockReturnValueOnce(makeSelectChain([{ percentage: 20, updatedAt: new Date(previousAt) }]))
+        .mockReturnValueOnce(makeSelectChain([{ percentage: 61 }]));
+      await makeService(db, {
+        current: vi.fn().mockResolvedValue({ id: 'new', previousId: 'old', state: 'offered', options: { replacement: true } }),
+      }).upsertState(1, 5, { CurrentBookmark: { ProgressPercent: 42, LastModified: incomingAt } }, 1, 99, true, 77);
+      expect(insert.values).toHaveBeenCalledOnce();
+      expect(insert.values).toHaveBeenCalledWith(
+        expect.objectContaining({ deviceId: 77, currentBookmark: { ProgressPercent: 42, LastModified: incomingAt } }),
+      );
+      expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+      expect(bookService.syncAudioProgressForExternalEbookProgress).not.toHaveBeenCalled();
+    });
+    it.each([null, savedCfi])('serves canonical percentage when precise conversion is unavailable (cfi=%s)', async (cfi) => {
+      const { db } = resetDb();
+      db.query.koboReadingStates.findFirst.mockResolvedValue({
+        currentBookmark: { ProgressPercent: 0, Location: { Value: 'stale' }, ContentSourceProgressPercent: 0 },
+      });
+      db.select
+        .mockReset()
+        .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
+        .mockReturnValueOnce(makeSelectChain([{ percentage: 61, cfi, updatedAt: new Date(previousAt) }]));
+      settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: true });
+      const result = (await makeService(db).getRawState(1, 5, 77)) as { CurrentBookmark: Record<string, unknown> };
+      expect(result.CurrentBookmark.ProgressPercent).toBe(61);
+      expect(result.CurrentBookmark.Location).toBeUndefined();
+      expect(result.CurrentBookmark.ContentSourceProgressPercent).toBeUndefined();
+    });
+    it('uses canonical progress for a first Kobo sync without any stored Kobo state', async () => {
+      const { db } = resetDb();
+      db.query.koboReadingStates.findFirst.mockResolvedValue(null);
+      settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: true });
+      await expect(makeService(db).getRawState(1, 5, 77)).resolves.toMatchObject({
+        CurrentBookmark: { ProgressPercent: 61 },
+        StatusInfo: { Status: 'Reading' },
+      });
+    });
   });
   describe('reading sessions derived from device reading time', () => {
     const STATS_AT = '2026-08-20T19:30:00.000Z';

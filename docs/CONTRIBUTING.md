@@ -13,6 +13,8 @@ Thanks for your interest in contributing to BookOrbit. Whether you are fixing a 
 
 ## Where to Start
 
+For usage questions, setup help, or community conversations, see the [community guide](COMMUNITY.md). You do not need approval or assignment to ask a question or participate.
+
 Not sure what to work on? Look for issues tagged with:
 
 - [`good first issue`](../../labels/good%20first%20issue) - Scoped tasks with clear acceptance criteria. Great for your first contribution.
@@ -34,7 +36,7 @@ The rest of this guide still applies (issue first, PR template, etc.), but expec
 
 ## Security Issues
 
-Do **not** open public issues for security vulnerabilities. Use GitHub's [private vulnerability reporting](../../security/advisories/new) instead. See [SECURITY.md](../.github/SECURITY.md) for details.
+Do **not** open public issues for security vulnerabilities. Use GitHub's [private vulnerability reporting](https://github.com/bookorbit/bookorbit/security/advisories/new) instead. See [SECURITY.md](../.github/SECURITY.md) for details.
 
 ---
 
@@ -48,8 +50,9 @@ This is the end-to-end journey from idea to merged PR. Each phase builds on the 
 > contributor. PRs without prior approval and assignment will be closed without review.
 
 - Browse [open issues](../../issues) for something you want to tackle.
-- If you have a new idea, open one using the [bug report](../../issues/new?template=bug_report.yml) or [feature request](../../issues/new?template=feature_request.yml) template.
-- Not sure if your idea fits the roadmap? Ask in a new issue before investing time.
+- Report a problem using the [bug report](https://github.com/bookorbit/bookorbit/issues/new?template=bug_report.yml) form, or propose a concrete improvement using the [feature request](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml) form.
+- For setup or usage questions, use [Question / Help](https://github.com/bookorbit/bookorbit/issues/new?template=question.yml).
+- Not sure if your idea fits the roadmap? Start a [Community Discussion](https://github.com/bookorbit/bookorbit/issues/new?template=discussion.yml) before investing time.
 
 ### Phase 2: Get Maintainer Approval
 

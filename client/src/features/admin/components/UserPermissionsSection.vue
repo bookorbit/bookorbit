@@ -200,7 +200,7 @@ function clearFilters() {
           <span
             v-if="group.manageOnly"
             aria-hidden="true"
-            class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            class="rounded-xs bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
           >
             {{ t('adminFeature.userForm.permissionLevels.manage') }}
           </span>
@@ -212,18 +212,18 @@ function clearFilters() {
           <label
             v-for="row in group.rows"
             :key="row.name"
-            class="flex cursor-pointer items-start gap-2 rounded py-1 focus-within:ring-2 focus-within:ring-ring"
+            class="flex cursor-pointer items-start gap-2 rounded-xs py-1 focus-within:ring-2 focus-within:ring-ring"
           >
             <input
               type="checkbox"
               :checked="row.checked"
-              class="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
+              class="mt-0.5 size-4 shrink-0 rounded-xs border-input accent-primary"
               @change="togglePermission(row.name)"
             />
             <span class="text-sm leading-tight text-foreground">{{ row.label }}</span>
             <span
               v-if="row.manage && !group.manageOnly"
-              class="ms-auto mt-0.5 shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              class="ms-auto mt-0.5 shrink-0 rounded-xs bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
             >
               {{ t('adminFeature.userForm.permissionLevels.manage') }}
             </span>

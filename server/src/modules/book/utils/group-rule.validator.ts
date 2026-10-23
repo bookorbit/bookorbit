@@ -20,6 +20,7 @@ const COMMUNITY_RATING_PROVIDER_VALUES = ['any', ...COMMUNITY_RATING_PROVIDER_KE
 
 const DATE_VALUE_FIELDS = new Set<StaticRuleField>(['addedAt', 'startedAt', 'finishedAt', 'publishedDate']);
 const DATE_VALUE_OPERATORS = new Set<RuleOperator>(['before', 'after', 'between']);
+const RELATIVE_DATE_OPERATORS = new Set<RuleOperator>(['moreThanAgo']);
 const CUSTOM_NUMERIC_OPERATORS = new Set<RuleOperator>(['gt', 'gte', 'lt', 'lte']);
 const CUSTOM_DATE_OPERATORS = new Set<RuleOperator>(['before', 'after']);
 const ISO_DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -46,6 +47,11 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isNonNegativeRelativeDayCount(value: unknown): boolean {
+  const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof number === 'number' && Number.isFinite(number) && number >= 0;
+}
+
 type UnvalidatedRule = { field: string; operator: string; value?: unknown; valueTo?: unknown };
 
 /**
@@ -65,6 +71,10 @@ function checkCustomFieldValue(rule: UnvalidatedRule, ctx: z.RefinementCtx): voi
   }
   if (CUSTOM_DATE_OPERATORS.has(operator as RuleOperator) && !isValidRuleDateValue(value)) {
     ctx.addIssue({ code: 'custom', message: `Operator '${operator}' requires a valid date value`, path: ['value'] });
+    return;
+  }
+  if (RELATIVE_DATE_OPERATORS.has(operator as RuleOperator) && !isNonNegativeRelativeDayCount(value)) {
+    ctx.addIssue({ code: 'custom', message: `Operator '${operator}' requires a non-negative day count`, path: ['value'] });
     return;
   }
   if (operator === 'between') {
@@ -110,6 +120,11 @@ const ruleSchema: z.ZodType<Rule> = z
       }
       if (rule.operator === 'between' && !isValidRuleDateValue(rule.valueTo)) {
         ctx.addIssue({ code: 'custom', message: `Operator '${rule.operator}' requires a valid date valueTo`, path: ['valueTo'] });
+      }
+    }
+    if (DATE_VALUE_FIELDS.has(rule.field as StaticRuleField) && RELATIVE_DATE_OPERATORS.has(rule.operator as RuleOperator)) {
+      if (!isNonNegativeRelativeDayCount(rule.value)) {
+        ctx.addIssue({ code: 'custom', message: `Operator '${rule.operator}' requires a non-negative day count`, path: ['value'] });
       }
     }
   }) as z.ZodType<Rule>;

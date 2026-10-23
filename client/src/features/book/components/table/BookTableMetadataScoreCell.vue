@@ -15,7 +15,7 @@ const scoreColor = computed(() => (display.value == null ? null : metadataScoreC
 <template>
   <span
     v-if="display != null"
-    class="block min-h-[20px] truncate rounded px-1 text-sm font-semibold tabular-nums"
+    class="block min-h-[20px] truncate rounded-xs px-1 text-sm font-semibold tabular-nums"
     :style="{ color: scoreColor ?? undefined }"
     :title="String(display)"
   >

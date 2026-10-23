@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import type { AuthorSummary } from '@bookorbit/types'
+import { i18n } from '@/i18n'
 import AuthorTile from '../AuthorTile.vue'
 
 function author(overrides: Partial<AuthorSummary> = {}): AuthorSummary {
@@ -24,6 +25,75 @@ function mountTile(props: Record<string, unknown> = {}) {
 }
 
 describe('AuthorTile', () => {
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-12T12:00:00Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('insets and centers circular hover metadata inside the unclipped area', () => {
+    const wrapper = mountTile({ shape: 'circle', author: author({ lastAddedAt: '2026-09-28T12:00:00Z' }) })
+    const metadata = wrapper.get('span.bg-linear-to-t')
+
+    // The inscribed square needs at least 14.65% padding on each edge to clear the circle.
+    expect(metadata.classes()).toContain('p-[16%]')
+    expect(metadata.classes()).toContain('text-center')
+    expect(metadata.classes()).not.toContain('p-2')
+    expect(metadata.element.children).toHaveLength(2)
+  })
+
+  it('preserves the square hover metadata layout', () => {
+    const wrapper = mountTile({ shape: 'square' })
+    const metadata = wrapper.get('span.bg-linear-to-t')
+
+    expect(metadata.classes()).toContain('p-2')
+    expect(metadata.classes()).not.toContain('p-[16%]')
+    expect(metadata.classes()).not.toContain('text-center')
+  })
+
+  it('updates the metadata inset when the cover shape changes', async () => {
+    const wrapper = mountTile({ shape: 'square' })
+    const metadata = wrapper.get('span.bg-linear-to-t')
+
+    await wrapper.setProps({ shape: 'circle' })
+    expect(metadata.classes()).toContain('p-[16%]')
+    expect(metadata.classes()).not.toContain('p-2')
+
+    await wrapper.setProps({ shape: 'square' })
+    expect(metadata.classes()).toContain('p-2')
+    expect(metadata.classes()).not.toContain('p-[16%]')
+  })
+
+  it.each(['circle', 'square'])('reveals both metadata lines on hover or keyboard focus for %s covers', (shape) => {
+    const wrapper = mountTile({ shape, author: author({ lastAddedAt: '2026-09-28T12:00:00Z' }) })
+    const metadata = wrapper.get('span.bg-linear-to-t')
+
+    expect(metadata.text()).toContain('3 books')
+    expect(metadata.text()).toContain('2 weeks ago')
+    expect(metadata.classes()).toEqual(
+      expect.arrayContaining(['pointer-events-none', 'group-hover/tile:opacity-100', 'group-focus-within/tile:opacity-100', '@[4.5rem]:flex']),
+    )
+    expect(metadata.get('span.hidden').classes()).toContain('@[5.5rem]:block')
+  })
+
+  it('omits the date line when no book addition date is available', () => {
+    const wrapper = mountTile({ shape: 'circle', author: author({ bookCount: 1, lastAddedAt: null }) })
+    const metadata = wrapper.get('span.bg-linear-to-t')
+
+    expect(metadata.text()).toBe('1 book')
+    expect(metadata.element.children).toHaveLength(1)
+  })
+
+  it('hides hover metadata in selection mode', () => {
+    const wrapper = mountTile({ shape: 'circle', selectionMode: true })
+
+    expect(wrapper.find('span.bg-linear-to-t').exists()).toBe(false)
+  })
+
   it('stretches the activate button over the whole tile, not just the artwork', () => {
     const wrapper = mountTile()
     const root = wrapper.element as HTMLElement

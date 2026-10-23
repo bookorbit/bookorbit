@@ -1,5 +1,6 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { i18n } from '@/i18n'
 import SelectionPopup from '../SelectionPopup.vue'
 
 const globalStubs = {
@@ -11,7 +12,70 @@ const globalStubs = {
   },
 }
 
+function accessibleName(button: DOMWrapper<Element>) {
+  return (button.attributes('aria-label') ?? button.text()).trim()
+}
+
+function getButtonByName(wrapper: VueWrapper, name: string) {
+  const matches = wrapper.findAll('button').filter((button) => accessibleName(button) === name)
+  expect(matches, `button named "${name}"`).toHaveLength(1)
+  return matches[0]!
+}
+
+function mountPopup(props: Partial<InstanceType<typeof SelectionPopup>['$props']> = {}) {
+  return mount(SelectionPopup, {
+    props: {
+      visible: true,
+      position: { x: 100, y: 200 },
+      showBelow: false,
+      selectedText: 'Text',
+      overlappingAnnotationId: null,
+      isTtsAvailable: false,
+      ...props,
+    },
+    global: globalStubs,
+  })
+}
+
 describe('SelectionPopup', () => {
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
+  it('gives every icon-only action a localized accessible name', () => {
+    const wrapper = mountPopup({ overlappingAnnotationId: 7, isTtsAvailable: true })
+
+    for (const name of ['Copy', 'Highlight', 'Search', 'Translate', 'Define', 'Add note', 'Delete annotation', 'Read from here']) {
+      getButtonByName(wrapper, name)
+    }
+    for (const button of wrapper.findAll('button')) {
+      expect(accessibleName(button)).not.toBe('')
+    }
+  })
+
+  it('names the highlight style buttons and exposes the selected style', async () => {
+    const wrapper = mountPopup()
+
+    await getButtonByName(wrapper, 'Highlight').trigger('click')
+
+    const highlight = getButtonByName(wrapper, 'Highlight style: Highlight')
+    const underline = getButtonByName(wrapper, 'Highlight style: Underline')
+    const strikethrough = getButtonByName(wrapper, 'Highlight style: Strikethrough')
+    const squiggly = getButtonByName(wrapper, 'Highlight style: Squiggly underline')
+
+    expect([highlight, underline, strikethrough, squiggly].map((button) => button.text())).toEqual(['H', 'U', 'S', '~'])
+    expect(highlight.attributes('aria-pressed')).toBe('true')
+    expect(underline.attributes('aria-pressed')).toBe('false')
+
+    await underline.trigger('click')
+    expect(getButtonByName(wrapper, 'Highlight style: Underline').attributes('aria-pressed')).toBe('true')
+    expect(getButtonByName(wrapper, 'Highlight style: Highlight').attributes('aria-pressed')).toBe('false')
+
+    for (const button of wrapper.findAll('button')) {
+      expect(accessibleName(button)).not.toBe('')
+    }
+  })
+
   it('copies selected text to clipboard and emits copy after feedback delay', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn<(value: string) => Promise<void>>().mockResolvedValue(undefined)

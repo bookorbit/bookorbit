@@ -45,6 +45,19 @@ describe('write-back cover preview', () => {
     expect(coverValue(book({ coverSource: 'extracted', covers: { ebook: slot('extracted'), audio: null }, files }))).toBeNull()
   })
 
+  it('shows each written file its own medium cover when asked for a format', () => {
+    const detail = book({
+      covers: { ebook: slot('extracted'), audio: slot('custom') },
+      files: [
+        { format: 'epub', role: 'primary' },
+        { format: 'm4b', role: 'content' },
+      ] as BookDetail['files'],
+    })
+
+    expect(resolveWriteBackFields(detail, ['coverBytes'], 'epub')[0]!.value).toBe('extracted')
+    expect(resolveWriteBackFields(detail, ['coverBytes'], 'm4b')[0]!.value).toBe('custom')
+  })
+
   it('falls back to the single legacy cover of a book the upgrade has not reached', () => {
     expect(coverValue(book({ coverSource: 'custom', files: [{ format: 'epub', role: 'primary' }] as BookDetail['files'] }))).toBe('custom')
   })

@@ -46,6 +46,7 @@ export interface BookSyncData {
   title: string | null;
   authorName: string | null;
   hardcoverMetadataId: string | null;
+  hardcoverEditionId?: string | null;
   pageCount: number | null;
   format: string | null;
   status: string;
@@ -157,6 +158,53 @@ export class HardcoverRepository {
     return row != null;
   }
 
+  /**
+   * Moves a user's link to a different Hardcover book. The user book, read and every live attempt's
+   * read link all point into the old book's Hardcover entry, so they are released with it; reusing
+   * them would keep writing progress to the old book. Soft-deleted attempts keep their ids as
+   * import tombstones. The new book counts as never synced, so a failed first sync is retried.
+   * Returns how many attempts were released.
+   */
+  async relinkBook(input: {
+    userId: number;
+    bookId: number;
+    hardcoverBookId: number;
+    hardcoverEditionId: number | null;
+    matchMethod: string;
+    matchBasis: string;
+  }): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.hardcoverBookState)
+        .set({
+          hardcoverBookId: input.hardcoverBookId,
+          hardcoverEditionId: input.hardcoverEditionId,
+          hardcoverUserBookId: null,
+          hardcoverReadId: null,
+          matchMethod: input.matchMethod,
+          matchBasis: input.matchBasis,
+          matchError: null,
+          lastSyncedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(schema.hardcoverBookState.userId, input.userId), eq(schema.hardcoverBookState.bookId, input.bookId)));
+
+      const released = await tx
+        .update(schema.readingAttempts)
+        .set({ externalProvider: null, externalId: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.readingAttempts.userId, input.userId),
+            eq(schema.readingAttempts.bookId, input.bookId),
+            eq(schema.readingAttempts.externalProvider, HARDCOVER_EXTERNAL_PROVIDER),
+            isNull(schema.readingAttempts.deletedAt),
+          ),
+        )
+        .returning({ id: schema.readingAttempts.id });
+      return released.length;
+    });
+  }
+
   async setBookSyncOverride(userId: number, bookId: number, syncOverride: 'included' | 'excluded' | null): Promise<HardcoverBookState> {
     const syncExcluded = syncOverride === 'excluded';
     const [row] = await this.db
@@ -253,6 +301,7 @@ export class HardcoverRepository {
         title: schema.bookMetadata.title,
         authorName: firstAuthorSq.authorName,
         hardcoverMetadataId: schema.bookMetadata.hardcoverId,
+        hardcoverEditionId: schema.bookMetadata.hardcoverEditionId,
         pageCount: schema.bookMetadata.pageCount,
         format: schema.bookFiles.format,
         status: includeUnread ? sql<string>`coalesce(${schema.userBookStatus.status}, 'unread')` : schema.userBookStatus.status,
@@ -316,7 +365,11 @@ export class HardcoverRepository {
             eq(schema.readingAttempts.id, attemptId),
             isNull(schema.readingAttempts.deletedAt),
             or(
-              and(isNull(schema.readingAttempts.externalProvider), isNull(schema.readingAttempts.externalId)),
+              // A Hardcover provider without an id owns nothing; hand-cleared links are left in this shape.
+              and(
+                or(isNull(schema.readingAttempts.externalProvider), eq(schema.readingAttempts.externalProvider, HARDCOVER_EXTERNAL_PROVIDER)),
+                isNull(schema.readingAttempts.externalId),
+              ),
               and(eq(schema.readingAttempts.externalProvider, HARDCOVER_EXTERNAL_PROVIDER), eq(schema.readingAttempts.externalId, externalId)),
             ),
           ),
@@ -327,6 +380,23 @@ export class HardcoverRepository {
       if (isExternalIdConflict(err)) return 'conflict';
       throw err;
     }
+  }
+
+  /** Releases one attempt's link, but only while it still points at the read the caller rejected. */
+  async unlinkReadingAttempt(userId: number, attemptId: number, hardcoverReadId: number): Promise<boolean> {
+    const rows = await this.db
+      .update(schema.readingAttempts)
+      .set({ externalProvider: null, externalId: null, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.readingAttempts.userId, userId),
+          eq(schema.readingAttempts.id, attemptId),
+          eq(schema.readingAttempts.externalProvider, HARDCOVER_EXTERNAL_PROVIDER),
+          eq(schema.readingAttempts.externalId, String(hardcoverReadId)),
+        ),
+      )
+      .returning({ id: schema.readingAttempts.id });
+    return rows.length > 0;
   }
 
   /**

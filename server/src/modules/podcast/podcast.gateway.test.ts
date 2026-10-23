@@ -58,6 +58,33 @@ describe('PodcastGateway', () => {
     expect(client.emit).toHaveBeenCalledWith('podcast:subscription:error', { libraryId: 8 });
   });
 
+  it('holds a subscription that arrives mid-handshake until the session check finishes', async () => {
+    const { gateway, jwtService, authService, libraries } = makeGateway();
+    jwtService.verify.mockReturnValue({ sub: 42, ver: 3, sid: 5 });
+    let finishSessionCheck!: (user: object) => void;
+    authService.validateSessionUser.mockReturnValue(new Promise((done) => (finishSessionCheck = done)));
+    libraries.verifyUserAccess.mockResolvedValue(undefined);
+    const client = {
+      id: 'podcast-2',
+      handshake: { auth: { token: 'valid' } },
+      data: {},
+      join: vi.fn().mockResolvedValue(undefined),
+      emit: vi.fn(),
+      disconnect: vi.fn(),
+    };
+
+    const connected = gateway.handleConnection(client as never);
+    const subscribed = gateway.handleSubscribeLibrary(client as never, 7);
+    await Promise.resolve();
+    expect(libraries.verifyUserAccess).not.toHaveBeenCalled();
+
+    finishSessionCheck({ id: 42, username: 'listener', isSuperuser: false });
+    await Promise.all([connected, subscribed]);
+
+    expect(libraries.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
+    expect(client.join).toHaveBeenCalledWith('library:7');
+  });
+
   it('emits podcast events only to the owning library room', () => {
     const { gateway } = makeGateway();
     const emit = vi.fn();

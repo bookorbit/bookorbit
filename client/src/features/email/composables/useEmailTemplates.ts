@@ -21,6 +21,14 @@ export interface EmailTemplateForm {
 const templates = ref<EmailTemplate[]>([])
 let fetchPromise: Promise<void> | null = null
 
+/** A template rendered against a book, with the file a send of that book would attach. */
+export interface TemplateTextPreview {
+  subject: string
+  bodyText: string
+  /** Absent from servers older than this field. */
+  attachment?: { fileName: string; format: string | null; sizeBytes: number | null } | null
+}
+
 export function useEmailTemplates() {
   async function fetchTemplates(): Promise<void> {
     if (fetchPromise) return fetchPromise
@@ -91,5 +99,16 @@ export function useEmailTemplates() {
     return res.json()
   }
 
-  return { templates, fetchTemplates, createTemplate, updateTemplate, deleteTemplate, setDefaultTemplate, previewTemplate }
+  /** Renders text that has not been saved yet against one book. */
+  async function previewTemplateText(subject: string, bodyText: string, bookId: number): Promise<TemplateTextPreview> {
+    const res = await api('/api/v1/email/templates/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject, bodyText, bookId }),
+    })
+    if (!res.ok) throw new Error('Failed to preview template')
+    return res.json()
+  }
+
+  return { templates, fetchTemplates, createTemplate, updateTemplate, deleteTemplate, setDefaultTemplate, previewTemplate, previewTemplateText }
 }

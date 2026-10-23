@@ -1,3 +1,5 @@
+import { realignAudioTrackOrder } from '../../db/audio-track-order';
+import { deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import { basename } from 'path';
@@ -17,6 +19,7 @@ import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/boo
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { MetadataService } from '../metadata/metadata.service';
+import { ScannerService } from '../scanner/scanner.service';
 import { METADATA_AUDIO_FORMATS } from '../metadata/metadata-extraction.service';
 import { computeFileHash } from '../scanner/lib/hash';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
@@ -83,6 +86,7 @@ const METADATA_FORMATS = new Set([
   'cb7',
   'fb2',
   'pdf',
+  'djvu',
   'm4b',
   'm4a',
   'mp3',
@@ -101,6 +105,7 @@ export class UploadProcessorService {
     private readonly coverStore: BookCoverStore,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
+    @Optional() private readonly scanner?: ScannerService,
   ) {}
 
   /** A file joined or left these books, so their cover slots are brought back in line with it. */
@@ -147,6 +152,9 @@ export class UploadProcessorService {
       if (upserted.joinedBook && (fileOptions.role ?? 'content') === 'content') {
         await this.reselectPrimaryFile(tx, upserted.joinedBook);
       }
+      if (upserted.joinedBook && isAudioFormat(format)) {
+        await realignAudioTrackOrder(tx, upserted.bookId);
+      }
       if (uploadSessionId) {
         await tx.update(uploadSessions).set({ resultBookId: upserted.bookId, updatedAt: new Date() }).where(eq(uploadSessions.id, uploadSessionId));
       }
@@ -176,10 +184,12 @@ export class UploadProcessorService {
       const createdBookIds: number[] = [];
       const attachedFileIds: number[] = [];
       const joinedBooks = new Map<number, JoinedBook>();
+      const audioBookIds = new Set<number>();
 
       for (const [index, file] of files.entries()) {
         const result = await this.upsertBookFile(tx, libraryId, libraryFolderId, file, measured[index]!);
         if (!bookIds.includes(result.bookId)) bookIds.push(result.bookId);
+        if (isAudioFormat(file.format)) audioBookIds.add(result.bookId);
         if (result.createdBook) createdBookIds.push(result.bookId);
         // A row on a book this unit created goes away with the book, so only rows attached to a
         // book that was already there need remembering - and only the ones actually inserted,
@@ -192,6 +202,9 @@ export class UploadProcessorService {
           joinedBooks.set(joined.id, joined);
         }
       }
+
+      // The unit numbered its files from zero, which collides with the numbers already on a book it joined.
+      for (const bookId of audioBookIds) await realignAudioTrackOrder(tx, bookId);
 
       const replacedPrimaries: ReplacedPrimary[] = [];
       for (const joined of joinedBooks.values()) {
@@ -213,14 +226,14 @@ export class UploadProcessorService {
 
     await this.db.transaction(async (tx) => {
       if (records.attachedFileIds.length > 0) {
-        await tx.delete(bookFiles).where(inArray(bookFiles.id, records.attachedFileIds));
+        await deleteBookFilesWithHashInvalidation(tx, inArray(bookFiles.id, records.attachedFileIds));
       }
       for (const replaced of records.replacedPrimaries) await this.restorePrimaryFile(tx, replaced);
       if (records.createdBookIds.length > 0) {
         // `books.primary_file_id` is `on delete set null`, so clearing the files first leaves
         // nothing pointing at a row that is about to disappear.
-        await tx.delete(bookFiles).where(inArray(bookFiles.bookId, records.createdBookIds));
-        await tx.delete(books).where(inArray(books.id, records.createdBookIds));
+        await deleteBookFilesWithHashInvalidation(tx, inArray(bookFiles.bookId, records.createdBookIds));
+        await deleteBooksWithHashInvalidation(tx, inArray(books.id, records.createdBookIds));
       }
     });
     // Metadata may already have written covers for the books this unit created.
@@ -393,7 +406,9 @@ export class UploadProcessorService {
         );
         return;
       }
-      await this.metadataService.extractAndSave(bookId, absolutePath, format);
+      // An upload records its own file, so no later scan would apply the library's regex rules to it.
+      const extractedWithRules = (await this.scanner?.extractMetadataWithLibraryRules(bookId)) ?? false;
+      if (!extractedWithRules) await this.metadataService.extractAndSave(bookId, absolutePath, format);
       // The embedded extractor writes the aggregate duration to book_metadata, but the
       // per-file book_files.durationSeconds the player sums is only populated here.
       if (isAudioFormat(format)) {

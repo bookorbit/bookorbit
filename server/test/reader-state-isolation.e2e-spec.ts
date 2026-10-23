@@ -588,20 +588,20 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
       );
     });
 
-    it('returns 403 for reader-state operations against inaccessible libraries', async () => {
+    it('denies inaccessible reader state and conceals book existence', async () => {
       const bookmarkResponse = await ctx.app.inject({
         method: 'GET',
         url: `/api/v1/books/${sharedEpub.bookId}/bookmarks`,
         headers: authHeader(outsider.accessToken),
       });
-      expect(bookmarkResponse.statusCode).toBe(403);
+      expect(bookmarkResponse.statusCode).toBe(404);
 
       const annotationResponse = await ctx.app.inject({
         method: 'GET',
         url: `/api/v1/books/${sharedEpub.bookId}/annotations`,
         headers: authHeader(outsider.accessToken),
       });
-      expect(annotationResponse.statusCode).toBe(403);
+      expect(annotationResponse.statusCode).toBe(404);
 
       const preferenceResponse = await ctx.app.inject({
         method: 'GET',
@@ -649,7 +649,7 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
           manifestRevision: '0'.repeat(64),
         },
       });
-      expect(audioProgressResponse.statusCode).toBe(403);
+      expect(audioProgressResponse.statusCode).toBe(404);
     });
   });
 

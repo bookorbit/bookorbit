@@ -138,7 +138,7 @@ watch([activeIndex, normalizedQuery], () => void scrollActiveIntoView(), { immed
         <button
           v-if="row.expandable"
           type="button"
-          class="flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          class="flex size-7 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           :aria-expanded="!row.isCollapsed"
           :aria-label="
             row.isCollapsed

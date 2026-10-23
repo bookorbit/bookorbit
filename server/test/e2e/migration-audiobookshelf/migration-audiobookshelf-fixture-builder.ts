@@ -20,6 +20,7 @@ import {
 const execFile = promisify(execFileCallback);
 const requireInstaller = createRequire(__filename);
 const MAYA_CFI = 'epubcfi(/6/2[chapter]!/4/2/2:5)';
+const THEO_MAP_STARTED_AT = '2025-01-10T12:30:00.000Z';
 const THEO_MAP_FINISHED_AT = '2025-01-15T12:30:00.000Z';
 const THEO_BRASS_FINISHED_AT = '2025-02-20T08:45:00.000Z';
 
@@ -54,6 +55,7 @@ export interface AudiobookshelfMigrationScenario {
   targetBooks: Record<'glass' | 'map' | 'brass' | 'northbound', SeededTargetBook>;
   expected: {
     mayaCfi: string;
+    theoMapStartedAt: string;
     theoMapFinishedAt: string;
     theoBrassFinishedAt: string;
   };
@@ -195,7 +197,7 @@ export async function seedAudiobookshelfMigrationScenario(ctx: MigrationAudioboo
       ebookProgress: 1,
       isFinished: true,
       finishedAt: THEO_MAP_FINISHED_AT,
-      createdAt: '2025-01-10T12:30:00.000Z',
+      createdAt: THEO_MAP_STARTED_AT,
     }),
     setProgress(ctx.audiobookshelf, theo.token, sourceItems.brass.id, {
       duration: 30,
@@ -203,7 +205,9 @@ export async function seedAudiobookshelfMigrationScenario(ctx: MigrationAudioboo
       progress: 1,
       isFinished: true,
       finishedAt: THEO_BRASS_FINISHED_AT,
-      createdAt: '2025-02-10T08:45:00.000Z',
+      // ABS reports a progress row's creation time as its start, while clients set the finish
+      // date freely, so a backfilled finish lands before the start (issue 1678).
+      createdAt: '2025-03-05T08:45:00.000Z',
     }),
     setProgress(ctx.audiobookshelf, lina.token, sourceItems.glass.id, {
       duration: 150,
@@ -239,7 +243,12 @@ export async function seedAudiobookshelfMigrationScenario(ctx: MigrationAudioboo
     sourceItems,
     targetUsers,
     targetBooks,
-    expected: { mayaCfi: MAYA_CFI, theoMapFinishedAt: THEO_MAP_FINISHED_AT, theoBrassFinishedAt: THEO_BRASS_FINISHED_AT },
+    expected: {
+      mayaCfi: MAYA_CFI,
+      theoMapStartedAt: THEO_MAP_STARTED_AT,
+      theoMapFinishedAt: THEO_MAP_FINISHED_AT,
+      theoBrassFinishedAt: THEO_BRASS_FINISHED_AT,
+    },
   };
 }
 

@@ -7,6 +7,7 @@ import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubOverview } from '@bookor
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import AnnotationBookThumb from '../AnnotationBookThumb.vue'
 import AnnotationActivitySpark from '../shared/AnnotationActivitySpark.vue'
+import { annotationSourceKey } from '@/features/annotations/lib/source-label'
 
 const props = defineProps<{
   overview: AnnotationHubOverview
@@ -44,7 +45,7 @@ function colorName(hex: string): string {
 }
 
 function deviceLabel(device: AnnotationHubOverview['devices'][number]): string {
-  return device.deviceName ?? t(`annotations.sources.${device.source}`)
+  return device.deviceName ?? t(annotationSourceKey(device.source))
 }
 
 function handleReview() {
@@ -68,6 +69,7 @@ function handleOpenTrash() {
         class="ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[11px] font-semibold transition-colors"
         :class="trashOpen ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
         :aria-pressed="trashOpen"
+        :aria-label="t('annotations.hub.trashToggle', { count: overview.trashed })"
         @click="handleOpenTrash"
       >
         <Trash2 :size="12" />
@@ -130,13 +132,13 @@ function handleOpenTrash() {
             v-for="entry in overview.originBreakdown"
             :key="entry.origin"
             type="button"
-            class="-mx-1 inline-flex h-6 items-center gap-1.5 rounded px-1 text-[11.5px] transition-colors"
+            class="-mx-1 inline-flex h-6 items-center gap-1.5 rounded-xs px-1 text-[11.5px] transition-colors"
             :class="selectedOrigin === entry.origin ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
             :aria-pressed="selectedOrigin === entry.origin"
             @click="emit('toggleOrigin', entry.origin)"
           >
             <span class="size-1.5 rounded-full" :style="{ backgroundColor: `var(--pill-${entry.origin})` }" />
-            {{ t(`annotations.sources.${entry.origin}`) }}
+            {{ t(annotationSourceKey(entry.origin)) }}
             <b class="font-semibold text-foreground">{{ formatNumber(entry.count) }}</b>
           </button>
         </div>
@@ -151,7 +153,7 @@ function handleOpenTrash() {
             </p>
             <button
               type="button"
-              class="-mx-1 mt-0.5 inline-flex h-6 items-center rounded px-1 text-[11.5px] font-semibold text-[var(--pill-repaired)] underline underline-offset-2"
+              class="-mx-1 mt-0.5 inline-flex h-6 items-center rounded-xs px-1 text-[11.5px] font-semibold text-[var(--pill-repaired)] underline underline-offset-2"
               @click="handleReview"
             >
               {{ t('annotations.hub.reviewThem') }}
@@ -183,7 +185,7 @@ function handleOpenTrash() {
         <RouterLink
           v-if="overview.books > overview.shelf.length"
           :to="{ name: 'libraries' }"
-          class="mt-1 inline-flex h-6 flex-none items-center gap-1 rounded px-1.5 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:text-primary"
+          class="mt-1 inline-flex h-6 flex-none items-center gap-1 rounded-xs px-1.5 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:text-primary"
         >
           {{ t('annotations.hub.allBooks', { count: overview.books }) }}
           <ChevronRight :size="10" />

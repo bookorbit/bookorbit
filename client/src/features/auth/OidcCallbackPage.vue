@@ -5,7 +5,9 @@ import { useRouter } from 'vue-router'
 import type { OidcCallbackResponse } from '@bookorbit/types'
 import { OidcErrorCode } from '@bookorbit/types'
 import { setAccessToken } from '@/lib/api'
-import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
+import { CircleAlert, LoaderCircle } from '@lucide/vue'
+import AuthAlert from './components/AuthAlert.vue'
+import AuthPlate from './components/AuthPlate.vue'
 import { useAuth } from './composables/useAuth'
 import { useOidc, OidcLoginError } from './composables/useOidc'
 
@@ -83,22 +85,20 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
-    <div class="w-full max-w-sm text-center">
-      <h1 class="text-2xl font-serif font-semibold text-foreground mb-6">Book<span class="text-primary"> Orbit</span></h1>
-
-      <div v-if="!error" class="space-y-3">
-        <div class="flex justify-center">
-          <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-        <p class="text-sm text-muted-foreground">{{ t('auth.oidc.completingSignIn') }}</p>
-      </div>
-
-      <div v-else class="space-y-4">
-        <p class="text-sm text-destructive">{{ error }}</p>
-        <RouterLink to="/login" class="text-sm text-primary hover:underline">{{ t('auth.oidc.tryAgain') }}</RouterLink>
-      </div>
+  <AuthPlate :heading="error ? t('auth.oidc.loginFailed') : t('auth.oidc.completingSignIn')">
+    <div v-if="!error" class="flex justify-center py-2" role="status" :aria-label="t('auth.oidc.completingSignIn')">
+      <LoaderCircle :size="24" class="animate-spin text-primary" aria-hidden="true" />
     </div>
-    <PublicLegalNotices />
-  </div>
+
+    <template v-else>
+      <AuthAlert :icon="CircleAlert">{{ error }}</AuthAlert>
+      <p class="mt-[1.375rem] text-center font-serif text-[0.9375rem]">
+        <RouterLink
+          to="/login"
+          class="font-medium text-primary hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >{{ t('auth.oidc.tryAgain') }}</RouterLink
+        >
+      </p>
+    </template>
+  </AuthPlate>
 </template>

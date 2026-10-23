@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Clock, Play } from '@lucide/vue'
 import { useRouter } from 'vue-router'
-import { FORMAT_TO_GROUP } from '@bookorbit/types'
+import { isComicFormat } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -17,7 +17,7 @@ const { coverUrl } = useCoverVersions()
 
 const isComic = computed(() => {
   const format = data.value?.fileFormat
-  return format != null && FORMAT_TO_GROUP[format] === 'cbx'
+  return format != null && isComicFormat(format)
 })
 
 function goToBook() {
@@ -48,8 +48,8 @@ function startReading() {
 
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col items-center justify-center gap-3">
-      <div class="h-16 w-12 animate-pulse rounded bg-muted" />
-      <div class="h-3 w-20 animate-pulse rounded bg-muted" />
+      <div class="h-16 w-12 animate-pulse rounded-xs bg-muted" />
+      <div class="h-3 w-20 animate-pulse rounded-xs bg-muted" />
     </div>
 
     <!-- Error -->
@@ -72,7 +72,7 @@ function startReading() {
           tag="button"
           type="button"
           size="mini"
-          class="book-cover-surface--spine-fitted h-24 w-18 shrink-0 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
+          class="book-cover-surface--spine-fitted h-24 w-18 shrink-0 cursor-pointer overflow-hidden rounded-xs transition-opacity hover:opacity-80"
           :is-comic="isComic"
           @click="goToBook"
         >

@@ -1,53 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Moon, Sun, Wallpaper } from '@lucide/vue'
-import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
+import { CircleAlert } from '@lucide/vue'
+import AuthAlert from './components/AuthAlert.vue'
+import AuthField from './components/AuthField.vue'
+import AuthPlate from './components/AuthPlate.vue'
+import AuthSubmit from './components/AuthSubmit.vue'
 import { useAuth } from './composables/useAuth'
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
-const accentOpen = ref(false)
-const radiusOpen = ref(false)
-const backgroundOpen = ref(false)
-const currentAccent = computed(() => ACCENT_OPTIONS.find((o) => o.id === themeStore.accent))
-
-function radiusPreview(id: string): string {
-  const map: Record<string, string> = {
-    sharp: '0px',
-    default: '4px',
-    rounded: '8px',
-    pill: '999px',
-  }
-  return map[id] ?? '4px'
-}
-
-function openRadius() {
-  radiusOpen.value = !radiusOpen.value
-  accentOpen.value = false
-  backgroundOpen.value = false
-}
-
-function openBackground() {
-  backgroundOpen.value = !backgroundOpen.value
-  accentOpen.value = false
-  radiusOpen.value = false
-}
-
-function openAccent() {
-  accentOpen.value = !accentOpen.value
-  radiusOpen.value = false
-  backgroundOpen.value = false
-}
-
-function closeAll() {
-  accentOpen.value = false
-  radiusOpen.value = false
-  backgroundOpen.value = false
-}
-
 const { setup } = useAuth()
 
 const username = ref('')
@@ -86,281 +47,39 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="login-bg min-h-screen flex flex-col items-center justify-center gap-3 px-4 overflow-hidden">
-    <!-- Compact theme picker -->
-    <div class="fixed bottom-5 right-5 z-20 flex items-center gap-1.5">
-      <!-- Dark / light toggle -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button class="theme-btn" @click="themeStore.toggleTheme()">
-            <Sun v-if="themeStore.resolvedTheme === 'dark'" :size="14" />
-            <Moon v-else :size="14" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{{
-          themeStore.resolvedTheme === 'dark' ? t('auth.themePicker.switchToLight') : t('auth.themePicker.switchToDark')
-        }}</TooltipContent>
-      </Tooltip>
-
-      <!-- Radius picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="radiusOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg">
-            <div class="flex items-center gap-1.5">
-              <Tooltip v-for="opt in RADIUS_OPTIONS" :key="opt.id">
-                <TooltipTrigger as-child>
-                  <button
-                    class="flex items-center justify-center w-8 h-8 rounded-lg transition-all focus:outline-none"
-                    :class="
-                      themeStore.radius === opt.id
-                        ? 'text-primary bg-primary/10'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
-                    "
-                    @click="themeStore.setRadius(opt.id)"
-                  >
-                    <span class="w-4 h-4 border-2 border-current block" :style="{ borderRadius: radiusPreview(opt.id) }" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ opt.label }}</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </Transition>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openRadius()">
-              <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeRadius') }}</TooltipContent>
-        </Tooltip>
+  <AuthPlate :heading="t('auth.setup.title')" :description="t('auth.setup.subtitle')" wide>
+    <form class="flex flex-col gap-[1.125rem]" @submit.prevent="handleSubmit">
+      <AuthAlert v-if="error" :icon="CircleAlert">{{ error }}</AuthAlert>
+      <div class="grid gap-[1.125rem] sm:grid-cols-2">
+        <AuthField id="setup-username" v-model="username" :label="t('auth.fields.username')" autocomplete="username" required :disabled="loading" />
+        <AuthField id="setup-name" v-model="name" :label="t('auth.fields.fullName')" autocomplete="name" required :disabled="loading" />
       </div>
-
-      <!-- Background picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="backgroundOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg w-64 max-h-72 overflow-y-auto">
-            <div class="grid grid-cols-5 gap-1.5">
-              <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
-                <TooltipTrigger as-child>
-                  <button
-                    class="w-full h-9 rounded overflow-hidden ring-2 transition-all focus:outline-none shrink-0"
-                    :class="
-                      themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
-                    "
-                    @click="themeStore.setBackground(opt.id)"
-                  >
-                    <div class="w-full h-full bg-background pattern-preview" :class="opt.cssClass" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ opt.label }}</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </Transition>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openBackground()">
-              <Wallpaper :size="14" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeBackground') }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <!-- Accent picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-lg space-y-2 w-96 max-w-[calc(100vw-2rem)]">
-            <div class="overflow-x-auto no-scrollbar px-1 py-0.5">
-              <div class="space-y-2 w-max">
-                <div v-for="(row, rowIndex) in ACCENT_ROWS" :key="rowIndex" class="flex items-center gap-1.5">
-                  <Tooltip v-for="opt in row" :key="opt.id">
-                    <TooltipTrigger as-child>
-                      <button
-                        class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card shrink-0"
-                        :class="opt.swatchClass"
-                        :aria-label="t(opt.labelKey)"
-                        :style="{
-                          backgroundColor: opt.color,
-                          outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                          outlineOffset: '2px',
-                          transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
-                        }"
-                        @click="themeStore.setAccent(opt.id)"
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent>{{ t(opt.labelKey) }}</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Transition>
-
-        <!-- Swatch button showing current accent -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openAccent()">
-              <span class="w-3.5 h-3.5 rounded-full block" :class="currentAccent?.swatchClass" :style="{ backgroundColor: currentAccent?.color }" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
-        </Tooltip>
-      </div>
-    </div>
-
-    <!-- Click-outside backdrop -->
-    <div v-if="accentOpen || radiusOpen || backgroundOpen" class="fixed inset-0 z-10" @click="closeAll()" />
-
-    <div class="login-card relative z-10 w-full max-w-md rounded-2xl p-8">
-      <div class="mb-6">
-        <h1 class="text-xl font-semibold text-foreground">{{ t('auth.setup.title') }}</h1>
-        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.setup.subtitle') }}</p>
-      </div>
-
-      <form class="space-y-4" @submit.prevent="handleSubmit">
-        <div class="space-y-1.5">
-          <label for="setup-username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
-          <input
-            id="setup-username"
-            v-model="username"
-            type="text"
-            autocomplete="username"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="setup-name" class="text-sm font-medium text-foreground">{{ t('auth.fields.fullName') }}</label>
-          <input
-            id="setup-name"
-            v-model="name"
-            type="text"
-            autocomplete="name"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="setup-email" class="text-sm font-medium text-foreground">{{ t('auth.fields.email') }}</label>
-          <input
-            id="setup-email"
-            v-model="email"
-            type="email"
-            autocomplete="email"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="setup-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.password') }}</label>
-          <input
-            id="setup-password"
-            v-model="password"
-            type="password"
-            autocomplete="new-password"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-          <p class="text-xs text-muted-foreground">{{ t('auth.fields.passwordHint') }}</p>
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="setup-confirm-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.confirmPassword') }}</label>
-          <input
-            id="setup-confirm-password"
-            v-model="confirmPassword"
-            type="password"
-            autocomplete="new-password"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="setup-token" class="text-sm font-medium text-foreground">
-            {{ t('auth.setup.setupToken') }}
-            <span class="text-muted-foreground">{{ t('auth.setup.setupTokenHint') }}</span>
-          </label>
-          <input
-            id="setup-token"
-            v-model="setupToken"
-            type="text"
-            autocomplete="off"
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
-
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {{ loading ? t('auth.setup.creatingAccount') : t('auth.setup.createAccount') }}
-        </button>
-      </form>
-    </div>
-    <PublicLegalNotices />
-  </div>
+      <AuthField id="setup-email" v-model="email" :label="t('auth.fields.email')" type="email" autocomplete="email" required :disabled="loading" />
+      <AuthField
+        id="setup-password"
+        v-model="password"
+        :label="t('auth.fields.password')"
+        type="password"
+        autocomplete="new-password"
+        required
+        :hint="t('auth.fields.passwordHint')"
+        :disabled="loading"
+      />
+      <AuthField
+        id="setup-confirm-password"
+        v-model="confirmPassword"
+        :label="t('auth.fields.confirmPassword')"
+        type="password"
+        autocomplete="new-password"
+        required
+        :disabled="loading"
+      />
+      <AuthField id="setup-token" v-model="setupToken" :label="t('auth.setup.setupToken')" autocomplete="off" :disabled="loading">
+        <template #aside>
+          <span class="text-xs text-muted-foreground">{{ t('auth.setup.setupTokenHint') }}</span>
+        </template>
+      </AuthField>
+      <AuthSubmit :label="t('auth.setup.createAccount')" :loading-label="t('auth.setup.creatingAccount')" :loading="loading" />
+    </form>
+  </AuthPlate>
 </template>
-
-<style scoped>
-.login-bg {
-  position: relative;
-}
-
-.theme-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 9999px;
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--elevation-md);
-  color: var(--muted-foreground);
-  transition: color 0.15s ease;
-}
-
-.theme-btn:hover {
-  color: var(--foreground);
-}
-
-.accent-popover {
-  background: color-mix(in oklch, var(--card) 80%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--elevation-lg);
-}
-
-.popover-enter-active,
-.popover-leave-active {
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
-}
-
-.popover-enter-from,
-.popover-leave-to {
-  opacity: 0;
-  transform: translateY(4px) scale(0.97);
-}
-
-.login-card {
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--elevation-xl);
-}
-</style>

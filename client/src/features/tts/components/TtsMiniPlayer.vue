@@ -229,7 +229,7 @@ onUnmounted(() => {
       <div v-else-if="isMiniMode" class="bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
         <div class="flex items-center gap-2 px-3 py-2.5">
           <button
-            class="flex-shrink-0 w-8 h-10 rounded bg-muted overflow-hidden flex items-center justify-center"
+            class="flex-shrink-0 w-8 h-10 rounded-xs bg-muted overflow-hidden flex items-center justify-center"
             :aria-label="t('tts.player.openDetails')"
             @click="openExpanded"
           >

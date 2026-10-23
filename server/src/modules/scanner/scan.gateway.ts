@@ -24,7 +24,9 @@ import {
   type BookProgressChangedPayload,
 } from '../achievement/achievement-events.service';
 import { ScanJobStore } from './scan-job-store.service';
-import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
+import { ScannerRepository } from './scanner.repository';
+import type { RequestUser } from '../../common/types/request-user';
+import { rejectSocketConnection, resolveSocketUser, trackSocketHandshake } from '../../common/utils/ws-auth.utils';
 import { appConfig } from '../../config/config';
 import { BOOK_COVER_CHANGED, BookCoverEventsService } from '../book-cover-store/book-cover-events.service';
 
@@ -44,6 +46,7 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     private readonly jwtService: JwtService,
     private readonly authService: AuthService,
     private readonly scanJobStore: ScanJobStore,
+    private readonly scannerRepository: ScannerRepository,
     private readonly achievementEvents: AchievementEventsService,
     @Inject(appConfig.KEY) app: ConfigType<typeof appConfig>,
     @Optional() private readonly coverEvents?: BookCoverEventsService,
@@ -71,6 +74,10 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   }
 
   async handleConnection(client: Socket): Promise<void> {
+    await trackSocketHandshake(client, this.authenticate(client));
+  }
+
+  private async authenticate(client: Socket): Promise<RequestUser | null> {
     try {
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new UnauthorizedException('No token provided');
@@ -82,11 +89,13 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       (client.data as Record<string, unknown>).user = user;
       await client.join(`user:${user.id}`);
       this.logger.debug(`[scanner.ws_connection] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
+      return user;
     } catch (err) {
       this.logger.warn(
         `[scanner.ws_connection] [fail] socketId=${client.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - websocket rejected`,
       );
       rejectSocketConnection(client, err);
+      return null;
     }
   }
 
@@ -94,9 +103,19 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     this.logger.debug(`[scanner.ws_connection] [end] socketId=${client.id} - websocket disconnected`);
   }
 
+  /**
+   * A library room carries the library's book cards and scan counts, so joining one needs the same
+   * access as reading the library over HTTP.
+   */
   @SubscribeMessage('subscribe:library')
-  handleSubscribeLibrary(client: Socket, libraryId: number): void {
-    void client.join(`library:${libraryId}`);
+  async handleSubscribeLibrary(client: Socket, libraryId: number): Promise<void> {
+    const user = await resolveSocketUser(client);
+    if (!user || !Number.isSafeInteger(libraryId) || libraryId <= 0) return;
+    if (!user.isSuperuser && !(await this.scannerRepository.hasLibraryAccess(user.id, libraryId))) {
+      this.logger.debug(`[scanner.ws_subscribe] [fail] userId=${user.id} libraryId=${libraryId} socketId=${client.id} - no library access`);
+      return;
+    }
+    await client.join(`library:${libraryId}`);
     // Send current snapshot immediately so reconnecting clients catch up.
     const entry = this.scanJobStore.get(libraryId);
     if (entry) {

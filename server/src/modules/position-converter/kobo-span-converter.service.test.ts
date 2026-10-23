@@ -77,8 +77,8 @@ async function buildEpub(path: string): Promise<void> {
   await writeFile(path, Buffer.concat(chunks));
 }
 
-function makeDb(absolutePath: string) {
-  const limit = vi.fn().mockResolvedValue([{ absolutePath, format: 'epub' }]);
+function makeDb(absolutePath: string, format = 'epub') {
+  const limit = vi.fn().mockResolvedValue([{ absolutePath, format }]);
   const where = vi.fn().mockReturnValue({ limit });
   const from = vi.fn().mockReturnValue({ where });
   const select = vi.fn().mockReturnValue({ from });
@@ -113,6 +113,50 @@ describe('KoboSpanConverterService (real kepubify output)', () => {
 
   afterAll(async () => {
     await rm(dir, { recursive: true, force: true });
+  });
+
+  it('round-trips native KEPUB bookmarks and highlights through canonical EPUB positions', async () => {
+    const nativeDb = makeDb(kepubPath, 'kepub');
+    const nativeDom = new EpubDomService(nativeDb as never);
+    const nativeConverter = new KoboSpanConverterService(nativeDom, kepubDom);
+    const nativeContext = { ...ctx, kepubifyVersion: 'native-kepub' };
+    const originalDoc = (await epubDom.getChapter(1, 0))!;
+    const nativeCanonicalDoc = (await nativeDom.getChapter(2, 0))!;
+    expect(nativeCanonicalDoc.index.collapsed).toBe(originalDoc.index.collapsed);
+    const raw = (await kepubDom.getChapterByIndex(kepubPath, 0))!;
+    const span = buildKoboSpanIndex(raw).ordered.find((entry) =>
+      raw.index.extractCollapsed(entry.collapsedStart, entry.collapsedEnd).includes('clocks'),
+    )!;
+    const original = await service.koboBookmarkToPositions({ bookFileId: 1, ctx, chapterFilename: 'OEBPS/text/ch1.xhtml', spanId: span.id });
+    const native = await nativeConverter.koboBookmarkToPositions({
+      bookFileId: 2,
+      ctx: nativeContext,
+      chapterFilename: 'OEBPS/text/ch1.xhtml',
+      spanId: span.id,
+    });
+    expect(native.status).toBe('exact');
+    expect(native.cfi).toBe(original.cfi);
+    expect(native.xpointer).toBe(original.xpointer);
+    const bookmark = await nativeConverter.cfiPointToKoboBookmark({ bookFileId: 2, ctx: nativeContext, cfi: native.cfi! });
+    expect(bookmark).toMatchObject({ status: 'exact', spanId: span.id, chapterFilename: 'OEBPS/text/ch1.xhtml' });
+    const highlight = await nativeConverter.koboSpanToCanonical({
+      bookFileId: 2,
+      ctx: nativeContext,
+      location: {
+        span: {
+          startPath: spanSelectorFromId(span.id),
+          startChar: 0,
+          endPath: spanSelectorFromId(span.id),
+          endChar: 10,
+          chapterFilename: 'OEBPS/text/ch1.xhtml',
+        },
+      },
+      text: null,
+    });
+    expect(highlight.status).toBe('exact');
+    expect(highlight.cfi).not.toContain('kobo.');
+    const restored = await nativeConverter.canonicalToKoboSpan({ bookFileId: 2, ctx: nativeContext, cfi: highlight.cfi!, text: null });
+    expect(restored).toMatchObject({ status: 'exact', pos0: `${span.id}:0`, pos1: `${span.id}:10` });
   });
 
   it('produces collapse-identical chapter text for every chapter (R1 gate)', async () => {

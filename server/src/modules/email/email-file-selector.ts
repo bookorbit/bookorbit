@@ -14,7 +14,7 @@ function isSendable(file: BookFile): boolean {
 export class EmailFileSelector {
   constructor(private readonly bookReadRepository: EmailBookReadRepository) {}
 
-  async select(bookId: number, fileId: number | null | undefined, preferredFormat: string | null | undefined): Promise<BookFile> {
+  async select(bookId: number, fileId: number | null | undefined, preferredFormat: string | null | undefined, original = false): Promise<BookFile> {
     if (fileId !== null && fileId !== undefined) {
       const file = await this.bookReadRepository.findFileForBook(bookId, fileId);
       if (!file || !isSendable(file)) throw new NotFoundException('Book file not found');
@@ -35,10 +35,15 @@ export class EmailFileSelector {
       const wanted = preferredFormat.toLowerCase();
       const matches = sendable.filter((file) => file.format?.toLowerCase() === wanted);
       // An e-reader gets the plain EPUB when a book has one beside its read-along copy.
-      const match = matches.find((file) => !file.mediaOverlayAvailable) ?? matches[0];
+      const match =
+        original && wanted === 'epub'
+          ? (matches.find((file) => file.mediaOverlayAvailable) ?? matches[0])
+          : (matches.find((file) => !file.mediaOverlayAvailable) ?? matches[0]);
       if (match) return match;
     }
 
-    return sendable[0];
+    return original && sendable[0].format?.toLowerCase() === 'epub'
+      ? (sendable.find((file) => file.format?.toLowerCase() === 'epub' && file.mediaOverlayAvailable) ?? sendable[0])
+      : sendable[0];
   }
 }

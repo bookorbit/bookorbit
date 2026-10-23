@@ -47,7 +47,7 @@ function handleKeydown(event: KeyboardEvent) {
       role="radio"
       :aria-checked="props.modelValue === option.value"
       :tabindex="props.modelValue === option.value ? 0 : -1"
-      class="inline-flex h-7 items-center rounded px-3 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+      class="inline-flex h-7 items-center rounded-xs px-3 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
       :class="
         props.modelValue === option.value
           ? 'bg-background font-semibold text-foreground shadow-xs'

@@ -8,6 +8,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateEmailTemplateDto } from './dto/create-email-template.dto';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { PreviewTemplateDto } from './dto/preview-template.dto';
+import { PreviewTemplateTextDto } from './dto/preview-template-text.dto';
 import { EmailTemplateService } from './email-template.service';
 
 @Controller('email/templates')
@@ -68,6 +69,13 @@ export class EmailTemplateController {
   })
   setDefault(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.setDefault(id, user);
+  }
+
+  /** Renders text from the editor before it is saved. */
+  @Post('preview')
+  @HttpCode(HttpStatus.OK)
+  previewText(@Body() dto: PreviewTemplateTextDto, @CurrentUser() user: RequestUser) {
+    return this.service.previewText(dto.subject, dto.bodyText, dto.bookId, user);
   }
 
   @Post(':id/preview')

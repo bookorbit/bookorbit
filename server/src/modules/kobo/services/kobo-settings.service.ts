@@ -15,7 +15,9 @@ export interface KoboSettings {
   kepubConversionLimitMb: number;
   twoWayProgressSync: boolean;
   syncBookOrbitAnnotationsToKobo: boolean;
+  readAloudDelivery?: 'original' | 'audioless_epub' | null;
   storeSync: boolean;
+  fullSizeCovers: boolean;
 }
 
 @Injectable()
@@ -51,7 +53,9 @@ export class KoboSettingsService {
       kepubConversionLimitMb: row.kepubConversionLimitMb,
       twoWayProgressSync: row.twoWayProgressSync,
       syncBookOrbitAnnotationsToKobo: row.syncBookOrbitAnnotationsToKobo,
+      readAloudDelivery: row.readAloudDelivery,
       storeSync: row.storeSync,
+      fullSizeCovers: row.fullSizeCovers,
     };
   }
 
@@ -78,7 +82,9 @@ export class KoboSettingsService {
         kepubConversionLimitMb: patch.kepubConversionLimitMb ?? current.kepubConversionLimitMb,
         twoWayProgressSync: newTwoWayProgressSync,
         syncBookOrbitAnnotationsToKobo: newAnnotationSync,
+        readAloudDelivery: patch.readAloudDelivery === undefined ? current.readAloudDelivery : patch.readAloudDelivery,
         storeSync: patch.storeSync ?? current.storeSync,
+        fullSizeCovers: patch.fullSizeCovers ?? current.fullSizeCovers,
         updatedAt: sql`now()`,
       })
       .where(eq(schema.koboSyncSettings.userId, userId))
@@ -100,7 +106,9 @@ export class KoboSettingsService {
       kepubConversionLimitMb: updated.kepubConversionLimitMb,
       twoWayProgressSync: updated.twoWayProgressSync,
       syncBookOrbitAnnotationsToKobo: updated.syncBookOrbitAnnotationsToKobo,
+      readAloudDelivery: updated.readAloudDelivery,
       storeSync: updated.storeSync,
+      fullSizeCovers: updated.fullSizeCovers,
     };
   }
 

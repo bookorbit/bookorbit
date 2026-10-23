@@ -13,6 +13,11 @@ const writerParser = new XMLParser({
   isArray: (name) => ['dc:creator', 'dc:identifier', 'dc:subject', 'dc:title', 'meta', 'item', 'link', 'reference'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
+  // Everything the writer does not replace is written back from this parse, so it must come
+  // through as it was: number parsing turns an identifier like 0441172717 into 441172717, and an
+  // undecoded character reference (&#169;) has its ampersand escaped again on the way out.
+  parseTagValue: false,
+  htmlEntities: true,
 });
 
 const writerBuilder = new XMLBuilder({
@@ -27,6 +32,10 @@ type OrderedNode = Record<string, unknown>;
 
 const EPUB_WRITABLE_FIELDS = new Set<BookWritePayloadKey>(EPUB_BOOK_FILE_WRITE_FIELDS);
 const CUSTOM_METADATA_PREFIX = `${APP_WRITE_NAMESPACE}:custom:`;
+const OPF_NS_URI = 'http://www.idpf.org/2007/opf';
+const DC_NS_URI = 'http://purl.org/dc/elements/1.1/';
+const MAIN_TITLE_ID = 't-main';
+const SUBTITLE_ID = 't-sub';
 
 function attr(obj: Record<string, unknown>, key: string): string {
   const v = obj[key];
@@ -84,8 +93,14 @@ function localName(tag: string): string {
   return tag.split(':').at(-1) ?? '';
 }
 
-function opfElementName(tag: string): string {
-  return tag.startsWith('opf:') ? tag.slice(4) : tag;
+// A file may bind Dublin Core to any prefix, on <package>, <metadata>, or the element itself. A
+// literal dc: always counts: older files bind it to a legacy URI or leave it undeclared.
+function isDublinCore(tag: string, scopes: Record<string, unknown>[]): boolean {
+  if (tag.startsWith('dc:')) return true;
+  const separatorIndex = tag.indexOf(':');
+  const declaration = separatorIndex === -1 ? '@_xmlns' : `@_xmlns:${tag.slice(0, separatorIndex)}`;
+  const binding = scopes.map((scope) => attr(scope, declaration)).find((uri) => uri !== '');
+  return binding === DC_NS_URI;
 }
 
 function childTag(parentTag: string, name: string): string {
@@ -109,55 +124,55 @@ function makeEmptyNode(tag: string, attrs: Record<string, unknown> = {}): Ordere
   return node;
 }
 
-// Strips known metadata elements, returns cleaned array + UID node + version
-function stripMetadata(children: OrderedNode[], uidRef: string): { cleaned: OrderedNode[]; uidNode: OrderedNode | null } {
-  const KNOWN_DC = new Set(['dc:title', 'dc:creator', 'dc:description', 'dc:publisher', 'dc:date', 'dc:language', 'dc:subject', 'dc:identifier']);
+// Strips known metadata elements, returns cleaned array + UID node. Elements are matched by local
+// name: a file can bind the OPF namespace to any prefix, and buildFreshMetadata writes its metas
+// under whatever prefix <metadata> carries, so matching a literal prefix would leave them behind.
+function stripMetadata(
+  children: OrderedNode[],
+  uidRef: string,
+  ancestorAttrs: Record<string, unknown>[],
+): { cleaned: OrderedNode[]; uidNode: OrderedNode | null } {
+  const KNOWN_DC = new Set(['title', 'creator', 'description', 'publisher', 'date', 'language', 'subject', 'identifier']);
 
   const CALIBRE_SERIES_NAMES = new Set(['calibre:series', 'calibre:series_index']);
 
   const BELONGS_TO_COLLECTION_PROPS = new Set(['belongs-to-collection', 'collection-type', 'group-position', 'dcterms:modified']);
 
-  // Collect ids of dc:creator nodes so we can remove their refines
-  const creatorIds = new Set<string>();
-  // Collect id of belonging-to-collection so we can remove their refines
-  const collectionIds = new Set<string>();
+  const knownDcName = (node: OrderedNode): string | null => {
+    const tag = nodeTagName(node);
+    const name = localName(tag);
+    return KNOWN_DC.has(name) && isDublinCore(tag, [getNodeAttrs(node), ...ancestorAttrs]) ? name : null;
+  };
+  const isUidNode = (node: OrderedNode): boolean => knownDcName(node) === 'identifier' && attr(getNodeAttrs(node), '@_id') === uidRef;
+  const isMeta = (node: OrderedNode): boolean => localName(nodeTagName(node)) === 'meta';
+
+  // Collect the id of every element being replaced so the metas refining it are removed with it.
+  // The replacements get new ids, so a refinement left behind dangles, and the ones written for
+  // the title ids would pile up on every save. Those two ids are always included: earlier versions
+  // left their refinements in the file when the title or subtitle itself was removed.
+  const replacedIds = new Set<string>([MAIN_TITLE_ID, SUBTITLE_ID]);
 
   for (const node of children) {
-    const tag = opfElementName(nodeTagName(node));
-    if (tag === 'dc:creator') {
-      const id = attr(getNodeAttrs(node), '@_id');
-      if (id) creatorIds.add(id);
-    }
-    if (tag === 'meta') {
-      const nodeAttrs = getNodeAttrs(node);
-      const prop = attr(nodeAttrs, '@_property');
-      if (prop === 'belongs-to-collection') {
-        const id = attr(nodeAttrs, '@_id');
-        if (id) collectionIds.add(id);
-      }
-    }
+    const nodeAttrs = getNodeAttrs(node);
+    const id = attr(nodeAttrs, '@_id');
+    if (!id) continue;
+    const isReplaced = knownDcName(node) !== null ? !isUidNode(node) : isMeta(node) && attr(nodeAttrs, '@_property') === 'belongs-to-collection';
+    if (isReplaced) replacedIds.add(id);
   }
 
   let uidNode: OrderedNode | null = null;
   const cleaned: OrderedNode[] = [];
 
   for (const node of children) {
-    const tag = opfElementName(nodeTagName(node));
     const nodeAttrs = getNodeAttrs(node);
 
-    if (KNOWN_DC.has(tag)) {
-      // Preserve the unique-identifier dc:identifier
-      if (tag === 'dc:identifier') {
-        const nodeId = attr(nodeAttrs, '@_id');
-        if (nodeId === uidRef) {
-          uidNode = node;
-        }
-      }
-      // All other known DC elements are stripped
+    if (knownDcName(node) !== null) {
+      // Preserve the unique-identifier dc:identifier; all other known DC elements are stripped
+      if (isUidNode(node)) uidNode = node;
       continue;
     }
 
-    if (tag === 'meta') {
+    if (isMeta(node)) {
       const name = attr(nodeAttrs, '@_name');
       const prop = attr(nodeAttrs, '@_property');
       const refines = attr(nodeAttrs, '@_refines');
@@ -166,10 +181,10 @@ function stripMetadata(children: OrderedNode[], uidRef: string): { cleaned: Orde
       if (CALIBRE_SERIES_NAMES.has(name)) continue;
       // Strip belongs-to-collection and its refines
       if (BELONGS_TO_COLLECTION_PROPS.has(prop)) continue;
-      // Strip refines that point to creator ids or collection ids
+      // Strip refines that point to a replaced element
       if (refines) {
         const refId = refines.startsWith('#') ? refines.slice(1) : refines;
-        if (creatorIds.has(refId) || collectionIds.has(refId)) continue;
+        if (replacedIds.has(refId)) continue;
       }
       // Strip bookorbit: named metas
       if (name.startsWith(`${APP_WRITE_NAMESPACE}:`)) continue;
@@ -192,8 +207,8 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
   // dc:title
   if (payload.title != null) {
     if (epubVersion === 3) {
-      nodes.push(makeTextNode('dc:title', payload.title, { '@_id': 't-main' }));
-      nodes.push(makeTextNode(metaTag, 'main', { '@_refines': '#t-main', '@_property': 'title-type' }));
+      nodes.push(makeTextNode('dc:title', payload.title, { '@_id': MAIN_TITLE_ID }));
+      nodes.push(makeTextNode(metaTag, 'main', { '@_refines': `#${MAIN_TITLE_ID}`, '@_property': 'title-type' }));
     } else {
       nodes.push(makeTextNode('dc:title', payload.title));
     }
@@ -202,8 +217,8 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
   // subtitle (EPUB3 as second dc:title, EPUB2 as bookorbit:subtitle meta)
   if (payload.subtitle != null) {
     if (epubVersion === 3) {
-      nodes.push(makeTextNode('dc:title', payload.subtitle, { '@_id': 't-sub' }));
-      nodes.push(makeTextNode(metaTag, 'subtitle', { '@_refines': '#t-sub', '@_property': 'title-type' }));
+      nodes.push(makeTextNode('dc:title', payload.subtitle, { '@_id': SUBTITLE_ID }));
+      nodes.push(makeTextNode(metaTag, 'subtitle', { '@_refines': `#${SUBTITLE_ID}`, '@_property': 'title-type' }));
     } else {
       nodes.push(makeEmptyNode(metaTag, { '@_name': `${APP_WRITE_NAMESPACE}:subtitle`, '@_content': payload.subtitle }));
     }
@@ -364,11 +379,18 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
     }
   }
 
+  // An unprefixed <package> without a default namespace (epubBuilder writes `mlns=` for `xmlns=`)
+  // leaves every package element in no namespace. Once xmlns:opf is bound below, namespace-aware
+  // readers such as foliate look for OPF elements by namespace and find no <spine>.
+  if (!pkgTag.includes(':') && !attr(pkgAttrs, '@_xmlns')) {
+    pkgAttrs['@_xmlns'] = OPF_NS_URI;
+  }
+
   // Ensure xmlns:opf is declared so opf:scheme attributes on dc:identifier (and opf:role/opf:file-as
   // on dc:creator in EPUB2) resolve to a bound namespace. Many EPUB3 files omit this declaration;
   // adding it to <package> is valid and covers the whole subtree.
   if (!attr(pkgAttrs, '@_xmlns:opf')) {
-    pkgAttrs['@_xmlns:opf'] = 'http://www.idpf.org/2007/opf';
+    pkgAttrs['@_xmlns:opf'] = OPF_NS_URI;
   }
 
   // Some EPUBs scope xmlns:dc to each dc:* element. Rebuilding metadata removes those
@@ -380,7 +402,7 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
   const pkgContent = getPkgContentAll(pkgNode, pkgTag);
   const metadata = findMetadata(pkgContent);
   if (!metadata) throw new Error('Cannot find <metadata> element in OPF');
-  const { cleaned, uidNode } = stripMetadata(metadata.children, uidRef);
+  const { cleaned, uidNode } = stripMetadata(metadata.children, uidRef, [getNodeAttrs(metadata.node), pkgAttrs]);
   const freshNodes = buildFreshMetadata(payload, epubVersion, uidNode, childTag(metadata.tag, 'meta'));
   const newMetaChildren = [...freshNodes, ...cleaned];
   metadata.node[metadata.tag] = newMetaChildren;

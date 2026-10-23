@@ -16,11 +16,21 @@ import { KoboAnnotationMaterializerService } from './services/kobo-annotation-ma
 import { KoboBookAccessService } from './services/kobo-book-access.service';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 import { KoboDeviceService } from './services/kobo-device.service';
+import { KoboDeliveryService } from './services/kobo-delivery.service';
+import { KoboDeliveryRepository } from './kobo-delivery.repository';
+import { KoboAnnotationServeRepository } from './kobo-annotation-serve.repository';
+import { KoboBookmarkLinkRepository } from './kobo-bookmark-link.repository';
+import { BookmarkModule } from '../bookmark/bookmark.module';
+import { KoboDownloadRepository } from './kobo-download.repository';
+import { KoboDownloadHashBackfillService } from './services/kobo-download-hash-backfill.service';
+import { AppSettingsModule } from '../app-settings/app-settings.module';
+import { KoboDownloadHashRegistrationService } from './services/kobo-download-hash-registration.service';
 import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboKepubContextService } from './services/kobo-kepub-context.service';
 import { KoboPositionRebuildService } from './services/kobo-position-rebuild.service';
 import { KoboProgressBridgeService } from './services/kobo-progress-bridge.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
+import { KoboReadingProgressRepository } from './kobo-reading-progress.repository';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
 import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
@@ -40,6 +50,8 @@ describe('KoboModule', () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, KoboModule) as unknown[];
 
     expect(imports).toContain(BookModule);
+    expect(imports).toContain(BookmarkModule);
+    expect(imports).toContain(AppSettingsModule);
     expect(imports).toContain(ReadingSessionModule);
     expect(imports).toContain(AnnotationModule);
     expect(imports).toContain(PositionConverterModule);
@@ -62,6 +74,14 @@ describe('KoboModule', () => {
       KoboSyncHistoryService,
       KoboThumbnailService,
       KoboDownloadService,
+      KoboDownloadRepository,
+      KoboDeliveryRepository,
+      KoboBookmarkLinkRepository,
+      KoboAnnotationServeRepository,
+      KoboReadingProgressRepository,
+      KoboDeliveryService,
+      KoboDownloadHashBackfillService,
+      KoboDownloadHashRegistrationService,
       KoboProxyService,
       KoboAnalyticsResolverService,
       KoboAnalyticsService,

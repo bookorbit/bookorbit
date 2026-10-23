@@ -5,10 +5,21 @@ import type {
   AuthorDetail,
   AuthorMetadataCandidate,
   AuthorMetadataProviderKey,
+  AuthorMetadataSearchCandidateEvent,
   JumpBucketsResponse,
   MergeAuthorsResult,
+  MetadataCacheRequestPolicy,
+  MetadataCandidateCacheInfo,
 } from '@bookorbit/types'
+import {
+  METADATA_CACHE_REFRESH,
+  splitCandidateCache,
+  withIgnoreCache,
+  type IgnoreCacheOptions,
+  type WithMetadataCacheUsage,
+} from '@/features/metadata-cache/lib/metadata-cache'
 import type { AuthorBookSort, AuthorListSort, SortDirection } from '../types/author'
+import type { AuthorFactsPayload } from '../lib/author-facts'
 
 export const MAX_AUTHOR_IMAGE_BYTES = 20 * 1024 * 1024
 
@@ -37,10 +48,26 @@ type ListAuthorBooksParams = {
   collapseSeries?: boolean
 }
 
-export type UpdateAuthorPayload = {
+export type UpdateAuthorPayload = AuthorFactsPayload & {
   name?: string
   sortName?: string | null
   description?: string | null
+}
+
+export type AuthorMetadataMatchPayload = {
+  provider: AuthorMetadataProviderKey
+  providerId: string
+}
+
+/** Carries the status so the picker can tell "no such author" (404) from a provider outage (503). */
+export class AuthorMetadataMatchError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'AuthorMetadataMatchError'
+  }
 }
 
 export type MergeAuthorsPayload = {
@@ -57,7 +84,11 @@ type AuthorMetadataSearchParams = {
   region?: string
   limit?: number
   providers?: AuthorMetadataProviderKey[]
+  /** `refresh` skips saved answers and asks every provider live. */
+  cache?: MetadataCacheRequestPolicy
 }
+
+export type AuthorMetadataRefreshResult = WithMetadataCacheUsage<AuthorDetail>
 
 export type BulkAuthorMetadataRefreshEvent = {
   authorId: number
@@ -219,30 +250,31 @@ export async function deleteAuthors(payload: DeleteAuthorsPayload): Promise<{ de
   return res.json()
 }
 
-export async function fetchAuthorMetadataCandidates(params: AuthorMetadataSearchParams): Promise<AuthorMetadataCandidate[]> {
-  const query = toQuery({
+function authorMetadataSearchQuery(params: AuthorMetadataSearchParams): string {
+  return toQuery({
     q: params.q,
     region: params.region ?? undefined,
     limit: params.limit ?? undefined,
     providers: params.providers ?? undefined,
+    cache: params.cache === METADATA_CACHE_REFRESH ? METADATA_CACHE_REFRESH : undefined,
   })
+}
+
+export async function fetchAuthorMetadataCandidates(params: AuthorMetadataSearchParams): Promise<AuthorMetadataSearchCandidateEvent[]> {
+  const query = authorMetadataSearchQuery(params)
 
   const res = await api(`/api/v1/authors/metadata/search${query}`)
   if (!res.ok) throw new Error('Failed to load author metadata')
   return res.json()
 }
 
+/** Streams candidates; the cache marker is handed over beside each candidate, never on it. */
 export async function streamAuthorMetadataCandidates(
   params: AuthorMetadataSearchParams,
-  onCandidate: (candidate: AuthorMetadataCandidate) => void,
+  onCandidate: (candidate: AuthorMetadataCandidate, cache: MetadataCandidateCacheInfo | null) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const query = toQuery({
-    q: params.q,
-    region: params.region ?? undefined,
-    limit: params.limit ?? undefined,
-    providers: params.providers ?? undefined,
-  })
+  const query = authorMetadataSearchQuery(params)
 
   const res = await api(`/api/v1/authors/metadata/stream${query}`, { signal })
   if (!res.ok || !res.body) throw new Error('Failed to stream author metadata')
@@ -263,7 +295,8 @@ export async function streamAuthorMetadataCandidates(
       const line = event.split('\n').find((entry) => entry.startsWith('data:'))
       if (!line) continue
       try {
-        onCandidate(JSON.parse(line.slice(5).trim()) as AuthorMetadataCandidate)
+        const { candidate, cache } = splitCandidateCache(JSON.parse(line.slice(5).trim()) as AuthorMetadataSearchCandidateEvent)
+        onCandidate(candidate, cache)
       } catch {
         // Ignore malformed SSE payloads
       }
@@ -274,6 +307,7 @@ export async function streamAuthorMetadataCandidates(
 export async function bulkRefreshAuthorsMetadata(
   authorIds: number[],
   onProgress?: (event: BulkAuthorMetadataRefreshEvent) => void,
+  options: IgnoreCacheOptions = {},
 ): Promise<BulkAuthorMetadataRefreshResult> {
   if (authorIds.length === 0) {
     return { processed: 0, failed: 0, updated: 0 }
@@ -282,7 +316,7 @@ export async function bulkRefreshAuthorsMetadata(
   const res = await api('/api/v1/authors/bulk-refresh-metadata', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ authorIds }),
+    body: JSON.stringify(withIgnoreCache({ authorIds }, options)),
   })
   if (!res.ok || !res.body) throw new Error('Failed to refresh author metadata')
 
@@ -325,7 +359,45 @@ export async function bulkRefreshAuthorsMetadata(
   return summary
 }
 
-export async function refreshAuthorMetadata(authorId: number): Promise<AuthorDetail> {
+/** One provider's person by id; null when the id matches nobody. The cache marker comes back beside it. */
+export async function lookupAuthorMetadata(
+  reference: AuthorMetadataMatchPayload,
+  options: { cache?: MetadataCacheRequestPolicy; signal?: AbortSignal } = {},
+): Promise<{ candidate: AuthorMetadataCandidate; cache: MetadataCandidateCacheInfo | null } | null> {
+  const query = toQuery({
+    provider: reference.provider,
+    id: reference.providerId,
+    region: 'us',
+    cache: options.cache === METADATA_CACHE_REFRESH ? METADATA_CACHE_REFRESH : undefined,
+  })
+  const res = await api(`/api/v1/authors/metadata/lookup${query}`, { signal: options.signal })
+  if (!res.ok) throw new AuthorMetadataMatchError(res.status, 'Failed to look up author metadata')
+  // A lookup that matched nobody answers 200 with an empty body.
+  const text = await res.text()
+  if (!text) return null
+  const event = JSON.parse(text) as AuthorMetadataSearchCandidateEvent | null
+  return event ? splitCandidateCache(event) : null
+}
+
+/** Replaces the author's metadata with one provider's person and keeps refreshes on that id. */
+export async function pinAuthorMetadataMatch(authorId: number, payload: AuthorMetadataMatchPayload): Promise<AuthorMetadataRefreshResult> {
+  const res = await api(`/api/v1/authors/${authorId}/metadata-match`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new AuthorMetadataMatchError(res.status, 'Failed to use this author')
+  return res.json()
+}
+
+export async function unpinAuthorMetadataMatch(authorId: number): Promise<AuthorDetail> {
+  const res = await api(`/api/v1/authors/${authorId}/metadata-match`, { method: 'DELETE' })
+  if (!res.ok) throw new AuthorMetadataMatchError(res.status, 'Failed to unpin the author match')
+  return res.json()
+}
+
+/** Always live; `metadataCache` lists providers that failed and were answered from saved results instead. */
+export async function refreshAuthorMetadata(authorId: number): Promise<AuthorMetadataRefreshResult> {
   const res = await api(`/api/v1/authors/${authorId}/enrichment/refresh`, {
     method: 'POST',
   })

@@ -118,9 +118,10 @@ export class BookDockController {
     return this.service.getStatistics(user.id, this.canManageAll(user));
   }
 
+  /** `readAlong=true` also says whether an EPUB carries narration, which means opening the file. */
   @Get('files/:id')
-  getFile(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
-    return this.service.getFile(id, user.id, this.canManageAll(user));
+  getFile(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Query('readAlong') readAlong?: string) {
+    return this.service.getFile(id, user.id, this.canManageAll(user), { readAlong: readAlong === 'true' });
   }
 
   @Get('files/:id/cover')

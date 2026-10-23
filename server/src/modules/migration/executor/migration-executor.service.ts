@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import type { MigrationProgressEvent } from '@bookorbit/types';
 import { NotificationType } from '@bookorbit/types';
+import { queryFailureReason } from '../../../common/utils/db-error.utils';
 import { NotificationService } from '../../notification/notification.service';
 import { asRecord } from '../core/coerce';
 import { parseConnectionConfig } from '../core/connection-config';
@@ -141,7 +142,8 @@ export class MigrationExecutorService {
       this.logger.warn(
         `[migration.execute] [fail] runId=${runId} durationMs=${durationMs} errorClass=${errorClass} error="${message}"${cause} - migration execution failed`,
       );
-      const failedStage = await this.failRun(runId, message);
+      const reason = queryFailureReason(error) ?? message;
+      const failedStage = await this.failRun(runId, reason);
       await this.emitRunProgress(runId, 'failed', failedStage);
 
       if (run.triggeredByUserId) {
@@ -149,7 +151,7 @@ export class MigrationExecutorService {
           .notify({
             type: NotificationType.MigrationFailed,
             title: 'Migration failed',
-            message: message.slice(0, 200),
+            message: reason.slice(0, 200),
             scope: { kind: 'user', userId: run.triggeredByUserId },
             meta: { runId },
           })

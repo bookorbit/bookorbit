@@ -1,11 +1,14 @@
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/fraunces';
+@import '@fontsource-variable/fraunces/wght-italic.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
 @import './theme/tokens.css';
 @import './theme/accents.css';
 @import './theme/radius.css';
+@import './theme/surfaces.css';
+@import './theme/styles/nostalgia.css';
 @import './theme/bridge.css';
 @import './theme/cover-effects.css';
 
@@ -251,12 +254,42 @@
   mask-size: 150px 150px;
 }
 
-.glow-wrapper {
-  background-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 35%, transparent) 0%, transparent 100%);
-  background-blend-mode: hard-light, color-dodge;
-  background-position: top;
+/* A zero-height flow item at the top of the main inset. Being in flow, it spans the inset's content box,
+   which ends at the sidebar's edge, so the glow centres on the main column and follows the sidebar as it
+   resizes or collapses. Its layers sit at a negative z-index, under the shell's content like the
+   background patterns. The texture is a layer of its own so its tiles keep their size; the reach only
+   moves the fade. */
+.shell-glow {
+  position: relative;
+  flex: none;
+  height: 0;
+}
+
+.shell-glow::before,
+.shell-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: calc(var(--glow-band) * var(--glow-reach));
+  pointer-events: none;
+}
+
+.shell-glow::before {
+  background-image: var(--glow-texture);
+  background-position: top center;
+  background-size: var(--glow-texture-size);
+  -webkit-mask-image: radial-gradient(ellipse 62% 100% at 50% 0%, #000 0%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 100% at 50% 0%, #000 0%, transparent 100%);
+}
+
+.shell-glow::after {
+  background-image: var(--glow-image);
   background-repeat: no-repeat;
-  background-size: auto 12rem;
+}
+
+html[data-glow='off'] .shell-glow {
+  display: none;
 }
 
 @layer base {
@@ -358,7 +391,7 @@
 
 @layer components {
   .viewer-btn {
-    @apply flex items-center justify-center w-8 h-8 rounded text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
+    @apply flex items-center justify-center w-8 h-8 rounded-xs text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
   }
   .viewer-sep {
     @apply w-px h-5 mx-1 bg-border shrink-0;
@@ -385,6 +418,44 @@
   .settings-value {
     @apply text-sm font-medium tabular-nums text-foreground;
   }
+  /* ── App shell ─────────────────────────────────────────────
+     The glass behind the sidebar and header cards. A style swaps
+     --shell-backdrop to change it.
+  ────────────────────────────────────────────────────────────── */
+  .shell-backdrop {
+    backdrop-filter: var(--shell-backdrop);
+    -webkit-backdrop-filter: var(--shell-backdrop);
+  }
+  .sidebar-section-label {
+    font-size: var(--sidebar-heading-size);
+    font-weight: var(--sidebar-heading-weight);
+    letter-spacing: var(--sidebar-heading-tracking);
+    color: var(--sidebar-heading-foreground);
+    text-transform: uppercase;
+  }
+  /* Count chips beside sidebar rows and collapsed sections. Colour utilities on the element still win. */
+  .sidebar-count {
+    background-color: var(--sidebar-count-bg);
+    font-size: var(--sidebar-count-size);
+    font-weight: var(--sidebar-count-weight);
+    color: var(--sidebar-count-foreground);
+  }
+
+  /* ── Book metadata chips ───────────────────────────────────
+     Genres and tags on the book detail page. The ring is inset so
+     a style can add one without moving the genre fold measurement.
+  ────────────────────────────────────────────────────────────── */
+  .chip-genre {
+    background-color: var(--chip-genre-bg);
+    color: var(--chip-genre-fg);
+    box-shadow: inset 0 0 0 1px var(--chip-genre-border);
+  }
+  .chip-tag {
+    background-color: var(--chip-tag-bg);
+    color: var(--chip-tag-fg);
+    border-color: var(--chip-tag-border);
+  }
+
   /* ── Provider chips ────────────────────────────────────────
      Callers set --provider-color; the ink/fill/ring mixes come from the theme so
      light mode darkens the brand hue enough to pass contrast. See tokens.css.
@@ -526,6 +597,28 @@
     }
     to {
       background-position: 400px 0;
+    }
+  }
+
+  @keyframes request-shimmer {
+    from {
+      inset-inline-start: -70%;
+    }
+    to {
+      inset-inline-start: 140%;
+    }
+  }
+
+  @keyframes request-wand {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    35% {
+      transform: rotate(-16deg);
+    }
+    70% {
+      transform: rotate(10deg);
     }
   }
 

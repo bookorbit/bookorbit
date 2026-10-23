@@ -18,6 +18,7 @@ function makeCredentials(overrides: Partial<KoreaderCredentials> = {}): Koreader
   return {
     username: 'reader-user',
     syncEnabled: true,
+    hideAudioOnlyBooks: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }

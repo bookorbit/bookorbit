@@ -522,4 +522,40 @@ describe('OpdsService', () => {
       expect(xml).toContain('&apos;');
     });
   });
+
+  describe('book descriptions', () => {
+    function feedFor(description: string | null): string {
+      return makeService().generateAcquisitionFeed(
+        'Catalog',
+        'urn:bookorbit:catalog',
+        [sampleBook({ description })],
+        1,
+        1,
+        50,
+        `${BASE}/catalog?page=1&size=50`,
+        'test-token',
+      );
+    }
+
+    it('sends an HTML description as plain text with its paragraph and line breaks', () => {
+      const xml = feedFor('<p>The <strong>first</strong> book &amp; its sequel.</p><p>Line one<br>line two</p>');
+
+      expect(xml).toContain('<content type="text">The first book &amp; its sequel.\nLine one\nline two</content>');
+      expect(xml).not.toContain('&lt;p&gt;');
+      expect(xml).not.toContain('&lt;strong&gt;');
+    });
+
+    it('keeps a plain-text description and its line breaks unchanged', () => {
+      const xml = feedFor('Part one.\n\nPart two.');
+
+      expect(xml).toContain('<content type="text">Part one.\n\nPart two.</content>');
+    });
+
+    it.each([
+      ['no description', null],
+      ['a description holding only markup', '<p> </p><br>'],
+    ])('sends empty content for %s', (_label, description) => {
+      expect(feedFor(description)).toContain('<content type="text"/>');
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 
+import { UserModule } from '../user/user.module';
 import { BookModule } from '../book/book.module';
 import { LibraryModule } from '../library/library.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -8,6 +9,7 @@ import { EmailBookAccessService } from './email-book-access.service';
 import { EmailBookReadRepository } from './email-book-read.repository';
 import { EmailEncryptionService } from './email-encryption.service';
 import { EmailFileSelector } from './email-file-selector';
+import { EmailRecipientTestService } from './email-recipient-test.service';
 import { EmailPreferencesController } from './email-preferences.controller';
 import { EmailPreferencesRepository } from './email-preferences.repository';
 import { EmailPreferencesService } from './email-preferences.service';
@@ -34,7 +36,7 @@ import { EmailTransportService } from './email-transport.service';
 import { SystemMailService } from './system-mail.service';
 
 @Module({
-  imports: [forwardRef(() => BookModule), forwardRef(() => LibraryModule), forwardRef(() => NotificationModule)],
+  imports: [UserModule, forwardRef(() => BookModule), forwardRef(() => LibraryModule), forwardRef(() => NotificationModule)],
   controllers: [
     EmailProviderController,
     EmailRecipientController,
@@ -63,6 +65,7 @@ import { SystemMailService } from './system-mail.service';
     EmailPreferencesService,
     EmailProviderResolver,
     EmailFileSelector,
+    EmailRecipientTestService,
     EmailSendLogRepository,
     EmailSendLogService,
     EmailSendOrchestrator,

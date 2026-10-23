@@ -177,7 +177,7 @@ watch([loading, result, notFound, hasError], async () => {
             <span v-if="result.phonetic" class="text-xs text-muted-foreground italic">{{ result.phonetic }}</span>
             <button
               v-if="result.audioUrl"
-              class="ml-auto flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+              class="ml-auto flex items-center justify-center w-6 h-6 rounded-xs hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
               @click="playAudio(result.audioUrl!)"
             >
               <Volume2 :size="13" />

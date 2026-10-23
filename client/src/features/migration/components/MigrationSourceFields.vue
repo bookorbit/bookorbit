@@ -170,7 +170,7 @@ function sourceTypeLabel(type: string): string {
         </label>
         <div class="flex items-center" :class="wide ? 'md:col-span-2 xl:col-span-4' : 'md:col-span-2'">
           <label class="flex min-h-9 cursor-pointer items-center gap-2">
-            <input v-model="draft.allowPrivateNetwork" type="checkbox" class="size-4 rounded border-border" :disabled="disabled" />
+            <input v-model="draft.allowPrivateNetwork" type="checkbox" class="size-4 rounded-xs border-border" :disabled="disabled" />
             <span class="settings-hint">{{ t('migration.source.fields.allowPrivateNetwork') }}</span>
           </label>
         </div>
@@ -270,7 +270,7 @@ function sourceTypeLabel(type: string): string {
       </label>
       <div class="flex items-center">
         <label class="flex min-h-9 cursor-pointer items-center gap-2">
-          <input v-model="draft.ssl" type="checkbox" class="size-4 rounded border-border" :disabled="disabled" />
+          <input v-model="draft.ssl" type="checkbox" class="size-4 rounded-xs border-border" :disabled="disabled" />
           <span class="settings-hint">{{ t('migration.source.fields.ssl') }}</span>
         </label>
       </div>

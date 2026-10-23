@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { check, index, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 import { users } from './auth';
 import { books, bookFiles } from './books';
@@ -19,6 +19,15 @@ export const emailSendLog = pgTable(
     templateId: integer('template_id').references(() => emailTemplates.id, { onDelete: 'set null' }),
     toEmail: varchar('to_email', { length: 255 }).notNull(),
     toName: varchar('to_name', { length: 255 }),
+    deliveryPolicy: varchar('delivery_policy', { length: 20 }).$type<'original' | 'audioless_epub'>(),
+    sourceRevision: varchar('source_revision', { length: 64 }),
+    artifactId: varchar('artifact_id', { length: 64 }),
+    deliveryMetadata: jsonb('delivery_metadata').$type<import('@bookorbit/types').DeliveryArtifactMetadata>(),
+    actualVariant: varchar('actual_variant', { length: 20 }),
+    deviceType: varchar('device_type', { length: 20 }),
+    recipientId: integer('recipient_id'),
+    failureCode: varchar('failure_code', { length: 64 }),
+    dispatchPhase: varchar('dispatch_phase', { length: 32 }),
     subject: text('subject'),
     status: varchar('status', { length: 20 }).notNull().default('pending'),
     attemptCount: integer('attempt_count').notNull().default(0),

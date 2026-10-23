@@ -111,6 +111,20 @@ describe('htmlToBlocks', () => {
   });
 });
 
+describe('htmlToBlocks tag names', () => {
+  // `p`, `li` and `tr` matched as prefixes, so these opened blocks Foliate does not count and
+  // every later block's index ran ahead of the reader's highlight.
+  it('starts no block at an element whose name only begins like a block', () => {
+    const html =
+      '<body><p>One <picture><source srcset="a.webp"/></picture> two</p><link rel="x"/><object><param name="a"/></object><svg><path d="M0"/><line x1="0"/></svg><p>Three</p><video><track src="t.vtt"/></video><p>Four</p></body>';
+    expect(htmlToBlocks(html)).toEqual(['One two', 'Three', 'Four']);
+  });
+
+  it('still opens a block at a block element with attributes, a newline or a self-closing slash', () => {
+    expect(htmlToBlocks('<body><p class="a">One</p><p\n>Two</p><hr/><div>Three</div></body>')).toEqual(['One', 'Two', 'Three']);
+  });
+});
+
 describe('normalizePath', () => {
   it('returns a simple path unchanged', () => {
     expect(normalizePath('OEBPS/Text/ch1.xhtml')).toBe('OEBPS/Text/ch1.xhtml');

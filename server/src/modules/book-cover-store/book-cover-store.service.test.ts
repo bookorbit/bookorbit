@@ -77,26 +77,98 @@ function makeLegacyStore(root: string, legacy: BookCoverContext) {
 }
 
 describe('BookCoverStore', () => {
-  it('versions the face slot together with its fallback slot', () => {
+  describe('faceOf', () => {
     const { store } = makeStore(join(tmpdir(), 'unused-cover-store'), context());
     const ebook = slot('ebook');
     const audio = { ...slot('audio'), updatedAt: new Date('2026-02-01T00:00:00.000Z') };
+    const both = { hasEbook: true, hasAudio: true };
+    const face = (overrides: Partial<Parameters<BookCoverStore['faceOf']>[0]>) =>
+      store.faceOf({
+        libraryCoverAspectRatio: '2/3',
+        primaryFormat: 'epub',
+        media: both,
+        slots: [ebook, audio],
+        legacyVersion: 'legacy-stamp',
+        ...overrides,
+      });
 
-    expect(store.coverVersion('2/3', [ebook, audio], 'unused')).toBe('ebook:2026-01-01T00:00:00.000Z:2026-02-01T00:00:00.000Z');
-    expect(store.coverVersion('1/1', [ebook, audio], 'unused')).toBe('audio:2026-02-01T00:00:00.000Z:2026-01-01T00:00:00.000Z');
-    expect(store.coverVersion('2/3', [{ ...ebook, dormantSince: new Date('2026-03-01T00:00:00.000Z') }, audio], 'unused')).toBe(
-      'ebook:-:2026-02-01T00:00:00.000Z',
-    );
+    it("follows the primary file's medium in either library shape", () => {
+      expect(face({ primaryFormat: 'm4b' })).toEqual({
+        coverAspectRatio: '1/1',
+        coverVersion: 'audio:2026-02-01T00:00:00.000Z:2026-01-01T00:00:00.000Z',
+      });
+      expect(face({ libraryCoverAspectRatio: '1/1', primaryFormat: 'EPUB' })).toEqual({
+        coverAspectRatio: '2/3',
+        coverVersion: 'ebook:2026-01-01T00:00:00.000Z:2026-02-01T00:00:00.000Z',
+      });
+    });
+
+    it('takes the library shape only for a book with no content file', () => {
+      const none = { hasEbook: false, hasAudio: false };
+      expect(face({ libraryCoverAspectRatio: '1/1', primaryFormat: null, media: none, slots: [] })).toEqual({
+        coverAspectRatio: '1/1',
+        coverVersion: 'legacy:legacy-stamp',
+      });
+      expect(face({ primaryFormat: undefined, media: none, slots: [] }).coverAspectRatio).toBe('2/3');
+    });
+
+    it('frames the slot it falls back to when the preferred one is empty, keeping the preferred medium in the version', () => {
+      expect(face({ primaryFormat: 'm4b', slots: [ebook] })).toEqual({ coverAspectRatio: '2/3', coverVersion: 'audio:-:2026-01-01T00:00:00.000Z' });
+      expect(face({ primaryFormat: 'm4b', slots: [ebook, { ...audio, dormantSince: new Date('2026-03-01T00:00:00.000Z') }] }).coverAspectRatio).toBe(
+        '2/3',
+      );
+      expect(face({ primaryFormat: 'm4b', media: { hasEbook: false, hasAudio: true }, slots: [] }).coverAspectRatio).toBe('1/1');
+    });
+
+    it('keeps a read-along EPUB on the ebook side', () => {
+      expect(face({ primaryFormat: 'epub', media: { hasEbook: true, hasAudio: true }, slots: [ebook, audio] }).coverAspectRatio).toBe('2/3');
+    });
   });
 
-  it('resolves the library face and honors explicit strict and fallback reads', async () => {
+  it('gives cards the face of their primary file and replaces the library shape they arrive with', async () => {
+    const { store, repository } = makeStore(join(tmpdir(), 'unused-cover-store'), context());
+    repository.slotsFor.mockResolvedValue(new Map([[7, [slot('ebook'), slot('audio')]]]));
+    const card = {
+      id: 7,
+      coverAspectRatio: '2/3',
+      addedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: null,
+      coverVersion: 'legacy:x',
+      files: [
+        { id: 70, format: 'epub', role: 'content', sizeBytes: null },
+        { id: 71, format: 'm4b', role: 'primary', sizeBytes: null },
+      ],
+    };
+
+    await store.enrichCardFaces([card as never]);
+
+    expect(card).toMatchObject({ coverAspectRatio: '1/1', coverVersion: 'audio:2026-01-01T00:00:00.000Z:2026-01-01T00:00:00.000Z' });
+  });
+
+  it('resolves faces for rows with no files of their own from one row and one slot query', async () => {
+    const { store, repository } = makeStore(join(tmpdir(), 'unused-cover-store'), context());
+    const findFaceRows = vi
+      .fn()
+      .mockResolvedValue([
+        { bookId: 7, libraryCoverAspectRatio: '2/3', primaryFormat: 'm4b', media: { hasEbook: true, hasAudio: true }, legacyVersion: 'x' },
+      ]);
+    Object.assign(repository, { findFaceRows });
+    repository.slotsFor.mockResolvedValue(new Map([[7, [slot('ebook'), slot('audio')]]]));
+
+    const faces = await store.facesFor([7, 7]);
+
+    expect(findFaceRows).toHaveBeenCalledWith([7]);
+    expect(faces.get(7)?.coverAspectRatio).toBe('1/1');
+  });
+
+  it("resolves the primary file's face and honors explicit strict and fallback reads", async () => {
     const root = await mkdtemp(join(tmpdir(), 'cover-store-resolve-'));
     try {
       const ebookDir = bookCoverSlotDirPath(root, 7, 'ebook');
       const audioDir = bookCoverSlotDirPath(root, 7, 'audio');
       await Promise.all([mkdir(ebookDir, { recursive: true }), mkdir(audioDir, { recursive: true })]);
       await Promise.all([writeFile(join(ebookDir, 'cover_extracted.jpg'), 'ebook'), writeFile(join(audioDir, 'cover_extracted.jpg'), 'audio')]);
-      const { store } = makeStore(root, context({ coverAspectRatio: '1/1' }));
+      const { store } = makeStore(root, context({ primaryFileId: 71 }));
 
       await expect(store.resolve(7, { variant: 'cover' })).resolves.toBe(join(audioDir, 'cover_extracted.jpg'));
       await expect(store.resolve(7, { medium: 'ebook', variant: 'cover', strict: true })).resolves.toBe(join(ebookDir, 'cover_extracted.jpg'));
@@ -353,13 +425,13 @@ describe('BookCoverStore', () => {
     await expect(readAlong.store.chooseSidecarMedium(7, await image(80, 80))).resolves.toBe('ebook');
   });
 
-  it('writes image bytes by shape, and a write with no image to the face slot of the library shape', async () => {
-    const portrait = makeStore(join(tmpdir(), 'unused-cover-store'), context());
-    await expect(portrait.store.chooseWriteMedium(7, await image(80, 80))).resolves.toBe('audio');
-    await expect(portrait.store.chooseWriteMedium(7)).resolves.toBe('ebook');
+  it("writes image bytes by shape, and a write with no image to the face slot of the primary file's medium", async () => {
+    const ebookFirst = makeStore(join(tmpdir(), 'unused-cover-store'), context({ coverAspectRatio: '1/1' }));
+    await expect(ebookFirst.store.chooseWriteMedium(7, await image(80, 80))).resolves.toBe('audio');
+    await expect(ebookFirst.store.chooseWriteMedium(7)).resolves.toBe('ebook');
 
-    const square = makeStore(join(tmpdir(), 'unused-cover-store'), context({ coverAspectRatio: '1/1' }));
-    await expect(square.store.chooseWriteMedium(7)).resolves.toBe('audio');
+    const audioFirst = makeStore(join(tmpdir(), 'unused-cover-store'), context({ primaryFileId: 71 }));
+    await expect(audioFirst.store.chooseWriteMedium(7)).resolves.toBe('audio');
   });
 
   it('hands a merged book’s slot to the target only for a medium the target has no cover for', async () => {
@@ -410,5 +482,18 @@ describe('BookCoverStore', () => {
       context({ slots: [{ ...slot('audio'), dormantSince: new Date() }], media: { hasEbook: true, hasAudio: true } }),
     );
     await expect(dormant.store.fetchState(7)).resolves.toMatchObject({ filled: { ebook: false, audio: false } });
+  });
+
+  it('calls a slot empty only when it holds nothing, a dormant custom cover counting as something', async () => {
+    const root = join(tmpdir(), 'unused-cover-store');
+    const ebookOnly = makeStore(root, context({ slots: [slot('ebook')], media: { hasEbook: true, hasAudio: true } }));
+    await expect(ebookOnly.store.slotIsEmpty(7, 'audio')).resolves.toBe(true);
+    await expect(ebookOnly.store.slotIsEmpty(7, 'ebook')).resolves.toBe(false);
+
+    const dormantCustom = makeStore(
+      root,
+      context({ slots: [{ ...slot('audio', 'custom'), dormantSince: new Date() }], media: { hasEbook: true, hasAudio: true } }),
+    );
+    await expect(dormantCustom.store.slotIsEmpty(7, 'audio')).resolves.toBe(false);
   });
 });

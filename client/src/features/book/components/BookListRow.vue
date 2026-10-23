@@ -33,6 +33,7 @@ import { useCoverVersions } from '../composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -61,6 +62,8 @@ const emit = defineEmits<{
 }>()
 
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { thumbnailClickAction } = useDisplaySettings()
 const showSendDialog = ref(false)
 
@@ -305,7 +308,7 @@ function handleRowClick(event: MouseEvent) {
     <div
       v-if="selectionMode"
       data-testid="book-selection-checkbox"
-      class="h-5 w-5 rounded shrink-0 flex items-center justify-center transition-colors"
+      class="h-5 w-5 rounded-xs shrink-0 flex items-center justify-center transition-colors"
       :class="selected ? 'bg-primary' : 'border border-border bg-background'"
     >
       <Check v-if="selected" class="text-primary-foreground" :size="12" />
@@ -314,7 +317,7 @@ function handleRowClick(event: MouseEvent) {
     <!-- Cover -->
     <BookCoverSurface
       size="mini"
-      class="book-cover-surface--spine-fitted w-16 rounded shrink-0 overflow-hidden relative"
+      class="book-cover-surface--spine-fitted w-16 rounded-xs shrink-0 overflow-hidden relative"
       :disable-spine="isAudiobook"
       :is-comic="isComic"
       :class="isMissing ? 'opacity-50 grayscale' : ''"
@@ -331,6 +334,11 @@ function handleRowClick(event: MouseEvent) {
         backdrop-class="blur-md brightness-50"
         :spine="!isAudiobook"
         :is-comic="isComic"
+        :authors="book.authors"
+        :subtitle="book.subtitle"
+        :series-name="book.seriesName"
+        :series-index="book.seriesIndex"
+        :genres="book.genres"
       />
     </BookCoverSurface>
 
@@ -373,7 +381,7 @@ function handleRowClick(event: MouseEvent) {
       <div class="flex items-center gap-1">
         <span
           v-if="isMissing"
-          class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
+          class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-xs bg-amber-500/15 text-amber-600 dark:text-amber-400"
         >
           <TriangleAlert class="size-3 shrink-0" />
           <span class="hidden sm:inline">{{ t('book.card.missing') }}</span>
@@ -382,7 +390,7 @@ function handleRowClick(event: MouseEvent) {
           <Tooltip v-for="entry in formatEntries" :key="entry.key">
             <TooltipTrigger as-child>
               <button
-                class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-xs"
                 :class="formatButtonClasses(entry)"
                 :style="formatButtonStyle(entry)"
                 :aria-label="formatButtonTooltip(entry)"
@@ -399,7 +407,7 @@ function handleRowClick(event: MouseEvent) {
 
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <button class="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+          <button class="p-1 rounded-xs hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
             <MoreHorizontal class="size-4" />
           </button>
         </DropdownMenuTrigger>
@@ -421,19 +429,16 @@ function handleRowClick(event: MouseEvent) {
             {{ t('book.actions.bookDetails') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            v-if="hasPermission('library_edit_metadata')"
-            @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
-          >
+          <DropdownMenuItem v-if="canEditMetadata" @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
             <Pencil class="size-4 mr-2" />
             {{ t('book.actions.editMetadata') }}
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
+          <DropdownMenuItem v-if="canEditMetadata" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
             <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
             <RefreshCw v-else class="size-4 mr-2" />
             {{ t('book.actions.refreshMetadata') }}
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="allowMoveToLibrary && hasPermission('library_edit_metadata')" @click="emit('action', 'move-to-library')">
+          <DropdownMenuItem v-if="allowMoveToLibrary && canEditMetadata" @click="emit('action', 'move-to-library')">
             <FolderInput class="size-4 mr-2" />
             {{ t('book.move.action') }}
           </DropdownMenuItem>
@@ -466,6 +471,7 @@ function handleRowClick(event: MouseEvent) {
     :selected-count="1"
     :book-files="book.files"
     :book-title="book.title ?? undefined"
+    :book-authors="authorLine ?? undefined"
     @update:open="showSendDialog = $event"
   />
 </template>

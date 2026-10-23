@@ -15,11 +15,15 @@ import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrol
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import AuthorHeader from '../components/AuthorHeader.vue'
 import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
+import AuthorFactsFields from '../components/AuthorFactsFields.vue'
+import AuthorMatchSheet from '../components/AuthorMatchSheet.vue'
+import { authorFactsDraft, authorFactsPayload, sameFactsDraft, type AuthorFactsDraft, type AuthorFactsField } from '../lib/author-facts'
 import {
   deleteAuthorImage,
   deleteAuthors,
@@ -34,17 +38,21 @@ import { useAuthorBooks } from '../composables/useAuthorBooks'
 import { useAuthorDetail } from '../composables/useAuthorDetail'
 import { useAuthorMetadataPreview } from '../composables/useAuthorMetadataPreview'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+import { showCacheFallbackToast } from '@/features/metadata-cache/lib/cache-feedback'
+import { splitMetadataCacheUsage, usageFallbackProviders } from '@/features/metadata-cache/lib/metadata-cache'
+import { metadataProviderLabel } from '@/features/book/lib/metadata-refresh-feedback'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const mainRef = ref<HTMLElement | null>(null)
 useScrollRestoreOnActivate(mainRef)
-const { hasPermission, isSuperuser } = usePermissions()
+const { isSuperuser } = usePermissions()
 const { width: windowWidth } = useWindowSize()
 
 const { portraitCoverSize, gridGap } = useDisplaySettings()
 const { libraries, fetchLibraries } = useLibraries()
+const { hasPermissionInAnyLibrary } = useLibraryPermissions()
 
 const authorBooksViewMode = ref<'grid' | 'list'>('grid')
 
@@ -75,6 +83,11 @@ watch(
   { immediate: true },
 )
 const authorName = computed(() => author.value?.name ?? '')
+const pinnedMatch = computed(() => {
+  const value = author.value
+  if (!value?.metadataProviderPinned || !value.metadataProvider || !value.metadataProviderId) return null
+  return { provider: value.metadataProvider, providerId: value.metadataProviderId }
+})
 const pageTitle = computed(() => {
   if (author.value?.name) return t('author.detail.pageTitleNamed', { name: author.value.name })
   return Number.isFinite(authorId.value) ? t('author.detail.pageTitleId', { id: authorId.value }) : t('author.detail.pageTitle')
@@ -82,13 +95,17 @@ const pageTitle = computed(() => {
 usePageTitle(pageTitle)
 const {
   preview: metadataPreview,
+  previewCache: metadataPreviewCache,
+  cacheSummary: metadataCacheSummary,
   loading: loadingMetadataPreview,
+  searched: metadataPreviewSearched,
   error: metadataPreviewError,
   cancel: cancelMetadataPreview,
   load: loadMetadataPreview,
-} = useAuthorMetadataPreview(authorName)
+  loadFresh: loadFreshMetadataPreview,
+} = useAuthorMetadataPreview(authorName, pinnedMatch)
 
-const canUpdate = computed(() => hasPermission('library_edit_metadata'))
+const canUpdate = computed(() => hasPermissionInAnyLibrary('library_edit_metadata', 'editor'))
 const canMerge = computed(() => isSuperuser.value)
 const canDelete = computed(() => isSuperuser.value)
 
@@ -107,13 +124,21 @@ const authorImageInput = ref<HTMLInputElement | null>(null)
 const draftName = ref('')
 const draftSortName = ref('')
 const draftDescription = ref('')
-const seededDrafts = ref<{ name: string; sortName: string; description: string } | null>(null)
+const draftFacts = ref<AuthorFactsDraft>(authorFactsDraft(null))
+const invalidFacts = ref<AuthorFactsField[]>([])
+const seededDrafts = ref<{ name: string; sortName: string; description: string; facts: AuthorFactsDraft } | null>(null)
 const authorImageBusy = computed(() => uploadingImage.value || removingImage.value)
+const matchSheetOpen = ref(false)
 
 const draftsDirty = computed(() => {
   const seeded = seededDrafts.value
   if (!seeded) return false
-  return draftName.value !== seeded.name || draftSortName.value !== seeded.sortName || draftDescription.value !== seeded.description
+  return (
+    draftName.value !== seeded.name ||
+    draftSortName.value !== seeded.sortName ||
+    draftDescription.value !== seeded.description ||
+    !sameFactsDraft(draftFacts.value, seeded.facts)
+  )
 })
 
 const mergeQuery = ref('')
@@ -178,10 +203,13 @@ function seedDrafts(value: AuthorDetail | null) {
     name: value?.name ?? '',
     sortName: value?.sortName ?? '',
     description: value?.description ?? '',
+    facts: authorFactsDraft(value),
   }
   draftName.value = seeded.name
   draftSortName.value = seeded.sortName
   draftDescription.value = seeded.description
+  draftFacts.value = authorFactsDraft(value)
+  invalidFacts.value = []
   seededDrafts.value = seeded
 }
 
@@ -195,6 +223,16 @@ watch(
     seedDrafts(value)
   },
   { immediate: true },
+)
+
+// After a failed save, re-check as the user types so a corrected field loses its error at once.
+watch(
+  draftFacts,
+  (draft) => {
+    if (invalidFacts.value.length === 0 || !seededDrafts.value) return
+    invalidFacts.value = authorFactsPayload(draft, seededDrafts.value.facts).invalid
+  },
+  { deep: true },
 )
 
 function goBack() {
@@ -259,12 +297,17 @@ async function saveAuthorEdits() {
     return
   }
 
+  const facts = authorFactsPayload(draftFacts.value, seededDrafts.value?.facts ?? authorFactsDraft(author.value))
+  invalidFacts.value = facts.invalid
+  if (facts.invalid.length > 0) return
+
   savingEdit.value = true
   try {
     const updated = await updateAuthor(author.value.id, {
       name,
       sortName: draftSortName.value.trim() || null,
       description: draftDescription.value.trim() || null,
+      ...facts.payload,
     })
     author.value = updated
     seedDrafts(updated)
@@ -443,15 +486,34 @@ async function refreshMetadata() {
   if (!author.value || refreshingMetadata.value) return
   refreshingMetadata.value = true
   try {
-    const updated = await refreshAuthorMetadata(author.value.id)
+    const { value: updated, usage } = splitMetadataCacheUsage(await refreshAuthorMetadata(author.value.id))
     author.value = updated
     await loadMetadataPreview()
     showRefreshResultToast(updated)
+    showCacheFallbackToast(usageFallbackProviders(usage), metadataProviderLabel)
   } catch (error) {
     toast.error(error instanceof Error ? error.message : t('author.detail.toast.refreshFailed'))
   } finally {
     refreshingMetadata.value = false
   }
+}
+
+function searchMetadataPreviewFresh() {
+  void loadFreshMetadataPreview()
+}
+
+function openMatchSheet() {
+  matchSheetOpen.value = true
+}
+
+function closeMatchSheet() {
+  matchSheetOpen.value = false
+}
+
+async function handleMatchUpdated(updated: AuthorDetail) {
+  author.value = updated
+  seedDrafts(updated)
+  await loadMetadataPreview()
 }
 
 onMounted(async () => {
@@ -512,7 +574,7 @@ defineOptions({ name: 'AuthorDetailView' })
 <template>
   <div class="flex h-full flex-col">
     <main ref="mainRef" class="flex flex-1 min-h-0 w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden pr-0 sm:pr-2">
-      <div class="mb-3 mt-2 mr-0 sm:mr-4 flex items-center gap-2 px-1">
+      <div class="mb-3 mt-2 mr-0 sm:mr-4 flex min-h-11 items-center gap-2 px-1">
         <button
           class="inline-flex h-8 items-center gap-1 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="goBack"
@@ -540,7 +602,10 @@ defineOptions({ name: 'AuthorDetailView' })
           :image-url="author.imageUrl ?? metadataPreview?.imageUrl ?? null"
           :preview-description="metadataPreview?.description ?? null"
           :preview-provider="metadataPreview?.provider ?? null"
+          :preview-cache="metadataPreviewCache"
+          :cache-summary="metadataCacheSummary"
           :loading-preview="loadingMetadataPreview"
+          :preview-searched="metadataPreviewSearched"
           :can-update="canUpdate"
           :can-merge="canMerge"
           :can-delete="canDelete"
@@ -548,8 +613,11 @@ defineOptions({ name: 'AuthorDetailView' })
           @edit="toggleEdit"
           @merge="toggleMerge"
           @refresh="refreshMetadata"
+          @search-fresh="searchMetadataPreviewFresh"
+          @find-match="openMatchSheet"
           @delete="confirmDeleteOpen = true"
         />
+        <AuthorMatchSheet v-if="author && matchSheetOpen && canUpdate" :author="author" @close="closeMatchSheet" @updated="handleMatchUpdated" />
 
         <div v-if="metadataPreviewError" class="mt-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           {{ t('author.detail.previewError') }}
@@ -571,6 +639,7 @@ defineOptions({ name: 'AuthorDetailView' })
               {{ t('author.detail.edit.description') }}
               <textarea v-model="draftDescription" rows="3" class="mt-1 w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm" />
             </label>
+            <AuthorFactsFields v-model="draftFacts" :invalid="invalidFacts" />
             <div class="space-y-1.5">
               <p class="text-xs text-muted-foreground">{{ t('author.detail.edit.image') }}</p>
               <input ref="authorImageInput" type="file" accept="image/*" class="hidden" :disabled="authorImageBusy" @change="onAuthorImageSelected" />

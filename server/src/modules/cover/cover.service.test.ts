@@ -99,7 +99,7 @@ function createMutationService(options?: { assertFieldsUnlocked?: ReturnType<typ
     { findLibraryIdByBookId: vi.fn().mockResolvedValue(7) } as never,
     { assertFieldsUnlocked } as never,
     fileWriteService as never,
-    { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
+    { verifyUserAccess: vi.fn().mockResolvedValue(undefined), verifyUserAccessLevel: vi.fn().mockResolvedValue(undefined) } as never,
     options?.providerRegistry ?? ({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry),
     scoreService as never,
     coverStore as never,

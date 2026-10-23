@@ -25,6 +25,11 @@ withDefaults(
      */
     showCoverFallbackToggle?: boolean
     coverFallback?: boolean
+    /** Book views only: series stacking, moved here from its own bar button. */
+    showCollapseSeries?: boolean
+    collapseSeries?: boolean
+    /** Selection keeps every book visible, so stacking is locked while selecting. */
+    collapseSeriesLocked?: boolean
     coverSizeMin?: number
     coverSizeMax?: number
     coverSizeStep?: number
@@ -50,7 +55,12 @@ const emit = defineEmits<{
   'update:coverShape': [value: 'square' | 'circle']
   'update:rowDensity': [value: TableDensity]
   'update:coverFallback': [value: boolean]
+  'update:collapseSeries': [value: boolean]
 }>()
+
+function handleCollapseSeriesChange(event: Event) {
+  emit('update:collapseSeries', (event.target as HTMLInputElement).checked)
+}
 
 function handleCoverFallbackChange(event: Event) {
   emit('update:coverFallback', (event.target as HTMLInputElement).checked)
@@ -135,7 +145,7 @@ function handleShowJumpRailsChange(event: Event) {
         <input
           type="checkbox"
           :checked="coverFallback"
-          class="size-4 shrink-0 cursor-pointer rounded border-input accent-primary"
+          class="size-4 shrink-0 cursor-pointer rounded-xs border-input accent-primary"
           @change="handleCoverFallbackChange"
         />
       </label>
@@ -145,7 +155,7 @@ function handleShowJumpRailsChange(event: Event) {
         <input
           type="checkbox"
           :checked="showJumpRails"
-          class="size-4 shrink-0 cursor-pointer rounded border-input accent-primary"
+          class="size-4 shrink-0 cursor-pointer rounded-xs border-input accent-primary"
           @change="handleShowJumpRailsChange"
         />
       </label>
@@ -156,6 +166,24 @@ function handleShowJumpRailsChange(event: Event) {
         <p class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.columnsHint') }}</p>
       </slot>
     </template>
+
+    <label
+      v-if="showCollapseSeries"
+      class="flex items-center justify-between gap-3 pt-1"
+      :class="collapseSeriesLocked ? 'cursor-not-allowed' : 'cursor-pointer'"
+    >
+      <span class="flex flex-col gap-0.5">
+        <span class="text-xs text-muted-foreground">{{ t('views.bookView.collapseSeries') }}</span>
+        <span v-if="collapseSeriesLocked" class="text-[11px] text-muted-foreground">{{ t('views.bookView.collapseLockedWhileSelecting') }}</span>
+      </span>
+      <input
+        type="checkbox"
+        :checked="collapseSeries"
+        :disabled="collapseSeriesLocked"
+        class="size-4 shrink-0 cursor-pointer rounded-xs border-input accent-primary disabled:cursor-not-allowed"
+        @change="handleCollapseSeriesChange"
+      />
+    </label>
 
     <div v-if="coverShape !== undefined && viewMode !== 'table'" class="space-y-1.5">
       <span class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.coverShape') }}</span>
@@ -185,5 +213,6 @@ function handleShowJumpRailsChange(event: Event) {
         </button>
       </div>
     </div>
+    <slot name="extra" />
   </div>
 </template>

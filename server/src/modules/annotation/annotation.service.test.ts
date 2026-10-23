@@ -81,6 +81,7 @@ async function makeService() {
   };
   const conversionService = {
     ensureCfiPositionsForBook: vi.fn().mockResolvedValue(0),
+    projectReaderPositions: vi.fn(),
   };
   const module = await Test.createTestingModule({
     providers: [
@@ -102,6 +103,13 @@ async function makeService() {
 }
 
 describe('AnnotationService', () => {
+  it('rejects projecting annotations into a file from a different book', async () => {
+    const { service, bookService, annotationRepo } = await makeService();
+    bookService.verifyFileAccess.mockResolvedValue({ id: 51, bookId: 6, format: 'epub' });
+    await expect(service.getAnnotationsPaginated(5, makeUser(), { page: 1, readerFileId: 51 })).rejects.toThrow(BadRequestException);
+    expect(annotationRepo.findPaginated).not.toHaveBeenCalled();
+  });
+
   describe('getAnnotations', () => {
     it('returns mapped response DTOs for the user and book', async () => {
       const { service, annotationRepo } = await makeService();
@@ -116,6 +124,40 @@ describe('AnnotationService', () => {
       expect(result[0]).toBeInstanceOf(AnnotationResponseDto);
       expect(result[0].id).toBe(10);
       expect(result[0].bookId).toBe(5);
+    });
+
+    it('projects the unpaginated list into a reader file of the same book', async () => {
+      const { service, annotationRepo, bookService, conversionService } = await makeService();
+      const row = makeAnnotationRow();
+      annotationRepo.findByBookId.mockResolvedValue([row]);
+      bookService.verifyFileAccess.mockResolvedValue({ id: 51, bookId: 5, format: 'epub' });
+      conversionService.projectReaderPositions.mockResolvedValue([{ ...row, cfi: 'epubcfi(/6/4!/4/2,/1:0,/1:4)', jumpFileId: 51 }]);
+
+      const result = await service.getAnnotations(5, makeUser(), 51);
+
+      expect(conversionService.projectReaderPositions).toHaveBeenCalledWith([row], 51);
+      expect(result[0]).toMatchObject({ cfi: 'epubcfi(/6/4!/4/2,/1:0,/1:4)', jumpFileId: 51 });
+    });
+
+    it('refuses to project the unpaginated list into a file of another book', async () => {
+      const { service, annotationRepo, bookService, conversionService } = await makeService();
+      bookService.verifyFileAccess.mockResolvedValue({ id: 61, bookId: 6, format: 'epub' });
+
+      await expect(service.getAnnotations(5, makeUser(), 61)).rejects.toThrow(BadRequestException);
+      expect(annotationRepo.findByBookId).not.toHaveBeenCalled();
+      expect(conversionService.projectReaderPositions).not.toHaveBeenCalled();
+    });
+
+    it('returns starredAt on the unpaginated list, null when not starred', async () => {
+      const { service, annotationRepo } = await makeService();
+      const starredAt = new Date('2026-03-04T05:06:07Z');
+      annotationRepo.findByBookId.mockResolvedValue([makeAnnotationRow({ starredAt }), makeAnnotationRow({ id: 11, starredAt: null })]);
+
+      const result = await service.getAnnotations(5, makeUser());
+
+      expect(result[0].starredAt).toEqual(starredAt);
+      expect(JSON.parse(JSON.stringify(result[0])).starredAt).toBe('2026-03-04T05:06:07.000Z');
+      expect(result[1].starredAt).toBeNull();
     });
 
     it('verifies book access before querying', async () => {
@@ -238,6 +280,15 @@ describe('AnnotationService', () => {
         text: 'text',
         note: null,
       });
+
+      expect(annotationRepo.create).toHaveBeenCalledWith(expect.objectContaining({ note: null }));
+    });
+
+    it('stores a blank or whitespace-only note as no note', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.create.mockResolvedValue(makeAnnotationRow());
+
+      await service.createAnnotation(5, makeUser(), { cfi: 'epubcfi(/6/4)', text: 'text', note: ' \n\t ' });
 
       expect(annotationRepo.create).toHaveBeenCalledWith(expect.objectContaining({ note: null }));
     });
@@ -428,6 +479,26 @@ describe('AnnotationService', () => {
       });
     });
 
+    it('clears the note when an empty or whitespace-only note is saved', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.update.mockResolvedValue(makeAnnotationRow({ note: null }));
+
+      await service.updateAnnotation(5, 10, makeUser(), { note: '' });
+      await service.updateAnnotation(5, 10, makeUser(), { note: '   ' });
+
+      expect(annotationRepo.update).toHaveBeenNthCalledWith(1, 5, 10, 1, { note: null });
+      expect(annotationRepo.update).toHaveBeenNthCalledWith(2, 5, 10, 1, { note: null });
+    });
+
+    it('keeps surrounding whitespace on a note that has text', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.update.mockResolvedValue(makeAnnotationRow({ note: '  kept  ' }));
+
+      await service.updateAnnotation(5, 10, makeUser(), { note: '  kept  ' });
+
+      expect(annotationRepo.update).toHaveBeenCalledWith(5, 10, 1, { note: '  kept  ' });
+    });
+
     it('does not include note in patch when note is undefined', async () => {
       const { service, annotationRepo } = await makeService();
       annotationRepo.update.mockResolvedValue(makeAnnotationRow({ color: '#4ADE80' }));
@@ -439,6 +510,25 @@ describe('AnnotationService', () => {
       });
       const callArg = annotationRepo.update.mock.calls[0][3];
       expect(callArg).not.toHaveProperty('note');
+    });
+
+    it('passes a star toggle through to the repository alongside the content patch', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.update.mockResolvedValue(makeAnnotationRow({ starredAt: new Date('2026-03-04T05:06:07Z') }));
+
+      const result = await service.updateAnnotation(5, 10, makeUser(), { starred: true });
+
+      expect(annotationRepo.update).toHaveBeenCalledWith(5, 10, 1, {}, { starred: true });
+      expect(result.starredAt).toEqual(new Date('2026-03-04T05:06:07Z'));
+    });
+
+    it('passes an unstar with a note change as one request', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.update.mockResolvedValue(makeAnnotationRow());
+
+      await service.updateAnnotation(5, 10, makeUser(), { starred: false, note: null });
+
+      expect(annotationRepo.update).toHaveBeenCalledWith(5, 10, 1, { note: null }, { starred: false });
     });
 
     it('throws NotFoundException when annotation is not found', async () => {
@@ -610,6 +700,20 @@ describe('AnnotationService', () => {
       expect(dto.positionStatus).toBeNull();
     });
 
+    it('does not call a device PDF point exact when the web PDF reader cannot draw it', () => {
+      const row = makeAnnotationRow({
+        cfi: null,
+        cfiStatus: null,
+        pageno: 22,
+        pdfPos0: JSON.stringify({ page: 22, x: 90, y: 98 }),
+        pdfStatus: 'exact',
+      });
+      const dto = AnnotationResponseDto.from(row as never);
+      expect(dto.pdf).toBeNull();
+      expect(dto.positionStatus).toBeNull();
+      expect(AnnotationResponseDto.from({ ...row, pdfStatus: 'failed' } as never).positionStatus).toBe('failed');
+    });
+
     it('ignores malformed pdf geometry json', () => {
       const row = makeAnnotationRow({
         cfi: null,
@@ -667,6 +771,20 @@ describe('AnnotationService', () => {
       expect(result.pageSize).toBe(25);
       expect(result.stats.totalHighlights).toBe(3);
       expect(result.stats.chapters).toEqual(['Chapter 1', 'Chapter 2']);
+    });
+
+    it('carries starredAt on paginated items as an ISO string or null', async () => {
+      const { service, annotationRepo } = await makeService();
+      annotationRepo.findPaginated.mockResolvedValue({
+        items: [makeAnnotationRow({ starredAt: new Date('2026-03-04T05:06:07Z') }), makeAnnotationRow({ id: 11 })],
+        total: 2,
+      });
+      annotationRepo.getStats.mockResolvedValue(makeStatsResult());
+      annotationRepo.getDistinctChapters.mockResolvedValue([]);
+
+      const result = await service.getAnnotationsPaginated(5, makeUser(), { page: 1 });
+
+      expect(result.items.map((item) => item.starredAt)).toEqual(['2026-03-04T05:06:07.000Z', null]);
     });
 
     it('verifies book access before querying', async () => {

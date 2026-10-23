@@ -24,6 +24,8 @@ export const APP_SETTING_KEYS = {
   CROSS_PLATFORM_PATH_SANITIZATION_ENABLED: 'cross_platform_path_sanitization_enabled',
   METADATA_SCORE_WEIGHTS: 'metadata_score_weights',
   AUDIT_RETENTION_DAYS: 'audit_retention_days',
+  AUDIT_TARGET_LABELS_BACKFILLED: 'audit_target_labels_backfilled',
+  SERIES_HARDCOVER_TOTALS_RESET: 'series_hardcover_totals_reset_v1',
   INITIAL_SETUP_COMPLETED_AT: 'initial_setup_completed_at',
   UPDATE_CHECK_ENABLED: 'update_check_enabled',
   MAX_UPLOAD_SIZE_MB: 'max_upload_size_mb',
@@ -41,6 +43,7 @@ export const BOOK_DOCK_MANAGED_SETTING_KEYS: readonly string[] = [
 ];
 
 export const DEFAULT_AUDIT_RETENTION_DAYS = 90;
+export const MAX_AUDIT_RETENTION_DAYS = 3650;
 
 export interface OidcFullConfig extends OidcBaseConfig {
   clientSecret: string;

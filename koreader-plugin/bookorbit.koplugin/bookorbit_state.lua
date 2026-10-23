@@ -31,8 +31,21 @@ local function deepCopy(value)
     return copy
 end
 
-function BookOrbitState.open()
+function BookOrbitState.open(account_identity)
     local self = setmetatable({}, BookOrbitState)
+    if account_identity then
+        local legacy = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. STATE_FILE)
+        local owner = legacy:readSetting("account_identity")
+        if not owner and account_identity ~= "anonymous" then
+            legacy:saveSetting("account_identity", account_identity)
+            self.settings = legacy
+            self:flush()
+            owner = account_identity
+        end
+        if owner ~= account_identity then
+            self.filename = "bookorbit_sync_state_" .. require("ffi/sha2").md5(account_identity) .. ".lua"
+        end
+    end
     self:reload()
     return self
 end
@@ -52,7 +65,8 @@ end
 -- reference, so a reload cannot strand a caller on an orphaned snapshot it
 -- would later flush over newer state.
 function BookOrbitState:reload()
-    local settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. STATE_FILE)
+    self.files_by_digest = nil
+    local settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. (self.filename or STATE_FILE))
     self.settings = settings
     -- readSetting with a default persists the returned live table on flush.
     self.books = settings:readSetting("books", {})
@@ -194,6 +208,7 @@ end
 
 function BookOrbitState:rememberFile(file, md5)
     if file and md5 then
+        if self.files[file] ~= md5 then self.files_by_digest = nil end
         self.files[file] = md5
         local book = self.books[md5]
         if book and not book.file then
@@ -202,12 +217,30 @@ function BookOrbitState:rememberFile(file, md5)
     end
 end
 
+-- Copies share a server rendition but have separate sidecars. An incomplete
+-- local copy cannot authoritatively delete annotations belonging to another.
+function BookOrbitState:hasOtherCopy(md5, file)
+    if not self.files_by_digest then
+        self.files_by_digest = {}
+        for path, digest in pairs(self.files) do
+            local paths = self.files_by_digest[digest] or {}
+            paths[#paths + 1] = path
+            self.files_by_digest[digest] = paths
+        end
+    end
+    for _, path in ipairs(self.files_by_digest[md5] or {}) do
+        if path ~= file and lfs.attributes(path, "mode") == "file" then return true end
+    end
+    return false
+end
+
 -- Repairs a path whose cached digest no longer matches the file on disk. A
 -- server identity is never copied between digests: only an identity already
 -- verified for the recomputed digest may be used to recover an ambiguous
 -- server match.
 function BookOrbitState:repairFileIdentity(file, old_md5, new_md5)
     if not file or not new_md5 then return nil end
+    self.files_by_digest = nil
     self.files[file] = new_md5
 
     if old_md5 and old_md5 ~= new_md5 then

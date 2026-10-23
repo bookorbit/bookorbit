@@ -68,6 +68,7 @@ function makeBook(id: number, overrides: Partial<BookCard> = {}): BookCard {
 const collapsedSeriesBook = makeBook(1, {
   seriesId: 7,
   seriesName: 'Discworld',
+  authors: ['Terry Pratchett'],
   collapsedSeries: { bookCount: 3, readCount: 0, coverBookIds: [1], seriesLatestAddedAt: null },
 })
 const plainBook = makeBook(2)
@@ -138,5 +139,14 @@ describe('VirtualBookTable collapsed series rows', () => {
     await grid.trigger('keydown', { key: ' ' })
 
     expect(wrapper.emitted('select')?.[0]?.[0]).toBe(plainBook.id)
+  })
+
+  it('gives a collapsed series row the author link used by book rows', () => {
+    const wrapper = mountTable()
+    const authorsCell = wrapper.findAllComponents({ name: 'BookTableCollapsedSeriesCell' }).find((cell) => cell.props('colId') === 'authors')
+    const linkFn = authorsCell?.props('linkFn') as ((chip: string) => string | null) | undefined
+
+    expect(authorsCell?.props('book')).toMatchObject({ authors: ['Terry Pratchett'] })
+    expect(linkFn?.('Terry Pratchett')).toBe('/authors?q=Terry%20Pratchett')
   })
 })

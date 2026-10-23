@@ -23,6 +23,18 @@ describe('IndexerRepository', () => {
     expect(queries[0].params).toEqual([3, 8]);
   });
 
+  it('reads the source and current manager seed policy in one bounded query without credentials', async () => {
+    const { db, queries } = createCapturingDb();
+    await new IndexerRepository(db).findSeedPolicyById(9);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toContain('left join "request_indexer_managers" on "request_indexers"."manager_id" = "request_indexer_managers"."id"');
+    expect(queries[0].sql).toContain('"request_indexer_managers"."inherit_seed_limits"');
+    expect(queries[0].sql).toMatch(/where "request_indexers"\."id" = \$1 limit \$2/);
+    expect(queries[0].sql).not.toContain('credentials_enc');
+    expect(queries[0].params).toEqual([9, 1]);
+  });
+
   it('deletes every indexer with the requested adapter type in one query', async () => {
     const { db, queries } = createCapturingDb();
     const repository = new IndexerRepository(db);

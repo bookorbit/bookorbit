@@ -113,6 +113,14 @@ end
 local normalized_many, many_max, many_signature = BookOrbitSidecar.normalizeAnnotations(many)
 assertEqual(#normalized_many, 120, "the fixture normalizes every entry")
 
+local pending = highlight("2026-07-08 09:00:00", "/body/p[1]", "pending sidecar")
+pending.bookorbit_pending_verification = true
+assertEqual(#BookOrbitSidecar.normalizeAnnotations({ pending }), 0,
+    "an unverified sidecar is not uploaded as device-authoritative content")
+pending.bookorbit_pending_verification = nil
+assertEqual(#BookOrbitSidecar.normalizeAnnotations({ pending }), 1,
+    "live verification makes the annotation eligible for upload")
+
 local requests = {}
 local uploaded_order = {}
 local state_book = {}
@@ -306,5 +314,20 @@ assert(not annotations_source:find("table.remove(delta, 1)", 1, true),
     "the exchange delta must not be drained from the front")
 assert(not book_sync_source:find("table.remove(ctx.ann_delta, 1)", 1, true),
     "the legacy upload delta must not be drained from the front")
+
+local copy_requests = {}
+local copy_book = {}
+BookOrbitAnnotations.exchangeBook({
+    client = {
+        exchangeAnnotations = function(_, books)
+            copy_requests[#copy_requests + 1] = books[1]
+            return { results = { { toApply = {}, more = false } } }
+        end,
+    },
+    state = { getBook = function() return copy_book end, hasOtherCopy = function() return true end },
+    digest = "copies", annotations = {}, ann_signature = "empty", apply_mode = "sidecar", file = "/books/copy.epub",
+})
+assertEqual(copy_requests[1].keysComplete, false, "one duplicate sidecar cannot delete another copy's highlights")
+assertEqual(copy_book.annSignature, nil, "an ambiguous local set cannot acquire a complete exchange stamp")
 
 print("bookorbit_annotation_exchange_skip_test.lua: ok")

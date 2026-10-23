@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -24,6 +24,15 @@ export class EmailProviderRepository {
     return this.db.select().from(emailProviders).where(eq(emailProviders.id, id)).limit(1);
   }
 
+  findSharedDefault() {
+    return this.db
+      .select()
+      .from(emailProviders)
+      .where(and(eq(emailProviders.isShared, true), eq(emailProviders.isDefault, true)))
+      .orderBy(desc(emailProviders.isSystemProvider), asc(emailProviders.id))
+      .limit(1);
+  }
+
   insert(values: typeof emailProviders.$inferInsert) {
     return this.db.insert(emailProviders).values(values).returning();
   }
@@ -33,24 +42,6 @@ export class EmailProviderRepository {
       .update(emailProviders)
       .set({ ...values, updatedAt: sql`now()` })
       .where(and(eq(emailProviders.id, id), eq(emailProviders.userId, userId)))
-      .returning();
-  }
-
-  clearDefault(userId: number) {
-    return this.db
-      .update(emailProviders)
-      .set({ isDefault: false })
-      .where(and(eq(emailProviders.userId, userId), eq(emailProviders.isDefault, true)));
-  }
-
-  setDefault(id: number, userId: number) {
-    return this.db
-      .update(emailProviders)
-      .set({
-        isDefault: sql`case when ${emailProviders.id} = ${id} then true else false end`,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(emailProviders.userId, userId))
       .returning();
   }
 
@@ -66,6 +57,15 @@ export class EmailProviderRepository {
     return this.db
       .delete(emailProviders)
       .where(and(eq(emailProviders.id, id), eq(emailProviders.userId, userId)))
+      .returning();
+  }
+
+  /** Kept on the row so the settings page can say whether a server works without testing it again. */
+  recordTestResult(id: number, ok: boolean, error: string | null) {
+    return this.db
+      .update(emailProviders)
+      .set({ lastTestedAt: sql`now()`, lastTestOk: ok, lastTestError: error })
+      .where(eq(emailProviders.id, id))
       .returning();
   }
 

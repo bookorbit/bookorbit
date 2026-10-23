@@ -1,16 +1,20 @@
 import 'reflect-metadata';
 
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AuthorMetadataProviderKey } from '@bookorbit/types';
 
+import { AuthorEnrichmentBackfillDto } from './author-enrichment-backfill.dto';
 import { BulkAuthorIdsDto } from './bulk-author-ids.dto';
+import { BulkRefreshAuthorsMetadataDto } from './bulk-refresh-authors-metadata.dto';
 import { DeleteAuthorsDto } from './delete-authors.dto';
 import { ListAuthorBooksDto } from './list-author-books.dto';
 import { ListAuthorMetadataDto } from './list-author-metadata.dto';
 import { ListAuthorsDto } from './list-authors.dto';
 import { LookupAuthorMetadataDto } from './lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './merge-authors.dto';
+import { PinAuthorMetadataMatchDto } from './pin-author-metadata-match.dto';
 import { PreviewAuthorEnrichmentCountDto } from './preview-author-enrichment-count.dto';
 import { UpdateAuthorDto } from './update-author.dto';
 
@@ -117,6 +121,45 @@ describe('Authors DTO validation', () => {
     expect((await errorsFor(UpdateAuthorDto, { name: 'x'.repeat(501) })).length).toBeGreaterThan(0);
   });
 
+  it('accepts author facts and clearing them with null', async () => {
+    expect(
+      (
+        await errorsFor(UpdateAuthorDto, {
+          website: 'https://johnreid.example/about',
+          birthDate: '1965-03-14',
+          birthYear: 1965,
+          deathDate: null,
+          deathYear: null,
+          genres: ['Thriller', 'Military fiction'],
+          influences: ['Alistair MacLean'],
+        })
+      ).length,
+    ).toBe(0);
+    expect((await errorsFor(UpdateAuthorDto, { website: null, birthDate: null, genres: null, influences: null })).length).toBe(0);
+    expect((await errorsFor(UpdateAuthorDto, { birthYear: -800 })).length).toBe(0);
+  });
+
+  it('rejects unsafe or malformed author facts', async () => {
+    expect((await errorsFor(UpdateAuthorDto, { website: 'javascript:alert(1)' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { website: 'johnreid.example' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { website: 'ftp://johnreid.example' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { birthDate: '14/03/1965' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { birthYear: 1965.5 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { deathYear: 10_000 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { genres: 'Thriller' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { genres: Array.from({ length: 51 }, (_, i) => `g${i}`) })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateAuthorDto, { influences: ['x'.repeat(501)] })).length).toBeGreaterThan(0);
+  });
+
+  it('validates a metadata match pin', async () => {
+    expect((await errorsFor(PinAuthorMetadataMatchDto, { provider: AuthorMetadataProviderKey.GOODREADS, providerId: '12345' })).length).toBe(0);
+    expect((await errorsFor(PinAuthorMetadataMatchDto, { provider: 'openlibrary', providerId: '12345' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(PinAuthorMetadataMatchDto, { provider: AuthorMetadataProviderKey.GOODREADS, providerId: '' })).length).toBeGreaterThan(0);
+    expect(
+      (await errorsFor(PinAuthorMetadataMatchDto, { provider: AuthorMetadataProviderKey.AUDNEXUS, providerId: 'B'.repeat(129) })).length,
+    ).toBeGreaterThan(0);
+  });
+
   it('requires enrichment preview conditions and boolean flags', async () => {
     expect(
       (
@@ -128,5 +171,43 @@ describe('Authors DTO validation', () => {
 
     expect((await errorsFor(PreviewAuthorEnrichmentCountDto, {})).length).toBeGreaterThan(0);
     expect((await errorsFor(PreviewAuthorEnrichmentCountDto, { conditions: { neverEnriched: 'true' } })).length).toBeGreaterThan(0);
+  });
+
+  describe('metadata cache options', () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    const body = <T>(metatype: new () => T, value: unknown) => pipe.transform(value, { type: 'body', metatype }) as Promise<T>;
+    const query = <T>(metatype: new () => T, value: unknown) => pipe.transform(value, { type: 'query', metatype }) as Promise<T>;
+
+    it('accepts an optional cache policy on metadata search and lookup queries', async () => {
+      expect((await query(ListAuthorMetadataDto, { q: 'Jane' })).cache).toBeUndefined();
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'refresh' })).resolves.toMatchObject({ cache: 'refresh' });
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'default' })).resolves.toMatchObject({ cache: 'default' });
+      await expect(query(LookupAuthorMetadataDto, { provider: 'audnexus', id: 'A1', cache: 'refresh' })).resolves.toMatchObject({ cache: 'refresh' });
+    });
+
+    it('rejects cache policies a client may not choose', async () => {
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'bypass' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(query(ListAuthorMetadataDto, { q: 'Jane', cache: 'only-if-cached' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(query(LookupAuthorMetadataDto, { provider: 'audnexus', id: 'A1', cache: 'live' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('accepts an optional ignoreCache flag on the bulk refresh body', async () => {
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [1, 2] })).resolves.toMatchObject({ authorIds: [1, 2] });
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [1], ignoreCache: true })).resolves.toMatchObject({ ignoreCache: true });
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [1], ignoreCache: 'yes' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(body(BulkRefreshAuthorsMetadataDto, { authorIds: [] })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('keeps rejecting ignoreCache on other bulk author bodies', async () => {
+      await expect(body(BulkAuthorIdsDto, { authorIds: [1], ignoreCache: true })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('accepts an absent, empty or flagged backfill body', async () => {
+      await expect(body(AuthorEnrichmentBackfillDto, undefined)).resolves.toBeInstanceOf(AuthorEnrichmentBackfillDto);
+      expect((await body(AuthorEnrichmentBackfillDto, {})).ignoreCache).toBeUndefined();
+      await expect(body(AuthorEnrichmentBackfillDto, { ignoreCache: true })).resolves.toMatchObject({ ignoreCache: true });
+      await expect(body(AuthorEnrichmentBackfillDto, { ignoreCache: 1 })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(body(AuthorEnrichmentBackfillDto, { force: true })).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

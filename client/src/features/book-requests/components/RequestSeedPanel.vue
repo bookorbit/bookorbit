@@ -199,7 +199,7 @@ function confirmRemove() {
         <p class="text-xs text-muted-foreground">{{ t('bookRequests.seed.removeHint') }}</p>
 
         <label class="flex items-center gap-2 text-sm text-foreground">
-          <input v-model="deleteFiles" type="checkbox" class="h-3.5 w-3.5 rounded border-border accent-primary" />
+          <input v-model="deleteFiles" type="checkbox" class="h-3.5 w-3.5 rounded-xs border-border accent-primary" />
           {{ t('bookRequests.seed.deleteFiles') }}
         </label>
 

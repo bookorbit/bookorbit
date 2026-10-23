@@ -242,7 +242,7 @@ export class EntityManagerService {
 
     try {
       const strategy = this.getStrategy(entityType);
-      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const libraryIds = await this.libraryService.findEditableLibraryIds(user);
       const result = await strategy.merge({ targetId, sourceIds, userId: user.id, libraryIds });
 
       const nonInlineSourceIds: number[] = [];
@@ -291,7 +291,7 @@ export class EntityManagerService {
 
     try {
       const strategy = this.getStrategy(entityType);
-      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const libraryIds = await this.libraryService.findEditableLibraryIds(user);
       const result = await strategy.rename({ entityId, newName, userId: user.id, libraryIds });
 
       if (writeFiles) {
@@ -333,7 +333,7 @@ export class EntityManagerService {
 
     try {
       const strategy = this.getStrategy(entityType);
-      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const libraryIds = await this.libraryService.findEditableLibraryIds(user);
       const effectiveMode = !strategy.isInline && mode === 'soft' && (await strategy.getBookCount(entityId)) === 0 ? 'hard' : mode;
       const result = await strategy.deleteEntity({ entityId, mode: effectiveMode, libraryIds });
 
@@ -400,7 +400,7 @@ export class EntityManagerService {
         throw new BadRequestException('Split requires at least 2 new names');
       }
 
-      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const libraryIds = await this.libraryService.findEditableLibraryIds(user);
       const result = await strategy.split({ entityId, newNames, libraryIds });
 
       await this.repo.deleteDismissedPairsForEntity(entityType, entityId);

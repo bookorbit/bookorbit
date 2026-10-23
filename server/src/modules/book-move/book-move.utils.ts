@@ -4,6 +4,10 @@ import { copyFile, mkdir, open, readdir, rename as fsRename, rmdir, stat, unlink
 import { dirname, isAbsolute, join, normalize, relative, sep } from 'path';
 import { pipeline } from 'stream/promises';
 
+import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
+
+import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
+
 export const MAX_PATH_LENGTH = 4096;
 
 export interface MovedFileStat {
@@ -209,4 +213,32 @@ export async function pathExists(absolutePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export interface MovedPrimaryCandidate {
+  id: number;
+  role: string;
+  format: string | null;
+  sizeBytes: number | null;
+  sortOrder: number | null;
+  mediaOverlayAvailable: boolean;
+}
+
+/**
+ * The file a moved book's primary becomes in the library it moves into, the way a scan of that
+ * library would choose: among the content files whose format it allows, the one its format
+ * priority ranks first, keeping the current primary on a tie. Null leaves the current primary in
+ * place, which is what happens when nothing it allows has any bytes. The planner names files and
+ * reports formats by this, and the move commits it, so the two cannot disagree.
+ */
+export function selectMovedPrimary<T extends MovedPrimaryCandidate>(
+  files: readonly T[],
+  currentPrimaryId: number | null,
+  target: { formatPriority: readonly string[] | null; allowedFormats: readonly string[] },
+): T | null {
+  const allowed = target.allowedFormats.length > 0 ? new Set(target.allowedFormats.map((format) => format.toLowerCase())) : null;
+  const candidates = files
+    .filter((file) => file.role === 'content' && (!allowed || (file.format !== null && allowed.has(file.format.toLowerCase()))))
+    .sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.id - b.id);
+  return selectPrimaryFileKeepingCurrent(candidates, currentPrimaryId, target.formatPriority ?? DEFAULT_FORMAT_PRIORITY);
 }

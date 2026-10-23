@@ -58,14 +58,14 @@ const iconChoices = computed(() => (props.icon && !SUGGESTED_ICONS.includes(prop
 const coverOptions = computed<{ value: CoverAspectRatio; title: string; hint: string; tiles: string[] }[]>(() => [
   {
     value: '2/3',
-    title: t('library.creator.details.cover.portraitTitle'),
-    hint: t('library.creator.details.cover.portraitHint'),
+    title: t('library.creator.details.gridShape.tallTitle'),
+    hint: t('library.creator.details.gridShape.tallHint'),
     tiles: ['var(--format-ebook)', 'var(--format-document)', 'var(--format-audio)'],
   },
   {
     value: '1/1',
-    title: t('library.creator.details.cover.squareTitle'),
-    hint: t('library.creator.details.cover.squareHint'),
+    title: t('library.creator.details.gridShape.squareTitle'),
+    hint: t('library.creator.details.gridShape.squareHint'),
     tiles: ['var(--format-kindle)', 'var(--format-comic)', 'var(--format-audio)'],
   },
 ])
@@ -193,9 +193,9 @@ function selectPodcastsType() {
       </div>
     </LibraryCreatorCard>
 
-    <LibraryCreatorCard v-if="type === 'books'" :label="t('library.creator.details.coverStyle.title')">
+    <LibraryCreatorCard v-if="type === 'books'" :label="t('library.creator.details.gridShape.title')">
       <fieldset aria-describedby="cover-style-description">
-        <legend class="sr-only">{{ t('library.creator.details.coverStyle.title') }}</legend>
+        <legend class="sr-only">{{ t('library.creator.details.gridShape.title') }}</legend>
         <div class="grid gap-2.5 @md:grid-cols-2">
           <label
             v-for="option in coverOptions"
@@ -231,7 +231,7 @@ function selectPodcastsType() {
             </span>
           </label>
         </div>
-        <p id="cover-style-description" class="mt-2.5 text-xs text-muted-foreground">{{ t('library.creator.details.cover.slotsHint') }}</p>
+        <p id="cover-style-description" class="mt-2.5 text-xs text-muted-foreground">{{ t('library.creator.details.gridShape.hint') }}</p>
       </fieldset>
     </LibraryCreatorCard>
   </div>

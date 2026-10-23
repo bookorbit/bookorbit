@@ -230,3 +230,53 @@ describe('useBookRequestActions with more than one row in flight', () => {
     await expect(actions.remove(1)).resolves.toEqual({ ok: false, reason: 'remove the download from its client first' })
   })
 })
+
+describe('useBookRequests pairs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const ebook = { id: 10, mediaKind: 'ebook', status: 'pending', companionRequestId: 11 }
+  const audiobook = { id: 11, mediaKind: 'audiobook', status: 'pending', companionRequestId: 10 }
+
+  it('asks for a pair as one row', async () => {
+    apiMock.mockResolvedValue(response({ items: [], total: 0 }))
+    const requests = await freshRequests('mine')
+
+    await requests.fetchRequests()
+
+    const params = new URLSearchParams(String(apiMock.mock.calls[0]?.[0]).split('?')[1])
+    expect(params.get('groupPairs')).toBe('true')
+  })
+
+  it('updates the half a decision was about, whichever half leads the row', async () => {
+    apiMock.mockResolvedValue(response({ items: [{ ...ebook, companion: audiobook }], total: 1 }))
+    const requests = await freshRequests('mine')
+    await requests.fetchRequests()
+
+    requests.replaceItem({ ...audiobook, status: 'approved' } as never)
+    expect(requests.items.value[0]!.companion?.status).toBe('approved')
+
+    // A single request comes back flat, so the lead keeps the companion it already had.
+    requests.replaceItem({ ...ebook, status: 'approved' } as never)
+    expect(requests.items.value[0]!.status).toBe('approved')
+    expect(requests.items.value[0]!.companion?.id).toBe(11)
+  })
+
+  it('keeps the other half of a pair on the list when one half leaves it', async () => {
+    apiMock.mockResolvedValue(response({ items: [{ ...ebook, companion: audiobook }], total: 1 }))
+    const requests = await freshRequests('mine')
+    await requests.fetchRequests()
+
+    requests.dropItem(10)
+
+    expect(requests.items.value).toHaveLength(1)
+    expect(requests.items.value[0]!.id).toBe(11)
+    expect(requests.items.value[0]!.companion).toBeNull()
+    expect(requests.total.value).toBe(1)
+
+    requests.dropItem(11)
+    expect(requests.items.value).toHaveLength(0)
+    expect(requests.total.value).toBe(0)
+  })
+})

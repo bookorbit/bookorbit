@@ -49,6 +49,6 @@ export async function assertEntityRelationsWithinLibraries(
   `);
 
   if (result.rows.length > 0) {
-    throw new ForbiddenException('Entity is used by a library outside the accessible scope');
+    throw new ForbiddenException('Entity is used by a library you cannot edit');
   }
 }

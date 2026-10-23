@@ -1,5 +1,6 @@
 import { ConcreteBookMediaKind, MetadataCandidate, MetadataCoverShape, MetadataProviderKey } from '@bookorbit/types';
 
+import type { ProviderCacheSpec } from '../../../common/provider-cache/provider-cache-spec';
 import { MetadataSearchParams } from './metadata-search-params';
 
 export interface MetadataProvider {
@@ -23,6 +24,11 @@ export interface MetadataProvider {
    * other medium.
    */
   readonly editionFollowsMedium?: boolean;
+  /**
+   * How the metadata cache identifies this provider's calls. A provider without one is never
+   * cached. Its key inputs must cover every parameter the provider reads, directly or in helpers.
+   */
+  readonly cache?: ProviderCacheSpec<MetadataSearchParams>;
   search(params: MetadataSearchParams): Promise<MetadataCandidate[]>;
 }
 

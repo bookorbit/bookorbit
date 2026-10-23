@@ -22,6 +22,7 @@ export const opdsUsers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     username: varchar('username', { length: 100 }).notNull().unique(),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
     sortOrder: opdsSortOrderEnum('sort_order').notNull().default('recent'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })

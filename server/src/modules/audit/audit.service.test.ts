@@ -1,5 +1,5 @@
 import { APP_SETTING_KEYS, DEFAULT_AUDIT_RETENTION_DAYS } from '../../common/constants/app-settings.constants';
-import { AuditAction } from '@bookorbit/types';
+import { AuditAction, AuditResource } from '@bookorbit/types';
 import { AUDIT_EVENT, AuditEventsService } from './audit-events.service';
 import { AuditService } from './audit.service';
 
@@ -37,13 +37,23 @@ function makeService() {
     findActors: vi.fn(),
     findReadingInsightsAccess: vi.fn(),
     deleteOlderThan: vi.fn().mockResolvedValue(undefined),
+    summarize: vi.fn(),
+    findSignInGroups: vi.fn(),
+    findExportBatch: vi.fn(),
   };
   const appSettings = {
     getValue: vi.fn(),
   };
+  const targetLabels = {
+    attach: vi.fn((rows: Array<Record<string, unknown>>) =>
+      Promise.resolve(rows.map(({ resourceLabel, ...row }) => ({ ...row, targetLabel: resourceLabel ?? null, targetExists: null }))),
+    ),
+    resolveForWrite: vi.fn().mockResolvedValue(null),
+    actorNames: vi.fn().mockResolvedValue(new Map([[2, 'Test One']])),
+  };
 
-  const service = new AuditService(auditEvents as never, auditRepository as never, appSettings as never);
-  return { service, auditEvents, auditRepository, appSettings };
+  const service = new AuditService(auditEvents as never, auditRepository as never, appSettings as never, targetLabels as never);
+  return { service, auditEvents, auditRepository, appSettings, targetLabels };
 }
 
 describe('AuditService', () => {
@@ -77,12 +87,34 @@ describe('AuditService', () => {
       action: AuditAction.BookMetadataUpdate,
       resource: null,
       resourceId: null,
+      resourceLabel: null,
       description: 'updated book metadata',
       ip: null,
       meta: null,
     });
 
     await service.onModuleDestroy();
+  });
+
+  it('snapshots the target name with the event so a deleted target can still be named', async () => {
+    const { service, auditRepository, targetLabels } = makeService();
+    targetLabels.resolveForWrite.mockResolvedValue('Science Fiction');
+
+    await service.record(makePayload({ action: AuditAction.LibraryUpdate, resource: AuditResource.Library, resourceId: 7 }));
+
+    expect(targetLabels.resolveForWrite).toHaveBeenCalledWith(AuditResource.Library, 7);
+    expect(auditRepository.insert).toHaveBeenCalledWith(expect.objectContaining({ resourceId: 7, resourceLabel: 'Science Fiction' }));
+  });
+
+  it('keeps a name read before the target was deleted instead of looking it up again', async () => {
+    const { service, auditRepository, targetLabels } = makeService();
+
+    await service.record(
+      makePayload({ action: AuditAction.LibraryDelete, resource: AuditResource.Library, resourceId: 7, resourceLabel: 'Old Shelf' }),
+    );
+
+    expect(targetLabels.resolveForWrite).not.toHaveBeenCalled();
+    expect(auditRepository.insert).toHaveBeenCalledWith(expect.objectContaining({ resourceLabel: 'Old Shelf' }));
   });
 
   it('drops writes when queue reaches max concurrent capacity', async () => {
@@ -148,15 +180,143 @@ describe('AuditService', () => {
     const result = await service.getAuditLogs(query);
 
     expect(auditRepository.findAll).toHaveBeenCalledWith(query);
-    expect(result).toEqual({ data: [{ id: 1 }], total: 1 });
+    expect(result).toEqual({ data: [{ id: 1, targetLabel: null, targetExists: null }], total: 1 });
+  });
+
+  it('returns view counts with the configured retention', async () => {
+    const { service, auditRepository, appSettings } = makeService();
+    appSettings.getValue.mockResolvedValue('30');
+    auditRepository.summarize.mockResolvedValue({
+      kinds: { all: 10, changes: 4, signins: 6, security: 2 },
+      categories: { access: 6, libraries: 4 },
+      securityGroups: { failed: 1, accounts: 1, passwords: 0, permissions: 0, access: 0, links: 0 },
+      oldestAt: new Date('2026-08-15T04:32:57.000Z'),
+    });
+
+    const summary = await service.getSummary({ kind: 'changes' });
+
+    expect(auditRepository.summarize).toHaveBeenCalledWith({ kind: 'changes' });
+    expect(summary).toEqual({
+      kinds: { all: 10, changes: 4, signins: 6, security: 2 },
+      categories: { access: 6, libraries: 4 },
+      securityGroups: { failed: 1, accounts: 1, passwords: 0, permissions: 0, access: 0, links: 0 },
+      retentionDays: 30,
+      oldestAt: '2026-08-15T04:32:57.000Z',
+    });
+  });
+
+  it('serialises sign-in group times as ISO strings', async () => {
+    const { service, auditRepository } = makeService();
+    auditRepository.findSignInGroups.mockResolvedValue({
+      data: [
+        {
+          day: '2026-10-15',
+          actorUsername: 'test1',
+          userId: 2,
+          ip: '192.168.8.230',
+          signIns: 1,
+          signOuts: 1,
+          failed: 1,
+          failedUsernames: ['test1'],
+          firstAt: new Date('2026-10-16T01:49:37Z'),
+          lastAt: '2026-10-16T02:02:00Z',
+        },
+      ],
+      total: '1',
+    });
+
+    const page = await service.getSignIns({ tz: 'America/Denver', page: 1, pageSize: 50 });
+
+    expect(page.total).toBe(1);
+    expect(page.data[0]).toMatchObject({
+      actorName: 'Test One',
+      firstAt: '2026-10-16T01:49:37.000Z',
+      lastAt: '2026-10-16T02:02:00.000Z',
+      failedUsernames: ['test1'],
+    });
+  });
+
+  it('exports CSV in id batches and defuses spreadsheet formulas', async () => {
+    const { service, auditRepository } = makeService();
+    const row = (id: number, description: string) => ({
+      id,
+      userId: 1,
+      actorUsername: 'neon',
+      action: AuditAction.LibraryCreate,
+      resource: AuditResource.Library,
+      resourceId: id,
+      resourceLabel: '=HYPERLINK("x")',
+      description,
+      ip: '127.0.0.1',
+      meta: null,
+      createdAt: new Date('2026-10-14T22:37:27Z'),
+    });
+    auditRepository.findExportBatch
+      .mockResolvedValueOnce(Array.from({ length: 500 }, (_, i) => row(i + 1, 'Created library')))
+      .mockResolvedValueOnce([row(501, 'Says "hi", twice')]);
+
+    const chunks: string[] = [];
+    for await (const chunk of service.exportEvents({ kind: 'changes' }, 'csv')) chunks.push(chunk);
+
+    expect(auditRepository.findExportBatch).toHaveBeenNthCalledWith(1, { kind: 'changes' }, 0, 500);
+    expect(auditRepository.findExportBatch).toHaveBeenNthCalledWith(2, { kind: 'changes' }, 500, 500);
+    expect(chunks).toHaveLength(502);
+    expect(chunks[0]).toBe('id,occurred_at,actor,user_id,action,category,target_type,target_id,target,ip,description,meta\n');
+    expect(chunks[501]).toBe(
+      `501,2026-10-14T22:37:27.000Z,neon,1,library.create,libraries,library,501,"'=HYPERLINK(""x"")",127.0.0.1,"Says ""hi"", twice",\n`,
+    );
+  });
+
+  it('exports JSON as one array', async () => {
+    const { service, auditRepository } = makeService();
+    auditRepository.findExportBatch.mockResolvedValueOnce([
+      {
+        id: 3,
+        userId: null,
+        actorUsername: 'system',
+        action: AuditAction.BookRequestImport,
+        resource: AuditResource.BookRequest,
+        resourceId: 9,
+        resourceLabel: null,
+        description: 'Imported',
+        ip: null,
+        meta: { format: 'm4b' },
+        createdAt: new Date('2026-10-14T23:56:00Z'),
+      },
+    ]);
+
+    let body = '';
+    for await (const chunk of service.exportEvents({}, 'json')) body += chunk;
+
+    expect(JSON.parse(body)).toEqual([
+      {
+        id: 3,
+        occurredAt: '2026-10-14T23:56:00.000Z',
+        actorUsername: 'system',
+        userId: null,
+        action: 'book_request.import',
+        category: 'requests',
+        resource: 'book_request',
+        resourceId: 9,
+        targetLabel: null,
+        ip: null,
+        description: 'Imported',
+        meta: { format: 'm4b' },
+      },
+    ]);
   });
 
   it('delegates actor suggestions to the repository', async () => {
     const { service, auditRepository } = makeService();
-    const actors = [{ userId: 12, username: 'admin' }];
-    auditRepository.findActors.mockResolvedValue(actors);
+    auditRepository.findActors.mockResolvedValue([
+      { userId: 2, username: 'test1' },
+      { userId: null, username: 'system' },
+    ]);
 
-    await expect(service.getActors('adm', 25)).resolves.toEqual(actors);
+    await expect(service.getActors('adm', 25)).resolves.toEqual([
+      { userId: 2, username: 'test1', name: 'Test One' },
+      { userId: null, username: 'system', name: null },
+    ]);
     expect(auditRepository.findActors).toHaveBeenCalledWith('adm', 25);
   });
 

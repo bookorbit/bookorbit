@@ -11,6 +11,7 @@ import {
   normalizeReadStatus,
   pruneUndefined,
   toDate,
+  toReadingDates,
   truncateNullableText,
   truncateText,
   uniqueNumbers,
@@ -272,6 +273,59 @@ describe('migration executor utils', () => {
     expect(clampNonNegative(null)).toBe(0);
     expect(clampNonNegative(-2)).toBe(0);
     expect(clampNonNegative(9)).toBe(9);
+  });
+
+  describe('toReadingDates', () => {
+    const date = (value: string) => new Date(value);
+
+    it('keeps the finish date and drops the start when the finish comes first', () => {
+      expect(toReadingDates('2026-10-12T05:23:33.044Z', '2025-09-07T05:23:32.000Z')).toEqual({
+        startedAt: null,
+        finishedAt: date('2025-09-07T05:23:32.000Z'),
+      });
+    });
+
+    it('drops the start when the finish is a single millisecond earlier', () => {
+      expect(toReadingDates('2025-02-20T08:45:00.001Z', '2025-02-20T08:45:00.000Z')).toEqual({
+        startedAt: null,
+        finishedAt: date('2025-02-20T08:45:00.000Z'),
+      });
+    });
+
+    it('keeps both dates when the finish matches or follows the start', () => {
+      // Marking a book finished in Audiobookshelf without listening stamps both dates at once.
+      expect(toReadingDates('2026-10-12T05:20:33.137Z', '2026-10-12T05:20:33.137Z')).toEqual({
+        startedAt: date('2026-10-12T05:20:33.137Z'),
+        finishedAt: date('2026-10-12T05:20:33.137Z'),
+      });
+      expect(toReadingDates('2025-01-10T12:30:00.000Z', '2025-01-15T12:30:00.000Z')).toEqual({
+        startedAt: date('2025-01-10T12:30:00.000Z'),
+        finishedAt: date('2025-01-15T12:30:00.000Z'),
+      });
+    });
+
+    it('orders by instant rather than by the text of the timestamp', () => {
+      // 10:00+05:00 is 05:00Z, so it starts an hour before a 06:00Z finish even though it sorts later as text.
+      expect(toReadingDates('2025-03-01T10:00:00+05:00', '2025-03-01T06:00:00Z')).toEqual({
+        startedAt: date('2025-03-01T05:00:00.000Z'),
+        finishedAt: date('2025-03-01T06:00:00.000Z'),
+      });
+      expect(toReadingDates('2025-03-01T06:00:00Z', '2025-03-01T10:00:00+05:00')).toEqual({
+        startedAt: null,
+        finishedAt: date('2025-03-01T05:00:00.000Z'),
+      });
+    });
+
+    it('passes a lone date through whichever side it is on', () => {
+      expect(toReadingDates('2025-01-10T12:30:00.000Z', null)).toEqual({ startedAt: date('2025-01-10T12:30:00.000Z'), finishedAt: null });
+      expect(toReadingDates(null, '2025-01-15T12:30:00.000Z')).toEqual({ startedAt: null, finishedAt: date('2025-01-15T12:30:00.000Z') });
+      expect(toReadingDates(null, null)).toEqual({ startedAt: null, finishedAt: null });
+    });
+
+    it('treats an unparseable date as missing instead of ordering against it', () => {
+      expect(toReadingDates('not-a-date', '2025-01-15T12:30:00.000Z')).toEqual({ startedAt: null, finishedAt: date('2025-01-15T12:30:00.000Z') });
+      expect(toReadingDates('2025-01-10T12:30:00.000Z', 'not-a-date')).toEqual({ startedAt: date('2025-01-10T12:30:00.000Z'), finishedAt: null });
+    });
   });
 
   it('truncates text helpers and normalizes read status from status/percentage', () => {

@@ -1,14 +1,15 @@
 import { api } from '@/lib/api'
+import { ignoreCachePostInit, type IgnoreCacheOptions } from '@/features/metadata-cache/lib/metadata-cache'
 
 export function useBookMetadataFetchActions() {
-  async function triggerGlobal(): Promise<{ queued: number }> {
-    const res = await api('/api/v1/book-metadata-fetch/run', { method: 'POST' })
+  async function triggerGlobal(options: IgnoreCacheOptions = {}): Promise<{ queued: number }> {
+    const res = await api('/api/v1/book-metadata-fetch/run', ignoreCachePostInit(options))
     if (!res.ok) throw new Error('Failed to trigger run')
     return res.json()
   }
 
-  async function triggerForLibrary(libraryId: number): Promise<{ queued: number }> {
-    const res = await api(`/api/v1/book-metadata-fetch/run/${libraryId}`, { method: 'POST' })
+  async function triggerForLibrary(libraryId: number, options: IgnoreCacheOptions = {}): Promise<{ queued: number }> {
+    const res = await api(`/api/v1/book-metadata-fetch/run/${libraryId}`, ignoreCachePostInit(options))
     if (!res.ok) throw new Error('Failed to trigger run')
     return res.json()
   }

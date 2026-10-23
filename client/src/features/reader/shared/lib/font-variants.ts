@@ -39,6 +39,19 @@ export function familyVariants(fonts: readonly UserFont[]): FontNamedInstance[] 
   return [...byKey.values()].sort(compareFontVariants)
 }
 
+type Translate = (key: string, named?: Record<string, unknown>) => string
+
+/**
+ * The name the reader's Style row gives a variant: the designer's own name when the font has one,
+ * otherwise the standard weight name, with "Italic" added only when the name does not already say so.
+ */
+export function fontVariantLabel(variant: FontNamedInstance, t: Translate): string {
+  const weightKey = FONT_WEIGHT_LABEL_KEYS[variant.weight]
+  const base = variant.name ?? (weightKey ? t(weightKey) : String(variant.weight))
+  if (variant.style !== 'italic' || /italic|oblique/i.test(base)) return base
+  return t('reader.settings.fontStyleItalicOf', { style: base })
+}
+
 /** The styles a built-in stack offers, in the same shape as an uploaded family's. */
 export function builtInVariants(): FontNamedInstance[] {
   return BUILT_IN_FONT_VARIANTS.map((variant) => ({ ...variant, name: null }))

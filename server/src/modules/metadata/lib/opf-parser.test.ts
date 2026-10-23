@@ -167,6 +167,97 @@ describe('parseOpf', () => {
       expect(r.authors[0].sortName).toBe('Pratchett, Terry');
     });
 
+    it.each(
+      [
+        ['aut', 'ann', 'dto', 'ill', 'wpr'],
+        ['ann', 'aut', 'dto', 'ill', 'wpr'],
+        ['ann', 'dto', 'aut', 'ill', 'wpr'],
+        ['ann', 'dto', 'ill', 'aut', 'wpr'],
+        ['ann', 'dto', 'ill', 'wpr', 'aut'],
+      ].map((roles) => ({ roles })),
+    )('includes a multi-role author with roles $roles', ({ roles }) => {
+      const xml = epub3Opf(`
+        <dc:title>Flatland</dc:title>
+        <dc:creator id="author">Edwin A. Abbott</dc:creator>
+        <meta property="file-as" refines="#author">Abbott, Edwin A.</meta>
+        ${roles.map((role) => `<meta property="role" refines="#author" scheme="marc:relators">${role}</meta>`).join('\n')}
+      `);
+
+      const r = parseOpf(xml);
+      expect(r.title).toBe('Flatland');
+      expect(r.authors).toEqual([{ name: 'Edwin A. Abbott', sortName: 'Abbott, Edwin A.' }]);
+      expect(r.narrators).toEqual([]);
+    });
+
+    it.each([' AUT ', 'http://id.loc.gov/vocabulary/relators/aut', 'marc:aut'])('normalizes a later author role %s', (role) => {
+      const xml = epub3Opf(`
+        <dc:creator id="author">Author Name</dc:creator>
+        <meta refines="#author" property="role">ann</meta>
+        <meta refines="#author" property="role">${role}</meta>
+      `);
+
+      expect(parseOpf(xml).authors).toEqual([{ name: 'Author Name', sortName: null }]);
+    });
+
+    it.each([{ roles: ['ann', 'ill'] }, { roles: ['', 'edt'] }, { roles: ['edt', ''] }])(
+      'excludes a creator with no author role among $roles',
+      ({ roles }) => {
+        const xml = epub3Opf(`
+        <dc:creator id="person">Editor Name</dc:creator>
+        ${roles.map((role) => `<meta refines="#person" property="role">${role}</meta>`).join('\n')}
+      `);
+
+        expect(parseOpf(xml).authors).toEqual([]);
+        expect(parseOpf(xml).narrators).toEqual([]);
+      },
+    );
+
+    it('keeps a creator whose role refinements are all empty as an author', () => {
+      const xml = epub3Opf(`
+        <dc:creator id="author">Author Name</dc:creator>
+        <meta refines="#author" property="role"></meta>
+        <meta refines="#author" property="role">   </meta>
+      `);
+
+      expect(parseOpf(xml).authors).toEqual([{ name: 'Author Name', sortName: null }]);
+    });
+
+    it.each([
+      { attribute: 'edt', refinements: ['ann', 'aut'], isAuthor: true },
+      { attribute: 'aut', refinements: ['ann', 'ill'], isAuthor: false },
+      { attribute: 'edt', refinements: [], isAuthor: false },
+      { attribute: 'aut', refinements: [], isAuthor: true },
+      { attribute: 'edt', refinements: [''], isAuthor: true },
+    ])('preserves role precedence for attribute $attribute and refinements $refinements', ({ attribute, refinements, isAuthor }) => {
+      const xml = epub3Opf(`
+        <dc:creator xmlns:opf="http://www.idpf.org/2007/opf" id="author" opf:role="${attribute}" opf:file-as="Name, Author">Author Name</dc:creator>
+        ${refinements.map((role) => `<meta refines="#author" property="role">${role}</meta>`).join('\n')}
+      `);
+
+      expect(parseOpf(xml).authors).toEqual(isAuthor ? [{ name: 'Author Name', sortName: 'Name, Author' }] : []);
+    });
+
+    it('keeps roles scoped to their person and emits each creator once in document order', () => {
+      const xml = epub3Opf(`
+        <dc:creator id="editor">Editor Name</dc:creator>
+        <dc:creator id="first">First Author</dc:creator>
+        <dc:creator id="second">Second Author</dc:creator>
+        <meta refines="#editor" property="role">edt</meta>
+        <meta refines="#second" property="role">ill</meta>
+        <meta refines="#first" property="role">ann</meta>
+        <meta refines="#second" property="role">aut</meta>
+        <meta refines="#first" property="role">aut</meta>
+        <meta refines="#first" property="role">aut</meta>
+        <meta refines="#first" property="file-as">Author, First</meta>
+        <meta refines="#first" property="file-as">Unused Sort Name</meta>
+      `);
+
+      expect(parseOpf(xml).authors).toEqual([
+        { name: 'First Author', sortName: 'Author, First' },
+        { name: 'Second Author', sortName: null },
+      ]);
+    });
+
     it('accepts EPUB3 role values in full relator URI form', () => {
       const xml = epub3Opf(`
         <dc:creator id="cr1">Ursula Le Guin</dc:creator>
@@ -228,6 +319,59 @@ describe('parseOpf', () => {
       expect(r.narrators).toEqual(['Lenny Henry']);
       expect(r.authors).toEqual([{ name: 'Neil Gaiman', sortName: null }]);
     });
+
+    it.each(['creator', 'contributor'])('recognizes a later narrator role on a %s', (element) => {
+      const xml = epub3Opf(`
+        <dc:${element} id="person">Narrator Name</dc:${element}>
+        <meta refines="#person" property="role">ann</meta>
+        <meta refines="#person" property="role">http://id.loc.gov/vocabulary/relators/nrt</meta>
+      `);
+
+      const r = parseOpf(xml);
+      expect(r.narrators).toEqual(['Narrator Name']);
+      expect(r.authors).toEqual([]);
+    });
+
+    it.each([{ roles: ['aut', 'nrt'] }, { roles: ['nrt', 'aut'] }])('records a self-narrating creator in both roles for $roles', ({ roles }) => {
+      const xml = epub3Opf(`
+        <dc:creator id="person">Author Narrator</dc:creator>
+        <meta refines="#person" property="file-as">Narrator, Author</meta>
+        ${roles.map((role) => `<meta refines="#person" property="role">${role}</meta>`).join('\n')}
+      `);
+
+      const r = parseOpf(xml);
+      expect(r.authors).toEqual([{ name: 'Author Narrator', sortName: 'Narrator, Author' }]);
+      expect(r.narrators).toEqual(['Author Narrator']);
+    });
+
+    it('does not skip authorship when a multi-role creator repeats a previously collected narrator', () => {
+      const xml = epub3Opf(`
+        <dc:creator id="narrator">Author Narrator</dc:creator>
+        <dc:creator id="author">author narrator</dc:creator>
+        <meta refines="#narrator" property="role">nrt</meta>
+        <meta refines="#author" property="role">nrt</meta>
+        <meta refines="#author" property="role">aut</meta>
+        <meta refines="#author" property="role">narrator</meta>
+      `);
+
+      const r = parseOpf(xml);
+      expect(r.authors).toEqual([{ name: 'author narrator', sortName: null }]);
+      expect(r.narrators).toEqual(['Author Narrator']);
+    });
+
+    it.each([{ roles: [] }, { roles: [''] }, { roles: ['aut'] }, { roles: ['aut', 'nrt'] }])(
+      'does not promote a contributor with roles $roles to an author',
+      ({ roles }) => {
+        const xml = epub3Opf(`
+          <dc:contributor id="person">Contributor Name</dc:contributor>
+          ${roles.map((role) => `<meta refines="#person" property="role">${role}</meta>`).join('\n')}
+        `);
+
+        const r = parseOpf(xml);
+        expect(r.authors).toEqual([]);
+        expect(r.narrators).toEqual(roles.includes('nrt') ? ['Contributor Name'] : []);
+      },
+    );
 
     it('accepts a narrator role in full relator URI form', () => {
       const xml = epub3Opf(`

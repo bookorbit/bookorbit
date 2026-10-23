@@ -388,7 +388,8 @@ function parseWiktionaryBlocks(data: Record<string, unknown>, lang: string): Sen
 }
 
 async function fetchWiktionaryPayload(word: string, lang: string): Promise<ProviderPayload | null> {
-  const res = await fetch(`https://${encodeURIComponent(lang)}.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`)
+  // Only English Wiktionary serves this endpoint; its response includes other languages.
+  const res = await fetch(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`)
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`Wiktionary API error: ${res.status}`)
 

@@ -9,6 +9,7 @@ vi.mock('../metadata-fetch/metadata-fetch.module', () => ({ MetadataFetchModule:
 vi.mock('../user-book-note/user-book-note.module', () => ({ UserBookNoteModule: class UserBookNoteModule {} }));
 
 import { MODULE_METADATA } from '@nestjs/common/constants';
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 
 import { LibraryModule } from '../library/library.module';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -21,9 +22,17 @@ import { BookService } from './book.service';
 import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfill.service';
 import { ReadingAttemptController } from './reading-attempt.controller';
 import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sync.service';
+import { DeliveryArtifactService } from './delivery-artifact.service';
+import { DeliveryArtifactRepository } from './delivery-artifact.repository';
+import { DeliveryHashRegistrationService } from './delivery-hash-registration.service';
+import { DeliverySelectionService } from './delivery-selection.service';
 import { AudiolessEpubService } from './audioless-epub.service';
 
 describe('BookModule', () => {
+  it('imports the shared registry used by the file watcher', () => {
+    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, BookModule)).toContain(SelfWriteRegistryModule);
+  });
+
   it('registers expected controller/providers/exports', () => {
     expect(Reflect.getMetadata('controllers', BookModule)).toEqual([BookController, ReadingAttemptController]);
     expect(Reflect.getMetadata('providers', BookModule)).toEqual([
@@ -35,10 +44,21 @@ describe('BookModule', () => {
       BookAuthorSortKeyBackfillService,
       AudiobookEbookProgressSyncService,
       AudiolessEpubService,
+      DeliveryArtifactService,
+      DeliveryArtifactRepository,
+      DeliverySelectionService,
+      DeliveryHashRegistrationService,
     ]);
     // AudiolessEpubService is exported so the Kobo download path can strip narration itself,
     // without routing through BookService and its RequestUser-based access checks.
-    expect(Reflect.getMetadata('exports', BookModule)).toEqual([BookService, BookReadService, BookQueryBuilder, AudiolessEpubService]);
+    expect(Reflect.getMetadata('exports', BookModule)).toEqual([
+      BookService,
+      BookReadService,
+      BookQueryBuilder,
+      AudiolessEpubService,
+      DeliveryArtifactService,
+      DeliverySelectionService,
+    ]);
   });
 
   it('keeps library module in forwardRef imports', () => {

@@ -1,8 +1,40 @@
+import { parseSeriesIndex, type MetadataCandidate } from '@bookorbit/types';
+
+import { normalizeTitleText, scoreTitleMatch } from '../../../../common/text-match/title-match';
+import type { MetadataSearchParams } from '../metadata-search-params';
 import { ComicVineVolume } from './comicvine.types';
 
 const LEADING_ARTICLE = /^(?:the|a|an)\s+/;
-const NON_ALPHANUMERIC = /[^a-z0-9]+/g;
 const LEADING_ZEROS = /^0+(?=\d)/;
+const ISSUE_PATTERN = /^(.*?)\s*#(\d[\d.]*)(.*)$/;
+
+interface ParsedIssueTitle {
+  seriesName: string;
+  issueNumber: string;
+}
+
+/** An explicit issue target wins; a typed series overrides the stored series but keeps its issue. */
+export function resolveComicVineIssueQuery(params: MetadataSearchParams): ParsedIssueTitle | null {
+  const match = params.title ? ISSUE_PATTERN.exec(params.title.trim()) : null;
+  if (match?.[1].trim()) return { seriesName: match[1].trim(), issueNumber: normalizeIssueNumber(match[2]) };
+
+  const issueNumber = parseSeriesIndex(params.seriesIndex);
+  const typedSeriesName = params.titleIsExplicitQuery ? params.title?.trim() : undefined;
+  if (typedSeriesName) return issueNumber ? { seriesName: typedSeriesName, issueNumber: normalizeIssueNumber(issueNumber) } : null;
+
+  const seriesName = params.seriesName?.trim();
+  return seriesName && issueNumber ? { seriesName, issueNumber: normalizeIssueNumber(issueNumber) } : null;
+}
+
+/** An issue subtitle is not evidence that a different run is a better series/number match. */
+export function scoreComicVineIssue(candidate: MetadataCandidate, params: MetadataSearchParams): number | null {
+  const query = resolveComicVineIssueQuery(params);
+  const seriesName = candidate.comicMetadata?.volumeName ?? candidate.seriesName;
+  const issueNumber = candidate.comicMetadata?.issueNumber ?? parseSeriesIndex(candidate.seriesIndex);
+  if (!query || !seriesName || !issueNumber) return null;
+  if (normalizeIssueNumber(issueNumber) !== query.issueNumber) return 0;
+  return scoreTitleMatch(normalizeName(query.seriesName), normalizeName(seriesName));
+}
 
 /**
  * ComicVine stores issue numbers unpadded, so a padded number lifted from a filename
@@ -14,7 +46,7 @@ export function normalizeIssueNumber(raw: string): string {
 }
 
 function normalizeName(name: string): string {
-  return name.toLowerCase().replace(LEADING_ARTICLE, '').replace(NON_ALPHANUMERIC, ' ').trim();
+  return normalizeTitleText(name).replace(LEADING_ARTICLE, '');
 }
 
 /**
@@ -48,7 +80,7 @@ function startYear(volume: ComicVineVolume): number {
   return Number.isFinite(year) ? year : 0;
 }
 
-function score(volume: ComicVineVolume, seriesName: string, issueNumber: string): number {
+export function volumeMatchScore(volume: ComicVineVolume, seriesName: string, issueNumber: string): number {
   return nameScore(volume.name, seriesName) * 2 + (holdsIssuePlausibly(volume, issueNumber) ? 1 : 0);
 }
 
@@ -58,7 +90,7 @@ function score(volume: ComicVineVolume, seriesName: string, issueNumber: string)
  */
 export function rankVolumes(volumes: ComicVineVolume[], seriesName: string, issueNumber: string): ComicVineVolume[] {
   return volumes
-    .map((volume, index) => ({ volume, index, score: score(volume, seriesName, issueNumber) }))
+    .map((volume, index) => ({ volume, index, score: volumeMatchScore(volume, seriesName, issueNumber) }))
     .sort((a, b) => b.score - a.score || startYear(b.volume) - startYear(a.volume) || a.index - b.index)
     .map((entry) => entry.volume);
 }

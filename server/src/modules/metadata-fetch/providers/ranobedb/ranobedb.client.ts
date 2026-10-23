@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { PROVIDER_DELAYS_MS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
@@ -34,6 +35,7 @@ export class RanobeDbClient {
       limit: '5',
     });
     const body = await this.get<RanobeDbSearchResponse>('search', `/books?${params.toString()}`, signal);
+    if (body && !Array.isArray(body.books)) markProviderFailed('ranobedb.search: response without books');
     return body?.books?.map((b) => b.id) ?? [];
   }
 
@@ -65,6 +67,7 @@ export class RanobeDbClient {
         this.logger.warn(`[ranobedb] [fail] op=${op} durationMs=${Date.now() - startedAt} error="throttled"`);
         throw err;
       }
+      markProviderFailed(`ranobedb.${op}: unusable response`);
       this.logger.warn(`[ranobedb] [fail] op=${op} durationMs=${Date.now() - startedAt} error="${sanitizeLogError(err)}"`);
       return null;
     }

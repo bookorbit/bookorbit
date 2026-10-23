@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyHelmet from '@fastify/helmet';
+import fastifyCompress from '@fastify/compress';
 import { request } from 'http';
 import type { AddressInfo } from 'net';
 import {
@@ -11,6 +12,8 @@ import {
   buildEmptyJsonBodyStream,
   registerEmptyBodyContentTypeParser,
   applyDeclaredBodyLimit,
+  applyDeclaredCompressionOptOut,
+  registerDeclaredCompressionOptOuts,
   shouldInjectEmptyJsonBody,
   isSecureProtocol,
   applyConditionalHsts,
@@ -609,5 +612,68 @@ describe('applyDeclaredBodyLimit', () => {
     const route: { config?: unknown; bodyLimit?: number } = { config: {}, bodyLimit: 1024 };
     applyDeclaredBodyLimit(route);
     expect(route.bodyLimit).toBe(1024);
+  });
+});
+
+describe('applyDeclaredCompressionOptOut', () => {
+  it('copies a declared opt-out onto the route option @fastify/compress reads', () => {
+    const route: { config?: unknown; compress?: unknown } = { config: { compress: false } };
+    applyDeclaredCompressionOptOut(route);
+    expect(route.compress).toBe(false);
+  });
+
+  it('leaves routes without an explicit opt-out on the global compression setting', () => {
+    const routes: Array<{ config?: unknown; compress?: unknown }> = [
+      {},
+      { config: {} },
+      { config: { compress: true } },
+      { config: { compress: 'no' } },
+    ];
+    for (const route of routes) {
+      applyDeclaredCompressionOptOut(route);
+      expect(route.compress).toBeUndefined();
+    }
+  });
+});
+
+describe('registerDeclaredCompressionOptOuts (integration)', () => {
+  const fb2Body = `<?xml version="1.0"?><FictionBook>${'<p>text</p>'.repeat(500)}</FictionBook>`;
+
+  async function withCompressApp(run: (app: FastifyInstance) => Promise<void>): Promise<void> {
+    const app = Fastify({ logger: false });
+    registerDeclaredCompressionOptOuts(app);
+    await app.register(fastifyCompress, { encodings: ['gzip', 'br'] });
+    app.route({
+      method: 'GET',
+      url: '/raw',
+      config: { compress: false },
+      handler: (_request, reply) => reply.type('application/x-fictionbook+xml').send(fb2Body),
+    });
+    app.route({ method: 'GET', url: '/default', handler: (_request, reply) => reply.type('application/x-fictionbook+xml').send(fb2Body) });
+
+    try {
+      await app.ready();
+      await run(app);
+    } finally {
+      await app.close();
+    }
+  }
+
+  it('serves a route that opted out byte for byte with its Content-Length', async () => {
+    await withCompressApp(async (app) => {
+      const response = await app.inject({ method: 'GET', url: '/raw', headers: { 'accept-encoding': 'gzip, br' } });
+
+      expect(response.headers['content-encoding']).toBeUndefined();
+      expect(response.headers['content-length']).toBe(String(Buffer.byteLength(fb2Body)));
+      expect(response.body).toBe(fb2Body);
+    });
+  });
+
+  it('keeps compressing routes that did not opt out', async () => {
+    await withCompressApp(async (app) => {
+      const response = await app.inject({ method: 'GET', url: '/default', headers: { 'accept-encoding': 'gzip' } });
+
+      expect(response.headers['content-encoding']).toBe('gzip');
+    });
   });
 });

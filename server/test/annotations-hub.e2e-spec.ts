@@ -1,4 +1,7 @@
 import { randomUUID } from 'crypto';
+import { and, eq } from 'drizzle-orm';
+
+import * as schema from '../src/db/schema';
 
 import { createEpubFixture, createPdfFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
@@ -233,6 +236,40 @@ describe('Annotations hub (e2e)', { timeout: 120_000 }, () => {
     expect(response.headers['content-disposition']).toContain('attachment');
     expect(response.body).toContain('# Annotations');
     expect(response.body).toContain('> fixture');
+  });
+
+  it('leaves highlights on a book the user can no longer open out of the hub until access returns', async () => {
+    const reader = await createUserAndLogin(ctx);
+    await grantLibraryAccess(ctx, reader.userId, library.libraryId, 'viewer');
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${epub.bookId}/annotations`,
+      headers: authHeader(reader.accessToken),
+      payload: { cfi: FIXTURE_CFI, text: 'fixture', color: '#FACC15', style: 'highlight', note: 'revoked reader' },
+    });
+    const id = (created.json() as { id: number }).id;
+    const hub = (url: string) => ctx.app.inject({ method: 'GET', url, headers: authHeader(reader.accessToken) });
+
+    await ctx.db
+      .delete(schema.userLibraryAccess)
+      .where(and(eq(schema.userLibraryAccess.userId, reader.userId), eq(schema.userLibraryAccess.libraryId, library.libraryId)));
+
+    expect(((await hub('/api/v1/annotations')).json() as { total: number }).total).toBe(0);
+    expect(((await hub('/api/v1/annotations/overview')).json() as { total: number; shelf: unknown[] }).shelf).toEqual([]);
+    expect((await hub('/api/v1/annotations/books')).json()).toEqual([]);
+    expect((await hub('/api/v1/annotations/export?format=md')).body).not.toContain('revoked reader');
+    expect((await hub(`/api/v1/annotations/${id}/sync-detail`)).statusCode).toBe(404);
+    const bulk = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/annotations/bulk',
+      headers: authHeader(reader.accessToken),
+      payload: { ids: [id], action: 'trash' },
+    });
+    expect((bulk.json() as { affected: number }).affected).toBe(0);
+
+    await grantLibraryAccess(ctx, reader.userId, library.libraryId, 'viewer');
+    expect(((await hub('/api/v1/annotations')).json() as { total: number }).total).toBe(1);
+    expect((await hub(`/api/v1/annotations/${id}/sync-detail`)).statusCode).toBe(200);
   });
 
   it('rejects unauthenticated access', async () => {

@@ -6,14 +6,14 @@ import { MonitorSmartphone } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 
-import { useThemeStore } from '@/stores/theme'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { resolveSourceBucketColors } from '../../lib/source-bucket-colors'
 import { useUserReadingSourceDistribution } from '../../composables/useUserReadingSourceDistribution'
 import ChartCard from '../ChartCard.vue'
 
 const { t } = useI18n()
 
-const themeStore = useThemeStore()
+const chartTokens = useChartTokens()
 const { data, loading, error } = useUserReadingSourceDistribution()
 const { md } = useBreakpoints(breakpointsTailwind)
 
@@ -34,7 +34,7 @@ watchEffect(() => {
   option.value = {}
   if (isEmpty.value) return
 
-  const colors = resolveSourceBucketColors(`${themeStore.resolvedTheme}:${themeStore.accent}`)
+  const colors = resolveSourceBucketColors(chartTokens.value.key)
 
   option.value = {
     tooltip: {

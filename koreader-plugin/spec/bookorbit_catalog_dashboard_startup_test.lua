@@ -192,4 +192,97 @@ assertEqual(last_fetch_opts.invisible, true, "automatic dashboard refresh is non
 assertEqual(switches, 0, "stale dashboard response cannot replace a navigated view")
 assertEqual(catalog.current_context, navigated_context, "navigation context remains current")
 
+-- An explicit open while offline shows the cache at once and asks for a
+-- connection a single time, through the user's Wi-Fi policy. Returning to the
+-- dashboard while still offline keeps the cache rather than asking again.
+local function openedCatalog(opts)
+    local opened = newCatalog(opts)
+    local _, initial = opened:initialDashboardContext()
+    opened.current_context = initial
+    opened.connection_requests = {}
+    function opened:runConnected(fn)
+        table.insert(self.connection_requests, fn)
+    end
+    function opened:switchTo(_, _, next_context)
+        self.current_context = next_context
+    end
+    return opened
+end
+
+connected = false
+catalog = openedCatalog{ cache = cached_dashboard }
+assertEqual(catalog.current_context.dashboard, cached_dashboard, "an offline explicit open shows the cache at once")
+catalog:refreshDashboardOnOpen()
+assertEqual(#catalog.connection_requests, 1, "an offline explicit open asks for a connection")
+catalog:refreshDashboardOnOpen()
+assertEqual(#catalog.connection_requests, 1, "returning to the dashboard offline does not ask again")
+
+-- The connection arrives: the cached dashboard is refreshed in place, quietly.
+connected = true
+requests = 0
+catalog.connection_requests[1]()
+assertEqual(requests, 1, "the refresh runs once the connection arrives")
+assertEqual(last_fetch_opts.invisible, true, "a refresh behind the cached dashboard stays non-modal")
+assertEqual(catalog.current_context.stale, false, "the cached dashboard is replaced by fresh data")
+catalog:refreshDashboardOnOpen()
+assertEqual(#catalog.connection_requests, 2, "returning to the dashboard online still refreshes")
+
+-- With no cache an offline explicit open says the dashboard could not be
+-- loaded rather than promising a load that may never come, and still asks.
+connected = false
+catalog = openedCatalog{}
+assertEqual(catalog.current_context.unavailable, true, "an offline open with no cache reports unavailable")
+assertEqual(catalog.current_context.loading, false, "an offline open with no cache does not claim to be loading")
+catalog:refreshDashboardOnOpen()
+assertEqual(#catalog.connection_requests, 1, "an offline open with no cache still asks for a connection")
+connected = true
+catalog.connection_requests[1]()
+assertEqual(last_fetch_opts.invisible, nil, "once connected, the fetch shows that the dashboard is loading")
+assertEqual(catalog.current_context.unavailable, false, "the unavailable placeholder is replaced")
+
+-- The auto-open never asks for a connection, offline or on later returns.
+connected = false
+catalog = openedCatalog{ prefer_cached_dashboard = true, cache = cached_dashboard }
+catalog:refreshDashboardOnOpen()
+catalog:refreshDashboardOnOpen()
+assertEqual(#catalog.connection_requests, 0, "an offline auto-open never asks for a connection")
+connected = true
+
+-- Going home from deep in the catalog (the Dashboard button, hold Return)
+-- switches to the cached dashboard at once instead of waiting on a connection.
+-- bookorbit_catalog.lua cannot be loaded outside KOReader, so the method is
+-- lifted out and run against the real dashboard methods.
+local catalog_source = assert(io.open("koreader-plugin/bookorbit.koplugin/bookorbit_catalog.lua", "rb"))
+local go_dashboard_source = assert(catalog_source:read("*a"):match("\n(function BookOrbitCatalog:goDashboard%(.-\nend)\n"),
+    "goDashboard is defined in bookorbit_catalog.lua")
+catalog_source:close()
+local next_ticks = {}
+local go_dashboard_env = {
+    BookOrbitCatalog = {},
+    UIManager = {
+        nextTick = function(_, fn)
+            table.insert(next_ticks, fn)
+        end,
+    },
+}
+local go_dashboard_chunk = assert(loadstring(go_dashboard_source, "goDashboard"))
+setfenv(go_dashboard_chunk, go_dashboard_env)
+go_dashboard_chunk()
+
+connected = false
+catalog = openedCatalog{ cache = cached_dashboard }
+catalog:refreshDashboardOnOpen()
+local detail_context = { kind = "detail" }
+catalog.current_context = detail_context
+catalog.stack = { { context = catalog.current_context } }
+catalog.goDashboard = go_dashboard_env.BookOrbitCatalog.goDashboard
+catalog.updateReturnPath = function() end
+catalog:goDashboard()
+assertEqual(catalog.current_context.kind, "dashboard", "going home offline shows the dashboard at once")
+assertEqual(catalog.current_context.dashboard, cached_dashboard, "going home offline shows the cached dashboard")
+assertEqual(#catalog.stack, 0, "going home clears the navigation stack")
+assertEqual(#next_ticks, 1, "the refresh is queued behind the redraw")
+next_ticks[1]()
+assertEqual(#catalog.connection_requests, 1, "going home offline does not ask for a connection again")
+
 print("bookorbit_catalog_dashboard_startup_test.lua: ok")

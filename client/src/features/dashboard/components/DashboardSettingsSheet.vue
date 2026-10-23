@@ -286,7 +286,7 @@ function handleCancel() {
               <label class="flex min-h-9 cursor-pointer items-center gap-3 rounded-md px-2 text-sm hover:bg-muted/60">
                 <input
                   type="checkbox"
-                  class="h-4 w-4 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  class="h-4 w-4 rounded-xs border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   :checked="libraryIdsDraft === null"
                   @change="handleAllLibrariesChange"
                 />
@@ -300,7 +300,7 @@ function handleCancel() {
                 >
                   <input
                     type="checkbox"
-                    class="h-4 w-4 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="h-4 w-4 rounded-xs border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :checked="libraryIdsDraft.includes(library.id)"
                     @change="handleLibraryChange(library.id, $event)"
                   />
@@ -312,7 +312,7 @@ function handleCancel() {
               <input
                 v-model="syncShelvesDraft"
                 type="checkbox"
-                class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded-xs border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-describedby="dashboard-shelf-sync-description"
               />
               <span class="min-w-0">
@@ -394,7 +394,7 @@ function handleCancel() {
                 <!-- Drag handle (desktop) + up/down arrows (mobile fallback) -->
                 <div class="flex shrink-0 flex-col items-center">
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === 0"
                     @click="moveUp(index)"
                   >
@@ -404,7 +404,7 @@ function handleCancel() {
                     <GripVertical :size="16" />
                   </div>
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === draft.length - 1"
                     @click="moveDown(index)"
                   >
@@ -520,7 +520,7 @@ function handleCancel() {
               <div class="flex items-center gap-3 px-3 py-2.5">
                 <div class="flex shrink-0 flex-col items-center">
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === 0"
                     @click="widgetMoveUp(index)"
                   >
@@ -530,7 +530,7 @@ function handleCancel() {
                     <GripVertical :size="16" />
                   </div>
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === widgetDraft.length - 1"
                     @click="widgetMoveDown(index)"
                   >

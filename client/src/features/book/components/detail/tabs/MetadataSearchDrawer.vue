@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { X } from '@lucide/vue'
+import { SlidersHorizontal, X } from '@lucide/vue'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getBookMediaProfile } from '@bookorbit/types'
 import type { BookDetail, BookMetadataLockField, CoverMedium, MetadataProviderKey, MetadataSource } from '@bookorbit/types'
 import { useMetadataSearch } from '../../../composables/useMetadataSearch'
+import { useMetadataSearchPreferences } from '../../../composables/useMetadataSearchPreferences'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 import type { MetadataDiffApply } from '../../../composables/useMetadataDiff'
 import type { SecondCoverInput } from '../../../composables/useSecondCoverRow'
@@ -22,6 +24,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const optionsId = useId()
+const { autoSearchOnOpen } = useMetadataSearchPreferences()
 const { coverUrl } = useCoverVersions()
 const libraryAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const isAudiobookSearch = computed(() => getBookMediaProfile(props.book.files).primaryMediaKind === 'audiobook')
@@ -46,7 +50,7 @@ const mainCoverUrl = computed(() => slotCoverUrl(mainCoverMedium.value))
 const searchDefaults = computed(() => ({
   title: props.book.title ?? undefined,
   author: props.book.authors[0]?.name ?? undefined,
-  isbn: props.book.isbn13 ?? props.book.isbn10 ?? undefined,
+  isbn: props.book.isbn13?.trim() || props.book.isbn10?.trim() || undefined,
 }))
 
 const currentSource = computed<MetadataSource>(() => ({
@@ -83,12 +87,15 @@ const {
   resultProviderOrder,
   loadProviders,
   search,
+  searchFresh,
   retryProvider,
   toggleProvider,
   selectFieldRuleProviders,
   clearProviderFilter,
   coverProviderOrder,
   audioCoverProviderOrder,
+  cacheSummary,
+  cacheInfoFor,
 } = useMetadataSearch()
 const secondSearch = useMetadataSearch()
 const { results: secondResults, isStreaming: secondSearching } = secondSearch
@@ -117,10 +124,17 @@ const subtitle = computed(() =>
     .join(' \u00b7 '),
 )
 
+let active = true
+onBeforeUnmount(() => {
+  active = false
+})
+
 onMounted(async () => {
+  const shouldSearchOnOpen = autoSearchOnOpen.value
   await loadProviders(props.book.id)
   const defaults = searchDefaults.value
-  if (defaults.title || defaults.isbn) runMetadataSearch({ title: defaults.title ?? '', author: defaults.author ?? '', isbn: defaults.isbn ?? '' })
+  if (active && shouldSearchOnOpen && (defaults.title || defaults.isbn))
+    runMetadataSearch({ title: defaults.title ?? '', author: defaults.author ?? '', isbn: defaults.isbn ?? '' })
 })
 
 function handleOpenChange(open: boolean) {
@@ -155,6 +169,11 @@ function handleSelectFieldRules() {
 
 function handleRetry(provider: MetadataProviderKey) {
   void retryProvider(provider)
+}
+
+function handleSearchFresh() {
+  void searchFresh()
+  if (secondCoverMedium.value) void secondSearch.searchFresh()
 }
 
 function handleApply(patch: MetadataDiffApply) {
@@ -214,14 +233,50 @@ function handleCancel() {
         :provider-order="resultProviderOrder"
         :is-streaming="isStreaming"
         :has-searched="hasSearched"
+        can-search-fresh
+        :cache-summary="cacheSummary"
+        :cache-info="cacheInfoFor"
         @search="runMetadataSearch"
         @toggle-provider="handleToggleProvider"
         @select-all="handleSelectAll"
         @select-field-rules="handleSelectFieldRules"
         @retry-provider="handleRetry"
+        @search-fresh="handleSearchFresh"
         @apply="handleApply"
         @cancel="handleCancel"
-      />
+      >
+        <template #search-options>
+          <Popover>
+            <PopoverTrigger as-child>
+              <button
+                type="button"
+                class="grid size-8 shrink-0 place-items-center rounded-lg border border-input bg-background text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :aria-label="t('book.detail.editMetadata.searchDrawer.searchOptions')"
+              >
+                <SlidersHorizontal class="size-4" aria-hidden="true" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              class="w-72 max-w-[calc(100vw-2rem)] p-3"
+              :aria-label="t('book.detail.editMetadata.searchDrawer.searchOptions')"
+            >
+              <label class="flex cursor-pointer items-start gap-2 text-sm text-foreground">
+                <input
+                  v-model="autoSearchOnOpen"
+                  type="checkbox"
+                  class="mt-0.5 size-4 shrink-0 rounded-xs border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :aria-describedby="`${optionsId}-hint`"
+                />
+                {{ t('book.detail.editMetadata.searchDrawer.autoSearchOnOpen') }}
+              </label>
+              <p :id="`${optionsId}-hint`" class="mt-2 text-xs text-muted-foreground">
+                {{ t('book.detail.editMetadata.searchDrawer.autoSearchOnOpenHint') }}
+              </p>
+            </PopoverContent>
+          </Popover>
+        </template>
+      </MetadataMatchWorkspace>
     </SheetContent>
   </Sheet>
 </template>

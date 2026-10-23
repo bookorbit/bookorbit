@@ -1,45 +1,57 @@
-import { describe, it, expect } from 'vitest'
-import { getThemePalette, getBookorbitThemeName, initChartThemes } from './echarts'
-import { DEFAULT_ACCENT } from './theme-accent-meta'
+import { describe, expect, it } from 'vitest'
+import { oklchToHex, toLegacyColor } from './css-color'
+import { buildChartTheme, createChartTokens } from './echarts'
 
 function isHexColor(v: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(v)
 }
 
-describe('getThemePalette', () => {
-  it('returns a 10-color hex palette', () => {
-    const palette = getThemePalette('dark', 'blue')
+const TOKENS: Record<string, string> = {
+  '--primary': 'oklch(0.62 0.19 259)',
+  '--border': 'oklch(1 0 0 / 0.1)',
+  '--muted-foreground': 'oklch(0.725 0.001 80)',
+  '--foreground': 'oklch(0.985 0.001 80)',
+  '--popover': 'oklch(0.18 0.0175 80)',
+  '--popover-foreground': 'oklch(0.985 0.001 80)',
+}
+
+function read(varName: string): string {
+  return TOKENS[varName] ?? ''
+}
+
+describe('createChartTokens', () => {
+  it('derives a 10-colour hex palette from the live primary', () => {
+    const tokens = createChartTokens('dark:blue', true, read)
+    const palette = tokens.palette()
     expect(palette).toHaveLength(10)
     expect(palette.every(isHexColor)).toBe(true)
+    expect(palette[0]).toBe(oklchToHex(0.62, 0.19, 259))
   })
 
-  it('falls back to the default accent when accent is unknown', () => {
-    expect(getThemePalette('light', 'unknown-accent')).toEqual(getThemePalette('light', DEFAULT_ACCENT))
+  it('scales chroma and lightness', () => {
+    const tokens = createChartTokens('dark:blue', true, read)
+    expect(tokens.palette(0.5, 0.5)[0]).toBe(oklchToHex(0.31, 0.095, 259))
   })
 
-  it('produces different palettes for light and dark mode', () => {
-    const lightPalette = getThemePalette('light', 'blue')
-    const darkPalette = getThemePalette('dark', 'blue')
-    expect(lightPalette).not.toEqual(darkPalette)
-  })
-})
-
-describe('getBookorbitThemeName', () => {
-  it('uses normalized accent names in theme keys', () => {
-    expect(getBookorbitThemeName('dark', 'blue')).toBe('bookorbit-dark-blue')
-    expect(getBookorbitThemeName('light', 'mint')).toBe('bookorbit-light-mint')
-  })
-
-  it('falls back to default accent for invalid names', () => {
-    expect(getBookorbitThemeName('dark', 'bad-accent')).toBe(`bookorbit-dark-${DEFAULT_ACCENT}`)
+  it('memoises token reads for its key', () => {
+    let reads = 0
+    const tokens = createChartTokens('k', false, (name) => {
+      reads += 1
+      return read(name)
+    })
+    tokens.color('--border')
+    tokens.color('--border')
+    expect(reads).toBe(1)
   })
 })
 
-describe('initChartThemes', () => {
-  it('is idempotent when called repeatedly', () => {
-    expect(() => {
-      initChartThemes()
-      initChartThemes()
-    }).not.toThrow()
+describe('buildChartTheme', () => {
+  it('paints axes, legend and tooltip from tokens', () => {
+    const theme = buildChartTheme(createChartTokens('dark:blue', true, read))
+    expect(theme.categoryAxis.axisLine.lineStyle.color).toBe('rgba(255, 255, 255, 0.1)')
+    expect(theme.valueAxis.axisLabel.color).toBe(toLegacyColor(TOKENS['--muted-foreground']!))
+    expect(theme.legend.textStyle.color).toBe(toLegacyColor(TOKENS['--foreground']!))
+    expect(theme.tooltip.backgroundColor).toBe(toLegacyColor(TOKENS['--popover']!))
+    expect(theme.color).toHaveLength(10)
   })
 })

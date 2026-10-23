@@ -80,6 +80,34 @@ describe('KoboProxyService', () => {
     expect(reply.send).toHaveBeenCalledWith(Buffer.from('{"ok":true}'));
   });
 
+  it.each([
+    ['token-less', '/api/UserStorage/Metadata?pageSize=50'],
+    ['tokened', '/api/v1/kobo/device-1/api/UserStorage/Metadata?pageSize=50'],
+  ])('relays a %s notebook call to Kobo reading services with the device credentials', async (_label, url) => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, headers: new Headers(), arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new KoboProxyService().forward(
+      { method: 'POST', url, headers: { authorization: 'Bearer kobo-jwt', host: 'bookorbit.local' }, body: { contentType: 'nebo' } } as never,
+      makeReply() as never,
+      'device-1',
+      'readingServices',
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://readingservices.kobo.com/api/UserStorage/Metadata?pageSize=50',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ contentType: 'nebo' }), headers: { authorization: 'Bearer kobo-jwt' } }),
+    );
+  });
+
+  it('keeps a reading services relay on its host', async () => {
+    await expect(
+      new KoboProxyService().request({ method: 'GET', url: '//evil.example/api/UserStorage/Metadata', headers: {} } as never, 'device-1', {
+        upstream: 'readingServices',
+      }),
+    ).rejects.toThrow('Invalid proxy path');
+  });
+
   it('skips body forwarding for GET requests', async () => {
     const service = new KoboProxyService();
     const upstream = {
@@ -263,6 +291,10 @@ describe('KoboProxyService', () => {
     // relays through request() with no options and must not hand Kobo a token it cannot read.
     it('substitutes the Kobo cursor for the composite token even with no options', async () => {
       expect((await sentHeaders({ 'x-kobo-synctoken': composite }))['x-kobo-synctoken']).toBe('kobo-cursor-9');
+    });
+
+    it('substitutes the Kobo cursor for a compact composite token', async () => {
+      expect((await sentHeaders({ 'x-kobo-synctoken': 'PX2.4.eyJ0Ijo5fQ.c2ln' }))['x-kobo-synctoken']).toBe('eyJ0Ijo5fQ.c2ln');
     });
 
     it('drops a composite token it cannot decode rather than forwarding it', async () => {

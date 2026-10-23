@@ -99,12 +99,18 @@ export class ReadingAttemptRepository {
     return row ?? null;
   }
 
+  /**
+   * The read that ended, or began, most recently. An undated read stands for one before BookOrbit kept
+   * history, such as the earlier read a reread implies, so it ranks behind every dated one. Taken by id,
+   * that earlier read recorded at a reread outranked the read just finished, and its missing dates
+   * replaced the book's started and finished dates.
+   */
   async findLatest(tx: Tx, userId: number, bookId: number) {
     const [row] = await tx
       .select()
       .from(readingAttempts)
       .where(and(eq(readingAttempts.userId, userId), eq(readingAttempts.bookId, bookId), isNull(readingAttempts.deletedAt)))
-      .orderBy(desc(readingAttempts.id))
+      .orderBy(sql`coalesce(${readingAttempts.endedOn}, ${readingAttempts.startedOn}) desc nulls last`, desc(readingAttempts.id))
       .limit(1)
       .for('update');
     return row ?? null;
@@ -233,8 +239,8 @@ export class ReadingAttemptRepository {
     return { items, total: totals[0]?.total ?? 0 };
   }
 
-  async findOwned(userId: number, bookId: number, attemptId: number) {
-    const [row] = await this.db
+  async findOwned(userId: number, bookId: number, attemptId: number, tx?: Tx) {
+    const query = (tx ?? this.db)
       .select()
       .from(readingAttempts)
       .where(
@@ -246,6 +252,7 @@ export class ReadingAttemptRepository {
         ),
       )
       .limit(1);
+    const [row] = await (tx ? query.for('update') : query);
     return row ?? null;
   }
 

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcryptjs';
@@ -677,11 +677,21 @@ export class UserRepository {
     return rows.map((r) => r.id);
   }
 
-  async replaceViewerLibraries(userId: number, libraryIds: number[]): Promise<void> {
+  /**
+   * Libraries that stay assigned keep their access level: it is set per library from the library's
+   * access settings, and resetting it here would silently revoke editing on every user save.
+   */
+  async replaceLibraries(userId: number, libraryIds: number[]): Promise<void> {
     await this.db.transaction(async (tx) => {
-      await tx.delete(schema.userLibraryAccess).where(eq(schema.userLibraryAccess.userId, userId));
+      const ownedByUser = eq(schema.userLibraryAccess.userId, userId);
+      await tx
+        .delete(schema.userLibraryAccess)
+        .where(libraryIds.length > 0 ? and(ownedByUser, notInArray(schema.userLibraryAccess.libraryId, libraryIds)) : ownedByUser);
       if (libraryIds.length > 0) {
-        await tx.insert(schema.userLibraryAccess).values(libraryIds.map((libraryId) => ({ userId, libraryId, accessLevel: 'viewer' as const })));
+        await tx
+          .insert(schema.userLibraryAccess)
+          .values(libraryIds.map((libraryId) => ({ userId, libraryId, accessLevel: 'viewer' as const })))
+          .onConflictDoNothing();
       }
     });
   }

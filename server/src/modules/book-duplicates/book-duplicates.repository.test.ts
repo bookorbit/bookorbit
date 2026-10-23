@@ -99,6 +99,7 @@ describe('BookDuplicatesRepository', () => {
       "'exact_metadata', md5(eligible.title_key || chr(31) || array_to_string(eligible.author_keys, chr(30)) || chr(31) || family)",
     );
     expect(query.match(/\bmd5\(/g)).toHaveLength(1);
+    expect(query).toContain("'pdf', 'djvu'");
   });
 
   it('limits identical-file signatures to content files in accessible, non-processing books', async () => {
@@ -139,6 +140,7 @@ describe('BookDuplicatesRepository', () => {
     expect(query).toContain('blocked AS');
     expect(query).toContain('a.author_key = b.author_key');
     expect(query).toContain('a.family = b.family');
+    expect(query).toContain("'pdf', 'djvu'");
     expect(query).toContain("author_key <> ''");
     expect(query).toContain('GROUP BY a.book_id, b.book_id');
     expect(rendered.params).toContain(0.85);

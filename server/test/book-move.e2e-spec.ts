@@ -31,7 +31,7 @@ import type { BookMovePreviewResult, BookMoveProgressEvent, BookMoveSummary } fr
 import { Permission } from '@bookorbit/types';
 
 import { annotations, bookFiles, bookMoveJobs, books, collectionBooks, collections, libraries, userBookStatus } from '../src/db/schema';
-import { createEpubFixture, createPdfFixture } from './e2e/metadata-write/metadata-write-fixture-builder';
+import { createEpubFixture, createM4bFixture, createPdfFixture } from './e2e/metadata-write/metadata-write-fixture-builder';
 import {
   authHeader,
   closeMetadataWriteE2EContext,
@@ -712,6 +712,37 @@ describe('Cross-library book move (e2e)', () => {
         const files = await readFileRows(book.bookId);
         expect(files[0].absolutePath).toBe(expectedPath);
         expect(await pathExists(expectedPath)).toBe(true);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'picks the primary file by the format priority of the library the book moved into',
+      async () => {
+        const src = await createSource({ mode: 'book_per_folder' });
+        const dst = await createTarget({ mode: 'book_per_folder' });
+        await ctx.db
+          .update(libraries)
+          .set({ formatPriority: ['m4b', 'epub'] })
+          .where(eq(libraries.id, dst.libraryId));
+        const title = `Both formats ${randomUUID().slice(0, 8)}`;
+        await createM4bFixture(src.folderPath, `${title}/${title}.m4b`, { title });
+        const book = await seedEpub(src, `${title}/${title}.epub`, title);
+
+        const formatOf = async (fileId: number | null) => (await readFileRows(book.bookId)).find((file) => file.id === fileId)?.relPath ?? null;
+        const primaryOf = async () =>
+          (await ctx.db.select({ primaryFileId: books.primaryFileId }).from(books).where(eq(books.id, book.bookId)))[0]?.primaryFileId ?? null;
+        expect(await formatOf(await primaryOf())).toMatch(/\.epub$/);
+
+        const summary = await moveAndSummarize({
+          selection: { bookIds: [book.bookId] },
+          targetLibraryId: dst.libraryId,
+          targetFolderId: dst.libraryFolderId,
+          collisionPolicy: 'suggested',
+        });
+
+        expect(summary.succeeded).toBe(1);
+        expect(await formatOf(await primaryOf())).toMatch(/\.m4b$/);
       },
       SCENARIO_TIMEOUT_MS,
     );

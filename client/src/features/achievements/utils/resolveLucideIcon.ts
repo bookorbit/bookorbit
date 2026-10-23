@@ -4,6 +4,7 @@ import {
   ArrowUpDown,
   Award,
   BookHeart,
+  BookMarked,
   BookmarkCheck,
   BookOpen,
   BookX,
@@ -64,6 +65,8 @@ const ICON_MAP: Record<string, Component> = {
   'arrow-up-down': ArrowUpDown,
   award: Award,
   'book-heart': BookHeart,
+  // Epic Voyager's seed name. Lucide ships it only as an alias of book-bookmark.
+  'book-marked': BookMarked,
   'bookmark-check': BookmarkCheck,
   'book-open': BookOpen,
   'book-x': BookX,

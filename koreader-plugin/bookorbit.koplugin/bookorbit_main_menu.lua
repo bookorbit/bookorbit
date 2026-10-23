@@ -1,87 +1,27 @@
 --[[--
 Main menu mixin for the BookOrbit plugin.
 
-Builds the BookOrbit entry in KOReader's Tools menu and the dashboard menu that
-mirrors it, plus the account dialogs: server address, login/logout. Installed
-onto the plugin controller as regular methods.
+KOReader's side of BookOrbit: an icon in KOReader's top menu bar that opens
+BookOrbit in one tap (in a book, the This book sheet), a trimmed Tools entry
+for anyone who turns the icon off, and the openers for BookOrbit's own menu
+sheet, settings, sync status and sign-in pages. Those pages load on first
+use. Installed onto the plugin controller as regular methods.
 ]]
 
 local Device = require("device")
 local InfoMessage = require("ui/widget/infomessage")
-local InputDialog = require("ui/widget/inputdialog")
-local MultiInputDialog = require("ui/widget/multiinputdialog")
 local NetworkMgr = require("ui/network/manager")
-local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
 local md5 = require("ffi/sha2").md5
-local util = require("util")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
 local BookOrbitApi = require("bookorbit_api")
-local BookOrbitCapabilities = require("bookorbit_capabilities")
 local BookOrbitHighlightDiagnostics = require("bookorbit_highlight_diagnostics")
 local BookOrbitSweep = require("bookorbit_sweep")
-local DashboardSections = require("bookorbit_dashboard_sections")
-
--- Assigned from the plugin class on install so menu labels can name the
--- shared sync strategies.
-local SYNC_STRATEGY
+local BoardStore = require("bookorbit_board_store")
 
 local MainMenu = {}
-
-local function getNameStrategy(strategy)
-    if strategy == SYNC_STRATEGY.PROMPT then
-        return _("Prompt")
-    elseif strategy == SYNC_STRATEGY.SILENT then
-        return _("Silently")
-    else
-        return _("Never")
-    end
-end
-
-function MainMenu:strategyMenu(getter, setter)
-    local function item(text, value)
-        return {
-            text = text,
-            checked_func = function() return getter() == value end,
-            callback = function() setter(value) end,
-        }
-    end
-    return {
-        item(_("Silently"), SYNC_STRATEGY.SILENT),
-        item(_("Prompt"), SYNC_STRATEGY.PROMPT),
-        item(_("Never"), SYNC_STRATEGY.DISABLE),
-    }
-end
-
-function MainMenu:catalogAutoOpenLabel()
-    local mode = self.settings.catalog_auto_open or "off"
-    if mode == "filemanager" then
-        return _("File manager only")
-    elseif mode == "always" then
-        return _("Every startup")
-    end
-    return _("Off")
-end
-
-function MainMenu:catalogAutoOpenMenu()
-    local function item(text, value)
-        return {
-            text = text,
-            checked_func = function() return (self.settings.catalog_auto_open or "off") == value end,
-            callback = function()
-                self.settings.catalog_auto_open = value
-                G_reader_settings:flush()
-            end,
-        }
-    end
-    return {
-        item(_("Off"), "off"),
-        item(_("File manager only"), "filemanager"),
-        item(_("Every startup"), "always"),
-    }
-end
 
 local function formatBool(value)
     return value and _("On") or _("Off")
@@ -144,7 +84,9 @@ local function hasCredentials(settings)
     return settings.server_url ~= nil and settings.username ~= nil and settings.userkey ~= nil
 end
 
-function MainMenu:diagnosticsRows()
+-- What the sync knows, in sections for the Technical details page. Each
+-- section: title and rows ({ label, value }); actions: { kind, label, icon }.
+function MainMenu:diagnosticsSections()
     local status = BookOrbitSweep.syncStatus()
     local sync_status = self.getSyncCoordinatorStatus and self:getSyncCoordinatorStatus() or { pending_count = 0 }
     local outbox_status = self.getLifecycleOutboxStatus and self:getLifecycleOutboxStatus()
@@ -153,471 +95,256 @@ function MainMenu:diagnosticsRows()
     local digest = safeDocumentDigest(self, has_open_book)
     local scheduler = self.open_annotation_scheduler and self.open_annotation_scheduler:status() or nil
     local logged_in = self:isLoggedIn()
-    local open_highlight_text = BookOrbitHighlightDiagnostics.openHighlightsText{
-        annotation_sync = self.settings.annotation_sync,
-        has_open_book = has_open_book,
-        matched = self.isOpenBookMatched and self:isOpenBookMatched(digest) or false,
-        scheduler_status = scheduler,
-        last_highlight_sync = self.settings.last_highlight_sync,
+    local DeviceNames = require("bookorbit_device_names")
+    local model = Device.model
+    local device_name = DeviceNames.label(model) or _("unknown")
+    if model and device_name ~= model then device_name = T(_("%1 (%2)"), device_name, model) end
+
+    local sections = {
+        { title = _("This device"), rows = {
+            { _("Device"), device_name },
+            { _("Device ID"), deviceIdPrefix(self.device_id) },
+            { _("Plugin"), versionText(self.PLUGIN_VERSION) },
+            { _("Latest plugin"), versionText(self.settings.update_latest_version) },
+        } },
+        { title = _("Account"), rows = {
+            { _("Server"), self.settings.server_url or _("not set") },
+            { _("Username"), self.settings.username or _("not set") },
+            { _("Login"), logged_in and _("configured") or _("not configured") },
+        } },
     }
-    local rows = {
-        { _("Server"), self.settings.server_url or _("not set") },
-        { _("Username"), self.settings.username or _("not set") },
-        { _("Login"), self:isLoggedIn() and _("configured") or _("not configured") },
-        { _("Device"), Device.model or _("unknown") },
-        { _("Device ID"), deviceIdPrefix(self.device_id) },
-        { _("Plugin"), versionText(self.PLUGIN_VERSION) },
-        { _("Latest plugin"), versionText(self.settings.update_latest_version) },
-    }
+    local actions = {}
 
     if not logged_in then
         if self.settings.last_error then
-            table.insert(rows, "----------------------------")
-            table.insert(rows, { _("Last error"), recordText(self.settings.last_error) })
+            table.insert(sections, { title = _("Last results"), rows = { { _("Last error"), recordText(self.settings.last_error) } } })
         end
-        table.insert(rows, "----------------------------")
         if hasCredentials(self.settings) then
-            table.insert(rows, {
-                _("Test connection"),
-                _("Run"),
-                callback = function()
-                    self:testConnection()
-                end,
-            })
+            table.insert(actions, { kind = "test", label = _("Test connection"), icon = "wifi" })
         end
-        return rows
+        return { sections = sections, actions = actions }
     end
 
-    table.insert(rows, "----------------------------")
-    table.insert(rows, { _("Auto sync"), formatBool(self.settings.auto_sync) })
-    table.insert(rows, { _("Two-way highlights & bookmarks"), formatBool(self.settings.annotation_sync) })
-    table.insert(rows, { _("Open highlights"), open_highlight_text })
-    table.insert(rows, { _("Highlight apply retry"), BookOrbitHighlightDiagnostics.retryText(self.open_highlight_retry_status) })
-    table.insert(rows, { _("Skip offline auto-sync"), formatBool(self.settings.skip_sync_when_offline) })
-    table.insert(rows, { _("Current sync"), jobText(sync_status.current) })
-    table.insert(rows, { _("Current sync started"), jobStartedText(sync_status.current) })
-    table.insert(rows, { _("Pending syncs"), tostring(sync_status.pending_count or 0) })
-    table.insert(rows, { _("Pending lifecycle syncs"), tostring(outbox_status.count or 0) })
-    table.insert(rows, { _("Parked lifecycle syncs"), tostring(outbox_status.blocked or 0) })
-    table.insert(rows, { _("Lifecycle sync storage"), tostring(outbox_status.bytes or 0) .. " B" })
-    table.insert(rows, { _("Next sync"), jobText(sync_status.next) })
-    table.insert(rows, { _("Last sweep"), formatTime(status.lastSweepAt) })
-    table.insert(rows, { _("Matched local books"), tostring(status.matched or 0) })
-    table.insert(rows, { _("Unmatched local books"), tostring(status.unmatched or 0) })
-    table.insert(rows, "----------------------------")
-    table.insert(rows, { _("Last sync"), recordText(self.settings.last_sync) })
-    table.insert(rows, { _("Last highlight sync"), highlightRecordText(self.settings.last_highlight_sync) })
-    table.insert(rows, { _("Last bookmark sync"),
-        BookOrbitHighlightDiagnostics.lastBookmarkSyncText(self.settings.last_highlight_sync, formatShortTime) })
-    table.insert(rows, { _("Last error"), recordText(self.settings.last_error) })
-    table.insert(rows, "----------------------------")
+    -- Short sections first, so the first page is full.
+    table.insert(sections, { title = _("Last results"), rows = {
+        { _("Last sync"), recordText(self.settings.last_sync) },
+        { _("Last error"), recordText(self.settings.last_error) },
+    } })
+
+    table.insert(sections, { title = _("Library"), rows = {
+        { _("Last sweep"), formatTime(status.lastSweepAt) },
+        { _("Matched local books"), tostring(status.matched or 0) },
+        { _("Unmatched local books"), tostring(status.unmatched or 0) },
+    } })
+    table.insert(sections, { title = _("Sync"), rows = {
+        { _("Auto sync"), formatBool(self.settings.auto_sync) },
+        { _("Two-way highlights & bookmarks"), formatBool(self.settings.annotation_sync) },
+        { _("Skip offline auto-sync"), formatBool(self.settings.skip_sync_when_offline) },
+        { _("Current sync"), jobText(sync_status.current) },
+        { _("Current sync started"), jobStartedText(sync_status.current) },
+        { _("Next sync"), jobText(sync_status.next) },
+        { _("Pending syncs"), tostring(sync_status.pending_count or 0) },
+        { _("Pending lifecycle syncs"), tostring(outbox_status.count or 0) },
+        { _("Parked lifecycle syncs"), tostring(outbox_status.blocked or 0) },
+        { _("Lifecycle sync storage"), tostring(outbox_status.bytes or 0) .. " B" },
+    } })
+    table.insert(sections, { title = _("Highlights"), rows = {
+        { _("Open highlights"), BookOrbitHighlightDiagnostics.openHighlightsText{
+            annotation_sync = self.settings.annotation_sync,
+            has_open_book = has_open_book,
+            matched = self.isOpenBookMatched and self:isOpenBookMatched(digest) or false,
+            scheduler_status = scheduler,
+            last_highlight_sync = self.settings.last_highlight_sync,
+        } },
+        { _("Highlight apply retry"), BookOrbitHighlightDiagnostics.retryText(self.open_highlight_retry_status) },
+        { _("Last highlight sync"), highlightRecordText(self.settings.last_highlight_sync) },
+        { _("Last bookmark sync"), BookOrbitHighlightDiagnostics.lastBookmarkSyncText(self.settings.last_highlight_sync, formatShortTime) },
+    } })
     if has_open_book then
         if self.settings.annotation_sync then
-            table.insert(rows, {
-                _("Retry highlight sync"),
-                _("Run"),
-                callback = function()
-                    self:retryOpenHighlightSync()
-                end,
-            })
+            table.insert(actions, { kind = "retry-highlights", label = _("Retry highlight sync"), icon = "highlighter" })
         end
-        table.insert(rows, {
-            _("Retry open-book match"),
-            _("Run"),
-            callback = function()
-                self:retryOpenBookMatch()
-            end,
-        })
+        table.insert(actions, { kind = "retry-match", label = _("Retry open-book match"), icon = "book-open" })
     end
-    table.insert(rows, {
-        _("Recheck all book matches"),
-        _("Run"),
-        callback = function()
-            self:startMatchRecheck()
-        end,
-    })
-    table.insert(rows, {
-        _("Test connection"),
-        _("Run"),
-        callback = function()
-            self:testConnection()
-        end,
-    })
-    table.insert(rows, {
-        _("Check for update"),
-        _("Run"),
-        callback = function()
-            self:checkForUpdate()
-        end,
-    })
+    table.insert(actions, { kind = "recheck", label = _("Recheck all book matches"), icon = "refresh-cw" })
+    table.insert(actions, { kind = "test", label = _("Test connection"), icon = "wifi" })
+    table.insert(actions, { kind = "check-update", label = _("Check for update"), icon = "download" })
+    return { sections = sections, actions = actions }
+end
+
+-- The same as one flat list: rows, separators between sections and the
+-- actions as rows that run them.
+function MainMenu:diagnosticsRows()
+    local d = self:diagnosticsSections()
+    local rows = {}
+    for index, section in ipairs(d.sections) do
+        if index > 1 then table.insert(rows, "----------------------------") end
+        for _i, row in ipairs(section.rows) do table.insert(rows, row) end
+    end
+    if #d.actions > 0 then table.insert(rows, "----------------------------") end
+    local run = {
+        test = function() self:testConnection() end,
+        ["check-update"] = function() self:checkForUpdate() end,
+        recheck = function() self:startMatchRecheck() end,
+        ["retry-highlights"] = function() self:retryOpenHighlightSync() end,
+        ["retry-match"] = function() self:retryOpenBookMatch() end,
+    }
+    for _i, a in ipairs(d.actions) do
+        table.insert(rows, { a.label, _("Run"), callback = run[a.kind] })
+    end
     return rows
 end
 
 function MainMenu:showDiagnostics()
-    local KeyValuePage = require("ui/widget/keyvaluepage")
-    UIManager:show(KeyValuePage:new{
-        title = _("BookOrbit diagnostics"),
-        kv_pairs = self:diagnosticsRows(),
-        value_overflow_align = "right",
-    })
+    return require("bookorbit_diagnostics_page").open(self)
 end
 
-function MainMenu:testConnection()
+-- on_done(ok, reason): a page that shows the result itself; without it the
+-- result is a message.
+function MainMenu:testConnection(on_done)
     if not self.settings.server_url then
-        UIManager:show(InfoMessage:new{ text = _("Set the BookOrbit server address first."), timeout = 3 })
+        require("bookorbit_toast").error(_("Set the BookOrbit server address first."))
+        if on_done then on_done(false, _("No server address")) end
         return
     end
     if not self:isLoggedIn() then
+        if on_done then on_done(false, _("Not signed in")) end
         self:promptLogin()
         return
     end
 
     NetworkMgr:runWhenConnected(function()
-        local checking = InfoMessage:new{ text = _("Testing BookOrbit connection...") }
-        UIManager:show(checking)
+        local checking
+        if not on_done then
+            checking = require("bookorbit_toast").loading(_("Testing the connection…"), { dismissable = false })
+        end
         local body, err = self:newClient():auth()
-        UIManager:close(checking)
+        if checking then checking:close() end
         if body then
             self:recordSyncSuccess("connection_test", _("Connection test succeeded"))
-            UIManager:show(InfoMessage:new{ text = _("BookOrbit connection works."), timeout = 3 })
         else
             self:recordSyncError("connection_test", err)
-            UIManager:show(InfoMessage:new{
-                text = T(_("BookOrbit connection failed: %1"), self:errorLabel(err)),
-                timeout = 4,
-            })
         end
-    end)
-end
-
-function MainMenu:dashboardSectionLabel(index)
-    return DashboardSections.headerText(DashboardSections.at(self.settings, index))
-end
-
--- Applies a new choice for one configurable dashboard row.
-function MainMenu:applyDashboardSection(index, config, catalog, touchmenu_instance)
-    if catalog and catalog.setDashboardSection then
-        catalog:setDashboardSection(config, index)
-    else
-        self.settings[DashboardSections.SETTING_KEY] = DashboardSections.storeAt(self.settings, index, config)
-        G_reader_settings:flush()
-    end
-    if touchmenu_instance then touchmenu_instance:updateItems() end
-end
-
--- Restores the four default slots in one write, so the dashboard refreshes once
--- rather than once per slot. The catalog owns the write while it is open, which
--- keeps the slots and the cache signature in step.
-function MainMenu:resetDashboardSections(catalog, touchmenu_instance)
-    local defaults = DashboardSections.normalize(nil)
-    if catalog and catalog.setDashboardSections then
-        catalog:setDashboardSections(defaults)
-    else
-        self.settings[DashboardSections.SETTING_KEY] = defaults
-        G_reader_settings:flush()
-    end
-    if touchmenu_instance then touchmenu_instance:updateItems() end
-end
-
-function MainMenu:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance)
-    if self.dashboard_menu_container then
-        local menu_container = self.dashboard_menu_container
-        self.dashboard_menu_container = nil
-        UIManager:close(menu_container)
-    elseif touchmenu_instance then
-        touchmenu_instance:closeMenu()
-    end
-
-    local function openSelector(target)
-        target:loadSection(section, { dashboard_source_index = index })
-    end
-
-    if catalog then
-        UIManager:nextTick(function() openSelector(catalog) end)
-        return
-    end
-
-    self:openCatalogBrowser(false)
-    UIManager:nextTick(function()
-        if self.catalog_browser then
-            openSelector(self.catalog_browser)
+        if on_done then
+            on_done(body ~= nil, not body and self:errorLabel(err) or nil)
+        elseif body then
+            require("bookorbit_toast").show(_("Connection works"))
         else
-            UIManager:show(InfoMessage:new{ text = _("Could not open the BookOrbit catalog."), timeout = 3 })
+            require("bookorbit_toast").error(T(_("Connection failed: %1"), self:errorLabel(err)))
         end
     end)
 end
 
--- The capability list recorded for the configured server, when one is known.
--- Nil (still unknown) keeps every source on offer; the dashboard downgrades
--- the capability itself when the server answers 404.
-function MainMenu:knownServerCapabilities(catalog)
-    local client = catalog and catalog.client
-    if not client and self.newClient then
-        local ok, built = pcall(function() return self:newClient() end)
-        client = ok and built or nil
-    end
-    return client and BookOrbitCapabilities.cached(client) or nil
+-- A connection test that reports to the page that started it, on page.test:
+-- testing, then ok or the reason it failed. The page repaints "Testing"
+-- before the request, which blocks until the server answers.
+function MainMenu:startPageTest(page, refresh)
+    page.test = { running = true }
+    refresh()
+    UIManager:tickAfterNext(function()
+        self:testConnection(function(ok, reason)
+            if page.closed then return end
+            page.test = ok and { ok = true } or { err = reason or _("Not reachable") }
+            refresh(true)
+        end)
+    end)
 end
 
-function MainMenu:dashboardSectionItems(index, catalog)
-    local items = {}
-    local known_capabilities = self:knownServerCapabilities(catalog)
-    for _index, section_type in ipairs(DashboardSections.TYPES) do
-        local unsupported = DashboardSections.usesSectionEndpoint(section_type)
-            and known_capabilities ~= nil
-            and known_capabilities[DashboardSections.SECTION_ENDPOINT_CAPABILITY] ~= true
-        local is_selector = DashboardSections.isCatalogSelector(section_type)
-        if not unsupported then
-            table.insert(items, {
-                text = DashboardSections.label(section_type),
-                mandatory = is_selector and ">" or nil,
-                help_text = DashboardSections.helpText(section_type),
-                checked_func = is_selector and nil or function()
-                    return DashboardSections.at(self.settings, index).type == section_type
-                end,
-                keep_menu_open = is_selector,
-                callback = function(touchmenu_instance)
-                    if is_selector then
-                        self:chooseDashboardCatalogSource(index, section_type, catalog, touchmenu_instance)
-                    else
-                        self:applyDashboardSection(index, { type = section_type }, catalog, touchmenu_instance)
-                    end
-                end,
-            })
+-- ----------------------------------------------------------- menu bar icon
+function MainMenu:menuBarIconEnabled()
+    return self.settings.menu_bar_icon ~= false
+end
+
+function MainMenu:menuBarIconPath()
+    if not self.path then return nil end
+    local path = self.path .. "/assets/bookorbit.tab.svg"
+    if path:sub(1, 1) ~= "/" then
+        local cwd = require("libs/libkoreader-lfs").currentdir()
+        if cwd then path = cwd .. "/" .. path end
+    end
+    return path
+end
+
+-- KOReader's tab bar looks icons up by name under its icon folders. Enough
+-- ".." segments climb from any of them to the root, so the shipped SVG is
+-- found by its absolute path without copying it anywhere.
+function MainMenu:menuBarIconName()
+    local path = self:menuBarIconPath()
+    if not path then return "appbar.menu" end
+    return string.rep("../", 32) .. path:gsub("^/+", ""):gsub("%.svg$", "")
+end
+
+function MainMenu:setMenuBarIconEnabled(enabled)
+    self.settings.menu_bar_icon = enabled == true
+    G_reader_settings:flush()
+    require("bookorbit_menu_pin").refresh(enabled == true)
+    -- The menu rebuilds from the rewritten order the next time it opens.
+    if self.ui and self.ui.menu then self.ui.menu.tab_item_table = nil end
+end
+
+local function closeKOReaderMenu(ui)
+    local menu = ui and ui.menu
+    if not menu then return end
+    if menu.onCloseFileManagerMenu then
+        menu:onCloseFileManagerMenu()
+    elseif menu.onCloseReaderMenu then
+        menu:onCloseReaderMenu()
+    end
+end
+
+-- The menu bar icon: BookOrbit in the file browser, This book in a book, and
+-- sign-in for either when signed out. Opened after the menu's own close has
+-- been painted, so a sheet's backdrop is the page, not the menu.
+function MainMenu:onMenuBarIcon()
+    closeKOReaderMenu(self.ui)
+    UIManager:tickAfterNext(function()
+        if not self:isLoggedIn() then
+            self:openSignIn(function() self:onMenuBarIconAfterSignIn() end)
+        elseif self.ui and self.ui.document then
+            self:openBookSheet()
+        else
+            self:browseCatalog(false)
         end
+    end)
+end
+
+function MainMenu:onMenuBarIconAfterSignIn()
+    if self.ui and self.ui.document then
+        self:openBookSheet()
+    else
+        self:browseCatalog(false)
     end
-    return items
-end
-
-function MainMenu:dashboardSettingsMenu(catalog)
-    local items = {
-        {
-            text_func = function()
-                return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())
-            end,
-            sub_item_table = self:catalogAutoOpenMenu(),
-        },
-        {
-            text = _("Tap Continue reading to open the book"),
-            checked_func = function()
-                return self.settings.catalog_dashboard_tap_resumes ~= false
-            end,
-            help_text = _([[Tapping a book under Continue reading opens it directly when it is already on the device; hold for its actions. When disabled, tapping opens the book's details instead.]]),
-            callback = function()
-                self.settings.catalog_dashboard_tap_resumes = self.settings.catalog_dashboard_tap_resumes == false
-            end,
-        },
-    }
-    for index = 1, DashboardSections.SLOT_COUNT do
-        table.insert(items, {
-            text_func = function()
-                return T(_("Section %1 (%2)"), index, self:dashboardSectionLabel(index))
-            end,
-            sub_item_table = self:dashboardSectionItems(index, catalog),
-        })
-    end
-    table.insert(items, {
-        text = _("Reset to Default"),
-        separator = true,
-        callback = function(touchmenu_instance)
-            self:resetDashboardSections(catalog, touchmenu_instance)
-        end,
-    })
-    return items
-end
-
-function MainMenu:syncSettingsMenu(has_open_book)
-    local items = {}
-    table.insert(items, {
-        text = _("Skip auto-sync when offline"),
-        checked_func = function() return self.settings.skip_sync_when_offline end,
-        enabled_func = function() return self.settings.auto_sync end,
-        help_text = _([[When enabled, automatic sync on book open is skipped if the device is not already online. Prevents the e-reader from stalling while trying to connect to Wi-Fi.]]),
-        callback = function()
-            self.settings.skip_sync_when_offline = not self.settings.skip_sync_when_offline
-        end,
-    })
-    table.insert(items, {
-        text_func = function()
-            return T(_("Periodically sync every # pages (%1)"), self:getSyncPeriod())
-        end,
-        enabled_func = function() return self.settings.auto_sync end,
-        keep_menu_open = true,
-        separator = true,
-        callback = function(touchmenu_instance)
-            local SpinWidget = require("ui/widget/spinwidget")
-            local spin = SpinWidget:new{
-                text = _([[This value determines how many page turns it takes to push book progress.
-If set to 0, updating progress based on page turns will be disabled.]]),
-                value = self.settings.pages_before_update or 0,
-                value_min = 0,
-                value_max = 999,
-                value_step = 1,
-                value_hold_step = 10,
-                ok_text = _("Set"),
-                title_text = _("Number of pages before update"),
-                default_value = 10,
-                callback = function(widget)
-                    self:setPagesBeforeUpdate(widget.value)
-                    if touchmenu_instance then touchmenu_instance:updateItems() end
-                end,
-            }
-            UIManager:show(spin)
-        end,
-    })
-    table.insert(items, {
-        text = _("Two-way highlights & bookmarks"),
-        checked_func = function() return self.settings.annotation_sync end,
-        help_text = _([[Also applies highlights, notes, bookmarks (dogears) and deletions made in BookOrbit to this device: on book open, after the manual book sync, and during the full sweep for closed books. Turning this off keeps uploads only. Bookmark sync needs a server that supports it, and PDF bookmarks never sync.]]),
-        callback = function()
-            self.settings.annotation_sync = not self.settings.annotation_sync
-        end,
-    })
-    table.insert(items, {
-        text_func = function()
-            return T(_("Sync to a newer state (%1)"), getNameStrategy(self.settings.sync_forward))
-        end,
-        sub_item_table = self:strategyMenu(
-            function() return self.settings.sync_forward end,
-            function(value) self.settings.sync_forward = value end
-        ),
-    })
-    table.insert(items, {
-        text_func = function()
-            return T(_("Sync to an older state (%1)"), getNameStrategy(self.settings.sync_backward))
-        end,
-        sub_item_table = self:strategyMenu(
-            function() return self.settings.sync_backward end,
-            function(value) self.settings.sync_backward = value end
-        ),
-    })
-    return items
-end
-
-function MainMenu:pluginSettingsMenu()
-    return {
-        {
-            id = "plugin_update",
-            text_func = function()
-                return self:updateCheckMenuText()
-            end,
-            keep_menu_open = true,
-            callback = function()
-                self:checkForUpdate()
-            end,
-        },
-    }
-end
-
-function MainMenu:settingsMenu(has_open_book, opts)
-    opts = opts or {}
-    local items = {
-        {
-            text = _("Dashboard"),
-            sub_item_table = self:dashboardSettingsMenu(opts.catalog),
-        },
-        {
-            text = _("Sync"),
-            sub_item_table = self:syncSettingsMenu(has_open_book),
-        },
-    }
-    if opts.include_plugin ~= false then
-        table.insert(items, {
-            text = _("Plugin"),
-            sub_item_table = self:pluginSettingsMenu(),
-        })
-    end
-    return items
 end
 
 function MainMenu:addToMainMenu(menu_items)
-    local logged_in = self:isLoggedIn()
-    local has_open_book = hasReaderBook(self)
-    local items = {}
-
-    if logged_in then
-        table.insert(items, {
+    local items = {
+        {
+            -- The id predates the rename; scripts and patches look it up.
             id = "open_dashboard",
-            text = _("Open dashboard"),
+            text = _("Open BookOrbit"),
             callback = function()
-                self:browseCatalog()
+                UIManager:tickAfterNext(function() self:openBookOrbit() end)
             end,
-            separator = true,
-        })
-        if has_open_book then
-            table.insert(items, {
-                id = "sync_current_book",
-                text = _("Sync current book now"),
-                callback = function()
-                    self:onBookOrbitSyncBook()
-                end,
-            })
-            table.insert(items, {
-                id = "auto_sync_current_book",
-                text = _("Auto sync current book"),
-                checked_func = function() return self.settings.auto_sync end,
-                help_text = _([[Pulls progress when a book is opened; pushes progress, highlights, status, rating and reading time when it is closed and on suspend.]]),
-                callback = function()
-                    self:onBookOrbitToggleAutoSync(nil, true)
-                end,
-                separator = true,
-            })
-        end
+        },
+    }
+    if self.ui and self.ui.document then
         table.insert(items, {
-            text = _("Sync all books now"),
-            help_text = _([[Syncs reading data, highlights, status and progress for books that changed since the last sync. Use "Recheck all book matches" in diagnostics to re-verify every book against the server.]]),
+            id = "this_book",
+            text = _("This book"),
             callback = function()
-                self:startSweep()
+                UIManager:tickAfterNext(function()
+                    if self:isLoggedIn() then self:openBookSheet() else self:openSignIn() end
+                end)
             end,
-            separator = true,
-        })
-        table.insert(items, {
-            id = "settings",
-            text = _("Settings"),
-            separator = true,
-            sub_item_table = self:settingsMenu(has_open_book),
         })
     end
-
     table.insert(items, {
-        text = _("Account & setup"),
-        sub_item_table = {
-            {
-                text = _("BookOrbit server address"),
-                keep_menu_open = true,
-                callback = function()
-                    self:setServerAddress()
-                end,
-            },
-            {
-                text_func = function()
-                    return self.settings.userkey and _("Logout") or _("Login")
-                end,
-                enabled_func = function()
-                    return self.settings.server_url ~= nil
-                end,
-                keep_menu_open = true,
-                callback_func = function()
-                    if self.settings.userkey then
-                        return function(menu)
-                            self:logout(menu)
-                        end
-                    else
-                        return function(menu)
-                            self:login(menu)
-                        end
-                    end
-                end,
-            },
-            {
-                text = _("Diagnostics"),
-                callback = function()
-                    self:showDiagnostics()
-                end,
-            },
-        },
+        id = "settings",
+        text = _("Settings"),
+        callback = function()
+            UIManager:tickAfterNext(function() self:openSettings(self.catalog_browser) end)
+        end,
     })
-
     menu_items.bookorbit = {
         text = _("BookOrbit"),
         -- Fallback placement only: BookOrbitMenuPin normally pins this entry
@@ -625,178 +352,290 @@ function MainMenu:addToMainMenu(menu_items)
         sorting_hint = "tools",
         sub_item_table = items,
     }
+    if self:menuBarIconEnabled() then
+        -- A tab that acts as a button, like the reader's file browser tab.
+        -- BookOrbitMenuPin lists it in KOReader's menu bar order.
+        menu_items.bookorbit_tab = {
+            icon = self:menuBarIconName(),
+            remember = false,
+            callback = function() self:onMenuBarIcon() end,
+        }
+    end
 end
 
-function MainMenu:dashboardMenuItems(catalog)
-    local menu_items = {}
-    self:addToMainMenu(menu_items)
-    local bookorbit_items = menu_items.bookorbit.sub_item_table or {}
-    local items = {
-        icon = "appbar.menu",
-    }
-    if self:isLoggedIn() then
-        local plugin_update = self:pluginSettingsMenu()[1]
-        plugin_update.separator = true
-        table.insert(items, plugin_update)
+-- ----------------------------------------------------------------- openers
+function MainMenu:openBookOrbit()
+    if not self:isLoggedIn() then
+        self:openSignIn(function() self:browseCatalog(false) end)
+        return
     end
-    for _index, item in ipairs(bookorbit_items) do
-        if item.id ~= "open_dashboard" and item.id ~= "sync_current_book" and item.id ~= "auto_sync_current_book" then
-            if item.id == "settings" then
-                table.insert(items, {
-                    id = "settings",
-                    text = _("Settings"),
-                    separator = item.separator,
-                    sub_item_table = self:settingsMenu(false, { include_plugin = false, catalog = catalog }),
-                })
-            else
-                table.insert(items, item)
+    self:browseCatalog(false)
+end
+
+function MainMenu:openSignIn(on_signed_in)
+    return require("bookorbit_signin_page").open(self, on_signed_in)
+end
+
+function MainMenu:openMenuSheet(catalog)
+    return require("bookorbit_menu_sheet").open(self, catalog, function(page, action)
+        return self:onMenuSheetAction(page, catalog, action)
+    end)
+end
+
+function MainMenu:openSettings(catalog, view)
+    return require("bookorbit_settings_page").open(self, catalog, view)
+end
+
+function MainMenu:openSyncStatus()
+    return require("bookorbit_status_page").open(self)
+end
+
+function MainMenu:openBookSheet()
+    if not (self.ui and self.ui.document) then return end
+    return require("bookorbit_book_sheet").open(self)
+end
+
+-- The open book's title, for the sheet's Back to book tile.
+function MainMenu:openBookTitle()
+    local ui = self.ui
+    if not (ui and ui.document) then return nil end
+    local props = ui.doc_props or {}
+    local title = props.display_title or props.title
+    if title and title ~= "" then return title end
+    local file = ui.document.file or ""
+    return (file:gsub(".*/", ""):gsub("%.[^%.]+$", ""))
+end
+
+function MainMenu:openBookDetails(book_id)
+    if not book_id then return end
+    self:browseCatalog(false)
+    local catalog = self.catalog_browser
+    if catalog and catalog.loadBookDetail then
+        UIManager:nextTick(function() catalog:loadBookDetail(book_id) end)
+    end
+end
+
+-- What the sheet does with a tap it does not handle itself.
+function MainMenu:onMenuSheetAction(page, catalog, action)
+    local kind = action.kind
+    local after = function(fn)
+        page:close()
+        UIManager:nextTick(fn)
+    end
+    if kind == "sync" or kind == "connect" then
+        -- The sheet stays open and its Sync tile follows the run.
+        local start = function()
+            self:startSheetSync(page, catalog)
+        end
+        if kind == "connect" then NetworkMgr:runWhenConnected(start) else start() end
+    elseif kind == "sync-stop" then
+        self:confirmStopSync()
+    elseif kind == "customize" then
+        page:close()
+        self:customizeHome(catalog)
+    elseif kind == "home" then
+        after(function() if catalog and catalog.goDashboard then catalog:goDashboard() end end)
+    elseif kind == "exit" then
+        after(function() if catalog then catalog:onCloseAllMenus() end end)
+    elseif kind == "search" then
+        after(function() if catalog then catalog:onSearchButtonTap() end end)
+    elseif kind == "link" then
+        after(function() if catalog and catalog.boardOpenLink then catalog:boardOpenLink(action.link) end end)
+    elseif kind == "list-options" then
+        after(function()
+            if not catalog then return end
+            if catalog.listMode and catalog:listMode() then return catalog:listOpenSheet("sort") end
+            catalog:showBookActions()
+        end)
+    elseif kind == "settings" then
+        after(function() self:openSettings(catalog) end)
+    elseif kind == "status" then
+        after(function() self:openSyncStatus() end)
+    elseif kind == "about" then
+        after(function() self:openSettings(catalog, "about") end)
+    elseif kind == "update" then
+        after(function() self:applyUpdate(self.settings.update_latest_version) end)
+    end
+    return true
+end
+
+-- ------------------------------------------------------------- page syncs
+-- Short words for how a sync started from a page ended.
+function MainMenu:syncErrorLabel(err)
+    if err == "cancelled" then return _("Stopped") end
+    if err == "not_started" then return _("Another sync is running") end
+    if err == "unmatched" then return _("Not in your BookOrbit library") end
+    if err == "capture" or err == "changed" then return _("Could not read this book") end
+    return self:errorLabel(err)
+end
+
+function MainMenu:confirmStopSync()
+    require("bookorbit_dialog_ui").confirm{
+        title = _("Stop syncing?"),
+        text = _("What has synced so far is kept. The rest syncs next time."),
+        ok_label = _("Stop"),
+        on_ok = function() BookOrbitSweep.cancel("user") end,
+    }
+end
+
+-- A library sync that reports to the page that started it: progress on
+-- page.sync while it runs, then the outcome. A page closed in the meantime
+-- hands the outcome to a notification instead.
+-- opts.full_recheck runs Recheck all books instead.
+function MainMenu:startPageSync(page, refresh, opts)
+    if not self:isLoggedIn() then
+        self:promptLogin()
+        return
+    end
+    local recheck = opts and opts.full_recheck
+    page.sync = { running = true, text = recheck and _("Rechecking") or _("Starting"), recheck = recheck }
+    refresh()
+    local start = recheck and self.startMatchRecheck or self.startSweep
+    start(self, {
+        quiet = true,
+        on_progress = function(text)
+            if page.closed then return end
+            page.sync = { running = true, text = text, recheck = recheck }
+            refresh()
+        end,
+        on_done = function(err)
+            local outcome = err and { err = self:syncErrorLabel(err), recheck = recheck } or { done = true, recheck = recheck }
+            if page.closed then
+                local Toast = require("bookorbit_toast")
+                if err then
+                    Toast.error(T(_("Sync stopped: %1"), outcome.err))
+                else
+                    Toast.show(recheck and _("Books rechecked") or _("Library synced"))
+                end
+                return
             end
-        end
-    end
-    if catalog then
-        table.insert(items, {
-            text = _("Close BookOrbit"),
-            separator = true,
-            callback = function()
-                local menu_container = self.dashboard_menu_container
-                self.dashboard_menu_container = nil
-                if menu_container then UIManager:close(menu_container) end
-                catalog:onCloseAllMenus()
-            end,
-        })
-    end
-    return items
+            page.sync = outcome
+            refresh(true)
+        end,
+    })
 end
 
-function MainMenu:showDashboardMenu(catalog)
-    local CenterContainer = require("ui/widget/container/centercontainer")
-    local TouchMenu = require("ui/widget/touchmenu")
-    if self.dashboard_menu_container then
-        local old_container = self.dashboard_menu_container
-        self.dashboard_menu_container = nil
-        UIManager:close(old_container)
+function MainMenu:startSheetSync(page, catalog)
+    local MenuSheet = require("bookorbit_menu_sheet")
+    self:startPageSync(page, function(reload)
+        if reload then page.sheet_data = MenuSheet.data(self, catalog) end
+        page.sheet_data.sync = page.sync
+        page:refresh()
+    end)
+end
+
+-- ------------------------------------------------------------------ Home
+function MainMenu:customizeHome(catalog)
+    if not catalog then
+        self:openCatalogBrowser(false)
+        catalog = self.catalog_browser
     end
-    local menu_container = CenterContainer:new{
-        covers_header = true,
-        ignore = "height",
-        dimen = Device.screen:getSize(),
-    }
-    local dashboard_menu = TouchMenu:new{
-        width = Device.screen:getWidth(),
-        last_index = 1,
-        tab_item_table = { self:dashboardMenuItems(catalog) },
-        show_parent = menu_container,
-    }
-    local closing = false
-    dashboard_menu.close_callback = function()
-        if closing then return true end
-        closing = true
-        if self.dashboard_menu_container == menu_container then
-            self.dashboard_menu_container = nil
+    if not catalog then return end
+    UIManager:nextTick(function()
+        if catalog.goDashboard and not catalog:dashboardMode() then catalog:goDashboard() end
+        if catalog.boardEnterEdit then catalog:boardEnterEdit() end
+    end)
+end
+
+-- Writes a board setting through the open catalog, so the board redraws, or
+-- straight to the settings when it is closed.
+function MainMenu:applyBoardSetting(catalog, change)
+    local state = change(self.settings)
+    if catalog and catalog.persistSetting then
+        catalog:persistSetting(BoardStore.SETTING_KEY, state)
+        catalog.board_edit = nil
+        if catalog:dashboardMode() then
+            catalog.current_context.board_page = 1
+            catalog:boardRefreshIfMissing()
         end
-        UIManager:close(menu_container)
-        return true
+    else
+        self.settings[BoardStore.SETTING_KEY] = state
+        G_reader_settings:flush()
     end
-    menu_container[1] = dashboard_menu
-    self.dashboard_menu_container = menu_container
-    UIManager:show(menu_container)
+end
+
+function MainMenu:applyBoardTiles(catalog, tiles)
+    if catalog and catalog.boardSetTiles then
+        catalog:boardSetTiles(tiles)
+    else
+        self.settings[BoardStore.SETTING_KEY] = BoardStore.withTiles(self.settings, tiles)
+        G_reader_settings:flush()
+    end
+end
+
+function MainMenu:chooseDownloadFolder(catalog, on_done)
+    if catalog and catalog.chooseDownloadDir then
+        catalog:chooseDownloadDir(on_done)
+        return
+    end
+    require("ui/downloadmgr"):new{
+        onConfirm = function(path)
+            G_reader_settings:saveSetting("download_dir", path)
+            G_reader_settings:flush()
+            if on_done then UIManager:nextTick(on_done) end
+        end,
+    }:chooseDir(require("bookorbit_download_root").get())
+end
+
+-- ---------------------------------------------------------------- shortcut
+function MainMenu:gesturesData()
+    local gestures = self.ui and self.ui.gestures
+    return gestures and gestures.data or nil
+end
+
+function MainMenu:applyShortcut(id)
+    local ok = require("bookorbit_shortcut").apply(self.ui and self.ui.gestures, id)
+    if not ok then
+        require("bookorbit_toast").error(_("Turn on KOReader's Gestures plugin first: Settings, Taps and gestures."))
+    end
+    return ok
 end
 
 function MainMenu:refreshActiveCatalogApi(refresh)
+    local api = self:apiOpts(true)
     if not self.catalog_browser then return end
-    self.catalog_browser:setApi(self:apiOpts(true))
+    self.catalog_browser:setApi(api)
     if refresh then self.catalog_browser:refreshCurrent() end
 end
 
 function MainMenu:applyServerAddress(server_url)
+    if self.settings.server_url ~= server_url then
+        self:clearAccountCaches()
+    end
     self.settings.server_url = server_url
     self:refreshActiveCatalogApi(false)
 end
 
-function MainMenu:setServerAddress()
-    local dialog
-    dialog = InputDialog:new{
-        title = _("BookOrbit server address"),
-        input = self.settings.server_url or "https://",
-        input_hint = "https://bookorbit.example.com",
-        buttons = {
-            {
-                {
-                    text = _("Cancel"),
-                    id = "close",
-                    callback = function()
-                        UIManager:close(dialog)
-                    end,
-                },
-                {
-                    text = _("OK"),
-                    is_enter_default = true,
-                    callback = function()
-                        local normalized = BookOrbitApi.normalizeServerUrl(dialog:getInputText())
-                        self:applyServerAddress(normalized)
-                        UIManager:close(dialog)
-                        if normalized then
-                            Notification:notify(T(_("BookOrbit server set to %1"), normalized))
-                        end
-                    end,
-                },
-            },
-        },
+-- The server address in the BookOrbit text panel; a value that is not a web
+-- address keeps the panel open with the reason under the field.
+function MainMenu:setServerAddress(on_done)
+    local DialogUI = require("bookorbit_dialog_ui")
+    local INK = require("bookorbit_board_metrics").INK
+    local current = self.settings.server_url
+    require("bookorbit_text_entry").open{
+        title = _("Server address"),
+        value = current and (current:gsub("/api/v1/?$", "")) or "https://",
+        hint = "https://books.example.com",
+        icon = "globe",
+        validate = function(value)
+            if not BookOrbitApi.normalizeServerUrl(value) then return _("Enter a valid http:// or https:// server address.") end
+        end,
+        below = function(_page, w)
+            return {
+                DialogUI.note(w, "info", _("The address you open BookOrbit at in a browser."), { col = INK.g3 }),
+                DialogUI.pillRow(w, {
+                    { label = _("Cancel"), kind = "outline", action = { kind = "close" } },
+                    { label = _("Save"), icon = "check", action = { kind = "submit" } },
+                }),
+            }
+        end,
+        on_submit = function(value)
+            local normalized = BookOrbitApi.normalizeServerUrl(value)
+            self:applyServerAddress(normalized)
+            require("bookorbit_toast").show(T(_("Server set to %1"), require("bookorbit_menu_ui").serverHost(normalized) or normalized))
+            if on_done then on_done() end
+        end,
     }
-    UIManager:show(dialog)
-    dialog:onShowKeyboard()
-end
-
-function MainMenu:login(menu)
-    if NetworkMgr:willRerunWhenConnected(function() self:login(menu) end) then
-        return
-    end
-
-    local dialog
-    dialog = MultiInputDialog:new{
-        title = self.title,
-        fields = {
-            {
-                text = self.settings.username,
-                hint = "username",
-            },
-            {
-                hint = "password",
-                text_type = "password",
-            },
-        },
-        description = _("Credentials are created in BookOrbit web settings under Settings, KOReader."),
-        buttons = {
-            {
-                {
-                    text = _("Cancel"),
-                    id = "close",
-                    callback = function()
-                        UIManager:close(dialog)
-                    end,
-                },
-                {
-                    text = _("Login"),
-                    is_enter_default = true,
-                    callback = function()
-                        local username, password = unpack(dialog:getFields())
-                        username = util.trim(username or "")
-                        if username == "" or not password or password == "" then
-                            UIManager:show(InfoMessage:new{ text = _("Please enter a username and password."), timeout = 2 })
-                            return
-                        end
-                        UIManager:close(dialog)
-                        UIManager:scheduleIn(0.5, function()
-                            self:doLogin(username, password, menu)
-                        end)
-                        UIManager:show(InfoMessage:new{ text = _("Logging in. Please wait."), timeout = 1 })
-                    end,
-                },
-            },
-        },
-    }
-    UIManager:show(dialog)
-    dialog:onShowKeyboard()
 end
 
 function MainMenu:doLogin(username, password, menu)
@@ -810,6 +649,7 @@ function MainMenu:doLogin(username, password, menu)
     Device:setIgnoreInput(false)
 
     if body then
+        if self.settings.username ~= username then self:clearAccountCaches() end
         self.settings.username = username
         self.settings.userkey = userkey
         self:refreshActiveCatalogApi(true)
@@ -831,14 +671,44 @@ function MainMenu:doLogin(username, password, menu)
     end
 end
 
+function MainMenu:clearAccountCaches()
+    self.settings.catalog_dashboard_cache = nil
+    self.settings.catalog_detail_cache = nil
+end
+
 function MainMenu:logout(menu)
+    self:clearAccountCaches()
     self.settings.userkey = nil
     self:refreshActiveCatalogApi(false)
     if menu then menu:updateItems() end
 end
 
+
+-- Stores credentials the sign-in page verified.
+function MainMenu:completeSignIn(server_url, username, userkey)
+    if self.settings.server_url ~= server_url or self.settings.username ~= username then
+        self:clearAccountCaches()
+    end
+    self.settings.server_url = server_url
+    self.settings.username = username
+    self.settings.userkey = userkey
+    G_reader_settings:flush()
+    self:refreshActiveCatalogApi(true)
+    require("bookorbit_toast").show(_("Signed in to BookOrbit"))
+    UIManager:scheduleIn(1, function()
+        if self.requestUpdateCheck then
+            self:requestUpdateCheck(false, "login")
+        end
+    end)
+end
+
+function MainMenu:signOut(catalog)
+    self:logout()
+    G_reader_settings:flush()
+    if catalog then catalog:onCloseAllMenus() end
+end
+
 function MainMenu.install(BookOrbit)
-    SYNC_STRATEGY = BookOrbit.SYNC_STRATEGY
     for name, fn in pairs(MainMenu) do
         if name ~= "install" then
             BookOrbit[name] = fn

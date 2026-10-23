@@ -21,7 +21,7 @@ const role = computed(() => ROLES[props.role] ?? null)
 <template>
   <span
     v-if="role"
-    class="inline-flex h-[18px] shrink-0 items-center rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
+    class="inline-flex h-[18px] shrink-0 items-center rounded-xs px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
     :class="role.class"
   >
     {{ t(role.label) }}

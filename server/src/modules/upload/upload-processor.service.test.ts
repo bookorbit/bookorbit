@@ -1,16 +1,19 @@
 vi.mock('fs/promises', () => ({ stat: vi.fn() }));
 vi.mock('../scanner/lib/hash', () => ({ computeFileHash: vi.fn() }));
+vi.mock('../../db/audio-track-order', () => ({ realignAudioTrackOrder: vi.fn() }));
 
 import { InternalServerErrorException } from '@nestjs/common';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import { stat } from 'fs/promises';
 import { computeFileHash } from '../scanner/lib/hash';
+import { realignAudioTrackOrder } from '../../db/audio-track-order';
 import { books, bookFiles, bookMetadata, uploadSessions } from '../../db/schema';
 import { UploadProcessorService } from './upload-processor.service';
 
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockComputeFileHash = computeFileHash as MockedFunction<typeof computeFileHash>;
+const mockRealignAudioTrackOrder = realignAudioTrackOrder as MockedFunction<typeof realignAudioTrackOrder>;
 
 describe('UploadProcessorService', () => {
   const metadataService = {
@@ -46,6 +49,7 @@ describe('UploadProcessorService', () => {
   const deleteWhere = vi.fn();
 
   const tx = {
+    execute: vi.fn().mockResolvedValue(undefined),
     select: vi.fn(() => ({ from: selectFrom })),
     insert: vi.fn((table: unknown) => {
       if (table === books) {
@@ -169,6 +173,24 @@ describe('UploadProcessorService', () => {
       }),
     );
     expect(orchestrator.scheduleImportedBooksIfEligible).not.toHaveBeenCalled();
+  });
+
+  it('renumbers the tracks of the book an audio file joins, inside the same transaction', async () => {
+    selectLimit.mockResolvedValueOnce([{ id: 99, primaryFileId: 5, status: 'present', formatPriority: ['mp3'] }]);
+
+    await service.createBookRecord(1, 2, '/folder', '/folder/Part 03.mp3', 'book/Part 03.mp3', 'mp3', 5000);
+
+    expect(mockRealignAudioTrackOrder).toHaveBeenCalledTimes(1);
+    expect(mockRealignAudioTrackOrder).toHaveBeenCalledWith(tx, 99);
+    expect(mockRealignAudioTrackOrder.mock.invocationCallOrder[0]).toBeGreaterThan(insertBookFilesValues.mock.invocationCallOrder[0]!);
+  });
+
+  it('leaves track order alone for an audio file that starts a book, or a file that is not audio', async () => {
+    await service.createBookRecord(1, 2, '/folder', '/folder/Part 01.mp3', 'book/Part 01.mp3', 'mp3', 5000);
+    selectLimit.mockResolvedValueOnce([{ id: 99, primaryFileId: 5, status: 'present', formatPriority: ['mp3'] }]);
+    await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 5000);
+
+    expect(mockRealignAudioTrackOrder).not.toHaveBeenCalled();
   });
 
   it('preserves oversized MergerFS inode values before persisting', async () => {
@@ -457,6 +479,44 @@ describe('UploadProcessorService', () => {
       expect(db.transaction).toHaveBeenCalledTimes(1);
     });
 
+    it('renumbers the tracks of each book that received audio once every file of the unit is in', async () => {
+      insertBooksReturning.mockResolvedValueOnce([{ id: 42 }]);
+      selectLimit
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 42 }])
+        .mockResolvedValueOnce([]);
+
+      await service.createUnitBookRecords(1, 2, unitFiles);
+
+      expect(mockRealignAudioTrackOrder).toHaveBeenCalledTimes(1);
+      expect(mockRealignAudioTrackOrder).toHaveBeenCalledWith(tx, 42);
+      expect(mockRealignAudioTrackOrder.mock.invocationCallOrder[0]).toBeGreaterThan(Math.max(...insertBookFilesValues.mock.invocationCallOrder));
+    });
+
+    it('renumbers a book the unit joined, whose tracks the unit numbered from zero', async () => {
+      selectLimit.mockResolvedValueOnce([{ id: 99, primaryFileId: 5, status: 'present', formatPriority: ['mp3'] }]).mockResolvedValueOnce([]);
+
+      await service.createUnitBookRecords(1, 2, [{ ...unitFiles[0]!, sortOrder: 0 }]);
+
+      expect(mockRealignAudioTrackOrder).toHaveBeenCalledWith(tx, 99);
+    });
+
+    it('does not renumber a book that only received files that are not audio', async () => {
+      selectLimit.mockResolvedValueOnce([{ id: 99, primaryFileId: 5, status: 'present', formatPriority: ['epub'] }]).mockResolvedValueOnce([]);
+
+      await service.createUnitBookRecords(1, 2, [
+        { folderPath: '/library/Book', absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', format: 'epub', sizeBytes: 10 },
+      ]);
+
+      expect(mockRealignAudioTrackOrder).not.toHaveBeenCalled();
+    });
+
+    it('rolls the whole unit back when the renumbering fails', async () => {
+      mockRealignAudioTrackOrder.mockRejectedValueOnce(new Error('deadlock detected'));
+
+      await expect(service.createUnitBookRecords(1, 2, unitFiles)).rejects.toThrow('deadlock detected');
+    });
+
     it('refuses an empty unit rather than creating a book with no files', async () => {
       await expect(service.createUnitBookRecords(1, 2, [])).rejects.toBeInstanceOf(InternalServerErrorException);
     });
@@ -633,9 +693,9 @@ describe('UploadProcessorService', () => {
     it('clears the file rows before the books that own them', async () => {
       await service.deleteUnitBookRecords({ bookIds: [42], createdBookIds: [42], attachedFileIds: [777], replacedPrimaries: [] });
 
-      expect(tx.delete).toHaveBeenNthCalledWith(1, bookFiles);
-      expect(tx.delete).toHaveBeenNthCalledWith(2, bookFiles);
-      expect(tx.delete).toHaveBeenNthCalledWith(3, books);
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[0]![0]).sql).toContain('delete from "book_files"');
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[1]![0]).sql).toContain('delete from "book_files"');
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[2]![0]).sql).toContain('delete from "books"');
     });
 
     const dialect = new PgDialect();
@@ -649,9 +709,9 @@ describe('UploadProcessorService', () => {
         replacedPrimaries: [{ bookId: 99, previousPrimaryFileId: 500, primaryFileId: 777 }],
       });
 
-      expect(tx.delete).toHaveBeenCalledWith(bookFiles);
+      expect(tx.execute).toHaveBeenCalledTimes(1);
       expect(updateBooksSet).toHaveBeenCalledWith({ primaryFileId: 500, updatedAt: expect.any(Date) });
-      expect(deleteWhere.mock.invocationCallOrder[0]).toBeLessThan(updateBooksSet.mock.invocationCallOrder[0]!);
+      expect(tx.execute.mock.invocationCallOrder[0]).toBeLessThan(updateBooksSet.mock.invocationCallOrder[0]!);
 
       // Only a primary that was cleared, or is still the one the unit chose, is undone, and only
       // onto a file that is still this book's.
@@ -719,5 +779,26 @@ describe('UploadProcessorService', () => {
 
     expect(coverReconciler.enqueue).toHaveBeenCalledWith([7], { filesChanged: true });
     expect(coverReconciler.enqueue.mock.invocationCallOrder[0]).toBeGreaterThan(metadataService.extractAndSave.mock.invocationCallOrder[0]!);
+  });
+
+  it.each([
+    [true, 0],
+    [false, 1],
+  ])('lets the library regex rules own extraction when they apply (%s)', async (handled, plainCalls) => {
+    const scanner = { extractMetadataWithLibraryRules: vi.fn().mockResolvedValue(handled) };
+    const withRules = new UploadProcessorService(
+      db as any,
+      metadataService as any,
+      coverStore as any,
+      orchestrator as any,
+      undefined,
+      scanner as any,
+    );
+    metadataService.extractAndSave.mockResolvedValue(undefined);
+
+    await withRules.extractMetadata(7, '/tmp/book.epub', 'epub');
+
+    expect(scanner.extractMetadataWithLibraryRules).toHaveBeenCalledWith(7);
+    expect(metadataService.extractAndSave).toHaveBeenCalledTimes(plainCalls);
   });
 });

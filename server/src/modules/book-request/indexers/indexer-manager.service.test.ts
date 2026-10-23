@@ -163,4 +163,14 @@ describe('IndexerManagerService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.create).not.toHaveBeenCalled();
   });
+
+  it('keeps a disabled seed-limit toggle saved when its source synchronization fails', async () => {
+    const { service, repo, prowlarr } = makeService();
+    prowlarr.indexers.mockRejectedValueOnce(new Error('Prowlarr unavailable'));
+
+    await expect(service.update(3, { inheritSeedLimits: false })).resolves.toMatchObject({ inheritSeedLimits: false });
+    expect(repo.update).toHaveBeenCalledWith(3, { inheritSeedLimits: false });
+    expect(repo.recordSyncFailure).toHaveBeenCalledWith(3, 'Prowlarr unavailable');
+    expect(repo.syncProwlarrSources).not.toHaveBeenCalled();
+  });
 });

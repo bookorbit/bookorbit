@@ -160,7 +160,7 @@ function handleCopyPath(file: TreeFile) {
           </span>
           <button
             v-if="isCollapsible(group)"
-            class="-mr-1 inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="-mr-1 inline-flex size-6 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             :aria-expanded="!isRolled(group)"
             :aria-label="isRolled(group) ? t('book.detail.files.showAllTracks') : t('book.detail.files.collapseTracks')"
             @click="toggleGroup(group)"
@@ -228,7 +228,7 @@ function handleCopyPath(file: TreeFile) {
             <FileRoleBadge v-if="file.role !== 'content' && file.role !== 'primary'" :role="file.role" class="pointer-events-none relative" />
             <span
               v-if="progressOf(file) > 0"
-              class="pointer-events-none relative inline-flex h-[18px] shrink-0 items-center rounded bg-primary/15 px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-primary tabular-nums"
+              class="pointer-events-none relative inline-flex h-[18px] shrink-0 items-center rounded-xs bg-primary/15 px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-primary tabular-nums"
             >
               {{ t('book.detail.files.percentRead', { percent: formatPercent(progressOf(file) / 100) }) }}
             </span>
@@ -283,7 +283,7 @@ function handleCopyPath(file: TreeFile) {
               t('book.detail.files.moreTracks', { count: hiddenCount(group) })
             }}</span>
             <button
-              class="rounded text-[12.5px] font-medium text-primary transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="rounded-xs text-[12.5px] font-medium text-primary transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               @click="revealAllTracks(group)"
             >
               {{ t('book.detail.files.showAllTracks') }}

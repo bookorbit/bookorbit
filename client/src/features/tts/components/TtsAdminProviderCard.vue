@@ -149,7 +149,7 @@ function handlePreview(voice: TtsAdminVoice) {
         <div class="flex flex-col sm:hidden">
           <button
             type="button"
-            class="flex size-6 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+            class="flex size-6 items-center justify-center rounded-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
             :disabled="!canMoveUp"
             :aria-label="t('settings.admin.tts.moveUp', { name: provider.name })"
             @click="handleMoveUp"
@@ -158,7 +158,7 @@ function handlePreview(voice: TtsAdminVoice) {
           </button>
           <button
             type="button"
-            class="flex size-6 items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+            class="flex size-6 items-center justify-center rounded-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
             :disabled="!canMoveDown"
             :aria-label="t('settings.admin.tts.moveDown', { name: provider.name })"
             @click="handleMoveDown"

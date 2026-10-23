@@ -27,8 +27,10 @@ vi.mock('@/features/book-dock/composables/useBookDockSummary', () => ({
 vi.mock('@/features/book-dock/composables/useBookDockStatistics', () => ({
   useBookDockStatistics: () => ({ statistics: ref(null), fetchStatistics: vi.fn<() => void>() }),
 }))
+const { addFilesMock } = vi.hoisted(() => ({ addFilesMock: vi.fn<(files: FileList | File[]) => void>() }))
+
 vi.mock('@/features/book-dock/composables/useBookDockUpload', () => ({
-  useBookDockUpload: () => ({ addFiles: vi.fn<() => void>(), isUploading: ref(false) }),
+  useBookDockUpload: () => ({ addFiles: addFilesMock, isUploading: ref(false) }),
   SUPPORTED_FORMATS: ['epub'],
   SUPPORTED_FORMATS_ACCEPT: '.epub',
 }))
@@ -53,6 +55,37 @@ describe('BookDockView pagination', () => {
     await wrapper.get('[aria-label="Go to page 350"]').trigger('click')
     await vi.waitFor(() => expect(String(apiMock.mock.calls.at(-1)?.[0])).toContain('page=350'))
     expect(wrapper.get('[aria-current="page"]').text()).toBe('350')
+    wrapper.unmount()
+  })
+})
+
+describe('BookDockView uploads', () => {
+  it('shows the upload failures panel on the page', () => {
+    const wrapper = shallowMount(BookDockView)
+
+    expect(wrapper.findComponent({ name: 'BookDockUploadFailures' }).exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('hands every dropped file to the uploader, including ones it will refuse, so the refusal is reported', async () => {
+    addFilesMock.mockClear()
+    const wrapper = shallowMount(BookDockView)
+    const files = [new File(['x'], 'dune.epub'), new File(['x'], 'notes.docx')]
+
+    await wrapper.get('main').trigger('drop', { dataTransfer: { files } })
+
+    expect(addFilesMock).toHaveBeenCalledTimes(1)
+    expect([...addFilesMock.mock.calls[0]![0]].map((file) => file.name)).toEqual(['dune.epub', 'notes.docx'])
+    wrapper.unmount()
+  })
+
+  it('ignores a drop that carries no files', async () => {
+    addFilesMock.mockClear()
+    const wrapper = shallowMount(BookDockView)
+
+    await wrapper.get('main').trigger('drop', { dataTransfer: { files: [] } })
+
+    expect(addFilesMock).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 })

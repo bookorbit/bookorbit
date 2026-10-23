@@ -3,10 +3,13 @@ import { isAudioFormat } from '@bookorbit/types'
 import { COLUMN_DEF_MAP, isCustomColumnId, parseCustomFieldId, type ColumnDef } from './tableColumnSchema'
 import type { useTableLocks } from './useTableLocks'
 
+const PERSONAL_STATE_COLUMN_IDS = new Set(['readStatus'])
+
 export function useTableCellHelpers(
   locks: ReturnType<typeof useTableLocks>,
   isReadOnly: () => boolean,
   columnMapGetter?: () => Map<string, ColumnDef>,
+  canEditBookMetadata?: (book: BookCard) => boolean,
 ) {
   function getCellValue(book: BookCard, colId: string): unknown {
     const map = columnMapGetter ? columnMapGetter() : (COLUMN_DEF_MAP as Map<string, ColumnDef>)
@@ -26,6 +29,7 @@ export function useTableCellHelpers(
 
   function isCellReadOnly(book: BookCard, col: { id: string; isEditable: boolean }): boolean {
     if (!col.isEditable) return true
+    if (canEditBookMetadata && !PERSONAL_STATE_COLUMN_IDS.has(col.id) && !canEditBookMetadata(book)) return true
     if (col.id === 'narrators' && !isBookAudio(book)) return true
     if (isCellLocked(book, col.id)) return true
     // Custom fields: block editing when the book has no entry for this field.

@@ -1,3 +1,4 @@
+import { ReadingAttemptEventsService } from '../../user-book-status/reading-attempt-events.service';
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -106,7 +107,7 @@ describe('UserStateImporter audiobook progress import', () => {
     const importRepo = createImportRepoMock();
     importRepo.upsertAudiobookProgress.mockResolvedValue(undefined);
 
-    const importer = new UserStateImporter(repo as never, importRepo as never);
+    const importer = new UserStateImporter(repo as never, importRepo as never, new ReadingAttemptEventsService());
 
     const planned = {
       execution: {
@@ -196,7 +197,7 @@ describe('UserStateImporter audiobook progress import', () => {
     const importRepo = createImportRepoMock();
     importRepo.upsertAudiobookProgress.mockResolvedValue(undefined);
 
-    const importer = new UserStateImporter(repo as never, importRepo as never);
+    const importer = new UserStateImporter(repo as never, importRepo as never, new ReadingAttemptEventsService());
 
     const planned = {
       execution: {
@@ -386,7 +387,7 @@ describe('UserStateImporter collection import', () => {
     importRepo.insertCollection.mockResolvedValue({ id: 701 });
     importRepo.upsertCollectionBook.mockResolvedValue(true);
 
-    const importer = new UserStateImporter(repo as never, importRepo as never);
+    const importer = new UserStateImporter(repo as never, importRepo as never, new ReadingAttemptEventsService());
 
     const planned = {
       execution: {
@@ -465,7 +466,7 @@ describe('UserStateImporter progress and bookmark edge cases', () => {
   it('marks user-state stages skipped when unavailable', async () => {
     const repo = createRepoMock();
     const importRepo = createImportRepoMock();
-    const importer = new UserStateImporter(repo as never, importRepo as never);
+    const importer = new UserStateImporter(repo as never, importRepo as never, new ReadingAttemptEventsService());
 
     const planned = {
       plan: {
@@ -508,7 +509,7 @@ describe('UserStateImporter progress and bookmark edge cases', () => {
   it('derives bookmark position from track index when source file id is missing', async () => {
     const repo = createRepoMock();
     const importRepo = createImportRepoMock();
-    const importer = new UserStateImporter(repo as never, importRepo as never);
+    const importer = new UserStateImporter(repo as never, importRepo as never, new ReadingAttemptEventsService());
 
     const planned = {
       execution: {

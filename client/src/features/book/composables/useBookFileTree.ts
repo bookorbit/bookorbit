@@ -64,7 +64,7 @@ function groupOf(file: BookDetailFile): FileGroupKey {
   if (!isContentBookFile(file)) return 'extras'
   const format = file.format!.toLowerCase()
   if (isAudioFormat(format)) return 'audio'
-  if (format === 'pdf') return 'document'
+  if (format === 'pdf' || format === 'djvu') return 'document'
   if (isComicFormat(format)) return 'comic'
   return 'ebook'
 }

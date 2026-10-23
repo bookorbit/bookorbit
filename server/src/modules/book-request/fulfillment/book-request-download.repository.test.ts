@@ -45,3 +45,31 @@ describe('BookRequestDownloadRepository.findLatestForRequests', () => {
     expect(queries).toHaveLength(0);
   });
 });
+
+describe('BookRequestDownloadRepository.findTriedReleaseKeys', () => {
+  function repositoryReturning(rows: Array<{ indexerId: number | null; releaseGuid: string | null }>) {
+    const db = { select: () => ({ from: () => ({ where: () => Promise.resolve(rows) }) }) };
+    return new BookRequestDownloadRepository(db as never);
+  }
+
+  /**
+   * Torznab guids are digested now, and an attempt made before that stored the raw link. Without
+   * the digested key alongside it, the next automated retry would pick the release that failed.
+   */
+  it('also matches a raw URL guid stored before guids were digested', async () => {
+    const keys = await repositoryReturning([{ indexerId: 3, releaseGuid: 'https://tracker.example.com/details/1' }]).findTriedReleaseKeys(9);
+
+    expect(keys.has('3:https://tracker.example.com/details/1')).toBe(true);
+    expect(keys.size).toBe(2);
+    expect([...keys].some((key) => /^3:[a-f0-9]{64}$/.test(key))).toBe(true);
+  });
+
+  it('adds nothing for an opaque guid or a hand-pasted magnet', async () => {
+    const keys = await repositoryReturning([
+      { indexerId: 3, releaseGuid: '12345' },
+      { indexerId: null, releaseGuid: null },
+    ]).findTriedReleaseKeys(9);
+
+    expect([...keys]).toEqual(['3:12345']);
+  });
+});

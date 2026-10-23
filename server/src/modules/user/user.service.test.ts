@@ -43,7 +43,7 @@ describe('UserService', () => {
     setSuperuser: vi.fn(),
     assignViewerLibraries: vi.fn(),
     findLibraryIdsByUserId: vi.fn(),
-    replaceViewerLibraries: vi.fn(),
+    replaceLibraries: vi.fn(),
     findExistingLibraryIds: vi.fn(),
     findSettingsById: vi.fn(),
   };
@@ -658,7 +658,7 @@ describe('UserService', () => {
 
     await service.setLibraries(2, [3, 7, 3], reqUser({ isSuperuser: true }));
 
-    expect(userRepo.replaceViewerLibraries).toHaveBeenCalledWith(2, [3, 7]);
+    expect(userRepo.replaceLibraries).toHaveBeenCalledWith(2, [3, 7]);
   });
 
   it('getContentFilters throws when the target user does not exist', async () => {
@@ -831,7 +831,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
     setSuperuser: vi.fn(),
     assignViewerLibraries: vi.fn(),
     findLibraryIdsByUserId: vi.fn(),
-    replaceViewerLibraries: vi.fn(),
+    replaceLibraries: vi.fn(),
     findExistingLibraryIds: vi.fn(),
   };
   const contentFilterRepo = {

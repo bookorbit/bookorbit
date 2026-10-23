@@ -236,6 +236,33 @@ describe('UserStatisticsRepository', () => {
     expect(text.match(/AT TIME ZONE/g)).toHaveLength(1);
   });
 
+  it('derives session archetype hour and weekday in the provided timezone', async () => {
+    const calls: Array<{ text: string; params: unknown[] }> = [];
+    const fakeClient = {
+      query: vi.fn().mockImplementation((cfg: { text: string }, params: unknown[]) => {
+        calls.push({ text: cfg.text, params });
+        return Promise.resolve({ rows: [] });
+      }),
+    };
+    const db = drizzle({ client: fakeClient as never, schema });
+    const repo = new UserStatisticsRepository(db as never);
+
+    await repo.getSessionArchetypePoints(5, true, [2], 30, 'Australia/Brisbane');
+    await repo.getSessionArchetypePoints(5, true, [2], 30, 'Not/AZone');
+    await repo.getSessionArchetypePoints(5, true, [2], 30);
+
+    expect(calls).toHaveLength(3);
+    const [brisbane, invalid, fallback] = calls;
+    expect(brisbane!.text).toMatch(/extract\(hour from \("reading_sessions"\."started_at" AT TIME ZONE \$\d+\)\)/);
+    expect(brisbane!.text).toMatch(/extract\(minute from \("reading_sessions"\."started_at" AT TIME ZONE \$\d+\)\)/);
+    expect(brisbane!.text).toMatch(/extract\(dow from \("reading_sessions"\."started_at" AT TIME ZONE \$\d+\)\)/);
+    expect(brisbane!.text).not.toMatch(/extract\(\w+ from "reading_sessions"\."started_at"\)/);
+    expect(brisbane!.params.filter((param) => param === 'Australia/Brisbane')).toHaveLength(3);
+    expect(invalid!.params).not.toContain('Not/AZone');
+    expect(invalid!.params.filter((param) => param === 'UTC')).toHaveLength(3);
+    expect(fallback!.params.filter((param) => param === 'UTC')).toHaveLength(3);
+  });
+
   it('returns per-source daily reading seconds for the heatmap tooltip', async () => {
     const db = makeDb([
       [

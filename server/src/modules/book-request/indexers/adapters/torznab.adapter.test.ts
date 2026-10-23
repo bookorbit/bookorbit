@@ -97,6 +97,7 @@ const ITEM = `
     <title>Dune - Frank Herbert (retail) [EPUB]</title>
     <guid>https://tracker.example.com/details/1</guid>
     <link>https://tracker.example.com/download/1.torrent?key=abc</link>
+    <comments>https://tracker.example.com/details/1</comments>
     <pubDate>Tue, 01 Apr 2025 10:00:00 +0000</pubDate>
     <enclosure url="https://tracker.example.com/download/1.torrent?key=abc" length="1048576" type="application/x-bittorrent" />
     <torznab:attr name="seeders" value="42" />
@@ -189,8 +190,8 @@ describe('TorznabAdapter', () => {
 
     expect(release).toMatchObject({
       indexerId: 7,
-      guid: 'https://tracker.example.com/details/1',
       title: 'Dune - Frank Herbert (retail) [EPUB]',
+      infoUrl: 'https://tracker.example.com/details/1',
       downloadUrl: 'https://tracker.example.com/download/1.torrent?key=abc',
       infoHash: 'c9e15763f722f23e98a29decdfae341b98d53056',
       sizeBytes: 1048576,
@@ -199,6 +200,41 @@ describe('TorznabAdapter', () => {
     });
     // `peers` counts seeders, so leechers is the difference and not the raw 50.
     expect(release.leechers).toBe(8);
+  });
+
+  /**
+   * Jackett reuses the tracker's download link as the guid for some trackers, and a private
+   * tracker's download link carries the passkey. The guid is what the picker holds on to, so it
+   * must not be the link itself.
+   */
+  it('digests a URL-shaped guid so a passkeyed link never reaches a client', async () => {
+    const item = `<item><title>Dune</title><guid>https://tracker.example.com/download.php?id=1&amp;passkey=p4ssk3y</guid><link>https://tracker.example.com/download.php?id=1&amp;passkey=p4ssk3y</link></item>`;
+    fetchMock.mockResolvedValue(new Response(feed(item)));
+
+    const [first] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+    fetchMock.mockResolvedValue(new Response(feed(item)));
+    const [second] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+
+    expect(first.guid).toMatch(/^[a-f0-9]{64}$/);
+    expect(first.guid).not.toContain('p4ssk3y');
+    // Stable across searches, which is what lets a grab name the release it was shown.
+    expect(second.guid).toBe(first.guid);
+  });
+
+  it('keeps an opaque guid exactly as the proxy sent it', async () => {
+    fetchMock.mockResolvedValue(new Response(feed(`<item><title>Dune</title><guid>12345</guid><link>https://t.example/1.torrent</link></item>`)));
+
+    const [release] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+
+    expect(release.guid).toBe('12345');
+  });
+
+  it('leaves the page link out when the proxy publishes none', async () => {
+    fetchMock.mockResolvedValue(new Response(feed(`<item><title>Dune</title><guid>1</guid><link>https://t.example/1.torrent</link></item>`)));
+
+    const [release] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+
+    expect(release.infoUrl).toBeUndefined();
   });
 
   it('treats a lone item as a list rather than dropping it', async () => {

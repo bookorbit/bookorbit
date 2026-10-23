@@ -1,0 +1,1 @@
+CREATE INDEX "bm_page_count_idx" ON "book_metadata" USING btree ("page_count");

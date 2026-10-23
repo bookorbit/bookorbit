@@ -8,6 +8,7 @@ import {
   DEFAULT_AUTHOR_ENRICHMENT_CONFIG,
   DEFAULT_OIDC_CONFIG,
 } from '../../common/constants/app-settings.constants';
+import { DEFAULT_MAX_UPLOAD_SIZE_MB } from '../../common/constants/upload.constants';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { getSanitizedErrorInfo } from './seed-log.util';
@@ -41,7 +42,7 @@ const DEFAULT_APP_SETTINGS: Array<typeof schema.appSettings.$inferInsert> = [
   { key: APP_SETTING_KEYS.OIDC_CONFIG, value: JSON.stringify(DEFAULT_OIDC_CONFIG) },
   { key: APP_SETTING_KEYS.UPDATE_CHECK_ENABLED, value: 'true' },
   { key: APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED, value: 'true' },
-  { key: APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB, value: '500' },
+  { key: APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB, value: String(DEFAULT_MAX_UPLOAD_SIZE_MB) },
 ];
 
 @Injectable()

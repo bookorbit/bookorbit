@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { NotificationType, type BookDockMetadata } from '@bookorbit/types';
 
 import type { BookRequestDownloadRow } from '../../../db/schema';
@@ -122,7 +123,7 @@ describe('verifyAgainstRequest with an operator-set threshold', () => {
  * handler: one file, one score, two operator settings, two outcomes.
  */
 describe('RequestVerificationService against the configured threshold', () => {
-  function makeService(threshold: number, verificationEnabled = true, overrides: { requestSettled?: boolean } = {}) {
+  function makeService(threshold: number, verificationEnabled = true, overrides: { requestSettled?: boolean; holdForReview?: boolean } = {}) {
     const events = { on: vi.fn() };
     const dockRepo = {
       findById: vi.fn().mockResolvedValue({ id: 100, fetchedMetadata: metadata({ authors: ['F. Herbert'] }), embeddedMetadata: null }),
@@ -130,7 +131,13 @@ describe('RequestVerificationService against the configured threshold', () => {
     const dock = { discardFile: vi.fn().mockResolvedValue(undefined) };
     const finalizeService = { finalizeManagedFile: vi.fn().mockResolvedValue({ success: true, bookId: 55 }) };
     const downloads = {
-      findByBookDockFileId: vi.fn().mockResolvedValue({ id: 11, requestId: 7, status: 'importing', bookDockFileId: 100 } as BookRequestDownloadRow),
+      findByBookDockFileId: vi.fn().mockResolvedValue({
+        id: 11,
+        requestId: 7,
+        status: 'importing',
+        bookDockFileId: 100,
+        holdForReview: overrides.holdForReview ?? false,
+      } as BookRequestDownloadRow),
       update: vi.fn().mockResolvedValue(undefined),
       updateIf: vi.fn().mockImplementation((id: number, _expected: unknown, patch: Record<string, unknown>) => Promise.resolve({ id, ...patch })),
     };
@@ -153,6 +160,7 @@ describe('RequestVerificationService against the configured threshold', () => {
     };
     const gateway = { emitChanged: vi.fn() };
     const settings = { get: vi.fn().mockResolvedValue({ verificationEnabled, verificationThreshold: threshold }) };
+    const companions = { resolveJoin: vi.fn().mockResolvedValue(null), handOn: vi.fn().mockResolvedValue(false) };
 
     const service = new RequestVerificationService(
       events as never,
@@ -165,6 +173,7 @@ describe('RequestVerificationService against the configured threshold', () => {
       notifier as never,
       gateway as never,
       settings as never,
+      companions as never,
     );
 
     service.onModuleInit();
@@ -234,6 +243,41 @@ describe('RequestVerificationService against the configured threshold', () => {
       expect.objectContaining({ status: 'available', matchedBookId: 55 }),
     );
     expect(fulfillment.holdForReview).not.toHaveBeenCalled();
+  });
+
+  it('holds a passing import when the person who sent it asked to look first', async () => {
+    const { ingest, finalizeService, fulfillment } = makeService(70, true, { holdForReview: true });
+
+    await ingest();
+
+    expect(finalizeService.finalizeManagedFile).not.toHaveBeenCalled();
+    expect(fulfillment.holdForReview).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 11 }),
+      expect.objectContaining({ id: 7 }),
+      expect.stringContaining('reviewed'),
+    );
+  });
+
+  it('holds an import the sender asked to review even with checking switched off', async () => {
+    const { ingest, finalizeService, fulfillment } = makeService(70, false, { holdForReview: true });
+
+    await ingest();
+
+    expect(finalizeService.finalizeManagedFile).not.toHaveBeenCalled();
+    expect(fulfillment.holdForReview).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: 7 }),
+      expect.stringContaining('reviewed'),
+    );
+  });
+
+  it('holds a failing import for its score rather than for the request to look', async () => {
+    const { ingest, fulfillment } = makeService(95, true, { holdForReview: true });
+
+    await ingest();
+
+    expect(fulfillment.holdForReview).toHaveBeenCalledTimes(1);
+    expect(fulfillment.holdForReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 7 }), expect.stringContaining('scored'));
   });
 });
 
@@ -345,6 +389,7 @@ describe('RequestVerificationService review surface', () => {
         verificationThreshold: overrides.threshold ?? 70,
       }),
     };
+    const companions = { resolveJoin: vi.fn().mockResolvedValue(null), handOn: vi.fn().mockResolvedValue(false) };
 
     const service = new RequestVerificationService(
       { on: vi.fn() } as never,
@@ -357,9 +402,10 @@ describe('RequestVerificationService review surface', () => {
       notifier as never,
       gateway as never,
       settings as never,
+      companions as never,
     );
 
-    return { service, dock, dockRepo, finalizeService, downloads, requests, notifier, gateway, fulfillment };
+    return { service, dock, dockRepo, finalizeService, downloads, requests, notifier, gateway, fulfillment, companions };
   }
 
   it('describes a loose single file from the anchor row, which already describes it fully', async () => {
@@ -473,6 +519,77 @@ describe('RequestVerificationService review surface', () => {
     expect(review).toMatchObject({ bookDockFileId: null, verification: null, files: [], canFile: false });
   });
 
+  it('says whether the sender asked for the review, and links the release it came from', async () => {
+    const { service } = makeService({ downloadRow: { holdForReview: true, releaseInfoUrl: 'https://tracker.example.com/details/1' } });
+
+    expect(await service.getReview(7)).toMatchObject({ heldOnRequest: true, releaseInfoUrl: 'https://tracker.example.com/details/1' });
+  });
+
+  it('keeps the release link once the dock entry is gone, since the source still describes it', async () => {
+    const { service } = makeService({
+      requestRow: { bookDockFileId: null },
+      downloadRow: { bookDockFileId: null, releaseInfoUrl: 'https://tracker.example.com/details/1' },
+    });
+
+    expect(await service.getReview(7)).toMatchObject({
+      bookDockFileId: null,
+      releaseInfoUrl: 'https://tracker.example.com/details/1',
+      edition: null,
+      hasCover: false,
+    });
+  });
+
+  /** A provider match is itself a guess at the edition, which is what these facts exist to check. */
+  it("states the edition from the file's own metadata, never from the provider match", async () => {
+    const { service } = makeService({
+      dockRow: {
+        id: 100,
+        fileName: 'dune.m4b',
+        fileSize: 1024,
+        format: 'm4b',
+        unitDirectory: null,
+        coverPath: '/data/dock/covers/100.jpg',
+        fetchedMetadata: metadata({ publisher: 'Provider Press', pageCount: 900 }),
+        embeddedMetadata: {
+          publisher: ' Macmillan Audio ',
+          publishedYear: 2007,
+          language: 'en',
+          narrators: ['Scott Brick', ' '],
+          durationSeconds: 75_600,
+          abridged: false,
+          chapters: [{ title: 'One' }, { title: 'Two' }],
+        },
+      },
+    });
+
+    const review = await service.getReview(7);
+
+    expect(review.edition).toEqual({
+      publisher: 'Macmillan Audio',
+      publishedDate: '2007',
+      language: 'en',
+      pageCount: null,
+      isbn10: null,
+      narrators: ['Scott Brick'],
+      durationSeconds: 75_600,
+      abridged: false,
+      chapterCount: 2,
+    });
+    expect(review.hasCover).toBe(true);
+  });
+
+  it('reports no edition for a file that states none of it', async () => {
+    const { service } = makeService();
+
+    expect(await service.getReview(7)).toMatchObject({ edition: null, hasCover: false, heldOnRequest: false, releaseInfoUrl: null });
+  });
+
+  it('answers no cover for a held import without one', async () => {
+    const { service } = makeService();
+
+    await expect(service.getReviewCoverPath(7)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('finds the entry through the attempt when only the request lost its pointer', async () => {
     const { service } = makeService({ requestRow: { bookDockFileId: null } });
     expect((await service.getReview(7)).bookDockFileId).toBe(100);
@@ -503,6 +620,57 @@ describe('RequestVerificationService review surface', () => {
       expect.objectContaining({ status: 'available', matchedBookId: 55, statusReason: null }),
     );
     expect(notifier.notifyBookAvailable).toHaveBeenCalled();
+  });
+
+  it("files a half of a pair into the book it joins, in that book's own library and folder", async () => {
+    const { service, finalizeService, companions } = makeService();
+    const join = { libraryId: 8, folderId: 9, joinBook: { bookId: 42, folderPath: '/lib/Dune' } };
+    companions.resolveJoin.mockResolvedValue(join);
+
+    await service.fileHeldImport(7, { id: 9 } as never);
+
+    expect(finalizeService.finalizeManagedFile).toHaveBeenCalledWith(100, { libraryId: 8, folderId: 9, joinBook: join.joinBook });
+  });
+
+  it('hands the book that landed on to the other half of the pair', async () => {
+    const { service, companions } = makeService();
+
+    await service.fileHeldImport(7, { id: 9 } as never);
+
+    expect(companions.handOn).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 55);
+  });
+
+  /**
+   * Filed side by side, each half would find the other not yet landed and both would become books
+   * of their own. The second has to start only once the first has finished.
+   */
+  it('files the two halves of a pair one after the other rather than side by side', async () => {
+    const { service, finalizeService, requests, downloads } = makeService();
+    const halves = new Map([
+      [7, { ...heldRequest, id: 7, companionRequestId: 8, bookDockFileId: 100 }],
+      [8, { ...heldRequest, id: 8, mediaKind: 'audiobook', companionRequestId: 7, bookDockFileId: 101 }],
+    ]);
+    requests.findById.mockImplementation((id: number) => Promise.resolve({ request: halves.get(id) }));
+    downloads.findLatestForRequests.mockImplementation((ids: number[]) =>
+      Promise.resolve(new Map(ids.map((id) => [id, { download: { id: id + 100, requestId: id, status: 'needs_review', bookDockFileId: null } }]))),
+    );
+
+    let releaseFirst!: () => void;
+    finalizeService.finalizeManagedFile
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = () => resolve({ success: true, bookId: 55 }))))
+      .mockResolvedValueOnce({ success: true, bookId: 55 });
+
+    const first = service.fileHeldImport(7, { id: 9 } as never);
+    const second = service.fileHeldImport(8, { id: 9 } as never);
+    await vi.waitFor(() => expect(finalizeService.finalizeManagedFile).toHaveBeenCalledTimes(1));
+    // Give the second half every chance to jump the queue before the first is let go.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(finalizeService.finalizeManagedFile).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(finalizeService.finalizeManagedFile).toHaveBeenCalledTimes(2);
+    expect(finalizeService.finalizeManagedFile.mock.calls.map(([fileId]) => fileId)).toEqual([100, 101]);
   });
 
   /** A failure here is the approver's to see, not another silent hold they have to come back to. */

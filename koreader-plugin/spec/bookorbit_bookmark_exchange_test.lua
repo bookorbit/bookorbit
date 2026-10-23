@@ -242,4 +242,13 @@ local flaky_result = BookOrbitBookmarks.exchangeBook({
 assertTrue(flaky_result.had_errors, "a 5xx is reported as an error")
 assertEqual(failing_book.bmSignature, nil, "a failed upload does not record the skip stamp")
 
+requests = {}
+local copy_state = makeState({})
+copy_state.hasOtherCopy = function() return true end
+BookOrbitBookmarks.exchangeBook({
+    client = client, state = copy_state, digest = "digest", bookmarks = {}, bm_signature = "empty-copy",
+    apply_mode = "sidecar", file = "/books/copy.epub",
+})
+assertEqual(requests[1].keysComplete, false, "one duplicate sidecar cannot delete another copy's dogears")
+
 print("bookorbit_bookmark_exchange_test.lua: ok")

@@ -8,11 +8,16 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateEmailRecipientDto } from './dto/create-email-recipient.dto';
 import { UpdateEmailRecipientDto } from './dto/update-email-recipient.dto';
 import { EmailRecipientService } from './email-recipient.service';
+import { EmailRecipientTestService } from './email-recipient-test.service';
+import { SendRecipientTestDto } from './dto/send-recipient-test.dto';
 
 @Controller('email/recipients')
 @RequirePermission(Permission.EmailSend)
 export class EmailRecipientController {
-  constructor(private readonly service: EmailRecipientService) {}
+  constructor(
+    private readonly service: EmailRecipientService,
+    private readonly testService: EmailRecipientTestService,
+  ) {}
 
   @Get()
   findAll(@CurrentUser() user: RequestUser) {
@@ -56,6 +61,12 @@ export class EmailRecipientController {
   })
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.service.remove(id, user);
+  }
+
+  @Post(':id/test')
+  @HttpCode(HttpStatus.OK)
+  sendTest(@Param('id', ParseIntPipe) id: number, @Body() dto: SendRecipientTestDto, @CurrentUser() user: RequestUser) {
+    return this.testService.send(id, dto.subject, dto.text, user);
   }
 
   @Patch(':id/default')

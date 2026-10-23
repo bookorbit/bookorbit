@@ -620,9 +620,9 @@ describe('AppSettingsService', () => {
   });
 
   describe('getMaxUploadSizeMb', () => {
-    it('returns 500 by default when setting is absent', async () => {
+    it('returns 4096 by default when setting is absent', async () => {
       repo.findByKey.mockResolvedValue(undefined);
-      expect(await service.getMaxUploadSizeMb()).toBe(500);
+      expect(await service.getMaxUploadSizeMb()).toBe(4096);
     });
 
     it('returns parsed integer value when valid', async () => {
@@ -630,9 +630,14 @@ describe('AppSettingsService', () => {
       expect(await service.getMaxUploadSizeMb()).toBe(1024);
     });
 
-    it('returns 500 when value is invalid or <= 0', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '-50' } as never);
+    it('preserves an existing 500 MB limit', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '500' } as never);
       expect(await service.getMaxUploadSizeMb()).toBe(500);
+    });
+
+    it('returns 4096 when value is invalid or <= 0', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '-50' } as never);
+      expect(await service.getMaxUploadSizeMb()).toBe(4096);
     });
   });
 
@@ -649,6 +654,21 @@ describe('AppSettingsService', () => {
       await expect(service.update('max_upload_size_mb', 'invalid')).rejects.toThrow(BadRequestException);
       await expect(service.update('max_upload_size_mb', '-10')).rejects.toThrow(BadRequestException);
       await expect(service.update('max_upload_size_mb', '0')).rejects.toThrow(BadRequestException);
+      expect(repo.updateByKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update audit_retention_days validation', () => {
+    it('stores a whole number of days', async () => {
+      repo.updateByKey.mockResolvedValue({ key: 'audit_retention_days', value: '365' } as never);
+      await service.update('audit_retention_days', ' 365 ');
+      expect(repo.updateByKey).toHaveBeenCalledWith('audit_retention_days', '365');
+    });
+
+    it('rejects anything that is not between 1 and 3650 days', async () => {
+      for (const value of ['0', '-1', '3651', '12.5', '90 days', 'forever']) {
+        await expect(service.update('audit_retention_days', value)).rejects.toThrow(BadRequestException);
+      }
       expect(repo.updateByKey).not.toHaveBeenCalled();
     });
   });

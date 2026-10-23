@@ -4,6 +4,8 @@ import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateRepository } from './email-template.repository';
 import { EmailTemplateContextService } from './email-template-context.service';
 import { EmailBookAccessService } from './email-book-access.service';
+import { EmailPreferencesRepository } from './email-preferences.repository';
+import { EmailFileSelector } from './email-file-selector';
 import type { RequestUser } from '../../common/types/request-user';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
@@ -11,6 +13,8 @@ describe('EmailTemplateService', () => {
   let service: EmailTemplateService;
   let repo: EmailTemplateRepository;
   let bookAccessService: EmailBookAccessService;
+  let preferences: EmailPreferencesRepository;
+  let fileSelector: EmailFileSelector;
 
   const mockUser: RequestUser = {
     id: 1,
@@ -54,8 +58,13 @@ describe('EmailTemplateService', () => {
             update: vi.fn().mockResolvedValue([mockTemplate]),
             updateById: vi.fn().mockResolvedValue([mockTemplate]),
             delete: vi.fn(),
-            clearDefault: vi.fn(),
-            setDefault: vi.fn().mockResolvedValue([mockTemplate]),
+          },
+        },
+        { provide: EmailPreferencesRepository, useValue: { setDefaults: vi.fn().mockResolvedValue({}) } },
+        {
+          provide: EmailFileSelector,
+          useValue: {
+            select: vi.fn().mockResolvedValue({ id: 500, absolutePath: '/library/Verity/Verity (2021).epub', format: 'epub', sizeBytes: 708549 }),
           },
         },
         {
@@ -72,6 +81,8 @@ describe('EmailTemplateService', () => {
     service = module.get<EmailTemplateService>(EmailTemplateService);
     repo = module.get<EmailTemplateRepository>(EmailTemplateRepository);
     bookAccessService = module.get<EmailBookAccessService>(EmailBookAccessService);
+    preferences = module.get<EmailPreferencesRepository>(EmailPreferencesRepository);
+    fileSelector = module.get<EmailFileSelector>(EmailFileSelector);
   });
 
   describe('findAll', () => {
@@ -149,15 +160,14 @@ describe('EmailTemplateService', () => {
   describe('setDefault', () => {
     it('should set owned template as default', async () => {
       const result = await service.setDefault(10, mockUser);
-      expect(repo.setDefault).toHaveBeenCalledWith(10, 1);
+      expect(preferences.setDefaults).toHaveBeenCalledWith(1, { defaultTemplateId: 10 });
       expect(result.id).toBe(10);
     });
 
-    it('should allow system template as default without database update', async () => {
+    it('records the built-in template as the default in preferences', async () => {
       (repo.findById as vi.Mock).mockResolvedValue([mockSystemTemplate]);
       const result = await service.setDefault(20, mockUser);
-      expect(repo.clearDefault).toHaveBeenCalledWith(1);
-      expect(repo.setDefault).not.toHaveBeenCalled();
+      expect(preferences.setDefaults).toHaveBeenCalledWith(1, { defaultTemplateId: 20 });
       expect(result.id).toBe(20);
     });
   });
@@ -176,6 +186,39 @@ describe('EmailTemplateService', () => {
       (bookAccessService.assertUserCanAccessBook as vi.Mock).mockRejectedValue(new ForbiddenException('No access to this library'));
 
       await expect(service.preview(10, 1, 100, mockUser)).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('previewText', () => {
+    it('renders unsaved text against the edition a send would pick', async () => {
+      const contextService = (service as any).contextService;
+      (contextService.buildForBook as vi.Mock).mockResolvedValue({ title: 'Verity', format: 'EPUB' });
+
+      const result = await service.previewText('Book club: {{title}}', 'The {{format}} is attached.', 7, mockUser);
+
+      expect(fileSelector.select).toHaveBeenCalledWith(7, null, null);
+      expect(contextService.buildForBook).toHaveBeenCalledWith(7, 500, mockUser.name);
+      expect(result).toEqual({
+        subject: 'Book club: Verity',
+        bodyText: 'The EPUB is attached.',
+        attachment: { fileName: 'Verity (2021).epub', format: 'epub', sizeBytes: 708549 },
+      });
+    });
+
+    it('still renders when the book has no sendable file', async () => {
+      const contextService = (service as any).contextService;
+      (contextService.buildForBook as vi.Mock).mockResolvedValue({ title: 'Verity' });
+      (fileSelector.select as vi.Mock).mockRejectedValue(new NotFoundException('No files found for this book'));
+
+      const result = await service.previewText('{{title}}', '', 7, mockUser);
+
+      expect(contextService.buildForBook).toHaveBeenCalledWith(7, null, mockUser.name);
+      expect(result.attachment).toBeNull();
+    });
+
+    it('checks book access before rendering', async () => {
+      (bookAccessService.assertUserCanAccessBook as vi.Mock).mockRejectedValue(new ForbiddenException('No access to this library'));
+      await expect(service.previewText('S', 'B', 7, mockUser)).rejects.toThrow(ForbiddenException);
     });
   });
 

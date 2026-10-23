@@ -2,7 +2,13 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
 
-import { DEFAULT_KOREADER_DEVICE_PATTERN, type KoreaderBookSyncInfo, type KoreaderDeviceInfo, type KoreaderSyncStatus } from '@bookorbit/types';
+import {
+  DEFAULT_KOREADER_DEVICE_PATTERN,
+  type ReadAloudDeliveryPreference,
+  type KoreaderBookSyncInfo,
+  type KoreaderDeviceInfo,
+  type KoreaderSyncStatus,
+} from '@bookorbit/types';
 import { StatsCache } from '../../common/cache/stats-cache';
 import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
@@ -31,6 +37,8 @@ const FILE_NAMING_CACHE_TTL_MS = 30_000;
 const FILE_NAMING_CACHE_MAX_ENTRIES = 5_000;
 const SHARED_PROGRESS_CONCURRENCY = 4;
 const CHAPTER_EXTRACTION_CONCURRENCY = 2;
+// Percentages from different readers disagree slightly about one place; only a clear lead counts.
+const LATE_PUSH_PERCENT_EPSILON = 0.05;
 const RESET_DEVICE = 'web';
 const RESET_DEVICE_ID = 'bookorbit-web';
 /** The start of a paged document, in the page-number form KOReader sends for those formats. */
@@ -51,11 +59,12 @@ export interface KoreaderProgressBookFile {
   bookId: number;
   libraryId: number;
   format: string | null;
+  progressCompatible?: boolean;
 }
 
 /** What one applied sync push changed, for callers that have to reason about the move it made. */
 export interface KoreaderProgressApplyResult {
-  /** Whether shared reading progress moved; false when the push was held behind a reset. */
+  /** Whether shared reading progress moved; false for stale pushes or pending reset holds. */
   shared: boolean;
   /** BookOrbit-scale position held before this push, across every device of this user. */
   previousPercentage: number | null;
@@ -66,6 +75,11 @@ export interface BulkProgressEntry {
   percentage: number;
   progress?: string;
   timestamp?: number;
+}
+
+function progressTimestamp(timestamp: number | null | undefined, receivedAt = new Date()): number {
+  const receivedSeconds = Math.floor(receivedAt.getTime() / 1000);
+  return Math.min(timestamp ?? receivedSeconds, receivedSeconds);
 }
 
 @Injectable()
@@ -84,7 +98,7 @@ export class KoreaderService {
     private readonly packageService: KoreaderPackageService,
   ) {}
 
-  async createCredentials(userId: number, username: string, password: string) {
+  async createCredentials(userId: number, username: string, password: string, readAloudDelivery?: ReadAloudDeliveryPreference) {
     this.logger.log(`[${CREDENTIALS_EVENT}] [start] userId=${userId} username=${username} - creating credentials`);
 
     const existing = await this.repo.findKoreaderUser(userId);
@@ -96,12 +110,27 @@ export class KoreaderService {
     const passwordHash = await bcryptHash(password, BCRYPT_ROUNDS);
     const passwordMd5 = createHash('md5').update(password).digest('hex');
 
-    const result = await this.repo.createKoreaderUser({ userId, username, passwordHash, passwordMd5 });
+    const result = await this.repo.createKoreaderUser({
+      userId,
+      username,
+      passwordHash,
+      passwordMd5,
+      ...(readAloudDelivery !== undefined ? { readAloudDelivery } : {}),
+    });
     this.logger.log(`[${CREDENTIALS_EVENT}] [end] userId=${userId} username=${username} - credentials created`);
     return result;
   }
 
-  async updateCredentials(userId: number, data: { username?: string; password?: string; syncEnabled?: boolean }) {
+  async updateCredentials(
+    userId: number,
+    data: {
+      username?: string;
+      password?: string;
+      syncEnabled?: boolean;
+      hideAudioOnlyBooks?: boolean;
+      readAloudDelivery?: ReadAloudDeliveryPreference;
+    },
+  ) {
     this.logger.log(`[${CREDENTIALS_EVENT}] [start] userId=${userId} - updating credentials`);
 
     const existing = await this.repo.findKoreaderUser(userId);
@@ -120,9 +149,13 @@ export class KoreaderService {
       updatePayload.passwordMd5 = createHash('md5').update(data.password).digest('hex');
     }
 
+    if (data.readAloudDelivery !== undefined) updatePayload.readAloudDelivery = data.readAloudDelivery;
+
     if (data.syncEnabled !== undefined) {
       updatePayload.syncEnabled = data.syncEnabled;
     }
+
+    if (data.hideAudioOnlyBooks !== undefined) updatePayload.hideAudioOnlyBooks = data.hideAudioOnlyBooks;
 
     if (Object.keys(updatePayload).length > 0) {
       await this.repo.updateKoreaderUser(userId, updatePayload as Parameters<typeof this.repo.updateKoreaderUser>[1]);
@@ -141,7 +174,18 @@ export class KoreaderService {
   async getCredentials(userId: number) {
     const row = await this.repo.findKoreaderUser(userId);
     if (!row) return null;
-    return { username: row.username, syncEnabled: row.syncEnabled, createdAt: row.createdAt.toISOString() };
+    return {
+      username: row.username,
+      syncEnabled: row.syncEnabled,
+      hideAudioOnlyBooks: row.hideAudioOnlyBooks,
+      createdAt: row.createdAt.toISOString(),
+      readAloudDelivery: row.readAloudDelivery ?? null,
+    };
+  }
+
+  /** Whether the plugin catalog leaves out audiobook-only books for this reader. Defaults to hiding them. */
+  async hidesAudioOnlyBooks(userId: number): Promise<boolean> {
+    return (await this.repo.findKoreaderCatalogPreferences(userId))?.hideAudioOnlyBooks ?? true;
   }
 
   async testConnection(userId: number, username: string, password: string): Promise<boolean> {
@@ -197,13 +241,28 @@ export class KoreaderService {
     data: { percentage: number; progress?: string; device: string; deviceId: string; timestamp?: number },
     options?: { skipSharedProgress?: boolean; timeZone?: string },
   ): Promise<KoreaderProgressApplyResult> {
+    data = {
+      ...data,
+      ...(bookFile.progressCompatible === false ? { progress: undefined } : {}),
+      timestamp: data.timestamp == null ? undefined : progressTimestamp(data.timestamp),
+    };
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
-    const previousDeviceProgress = await this.repo.getLatestDeviceProgress(bookFile.id, userId);
+    const [previousDeviceProgress, readingProgress] = await Promise.all([
+      this.repo.getLatestDeviceProgress(bookFile.id, userId),
+      this.repo.getReadingProgress(bookFile.id, userId),
+    ]);
     const result: KoreaderProgressApplyResult = {
       shared: false,
       previousPercentage: previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null,
     };
+
+    const newestKnown = Math.max(
+      previousDeviceProgress ? progressTimestamp(previousDeviceProgress.syncTimestamp, previousDeviceProgress.updatedAt) : 0,
+      Math.floor((readingProgress?.updatedAt?.getTime() ?? 0) / 1000),
+    );
+    const late = data.timestamp != null && data.timestamp < newestKnown;
+    if (late && !(await this.reachesFurther(bookFile, data, readingProgress, previousDeviceProgress?.percentage ?? null))) return result;
 
     this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
 
@@ -226,9 +285,31 @@ export class KoreaderService {
 
     if (!(await this.resolveResetHold(userId, bookFile, data))) return result;
 
-    await this.applySharedProgress(userId, bookFile, data, result.previousPercentage, options?.timeZone);
+    await this.applySharedProgress(userId, bookFile, data, result.previousPercentage, options?.timeZone, late);
     result.shared = true;
     return result;
+  }
+
+  /**
+   * Whether a push that arrived after newer writes still carries the furthest reading. A book
+   * closed offline is pushed on reconnection stamped with when it was closed, and anything done
+   * elsewhere meanwhile, listening on a phone included, made that reading look stale. Only a
+   * place past the shared one is taken; a late push that lands behind it is still dropped.
+   */
+  private async reachesFurther(
+    bookFile: KoreaderProgressBookFile,
+    data: { percentage: number; progress?: string },
+    shared: { cfi: string | null; percentage: number } | null,
+    devicePercentage: number | null,
+  ): Promise<boolean> {
+    if (shared?.cfi && data.progress && !isPagedReadingFormat(bookFile.format)) {
+      const cfi = await this.convertProgressToCfi(bookFile.id, data.progress);
+      const order = cfi ? this.positionConverter.compareCfi(cfi, shared.cfi) : null;
+      if (order !== null) return order > 0;
+    }
+    const baseline = shared?.percentage ?? (devicePercentage != null ? toBookorbitPercentage(devicePercentage) : null);
+    if (baseline == null) return false;
+    return toBookorbitPercentage(data.percentage) > baseline + LATE_PUSH_PERCENT_EPSILON;
   }
 
   /**
@@ -280,9 +361,8 @@ export class KoreaderService {
    * statement, and runs the remaining per-book work under bounded concurrency.
    *
    * A sweep can carry a stale sidecar position from a secondary device (book last opened
-   * there long ago). The per-device row is recorded regardless, but the shared
-   * reading_progress and status updates are skipped when something newer is already
-   * known server-side.
+   * there long ago). Stale entries leave both device pull state and shared progress
+   * unchanged when something newer is already known server-side.
    */
   async applyBulkProgress(
     userId: number,
@@ -308,7 +388,7 @@ export class KoreaderService {
       let otherDevicesNewest = 0;
       let ownDeviceNewest = 0;
       for (const row of rows) {
-        const rowSeconds = row.syncTimestamp ?? Math.floor((row.updatedAt?.getTime() ?? 0) / 1000);
+        const rowSeconds = progressTimestamp(row.syncTimestamp, row.updatedAt);
         if (row.device === device.device && row.deviceId === device.deviceId) ownDeviceNewest = Math.max(ownDeviceNewest, rowSeconds);
         else otherDevicesNewest = Math.max(otherDevicesNewest, rowSeconds);
       }
@@ -317,20 +397,28 @@ export class KoreaderService {
       fileStates.set(bookFileId, { otherDevicesNewest, ownDeviceNewest, latestPercentage: rows[0]?.percentage ?? null });
     }
 
-    const plans = entries.map((entry) => {
+    const plans = entries.map((input) => {
+      const entry = {
+        ...input,
+        ...(input.bookFile.progressCompatible === false ? { progress: undefined } : {}),
+        timestamp: input.timestamp == null ? undefined : progressTimestamp(input.timestamp, appliedAt),
+      };
       const state = fileStates.get(entry.bookFile.id)!;
       const newestKnown = Math.max(state.otherDevicesNewest, state.ownDeviceNewest);
-      const stale = entry.timestamp ? entry.timestamp < newestKnown : false;
+      const stale = entry.timestamp != null && entry.timestamp < newestKnown;
       const previousPercentage = state.latestPercentage != null ? toBookorbitPercentage(state.latestPercentage) : null;
       // Mirror the row this batch is about to write, so a later entry for the same file
       // sees what a sequential apply would have seen.
-      state.ownDeviceNewest = entry.timestamp ?? appliedAtSeconds;
-      state.latestPercentage = entry.percentage;
+      if (!stale) {
+        state.ownDeviceNewest = entry.timestamp ?? appliedAtSeconds;
+        state.latestPercentage = entry.percentage;
+      }
       return { entry, stale, previousPercentage, heldByReset: false };
     });
 
     const deviceUpserts = new Map<number, DeviceProgressUpsert>();
-    for (const { entry } of plans) {
+    for (const { entry, stale } of plans) {
+      if (stale) continue;
       deviceUpserts.set(entry.bookFile.id, {
         bookFileId: entry.bookFile.id,
         userId,
@@ -342,7 +430,7 @@ export class KoreaderService {
         syncTimestamp: entry.timestamp ?? null,
       });
     }
-    await this.repo.upsertDeviceProgressMany([...deviceUpserts.values()], appliedAt);
+    if (deviceUpserts.size > 0) await this.repo.upsertDeviceProgressMany([...deviceUpserts.values()], appliedAt);
     await this.repo.restoreDevice(userId, device.deviceId);
 
     // A sweep carries the device's whole shelf, so a book the user reset in BookOrbit shows up
@@ -409,6 +497,7 @@ export class KoreaderService {
     data: { percentage: number; progress?: string; timestamp?: number },
     previousPercentage: number | null,
     timeZone?: string,
+    late = false,
   ) {
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
     // KOReader reports a paged document's position as a page number and a reflowable one's as
@@ -417,6 +506,7 @@ export class KoreaderService {
     const paged = isPagedReadingFormat(bookFile.format);
     const cfi = !paged && data.progress ? await this.convertProgressToCfi(bookFile.id, data.progress) : null;
     const pageNumber = paged ? parseKoreaderPageNumber(data.progress) : null;
+    const readAt = data.timestamp ? new Date(data.timestamp * 1000) : new Date();
     await this.repo.upsertReadingProgress({
       bookFileId: bookFile.id,
       userId,
@@ -424,13 +514,18 @@ export class KoreaderService {
       cfi,
       xpointer: data.progress ?? null,
       pageNumber,
+      // A late push moves the page now, which is what other clients need to see; the narration
+      // below and last-read ordering still judge it by when it was read, so newer listening
+      // keeps its marker.
+      readAt: late ? new Date() : readAt,
+      lastReadAt: readAt,
     });
     await this.bookService.syncKoboReadingStateForExternalProgress(userId, bookFile.id, bookorbitPercentage).catch(() => undefined);
     await this.bookService
       .syncAudioProgressForExternalEbookProgress(userId, bookFile.bookId, bookFile.id, bookorbitPercentage, {
         cfi,
         koreaderProgress: data.progress ?? null,
-        sourceUpdatedAt: data.timestamp ? new Date(data.timestamp * 1000) : undefined,
+        sourceUpdatedAt: readAt,
       })
       .catch(() => undefined);
     const strongRereadEvidence = previousPercentage !== null && previousPercentage - bookorbitPercentage >= 10;
@@ -507,19 +602,36 @@ export class KoreaderService {
       return {
         document: documentHash,
         percentage: latestDevice.percentage,
-        progress: latestDevice.progress ?? '',
+        progress: bookFile.progressCompatible === false ? null : (latestDevice.progress ?? ''),
         device: latestDevice.device,
         device_id: latestDevice.deviceId,
-        timestamp: latestDevice.syncTimestamp ?? Math.floor(deviceTime / 1000),
+        timestamp: progressTimestamp(latestDevice.syncTimestamp, latestDevice.updatedAt),
       };
     }
 
     if (readingProg) {
-      let xpointer = readingProg.koreaderProgress ?? null;
-      if (!xpointer && readingProg.cfi) {
-        const chapterIndex = this.chapterService.parseChapterIndexFromCfi(readingProg.cfi);
-        if (chapterIndex !== null && chapterIndex >= 0) {
-          xpointer = `/body/DocFragment[${chapterIndex + 1}]/body`;
+      let xpointer = bookFile.progressCompatible === false ? null : (readingProg.koreaderProgress ?? null);
+      const paged = isPagedReadingFormat(bookFile.format);
+      // A BookOrbit client write clears koreaderProgress for a paged file and keeps only the
+      // page, so the page is what KOReader has to be sent back, in the form it reports itself.
+      if (
+        bookFile.progressCompatible !== false &&
+        paged &&
+        parseKoreaderPageNumber(xpointer) === null &&
+        isServablePageNumber(readingProg.pageNumber)
+      ) {
+        xpointer = String(readingProg.pageNumber);
+      }
+      if (bookFile.progressCompatible !== false && !xpointer && readingProg.cfi && !paged) {
+        const startedAt = Date.now();
+        try {
+          const outcome = await this.positionConverter.cfiPointToXpointer({ bookFileId: bookFile.id, cfi: readingProg.cfi });
+          // A chapter start would override the percentage fallback and discard the text offset.
+          if (outcome.status !== 'failed' && outcome.pos0) xpointer = outcome.pos0;
+        } catch (error) {
+          this.logger.warn(
+            `[${SYNC_EVENT}] [fail] userId=${userId} bookFileId=${bookFile.id} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? sanitizeLogValue(error.name) : 'unknown'} - position conversion failed; serving percentage fallback`,
+          );
         }
       }
 
@@ -547,7 +659,15 @@ export class KoreaderService {
       this.packageService.getVersionInfo(),
       this.repo.listRetiredDeviceIds(userId),
     ]);
-    const devices = this.mapDevices(deviceRows, deviceSettings);
+    const deliveryRows = await this.repo.getDeviceDeliverySettingsForDevices(userId, [
+      ...deviceRows.map((row) => row.deviceId),
+      ...sweepRows.map((row) => row.deviceId),
+    ]);
+    const deliveryByDevice = new Map(deliveryRows.map((row) => [row.deviceId, row.readAloudDelivery]));
+    const devices = this.mapDevices(deviceRows, deviceSettings).map((device) => ({
+      ...device,
+      readAloudDelivery: deliveryByDevice.get(device.deviceId) ?? null,
+    }));
     // Rows are ordered newest first, so the first active device is the last sync that still counts.
     const lastSyncAt = devices.find((device) => device.retiredAt === null)?.lastSyncAt ?? null;
     const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
@@ -557,6 +677,7 @@ export class KoreaderService {
       return {
         deviceId: row.deviceId,
         deviceModel: row.deviceModel,
+        readAloudDelivery: deliveryByDevice.get(row.deviceId) ?? null,
         pluginVersion: row.pluginVersion,
         latestPluginVersion,
         updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
@@ -851,4 +972,8 @@ function toBookorbitPercentage(koreaderPct: number): number {
 
 function toKoreaderPercentage(bookorbitPct: number): number {
   return Math.round(bookorbitPct * 100) / 10000;
+}
+
+function isServablePageNumber(pageNumber: number | null | undefined): pageNumber is number {
+  return typeof pageNumber === 'number' && Number.isSafeInteger(pageNumber) && pageNumber >= 1;
 }

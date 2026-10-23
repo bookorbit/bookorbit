@@ -491,6 +491,37 @@ describe('useBookBulkActions', () => {
     expect(mocks.bumpVersion.mock.calls.filter((c) => c[0] === 20).length).toBe(1)
   })
 
+  it('sends the bulk metadata refresh body unchanged unless cached results are ignored', async () => {
+    mocks.api.mockResolvedValue(makeSseStream([`data: ${JSON.stringify({ done: true, processed: 0, failed: 0 })}`]))
+
+    const selectedIds = ref(new Set([10, 20]))
+    const { handleBulkRefreshMetadata } = useBookBulkActions(selectedIds, vi.fn())
+
+    await handleBulkRefreshMetadata()
+    await handleBulkRefreshMetadata({ ignoreCache: false })
+    await handleBulkRefreshMetadata({ ignoreCache: true })
+
+    const bodies = mocks.api.mock.calls
+      .filter(([url]) => url === '/api/v1/books/bulk-refresh-metadata')
+      .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>)
+    expect(bodies).toEqual([{ bookIds: [10, 20] }, { bookIds: [10, 20] }, { bookIds: [10, 20], ignoreCache: true }])
+  })
+
+  it('adds ignoreCache to a query-scoped bulk metadata refresh only when asked', async () => {
+    mocks.api.mockResolvedValue(makeSseStream([`data: ${JSON.stringify({ done: true, processed: 0, failed: 0 })}`]))
+
+    const querySelection = ref<QuerySelectionState | null>(makeQuerySelection())
+    const { handleBulkRefreshMetadata } = useBookBulkActions(ref(new Set<number>()), vi.fn(), undefined, undefined, querySelection)
+
+    await handleBulkRefreshMetadata({ ignoreCache: true })
+
+    const [, init] = mocks.api.mock.calls.find(([url]) => url === '/api/v1/books/bulk-refresh-metadata')!
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>
+    expect(body).toHaveProperty('query')
+    expect(body).not.toHaveProperty('bookIds')
+    expect(body.ignoreCache).toBe(true)
+  })
+
   it('does not bump for query-selection books that received no SSE event', async () => {
     mocks.api.mockResolvedValue(
       makeSseStream([`data: ${JSON.stringify({ bookId: 42, success: true })}`, `data: ${JSON.stringify({ done: true, processed: 1, failed: 0 })}`]),

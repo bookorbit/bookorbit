@@ -19,6 +19,10 @@ export interface EmailProvider {
   isSystemProvider: boolean
   hasPassword: boolean
   createdAt: string
+  /** Set by the last connection test; absent on a server that predates them. */
+  lastTestedAt?: string | null
+  lastTestOk?: boolean | null
+  lastTestError?: string | null
 }
 
 export interface EmailProviderForm {
@@ -111,7 +115,13 @@ export function useEmailProviders() {
   async function testProvider(id: number): Promise<{ success: boolean; error?: string }> {
     const res = await api(`/api/v1/email/providers/${id}/test`, { method: 'POST' })
     if (!res.ok) throw new Error('Failed to test connection')
-    return res.json()
+    const result: { success: boolean; error?: string } = await res.json()
+    // The server keeps the outcome on the row; mirror it so the page shows it without a refetch.
+    const lastTestedAt = new Date().toISOString()
+    providers.value = providers.value.map((p) =>
+      p.id === id ? { ...p, lastTestedAt, lastTestOk: result.success, lastTestError: result.success ? null : (result.error ?? null) } : p,
+    )
+    return result
   }
 
   async function setSystemProvider(id: number): Promise<void> {

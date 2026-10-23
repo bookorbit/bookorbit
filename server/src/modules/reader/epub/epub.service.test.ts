@@ -1,15 +1,21 @@
 vi.mock('fs/promises', () => ({ stat: vi.fn() }));
 vi.mock('unzipper', () => ({ Open: { file: vi.fn() } }));
+vi.mock('./epub-zip-entry-stream', () => ({ openEpubZipEntryRange: vi.fn() }));
 
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { stat } from 'fs/promises';
 import { Readable } from 'stream';
 import * as unzipper from 'unzipper';
 
-import { EpubService } from './epub.service';
+import { EpubService, chapterTitleForHref } from './epub.service';
+import { openEpubZipEntryRange } from './epub-zip-entry-stream';
+import { BookReadService } from '../../book/book-read.service';
+import { LibraryService } from '../../library/library.service';
 
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockOpenFile = (unzipper as any).Open.file as vi.Mock;
+const mockOpenRange = openEpubZipEntryRange as MockedFunction<typeof openEpubZipEntryRange>;
 
 interface ZipEntrySpec {
   path: string;
@@ -158,18 +164,30 @@ const SMIL_XML = `
 </smil>
 `;
 
-function makeMediaOverlayArchive(smil = SMIL_XML) {
+function makeMediaOverlayArchive(
+  smil = SMIL_XML,
+  audioEntries: ZipEntrySpec[] = [{ path: 'OPS/audio/ch1.mp3', content: Buffer.from('0123456789') }],
+) {
   return makeArchive([
     { path: 'META-INF/container.xml', content: CONTAINER_XML },
     { path: 'OPS/content.opf', content: OPF_MEDIA_OVERLAY_XML },
     { path: 'OPS/nav.xhtml', content: NAV_XHTML },
     { path: 'OPS/text/ch1.xhtml', content: '<h1>ch1</h1>' },
     { path: 'OPS/smil/ch1.smil', content: smil },
-    { path: 'OPS/audio/ch1.mp3', content: Buffer.from('0123456789') },
+    ...audioEntries,
   ]);
 }
 
-function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?: boolean; lowerCasePaths?: boolean }) {
+/** An overlay whose audio file is named by `href`, written into the OPF and the SMIL as given. */
+function makeNamedAudioArchive(href: string, audioEntries: ZipEntrySpec[]) {
+  const archive = makeMediaOverlayArchive(SMIL_XML.replaceAll('../audio/ch1.mp3', `../${href}`), audioEntries);
+  const opf = OPF_MEDIA_OVERLAY_XML.replace('href="audio/ch1.mp3"', `href="${href}"`);
+  const opfEntry = archive.files.find((file) => file.path === 'OPS/content.opf')!;
+  opfEntry.buffer.mockResolvedValue(Buffer.from(opf));
+  return archive;
+}
+
+function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?: boolean; lowerCasePaths?: boolean; opf?: string }) {
   const lower = options?.lowerCasePaths === true;
   const ops = lower ? 'ops' : 'OPS';
   const navSpec: ZipEntrySpec = options?.navBufferError
@@ -178,7 +196,7 @@ function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?:
 
   return makeArchive([
     { path: 'META-INF/container.xml', content: CONTAINER_XML },
-    { path: `${ops}/content.opf`, content: OPF_XML },
+    { path: `${ops}/content.opf`, content: options?.opf ?? OPF_XML },
     navSpec,
     { path: `${ops}/toc.ncx`, content: NCX_XML },
     ...(options?.omitChapterFile
@@ -203,13 +221,76 @@ describe('EpubService', () => {
   };
   let service: EpubService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
-    service = new EpubService(bookReadService as any, libraryService as any);
+    const module = await Test.createTestingModule({
+      providers: [EpubService, { provide: BookReadService, useValue: bookReadService }, { provide: LibraryService, useValue: libraryService }],
+    }).compile();
+    service = module.get(EpubService);
     bookReadService.findLibraryIdByBookId.mockResolvedValue(3);
     bookReadService.findPrimaryFilesByBookIds.mockResolvedValue([{ format: 'epub', absolutePath: '/books/book.epub', sizeBytes: null }]);
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
     mockStat.mockResolvedValue({ mtimeMs: 100 } as Awaited<ReturnType<typeof stat>>);
+    mockOpenRange.mockImplementation(async (_path, entry, start, end) => Readable.from([(await entry.buffer()).subarray(start, end + 1)]));
+  });
+
+  it.each([
+    { name: 'the reported opf:metadata declaration', prefix: '', metadataPrefix: 'opf', dcPrefix: 'dc' },
+    { name: 'an arbitrary metadata prefix', prefix: '', metadataPrefix: 'publication', dcPrefix: 'dc' },
+    { name: 'fully prefixed package elements', prefix: 'opf', metadataPrefix: 'opf', dcPrefix: 'dc' },
+    { name: 'arbitrary OPF and Dublin Core prefixes', prefix: 'publication', metadataPrefix: 'publication', dcPrefix: 'bibliography' },
+    { name: 'an unprefixed package with a default namespace', prefix: '', metadataPrefix: '', dcPrefix: 'dc' },
+  ])('preserves metadata, cover, manifest and spine with $name', async ({ prefix, metadataPrefix, dcPrefix }) => {
+    const qualify = (name: string, nsPrefix: string) => (nsPrefix ? `${nsPrefix}:${name}` : name);
+    const opf = OPF_XML.replace('<package version="3.0">', '<package xmlns="http://www.idpf.org/2007/opf" version="2.0">')
+      .replaceAll('<metadata ', `<metadata xmlns:${metadataPrefix || 'opf'}="http://www.idpf.org/2007/opf" `)
+      .replaceAll('xmlns:dc=', `xmlns:${dcPrefix}=`)
+      .replaceAll('dc:', `${dcPrefix}:`)
+      .replaceAll('<dc:language>en</dc:language>'.replaceAll('dc:', `${dcPrefix}:`), `<${dcPrefix}:language>pt</${dcPrefix}:language>`)
+      .replace(
+        /<(\/?)(package|metadata|manifest|item|spine|itemref|meta)(?=[\s>])/g,
+        (_, closing: string, name: string) => `<${closing}${qualify(name, name === 'metadata' ? metadataPrefix : prefix)}`,
+      )
+      .replace('version="2.0"', `xmlns:${prefix || 'opf'}="http://www.idpf.org/2007/opf" version="2.0"`);
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive({ opf }) as any);
+
+    const info = await service.getBookInfo(99, undefined, user);
+
+    expect(info.metadata).toEqual({
+      title: 'Reader Test',
+      creator: 'Jane Doe',
+      language: 'pt',
+      publisher: 'Acme',
+      description: 'A sample EPUB',
+      identifier: 'book-1',
+    });
+    expect(info.coverPath).toBe('OPS/images/cover.jpg');
+    expect(info.manifest).toHaveLength(6);
+    expect(info.spine.map((item) => item.idref)).toEqual(['chap1', 'chap2']);
+    expect(info.spine[1].linear).toBe(false);
+    expect(info.toc?.children?.[0].label).toBe('Chapter 1');
+  });
+
+  it('resolves namespace declarations on each element without accepting foreign metadata or prefix rebinding', async () => {
+    const opf = OPF_XML.replace(
+      '<package version="3.0">',
+      '<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="urn:foreign" version="3.0">' +
+        '<metadata xmlns="urn:foreign"><dc:language>de</dc:language></metadata>',
+    )
+      .replace(
+        '<dc:title>',
+        '<dc:title xmlns:dc="urn:foreign">Foreign title</dc:title><bibliography:title xmlns:bibliography="http://purl.org/dc/elements/1.1/">',
+      )
+      .replace('</dc:title>\n', '</bibliography:title>\n')
+      .replace('<dc:language>en</dc:language>', '<language xmlns="http://purl.org/dc/elements/1.1/">pt-BR</language>')
+      .replace('<dc:identifier>book-1</dc:identifier>', '<dc:identifier>0000123</dc:identifier>');
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive({ opf }) as any);
+
+    const info = await service.getBookInfo(99, undefined, user);
+
+    expect(info.metadata).toMatchObject({ title: 'Reader Test', creator: 'Jane Doe', language: 'pt-BR', identifier: '0000123' });
+    expect(info.coverPath).toBe('OPS/images/cover.jpg');
+    expect(info.spine).toHaveLength(2);
   });
 
   it('parses EPUB metadata, spine, TOC, and optional META-INF files', async () => {
@@ -360,7 +441,93 @@ describe('EpubService', () => {
     expect(result.status).toBe(206);
     expect(result.contentRange).toBe('bytes 2-5/10');
     expect(result.contentType).toBe('audio/mpeg');
-    expect(result.data).toEqual(Buffer.from('2345'));
+    expect(result.size).toBe(10);
+    expect(result.length).toBe(4);
+    expect(mockOpenRange).toHaveBeenCalledWith('/books/book.epub', expect.objectContaining({ path: 'OPS/audio/ch1.mp3' }), 2, 5);
+    expect(await readStream(result.body as Readable)).toEqual(Buffer.from('2345'));
+  });
+
+  it('reads the audio as a stream rather than buffering the whole entry', async () => {
+    const archive = makeMediaOverlayArchive();
+    mockOpenFile.mockImplementation(() => Promise.resolve(archive as any));
+    mockOpenRange.mockResolvedValue(Readable.from([Buffer.from('0123456789')]));
+
+    const result = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, undefined, user);
+
+    expect(result.status).toBe(200);
+    expect(result.contentRange).toBeNull();
+    expect(result.length).toBe(10);
+    expect(mockOpenRange).toHaveBeenCalledWith('/books/book.epub', expect.objectContaining({ path: 'OPS/audio/ch1.mp3' }), 0, 9);
+    expect(archive.files.find((file) => file.path === 'OPS/audio/ch1.mp3')!.buffer).not.toHaveBeenCalled();
+  });
+
+  it('matches the requested path to the playlist exactly as the router decoded it', async () => {
+    mockOpenFile.mockImplementation(() =>
+      Promise.resolve(makeNamedAudioArchive('audio/50%25%20off.mp3', [{ path: 'OPS/audio/50% off.mp3', content: 'percent' }]) as any),
+    );
+
+    const playlist = await service.getMediaOverlayPlaylist(99, undefined, user);
+    const result = await service.streamMediaOverlayFile(99, 'OPS/audio/50% off.mp3', undefined, undefined, user);
+
+    expect(playlist.resources).toEqual([{ href: 'OPS/audio/50% off.mp3', mediaType: 'audio/mpeg', size: 7 }]);
+    expect(await readStream(result.body as Readable)).toEqual(Buffer.from('percent'));
+    // Decoding the request again is what let an escaped spelling of the name through.
+    await expect(service.streamMediaOverlayFile(99, 'OPS/audio/50%25%20off.mp3', undefined, undefined, user)).rejects.toThrow(NotFoundException);
+  });
+
+  it('serves the entry named by the href over one whose literal escape decodes to it', async () => {
+    mockOpenFile.mockImplementation(() =>
+      Promise.resolve(
+        makeNamedAudioArchive('audio/track%201.mp3', [
+          { path: 'OPS/audio/track%201.mp3', content: 'literal escape' },
+          { path: 'OPS/audio/track 1.mp3', content: 'space' },
+        ]) as any,
+      ),
+    );
+
+    const playlist = await service.getMediaOverlayPlaylist(99, undefined, user);
+    const result = await service.streamMediaOverlayFile(99, 'OPS/audio/track 1.mp3', undefined, undefined, user);
+
+    expect(playlist.resources).toEqual([{ href: 'OPS/audio/track 1.mp3', mediaType: 'audio/mpeg', size: 5 }]);
+    expect(result.size).toBe(5);
+    expect(await readStream(result.body as Readable)).toEqual(Buffer.from('space'));
+  });
+
+  // A player asks for many ranges of one clip. Each used to parse every SMIL in the book again.
+  it('builds the playlist once for every range of a clip', async () => {
+    mockOpenFile.mockImplementation(() => Promise.resolve(makeMediaOverlayArchive() as any));
+
+    await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=0-1', user);
+    const opensForFirst = mockOpenFile.mock.calls.length;
+    const second = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=2-3', user);
+
+    expect(mockOpenFile.mock.calls.length - opensForFirst).toBe(1);
+    expect(await readStream(second.body as Readable)).toEqual(Buffer.from('23'));
+  });
+
+  it('answers a range past the end with 416 and ignores a header it cannot read', async () => {
+    mockOpenFile.mockImplementation(() => Promise.resolve(makeMediaOverlayArchive() as any));
+
+    const beyond = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=20-30', user);
+    expect(beyond.status).toBe(416);
+    expect(beyond.contentRange).toBe('bytes */10');
+    expect(beyond.length).toBe(0);
+    expect(beyond.body).toEqual(Buffer.alloc(0));
+
+    const openPastEnd = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=10-', user);
+    expect(openPastEnd.status).toBe(416);
+    expect(openPastEnd.contentRange).toBe('bytes */10');
+
+    const openTail = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=7-', user);
+    expect(openTail.status).toBe(206);
+    expect(openTail.contentRange).toBe('bytes 7-9/10');
+    expect(await readStream(openTail.body as Readable)).toEqual(Buffer.from('789'));
+
+    const unreadable = await service.streamMediaOverlayFile(99, 'OPS/audio/ch1.mp3', undefined, 'bytes=abc', user);
+    expect(unreadable.status).toBe(200);
+    expect(unreadable.contentRange).toBeNull();
+    expect(unreadable.length).toBe(10);
+    expect(await readStream(unreadable.body as Readable)).toEqual(Buffer.from('0123456789'));
   });
 
   it('rejects media-overlay file requests for non-playlist resources', async () => {
@@ -492,5 +659,40 @@ describe('EpubService', () => {
 
     expect(cache.size).toBe(49);
     expect(cache.has('book-0')).toBe(false);
+  });
+});
+
+describe('chapterTitleForHref', () => {
+  const spine = ['OEBPS/part-1.html', 'OEBPS/part-1-text.html', 'OEBPS/part-2.html', 'OEBPS/part-2-text.html', 'OEBPS/notes.html'].map(
+    (href, index) => ({ idref: `s${index}`, href, mediaType: 'application/xhtml+xml', linear: true }),
+  );
+  const toc = {
+    label: 'Table of Contents',
+    children: [
+      { label: 'part 1', href: 'OEBPS/part-1.html' },
+      {
+        label: 'part 2',
+        href: 'OEBPS/part-2.html',
+        children: [
+          { label: 'A letter', href: 'OEBPS/part-2-text.html#letter-1' },
+          { label: 'Another letter', href: 'OEBPS/part-2-text.html#letter-2' },
+        ],
+      },
+    ],
+  };
+
+  it('names a file the contents does not list by the nearest entry before it', () => {
+    expect(chapterTitleForHref({ spine, toc }, 'part-1-text.html')).toBe('part 1');
+    expect(chapterTitleForHref({ spine, toc }, 'OEBPS/notes.html')).toBe('Another letter');
+  });
+
+  it('uses the first entry of a listed file, matching a path relative to the package', () => {
+    expect(chapterTitleForHref({ spine, toc }, 'part-2-text.html')).toBe('A letter');
+    expect(chapterTitleForHref({ spine, toc }, 'part-2.html#top')).toBe('part 2');
+  });
+
+  it('gives nothing for a file outside the spine or a book without contents', () => {
+    expect(chapterTitleForHref({ spine, toc }, 'OEBPS/missing.html')).toBeNull();
+    expect(chapterTitleForHref({ spine, toc: null }, 'part-1-text.html')).toBeNull();
   });
 });

@@ -147,12 +147,12 @@ function handleSelectFieldRules() {
       </Popover>
     </div>
 
-    <div class="flex flex-wrap gap-1.5" role="group" :aria-label="t('book.detail.editMetadata.match.sources.heading')">
+    <div class="flex flex-wrap gap-1" role="group" :aria-label="t('book.detail.editMetadata.match.sources.heading')">
       <button
         v-for="provider in providers"
         :key="provider.key"
         type="button"
-        class="inline-flex h-[26px] items-center gap-1.5 rounded-full border ps-2.5 pe-1.5 text-xs font-medium transition-colors"
+        class="inline-flex h-[22px] items-center gap-1 rounded-full border ps-2 pe-1 text-[11px] font-medium transition-colors"
         :class="[
           isOn(provider.key) ? 'border-transparent' : 'border-border text-foreground hover:bg-muted',
           provider.selectedByFieldRules === false ? 'border-dashed' : '',
@@ -168,16 +168,16 @@ function handleSelectFieldRules() {
         @click="handleToggle(provider.key)"
       >
         <span
-          class="size-[7px] shrink-0 rounded-full"
+          class="size-1.5 shrink-0 rounded-full"
           :class="isOn(provider.key) ? '' : 'ring-[1.5px] ring-muted-foreground ring-inset'"
           :style="dotStyle(provider.key)"
         />
         {{ provider.label }}
-        <Loader2 v-if="statusOf(provider) === 'searching'" class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-        <span v-else-if="statusOf(provider) === 'stopped'" class="grid size-[18px] place-items-center rounded-full bg-warning/20 text-warning">
-          <TriangleAlert class="size-2.5" aria-hidden="true" />
+        <Loader2 v-if="statusOf(provider) === 'searching'" class="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        <span v-else-if="statusOf(provider) === 'stopped'" class="grid size-[15px] place-items-center rounded-full bg-warning/20 text-warning">
+          <TriangleAlert class="size-2" aria-hidden="true" />
         </span>
-        <span v-else class="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-current/15 px-1 text-[10.5px] font-bold tabular-nums">
+        <span v-else class="grid h-[15px] min-w-[15px] place-items-center rounded-full bg-current/15 px-1 text-[9.5px] font-bold tabular-nums">
           <span class="text-foreground">{{ providerCounts[provider.key] ?? 0 }}</span>
         </span>
       </button>

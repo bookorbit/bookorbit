@@ -3,22 +3,15 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { BookHeadphones, ChevronDown, Ellipsis, ExternalLink, EyeOff, FileText, Library, Loader2, Search, TriangleAlert, Users } from '@lucide/vue'
 import {
-  BookOpen,
-  ChevronDown,
-  Ellipsis,
-  ExternalLink,
-  EyeOff,
-  FileText,
-  Headphones,
-  Images,
-  Library,
-  Loader2,
-  Search,
-  TriangleAlert,
-  Users,
-} from '@lucide/vue'
-import { isBookRequestFulfiller, isFulfillableBookRequestStatus, isGrabbableBookRequestStatus, Permission } from '@bookorbit/types'
+  isBookRequestFulfiller,
+  isBookRequestMediaKind,
+  isFulfillableBookRequestStatus,
+  isGrabbableBookRequestStatus,
+  NO_RESOLVED_REQUEST_DESTINATION,
+  Permission,
+} from '@bookorbit/types'
 import type { BookCard, BookDockFile, BookRequestItem } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
@@ -32,6 +25,7 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { formatDateTime } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import RequestCover from './RequestCover.vue'
+import RequestPairSwitch from './RequestPairSwitch.vue'
 import ReleaseUnitChooser from './ReleaseUnitChooser.vue'
 import RequestReviewPanel from './RequestReviewPanel.vue'
 import RequestDownloadProgress from './RequestDownloadProgress.vue'
@@ -48,8 +42,12 @@ import { useFulfilmentPicker, type FulfilmentSource } from '../composables/useFu
 import { formatLanguageName } from '@/i18n/formatters'
 import { requestLanguageOptions, useRequestDestinationDefault } from '../composables/useRequestDestinationDefault'
 import { useRequestReview } from '../composables/useRequestReview'
+import { prefetchRequestAttempts } from '../composables/useRequestAttempts'
+import { prefetchSeedStatus } from '../composables/useRequestSeedStatus'
 import { REQUEST_DRAWER } from '../requestDrawerContext'
 import { canCancelRequest, canDeleteRequest, canDismissRequest, canLeaveRequest, cancelStopsATransfer } from '../requestActions'
+import { requestBookCoverSources } from '../requestBookCover'
+import { requestMediaIcon } from '../requestMedia'
 import { requestFailureText } from '../requestOutcome'
 import { localizedRequestActionFailure } from '../requestActionFailure'
 import { currentRequestProgress, requestPresentationStatus } from '../requestPipeline'
@@ -60,8 +58,6 @@ const router = useRouter()
 const { hasPermission } = usePermissions()
 const { user } = useAuth()
 const drawer = inject(REQUEST_DRAWER, null)
-
-const MEDIA_ICONS = { ebook: BookOpen, audiobook: Headphones, comic: Images } as const
 
 /** The same window the list behind the drawer collapses its own refreshes into. */
 const CHANGE_REFRESH_WINDOW_MS = 400
@@ -74,12 +70,21 @@ const CHANGE_REFRESH_WINDOW_MS = 400
 const canManageFn = () => hasPermission(Permission.ManageBookRequests)
 
 const { request, loading, error, fetchRequest, setRequest } = useBookRequestDetail()
+/**
+ * The other half of a pair, read on its own because it is its own request. Only kept when it
+ * really is this request's partner and the viewer may see it; anything else hides the switch.
+ */
+const companionDetail = useBookRequestDetail()
+const companion = computed(() => {
+  const other = companionDetail.request.value
+  return other && request.value && other.id === request.value.companionRequestId && other.companionRequestId === request.value.id ? other : null
+})
 const { libraries, fetchLibraries } = useLibraries()
 const { load: loadDefaultDestination, defaultFor: instanceDefaultFor, resolveDestination } = useRequestDestinationDefault()
 const { progressByRequest, onRequestsChanged, pruneSettledProgress } = useBookRequestProgress()
 const actions = useBookRequestActions(canManageFn)
 const picker = useFulfilmentPicker()
-const { review, fetchReview, reset: resetReview } = useRequestReview(canManageFn)
+const { review, coverUrl: reviewCoverUrl, fetchReview, reset: resetReview } = useRequestReview(canManageFn)
 
 const decisionNote = ref('')
 /**
@@ -111,8 +116,9 @@ const canFulfilThis = computed(
     (hasPermission(Permission.BookRequestSelfFulfill) && request.value != null && isBookRequestFulfiller(request.value, user.value?.id)),
 )
 const busy = computed(() => actions.isPending(request.value?.id))
-const mediaIcon = computed(() => (request.value ? (MEDIA_ICONS[request.value.mediaKind] ?? BookOpen) : BookOpen))
+const mediaIcon = computed(() => requestMediaIcon(request.value?.mediaKind ?? 'ebook'))
 const authorLine = computed(() => request.value?.authors.join(', ') ?? '')
+const bookCoverSources = computed(() => (request.value ? requestBookCoverSources(request.value) : []))
 /** Non-empty only while an attempt is held because its release turned out to hold several books. */
 const releaseUnits = computed(() => request.value?.download?.releaseUnits ?? [])
 const isHeld = computed(() => request.value?.status === 'needs_review')
@@ -122,7 +128,9 @@ const isHeld = computed(() => request.value?.status === 'needs_review')
  * stays. It also stays for every ordinary failure, which has no panel at all.
  */
 const failureText = computed(() => (request.value ? requestFailureText(request.value, (key, named) => t(key, named)) : null))
-const showFailureReason = computed(() => failureText.value != null && !(isHeld.value && review.value?.verification != null))
+const showFailureReason = computed(
+  () => failureText.value != null && !(isHeld.value && (review.value?.verification != null || review.value?.heldOnRequest === true)),
+)
 /** Only a request that stopped badly earns the destructive treatment; a hand-back is information. */
 const failureIsAlarming = computed(() => request.value?.status === 'failed' || request.value?.status === 'needs_review')
 /** Whoever is going to say it, the transfer line is not the one that should say it twice. */
@@ -146,6 +154,15 @@ const canDelete = computed(() => (request.value ? canDeleteRequest(request.value
 const canLeave = computed(() => (request.value ? canLeaveRequest(request.value, user.value?.id ?? null) : false))
 const hasMenuActions = computed(() => canDismiss.value || canLeave.value || canCancel.value || canDelete.value)
 const canApproveNow = computed(() => canDecide.value && !busy.value && targetLibraryId.value !== null)
+/** Both halves waiting on the same decision, which is the moment one press should cover both. */
+const canApproveBoth = computed(() => canApproveNow.value && companion.value?.status === 'pending' && !actions.isPending(companion.value.id))
+/** In a pair a bare "Approve" could mean either half, so it names the one this drawer is open on. */
+const approveLabel = computed(() => {
+  if (!companion.value) return t('bookRequests.actions.approve')
+  return request.value?.mediaKind === 'audiobook' ? t('bookRequests.actions.pair.approveAudiobook') : t('bookRequests.actions.pair.approveEbook')
+})
+/** A book on the shelf this request's files will join, said until they have. */
+const joinsBookId = computed(() => (request.value && request.value.status !== 'available' ? request.value.targetBookId : null))
 const showFooter = computed(() => canDecide.value || (canGrab.value && !showTransferRetry.value))
 
 const confirming = ref<'cancel' | 'cancelDownload' | 'delete' | 'leave' | 'discardImport' | null>(null)
@@ -185,6 +202,35 @@ onMounted(async () => {
   void syncReview()
 })
 
+/** The companion follows whichever half is open, and goes away when the open request has none. */
+watch(
+  () => request.value?.companionRequestId ?? null,
+  (companionId) => {
+    if (companionId === null) {
+      companionDetail.request.value = null
+      return
+    }
+    void companionDetail.fetchRequest(companionId, { background: companionDetail.request.value?.id === companionId })
+  },
+  { immediate: true },
+)
+
+/**
+ * Warms what the other half's drawer reads for itself, so the first switch to it shows its panels
+ * at once rather than each one loading in turn. Only for somebody who sees those panels at all.
+ */
+watch(
+  () => companion.value?.id ?? null,
+  (companionId) => {
+    const partner = companion.value
+    if (companionId === null || !partner || !canFulfilThis.value) return
+    void prefetchRequestAttempts(canManage.value, companionId)
+    // The same test the seed panel applies: only a torrent has a seed to read.
+    const source = partner.download?.source
+    if (source === 'magnet' || source === 'torrent_file') void prefetchSeedStatus(canManage.value, companionId)
+  },
+)
+
 /** Only a held request has anything to review, and only somebody who can file it may read it. */
 async function syncReview(): Promise<void> {
   if (!canFulfilThis.value || !isHeld.value || !request.value) {
@@ -217,6 +263,8 @@ onRequestsChanged(
   useCoalescedRefresh(() => {
     if (!Number.isInteger(requestId.value)) return
     void fetchRequest(requestId.value, { background: true }).then(syncReview)
+    const companionId = request.value?.companionRequestId
+    if (companionId != null) void companionDetail.fetchRequest(companionId, { background: true })
   }, CHANGE_REFRESH_WINDOW_MS),
 )
 
@@ -231,6 +279,21 @@ watch(requestId, async (id) => {
   picker.reset()
   decisionNote.value = ''
   resetReview()
+
+  // Switching between the halves of a pair: both are already loaded, so they trade places at once
+  // and are refreshed behind the scenes. Fetching from scratch blanked the drawer to a loading line
+  // on every switch.
+  const partner = companion.value
+  const previous = request.value
+  if (partner && previous && partner.id === id) {
+    setRequest(partner)
+    companionDetail.setRequest(previous)
+    resetDestination()
+    void syncReview()
+    void fetchRequest(id, { background: true }).then(syncReview)
+    return
+  }
+
   await fetchRequest(id)
   resetDestination()
   void syncReview()
@@ -243,7 +306,8 @@ watch(libraries, () => {
 
 /** What approving without touching this would do, which is the instance default for its medium. */
 const unpickedDestinationLabel = computed(() => {
-  const fallback = instanceDefaultFor(request.value?.mediaKind ?? 'ebook')
+  const kind = request.value?.mediaKind
+  const fallback = kind && isBookRequestMediaKind(kind) ? instanceDefaultFor(kind) : NO_RESOLVED_REQUEST_DESTINATION
   return fallback.libraryName === null
     ? t('bookRequests.detail.destinationLibraryPlaceholder')
     : t('bookRequests.search.libraryDefault', { library: fallback.libraryName })
@@ -369,6 +433,27 @@ async function handleLanguageChange(event: Event) {
 
 function handleApprove() {
   void approveRequest()
+}
+
+/**
+ * This half with the destination picked here, and its partner with its own: the two media are
+ * often filed into different libraries, so one choice must not be applied to both. The partner is
+ * approved second and reports its own refusal, since this half's approval already stands.
+ */
+async function handleApproveBoth() {
+  const partner = companion.value
+  if (!partner || !(await approveRequest())) return
+
+  const outcome = await actions.approve(partner.id, {})
+  if (!outcome.item) {
+    const localized = localizedRequestActionFailure(outcome)
+    const description = localized ? t(localized.key, localized.params) : outcome.reason
+    const failed =
+      partner.mediaKind === 'audiobook' ? 'bookRequests.errors.approveCompanionFailedAudiobook' : 'bookRequests.errors.approveCompanionFailedEbook'
+    toast.error(t(failed), description ? { description } : undefined)
+    return
+  }
+  companionDetail.setRequest(outcome.item)
 }
 
 /**
@@ -595,8 +680,16 @@ function dockFileMeta(file: BookDockFile): string {
       </div>
 
       <template v-else-if="request">
+        <RequestPairSwitch v-if="companion" :request="request" :companion="companion" :progress-by-request="progressByRequest" />
+
         <header class="flex items-start gap-4">
-          <RequestCover :src="request.coverUrl" :media-kind="request.mediaKind" class="h-[105px] w-[70px] shadow-sm" :icon-size="24" />
+          <RequestCover
+            :src="request.coverUrl"
+            :fallback-sources="bookCoverSources"
+            :media-kind="request.mediaKind"
+            class="h-[105px] w-[70px] shadow-sm"
+            :icon-size="24"
+          />
 
           <div class="min-w-0 flex-1 space-y-1.5">
             <h2 class="text-lg leading-snug font-semibold tracking-tight text-foreground">{{ request.title }}</h2>
@@ -615,6 +708,16 @@ function dockFileMeta(file: BookDockFile): string {
                 <Library :size="12" aria-hidden="true" />
                 {{ request.targetLibraryName }}
               </span>
+              <!-- Where the files go matters more than which library, once there is a book to join. -->
+              <RouterLink
+                v-if="joinsBookId !== null"
+                :to="{ name: 'book-detail', params: { bookId: joinsBookId } }"
+                class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
+                :title="t('bookRequests.detail.joinsBookHint')"
+              >
+                <BookHeadphones :size="12" aria-hidden="true" />
+                {{ t('bookRequests.detail.joinsBook') }}
+              </RouterLink>
               <Button
                 v-if="request.status === 'available' && request.matchedBookId !== null"
                 as-child
@@ -676,6 +779,7 @@ function dockFileMeta(file: BookDockFile): string {
           <RequestReviewPanel
             v-if="isHeld && review"
             :review="review"
+            :cover-url="reviewCoverUrl"
             :can-manage="canFulfilThis"
             :busy="busy"
             @file="handleFileAnyway"
@@ -851,7 +955,7 @@ function dockFileMeta(file: BookDockFile): string {
                       :book-id="book.id"
                       type="thumbnail"
                       :version="book.updatedAt"
-                      class="h-[42px] w-7 shrink-0 rounded bg-muted object-cover"
+                      class="h-[42px] w-7 shrink-0 rounded-xs bg-muted object-cover"
                       :alt="''"
                     />
                     <span class="min-w-0 flex-1">
@@ -948,11 +1052,25 @@ function dockFileMeta(file: BookDockFile): string {
     <!-- The action that matters for the stage this request is at, and nothing else. -->
     <footer v-if="request && showFooter" class="flex shrink-0 flex-wrap items-center gap-2 border-t border-border px-4 py-3">
       <template v-if="canDecide">
-        <Button v-if="drawer?.hasNext.value" :disabled="!canApproveNow" @click="handleApproveAndNext">
+        <Button v-if="canApproveBoth" :disabled="!canApproveBoth" @click="handleApproveBoth">
+          <BookHeadphones :size="14" aria-hidden="true" />
+          {{ t('bookRequests.actions.pair.approveBoth') }}
+        </Button>
+        <Button
+          v-if="drawer?.hasNext.value"
+          :variant="canApproveBoth ? 'outline' : 'default'"
+          :disabled="!canApproveNow"
+          @click="handleApproveAndNext"
+        >
           {{ t('bookRequests.actions.approveAndNext') }}
         </Button>
-        <Button :variant="drawer?.hasNext.value ? 'outline' : 'default'" :disabled="!canApproveNow" aria-keyshortcuts="a" @click="handleApprove">
-          {{ t('bookRequests.actions.approve') }}
+        <Button
+          :variant="drawer?.hasNext.value || canApproveBoth ? 'outline' : 'default'"
+          :disabled="!canApproveNow"
+          aria-keyshortcuts="a"
+          @click="handleApprove"
+        >
+          {{ approveLabel }}
         </Button>
         <Button variant="destructive-outline" :disabled="busy" @click="handleReject">{{ t('bookRequests.actions.reject') }}</Button>
       </template>

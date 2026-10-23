@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import BookDetailTabs from './BookDetailTabs.vue'
 import { useBookNavigation } from '../../composables/useBookNavigation'
 
-const props = defineProps<{ bookId: number }>()
+const props = defineProps<{ bookId: number; canEditMetadata?: boolean; parentLibrary?: { id: number; name: string } | null }>()
 
 const { t } = useI18n()
 const route = useRoute()
@@ -36,7 +36,19 @@ async function navigateToBook(id: number) {
   <div
     class="flex items-stretch border-b shrink-0 h-10 md:h-9 px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-3"
   >
-    <BookDetailTabs :book-id="bookId" />
+    <!-- Without a global header this band is the page's top edge, so it carries the way back up. -->
+    <template v-if="parentLibrary">
+      <RouterLink
+        :to="{ name: 'library', params: { id: parentLibrary.id } }"
+        class="-ms-1.5 me-2 flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:text-foreground"
+        :aria-label="t('book.detail.header.backToLibrary', { library: parentLibrary.name })"
+      >
+        <ChevronLeft :size="15" class="shrink-0 rtl:rotate-180" aria-hidden="true" />
+        <span class="max-w-[10rem] truncate max-sm:hidden">{{ parentLibrary.name }}</span>
+      </RouterLink>
+      <span class="me-2 h-4 w-px shrink-0 self-center bg-border" aria-hidden="true" />
+    </template>
+    <BookDetailTabs :book-id="bookId" :can-edit-metadata="canEditMetadata" />
 
     <div v-if="hasContext" class="hidden sm:flex items-center gap-1 ml-4 border-l pl-4">
       <span v-if="index !== -1" class="text-xs text-muted-foreground mr-2 font-medium tabular-nums">

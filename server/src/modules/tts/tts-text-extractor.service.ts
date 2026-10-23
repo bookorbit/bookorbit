@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { load } from 'cheerio';
+import { stat } from 'node:fs/promises';
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -34,8 +35,11 @@ export function htmlToBlocks(html: string): string[] {
 
   // Keep this block list aligned with Foliate's TTS block segmentation so
   // server-side audio blocks and client-side highlight blocks stay in sync.
+  // Whole tag names only: without the lookahead `p` also opened a block at
+  // <picture>, <param> and an SVG <path>, `li` at <link> and `tr` at <track>,
+  // none of which Foliate counts.
   const BLOCK_SPLIT_RE =
-    /<(?:article|aside|audio|blockquote|caption|details|dialog|div|dl|dt|dd|figure|footer|form|figcaption|h[1-6]|header|hgroup|hr|li|main|math|nav|ol|p|pre|section|tr)[^>]*>/gi;
+    /<(?:article|aside|audio|blockquote|caption|details|dialog|div|dl|dt|dd|figure|footer|form|figcaption|h[1-6]|header|hgroup|hr|li|main|math|nav|ol|p|pre|section|tr)(?=[\s/>])[^>]*>/gi;
 
   // Foliate's getBlocks() starts the first block at the first block-level
   // element and discards any content before it. Anchor extraction at the same
@@ -76,6 +80,14 @@ function blockText(chunk: string): string {
   return load(chunk, undefined, false).root().text().replace(/\s+/g, ' ').trim();
 }
 
+function decodeHref(href: string): string {
+  try {
+    return decodeURIComponent(href);
+  } catch {
+    return href;
+  }
+}
+
 @Injectable()
 export class TtsTextExtractorService {
   private readonly logger = new Logger(TtsTextExtractorService.name);
@@ -84,21 +96,24 @@ export class TtsTextExtractorService {
   constructor(private readonly bookReadService: BookReadService) {}
 
   async extractChapterText(bookFileId: number, chapterIndex: number): Promise<TtsChapterText> {
-    const cacheKey = `${bookFileId}:${chapterIndex}`;
-    const cached = this.textCache.get(cacheKey);
-    if (cached) {
-      cached.lastAccessed = Date.now();
-      return cached.text;
-    }
-
     const event = 'tts.text_extractor.extract';
     const startMs = Date.now();
-    this.logger.log(`[${event}] [start] bookFileId=${bookFileId} chapterIndex=${chapterIndex} - extracting chapter text`);
 
     try {
       const file = await this.bookReadService.findFileById(bookFileId);
       if (!file) throw new NotFoundException(`Book file ${bookFileId} not found`);
       if (file.format !== 'epub') throw new NotFoundException(`File ${bookFileId} is not an EPUB`);
+
+      // Keyed by when the file last changed, so a replaced EPUB is read afresh rather than
+      // narrated from the text of the one before it.
+      const { mtimeMs } = await stat(file.absolutePath);
+      const cacheKey = `${bookFileId}:${mtimeMs}:${chapterIndex}`;
+      const cached = this.textCache.get(cacheKey);
+      if (cached) {
+        cached.lastAccessed = Date.now();
+        return cached.text;
+      }
+      this.logger.log(`[${event}] [start] bookFileId=${bookFileId} chapterIndex=${chapterIndex} - extracting chapter text`);
 
       const result = await this.extractFromEpub(file.absolutePath, chapterIndex);
       this.logger.log(
@@ -165,7 +180,8 @@ export class TtsTextExtractorService {
     if (!href) throw new NotFoundException(`Manifest item ${idref} has no href`);
 
     const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
-    const chapterPath = normalizePath(opfDir + href);
+    // Manifest hrefs are URLs: `Chapter%201.xhtml` names the archive entry `Chapter 1.xhtml`.
+    const chapterPath = normalizePath(opfDir + decodeHref(href));
 
     const chapterFile = zip.files.find((f) => f.path === chapterPath);
     if (!chapterFile) throw new NotFoundException(`Chapter file not found: ${chapterPath}`);

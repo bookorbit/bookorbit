@@ -27,7 +27,7 @@ export const BOOK_REQUEST_AUTOMATION_SETTING_KEYS = {
  * The instance default destination for one medium, as two flat rows rather than a JSON blob, so
  * the destinations follow the same one-row-per-knob rule as the settings above.
  *
- * Derived from the medium rather than spelled out three times: `BOOK_REQUEST_MEDIA_KINDS` is what
+ * Derived from the medium rather than spelled out per medium: `BOOK_REQUEST_MEDIA_KINDS` is what
  * decides how many there are, and a medium added later should not need six more literals here.
  */
 export function bookRequestDefaultLibraryKey(mediaKind: BookRequestMediaKind): string {

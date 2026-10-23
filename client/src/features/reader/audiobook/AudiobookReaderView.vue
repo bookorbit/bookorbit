@@ -947,7 +947,7 @@ onMounted(async () => {
                 class="absolute -top-8 pointer-events-none flex flex-col items-center"
                 :style="{ left: (scrubberHoverSeconds / (totalBookDuration || 1)) * 100 + '%', transform: 'translateX(-50%)' }"
               >
-                <span class="text-xs font-semibold text-white bg-black/70 rounded px-1.5 py-0.5 whitespace-nowrap">
+                <span class="text-xs font-semibold text-white bg-black/70 rounded-xs px-1.5 py-0.5 whitespace-nowrap">
                   {{ formatTime(scrubberHoverSeconds) }}
                 </span>
                 <span v-if="scrubberHoverChapter" class="text-[10px] text-white/60 truncate max-w-[10rem] text-center">

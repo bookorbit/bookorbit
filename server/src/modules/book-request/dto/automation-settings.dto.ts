@@ -59,11 +59,6 @@ class RequestDestinationDefaultsDto {
   @ValidateNested()
   @Type(() => RequestDestinationDto)
   audiobook?: RequestDestinationDto;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => RequestDestinationDto)
-  comic?: RequestDestinationDto;
 }
 
 /**
@@ -162,13 +157,6 @@ class ReleaseProfilesDto {
   @ValidateNested({ each: true })
   @Type(() => ReleaseTierDto)
   audiobook?: ReleaseTierDto[];
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(MAX_RELEASE_TIERS)
-  @ValidateNested({ each: true })
-  @Type(() => ReleaseTierDto)
-  comic?: ReleaseTierDto[];
 }
 
 /**

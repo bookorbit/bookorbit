@@ -66,6 +66,20 @@ describe('useAnnotations', () => {
     expect(store.annotations.value).toEqual([])
   })
 
+  it('loads every page of annotations projected for the selected reader file', async () => {
+    apiMock.mockResolvedValueOnce(response(true, { items: [makeAnnotation(1)], total: 2 }))
+    apiMock.mockResolvedValueOnce(response(true, { items: [makeAnnotation(2)], total: 2 }))
+    const store = useAnnotations()
+
+    await store.load(9, 33)
+
+    expect(apiMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/books/9/annotations?page=1&pageSize=100&readerFileId=33',
+      '/api/v1/books/9/annotations?page=2&pageSize=100&readerFileId=33',
+    ])
+    expect(store.annotations.value.map((annotation) => annotation.id)).toEqual([1, 2])
+  })
+
   it('creates and appends annotation on success', async () => {
     const created = makeAnnotation(3)
     const createdCfi = created.cfi ?? 'epubcfi(/6/3)'
@@ -159,6 +173,19 @@ describe('useAnnotations', () => {
     expect(store.annotations.value).toEqual(existing)
   })
 
+  it('keeps the reader projection when a metadata update returns the canonical source position', async () => {
+    const projected = { ...makeAnnotation(1, 'epubcfi(/6/2!/4/2/2,/1:0,/1:5)'), jumpFileId: 44, positionStatus: 'repaired' as const }
+    const canonical = { ...makeAnnotation(1), note: 'Edited note', color: '#38BDF8' }
+    apiMock.mockResolvedValueOnce(response(true, canonical))
+    const store = useAnnotations()
+    store.annotations.value = [projected]
+
+    const result = await store.update(9, 1, { note: canonical.note, color: canonical.color })
+
+    expect(result).toEqual({ ...canonical, cfi: projected.cfi, jumpFileId: 44, positionStatus: 'repaired', chapterIndex: projected.chapterIndex })
+    expect(store.annotations.value).toEqual([result])
+  })
+
   it('removes annotation when delete succeeds', async () => {
     apiMock.mockResolvedValueOnce(response(true))
 
@@ -169,5 +196,25 @@ describe('useAnnotations', () => {
 
     expect(apiMock).toHaveBeenCalledWith('/api/v1/books/9/annotations/1', { method: 'DELETE' })
     expect(store.annotations.value.map((a) => a.id)).toEqual([2])
+  })
+
+  it('reports a failed or unreachable delete and keeps the annotation', async () => {
+    apiMock.mockResolvedValueOnce(response(false))
+    apiMock.mockRejectedValueOnce(new Error('offline'))
+
+    const store = useAnnotations()
+    store.annotations.value = [makeAnnotation(1)]
+
+    expect(await store.remove(9, 1)).toBe(false)
+    expect(await store.remove(9, 1)).toBe(false)
+    expect(store.annotations.value.map((a) => a.id)).toEqual([1])
+  })
+
+  it('returns null instead of throwing when a save cannot reach the server', async () => {
+    apiMock.mockRejectedValueOnce(new Error('offline'))
+
+    const store = useAnnotations()
+
+    expect(await store.update(9, 1, { note: 'x' })).toBeNull()
   })
 })

@@ -33,7 +33,9 @@ const SHORTCUTS = [
         <div v-for="shortcut in SHORTCUTS" :key="shortcut.label" class="flex items-center justify-between gap-3">
           <dt>{{ t(shortcut.label) }}</dt>
           <dd class="flex gap-1">
-            <kbd v-for="key in shortcut.keys" :key="key" class="rounded border border-border bg-card px-1.5 font-mono text-[10.5px]">{{ key }}</kbd>
+            <kbd v-for="key in shortcut.keys" :key="key" class="rounded-xs border border-border bg-card px-1.5 font-mono text-[10.5px]">{{
+              key
+            }}</kbd>
           </dd>
         </div>
       </dl>

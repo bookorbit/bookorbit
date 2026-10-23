@@ -7,7 +7,8 @@ export interface ProviderCaptionedSpeech {
 }
 
 export interface ITtsProvider {
-  synthesize(text: string, voiceId: string, speed: number, format?: string): Promise<Buffer>;
+  /** `signal` aborts the upstream request once nobody is waiting for the audio. */
+  synthesize(text: string, voiceId: string, speed: number, format?: string, signal?: AbortSignal): Promise<Buffer>;
   /**
    * Synthesize with word timings when the upstream can produce them.
    *

@@ -109,6 +109,53 @@ export class DashboardWidgetRepository {
     return row?.count ?? 0;
   }
 
+  /** Books with a completed attempt ending between two local days, most recently finished first. */
+  async getRecentlyFinishedBookIds(
+    userId: number,
+    accessibleLibraryIds: number[],
+    fromDay: string,
+    untilDay: string,
+    limit: number,
+    contentFilters?: ContentFilterRules,
+  ): Promise<number[]> {
+    const rows = await this.getRecentlyFinishedBooks(userId, accessibleLibraryIds, fromDay, untilDay, limit, contentFilters);
+    return rows.map((row) => row.bookId);
+  }
+
+  /** The same books with the local day each was last finished. */
+  async getRecentlyFinishedBooks(
+    userId: number,
+    accessibleLibraryIds: number[],
+    fromDay: string,
+    untilDay: string,
+    limit: number,
+    contentFilters?: ContentFilterRules,
+  ): Promise<Array<{ bookId: number; finishedOn: string }>> {
+    if (accessibleLibraryIds.length === 0) return [];
+
+    const cfClauses = this.getContentFilterClauses(contentFilters);
+    const rows = await this.db
+      .select({ bookId: readingAttempts.bookId, finishedOn: sql<string>`max(${readingAttempts.endedOn})` })
+      .from(readingAttempts)
+      .innerJoin(books, eq(books.id, readingAttempts.bookId))
+      .where(
+        and(
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNull(readingAttempts.deletedAt),
+          isNotNull(readingAttempts.endedOn),
+          gte(readingAttempts.endedOn, fromDay),
+          lt(readingAttempts.endedOn, untilDay),
+          inArray(books.libraryId, accessibleLibraryIds),
+          ...cfClauses,
+        ),
+      )
+      .groupBy(readingAttempts.bookId)
+      .orderBy(desc(sql`max(${readingAttempts.endedOn})`), desc(sql`max(${readingAttempts.id})`))
+      .limit(limit);
+    return rows.map((row) => ({ bookId: row.bookId, finishedOn: String(row.finishedOn) }));
+  }
+
   async getCurrentlyReadingBooks(
     userId: number,
     accessibleLibraryIds: number[],
@@ -242,6 +289,59 @@ export class DashboardWidgetRepository {
 
     const readDays = new Set(rows.filter((r) => r.totalSeconds > 0).map((r) => r.day));
     return computeStreakData(readDays, today);
+  }
+
+  /** Reading seconds per local day from `fromDay` to `toDay`, both inclusive. */
+  async getReadingSecondsByDay(
+    userId: number,
+    accessibleLibraryIds: number[],
+    fromDay: string,
+    toDay: string,
+  ): Promise<Array<{ day: string; seconds: number }>> {
+    if (accessibleLibraryIds.length === 0) return [];
+    return this.db
+      .select({
+        day: userReadingDailyStats.day,
+        seconds: sql<number>`sum(${userReadingDailyStats.readingSeconds})::int`,
+      })
+      .from(userReadingDailyStats)
+      .where(
+        and(
+          eq(userReadingDailyStats.userId, userId),
+          inArray(userReadingDailyStats.libraryId, accessibleLibraryIds),
+          gte(userReadingDailyStats.day, fromDay),
+          sql`${userReadingDailyStats.day} <= ${toDay}`,
+        ),
+      )
+      .groupBy(userReadingDailyStats.day);
+  }
+
+  /**
+   * The books read most between two instants, with how long, on how many local
+   * days and how far they got. Callers resolve access when loading the books.
+   */
+  async getTopBooksReadBetween(
+    userId: number,
+    start: Date,
+    end: Date,
+    timeZone: string,
+    limit: number,
+  ): Promise<Array<{ bookId: number; seconds: number; days: number; endProgress: number | null; firstDay: string; lastDay: string }>> {
+    const localDay = sql`(${readingSessions.startedAt} at time zone ${timeZone})::date`;
+    return this.db
+      .select({
+        bookId: readingSessions.bookId,
+        seconds: sql<number>`sum(${readingSessions.durationSeconds})::int`,
+        days: sql<number>`count(distinct ${localDay})::int`,
+        endProgress: sql<number | null>`max(${readingSessions.endProgress})`,
+        firstDay: sql<string>`min(${localDay})::text`,
+        lastDay: sql<string>`max(${localDay})::text`,
+      })
+      .from(readingSessions)
+      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, start), lt(readingSessions.startedAt, end)))
+      .groupBy(readingSessions.bookId)
+      .orderBy(desc(sql`sum(${readingSessions.durationSeconds})`))
+      .limit(limit);
   }
 
   /** `yearStart` is the instant the reader's local year began. */

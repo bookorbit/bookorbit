@@ -84,7 +84,7 @@ describe('secret input policy', () => {
         'features/settings/OpdsSettings.vue',
         'features/settings/KoreaderSettings.vue',
         'features/settings/OidcSettings.vue',
-        'features/email/components/ProvidersTab.vue',
+        'features/email/components/EmailServerEditor.vue',
       ]),
     )
   })

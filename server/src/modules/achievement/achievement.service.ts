@@ -415,6 +415,8 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
         return this.repo.countBooksFinishedInYear(userId, getYearInTimeZone(new Date(), timeZone));
       case 'category_sweeper':
         return this.repo.countDistinctEarnedCategories(userId);
+      case 'year_round_reader':
+        return this.repo.countDistinctMonthsWithReading(userId, getYearInTimeZone(new Date(), timeZone));
       case 'consistent_reader':
         return null;
       case 'weekend_rhythm':

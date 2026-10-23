@@ -62,7 +62,7 @@ local function startSweep(harness, Sweep, opts)
         api = {},
         interactive = opts.interactive ~= false,
         full_recheck = opts.full_recheck == true,
-        annotation_sync = false,
+        annotation_sync = opts.annotation_sync == true,
         on_finish = function(err)
             finished = true
             finish_err = err
@@ -182,7 +182,7 @@ do
     local finished, err = result()
     assertEqual(finished, true, "a rejected sweep reports completion")
     assertEqual(err, "server", "an HTTP rejection is classified as a server failure")
-    assertEqual(harness.shown.text, "BookOrbit sync: server request failed.",
+    assertEqual(harness.shown.result.title, "The server could not finish the sync",
         "an HTTP rejection is not presented as an unreachable server")
     assertEqual(harness.calls.sweep_complete, 0, "a rejected match phase is not recorded as a completed sweep")
 end
@@ -424,6 +424,78 @@ do
     harness.scheduler:drain()
     assertEqual(select(2, restart_result()), nil, "the restarted sweep completes normally")
     assertEqual(harness.calls.sweep_complete, 1, "the restarted run records exactly one sweep")
+end
+
+do
+    local newer, older = "/books/current.epub", "/books/older-copy.epub"
+    local harness = SweepHarness.install{
+        history = { { file = newer, time = 200 }, { file = older, time = 100 } },
+        state = {
+            books = { shared = { bookId = 1, fileId = 11, file = older, matchVerifiedAt = NOW, matchVerifiedVersion = "v1" } },
+            files = { [newer] = "shared", [older] = "shared" }, global = { libraryVersion = "v1" },
+        },
+    }
+    -- The copies have identical bytes despite different paths.
+    package.loaded["util"].partialMD5 = function() return "shared" end
+    startSweep(harness, require("bookorbit_sweep"))
+    harness.scheduler:drain()
+    assertEqual(harness.state.books.shared.file, newer, "the most recently opened copy owns the sweep sidecar")
+end
+
+-- A highlight made elsewhere on a closed, untouched book: its sidecar did not
+-- change, so the sweep used to leave it alone (S-08). A server that lists the
+-- book as pending brings it into the exchange; an older server is not asked.
+for _, case in ipairs({
+    { capabilities = { "annotationPendingBooks" }, asked = 1, exchanged = 1, label = "a book the server lists as pending" },
+    { capabilities = {}, asked = 0, exchanged = 0, label = "a server without the capability" },
+}) do
+    local harness = SweepHarness.install{
+        books = { { md5 = "aaa", id = 1, title = "A", last_open = 100 } },
+        library_version = "v1",
+        capabilities = case.capabilities,
+        pending = { "aaa" },
+        state = {
+            books = {
+                aaa = {
+                    bookId = 1,
+                    fileId = 11,
+                    file = "/books/a.epub",
+                    annCount = 1,
+                    sidecarMtime = 100,
+                    matchVerifiedAt = NOW,
+                    matchVerifiedVersion = "v1",
+                    statusSyncedKnown = true,
+                    ratingSyncedKnown = true,
+                    reviewSyncedKnown = true,
+                },
+            },
+            global = { libraryVersion = "v1" },
+        },
+        sidecar = {
+            sidecarMtime = function() return 100 end,
+            extract = function()
+                return {
+                    annotations = { { datetime = "2025-01-01 10:00:00", text = "A highlight" } },
+                    annotations_count = 1,
+                    annotations_max_datetime = "2025-01-01 10:00:00",
+                    annotations_signature = "same-signature",
+                    bookmarks = {},
+                    bookmarks_signature = "empty-bookmarks",
+                }
+            end,
+        },
+    }
+    local Sweep = require("bookorbit_sweep")
+
+    startSweep(harness, Sweep, { annotation_sync = true })
+    harness.scheduler:drain()
+
+    assertEqual(#harness.calls.pending, case.asked, case.label .. ": pending books asked for")
+    assertEqual(#harness.calls.annotation_exchanges, case.exchanged, case.label .. ": exchanges")
+    if case.exchanged > 0 then
+        assertEqual(harness.calls.annotation_exchanges[1].digest, "aaa", "the pending book is the one exchanged")
+        assertEqual(harness.calls.annotation_exchanges[1].captured_at, 100, "dated by when its sidecar was written")
+    end
 end
 
 print("bookorbit_sweep_test.lua: ok")

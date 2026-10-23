@@ -74,7 +74,7 @@ function dismiss() {
     <button
       v-if="failed"
       type="button"
-      class="ml-auto flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+      class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
       :aria-label="t('settings.admin.scoreWeights.progress.dismiss')"
       @click="dismiss"
     >

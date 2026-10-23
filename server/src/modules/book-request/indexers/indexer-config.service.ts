@@ -252,10 +252,16 @@ export class IndexerConfigService {
     const row = await this.repo.findSeedPolicyById(id);
     if (!row) throw new NotFoundException('Indexer not found');
     this.registry.require(row.adapterType);
+    // Read the manager toggle at grab time even if synchronizing its source rows failed.
+    const managed = row.managerId !== null;
+    const inheritSeedLimits = !managed || row.inheritSeedLimits === true;
     return {
-      ...row,
+      id: row.id,
       adapterType: row.adapterType as IndexerAdapterType,
       seedsBack: this.registry.seedsBack(row.adapterType),
+      applyTrackerSeedGoals: managed ? inheritSeedLimits : row.applyTrackerSeedGoals,
+      seedRatioGoal: inheritSeedLimits ? row.seedRatioGoal : null,
+      seedTimeMinutes: inheritSeedLimits ? row.seedTimeMinutes : null,
     };
   }
 
@@ -416,7 +422,6 @@ function mergeCategories(defaults: IndexerCategoryMap, categories: Partial<Index
   return {
     ebook: categories?.ebook ?? defaults.ebook,
     audiobook: categories?.audiobook ?? defaults.audiobook,
-    comic: categories?.comic ?? defaults.comic,
   };
 }
 

@@ -6,9 +6,7 @@ the plugin zip from the BookOrbit server and atomically replaces the current
 plugin directory. KOReader must be restarted for the new files to load.
 ]]
 
-local ConfirmBox = require("ui/widget/confirmbox")
 local Device = require("device")
-local InfoMessage = require("ui/widget/infomessage")
 local NetworkMgr = require("ui/network/manager")
 local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
@@ -21,6 +19,8 @@ local BookOrbitBookSync = require("bookorbit_book_sync")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitSweep = require("bookorbit_sweep")
 local Transfer = require("bookorbit_download_transfer")
+-- Loaded on first use: specs load this module without KOReader's widgets.
+local Toast = setmetatable({}, { __index = function(_t, key) return require("bookorbit_toast")[key] end })
 
 local BookOrbitUpdater = {}
 
@@ -279,10 +279,7 @@ function UpdateCheck:maybeCheckForUpdate(interactive)
             self:recordSyncError("update_check", err)
         end
         if interactive then
-            UIManager:show(InfoMessage:new{
-                text = T(_("Could not check for update: %1"), tostring(err or "network error")),
-                timeout = 4,
-            })
+            Toast.error(T(_("Could not check for update: %1"), tostring(err or "network error")))
         else
             logger.dbg("BookOrbit: plugin update check failed:", err)
         end
@@ -296,10 +293,12 @@ function UpdateCheck:doCheckForUpdate()
     if self._checking_update or self._updating then return end
     self._checking_update = true
     local api_opts = self:apiOpts(false)
+    local checking = Toast.loading(_("Checking for an update…"))
     local completed, result = Trapper:dismissableRunInSubprocess(function()
         local body, err = BookOrbitApi.new(api_opts):getPluginVersion()
         return { body = body, err = err }
-    end, _("Checking for update..."))
+    end, checking)
+    checking:close()
     self._checking_update = false
     if not completed then return end
     result = result or {}
@@ -309,10 +308,7 @@ function UpdateCheck:doCheckForUpdate()
         if self.recordSyncError then
             self:recordSyncError("update_check", err)
         end
-        UIManager:show(InfoMessage:new{
-            text = T(_("Could not check for update: %1"), tostring(err or "network error")),
-            timeout = 4,
-        })
+        Toast.error(T(_("Could not check for update: %1"), tostring(err or "network error")))
         return
     end
 
@@ -330,10 +326,7 @@ function UpdateCheck:handleUpdateVersionResponse(body, interactive, prompt_allow
             self:recordSyncError("update_check", "unsupported_server", _("latest plugin version unavailable"))
         end
         if interactive then
-            UIManager:show(InfoMessage:new{
-                text = _("Could not determine the latest plugin version from the server."),
-                timeout = 4,
-            })
+            Toast.error(_("Could not determine the latest plugin version from the server."))
         end
         return
     end
@@ -343,10 +336,7 @@ function UpdateCheck:handleUpdateVersionResponse(body, interactive, prompt_allow
 
     if BookOrbitUpdater.isNewer(plugin_latest, PLUGIN_VERSION) ~= true then
         if interactive then
-            UIManager:show(InfoMessage:new{
-                text = T(_("Plugin is up to date (v%1).\nServer: v%2"), PLUGIN_VERSION, server_ver),
-                timeout = 4,
-            })
+            Toast.show(T(_("BookOrbit is up to date, v%1"), tostring(PLUGIN_VERSION):gsub("^v", "")))
         end
         return
     end
@@ -363,91 +353,67 @@ function UpdateCheck:handleUpdateVersionResponse(body, interactive, prompt_allow
         G_reader_settings:flush()
     end
 
-    UIManager:show(ConfirmBox:new{
-        text = T(_("Update available: v%1 -> v%2\nServer: v%3\n\nDownload and apply the update now?"),
-            PLUGIN_VERSION, plugin_latest, server_ver),
-        ok_text = _("Update"),
-        ok_callback = function()
-            self:applyUpdate(plugin_latest)
-        end,
-    })
+    require("bookorbit_update_sheet").open(self, { current = PLUGIN_VERSION, latest = plugin_latest, server = server_ver })
 end
 
-function UpdateCheck:applyUpdate(new_version)
+-- sheet: the update sheet that asked for it; without one (Update from the
+-- menu or Settings) a sheet opens to show the download.
+function UpdateCheck:applyUpdate(new_version, sheet)
     if self._updating then
-        UIManager:show(InfoMessage:new{ text = _("An update is already in progress."), timeout = 3 })
+        Toast.show(_("An update is already in progress."), { icon = "hourglass" })
         return
     end
     self._updating = true
+    if sheet then
+        sheet:downloading()
+    else
+        sheet = require("bookorbit_update_sheet").open(self, { current = PLUGIN_VERSION, latest = new_version, state = "downloading" })
+    end
     -- The transfer owns a background subprocess, so the whole flow needs a
     -- Trapper coroutine; the busy flag clears inside it, not when wrap returns.
     Trapper:wrap(function()
         local ok, err = pcall(function()
-            self:_doApplyUpdate(new_version)
+            self:_doApplyUpdate(new_version, sheet)
         end)
         self._updating = false
-        if not ok then error(err, 0) end
+        if not ok then
+            sheet:failed(tostring(err))
+            error(err, 0)
+        end
     end)
 end
 
-function UpdateCheck:_doApplyUpdate(new_version)
+function UpdateCheck:_doApplyUpdate(new_version, sheet)
     if not self.path then
-        UIManager:show(InfoMessage:new{
-            text = _("Cannot determine plugin path. Update aborted."),
-            timeout = 3,
-        })
+        sheet:failed(_("Cannot find where the plugin is installed."))
         return
     end
 
-    local progress
     local last_bucket = -1
-    local function showProgress(text)
-        if progress then UIManager:close(progress) end
-        progress = InfoMessage:new{ text = text }
-        UIManager:show(progress)
-        UIManager:forceRePaint()
-    end
-    showProgress(T(_("Downloading BookOrbit v%1..."), new_version))
-
     local ok, err = BookOrbitUpdater.apply(self:newClient(), self.path, {
         on_progress = function(received, total)
-            local bucket, text
+            local bucket
             if total and total > 0 then
-                local pct = math.min(100, math.floor(received / total * 100))
-                bucket = math.floor(pct / 5)
-                text = T(_("Downloading BookOrbit v%1...\n\n%2"), new_version, pct .. "%")
+                bucket = math.floor(math.min(100, math.floor(received / total * 100)) / 5)
             else
                 bucket = math.floor((received or 0) / (256 * 1024))
-                text = T(_("Downloading BookOrbit v%1...\n\n%2 KB"), new_version, math.floor((received or 0) / 1024))
             end
             if bucket == last_bucket then return end
             last_bucket = bucket
-            showProgress(text)
+            sheet:progressed(received, total)
+            UIManager:forceRePaint()
         end,
     })
-    if progress then UIManager:close(progress) end
 
     if not ok then
-        local msg
         if type(err) == "number" and err == 503 then
-            msg = _("Update failed: the server does not have the plugin package available.")
+            sheet:failed(_("The server does not have the plugin package available."))
         else
-            msg = T(_("Update failed: %1"), tostring(err or "unknown error"))
+            sheet:failed(T(_("Update failed: %1"), tostring(err or "unknown error")))
         end
-        UIManager:show(InfoMessage:new{ text = msg, timeout = 6 })
         return
     end
-
-    UIManager:show(ConfirmBox:new{
-        text = T(_("BookOrbit v%1 installed. KOReader needs to restart to apply the update."), new_version),
-        ok_text = _("Restart now"),
-        ok_callback = function()
-            -- Exit code 85 triggers an app restart on Kobo and most e-ink platforms.
-            -- On other platforms KOReader exits cleanly; reopen it to apply the update.
-            UIManager:quit(UIManager.RETURN_CODE_REBOOT or 85)
-        end,
-        cancel_text = _("Later"),
-    })
+    sheet:installed()
 end
 
 function BookOrbitUpdater.install(BookOrbit)

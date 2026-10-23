@@ -41,6 +41,11 @@ export interface MetadataSearchParams {
   // Preferred language for collection selection (e.g. "fr", "en").
   // When set, pickBestCollection will prefer collections in this language.
   preferredLanguage?: string;
+  // How many ranked candidates each provider contributes. Browsing searches ask for more than matching
+  // one book needs; providers that can return that many from one request widen their page to match.
+  resultsPerProvider?: number;
+  // Automatic pipelines must not select a ComicVine run from equally plausible volume matches.
+  requireUnambiguousMatch?: boolean;
   // Interactive result lists can afford bounded cover checks. Bulk metadata pipelines must not
   // multiply one provider lookup into many thumbnail requests.
   validateCoverPlaceholders?: boolean;

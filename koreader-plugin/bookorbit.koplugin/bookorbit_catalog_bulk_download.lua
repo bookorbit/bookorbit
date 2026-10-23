@@ -13,9 +13,6 @@ cursor of the page being processed and that page's completed destinations, so an
 interrupted run resumes without re-transferring files it already published.
 ]]
 
-local BD = require("ui/bidi")
-local ButtonDialog = require("ui/widget/buttondialog")
-local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
@@ -28,20 +25,22 @@ local BulkCheckpoint = require("bookorbit_bulk_checkpoint")
 local Capabilities = require("bookorbit_capabilities")
 local CatalogUtil = require("bookorbit_catalog_util")
 local Transfer = require("bookorbit_download_transfer")
+-- Loaded on first use: specs load this module without KOReader's widgets.
+local function lazy(name) return setmetatable({}, { __index = function(_t, key) return require(name)[key] end }) end
+local BulkSheet = lazy("bookorbit_bulk_sheet")
+local DialogUI = lazy("bookorbit_dialog_ui")
+local Toast = lazy("bookorbit_toast")
 
 local cloneParams = CatalogUtil.cloneParams
 local formatBytes = CatalogUtil.formatBytes
 local isSupportedFormat = CatalogUtil.isSupportedFormat
 local safeFilenameBase = CatalogUtil.safeFilenameBase
-local shortPath = CatalogUtil.shortPath
 local shortText = CatalogUtil.shortText
 
 local STEP_DELAY = 0.15
 local NEXT_ITEM_DELAY = 0.02
 local PROGRESS_THROTTLE = 1
 local FAILED_TITLES_LIMIT = 8
-local TITLE_LINE_LENGTH = 38
-local FOLDER_LABEL_LENGTH = 32
 
 local MANIFEST_FEATURE = "catalogBulkManifest"
 local PAGE_SIZE = 100
@@ -60,24 +59,6 @@ local MAX_EMPTY_PAGES = 50
 local MANIFEST_FILTER_KEYS = {
     "q", "readStatus", "format", "libraryId", "collectionId", "smartScopeId", "author", "series", "seriesId",
 }
-
-local function fixedTwoLineTitle(book)
-    local title = shortText(book and book.title or _("Untitled"), TITLE_LINE_LENGTH * 2)
-    if #title <= TITLE_LINE_LENGTH then
-        return title .. "\n "
-    end
-
-    local split_at = TITLE_LINE_LENGTH
-    for index = TITLE_LINE_LENGTH, 1, -1 do
-        if title:sub(index, index) == " " then
-            split_at = index - 1
-            break
-        end
-    end
-    local first = title:sub(1, split_at):gsub("%s+$", "")
-    local second = title:sub(split_at + 1):gsub("^%s+", "")
-    return first .. "\n" .. shortText(second, TITLE_LINE_LENGTH)
-end
 
 local function pathKey(path)
     return tostring(path or ""):gsub("\\", "/"):lower()
@@ -188,6 +169,8 @@ local function chunkIds(ids, size)
     return chunks
 end
 
+local Delivery = require("bookorbit_delivery")
+
 local CatalogBulkDownload = {}
 
 function CatalogBulkDownload.install(Catalog)
@@ -196,6 +179,7 @@ function CatalogBulkDownload.install(Catalog)
         self.bulk_selection_scope_key = nil
         self.bulk_selected_books = {}
         self.bulk_selected_order = {}
+        self.bulk_select_all = false
         self.bulk_running = false
         self.bulk_ctx = nil
     end
@@ -251,6 +235,7 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:bulkSelectedCount()
+        if self.bulk_select_all then return (self.current_context or {}).total or 0 end
         local count = 0
         for _ in pairs(self.bulk_selected_books or {}) do
             count = count + 1
@@ -273,6 +258,7 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:bulkClearSelectedBooks(redraw)
+        self.bulk_select_all = false
         self.bulk_selected_books = {}
         self.bulk_selected_order = {}
         if redraw then self:updateItems() end
@@ -342,6 +328,7 @@ function CatalogBulkDownload.install(Catalog)
 
     function Catalog:bulkSelectCurrentPage()
         if not self:bookMode() then return end
+        self.bulk_select_all = false
         self.bulk_selection_mode = true
         self.bulk_selection_scope_key = self:bulkListScopeKey(self.current_context)
         for _, book in ipairs(self:bulkCurrentPageBooks()) do
@@ -351,138 +338,92 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:showBulkSelectionActions()
-        local dialog
-        dialog = ButtonDialog:new{
-            title = T(_("Selected books: %1"), self:bulkSelectedCount()),
-            buttons = {
-                {
-                    {
-                        text = _("Download selected"),
-                        enabled = self:bulkSelectedCount() > 0,
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:confirmBulkBooks(
-                                self:bulkSelectedBooks(), _("Selected books"), { clear_selection = true })
-                        end,
-                    },
-                },
-                {
-                    {
-                        text = _("Select page"),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:bulkSelectCurrentPage()
-                        end,
-                    },
-                    {
-                        text = _("Clear"),
-                        enabled = self:bulkSelectedCount() > 0,
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:bulkClearSelectedBooks(true)
-                        end,
-                    },
-                },
-                {
-                    {
-                        text = _("Exit selection"),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:bulkExitSelectionMode()
-                        end,
-                    },
-                },
-                {
-                    {
-                        text = _("Close BookOrbit"),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:onCloseAllMenus()
-                        end,
-                    },
-                },
+        local count = self:bulkSelectedCount()
+        DialogUI.actions{
+            title = T(_.ngettext("%1 book selected", "%1 books selected", count), count),
+            rows = {
+                count > 0 and { icon = "download", label = _("Download selected"), opens = true, run = function()
+                    if self.bulk_select_all then return self:confirmBulkAllMatching() end
+                    self:confirmBulkBooks(self:bulkSelectedBooks(), _("Selected books"), { clear_selection = true })
+                end } or false,
+                { icon = "list-checks", label = _("Select this page"), run = function() self:bulkSelectCurrentPage() end },
+                count > 0 and { icon = "x", label = _("Clear the selection"), run = function() self:bulkClearSelectedBooks(true) end } or false,
+                { icon = "check", label = _("Done selecting"), run = function() self:bulkExitSelectionMode() end },
             },
         }
-        UIManager:show(dialog)
+    end
+
+    -- How read-aloud EPUBs arrive on this device, in a word.
+    function Catalog:bulkDeliveryLabel()
+        local server_settings = self.client and self.client.delivery_settings
+        if not server_settings or server_settings.deviceOverride == nil then return _("BookOrbit default") end
+        if server_settings.deviceOverride == "original" then return _("With narration") end
+        return _("Text only")
+    end
+
+    -- on_done: called once a choice is saved (the sheet that asked redraws).
+    function Catalog:showDeliveryPreferenceDialog(on_done)
+        self:runConnected(function()
+            local current, err = self:fetchDeliveryPreference()
+            if err then Toast.error(err); return end
+            local server_settings = self.client.delivery_settings
+            local selected = server_settings and server_settings.deviceOverride or current
+            local uses_default = server_settings and server_settings.deviceOverride == nil
+            local variants = { nil, "audioless_epub", "original" }
+            DialogUI.choose{
+                title = _("Read-aloud EPUBs"),
+                sub = _("Saved in BookOrbit for this device. Books already here stay as they are."),
+                options = {
+                    { label = _("BookOrbit default"), sub = _("Whatever your BookOrbit settings say"), selected = uses_default },
+                    { label = _("Text only"), sub = _("Narration taken out, so books stay small"), selected = not uses_default and selected == "audioless_epub" },
+                    { label = _("With narration"), sub = _("The audio comes too"), selected = not uses_default and selected == "original" },
+                },
+                on_pick = function(index)
+                    self:runConnected(function()
+                        local resolved, save_err = self:fetchDeliveryPreference(variants[index], true)
+                        if not resolved then Toast.error(save_err); return end
+                        if on_done then on_done() end
+                    end)
+                end,
+            }
+        end)
     end
 
     function Catalog:showBulkDownloadSettings()
-        local dialog
-        local preset = self:bulkFormatPreset()
-        local policy = self:bulkExistingPolicy()
-        dialog = ButtonDialog:new{
-            title = _("Bulk download settings"),
-            buttons = {
-                {
-                    {
-                        text = T(_("Folder: %1"), BD.dirpath(shortPath(self:getCurrentDownloadDir(), FOLDER_LABEL_LENGTH))),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:chooseDownloadDir(function()
-                                self:showBulkDownloadSettings()
-                            end)
-                        end,
-                    },
-                },
-                {
-                    {
-                        text = T(_("Format: %1"), preset.label),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:showBulkFormatPresetDialog()
-                        end,
-                    },
-                },
-                {
-                    {
-                        text = T(_("Existing files: %1"), policy.label),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:showBulkExistingPolicyDialog()
-                        end,
-                    },
-                },
-            },
-        }
-        UIManager:show(dialog)
+        BulkSheet.openPlan(self, { settings_only = true })
     end
 
-    function Catalog:showBulkFormatPresetDialog()
+    function Catalog:showBulkFormatPresetDialog(on_done)
         local current = self:bulkFormatPreset().id
-        local dialog
-        local buttons = {}
+        local options = {}
         for _, preset in ipairs(FORMAT_PRESETS) do
-            table.insert(buttons, {
-                {
-                    text = preset.label .. (current == preset.id and " *" or ""),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:persistSetting("catalog_bulk_format_preset", preset.id)
-                    end,
-                },
-            })
+            table.insert(options, { label = preset.label, selected = current == preset.id })
         end
-        dialog = ButtonDialog:new{ title = _("Bulk format preference"), buttons = buttons }
-        UIManager:show(dialog)
+        DialogUI.choose{
+            title = _("Format"),
+            sub = _("Which file to take when a book has several"),
+            options = options,
+            on_pick = function(index)
+                self:persistSetting("catalog_bulk_format_preset", FORMAT_PRESETS[index].id)
+                if on_done then on_done() end
+            end,
+        }
     end
 
-    function Catalog:showBulkExistingPolicyDialog()
+    function Catalog:showBulkExistingPolicyDialog(on_done)
         local current = self:bulkExistingPolicy().id
-        local dialog
-        local buttons = {}
+        local options = {}
         for _, policy in ipairs(EXISTING_POLICIES) do
-            table.insert(buttons, {
-                {
-                    text = policy.label .. (current == policy.id and " *" or ""),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:persistSetting("catalog_bulk_existing_policy", policy.id)
-                    end,
-                },
-            })
+            table.insert(options, { label = policy.label, sub = policy.id == "overwrite" and _("Can move a book's place and highlights") or nil, selected = current == policy.id })
         end
-        dialog = ButtonDialog:new{ title = _("Existing files"), buttons = buttons }
-        UIManager:show(dialog)
+        DialogUI.choose{
+            title = _("Files already there"),
+            options = options,
+            on_pick = function(index)
+                self:persistSetting("catalog_bulk_existing_policy", EXISTING_POLICIES[index].id)
+                if on_done then on_done() end
+            end,
+        }
     end
 
     function Catalog:bulkSupportedFormatHint(book)
@@ -495,8 +436,10 @@ function CatalogBulkDownload.install(Catalog)
 
     function Catalog:bulkCountKnownSkips(books)
         local counts = { on_device = 0, unsupported = 0 }
+        local capabilities = Capabilities.cached(self.client)
+        local legacy = capabilities and not capabilities.readAloudDeliveryVariants
         for _, book in ipairs(books or {}) do
-            if self:isOnDevice(book) then
+            if legacy and self:isOnDevice(book) then
                 counts.on_device = counts.on_device + 1
             elseif not self:bulkSupportedFormatHint(book) then
                 counts.unsupported = counts.unsupported + 1
@@ -505,59 +448,33 @@ function CatalogBulkDownload.install(Catalog)
         return counts
     end
 
-    function Catalog:bulkConfirmationTitle(source)
-        local total = source.total or 0
-        local lines = {
-            T(_("Download %1 books?"), total),
-            T(_("Scope: %1"), source.label or _("Books")),
-            T(_("Folder: %1"), BD.dirpath(self:getCurrentDownloadDir())),
-            T(_("Format: %1"), self:bulkFormatPreset().label),
-            T(_("Existing files: %1"), self:bulkExistingPolicy().label),
-        }
-        if source.known_skips then
-            if source.known_skips.on_device > 0 then
-                table.insert(lines, T(_("Already on device: %1"), source.known_skips.on_device))
-            end
-            if source.known_skips.unsupported > 0 then
-                table.insert(lines, T(_("No supported format: %1"), source.known_skips.unsupported))
-            end
-        end
-        return table.concat(lines, "\n")
+    -- "Download 345 books".
+    function Catalog:bulkDownloadLabel(total)
+        return T(_.ngettext("Download %1 book", "Download %1 books", total), total)
     end
 
+    -- The plan sheet for one source: where the books go and how, then Download.
     function Catalog:confirmBulkSource(source)
         if self.bulk_running then
-            UIManager:show(InfoMessage:new{ text = _("A bulk download is already running."), timeout = 3 })
+            Toast.show(_("A bulk download is already running."), { icon = "hourglass" })
             return
         end
         if (source.total or 0) == 0 then
-            UIManager:show(InfoMessage:new{ text = _("No books to download."), timeout = 2 })
+            Toast.show(_("No books to download."), { icon = "info" })
             return
         end
-        local dialog
-        dialog = ButtonDialog:new{
-            title = self:bulkConfirmationTitle(source),
-            buttons = {
-                {
-                    {
-                        text = _("Download"),
-                        callback = function()
-                            UIManager:close(dialog)
-                            self:startBulkSource(source)
-                        end,
-                    },
-                },
-                {
-                    {
-                        text = _("Cancel"),
-                        callback = function()
-                            UIManager:close(dialog)
-                        end,
-                    },
-                },
-            },
-        }
-        UIManager:show(dialog)
+        BulkSheet.openPlan(self, {
+            sub = source.label,
+            scopes = { { label = source.label, source = source } },
+            on_download = function(chosen) self:bulkStart(chosen) end,
+        })
+    end
+
+    -- Download, from the plan sheet: the run starts in this process.
+    function Catalog:bulkStart(source)
+        self:runConnected(function()
+            self:startBulkSource(source)
+        end)
     end
 
     function Catalog:confirmBulkBooks(books, label, opts)
@@ -592,18 +509,31 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:bulkSourceKey(source)
+        local prefix = source.account_key and (source.account_key .. "|" .. tostring(source.variant) .. "|") or ""
         if source.kind == "ids" then
-            return "ids|" .. idListKey(source.ids)
+            return prefix .. "ids|" .. idListKey(source.ids)
         end
-        return "filter|" .. sortedParamKey(source.params or {})
+        return prefix .. "filter|" .. sortedParamKey(source.params or {})
     end
 
     function Catalog:startBulkSource(source)
         if self.bulk_running then
-            UIManager:show(InfoMessage:new{ text = _("A bulk download is already running."), timeout = 3 })
+            Toast.show(_("A bulk download is already running."), { icon = "hourglass" })
             return
         end
 
+        source.account_key = Delivery.key(self.client)
+        local checkpoint = self:bulkOpenCheckpoint():load()
+        local pinned_variant
+        if checkpoint then
+            for _, candidate in ipairs({ "original", "audioless_epub" }) do
+                source.variant = candidate
+                if checkpoint.source_key == self:bulkSourceKey(source) then pinned_variant = candidate; break end
+            end
+        end
+        local variant, variant_err = self:fetchDeliveryPreference(pinned_variant)
+        if variant_err then Toast.error(variant_err); return end
+        source.variant = variant
         local ctx = {
             source = source,
             source_key = self:bulkSourceKey(source),
@@ -630,6 +560,7 @@ function CatalogBulkDownload.install(Catalog)
             pending_links = {},
             pending_matches = {},
             completed = {},
+            linked_paths = {},
             failed_books = {},
             failed_titles = {},
             existing_files = {},
@@ -638,8 +569,9 @@ function CatalogBulkDownload.install(Catalog)
             since_checkpoint = 0,
             cancel_requested = false,
             cancelled = false,
-            progress_dialog = nil,
-            progress_shown_text = nil,
+            progress_sheet = nil,
+            progress_status = nil,
+            progress_book = nil,
             progress_shown_at = 0,
         }
         self.bulk_running = true
@@ -649,7 +581,7 @@ function CatalogBulkDownload.install(Catalog)
         if source.clear_selection then
             self:bulkClearSelection(true)
         end
-        self:bulkSetProgress(ctx, _("Preparing bulk download..."), true)
+        self:bulkSetProgress(ctx, _("Getting ready…"), true)
         -- Enumeration runs off the UI thread; every continuation stays inside
         -- that boundary so the next step never starts before it finishes.
         UIManager:scheduleIn(STEP_DELAY, function()
@@ -683,6 +615,7 @@ function CatalogBulkDownload.install(Catalog)
         if resumed and resumed.source_key == ctx.source_key then
             ctx.resumed = true
             ctx.resumed_completed = resumed.completed or {}
+            ctx.linked_paths = resumed.linked_paths or {}
             ctx.position = {
                 cursor = resumed.cursor,
                 chunk = resumed.chunk_index or 1,
@@ -774,6 +707,7 @@ function CatalogBulkDownload.install(Catalog)
         params.size = PAGE_SIZE
         params.cursor = position.cursor
 
+        params.variant = ctx.source.variant
         local body, err = self.client:catalogManifest(params)
         if not body then
             -- A server that answers the route with "not found" is a confirmed
@@ -853,76 +787,44 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:bulkAbort(ctx, message)
-        if ctx.progress_dialog then
-            UIManager:close(ctx.progress_dialog)
-            ctx.progress_dialog = nil
+        if ctx.progress_sheet then
+            ctx.progress_sheet:close()
+            ctx.progress_sheet = nil
         end
         self.bulk_running = false
         self.bulk_ctx = nil
         self:bulkReleaseStandby(ctx)
-        UIManager:show(InfoMessage:new{ text = message, timeout = 4 })
+        Toast.error(message)
     end
 
-    function Catalog:bulkSetProgress(ctx, text, force)
+    -- The run's sheet follows ctx; status is the line under the book, or the
+    -- title before the first book. Redraws at most every PROGRESS_THROTTLE
+    -- seconds unless forced, so a long run does not flood the e-ink screen.
+    function Catalog:bulkSetProgress(ctx, status, force)
         if not ctx then return end
-        if not force then
-            if text == ctx.progress_shown_text then return end
-            if ctx.progress_dialog and os.time() - (ctx.progress_shown_at or 0) < PROGRESS_THROTTLE then
-                return
-            end
+        if status ~= nil then ctx.progress_status = status end
+        if not ctx.progress_sheet then
+            ctx.progress_sheet = BulkSheet.openProgress(self, ctx)
+            ctx.progress_shown_at = os.time()
+            UIManager:forceRePaint()
+            return
         end
-        ctx.progress_shown_text = text
+        if not force and os.time() - (ctx.progress_shown_at or 0) < PROGRESS_THROTTLE then return end
         ctx.progress_shown_at = os.time()
-        if ctx.progress_dialog then
-            ctx.progress_dialog:setTitle(text)
-        else
-            ctx.progress_dialog = ButtonDialog:new{
-                title = text,
-                buttons = {
-                    {
-                        {
-                            text = ctx.cancel_requested and _("Stopping...") or _("Cancel after current file"),
-                            enabled = not ctx.cancel_requested,
-                            callback = function()
-                                if ctx.cancel_requested then return end
-                                ctx.cancel_requested = true
-                                if ctx.progress_dialog then
-                                    UIManager:close(ctx.progress_dialog)
-                                    ctx.progress_dialog = nil
-                                end
-                                self:bulkSetProgress(ctx, _("Stopping after current file..."), true)
-                            end,
-                        },
-                    },
-                },
-            }
-            UIManager:show(ctx.progress_dialog)
-        end
+        ctx.progress_sheet:update()
         UIManager:forceRePaint()
     end
 
-    function Catalog:bulkProgressText(ctx, status, book)
-        local counts = ctx.counts
-        local lines = {
-            T(_("Processing %1/%2"), ctx.index, math.max(ctx.total or 0, ctx.index)),
-        }
-        table.insert(lines, fixedTwoLineTitle(book))
-        if status then
-            table.insert(lines, status)
-        end
-        table.insert(lines, T(_("Downloaded: %1\nAlready on device: %2\nExisting file (Not in BookOrbit): %3\nRenamed conflicts: %4\nUnsupported: %5\nFailed: %6"),
-            counts.downloaded,
-            counts.skipped_on_device,
-            counts.skipped_existing,
-            counts.path_conflicts or 0,
-            counts.skipped_unsupported,
-            counts.failed
-        ))
-        return table.concat(lines, "\n\n")
+    function Catalog:bulkShowStatus(ctx, status, book, force)
+        ctx.progress_book = book
+        self:bulkSetProgress(ctx, status, force == true)
     end
 
-    function Catalog:bulkShowStatus(ctx, status, book, force)
-        self:bulkSetProgress(ctx, self:bulkProgressText(ctx, status, book), force == true)
+    -- Stop after this book: the run finishes the file it is on.
+    function Catalog:bulkRequestStop(ctx)
+        if not ctx or ctx.cancel_requested then return end
+        ctx.cancel_requested = true
+        self:bulkSetProgress(ctx, _("Stopping after this book…"), true)
     end
 
     function Catalog:bulkQueueStep(ctx)
@@ -975,6 +877,7 @@ function CatalogBulkDownload.install(Catalog)
         self:runOffThread(function()
             self:bulkFlushLinks(ctx, true)
             ctx.completed = {}
+            ctx.linked_paths = {}
             ctx.resumed_completed = nil
             ctx.position = ctx.next_position or {}
             self:bulkCommitCheckpoint(ctx)
@@ -1037,14 +940,19 @@ function CatalogBulkDownload.install(Catalog)
 
     -- Restart validation: a destination this run already published is accepted
     -- only when its size and content hash still match the manifest.
-    function Catalog:bulkValidatePublished(ctx, path, file, book_id)
+    function Catalog:bulkValidatePublished(ctx, path, file, book_id, recorded)
         if not path then return false end
         local size = lfs.attributes(path, "size")
         if not size then return false end
-        if file.sizeBytes and file.sizeBytes > 0 and size ~= file.sizeBytes then return false end
-        if not file.fileHash then return false end
+        local expected_size, expected_hash = file.sizeBytes, file.fileHash
+        if type(recorded) == "table" then
+            if recorded.selection ~= file.selection or recorded.file_id ~= file.id then return false end
+            expected_size, expected_hash = recorded.size, recorded.hash
+        end
+        if expected_size and expected_size > 0 and size ~= expected_size then return false end
+        if not expected_hash then return false end
         local hashed, digest = pcall(util.partialMD5, path)
-        if not hashed or digest ~= file.fileHash then return false end
+        if not hashed or digest ~= expected_hash then return false end
         self:bulkQueueLink(ctx, {
             digest = digest,
             bookId = book_id,
@@ -1057,7 +965,7 @@ function CatalogBulkDownload.install(Catalog)
     function Catalog:bulkProcessBook(ctx, book)
         self:bulkShowStatus(ctx, _("Checking book..."), book, ctx.index % 5 == 0)
 
-        if self:isOnDevice(book) then
+        if not (ctx.source and ctx.source.variant) and self:isOnDevice(book) then
             ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
             self:bulkShowStatus(ctx, _("Already on device - skipping"), book, ctx.index % 5 == 0)
             return
@@ -1072,7 +980,7 @@ function CatalogBulkDownload.install(Catalog)
         if not book.files then
             -- Only reached on a server without the manifest capability.
             self:bulkShowStatus(ctx, _("Loading book details..."), book, true)
-            local body, err = self.client:catalogBook(book.id)
+            local body, err = self.client:catalogBook(book.id, ctx.source.variant)
             if not body then
                 logger.warn("BookOrbit: bulk detail fetch failed", book.id, err)
                 self:bulkRecordFailure(ctx, book)
@@ -1080,14 +988,19 @@ function CatalogBulkDownload.install(Catalog)
                 return
             end
             detail = body
-            if self:isOnDevice(detail) then
+            if not (ctx.source and ctx.source.variant) and self:isOnDevice(detail) then
                 ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
                 self:bulkShowStatus(ctx, _("Already on device - skipping"), detail, true)
                 return
             end
         end
 
-        local file = self:bulkChooseFile(detail)
+        local file = self:bulkChooseFile(detail, ctx.resumed)
+        if not file and #self:supportedFiles(detail) > 0 then
+            ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
+            self:bulkShowStatus(ctx, _("Already on device - skipping"), detail, true)
+            return
+        end
         if not file then
             ctx.counts.skipped_unsupported = ctx.counts.skipped_unsupported + 1
             self:bulkShowStatus(ctx, _("No supported format - skipping"), detail, true)
@@ -1099,11 +1012,12 @@ function CatalogBulkDownload.install(Catalog)
 
         if ctx.resumed then
             local recorded = ctx.resumed_completed and ctx.resumed_completed[tostring(book_id)]
-            for _, candidate in ipairs({ recorded, local_path }) do
-                if self:bulkValidatePublished(ctx, candidate, file, book_id) then
+            local recorded_path = type(recorded) == "table" and recorded.path or recorded
+            for candidate_index, candidate in ipairs({ recorded_path or local_path, local_path }) do
+                if self:bulkValidatePublished(ctx, candidate, file, book_id, candidate == recorded_path and recorded or nil) then
                     ctx.counts.skipped_present = ctx.counts.skipped_present + 1
                     ctx.destination_paths[pathKey(candidate)] = { book_id = book_id, file_id = file.id }
-                    ctx.completed[tostring(book_id)] = candidate
+                    ctx.completed[tostring(book_id)] = recorded or candidate
                     self:bulkShowStatus(ctx, _("Already downloaded - skipping"), detail, true)
                     return
                 end
@@ -1126,11 +1040,19 @@ function CatalogBulkDownload.install(Catalog)
         end
         ctx.counts.downloaded = ctx.counts.downloaded + 1
         ctx.destination_paths[pathKey(local_path)] = { book_id = book_id, file_id = file.id }
-        ctx.completed[tostring(book_id)] = local_path
+        if file.selection then
+            local hashed, digest = pcall(util.partialMD5, local_path)
+            ctx.completed[tostring(book_id)] = {
+                path = local_path, selection = file.selection, file_id = file.id,
+                size = lfs.attributes(local_path, "size"), hash = hashed and digest or nil,
+            }
+        else
+            ctx.completed[tostring(book_id)] = local_path
+        end
         self:bulkShowStatus(ctx, _("Download complete"), detail, true)
     end
 
-    function Catalog:bulkChooseFile(detail)
+    function Catalog:bulkChooseFile(detail, validate_present)
         local files = self:supportedFiles(detail)
         if #files == 0 then return nil end
 
@@ -1138,13 +1060,13 @@ function CatalogBulkDownload.install(Catalog)
             local wanted = string.lower(format)
             for _, file in ipairs(files) do
                 local file_format = string.lower(file.format or "")
-                if file_format == wanted and not self:onDeviceFilePath(file) then
+                if file_format == wanted and (validate_present or not self:onDeviceFilePath(file)) then
                     return file
                 end
             end
         end
         for _, file in ipairs(files) do
-            if not self:onDeviceFilePath(file) then
+            if validate_present or not self:onDeviceFilePath(file) then
                 return file
             end
         end
@@ -1173,20 +1095,23 @@ function CatalogBulkDownload.install(Catalog)
 
         self:bulkShowStatus(ctx, _("Downloading..."), detail, true)
         -- The shared counter only supplies a unique progress generation here;
-        -- the run's own cancellation state decides whether a result may publish,
-        -- so an unrelated single download cannot discard a bulk transfer.
+        -- Stopping after the current file still publishes that file. Only a
+        -- finished or replaced run must discard an outstanding result.
         local generation = self:nextDownloadGeneration()
         local ok, err, result = Transfer.run{
             root = self:getCurrentDownloadDir(),
             destination = local_path,
             generation = generation,
             expected_bytes = total,
+            expected_hash = file.fileHash,
             hash = "partial_md5",
             on_progress = onProgress,
             is_current = function()
-                return ctx == self.bulk_ctx and not ctx.cancel_requested
+                return ctx == self.bulk_ctx
             end,
             perform = function(download_opts)
+                download_opts.variant = file.selection and (file.requestedVariant or file.downloadVariant) or nil
+                download_opts.selection = file.selection
                 return self.client:downloadCatalogFile(file.id, local_path, download_opts)
             end,
         }
@@ -1195,6 +1120,12 @@ function CatalogBulkDownload.install(Catalog)
             return false
         end
 
+        if file.selection then
+            local variants = self.settings.catalog_downloaded_variants or {}
+            variants[Delivery.key(self.client) .. "|" .. tostring(file.id) .. "|" .. file.downloadVariant] = { path = local_path, selection = file.selection }
+            self.settings.catalog_downloaded_variants = variants
+            ctx.delivery_markers_dirty = true
+        end
         local digest = result and result.hash
         if digest and file.fileHash and digest == file.fileHash then
             -- The manifest hash is the digest local match state keys on, so a
@@ -1237,8 +1168,12 @@ function CatalogBulkDownload.install(Catalog)
     -- single bounded match check, instead of one request and one flush per file.
     function Catalog:bulkFlushLinks(ctx, force)
         local pending = #ctx.pending_links + #ctx.pending_matches
-        if pending == 0 then return end
         if not force and pending < LINK_BATCH_SIZE then return end
+        if ctx.delivery_markers_dirty then
+            self:persistSetting("catalog_downloaded_variants", self.settings.catalog_downloaded_variants)
+            ctx.delivery_markers_dirty = false
+        end
+        if pending == 0 then return end
 
         local links = ctx.pending_links
         local matches = ctx.pending_matches
@@ -1295,7 +1230,13 @@ function CatalogBulkDownload.install(Catalog)
 
         if #links > 0 then
             BookOrbitStateManager.linkFiles(links)
-            ctx.counts.linked = ctx.counts.linked + #links
+            ctx.linked_paths = ctx.linked_paths or {}
+            for _, link in ipairs(links) do
+                if not ctx.linked_paths[link.file] then
+                    ctx.counts.linked = ctx.counts.linked + 1
+                    ctx.linked_paths[link.file] = true
+                end
+            end
             self:refreshOnDevice()
             if self.markStackDirty then self:markStackDirty() end
         end
@@ -1325,6 +1266,7 @@ function CatalogBulkDownload.install(Catalog)
             page_number = position.page,
             processed = ctx.index,
             completed = ctx.completed,
+            linked_paths = ctx.linked_paths,
             counts = ctx.counts,
             failures = failures,
         })
@@ -1358,12 +1300,55 @@ function CatalogBulkDownload.install(Catalog)
         self:bulkFinish(ctx)
     end
 
+    -- What a run came to, as plain data for the sheet: the counts that are
+    -- not zero, what needs attention, and the books that failed.
+    function Catalog:bulkSummary(ctx)
+        local counts = ctx.counts
+        local summary = {
+            stopped = ctx.cancelled == true,
+            title = ctx.cancelled and _("Bulk download stopped") or _("Bulk download complete"),
+            sub = ctx.label,
+            rows = { { label = _("Downloaded"), value = counts.downloaded } },
+            notes = {},
+            failed_titles = ctx.failed_titles or {},
+            more_failed = math.max(0, #(ctx.failed_books or {}) - #(ctx.failed_titles or {})),
+            can_retry = #(ctx.failed_books or {}) > 0,
+        }
+        local function add(label, value)
+            if (value or 0) > 0 then table.insert(summary.rows, { label = label, value = value }) end
+        end
+        add(_("Linked for sync"), counts.linked)
+        add(_("Already on this device"), counts.skipped_on_device)
+        add(_("Already downloaded"), counts.skipped_present)
+        add(_("Kept a file not from BookOrbit"), counts.skipped_existing)
+        add(_("Saved under a new name"), counts.path_conflicts)
+        add(_("No format this reader opens"), counts.skipped_unsupported)
+        add(_("Failed"), counts.failed)
+        if ctx.limit_reached then
+            table.insert(summary.notes, T(_("Stopped at the %1 page enumeration limit. Run it again to continue."), MAX_ENUMERATION_PAGES))
+        end
+        if ctx.enumeration_error then
+            table.insert(summary.notes, _("The book list could not be loaded to the end. Run it again to continue."))
+        end
+        if #(ctx.path_conflicts or {}) > 0 then
+            table.insert(summary.notes, _("Books whose file names clashed were saved with their BookOrbit ID added."))
+        end
+        local existing = ctx.existing_files or {}
+        if #existing > 0 then
+            local titles = {}
+            for index, entry in ipairs(existing) do
+                if index > 3 then break end
+                table.insert(titles, shortText(entry.title, 40))
+            end
+            local list = table.concat(titles, ", ")
+            if #existing > 3 then list = T(_("%1, and %2 more"), list, #existing - 3) end
+            table.insert(summary.notes, T(_("Files not from BookOrbit were already there and were kept: %1"), list))
+        end
+        return summary
+    end
+
     function Catalog:bulkFinish(ctx)
         self:bulkReleaseStandby(ctx)
-        if ctx.progress_dialog then
-            UIManager:close(ctx.progress_dialog)
-            ctx.progress_dialog = nil
-        end
         self.bulk_running = false
         self.bulk_ctx = nil
         self:refreshOnDevice()
@@ -1372,88 +1357,12 @@ function CatalogBulkDownload.install(Catalog)
             self:updateItems()
         end
 
-        local counts = ctx.counts
-        local lines = {
-            ctx.cancelled and _("Bulk download stopped.") or _("Bulk download complete."),
-            T(_("Downloaded: %1"), counts.downloaded),
-            T(_("Linked for sync: %1"), counts.linked),
-            T(_("Skipped on device: %1"), counts.skipped_on_device),
-            T(_("Existing file (Not in BookOrbit): %1"), counts.skipped_existing),
-            T(_("Renamed path conflicts: %1"), counts.path_conflicts or 0),
-            T(_("No supported format: %1"), counts.skipped_unsupported),
-            T(_("Failed: %1"), counts.failed),
-        }
-        if (counts.skipped_present or 0) > 0 then
-            table.insert(lines, T(_("Already downloaded: %1"), counts.skipped_present))
-        end
-        if ctx.limit_reached then
-            table.insert(lines, "")
-            table.insert(lines, T(_("Stopped at the %1 page enumeration limit. Run it again to continue."), MAX_ENUMERATION_PAGES))
-        end
-        if ctx.enumeration_error then
-            table.insert(lines, "")
-            table.insert(lines, _("The book list could not be loaded to the end. Run it again to continue."))
-        end
-        local existing_files = ctx.existing_files or {}
-        local path_conflicts = ctx.path_conflicts or {}
-        if #existing_files > 0 then
-            table.insert(lines, "")
-            table.insert(lines, _("Existing files (Not in BookOrbit):"))
-            for _, entry in ipairs(existing_files) do
-                table.insert(lines, shortText(entry.title, 52))
-                table.insert(lines, shortText(entry.path, 72))
-            end
-        end
-        if #path_conflicts > 0 then
-            table.insert(lines, "")
-            table.insert(lines, _("Conflicting destinations were renamed with BookOrbit IDs."))
-        end
-
-        if #ctx.failed_titles > 0 then
-            table.insert(lines, "")
-            table.insert(lines, _("Failed books:"))
-            for _, title in ipairs(ctx.failed_titles) do
-                table.insert(lines, title)
-            end
-            if #ctx.failed_books > #ctx.failed_titles then
-                table.insert(lines, T(_("+%1 more"), #ctx.failed_books - #ctx.failed_titles))
-            end
-        end
-
-        local dialog
-        local buttons = {}
-        if #ctx.failed_books > 0 then
-            table.insert(buttons, {
-                {
-                    text = _("Retry failed"),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:confirmBulkBooks(ctx.failed_books, _("Failed downloads"))
-                    end,
-                },
-            })
-        end
-        table.insert(buttons, {
-            {
-                text = _("View On device"),
-                callback = function()
-                    UIManager:close(dialog)
-                    self:loadOnDevice()
-                end,
-            },
-            {
-                text = _("Close"),
-                callback = function()
-                    UIManager:close(dialog)
-                end,
-            },
-        })
-
-        dialog = ButtonDialog:new{
-            title = table.concat(lines, "\n"),
-            buttons = buttons,
-        }
-        UIManager:show(dialog)
+        local summary = self:bulkSummary(ctx)
+        summary.on_retry = function() self:confirmBulkBooks(ctx.failed_books, _("Failed downloads")) end
+        local sheet = ctx.progress_sheet
+        ctx.progress_sheet = nil
+        if not sheet or sheet.closed then sheet = BulkSheet.openProgress(self, ctx) end
+        sheet:finished(summary)
     end
 end
 

@@ -27,7 +27,15 @@ export class TtsSynthesisService {
     this.maxEntries = maxEntries ?? DEFAULT_MAX_ENTRIES;
   }
 
-  async synthesize(provider: ITtsProvider, providerId: string, voiceId: string, speed: number, text: string, format = 'mp3'): Promise<Buffer> {
+  async synthesize(
+    provider: ITtsProvider,
+    providerId: string,
+    voiceId: string,
+    speed: number,
+    text: string,
+    format = 'mp3',
+    signal?: AbortSignal,
+  ): Promise<Buffer> {
     const event = 'tts.synthesis';
     const cacheKey = this.buildCacheKey(providerId, voiceId, speed, text, format);
     const cached = this.cache.get(cacheKey);
@@ -39,7 +47,7 @@ export class TtsSynthesisService {
     const startMs = Date.now();
     this.logger.log(`[${event}] [start] providerId=${providerId} voiceId=${voiceId} speed=${speed} textLen=${text.length} - synthesis started`);
     try {
-      const buffer = await provider.synthesize(text, voiceId, speed, format);
+      const buffer = await provider.synthesize(text, voiceId, speed, format, signal);
       this.logger.log(
         `[${event}] [end] providerId=${providerId} voiceId=${voiceId} durationMs=${Date.now() - startMs} bytes=${buffer.length} - synthesis completed`,
       );
@@ -48,6 +56,12 @@ export class TtsSynthesisService {
       }
       return buffer;
     } catch (err) {
+      if (signal?.aborted) {
+        this.logger.log(
+          `[${event}] [end] providerId=${providerId} voiceId=${voiceId} durationMs=${Date.now() - startMs} outcome=cancelled - synthesis cancelled because the client disconnected`,
+        );
+        throw err;
+      }
       const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
       const error = err instanceof Error ? sanitizeLogValue(err.message) : 'unknown';
       this.logger.error(

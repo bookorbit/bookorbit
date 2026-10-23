@@ -1,8 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BookRecommendation, SeriesBookRecommendation, UnscopedBookRecommendation, UserBookStatus } from '@bookorbit/types';
+import type { BookRecommendation, CoverAspectRatio, SeriesBookRecommendation, UnscopedBookRecommendation, UserBookStatus } from '@bookorbit/types';
 import { normalizeCoverAspectRatio } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
@@ -34,14 +35,17 @@ export class RecommendationService {
     private readonly libraryService: LibraryService,
     private readonly embedder: BookEmbedderService,
     private readonly userBookStatusService: UserBookStatusService,
+    private readonly coverStore: BookCoverStore,
   ) {}
 
-  private async withReadStatus<T extends { id: number }>(rows: T[], userId: number): Promise<(T & { readStatus: UserBookStatus | null })[]> {
-    const statuses = await this.userBookStatusService.findByBookIds(
-      userId,
-      rows.map((row) => row.id),
-    );
-    return rows.map((row) => ({ ...row, readStatus: statuses.get(row.id) ?? null }));
+  /** Adds the viewer's read status and each book's cover face, which replaces the library shape the rows carry. */
+  private async withCoverAndReadStatus<T extends { id: number; coverAspectRatio: CoverAspectRatio }>(
+    rows: T[],
+    userId: number,
+  ): Promise<(T & { coverVersion?: string; readStatus: UserBookStatus | null })[]> {
+    const ids = rows.map((row) => row.id);
+    const [statuses, faces] = await Promise.all([this.userBookStatusService.findByBookIds(userId, ids), this.coverStore.facesFor(ids)]);
+    return rows.map((row) => ({ ...row, ...faces.get(row.id), readStatus: statuses.get(row.id) ?? null }));
   }
 
   async getRecommendations(bookId: number, user: RequestUser): Promise<BookRecommendation[]> {
@@ -104,7 +108,7 @@ export class RecommendationService {
       const ordered = rescored
         .map((rescoredCandidate) => rowMap.get(rescoredCandidate.bookId))
         .filter((row): row is UnscopedBookRecommendation => row != null);
-      const recommendations = await this.withReadStatus(ordered, user.id);
+      const recommendations = await this.withCoverAndReadStatus(ordered, user.id);
 
       this.logger.log(
         `[${RECOMMENDATION_EVENT}] [end] bookId=${bookId} userId=${user.id} libraryId=${libraryId} durationMs=${Date.now() - startedAt} accessibleLibraryCount=${accessibleLibraryIds.length} candidateCount=${candidates.length} rescoredCount=${rescored.length} resultCount=${recommendations.length} - recommendation lookup completed`,
@@ -144,7 +148,7 @@ export class RecommendationService {
         `[${SERIES_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} seriesId=${series.id} seriesName="${sanitizeLogValue(series.name ?? '')}" resultCount=${rows.length} - series books lookup completed`,
       );
 
-      return this.withReadStatus(
+      return this.withCoverAndReadStatus(
         rows.map((r) => ({
           id: r.bookId,
           title: r.title,
@@ -183,7 +187,7 @@ export class RecommendationService {
         `[${AUTHOR_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} resultCount=${rows.length} - author books lookup completed`,
       );
 
-      return this.withReadStatus(
+      return this.withCoverAndReadStatus(
         rows.map((r) => ({
           id: r.bookId,
           title: r.title,

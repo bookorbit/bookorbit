@@ -6,10 +6,12 @@ import { Readable } from 'stream';
 import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { splitMetadataIsbn } from '../../common/text-match/isbn-normalize';
 import { buildPatternTokens, patternReferencesToken } from '../../common/utils/pattern-tokens.utils';
 import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
 
 import { DB } from '../../db';
+import { realignAudioTrackOrder } from '../../db/audio-track-order';
 import * as schema from '../../db/schema';
 import { books, bookFiles, libraries, libraryFolders } from '../../db/schema';
 import type { RequestUser } from '../../common/types/request-user';
@@ -28,6 +30,7 @@ import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
 import { computeFileHash } from '../scanner/lib/hash';
 import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
+import { resolveSingleFileBookPath } from '../../common/utils/book-path.utils';
 import { inspectEpubMediaOverlayFields, mediaOverlayCapabilityFromFields } from '../reader/epub/epub-media-overlay-capability';
 import { PathPolicyService } from '../path/path-policy.service';
 import { FORMATS_WITH_UNBOUNDED_METADATA_READS, MAX_BUFFERED_METADATA_BYTES } from '../../common/constants/upload.constants';
@@ -250,7 +253,7 @@ export class UploadService {
 
       shouldCleanupDestination = true;
       await this.storage.moveToPath(tempPath, destination);
-      // File is on disk. Do not delete it on any subsequent failure — the scanner
+      // File is on disk. Do not delete it on any subsequent failure; the scanner
       // will reconcile any orphan. This also prevents the catch block from deleting
       // a file that a concurrent upload may have written to the same path.
       shouldCleanupDestination = false;
@@ -259,6 +262,8 @@ export class UploadService {
       const ino = fileStat.ino;
       const relPath = relative(bookRow.libraryFolderPath, destination);
       const mediaOverlayFields = await this.inspectMediaOverlayFields(destination, format);
+      // The transaction callback cannot see the narrowing of the outer `let`.
+      const absolutePath = destination;
 
       const { inserted, isPrimary, finalStatus } = await this.db.transaction(async (tx) => {
         const [lockedBook] = await tx
@@ -280,7 +285,7 @@ export class UploadService {
           .values({
             bookId,
             libraryFolderId: bookRow.libraryFolderId,
-            absolutePath: destination,
+            absolutePath,
             relPath,
             ino,
             sizeBytes,
@@ -301,6 +306,8 @@ export class UploadService {
           });
 
         if (!inserted) throw new Error('Failed to insert book file record');
+        // A track added by hand has no number yet, which would play it after every other track.
+        if (isAudioFormat(format)) await realignAudioTrackOrder(tx, bookId);
 
         const contentFiles = await tx
           .select({
@@ -383,7 +390,7 @@ export class UploadService {
 
     if (!bookRow) throw new NotFoundException(`Book ${bookId} not found`);
 
-    await this.libraryService.verifyUserAccess(user.id, bookRow.libraryId, user.isSuperuser);
+    await this.libraryService.verifyUserAccessLevel(user.id, bookRow.libraryId, user.isSuperuser, 'editor');
 
     const fileRenameService = this.resolveFileRenameService();
     if (!fileRenameService) {
@@ -425,7 +432,7 @@ export class UploadService {
 
       if (resolved) {
         const absolutePath = join(libraryFolderPath, resolved);
-        return { absolutePath, bookFolderPath: isBookPerFile ? absolutePath : dirname(absolutePath) };
+        return { absolutePath, bookFolderPath: resolveSingleFileBookPath(absolutePath, libraryFolderPath, library.organizationMode) };
       }
     }
 
@@ -462,6 +469,7 @@ export class UploadService {
         seriesName?: string | null;
         seriesIndex?: string | null;
         isbn13?: string | null;
+        isbn10?: string | null;
         authors: { name: string }[];
         narrators?: string[];
       } | null = null;
@@ -483,7 +491,7 @@ export class UploadService {
             publisher: mobi.publisher,
             publishedYear: year,
             language: mobi.language,
-            isbn13: mobi.isbn,
+            ...splitMetadataIsbn(mobi.isbn),
             seriesName: null,
             seriesIndex: null,
             authors: mobi.authors.map((name) => ({ name })),

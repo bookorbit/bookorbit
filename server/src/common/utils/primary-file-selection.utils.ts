@@ -7,13 +7,14 @@ export type PrimaryFileCandidate = {
   mediaOverlayAvailable?: boolean | null;
 };
 
-function isReadAlong(file: PrimaryFileCandidate): boolean {
+/** An EPUB with synced narration. Primary selection and file write-back both ask this one question. */
+export function isReadAlongBookFile(file: Pick<PrimaryFileCandidate, 'format' | 'mediaOverlayAvailable'>): boolean {
   return file.format?.toLowerCase() === 'epub' && file.mediaOverlayAvailable === true;
 }
 
 function matchesPriorityEntry(file: PrimaryFileCandidate, entry: string, readAlongRankedApart: boolean): boolean {
-  if (entry === READ_ALONG_FORMAT_PRIORITY) return isReadAlong(file);
-  if (entry === 'epub' && readAlongRankedApart) return file.format?.toLowerCase() === 'epub' && !isReadAlong(file);
+  if (entry === READ_ALONG_FORMAT_PRIORITY) return isReadAlongBookFile(file);
+  if (entry === 'epub' && readAlongRankedApart) return file.format?.toLowerCase() === 'epub' && !isReadAlongBookFile(file);
   return file.format?.toLowerCase() === entry;
 }
 

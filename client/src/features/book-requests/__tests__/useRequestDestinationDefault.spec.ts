@@ -60,7 +60,6 @@ describe('useRequestDestinationDefault', () => {
     expect(apiMock).toHaveBeenCalledWith('/api/v1/book-requests/default-destinations')
     expect(preferences.defaultFor('ebook')).toEqual({ libraryId: 4, libraryName: 'Novels', folderId: 9 })
     expect(preferences.defaultFor('audiobook')).toEqual({ libraryId: 5, libraryName: 'Audiobooks', folderId: 10 })
-    expect(preferences.defaultFor('comic')).toEqual({ libraryId: null, libraryName: null, folderId: null })
   })
 
   it('reads a malformed body as no default rather than a half-made destination', async () => {

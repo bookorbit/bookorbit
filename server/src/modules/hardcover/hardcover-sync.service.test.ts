@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BookService } from '../book/book.service';
 import { HardcoverBookMatchService } from './hardcover-book-match.service';
 import { HardcoverClientService } from './hardcover-client.service';
+import { buildHardcoverMatchBasis } from './hardcover-id.utils';
 import { HardcoverRepository } from './hardcover.repository';
 import { HardcoverSettingsService } from './hardcover-settings.service';
 import { HardcoverSyncService } from './hardcover-sync.service';
@@ -22,6 +23,7 @@ const mockRepo = {
   findReadingAttempts: vi.fn(),
   findClaimedHardcoverReadIds: vi.fn(),
   linkReadingAttempt: vi.fn(),
+  unlinkReadingAttempt: vi.fn(),
 };
 
 const mockClient = {
@@ -99,6 +101,7 @@ describe('HardcoverSyncService', () => {
     mockRepo.findReadingAttempts.mockResolvedValue([]);
     mockRepo.findClaimedHardcoverReadIds.mockResolvedValue([]);
     mockRepo.linkReadingAttempt.mockResolvedValue('linked');
+    mockRepo.unlinkReadingAttempt.mockResolvedValue(true);
     mockRepo.upsertBookState.mockResolvedValue({});
     mockRepo.setBookSyncOverride.mockResolvedValue({});
     mockRepo.updateLastSyncedAt.mockResolvedValue(undefined);
@@ -1317,7 +1320,132 @@ describe('HardcoverSyncService', () => {
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('cause="23505 reading_attempts_external_uidx duplicate key value"'));
       errorSpy.mockRestore();
     });
+
+    describe('a linked read filed under another Hardcover book', () => {
+      const FOREIGN_READ = 7159741;
+      const FOREIGN_USER_BOOK = 19544253;
+
+      function owner(userBookId: number | null) {
+        mockClient.query.mockResolvedValueOnce({ user_book_reads: userBookId == null ? [] : [{ id: FOREIGN_READ, user_book_id: userBookId }] });
+      }
+
+      it('is released, and the attempt gets a read on this book instead of a rejected edit', async () => {
+        const logSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+        mockRepo.findBookSyncData.mockResolvedValue(readingBook);
+        mockRepo.findReadingAttempts.mockResolvedValue([linked(1, FOREIGN_READ, { startedOn: '2024-01-01' })]);
+        mockRepo.findClaimedHardcoverReadIds.mockResolvedValue([FOREIGN_READ]);
+        arrange([]);
+        owner(FOREIGN_USER_BOOK);
+        insertRead(601);
+
+        await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+        expect(mockClient.query).toHaveBeenNthCalledWith(4, 1, 'tok', expect.stringContaining('query FindUserBookReadOwner'), { id: FOREIGN_READ });
+        expect(mockRepo.unlinkReadingAttempt).toHaveBeenCalledWith(1, 1, FOREIGN_READ);
+        expect(linkCalls()).toEqual([[1, 1, 601]]);
+        expect(mockClient.query).not.toHaveBeenCalledWith(
+          1,
+          'tok',
+          expect.stringContaining('mutation UpdateUserBookRead'),
+          expect.objectContaining({ id: FOREIGN_READ }),
+        );
+        expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ hardcoverReadId: 601, syncError: null }));
+        expect(logSpy).toHaveBeenCalledWith(
+          expect.stringContaining(`[hardcover.read_unlink] [end] userId=1 attemptId=1 hardcoverReadId=${FOREIGN_READ}`),
+        );
+        logSpy.mockRestore();
+      });
+
+      it('is kept when Hardcover files it under this book, past the fetched window', async () => {
+        mockRepo.findBookSyncData.mockResolvedValue(readingBook);
+        mockRepo.findReadingAttempts.mockResolvedValue([linked(1, FOREIGN_READ, { startedOn: '2024-01-01' })]);
+        mockRepo.findClaimedHardcoverReadIds.mockResolvedValue([FOREIGN_READ]);
+        arrange([]);
+        owner(55);
+        updateRead(FOREIGN_READ);
+
+        await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+        expect(mockRepo.unlinkReadingAttempt).not.toHaveBeenCalled();
+        expect(mockClient.query).toHaveBeenNthCalledWith(
+          5,
+          1,
+          'tok',
+          expect.stringContaining('mutation UpdateUserBookRead'),
+          expect.objectContaining({ id: FOREIGN_READ }),
+        );
+      });
+
+      it('is kept when Hardcover cannot place it', async () => {
+        mockRepo.findBookSyncData.mockResolvedValue(readingBook);
+        mockRepo.findReadingAttempts.mockResolvedValue([linked(1, FOREIGN_READ, { startedOn: '2024-01-01' })]);
+        mockRepo.findClaimedHardcoverReadIds.mockResolvedValue([FOREIGN_READ]);
+        arrange([]);
+        owner(null);
+        updateRead(FOREIGN_READ);
+
+        await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+        expect(mockRepo.unlinkReadingAttempt).not.toHaveBeenCalled();
+      });
+
+      it('is kept when the owner lookup fails', async () => {
+        const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        mockRepo.findBookSyncData.mockResolvedValue(readingBook);
+        mockRepo.findReadingAttempts.mockResolvedValue([linked(1, FOREIGN_READ, { startedOn: '2024-01-01' })]);
+        mockRepo.findClaimedHardcoverReadIds.mockResolvedValue([FOREIGN_READ]);
+        arrange([]);
+        mockClient.query.mockRejectedValueOnce(new Error('Hardcover unavailable'));
+        updateRead(FOREIGN_READ);
+
+        await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+        expect(mockRepo.unlinkReadingAttempt).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`[hardcover.read_owner] [fail] userId=1 hardcoverReadId=${FOREIGN_READ}`));
+        warnSpy.mockRestore();
+      });
+    });
   });
+
+  describe('after the match moves to another Hardcover book', () => {
+    const wantToRead = { ...readingBook, status: 'want_to_read', startedAt: null, progress: null };
+    const staleState = { hardcoverBookId: 1554702, hardcoverUserBookId: 19544253, hardcoverReadId: 7159741 };
+
+    function arrangeWantToRead(match: Record<string, unknown>) {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue(wantToRead);
+      mockRepo.findBookState.mockResolvedValue(staleState);
+      mockMatchService.matchBook.mockResolvedValue(match);
+      mockClient.query
+        .mockResolvedValueOnce({ insert_user_book: { user_book: { id: 19544262 }, error: null } })
+        .mockResolvedValueOnce({ update_user_book: { user_book: { id: 19544262 }, error: null } });
+    }
+
+    it("does not carry the old book's read id over", async () => {
+      arrangeWantToRead({
+        hardcoverBookId: 2973670,
+        hardcoverEditionId: 33314466,
+        editionPages: 321,
+        matchMethod: 'metadata_id',
+        replacedHardcoverBookId: 1554702,
+      });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(
+        expect.objectContaining({ hardcoverBookId: 2973670, hardcoverUserBookId: 19544262, hardcoverReadId: null, syncError: null }),
+      );
+    });
+
+    it('keeps the read id while the match stays on the same book', async () => {
+      arrangeWantToRead({ hardcoverBookId: 1554702, hardcoverEditionId: 31616496, editionPages: 217, matchMethod: 'cached' });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ hardcoverBookId: 1554702, hardcoverReadId: 7159741 }));
+    });
+  });
+
   describe('change detection', () => {
     const syncedState = {
       hardcoverBookId: 10,
@@ -1351,6 +1479,49 @@ describe('HardcoverSyncService', () => {
         .mockResolvedValueOnce({ update_user_book_read: { user_book_read: { id: 700 }, error: null } });
 
       await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+    });
+
+    it('re-syncs a settled link whose identifiers changed, even with nothing else to send', async () => {
+      const before = { ...readingBook, hardcoverMetadataId: 'hell-be-ok-growing-gorgeous-boys-into-good-men' };
+      const corrected = { ...readingBook, hardcoverMetadataId: 'ok-amen', isbn13: '9789146223856' };
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue(corrected);
+      mockRepo.findBookState.mockResolvedValue({ ...syncedState, matchBasis: buildHardcoverMatchBasis(before) });
+      mockMatchService.matchBook.mockResolvedValue(null);
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+      await makeService().syncBook(1, 1);
+
+      expect(mockMatchService.matchBook).toHaveBeenCalledWith(1, 'tok', corrected);
+      warnSpy.mockRestore();
+    });
+
+    it('skips a settled link whose identifiers are unchanged', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue(readingBook);
+      mockRepo.findBookState.mockResolvedValue({ ...syncedState, matchBasis: buildHardcoverMatchBasis(readingBook) });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+      expect(mockMatchService.matchBook).not.toHaveBeenCalled();
+    });
+
+    it('stops re-syncing a numeric Hardcover ID once a check settled it without moving the link', async () => {
+      const unresolvable = { ...readingBook, hardcoverMetadataId: '84' };
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue(unresolvable);
+      mockRepo.findBookState.mockResolvedValue({ ...syncedState, hardcoverBookId: 277100, matchBasis: buildHardcoverMatchBasis(unresolvable) });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+      expect(mockMatchService.matchBook).not.toHaveBeenCalled();
+    });
+
+    it('does not queue every older link for a re-sync because no basis was recorded for it', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue({ ...readingBook, isbn13: '9789146223856', hardcoverMetadataId: 'ok-amen' });
+      mockRepo.findBookState.mockResolvedValue({ ...syncedState, matchBasis: null });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+      expect(mockMatchService.matchBook).not.toHaveBeenCalled();
     });
   });
 });

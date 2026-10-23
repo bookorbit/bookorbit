@@ -1,0 +1,34 @@
+name: Community Discussion
+description: Discuss workflows and ideas, share your setup, or introduce companion apps
+title: "[Discussion] "
+labels: ["discussion", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this space to talk with other BookOrbit users about workflows, ideas, companion apps,
+        integrations, or your setup. You do not need approval or assignment to participate.
+
+        Browse [existing community conversations](https://github.com/bookorbit/bookorbit/issues?q=is%3Aissue%20label%3Adiscussion)
+        before starting a new topic. If you need troubleshooting help, use
+        [Question / Help](https://github.com/bookorbit/bookorbit/issues/new?template=question.yml).
+        For a concrete improvement, use the
+        [Feature Request](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml) form.
+
+        Do not share passwords, tokens, private book content, or other sensitive information.
+        Report security vulnerabilities privately using the
+        [security policy](https://github.com/bookorbit/bookorbit/blob/main/.github/SECURITY.md).
+
+  - type: textarea
+    id: topic
+    attributes:
+      label: What would you like to discuss or share?
+      description: Introduce your topic and give enough context for others to join the conversation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Links, examples, or screenshots (optional)
+      description: Add relevant resources and remove sensitive information from screenshots.

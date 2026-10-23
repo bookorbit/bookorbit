@@ -1,3 +1,7 @@
+import 'reflect-metadata';
+import { plainToInstance } from 'class-transformer';
+import { UpdateLibraryDto } from './dto/update-library.dto';
+import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 vi.mock('fs/promises', () => ({
   readdir: vi.fn(),
   realpath: vi.fn(),
@@ -95,11 +99,14 @@ describe('LibraryService', () => {
     removeSchedule: vi.fn(),
   };
 
+  const regexMetadata = { validate: vi.fn() };
   let service: LibraryService;
+  let readingEvents: ReadingAttemptEventsService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('/books');
+    readingEvents = new ReadingAttemptEventsService();
     service = new LibraryService(
       libraryRepo as any,
       config as any,
@@ -109,6 +116,8 @@ describe('LibraryService', () => {
       achievementEvents as any,
       pathPolicy as any,
       scanScheduler as any,
+      regexMetadata as any,
+      readingEvents,
     );
 
     libraryRepo.findPodcastIds.mockResolvedValue([]);
@@ -166,6 +175,21 @@ describe('LibraryService', () => {
     ).resolves.toEqual([3, 4]);
   });
 
+  it('findEditableLibraryIds reads all IDs for superusers and editor-or-owner IDs for normal users', async () => {
+    libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 4 }]);
+
+    await expect(service.findEditableLibraryIds({ id: 99, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual([
+      1, 2,
+    ]);
+    expect(libraryRepo.findAccessibleIdsForUser).not.toHaveBeenCalled();
+
+    await expect(service.findEditableLibraryIds({ id: 42, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual([
+      4,
+    ]);
+    expect(libraryRepo.findAccessibleIdsForUser).toHaveBeenCalledWith(42, ['editor', 'owner']);
+  });
+
   it('findOne returns library details and normalizes organization mode', async () => {
     libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Main', organizationMode: null }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 50, path: '/books/main' }]);
@@ -181,6 +205,53 @@ describe('LibraryService', () => {
   it('findOne throws when library is missing', async () => {
     libraryRepo.findById.mockResolvedValue([]);
     await expect(service.findOne(111)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects regex validation for podcast libraries', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'podcasts' }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
+    await expect(service.validateRegexMetadata({ config: { rules: [{ pattern: '(?<title>.+)', flags: '' }] }, libraryId: 2 })).rejects.toThrow(
+      'Regex metadata is only available for book libraries',
+    );
+  });
+
+  describe('regex configuration updates', () => {
+    const first = { pattern: '(?<title>.+)', flags: 'i' };
+    const second = { pattern: '(?<series>.+)', flags: '' };
+    const config = { rules: [first, second] };
+    beforeEach(() => {
+      libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: config }]);
+      libraryRepo.update.mockResolvedValue([{ id: 2 }]);
+      libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
+    });
+
+    it.each([null, { rules: [{ flags: 'i', pattern: first.pattern }, second] }])(
+      'does not revalidate or rewrite unchanged rules: %j',
+      async (unchanged) => {
+        libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: unchanged === null ? null : config }]);
+        await service.update(2, plainToInstance(UpdateLibraryDto, { coverAspectRatio: '1/1', regexMetadata: unchanged }));
+        expect(regexMetadata.validate).not.toHaveBeenCalled();
+        expect(libraryRepo.update).toHaveBeenCalledWith(2, { coverAspectRatio: '1/1' });
+      },
+    );
+
+    it.each([
+      null,
+      { rules: [second, first] },
+      { rules: [{ ...first, flags: 'u' }, second] },
+      { rules: [{ ...first, pattern: '(?<title>.*)' }, second] },
+    ])('validates and persists an actual change without a library grant: %j', async (changed) => {
+      await service.update(2, { regexMetadata: changed });
+      expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
+      expect(regexMetadata.validate).toHaveBeenCalledWith(changed);
+      expect(libraryRepo.update).toHaveBeenCalledWith(2, { regexMetadata: changed });
+    });
+
+    it('does not persist a change that fails validation', async () => {
+      regexMetadata.validate.mockRejectedValueOnce(new BadRequestException('Invalid regex metadata configuration'));
+      await expect(service.update(2, { regexMetadata: null })).rejects.toThrow('Invalid regex metadata configuration');
+      expect(libraryRepo.update).not.toHaveBeenCalled();
+    });
   });
 
   it('verifyUserAccess bypasses lookup for superusers', async () => {
@@ -200,6 +271,20 @@ describe('LibraryService', () => {
     await expect(service.verifyUserAccessLevel(1, 2, true, 'owner')).resolves.toBeUndefined();
   });
 
+  it.each([undefined, ['regex', 'embedded']])('preserves regex configuration with precedence %j on create', async (metadataPrecedence) => {
+    const config = { rules: [{ pattern: '(?<title>.+)', flags: '' }] };
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Regex', icon: 'BookOpen' }]);
+    libraryRepo.insertFolders.mockResolvedValue([]);
+    await service.create({ name: 'Regex', icon: 'BookOpen', folders: ['/a'], regexMetadata: config, metadataPrecedence });
+    expect(libraryRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        regexMetadata: config,
+        metadataPrecedence: metadataPrecedence ?? ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar', 'regex'],
+      }),
+    );
+  });
+
   it('create applies defaults, inserts folders, and starts an async scan', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
     libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Sci-Fi', icon: 'BookOpen' }]);
@@ -216,8 +301,26 @@ describe('LibraryService', () => {
         icon: 'BookOpen',
         displayOrder: 0,
         watch: false,
-        metadataPrecedence: ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'],
-        formatPriority: ['epub', 'kepub', 'pdf', 'cbz', 'cbr', 'cb7', 'mobi', 'azw3', 'azw', 'fb2', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'],
+        metadataPrecedence: ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar', 'regex'],
+        formatPriority: [
+          'epub',
+          'kepub',
+          'pdf',
+          'cbz',
+          'cbr',
+          'cb7',
+          'mobi',
+          'azw3',
+          'azw',
+          'fb2',
+          'djvu',
+          'm4b',
+          'mp3',
+          'm4a',
+          'opus',
+          'ogg',
+          'flac',
+        ],
         organizationMode: 'book_per_folder',
         coverAspectRatio: '2/3',
       }),
@@ -253,9 +356,39 @@ describe('LibraryService', () => {
         fileWriteCbxMaxFileSizeMb: 500,
         fileWriteAudioEnabled: true,
         fileWriteAudioMaxFileSizeMb: 500,
+        fileWriteAllFiles: false,
+        fileWriteReadAlongEnabled: false,
+        fileWriteReadAlongMaxFileSizeMb: 1000,
         fileRenameEnabled: false,
       }),
     );
+  });
+
+  it('create stores the all-files write scope when asked', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Mixed', icon: 'BookOpen' }]);
+    libraryRepo.insertFolders.mockResolvedValue([{ id: 11, path: '/a' }]);
+
+    await service.create({ name: 'Mixed', icon: 'BookOpen', folders: ['/a'], fileWriteAllFiles: true } as any);
+
+    expect(libraryRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ fileWriteAllFiles: true }));
+  });
+
+  it('update leaves the stored all-files write scope alone when the request omits it', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, fileWriteAllFiles: true }]);
+    libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, fileWriteAllFiles: true }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    await service.update(10, { fileWriteEnabled: true } as any);
+
+    expect(libraryRepo.update).toHaveBeenCalledWith(10, { fileWriteEnabled: true });
+  });
+
+  it('update rejects the all-files write scope for podcast libraries', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast' }]);
+
+    await expect(service.update(12, { fileWriteAllFiles: true } as any)).rejects.toThrow('fileWriteAllFiles is only supported for book libraries');
+    expect(libraryRepo.update).not.toHaveBeenCalled();
   });
 
   it('create starts watcher immediately when watch is enabled', async () => {
@@ -623,13 +756,27 @@ describe('LibraryService', () => {
     libraryRepo.findById.mockResolvedValue([{ id: 4, name: 'L' }]);
     libraryRepo.findBookIdsByLibrary.mockResolvedValue([{ id: 101 }, { id: 102 }]);
 
+    const notify = vi.spyOn(readingEvents, 'notifyChanged');
+    libraryRepo.delete.mockImplementation(() => {
+      expect(notify).not.toHaveBeenCalled();
+      return Promise.resolve();
+    });
     await service.remove(4);
+    expect(notify).toHaveBeenCalledExactlyOnceWith(null);
 
     expect(fileWatcherService.stopWatcher).toHaveBeenCalledWith(4);
     expect(libraryRepo.delete).toHaveBeenCalledWith(4);
     expect(scanScheduler.removeSchedule).toHaveBeenCalledWith(4);
     expect(mockRm).toHaveBeenCalledWith('/books/covers/101', { recursive: true, force: true });
     expect(mockRm).toHaveBeenCalledWith('/books/covers/102', { recursive: true, force: true });
+  });
+
+  it('does not invalidate reading caches when deleting the library fails', async () => {
+    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
+    libraryRepo.delete.mockRejectedValueOnce(new Error('Delete failed'));
+    const notify = vi.spyOn(readingEvents, 'notifyChanged');
+    await expect(service.remove(1)).rejects.toThrow('Delete failed');
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('remove deletes downloaded podcast files before deleting the library', async () => {

@@ -72,6 +72,7 @@ const globalStubs = {
     BookCoverLightbox: true,
     AddToCollectionSheet: true,
     MoveToLibrarySheet: true,
+    SendBookDialog: true,
     DeleteBookDialog: true,
     ResetReadingStateDialog: true,
   },

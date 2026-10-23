@@ -100,6 +100,23 @@ describe('QbittorrentAdapter', () => {
       expect(form.get('category')).toBe('bookorbit');
     });
 
+    it.each(['magnet', 'torrent'] as const)('leaves the client seed defaults untouched when adding a %s without goals', async (transport) => {
+      const { calls } = mockFetch();
+      await adapter.add(
+        {
+          clientKey: INFO_HASH,
+          ...(transport === 'magnet' ? { magnet: `magnet:?xt=urn:btih:${INFO_HASH}` } : { torrentFile: Buffer.from('d4:infod4:name4:duneee') }),
+        },
+        config(),
+      );
+
+      const form = calls.find((call) => call.url.includes('/torrents/add'))?.init.body as FormData;
+      expect(form.get('category')).toBe('bookorbit');
+      expect(form.has('ratioLimit')).toBe(false);
+      expect(form.has('seedingTimeLimit')).toBe(false);
+      expect(calls.some((call) => call.url.includes('setShareLimits'))).toBe(false);
+    });
+
     it('passes seed goals through so the client, not BookOrbit, enforces them', async () => {
       const { calls } = mockFetch();
 

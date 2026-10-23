@@ -1,5 +1,7 @@
+import { EventEmitter } from 'events';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 
 import { TtsController } from './tts.controller';
 import { TtsService } from './tts.service';
@@ -35,6 +37,78 @@ describe('TtsController', () => {
 
     controller = module.get<TtsController>(TtsController);
     vi.clearAllMocks();
+  });
+
+  describe('synthesize', () => {
+    const dto = { text: 'Hello', providerId: '1', voiceId: 'af_heart', speed: 1.0 };
+
+    function makeReply() {
+      const raw = Object.assign(new EventEmitter(), { writableEnded: false });
+      const reply = {
+        raw,
+        header: vi.fn().mockReturnThis(),
+        send: vi.fn().mockImplementation(() => {
+          raw.writableEnded = true;
+          return reply;
+        }),
+      };
+      return reply;
+    }
+
+    function holdSynthesisUntilAborted(): { signal: () => AbortSignal } {
+      let captured: AbortSignal | undefined;
+      mockTtsService.synthesize.mockImplementationOnce(
+        (_dto: unknown, signal: AbortSignal) =>
+          new Promise((_resolve, reject) => {
+            captured = signal;
+            signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+          }),
+      );
+      return { signal: () => captured! };
+    }
+
+    it('sends the synthesized audio with its content type', async () => {
+      const reply = makeReply();
+      await controller.synthesize(dto, reply as unknown as FastifyReply);
+
+      expect(reply.header).toHaveBeenCalledWith('Content-Type', 'audio/mpeg');
+      expect(reply.send).toHaveBeenCalledWith(Buffer.from('audio'));
+      expect(reply.raw.listenerCount('close')).toBe(0);
+    });
+
+    it('cancels the synthesis and sends nothing when the client disconnects first', async () => {
+      const reply = makeReply();
+      const held = holdSynthesisUntilAborted();
+      const pending = controller.synthesize(dto, reply as unknown as FastifyReply);
+      expect(held.signal().aborted).toBe(false);
+
+      reply.raw.emit('close');
+
+      await expect(pending).resolves.toBeUndefined();
+      expect(held.signal().aborted).toBe(true);
+      expect(reply.send).not.toHaveBeenCalled();
+      expect(reply.raw.listenerCount('close')).toBe(0);
+    });
+
+    it('does not cancel when the connection closes after the audio was sent', async () => {
+      const reply = makeReply();
+      const pending = controller.synthesize(dto, reply as unknown as FastifyReply);
+      const signal = mockTtsService.synthesize.mock.calls[0]![1] as AbortSignal;
+      await pending;
+
+      reply.raw.writableEnded = true;
+      reply.raw.emit('close');
+
+      expect(signal.aborted).toBe(false);
+    });
+
+    it('rethrows a synthesis failure while the client is still connected', async () => {
+      mockTtsService.synthesize.mockRejectedValueOnce(new Error('provider down'));
+      const reply = makeReply();
+
+      await expect(controller.synthesize(dto, reply as unknown as FastifyReply)).rejects.toThrow('provider down');
+      expect(reply.raw.listenerCount('close')).toBe(0);
+    });
   });
 
   describe('synthesizeCaptioned', () => {

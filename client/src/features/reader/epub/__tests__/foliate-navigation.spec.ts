@@ -33,8 +33,11 @@ function installBrowserGlobals() {
 
 describe('Foliate navigation', () => {
   let View: new () => {
+    open: (book: { sections: { id: string }[] }) => Promise<void>
+    addEventListener: HTMLElement['addEventListener']
     book: { sections?: unknown[]; resolveHref?: (href: string) => { index: number }; dir?: string | null }
     renderer: {
+      dispatchEvent?: HTMLElement['dispatchEvent']
       goTo?: (resolved: { index: number }) => Promise<void>
       getContents?: () => { index: number; text?: string }[]
       prev?: () => void
@@ -45,8 +48,7 @@ describe('Foliate navigation', () => {
     goLeft: () => Promise<void>
     goRight: () => Promise<void>
   }
-  let getKoreaderProgress: (index: number, range: Range | null) => string | null
-  let getKoreaderDocFragmentIndex: (sections: { id: string }[], index: number) => number | null
+  let getReadingProgressRange: (range: Range | null) => Range | null
   let getKoboSpanValue: (range: Range | null) => string | null
   let getPageProgressionRtl: (bookDir: string | null | undefined, contentRtl: boolean) => boolean
   let usesNegativePageScroll: (vertical: boolean, pageProgressionRtl: boolean) => boolean
@@ -69,10 +71,9 @@ describe('Foliate navigation', () => {
     const viewModulePath = '../../../../../public/assets/foliate/view.js'
     const fixedLayoutModulePath = '../../../../../public/assets/foliate/fixed-layout.js'
     const paginatorModulePath = '../../../../../public/assets/foliate/paginator.js'
-    ;({ View, getKoreaderProgress, getKoreaderDocFragmentIndex, getKoboSpanValue } = (await import(viewModulePath)) as {
+    ;({ View, getReadingProgressRange, getKoboSpanValue } = (await import(viewModulePath)) as {
       View: typeof View
-      getKoreaderProgress: typeof getKoreaderProgress
-      getKoreaderDocFragmentIndex: typeof getKoreaderDocFragmentIndex
+      getReadingProgressRange: typeof getReadingProgressRange
       getKoboSpanValue: typeof getKoboSpanValue
     })
     ;({ FixedLayout } = (await import(fixedLayoutModulePath)) as { FixedLayout: typeof FixedLayout })
@@ -335,7 +336,81 @@ describe('Foliate navigation', () => {
     expect(prev).toHaveBeenCalledTimes(1)
   })
 
-  it('preserves real inline elements for KOReader XPointer progress', () => {
+  it('emits a source point CFI and clears browser-generated KOReader progress on relocation', async () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML = '<div id="book-columns"><div id="book-inner"><div id="anchor"></div><p>ab\u{1F600}cd</p></div></div>'
+    const range = doc.createRange()
+    range.setStart(doc.querySelector('#anchor')!, 0)
+    range.setEnd(doc.querySelector('p')!.firstChild!, 4)
+    const originalCreateElement = document.createElement.bind(document)
+    const renderer = Object.assign(originalCreateElement('div'), { open: vi.fn<() => void>() })
+    const createElement = vi
+      .spyOn(document, 'createElement')
+      .mockImplementation((name: string) => (name === 'foliate-paginator' ? renderer : originalCreateElement(name)))
+    try {
+      const view = new View()
+      await view.open({ sections: [{ id: 'chapter.xhtml' }] })
+      const relocate = vi.fn<(event: Event) => void>()
+      view.addEventListener('relocate', relocate)
+      renderer.dispatchEvent(new CustomEvent('relocate', { detail: { index: 0, range, fraction: 0.5 } }))
+      const detail = (relocate.mock.calls[0]![0] as CustomEvent).detail
+      expect(detail.cfi).toBe('epubcfi(/6/2!/4/2[book-columns]/2[book-inner]/4/1:0)')
+      expect(detail.koreaderProgress).toBeNull()
+      expect(detail.range).toBe(range)
+      expect(range.startContainer).toBe(doc.querySelector('#anchor'))
+      expect(range.collapsed).toBe(false)
+    } finally {
+      createElement.mockRestore()
+    }
+  })
+
+  it('keeps the reader selection while narration moves on, and follows the voice once it is gone', async () => {
+    document.body.innerHTML = '<p><span id="s1">First sentence.</span> <span id="s2">Second sentence.</span></p>'
+    const originalCreateElement = document.createElement.bind(document)
+    const goTo = vi.fn<() => Promise<void>>(() => Promise.resolve())
+    const renderer = Object.assign(originalCreateElement('div'), {
+      open: vi.fn<() => void>(),
+      goTo,
+      getContents: () => [{ index: 0, doc: document }],
+    })
+    const overlay = new EventTarget()
+    const createElement = vi
+      .spyOn(document, 'createElement')
+      .mockImplementation((name: string) => (name === 'foliate-paginator' ? renderer : originalCreateElement(name)))
+    const highlight = async (id: string) => {
+      overlay.dispatchEvent(new CustomEvent('highlight', { detail: { text: `chapter.xhtml#${id}` } }))
+      await Promise.resolve()
+    }
+    try {
+      const view = new View()
+      await view.open({
+        sections: [{ id: 'chapter.xhtml', mediaOverlay: {} }],
+        media: { activeClass: 'narrating' },
+        getMediaOverlay: () => overlay,
+        resolveHref: (href: string) => ({ index: 0, anchor: (doc: Document) => doc.getElementById(href.split('#')[1]!) }),
+      } as never)
+      const selection = window.getSelection()!
+      const range = document.createRange()
+      range.selectNodeContents(document.getElementById('s1')!)
+      selection.removeAllRanges()
+      selection.addRange(range)
+
+      await highlight('s2')
+      expect(goTo).not.toHaveBeenCalled()
+      expect(selection.toString()).toBe('First sentence.')
+      expect(document.getElementById('s2')!.classList.contains('narrating')).toBe(true)
+
+      selection.removeAllRanges()
+      await highlight('s1')
+      expect(goTo).toHaveBeenCalledTimes(1)
+    } finally {
+      createElement.mockRestore()
+      window.getSelection()?.removeAllRanges()
+      document.body.innerHTML = ''
+    }
+  })
+
+  it('preserves the source text point inside inline elements', () => {
     const doc = document.implementation.createHTMLDocument('chapter')
     doc.body.innerHTML = '<p>First paragraph</p><p><span>Middle text</span> tail</p>'
 
@@ -346,10 +421,29 @@ describe('Foliate navigation', () => {
     range.setStart(text, 2)
     range.setEnd(text, 8)
 
-    expect(getKoreaderProgress(8, range)).toBe('/body/DocFragment[8]/body/p[2]/span/text().2')
+    expect(getReadingProgressRange(range)?.startContainer).toBe(text)
+    expect(getReadingProgressRange(range)?.startOffset).toBe(2)
   })
 
-  it('uses the text endpoint and strips Foliate layout wrappers when the range starts on a container', () => {
+  it('keeps the first visible text when a page range starts at an inline container', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML = '<p><span id="first">First visible sentence.</span></p><p>Last visible sentence.</p>'
+    const first = doc.querySelector('span')!.firstChild!
+    const last = doc.querySelector('p:last-child')!.firstChild!
+    const range = doc.createRange()
+    range.setStart(doc.querySelector('p')!, 0)
+    range.setEnd(last, 8)
+
+    const point = getReadingProgressRange(range)
+    expect(point?.startContainer).toBe(first)
+    expect(point?.startOffset).toBe(0)
+    expect(point?.collapsed).toBe(true)
+    expect(range.startContainer).toBe(doc.querySelector('p'))
+    expect(range.endContainer).toBe(last)
+    expect(range.collapsed).toBe(false)
+  })
+
+  it('finds the first following text and retains source wrappers after an empty anchor', () => {
     const doc = document.implementation.createHTMLDocument('chapter')
     doc.body.innerHTML =
       '<div id="book-columns"><div id="book-inner"><div id="filepos48449"></div><p><span id="kobo.10.6">Middle text</span></p></div></div>'
@@ -362,10 +456,12 @@ describe('Foliate navigation', () => {
     range.setStart(start, 0)
     range.setEnd(text, 6)
 
-    expect(getKoreaderProgress(7, range)).toBe('/body/DocFragment[7]/body/p/span/text().6')
+    expect(getReadingProgressRange(range)?.startContainer).toBe(text)
+    expect(getReadingProgressRange(range)?.startOffset).toBe(0)
+    expect(range.startContainer).toBe(start)
   })
 
-  it('merges adjacent KoboSpan text wrappers for KOReader text node offsets', () => {
+  it('keeps the reading point within its source KoboSpan', () => {
     const doc = document.implementation.createHTMLDocument('chapter')
     doc.body.innerHTML =
       '<p><span class="koboSpan" id="kobo.5.1">“</span><span class="italic"><span class="koboSpan" id="kobo.5.2">Fascinating</span></span><span class="koboSpan" id="kobo.5.3">!” </span><span class="koboSpan" id="kobo.5.4">he would say as Harry talked him through using a telephone. </span><span class="koboSpan" id="kobo.5.5">“</span><span class="italic"><span class="koboSpan" id="kobo.5.6">Ingenious,</span></span><span class="koboSpan" id="kobo.5.7"> really, how many ways Muggles have found of getting along without magic.”</span></p>'
@@ -377,7 +473,8 @@ describe('Foliate navigation', () => {
     range.setStart(text, 33)
     range.setEnd(text, 33)
 
-    expect(getKoreaderProgress(8, range)).toBe('/body/DocFragment[8]/body/p/text()[2].36')
+    expect(getReadingProgressRange(range)?.startContainer).toBe(text)
+    expect(getReadingProgressRange(range)?.startOffset).toBe(33)
   })
 
   it('uses the KoboSpan-local offset inside the original EPUB text node', () => {
@@ -392,40 +489,38 @@ describe('Foliate navigation', () => {
     range.setStart(text, 21)
     range.setEnd(text, 21)
 
-    expect(getKoreaderProgress(8, range)).toBe('/body/DocFragment[8]/body/p/text().21')
+    expect(getReadingProgressRange(range)?.startContainer).toBe(text)
+    expect(getReadingProgressRange(range)?.startOffset).toBe(21)
   })
 
-  it('maps KEPUB sections back to KOReader DocFragment indexes', () => {
-    const sections = [
-      { id: 'kepubify-titlepage-dummy.xhtml' },
-      { id: 'text/part0000_split_000.html' },
-      { id: 'text/part0000_split_000.html' },
-      { id: 'text/part0000_split_001.html' },
-      { id: 'text/part0001.html' },
-      { id: 'text/part0002.html' },
-      { id: 'text/part0003.html' },
-      { id: 'text/part0004.html' },
-      { id: 'text/part0005.html' },
-      { id: 'text/part0006.html' },
-      { id: 'text/part0007.html' },
-      { id: 'text/part0008.html' },
-      { id: 'text/part0009.html' },
-      { id: 'text/part0010.html' },
-      { id: 'text/part0011.html' },
-      { id: 'text/part0012.html' },
-      { id: 'text/part0013.html' },
-      { id: 'text/part0014.html' },
-      { id: 'text/part0015.html' },
-      { id: 'text/part0016.html' },
-    ]
-
-    expect(getKoreaderDocFragmentIndex(sections, 0)).toBeNull()
-    expect(getKoreaderDocFragmentIndex(sections, 1)).toBe(1)
-    expect(getKoreaderDocFragmentIndex(sections, 2)).toBe(2)
-    expect(getKoreaderDocFragmentIndex(sections, 19)).toBe(19)
+  it('preserves raw UTF-16 offsets in long Unicode text for server conversion', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML = '<p></p>'
+    const text = doc.createTextNode('word '.repeat(2000) + '\u{1F600} end')
+    doc.querySelector('p')!.append(text)
+    const range = doc.createRange()
+    range.setStart(text, 10002)
+    range.setEnd(text, 10006)
+    const point = getReadingProgressRange(range)
+    expect(point?.startContainer).toBe(text)
+    expect(point?.startOffset).toBe(10002)
+    expect(point?.collapsed).toBe(true)
+    expect(range.collapsed).toBe(false)
   })
 
-  it('uses the selected text point for KoboSpan instead of the first span in a wide range', () => {
+  it('retains an element reading anchor when no text endpoint exists', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML = '<p><img alt="" /></p>'
+    const range = doc.createRange()
+    range.selectNode(doc.querySelector('img')!)
+    const point = getReadingProgressRange(range)
+    expect(point?.startContainer).toBe(range.startContainer)
+    expect(point?.startOffset).toBe(range.startOffset)
+    expect(point?.collapsed).toBe(true)
+    expect(getReadingProgressRange(null)).toBeNull()
+  })
+
+  it('uses the first visible KoboSpan when a page starts at an empty anchor', () => {
     const doc = document.implementation.createHTMLDocument('chapter')
     doc.body.innerHTML =
       '<div id="filepos48449"></div><p><span class="koboSpan" id="kobo.1.1">Start</span></p><p><span class="koboSpan" id="kobo.10.6">Middle text</span></p>'
@@ -438,6 +533,6 @@ describe('Foliate navigation', () => {
     range.setStart(start, 0)
     range.setEnd(text, 6)
 
-    expect(getKoboSpanValue(range)).toBe('kobo.10.6')
+    expect(getKoboSpanValue(range)).toBe('kobo.1.1')
   })
 })

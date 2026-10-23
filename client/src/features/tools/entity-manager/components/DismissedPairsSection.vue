@@ -36,7 +36,7 @@ function handleUndismiss(pair: DismissedPairInfo): void {
           <span v-if="pair.reason" class="text-xs text-muted-foreground ml-2">({{ pair.reason }})</span>
         </div>
         <button
-          class="inline-flex items-center gap-1 h-7 px-2 text-xs rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          class="inline-flex items-center gap-1 h-7 px-2 text-xs rounded-xs hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
           :title="t('tools.entityManager.dismissed.restoreTitle')"
           @click="handleUndismiss(pair)"
         >

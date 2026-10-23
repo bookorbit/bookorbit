@@ -39,6 +39,8 @@ export function fileMimeType(format: string): string {
       return 'application/kepub+zip';
     case 'pdf':
       return 'application/pdf';
+    case 'djvu':
+      return 'image/vnd.djvu';
     case 'mobi':
       return 'application/x-mobipocket-ebook';
     case 'azw3':

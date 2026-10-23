@@ -50,6 +50,8 @@ export function buildMetadataLockCandidates(
       authors: ['Refreshed Author'],
       description: 'Refreshed description from fake Goodreads',
       publisher: 'Refreshed Publisher',
+      isbn10: '0306406152',
+      isbn13: '9780306406157',
       publishedYear: 2024,
       language: 'fr',
       pageCount: 321,

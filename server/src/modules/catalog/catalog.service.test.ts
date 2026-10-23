@@ -23,6 +23,7 @@ function makeService(libraryIds: number[] = [1, 2]) {
     searchPublishers: vi.fn(),
     searchSeries: vi.fn(),
     searchLanguages: vi.fn(),
+    listLanguages: vi.fn(),
     searchCollections: vi.fn(),
   } as unknown as Mocked<CatalogRepository>;
   const libraryService = {
@@ -106,6 +107,29 @@ describe('CatalogService', () => {
       libraryIds: [12],
       contentFilters: EMPTY_CONTENT_FILTER_RULES,
     });
+  });
+
+  it('lists every visible language for a blank language term', async () => {
+    const { service, catalogRepository, libraryService } = makeService([4, 9]);
+    const user = requestUser();
+    catalogRepository.listLanguages.mockResolvedValue([{ name: 'English' }, { name: 'nl' }]);
+
+    await expect(service.searchLanguages(user, '  ')).resolves.toEqual([{ name: 'English' }, { name: 'nl' }]);
+
+    expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
+    expect(catalogRepository.listLanguages).toHaveBeenCalledWith({
+      libraryIds: [4, 9],
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
+    expect(catalogRepository.searchLanguages).not.toHaveBeenCalled();
+  });
+
+  it('lists no languages without an accessible library', async () => {
+    const { service, catalogRepository } = makeService([]);
+
+    await expect(service.searchLanguages(requestUser(), '')).resolves.toEqual([]);
+
+    expect(catalogRepository.listLanguages).not.toHaveBeenCalled();
   });
 
   it('keeps collection searches scoped directly by owner id', async () => {

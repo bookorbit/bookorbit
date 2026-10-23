@@ -3,6 +3,7 @@ import { rm } from 'fs/promises';
 import { eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
+import { PositionConverterService } from '../src/modules/position-converter/position-converter.service';
 import { createZipArchiveFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -119,13 +120,13 @@ ${spine}
 
   /** Scans a book whose original and read-along copy share a folder, and checks they became one book. */
   async function scanReadAlongBook(folder: string) {
-    const { originalPath, readAlongPath } = await writeBook(folder, { readAlong: true });
+    const { title, originalPath, readAlongPath } = await writeBook(folder, { readAlong: true });
     await triggerAndWaitForLibraryScan(ctx, library.libraryId);
     const original = await locateBookByAbsolutePath(ctx, originalPath);
     const readAlong = await locateBookByAbsolutePath(ctx, readAlongPath!);
     expect(readAlong.bookId).toBe(original.bookId);
     expect(await webReaderFileId(original.bookId)).toBe(readAlong.bookFileId);
-    return { original, readAlong, readAlongPath: readAlongPath!, originalHash: await fileHashFor(original.bookFileId) };
+    return { title, original, readAlong, readAlongPath: readAlongPath!, originalHash: await fileHashFor(original.bookFileId) };
   }
 
   async function fileHashFor(bookFileId: number): Promise<string> {
@@ -270,6 +271,163 @@ ${spine}
     // The original has no narration of its own, so it must not carry the read-along copy's
     // sentence id, which the web reader would otherwise try to open it at.
     expect((await fileProgress(original.bookFileId)).mediaOverlayFragment).toBeNull();
+  });
+
+  it('projects a plain-file highlight into its narrated sibling without overwriting its canonical position', async () => {
+    const { title, original, readAlong } = await scanReadAlongBook('Author K/Series K/Annotation Projection');
+    const text = `Chapter 7 of ${title} has one sentence of prose in it.`;
+    const cfi = `epubcfi(/6/14!/4/2,/1:0,/1:${text.length})`;
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${original.bookId}/annotations`,
+      headers: authHeader(ctx.adminToken),
+      payload: { bookFileId: original.bookFileId, cfi, text },
+    });
+    expect(created.statusCode).toBe(201);
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${original.bookId}/annotations?page=1&readerFileId=${readAlong.bookFileId}`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(response.statusCode).toBe(200);
+    const projected = response.json().items.find((item: { id: number }) => item.id === created.json().id);
+    expect(projected.jumpFileId).toBe(readAlong.bookFileId);
+    expect(projected.cfi).not.toBe(cfi);
+    await expect(
+      ctx.app.get(PositionConverterService).cfiToXpointer({ bookFileId: readAlong.bookFileId, cfi: projected.cfi, text }),
+    ).resolves.toEqual(expect.objectContaining({ status: 'exact' }));
+    const legacy = await ctx.app.inject({ method: 'GET', url: `/api/v1/books/${original.bookId}/annotations`, headers: authHeader(ctx.adminToken) });
+    expect(legacy.json().find((item: { id: number }) => item.id === created.json().id)).toEqual(
+      expect.objectContaining({ cfi, jumpFileId: original.bookFileId }),
+    );
+  });
+
+  it('keeps annotation and bookmark acknowledgements independent for two renditions on one device', async () => {
+    const { title, original, readAlong, originalHash } = await scanReadAlongBook('Author L/Series L/Rendition Sidecars');
+    const narratedHash = await fileHashFor(readAlong.bookFileId);
+    const text = `Chapter 7 of ${title} has one sentence of prose in it.`;
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${original.bookId}/annotations`,
+      headers: authHeader(ctx.adminToken),
+      payload: { bookFileId: original.bookFileId, cfi: `epubcfi(/6/14!/4/2,/1:0,/1:${text.length})`, text },
+    });
+    expect(created.statusCode).toBe(201);
+    const bookmark = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${original.bookId}/bookmarks`,
+      headers: authHeader(ctx.adminToken),
+      payload: { bookFileId: original.bookFileId, cfi: ORIGINAL_CHAPTER_7_CFI, title: 'Rendition dogear' },
+    });
+    expect(bookmark.statusCode).toBe(201);
+    const exchange = async (kind: string, hash: string, keysComplete: boolean) => {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/koreader/plugin/${kind}/exchange`,
+        headers: deviceHeaders(),
+        payload: { deviceId: DEVICE_ID, deviceModel: 'E2E', pluginVersion: '1.7.0', books: [{ hash, keys: [], keysComplete, changes: [] }] },
+      });
+      expect(response.statusCode).toBe(201);
+      return response.json().results[0];
+    };
+    const annotationAdd = (await exchange('annotations', originalHash, false)).toApply.add.find(
+      (entry: { serverId: number }) => entry.serverId === created.json().id,
+    );
+    expect(annotationAdd).toBeDefined();
+    const bookmarkAdd = (await exchange('bookmarks', originalHash, false)).toApply.add.find(
+      (entry: { serverId: number }) => entry.serverId === bookmark.json().id,
+    );
+    expect(bookmarkAdd).toBeDefined();
+    for (const [kind, applied] of [
+      ['annotations', [{ serverId: annotationAdd.serverId, version: annotationAdd.version, status: 'applied', verified: true }]],
+      ['bookmarks', [{ serverId: bookmarkAdd.serverId, status: 'applied', datetime: '2026-06-02 08:00:00', pos: bookmarkAdd.pos }]],
+    ] as const) {
+      const ack = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/koreader/plugin/${kind}/exchange-ack`,
+        headers: deviceHeaders(),
+        payload: { deviceId: DEVICE_ID, deviceModel: 'E2E', pluginVersion: '1.7.0', books: [{ hash: originalHash, applied, deleted: [] }] },
+      });
+      expect(ack.statusCode).toBe(201);
+      expect(ack.json().results[0].acked).toBe(1);
+      const otherRendition = await exchange(kind, narratedHash, true);
+      expect(kind === 'annotations' ? otherRendition.applied.deviceDeleted : otherRendition.deviceDeleted).toBe(0);
+      expect(otherRendition.toApply.add.some((entry: { serverId: number }) => entry.serverId === applied[0].serverId)).toBe(true);
+      expect((await exchange(kind, originalHash, false)).toApply.add).toEqual([]);
+    }
+    const annotations = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${original.bookId}/annotations`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(annotations.json().some((entry: { id: number }) => entry.id === created.json().id)).toBe(true);
+    const bookmarks = await ctx.app.inject({ method: 'GET', url: `/api/v1/books/${original.bookId}/bookmarks`, headers: authHeader(ctx.adminToken) });
+    expect(bookmarks.json().some((entry: { id: number }) => entry.id === bookmark.json().id)).toBe(true);
+  });
+
+  it('projects a source-file bookmark into narrated DOM and preserves the legacy bookmark response', async () => {
+    const { original, readAlong } = await scanReadAlongBook('Author M/Series M/Bookmark Projection');
+    const cfi = 'epubcfi(/6/14!/4/2/1:19)';
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${original.bookId}/bookmarks`,
+      headers: authHeader(ctx.adminToken),
+      payload: { bookFileId: original.bookFileId, cfi, title: 'Interior prose dogear' },
+    });
+    expect(created.statusCode).toBe(201);
+    const projected = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${original.bookId}/bookmarks?readerFileId=${readAlong.bookFileId}`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(projected.statusCode).toBe(200);
+    const target = projected.json().find((entry: { id: number }) => entry.id === created.json().id);
+    expect(target.cfi).not.toBe(cfi);
+    const position = await ctx.app.get(PositionConverterService).cfiPointToXpointer({ bookFileId: readAlong.bookFileId, cfi: target.cfi });
+    expect(position.pos0).toBe('/body/DocFragment[7]/body/p/span/text().19');
+    const exchange = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/bookmarks/exchange',
+      headers: deviceHeaders(),
+      payload: {
+        deviceId: DEVICE_ID,
+        deviceModel: 'E2E',
+        pluginVersion: '1.7.0',
+        books: [{ hash: await fileHashFor(readAlong.bookFileId), keys: [], keysComplete: false, changes: [] }],
+      },
+    });
+    expect(exchange.statusCode).toBe(201);
+    expect(exchange.json().results[0].toApply.add).toContainEqual(expect.objectContaining({ serverId: created.json().id, pos: position.pos0 }));
+    const legacy = await ctx.app.inject({ method: 'GET', url: `/api/v1/books/${original.bookId}/bookmarks`, headers: authHeader(ctx.adminToken) });
+    expect(legacy.json().find((entry: { id: number }) => entry.id === created.json().id).cfi).toBe(cfi);
+  });
+
+  // A newer page past the narration takes it along, so listening resumes where the reading went.
+  it('maps an explicit text jump using its CFI and carries the older narration marker to it', async () => {
+    const { original, readAlong, originalHash } = await scanReadAlongBook('Author J/Series J/Stale Narration');
+    await pushFromKoreader(originalHash, 0.69);
+    expect((await fileProgress(readAlong.bookFileId)).mediaOverlayFragment).toBe(READ_ALONG_CHAPTER_7_SENTENCE);
+
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/files/${readAlong.bookFileId}/progress`,
+      headers: authHeader(ctx.adminToken),
+      payload: {
+        percentage: 90,
+        cfi: 'epubcfi(/6/20!/4/2/2/1:0)',
+        source: 'text',
+        positionSeconds: 60,
+        mediaOverlayFragment: READ_ALONG_CHAPTER_7_SENTENCE,
+        mediaOverlaySectionIndex: 6,
+      },
+    });
+    expect([200, 201, 204]).toContain(response.statusCode);
+
+    const pulled = await pullFromKoreader(originalHash);
+    expect(pulled.progress).toMatch(/^\/body\/DocFragment\[10\]\//);
+    expect(pulled.percentage).toBeCloseTo(0.9, 3);
+    expect((await fileProgress(original.bookFileId)).cfi).toMatch(/^epubcfi\(\/6\/20!/);
+    expect((await fileProgress(readAlong.bookFileId)).mediaOverlayFragment).toBe('OPS/chapter-10.xhtml#c10-s1');
   });
 
   it('round trip: the web reader re-saving the synced position does not drag the device backwards', async () => {

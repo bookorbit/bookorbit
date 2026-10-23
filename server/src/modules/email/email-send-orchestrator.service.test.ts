@@ -1,3 +1,4 @@
+import { Readable } from 'stream';
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailSendOrchestrator } from './email-send-orchestrator.service';
@@ -148,7 +149,7 @@ describe('EmailSendOrchestrator', () => {
     bookService = module.get<BookService>(BookService);
     templateService = module.get<EmailTemplateService>(EmailTemplateService);
 
-    (fs.createReadStream as vi.Mock).mockReturnValue('mock-stream');
+    (fs.createReadStream as vi.Mock).mockImplementation(() => Readable.from([]));
   });
 
   describe('send', () => {
@@ -288,7 +289,7 @@ describe('EmailSendOrchestrator', () => {
       expect(fs.createReadStream).toHaveBeenCalledWith('/library/Author/new.epub');
       expect(mockTransporter.sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          attachments: [{ filename: 'new.epub', content: 'mock-stream' }],
+          attachments: [{ filename: 'new.epub', content: expect.any(Readable) }],
         }),
       );
     });
@@ -312,7 +313,7 @@ describe('EmailSendOrchestrator', () => {
     it('should retry on failure', async () => {
       vi.useFakeTimers();
       vi.spyOn(global, 'setTimeout');
-      mockTransporter.sendMail.mockRejectedValueOnce(new Error('SMTP Error'));
+      mockTransporter.sendMail.mockRejectedValueOnce(Object.assign(new Error('SMTP Error'), { command: 'MAIL FROM' }));
       (sendLogService.markFailed as vi.Mock).mockResolvedValue({ isFinal: false });
 
       const task = { recipientEmail: 'test@test.com' } as any;
@@ -376,7 +377,7 @@ describe('EmailSendOrchestrator', () => {
     it('should not retry if isFinal is true', async () => {
       vi.useFakeTimers();
       vi.spyOn(global, 'setTimeout');
-      mockTransporter.sendMail.mockRejectedValueOnce(new Error('SMTP Error'));
+      mockTransporter.sendMail.mockRejectedValueOnce(Object.assign(new Error('SMTP Error'), { command: 'MAIL FROM' }));
       (sendLogService.markFailed as vi.Mock).mockResolvedValue({ isFinal: true });
 
       const task = { recipientEmail: 'test@test.com' } as any;

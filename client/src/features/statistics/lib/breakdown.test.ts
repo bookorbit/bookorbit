@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/lib/echarts', () => ({
+vi.mock('@/lib/css-color', () => ({
   readCssColor: (varName: string) => `rgb(${varName})`,
-  oklchToHex: () => '#000000',
+  toLegacyColor: (value: string) => value,
 }))
 
 import { BREAKDOWN_OPTIONS, DEFAULT_BREAKDOWN_DIMENSION, getBreakdownColor, getBreakdownSeries } from './breakdown'

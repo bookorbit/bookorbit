@@ -11,6 +11,7 @@ const NS = {
   NCX: 'http://www.daisy.org/z3986/2005/ncx/',
   XLINK: 'http://www.w3.org/1999/xlink',
   SMIL: 'http://www.w3.org/ns/SMIL',
+  SVG: 'http://www.w3.org/2000/svg',
 }
 
 const MIME = {
@@ -90,8 +91,10 @@ const childGetter = (doc, ns) => {
       $$: () => [],
       $$$: () => [],
     }
-  // ignore the namespace if it doesn't appear in document at all
-  const useNS = doc.lookupNamespaceURI(null) === ns || doc.lookupPrefix(ns)
+  // match by namespace only when the document's elements are actually in it: an OPF whose
+  // <package> lost its default xmlns (e.g. a `mlns` typo) can still bind the namespace to a
+  // prefix for its `opf:` attributes, which must not make its unqualified elements invisible
+  const useNS = doc.documentElement.namespaceURI === ns
   const f = useNS ? (el, name) => (el) => el.namespaceURI === ns && el.localName === name : (el, name) => (el) => el.localName === name
   return {
     $: (el, name) => [...el.children].find(f(el, name)),
@@ -115,6 +118,11 @@ const resolveURL = (url, relativeTo) => {
 }
 
 const isExternal = (uri) => /^(?!blob)\w+:/i.test(uri)
+
+const isInSVG = (el) => {
+  for (let node = el; node; node = node.parentElement) if (node.namespaceURI === NS.SVG) return true
+  return false
+}
 
 // like `path.relative()` in Node.js
 const pathRelative = (from, to) => {
@@ -179,13 +187,34 @@ const getPropertyURL = (value, prefixes) => {
   return baseURL ? baseURL + reference : null
 }
 
+const groupBy = (items, getKey) => {
+  const groups = Object.create(null)
+  for (const item of items) {
+    const key = getKey(item)
+    ;(groups[key] ??= []).push(item)
+  }
+  return groups
+}
+
+const groupByMap = (items, getKey) => {
+  const groups = new Map()
+  for (const item of items) {
+    const key = getKey(item)
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(item)
+  }
+  return groups
+}
+
 const getMetadata = (opf) => {
   const { $ } = childGetter(opf, NS.OPF)
   const $metadata = $(opf.documentElement, 'metadata')
+  // without the package's default xmlns its own elements, `meta` included, have no namespace
+  const opfNS = opf.documentElement.namespaceURI === NS.OPF ? NS.OPF : null
 
   // first pass: convert to JS objects
-  const els = Object.groupBy($metadata.children, (el) =>
-    el.namespaceURI === NS.DC ? 'dc' : el.namespaceURI === NS.OPF && el.localName === 'meta' ? (el.hasAttribute('name') ? 'legacyMeta' : 'meta') : '',
+  const els = groupBy($metadata.children, (el) =>
+    el.namespaceURI === NS.DC ? 'dc' : el.namespaceURI === opfNS && el.localName === 'meta' ? (el.hasAttribute('name') ? 'legacyMeta' : 'meta') : '',
   )
   const baseLang = $metadata.getAttribute('xml:lang') ?? opf.documentElement.getAttribute('xml:lang') ?? 'und'
   const prefixes = getPrefixes(opf)
@@ -206,13 +235,13 @@ const getMetadata = (opf) => {
       ),
     }
   }
-  const refines = Map.groupBy(els.meta ?? [], (el) => el.getAttribute('refines'))
+  const refines = groupByMap(els.meta ?? [], (el) => el.getAttribute('refines'))
   const getProperties = (el) => {
     const els = refines.get(el ? '#' + el.getAttribute('id') : null)
     if (!els) return null
-    return Object.groupBy(els.map(parse), (x) => x.property)
+    return groupBy(els.map(parse), (x) => x.property)
   }
-  const dc = Object.fromEntries(Object.entries(Object.groupBy(els.dc, (el) => el.localName)).map(([name, els]) => [name, els.map(parse)]))
+  const dc = Object.fromEntries(Object.entries(groupBy(els.dc, (el) => el.localName)).map(([name, els]) => [name, els.map(parse)]))
   const properties = getProperties() ?? {}
   const legacyMeta = Object.fromEntries(els.legacyMeta?.map((el) => [el.getAttribute('name'), el.getAttribute('content')]) ?? [])
 
@@ -264,9 +293,7 @@ const getMetadata = (opf) => {
     }
     return value
   }
-  const belongsTo = Object.groupBy(properties['belongs-to-collection'] ?? [], (x) =>
-    prop(x, 'collection-type') === 'series' ? 'series' : 'collection',
-  )
+  const belongsTo = groupBy(properties['belongs-to-collection'] ?? [], (x) => (prop(x, 'collection-type') === 'series' ? 'series' : 'collection'))
   const mainTitle = dc.title?.find((x) => prop(x, 'title-type') === 'main') ?? dc.title?.[0]
   const metadata = {
     identifier: getIdentifier(opf),
@@ -450,7 +477,7 @@ class MediaOverlay extends EventTarget {
     this.dispatchEvent(new CustomEvent('error', { detail: e }))
   }
   #highlight() {
-    this.dispatchEvent(new CustomEvent('highlight', { detail: this.#activeItem }))
+    this.dispatchEvent(new CustomEvent('highlight', { detail: { ...this.#activeItem, sectionIndex: this.#sectionIndex } }))
   }
   #unhighlight() {
     this.dispatchEvent(new CustomEvent('unhighlight', { detail: this.#activeItem }))
@@ -937,15 +964,31 @@ class Loader {
           ),
         )
       // replace inline styles
-      for (const el of doc.querySelectorAll('style')) if (el.textContent) el.textContent = await this.replaceCSS(el.textContent, href, parents)
-      for (const el of doc.querySelectorAll('[style]')) el.setAttribute('style', await this.replaceCSS(el.getAttribute('style'), href, parents))
+      for (const el of doc.querySelectorAll('style')) {
+        if (!el.textContent) continue
+        const css = await this.replaceCSS(el.textContent, href, parents)
+        el.textContent = isInSVG(el) ? css : await this.transformCSS(css, href)
+      }
+      for (const el of doc.querySelectorAll('[style]')) {
+        const css = await this.replaceCSS(el.getAttribute('style'), href, parents)
+        el.setAttribute('style', isInSVG(el) ? css : await this.transformCSS(css, href))
+      }
       // TODO: replace inline scripts? probably not worth the trouble
       const result = new XMLSerializer().serializeToString(doc)
       return this.createURL(href, result, item.mediaType, parent)
     }
 
-    const result = mediaType === MIME.CSS ? await this.replaceCSS(str, href, parents) : await this.replaceString(str, href, parents)
+    const result =
+      mediaType === MIME.CSS ? await this.transformCSS(await this.replaceCSS(str, href, parents), href) : await this.replaceString(str, href, parents)
     return this.createURL(href, result, mediaType, parent)
+  }
+  // Lets the host rewrite book CSS before it is used. CSS that styles SVG is never passed here,
+  // because its sizes belong to the drawing's coordinate system rather than to the text.
+  async transformCSS(css, href) {
+    const detail = { data: css }
+    Object.defineProperty(detail, 'name', { value: href })
+    this.eventTarget.dispatchEvent(new CustomEvent('css', { detail }))
+    return await detail.data
   }
   async replaceCSS(str, href, parents = []) {
     // For url() references, use direct URLs for fonts and images (lazy loading)

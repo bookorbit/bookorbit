@@ -26,7 +26,7 @@ defineProps<{
         {{ formatCompactNumber(count) }}
       </span>
     </PopoverTrigger>
-    <PopoverContent side="right" align="start" :side-offset="8" class="w-72 border-(--shell-border) bg-(--shell-surface) p-1 backdrop-blur-xl">
+    <PopoverContent side="right" align="start" :side-offset="8" class="w-72 border-(--shell-border) bg-(--shell-surface) p-1 shell-backdrop">
       <slot />
     </PopoverContent>
   </Popover>

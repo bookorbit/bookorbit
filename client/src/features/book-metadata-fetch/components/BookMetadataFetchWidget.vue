@@ -13,6 +13,11 @@ import BookMetadataFetchReportModal from './BookMetadataFetchReportModal.vue'
 import AuthorEnrichmentExpanded from './AuthorEnrichmentExpanded.vue'
 import AuthorEnrichmentReportModal from './AuthorEnrichmentReportModal.vue'
 
+const props = defineProps<{
+  /** Set where the page already shows the book queue, so the card does not repeat it over the page's own controls. */
+  hideBookCard?: boolean
+}>()
+
 const { status, subscribe } = useBookMetadataFetchStatus()
 const { status: authorStatus, subscribe: subscribeAuthors } = useAuthorEnrichmentStatus()
 const { hasPermission, isSuperuser } = usePermissions()
@@ -52,7 +57,7 @@ const hasAuthorStatus = computed(() => hasAuthorWork.value || authorStatus.value
 const cardUserId = computed(() => user.value?.id ?? null)
 const { dismissed: bookCardDismissed, dismiss: dismissBookCard } = useMetadataCardDismissal('books', status, hasBookWork, cardUserId)
 const { dismissed: authorCardDismissed, dismiss: dismissAuthorCard } = useMetadataCardDismissal('authors', authorStatus, hasAuthorWork, cardUserId)
-const showBookCard = computed(() => hasBookStatus.value && !bookCardDismissed.value)
+const showBookCard = computed(() => hasBookStatus.value && !bookCardDismissed.value && !props.hideBookCard)
 const showAuthorCard = computed(() => hasAuthorStatus.value && !authorCardDismissed.value)
 
 watch(hasAuthorWork, (active) => {
@@ -242,7 +247,7 @@ onMounted(() => {
         </div>
       </button>
       <button
-        class="absolute end-1.5 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="absolute end-1.5 top-1.5 rounded-xs p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="t('bookMetadataFetch.actions.dismissBookStatus')"
         @click="handleDismissBookCard"
       >
@@ -275,7 +280,7 @@ onMounted(() => {
         </div>
       </button>
       <button
-        class="absolute end-1.5 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="absolute end-1.5 top-1.5 rounded-xs p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="t('bookMetadataFetch.actions.dismissAuthorStatus')"
         @click="handleDismissAuthorCard"
       >

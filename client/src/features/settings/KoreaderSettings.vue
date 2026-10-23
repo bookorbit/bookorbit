@@ -40,6 +40,10 @@ import type {
 } from '@bookorbit/types'
 import SettingsTabs from './components/SettingsTabs.vue'
 import KoreaderCredentialsDialog from './KoreaderCredentialsDialog.vue'
+import KoreaderDeliverySettings from './KoreaderDeliverySettings.vue'
+import ReadAloudDeliverySelect from '@/features/delivery/components/ReadAloudDeliverySelect.vue'
+import { useReadAloudDelivery } from '@/features/delivery/composables/useReadAloudDelivery'
+import type { ReadAloudDeliveryPreference } from '@bookorbit/types'
 import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -170,6 +174,10 @@ onUnmounted(() => {
 })
 
 const syncUrl = computed(() => new URL('/api/v1/koreader', getSyncUrl()).toString())
+const { supported: deliverySupported } = useReadAloudDelivery('koreader-delivery-settings')
+const newReadAloudDelivery = ref<ReadAloudDeliveryPreference>('audioless_epub')
+const savingHideAudioOnlyBooks = ref(false)
+
 const hasCredentials = computed(() => !!credentials.value)
 const activeDevices = computed(() => (syncStatus.value?.devices ?? []).filter((device) => device.retiredAt === null))
 const retiredDevices = computed(() => (syncStatus.value?.devices ?? []).filter((device) => device.retiredAt !== null))
@@ -343,6 +351,7 @@ async function handleCreate() {
     await createCredentials({
       username: newUsername.value,
       password: newPassword.value,
+      ...(deliverySupported.value ? { readAloudDelivery: newReadAloudDelivery.value } : {}),
     })
     showSetupForm.value = false
     helpOpen.value = false
@@ -414,6 +423,18 @@ async function handleToggleSync(newValue: boolean) {
   }
 }
 
+async function handleToggleHideAudioOnlyBooks(newValue: boolean) {
+  savingHideAudioOnlyBooks.value = true
+  try {
+    await updateCredentials({ hideAudioOnlyBooks: newValue })
+    toast.success(newValue ? t('settings.reader.koreader.audioOnlyBooksHidden') : t('settings.reader.koreader.audioOnlyBooksShown'))
+  } catch {
+    toast.error(t('settings.reader.koreader.toggleAudioOnlyBooksFailed'))
+  } finally {
+    savingHideAudioOnlyBooks.value = false
+  }
+}
+
 async function handleDelete() {
   try {
     await deleteCredentials()
@@ -454,9 +475,9 @@ async function handleRefreshUnmatched() {
   try {
     await fetchUnmatchedBooks()
     unmatchedPage.value = 1
-    toast.success(t('settings.reader.koreader.hashLinks.toast.unmatchedRefreshed'))
+    toast.success(t('settings.reader.koreader.hashLinks.toast.reviewRefreshed'))
   } catch {
-    toast.error(t('settings.reader.koreader.hashLinks.toast.unmatchedRefreshFailed'))
+    toast.error(t('settings.reader.koreader.hashLinks.toast.reviewRefreshFailed'))
   }
 }
 
@@ -499,10 +520,10 @@ async function handleDismissUnmatchedBook() {
   dismissingHash.value = dismissConfirmBook.value.hash
   try {
     await dismissUnmatchedBook(dismissConfirmBook.value.hash)
-    toast.success(t('settings.reader.koreader.hashLinks.toast.unmatchedDismissed'))
+    toast.success(t('settings.reader.koreader.hashLinks.toast.reviewDismissed'))
     handleCloseDismiss()
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : t('settings.reader.koreader.hashLinks.toast.dismissFailed'))
+    toast.error(e instanceof Error ? e.message : t('settings.reader.koreader.hashLinks.toast.reviewDismissFailed'))
   } finally {
     dismissingHash.value = null
   }
@@ -521,14 +542,14 @@ async function handleDismissAllUnmatchedBooks() {
   try {
     const result = await dismissAllUnmatchedBooks()
     toast.success(
-      t('settings.reader.koreader.hashLinks.toast.allDismissed', {
+      t('settings.reader.koreader.hashLinks.toast.reviewAllDismissed', {
         count: result.count,
       }),
     )
     dismissAllConfirmOpen.value = false
     unmatchedPage.value = 1
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : t('settings.reader.koreader.hashLinks.toast.dismissAllFailed'))
+    toast.error(e instanceof Error ? e.message : t('settings.reader.koreader.hashLinks.toast.reviewDismissAllFailed'))
   } finally {
     dismissingAll.value = false
   }
@@ -722,6 +743,7 @@ async function handleDownloadPlugin() {
           <p class="text-xs text-muted-foreground">
             {{ t('settings.reader.koreader.createFormHint') }}
           </p>
+          <ReadAloudDeliverySelect v-if="deliverySupported" v-model="newReadAloudDelivery" :disabled="creating" explicit-only />
           <div>
             <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('settings.reader.koreader.username') }}</label>
             <input
@@ -857,6 +879,32 @@ async function handleDownloadPlugin() {
                   {{ formatDate(credentials?.createdAt) }}
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-8">
+          <p class="settings-group-label">
+            {{ t('settings.reader.koreader.pluginLibrary') }}
+          </p>
+          <div class="settings-card">
+            <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
+              <div class="min-w-0">
+                <p id="koreader-hide-audio-only-label" class="settings-label">
+                  {{ t('settings.reader.koreader.hideAudioOnlyBooks') }}
+                </p>
+                <p id="koreader-hide-audio-only-hint" class="settings-hint">
+                  {{ t('settings.reader.koreader.hideAudioOnlyBooksHint') }}
+                </p>
+              </div>
+              <ToggleSwitch
+                :model-value="credentials?.hideAudioOnlyBooks ?? true"
+                :disabled="savingHideAudioOnlyBooks"
+                aria-labelledby="koreader-hide-audio-only-label"
+                aria-describedby="koreader-hide-audio-only-hint"
+                class="self-start md:self-auto"
+                @update:model-value="handleToggleHideAudioOnlyBooks"
+              />
             </div>
           </div>
         </div>
@@ -1023,6 +1071,14 @@ async function handleDownloadPlugin() {
           </div>
         </div>
 
+        <KoreaderDeliverySettings
+          v-if="deliverySupported"
+          :credentials="credentials"
+          :devices="syncStatus?.devices ?? []"
+          :sweeps="syncStatus?.sweeps ?? []"
+          @updated="handleRefresh"
+        />
+
         <div class="mb-8">
           <p class="settings-group-label">
             {{ t('settings.reader.koreader.pluginActivity') }}
@@ -1152,7 +1208,7 @@ async function handleDownloadPlugin() {
         <div class="mb-8">
           <div class="mb-2 flex items-center justify-between gap-3">
             <p class="settings-group-label mb-0">
-              {{ t('settings.reader.koreader.hashLinks.unmatchedTitle') }}
+              {{ t('settings.reader.koreader.hashLinks.reviewTitle') }}
             </p>
             <div class="flex items-center gap-2">
               <Button
@@ -1171,12 +1227,13 @@ async function handleDownloadPlugin() {
               </Button>
             </div>
           </div>
+          <p class="settings-hint mb-3">{{ t('settings.reader.koreader.hashLinks.reviewHint') }}</p>
           <div class="settings-card">
             <div v-if="unmatchedLoading" class="px-4 py-5 bg-card text-sm text-muted-foreground md:px-5">
-              {{ t('settings.reader.koreader.hashLinks.loadingUnmatched') }}
+              {{ t('settings.reader.koreader.hashLinks.loadingReview') }}
             </div>
             <div v-else-if="unmatchedBooks.length === 0" class="px-4 py-5 bg-card text-sm text-muted-foreground md:px-5">
-              {{ t('settings.reader.koreader.hashLinks.noUnmatched') }}
+              {{ t('settings.reader.koreader.hashLinks.noReview') }}
             </div>
             <template v-else>
               <div v-for="book in pagedUnmatchedBooks" :key="book.hash" class="px-4 py-4 bg-card md:px-5">
@@ -1469,7 +1526,7 @@ async function handleDownloadPlugin() {
           </p>
           <p class="mt-1 text-sm text-muted-foreground">
             {{
-              t('settings.reader.koreader.hashLinks.unlinkConfirmBody', {
+              t('settings.reader.koreader.hashLinks.manualUnlinkConfirmBody', {
                 title: linkedBookTitle(unlinkConfirmLink),
               })
             }}
@@ -1544,7 +1601,7 @@ async function handleDownloadPlugin() {
             }}
           </p>
           <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.reader.koreader.hashLinks.dismissConfirmBody') }}
+            {{ t('settings.reader.koreader.hashLinks.reviewDismissConfirmBody') }}
           </p>
           <div class="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             <p class="font-mono text-foreground truncate">
@@ -1575,7 +1632,7 @@ async function handleDownloadPlugin() {
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
             {{
-              t('settings.reader.koreader.hashLinks.dismissAllConfirmTitle', {
+              t('settings.reader.koreader.hashLinks.reviewDismissAllConfirmTitle', {
                 count: unmatchedBooks.length,
               })
             }}
@@ -1583,7 +1640,7 @@ async function handleDownloadPlugin() {
           <div class="mt-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <AlertTriangle :size="14" class="mt-0.5 shrink-0" />
             <p>
-              {{ t('settings.reader.koreader.hashLinks.dismissAllConfirmBody') }}
+              {{ t('settings.reader.koreader.hashLinks.reviewDismissAllConfirmBody') }}
             </p>
           </div>
           <div class="mt-4 flex items-center justify-end gap-2">

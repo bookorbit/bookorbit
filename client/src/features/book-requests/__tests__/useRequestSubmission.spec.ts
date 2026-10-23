@@ -189,3 +189,97 @@ describe('submit refusals', () => {
     scope.stop()
   })
 })
+
+describe('useRequestSubmission for a pair', () => {
+  const dune = { provider: MetadataProviderKey.GOOGLE, providerId: 'g1', title: 'Dune', authors: ['Frank Herbert'] } as MetadataCandidate
+
+  beforeEach(() => {
+    api.mockReset()
+  })
+
+  it('asks about both media for every candidate, and files each answer under its own medium', async () => {
+    vi.useFakeTimers()
+    try {
+      api.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { ownedBookId: 42, existingRequestId: null, existingRequestStatus: null, alreadySubscribed: false },
+          { ownedBookId: null, existingRequestId: 9, existingRequestStatus: 'pending', alreadySubscribed: false },
+        ],
+      } as Response)
+      const scope = effectScope()
+      const state = scope.run(() => useRequestSubmission())!
+      state.pairMode.value = true
+      await Promise.resolve()
+
+      state.annotate([dune])
+      await vi.runAllTimersAsync()
+
+      const body = JSON.parse(api.mock.calls[0]![1]!.body as string) as { items: Array<{ mediaKind: string }> }
+      expect(body.items.map((item) => item.mediaKind)).toEqual(['ebook', 'audiobook'])
+      expect(state.getAvailability(dune, 'ebook')?.ownedBookId).toBe(42)
+      expect(state.getAvailability(dune, 'audiobook')?.existingRequestId).toBe(9)
+      scope.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('submits both halves in one call, each with its own destination, formats and cover', async () => {
+    api.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ebook: { request: { id: 10, status: 'pending' }, subscribed: false },
+        audiobook: { request: { id: 11, status: 'pending' }, subscribed: true },
+      }),
+    } as Response)
+    const scope = effectScope()
+    const state = scope.run(() => useRequestSubmission())!
+
+    const result = await state.submitPair(dune, {
+      language: 'en',
+      ebook: { targetLibraryId: 1, preferredFormats: ['epub'] },
+      audiobook: { targetLibraryId: 2, preferredFormats: ['m4b'], coverUrl: 'https://covers.test/square.jpg' },
+    })
+
+    const [path, init] = api.mock.calls[0]!
+    expect(path).toBe('/api/v1/book-requests/pairs')
+    const body = JSON.parse(init!.body as string)
+    expect(body).not.toHaveProperty('mediaKind')
+    expect(body.ebook).toEqual({ targetLibraryId: 1, targetFolderId: null, preferredFormats: ['epub'], coverUrl: null })
+    expect(body.audiobook).toEqual({
+      targetLibraryId: 2,
+      targetFolderId: null,
+      preferredFormats: ['m4b'],
+      coverUrl: 'https://covers.test/square.jpg',
+    })
+    expect(result?.audiobook.subscribed).toBe(true)
+    // What the server just said stands in for both halves until the next annotation.
+    expect(state.getAvailability(dune, 'ebook')?.existingRequestId).toBe(10)
+    expect(state.getAvailability(dune, 'audiobook')?.existingRequestId).toBe(11)
+    scope.stop()
+  })
+
+  it('asks for one medium with the book it should join when only that one is missing', async () => {
+    api.mockResolvedValueOnce({ ok: true, json: async () => ({ request: { id: 12, status: 'pending' }, subscribed: false }) } as Response)
+    const scope = effectScope()
+    const state = scope.run(() => useRequestSubmission())!
+
+    await state.submit(dune, { mediaKind: 'audiobook', targetBookId: 42 })
+
+    const body = JSON.parse(api.mock.calls[0]![1]!.body as string)
+    expect(body).toMatchObject({ mediaKind: 'audiobook', targetBookId: 42 })
+    scope.stop()
+  })
+
+  it('leaves the book field off entirely for an ordinary request, so an older server never sees it', async () => {
+    api.mockResolvedValueOnce({ ok: true, json: async () => ({ request: { id: 12, status: 'pending' }, subscribed: false }) } as Response)
+    const scope = effectScope()
+    const state = scope.run(() => useRequestSubmission())!
+
+    await state.submit(dune, {})
+
+    expect(JSON.parse(api.mock.calls[0]![1]!.body as string)).not.toHaveProperty('targetBookId')
+    scope.stop()
+  })
+})

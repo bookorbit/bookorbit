@@ -1,3 +1,5 @@
+import { Test } from '@nestjs/testing';
+import { BookService } from '../book/book.service';
 import { BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,7 +21,7 @@ describe('KoreaderHashLinkService', () => {
     listBookHashLinks: ReturnType<typeof vi.fn>;
     upsertBookHashLink: ReturnType<typeof vi.fn>;
     getBookHashLink: ReturnType<typeof vi.fn>;
-    deleteBookHashLink: ReturnType<typeof vi.fn>;
+    unlinkBookHashLink: ReturnType<typeof vi.fn>;
     upsertUnmatchedBooks: ReturnType<typeof vi.fn>;
     findBookFileIdByBookId: ReturnType<typeof vi.fn>;
     dismissUnmatchedBook: ReturnType<typeof vi.fn>;
@@ -48,7 +50,7 @@ describe('KoreaderHashLinkService', () => {
     };
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
 
@@ -62,7 +64,7 @@ describe('KoreaderHashLinkService', () => {
       listBookHashLinks: vi.fn().mockResolvedValue([]),
       upsertBookHashLink: vi.fn().mockResolvedValue(undefined),
       getBookHashLink: vi.fn().mockResolvedValue(null),
-      deleteBookHashLink: vi.fn().mockResolvedValue(null),
+      unlinkBookHashLink: vi.fn().mockResolvedValue(null),
       upsertUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
       findBookFileIdByBookId: vi.fn(),
       dismissUnmatchedBook: vi.fn().mockResolvedValue(null),
@@ -77,7 +79,10 @@ describe('KoreaderHashLinkService', () => {
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
-    service = new KoreaderHashLinkService(mockRepo as unknown as KoreaderRepository, mockBookService as never);
+    const module = await Test.createTestingModule({
+      providers: [KoreaderHashLinkService, { provide: KoreaderRepository, useValue: mockRepo }, { provide: BookService, useValue: mockBookService }],
+    }).compile();
+    service = module.get(KoreaderHashLinkService);
   });
 
   describe('listUnmatchedBooks', () => {
@@ -131,6 +136,16 @@ describe('KoreaderHashLinkService', () => {
       expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A]);
     });
 
+    it('keeps a pending manual override visible even after intrinsic resolution succeeds', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ manualLinkRequested: true })]);
+      mockRepo.resolveBookFilesByHashes.mockResolvedValue(new Map([[HASH_A, { bookFileId: 44, bookId: 55, libraryId: 1 }]]));
+      const rows = await service.listUnmatchedBooks(user);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.hash).toBe(HASH_A);
+      expect(rows[0]).not.toHaveProperty('manualLinkRequested');
+      expect(mockRepo.resolveBookFilesByHashes).toHaveBeenCalledWith([], [1, 2], 7);
+    });
+
     it('does not call clearUnmatchedBooks when nothing resolves', async () => {
       mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow()]);
       mockRepo.resolveBookFilesByHashes.mockResolvedValue(new Map());
@@ -158,25 +173,25 @@ describe('KoreaderHashLinkService', () => {
       await expect(service.linkUnmatchedBook(user, HASH_A.toUpperCase(), 55)).resolves.toEqual({ hash: HASH_A, bookId: 55, bookFileId: 44 });
 
       expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(55, user);
-      expect(mockRepo.resolveBookFileByHash).toHaveBeenCalledWith(HASH_A, [1, 2]);
+      expect(mockRepo.resolveBookFileByHash).not.toHaveBeenCalled();
       expect(mockRepo.getBookHashLink).toHaveBeenCalledWith(7, HASH_A);
       expect(mockRepo.upsertBookHashLink).toHaveBeenCalledWith(7, HASH_A, 44, {
         title: 'Stats title',
         authors: 'Stats author',
         lastOpen: 100,
       });
-      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A]);
+      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A], true);
     });
 
-    it('does not create a manual link when the hash already resolves to the same file intrinsically', async () => {
+    it('preserves explicit intent even when the hash already resolves to the same file intrinsically', async () => {
       mockRepo.getUnmatchedBook.mockResolvedValue(makeUnmatchedRow());
       mockRepo.findBookFileIdByBookId.mockResolvedValue(44);
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 1 });
 
       await service.linkUnmatchedBook(user, HASH_A, 55);
 
-      expect(mockRepo.upsertBookHashLink).not.toHaveBeenCalled();
-      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A]);
+      expect(mockRepo.upsertBookHashLink).toHaveBeenCalledWith(7, HASH_A, 44, expect.any(Object));
+      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A], true);
     });
 
     it('rejects linking historical or ambiguous unmatched rows', async () => {
@@ -205,15 +220,15 @@ describe('KoreaderHashLinkService', () => {
       expect(mockRepo.upsertBookHashLink).not.toHaveBeenCalled();
     });
 
-    it('rejects links when the hash already belongs to a different accessible book file', async () => {
+    it('allows an explicit override of an intrinsic match to another book', async () => {
       mockRepo.getUnmatchedBook.mockResolvedValue(makeUnmatchedRow());
       mockRepo.findBookFileIdByBookId.mockResolvedValue(44);
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 99, bookId: 88, libraryId: 1 });
 
-      await expect(service.linkUnmatchedBook(user, HASH_A, 55)).rejects.toThrow(ConflictException);
+      await expect(service.linkUnmatchedBook(user, HASH_A, 55)).resolves.toEqual({ hash: HASH_A, bookId: 55, bookFileId: 44 });
 
-      expect(mockRepo.upsertBookHashLink).not.toHaveBeenCalled();
-      expect(mockRepo.clearUnmatchedBooks).not.toHaveBeenCalled();
+      expect(mockRepo.upsertBookHashLink).toHaveBeenCalled();
+      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A], true);
     });
 
     it('rejects linking when the hash is already manually linked to a different file', async () => {
@@ -276,7 +291,7 @@ describe('KoreaderHashLinkService', () => {
 
       expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(77, user);
       expect(mockRepo.upsertBookHashLink).toHaveBeenCalledWith(7, HASH_A, 66);
-      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A]);
+      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A], true);
     });
 
     it('rejects relinking when no manual link exists', async () => {
@@ -298,21 +313,21 @@ describe('KoreaderHashLinkService', () => {
       expect(mockRepo.upsertBookHashLink).not.toHaveBeenCalled();
     });
 
-    it('rejects relinking when the hash already matches a different book intrinsically', async () => {
+    it('allows relinking despite an intrinsic match to a different book', async () => {
       mockRepo.getBookHashLink.mockResolvedValue({ bookFileId: 44 });
       mockRepo.findBookFileIdByBookId.mockResolvedValue(66);
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 99, bookId: 88, libraryId: 1 });
 
-      await expect(service.relinkManualHashLink(user, HASH_A, 77)).rejects.toThrow(ConflictException);
+      await expect(service.relinkManualHashLink(user, HASH_A, 77)).resolves.toEqual({ hash: HASH_A, bookId: 77, bookFileId: 66 });
 
-      expect(mockRepo.upsertBookHashLink).not.toHaveBeenCalled();
-      expect(mockRepo.clearUnmatchedBooks).not.toHaveBeenCalled();
+      expect(mockRepo.upsertBookHashLink).toHaveBeenCalledWith(7, HASH_A, 66);
+      expect(mockRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A], true);
     });
   });
 
   describe('unlinkManualHashLink', () => {
     it('unlinks a manual hash link and restores it as unmatched when no intrinsic match exists', async () => {
-      mockRepo.deleteBookHashLink.mockResolvedValue({
+      mockRepo.unlinkBookHashLink.mockResolvedValue({
         hash: HASH_A,
         bookFileId: 44,
         koreaderTitle: 'KOReader Title',
@@ -323,14 +338,12 @@ describe('KoreaderHashLinkService', () => {
 
       await expect(service.unlinkManualHashLink(user, HASH_A)).resolves.toEqual({ hash: HASH_A });
 
-      expect(mockRepo.deleteBookHashLink).toHaveBeenCalledWith(7, HASH_A);
-      expect(mockRepo.upsertUnmatchedBooks).toHaveBeenCalledWith(7, [
-        { hash: HASH_A, title: 'KOReader Title', authors: 'KOReader Author', lastOpen: 100, source: 'file', metadataAmbiguous: false },
-      ]);
+      expect(mockRepo.unlinkBookHashLink).toHaveBeenCalledWith(7, HASH_A);
+      expect(mockRepo.unlinkBookHashLink).toHaveBeenCalledWith(7, HASH_A);
     });
 
-    it('does not restore the hash as unmatched when it still resolves intrinsically', async () => {
-      mockRepo.deleteBookHashLink.mockResolvedValue({
+    it('restores a manual-link request even when the hash resolves intrinsically', async () => {
+      mockRepo.unlinkBookHashLink.mockResolvedValue({
         hash: HASH_A,
         bookFileId: 44,
         koreaderTitle: 'KOReader Title',
@@ -341,11 +354,11 @@ describe('KoreaderHashLinkService', () => {
 
       await expect(service.unlinkManualHashLink(user, HASH_A)).resolves.toEqual({ hash: HASH_A });
 
-      expect(mockRepo.upsertUnmatchedBooks).not.toHaveBeenCalled();
+      expect(mockRepo.unlinkBookHashLink).toHaveBeenCalledWith(7, HASH_A);
     });
 
     it('rejects unlinking when no manual link exists', async () => {
-      mockRepo.deleteBookHashLink.mockResolvedValue(null);
+      mockRepo.unlinkBookHashLink.mockResolvedValue(null);
 
       await expect(service.unlinkManualHashLink(user, HASH_A)).rejects.toThrow(NotFoundException);
 

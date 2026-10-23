@@ -427,6 +427,7 @@ describe('metadata format extractors', () => {
         publishedYear: 2014,
         authors: [],
         genres: [],
+        tags: [],
         comicvineId: null,
       }),
     );
@@ -454,11 +455,27 @@ describe('metadata format extractors', () => {
       expect.objectContaining({
         title: 'Batman',
         genres: ['Comics'],
+        tags: ['Superhero'],
         ranobedbId: 'comic-ranobe',
         comicvineId: '140529',
         comicMetadata: { issueNumber: '55', volumeName: 'Batman' },
       }),
     );
+  });
+
+  it('comic extractor keeps Tags as tags and never promotes them to genres', async () => {
+    mockExtractCbzMetadata.mockResolvedValue({
+      title: 'Ninja Scroll',
+      authors: [],
+      genres: [],
+      tags: ['ninja', 'school life'],
+    } as any);
+    mockExtractCbzCover.mockResolvedValue(null);
+
+    const result = await new ComicFormatExtractor('cbz').extract('/books/ninja.cbz');
+
+    expect(result?.genres).toEqual([]);
+    expect(result?.tags).toEqual(['ninja', 'school life']);
   });
 
   it('comic extractor uses CBR reader when a CBZ file is actually a RAR archive', async () => {
@@ -502,8 +519,17 @@ describe('metadata format extractors', () => {
       expect.objectContaining({
         publishedYear: 1992,
         cover: null,
+        isbn13: '9780553380958',
       }),
     );
+  });
+
+  it('puts a formatted MOBI ISBN-10 in isbn10', async () => {
+    mockParseMobiFile.mockResolvedValue({ title: 'Book', isbn: '0-9752298-0-x', authors: [], tags: [] } as never);
+    mockExtractMobiCover.mockResolvedValue(null);
+    const result = await new MobiFormatExtractor().extract('/books/book.mobi');
+    expect(result?.isbn10).toBe('097522980X');
+    expect(result?.isbn13).toBeUndefined();
   });
 
   it('pdf extractor returns null for unparseable PDFs', async () => {

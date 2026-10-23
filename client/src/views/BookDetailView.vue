@@ -12,7 +12,7 @@ import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
-import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -29,12 +29,13 @@ const KEPT_ALIVE_TABS = ['ReadingLogTab', 'HighlightsTab']
 
 const { t } = useI18n()
 const route = useRoute()
-const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
 const { libraries } = useLibraries()
 
 provide(
   COVER_ASPECT_RATIO_KEY,
   computed(() => {
+    if (detail.value?.coverAspectRatio) return detail.value.coverAspectRatio
     const libraryId = detail.value?.libraryId
     const library = libraryId != null ? libraries.value.find((l) => l.id === libraryId) : null
     return library?.coverAspectRatio ?? DEFAULT_COVER_ASPECT_RATIO
@@ -42,9 +43,16 @@ provide(
 )
 
 const bookId = computed(() => Number(route.params.bookId))
-const tab = computed(() => normalizeBookDetailTab(route.query.tab))
+const tab = computed(() => {
+  const requested = normalizeBookDetailTab(route.query.tab)
+  return requested === 'edit' && detail.value && !canEditMetadata.value ? 'details' : requested
+})
 
 const { detail, loading, notFound, fetch } = useBookDetail()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', detail.value?.libraryId, 'editor'))
+const parentLibrary = computed(() =>
+  detail.value?.libraryId != null && detail.value.libraryName ? { id: detail.value.libraryId, name: detail.value.libraryName } : null,
+)
 const pageTitle = computed(() => {
   const title = detail.value?.title?.trim()
   const base = title || (Number.isFinite(bookId.value) ? t('views.bookDetail.titleWithId', { id: bookId.value }) : t('views.bookDetail.title'))
@@ -126,6 +134,10 @@ function onLocksChanged(lockedFields: BookMetadataLockField[]) {
   if (detail.value) detail.value.lockedFields = lockedFields
 }
 
+function handleBookRefetch() {
+  void fetch(bookId.value)
+}
+
 // A cover write can change either slot, the summary and the face version, so take the server's view.
 function onCoverChanged() {
   void fetch(bookId.value)
@@ -133,7 +145,7 @@ function onCoverChanged() {
 </script>
 
 <template>
-  <BookDetailLayout :book-id="bookId" :cover-tint="coverTint">
+  <BookDetailLayout :book-id="bookId" :cover-tint="coverTint" :can-edit-metadata="canEditMetadata" :parent-library="parentLibrary">
     <Transition name="content" mode="out-in">
       <div v-if="detail" key="detail" class="@container/book-detail h-full">
         <!--
@@ -144,14 +156,14 @@ function onCoverChanged() {
         <KeepAlive :include="KEPT_ALIVE_TABS">
           <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" @moved="handleMovedToLibrary" />
           <EditMetadataTab
-            v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
+            v-else-if="tab === 'edit' && canEditMetadata"
             :book="detail"
             @saved="onMetadataSaved"
             @locks-changed="onLocksChanged"
             @cover-changed="onCoverChanged"
           />
           <FilesTab v-else-if="tab === 'files'" :book="detail" @refetch="fetch(detail.id)" />
-          <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" @saved="onMetadataSaved" />
+          <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" @saved="onMetadataSaved" @refetch="handleBookRefetch" />
           <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
         </KeepAlive>
       </div>
@@ -166,15 +178,15 @@ function onCoverChanged() {
             </div>
           </div>
           <div class="flex-1 space-y-3">
-            <div class="h-7 w-3/4 rounded bg-muted animate-shimmer" />
-            <div class="h-4 w-1/2 rounded bg-muted animate-shimmer" />
-            <div class="h-4 w-1/3 rounded bg-muted animate-shimmer" />
+            <div class="h-7 w-3/4 rounded-xs bg-muted animate-shimmer" />
+            <div class="h-4 w-1/2 rounded-xs bg-muted animate-shimmer" />
+            <div class="h-4 w-1/3 rounded-xs bg-muted animate-shimmer" />
             <div class="flex gap-1.5 mt-4">
-              <div class="h-5 w-12 rounded bg-muted animate-shimmer" />
-              <div class="h-5 w-16 rounded bg-muted animate-shimmer" />
-              <div class="h-5 w-10 rounded bg-muted animate-shimmer" />
+              <div class="h-5 w-12 rounded-xs bg-muted animate-shimmer" />
+              <div class="h-5 w-16 rounded-xs bg-muted animate-shimmer" />
+              <div class="h-5 w-10 rounded-xs bg-muted animate-shimmer" />
             </div>
-            <div class="h-32 w-full rounded bg-muted animate-shimmer mt-4" />
+            <div class="h-32 w-full rounded-xs bg-muted animate-shimmer mt-4" />
           </div>
         </div>
         <div v-else-if="tab === 'edit'" class="max-w-2xl space-y-4">

@@ -5,6 +5,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CoverSweepStore } from './cover-sweep.store';
+import { ReadingAttemptEventsService, READING_ATTEMPT_CHANGED } from '../user-book-status/reading-attempt-events.service';
 import { MissingResourcesService } from './missing-resources.service';
 
 const user = { id: 7, isSuperuser: true } as never;
@@ -71,6 +72,7 @@ describe('MissingResourcesService', () => {
     const libraryService = { findAccessibleLibraryIds: vi.fn().mockResolvedValue([1, 2]) };
     const bookService = { deleteBooks: vi.fn().mockImplementation((ids: number[]) => Promise.resolve({ total: ids.length, books: [], omitted: 0 })) };
     const config = { get: vi.fn().mockReturnValue(appDataPath) };
+    const events = new ReadingAttemptEventsService();
     const service = new MissingResourcesService(
       repo as never,
       store,
@@ -78,8 +80,9 @@ describe('MissingResourcesService', () => {
       bookService as never,
       config as never,
       coverStore as never,
+      events,
     );
-    return { service, repo, libraryService, bookService, coverStore };
+    return { service, repo, libraryService, bookService, coverStore, events };
   }
 
   async function runSweep(service: MissingResourcesService): Promise<void> {
@@ -249,6 +252,36 @@ describe('MissingResourcesService', () => {
       expect(repo.findMissingBookIds).toHaveBeenCalledWith([1, 2], 0, 5000);
       expect(bookService.deleteBooks).toHaveBeenCalledWith([8, 9], user);
       expect(result).toMatchObject({ cleaned: 2, remaining: 0 });
+    });
+
+    it('coalesces global cache invalidation across every bounded deletion batch', async () => {
+      const ids = Array.from({ length: 1043 }, (_, index) => index + 1);
+      const { service, events, bookService } = setup({ findMissingBookIds: vi.fn().mockResolvedValue(ids) });
+      const listener = vi.fn();
+      events.on(READING_ATTEMPT_CHANGED, listener);
+      bookService.deleteBooks.mockImplementation((batch: number[]) => {
+        events.notifyChanged(null);
+        expect(listener).not.toHaveBeenCalled();
+        return Promise.resolve({ total: batch.length, books: [], omitted: 0 });
+      });
+      expect(await service.cleanMissingBooks(user, { all: true })).toMatchObject({ cleaned: 1043 });
+      expect(bookService.deleteBooks.mock.calls.map(([batch]) => batch.length)).toEqual([500, 500, 43]);
+      expect(listener).toHaveBeenCalledExactlyOnceWith({ userId: null });
+    });
+
+    it('flushes committed deletions when a later cleanup batch fails', async () => {
+      const ids = Array.from({ length: 501 }, (_, index) => index + 1);
+      const { service, events, bookService } = setup({ findMissingBookIds: vi.fn().mockResolvedValue(ids) });
+      const listener = vi.fn();
+      events.on(READING_ATTEMPT_CHANGED, listener);
+      bookService.deleteBooks.mockImplementation((batch: number[]) => {
+        if (batch[0] === 501) return Promise.reject(new Error('Deletion failed'));
+        events.notifyChanged(null);
+        expect(listener).not.toHaveBeenCalled();
+        return Promise.resolve({ total: batch.length, books: [], omitted: 0 });
+      });
+      await expect(service.cleanMissingBooks(user, { all: true })).rejects.toThrow('Deletion failed');
+      expect(listener).toHaveBeenCalledExactlyOnceWith({ userId: null });
     });
 
     it('rejects a request with neither ids nor all', async () => {

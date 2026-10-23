@@ -16,7 +16,11 @@ const state = vi.hoisted(
       hasPermission: vi.fn<(permission: string) => boolean>(),
       defaultFor: vi.fn<(mediaKind: BookRequestMediaKind) => ResolvedRequestDestination>(),
       submit: vi.fn<() => Promise<unknown>>(),
+      submitPair: vi.fn<() => Promise<unknown>>(),
       submitFreeText: vi.fn<() => Promise<unknown>>(),
+      submitPairFreeText: vi.fn<() => Promise<unknown>>(),
+      search: vi.fn<() => void>(),
+      searchFresh: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       checkFreeText: vi.fn<() => Promise<unknown>>(),
       push: vi.fn<() => Promise<void>>(),
       routeQuery: {} as Record<string, string>,
@@ -25,12 +29,17 @@ const state = vi.hoisted(
       hasPermission: ReturnType<typeof vi.fn>
       defaultFor: ReturnType<typeof vi.fn>
       mediaKind: Ref<BookRequestMediaKind>
-      libraries: Ref<{ id: number; name: string; folders: { id: number; path: string }[] }[]>
+      pairMode: Ref<boolean>
+      libraries: Ref<{ id: number; name: string; folders: { id: number; path: string }[]; organizationMode?: string }[]>
       hasSearched: Ref<boolean>
       providers: Ref<MetadataProviderInfo[]>
       groups: Ref<CandidateGroup[]>
       submit: ReturnType<typeof vi.fn>
+      submitPair: ReturnType<typeof vi.fn>
       submitFreeText: ReturnType<typeof vi.fn>
+      submitPairFreeText: ReturnType<typeof vi.fn>
+      search: ReturnType<typeof vi.fn>
+      searchFresh: ReturnType<typeof vi.fn>
       checkFreeText: ReturnType<typeof vi.fn>
       push: ReturnType<typeof vi.fn>
       routeQuery: Record<string, string>
@@ -81,7 +90,9 @@ vi.mock('@/features/book/composables/useMetadataSearch', async () => {
       hasSearched: state.hasSearched,
       providers: state.providers,
       loadProviders: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-      search: vi.fn<() => void>(),
+      search: state.search,
+      searchFresh: state.searchFresh,
+      cacheSummary: ref({ cachedCount: 0, staleCount: 0, oldestFetchedAt: null }),
     }),
   }
 })
@@ -90,6 +101,7 @@ vi.mock('../composables/useRequestSubmission', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../composables/useRequestSubmission')>()
   const { ref } = await import('vue')
   state.mediaKind = ref<BookRequestMediaKind>('ebook')
+  state.pairMode = ref(false)
   state.lastFailure = ref(null)
   return {
     ...actual,
@@ -97,10 +109,13 @@ vi.mock('../composables/useRequestSubmission', async (importOriginal) => {
       lastFailure: state.lastFailure,
       submitting: ref(null),
       mediaKind: state.mediaKind,
+      pairMode: state.pairMode,
       annotate: vi.fn<() => void>(),
       getAvailability: vi.fn<() => null>().mockReturnValue(null),
       submit: state.submit,
+      submitPair: state.submitPair,
       submitFreeText: state.submitFreeText,
+      submitPairFreeText: state.submitPairFreeText,
       checkFreeText: state.checkFreeText,
       candidateKey: vi.fn<() => string>().mockReturnValue('k'),
     }),
@@ -245,8 +260,32 @@ describe('RequestSearchPanel provider sources', () => {
         publishedYear: 2022,
         providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.AMAZON, MetadataProviderKey.COMICVINE],
         availability: null,
+        pairAvailability: null,
+        audioCoverUrls: [],
       },
     ]
+  })
+
+  it('asks every provider for a browsing page of results', async () => {
+    const wrapper = await render()
+    await wrapper.find('#request-author').setValue('Terry Pratchett')
+    await wrapper.find('form').trigger('submit')
+
+    expect(state.search).toHaveBeenLastCalledWith({ title: undefined, author: 'Terry Pratchett', mediaKind: 'ebook', resultsPerProvider: 20 })
+  })
+
+  it('searches for an author alone when their name on a result is pressed', async () => {
+    const scrollIntoView = vi.fn<() => void>()
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+    const wrapper = await render()
+    await wrapper.find('#request-title').setValue('One Dark Window')
+
+    await wrapper.find('button[aria-label="Show books by Rachel Gillig"]').trigger('click')
+
+    expect((wrapper.find('#request-title').element as HTMLInputElement).value).toBe('')
+    expect((wrapper.find('#request-author').element as HTMLInputElement).value).toBe('Rachel Gillig')
+    expect(state.search).toHaveBeenLastCalledWith({ title: undefined, author: 'Rachel Gillig', mediaKind: 'ebook', resultsPerProvider: 20 })
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
   })
 
   it('shows every contributing provider as an icon or initials badge', async () => {
@@ -332,6 +371,29 @@ describe('RequestSearchPanel provider sources', () => {
       state.groups.value[0]!.candidate,
       expect.objectContaining({ preferredFormats: ['epub'], note: 'Please use the illustrated edition' }),
     )
+  })
+
+  it('offers comic archives beside book formats and sends them through the non-audio request', async () => {
+    state.submit.mockResolvedValue(null)
+    const wrapper = await render()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('More options'))!
+      .trigger('click')
+
+    expect(wrapper.find('button[aria-label="Prefer EPUB"]').exists()).toBe(true)
+    for (const format of ['CBZ', 'CBR', 'CB7', 'CBX']) {
+      expect(wrapper.find(`button[aria-label="Prefer ${format}"]`).exists()).toBe(true)
+    }
+    expect(wrapper.find('button[aria-label="Prefer MP3"]').exists()).toBe(false)
+    await wrapper.get('button[aria-label="Prefer CBZ"]').trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Request')!
+      .trigger('click')
+
+    expect(state.mediaKind.value).toBe('ebook')
+    expect(state.submit).toHaveBeenCalledWith(state.groups.value[0]!.candidate, expect.objectContaining({ preferredFormats: ['cbz'] }))
   })
 
   it('shows the recommended ISBN and explains the deterministic ranking', async () => {
@@ -432,6 +494,19 @@ describe('RequestSearchPanel provider sources', () => {
       params: { id: 31 },
       query: { isbn: '9780441013593' },
     })
+  })
+
+  it('offers a fresh search after every finished search, even when no result came from saved searches', async () => {
+    const before = await render()
+    expect(before.find('[data-testid="metadata-cache-search-fresh"]').exists()).toBe(false)
+    before.unmount()
+
+    state.hasSearched.value = true
+    const wrapper = await render()
+    await wrapper.get('[data-testid="metadata-cache-search-fresh"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="metadata-cache-notice"]').exists()).toBe(false)
+    expect(state.searchFresh).toHaveBeenCalledTimes(1)
   })
 
   it('offers a one-off manual indexer search even when metadata results exist', async () => {
@@ -632,6 +707,92 @@ describe('RequestSearchPanel free-text fallback', () => {
     expect(wrapper.text()).not.toContain(ACTION)
   })
 
+  describe('for a requester whose requests go to an approver', () => {
+    const REQUEST_ANYWAY = 'Request anyway'
+
+    beforeEach(() => {
+      state.hasPermission.mockImplementation((permission: string) => permission === Permission.BookRequestAccess)
+    })
+
+    async function requestAnyway(wrapper: Awaited<ReturnType<typeof render>>) {
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === REQUEST_ANYWAY)!
+        .trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+
+    it('offers the typed title as a request once a provider search comes back empty', async () => {
+      const wrapper = await typeTitle(await render())
+
+      expect(wrapper.text()).toContain(REQUEST_ANYWAY)
+      expect(wrapper.text()).toContain('A note for the approver under More options helps them find the right book.')
+    })
+
+    it('does not offer it before a search has been run', async () => {
+      state.hasSearched.value = false
+
+      const wrapper = await typeTitle(await render())
+      expect(wrapper.text()).not.toContain(REQUEST_ANYWAY)
+    })
+
+    it('leaves out the approver for a requester whose requests approve themselves', async () => {
+      state.hasPermission.mockImplementation(
+        (permission: string) => permission === Permission.BookRequestAccess || permission === Permission.BookRequestAutoApprove,
+      )
+
+      const wrapper = await typeTitle(await render())
+      expect(wrapper.text()).toContain(REQUEST_ANYWAY)
+      expect(wrapper.text()).not.toContain('approver under More options')
+    })
+
+    it('says what the queue already has, before anything is created', async () => {
+      state.checkFreeText.mockResolvedValue({ ownedBookId: null, existingRequestId: 5, alreadySubscribed: false })
+
+      const wrapper = await typeTitle(await render())
+      await settleHint(wrapper)
+
+      expect(wrapper.text()).toContain('Already requested by someone else')
+      expect(state.submitFreeText).not.toHaveBeenCalled()
+    })
+
+    it('sends it with the note to the approver and stays on the search', async () => {
+      state.submitFreeText.mockResolvedValue({ request: { id: 32, userId: 7, status: 'pending' }, subscribed: false })
+
+      const wrapper = await typeTitle(await render())
+      await wrapper.find('#request-note').setValue('The 1998 paperback')
+      await requestAnyway(wrapper)
+
+      expect(state.submitFreeText).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'An Untracked Novel' }),
+        expect.objectContaining({ selfServe: false, note: 'The 1998 paperback' }),
+      )
+      expect(state.push).not.toHaveBeenCalled()
+      expect(wrapper.emitted('submitted')).toHaveLength(1)
+    })
+
+    it('requests both media as typed in pair mode', async () => {
+      state.pairMode.value = true
+      state.submitPairFreeText.mockResolvedValue({
+        ebook: { request: { id: 40, userId: 7, status: 'pending' }, subscribed: false },
+        audiobook: { request: { id: 41, userId: 7, status: 'pending' }, subscribed: false },
+      })
+
+      try {
+        const wrapper = await typeTitle(await render())
+        await requestAnyway(wrapper)
+
+        expect(state.submitPairFreeText).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'An Untracked Novel' }),
+          expect.objectContaining({ selfServe: false }),
+        )
+        expect(state.push).not.toHaveBeenCalled()
+      } finally {
+        state.pairMode.value = false
+      }
+    })
+  })
+
   it('does not offer it before a search has been run', async () => {
     state.hasSearched.value = false
 
@@ -809,5 +970,144 @@ describe('RequestSearchPanel free-text fallback', () => {
     expect(state.coverOrder?.value).toEqual(['amazon', 'itunes'])
     state.mediaKind.value = 'audiobook'
     expect(state.coverOrder?.value).toEqual(['audible', 'itunes'])
+  })
+})
+
+describe('RequestSearchPanel pair mode', () => {
+  const dune: MetadataCandidate = {
+    provider: MetadataProviderKey.GOOGLE,
+    providerId: 'google-dune',
+    title: 'Dune',
+    authors: ['Frank Herbert'],
+    coverUrl: 'https://covers.test/portrait.jpg',
+  }
+  const OWNED = { ownedBookId: 42, existingRequestId: null, existingRequestStatus: null, alreadySubscribed: false }
+
+  function group(pairAvailability: CandidateGroup['pairAvailability']): CandidateGroup {
+    return {
+      key: 'dune',
+      candidate: dune,
+      candidates: [dune],
+      isbns: [],
+      isbnChoices: [],
+      recommendedIsbnChoice: null,
+      title: 'Dune',
+      authors: ['Frank Herbert'],
+      coverUrl: 'https://covers.test/portrait.jpg',
+      coverUrls: ['https://covers.test/portrait.jpg'],
+      publishedYear: 1965,
+      providers: [MetadataProviderKey.GOOGLE],
+      availability: null,
+      pairAvailability,
+      audioCoverUrls: ['https://covers.test/square.jpg'],
+    }
+  }
+
+  function button(wrapper: Awaited<ReturnType<typeof render>>, text: string) {
+    return wrapper.findAll('button').find((candidate) => candidate.text() === text)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    state.mediaKind.value = 'ebook'
+    state.pairMode.value = false
+    state.hasSearched.value = false
+    state.hasPermission.mockReturnValue(false)
+    state.defaultFor.mockReturnValue(NO_DEFAULT)
+    state.providers.value = [{ key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true }]
+    state.libraries.value = [
+      { id: 1, name: 'Books', folders: [{ id: 11, path: '/books' }], organizationMode: 'book_per_folder' },
+      { id: 2, name: 'Audiobooks', folders: [{ id: 21, path: '/audiobooks' }], organizationMode: 'book_per_folder' },
+    ]
+  })
+
+  it('offers Both beside the two media it combines, and searches both media at once', async () => {
+    state.hasSearched.value = true
+    const wrapper = await render()
+    await wrapper.get('#request-title').setValue('Dune')
+
+    const choices = wrapper
+      .findAll('fieldset')[0]!
+      .findAll('button')
+      .map((choice) => choice.text())
+    // Comics are never offered here; the server only keeps accepting them for released iOS builds.
+    expect(choices).toEqual(['E-book', 'Audiobook', 'Both'])
+
+    await button(wrapper, 'Both')!.trigger('click')
+
+    expect(state.pairMode.value).toBe(true)
+    expect(state.mediaKind.value).toBe('ebook')
+    expect(button(wrapper, 'Both')!.attributes('aria-pressed')).toBe('true')
+    expect(state.search).toHaveBeenLastCalledWith(expect.objectContaining({ mediaKinds: ['ebook', 'audiobook'] }))
+    expect(state.search).toHaveBeenLastCalledWith(expect.not.objectContaining({ mediaKind: expect.anything() }))
+  })
+
+  it('shows where each half stands and submits both, each to its own library', async () => {
+    state.pairMode.value = true
+    state.groups.value = [group({ ebook: null, audiobook: null })]
+    state.submitPair.mockResolvedValue(null)
+    const wrapper = await render()
+
+    await wrapper.get('#request-library').setValue('1')
+    await wrapper.get('#request-audio-library').setValue('2')
+    expect(wrapper.text().match(/Not requested/g)).toHaveLength(2)
+
+    await button(wrapper, 'Request both')!.trigger('click')
+
+    expect(state.submitPair).toHaveBeenCalledWith(
+      dune,
+      expect.objectContaining({
+        ebook: expect.objectContaining({ targetLibraryId: 1, coverUrl: 'https://covers.test/portrait.jpg' }),
+        audiobook: expect.objectContaining({ targetLibraryId: 2, coverUrl: 'https://covers.test/square.jpg' }),
+      }),
+    )
+    expect(state.submit).not.toHaveBeenCalled()
+  })
+
+  it('asks only for the missing format, aimed at the copy already on the shelf', async () => {
+    state.pairMode.value = true
+    state.groups.value = [group({ ebook: OWNED, audiobook: null })]
+    state.submit.mockResolvedValue(null)
+    const wrapper = await render()
+
+    expect(wrapper.text()).toContain('In your library')
+    await button(wrapper, 'Request audiobook')!.trigger('click')
+
+    expect(state.submit).toHaveBeenCalledWith(dune, expect.objectContaining({ mediaKind: 'audiobook', targetBookId: 42 }))
+    expect(state.submitPair).not.toHaveBeenCalled()
+  })
+
+  it('says before submitting whether the pair will arrive as one book or two', async () => {
+    state.pairMode.value = true
+    state.groups.value = [group({ ebook: null, audiobook: null })]
+    const wrapper = await render()
+
+    await wrapper.get('#request-library').setValue('1')
+    await wrapper.get('#request-audio-library').setValue('1')
+    expect(wrapper.text()).toContain('Both formats arrive as one book in Books.')
+
+    await wrapper.get('#request-audio-library').setValue('2')
+    expect(wrapper.text()).toContain('they arrive as two books')
+  })
+
+  it('offers nothing to press once both formats are already in the library', async () => {
+    state.pairMode.value = true
+    state.groups.value = [group({ ebook: OWNED, audiobook: { ...OWNED, ownedBookId: 43 } })]
+    const wrapper = await render()
+
+    const owned = wrapper.findAll('button').find((candidate) => candidate.text() === 'In your library')
+    expect(owned?.attributes('disabled')).toBeDefined()
+  })
+
+  it('offers a format preference row for each half', async () => {
+    state.pairMode.value = true
+    const wrapper = await render()
+
+    await button(wrapper, 'More options')!.trigger('click')
+
+    expect(wrapper.text()).toContain('Preferred e-book formats')
+    expect(wrapper.text()).toContain('Preferred audiobook formats')
+    expect(wrapper.find('button[aria-label="Prefer M4B"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Prefer EPUB"]').exists()).toBe(true)
   })
 })

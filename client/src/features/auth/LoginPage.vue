@@ -1,74 +1,44 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { ArrowRight, CircleAlert, CircleCheck, KeyRound, Lock, RefreshCw } from '@lucide/vue'
 import { LoginErrorCode, type OidcProviderPublic } from '@bookorbit/types'
-import { Moon, Sun, Wallpaper } from '@lucide/vue'
-import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { LoginError, useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
 import { useSetupStatus } from './composables/useSetupStatus'
 import { useLoginOptions } from './composables/useLoginOptions'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
+import AuthAlert from './components/AuthAlert.vue'
+import AuthField from './components/AuthField.vue'
+import AuthPlate from './components/AuthPlate.vue'
+import AuthSubmit from './components/AuthSubmit.vue'
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
-const accentOpen = ref(false)
-const radiusOpen = ref(false)
-const backgroundOpen = ref(false)
-const currentAccent = computed(() => ACCENT_OPTIONS.find((o) => o.id === themeStore.accent))
-
-function radiusPreview(id: string): string {
-  const map: Record<string, string> = {
-    sharp: '0px',
-    default: '4px',
-    rounded: '8px',
-    pill: '999px',
-  }
-  return map[id] ?? '4px'
-}
-
-function openRadius() {
-  radiusOpen.value = !radiusOpen.value
-  accentOpen.value = false
-  backgroundOpen.value = false
-}
-
-function openBackground() {
-  backgroundOpen.value = !backgroundOpen.value
-  accentOpen.value = false
-  radiusOpen.value = false
-}
-
-function openAccent() {
-  accentOpen.value = !accentOpen.value
-  radiusOpen.value = false
-  backgroundOpen.value = false
-}
-
-function closeAll() {
-  accentOpen.value = false
-  radiusOpen.value = false
-  backgroundOpen.value = false
-}
-
 const { login } = useAuth()
 const { initiateLogin } = useOidc()
-const { setupStatusError } = useSetupStatus()
+const { setupStatusError, fetchSetupStatus } = useSetupStatus()
 const { loginOptions, loginOptionsError, fetchLoginOptions } = useLoginOptions()
 const passwordLoginEnabled = computed(() => loginOptions.value?.passwordLoginEnabled === true)
 const allowRegistration = computed(() => loginOptions.value?.allowRegistration === true)
 
 const route = useRoute()
 const justRegistered = computed(() => route.query.registered === '1')
+const justReset = computed(() => route.query.reset === '1')
 
 const username = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
+const errorCode = ref<string | null>(null)
+const credentialsRejected = ref(false)
+const optionsFailed = ref(false)
+const retrying = ref(false)
 const loading = ref(false)
 const oidcProviders = ref<OidcProviderPublic[]>([])
 const oidcLoadingSlug = ref<string | null>(null)
+const passwordField = ref<InstanceType<typeof AuthField> | null>(null)
+
+const showOptionsError = computed(() => optionsFailed.value || setupStatusError.value !== null || loginOptionsError.value !== null)
+const accountLocked = computed(() => errorCode.value === LoginErrorCode.ACCOUNT_LOCKED)
 
 function resolveLoginError(err: unknown): string {
   if (!(err instanceof Error)) return t('auth.login.errors.invalidCredentials')
@@ -87,34 +57,56 @@ function resolveLoginError(err: unknown): string {
     return t('auth.login.errors.tooManyAttempts')
   }
   if (normalizedMessage.includes('invalid credentials')) {
+    credentialsRejected.value = true
     return t('auth.login.errors.invalidCredentials')
   }
 
   return err.message || t('auth.login.errors.invalidCredentials')
 }
 
-onMounted(async () => {
+async function loadOptions(force: boolean) {
   try {
-    oidcProviders.value = (await fetchLoginOptions()).oidcProviders
+    oidcProviders.value = (await fetchLoginOptions(force)).oidcProviders
+    optionsFailed.value = false
   } catch {
-    error.value = t('auth.login.errors.optionsUnavailable')
+    optionsFailed.value = true
   }
-})
+}
+
+onMounted(() => loadOptions(false))
+
+async function handleRetry() {
+  retrying.value = true
+  try {
+    await Promise.allSettled([loadOptions(true), setupStatusError.value ? fetchSetupStatus(true) : Promise.resolve()])
+  } finally {
+    retrying.value = false
+  }
+}
 
 async function handleSubmit() {
   error.value = null
+  errorCode.value = null
+  credentialsRejected.value = false
   loading.value = true
   try {
     await login(username.value, password.value)
   } catch (err) {
+    errorCode.value = err instanceof LoginError ? (err.errorCode ?? null) : null
     error.value = resolveLoginError(err)
   } finally {
     loading.value = false
+  }
+  if (credentialsRejected.value) {
+    // The field is still disabled from the request until the next render.
+    await nextTick()
+    passwordField.value?.focusAndSelect()
   }
 }
 
 async function handleOidcLogin(provider: OidcProviderPublic) {
   error.value = null
+  errorCode.value = null
   oidcLoadingSlug.value = provider.slug
   try {
     await initiateLogin(provider)
@@ -126,270 +118,105 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
 </script>
 
 <template>
-  <div class="login-bg min-h-screen flex flex-col items-center justify-center gap-3 px-4 overflow-hidden">
-    <!-- Compact theme picker -->
-    <div class="fixed top-5 right-5 z-20 flex items-center gap-1.5">
-      <!-- Dark / light toggle -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button class="theme-btn" @click="themeStore.toggleTheme()">
-            <Sun v-if="themeStore.resolvedTheme === 'dark'" :size="14" />
-            <Moon v-else :size="14" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{{
-          themeStore.resolvedTheme === 'dark' ? t('auth.themePicker.switchToLight') : t('auth.themePicker.switchToDark')
-        }}</TooltipContent>
-      </Tooltip>
+  <AuthPlate :heading="t('auth.login.subtitle')">
+    <div class="flex flex-col gap-4">
+      <AuthAlert v-if="justRegistered" tone="notice" :icon="CircleCheck">{{ t('auth.login.registeredNotice') }}</AuthAlert>
+      <AuthAlert v-else-if="justReset" tone="notice" :icon="CircleCheck">{{ t('auth.login.resetNotice') }}</AuthAlert>
 
-      <!-- Radius picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="radiusOpen" class="accent-popover absolute top-full right-0 mt-2 p-2.5 rounded-lg">
-            <div class="flex items-center gap-1.5">
-              <Tooltip v-for="opt in RADIUS_OPTIONS" :key="opt.id">
-                <TooltipTrigger as-child>
-                  <button
-                    class="flex items-center justify-center w-8 h-8 rounded-lg transition-all focus:outline-none"
-                    :class="
-                      themeStore.radius === opt.id
-                        ? 'text-primary bg-primary/10'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
-                    "
-                    @click="themeStore.setRadius(opt.id)"
-                  >
-                    <span class="w-4 h-4 border-2 border-current block" :style="{ borderRadius: radiusPreview(opt.id) }" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ opt.label }}</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </Transition>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openRadius()">
-              <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeRadius') }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <!-- Background picker -->
-      <div class="relative">
-        <Transition name="popover">
-          <div v-if="backgroundOpen" class="accent-popover absolute top-full right-0 mt-2 p-2.5 rounded-lg w-64 max-h-72 overflow-y-auto">
-            <div class="grid grid-cols-5 gap-1.5">
-              <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
-                <TooltipTrigger as-child>
-                  <button
-                    class="w-full h-9 rounded overflow-hidden ring-2 transition-all focus:outline-none shrink-0"
-                    :class="
-                      themeStore.background === opt.id ? 'ring-primary shadow-sm shadow-primary/20' : 'ring-border hover:ring-muted-foreground/40'
-                    "
-                    @click="themeStore.setBackground(opt.id)"
-                  >
-                    <div class="w-full h-full bg-background pattern-preview" :class="opt.cssClass" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ opt.label }}</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </Transition>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openBackground()">
-              <Wallpaper :size="14" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeBackground') }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <!-- Accent picker -->
-      <div class="relative">
-        <!-- Colour popover -->
-        <Transition name="popover">
-          <div v-if="accentOpen" class="accent-popover absolute top-full right-0 mt-2 p-3 rounded-lg space-y-2 w-96 max-w-[calc(100vw-2rem)]">
-            <div class="overflow-x-auto no-scrollbar px-1 py-0.5">
-              <div class="space-y-2 w-max">
-                <div v-for="(row, rowIndex) in ACCENT_ROWS" :key="rowIndex" class="flex items-center gap-1.5">
-                  <Tooltip v-for="opt in row" :key="opt.id">
-                    <TooltipTrigger as-child>
-                      <button
-                        class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card shrink-0"
-                        :class="opt.swatchClass"
-                        :aria-label="t(opt.labelKey)"
-                        :style="{
-                          backgroundColor: opt.color,
-                          outline: themeStore.accent === opt.id ? `2px solid ${opt.color}` : 'none',
-                          outlineOffset: '2px',
-                          transform: themeStore.accent === opt.id ? 'scale(1.2)' : '',
-                        }"
-                        @click="themeStore.setAccent(opt.id)"
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent>{{ t(opt.labelKey) }}</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Transition>
-
-        <!-- Swatch button showing current accent -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openAccent()">
-              <span class="w-3.5 h-3.5 rounded-full block" :class="currentAccent?.swatchClass" :style="{ backgroundColor: currentAccent?.color }" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
-        </Tooltip>
-      </div>
-    </div>
-
-    <!-- Click-outside backdrop -->
-    <div v-if="accentOpen || radiusOpen || backgroundOpen" class="fixed inset-0 z-10" @click="closeAll()" />
-
-    <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
-      <div class="text-center mb-8 animate-fade-up">
-        <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
-        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.login.subtitle') }}</p>
-      </div>
-
-      <div v-if="justRegistered" role="status" class="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2.5 text-sm text-foreground">
-        {{ t('auth.login.registeredNotice') }}
-      </div>
-
-      <form v-if="passwordLoginEnabled" @submit.prevent="handleSubmit" class="space-y-4">
-        <div class="space-y-1.5 animate-fade-up" style="animation-delay: 80ms">
-          <label for="username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
-          <input
-            id="username"
-            v-model="username"
-            type="text"
-            autocomplete="username"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div class="space-y-1.5 animate-fade-up" style="animation-delay: 160ms">
-          <label for="password" class="text-sm font-medium text-foreground">{{ t('auth.fields.password') }}</label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            required
-            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
-          />
-        </div>
-
-        <div v-if="error" role="alert" class="text-sm text-destructive animate-shake">{{ error }}</div>
-        <div v-if="setupStatusError || loginOptionsError" class="text-sm text-destructive animate-shake">
-          {{ t('auth.login.errors.optionsUnavailable') }}
-        </div>
-
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors animate-fade-up"
-          style="animation-delay: 240ms"
-        >
-          {{ loading ? t('auth.login.signingIn') : t('auth.login.signIn') }}
-        </button>
-      </form>
-
-      <template v-if="oidcProviders.length > 0">
-        <div v-if="passwordLoginEnabled" class="flex items-center gap-3 my-6">
-          <div class="flex-1 h-px bg-border" />
-          <span class="text-sm text-muted-foreground">{{ t('auth.login.orDivider') }}</span>
-          <div class="flex-1 h-px bg-border" />
-        </div>
-
-        <div class="space-y-3" :class="passwordLoginEnabled ? '' : 'mt-2'">
-          <button
-            v-for="provider in oidcProviders"
-            :key="provider.slug"
-            type="button"
-            :disabled="oidcLoadingSlug !== null"
-            class="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background/60 px-4 py-2 text-[14px] font-medium text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors backdrop-blur-sm"
-            @click="handleOidcLogin(provider)"
+      <AuthAlert v-if="error" id="login-error" :icon="accountLocked ? Lock : CircleAlert">
+        {{ error }}
+        <template v-if="accountLocked && passwordLoginEnabled" #action>
+          <RouterLink
+            to="/forgot-password"
+            class="inline-flex items-center gap-1 text-[0.78125rem] font-semibold underline decoration-foreground/35 underline-offset-[3px] hover:decoration-current focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="h-4 w-4 shrink-0 object-contain" />
-            {{ oidcLoadingSlug === provider.slug ? t('auth.oidc.redirecting') : t('auth.oidc.signInWith', { provider: provider.displayName }) }}
+            {{ t('auth.login.resetPasswordAction') }}
+            <ArrowRight :size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+          </RouterLink>
+        </template>
+      </AuthAlert>
+
+      <AuthAlert v-if="showOptionsError" :icon="CircleAlert">
+        {{ t('auth.login.errors.optionsUnavailable') }}
+        <template #action>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 text-[0.78125rem] font-semibold underline decoration-foreground/35 underline-offset-[3px] hover:decoration-current focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-progress"
+            :disabled="retrying"
+            @click="handleRetry"
+          >
+            <RefreshCw :size="13" :class="{ 'animate-spin': retrying }" aria-hidden="true" />
+            {{ t('common.retry') }}
           </button>
-        </div>
-      </template>
-
-      <p v-if="passwordLoginEnabled" class="mt-6 text-center text-sm text-muted-foreground">
-        <RouterLink to="/forgot-password" class="text-primary hover:underline">{{ t('auth.login.forgotPassword') }}</RouterLink>
-      </p>
-
-      <p v-if="allowRegistration" class="mt-2 text-center text-sm text-muted-foreground">
-        {{ t('auth.login.noAccount') }}
-        <RouterLink to="/register" class="text-primary hover:underline">{{ t('auth.login.signUp') }}</RouterLink>
-      </p>
+        </template>
+      </AuthAlert>
     </div>
-    <PublicLegalNotices />
-  </div>
+
+    <form
+      v-if="passwordLoginEnabled"
+      class="flex flex-col gap-[1.125rem]"
+      :class="{ 'mt-[1.125rem]': error || showOptionsError || justRegistered || justReset }"
+      @submit.prevent="handleSubmit"
+    >
+      <AuthField id="username" v-model="username" :label="t('auth.fields.username')" autocomplete="username" required :disabled="loading" />
+      <AuthField
+        id="password"
+        ref="passwordField"
+        v-model="password"
+        :label="t('auth.fields.password')"
+        type="password"
+        autocomplete="current-password"
+        required
+        :disabled="loading"
+        :invalid="credentialsRejected"
+        :describedby="credentialsRejected ? 'login-error' : undefined"
+      >
+        <template #aside>
+          <RouterLink
+            to="/forgot-password"
+            class="font-serif text-[0.84375rem] text-primary italic hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            {{ t('auth.login.forgotPassword') }}
+          </RouterLink>
+        </template>
+      </AuthField>
+
+      <AuthSubmit :label="t('auth.login.signIn')" :loading-label="t('auth.login.signingIn')" :loading="loading" />
+    </form>
+
+    <template v-if="oidcProviders.length > 0">
+      <div v-if="passwordLoginEnabled" class="my-5 flex items-center gap-3 font-serif text-sm text-muted-foreground italic">
+        <span class="h-px flex-1 bg-border" />
+        {{ t('auth.login.orDivider') }}
+        <span class="h-px flex-1 bg-border" />
+      </div>
+
+      <div class="flex flex-col gap-2.5" :class="{ 'mt-1': !passwordLoginEnabled }">
+        <button
+          v-for="provider in oidcProviders"
+          :key="provider.slug"
+          type="button"
+          :disabled="oidcLoadingSlug !== null"
+          class="flex h-10 w-full items-center justify-center gap-2.5 rounded-[3px] border border-input px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground/25 hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-progress disabled:opacity-70"
+          @click="handleOidcLogin(provider)"
+        >
+          <span class="grid size-[1.375rem] shrink-0 place-items-center rounded-md bg-foreground/8">
+            <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="size-4 object-contain" />
+            <KeyRound v-else :size="13" aria-hidden="true" />
+          </span>
+          {{ oidcLoadingSlug === provider.slug ? t('auth.oidc.redirecting') : t('auth.oidc.signInWith', { provider: provider.displayName }) }}
+        </button>
+      </div>
+    </template>
+
+    <p v-if="allowRegistration" class="mt-[1.375rem] text-center font-serif text-[0.9375rem] text-muted-foreground">
+      {{ t('auth.login.noAccount') }}
+      <RouterLink
+        to="/register"
+        class="font-medium text-primary hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
+        {{ t('auth.login.signUp') }}
+      </RouterLink>
+    </p>
+  </AuthPlate>
 </template>
-
-<style scoped>
-.login-bg {
-  position: relative;
-}
-
-.theme-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 9999px;
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--elevation-md);
-  color: var(--muted-foreground);
-  transition: color 0.15s ease;
-}
-
-.theme-btn:hover {
-  color: var(--foreground);
-}
-
-.accent-popover {
-  background: color-mix(in oklch, var(--card) 80%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--elevation-lg);
-}
-
-.popover-enter-active,
-.popover-leave-active {
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
-}
-
-.popover-enter-from,
-.popover-leave-to {
-  opacity: 0;
-  transform: translateY(4px) scale(0.97);
-}
-
-.login-card {
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--elevation-xl);
-}
-</style>

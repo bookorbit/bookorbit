@@ -149,6 +149,43 @@ describe('Catalog visibility (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
     }
   });
 
+  it('returns current visible book counts when creating and updating a smart scope', async () => {
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/smart-scopes',
+      headers: authHeader(scopedReader.accessToken),
+      payload: {
+        name: `${queryToken} Scope`,
+        icon: 'Aperture',
+        defaultSort: [],
+        filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: queryToken }] },
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const scope = created.json() as { id: number; bookCount: number };
+    expect(scope.bookCount).toBe(1);
+
+    const updated = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/smart-scopes/${scope.id}`,
+      headers: authHeader(scopedReader.accessToken),
+      payload: {
+        filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: `${queryToken} Filtered` }] },
+      },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toEqual(expect.objectContaining({ id: scope.id, bookCount: 0 }));
+
+    const cleared = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/smart-scopes/${scope.id}`,
+      headers: authHeader(scopedReader.accessToken),
+      payload: { filter: null },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json()).toEqual(expect.objectContaining({ id: scope.id, filter: null, bookCount: 0 }));
+  });
+
   it('returns no suggestions when the reader cannot access a library', async () => {
     for (const endpoint of Object.keys(visible.names) as Array<keyof CatalogNames>) {
       await expect(search(endpoint, noLibraryReader.accessToken)).resolves.toEqual([]);

@@ -5,7 +5,7 @@ import { FileCode, FilePenLine } from '@lucide/vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { formatNumber } from '@/i18n/formatters'
 
-type FamilyKey = 'epub' | 'fb2' | 'pdf' | 'cbx' | 'kindle' | 'audio'
+type FamilyKey = 'epub' | 'readAlong' | 'fb2' | 'pdf' | 'cbx' | 'kindle' | 'audio'
 
 const { t } = useI18n()
 
@@ -26,6 +26,9 @@ const props = withDefaults(
     fileWriteKindleMaxFileSizeMb: number
     fileWriteAudioEnabled: boolean
     fileWriteAudioMaxFileSizeMb: number
+    fileWriteAllFiles: boolean
+    fileWriteReadAlongEnabled: boolean
+    fileWriteReadAlongMaxFileSizeMb: number
     formatCounts?: Record<string, number> | null
   }>(),
   { formatCounts: null },
@@ -47,11 +50,18 @@ const emit = defineEmits<{
   'update:fileWriteKindleMaxFileSizeMb': [value: number]
   'update:fileWriteAudioEnabled': [value: boolean]
   'update:fileWriteAudioMaxFileSizeMb': [value: number]
+  'update:fileWriteAllFiles': [value: boolean]
+  'update:fileWriteReadAlongEnabled': [value: boolean]
+  'update:fileWriteReadAlongMaxFileSizeMb': [value: number]
 }>()
 
-/** The formats each writer handles, as its hint describes them, so the count matches what gets written. */
+/**
+ * The formats each writer handles, as its hint describes them, so the count matches what gets written.
+ * Library stats do not tell read-along EPUBs apart from plain ones, so that row shows no count.
+ */
 const FAMILY_FORMATS: Record<FamilyKey, string[]> = {
   epub: ['epub'],
+  readAlong: [],
   fb2: ['fb2'],
   pdf: ['pdf'],
   cbx: ['cbz', 'cb7'],
@@ -59,39 +69,54 @@ const FAMILY_FORMATS: Record<FamilyKey, string[]> = {
   audio: ['m4b', 'm4a', 'mp3', 'flac'],
 }
 
+/** Audio used to be described as cover-only; its hint and label now say what is actually written. */
+const FAMILY_COPY: Record<FamilyKey, { hint: string; toggleAria: string }> = {
+  epub: { hint: 'library.creator.fileWrite.epub.hint', toggleAria: 'library.creator.fileWrite.epub.toggleAria' },
+  readAlong: { hint: 'library.creator.fileWrite.readAlong.hint', toggleAria: 'library.creator.fileWrite.readAlong.toggleAria' },
+  fb2: { hint: 'library.creator.fileWrite.fb2.hint', toggleAria: 'library.creator.fileWrite.fb2.toggleAria' },
+  pdf: { hint: 'library.creator.fileWrite.pdf.hint', toggleAria: 'library.creator.fileWrite.pdf.toggleAria' },
+  cbx: { hint: 'library.creator.fileWrite.cbx.hint', toggleAria: 'library.creator.fileWrite.cbx.toggleAria' },
+  kindle: { hint: 'library.creator.fileWrite.kindle.hint', toggleAria: 'library.creator.fileWrite.kindle.toggleAria' },
+  audio: { hint: 'library.creator.fileWrite.audio.tagsHint', toggleAria: 'library.creator.fileWrite.audio.tagsToggleAria' },
+}
+
 interface FamilyRow {
   key: FamilyKey
   enabled: boolean
   size: number
-  blocked: boolean
   count: number | null
+  hint: string
+  toggleAria: string
 }
 
 const rows = computed<FamilyRow[]>(() => {
   const state: Record<FamilyKey, [boolean, number]> = {
     epub: [props.fileWriteEpubEnabled, props.fileWriteEpubMaxFileSizeMb],
+    readAlong: [props.fileWriteReadAlongEnabled, props.fileWriteReadAlongMaxFileSizeMb],
     fb2: [props.fileWriteFb2Enabled, props.fileWriteFb2MaxFileSizeMb],
     pdf: [props.fileWritePdfEnabled, props.fileWritePdfMaxFileSizeMb],
     cbx: [props.fileWriteCbxEnabled, props.fileWriteCbxMaxFileSizeMb],
     kindle: [props.fileWriteKindleEnabled, props.fileWriteKindleMaxFileSizeMb],
     audio: [props.fileWriteAudioEnabled, props.fileWriteAudioMaxFileSizeMb],
   }
-  return (Object.keys(FAMILY_FORMATS) as FamilyKey[]).map((key) => {
-    const blocked = key === 'audio' && !props.fileWriteWriteCover
-    return {
-      key,
-      enabled: state[key][0] && !blocked,
-      size: state[key][1],
-      blocked,
-      count: props.formatCounts ? FAMILY_FORMATS[key].reduce((sum, format) => sum + (props.formatCounts?.[format] ?? 0), 0) : null,
-    }
-  })
+  return (Object.keys(FAMILY_FORMATS) as FamilyKey[]).map((key) => ({
+    key,
+    enabled: state[key][0],
+    size: state[key][1],
+    count:
+      props.formatCounts && FAMILY_FORMATS[key].length > 0
+        ? FAMILY_FORMATS[key].reduce((sum, format) => sum + (props.formatCounts?.[format] ?? 0), 0)
+        : null,
+    hint: t(FAMILY_COPY[key].hint),
+    toggleAria: t(FAMILY_COPY[key].toggleAria),
+  }))
 })
 
 const writtenCount = computed(() => rows.value.filter((row) => row.enabled).length)
 
 function emitEnabled(key: FamilyKey, value: boolean) {
   if (key === 'epub') emit('update:fileWriteEpubEnabled', value)
+  else if (key === 'readAlong') emit('update:fileWriteReadAlongEnabled', value)
   else if (key === 'fb2') emit('update:fileWriteFb2Enabled', value)
   else if (key === 'pdf') emit('update:fileWritePdfEnabled', value)
   else if (key === 'cbx') emit('update:fileWriteCbxEnabled', value)
@@ -101,6 +126,7 @@ function emitEnabled(key: FamilyKey, value: boolean) {
 
 function emitSize(key: FamilyKey, value: number) {
   if (key === 'epub') emit('update:fileWriteEpubMaxFileSizeMb', value)
+  else if (key === 'readAlong') emit('update:fileWriteReadAlongMaxFileSizeMb', value)
   else if (key === 'fb2') emit('update:fileWriteFb2MaxFileSizeMb', value)
   else if (key === 'pdf') emit('update:fileWritePdfMaxFileSizeMb', value)
   else if (key === 'cbx') emit('update:fileWriteCbxMaxFileSizeMb', value)
@@ -117,9 +143,11 @@ function handleWriteToggle(value: boolean) {
 }
 
 function handleCoverChange(event: Event) {
-  const next = (event.target as HTMLInputElement).checked
-  emit('update:fileWriteWriteCover', next)
-  if (!next && props.fileWriteAudioEnabled) emit('update:fileWriteAudioEnabled', false)
+  emit('update:fileWriteWriteCover', (event.target as HTMLInputElement).checked)
+}
+
+function handleAllFilesChange(event: Event) {
+  emit('update:fileWriteAllFiles', (event.target as HTMLInputElement).checked)
 }
 
 function toggleFamily(row: FamilyRow, event: Event) {
@@ -164,7 +192,15 @@ function updateSize(row: FamilyRow, event: Event) {
         <input type="checkbox" class="mt-0.5 size-4 shrink-0 accent-primary" :checked="fileWriteWriteCover" @change="handleCoverChange" />
         <span class="min-w-0">
           <span class="block text-[13px] font-medium text-foreground">{{ t('library.creator.fileWrite.cover.title') }}</span>
-          <span class="block text-xs text-muted-foreground">{{ t('library.creator.fileWrite.coverAudioHint') }}</span>
+          <span class="block text-xs text-muted-foreground">{{ t('library.creator.fileWrite.cover.mediumHint') }}</span>
+        </span>
+      </label>
+
+      <label class="mb-3 flex cursor-pointer items-start gap-2.5">
+        <input type="checkbox" class="mt-0.5 size-4 shrink-0 accent-primary" :checked="fileWriteAllFiles" @change="handleAllFilesChange" />
+        <span class="min-w-0">
+          <span class="block text-[13px] font-medium text-foreground">{{ t('library.creator.fileWrite.allFiles.title') }}</span>
+          <span class="block text-xs text-muted-foreground">{{ t('library.creator.fileWrite.allFiles.hint') }}</span>
         </span>
       </label>
 
@@ -177,23 +213,20 @@ function updateSize(row: FamilyRow, event: Event) {
           <span class="w-28 text-end">{{ t('library.creator.fileWrite.table.sizeLimit') }}</span>
         </div>
         <ul class="divide-y divide-border">
-          <li v-for="row in rows" :key="row.key" class="flex items-center gap-3 px-3 py-2.5" :class="row.blocked ? 'text-muted-foreground' : ''">
-            <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5" :class="row.blocked ? 'cursor-not-allowed' : ''">
+          <li v-for="row in rows" :key="row.key" class="flex items-center gap-3 px-3 py-2.5">
+            <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5">
               <input
                 type="checkbox"
-                class="mt-0.5 size-4 shrink-0 accent-primary disabled:opacity-50"
+                class="mt-0.5 size-4 shrink-0 accent-primary"
                 :checked="row.enabled"
-                :disabled="row.blocked"
-                :aria-label="t(`library.creator.fileWrite.${row.key}.toggleAria`)"
+                :aria-label="row.toggleAria"
                 @change="toggleFamily(row, $event)"
               />
               <span class="min-w-0">
-                <span class="block text-[13px] font-medium" :class="row.blocked ? 'text-muted-foreground' : 'text-foreground'">
+                <span class="block text-[13px] font-medium text-foreground">
                   {{ t(`library.creator.fileWrite.${row.key}.title`) }}
                 </span>
-                <span class="block text-xs text-muted-foreground">
-                  {{ row.blocked ? t('library.creator.fileWrite.audioNeedsCover') : t(`library.creator.fileWrite.${row.key}.hint`) }}
-                </span>
+                <span class="block text-xs text-muted-foreground">{{ row.hint }}</span>
               </span>
             </label>
             <span

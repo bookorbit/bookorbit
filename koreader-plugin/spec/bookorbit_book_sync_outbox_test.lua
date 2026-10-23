@@ -3,6 +3,7 @@ package.path = "koreader-plugin/bookorbit.koplugin/?.lua;koreader-plugin/spec/?.
 local FakeScheduler = require("helpers/fake_scheduler")
 local scheduler = FakeScheduler.new()
 local calls = {}
+local progress_request
 local acknowledged = {}
 local remote_pending
 local finished
@@ -13,6 +14,7 @@ local annotation_result = {
     failed = 0,
     had_errors = false,
 }
+local last_annotation_opts
 
 package.loaded["ui/widget/infomessage"] = { new = function(_, opts) return opts end }
 package.loaded["ui/widget/notification"] = { notify = function() end }
@@ -46,6 +48,7 @@ package.loaded["bookorbit_bookmarks"] = {
 }
 package.loaded["bookorbit_annotations"] = {
     exchangeBook = function(opts)
+        last_annotation_opts = opts
         table.insert(calls, "annotations")
         assert(opts.annotations[1].text == "captured while open")
         return annotation_result
@@ -65,7 +68,8 @@ package.loaded["bookorbit_api"] = {
                     },
                 }
             end,
-            updateProgress = function()
+            updateProgress = function(_, digest, percentage, progress, timestamp)
+                progress_request = { digest = digest, percentage = percentage, progress = progress, timestamp = timestamp }
                 table.insert(calls, "progress")
                 return {}
             end,
@@ -78,6 +82,7 @@ package.loaded["bookorbit_highlight_summary"] = {
     hasCounts = function() return false end,
 }
 package.loaded["bookorbit_sidecar"] = {
+    normalizeAnnotations = function(raw) return raw end,
     buildStatePayload = function()
         table.insert(calls, "state")
         return nil
@@ -85,6 +90,11 @@ package.loaded["bookorbit_sidecar"] = {
     sidecarMtime = function() return nil end,
     needsStatePull = function() return true end,
     markStatePulled = function() end,
+    isMarked = function() return nil end,
+    readMarked = function() return false end,
+    sidecarState = function() return nil end,
+    markLive = function() return false end,
+    markFile = function() return false end,
 }
 
 local book
@@ -176,6 +186,28 @@ assert(table.concat(acknowledged, ",") == "match,stats,annotations,state,progres
 -- acknowledgement; the stats and state phases short-circuit and must not.
 assert(flushes == 4, "only mutating phases flush, got " .. tostring(flushes))
 assert(finished == true)
+assert(last_annotation_opts.keys_complete == false, "an unavailable document cannot authorize deletions from a queued snapshot")
+
+scheduler = FakeScheduler.new()
+calls = {}
+acknowledged = {}
+snapshot.ts = 1001
+local replay_ack = { match = true, stats = true, annotations = true, state = true, progress = false }
+assert(BookSync.run{
+    api = {}, snap = snapshot, reason = "recovery", plugin = {}, acknowledged = replay_ack,
+    on_phase_ack = function(phase) replay_ack[phase] = true; return true end,
+})
+scheduler:drain()
+assert(table.concat(calls, ",") == "progress",
+    "a fresh snapshot must push even when this device last uploaded the same percentage")
+assert(progress_request.timestamp == 1001 and progress_request.progress == snapshot.progress)
+calls = {}
+assert(BookSync.run{
+    api = {}, snap = snapshot, reason = "recovery", plugin = {}, acknowledged = replay_ack,
+})
+scheduler:drain()
+assert(#calls == 0, "acknowledged snapshot replay must not upload progress again")
+snapshot.ts = 1000
 
 scheduler = FakeScheduler.new()
 calls = {}
@@ -224,5 +256,17 @@ assert(remote_pending and remote_pending.kind == "annotations",
 assert(table.concat(acknowledged, ",") == "match,state,progress",
     "unapplied remote annotation phase remains unacknowledged")
 assert(finished == true)
+
+local current = { { text = "delivered after the queued snapshot" } }
+assert(BookSync.run{
+    api = {}, snap = snapshot, reason = "recovery",
+    plugin = { ui = { document = { file = snapshot.file }, annotation = { annotations = current } } },
+    acknowledged = { match = true, stats = true, annotations = false, state = true, progress = true },
+})
+scheduler:drain()
+assert(last_annotation_opts.annotations == snapshot.annotations, "queued edits remain available for upload")
+assert(last_annotation_opts.key_annotations == current, "deletion checks use current live keys rather than the old snapshot")
+assert(last_annotation_opts.keys_complete == true, "a current live key set remains authoritative")
+assert(last_annotation_opts.apply_mode == "live", "recovery applies to the current reader rather than acknowledging disk-only changes")
 
 print("bookorbit_book_sync_outbox_test.lua: ok")

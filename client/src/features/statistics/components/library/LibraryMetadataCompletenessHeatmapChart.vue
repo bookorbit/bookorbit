@@ -3,7 +3,7 @@ import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { ListChecks } from '@lucide/vue'
-import { useThemeStore } from '@/stores/theme'
+import { useChartTokens } from '@/composables/useChartTokens'
 
 import { buildHeatmapPalette } from '@/lib/heatmap-palette'
 import { useLibraryMetadataCompleteness } from '../../composables/useLibraryMetadataCompleteness'
@@ -25,14 +25,14 @@ const FIELD_ORDER = [
   'ISBN',
 ]
 
-const themeStore = useThemeStore()
+const chartTokens = useChartTokens()
 const { t } = useI18n()
 
 const { data, loading, error } = useLibraryMetadataCompleteness()
 const option = shallowRef({})
 const heatmapPaletteState = computed(() => ({
-  accent: themeStore.accent,
-  palette: buildHeatmapPalette({ theme: themeStore.resolvedTheme }),
+  key: chartTokens.value.key,
+  palette: buildHeatmapPalette({ theme: chartTokens.value.dark ? 'dark' : 'light' }),
 }))
 
 watchEffect(() => {
@@ -47,7 +47,7 @@ watchEffect(() => {
     return [x, y, item.percent, item.presentCount, item.totalCount]
   })
   const palette = heatmapPaletteState.value.palette
-  const labelColor = themeStore.resolvedTheme === 'dark' ? '#f8fafc' : '#0f172a'
+  const labelColor = chartTokens.value.color('--foreground')
   const pieces = [
     { value: 0, color: palette.scale[0] },
     { gt: 0, lte: 25, color: palette.scale[1] },

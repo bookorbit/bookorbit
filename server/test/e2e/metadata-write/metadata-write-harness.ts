@@ -71,6 +71,8 @@ export type LibraryFileWritePatch = {
   fileWritePdfMaxFileSizeMb?: number;
   fileWriteCbxEnabled?: boolean;
   fileWriteCbxMaxFileSizeMb?: number;
+  fileWriteAudioEnabled?: boolean;
+  fileWriteAllFiles?: boolean;
 };
 
 export function authHeader(token: string): Record<string, string> {
@@ -196,6 +198,8 @@ export async function setLibraryFileWriteSettings(db: Db, libraryId: number, pat
   if (patch.fileWritePdfMaxFileSizeMb !== undefined) updateValues.fileWritePdfMaxFileSizeMb = patch.fileWritePdfMaxFileSizeMb;
   if (patch.fileWriteCbxEnabled !== undefined) updateValues.fileWriteCbxEnabled = patch.fileWriteCbxEnabled;
   if (patch.fileWriteCbxMaxFileSizeMb !== undefined) updateValues.fileWriteCbxMaxFileSizeMb = patch.fileWriteCbxMaxFileSizeMb;
+  if (patch.fileWriteAudioEnabled !== undefined) updateValues.fileWriteAudioEnabled = patch.fileWriteAudioEnabled;
+  if (patch.fileWriteAllFiles !== undefined) updateValues.fileWriteAllFiles = patch.fileWriteAllFiles;
 
   if (Object.keys(updateValues).length > 0) {
     await db.update(libraries).set(updateValues).where(eq(libraries.id, libraryId));

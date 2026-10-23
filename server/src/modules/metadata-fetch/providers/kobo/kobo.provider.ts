@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
+import { markProviderDegraded, markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { appConfig } from '../../../../config/config';
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
@@ -9,6 +11,7 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { pickSearchInputs, providerCacheContext, requestedMax } from '../provider-cache';
 import { normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import { fetchKoboHtmlWithCloudscraper } from './kobo-cloudscraper.fetcher';
 import {
@@ -50,6 +53,21 @@ export class KoboProvider implements IdentifiableProvider {
 
   private readonly logger = new Logger(KoboProvider.name);
 
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: false,
+    context: async () => {
+      const { enabled, country, language } = (await this.providerConfig.getConfig()).kobo;
+      return providerCacheContext(enabled, { country, language });
+    },
+    // The ISBN alone forms the query whenever one is given; title and author only matter without it.
+    describeSearch: (params) => ({
+      inputs: params.isbn ? { isbn: params.isbn } : pickSearchInputs(params, ['title', 'author']),
+      maxCandidates: requestedMax(params),
+    }),
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
+
   constructor(
     private readonly providerConfig: ProviderConfigService,
     @Inject(appConfig.KEY) private readonly appConfiguration: ConfigType<typeof appConfig>,
@@ -65,13 +83,20 @@ export class KoboProvider implements IdentifiableProvider {
 
     try {
       for (const link of links.slice(0, maxCandidates)) {
-        if (params.signal?.aborted) break;
+        if (params.signal?.aborted) {
+          markProviderDegraded('kobo.search: aborted before every product loaded');
+          break;
+        }
         if (results.length > 0) {
           await sleep(PROVIDER_DELAYS_MS.KOBO_BETWEEN_REQUESTS, params.signal);
         }
         const candidate = await this.fetchByUrl(link.url, link.providerId, params.signal);
         if (candidate) results.push(candidate);
-        if (params.signal?.aborted) break;
+        else markProviderDegraded('kobo.search: product skipped');
+        if (params.signal?.aborted) {
+          markProviderDegraded('kobo.search: aborted before every product loaded');
+          break;
+        }
       }
     } catch (err) {
       rethrowWithPartialCandidates(err, results);
@@ -115,7 +140,10 @@ export class KoboProvider implements IdentifiableProvider {
 
     const data = parseKoboBookPage(fetched.html, fetched.url);
     const providerId = data.providerId || extractKoboProviderId(fetched.url) || fallbackProviderId;
-    if (!data.title || !providerId) return null;
+    if (!data.title || !providerId) {
+      markProviderDegraded('kobo.lookup: product page did not parse');
+      return null;
+    }
 
     return {
       provider: MetadataProviderKey.KOBO,
@@ -155,6 +183,7 @@ export class KoboProvider implements IdentifiableProvider {
       }
 
       if (isKoboChallengePage(fetched.html, toChallengeResponse(fetched))) {
+        markProviderDegraded(`kobo.${context.op}: challenge page`);
         this.logger.warn(
           `[kobo] [fail] op=${context.op}${subject} status=${fetched.status} durationMs=${Date.now() - startedAt} attempts=${fetched.attempts} errorClass=KoboChallenge error="cloudflare challenge" - kobo fetch blocked`,
         );
@@ -180,6 +209,7 @@ export class KoboProvider implements IdentifiableProvider {
         throw error;
       }
 
+      markProviderFailed(`kobo.${context.op}: request failed`);
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
       this.logger.warn(

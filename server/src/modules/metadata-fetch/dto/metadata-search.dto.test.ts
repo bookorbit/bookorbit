@@ -96,6 +96,19 @@ describe('MetadataSearchDto', () => {
     expect(falseValue.dto.isAudiobook).toBe(false);
   });
 
+  it('converts resultsPerProvider to a number within the browsing cap', async () => {
+    const valid = await validateInput({ author: 'Terry Pratchett', resultsPerProvider: '20' });
+    const tooMany = await validateInput({ author: 'Terry Pratchett', resultsPerProvider: '21' });
+    const zero = await validateInput({ author: 'Terry Pratchett', resultsPerProvider: '0' });
+    const fraction = await validateInput({ author: 'Terry Pratchett', resultsPerProvider: '2.5' });
+
+    expect(valid.errors).toHaveLength(0);
+    expect(valid.dto.resultsPerProvider).toBe(20);
+    for (const { errors } of [tooMany, zero, fraction]) {
+      expect(errors).toEqual(expect.arrayContaining([expect.objectContaining({ property: 'resultsPerProvider' })]));
+    }
+  });
+
   it('rejects unknown provider keys after normalization', async () => {
     const { errors } = await validateInput({
       title: 'Dune',

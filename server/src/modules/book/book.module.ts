@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 
 import { AchievementModule } from '../achievement/achievement.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
@@ -16,6 +17,10 @@ import { UserBookNoteModule } from '../user-book-note/user-book-note.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sync.service';
+import { DeliveryArtifactRepository } from './delivery-artifact.repository';
+import { DeliveryHashRegistrationService } from './delivery-hash-registration.service';
+import { DeliverySelectionService } from './delivery-selection.service';
+import { DeliveryArtifactService } from './delivery-artifact.service';
 import { AudiolessEpubService } from './audioless-epub.service';
 import { BookReadService } from './book-read.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -36,6 +41,7 @@ import { ReadingAttemptController } from './reading-attempt.controller';
     EmbeddingModule,
     MetadataFetchModule,
     FileWriteModule,
+    SelfWriteRegistryModule,
     AppSettingsModule,
     MetadataScoreModule,
     NarratorModule,
@@ -54,7 +60,11 @@ import { ReadingAttemptController } from './reading-attempt.controller';
     BookAuthorSortKeyBackfillService,
     AudiobookEbookProgressSyncService,
     AudiolessEpubService,
+    DeliveryArtifactService,
+    DeliveryArtifactRepository,
+    DeliverySelectionService,
+    DeliveryHashRegistrationService,
   ],
-  exports: [BookService, BookReadService, BookQueryBuilder, AudiolessEpubService],
+  exports: [BookService, BookReadService, BookQueryBuilder, AudiolessEpubService, DeliveryArtifactService, DeliverySelectionService],
 })
 export class BookModule {}

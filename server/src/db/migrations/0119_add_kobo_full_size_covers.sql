@@ -1,0 +1,1 @@
+ALTER TABLE "kobo_sync_settings" ADD COLUMN "full_size_covers" boolean DEFAULT true NOT NULL;

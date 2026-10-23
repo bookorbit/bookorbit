@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { mkdir, readFile, stat, writeFile } from 'fs/promises';
 import { dirname, join, relative } from 'path';
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
 import { ConfigService } from '@nestjs/config';
 
@@ -486,6 +486,128 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(seriesResponse.statusCode).toBe(200);
       expect(seriesResponse.body).toContain(visibleSeriesName);
       expect(seriesResponse.body).not.toContain(hiddenSeriesName);
+    });
+
+    it('exposes public collections across OPDS and KOReader with viewer-scoped counts and access', async () => {
+      const reader = await createUserAndLogin(ctx, { permissions: [Permission.OpdsAccess, Permission.KoreaderSync] });
+      const noLibraryReader = await createUserAndLogin(ctx, { permissions: [Permission.OpdsAccess] });
+      const readerOpds = await createOpdsUserCredential(ctx, { userId: reader.userId });
+      const noLibraryOpds = await createOpdsUserCredential(ctx, { userId: noLibraryReader.userId });
+      const credentials = { username: readerOpds.row.username, password: readerOpds.password };
+      const koreaderHeaders = { 'x-auth-user': reader.username, 'x-auth-key': reader.password };
+      await grantLibraryAccess(ctx, reader.userId, visibleLibrary.libraryId);
+      const credentialResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/koreader/credentials',
+        headers: authHeader(reader.accessToken),
+        payload: { username: reader.username, password: reader.password },
+      });
+      expect([200, 201]).toContain(credentialResponse.statusCode);
+
+      const [excludedTag] = await ctx.db
+        .insert(schema.tags)
+        .values({ name: `opds-excluded-${randomUUID()}` })
+        .returning();
+      await ctx.db.insert(schema.bookTags).values({ bookId: visibleBookBeta.bookId, tagId: excludedTag.id });
+      await ctx.db.insert(schema.userContentFilterTags).values({ userId: reader.userId, tagId: excludedTag.id, filterType: 'exclude' });
+      const unavailableBooks = await ctx.db
+        .insert(schema.books)
+        .values(
+          (['missing', 'processing'] as const).map((status) => ({
+            libraryId: visibleLibrary.libraryId,
+            libraryFolderId: visibleLibrary.libraryFolderId,
+            folderPath: join(visibleLibrary.folderPath, `unavailable-${status}-${randomUUID()}`),
+            status,
+          })),
+        )
+        .returning({ id: schema.books.id });
+      const [publicCollection, ownCollection, emptyCollection, podcastCollection] = await ctx.db
+        .insert(schema.collections)
+        .values([
+          { userId: intruder.userId, name: `public-collection-${randomUUID()}`, isPublic: true },
+          { userId: reader.userId, name: `private-own-${randomUUID()}` },
+          { userId: intruder.userId, name: `public-empty-${randomUUID()}`, isPublic: true },
+          { userId: intruder.userId, name: `public-podcast-${randomUUID()}`, isPublic: true, mediaType: 'podcasts' as const },
+        ])
+        .returning();
+      await ctx.db.insert(schema.collectionBooks).values(
+        [visibleBookAlpha.bookId, visibleBookBeta.bookId, hiddenBook.bookId, ...unavailableBooks.map((book) => book.id)].map((bookId) => ({
+          collectionId: publicCollection.id,
+          bookId,
+        })),
+      );
+
+      const koreaderGet = (url: string) => ctx.app.inject({ method: 'GET', url, headers: koreaderHeaders });
+      try {
+        const web = await ctx.app.inject({ method: 'GET', url: '/api/v1/collections', headers: authHeader(reader.accessToken) });
+        expect(web.statusCode).toBe(200);
+        expect(web.json()).toEqual(expect.arrayContaining([expect.objectContaining({ id: publicCollection.id })]));
+
+        const navigation = await opdsGet('/api/v1/opds/collections', credentials);
+        expect(navigation.statusCode).toBe(200);
+        expect(navigation.body).toContain(`collectionId=${publicCollection.id}`);
+        expect(navigation.body).toContain('<content type="text">1 books</content>');
+        expect(navigation.body).not.toContain(`collectionId=${foreignCollectionId}`);
+        expect(navigation.body).not.toContain(`collectionId=${podcastCollection.id}`);
+
+        const section = await koreaderGet('/api/v1/koreader/plugin/catalog/sections/collections');
+        expect(section.statusCode).toBe(200);
+        expect(section.json().items).toEqual([
+          expect.objectContaining({ id: String(ownCollection.id), count: 0 }),
+          expect.objectContaining({ id: String(publicCollection.id), count: 1 }),
+          expect.objectContaining({ id: String(emptyCollection.id), count: 0 }),
+        ]);
+        const dashboard = await koreaderGet('/api/v1/koreader/plugin/catalog/dashboard');
+        expect(dashboard.statusCode).toBe(200);
+        expect(dashboard.json().browseCounts.collections).toBe(3);
+
+        const catalog = await opdsGet(`/api/v1/opds/catalog?collectionId=${publicCollection.id}`, credentials);
+        expect(catalog.statusCode).toBe(200);
+        expect(catalog.body).toContain('<opensearch:totalResults>1</opensearch:totalResults>');
+        expect(catalog.body).toContain('Visible Alpha');
+        expect(catalog.body).not.toContain('Visible Beta');
+        expect(catalog.body).not.toContain('Hidden Gamma');
+        for (const route of ['books', 'manifest']) {
+          const response = await koreaderGet(`/api/v1/koreader/plugin/catalog/${route}?collectionId=${publicCollection.id}`);
+          expect(response.statusCode).toBe(200);
+          expect(response.json().items.map((book: { id: number }) => book.id)).toEqual([visibleBookAlpha.bookId]);
+        }
+        const privateCatalog = await koreaderGet(`/api/v1/koreader/plugin/catalog/books?collectionId=${foreignCollectionId}`);
+        expect(privateCatalog.statusCode).toBe(403);
+        const podcastCatalog = await opdsGet(`/api/v1/opds/catalog?collectionId=${podcastCollection.id}`, credentials);
+        expect(podcastCatalog.statusCode).toBe(403);
+
+        const emptyNavigation = await opdsGet('/api/v1/opds/collections', {
+          username: noLibraryOpds.row.username,
+          password: noLibraryOpds.password,
+        });
+        expect(emptyNavigation.statusCode).toBe(200);
+        expect(emptyNavigation.body).toContain(`collectionId=${publicCollection.id}`);
+        expect(emptyNavigation.body).toContain('<content type="text">0 books</content>');
+        expect(emptyNavigation.body).not.toMatch(/<content type="text">[1-9]\d* books<\/content>/);
+
+        await ctx.db.update(schema.collections).set({ isPublic: false }).where(eq(schema.collections.id, publicCollection.id));
+        const revokedNavigation = await opdsGet('/api/v1/opds/collections', credentials);
+        expect(revokedNavigation.body).not.toContain(`collectionId=${publicCollection.id}`);
+        const revokedCatalog = await opdsGet(`/api/v1/opds/catalog?collectionId=${publicCollection.id}`, credentials);
+        expect(revokedCatalog.statusCode).toBe(403);
+        const revokedManifest = await koreaderGet(`/api/v1/koreader/plugin/catalog/manifest?collectionId=${publicCollection.id}`);
+        expect(revokedManifest.statusCode).toBe(403);
+        const revokedDashboard = await koreaderGet('/api/v1/koreader/plugin/catalog/dashboard');
+        expect(revokedDashboard.json().browseCounts.collections).toBe(2);
+      } finally {
+        await ctx.db
+          .delete(schema.collections)
+          .where(inArray(schema.collections.id, [publicCollection.id, ownCollection.id, emptyCollection.id, podcastCollection.id]));
+        await ctx.db.delete(schema.books).where(
+          inArray(
+            schema.books.id,
+            unavailableBooks.map((book) => book.id),
+          ),
+        );
+        await ctx.db.delete(schema.tags).where(eq(schema.tags.id, excludedTag.id));
+        await ctx.db.delete(schema.users).where(inArray(schema.users.id, [reader.userId, noLibraryReader.userId]));
+      }
     });
 
     it('enforces catalog pagination, filters, and strict query validation', async () => {

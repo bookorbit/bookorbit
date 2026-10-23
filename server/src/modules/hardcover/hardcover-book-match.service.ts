@@ -3,7 +3,7 @@ import type { HardcoverEdition as HardcoverEditionSummary, HardcoverEditionsResu
 
 import { parsePublishedDateKey } from '../../common/utils/published-date.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { parseHardcoverBookId } from './hardcover-id.utils';
+import { buildHardcoverMatchBasis, parseHardcoverBookId, parseHardcoverEditionId } from './hardcover-id.utils';
 import type { BookSyncData } from './hardcover.repository';
 import { HardcoverClientService } from './hardcover-client.service';
 import { HardcoverRepository } from './hardcover.repository';
@@ -14,6 +14,15 @@ export interface HardcoverBookMatch {
   editionPages: number | null;
   editionAudioSeconds: number | null;
   matchMethod: 'isbn' | 'title' | 'cached' | 'metadata_id';
+  // Set when this match moved the link off another Hardcover book, whose read ids no longer apply.
+  replacedHardcoverBookId?: number;
+}
+
+// `failed` tells a lookup that could not run apart from one Hardcover answered with no book: only
+// the second may settle a re-check, the first has to be retried.
+interface HardcoverLookup {
+  match: HardcoverBookMatch | null;
+  failed: boolean;
 }
 
 const FIND_BOOK_BY_ISBN13_QUERY = `
@@ -229,6 +238,12 @@ export class HardcoverBookMatchService {
   async matchBook(userId: number, token: string, book: BookSyncData): Promise<HardcoverBookMatch | null> {
     const cached = await this.repo.findBookState(userId, book.bookId);
     if (cached?.hardcoverBookId && !cached.matchError) {
+      const matchBasis = buildHardcoverMatchBasis(book);
+      if (cached.matchBasis !== matchBasis) {
+        const relinked = await this.relinkIfIdentifiersMoved(userId, token, book, cached.hardcoverBookId, cached.matchBasis ?? null, matchBasis);
+        if (relinked) return relinked;
+      }
+
       const cachedMatch = await this.resolveCachedMatch(userId, token, book, cached.hardcoverBookId, cached.hardcoverEditionId ?? null);
 
       if ((cached.hardcoverEditionId ?? null) !== cachedMatch.hardcoverEditionId) {
@@ -254,20 +269,15 @@ export class HardcoverBookMatchService {
     let match: HardcoverBookMatch | null = null;
 
     if (book.hardcoverMetadataId) {
-      const id = parseHardcoverBookId(book.hardcoverMetadataId);
-      if (id !== null) {
-        match = await this.matchByHardcoverId(userId, token, id, book);
-      } else {
-        match = await this.matchByHardcoverSlug(userId, token, book.hardcoverMetadataId, book);
-      }
+      match = (await this.matchByMetadataId(userId, token, book, book.hardcoverMetadataId)).match;
     }
 
     if (!match && book.isbn13) {
-      match = await this.matchByIsbn(userId, token, book.isbn13, book.bookId, 13);
+      match = (await this.matchByIsbn(userId, token, book, book.isbn13, 13)).match;
     }
 
     if (!match && book.isbn10) {
-      match = await this.matchByIsbn(userId, token, book.isbn10, book.bookId, 10);
+      match = (await this.matchByIsbn(userId, token, book, book.isbn10, 10)).match;
     }
 
     if (!match && book.title && book.authorName) {
@@ -281,6 +291,7 @@ export class HardcoverBookMatchService {
         hardcoverBookId: match.hardcoverBookId,
         hardcoverEditionId: match.hardcoverEditionId ?? null,
         matchMethod: match.matchMethod,
+        matchBasis: buildHardcoverMatchBasis(book),
         matchError: null,
       });
     } else {
@@ -288,6 +299,7 @@ export class HardcoverBookMatchService {
         userId,
         bookId: book.bookId,
         hardcoverBookId: null,
+        matchBasis: null,
         matchError: 'no_match',
       });
     }
@@ -295,68 +307,109 @@ export class HardcoverBookMatchService {
     return match;
   }
 
-  private async matchByHardcoverId(userId: number, token: string, id: number, book: BookSyncData): Promise<HardcoverBookMatch | null> {
+  /**
+   * Re-checks a cached link whose identifiers changed since it was made. Only an explicit identifier
+   * can move it, and only to a book Hardcover positively resolves: a title search, or an identifier
+   * Hardcover does not know, must never replace a link that works.
+   */
+  private async relinkIfIdentifiersMoved(
+    userId: number,
+    token: string,
+    book: BookSyncData,
+    cachedBookId: number,
+    previousBasis: string | null,
+    matchBasis: string,
+  ): Promise<HardcoverBookMatch | null> {
+    // A link made before its basis was recorded may have been confirmed through import against an
+    // ISBN that disagrees with it, so only the explicit Hardcover ID is trusted to move it.
+    const lookup = await this.findIdentifiedBook(userId, token, book, previousBasis !== null);
+    if (lookup.failed) return null;
+
+    const match = lookup.match;
+    if (!match || match.hardcoverBookId === cachedBookId) {
+      await this.repo.upsertBookState({ userId, bookId: book.bookId, matchBasis });
+      return null;
+    }
+
+    const releasedAttempts = await this.repo.relinkBook({
+      userId,
+      bookId: book.bookId,
+      hardcoverBookId: match.hardcoverBookId,
+      hardcoverEditionId: match.hardcoverEditionId,
+      matchMethod: match.matchMethod,
+      matchBasis,
+    });
+    this.logger.log(
+      `[hardcover.book_relink] [end] userId=${userId} bookId=${book.bookId} previousHardcoverBookId=${cachedBookId} hardcoverBookId=${match.hardcoverBookId} hardcoverEditionId=${match.hardcoverEditionId ?? null} matchMethod=${match.matchMethod} releasedAttempts=${releasedAttempts} - link moved to the book the metadata identifies`,
+    );
+    return { ...match, replacedHardcoverBookId: cachedBookId };
+  }
+
+  private async findIdentifiedBook(userId: number, token: string, book: BookSyncData, includeIsbn: boolean): Promise<HardcoverLookup> {
+    const lookups: Array<() => Promise<HardcoverLookup>> = [];
+    const { hardcoverMetadataId, isbn13, isbn10 } = book;
+    if (hardcoverMetadataId) lookups.push(() => this.matchByMetadataId(userId, token, book, hardcoverMetadataId));
+    if (includeIsbn && isbn13) lookups.push(() => this.matchByIsbn(userId, token, book, isbn13, 13));
+    if (includeIsbn && isbn10) lookups.push(() => this.matchByIsbn(userId, token, book, isbn10, 10));
+
+    for (const lookup of lookups) {
+      const result = await lookup();
+      // A stronger identifier that could not be checked must not let a weaker one decide instead.
+      if (result.match || result.failed) return result;
+    }
+    return { match: null, failed: false };
+  }
+
+  private matchByMetadataId(userId: number, token: string, book: BookSyncData, metadataId: string): Promise<HardcoverLookup> {
+    const id = parseHardcoverBookId(metadataId);
+    return id !== null ? this.matchByHardcoverId(userId, token, id, book) : this.matchByHardcoverSlug(userId, token, metadataId, book);
+  }
+
+  private async matchByHardcoverId(userId: number, token: string, id: number, book: BookSyncData): Promise<HardcoverLookup> {
     try {
       const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_BY_HARDCOVER_ID_QUERY, { id });
       const hardcoverBook = data.books?.[0];
-      if (!hardcoverBook) return null;
-      const edition = this.pickBestEdition(hardcoverBook.editions ?? [], book);
-      return {
-        hardcoverBookId: hardcoverBook.id,
-        hardcoverEditionId: edition?.id ?? null,
-        editionPages: this.normalizeEditionPages(edition?.pages),
-        editionAudioSeconds: this.normalizeEditionAudioSeconds(edition?.audio_seconds),
-        matchMethod: 'metadata_id',
-      };
+      if (!hardcoverBook) return { match: null, failed: false };
+      const fallback = this.pickBestEdition(hardcoverBook.editions ?? [], book);
+      return { match: await this.buildMatch(userId, token, hardcoverBook, book, 'metadata_id', fallback), failed: false };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
         `[hardcover.book_match] [fail] userId=${userId} bookId=${book.bookId} method=metadata_id error="${error}" - metadata_id lookup failed`,
       );
-      return null;
+      return { match: null, failed: true };
     }
   }
 
-  private async matchByHardcoverSlug(userId: number, token: string, slug: string, book: BookSyncData): Promise<HardcoverBookMatch | null> {
+  private async matchByHardcoverSlug(userId: number, token: string, slug: string, book: BookSyncData): Promise<HardcoverLookup> {
     try {
       const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_BY_HARDCOVER_SLUG_QUERY, { slug });
       const hardcoverBook = data.books?.[0];
-      if (!hardcoverBook) return null;
-      const edition = this.pickBestEdition(hardcoverBook.editions ?? [], book);
-      return {
-        hardcoverBookId: hardcoverBook.id,
-        hardcoverEditionId: edition?.id ?? null,
-        editionPages: this.normalizeEditionPages(edition?.pages),
-        editionAudioSeconds: this.normalizeEditionAudioSeconds(edition?.audio_seconds),
-        matchMethod: 'metadata_id',
-      };
+      if (!hardcoverBook) return { match: null, failed: false };
+      const fallback = this.pickBestEdition(hardcoverBook.editions ?? [], book);
+      return { match: await this.buildMatch(userId, token, hardcoverBook, book, 'metadata_id', fallback), failed: false };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
         `[hardcover.book_match] [fail] userId=${userId} bookId=${book.bookId} method=metadata_slug error="${error}" - metadata_slug lookup failed`,
       );
-      return null;
+      return { match: null, failed: true };
     }
   }
 
-  private async matchByIsbn(userId: number, token: string, isbn: string, bookId: number, version: 10 | 13): Promise<HardcoverBookMatch | null> {
+  private async matchByIsbn(userId: number, token: string, book: BookSyncData, isbn: string, version: 10 | 13): Promise<HardcoverLookup> {
     const query = version === 13 ? FIND_BOOK_BY_ISBN13_QUERY : FIND_BOOK_BY_ISBN10_QUERY;
     try {
       const data = await this.client.query<BooksQueryResult>(userId, token, query, { isbn });
       const hardcoverBook = data.books?.[0];
-      if (!hardcoverBook) return null;
-      const edition = hardcoverBook.editions?.[0];
-      return {
-        hardcoverBookId: hardcoverBook.id,
-        hardcoverEditionId: edition?.id ?? null,
-        editionPages: this.normalizeEditionPages(edition?.pages),
-        editionAudioSeconds: this.normalizeEditionAudioSeconds(edition?.audio_seconds),
-        matchMethod: 'isbn',
-      };
+      if (!hardcoverBook) return { match: null, failed: false };
+      return { match: await this.buildMatch(userId, token, hardcoverBook, book, 'isbn', hardcoverBook.editions?.[0]), failed: false };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      this.logger.warn(`[hardcover.book_match] [fail] userId=${userId} bookId=${bookId} method=isbn${version} error="${error}" - ISBN lookup failed`);
-      return null;
+      this.logger.warn(
+        `[hardcover.book_match] [fail] userId=${userId} bookId=${book.bookId} method=isbn${version} error="${error}" - ISBN lookup failed`,
+      );
+      return { match: null, failed: true };
     }
   }
 
@@ -386,14 +439,8 @@ export class HardcoverBookMatchService {
       const booksById = new Map((data.books ?? []).map((candidate) => [candidate.id, candidate]));
       const hardcoverBook = ids.map((id) => booksById.get(id)).find((candidate): candidate is BooksQueryResult['books'][number] => candidate != null);
       if (!hardcoverBook) return null;
-      const edition = this.pickBestEdition(hardcoverBook.editions ?? [], book);
-      return {
-        hardcoverBookId: hardcoverBook.id,
-        hardcoverEditionId: edition?.id ?? null,
-        editionPages: this.normalizeEditionPages(edition?.pages),
-        editionAudioSeconds: this.normalizeEditionAudioSeconds(edition?.audio_seconds),
-        matchMethod: 'title',
-      };
+      const fallback = this.pickBestEdition(hardcoverBook.editions ?? [], book);
+      return await this.buildMatch(userId, token, hardcoverBook, book, 'title', fallback);
     } catch (err) {
       const errorClass = err instanceof Error ? err.constructor.name : 'Error';
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -401,6 +448,57 @@ export class HardcoverBookMatchService {
         `[hardcover.book_match] [fail] userId=${userId} bookId=${book.bookId} method=title_author durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - title lookup failed`,
       );
       return null;
+    }
+  }
+
+  private async buildMatch(
+    userId: number,
+    token: string,
+    hardcoverBook: BooksQueryResult['books'][number],
+    book: BookSyncData,
+    matchMethod: HardcoverBookMatch['matchMethod'],
+    fallback: HardcoverEdition | undefined,
+  ): Promise<HardcoverBookMatch> {
+    const edition = await this.chooseEdition(userId, token, hardcoverBook.id, hardcoverBook.editions ?? [], book, fallback);
+    return {
+      hardcoverBookId: hardcoverBook.id,
+      hardcoverEditionId: edition?.id ?? null,
+      editionPages: this.normalizeEditionPages(edition?.pages),
+      editionAudioSeconds: this.normalizeEditionAudioSeconds(edition?.audio_seconds),
+      matchMethod,
+    };
+  }
+
+  /**
+   * The edition named in the book's metadata wins whenever it belongs to the matched book, looked up
+   * directly when the capped list does not carry it. An edition of another book is ignored.
+   */
+  private async chooseEdition(
+    userId: number,
+    token: string,
+    hardcoverBookId: number,
+    editions: HardcoverEdition[],
+    book: BookSyncData,
+    fallback: HardcoverEdition | undefined,
+  ): Promise<HardcoverEdition | undefined> {
+    const preferredId = parseHardcoverEditionId(book.hardcoverEditionId);
+    if (preferredId === null || preferredId === fallback?.id) return fallback;
+
+    const listed = editions.find((edition) => edition.id === preferredId);
+    if (listed) return listed;
+
+    try {
+      const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_EDITION_METRICS_BY_ID_QUERY, {
+        id: hardcoverBookId,
+        editionId: preferredId,
+      });
+      return data.books?.[0]?.editions?.find((edition) => edition.id === preferredId) ?? fallback;
+    } catch (err) {
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[hardcover.book_match] [fail] userId=${userId} bookId=${book.bookId} method=metadata_edition error="${error}" - metadata edition lookup failed`,
+      );
+      return fallback;
     }
   }
 
@@ -490,7 +588,8 @@ export class HardcoverBookMatchService {
         return { hardcoverEditionId: cachedEditionId, editionPages: null, editionAudioSeconds: null };
       }
 
-      const edition = this.pickBestEdition(hardcoverBook.editions ?? [], book);
+      const editions = hardcoverBook.editions ?? [];
+      const edition = await this.chooseEdition(userId, token, hardcoverBookId, editions, book, this.pickBestEdition(editions, book));
       if (!edition) {
         return { hardcoverEditionId: cachedEditionId, editionPages: null, editionAudioSeconds: null };
       }

@@ -14,6 +14,7 @@ function toBookFileRef(file: BookDetail['files'][number]): BookFileRef {
 export function mergeBookCardWithDetail(book: BookCard, detail: BookDetail): BookCard {
   return {
     ...book,
+    libraryId: detail.libraryId,
     status: detail.status,
     title: detail.title,
     subtitle: detail.subtitle,
@@ -35,6 +36,7 @@ export function mergeBookCardWithDetail(book: BookCard, detail: BookDetail): Boo
     readStatus: detail.readStatus,
     metadataScore: detail.metadataScore,
     hasCover: detail.coverSource !== null,
+    coverAspectRatio: detail.coverAspectRatio ?? book.coverAspectRatio,
     coverVersion: detail.coverVersion,
     hasMetadataLocks: detail.lockedFields.length > 0,
     lockedFields: detail.lockedFields,

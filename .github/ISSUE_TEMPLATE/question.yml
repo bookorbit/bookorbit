@@ -1,0 +1,59 @@
+name: Question / Help
+description: Ask about setup, configuration, troubleshooting, or using BookOrbit
+title: "[Help] "
+labels: ["support", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions are welcome, even if you are unsure whether something is a bug.
+        You do not need approval or assignment to ask for help.
+
+        Check the [documentation](https://bookorbit.app) and
+        [existing help requests](https://github.com/bookorbit/bookorbit/issues?q=is%3Aissue%20label%3Asupport)
+        for an answer first. If you still need help, ask here.
+
+        Do not include passwords, tokens, private book content, or other sensitive information in
+        logs or screenshots. Report security vulnerabilities privately using the
+        [security policy](https://github.com/bookorbit/bookorbit/blob/main/.github/SECURITY.md).
+
+        NAS and network storage configurations are unsupported. For storage-related problems,
+        reproduce the problem on supported local storage before asking for troubleshooting help.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+      description: Describe what you want to achieve and where you are stuck.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried? (optional)
+      description: Share any documentation, settings, or troubleshooting steps you have tried.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Your setup (optional)
+      description: Include the details relevant to your question.
+      placeholder: |
+        - BookOrbit version/image tag:
+        - Deployment: Docker / manual
+        - OS:
+        - Client: web browser / iOS / Kobo / KOReader / other
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs (optional)
+      description: Include only relevant excerpts and remove sensitive information before posting.
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots (optional)
+      description: Remove sensitive information before attaching screenshots.

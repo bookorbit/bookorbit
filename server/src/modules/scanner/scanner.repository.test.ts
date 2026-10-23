@@ -47,6 +47,7 @@ function makeDb() {
 
   const db: any = {};
   Object.assign(db, {
+    execute: vi.fn().mockResolvedValue(undefined),
     select: vi.fn(() => next('select')),
     insert: vi.fn(() => next('insert')),
     update: vi.fn(() => next('update')),
@@ -235,7 +236,7 @@ describe('ScannerRepository', () => {
         coverAspectRatio: '1/1',
       }),
     ]);
-    expect(db.select.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ coverAspectRatio: expect.anything() }));
+    expect(db.select.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ libraryId: expect.anything(), coverAspectRatio: expect.anything() }));
     expect(chains.select[0]?.mocks.innerJoin).toHaveBeenCalledTimes(1);
   });
 
@@ -321,7 +322,7 @@ describe('ScannerRepository', () => {
     await repo.deleteBookFile(21);
     await repo.updateBookFolderPath(4, '/books/D');
 
-    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.execute).toHaveBeenCalledTimes(1);
     expect(db.update).toHaveBeenCalledTimes(1);
   });
 
@@ -442,5 +443,74 @@ describe('ScannerRepository', () => {
 
     await expect(repo.findLatestScanJobs([])).resolves.toEqual([]);
     expect(db.selectDistinctOn).not.toHaveBeenCalled();
+  });
+
+  describe('realignAudioTrackOrder', () => {
+    it('renumbers the tracks inside a transaction that holds the book row', async () => {
+      const { repo, queues, db, chains } = makeRepo();
+      queues.select.push([{ id: 4 }]);
+      queues.select.push([
+        { id: 41, absolutePath: '/books/Book/Part 2.mp3', format: 'mp3', sortOrder: 0 },
+        { id: 42, absolutePath: '/books/Book/Part 1.mp3', format: 'mp3', sortOrder: 1 },
+      ]);
+
+      await expect(repo.realignAudioTrackOrder(4)).resolves.toBe(2);
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(chains.select[0]!.mocks.for).toHaveBeenCalledWith('update');
+      expect(chains.update).toHaveLength(1);
+      expect(chains.update[0]!.mocks.set).toHaveBeenCalledWith({ sortOrder: expect.anything() });
+    });
+
+    it('does not write when the tracks already play in path order', async () => {
+      const { repo, queues, chains } = makeRepo();
+      queues.select.push([{ id: 4 }]);
+      queues.select.push([
+        { id: 41, absolutePath: '/books/Book/Part 1.mp3', format: 'mp3', sortOrder: 0 },
+        { id: 42, absolutePath: '/books/Book/Part 2.mp3', format: 'mp3', sortOrder: 1 },
+      ]);
+
+      await expect(repo.realignAudioTrackOrder(4)).resolves.toBe(0);
+
+      expect(chains.update).toHaveLength(0);
+    });
+  });
+
+  describe('remapAudioPositions', () => {
+    it('moves audio bookmarks and progress percentages in one transaction, skipping finished books and unplaceable rows', async () => {
+      const { repo, queues, db, chains } = makeRepo();
+      queues.select.push([
+        { id: 1, positionSeconds: 350 },
+        { id: 2, positionSeconds: 50 },
+        { id: 3, positionSeconds: 9999 },
+      ]);
+      queues.select.push([
+        { userId: 7, currentFileId: 21, positionSeconds: 20, percentage: 12 },
+        { userId: 8, currentFileId: 21, positionSeconds: 20, percentage: 100 },
+        { userId: 9, currentFileId: 99, positionSeconds: 20, percentage: 30 },
+      ]);
+      const remap = vi.fn((seconds: number) => (seconds === 350 ? 150 : seconds === 9999 ? null : seconds));
+      const percentageAt = vi.fn((fileId: number) => (fileId === 21 ? 42 : null));
+
+      await expect(repo.remapAudioPositions(4, remap, percentageAt)).resolves.toEqual({ bookmarks: 1, progress: 1 });
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(chains.select[0]!.mocks.for).toHaveBeenCalledWith('update');
+      expect(chains.select[1]!.mocks.for).toHaveBeenCalledWith('update');
+      expect(db.update).toHaveBeenCalledTimes(2);
+      expect(chains.update[0]!.mocks.set).toHaveBeenCalledWith({ positionSeconds: 150 });
+      expect(chains.update[1]!.mocks.set).toHaveBeenCalledWith({ percentage: 42 });
+      expect(percentageAt.mock.calls).toEqual([
+        [21, 20],
+        [99, 20],
+      ]);
+    });
+  });
+
+  it("reads the formats of a book's files", async () => {
+    const { repo, queues } = makeRepo();
+    queues.select.push([{ id: 3, format: 'mp3' }]);
+
+    await expect(repo.findBookFileFormats(4)).resolves.toEqual([{ id: 3, format: 'mp3' }]);
   });
 });

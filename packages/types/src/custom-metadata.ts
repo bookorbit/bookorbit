@@ -18,6 +18,11 @@ export interface CustomMetadataFieldDefinition {
   updatedAt: string;
   enabledLibraryIds: number[];
   usageCount: number;
+  /**
+   * Stored values per library id, summing to `usageCount`. Includes libraries the field is no longer
+   * enabled for: those values are kept but hidden until the library is turned back on.
+   */
+  usageByLibrary: Record<number, number>;
 }
 
 /** Lean summary used for table column building. Omits admin-only attributes (usageCount, timestamps). */

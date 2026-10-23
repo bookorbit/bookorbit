@@ -4,7 +4,7 @@ export interface KoboReadingServiceAnnotation {
   attachments: Record<string, never>;
   clientLastModifiedUtc: string;
   context: null;
-  highlightColor: string;
+  highlightColor?: string;
   highlightedText: string;
   id: string;
   location: unknown;
@@ -60,6 +60,31 @@ export function toKoboReadingServiceAnnotation(row: ServeAnnotation): KoboReadin
     location: row.location,
     ...(row.note ? { noteText: row.note } : {}),
     type: row.hasNote ? 'note' : 'highlight',
+  };
+}
+
+/**
+ * A bookmark, served back as the dogear the device created: no text and no colour, as it uploads one.
+ * One with a note goes in the shape the device uploads after a note is added: a "note" with the
+ * default colour and still no text.
+ */
+export function toKoboReadingServiceDogear(row: {
+  externalKey: string;
+  clientLastModifiedUtc: string;
+  location: unknown;
+  note?: string | null;
+}): KoboReadingServiceAnnotation {
+  const note = row.note?.trim() ? row.note : null;
+  return {
+    attachments: {},
+    clientLastModifiedUtc: row.clientLastModifiedUtc,
+    context: null,
+    ...(note ? { highlightColor: koboColorFromHex(null) } : {}),
+    highlightedText: '',
+    id: row.externalKey,
+    location: row.location,
+    ...(note ? { noteText: note } : {}),
+    type: note ? 'note' : 'dogear',
   };
 }
 

@@ -4,12 +4,14 @@ import { BadRequestException } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { of } from 'rxjs';
-import { Permission } from '@bookorbit/types';
+import { AuditAction, Permission } from '@bookorbit/types';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
+import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthorsController } from './authors.controller';
+import { BulkRefreshAuthorsMetadataDto } from './dto/bulk-refresh-authors-metadata.dto';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 vi.mock('fs', async () => {
@@ -94,6 +96,8 @@ function makeController() {
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     refreshEnrichment: vi.fn(),
+    pinMetadataMatch: vi.fn(),
+    unpinMetadataMatch: vi.fn(),
     update: vi.fn(),
     merge: vi.fn(),
     delete: vi.fn(),
@@ -184,6 +188,58 @@ describe('AuthorsController', () => {
     expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ authorId: 5, status: 'queued' })}\n\n`);
     expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, queued: 1, processed: 1, failed: 0 })}\n\n`);
     expect(raw.end).toHaveBeenCalled();
+    expect(authorsService.bulkRefreshMetadata).toHaveBeenCalledWith([5], user, expect.any(Function), { ignoreCache: false });
+  });
+
+  it('passes ignoreCache from the bulk refresh body', async () => {
+    const { controller, authorsService } = makeController();
+    const { reply } = makeReply();
+    const user = makeUser();
+    authorsService.bulkRefreshMetadata.mockResolvedValue({ processed: 1, failed: 0, updated: 1 });
+
+    await controller.bulkRefreshMetadata({ authorIds: [5], ignoreCache: true }, user, reply);
+
+    expect(authorsService.bulkRefreshMetadata).toHaveBeenCalledWith([5], user, expect.any(Function), { ignoreCache: true });
+  });
+
+  it('accepts the bulk refresh body with an optional ignoreCache only on that endpoint', () => {
+    const [bulkRefreshBody] = Reflect.getMetadata('design:paramtypes', AuthorsController.prototype, 'bulkRefreshMetadata') as unknown[];
+    const [deleteBody] = Reflect.getMetadata('design:paramtypes', AuthorsController.prototype, 'delete') as unknown[];
+
+    expect(bulkRefreshBody).toBe(BulkRefreshAuthorsMetadataDto);
+    expect(deleteBody).not.toBe(BulkRefreshAuthorsMetadataDto);
+  });
+
+  it('streams cache provenance alongside each candidate', async () => {
+    const { controller, authorsService } = makeController();
+    const cached = { provider: 'audnexus', providerId: 'x1', name: 'Jane Doe', cache: { fetchedAt: '2026-09-01T00:00:00.000Z', stale: false } };
+    authorsService.streamMetadata.mockReturnValue(of(cached));
+
+    const events = await new Promise<unknown[]>((resolve, reject) => {
+      const rows: unknown[] = [];
+      controller.streamMetadata({ q: 'Jane', cache: 'refresh' }).subscribe({
+        next: (row) => rows.push(row),
+        error: reject,
+        complete: () => resolve(rows),
+      });
+    });
+
+    expect(events).toEqual([{ data: cached }]);
+    expect(authorsService.streamMetadata).toHaveBeenCalledWith({ q: 'Jane', cache: 'refresh' });
+  });
+
+  it('passes the backfill ignoreCache flag and tolerates an absent body', async () => {
+    const { controller, enrichmentOrchestrator } = makeController();
+    enrichmentOrchestrator.backfillLinkedAuthors.mockResolvedValue(2);
+    enrichmentOrchestrator.backfillAllLinkedAuthors.mockResolvedValue(4);
+
+    await expect(controller.enqueueBackfill({ ignoreCache: true })).resolves.toEqual({ queued: 2 });
+    await expect(controller.enqueueBackfillAll({ ignoreCache: true })).resolves.toEqual({ queued: 4 });
+    await expect(controller.enqueueBackfill(undefined)).resolves.toEqual({ queued: 2 });
+    await expect(controller.enqueueBackfillAll({})).resolves.toEqual({ queued: 4 });
+
+    expect(enrichmentOrchestrator.backfillLinkedAuthors.mock.calls).toEqual([[{ ignoreCache: true }], [{ ignoreCache: false }]]);
+    expect(enrichmentOrchestrator.backfillAllLinkedAuthors.mock.calls).toEqual([[{ ignoreCache: true }], [{ ignoreCache: false }]]);
   });
 
   it('marks bulk metadata refresh endpoint as demo-restricted', () => {
@@ -311,18 +367,38 @@ describe('AuthorsController', () => {
   it('delegates write endpoints for refresh/update/merge/delete', async () => {
     const { controller, authorsService } = makeController();
     const user = makeUser();
-    authorsService.refreshEnrichment.mockResolvedValue({ id: 9 });
+    authorsService.refreshEnrichment.mockResolvedValue({ id: 9, metadataCache: { fallbackProviders: [] } });
     authorsService.update.mockResolvedValue({ id: 9, name: 'Updated' });
     authorsService.merge.mockResolvedValue({ mergedAuthorIds: [2], affectedBookCount: 3 });
     authorsService.delete.mockResolvedValue({ deletedAuthorIds: [2], affectedBookCount: 3 });
 
-    await expect(controller.refreshEnrichment(user, 9)).resolves.toEqual({ id: 9 });
+    await expect(controller.refreshEnrichment(user, 9)).resolves.toEqual({ id: 9, metadataCache: { fallbackProviders: [] } });
     await expect(controller.update(user, 9, { name: 'Updated' })).resolves.toEqual({ id: 9, name: 'Updated' });
     await expect(controller.merge(user, { targetAuthorId: 9, sourceAuthorIds: [2] })).resolves.toEqual({
       mergedAuthorIds: [2],
       affectedBookCount: 3,
     });
     await expect(controller.delete(user, { authorIds: [2] })).resolves.toEqual({ deletedAuthorIds: [2], affectedBookCount: 3 });
+  });
+
+  it('delegates metadata match pin and unpin, gated and audited like an author edit', async () => {
+    const { controller, authorsService } = makeController();
+    const user = makeUser();
+    const dto = { provider: 'goodreads', providerId: '4567' } as never;
+    authorsService.pinMetadataMatch.mockResolvedValue({ id: 9, metadataProviderPinned: true });
+    authorsService.unpinMetadataMatch.mockResolvedValue({ id: 9, metadataProviderPinned: false });
+
+    await expect(controller.pinMetadataMatch(user, 9, dto)).resolves.toEqual({ id: 9, metadataProviderPinned: true });
+    expect(authorsService.pinMetadataMatch).toHaveBeenCalledWith(user, 9, dto);
+    await expect(controller.unpinMetadataMatch(user, 9)).resolves.toEqual({ id: 9, metadataProviderPinned: false });
+    expect(authorsService.unpinMetadataMatch).toHaveBeenCalledWith(user, 9);
+
+    for (const handler of [AuthorsController.prototype.pinMetadataMatch, AuthorsController.prototype.unpinMetadataMatch]) {
+      expect(Reflect.getMetadata(PERMISSION_KEY, handler)).toBe(Permission.LibraryEditMetadata);
+      const audit = Reflect.getMetadata(AUDITABLE_KEY, handler) as { action: string; getResourceId: (req: unknown) => number };
+      expect(audit.action).toBe(AuditAction.AuthorUpdate);
+      expect(audit.getResourceId({ params: { id: '9' } })).toBe(9);
+    }
   });
 
   it('delegates delete image endpoint to AuthorsService', async () => {

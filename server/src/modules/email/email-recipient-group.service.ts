@@ -1,6 +1,8 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import type { EmailRecipient, EmailRecipientGroup as EmailRecipientGroupJson, EmailRecipientGroupSummary } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
+import type { Unserialized } from '../../common/types/unserialized';
 import { EmailRecipientGroupRepository } from './email-recipient-group.repository';
 import { EmailRecipientRepository } from './email-recipient.repository';
 import { EmailTemplateService } from './email-template.service';
@@ -8,6 +10,11 @@ import { CreateEmailRecipientGroupDto } from './dto/create-email-recipient-group
 import { UpdateEmailRecipientGroupDto } from './dto/update-email-recipient-group.dto';
 import type { EmailRecipientGroup } from '../../db/schema';
 import { isUniqueViolation } from './email-db-error.util';
+
+type EmailRecipientGroupSummaryResponse = Unserialized<EmailRecipientGroupSummary, 'createdAt' | 'updatedAt'>;
+type EmailRecipientGroupResponse = Unserialized<Omit<EmailRecipientGroupJson, 'members'>, 'createdAt' | 'updatedAt'> & {
+  members: Unserialized<EmailRecipient, 'createdAt'>[];
+};
 
 @Injectable()
 export class EmailRecipientGroupService {
@@ -17,7 +24,7 @@ export class EmailRecipientGroupService {
     private readonly templateService: EmailTemplateService,
   ) {}
 
-  async findAll(user: RequestUser) {
+  async findAll(user: RequestUser): Promise<EmailRecipientGroupResponse[]> {
     const groups = await this.repo.findAllForUser(user.id);
     if (groups.length === 0) return [];
 
@@ -38,13 +45,13 @@ export class EmailRecipientGroupService {
     }));
   }
 
-  async findOne(id: number, user: RequestUser) {
+  async findOne(id: number, user: RequestUser): Promise<EmailRecipientGroupResponse> {
     const group = await this.getOwned(id, user);
     const memberRows = await this.repo.findMembers(group.id);
     return { ...group, members: memberRows.map((r) => r.recipient) };
   }
 
-  async create(dto: CreateEmailRecipientGroupDto, user: RequestUser) {
+  async create(dto: CreateEmailRecipientGroupDto, user: RequestUser): Promise<EmailRecipientGroupResponse> {
     await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [created] = await this.repo.insert({
@@ -61,7 +68,7 @@ export class EmailRecipientGroupService {
     }
   }
 
-  async update(id: number, dto: UpdateEmailRecipientGroupDto, user: RequestUser) {
+  async update(id: number, dto: UpdateEmailRecipientGroupDto, user: RequestUser): Promise<EmailRecipientGroupSummaryResponse> {
     await this.getOwned(id, user);
     await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
@@ -81,7 +88,7 @@ export class EmailRecipientGroupService {
     await this.repo.delete(id, user.id);
   }
 
-  async addMember(groupId: number, recipientId: number, user: RequestUser) {
+  async addMember(groupId: number, recipientId: number, user: RequestUser): Promise<EmailRecipientGroupResponse> {
     await this.getOwned(groupId, user);
     const [recipient] = await this.recipientRepo.findById(recipientId);
     if (!recipient) throw new NotFoundException('Recipient not found');

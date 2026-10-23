@@ -29,6 +29,11 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
 }
 
 describe('assembleBookCards', () => {
+  it('preserves each book library ID for permission checks', () => {
+    const cards = assembleBookCards([makeBookRow(1, { libraryId: 7 }), makeBookRow(2, { libraryId: 8 })], [], [], [], []);
+    expect(cards.map((card) => card.libraryId)).toEqual([7, 8]);
+  });
+
   it('assembles a simple book card with authors and files', () => {
     const rows = [makeBookRow(1)];
     const authorRows = [{ bookId: 1, name: 'Author A' }];

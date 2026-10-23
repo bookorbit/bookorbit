@@ -196,6 +196,12 @@ export interface AuditLogEntry {
   ip: string | null;
   meta: Record<string, unknown> | null;
   createdAt: string;
+  /** The person's display name while their account exists. */
+  actorName?: string | null;
+  /** Name of the target: its current name, or the last one the log saw if it is gone. Null when unknown. */
+  targetLabel?: string | null;
+  /** Whether the target still exists. Null when the target type has nothing to look up. */
+  targetExists?: boolean | null;
 }
 
 export interface BookDeletionAuditBook {
@@ -212,9 +218,115 @@ export interface BookDeletionAuditMeta {
 export interface AuditActorOption {
   userId: number | null;
   username: string;
+  /** Display name while the account exists. */
+  name?: string | null;
 }
 
 export interface AuditLogPage {
   data: AuditLogEntry[];
+  total: number;
+}
+
+/**
+ * Display groups for audit events. `other` catches actions this build does not know yet, so an
+ * older client or a newer server never fails to place a row.
+ */
+export const AUDIT_CATEGORIES = ["access", "users", "libraries", "books", "requests", "collections", "devices", "settings", "other"] as const;
+export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
+
+/** Action prefixes per category. The server filters with these and the client labels with them. */
+export const AUDIT_CATEGORY_PREFIXES: Record<Exclude<AuditCategory, "other">, readonly string[]> = {
+  access: ["auth.", "magic_link."],
+  users: ["user.", "reading_insights."],
+  libraries: ["library.", "podcast."],
+  books: ["book.", "book_dock."],
+  requests: ["book_request.", "download_client.", "request_indexer."],
+  collections: ["collection.", "smart_scope."],
+  devices: ["kobo.", "email."],
+  settings: ["app_settings.", "entity_manager.", "author.", "maintenance."],
+};
+
+export function getAuditCategory(action: string): AuditCategory {
+  for (const [category, prefixes] of Object.entries(AUDIT_CATEGORY_PREFIXES)) {
+    if (prefixes.some((prefix) => action.startsWith(prefix))) return category as AuditCategory;
+  }
+  return "other";
+}
+
+/** Routine sign-in traffic: left out of the Changes view and folded in the Sign-ins view. */
+export const AUDIT_SIGN_IN_ACTIONS: readonly AuditAction[] = [
+  AuditAction.AuthLogin,
+  AuditAction.AuthLogout,
+  AuditAction.AuthLoginFailed,
+  AuditAction.OidcLogin,
+  AuditAction.MagicLinkLogin,
+];
+
+/** Security groups shown as chips in the Security view. Their union is the Security view. */
+export const AUDIT_SECURITY_GROUPS = {
+  failed: [AuditAction.AuthLoginFailed],
+  accounts: [
+    AuditAction.AuthRegister,
+    AuditAction.UserCreate,
+    AuditAction.UserUpdate,
+    AuditAction.UserDelete,
+    AuditAction.UserUnlock,
+    AuditAction.OidcUserProvisioned,
+  ],
+  passwords: [AuditAction.AuthPasswordChange, AuditAction.AuthPasswordResetRequest, AuditAction.AuthPasswordReset, AuditAction.AuthPasswordAdminReset],
+  permissions: [AuditAction.UserPermissionSet, AuditAction.UserSuperuserEnable, AuditAction.UserSuperuserDisable],
+  access: [
+    AuditAction.UserContentFiltersSet,
+    AuditAction.LibraryAccessGrant,
+    AuditAction.LibraryAccessUpdate,
+    AuditAction.LibraryAccessRevoke,
+    AuditAction.ReadingInsightsSharingUpdate,
+  ],
+  links: [
+    AuditAction.AuthSessionRevoke,
+    AuditAction.MagicLinkCreate,
+    AuditAction.MagicLinkRevoke,
+    AuditAction.MagicLinkActivate,
+    AuditAction.MagicLinkDeactivate,
+    AuditAction.OidcIdentityLinked,
+    AuditAction.OidcIdentityUnlinked,
+  ],
+} as const satisfies Record<string, readonly AuditAction[]>;
+export type AuditSecurityGroup = keyof typeof AUDIT_SECURITY_GROUPS;
+export const AUDIT_SECURITY_GROUP_KEYS = Object.keys(AUDIT_SECURITY_GROUPS) as AuditSecurityGroup[];
+export const AUDIT_SECURITY_ACTIONS: readonly AuditAction[] = Object.values(AUDIT_SECURITY_GROUPS).flat();
+
+/** `changes` is everything except sign-in traffic. Omitting the kind keeps the original unfiltered list. */
+export const AUDIT_LOG_KINDS = ["changes", "signins", "security"] as const;
+export type AuditLogKind = (typeof AUDIT_LOG_KINDS)[number];
+
+export interface AuditLogSummary {
+  /** Events matching the filters, per view. `all` ignores the view. */
+  kinds: Record<AuditLogKind | "all", number>;
+  /** Per category, within the requested view. */
+  categories: Partial<Record<AuditCategory, number>>;
+  /** Per security group, within the filters. */
+  securityGroups: Record<AuditSecurityGroup, number>;
+  retentionDays: number;
+  oldestAt: string | null;
+}
+
+/** Sign-in traffic folded per person, local day and address. */
+export interface AuditSignInGroup {
+  day: string;
+  actorUsername: string;
+  actorName: string | null;
+  userId: number | null;
+  ip: string | null;
+  signIns: number;
+  signOuts: number;
+  failed: number;
+  failedUsernames: string[];
+  firstAt: string;
+  lastAt: string;
+}
+
+export interface AuditSignInPage {
+  data: AuditSignInGroup[];
   total: number;
 }

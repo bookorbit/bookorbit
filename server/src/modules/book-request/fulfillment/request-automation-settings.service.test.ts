@@ -28,7 +28,6 @@ function makeService(stored: Record<string, string> = {}, repoOverrides: Record<
 const NO_DESTINATIONS = {
   ebook: { libraryId: null, folderId: null },
   audiobook: { libraryId: null, folderId: null },
-  comic: { libraryId: null, folderId: null },
 };
 
 describe('RequestAutomationSettingsService.get', () => {
@@ -133,12 +132,21 @@ describe('RequestAutomationSettingsService destinations', () => {
 
     expect(destinations.ebook).toEqual({ libraryId: 4, folderId: 9 });
     expect(destinations.audiobook).toEqual({ libraryId: 5, folderId: 12 });
-    expect(destinations.comic).toEqual({ libraryId: null, folderId: null });
+  });
+
+  /** A server that set one before comics were retired still holds the rows; nothing reads them. */
+  it('leaves a destination stored for the retired comic medium out entirely', async () => {
+    const { service } = makeService({ book_request_default_library_comic: '6', book_request_default_folder_comic: '7' });
+
+    const { destinations } = await service.get();
+
+    expect(destinations).toEqual(NO_DESTINATIONS);
+    expect(destinations).not.toHaveProperty('comic');
   });
 
   /** A folder on its own files into whichever library that folder belongs to, which nobody chose. */
   it('drops a stored folder whose library is unset', async () => {
-    const { service } = makeService({ [bookRequestDefaultFolderKey('comic')]: '12' });
+    const { service } = makeService({ [bookRequestDefaultFolderKey('ebook')]: '12' });
 
     await expect(service.get()).resolves.toMatchObject({ destinations: NO_DESTINATIONS });
   });
@@ -177,10 +185,10 @@ describe('RequestAutomationSettingsService destinations', () => {
   it('clears a medium when its library is set to null', async () => {
     const { service, appSettings } = makeService();
 
-    await service.update({ destinations: { comic: { libraryId: null, folderId: null } } });
+    await service.update({ destinations: { audiobook: { libraryId: null, folderId: null } } });
 
-    expect(appSettings.setValue).toHaveBeenCalledWith(bookRequestDefaultLibraryKey('comic'), '');
-    expect(appSettings.setValue).toHaveBeenCalledWith(bookRequestDefaultFolderKey('comic'), '');
+    expect(appSettings.setValue).toHaveBeenCalledWith(bookRequestDefaultLibraryKey('audiobook'), '');
+    expect(appSettings.setValue).toHaveBeenCalledWith(bookRequestDefaultFolderKey('audiobook'), '');
   });
 });
 
@@ -250,9 +258,9 @@ describe('RequestAutomationSettingsService.resolveDestinationFor', () => {
     it('clears a profile with an empty list', async () => {
       const { service, appSettings } = makeService();
 
-      await service.update({ profiles: { comic: [] } });
+      await service.update({ profiles: { ebook: [] } });
 
-      expect(appSettings.setValue).toHaveBeenCalledWith(bookRequestReleaseProfileKey('comic'), '[]');
+      expect(appSettings.setValue).toHaveBeenCalledWith(bookRequestReleaseProfileKey('ebook'), '[]');
     });
 
     it('refuses a tier with no name, since the release row has nothing to show', async () => {

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
@@ -51,6 +51,8 @@ export interface CatalogSearchScope {
 
 const DEFAULT_SEARCH_LIMIT = 15;
 const COLLECTION_SEARCH_LIMIT = 20;
+// Distinct stored spellings, not languages: "en", "eng" and "English" are three rows here.
+const LANGUAGE_LIST_LIMIT = 200;
 
 @Injectable()
 export class CatalogRepository {
@@ -82,6 +84,20 @@ export class CatalogRepository {
 
   searchLanguages(q: string, scope: CatalogSearchScope): Promise<SearchResult[]> {
     return this.searchDistinctMetadataField(q, bookMetadata.language, scope);
+  }
+
+  /** Every language value on a visible book, most common first so a capped list keeps the ones that matter. */
+  async listLanguages(scope: CatalogSearchScope): Promise<SearchResult[]> {
+    const rows = await this.db
+      .select({ name: bookMetadata.language })
+      .from(bookMetadata)
+      .innerJoin(books, eq(books.id, bookMetadata.bookId))
+      .where(and(isNotNull(bookMetadata.language), ...this.visibilityClauses(scope)))
+      .groupBy(bookMetadata.language)
+      .orderBy(desc(sql`count(*)`), bookMetadata.language)
+      .limit(LANGUAGE_LIST_LIMIT);
+
+    return rows.filter((row): row is SearchResult => row.name !== null && row.name.trim() !== '');
   }
 
   searchCollections(userId: number, q: string): Promise<SearchResult[]> {

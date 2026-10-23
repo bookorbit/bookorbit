@@ -1,4 +1,5 @@
-import { IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 import { READER_GROUP_DEFAULTS, type ReaderFormatGroup } from '@bookorbit/types';
 
@@ -9,4 +10,10 @@ export class FindNextSeriesBookDto {
   @IsOptional()
   @IsIn(READER_FORMAT_GROUPS)
   formatGroup?: ReaderFormatGroup;
+
+  /** Released native builds cannot open DjVu, so it is offered only to a caller that asks for it. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  includeDjvu?: boolean;
 }

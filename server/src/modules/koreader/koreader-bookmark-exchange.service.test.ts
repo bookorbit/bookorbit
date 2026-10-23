@@ -5,6 +5,8 @@ import type { RequestUser } from '../../common/types/request-user';
 import type { BookmarkExchangeAckDto, BookmarkExchangeDto } from './dto';
 import { KoreaderBookmarkExchangeService, buildBookmarkKey } from './koreader-bookmark-exchange.service';
 
+import { exchangeDeviceId } from './koreader-exchange-device';
+
 const DEVICE_ID = 'device-1234';
 const HASH_A = 'a'.repeat(32);
 const HASH_B = 'b'.repeat(32);
@@ -20,6 +22,7 @@ function makeBookmarkRow(overrides: Record<string, unknown> = {}) {
     id: 100,
     userId: 7,
     bookId: 20,
+    bookFileId: 10,
     cfi: 'epubcfi(/6/8!/4/2/14/1:0)',
     title: 'Chapter 3',
     positionSeconds: null,
@@ -114,6 +117,7 @@ describe('KoreaderBookmarkExchangeService', () => {
 
       expect(positionConverter.xpointerPointToCfi).toHaveBeenCalledWith({ bookFileId: 10, pos: POS });
       expect(bookmarkSync.upsertFromDevice).toHaveBeenCalledWith(7, 20, {
+        bookFileId: 10,
         cfi: 'epubcfi(/6/8!/4/2/14/1:0)',
         title: 'Chapter 3',
         devicePos: POS,
@@ -122,7 +126,7 @@ describe('KoreaderBookmarkExchangeService', () => {
       expect(bookmarkRepo.upsertLink).toHaveBeenCalledWith({
         bookmarkId: 101,
         userId: 7,
-        deviceId: DEVICE_ID,
+        deviceId: exchangeDeviceId(DEVICE_ID, HASH_A),
         koreaderKey: buildBookmarkKey(DATETIME, POS),
         deviceDatetime: DATETIME,
       });
@@ -180,6 +184,20 @@ describe('KoreaderBookmarkExchangeService', () => {
       expect(result.results[0]).toMatchObject({ accepted: 0, duplicates: 1 });
     });
 
+    it('keeps a newer server rename and pushes it over the stale device title', async () => {
+      const bookmark = makeBookmarkRow({ title: 'Renamed elsewhere', updatedAt: new Date('2026-06-03T10:00:00Z') });
+      bookmarkSync.listForSync.mockResolvedValue([bookmark]);
+      bookmarkRepo.findLinksForBookmarks.mockResolvedValue([makeLinkRow()]);
+
+      const result = await service.exchange(
+        makeUser(),
+        makeExchangeDto([makeBook({ changes: [{ datetime: DATETIME, pos: POS, pageno: 42, chapter: 'Chapter 3' }] })]),
+      );
+
+      expect(bookmarkSync.applyDeviceEdit).not.toHaveBeenCalled();
+      expect(result.results[0].toApply.add).toEqual([{ serverId: 100, pos: POS, pageno: null, title: 'Renamed elsewhere' }]);
+    });
+
     it('leaves an unchanged known key alone', async () => {
       bookmarkSync.listForSync.mockResolvedValue([makeBookmarkRow({ title: 'Chapter 3' })]);
       bookmarkRepo.findLinksForBookmarks.mockResolvedValue([makeLinkRow()]);
@@ -194,7 +212,7 @@ describe('KoreaderBookmarkExchangeService', () => {
 
       const result = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
 
-      expect(positionConverter.cfiPointToXpointer).toHaveBeenCalledWith({ bookFileId: 10, cfi: 'epubcfi(/6/8!/4/2/14/1:0)' });
+      expect(positionConverter.cfiPointToXpointer).toHaveBeenCalledWith({ bookFileId: 10, sourceBookFileId: 10, cfi: 'epubcfi(/6/8!/4/2/14/1:0)' });
       expect(result.results[0].toApply.add).toEqual([{ serverId: 100, pos: POS, pageno: 7, title: 'Chapter 3' }]);
       expect(result.results[0].skippedConversion).toBe(0);
     });
@@ -206,6 +224,17 @@ describe('KoreaderBookmarkExchangeService', () => {
 
       expect(positionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
       expect(result.results[0].toApply.add[0]).toMatchObject({ serverId: 100, pos: POS, pageno: 3 });
+    });
+
+    it.each([null, POS])('retains a legacy bookmark without source provenance when its stored pointer is %s', async (devicePos) => {
+      bookmarkSync.listForSync.mockResolvedValue([makeBookmarkRow({ bookFileId: null, devicePos })]);
+
+      const result = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
+
+      expect(result.results[0].toApply.add).toEqual([]);
+      expect(result.results[0].skippedConversion).toBe(1);
+      expect(positionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
+      expect(bookmarkSync.tombstone).not.toHaveBeenCalled();
     });
 
     it('counts an unconvertible web bookmark as skipped instead of pushing it', async () => {
@@ -246,7 +275,7 @@ describe('KoreaderBookmarkExchangeService', () => {
       const result = await service.exchange(makeUser(), makeExchangeDto([makeBook({ keys: [], keysComplete: true })]));
 
       expect(bookmarkSync.tombstone).toHaveBeenCalledWith(7, [100]);
-      expect(bookmarkRepo.deleteLinks).toHaveBeenCalledWith(7, DEVICE_ID, [100]);
+      expect(bookmarkRepo.deleteLinks).toHaveBeenCalledWith(7, exchangeDeviceId(DEVICE_ID, HASH_A), [100]);
       expect(result.results[0].deviceDeleted).toBe(1);
     });
 
@@ -290,6 +319,53 @@ describe('KoreaderBookmarkExchangeService', () => {
 
       expect(bookmarkSync.purge).not.toHaveBeenCalled();
     });
+
+    describe('a lost or replaced copy', () => {
+      const deviceId = exchangeDeviceId(DEVICE_ID, HASH_A);
+      const first = makeBookmarkRow({ id: 100 });
+      const second = makeBookmarkRow({ id: 101, cfi: 'epubcfi(/6/10!/4/2/1:0)' });
+      const firstLink = makeLinkRow({ bookmarkId: 100 });
+      const secondLink = makeLinkRow({ id: 901, bookmarkId: 101, koreaderKey: buildBookmarkKey(DATETIME, `${POS}x`) });
+
+      beforeEach(() => {
+        bookmarkSync.listForSync.mockResolvedValue([first, second]);
+        bookmarkRepo.findLinksForBookmarks.mockResolvedValueOnce([firstLink, secondLink]).mockResolvedValue([]);
+        bookmarkRepo.deleteLinks.mockResolvedValue(2);
+      });
+
+      it('re-offers every dogear when the device reports a new sidecar, and tombstones nothing', async () => {
+        const result = await service.exchange(makeUser(), makeExchangeDto([makeBook({ keys: [], keysComplete: true, sidecarState: 'new' })]));
+
+        expect(bookmarkRepo.deleteLinks).toHaveBeenCalledWith(7, deviceId, [100, 101]);
+        expect(bookmarkSync.tombstone).not.toHaveBeenCalled();
+        expect(result.results[0].toApply.add.map((entry) => entry.serverId)).toEqual([100, 101]);
+      });
+
+      it('reads a complete set that keeps none of two applied dogears as a lost copy for an older plugin', async () => {
+        await service.exchange(makeUser(), makeExchangeDto([makeBook({ keys: [], keysComplete: true })]));
+
+        expect(bookmarkRepo.deleteLinks).toHaveBeenCalledWith(7, deviceId, [100, 101]);
+        expect(bookmarkSync.tombstone).not.toHaveBeenCalled();
+      });
+
+      it('still deletes when a known sidecar reports none of them', async () => {
+        bookmarkSync.tombstone.mockResolvedValue(2);
+
+        await service.exchange(makeUser(), makeExchangeDto([makeBook({ keys: [], keysComplete: true, sidecarState: 'known' })]));
+
+        expect(bookmarkSync.tombstone).toHaveBeenCalledWith(7, [100, 101]);
+      });
+
+      it('still deletes the only dogear an older plugin had', async () => {
+        bookmarkSync.listForSync.mockResolvedValue([first]);
+        bookmarkRepo.findLinksForBookmarks.mockReset().mockResolvedValue([firstLink]);
+        bookmarkSync.tombstone.mockResolvedValue(1);
+
+        await service.exchange(makeUser(), makeExchangeDto([makeBook({ keys: [], keysComplete: true })]));
+
+        expect(bookmarkSync.tombstone).toHaveBeenCalledWith(7, [100]);
+      });
+    });
   });
 
   describe('exchangeAck', () => {
@@ -308,7 +384,7 @@ describe('KoreaderBookmarkExchangeService', () => {
       expect(bookmarkRepo.upsertLink).toHaveBeenCalledWith({
         bookmarkId: 100,
         userId: 7,
-        deviceId: DEVICE_ID,
+        deviceId: exchangeDeviceId(DEVICE_ID, HASH_A),
         koreaderKey: 'f'.repeat(32),
         deviceDatetime: DATETIME,
       });
@@ -366,7 +442,7 @@ describe('KoreaderBookmarkExchangeService', () => {
         makeAckDto([{ hash: HASH_A, applied: [], deleted: [{ serverId: 100, status: 'applied' }] }]),
       );
 
-      expect(bookmarkRepo.deleteLinks).toHaveBeenCalledWith(7, DEVICE_ID, [100]);
+      expect(bookmarkRepo.deleteLinks).toHaveBeenCalledWith(7, exchangeDeviceId(DEVICE_ID, HASH_A), [100]);
       expect(result.results).toEqual([{ hash: HASH_A, acked: 1 }]);
     });
 

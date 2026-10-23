@@ -1,3 +1,4 @@
+import { deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -19,8 +20,10 @@ import {
   userLibraryAccess,
   users,
 } from '../../db/schema';
+import { selectMovedPrimary } from './book-move.utils';
 
 type Db = NodePgDatabase<typeof schema>;
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const ID_BATCH_SIZE = 500;
 
@@ -31,6 +34,7 @@ export interface MoveBookFile {
   role: string;
   format: string | null;
   fileHash: string | null;
+  sizeBytes: number | null;
   sortOrder: number | null;
   mediaOverlayAvailable: boolean;
 }
@@ -50,6 +54,7 @@ export interface MoveBookData {
     subtitle: string | null;
     publisher: string | null;
     language: string | null;
+    isbn10: string | null;
     isbn13: string | null;
     publishedYear: number | null;
     seriesName: string | null;
@@ -66,6 +71,7 @@ export interface MoveTargetLibrary {
   organizationMode: string;
   fileNamingPattern: string | null;
   allowedFormats: string[];
+  formatPriority: string[];
   folderId: number;
   folderPath: string;
   watch: boolean;
@@ -103,6 +109,7 @@ export class BookMoveRepository {
         organizationMode: libraries.organizationMode,
         fileNamingPattern: libraries.fileNamingPattern,
         allowedFormats: libraries.allowedFormats,
+        formatPriority: libraries.formatPriority,
         watch: libraries.watch,
         folderId: libraryFolders.id,
         folderPath: libraryFolders.path,
@@ -137,6 +144,7 @@ export class BookMoveRepository {
           subtitle: bookMetadata.subtitle,
           publisher: bookMetadata.publisher,
           language: bookMetadata.language,
+          isbn10: bookMetadata.isbn10,
           isbn13: bookMetadata.isbn13,
           publishedYear: bookMetadata.publishedYear,
           seriesName: bookMetadata.seriesName,
@@ -161,6 +169,7 @@ export class BookMoveRepository {
           role: bookFiles.role,
           format: bookFiles.format,
           fileHash: bookFiles.fileHash,
+          sizeBytes: bookFiles.sizeBytes,
           sortOrder: bookFiles.sortOrder,
           mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
         })
@@ -193,6 +202,7 @@ export class BookMoveRepository {
           role: file.role,
           format: file.format,
           fileHash: file.fileHash,
+          sizeBytes: file.sizeBytes,
           sortOrder: file.sortOrder,
           mediaOverlayAvailable: file.mediaOverlayAvailable,
         };
@@ -230,6 +240,7 @@ export class BookMoveRepository {
             subtitle: row.subtitle,
             publisher: row.publisher,
             language: row.language,
+            isbn10: row.isbn10,
             isbn13: row.isbn13,
             publishedYear: row.publishedYear,
             seriesName: row.seriesName,
@@ -363,7 +374,7 @@ export class BookMoveRepository {
           .limit(1);
 
         if (duplicate && duplicate.libraryId === input.targetLibraryId) {
-          await tx.delete(books).where(eq(books.id, duplicate.id));
+          await deleteBooksWithHashInvalidation(tx, eq(books.id, duplicate.id));
           mergedBookId = duplicate.id;
         }
       }
@@ -396,6 +407,8 @@ export class BookMoveRepository {
           })
           .where(eq(bookFiles.id, update.fileId));
       }
+
+      await reselectPrimaryFile(tx, input.bookId, input.targetLibraryId);
 
       return { moved: true, mergedBookId };
     });
@@ -493,4 +506,36 @@ export class BookMoveRepository {
       .where(and(inArray(libraries.id, libraryIds), eq(libraries.watch, true)));
     return rows.map((row) => row.id);
   }
+}
+
+/**
+ * Re-picks a moved book's primary by the library it now belongs to (`selectMovedPrimary`). Leaving
+ * the old library's choice in place kept an EPUB primary in a library that ranks audiobooks first,
+ * until something happened to rescan it.
+ */
+async function reselectPrimaryFile(tx: Tx, bookId: number, libraryId: number): Promise<void> {
+  const [library] = await tx
+    .select({ formatPriority: libraries.formatPriority, allowedFormats: libraries.allowedFormats })
+    .from(libraries)
+    .where(eq(libraries.id, libraryId))
+    .limit(1);
+  const [book] = await tx.select({ primaryFileId: books.primaryFileId }).from(books).where(eq(books.id, bookId)).limit(1);
+  if (!library || !book) return;
+  const files = await tx
+    .select({
+      id: bookFiles.id,
+      role: bookFiles.role,
+      format: bookFiles.format,
+      sizeBytes: bookFiles.sizeBytes,
+      sortOrder: bookFiles.sortOrder,
+      mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+    })
+    .from(bookFiles)
+    .where(eq(bookFiles.bookId, bookId));
+  const winner = selectMovedPrimary(files, book.primaryFileId, library);
+  if (!winner) return;
+  await tx
+    .update(books)
+    .set({ primaryFileId: winner.id })
+    .where(and(eq(books.id, bookId), sql`${books.primaryFileId} IS DISTINCT FROM ${winner.id}`));
 }

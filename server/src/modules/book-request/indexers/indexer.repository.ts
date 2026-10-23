@@ -6,13 +6,15 @@ import type { BookRequestSourceStatus, IndexerColor } from '@bookorbit/types';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
-import { requestIndexers, type NewRequestIndexerRow, type RequestIndexerRow } from '../../../db/schema';
+import { requestIndexerManagers, requestIndexers, type NewRequestIndexerRow, type RequestIndexerRow } from '../../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
 export interface IndexerSeedPolicyRow {
   id: number;
   adapterType: string;
+  managerId: number | null;
+  inheritSeedLimits: boolean | null;
   applyTrackerSeedGoals: boolean;
   seedRatioGoal: number | null;
   seedTimeMinutes: number | null;
@@ -46,11 +48,14 @@ export class IndexerRepository {
       .select({
         id: requestIndexers.id,
         adapterType: requestIndexers.adapterType,
+        managerId: requestIndexers.managerId,
+        inheritSeedLimits: requestIndexerManagers.inheritSeedLimits,
         applyTrackerSeedGoals: requestIndexers.applyTrackerSeedGoals,
         seedRatioGoal: requestIndexers.seedRatioGoal,
         seedTimeMinutes: requestIndexers.seedTimeMinutes,
       })
       .from(requestIndexers)
+      .leftJoin(requestIndexerManagers, eq(requestIndexers.managerId, requestIndexerManagers.id))
       .where(eq(requestIndexers.id, id))
       .limit(1);
     return row;

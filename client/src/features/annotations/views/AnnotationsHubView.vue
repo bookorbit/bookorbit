@@ -3,10 +3,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMediaQuery } from '@vueuse/core'
 import { useRouter } from 'vue-router'
+import { Highlighter } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import { downloadFromUrl } from '@/lib/download'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import AnnotationStream from '../components/shared/AnnotationStream.vue'
 import AnnotationEntry from '../components/shared/AnnotationEntry.vue'
 import AnnotationEntryDetail from '../components/shared/AnnotationEntryDetail.vue'
@@ -19,6 +22,7 @@ import type { StreamGroup } from '../lib/stream-groups'
 import { useAnnotationsHub } from '../composables/useAnnotationsHub'
 import { useAnnotationsUrlSync } from '../composables/useAnnotationsUrlSync'
 import { useDensity } from '../composables/useDensity'
+import { annotationSourceKey } from '@/features/annotations/lib/source-label'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -38,6 +42,8 @@ const { density } = useDensity()
 const stacked = useMediaQuery('(max-width: 1535px), (pointer: coarse)')
 const compact = computed(() => density.value === 'compact')
 const activeId = ref<number | null>(null)
+const purgeConfirmId = ref<number | null>(null)
+const purging = ref(false)
 
 const chips = computed(() =>
   buildHubChips(
@@ -81,7 +87,7 @@ const groups = computed<StreamGroup[]>(() =>
     if (group.mode === 'source') {
       return {
         key: group.key,
-        label: t(`annotations.sources.${group.key}`),
+        label: t(annotationSourceKey(group.key)),
         swatch: `var(--pill-${group.key})`,
         count: group.items.length,
         items: group.items,
@@ -147,14 +153,28 @@ async function handleTrash(id: number) {
   }
 }
 
-async function handlePurge(id: number) {
-  const result = await hub.purge(id)
+function handlePurge(id: number) {
+  purgeConfirmId.value = id
+}
+
+function cancelPurge() {
+  purgeConfirmId.value = null
+}
+
+async function confirmPurge() {
+  const id = purgeConfirmId.value
+  if (id === null) return
+  purging.value = true
+  const result = await hub.purge(id).finally(() => {
+    purging.value = false
+    purgeConfirmId.value = null
+  })
   if (result.ok) {
     if (activeId.value === id) activeId.value = null
     toast.success(t('annotations.hub.toast.annotationDeletedForever'))
     return
   }
-  toast.error(result.message ?? t('annotations.hub.toast.failedToDelete'))
+  toast.error(result.pendingDeviceSync ? t('annotations.hub.toast.purgePendingDeviceSync') : t('annotations.hub.toast.failedToDelete'))
 }
 
 async function handleRestore(id: number) {
@@ -207,7 +227,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-4 pt-4 pb-4 xl:h-[calc(100svh-5.25rem)] xl:min-h-0 xl:pb-0">
+  <div class="flex w-full flex-col gap-4 pt-2 pb-4 xl:h-[calc(100svh-1.5rem)] xl:min-h-0 xl:pb-0">
+    <PageTitleRow
+      class="shrink-0"
+      :eyebrow="t('components.sidebar.zones.reading')"
+      :title="t('components.appHeader.annotations')"
+      :icon="Highlighter"
+    />
+
     <div v-if="hub.error.value" role="alert" class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
       {{ t('annotations.hub.loadFailed') }}
     </div>
@@ -317,5 +344,15 @@ onMounted(() => {
         @open-trash="handleOpenTrash"
       />
     </div>
+
+    <ConfirmDialog
+      :open="purgeConfirmId !== null"
+      :title="t('annotations.hub.purgeDialog.title')"
+      :description="t('annotations.hub.purgeDialog.description')"
+      :confirm-label="t('annotations.listItem.deleteForever')"
+      :busy="purging"
+      @confirm="confirmPurge"
+      @cancel="cancelPurge"
+    />
   </div>
 </template>

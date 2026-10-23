@@ -57,7 +57,7 @@ function expectedBucketKey(
     return String(Math.floor(book.publishedYear / step) * step);
   }
   if (field === 'author') return letterOf(book.authorSortName);
-  if (field === 'series') return letterOf(collapsed ? (book.seriesName ?? book.title) : book.seriesName);
+  if (field === 'series') return letterOf(book.seriesName);
   if (field === 'publisher') return letterOf(book.publisher);
   if (collapsed) return letterOf(book.seriesName ?? book.title);
   return letterOf(book.title);
@@ -411,6 +411,25 @@ describe('Jump buckets invariant (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
       expect(expectedBucketKey(seeded!, 'title', true, bucketsResponse.granularity)).toBe(bucket.key);
     }
   });
+
+  for (const dir of dirs) {
+    it(`lists collapsed series stacks before standalone books by title when sorting by series ${dir}`, async () => {
+      const [seriesListing, titleListing] = await Promise.all([
+        fetchListing([{ field: 'series', dir }], true),
+        fetchListing([{ field: 'title', dir }], true),
+      ]);
+      const rows = seriesListing.items.map((item) => seededById.get((item as BookCard).id)!);
+      const firstStandalone = rows.findIndex((row) => row.seriesName === null);
+
+      expect(rows.slice(0, firstStandalone).map((row) => row.seriesName)).toEqual(
+        dir === 'asc' ? ['Dune Saga', 'zeta chronicles'] : ['zeta chronicles', 'Dune Saga'],
+      );
+      expect(rows.slice(firstStandalone).every((row) => row.seriesName === null)).toBe(true);
+      expect(rows.slice(firstStandalone).map((row) => row.id)).toEqual(
+        titleListing.items.map((item) => (item as BookCard).id).filter((id) => seededById.get(id)!.seriesName === null),
+      );
+    });
+  }
 
   it('preserves every populated year when sparse years fit the bounded capacity', async () => {
     const response = await fetchBuckets([{ field: 'publishedYear', dir: 'asc' }], false);

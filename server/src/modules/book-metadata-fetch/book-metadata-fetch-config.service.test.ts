@@ -15,6 +15,7 @@ describe('BookMetadataFetchConfigService', () => {
       },
       insert: vi.fn(),
       update: vi.fn(),
+      select: vi.fn(),
     };
 
     return {
@@ -195,6 +196,41 @@ describe('BookMetadataFetchConfigService', () => {
       override,
       lastRunAt: null,
       lastQueuedCount: null,
+    });
+  });
+
+  it('lists every books library with its effective config, stored override and last run', async () => {
+    const { db, service } = makeService();
+    db.query.appSettings.findFirst.mockResolvedValueOnce({ value: JSON.stringify(DEFAULT_BOOK_METADATA_FETCH_CONFIG) });
+    const builder = { from: vi.fn(), where: vi.fn(), orderBy: vi.fn() };
+    builder.from.mockReturnValue(builder);
+    builder.where.mockReturnValue(builder);
+    builder.orderBy.mockResolvedValue([
+      { id: 2, name: 'Audiobooks', override: null, lastRunAt: null, lastQueuedCount: null },
+      {
+        id: 6,
+        name: 'Comics',
+        override: { conditions: { scoreThreshold: { threshold: 75 } } },
+        lastRunAt: new Date('2026-10-16T12:00:00.000Z'),
+        lastQueuedCount: 10,
+      },
+    ]);
+    db.select.mockReturnValue(builder);
+
+    const entries = await service.listLibraryConfigs();
+
+    expect(entries.map((entry) => [entry.libraryId, entry.libraryName])).toEqual([
+      [2, 'Audiobooks'],
+      [6, 'Comics'],
+    ]);
+    expect(entries[0]).toMatchObject({ override: null, lastRunAt: null, conditions: DEFAULT_BOOK_METADATA_FETCH_CONFIG.conditions });
+    // A partial override replaces only what it names; everything else keeps following the global rule.
+    expect(entries[1]!.conditions.scoreThreshold).toEqual({ enabled: true, threshold: 75 });
+    expect(entries[1]!.conditions.missingFields).toEqual(DEFAULT_BOOK_METADATA_FETCH_CONFIG.conditions.missingFields);
+    expect(entries[1]).toMatchObject({
+      enabled: DEFAULT_BOOK_METADATA_FETCH_CONFIG.enabled,
+      lastRunAt: '2026-10-16T12:00:00.000Z',
+      lastQueuedCount: 10,
     });
   });
 });

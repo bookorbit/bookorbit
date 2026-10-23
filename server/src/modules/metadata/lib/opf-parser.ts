@@ -295,6 +295,15 @@ function getRefineValue(refines: Map<string, unknown[]>, id: string, property: s
   return null;
 }
 
+function getRefineValues(refines: Map<string, unknown[]>, id: string, property: string): string[] {
+  const values: string[] = [];
+  for (const node of refines.get(id) ?? []) {
+    const m = node as Record<string, unknown>;
+    if (m['@_property'] === property) values.push(getText(m));
+  }
+  return values;
+}
+
 export function parseOpf(xml: string): ParsedOpf {
   const root = parser.parse(xml) as Record<string, unknown>;
   const pkg = (root['package'] ?? root['opf:package'] ?? {}) as Record<string, unknown>;
@@ -366,21 +375,21 @@ export function parseOpf(xml: string): ParsedOpf {
 
     const id = mo['@_id'] as string | undefined;
     // EPUB 3: role via refines
-    const role3 = id ? getRefineValue(refineMap, id, 'role') : null;
+    const roles3 = id ? getRefineValues(refineMap, id, 'role') : [];
     // EPUB 2: opf:role attribute
     const role2 = (mo['@_opf:role'] ?? mo['@_role']) as string | undefined;
-    const role = normalizeCreatorRole(role3 ?? role2 ?? defaults.role);
+    const roles = (roles3.length > 0 ? roles3 : [role2 ?? defaults.role]).map(normalizeCreatorRole).filter(Boolean);
 
-    if (NARRATOR_ROLES.has(role)) {
+    if (roles.some((role) => NARRATOR_ROLES.has(role))) {
       const key = name.toLowerCase();
-      if (seenNarrators.has(key)) return;
-      seenNarrators.add(key);
-      narrators.push(name);
-      return;
+      if (!seenNarrators.has(key)) {
+        seenNarrators.add(key);
+        narrators.push(name);
+      }
     }
 
     if (!defaults.allowAuthor) return;
-    if (role !== 'aut' && role !== '') return; // skip editors, illustrators, etc.
+    if (roles.length > 0 && !roles.includes('aut')) return; // skip editors, illustrators, etc.
 
     // EPUB 3: file-as via refines; EPUB 2: opf:file-as attribute
     const sortName = (id ? getRefineValue(refineMap, id, 'file-as') : null) ?? ((mo['@_opf:file-as'] ?? mo['@_file-as'] ?? null) as string | null);

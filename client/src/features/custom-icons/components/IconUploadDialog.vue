@@ -246,7 +246,7 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
                     <p class="truncate text-xs text-muted-foreground" :title="entry.filename">{{ entry.filename }}</p>
                     <button
                       type="button"
-                      class="ml-auto flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       @click="removeEntry(entry)"
                     >
                       <X :size="13" />

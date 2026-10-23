@@ -11,7 +11,9 @@ function makeFile(overrides: Partial<MoveBookFile> & { id: number; absolutePath:
     role: 'content',
     format: 'epub',
     fileHash: null,
+    sizeBytes: 100,
     sortOrder: null,
+    mediaOverlayAvailable: false,
     ...overrides,
   };
 }
@@ -33,6 +35,7 @@ function makeBook(overrides: Partial<MoveBookData> = {}): MoveBookData {
       subtitle: null,
       publisher: null,
       language: null,
+      isbn10: null,
       isbn13: null,
       publishedYear: null,
       seriesName: null,
@@ -51,6 +54,7 @@ function makeTarget(overrides: Partial<MoveTargetLibrary> = {}): MoveTargetLibra
     organizationMode: 'book_per_folder',
     fileNamingPattern: PATTERN_PER_FOLDER,
     allowedFormats: [],
+    formatPriority: ['epub', 'm4b'],
     folderId: 22,
     folderPath: '/libB',
     watch: false,
@@ -146,6 +150,16 @@ describe('eligibility', () => {
     expect(expectReady(outcome).targetPath).toBe('/libB/Frank Herbert/Dune.epub');
   });
 
+  it('uses ISBN-10 when the destination naming pattern needs an ISBN', () => {
+    const book = makeBook();
+    book.metadata.isbn10 = '0306406152';
+    const outcome = planner.plan(
+      makeInput({ books: [book], target: makeTarget({ organizationMode: 'book_per_file', fileNamingPattern: '{isbn}' }), pattern: '{isbn}' }),
+    )[0];
+
+    expect(expectReady(outcome).targetPath).toBe('/libB/0306406152.epub');
+  });
+
   it('refuses when no naming pattern is configured', () => {
     expect(expectIneligible(planner.plan(makeInput({ pattern: null }))[0])).toMatchObject({ reason: 'pattern_unresolved' });
   });
@@ -166,6 +180,23 @@ describe('cross-mode layout', () => {
     expect(plan.layoutChange).toBe('wrap_into_folder');
     expect(plan.targetPath).toBe('/libB/Frank Herbert/Dune/Dune.epub');
     expect(plan.targetFolderPathKey).toBe('/libB/Frank Herbert/Dune');
+  });
+
+  it('names and reports the file that will be primary in the target, not the one that was', () => {
+    const books = [
+      makeBook({
+        files: [
+          makeFile({ id: 10, absolutePath: '/libA/Frank Herbert/Dune/Dune.epub' }),
+          makeFile({ id: 11, absolutePath: '/libA/Frank Herbert/Dune/Dune audiobook.m4b', format: 'm4b' }),
+        ],
+        primaryFileId: 10,
+      }),
+    ];
+
+    const plan = expectReady(planner.plan(makeInput({ books, target: makeTarget({ formatPriority: ['m4b', 'epub'] }) }))[0]);
+
+    expect(plan.primaryFormat).toBe('m4b');
+    expect(plan.targetPath).toBe('/libB/Frank Herbert/Dune/Dune.m4b');
   });
 
   it('dissolves a folder book into a single file in a per-file library', () => {

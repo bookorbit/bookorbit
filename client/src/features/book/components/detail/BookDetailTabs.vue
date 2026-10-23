@@ -3,19 +3,20 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { normalizeBookDetailTab, type BookDetailTab } from '@/features/book/lib/book-detail-tabs'
-import { usePermissions } from '@/features/auth/composables/usePermissions'
 
-const props = defineProps<{ bookId: number }>()
+const props = defineProps<{ bookId: number; canEditMetadata?: boolean }>()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const { hasPermission } = usePermissions()
 
-const activeTab = computed(() => normalizeBookDetailTab(route.query.tab))
+const activeTab = computed(() => {
+  const requested = normalizeBookDetailTab(route.query.tab)
+  return requested === 'edit' && !props.canEditMetadata ? 'details' : requested
+})
 
 const tabs = computed<{ label: string; tab: BookDetailTab }[]>(() => {
   const result: { label: string; tab: BookDetailTab }[] = [{ label: t('book.detail.tabs.details'), tab: 'details' }]
-  if (hasPermission('library_edit_metadata')) {
+  if (props.canEditMetadata) {
     result.push({ label: t('book.detail.tabs.editMetadata'), tab: 'edit' })
   }
   result.push({ label: t('book.detail.tabs.files'), tab: 'files' })

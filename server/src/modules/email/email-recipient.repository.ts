@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -35,24 +35,6 @@ export class EmailRecipientRepository {
       .update(emailRecipients)
       .set(values)
       .where(and(eq(emailRecipients.id, id), eq(emailRecipients.userId, userId)))
-      .returning();
-  }
-
-  clearDefault(userId: number) {
-    return this.db
-      .update(emailRecipients)
-      .set({ isDefault: false })
-      .where(and(eq(emailRecipients.userId, userId), eq(emailRecipients.isDefault, true)));
-  }
-
-  setDefault(id: number, userId: number): Promise<EmailRecipientRow[]> {
-    return this.db
-      .update(emailRecipients)
-      .set({
-        isDefault: sql`case when ${emailRecipients.id} = ${id} then true else false end`,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(emailRecipients.userId, userId))
       .returning();
   }
 

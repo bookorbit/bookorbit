@@ -7,7 +7,11 @@ import type { BookRequestItem } from '@bookorbit/types'
  * from the last row back to the first reads as a bug when the count says you are at the end.
  */
 export function useRequestQueue(items: Ref<BookRequestItem[]>, currentId: Ref<number | null>) {
-  const index = computed(() => (currentId.value === null ? -1 : items.value.findIndex((request) => request.id === currentId.value)))
+  // Either half of a pair stands at the pair's place in the list: the drawer can be open on the
+  // audiobook while the row it belongs to is led by the ebook.
+  const index = computed(() =>
+    currentId.value === null ? -1 : items.value.findIndex((request) => request.id === currentId.value || request.companion?.id === currentId.value),
+  )
   const total = computed(() => items.value.length)
 
   /**

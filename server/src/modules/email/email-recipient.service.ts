@@ -1,7 +1,9 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { EmailRecipientRepository } from './email-recipient.repository';
+import { EmailPreferencesRepository } from './email-preferences.repository';
+import { EmailSendLogRepository } from './email-send-log.repository';
 import { EmailTemplateService } from './email-template.service';
 import { CreateEmailRecipientDto } from './dto/create-email-recipient.dto';
 import { UpdateEmailRecipientDto } from './dto/update-email-recipient.dto';
@@ -13,10 +15,15 @@ export class EmailRecipientService {
   constructor(
     private readonly repo: EmailRecipientRepository,
     private readonly templateService: EmailTemplateService,
+    private readonly preferences: EmailPreferencesRepository,
+    private readonly sendLog: EmailSendLogRepository,
   ) {}
 
-  findAll(user: RequestUser) {
-    return this.repo.findAllForUser(user.id);
+  /** Each recipient with the last book sent to it, so the settings page can show what arrived. */
+  async findAll(user: RequestUser) {
+    const [recipients, lastSends] = await Promise.all([this.repo.findAllForUser(user.id), this.sendLog.findLastSendPerRecipient(user.id)]);
+    const lastByRecipient = new Map(lastSends.map(({ recipientId, ...last }) => [recipientId, last]));
+    return recipients.map((recipient) => ({ ...recipient, lastSend: lastByRecipient.get(recipient.id) ?? null }));
   }
 
   async findOne(id: number, user: RequestUser) {
@@ -24,6 +31,7 @@ export class EmailRecipientService {
   }
 
   async create(dto: CreateEmailRecipientDto, user: RequestUser) {
+    if (dto.deviceType === 'kindle' && dto.readAloudDelivery === 'original') throw new BadRequestException({ code: 'KINDLE_ORIGINAL_UNAVAILABLE' });
     await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [created] = await this.repo.insert({
@@ -32,6 +40,7 @@ export class EmailRecipientService {
         email: dto.email,
         deviceType: dto.deviceType ?? null,
         preferredFormat: dto.preferredFormat ?? null,
+        readAloudDelivery: dto.readAloudDelivery ?? null,
         defaultTemplateId: dto.defaultTemplateId ?? null,
       });
       return created;
@@ -44,7 +53,11 @@ export class EmailRecipientService {
   }
 
   async update(id: number, dto: UpdateEmailRecipientDto, user: RequestUser) {
-    await this.getOwnedById(id, user);
+    const current = await this.getOwnedById(id, user);
+    const deviceType = dto.deviceType === undefined ? current.deviceType : dto.deviceType;
+    if (deviceType === 'kindle' && dto.readAloudDelivery === 'original') throw new BadRequestException({ code: 'KINDLE_ORIGINAL_UNAVAILABLE' });
+    if (deviceType === 'kindle' && current.readAloudDelivery === 'original' && dto.readAloudDelivery === undefined)
+      dto.readAloudDelivery = 'audioless_epub';
     await this.validateDefaultTemplate(dto.defaultTemplateId, user);
     try {
       const [updated] = await this.repo.update(id, user.id, dto);
@@ -65,7 +78,8 @@ export class EmailRecipientService {
 
   async setDefault(id: number, user: RequestUser) {
     await this.getOwnedById(id, user);
-    const updated = (await this.repo.setDefault(id, user.id)).find((recipient) => recipient.id === id);
+    await this.preferences.setDefaults(user.id, { defaultRecipientId: id });
+    const [updated] = await this.repo.findById(id);
     if (!updated) throw new NotFoundException('Recipient not found');
     return updated;
   }

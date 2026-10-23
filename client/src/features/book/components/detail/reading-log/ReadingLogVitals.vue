@@ -180,8 +180,9 @@ function handleFinishedCancel() {
 const readerProgress = ref(0)
 const progressLoaded = ref(false)
 
-async function loadProgress() {
-  progressLoaded.value = false
+/** `silent` keeps the current figure on screen while it is reread, so the ring does not blank. */
+async function loadProgress(silent = false) {
+  if (!silent) progressLoaded.value = false
   const bookId = props.book.id
   const hasAudio = props.book.files.some((file) => file.format != null && isAudioFormat(file.format))
   try {
@@ -210,7 +211,15 @@ async function loadProgress() {
   }
 }
 
-watch(() => props.book.id, loadProgress, { immediate: true })
+watch(
+  () => props.book.id,
+  () => loadProgress(),
+  { immediate: true },
+)
+
+// The stored position can move without the book changing, such as a held KOReader position being
+// accepted, so the tab asks for a reread rather than this card watching for it.
+defineExpose({ reloadProgress: () => loadProgress(true) })
 
 // The stored reading position only moves when a reader or a synced device writes it, so a book
 // whose progress was only ever logged by hand has none. Sessions are the other observation of how
@@ -360,6 +369,10 @@ function handleAddSession() {
       </div>
     </div>
 
+    <div v-if="$slots.notice" class="mt-2.5 shrink-0">
+      <slot name="notice" />
+    </div>
+
     <dl class="mt-3 shrink-0">
       <div class="flex h-[26px] items-center gap-2">
         <dt class="text-xs leading-4 text-muted-foreground">{{ t('book.detail.readingLog.vitals.started') }}</dt>
@@ -370,7 +383,7 @@ function handleAddSession() {
             type="date"
             :max="todayDateInput"
             :disabled="savingDates"
-            class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            class="h-6 rounded-xs border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             :aria-label="t('book.detail.readingLog.vitals.editStarted')"
             autofocus
             @blur="handleStartedSave"
@@ -396,7 +409,7 @@ function handleAddSession() {
             type="date"
             :max="todayDateInput"
             :disabled="savingDates"
-            class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            class="h-6 rounded-xs border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             :aria-label="t('book.detail.readingLog.vitals.editFinished')"
             autofocus
             @blur="handleFinishedSave"

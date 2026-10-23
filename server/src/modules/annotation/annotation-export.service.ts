@@ -10,6 +10,15 @@ export interface AnnotationExportResult {
   filename: string;
 }
 
+// Highlight text keeps whatever whitespace the source file had between paragraphs; indentation after
+// "> " would turn a paragraph into a code block.
+function paragraphs(text: string): string[] {
+  return text
+    .split(/\r\n?|\n/)
+    .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
+    .filter((line) => line.length > 0);
+}
+
 @Injectable()
 export class AnnotationExportService {
   export(rows: HubAnnotationRow[], format: AnnotationExportFormat, scopeLabel: string): AnnotationExportResult {
@@ -56,12 +65,12 @@ export class AnnotationExportService {
         currentChapter = chapter;
         if (chapter) lines.push(`### ${chapter}`, '');
       }
-      const quote = row.text
-        .split('\n')
-        .map((line) => `> ${line}`)
-        .join('\n');
-      lines.push(quote);
-      if (row.note) lines.push('', `Note: ${row.note}`);
+      lines.push(
+        paragraphs(row.text)
+          .map((line) => `> ${line}`)
+          .join('\n>\n'),
+      );
+      if (row.note) lines.push('', `Note: ${paragraphs(row.note).join('\n\n')}`);
       lines.push('', `<sub>${row.style}, ${row.color}, ${row.origin}, ${this.highlightedAt(row).toISOString().slice(0, 10)}</sub>`, '');
     }
     return lines.join('\n');

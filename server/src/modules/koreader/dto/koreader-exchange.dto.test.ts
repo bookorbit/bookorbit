@@ -3,7 +3,8 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate, type ValidationError } from 'class-validator';
 
-import { AnnotationExchangeAckDto } from './koreader-exchange.dto';
+import { BookmarkExchangeDto } from './koreader-bookmark-exchange.dto';
+import { AnnotationExchangeAckDto, AnnotationExchangeDto } from './koreader-exchange.dto';
 
 const DEVICE = { deviceId: '40A755B5', deviceModel: 'Emulator', pluginVersion: '0.4.0' };
 const HASH = '5f4dcc3b5aa765d61d8327deb882cf99';
@@ -52,5 +53,28 @@ describe('AnnotationExchangeAckDto', () => {
     const errors = await validate(dto);
 
     expect(failedProperties(errors)).toContain('deleted');
+  });
+});
+
+describe('sidecarState on the exchanges', () => {
+  const book = (extra: Record<string, unknown>) => ({ hash: HASH, keys: [], keysComplete: true, changes: [], ...extra });
+
+  it.each([AnnotationExchangeDto, BookmarkExchangeDto])('stays optional so older plugins keep validating (%o)', async (Dto) => {
+    const errors = await validate(plainToInstance(Dto, { ...DEVICE, books: [book({})] }));
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it.each([AnnotationExchangeDto, BookmarkExchangeDto])('accepts known and new (%o)', async (Dto) => {
+    for (const sidecarState of ['known', 'new']) {
+      const errors = await validate(plainToInstance(Dto, { ...DEVICE, books: [book({ sidecarState })] }));
+      expect(errors).toHaveLength(0);
+    }
+  });
+
+  it.each([AnnotationExchangeDto, BookmarkExchangeDto])('rejects any other value (%o)', async (Dto) => {
+    const errors = await validate(plainToInstance(Dto, { ...DEVICE, books: [book({ sidecarState: 'lost' })] }));
+
+    expect(failedProperties(errors)).toContain('sidecarState');
   });
 });

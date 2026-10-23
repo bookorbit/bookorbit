@@ -154,7 +154,7 @@ function handlePickStyle(style: string) {
         <span class="text-[8.5px] font-bold uppercase tracking-[0.13em] text-muted-foreground">{{ t('annotations.hub.positionAndSync') }}</span>
         <button
           type="button"
-          class="ml-auto grid size-5 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+          class="ml-auto grid size-5 place-items-center rounded-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           :aria-label="t('common.close')"
           @click="handleClose"
         >

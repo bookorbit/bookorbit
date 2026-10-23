@@ -202,6 +202,9 @@ describe('useLibraryCreator', () => {
       fileWriteKindleMaxFileSizeMb: 100,
       fileWriteAudioEnabled: false,
       fileWriteAudioMaxFileSizeMb: 750,
+      fileWriteAllFiles: true,
+      fileWriteReadAlongEnabled: false,
+      fileWriteReadAlongMaxFileSizeMb: 1000,
       fileRenameEnabled: true,
       folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2026-01-01T00:00:00.000Z' }],
       createdAt: '2026-01-01T00:00:00.000Z',
@@ -211,6 +214,42 @@ describe('useLibraryCreator', () => {
     expect(creator.form.fileRenameEnabled).toBe(true)
     expect(creator.form.fileWriteAudioEnabled).toBe(false)
     expect(creator.form.fileWriteAudioMaxFileSizeMb).toBe(750)
+    expect(creator.form.fileWriteAllFiles).toBe(true)
+  })
+
+  it('starts new libraries writing only the primary file, with read-along EPUBs off', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+
+    expect([creator.form.fileWriteAllFiles, creator.form.fileWriteReadAlongEnabled, creator.form.fileWriteReadAlongMaxFileSizeMb]).toEqual([
+      false,
+      false,
+      1000,
+    ])
+  })
+
+  it('hydrates and validates the read-along settings', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    creator.initEdit(makeLibrary({ fileWriteReadAlongEnabled: true, fileWriteReadAlongMaxFileSizeMb: 2500 }))
+
+    expect([creator.form.fileWriteReadAlongEnabled, creator.form.fileWriteReadAlongMaxFileSizeMb]).toEqual([true, 2500])
+    creator.form.fileWriteReadAlongMaxFileSizeMb = 10_001
+    expect(creator.validationErrors.value.fileWrite).toBe('File-size limits must be whole numbers from 1 to 10,000 MB.')
+  })
+
+  it('sends the all-files write scope and keeps it through unrelated edits', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    creator.initEdit(makeLibrary({ id: 4, fileWriteAllFiles: true }))
+    apiMock.mockResolvedValue(jsonResponse(makeLibrary({ id: 4, fileWriteAllFiles: true })))
+
+    creator.form.fileWriteWriteCover = false
+    creator.form.fileWriteAudioEnabled = true
+    creator.form.readingThreshold = 0.5
+    await creator.save()
+
+    expect(JSON.parse(apiMock.mock.calls[0]?.[1]?.body as string)).toMatchObject({ fileWriteAllFiles: true, fileWriteWriteCover: false })
   })
 
   it('creates a library with audio write-back settings in the payload', async () => {
@@ -367,6 +406,9 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     fileWriteKindleMaxFileSizeMb: 100,
     fileWriteAudioEnabled: false,
     fileWriteAudioMaxFileSizeMb: 750,
+    fileWriteAllFiles: false,
+    fileWriteReadAlongEnabled: false,
+    fileWriteReadAlongMaxFileSizeMb: 1000,
     fileRenameEnabled: true,
     folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2026-01-01T00:00:00.000Z' }],
     createdAt: '2026-01-01T00:00:00.000Z',

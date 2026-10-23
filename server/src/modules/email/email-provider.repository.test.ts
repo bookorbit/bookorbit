@@ -1,11 +1,13 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
+  asc: vi.fn((value: unknown) => ({ op: 'asc', value })),
+  desc: vi.fn((value: unknown) => ({ op: 'desc', value })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 
 import { emailProviders } from '../../db/schema';
 import { EmailProviderRepository } from './email-provider.repository';
@@ -20,6 +22,7 @@ describe('EmailProviderRepository', () => {
     };
     selectBuilder.from.mockReturnValue(selectBuilder);
     selectBuilder.where.mockReturnValue(selectBuilder);
+    selectBuilder.orderBy.mockReturnValue(selectBuilder);
 
     const insertBuilder = { values: vi.fn(), returning: vi.fn() };
     insertBuilder.values.mockReturnValue(insertBuilder);
@@ -67,6 +70,25 @@ describe('EmailProviderRepository', () => {
     expect(selectBuilder.limit).toHaveBeenCalledWith(1);
   });
 
+  it('findSharedDefault only returns shared defaults with deterministic precedence', () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new EmailProviderRepository(db as never);
+
+    void repo.findSharedDefault();
+
+    expect(and).toHaveBeenCalledWith(
+      { op: 'eq', left: emailProviders.isShared, right: true },
+      { op: 'eq', left: emailProviders.isDefault, right: true },
+    );
+    expect(desc).toHaveBeenCalledWith(emailProviders.isSystemProvider);
+    expect(asc).toHaveBeenCalledWith(emailProviders.id);
+    expect(selectBuilder.orderBy).toHaveBeenCalledWith(
+      { op: 'desc', value: emailProviders.isSystemProvider },
+      { op: 'asc', value: emailProviders.id },
+    );
+    expect(selectBuilder.limit).toHaveBeenCalledWith(1);
+  });
+
   it('insert forwards values and returns inserted row', () => {
     const { db, insertBuilder } = makeDb();
     insertBuilder.returning.mockResolvedValue([{ id: 5 }]);
@@ -103,40 +125,6 @@ describe('EmailProviderRepository', () => {
     expect(and).toHaveBeenCalledWith({ op: 'eq', left: emailProviders.id, right: 8 }, { op: 'eq', left: emailProviders.userId, right: 21 });
     expect(updateBuilder.returning).toHaveBeenCalled();
     expect(sql).toHaveBeenCalled();
-  });
-
-  it('clearDefault only clears current owners default rows', () => {
-    const { db, updateBuilder } = makeDb();
-    const repo = new EmailProviderRepository(db as never);
-
-    void repo.clearDefault(4);
-
-    expect(db.update).toHaveBeenCalledWith(emailProviders);
-    expect(updateBuilder.set).toHaveBeenCalledWith({ isDefault: false });
-    expect(updateBuilder.where).toHaveBeenCalledWith({
-      op: 'and',
-      clauses: [
-        { op: 'eq', left: emailProviders.userId, right: 4 },
-        { op: 'eq', left: emailProviders.isDefault, right: true },
-      ],
-    });
-  });
-
-  it('setDefault atomically flips defaults within the owner scope and returns updated rows', () => {
-    const { db, updateBuilder } = makeDb();
-    const repo = new EmailProviderRepository(db as never);
-
-    void repo.setDefault(9, 4);
-
-    expect(db.update).toHaveBeenCalledWith(emailProviders);
-    expect(updateBuilder.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isDefault: expect.objectContaining({ op: 'sql', text: 'case when  =  then true else false end' }),
-        updatedAt: expect.objectContaining({ op: 'sql', text: 'now()' }),
-      }),
-    );
-    expect(updateBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: emailProviders.userId, right: 4 });
-    expect(updateBuilder.returning).toHaveBeenCalled();
   });
 
   it('setSharedByOwner restricts by owner id', () => {

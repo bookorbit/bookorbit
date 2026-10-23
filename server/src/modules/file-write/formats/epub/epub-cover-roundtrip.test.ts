@@ -1,4 +1,5 @@
 import { ZipArchive } from 'archiver';
+import { randomBytes } from 'crypto';
 import { createWriteStream } from 'fs';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -26,7 +27,11 @@ afterEach(async () => {
   await rm(testRoot, { recursive: true, force: true });
 });
 
-async function writeArchive(filePath: string, opfXml: string, entries: Array<{ path: string; content: string | Buffer }>): Promise<void> {
+async function writeArchive(
+  filePath: string,
+  opfXml: string,
+  entries: Array<{ path: string; content: string | Buffer; store?: boolean }>,
+): Promise<void> {
   const output = createWriteStream(filePath);
   const archive = new ZipArchive({ zlib: { level: 6 } });
 
@@ -38,7 +43,7 @@ async function writeArchive(filePath: string, opfXml: string, entries: Array<{ p
     archive.append(Buffer.from('application/epub+zip'), { name: 'mimetype', store: true });
     archive.append(Buffer.from(containerXml), { name: 'META-INF/container.xml' });
     archive.append(Buffer.from(opfXml), { name: 'OPS/content.opf' });
-    for (const entry of entries) archive.append(entry.content, { name: entry.path });
+    for (const entry of entries) archive.append(entry.content, { name: entry.path, store: entry.store });
     void archive.finalize();
   });
 }
@@ -221,5 +226,169 @@ describe('EPUB cover write round trip', () => {
       '@_href': 'images/cover.png',
       '@_media-type': 'image/png',
     });
+  });
+});
+
+describe('EPUB metadata write round trip', () => {
+  it('preserves original entry compression and content across repeated metadata saves', async () => {
+    const filePath = join(testRoot, 'image-heavy.epub');
+    const opf = `
+      <package version="3.0" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:identifier id="uid">urn:test:image-heavy</dc:identifier>
+          <dc:title>Old title</dc:title>
+          <dc:language>en</dc:language>
+        </metadata>
+        <manifest>
+          <item id="image" href="images/page.JPG" media-type="image/jpeg" />
+          <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+        </manifest>
+        <spine><itemref idref="chapter" /></spine>
+      </package>`;
+    const image = await sharp(randomBytes(256 * 256 * 3), { raw: { width: 256, height: 256, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    const compressible = Buffer.alloc(100_000);
+    const chapter = `<html><body>${'chapter text '.repeat(1000)}</body></html>`;
+    await writeArchive(filePath, opf, [
+      { path: 'OPS/images/page.JPG', content: image, store: true },
+      { path: 'OPS/images/mislabeled.png', content: compressible },
+      { path: 'OPS/chapter.xhtml', content: chapter },
+    ]);
+
+    for (const title of ['First title', 'Second title']) {
+      const result = await new EpubFormatWriter().write(filePath, { title }, { fieldMask: new Set(['title']), dryRun: false });
+      expect(result.status).toBe('success');
+      const zip = await unzipper.Open.file(filePath);
+      const byPath = new Map(zip.files.map((entry) => [entry.path, entry]));
+      expect(zip.files[0]!.path).toBe('mimetype');
+      expect(zip.files[0]!.compressionMethod).toBe(0);
+      expect(byPath.get('OPS/images/page.JPG')!.compressionMethod).toBe(0);
+      expect(byPath.get('OPS/images/mislabeled.png')!.compressionMethod).toBe(8);
+      expect(byPath.get('OPS/chapter.xhtml')!.compressionMethod).toBe(8);
+      expect(byPath.get('OPS/content.opf')!.compressionMethod).toBe(8);
+      await expect(byPath.get('OPS/images/page.JPG')!.buffer()).resolves.toEqual(image);
+      await expect(byPath.get('OPS/images/mislabeled.png')!.buffer()).resolves.toEqual(compressible);
+      await expect(byPath.get('OPS/chapter.xhtml')!.buffer()).resolves.toEqual(Buffer.from(chapter));
+      const pkg = objectParser.parse((await byPath.get('OPS/content.opf')!.buffer()).toString()).package;
+      expect(pkg.metadata.title['#text']).toBe(title);
+    }
+  });
+
+  async function listEntryPaths(filePath: string): Promise<string[]> {
+    const zip = await unzipper.Open.file(filePath);
+    return zip.files.map((entry) => entry.path).sort();
+  }
+
+  async function readMetas(filePath: string): Promise<Array<Record<string, string>>> {
+    const pkg = objectParser.parse((await readArchiveEntry(filePath, 'OPS/content.opf')).toString()).package;
+    return asArray<Record<string, string>>(pkg.metadata.meta);
+  }
+
+  it('keeps one ISBN-10 entry in a package bound to a foreign OPF prefix across consecutive saves', async () => {
+    const filePath = join(testRoot, 'foreign-prefix.epub');
+    const opf = `
+      <ns0:package version="2.0" unique-identifier="uid" xmlns:ns0="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <ns0:metadata>
+          <dc:identifier id="uid">urn:test:foreign-prefix</dc:identifier>
+          <dc:title>Old title</dc:title>
+          <dc:language>pt</dc:language>
+          <ns0:meta name="cover" content="cover" />
+        </ns0:metadata>
+        <ns0:manifest>
+          <ns0:item id="cover" href="images/cover.jpg" media-type="image/jpeg" />
+          <ns0:item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+        </ns0:manifest>
+        <ns0:spine><ns0:itemref idref="chapter" /></ns0:spine>
+      </ns0:package>`;
+    const cover = await makeCover('jpeg', { r: 30, g: 60, b: 90 });
+    await writeArchive(filePath, opf, [
+      { path: 'OPS/images/cover.jpg', content: await makeCover('jpeg', { r: 200, g: 20, b: 20 }) },
+      { path: 'OPS/chapter.xhtml', content: '<html><body>chapter</body></html>' },
+    ]);
+    const entryPaths = await listEntryPaths(filePath);
+
+    const titleFix = { title: 'Titulo', language: 'pt', isbn10: '9722623702', coverBytes: cover };
+    const authorFix = { ...titleFix, authors: [{ name: 'Autor', sortName: null }] };
+    const descriptionFix = { ...authorFix, description: 'Sinopse' };
+
+    for (const payload of [titleFix, authorFix, descriptionFix]) {
+      const result = await new EpubFormatWriter().write(filePath, payload, {
+        fieldMask: new Set(['title', 'language', 'isbn10', 'authors', 'description', 'coverBytes']),
+        dryRun: false,
+      });
+
+      expect(result.status).toBe('success');
+      const metas = await readMetas(filePath);
+      expect(metas.filter((meta) => meta['@_name'] === 'bookorbit:isbn10')).toEqual([{ '@_name': 'bookorbit:isbn10', '@_content': '9722623702' }]);
+      expect(metas.filter((meta) => meta['@_name'] === 'cover')).toEqual([{ '@_name': 'cover', '@_content': 'cover' }]);
+    }
+
+    await expect(listEntryPaths(filePath)).resolves.toEqual(entryPaths);
+    await expect(readArchiveEntry(filePath, 'OPS/images/cover.jpg')).resolves.toEqual(cover);
+  });
+
+  it('keeps one title refinement in an EPUB 3 package across consecutive saves', async () => {
+    const filePath = join(testRoot, 'epub3-repeated.epub');
+    const opf = `
+      <package version="3.0" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:identifier id="uid">urn:test:epub3-repeated</dc:identifier>
+          <dc:title>Old title</dc:title>
+          <dc:language>en</dc:language>
+          <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+        </metadata>
+        <manifest>
+          <item id="cover" href="images/cover.png" media-type="image/png" properties="cover-image" />
+          <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+        </manifest>
+        <spine><itemref idref="chapter" /></spine>
+      </package>`;
+    const cover = await makeCover('png', { r: 30, g: 60, b: 90 });
+    await writeArchive(filePath, opf, [
+      { path: 'OPS/images/cover.png', content: await makeCover('png', { r: 200, g: 20, b: 20 }) },
+      { path: 'OPS/chapter.xhtml', content: '<html><body>chapter</body></html>' },
+    ]);
+
+    for (const title of ['First title', 'Second title', 'Third title']) {
+      await new EpubFormatWriter().write(filePath, { title, coverBytes: cover }, { fieldMask: new Set(['title', 'coverBytes']), dryRun: false });
+
+      const metas = await readMetas(filePath);
+      expect(metas.filter((meta) => meta['@_property'] === 'title-type')).toEqual([
+        { '#text': 'main', '@_refines': '#t-main', '@_property': 'title-type' },
+      ]);
+      expect(metas.filter((meta) => meta['@_property'] === 'dcterms:modified')).toHaveLength(1);
+    }
+  });
+
+  it('leaves the unique identifier and other untouched text as written when a cover is injected', async () => {
+    const filePath = join(testRoot, 'untouched-text.epub');
+    const opf = `
+      <package version="3.0" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:identifier id="uid">0441172717</dc:identifier>
+          <meta refines="#uid" property="identifier-type" scheme="onix:codelist5">02</meta>
+          <dc:title>Old title</dc:title>
+          <dc:language>en</dc:language>
+          <dc:rights>&#169; 2020 Caf&#xE9; &amp; Bar</dc:rights>
+          <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+        </metadata>
+        <manifest>
+          <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+        </manifest>
+        <spine><itemref idref="chapter" /></spine>
+      </package>`;
+    await writeArchive(filePath, opf, [{ path: 'OPS/chapter.xhtml', content: '<html><body>chapter</body></html>' }]);
+    const cover = await makeCover('webp', { r: 30, g: 60, b: 90 });
+
+    for (const title of ['First title', 'Second title']) {
+      await new EpubFormatWriter().write(filePath, { title, coverBytes: cover }, { fieldMask: new Set(['title', 'coverBytes']), dryRun: false });
+
+      const written = (await readArchiveEntry(filePath, 'OPS/content.opf')).toString();
+      expect(written).toContain('<dc:identifier id="uid">0441172717</dc:identifier>');
+      expect(written).toContain('<meta refines="#uid" property="identifier-type" scheme="onix:codelist5">02</meta>');
+      expect(written).toContain('<dc:rights>© 2020 Café &amp; Bar</dc:rights>');
+    }
+    await expect(readArchiveEntry(filePath, 'OPS/images/bookorbit-cover.webp')).resolves.toEqual(cover);
   });
 });

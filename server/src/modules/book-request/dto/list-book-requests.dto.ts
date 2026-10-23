@@ -52,6 +52,16 @@ export class ListBookRequestsDto {
   @IsOptional()
   @IsIn(BOOK_REQUEST_SORT_DIRECTIONS)
   sortDir?: BookRequestSortDirection;
+
+  /**
+   * One entry per ebook and audiobook pair, led by the ebook half with the audiobook embedded as
+   * its companion, rather than one entry per request. Opt-in, because a client that keys its rows
+   * by request id needs every request as an entry of its own.
+   */
+  @IsOptional()
+  @Transform(({ value }) => (value === true || value === 'true' ? true : value === false || value === 'false' ? false : value))
+  @IsBoolean()
+  groupPairs?: boolean;
 }
 
 /**

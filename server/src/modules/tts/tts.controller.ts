@@ -13,10 +13,26 @@ import { TtsService } from './tts.service';
 export class TtsController {
   constructor(private readonly ttsService: TtsService) {}
 
+  /**
+   * A reader that skips ahead or changes voice drops the request, and the provider call is cancelled
+   * with it. Not `request.signal`: Fastify aborts that once the request body has been read.
+   */
   @Post('synthesize')
   async synthesize(@Body() dto: SynthesizeDto, @Res() reply: FastifyReply) {
-    const buffer = await this.ttsService.synthesize(dto);
-    void reply.header('Content-Type', ttsContentType(dto.format)).header('Content-Length', buffer.length).send(buffer);
+    const disconnected = new AbortController();
+    const handleClose = () => {
+      if (!reply.raw.writableEnded) disconnected.abort();
+    };
+    reply.raw.on('close', handleClose);
+    try {
+      const buffer = await this.ttsService.synthesize(dto, disconnected.signal);
+      void reply.header('Content-Type', ttsContentType(dto.format)).header('Content-Length', buffer.length).send(buffer);
+    } catch (err) {
+      if (disconnected.signal.aborted) return;
+      throw err;
+    } finally {
+      reply.raw.off('close', handleClose);
+    }
   }
 
   /**

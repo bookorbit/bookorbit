@@ -342,6 +342,16 @@ export function toDate(value: string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+// user_book_status rejects a finish before its start, and sources produce one: Audiobookshelf
+// reports a progress row's creation time as its start while clients set the finish date freely.
+// The finish date is the one readers care about, so it is kept and the start dropped.
+export function toReadingDates(startedAt: string | null, finishedAt: string | null): { startedAt: Date | null; finishedAt: Date | null } {
+  const started = toDate(startedAt);
+  const finished = toDate(finishedAt);
+  if (started && finished && finished.getTime() < started.getTime()) return { startedAt: null, finishedAt: finished };
+  return { startedAt: started, finishedAt: finished };
+}
+
 export function clampPercent(value: number | null): number {
   if (value == null || !Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));

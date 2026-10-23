@@ -190,6 +190,30 @@ describe('useFoliate.open', () => {
     expect(foliate.isFixedLayout.value).toBe(false)
   })
 
+  it('makes publisher font sizes in a reflowable EPUB follow the reader text size', async () => {
+    const book = { type: 'book', rendition: { layout: 'reflowable' }, transformTarget: new EventTarget() }
+    ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce(book)
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    const detail = { data: 'body { font-size: medium }' }
+    book.transformTarget.dispatchEvent(new CustomEvent('css', { detail }))
+    expect(detail.data).toBe('body { font-size: var(--bookorbit-font-medium, medium) }')
+  })
+
+  it('leaves publisher font sizes in a fixed-layout EPUB alone', async () => {
+    const book = { type: 'book', rendition: { layout: 'pre-paginated' }, transformTarget: new EventTarget() }
+    ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce(book)
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    const detail = { data: 'body { font-size: medium }' }
+    book.transformTarget.dispatchEvent(new CustomEvent('css', { detail }))
+    expect(detail.data).toBe('body { font-size: medium }')
+  })
+
   it('tracks whether the opened EPUB is fixed-layout', async () => {
     const book = { type: 'book', rendition: { layout: 'pre-paginated', spread: 'auto' } }
     ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce(book)
@@ -306,7 +330,7 @@ describe('useFoliate.open', () => {
     expect(inputMock.suppressNextTapNavigation.mock.invocationCallOrder[0]!).toBeLessThan(onAnnotationClick.mock.invocationCallOrder[0]!)
   })
 
-  it('prefers media-overlay fragment when requested', async () => {
+  it('restores the reading CFI before an older narration fragment', async () => {
     const foliate = useFoliate(() => container)
 
     await foliate.open(1, 1, 'epub', {
@@ -314,11 +338,93 @@ describe('useFoliate.open', () => {
       fallbackFraction: 0.75,
       mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
       mediaOverlaySectionIndex: 2,
-      preferMediaOverlay: true,
     })
 
-    expect(mockGoTo).toHaveBeenCalledWith('OPS/ch1.xhtml#s12')
-    expect(mockGoTo).not.toHaveBeenCalledWith('epubcfi(/6/4!)')
+    expect(mockGoTo).toHaveBeenCalledExactlyOnceWith('epubcfi(/6/4!)')
     expect(mockGoToFraction).not.toHaveBeenCalled()
+  })
+
+  it('restores the reading fraction when its CFI cannot be resolved, retaining narration as a fallback', async () => {
+    mockGoTo.mockResolvedValueOnce(undefined)
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', {
+      cfi: 'epubcfi(/bad)',
+      fallbackFraction: 0.75,
+      mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+      mediaOverlaySectionIndex: 2,
+    })
+
+    expect(mockGoTo).toHaveBeenCalledExactlyOnceWith('epubcfi(/bad)')
+    expect(mockGoToFraction).toHaveBeenCalledExactlyOnceWith(0.75)
+  })
+
+  it.each([0, 0.75])('opens an explicit reading checkpoint at fraction %s rather than narration', async (fraction) => {
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', {
+      fallbackFraction: fraction,
+      mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+      mediaOverlaySectionIndex: 2,
+    })
+
+    expect(mockGoTo).not.toHaveBeenCalledWith('OPS/ch1.xhtml#s12')
+    expect(mockGoTo.mock.calls).toEqual(fraction === 0 ? [[0]] : [])
+    expect(mockGoToFraction.mock.calls).toEqual(fraction === 0 ? [] : [[fraction]])
+  })
+
+  it('restores fixed-layout reading progress before a narration fragment', async () => {
+    ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce({
+      rendition: { layout: 'pre-paginated' },
+    })
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', {
+      cfi: 'epubcfi(/6/4!)',
+      fallbackFraction: 0.75,
+      mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+    })
+
+    expect(mockGoTo).not.toHaveBeenCalled()
+    expect(mockGoToFraction).toHaveBeenCalledExactlyOnceWith(0.75)
+  })
+
+  it('falls back to narration when there is no saved reading position', async () => {
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', {
+      mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+      mediaOverlaySectionIndex: 2,
+    })
+
+    expect(mockGoTo).toHaveBeenCalledExactlyOnceWith('OPS/ch1.xhtml#s12')
+  })
+
+  it('falls back to narration when both reading targets fail', async () => {
+    mockGoTo.mockRejectedValueOnce(new Error('invalid CFI'))
+    mockGoToFraction.mockRejectedValueOnce(new Error('invalid fraction'))
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', {
+      cfi: 'epubcfi(/bad)',
+      fallbackFraction: 0.75,
+      mediaOverlayFragment: 'OPS/ch1.xhtml#s12',
+      mediaOverlaySectionIndex: 2,
+    })
+
+    expect(mockGoTo.mock.calls).toEqual([['epubcfi(/bad)'], ['OPS/ch1.xhtml#s12']])
+    expect(mockGoToFraction).toHaveBeenCalledWith(0.75)
+  })
+
+  it('falls back to the narration section when its fragment fails', async () => {
+    mockGoTo.mockResolvedValueOnce(undefined)
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', {
+      mediaOverlayFragment: 'OPS/ch1.xhtml#missing',
+      mediaOverlaySectionIndex: 2,
+    })
+
+    expect(mockGoTo.mock.calls).toEqual([['OPS/ch1.xhtml#missing'], [2]])
   })
 })

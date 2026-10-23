@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { expect, vi } from 'vitest';
 import fastifyCookie from '@fastify/cookie';
+import fastifyMultipart from '@fastify/multipart';
 import { count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { hash } from 'bcryptjs';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -113,9 +114,10 @@ export interface E2EContext {
 
 /**
  * Scans write and prune covers under APP_DATA_PATH, which `.env` points at the developer's own
- * data folder. Suites that scan and do not set their own path pass `isolateAppData`.
+ * data folder. Suites that scan and do not set their own path pass `isolateAppData`. Suites that
+ * upload files pass `multipart`, which `main.ts` registers for the real server.
  */
-export async function createE2EContext(options: { isolateAppData?: boolean } = {}): Promise<E2EContext> {
+export async function createE2EContext(options: { isolateAppData?: boolean; multipart?: boolean } = {}): Promise<E2EContext> {
   let isolatedAppData: E2EContext['isolatedAppData'] = null;
   if (options.isolateAppData) {
     isolatedAppData = { path: await mkdtemp(join(tmpdir(), 'bookorbit-e2e-data-')), previous: process.env.APP_DATA_PATH };
@@ -139,6 +141,7 @@ export async function createE2EContext(options: { isolateAppData?: boolean } = {
   );
   app.useGlobalFilters(new GlobalExceptionFilter());
   await app.register(fastifyCookie as never);
+  if (options.multipart) await app.register(fastifyMultipart as never);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 

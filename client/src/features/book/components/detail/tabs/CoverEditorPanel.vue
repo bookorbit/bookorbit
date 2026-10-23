@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onUnmounted, reactive, ref, useId, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Image, ImagePlus, Link, Loader2, Lock, LockOpen, Maximize2, RotateCcw, Search, Upload } from '@lucide/vue'
 import type { BookDetail, BookMetadataLockField, CoverMedium } from '@bookorbit/types'
@@ -7,7 +7,7 @@ import { hideOnError } from '../../../lib/metadata-fetch'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
-import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
+import { useBookCoverAspectRatio } from '../../../composables/useBookCoverAspectRatio'
 import { coverFieldMedium, coverLockField, coverTileState, editorTiles } from '../../../lib/cover-slots'
 import { nextRovingIndex } from '@/lib/roving-index'
 import BookCoverLightbox from '@/features/book/components/BookCoverLightbox.vue'
@@ -23,7 +23,7 @@ const emit = defineEmits<{ coverChanged: [medium: CoverMedium | null]; toggleLoc
 const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
 const { hasPermission } = usePermissions()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const coverAspectRatio = useBookCoverAspectRatio(() => props.book)
 
 const bookIdRef = computed(() => props.book.id)
 // One editor per slot, so a pending image on one tile survives selecting the other.

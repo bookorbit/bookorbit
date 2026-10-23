@@ -99,7 +99,7 @@ const ACCENT_META_BY_ID: Record<Accent, AccentMetaDefinition> = {
   blush: { label: 'Blush', tone: 'pastel', hue: 328, primary: [0.68, 0.13, 0.81, 0.12] },
 }
 
-export const DEFAULT_ACCENT: Accent = 'blue'
+export const DEFAULT_ACCENT: Accent = 'teal'
 
 export function resolveAccent(accent: string | null | undefined): Accent {
   if (!accent) return DEFAULT_ACCENT

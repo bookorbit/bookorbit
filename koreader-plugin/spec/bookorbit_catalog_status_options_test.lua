@@ -1,7 +1,5 @@
--- The read status dialog is the only place a device can undo its own status
--- write, so it has to offer Unread and mark it as current. A book with no
--- status row comes back from the catalog with readStatus nil, which the detail
--- header already renders as Unread, so the marker has to fold nil in too.
+-- The detail page's status sheet is the only place a device can undo its own
+-- status write, so Unread has to be among the statuses a device may set.
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;koreader-plugin/spec/?.lua;" .. package.path
 
@@ -68,16 +66,9 @@ package.loaded["ffi/util"] = {
     end,
 }
 package.loaded["gettext"] = setmetatable({}, { __call = function(_, value) return value end })
-local widget_stub = stubWidget()
-package.loaded["bookorbit_catalog_widgets"] = {
-    buildCoverWidget = function() return widget_stub:new() end,
-    buildDetailPill = function() return widget_stub:new() end,
-    buildDetailProgressBar = function() return widget_stub:new() end,
-    detailRatingStarWidth = function() return 20 end,
-    DetailRelatedCard = stubWidget(),
-    DetailTabButton = stubWidget(),
-    DetailRatingStar = stubWidget(),
-}
+package.loaded["bookorbit_catalog_widgets"] = { focusable = identity }
+-- The page itself is drawn by bookorbit_detail_view; the dialog never touches it.
+package.loaded["bookorbit_detail_view"] = {}
 
 local CatalogUtil = require("bookorbit_catalog_util")
 local CatalogDetail = require("bookorbit_catalog_detail")
@@ -106,40 +97,5 @@ assertEqual(settable.abandoned ~= nil, true, "abandoned stays settable")
 assertEqual(settable.rereading, nil, "rereading is server-derived, not device-settable")
 assertEqual(settable.skimmed, nil, "skimmed is not offered on the device")
 assertEqual(#CatalogUtil.SETTABLE_READ_STATUSES, 6, "no other status leaked into the dialog")
-
--- Status dialog
-
-local applied = {}
-local menu = setmetatable({}, { __index = CatalogDetail })
-function menu:applyReadStatus(detail, status)
-    table.insert(applied, { id = detail.id, status = status })
-end
-
-local function rowFor(label)
-    for _, row in ipairs(last_dialog.buttons) do
-        local button = row[1]
-        if button.text == label or button.text == label .. " *" then return button end
-    end
-end
-
-local function isMarked(label)
-    local button = rowFor(label)
-    return button ~= nil and button.text == label .. " *"
-end
-
-menu:showSetStatusDialog({ id = 1, readStatus = nil })
-assertEqual(rowFor("Unread") ~= nil, true, "the dialog offers the unread reset")
-assertEqual(isMarked("Unread"), true, "a book with no status row shows Unread as current")
-assertEqual(isMarked("Read"), false, "no other status is marked current")
-
-menu:showSetStatusDialog({ id = 2, readStatus = "read" })
-assertEqual(isMarked("Read"), true, "a finished book marks Read as current")
-assertEqual(isMarked("Unread"), false, "a finished book does not also mark Unread")
-
-menu:showSetStatusDialog({ id = 3, readStatus = "reading" })
-rowFor("Unread").callback()
-assertEqual(#applied, 1, "tapping the reset issues exactly one write")
-assertEqual(applied[1].id, 3, "the reset targets the open book")
-assertEqual(applied[1].status, "unread", "the reset sends the unread status the plugin API now accepts")
 
 print("bookorbit_catalog_status_options_test.lua: ok")

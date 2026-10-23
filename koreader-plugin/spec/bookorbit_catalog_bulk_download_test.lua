@@ -104,9 +104,9 @@ package.loaded["util"] = {
         return true
     end,
 }
-package.loaded["gettext"] = function(text)
-    return text
-end
+package.loaded["gettext"] = setmetatable({
+    ngettext = function(one, many, count) return count == 1 and one or many end,
+}, { __call = function(_, text) return text end })
 package.loaded["bookorbit_catalog_util"] = {
     cloneParams = function(value)
         local copy = {}
@@ -123,6 +123,9 @@ package.loaded["bookorbit_catalog_util"] = {
         return "book"
     end,
     shortText = function(value)
+        return value
+    end,
+    shortPath = function(value)
         return value
     end,
 }
@@ -157,6 +160,38 @@ package.loaded["bookorbit_download_transfer"] = {
     end,
 }
 
+-- The bulk sheet, choice sheets and pills are drawn elsewhere; here they
+-- record what they were given. A run's summary reads as "label: value"
+-- lines, the way it is laid out on the sheet.
+local plans, choices = {}, {}
+local function summaryText(summary)
+    local lines = { summary.title }
+    for _, row in ipairs(summary.rows) do table.insert(lines, row.label .. ": " .. tostring(row.value)) end
+    for _, note in ipairs(summary.notes) do table.insert(lines, note) end
+    return table.concat(lines, "\n")
+end
+package.loaded["bookorbit_bulk_sheet"] = {
+    openPlan = function(_, plan)
+        table.insert(plans, plan)
+        return plan
+    end,
+    openProgress = function()
+        local sheet = {}
+        function sheet:update() end
+        function sheet:close() self.closed = true end
+        function sheet:finished(summary) shown_widget = { title = summaryText(summary), summary = summary } end
+        return sheet
+    end,
+}
+package.loaded["bookorbit_dialog_ui"] = {
+    choose = function(o) table.insert(choices, o) end,
+    actions = function(o) shown_widget = { actions = o } end,
+}
+package.loaded["bookorbit_toast"] = {
+    show = function(text) shown_widget = { text = text } end,
+    error = function(text) shown_widget = { text = text } end,
+}
+
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
 local BulkDownload = require("bookorbit_catalog_bulk_download")
@@ -170,6 +205,12 @@ CatalogDownload.install(Catalog)
 -- test can drive each step deterministically.
 function Catalog:runOffThread(fn)
     return fn()
+end
+function Catalog:fetch(_, fn)
+    return fn()
+end
+function Catalog:persistSetting(key, value)
+    self.settings[key] = value
 end
 
 local function assertEqual(actual, expected, label)
@@ -311,6 +352,20 @@ local function manifestBook(id, hash)
     }
 end
 
+resetRun()
+Catalog.current_context = { kind = "books", title = "Books", total = 2, params = {} }
+Catalog.bulk_select_all = true
+assertEqual(Catalog:bulkSelectedCount(), 2, "All count follows the current scope")
+Catalog:bulkClearSelectedBooks(false)
+assertEqual(Catalog.bulk_select_all, false, "Clear resets All selection")
+Catalog.bulk_select_all = true
+Catalog:bulkClearSelection(false)
+assertEqual(Catalog.bulk_select_all, false, "Exit resets All selection")
+Catalog.current_context = nil
+
+assertEqual(Catalog:bulkDownloadLabel(1), "Download 1 book", "a single book uses singular copy")
+assertEqual(Catalog:bulkDownloadLabel(3), "Download 3 books", "more than one uses plural copy")
+
 -- A manifest run pages through cursors and never issues a detail or match
 -- request: the manifest hash is the digest local match state keys on.
 resetRun()
@@ -385,11 +440,12 @@ resetRun()
 files["/downloads/Books/Book1.epub"] = { size = 1001 }
 hashes["/downloads/Books/Book1.epub"] = "hash1001"
 checkpoint_store.record = {
-    source_key = "filter|sort=title",
+    source_key = "https://books.example.com/api/v1|reader|nil|filter|sort=title",
     cursor = "cursor-2",
     manifest_version = "lib-v1",
     completed = { ["1"] = "/downloads/Books/Book1.epub" },
-    counts = { downloaded = 4 },
+    counts = { downloaded = 4, linked = 4 },
+    linked_paths = { ["/downloads/Books/Book1.epub"] = true },
     failures = {},
     processed = 4,
 }
@@ -407,6 +463,8 @@ Catalog.client = makeClient{
 Catalog:startBulkSource{ kind = "filter", label = "All", total = 6, params = { sort = "title" } }
 drain()
 assertEqual(#transfers, 1, "a validated published file is not transferred again")
+assertEqual(shown_widget.title:find("Linked for sync: 5", 1, true) ~= nil, true,
+    "relinking a checkpoint file does not count it twice")
 assertEqual(transfers[1], "/downloads/Books/Book2.epub", "only the unfinished book transfers")
 assertEqual(#link_batches, 1, "the resumed run still links in one batch")
 assertEqual(#link_batches[1], 2, "the validated file is linked alongside the new one")
@@ -417,7 +475,7 @@ files["/downloads/Books/Book2.epub"] = nil
 -- page, so the resumed run cannot skip the books it had not reached yet.
 resetRun()
 checkpoint_store.record = {
-    source_key = "filter|sort=title",
+    source_key = "https://books.example.com/api/v1|reader|nil|filter|sort=title",
     cursor = "cursor-A",
     manifest_version = "lib-v1",
     completed = {},
@@ -452,7 +510,7 @@ assertEqual(checkpoint_store.record.completed["2"], nil, "an unreached book is n
 
 -- A stale checkpoint from another source never resumes into the wrong run.
 resetRun()
-checkpoint_store.record = { source_key = "filter|sort=author", cursor = "other", completed = {} }
+checkpoint_store.record = { source_key = "https://books.example.com/api/v1|reader|nil|filter|sort=author", cursor = "other", completed = {} }
 Catalog.client = makeClient{
     capabilities = { "catalogBulkManifest" },
     manifest = function(params)
@@ -558,7 +616,7 @@ Catalog:startBulkSource{ kind = "filter", label = "Everything", total = large_pa
 drain(large_pages * 100 + large_pages + 100)
 assertEqual(Catalog.bulk_ctx, nil, "the large run completes")
 assertEqual(calls.manifest, large_pages, "every cursor page is requested")
-assertEqual(shown_widget.title:find("Skipped on device: 21000", 1, true) ~= nil, true, "the run processed 21000 books")
+assertEqual(shown_widget.title:find("Already on this device: 21000", 1, true) ~= nil, true, "the run processed 21000 books")
 Catalog.isOnDevice = function() return false end
 
 -- Cancelling stops before the next book starts.
@@ -582,6 +640,22 @@ local cancel_ctx = {
 }
 Catalog.bulk_running = true
 Catalog.bulk_ctx = cancel_ctx
+local original_transfer = package.loaded["bookorbit_download_transfer"].run
+package.loaded["bookorbit_download_transfer"].run = function(opts)
+    cancel_ctx.cancel_requested = true
+    assertEqual(opts.is_current(), true, "stop after current still publishes the current file")
+    Catalog.bulk_ctx = {}
+    assertEqual(opts.is_current(), false, "a replaced run cannot publish the current file")
+    Catalog.bulk_ctx = cancel_ctx
+    return true, nil, { hash = "current-file-hash" }
+end
+local kept_current = Catalog:bulkDownloadFile(cancel_ctx, { id = 1, title = "Current" },
+    { id = 101, sizeBytes = 42, fileHash = "current-file-hash" }, "/downloads/current.epub", 1)
+assertEqual(kept_current, true, "the completed current file is not counted as a failure")
+assertEqual(#cancel_ctx.pending_links, 1, "the completed current file is queued for linking")
+package.loaded["bookorbit_download_transfer"].run = original_transfer
+cancel_ctx.cancel_requested = false
+cancel_ctx.pending_links = {}
 local realBulkProcessBook = Catalog.bulkProcessBook
 Catalog.bulkProcessBook = function(_, _, book)
     table.insert(processed, book.id)
@@ -596,6 +670,33 @@ assertEqual(cancel_ctx.cancelled, true, "cancel marks the run as stopped")
 assertEqual(Catalog.bulk_running, false, "cancel finishes the bulk run")
 assertEqual(checkpoint_store.record ~= nil, true, "a cancelled run keeps its checkpoint for resume")
 Catalog.bulkProcessBook = realBulkProcessBook
+
+resetRun()
+Catalog.client = makeClient{
+    capabilities = { "catalogBulkManifest" },
+    manifest = function()
+        return { items = { manifestBook(1, "hash1001"), manifestBook(2, "hash1002") }, hasNext = false }
+    end,
+}
+local transfer = package.loaded["bookorbit_download_transfer"]
+local realTransferRun = transfer.run
+transfer.run = function(opts)
+    local active = Catalog.bulk_ctx
+    active.cancel_requested = true
+    assertEqual(opts.is_current(), true, "stop after current file still permits its completed transfer to publish")
+    Catalog.bulk_ctx = nil
+    assertEqual(opts.is_current(), false, "a discarded bulk context cannot publish a late transfer")
+    Catalog.bulk_ctx = active
+    return realTransferRun(opts)
+end
+Catalog:startBulkSource{ kind = "filter", label = "All", total = 2, params = { sort = "title" } }
+drain()
+transfer.run = realTransferRun
+assertEqual(#transfers, 1, "stop during transfer prevents the next book from starting")
+assertEqual(checkpoint_store.record.counts.downloaded, 1, "the current completed file counts as downloaded")
+assertEqual(checkpoint_store.record.counts.failed, 0, "requested stopping is not a file failure")
+assertEqual(checkpoint_store.record.completed["1"] ~= nil, true, "the current published file is checkpointed")
+assertEqual(checkpoint_store.record.completed["2"], nil, "the unreached book remains resumable")
 
 -- Two books whose device paths collide publish to distinct destinations.
 resetRun()
@@ -644,8 +745,121 @@ assertEqual(collision_ctx.completed["2"], "/downloads/Shared/Book_ One [2].epub"
 
 Catalog.bulkReleaseStandby = function() end
 Catalog:bulkFinish(collision_ctx)
-assertEqual(shown_widget.title:find("Renamed path conflicts: 2", 1, true) ~= nil, true, "completion summary keeps conflict count")
-assertEqual(shown_widget.title:find("Conflicting destinations were renamed with BookOrbit IDs.", 1, true) ~= nil, true, "completion summary explains renaming")
+assertEqual(shown_widget.title:find("Saved under a new name: 2", 1, true) ~= nil, true, "completion summary keeps conflict count")
+assertEqual(shown_widget.title:find("Books whose file names clashed were saved with their BookOrbit ID added.", 1, true) ~= nil, true, "completion summary explains renaming")
 assertEqual(shown_widget.title:find(" -> ", 1, true), nil, "completion summary omits long path mappings")
 
+local count_skips = Catalog:bulkCountKnownSkips({ manifestBook(1, "hash1001") })
+assertEqual(count_skips.unsupported, 0, "bulk confirmation counts supported formats without a run context")
+assertEqual(count_skips.on_device, 0, "unknown variant recognition does not promise a skip")
+
+local oldOnDeviceFilePath = Catalog.onDeviceFilePath
+Catalog.onDeviceFilePath = function() return "/downloads/existing.epub" end
+assertEqual(Catalog:bulkChooseFile(manifestBook(1, "hash1001")), nil, "ordinary bulk recognizes downloaded variant")
+assertEqual(Catalog:bulkChooseFile(manifestBook(1, "hash1001"), true).id, 101, "resumed bulk validates bytes even when local marker exists")
+Catalog.onDeviceFilePath = oldOnDeviceFilePath
+
+local resumed_path = "/downloads/unknown-size.epub"
+files[resumed_path] = { size = 42 }
+hashes[resumed_path] = "prepared-fingerprint"
+local resumed_file = { id = 101, selection = "captured-selection", downloadVariant = "audioless_epub" }
+local captured = { path = resumed_path, file_id = 101, selection = "captured-selection", size = 42, hash = "prepared-fingerprint" }
+local resumed_ctx = { pending_links = {} }
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1, captured), true, "unknown-size derivative resumes with captured identity")
+resumed_file.selection = "changed-selection"
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1, captured), false, "changed selection cannot reuse checkpoint bytes")
+resumed_file.selection = "captured-selection"
+hashes[resumed_path] = "changed-content"
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1, captured), false, "changed local contents restart safely")
+assertEqual(Catalog:bulkValidatePublished(resumed_ctx, resumed_path, resumed_file, 1), false, "unknown metadata cannot validate an old path-only checkpoint")
+
 print("bookorbit_catalog_bulk_download_test.lua: ok")
+
+-- A fork discards child UI schedules and object mutations; only the returned
+-- body is marshalled back. Drive the real buttons across that boundary.
+local function copy(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, item in pairs(value) do result[key] = copy(item) end
+    return result
+end
+BulkDownload.install(Catalog)
+CatalogDownload.install(Catalog)
+resetRun()
+Catalog.settings = {}
+Catalog.runConnected = function(_, fn) return fn() end
+local persisted = {}
+Catalog.persistSetting = function(self, key, value)
+    self.settings[key] = value
+    persisted[key] = copy(value)
+end
+local in_child = false
+Catalog.fetch = function(self, _, fn)
+    assertEqual(in_child, false, "network boundaries are owned by the parent")
+    local parent = {}
+    for key, value in pairs(self) do parent[key] = value end
+    local parent_scheduled, parent_widget = scheduled, shown_widget
+    local parent_prevent, parent_allow = prevent_calls, allow_calls
+    self.settings, self.client = copy(self.settings), copy(self.client)
+    scheduled = {}
+    in_child = true
+    local ok, body, err = pcall(fn)
+    in_child = false
+    for key in pairs(self) do self[key] = nil end
+    for key, value in pairs(parent) do self[key] = value end
+    scheduled, shown_widget = parent_scheduled, parent_widget
+    prevent_calls, allow_calls = parent_prevent, parent_allow
+    if not ok then error(body) end
+    return copy(body), err
+end
+local server_override
+local server_default = "original"
+Catalog.client = makeClient{
+    capabilities = { "catalogBulkManifest", "readAloudDeliveryVariants", "readAloudDeliverySettings" },
+    manifest = function()
+        return { items = { manifestBook(1, "hash1001") }, hasNext = false, manifestVersion = "lib-v1" }
+    end,
+}
+function Catalog.client:getDeliverySettings()
+    return { readAloudDelivery = server_override or server_default, deviceOverride = server_override,
+        credentialDefault = server_default, deviceConfigured = true }
+end
+function Catalog.client:setDeliverySettings(variant)
+    server_override = variant
+    return self:getDeliverySettings()
+end
+function Catalog.client:catalogBook(id, variant)
+    return { id = id, variant = variant, files = {} }
+end
+transfer_result_hash = function(opts) return "hash" .. tostring(opts.expected_bytes) end
+Catalog:confirmBulkSource{ kind = "filter", label = "All", total = 1, params = {} }
+local plan = plans[#plans]
+plan.on_download(plan.scopes[1].source)
+assertEqual(Catalog.bulk_running, true, "the Download button starts the run in parent memory")
+assertEqual(#scheduled > 0, true, "the Download button schedules enumeration in the parent")
+assertEqual(Catalog.bulk_ctx.source.variant, "original", "the run captures the server default")
+drain()
+assertEqual(#transfers, 1, "the real Download button completes its transfer")
+assertEqual(Catalog.bulk_running, false, "the parent observes completion")
+
+Catalog:showDeliveryPreferenceDialog()
+assertEqual(choices[#choices].options[1].selected, true, "inherited preference remains selected after the fork")
+choices[#choices].on_pick(3)
+local key = "https://books.example.com/api/v1|reader"
+assertEqual(server_override, "original", "the preference button updates the server")
+assertEqual(Catalog.client.delivery_settings.deviceOverride, "original", "the parent retains the new override")
+assertEqual(persisted.catalog_delivery_server_profiles[key], "original", "the parent persists the resolved server preference")
+Catalog:showDeliveryPreferenceDialog()
+assertEqual(choices[#choices].options[3].selected, true, "the new override remains selected")
+choices[#choices].on_pick(1)
+assertEqual(server_override, nil, "the default button restores server inheritance")
+assertEqual(Catalog.client.delivery_settings.deviceOverride, nil, "the parent clears the cached override")
+
+server_default = "audioless_epub"
+local fetched = Catalog:fetchDeliveryBook(1)
+assertEqual(fetched.variant, "audioless_epub", "book details use the refreshed preference")
+assertEqual(Catalog.client.delivery_settings.readAloudDelivery, "audioless_epub", "book detail fetch retains parent preference state")
+assertEqual(persisted.catalog_delivery_server_profiles[key], "audioless_epub", "book detail preference survives restart")
+Capabilities.remember(Catalog.client, { capabilities = {} })
+assertEqual(require("bookorbit_delivery").preference(Catalog.settings, Catalog.client), "audioless_epub", "downgrade preserves the cached server preference")
+print("catalog delivery fork isolation: ok")

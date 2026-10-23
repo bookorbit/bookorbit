@@ -107,19 +107,19 @@ describe('TtsService', () => {
       repo.findProviderById.mockResolvedValue(DB_PROVIDER);
       await service.synthesize({ providerId: '1', voiceId: 'alloy', text: 'Hello', speed: 1.0 });
       expect(factory.getOpenAiProvider).toHaveBeenCalledWith(DB_PROVIDER);
-      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'alloy', 1.0, 'Hello', 'mp3');
+      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'alloy', 1.0, 'Hello', 'mp3', undefined);
     });
 
     it('should trim voiceId before synthesis', async () => {
       repo.findProviderById.mockResolvedValue(DB_PROVIDER);
       await service.synthesize({ providerId: '1', voiceId: '  alloy  ', text: 'Hello', speed: 1.0 });
-      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'alloy', 1.0, 'Hello', 'mp3');
+      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'alloy', 1.0, 'Hello', 'mp3', undefined);
     });
 
     it('should fall back to the first listed voice when voiceId is missing', async () => {
       repo.findProviderById.mockResolvedValue(DB_PROVIDER);
       await service.synthesize({ providerId: '1', voiceId: '', text: 'Hello', speed: 1.0 });
-      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'alloy', 1.0, 'Hello', 'mp3');
+      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'alloy', 1.0, 'Hello', 'mp3', undefined);
     });
 
     it('should throw NotFoundException when no fallback voices are available', async () => {
@@ -295,7 +295,7 @@ describe('TtsService', () => {
     it('synthesizes a curated voice', async () => {
       curateProvider();
       await service.synthesize({ providerId: '1', voiceId: 'af_heart', text: 'Hello', speed: 1.0 });
-      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'af_heart', 1.0, 'Hello', 'mp3');
+      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'af_heart', 1.0, 'Hello', 'mp3', undefined);
     });
 
     it('rejects a voice curation has withdrawn', async () => {
@@ -313,7 +313,7 @@ describe('TtsService', () => {
     it('accepts any voice id when the provider is not curated', async () => {
       repo.findProviderById.mockResolvedValue({ ...DB_PROVIDER, staticVoices: null });
       await service.synthesize({ providerId: '1', voiceId: 'af_sky+af_bella', text: 'Hello', speed: 1.0 });
-      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'af_sky+af_bella', 1.0, 'Hello', 'mp3');
+      expect(synthesis.synthesize).toHaveBeenCalledWith(OPENAI_PROVIDER_MOCK, '1', 'af_sky+af_bella', 1.0, 'Hello', 'mp3', undefined);
     });
 
     it('clears a withdrawn voice from saved preferences', async () => {
@@ -343,6 +343,7 @@ describe('TtsService', () => {
 
   describe('saveUserPreferences', () => {
     it('should call repo with correct shape', async () => {
+      repo.findProviderById.mockResolvedValue(DB_PROVIDER);
       await service.saveUserPreferences(42, { providerId: '1', voiceId: 'alloy', speed: 1.5 });
       expect(repo.upsertUserPreferences).toHaveBeenCalledWith(42, {
         providerId: 1,
@@ -366,9 +367,41 @@ describe('TtsService', () => {
     });
 
     it('should return mapped TtsUserPreferences with string providerId', async () => {
+      repo.findProviderById.mockResolvedValue(DB_PROVIDER);
       repo.upsertUserPreferences.mockResolvedValue({ providerId: 3, voiceId: 'alloy', speed: 1.25 });
       const result = await service.saveUserPreferences(42, { providerId: '3', voiceId: 'alloy', speed: 1.25 });
       expect(result).toEqual({ providerId: '3', voiceId: 'alloy', speed: 1.25 });
+    });
+
+    // The account's speed is NOT NULL, so a null used to reach the database as a 500.
+    it('leaves the speed alone when it is sent as null', async () => {
+      await service.saveUserPreferences(42, { voiceId: 'alloy', speed: null as never });
+      expect(repo.upsertUserPreferences).toHaveBeenCalledWith(42, { voiceId: 'alloy' });
+    });
+
+    // A provider that does not exist failed the foreign key as a 500.
+    it.each(['99', '1.5', '99999999999'])('refuses a provider %s that names no provider', async (providerId) => {
+      repo.findProviderById.mockResolvedValue(null);
+      await expect(service.saveUserPreferences(42, { providerId })).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsertUserPreferences).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveBookPreferences', () => {
+    it('answers in the documented shape, with the provider as a string', async () => {
+      repo.findProviderById.mockResolvedValue(DB_PROVIDER);
+      repo.upsertBookPreferences.mockResolvedValue({
+        id: 5,
+        userId: 42,
+        bookId: 7,
+        providerId: 3,
+        voiceId: 'alloy',
+        speed: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const result = await service.saveBookPreferences(42, 7, { providerId: '3', voiceId: 'alloy' }, USER);
+      expect(result).toEqual({ providerId: '3', voiceId: 'alloy', speed: null, bookId: 7 });
     });
   });
 
@@ -390,6 +423,20 @@ describe('TtsService', () => {
       const result = await service.getPosition(42, 10, USER);
       expect(bookService.verifyFileAccess).toHaveBeenCalledWith(10, USER);
       expect(result).toEqual({ cfi: 'epubcfi(/6/2!)', chapterIndex: 3 });
+    });
+  });
+
+  describe('nothing saved', () => {
+    // An undefined row went out as an empty 200 body, which is not JSON.
+    it('answers a position never saved with null', async () => {
+      repo.findPosition.mockResolvedValue(undefined);
+      await expect(service.getPosition(42, 10, USER)).resolves.toBeNull();
+    });
+
+    // `Number('abc')` reached the database as NaN, a 500.
+    it('answers voices for a provider id that is not a number with a 404', async () => {
+      await expect(service.getVoices('abc')).rejects.toBeInstanceOf(NotFoundException);
+      expect(repo.findProviderById).not.toHaveBeenCalled();
     });
   });
 

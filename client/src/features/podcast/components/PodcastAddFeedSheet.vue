@@ -126,7 +126,7 @@ function startLocalImport() {
             :aria-label="addFeed.directoryResultLabel(result)"
             @click="selectDirectoryResult(result)"
           >
-            <PodcastArtwork :src="result.artworkUrl" :reset-key="result.feedUrl" class="h-10 w-10 shrink-0 rounded" icon-class="size-4" />
+            <PodcastArtwork :src="result.artworkUrl" :reset-key="result.feedUrl" class="h-10 w-10 shrink-0 rounded-xs" icon-class="size-4" />
             <span class="min-w-0 flex-1">
               <span class="block truncate text-sm font-medium">{{ result.title }}</span>
               <span class="block truncate text-xs text-muted-foreground">{{ result.author || t('podcast.labels.unknownPublisher') }}</span>

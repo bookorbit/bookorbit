@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type { BookCard } from '@bookorbit/types'
 import { useTableViewControls } from './useTableViewControls'
 import { useBookViewSelection } from './useBookViewSelection'
+import { useBookSelectionPermissions } from './useBookSelectionPermissions'
 import { useBookNavigation } from './useBookNavigation'
 import { useDeleteBook } from './useDeleteBook'
 import { useBookBulkActions, type QuerySelectionState } from './useBookBulkActions'
@@ -27,6 +28,7 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
   const { setBookContext } = useBookNavigation()
   const tableControls = useTableViewControls()
   const selection = useBookViewSelection(books, selectionMode)
+  const { canEditSelectionMetadata } = useBookSelectionPermissions(books, selection.selectedIds, querySelection)
 
   const {
     pendingId: deleteBookId,
@@ -100,6 +102,7 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
   return {
     ...tableControls,
     ...selection,
+    canEditSelectionMetadata,
     deleteBookId,
     deletingBook,
     promptDelete,

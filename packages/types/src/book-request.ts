@@ -1,8 +1,29 @@
-import { CONCRETE_BOOK_MEDIA_KINDS, type ConcreteBookMediaKind } from "./book";
 import type { BookRequestDownloadItem } from "./download-client";
+import { AUDIO_FORMAT_LIST, COMIC_FORMAT_LIST, EBOOK_FORMAT_LIST } from "./book";
 
-export const BOOK_REQUEST_MEDIA_KINDS = CONCRETE_BOOK_MEDIA_KINDS;
-export type BookRequestMediaKind = ConcreteBookMediaKind;
+/** What a book can be requested as: an ebook or an audiobook, alone or as a pair. */
+export const BOOK_REQUEST_MEDIA_KINDS = ["ebook", "audiobook"] as const;
+export type BookRequestMediaKind = (typeof BOOK_REQUEST_MEDIA_KINDS)[number];
+
+/** The `ebook` API kind covers readable books and comics; audio stays a separate request. */
+export const BOOK_REQUEST_FORMATS_BY_MEDIA_KIND: Readonly<Record<BookRequestMediaKind, readonly string[]>> = {
+  ebook: [...EBOOK_FORMAT_LIST, ...COMIC_FORMAT_LIST],
+  audiobook: AUDIO_FORMAT_LIST,
+};
+
+/**
+ * A medium requests no longer offer, still carried by requests made before it was retired. Those
+ * rows keep loading, and can be cancelled, hidden or deleted; nothing creates one any more, and
+ * nothing fetches a release for one.
+ */
+export type LegacyBookRequestMediaKind = "comic";
+
+/** Every medium a stored request can carry, including the retired one. */
+export type StoredBookRequestMediaKind = BookRequestMediaKind | LegacyBookRequestMediaKind;
+
+export function isBookRequestMediaKind(value: string): value is BookRequestMediaKind {
+  return (BOOK_REQUEST_MEDIA_KINDS as readonly string[]).includes(value);
+}
 
 /** Bounds exact indexer passes before the title-and-author fallback. */
 export const MAX_BOOK_REQUEST_SEARCH_ISBNS = 8;
@@ -289,6 +310,10 @@ export const BOOK_REQUEST_SUBMIT_ERROR_CODES = [
   "SUBMIT_ON_BEHALF_FORBIDDEN",
   /** The named requester does not exist, or is not an account that could file this itself. */
   "SUBMIT_ON_BEHALF_UNKNOWN_USER",
+  /** The book a request was asked to join is gone, or sits in a library the requester cannot reach. */
+  "SUBMIT_TARGET_BOOK_NOT_FOUND",
+  /** The book a request was asked to join already has the requested medium. Carries `mediaKind`. */
+  "SUBMIT_TARGET_BOOK_HAS_MEDIUM",
 ] as const;
 
 export type BookRequestSubmitErrorCode = (typeof BOOK_REQUEST_SUBMIT_ERROR_CODES)[number];
@@ -402,7 +427,8 @@ export interface BookRequestItem extends BookRequestWorkSnapshot {
   userId: number;
   requesterUsername: string;
   requesterName: string;
-  mediaKind: BookRequestMediaKind;
+  /** A retired medium only on a request made before it was retired; see `LegacyBookRequestMediaKind`. */
+  mediaKind: StoredBookRequestMediaKind;
   status: BookRequestStatus;
   preferredFormats: string[];
   note: string | null;
@@ -438,8 +464,29 @@ export interface BookRequestItem extends BookRequestWorkSnapshot {
   download: BookRequestDownloadItem | null;
   /** Whether the signed-in user has hidden this from their own list. Never shared between users. */
   dismissed: boolean;
+  /**
+   * The other half of an ebook and audiobook pair. Set on both halves, so either one names the
+   * other; null on every request made on its own.
+   */
+  companionRequestId: number | null;
+  /**
+   * The book this request's files join when they arrive, rather than becoming a book of their own.
+   * Set when a missing format was requested from a book's page, and on the second half of a pair
+   * once the first half has landed.
+   */
+  targetBookId: number | null;
+  /**
+   * The companion itself, present only on a list asked for with `groupPairs`, and only when the
+   * caller can see it. A pair is then one entry, led by its ebook half.
+   */
+  companion?: BookRequestItem | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** The medium on the other side of a pair. */
+export function bookRequestCompanionKind(mediaKind: BookRequestMediaKind): BookRequestMediaKind {
+  return mediaKind === "ebook" ? "audiobook" : "ebook";
 }
 
 export interface BookRequestPage {
@@ -471,6 +518,39 @@ export interface CreateBookRequestPayload extends Partial<BookRequestWorkSnapsho
    * ordinary case: the caller is the requester.
    */
   userId?: number;
+  /**
+   * The book the arriving files should join, for a format that book is missing. Advertised by the
+   * `book-request-pairs` server feature.
+   */
+  targetBookId?: number;
+}
+
+/** What one half of a pair may set for itself; everything else about the work is shared. */
+export interface BookRequestPairHalfPayload {
+  targetLibraryId?: number | null;
+  targetFolderId?: number | null;
+  preferredFormats?: string[];
+  /** The cover this half shows, when it differs from the pair's: audiobook art is square. */
+  coverUrl?: string | null;
+}
+
+/**
+ * An ebook and an audiobook of one work, asked for together. Each half is submitted under the same
+ * rules a single request is, so either one may join a request that already exists or arrive
+ * already available, and the two are linked whichever way each one went.
+ */
+export interface CreateBookRequestPairPayload extends Partial<BookRequestWorkSnapshot> {
+  title: string;
+  note?: string | null;
+  selfServe?: boolean;
+  userId?: number;
+  ebook?: BookRequestPairHalfPayload;
+  audiobook?: BookRequestPairHalfPayload;
+}
+
+export interface BookRequestPairSubmitResult {
+  ebook: BookRequestSubmitResult;
+  audiobook: BookRequestSubmitResult;
 }
 
 /**

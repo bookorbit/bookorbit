@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { i18n } from '@/i18n'
 import ReaderHeader from '../ReaderHeader.vue'
 
 const viewport = vi.hoisted(() => ({ isCompact: false }))
@@ -74,6 +75,16 @@ describe('ReaderHeader', () => {
     expect(wrapper.get('button[aria-label="Enter fullscreen"]').classes()).not.toContain('hidden')
     expect(wrapper.emitted('toggleTapZones')?.length).toBe(1)
     expect(wrapper.emitted('togglePin')?.length).toBe(1)
+  })
+
+  it('exposes whether the current location is bookmarked as a pressed state', async () => {
+    i18n.global.locale.value = 'en'
+    const wrapper = mountHeader({ isBookmarked: false })
+
+    expect(wrapper.get('button[aria-label="Toggle bookmark"]').attributes('aria-pressed')).toBe('false')
+
+    await wrapper.setProps({ isBookmarked: true })
+    expect(wrapper.get('button[aria-label="Toggle bookmark"]').attributes('aria-pressed')).toBe('true')
   })
 
   describe('settings container', () => {

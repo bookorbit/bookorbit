@@ -3,10 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical, Slash, X } from '@lucide/vue'
-import type { MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
+import type { MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { PROVIDER_DND_GROUP, toProviderDragItems } from '../lib/provider-drag'
-import { isProviderUsable, providerRank, skipReasonFor } from '../lib/field-rules'
+import { isProviderUsable, providerHasOtherShape, providerRank, skipReasonFor } from '../lib/field-rules'
 
 const { t } = useI18n()
 
@@ -14,6 +14,8 @@ const props = defineProps<{
   providers: MetadataProviderKey[]
   statuses: ProviderStatus[]
   disabled?: boolean
+  /** The rule these chips order, so a provider that never fills it shows as skipped. */
+  field?: MetadataField
 }>()
 
 const emit = defineEmits<{ 'update:providers': [value: MetadataProviderKey[]] }>()
@@ -47,25 +49,28 @@ watch(
 const chips = computed(() =>
   localProviders.value.map((item, index) => {
     const status = statusFor(item.key)
-    const skipReason = skipReasonFor(status)
+    const skipReason = skipReasonFor(status, props.field, item.key)
     return {
       ...item,
       skipReason,
+      otherShape: !skipReason && providerHasOtherShape(item.key, props.field),
       rank: providerRank(
         localProviders.value.map((entry) => entry.key),
         index,
         props.statuses,
+        props.field,
       ),
       label: status?.label ?? item.key,
       short: PROVIDER_SHORT_LABELS[item.key] ?? item.key,
-      usable: isProviderUsable(item.key, props.statuses),
+      usable: isProviderUsable(item.key, props.statuses, props.field),
     }
   }),
 )
 
 function chipTitle(chip: (typeof chips.value)[number]) {
-  if (!chip.skipReason) return chip.label
-  return t(`settings.metadata.fieldRules.providerState.${chip.skipReason}Detail`, { provider: chip.label })
+  if (chip.skipReason) return t(`settings.metadata.fieldRules.providerState.${chip.skipReason}Detail`, { provider: chip.label })
+  if (chip.otherShape) return t('settings.metadata.fieldRules.providerState.otherShapeDetail', { provider: chip.label })
+  return chip.label
 }
 
 function sameOrder(a: MetadataProviderKey[], b: MetadataProviderKey[]) {
@@ -127,7 +132,7 @@ function removeProvider(index: number) {
         v-for="(chip, index) in chips"
         :key="chip.dragId"
         :title="chipTitle(chip)"
-        class="flex h-6 select-none items-center gap-1 rounded pl-1.5 pr-1 text-xs font-medium transition-transform"
+        class="flex h-6 select-none items-center gap-1 rounded-xs pl-1.5 pr-1 text-xs font-medium transition-transform"
         :class="[
           chip.usable ? 'provider-chip' : 'provider-chip-skipped',
           !disabled ? 'provider-chip-handle cursor-grab active:cursor-grabbing' : 'cursor-default',
@@ -138,7 +143,7 @@ function removeProvider(index: number) {
         <Slash v-if="chip.skipReason" :size="10" class="shrink-0" aria-hidden="true" />
         <span v-else class="tabular-nums leading-none opacity-70">{{ chip.rank }}</span>
         <span>{{ chip.short }}</span>
-        <span class="sr-only" v-if="chip.skipReason">{{ chipTitle(chip) }}</span>
+        <span class="sr-only" v-if="chip.skipReason || chip.otherShape">{{ chipTitle(chip) }}</span>
         <button
           v-if="!disabled"
           type="button"

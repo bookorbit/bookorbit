@@ -73,7 +73,7 @@ function rescore() {
       <button
         v-if="query"
         type="button"
-        class="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+        class="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
         :aria-label="t('settings.admin.scoreWeights.clearSearch')"
         @click="clearQuery"
       >

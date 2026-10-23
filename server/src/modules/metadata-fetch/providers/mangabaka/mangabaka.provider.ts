@@ -19,6 +19,7 @@ export class MangabakaProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.MANGABAKA;
   readonly label = 'MangaBaka';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
 
   private readonly logger = new Logger(MangabakaProvider.name);
 

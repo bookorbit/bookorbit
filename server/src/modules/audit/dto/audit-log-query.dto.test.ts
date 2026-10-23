@@ -4,7 +4,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AuditAction, AuditResource } from '@bookorbit/types';
 
-import { AuditActorQueryDto, AuditLogQueryDto } from './audit-log-query.dto';
+import { AuditActorQueryDto, AuditExportQueryDto, AuditLogQueryDto, AuditSignInQueryDto } from './audit-log-query.dto';
 
 describe('AuditLogQueryDto', () => {
   it('transforms numeric query strings and validates enums/date strings', async () => {
@@ -45,6 +45,43 @@ describe('AuditLogQueryDto', () => {
     expect((await validate(plainToInstance(AuditLogQueryDto, { dateFrom: 'not-a-date' }))).length).toBeGreaterThan(0);
     expect((await validate(plainToInstance(AuditLogQueryDto, { search: 'x'.repeat(201) }))).length).toBeGreaterThan(0);
     expect((await validate(plainToInstance(AuditLogQueryDto, { actorUsername: 'x'.repeat(256) }))).length).toBeGreaterThan(0);
+  });
+
+  it('accepts the view, category, security group and target filters', async () => {
+    const dto = plainToInstance(AuditLogQueryDto, {
+      kind: 'changes',
+      category: 'requests',
+      securityGroup: 'failed',
+      resourceId: '88',
+      ip: '192.168.8.230',
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.resourceId).toBe(88);
+  });
+
+  it('rejects unknown views, categories and groups', async () => {
+    expect((await validate(plainToInstance(AuditLogQueryDto, { kind: 'everything' }))).length).toBeGreaterThan(0);
+    expect((await validate(plainToInstance(AuditLogQueryDto, { category: 'clubs' }))).length).toBeGreaterThan(0);
+    expect((await validate(plainToInstance(AuditLogQueryDto, { securityGroup: 'admins' }))).length).toBeGreaterThan(0);
+    expect((await validate(plainToInstance(AuditLogQueryDto, { resourceId: '0' }))).length).toBeGreaterThan(0);
+    expect((await validate(plainToInstance(AuditLogQueryDto, { ip: 'x'.repeat(46) }))).length).toBeGreaterThan(0);
+  });
+
+  it('defaults sign-in grouping to UTC and rejects unknown time zones', async () => {
+    const defaults = plainToInstance(AuditSignInQueryDto, {});
+    expect(await validate(defaults)).toHaveLength(0);
+    expect(defaults.tz).toBe('UTC');
+    expect(await validate(plainToInstance(AuditSignInQueryDto, { tz: 'America/Denver' }))).toHaveLength(0);
+    expect((await validate(plainToInstance(AuditSignInQueryDto, { tz: 'Mars/Olympus' }))).length).toBeGreaterThan(0);
+    expect((await validate(plainToInstance(AuditSignInQueryDto, { tz: "UTC'; drop table audit_log; --" }))).length).toBeGreaterThan(0);
+  });
+
+  it('exports CSV unless JSON is asked for', async () => {
+    const defaults = plainToInstance(AuditExportQueryDto, {});
+    expect(await validate(defaults)).toHaveLength(0);
+    expect(defaults.format).toBe('csv');
+    expect((await validate(plainToInstance(AuditExportQueryDto, { format: 'xlsx' }))).length).toBeGreaterThan(0);
   });
 
   it('validates actor lookup queries and applies the default limit', async () => {

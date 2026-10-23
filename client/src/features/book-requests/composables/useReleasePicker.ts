@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, shallowReactive } from 'vue'
 import { api } from '@/lib/api'
 import { fulfilmentBase } from '../fulfilmentBase'
 import type {
@@ -17,6 +17,81 @@ export const TITLE_AUTHOR_SEARCH_KEY = 'titleAuthor'
 /** The key one search ran under, which is the ISBN it used or the title and author fallback. */
 export function searchAttemptKey(activeIsbn: string | null): string {
   return activeIsbn ?? TITLE_AUTHOR_SEARCH_KEY
+}
+
+/**
+ * A request's last search, kept for a moment on this side too. The picker for a pair searches both
+ * halves when it opens, and the server never merges a search still in flight, so the half the
+ * approver switches to reads its answer here instead of asking every tracker a second time. Every
+ * search that answers replaces the entry, so switching back shows the list that was last on screen.
+ */
+interface DefaultSearch {
+  startedAt: number
+  result: ReleaseSearchResult | null
+  pending: Promise<ReleaseSearchResult | null> | null
+}
+
+/** The server's own cache window; past it, a revisit searches again. */
+const SEARCH_CACHE_TTL_MS = 3 * 60 * 1000
+const SEARCH_CACHE_LIMIT = 8
+/** Reactive so a tab can show the other half's count the moment its search lands. */
+const defaultSearches = shallowReactive(new Map<string, DefaultSearch>())
+
+function defaultSearchPath(canManage: boolean, requestId: number): string {
+  return `${fulfilmentBase(canManage)}/${requestId}/releases`
+}
+
+function freshEntry(path: string): DefaultSearch | null {
+  const entry = defaultSearches.get(path)
+  return entry && Date.now() - entry.startedAt <= SEARCH_CACHE_TTL_MS ? entry : null
+}
+
+function rememberSearch(path: string, entry: DefaultSearch): void {
+  defaultSearches.delete(path)
+  defaultSearches.set(path, entry)
+  if (defaultSearches.size > SEARCH_CACHE_LIMIT) defaultSearches.delete(defaultSearches.keys().next().value!)
+}
+
+/** One default search, shared by everything that asks for it while it runs. */
+function loadDefaultSearch(path: string, refresh: boolean): Promise<ReleaseSearchResult | null> {
+  const existing = refresh ? null : freshEntry(path)
+  if (existing?.result) return Promise.resolve(existing.result)
+  if (existing?.pending) return existing.pending
+
+  const startedAt = Date.now()
+  const pending = (async () => {
+    try {
+      const res = await api(refresh ? `${path}?refresh=true` : path)
+      if (!res.ok) return null
+      return (await res.json()) as ReleaseSearchResult
+    } catch {
+      return null
+    }
+  })()
+  rememberSearch(path, { startedAt, result: null, pending })
+  void pending.then((result) => {
+    // Only the search that still owns the slot may settle it: a refresh started meanwhile replaced it.
+    if (defaultSearches.get(path)?.pending !== pending) return
+    if (result) rememberSearch(path, { startedAt, result, pending: null })
+    else defaultSearches.delete(path)
+  })
+  return pending
+}
+
+/** Starts a request's default search ahead of time, so opening it shows the list straight away. */
+export function prefetchReleaseSearch(canManage: boolean, requestId: number): void {
+  void loadDefaultSearch(defaultSearchPath(canManage, requestId), false)
+}
+
+/** What is known about a request's default search without asking for it. */
+export function peekReleaseSearch(canManage: boolean, requestId: number): { searching: boolean; count: number | null } {
+  const entry = freshEntry(defaultSearchPath(canManage, requestId))
+  return { searching: entry?.pending != null, count: entry?.result?.releases.length ?? null }
+}
+
+/** For tests: every module-level answer is forgotten. */
+export function clearReleaseSearchCache(): void {
+  defaultSearches.clear()
 }
 
 /**
@@ -67,38 +142,54 @@ export function useReleasePicker(canManage: () => boolean) {
    */
   let searchGeneration = 0
 
+  function applyResult(result: ReleaseSearchResult): void {
+    releases.value = result.releases
+    criteria.value = result.criteria
+    indexers.value = result.indexers
+    uncoveredIndexerCount.value = result.uncoveredIndexerCount
+    enabledIndexerCount.value = result.enabledIndexerCount
+    configuredIndexerCount.value = result.configuredIndexerCount
+    profileActive.value = result.profileActive
+    cached.value = result.cached
+    searched.value = true
+    attempts.value = new Map(attempts.value).set(searchAttemptKey(result.criteria.activeIsbn), result.releases.length)
+  }
+
   async function fetchReleases(requestId: number, options: { refresh?: boolean; overrides?: ReleaseSearchOverrides } = {}): Promise<boolean> {
     const generation = ++searchGeneration
-    loading.value = true
+    const custom = options.overrides !== undefined
+    const path = defaultSearchPath(canManage(), requestId)
     loadFailed.value = false
     clearInspections()
+    // A search already answered is shown in the same tick, so switching to it never flashes a spinner.
+    const known = custom || options.refresh ? null : freshEntry(path)?.result
+    if (known) {
+      // It is a list already searched, which is what the cached note says.
+      applyResult({ ...known, cached: true })
+      loading.value = false
+      return true
+    }
+
+    loading.value = true
     try {
-      const custom = options.overrides !== undefined
-      const url = `${basePath()}/${requestId}/releases${custom ? '/search' : options.refresh ? '?refresh=true' : ''}`
-      const res = custom
-        ? await api(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(options.overrides),
-          })
-        : await api(url)
+      let result: ReleaseSearchResult | null
+      if (custom) {
+        const res = await api(`${path}/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(options.overrides),
+        })
+        result = res.ok ? ((await res.json()) as ReleaseSearchResult) : null
+        if (result) rememberSearch(path, { startedAt: Date.now(), result, pending: null })
+      } else {
+        result = await loadDefaultSearch(path, options.refresh === true)
+      }
       if (generation !== searchGeneration) return false
-      if (!res.ok) {
+      if (!result) {
         loadFailed.value = true
         return false
       }
-      const result = (await res.json()) as ReleaseSearchResult
-      if (generation !== searchGeneration) return false
-      releases.value = result.releases
-      criteria.value = result.criteria
-      indexers.value = result.indexers
-      uncoveredIndexerCount.value = result.uncoveredIndexerCount
-      enabledIndexerCount.value = result.enabledIndexerCount
-      configuredIndexerCount.value = result.configuredIndexerCount
-      profileActive.value = result.profileActive
-      cached.value = result.cached
-      searched.value = true
-      attempts.value = new Map(attempts.value).set(searchAttemptKey(result.criteria.activeIsbn), result.releases.length)
+      applyResult(result)
       return true
     } catch {
       if (generation === searchGeneration) loadFailed.value = true

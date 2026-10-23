@@ -112,7 +112,7 @@ function rowMeasure(row: BookFormatEntry): string {
         <button
           v-if="progressFor(row)?.resetFileId != null"
           type="button"
-          class="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex size-5 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           :aria-label="t('book.detail.details.resetEditionProgress', { format: formatKeyName(row.key) })"
           :disabled="isResetting(row)"
           @click="handleReset(row)"
@@ -125,6 +125,9 @@ function rowMeasure(row: BookFormatEntry): string {
     <p v-if="hiddenCount > 0" class="mt-2 text-[11px] text-muted-foreground">
       {{ t('book.detail.details.moreFormats', { count: hiddenCount }) }}
     </p>
+
+    <!-- What this book could still have: a format another feature can offer to fetch. -->
+    <slot name="missing" />
 
     <div class="mt-2.5 flex items-baseline gap-2 border-t border-border pt-2">
       <p class="text-[11px] text-muted-foreground">{{ t('book.detail.details.filesOnDisk') }}</p>

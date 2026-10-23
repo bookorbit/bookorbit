@@ -22,8 +22,12 @@ const { attempts, loading, failed, fetchAttempts, reset } = useRequestAttempts((
  */
 const earlier = computed(() => attempts.value.filter((attempt) => attempt.id !== props.request.download?.id))
 
-/** Nothing to say until a request has been sent somewhere more than once. */
-const show = computed(() => loading.value || failed.value || earlier.value.length > 0)
+/**
+ * Nothing to say until a request has been sent somewhere more than once. Not shown merely because
+ * it is loading: most requests have no earlier attempt, and a box that appears to say "loading"
+ * and then vanishes is a flash on every request opened.
+ */
+const show = computed(() => failed.value || earlier.value.length > 0)
 
 watch(
   () => [props.request.id, props.request.download?.id, props.request.status] as const,

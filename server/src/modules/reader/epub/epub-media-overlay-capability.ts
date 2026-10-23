@@ -51,7 +51,7 @@ export async function inspectEpubMediaOverlayFields(
     return {
       mediaOverlayAvailable: false,
       mediaOverlayDurationSeconds: null,
-      mediaOverlayCheckedAt: new Date(),
+      mediaOverlayCheckedAt: null,
     };
   }
 }

@@ -1,0 +1,128 @@
+/* ── Surface palettes ────────────────────────────────────────
+   Neutral grounds for styles that declare a surface palette
+   control. A palette is a hue, a chroma and a small lightness
+   offset on the style's ladder (darker for onyx, lighter for
+   charcoal), bounded so every palette keeps the ladder's AA
+   contrast. Applied as data-surface on <html>, or on a swatch
+   to preview a palette in place.
+────────────────────────────────────────────────────────────── */
+[data-surface='onyx'] {
+  --surface-h: 0;
+  --surface-c: 0;
+  --surface-l: -0.06;
+}
+[data-surface='carbon'] {
+  --surface-h: 248;
+  --surface-c: 0.005;
+  --surface-l: -0.035;
+}
+[data-surface='neutral'] {
+  --surface-h: 0;
+  --surface-c: 0;
+  --surface-l: -0.015;
+}
+[data-surface='zinc'] {
+  --surface-h: 286;
+  --surface-c: 0.006;
+  --surface-l: -0.025;
+}
+[data-surface='iron'] {
+  --surface-h: 248;
+  --surface-c: 0.007;
+  --surface-l: 0;
+}
+[data-surface='steel'] {
+  --surface-h: 258;
+  --surface-c: 0.01;
+  --surface-l: -0.005;
+}
+[data-surface='ash'] {
+  --surface-h: 245;
+  --surface-c: 0.012;
+  --surface-l: 0;
+}
+[data-surface='smoke'] {
+  --surface-h: 270;
+  --surface-c: 0.006;
+  --surface-l: 0.005;
+}
+[data-surface='charcoal'] {
+  --surface-h: 0;
+  --surface-c: 0;
+  --surface-l: 0.025;
+}
+[data-surface='slate'] {
+  --surface-h: 262;
+  --surface-c: 0.03;
+  --surface-l: -0.038;
+}
+[data-surface='midnight-blue'] {
+  --surface-h: 252;
+  --surface-c: 0.022;
+  --surface-l: 0.027;
+}
+[data-surface='ocean'] {
+  --surface-h: 228;
+  --surface-c: 0.034;
+  --surface-l: 0.038;
+}
+[data-surface='pine'] {
+  --surface-h: 165;
+  --surface-c: 0.022;
+  --surface-l: 0;
+}
+[data-surface='olive'] {
+  --surface-h: 135;
+  --surface-c: 0.018;
+  --surface-l: 0.03;
+}
+[data-surface='stone'] {
+  --surface-h: 58;
+  --surface-c: 0.009;
+  --surface-l: -0.02;
+}
+[data-surface='sepia'] {
+  --surface-h: 70;
+  --surface-c: 0.024;
+  --surface-l: 0;
+}
+[data-surface='crimson'] {
+  --surface-h: 18;
+  --surface-c: 0.016;
+  --surface-l: 0.018;
+}
+[data-surface='plum'] {
+  --surface-h: 330;
+  --surface-c: 0.02;
+  --surface-l: 0;
+}
+
+/* The ground, card and edge of the ladder, in the active mode, for whichever palette the element carries. The
+   Nostalgia style paints its surfaces from these, and a picker tile previews a palette with the very same values. */
+[data-surface] {
+  --surface-ground: oklch(calc(0.955 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.6) var(--surface-h));
+  --surface-card: oklch(calc(0.99 + var(--surface-l) * 0.4) calc(var(--surface-c) * 0.3) var(--surface-h));
+  --surface-edge: oklch(calc(0.87 + var(--surface-l) * 0.4) calc(var(--surface-c) * 1.2) var(--surface-h));
+}
+.dark[data-surface],
+.dark [data-surface] {
+  --surface-ground: oklch(calc(0.167 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --surface-card: oklch(calc(0.232 + var(--bg-lift) + var(--surface-l)) var(--surface-c) var(--surface-h));
+  --surface-edge: oklch(calc(0.402 + var(--bg-lift) + var(--surface-l)) calc(var(--surface-c) * 1.4) var(--surface-h));
+}
+
+/* Picker tile: a small window, ground behind a card panel. */
+.surface-tile {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-ground);
+  border: 1px solid var(--surface-edge);
+}
+.surface-tile::before {
+  content: '';
+  position: absolute;
+  inset: 34% -1px -1px 26%;
+  border: 1px solid var(--surface-edge);
+  border-top-left-radius: 4px;
+  background-color: var(--surface-card);
+}

@@ -29,8 +29,13 @@ vi.mock('vue-router', async (importOriginal) => {
   }
 })
 
+vi.mock('@/features/library/composables/useLibraries', () => ({
+  useLibraries: () => ({ libraries: ref([{ id: 1, accessLevel: 'editor' }]) }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({
+    isSuperuser: { value: false },
     hasPermission: (name: string) => {
       if (name === 'library_delete_books') return permissionState.canDelete
       if (name === 'library_edit_metadata') return permissionState.canEditMetadata

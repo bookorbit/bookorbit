@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesNextBookResponse, SeriesPage, SeriesSummary } from '@bookorbit/types';
-import { READER_OPENABLE_FORMATS, SERIES_GAP_PREVIEW_LIMIT, getOpenableFormatsForGroup } from '@bookorbit/types';
+import { READER_OPENABLE_FORMATS, SERIES_GAP_PREVIEW_LIMIT, getOpenableFormatsForGroup, isOptInReaderFormat } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import type { RequestUser } from '../../common/types/request-user';
 import { normalizeSeriesTotalBooks } from '../../common/utils/series-total-books.utils';
@@ -164,7 +164,7 @@ export class SeriesService {
         cardData.tagRows,
         cardData.seriesMembershipRows,
       );
-      await this.coverStore.enrichCardVersions(cards);
+      await this.coverStore.enrichCardFaces(cards);
       const orderMap = new Map(bookPage.bookIds.map((id, i) => [id, i]));
       items = cards
         .map((card) => {
@@ -207,7 +207,9 @@ export class SeriesService {
       seriesId,
       bookId,
       libraryIds,
-      formats: dto.formatGroup ? getOpenableFormatsForGroup(dto.formatGroup) : [...READER_OPENABLE_FORMATS],
+      formats: (dto.formatGroup ? getOpenableFormatsForGroup(dto.formatGroup) : [...READER_OPENABLE_FORMATS]).filter(
+        (format) => dto.includeDjvu === true || !isOptInReaderFormat(format),
+      ),
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
 

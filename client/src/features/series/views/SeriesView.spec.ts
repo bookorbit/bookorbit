@@ -121,7 +121,8 @@ async function mountView() {
     global: {
       plugins: [i18n],
       stubs: {
-        ViewHeader: { template: '<div><slot name="toolbar" /></div>' },
+        BrowseHeader: { template: '<div><slot name="bar" /></div>' },
+        BrowseInlineGroup: { template: '<div><slot /></div>' },
         Popover: { template: '<div><slot /></div>' },
         PopoverTrigger: { template: '<div><slot /></div>' },
         PopoverContent: { template: '<div><slot /></div>' },

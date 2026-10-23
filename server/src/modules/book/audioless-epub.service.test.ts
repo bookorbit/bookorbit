@@ -348,7 +348,7 @@ describe('AudiolessEpubService', () => {
     expect(stripped.removedEntries).toBe(4);
   });
 
-  it('rewrites entry names that escape the archive root', async () => {
+  it('rejects entry names that escape the archive root', async () => {
     const path = join(dir, 'unsafe-paths.epub');
     await buildRawZip(path, [
       ...readaloudEntries(),
@@ -359,11 +359,7 @@ describe('AudiolessEpubService', () => {
     const source = await unzipper.Open.file(path);
     expect(source.files.map((file) => file.path)).toEqual(expect.arrayContaining(['../../evil.txt', '/absolute.txt']));
 
-    const stripped = await strip(service, path);
-
-    expect(stripped.names.some((name) => name.startsWith('/') || name.includes('..'))).toBe(false);
-    expect(stripped.names).toEqual(expect.arrayContaining(['evil.txt', 'absolute.txt', 'escape.xhtml']));
-    expect(stripped.sanitizedEntries).toBe(3);
+    await expect(service.createArchive(path)).rejects.toThrow('Unsafe archive entry');
   });
 
   it('passes through an EPUB that has no media overlay', async () => {
@@ -423,7 +419,7 @@ describe('AudiolessEpubService', () => {
       const padded = READALOUD_OPF.replace('</metadata>', `<meta property="pad">${'x'.repeat(4096)}</meta></metadata>`);
       const path = await fixture('huge-opf', readaloudEntries({ opf: padded }));
 
-      await expect(makeService({ maxMetadataBytes: 1024 }).createArchive(path)).rejects.toThrow(/OPF is \d+ bytes/);
+      await expect(makeService({ maxMetadataBytes: 1024 }).createArchive(path)).rejects.toThrow(/EPUB resource exceeds inspection limit/);
     });
 
     it('rejects a container.xml larger than the metadata limit', async () => {
@@ -431,7 +427,7 @@ describe('AudiolessEpubService', () => {
       const entries = readaloudEntries().map((entry) => (entry.name === 'META-INF/container.xml' ? { ...entry, content: padded } : entry));
       const path = await fixture('huge-container', entries);
 
-      await expect(makeService({ maxMetadataBytes: 1024 }).createArchive(path)).rejects.toThrow(/container\.xml is \d+ bytes/);
+      await expect(makeService({ maxMetadataBytes: 1024 }).createArchive(path)).rejects.toThrow(/EPUB resource exceeds inspection limit/);
     });
 
     it('rejects when the retained text would exceed the output limit', async () => {

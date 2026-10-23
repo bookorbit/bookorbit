@@ -44,6 +44,7 @@ import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { mergeBookCardWithDetail } from '../lib/book-card-mapper'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useDisplaySettings, type GridCardLabelField } from '@/composables/useDisplaySettings'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, coverAspectRatioValue, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
@@ -124,6 +125,8 @@ async function handleRefreshMetadata() {
   if (updated) emit('update:book', mergeBookCardWithDetail(props.book, updated))
 }
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } = useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed<CoverAspectRatio>(
@@ -423,7 +426,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
     <div class="group">
       <BookCoverSurface
         class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-[box-shadow,transform,ring] duration-150 will-change-transform"
-        :class="isMissing || selectionMode ? '' : 'group-hover:scale-[1.02]'"
+        :class="isMissing || selectionMode ? '' : 'group-hover:[transform:var(--cover-hover-transform)] motion-reduce:group-hover:[transform:none]'"
         :interactive="!isMissing && !selectionMode"
         :disable-spine="isAudiobook"
         :is-comic="isComic"
@@ -444,6 +447,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           :image-class="isMissing ? 'brightness-50' : ''"
           :spine="!isAudiobook"
           :is-comic="isComic"
+          :authors="book.authors"
+          :subtitle="book.subtitle"
+          :series-name="book.seriesName"
+          :series-index="book.seriesIndex"
+          :genres="book.genres"
           @load="handleArtworkLoad"
           @error="handleArtworkError"
         />
@@ -503,7 +511,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             <BookFormatChip
               :format-key="formatOverlayKey!"
               variant="solid"
-              class="gap-0.5 rounded px-1.5 py-0.5 text-[8px] font-semibold tracking-widest opacity-90"
+              class="gap-0.5 rounded-xs px-1.5 py-0.5 text-[8px] font-semibold tracking-widest opacity-90"
             />
           </div>
 
@@ -523,7 +531,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             :class="selected ? 'bg-primary/20 ring-2 ring-inset ring-primary' : ''"
           >
             <div
-              class="absolute top-1.5 left-1.5 h-5 w-5 rounded flex items-center justify-center transition-colors"
+              class="absolute top-1.5 left-1.5 h-5 w-5 rounded-xs flex items-center justify-center transition-colors"
               :class="selected ? 'bg-primary' : 'bg-black/40 border border-white/50'"
             >
               <Check v-if="selected" class="text-primary-foreground" :size="12" />
@@ -532,7 +540,9 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
 
           <!-- Missing badge -->
           <div v-if="isMissing" class="absolute top-1.5 right-1.5 z-20">
-            <span class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-600/95 text-white">
+            <span
+              class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded-xs bg-amber-600/95 text-white"
+            >
               <TriangleAlert class="size-2.5 shrink-0" />
               {{ t('book.card.missing') }}
             </span>
@@ -679,8 +689,8 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     <BookText class="size-4 mr-2" />
                     {{ t('book.actions.bookDetails') }}
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-                  <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
+                  <DropdownMenuSeparator v-if="canEditMetadata" />
+                  <DropdownMenuSub v-if="canEditMetadata">
                     <DropdownMenuSubTrigger>
                       <Pencil class="size-4 mr-2" />
                       {{ t('book.actions.metadata') }}
@@ -706,7 +716,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     <FolderPlus class="size-4 mr-2" />
                     {{ t('book.actions.addToCollection') }}
                   </DropdownMenuItem>
-                  <DropdownMenuItem v-if="allowMoveToLibrary && hasPermission('library_edit_metadata')" @click="emit('action', 'move-to-library')">
+                  <DropdownMenuItem v-if="allowMoveToLibrary && canEditMetadata" @click="emit('action', 'move-to-library')">
                     <FolderInput class="size-4 mr-2" />
                     {{ t('book.move.action') }}
                   </DropdownMenuItem>
@@ -763,7 +773,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
         <div v-else class="flex-1" />
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <button class="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors" data-testid="grid-card-kebab">
+            <button class="shrink-0 p-0.5 rounded-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="grid-card-kebab">
               <MoreVertical class="size-3.5" />
             </button>
           </DropdownMenuTrigger>
@@ -821,8 +831,8 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               <BookText class="size-4 mr-2" />
               {{ t('book.actions.bookDetails') }}
             </DropdownMenuItem>
-            <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-            <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
+            <DropdownMenuSeparator v-if="canEditMetadata" />
+            <DropdownMenuSub v-if="canEditMetadata">
               <DropdownMenuSubTrigger>
                 <Pencil class="size-4 mr-2" />
                 {{ t('book.actions.metadata') }}
@@ -896,6 +906,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
     :selected-count="1"
     :book-files="book.files"
     :book-title="book.title ?? undefined"
+    :book-authors="authorLine ?? undefined"
     @update:open="showSendDialog = $event"
   />
 </template>

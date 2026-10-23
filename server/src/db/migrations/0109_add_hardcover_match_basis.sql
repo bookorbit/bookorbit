@@ -1,0 +1,1 @@
+ALTER TABLE "hardcover_book_state" ADD COLUMN "match_basis" text;

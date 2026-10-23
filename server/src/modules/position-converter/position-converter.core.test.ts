@@ -104,7 +104,7 @@ describe('parseChapterDocument', () => {
 
   it('indexes named entities as the characters a renderer would show', () => {
     const doc = parseChapterDocument(chapter('<p>a&nbsp;b pa&shy;sakyti c&mdash;d</p>'));
-    expect(doc.index.collapsed).toBe('a b pa­sakyti c—d');
+    expect(doc.index.collapsed).toBe('a b pa­sakyti c\u2014d');
   });
 
   it('keeps escaped entity text literal instead of resolving it twice', () => {
@@ -128,7 +128,7 @@ describe('xpointerRangeToCfi', () => {
 
   it('maps collapsed crengine offsets back to raw offsets in indented source', () => {
     const doc = parseChapterDocument(INDENTED_CHAPTER);
-    const result = xpointerRangeToCfi(doc, 0, '/body/DocFragment[1]/body/p/text().6', '/body/DocFragment[1]/body/p/text().11', 'world');
+    const result = xpointerRangeToCfi(doc, 0, '/body/DocFragment[1]/body/p/text().7', '/body/DocFragment[1]/body/p/text().12', 'world');
     expect(result.status).toBe('exact');
     expect((result as { pos0: string }).pos0).toBe('epubcfi(/6/2!/4/2,/1:13,/1:18)');
   });
@@ -216,8 +216,8 @@ describe('cfiRangeToXPointer', () => {
     const result = cfiRangeToXPointer(doc, 0, 'epubcfi(/6/2!/4/2,/1:13,/1:18)', 'world');
     expect(result).toEqual({
       status: 'exact',
-      pos0: '/body/DocFragment[1]/body/p/text().6',
-      pos1: '/body/DocFragment[1]/body/p/text().11',
+      pos0: '/body/DocFragment[1]/body/p/text().7',
+      pos1: '/body/DocFragment[1]/body/p/text().12',
     });
   });
 
@@ -285,8 +285,8 @@ describe('round trips', () => {
     },
     {
       chapter: INDENTED_CHAPTER,
-      pos0: '/body/DocFragment[1]/body/p/text().0',
-      pos1: '/body/DocFragment[1]/body/p/text().5',
+      pos0: '/body/DocFragment[1]/body/p/text().1',
+      pos1: '/body/DocFragment[1]/body/p/text().6',
       text: 'Hello',
     },
     {

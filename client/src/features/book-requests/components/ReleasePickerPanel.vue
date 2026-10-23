@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowUpRight,
+  Check,
   ChevronDown,
   ChevronUp,
   CircleCheck,
@@ -23,8 +24,10 @@ import {
   TriangleAlert,
   Zap,
 } from '@lucide/vue'
-import { Permission, releaseInspectionBlocksGrab } from '@bookorbit/types'
+import { isBookRequestFulfiller, isGrabbableBookRequestStatus, Permission, releaseInspectionBlocksGrab } from '@bookorbit/types'
 import type {
+  BookRequestItem,
+  BookRequestStatus,
   DownloadDelivery,
   IndexerSearchFailure,
   ReleaseCandidateItem,
@@ -38,11 +41,14 @@ import { formatDate, formatLanguageName, formatList } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import GrabReleaseDialog from './GrabReleaseDialog.vue'
 import ReleaseFileInspectionPanel from './ReleaseFileInspectionPanel.vue'
+import ReleasePairTabs from './ReleasePairTabs.vue'
+import type { ReleasePairTab } from './ReleasePairTabs.vue'
 import RequestCover from './RequestCover.vue'
 import RequestDrawerToolbar from './RequestDrawerToolbar.vue'
 import RequestEmptyState from './RequestEmptyState.vue'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 import { formatKey, formatKeys, languageKey } from '../releaseFacets'
+import { requestBookCoverSources } from '../requestBookCover'
 import { requestFailureText } from '../requestOutcome'
 import { protocolChipClass, sourceChipClass } from '../sourceColors'
 import { useBookRequestActions } from '../composables/useBookRequests'
@@ -51,8 +57,9 @@ import { useDownloadClientSummaries } from '../composables/useDownloadClients'
 import { useReleaseFacetGroups } from '../composables/useReleaseFacetGroups'
 import { useReleaseFilters } from '../composables/useReleaseFilters'
 import { useReleaseGrab } from '../composables/useReleaseGrab'
-import { useReleasePicker } from '../composables/useReleasePicker'
+import { peekReleaseSearch, prefetchReleaseSearch, useReleasePicker } from '../composables/useReleasePicker'
 import { useReleaseSearchEditor } from '../composables/useReleaseSearchEditor'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const { t } = useI18n()
@@ -84,6 +91,13 @@ const {
   reset,
 } = useReleasePicker(canManage)
 const { request, loading: requestLoading, error: requestError, fetchRequest, setRequest } = useBookRequestDetail()
+const { user } = useAuth()
+const companionDetail = useBookRequestDetail()
+/** The other half of a pair, once both ends of the link agree. */
+const companion = computed(() => {
+  const other = companionDetail.request.value
+  return other && request.value && other.id === request.value.companionRequestId && other.companionRequestId === request.value.id ? other : null
+})
 const { clients, fetchClients } = useDownloadClientSummaries(canManage)
 const torrentClients = computed(() => clients.value.filter((client) => client.delivery === 'torrent'))
 const actions = useBookRequestActions(canManage)
@@ -94,6 +108,37 @@ const COMMON_SAMPLING_RATE_HZ = 44100
 const MAX_LISTED_SOURCES = 4
 
 const requestId = computed(() => Number(route.params.id))
+
+/** Mirrors `RequestDetailPanel.canFulfilThis`, for whichever half it is asked about. */
+function canDrive(half: BookRequestItem): boolean {
+  return canManage() || (hasPermission(Permission.BookRequestSelfFulfill) && isBookRequestFulfiller(half, user.value?.id))
+}
+
+function isChoosable(half: BookRequestItem): boolean {
+  return canDrive(half) && isGrabbableBookRequestStatus(half.status)
+}
+
+/** A half past choosing: its release is on its way or already in the library. */
+const SETTLED_STATUSES: readonly BookRequestStatus[] = ['grabbed', 'downloading', 'importing', 'needs_review', 'available']
+/** Set by the send that leaves neither half needing a release, and cleared when the picker moves. */
+const finished = ref(false)
+/**
+ * The list the drawer sits on, without what only the first search was opened with. An ISBN picked
+ * for one half's search says nothing about the other's, so switching halves searches afresh.
+ */
+const listQuery = computed(() => Object.fromEntries(Object.entries(route.query).filter(([key]) => key !== 'isbn' && key !== 'search')))
+const pairTabs = computed<ReleasePairTab[] | null>(() => {
+  const current = request.value
+  const partner = companion.value
+  if (!current || !partner) return null
+  return [current, partner]
+    .sort((a, b) => (a.mediaKind === b.mediaKind ? 0 : a.mediaKind === 'ebook' ? -1 : 1))
+    .map((half) => {
+      if (half.id !== current.id) return { request: half, current: false, choosable: isChoosable(half), ...peekReleaseSearch(canManage(), half.id) }
+      const count = searched.value && !loading.value ? releases.value.length : null
+      return { request: half, current: true, choosable: isChoosable(half), count, searching: loading.value }
+    })
+})
 
 const filters = useReleaseFilters(releases)
 const { visibleReleases, hasFilter, showFacets, marksBest, tiedWithBest, clearFilters, resetFilters } = filters
@@ -134,15 +179,17 @@ const {
   resetSearchEditorState,
 } = useReleaseSearchEditor({ request, criteria, attempts, requestId, fetchReleases, beforeSearch: startFreshSearch })
 
-const { manualOpen, grabbing, openManual, closeManual, forgetRefusals, handleGrab, handleManualGrab, isRefused, refusalText } = useReleaseGrab({
-  request,
-  requestId,
-  grab: actions.grab,
-  setRequest,
-  inspectRelease,
-  setFilesExpanded,
-  deliveryFor,
-})
+const { manualOpen, grabbing, holdForReview, openManual, closeManual, forgetRefusals, handleGrab, handleManualGrab, isRefused, refusalText } =
+  useReleaseGrab({
+    request,
+    requestId,
+    grab: actions.grab,
+    setRequest,
+    inspectRelease,
+    setFilesExpanded,
+    deliveryFor,
+    afterGrab,
+  })
 
 /**
  * Every Send is off while one release is on its way, not only the row being inspected. The
@@ -154,6 +201,7 @@ const busy = computed(() => grabbing.value || actions.isPending(request.value?.i
 const isRetry = computed(() => request.value?.status === 'failed')
 const failureText = computed(() => (request.value ? requestFailureText(request.value, (key, named) => t(key, named)) : null))
 const authorLine = computed(() => request.value?.authors.join(', ') ?? '')
+const bookCoverSources = computed(() => (request.value ? requestBookCoverSources(request.value) : []))
 const localOnlyCriteriaFacts = computed(() => (criteria.value ? localOnlyFacts(criteria.value) : []))
 /**
  * Adding a source or switching one back on happens under Settings > System > Requests, which is
@@ -346,6 +394,25 @@ onMounted(async () => {
   if (Number.isInteger(requestId.value)) void fetchInitialReleases(requestId.value)
 })
 
+watch(
+  () => request.value?.companionRequestId ?? null,
+  (companionId) => {
+    if (companionId === null) {
+      companionDetail.request.value = null
+      return
+    }
+    void companionDetail.fetchRequest(companionId, { background: companionDetail.request.value?.id === companionId })
+  },
+)
+
+// Both halves are searched once the picker is open on either, so the second never makes anyone wait.
+watch(
+  () => (companion.value && isChoosable(companion.value) ? companion.value.id : null),
+  (companionId) => {
+    if (companionId !== null) prefetchReleaseSearch(canManage(), companionId)
+  },
+)
+
 watch(requestId, (id) => {
   if (!Number.isInteger(id)) return
   reset()
@@ -354,9 +421,40 @@ watch(requestId, (id) => {
   showEachSource.value = false
   expandedFiles.value = new Set()
   resetFilters()
-  void fetchRequest(id)
+  finished.value = false
+  // Switching between the halves of a pair: both are already loaded, so they trade places at once.
+  const partner = companion.value
+  const previous = request.value
+  if (partner && previous && partner.id === id) {
+    setRequest(partner)
+    companionDetail.setRequest(previous)
+    void fetchRequest(id, { background: true })
+  } else {
+    void fetchRequest(id)
+  }
   void fetchInitialReleases(id)
 })
+
+/**
+ * Where a sent release leaves a pair: on the other half while it still needs one, on a closing
+ * state once neither does, and otherwise back on the request as for any single release.
+ */
+function afterGrab(item: BookRequestItem): void {
+  const partner = companion.value
+  if (partner && isChoosable(partner)) {
+    void router.push({ name: 'book-request-releases', params: { id: partner.id }, query: listQuery.value })
+    return
+  }
+  if (partner && SETTLED_STATUSES.includes(partner.status)) {
+    finished.value = true
+    return
+  }
+  void router.push({ name: 'book-request-detail', params: { id: item.id }, query: route.query })
+}
+
+function closeDrawer(): void {
+  void router.push({ name: 'book-requests', query: listQuery.value })
+}
 
 function releaseKey(release: ReleaseCandidateItem): string {
   return `${release.indexerId}:${release.guid}`
@@ -669,10 +767,10 @@ function showEverySource(): void {
     <RequestDrawerToolbar leading="back" @back="goBack">
       <template #title>
         <p class="truncate text-sm font-medium text-foreground">
-          {{ isRetry ? t('bookRequests.releases.retryTitle') : t('bookRequests.releases.title') }}
+          {{ isRetry ? t('bookRequests.releases.retryTitle') : pairTabs ? t('bookRequests.releases.pairTitle') : t('bookRequests.releases.title') }}
         </p>
       </template>
-      <template #actions>
+      <template v-if="!finished" #actions>
         <Button variant="ghost" size="sm" :disabled="loading" @click="handleRefresh">
           <RefreshCw :size="14" aria-hidden="true" />
           {{ t('bookRequests.releases.refresh') }}
@@ -694,7 +792,13 @@ function showEverySource(): void {
       <template v-else-if="request">
         <!-- The stage is named in the toolbar, so what is left here is the book being grabbed for. -->
         <header class="flex items-center gap-3.5">
-          <RequestCover :src="request.coverUrl" :media-kind="request.mediaKind" class="h-[72px] w-12 shadow-sm" :icon-size="20" />
+          <RequestCover
+            :src="request.coverUrl"
+            :fallback-sources="bookCoverSources"
+            :media-kind="request.mediaKind"
+            class="h-[72px] w-12 shadow-sm"
+            :icon-size="20"
+          />
 
           <div class="min-w-0 flex-1">
             <h2 class="truncate text-base font-semibold tracking-tight text-foreground">{{ request.title }}</h2>
@@ -707,6 +811,8 @@ function showEverySource(): void {
           </div>
         </header>
 
+        <ReleasePairTabs v-if="pairTabs" :tabs="pairTabs" :query="listQuery" />
+
         <p v-if="isRetry && failureText" class="mt-3 text-sm text-muted-foreground">
           {{ t('bookRequests.releases.previousFailure', { reason: failureText }) }}
         </p>
@@ -718,7 +824,7 @@ function showEverySource(): void {
           quieter voice. The empty state below says what actually happened.
         -->
         <section
-          v-if="criteria && !noSourcesEnabled"
+          v-if="criteria && !noSourcesEnabled && !finished"
           class="mt-3 rounded-lg border border-border bg-muted/40 p-3"
           :aria-label="t('bookRequests.releases.criteria.label')"
         >
@@ -1028,11 +1134,24 @@ function showEverySource(): void {
         </section>
 
         <!-- Not while nothing was searched: "showing the last search" is the same claim again. -->
-        <p v-if="cached && !loading && !noSourcesEnabled" class="mt-3 text-xs text-muted-foreground">
+        <p v-if="cached && !loading && !noSourcesEnabled && !finished" class="mt-3 text-xs text-muted-foreground">
           {{ t('bookRequests.releases.cached') }}
         </p>
 
-        <p v-if="loading" role="status" class="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
+        <!-- Where a pair ends once neither half needs a release: said here, not left to a passing toast. -->
+        <div v-if="finished" role="status" class="mt-10 flex flex-col items-center gap-3 text-center">
+          <span class="grid size-11 place-items-center rounded-full bg-success/15 text-success">
+            <Check :size="22" aria-hidden="true" />
+          </span>
+          <p class="text-base font-semibold text-foreground">{{ t('bookRequests.releases.pair.finishedTitle') }}</p>
+          <p class="max-w-sm text-sm text-muted-foreground">{{ t('bookRequests.releases.pair.finishedHint') }}</p>
+          <div class="mt-2 flex flex-wrap justify-center gap-2">
+            <Button variant="outline" size="sm" @click="goBack">{{ t('bookRequests.releases.pair.backToRequest') }}</Button>
+            <Button size="sm" @click="closeDrawer">{{ t('bookRequests.releases.pair.done') }}</Button>
+          </div>
+        </div>
+
+        <p v-else-if="loading" role="status" class="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 class="size-4 animate-spin" aria-hidden="true" />
           {{ t('bookRequests.releases.searching') }}
         </p>
@@ -1083,19 +1202,30 @@ function showEverySource(): void {
               constant on a single-indexer search, and dropping them gives the two that actually
               differ the width the release title was being squeezed out of.
             -->
-            <p class="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              <span class="font-medium text-foreground">{{ t('bookRequests.releases.summaryCount', { count: releases.length }) }}</span>
-              <template v-for="fact in summaryFacts" :key="fact">
-                <span aria-hidden="true" class="opacity-50">&middot;</span>
-                <span>{{ fact }}</span>
-              </template>
-              <template v-if="sharedIndexer">
-                <span aria-hidden="true" class="opacity-50">&middot;</span>
-                <span class="rounded-full border px-1.5 py-px font-medium" :class="sharedIndexerClass">
-                  {{ t('bookRequests.releases.allIndexer', { name: sharedIndexer }) }}
-                </span>
-              </template>
-            </p>
+            <div class="mt-3.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span class="font-medium text-foreground">{{ t('bookRequests.releases.summaryCount', { count: releases.length }) }}</span>
+                <template v-for="fact in summaryFacts" :key="fact">
+                  <span aria-hidden="true" class="opacity-50">&middot;</span>
+                  <span>{{ fact }}</span>
+                </template>
+                <template v-if="sharedIndexer">
+                  <span aria-hidden="true" class="opacity-50">&middot;</span>
+                  <span class="rounded-full border px-1.5 py-px font-medium" :class="sharedIndexerClass">
+                    {{ t('bookRequests.releases.allIndexer', { name: sharedIndexer }) }}
+                  </span>
+                </template>
+              </p>
+
+              <!--
+                Beside the list it governs rather than on each row: it answers a doubt about the
+                request, and it applies to a magnet pasted by hand as much as to a ranked release.
+              -->
+              <label class="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+                <input v-model="holdForReview" type="checkbox" class="size-3.5 shrink-0 rounded-xs border-border accent-primary" />
+                {{ t('bookRequests.releases.holdForReview') }}
+              </label>
+            </div>
 
             <div
               v-if="nothingMatchedProfile"
@@ -1226,7 +1356,25 @@ function showEverySource(): void {
                         </span>
                       </p>
 
-                      <p class="line-clamp-2 text-sm font-medium text-foreground">{{ release.title }}</p>
+                      <!--
+                        The title is the link because it is what the source page describes, and a
+                        separate button would be a third control competing with Send on every row.
+                        `noreferrer` keeps a private tracker from learning this instance's address.
+                      -->
+                      <p class="line-clamp-2 text-sm font-medium text-foreground">
+                        <a
+                          v-if="release.infoUrl"
+                          :href="release.infoUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          :aria-label="t('bookRequests.releases.releasePageLabel', { title: release.title, indexer: release.indexerName })"
+                          class="rounded-xs underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                          {{ release.title }}
+                          <ArrowUpRight :size="13" class="inline-block align-[-2px] text-muted-foreground" aria-hidden="true" />
+                        </a>
+                        <template v-else>{{ release.title }}</template>
+                      </p>
 
                       <!--
                         Two runs, not one. The chips say where the release comes from and what
@@ -1311,7 +1459,7 @@ function showEverySource(): void {
                         <button
                           v-if="credits(release).length"
                           type="button"
-                          class="ms-1 rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          class="ms-1 rounded-xs text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           :aria-expanded="isExpanded(release)"
                           @click="toggleWhy(release)"
                         >
@@ -1342,7 +1490,7 @@ function showEverySource(): void {
                         <li
                           v-for="reason in credits(release)"
                           :key="reason.code"
-                          class="rounded border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                          class="rounded-xs border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
                         >
                           {{ reasonText(reason) }} <span class="tabular-nums text-foreground">{{ reasonPoints(reason.points) }}</span>
                         </li>

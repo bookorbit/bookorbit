@@ -1,5 +1,6 @@
 import {
   findSiblingOccupiedTarget,
+  isSameWork,
   resolveBookFileTargets,
   resolvePrimaryFileTarget,
   type BookFileTargetsInput,
@@ -463,6 +464,27 @@ describe('resolveBookFileTargets', () => {
       ]);
 
       expect(findSiblingOccupiedTarget(files, targets)).toBe(`${folder}/book-part02.mp3`);
+    });
+  });
+
+  describe('isSameWork', () => {
+    it('matches the same title and primary author regardless of case, spacing, and Unicode form', () => {
+      expect(isSameWork({ title: 'Dune', primaryAuthor: 'Frank Herbert' }, { title: '  dune ', primaryAuthor: 'FRANK  HERBERT' })).toBe(true);
+      expect(isSameWork({ title: 'Caf\u00e9', primaryAuthor: null }, { title: 'Cafe\u0301', primaryAuthor: null })).toBe(true);
+    });
+
+    it('tells apart different volumes of one series', () => {
+      expect(isSameWork({ title: 'Dune Messiah', primaryAuthor: 'Frank Herbert' }, { title: 'Dune', primaryAuthor: 'Frank Herbert' })).toBe(false);
+    });
+
+    it('tells apart one title by two authors', () => {
+      expect(isSameWork({ title: 'Dune', primaryAuthor: 'Frank Herbert' }, { title: 'Dune', primaryAuthor: 'Brian Herbert' })).toBe(false);
+      expect(isSameWork({ title: 'Dune', primaryAuthor: 'Frank Herbert' }, { title: 'Dune', primaryAuthor: null })).toBe(false);
+    });
+
+    it('never treats untitled books as the same work', () => {
+      expect(isSameWork({ title: null, primaryAuthor: 'Frank Herbert' }, { title: null, primaryAuthor: 'Frank Herbert' })).toBe(false);
+      expect(isSameWork({ title: ' ', primaryAuthor: null }, { title: ' ', primaryAuthor: null })).toBe(false);
     });
   });
 });

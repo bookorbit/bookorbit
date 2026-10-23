@@ -1,4 +1,5 @@
 import { extractMobiCover, parseMobiFile } from '../lib/mobi-parser';
+import { splitMetadataIsbn } from '../../../common/text-match/isbn-normalize';
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../common/utils/published-date.utils';
 import type { FormatExtractor, ParsedBookData } from './format-extractor.interface';
 
@@ -12,7 +13,7 @@ export class MobiFormatExtractor implements FormatExtractor {
     return {
       title: mobi.title,
       description: mobi.description,
-      isbn13: mobi.isbn,
+      ...splitMetadataIsbn(mobi.isbn),
       publisher: mobi.publisher,
       publishedDate,
       publishedYear,

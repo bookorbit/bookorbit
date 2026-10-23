@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Questions and Discussions
-    url: https://github.com/bookorbit/bookorbit/discussions
-    about: Ask questions, get help with your setup, or share how you use BookOrbit
   - name: Documentation
     url: https://bookorbit.app
     about: Read the full documentation at bookorbit.app

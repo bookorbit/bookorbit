@@ -25,7 +25,9 @@
   --popover: oklch(0.975 var(--tint-c-surface) var(--tint-h));
   --popover-foreground: oklch(0.145 var(--tint-c-surface) var(--tint-h));
 
-  --primary: oklch(0.21 var(--tint-c-surface) var(--tint-h));
+  /* The accent class sets --accent-primary; a style may derive --primary from it instead. */
+  --accent-primary: oklch(0.21 var(--tint-c-surface) var(--tint-h));
+  --primary: var(--accent-primary);
   --primary-foreground: oklch(0.985 0.004 var(--tint-h));
 
   --secondary: oklch(0.955 var(--tint-c-surface) var(--tint-h));
@@ -39,12 +41,6 @@
 
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.52 0.16 150);
-  --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.57 0.15 75);
-  --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.52 0.17 245);
-  --info-foreground: oklch(0.985 0 0);
 
   --success: oklch(0.52 0.14 148);
   --success-foreground: oklch(0.985 0 0);
@@ -56,6 +52,7 @@
 
   /* In flight: neither finished nor broken. Tuned per theme for the same reason. */
   --info: oklch(0.55 0.12 255);
+  --info-foreground: oklch(0.985 0 0);
 
   --star-highlight: oklch(0.76 0.18 90);
 
@@ -69,6 +66,11 @@
   --volume-reading: oklch(0.74 0.15 72);
   --volume-unread: oklch(0.855 var(--tint-c-surface) var(--tint-h));
   --volume-missing: oklch(0.58 0.22 27);
+
+  /* Read-aloud sync meter: the text and audio tracks drawn in the sync pill. Fills only, so they
+     have to separate from each other and from the card, not clear text contrast. */
+  --sync-meter-text: oklch(0.6 0.15 235);
+  --sync-meter-audio: oklch(0.62 0.21 355);
 
   /* Metadata score ramp: red at 0, through orange and yellow, to green at 100. Consumers
      interpolate between these four with color-mix in oklch, so the whole spectrum follows
@@ -129,6 +131,16 @@
   /* Shape */
   --radius: 0.625rem;
 
+  /* The default surface palette (steel, as in surfaces.css), so a ladder that reads these is valid before data-surface lands. */
+  --surface-h: 258;
+  --surface-c: 0.01;
+  --surface-l: -0.005;
+
+  /* Type. The bridge maps the Tailwind font utilities onto these, so a style can swap them at runtime. */
+  --app-font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --app-font-serif: 'Fraunces Variable', ui-serif, Georgia, serif;
+  --app-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
   /* App shell (sidebar + header): one card gap, one material.
      --shell-surface-opacity is user-controlled and overwritten on <html>. */
   --shell-gap: 0.75rem;
@@ -140,6 +152,43 @@
   --shell-accent-tint: color-mix(in oklch, var(--primary) 12%, transparent);
   --shell-accent-line: color-mix(in oklch, var(--primary) 30%, transparent);
   --shell-border: var(--shell-accent-line);
+  --shell-backdrop: blur(24px) saturate(150%);
+  --shell-shadow: var(--elevation-lg);
+
+  /* Accent glow behind the top of the main column (.shell-glow). --glow-band is the style's own reach and
+     --glow-reach the user's multiplier on it, written on <html>. A texture keeps its tile size at any reach;
+     only the fade that reveals it follows the band. */
+  --glow-reach: 0.5;
+  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 38%, transparent) 0%, transparent 100%);
+  --glow-band: 20rem;
+  --glow-texture: none;
+  --glow-texture-size: auto;
+
+  /* How a grid cover answers the pointer. */
+  --cover-hover-transform: scale(1.02);
+
+  /* Sidebar section labels, counts and the active navigation row. */
+  --sidebar-heading-foreground: var(--muted-foreground);
+  --sidebar-heading-size: 11px;
+  --sidebar-heading-weight: 500;
+  --sidebar-heading-tracking: 0.14em;
+  --sidebar-count-bg: var(--shell-accent-tint);
+  --sidebar-count-size: 11px;
+  --sidebar-count-weight: 600;
+  --sidebar-active-bg: var(--shell-accent-tint);
+  --sidebar-active-weight: 500;
+
+  /* How strongly a format chip wears its format colour (see formatChipStyle). */
+  --format-chip-fill: 10%;
+  --format-chip-border: 40%;
+
+  /* Book detail metadata chips. Tag ink is tuned like --warning so it clears AA on a light card. */
+  --chip-genre-bg: var(--muted);
+  --chip-genre-fg: var(--foreground);
+  --chip-genre-border: transparent;
+  --chip-tag-bg: oklch(0.769 0.188 70.08 / 0.1);
+  --chip-tag-fg: oklch(0.52 0.13 68);
+  --chip-tag-border: oklch(0.769 0.188 70.08 / 0.3);
 
   --dot-color: oklch(0.82 var(--tint-c-surface) var(--tint-h));
 
@@ -244,6 +293,9 @@
   --path-fold: oklch(0.62 0.02 var(--tint-h));
 
   --audit-authentication: oklch(0.55 0.17 295);
+  --audit-requests: oklch(0.56 0.17 350);
+  /* Settings events sit on a neutral, so red in the audit log only ever means something was deleted. */
+  --audit-config: oklch(0.56 0.035 255);
   --audit-books: oklch(0.55 0.16 245);
   --audit-users: oklch(0.62 0.14 70);
   --audit-libraries: oklch(0.55 0.1 195);
@@ -251,30 +303,44 @@
   --audit-integrations: oklch(0.58 0.15 150);
   --audit-settings: oklch(0.55 0.15 25);
 
-  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
-     reason every other text colour is: one set of hex values for both themes left the brightest
-     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
-  --pill-format-default: oklch(0.55 0.02 260);
-  --pill-format-epub: oklch(0.55 0.14 150);
-  --pill-format-kepub: oklch(0.55 0.12 178);
-  --pill-format-mobi: oklch(0.55 0.18 275);
-  --pill-format-azw3: oklch(0.53 0.11 185);
-  --pill-format-azw: oklch(0.55 0.14 235);
-  --pill-format-fb2: oklch(0.55 0.17 355);
-  --pill-format-djvu: oklch(0.55 0.04 255);
-  --pill-format-txt: oklch(0.55 0.03 60);
-  --pill-format-pdf: oklch(0.55 0.17 25);
-  --pill-format-cbz: oklch(0.55 0.16 260);
-  --pill-format-cbr: oklch(0.58 0.15 55);
-  --pill-format-cb7: oklch(0.55 0.19 300);
-  --pill-format-cbx: oklch(0.55 0.17 325);
-  --pill-format-m4b: oklch(0.58 0.13 75);
-  --pill-format-m4a: oklch(0.58 0.13 95);
-  --pill-format-mp3: oklch(0.56 0.15 145);
-  --pill-format-opus: oklch(0.55 0.11 205);
-  --pill-format-ogg: oklch(0.56 0.15 130);
-  --pill-format-flac: oklch(0.55 0.13 165);
-  --pill-format-readalong: oklch(0.52 0.1 186);
+  /* Achievement medals. Rarity is a metal, the same four finishes the iOS app uses (pewter, steel,
+     amethyst, gold), each as three stops (shadow, body, highlight) so a medal reads as struck metal
+     rather than a flat colour. A medal is an object, so its faces keep the bright stops in both
+     themes; rarity text uses the -ink tokens, which are tuned per theme to clear AA, and bars use
+     the -fill tokens. */
+  --medal-common-shadow: oklch(0.454 0.014 84.6);
+  --medal-common-body: oklch(0.72 0.018 84.6);
+  --medal-common-highlight: oklch(0.929 0.013 86.8);
+  --medal-rare-shadow: oklch(0.452 0.077 244.9);
+  --medal-rare-body: oklch(0.712 0.085 244.9);
+  --medal-rare-highlight: oklch(0.933 0.028 239.7);
+  --medal-epic-shadow: oklch(0.423 0.116 299.6);
+  --medal-epic-body: oklch(0.652 0.137 294.7);
+  --medal-epic-highlight: oklch(0.895 0.051 308.4);
+  --medal-legendary-shadow: oklch(0.54 0.105 85.4);
+  --medal-legendary-body: oklch(0.827 0.129 89.2);
+  --medal-legendary-highlight: oklch(0.964 0.06 96.1);
+  --rarity-common: oklch(0.472 0.018 90.4);
+  --rarity-rare: oklch(0.495 0.094 246.5);
+  --rarity-epic: oklch(0.448 0.125 297.7);
+  --rarity-legendary: oklch(0.495 0.096 86);
+  --rarity-common-fill: oklch(0.632 0.019 84.6);
+  --rarity-rare-fill: oklch(0.621 0.101 246.1);
+  --rarity-epic-fill: oklch(0.575 0.151 294.4);
+  --rarity-legendary-fill: oklch(0.726 0.133 88.4);
+  /* A medal not yet earned: an unstruck blank in the card's own colour. */
+  --medal-blank: color-mix(in oklch, var(--foreground) 5%, var(--card));
+  --medal-blank-edge: color-mix(in oklch, var(--foreground) 15%, var(--card));
+  --medal-blank-face-low: color-mix(in oklch, var(--foreground) 3%, var(--card));
+  --medal-blank-face-high: color-mix(in oklch, var(--foreground) 8%, var(--card));
+  --medal-blank-glyph: color-mix(in oklch, var(--muted-foreground) 70%, var(--card));
+  --medal-shadow: oklch(0.2 0.02 260 / 0.22);
+  --shelf-line: color-mix(in oklch, var(--foreground) 14%, transparent);
+  /* Sign-in pages: a bookplate pasted on an endpaper. Light mode prints the plate on a warm sheet. */
+  --plate: oklch(0.975 0.012 84);
+  --plate-rule: color-mix(in oklch, var(--foreground) 42%, transparent);
+  --endpaper: color-mix(in oklch, var(--primary) 5%, var(--background));
+  --endpaper-ink: color-mix(in oklch, var(--primary) 14%, var(--background));
 }
 
 @media (min-width: 40rem) {
@@ -290,6 +356,10 @@
 }
 
 .dark {
+  /* Every style shares one glow reach and strength, so a percentage looks the same in each; only
+     Nostalgia lays its square texture over it. */
+  --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 60%, transparent) 0%, transparent 100%);
+
   color-scheme: dark;
   --tint-c: 0.0175;
   --tint-c-surface: var(--tint-c);
@@ -304,7 +374,7 @@
   --popover: oklch(calc(0.18 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));
   --popover-foreground: oklch(0.985 0.001 var(--tint-h));
 
-  --primary: oklch(0.91 var(--tint-c-surface) var(--tint-h));
+  --accent-primary: oklch(0.91 var(--tint-c-surface) var(--tint-h));
   --primary-foreground: oklch(0.18 var(--tint-c-surface) var(--tint-h));
 
   --secondary: oklch(calc(0.245 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));
@@ -318,12 +388,6 @@
 
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.74 0.15 150);
-  --success-foreground: oklch(0.145 0 0);
-  --warning: oklch(0.78 0.14 75);
-  --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.75 0.14 245);
-  --info-foreground: oklch(0.145 0 0);
 
   --success: oklch(0.72 0.15 148);
   --success-foreground: oklch(0.145 0 0);
@@ -332,6 +396,7 @@
   --warning-foreground: oklch(0.145 0 0);
 
   --info: oklch(0.72 0.12 255);
+  --info-foreground: oklch(0.145 0 0);
 
   --star-highlight: oklch(0.84 0.17 95);
 
@@ -341,6 +406,8 @@
   --volume-reading: oklch(0.78 0.14 75);
   --volume-unread: oklch(0.315 var(--tint-c-surface) var(--tint-h));
   --volume-missing: oklch(0.7 0.19 25);
+  --sync-meter-text: oklch(0.74 0.14 230);
+  --sync-meter-audio: oklch(0.72 0.18 350);
 
   /* Lifted the way the pills are, with the yellow middle highest so the ramp holds an even
      weight across the spectrum on a dark card */
@@ -389,6 +456,8 @@
 
   --scrollbar-thumb: oklch(0.35 var(--tint-c) var(--tint-h));
   --scrollbar-thumb-hover: oklch(0.45 var(--tint-c) var(--tint-h));
+
+  --chip-tag-fg: oklch(0.828 0.189 84.429);
 
   /* Lifted lightness so pills read on dark surfaces */
   --pill-web: oklch(0.72 0.14 245);
@@ -468,6 +537,8 @@
   --path-fold: oklch(0.6 0.01 var(--tint-h));
 
   --audit-authentication: oklch(0.72 0.17 295);
+  --audit-requests: oklch(0.74 0.14 350);
+  --audit-config: oklch(0.74 0.035 255);
   --audit-books: oklch(0.72 0.14 245);
   --audit-users: oklch(0.78 0.13 70);
   --audit-libraries: oklch(0.74 0.1 195);
@@ -475,29 +546,22 @@
   --audit-integrations: oklch(0.75 0.13 150);
   --audit-settings: oklch(0.72 0.15 25);
 
-  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
-     reason every other text colour is: one set of hex values for both themes left the brightest
-     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
-
-  --pill-format-default: oklch(0.75 0.02 260);
-  --pill-format-epub: oklch(0.75 0.13 150);
-  --pill-format-kepub: oklch(0.75 0.11 178);
-  --pill-format-mobi: oklch(0.72 0.16 275);
-  --pill-format-azw3: oklch(0.76 0.11 185);
-  --pill-format-azw: oklch(0.72 0.13 235);
-  --pill-format-fb2: oklch(0.73 0.15 355);
-  --pill-format-djvu: oklch(0.75 0.04 255);
-  --pill-format-txt: oklch(0.76 0.03 60);
-  --pill-format-pdf: oklch(0.72 0.15 25);
-  --pill-format-cbz: oklch(0.72 0.14 260);
-  --pill-format-cbr: oklch(0.76 0.13 55);
-  --pill-format-cb7: oklch(0.72 0.17 300);
-  --pill-format-cbx: oklch(0.73 0.15 325);
-  --pill-format-m4b: oklch(0.79 0.13 75);
-  --pill-format-m4a: oklch(0.8 0.13 95);
-  --pill-format-mp3: oklch(0.78 0.15 145);
-  --pill-format-opus: oklch(0.76 0.11 205);
-  --pill-format-ogg: oklch(0.78 0.15 130);
-  --pill-format-flac: oklch(0.75 0.13 165);
-  --pill-format-readalong: oklch(0.78 0.11 186);
+  --rarity-common: oklch(0.781 0.018 84.6);
+  --rarity-rare: oklch(0.789 0.072 244.4);
+  --rarity-epic: oklch(0.764 0.102 296.2);
+  --rarity-legendary: oklch(0.846 0.125 90.3);
+  --rarity-common-fill: oklch(0.714 0.018 84.6);
+  --rarity-rare-fill: oklch(0.712 0.085 244.9);
+  --rarity-epic-fill: oklch(0.652 0.137 294.7);
+  --rarity-legendary-fill: oklch(0.827 0.129 89.2);
+  --medal-blank: color-mix(in oklch, var(--foreground) 6%, var(--card));
+  --medal-blank-edge: color-mix(in oklch, var(--foreground) 16%, var(--card));
+  --medal-blank-face-high: color-mix(in oklch, var(--foreground) 9%, var(--card));
+  --medal-blank-glyph: color-mix(in oklch, var(--muted-foreground) 62%, var(--card));
+  --medal-shadow: oklch(0 0 0 / 0.55);
+  --shelf-line: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --plate: var(--card);
+  --plate-rule: color-mix(in oklch, var(--foreground) 34%, transparent);
+  --endpaper: color-mix(in oklch, var(--primary) 7%, var(--background));
+  --endpaper-ink: color-mix(in oklch, var(--primary) 17%, var(--background));
 }

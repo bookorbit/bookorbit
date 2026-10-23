@@ -43,6 +43,7 @@ function makeKoreaderUserRow(overrides?: Record<string, unknown>) {
     passwordHash: 'stored-bcrypt-hash',
     passwordMd5: md5Hex('secret'),
     syncEnabled: true,
+    hideAudioOnlyBooks: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
   };
@@ -52,6 +53,7 @@ describe('KoreaderService', () => {
   let service: KoreaderService;
   let mockRepo: {
     findKoreaderUser: ReturnType<typeof vi.fn>;
+    findKoreaderCatalogPreferences: ReturnType<typeof vi.fn>;
     findKoreaderUserByUsername: ReturnType<typeof vi.fn>;
     createKoreaderUser: ReturnType<typeof vi.fn>;
     updateKoreaderUser: ReturnType<typeof vi.fn>;
@@ -75,6 +77,7 @@ describe('KoreaderService', () => {
     getReadingProgress: ReturnType<typeof vi.fn>;
     getTotalSyncedBooks: ReturnType<typeof vi.fn>;
     getDevicesList: ReturnType<typeof vi.fn>;
+    getDeviceDeliverySettingsForDevices: ReturnType<typeof vi.fn>;
     getDeviceFileNamingPatterns: ReturnType<typeof vi.fn>;
     getDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
     getKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
@@ -102,6 +105,8 @@ describe('KoreaderService', () => {
   };
   let mockPositionConverter: {
     xpointerPointToCfi: ReturnType<typeof vi.fn>;
+    cfiPointToXpointer: ReturnType<typeof vi.fn>;
+    compareCfi: ReturnType<typeof vi.fn>;
   };
   let mockBookService: {
     syncKoboReadingStateForExternalProgress: ReturnType<typeof vi.fn>;
@@ -131,6 +136,7 @@ describe('KoreaderService', () => {
 
     mockRepo = {
       findKoreaderUser: vi.fn(),
+      findKoreaderCatalogPreferences: vi.fn(),
       findKoreaderUserByUsername: vi.fn(),
       createKoreaderUser: vi.fn(),
       updateKoreaderUser: vi.fn(),
@@ -154,6 +160,7 @@ describe('KoreaderService', () => {
       getReadingProgress: vi.fn(),
       getTotalSyncedBooks: vi.fn(),
       getDevicesList: vi.fn().mockResolvedValue([]),
+      getDeviceDeliverySettingsForDevices: vi.fn().mockResolvedValue([]),
       getDeviceFileNamingPatterns: vi.fn().mockResolvedValue([]),
       getDeviceFileNamingPattern: vi.fn().mockResolvedValue(null),
       getKoreaderUserDefaultPattern: vi.fn(),
@@ -185,6 +192,8 @@ describe('KoreaderService', () => {
 
     mockPositionConverter = {
       xpointerPointToCfi: vi.fn().mockResolvedValue({ status: 'failed', reason: 'chapter_unavailable' }),
+      cfiPointToXpointer: vi.fn().mockResolvedValue({ status: 'failed', reason: 'chapter_unavailable' }),
+      compareCfi: vi.fn().mockReturnValue(null),
     };
 
     mockBookService = {
@@ -291,6 +300,16 @@ describe('KoreaderService', () => {
       });
     });
 
+    it('stores the audiobook-only catalog setting either way', async () => {
+      mockRepo.findKoreaderUser.mockResolvedValue(makeKoreaderUserRow());
+
+      await service.updateCredentials(7, { hideAudioOnlyBooks: false });
+      await service.updateCredentials(7, { hideAudioOnlyBooks: true });
+
+      expect(mockRepo.updateKoreaderUser).toHaveBeenNthCalledWith(1, 7, { hideAudioOnlyBooks: false });
+      expect(mockRepo.updateKoreaderUser).toHaveBeenNthCalledWith(2, 7, { hideAudioOnlyBooks: true });
+    });
+
     it('throws when credentials do not exist', async () => {
       mockRepo.findKoreaderUser.mockResolvedValue(null);
 
@@ -334,14 +353,39 @@ describe('KoreaderService', () => {
       await expect(service.getCredentials(7)).resolves.toEqual({
         username: 'reader',
         syncEnabled: true,
+        hideAudioOnlyBooks: true,
         createdAt: '2026-01-01T00:00:00.000Z',
+        readAloudDelivery: null,
       });
+    });
+
+    it('reports a reader who chose to see audiobook-only books', async () => {
+      mockRepo.findKoreaderUser.mockResolvedValue(makeKoreaderUserRow({ hideAudioOnlyBooks: false }));
+
+      await expect(service.getCredentials(7)).resolves.toMatchObject({ hideAudioOnlyBooks: false });
     });
 
     it('returns null when credentials do not exist', async () => {
       mockRepo.findKoreaderUser.mockResolvedValue(null);
 
       await expect(service.getCredentials(7)).resolves.toBeNull();
+    });
+  });
+
+  describe('hidesAudioOnlyBooks', () => {
+    it('follows the stored setting', async () => {
+      mockRepo.findKoreaderCatalogPreferences.mockResolvedValueOnce({ hideAudioOnlyBooks: false });
+      mockRepo.findKoreaderCatalogPreferences.mockResolvedValueOnce({ hideAudioOnlyBooks: true });
+
+      await expect(service.hidesAudioOnlyBooks(7)).resolves.toBe(false);
+      await expect(service.hidesAudioOnlyBooks(7)).resolves.toBe(true);
+      expect(mockRepo.findKoreaderCatalogPreferences).toHaveBeenCalledWith(7);
+    });
+
+    it('hides them when the reader has no stored setting', async () => {
+      mockRepo.findKoreaderCatalogPreferences.mockResolvedValue(undefined);
+
+      await expect(service.hidesAudioOnlyBooks(7)).resolves.toBe(true);
     });
   });
 
@@ -379,6 +423,110 @@ describe('KoreaderService', () => {
   });
 
   describe('saveProgress', () => {
+    it('does not let an older single push rewind newer web progress or become the latest device position', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 62, updatedAt: new Date('2026-10-10T18:00:00Z') });
+
+      await service.saveProgress(syncUser(12), {
+        document: 'abcdef1234567890fedcba',
+        percentage: 0.05,
+        progress: '/body/DocFragment[1]/body',
+        timestamp: Math.floor(Date.parse('2026-10-10T17:00:00Z') / 1000),
+      });
+
+      expect(mockRepo.upsertDeviceProgress).not.toHaveBeenCalled();
+      expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
+      expect(mockBookService.syncKoboReadingStateForExternalProgress).not.toHaveBeenCalled();
+      expect(mockBookService.autoUpdateReadStatusForProgress).not.toHaveBeenCalled();
+      expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
+    });
+
+    // A book closed offline is pushed on reconnection with the time it was closed; listening on a
+    // phone meanwhile must not make that reading vanish.
+    it('takes a late push that reaches further than the shared position, stamped as moved now', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 62, cfi: 'epubcfi(/6/14!/4/2/1:0)', updatedAt: new Date('2026-10-10T18:00:00Z') });
+      mockPositionConverter.xpointerPointToCfi.mockResolvedValue({ status: 'exact', cfi: 'epubcfi(/6/14!/4/90/1:0)' });
+      mockPositionConverter.compareCfi.mockReturnValue(1);
+      const before = Date.now();
+
+      await service.saveProgress(syncUser(12), {
+        document: 'abcdef1234567890fedcba',
+        percentage: 0.7,
+        progress: '/body/DocFragment[7]/body/p[90]/text().0',
+        timestamp: Math.floor(Date.parse('2026-10-10T17:00:00Z') / 1000),
+      });
+
+      expect(mockRepo.upsertDeviceProgress).toHaveBeenCalled();
+      const written = mockRepo.upsertReadingProgress.mock.calls[0]![0] as { percentage: number; readAt: Date; lastReadAt: Date };
+      expect(written.percentage).toBe(70);
+      expect(written.readAt.getTime()).toBeGreaterThanOrEqual(before);
+      // Still ranked by when it was read, so reconnecting does not lift it above books read since.
+      expect(written.lastReadAt).toEqual(new Date('2026-10-10T17:00:00Z'));
+      expect(mockBookService.syncAudioProgressForExternalEbookProgress).toHaveBeenCalledWith(
+        12,
+        55,
+        44,
+        70,
+        expect.objectContaining({ sourceUpdatedAt: new Date('2026-10-10T17:00:00Z') }),
+      );
+    });
+
+    it('still drops a late push whose place is behind the shared one', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 62, cfi: 'epubcfi(/6/14!/4/90/1:0)', updatedAt: new Date('2026-10-10T18:00:00Z') });
+      mockPositionConverter.xpointerPointToCfi.mockResolvedValue({ status: 'exact', cfi: 'epubcfi(/6/14!/4/2/1:0)' });
+      mockPositionConverter.compareCfi.mockReturnValue(-1);
+
+      await service.saveProgress(syncUser(12), {
+        document: 'abcdef1234567890fedcba',
+        percentage: 0.7,
+        progress: '/body/DocFragment[7]/body/p[2]/text().0',
+        timestamp: Math.floor(Date.parse('2026-10-10T17:00:00Z') / 1000),
+      });
+
+      expect(mockRepo.upsertDeviceProgress).not.toHaveBeenCalled();
+      expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
+    });
+
+    it.each([1700000000, 0])('ignores a delayed push older than the most recent device position at %s', async (timestamp) => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({ percentage: 0.75, syncTimestamp: 1700000010 });
+
+      await service.saveProgress(syncUser(12), { document: 'doc-hash', percentage: 0.2, timestamp });
+
+      expect(mockRepo.upsertDeviceProgress).not.toHaveBeenCalled();
+      expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
+    });
+
+    it.each([1700000000, 1700000001, undefined])('keeps deliberate backward single pushes compatible at timestamp %s', async (timestamp) => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({ percentage: 0.75, syncTimestamp: 1700000000 });
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 75, updatedAt: new Date(1700000000500) });
+
+      await service.saveProgress(syncUser(12), { document: 'doc-hash', percentage: 0.2, timestamp });
+
+      expect(mockRepo.upsertDeviceProgress).toHaveBeenCalled();
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(expect.objectContaining({ percentage: 20 }));
+    });
+
+    it('bounds a future device clock and recovers a previously stored future timestamp', async () => {
+      const before = Math.floor(Date.now() / 1000);
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({
+        percentage: 0.75,
+        syncTimestamp: before + 86400,
+        updatedAt: new Date((before - 10) * 1000),
+      });
+
+      await service.saveProgress(syncUser(12), { document: 'doc-hash', percentage: 0.2, timestamp: before + 86400 });
+
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(expect.objectContaining({ percentage: 20 }));
+      const written = mockRepo.upsertDeviceProgress.mock.calls[0]![0] as { syncTimestamp: number };
+      expect(written.syncTimestamp).toBeGreaterThanOrEqual(before);
+      expect(written.syncTimestamp).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
+    });
+
     it('resolves the book file, parses progress, extracts chapters, and updates synced progress', async () => {
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
       mockChapterService.parseChapterIndexFromProgress.mockReturnValue(6);
@@ -406,6 +554,7 @@ describe('KoreaderService', () => {
         chapterIndex: 6,
         syncTimestamp: 1700000000,
       });
+      // Stamped as a text move, so a client can tell the device's page from narration saved before it.
       expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith({
         bookFileId: 44,
         userId: 12,
@@ -413,6 +562,8 @@ describe('KoreaderService', () => {
         cfi: null,
         xpointer: '/body/DocFragment[7]',
         pageNumber: null,
+        readAt: new Date(1700000000 * 1000),
+        lastReadAt: new Date(1700000000 * 1000),
       });
       expect(mockRepo.restoreDevice).toHaveBeenCalledWith(12, 'device-12');
       expect(mockBookService.syncKoboReadingStateForExternalProgress).toHaveBeenCalledWith(12, 44, 50);
@@ -627,6 +778,33 @@ describe('KoreaderService', () => {
       expect(written.get(12)).toEqual(expect.objectContaining({ pageNumber: 31, cfi: null }));
     });
 
+    // Regression: a first sweep pushes every book on the device, and each one was ranked as read
+    // the moment the sweep arrived, so sorting by last read came out in processing order.
+    it("stamps each swept book's last read with when the device last opened it", async () => {
+      const appliedAt = Math.floor(Date.now() / 1000);
+
+      await service.applyBulkProgress(
+        7,
+        [
+          { bookFile: bookFile(10, 100), percentage: 0.5, timestamp: 1700000000 },
+          { bookFile: bookFile(11, 110), percentage: 0.2, timestamp: 1750000000 },
+          { bookFile: bookFile(12, 120), percentage: 0.9 },
+        ],
+        device,
+      );
+
+      const written = new Map(
+        mockRepo.upsertReadingProgress.mock.calls.map((call) => {
+          const entry = call[0] as { bookFileId: number; lastReadAt: Date };
+          return [entry.bookFileId, entry.lastReadAt];
+        }),
+      );
+
+      expect(written.get(10)).toEqual(new Date(1700000000 * 1000));
+      expect(written.get(11)).toEqual(new Date(1750000000 * 1000));
+      expect(written.get(12)!.getTime()).toBeGreaterThanOrEqual(appliedAt * 1000);
+    });
+
     it('issues no query for an empty entry list', async () => {
       await expect(service.applyBulkProgress(7, [], device)).resolves.toEqual({ shared: 0, stale: 0, held: 0 });
 
@@ -634,14 +812,14 @@ describe('KoreaderService', () => {
       expect(mockRepo.upsertDeviceProgressMany).not.toHaveBeenCalled();
     });
 
-    it('records the device row but skips shared progress when another device knows something newer', async () => {
+    it('preserves device and shared progress when another device knows something newer', async () => {
       mockRepo.getDeviceProgressForFiles.mockResolvedValue(
         new Map([[10, [{ device: 'Kindle', deviceId: 'device-b', percentage: 0.9, syncTimestamp: 1800000000, updatedAt: new Date() }]]]),
       );
 
       const result = await service.applyBulkProgress(7, [{ bookFile: bookFile(10), percentage: 0.2, timestamp: 1700000000 }], device);
 
-      expect(mockRepo.upsertDeviceProgressMany).toHaveBeenCalledTimes(1);
+      expect(mockRepo.upsertDeviceProgressMany).not.toHaveBeenCalled();
       expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
       expect(mockChapterExtractor.extractAndStoreChapters).not.toHaveBeenCalled();
       expect(result).toEqual({ shared: 0, stale: 1, held: 0 });
@@ -676,8 +854,28 @@ describe('KoreaderService', () => {
       );
 
       expect(result).toEqual({ shared: 1, stale: 1, held: 0 });
-      // One row per file: the last entry wins, exactly as a sequential upsert would leave it.
-      expect(mockRepo.upsertDeviceProgressMany.mock.calls[0]![0]).toEqual([expect.objectContaining({ bookFileId: 10, percentage: 0.3 })]);
+      // Stale entries cannot replace the device position that future pulls will serve.
+      expect(mockRepo.upsertDeviceProgressMany.mock.calls[0]![0]).toEqual([expect.objectContaining({ bookFileId: 10, percentage: 0.6 })]);
+    });
+
+    it('bounds future batch clocks and preserves the newest entry across several delayed entries', async () => {
+      const before = Math.floor(Date.now() / 1000);
+      const result = await service.applyBulkProgress(
+        7,
+        [
+          { bookFile: bookFile(10), percentage: 0.8, timestamp: before + 86400 },
+          { bookFile: bookFile(10), percentage: 0.2, timestamp: before - 60 },
+          { bookFile: bookFile(10), percentage: 0.3, timestamp: before - 30 },
+        ],
+        device,
+      );
+
+      expect(result).toEqual({ shared: 1, stale: 2, held: 0 });
+      const rows = mockRepo.upsertDeviceProgressMany.mock.calls[0]![0] as { percentage: number; syncTimestamp: number }[];
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.percentage).toBe(0.8);
+      expect(rows[0]!.syncTimestamp).toBeGreaterThanOrEqual(before);
+      expect(rows[0]!.syncTimestamp).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
     });
 
     it('carries the previous percentage of the same file into the reread heuristic', async () => {
@@ -1038,27 +1236,27 @@ describe('KoreaderService', () => {
       });
     });
 
-    it('converts CFI to DocFragment XPointer using chapter service (no file I/O)', async () => {
+    it('converts the complete reader CFI rather than returning the chapter start', async () => {
       const readerTime = new Date('2026-02-01T11:00:00.000Z');
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
       mockRepo.getReadingProgress.mockResolvedValue({
         percentage: 50,
-        // /6/4 -> spinePos=4 -> floor(4/2)-1 = 1 -> chapterIndex=1 -> DocFragment[2]
-        cfi: 'epubcfi(/6/4!/4/2/2:10)',
+        cfi: 'epubcfi(/6/4!/4/2/1:10)',
         updatedAt: readerTime,
       });
-      mockChapterService.parseChapterIndexFromCfi.mockReturnValue(1);
+      mockPositionConverter.cfiPointToXpointer.mockResolvedValue({ status: 'exact', pos0: '/body/DocFragment[2]/body/p/text().10' });
 
       await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
         document: 'doc-hash',
         percentage: 0.5,
-        progress: '/body/DocFragment[2]/body',
+        progress: '/body/DocFragment[2]/body/p/text().10',
         device: 'web',
         device_id: 'bookorbit-web',
         timestamp: Math.floor(readerTime.getTime() / 1000),
       });
-      expect(mockChapterService.parseChapterIndexFromCfi).toHaveBeenCalledWith('epubcfi(/6/4!/4/2/2:10)');
+      expect(mockPositionConverter.cfiPointToXpointer).toHaveBeenCalledWith({ bookFileId: 10, cfi: 'epubcfi(/6/4!/4/2/1:10)' });
+      expect(mockChapterService.parseChapterIndexFromCfi).not.toHaveBeenCalled();
     });
 
     it('returns exact web reader KOReader XPointer when it is stored', async () => {
@@ -1080,10 +1278,10 @@ describe('KoreaderService', () => {
         device_id: 'bookorbit-web',
         timestamp: Math.floor(readerTime.getTime() / 1000),
       });
-      expect(mockChapterService.parseChapterIndexFromCfi).not.toHaveBeenCalled();
+      expect(mockPositionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
     });
 
-    it('returns null XPointer when chapter service cannot parse CFI spine index', async () => {
+    it('returns percentage fallback when the converter cannot resolve a CFI', async () => {
       const readerTime = new Date('2026-02-01T11:00:00.000Z');
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
@@ -1092,10 +1290,96 @@ describe('KoreaderService', () => {
         cfi: 'some-unparseable-format',
         updatedAt: readerTime,
       });
-      mockChapterService.parseChapterIndexFromCfi.mockReturnValue(null);
+      mockPositionConverter.cfiPointToXpointer.mockResolvedValue({ status: 'failed', reason: 'unparsable_cfi' });
 
       const result = await service.getProgress(7, 'doc-hash');
-      expect(result?.progress).toBeNull();
+      expect(result).toEqual(expect.objectContaining({ progress: null, percentage: 0.3, device: 'web' }));
+    });
+
+    it.each([
+      { status: 'failed', reason: 'chapter_unavailable', pos0: '/body/DocFragment[1]/body' },
+      { status: 'exact' },
+      { status: 'exact', pos0: '' },
+    ])('never serves a guessed or missing position: %j', async (outcome) => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'epub' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 10.53, cfi: 'epubcfi(/6/2!/4/82/1:50)', updatedAt: new Date() });
+      mockPositionConverter.cfiPointToXpointer.mockResolvedValue(outcome);
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: null, percentage: 0.1053 }));
+    });
+
+    it('keeps percentage fallback available when chapter loading throws', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'epub' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 10.53, cfi: 'epubcfi(/6/2!/4/82/1:50)', updatedAt: new Date() });
+      mockPositionConverter.cfiPointToXpointer.mockRejectedValue(new Error('chapter unavailable'));
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: null, percentage: 0.1053 }));
+      expect(Logger.prototype.warn).toHaveBeenCalled();
+    });
+
+    it.each(['pdf', 'cbz'])('does not send an EPUB pointer to a paged %s reader', async (format) => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 25, cfi: 'epubcfi(/6/2!/4/2/1:5)', updatedAt: new Date() });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: null, percentage: 0.25 }));
+      expect(mockPositionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
+    });
+
+    it.each(['pdf', 'cbz', 'cbr', 'cb7'])('serves the stored page to KOReader for a %s written by a BookOrbit client', async (format) => {
+      const readerTime = new Date('2026-02-01T11:00:00.000Z');
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 42, cfi: null, pageNumber: 37, koreaderProgress: null, updatedAt: readerTime });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
+        document: 'doc-hash',
+        percentage: 0.42,
+        progress: '37',
+        device: 'web',
+        device_id: 'bookorbit-web',
+        timestamp: Math.floor(readerTime.getTime() / 1000),
+      });
+      expect(mockPositionConverter.cfiPointToXpointer).not.toHaveBeenCalled();
+    });
+
+    it('keeps the page KOReader itself stored for a paged file', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'pdf' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 12, pageNumber: 12, koreaderProgress: '12', updatedAt: new Date() });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: '12' }));
+    });
+
+    it('prefers the stored page over a non-page pointer on a paged file', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'cbz' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 12,
+        pageNumber: 9,
+        koreaderProgress: '/body/DocFragment[2]/body',
+        updatedAt: new Date(),
+      });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: '9' }));
+    });
+
+    it.each([null, 0])('serves no position for a paged file whose stored page is %s', async (pageNumber) => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'pdf' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 5, pageNumber, koreaderProgress: null, updatedAt: new Date() });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: null, percentage: 0.05 }));
+    });
+
+    it('never turns a stored page into a position for a reflowable file', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, format: 'epub' });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 5, cfi: null, pageNumber: 4, koreaderProgress: null, updatedAt: new Date() });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual(expect.objectContaining({ progress: null }));
     });
 
     it('returns null when neither device nor web reader progress exists', async () => {
@@ -1135,6 +1419,7 @@ describe('KoreaderService', () => {
           lastSyncAt: '2026-02-01T10:00:00.000Z',
           lastBookTitle: null,
           retiredAt: null,
+          readAloudDelivery: null,
           fileNamingPattern: null,
           seriesFileNamingPattern: null,
           standaloneFileNamingPattern: null,

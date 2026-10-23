@@ -1,7 +1,7 @@
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
-import { readingAttempts } from '../../db/schema';
+import { readingAttempts, readingSessions, userReadingDailyStats } from '../../db/schema';
 import { computeLongestStreak, computeStreakData, resolveResumeModes } from './dashboard-widget.calculations';
 import { DashboardWidgetRepository } from './dashboard-widget.repository';
 
@@ -153,6 +153,12 @@ describe('resolveResumeModes', () => {
     expect(resolveResumeModes(files, 1)).toMatchObject({ readFileId: 1, readFileFormat: 'pdf' });
   });
 
+  it('never offers DjVu, which released iOS builds cannot open, and keeps a readable edition beside it', () => {
+    expect(resolveResumeModes([file(1, 'djvu')], 1)).toMatchObject({ readFileId: null, readFileFormat: null });
+    expect(resolveResumeModes([file(1, 'djvu'), file(2, 'cbz')], 1)).toMatchObject({ readFileId: 2, readFileFormat: 'cbz' });
+    expect(resolveResumeModes([file(1, 'm4b'), file(2, 'djvu')], 1)).toMatchObject({ readFileId: null, hasAudio: true });
+  });
+
   it("falls back to the library's best readable file when the primary is an audiobook", () => {
     const files = [file(1, 'm4b'), file(2, 'pdf'), file(3, 'mobi')];
 
@@ -234,6 +240,87 @@ describe('DashboardWidgetRepository.countCompletedBooks', () => {
 
     await expect(repository.countCompletedBooks(1, [], '2026-01-01', '2027-01-01')).resolves.toBe(0);
     expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('DashboardWidgetRepository.getReadingSecondsByDay', () => {
+  it('sums each local day across the accessible libraries, both ends inclusive', async () => {
+    const query = makeQuery([{ day: '2026-09-27', seconds: 900 }]);
+    const db = { select: vi.fn(() => query) };
+    const repository = new DashboardWidgetRepository(db as never);
+
+    await expect(repository.getReadingSecondsByDay(1, [3, 4], '2025-09-22', '2026-09-27')).resolves.toEqual([{ day: '2026-09-27', seconds: 900 }]);
+
+    expect(query.from).toHaveBeenCalledWith(userReadingDailyStats);
+    expect(query.groupBy).toHaveBeenCalledWith(userReadingDailyStats.day);
+    const where = render(query.where!.mock.calls[0]![0]);
+    expect(where.sql).toContain('"user_reading_daily_stats"."user_id" = $1');
+    expect(where.sql).toContain('"user_reading_daily_stats"."day" >= $4');
+    expect(where.sql).toContain('"user_reading_daily_stats"."day" <= $5');
+    expect(where.params).toEqual([1, 3, 4, '2025-09-22', '2026-09-27']);
+  });
+
+  it('does not query without accessible libraries', async () => {
+    const db = { select: vi.fn() };
+    const repository = new DashboardWidgetRepository(db as never);
+
+    await expect(repository.getReadingSecondsByDay(1, [], '2025-09-22', '2026-09-27')).resolves.toEqual([]);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('DashboardWidgetRepository.getRecentlyFinishedBookIds', () => {
+  it('lists each book finished between two local days once, most recently finished first', async () => {
+    const query = makeQuery([{ bookId: 9 }, { bookId: 4 }]);
+    const db = { select: vi.fn(() => query) };
+    const repository = new DashboardWidgetRepository(db as never);
+
+    await expect(repository.getRecentlyFinishedBookIds(1, [3], '2026-01-01', '2027-01-01', 12)).resolves.toEqual([9, 4]);
+
+    expect(query.from).toHaveBeenCalledWith(readingAttempts);
+    expect(query.groupBy).toHaveBeenCalledWith(readingAttempts.bookId);
+    expect(query.limit).toHaveBeenCalledWith(12);
+    const where = render(query.where!.mock.calls[0]![0]);
+    expect(where.sql).toContain('"reading_attempts"."outcome" = $2');
+    expect(where.sql).toContain('"reading_attempts"."deleted_at" is null');
+    expect(where.sql).toContain('"reading_attempts"."ended_on" >= $3');
+    expect(where.sql).toContain('"reading_attempts"."ended_on" < $4');
+    expect(where.params).toEqual([1, 'completed', '2026-01-01', '2027-01-01', 3]);
+    expect(render(query.orderBy!.mock.calls[0]![0]).sql).toContain('max("reading_attempts"."ended_on") desc');
+  });
+
+  it('does not query without accessible libraries', async () => {
+    const db = { select: vi.fn() };
+    const repository = new DashboardWidgetRepository(db as never);
+
+    await expect(repository.getRecentlyFinishedBookIds(1, [], '2026-01-01', '2027-01-01', 12)).resolves.toEqual([]);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('DashboardWidgetRepository.getTopBooksReadBetween', () => {
+  it("ranks the reader's own sessions in a half-open window by time read", async () => {
+    const query = makeQuery([]);
+    const db = { select: vi.fn(() => query) };
+    const repository = new DashboardWidgetRepository(db as never);
+    const start = new Date('2025-09-13T06:00:00Z');
+    const end = new Date('2025-10-12T06:00:00Z');
+
+    await repository.getTopBooksReadBetween(1, start, end, 'America/Denver', 5);
+
+    expect(query.from).toHaveBeenCalledWith(readingSessions);
+    expect(query.groupBy).toHaveBeenCalledWith(readingSessions.bookId);
+    expect(query.limit).toHaveBeenCalledWith(5);
+    const where = render(query.where!.mock.calls[0]![0]);
+    expect(where.sql).toContain('"reading_sessions"."user_id" = $1');
+    expect(where.sql).toContain('"reading_sessions"."started_at" >= $2');
+    expect(where.sql).toContain('"reading_sessions"."started_at" < $3');
+    expect(where.params).toEqual([1, start.toISOString(), end.toISOString()]);
+    expect(render(query.orderBy!.mock.calls[0]![0]).sql).toContain('sum("reading_sessions"."duration_seconds") desc');
+    const fields = (db.select.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    const days = render(fields.days);
+    expect(days.sql).toContain('at time zone $1');
+    expect(days.params).toEqual(['America/Denver']);
   });
 });
 

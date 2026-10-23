@@ -103,7 +103,7 @@ async function exportJson() {
     </PopoverTrigger>
     <PopoverContent align="end" class="w-44 p-1">
       <button
-        class="flex items-center gap-2 w-full px-3 py-2 rounded text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        class="flex items-center gap-2 w-full px-3 py-2 rounded-xs text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
         :disabled="exporting"
         @click="exportCsv"
       >
@@ -111,7 +111,7 @@ async function exportJson() {
         CSV
       </button>
       <button
-        class="flex items-center gap-2 w-full px-3 py-2 rounded text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        class="flex items-center gap-2 w-full px-3 py-2 rounded-xs text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
         :disabled="exporting"
         @click="exportJson"
       >

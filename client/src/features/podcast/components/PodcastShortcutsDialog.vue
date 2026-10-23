@@ -43,7 +43,7 @@ function handleOpenChange(next: boolean) {
                 <kbd
                   v-for="key in shortcut.keys"
                   :key="key"
-                  class="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border bg-muted px-1.5 font-mono text-[11px] font-medium text-foreground"
+                  class="inline-flex h-6 min-w-6 items-center justify-center rounded-xs border border-border bg-muted px-1.5 font-mono text-[11px] font-medium text-foreground"
                 >
                   {{ key }}
                 </kbd>

@@ -1,5 +1,11 @@
 import { computed, nextTick, ref, watch } from 'vue'
-import type { AnnotationHubBookFacet, AnnotationHubItem, AnnotationHubOverview, AnnotationHubResponse } from '@bookorbit/types'
+import {
+  ANNOTATION_PURGE_PENDING_DEVICE_SYNC,
+  type AnnotationHubBookFacet,
+  type AnnotationHubItem,
+  type AnnotationHubOverview,
+  type AnnotationHubResponse,
+} from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { HUB_VIEWS, type HubViewKey } from '../lib/hub-groups'
 import { useAnnotationSelection } from './useAnnotationSelection'
@@ -270,17 +276,14 @@ export function useAnnotationsHub() {
     return res.ok
   }
 
-  async function purge(id: number): Promise<{ ok: boolean; message?: string }> {
+  async function purge(id: number): Promise<{ ok: boolean; pendingDeviceSync?: boolean }> {
     const res = await api(`/api/v1/annotations/${id}`, { method: 'DELETE' })
     if (res.ok) {
       await refresh()
       return { ok: true }
     }
-    if (res.status === 409) {
-      const body = (await res.json().catch(() => null)) as { message?: string } | null
-      return { ok: false, message: body?.message }
-    }
-    return { ok: false }
+    const body = (await res.json().catch(() => null)) as { errorCode?: string } | null
+    return { ok: false, pendingDeviceSync: body?.errorCode === ANNOTATION_PURGE_PENDING_DEVICE_SYNC }
   }
 
   async function trashOne(id: number): Promise<boolean> {

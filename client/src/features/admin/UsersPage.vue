@@ -424,7 +424,7 @@ async function saveDefaultLibraryAccess() {
             >
               {{ filter.label }}
               <span
-                class="rounded px-1 text-xs tabular-nums"
+                class="rounded-xs px-1 text-xs tabular-nums"
                 :class="state === filter.value ? 'bg-primary/15 text-primary' : 'bg-foreground/8 text-muted-foreground'"
               >
                 {{ formatNumber(filter.count) }}

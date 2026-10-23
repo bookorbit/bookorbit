@@ -19,6 +19,7 @@ import { useRefreshingBooks } from './useRefreshingBooks'
 import { useBookDownload } from './useBookDownload'
 import { useBookRefreshFeedback } from './useBookRefreshFeedback'
 import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/lib/book-card-mapper'
+import { withIgnoreCache, type IgnoreCacheOptions } from '@/features/metadata-cache/lib/metadata-cache'
 
 export type ExportScope = 'primary' | 'all' | 'audio'
 
@@ -105,7 +106,8 @@ export function useBookBulkActions(
     books.value = books.value.map((book) => (selected.has(book.id) ? updater(book) : book))
   }
 
-  async function handleBulkRefreshMetadata() {
+  /** Bound straight to the action bar's `refresh-metadata` event, so its payload arrives here as `options`. */
+  async function handleBulkRefreshMetadata(options?: IgnoreCacheOptions) {
     if (!hasSelection()) return
     const ids = querySelection?.value ? [] : [...selectedIds.value]
     const total = querySelection?.value ? querySelection.value.total : ids.length
@@ -115,7 +117,7 @@ export function useBookBulkActions(
     const res = await api('/api/v1/books/bulk-refresh-metadata', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(getSelectionPayload()),
+      body: JSON.stringify(withIgnoreCache(getSelectionPayload(), { ignoreCache: options?.ignoreCache === true })),
     })
     if (!res.ok) {
       clearRefreshing(ids)

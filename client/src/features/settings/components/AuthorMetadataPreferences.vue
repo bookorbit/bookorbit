@@ -188,7 +188,7 @@ defineExpose({ save })
             type="button"
             :disabled="saving || !preferences.fields[field].enabled"
             :aria-label="t('settings.admin.authorEnrichment.metadataPreferences.addProvider', { provider: provider.label })"
-            class="flex items-center gap-1 h-6 px-2 rounded border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+            class="flex items-center gap-1 h-6 px-2 rounded-xs border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
             @click="addProvider(field, provider.key)"
           >
             <Plus :size="11" :stroke-width="3" />

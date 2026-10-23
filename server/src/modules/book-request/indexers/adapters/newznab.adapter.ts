@@ -8,9 +8,11 @@ import { readBoundedBytes, ResponseTooLargeError } from '../../../../common/util
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { safeFetch } from '../../../../common/utils/safe-fetch';
 import { ensureSafeUrl, PrivateAddressException } from '../../../../common/utils/ssrf.utils';
+import { publicReleaseGuid } from '../release-guid';
 import { buildSearchText } from '../search-text';
 import {
   IndexerSearchException,
+  IndexerRetryExhaustedException,
   type IndexerAdapter,
   type ReleaseCandidate,
   type ReleaseQuery,
@@ -23,6 +25,9 @@ const MAX_FEED_ITEMS = 500;
 const MAX_FEED_FIELD_CHARS = MAX_INDEXER_RELEASE_GUID_LENGTH;
 const REQUEST_TIMEOUT_MS = 25_000;
 const MAX_REDIRECTS = 5;
+const MAX_RATE_LIMIT_RETRIES = 2;
+const MAX_RATE_LIMIT_DELAY_MS = 10_000;
+const DEFAULT_RATE_LIMIT_DELAY_MS = 1000;
 const XML_ACCEPT = 'application/rss+xml, application/xml, text/xml, */*;q=0.1';
 const NZB_ACCEPT = 'application/x-nzb, application/xml, text/xml, */*;q=0.1';
 
@@ -37,6 +42,8 @@ interface NewznabItem {
   title?: string;
   guid?: unknown;
   link?: string;
+  /** The release's details page, which the Newznab spec points at its comment thread. */
+  comments?: unknown;
   size?: string | number;
   pubDate?: string;
   category?: string | string[];
@@ -49,7 +56,7 @@ interface NewznabItem {
 export class NewznabAdapter implements IndexerAdapter {
   readonly type = 'newznab' as const;
   readonly label = 'Newznab';
-  readonly mediaKinds: readonly BookRequestMediaKind[] = ['ebook', 'audiobook', 'comic'];
+  readonly mediaKinds: readonly BookRequestMediaKind[] = ['ebook', 'audiobook'];
   readonly supportsIsbnSearch = true;
   readonly requiresCredential = true;
 
@@ -88,12 +95,9 @@ export class NewznabAdapter implements IndexerAdapter {
     try {
       let current = await ensureSafeUrl(release.downloadUrl, { allowPrivate: config.allowPrivateAddress });
       const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const retries = { remaining: MAX_RATE_LIMIT_RETRIES };
       for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-        const response = await safeFetch(
-          current.href,
-          { signal, redirect: 'manual', headers: { Accept: NZB_ACCEPT } },
-          { allowPrivate: config.allowPrivateAddress, profile: config.networkProfile, pinResolvedAddress: true },
-        );
+        const response = await fetchWithRateLimitRetry(current.href, config, NZB_ACCEPT, signal, retries);
 
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers.get('location');
@@ -103,7 +107,10 @@ export class NewznabAdapter implements IndexerAdapter {
           continue;
         }
 
-        if (!response.ok) throw new IndexerSearchException('error', `The indexer answered ${response.status} for that NZB`);
+        if (!response.ok) {
+          void response.body?.cancel().catch(() => undefined);
+          throw new IndexerSearchException('error', `The indexer answered ${response.status} for that NZB`);
+        }
         const body = await readBounded(response, MAX_NZB_FILE_BYTES, 'The indexer returned an NZB that is too large');
         assertNzb(body);
         return body;
@@ -127,11 +134,13 @@ export class NewznabAdapter implements IndexerAdapter {
     const options = { allowPrivate: config.allowPrivateAddress, profile: config.networkProfile, pinResolvedAddress: true };
     let current = await endpointUrl(config, params);
     let response: Response | null = null;
+    const retries = { remaining: MAX_RATE_LIMIT_RETRIES };
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
       try {
-        response = await safeFetch(current.href, { signal, redirect: 'manual', headers: { Accept: XML_ACCEPT } }, options);
+        response = await fetchWithRateLimitRetry(current.href, config, XML_ACCEPT, signal, retries);
       } catch (error) {
+        if (error instanceof IndexerSearchException) throw error;
         if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
           throw new IndexerSearchException('timeout', `${config.name} did not answer in time`);
         }
@@ -147,7 +156,7 @@ export class NewznabAdapter implements IndexerAdapter {
     }
 
     if (!response) throw new IndexerSearchException('error', `${config.name} redirected more than ${MAX_REDIRECTS} times`);
-    if (response.status === 429) throw new IndexerSearchException('throttled', `${config.name} is rate limiting us`);
+    if (!response.ok) void response.body?.cancel().catch(() => undefined);
     if (response.status === 401 || response.status === 403) throw new IndexerSearchException('unauthorized', `${config.name} rejected the API key`);
     if (!response.ok) throw new IndexerSearchException('error', `${config.name} answered ${response.status}`);
 
@@ -158,6 +167,74 @@ export class NewznabAdapter implements IndexerAdapter {
     if (error) throw new IndexerSearchException(error.failure, `${config.name}: ${error.description}`);
     return body;
   }
+}
+
+async function fetchWithRateLimitRetry(
+  url: string,
+  config: ResolvedIndexerConfig,
+  accept: string,
+  signal: AbortSignal,
+  retries: { remaining: number },
+): Promise<Response> {
+  for (;;) {
+    let response: Response;
+    try {
+      signal.throwIfAborted();
+      response = await safeFetch(
+        url,
+        { signal, redirect: 'manual', headers: { Accept: accept } },
+        { allowPrivate: config.allowPrivateAddress, profile: config.networkProfile, pinResolvedAddress: true },
+      );
+    } catch (error) {
+      if (signal.aborted && retries.remaining < MAX_RATE_LIMIT_RETRIES) {
+        throw new IndexerRetryExhaustedException('throttled', `${config.name} is rate limiting us beyond the request deadline`);
+      }
+      throw error;
+    }
+    if (response.status !== 429) return response;
+
+    const delayMs = rateLimitDelay(response.headers.get('retry-after'));
+    void response.body?.cancel().catch(() => undefined);
+    if (retries.remaining === 0) {
+      throw new IndexerRetryExhaustedException('throttled', `${config.name} is rate limiting us after ${MAX_RATE_LIMIT_RETRIES} retries`);
+    }
+    retries.remaining--;
+    try {
+      await waitForRateLimit(delayMs, signal);
+    } catch (error) {
+      // Restarting the generic grab retry after the deadline would exceed this bounded wait.
+      if (signal.aborted) throw new IndexerRetryExhaustedException('throttled', `${config.name} is rate limiting us beyond the request deadline`);
+      throw error;
+    }
+  }
+}
+
+function rateLimitDelay(header: string | null): number {
+  const value = header?.trim();
+  if (!value) return DEFAULT_RATE_LIMIT_DELAY_MS;
+  if (/^\d+$/.test(value)) return Math.min(Number(value) * 1000, MAX_RATE_LIMIT_DELAY_MS);
+  // Date.parse also accepts non-HTTP inputs such as "-1" as dates.
+  const httpDate = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/i;
+  const obsoleteDate = /^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{2}-[A-Za-z]{3}-\d{2} \d{2}:\d{2}:\d{2} GMT$/i;
+  const asctimeDate = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Za-z]{3} {1,2}\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/i;
+  const date = httpDate.test(value) || obsoleteDate.test(value) ? Date.parse(value) : asctimeDate.test(value) ? Date.parse(`${value} GMT`) : NaN;
+  return Number.isFinite(date) ? Math.min(Math.max(0, date - Date.now()), MAX_RATE_LIMIT_DELAY_MS) : DEFAULT_RATE_LIMIT_DELAY_MS;
+}
+
+async function waitForRateLimit(delayMs: number, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  await new Promise<void>((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      const reason: unknown = signal.reason;
+      reject(reason instanceof Error ? reason : new DOMException('The indexer wait was aborted', 'AbortError'));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener('abort', abort, { once: true });
+  });
 }
 
 export function newznabClientKey(indexerId: number, guid: string): string {
@@ -221,6 +298,7 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
       const sourceGuid = readGuid(item);
       if (!withinBound(sourceGuid) || !withinBound(link) || !link || !/^https?:/i.test(link)) return [];
       const guid = publicReleaseGuid(indexerId, sourceGuid ?? link);
+      const infoUrl = readText(item.comments);
       const publishedAt = parseDate(item.pubDate);
       const fileCount = toNumber(attrs.get('files'));
       const format = attrs.get('format');
@@ -229,6 +307,7 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
           indexerId,
           guid,
           title,
+          ...(infoUrl && withinBound(infoUrl) ? { infoUrl } : {}),
           downloadUrl: link,
           sizeBytes: toNumber(attrs.get('size') ?? item.size ?? enclosure?.['@_length']),
           seeders: null,
@@ -258,20 +337,19 @@ function attrMap(item: NewznabItem): Map<string, string> {
 }
 
 function readGuid(item: NewznabItem): string | undefined {
-  if (typeof item.guid === 'string' && item.guid.trim()) return item.guid.trim();
-  if (typeof item.guid === 'number') return String(item.guid);
-  if (item.guid && typeof item.guid === 'object') {
-    const text = (item.guid as { '#text'?: unknown })['#text'];
+  return readText(item.guid);
+}
+
+/** An element's text, whether the parser handed it over bare or as `{ '#text', ...attributes }`. */
+function readText(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number') return String(value);
+  if (value && typeof value === 'object') {
+    const text = (value as { '#text'?: unknown })['#text'];
     if (typeof text === 'string' && text.trim()) return text.trim();
     if (typeof text === 'number') return String(text);
   }
   return undefined;
-}
-
-/** A URL-shaped GUID can carry the API key, so expose only a stable opaque identifier for it. */
-function publicReleaseGuid(indexerId: number, value: string): string {
-  if (!/^https?:/i.test(value)) return value;
-  return createHash('sha256').update(String(indexerId)).update('\0release\0').update(value).digest('hex');
 }
 
 function withinBound(value: string | undefined): boolean {

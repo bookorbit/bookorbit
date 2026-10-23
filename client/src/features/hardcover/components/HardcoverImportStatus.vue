@@ -141,7 +141,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
             <input
               v-model="importProgress"
               type="checkbox"
-              class="size-4 rounded border-border text-primary focus:ring-primary/40"
+              class="size-4 rounded-xs border-border text-primary focus:ring-primary/40"
               :disabled="applying"
             />
             <span>{{ t('hardcover.import.importProgress') }}</span>

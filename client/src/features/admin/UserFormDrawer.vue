@@ -352,7 +352,7 @@ async function handleSubmit() {
               v-if="!isEdit && passwordLoginEnabled"
               class="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
             >
-              <input v-model="isSharedAccount" type="checkbox" class="mt-0.5 size-4 shrink-0 rounded border-input accent-primary" />
+              <input v-model="isSharedAccount" type="checkbox" class="mt-0.5 size-4 shrink-0 rounded-xs border-input accent-primary" />
               <span>
                 <span class="block text-sm font-medium text-foreground">{{ t('adminFeature.userForm.sharedAccount') }}</span>
                 <span class="settings-hint block">{{ t('adminFeature.userForm.sharedAccountHint') }}</span>
@@ -473,7 +473,7 @@ async function handleSubmit() {
                   <input
                     type="checkbox"
                     :checked="selectedLibraryIds.has(library.id)"
-                    class="size-4 shrink-0 rounded border-input accent-primary"
+                    class="size-4 shrink-0 rounded-xs border-input accent-primary"
                     @change="toggleLibrary(library.id)"
                   />
                   <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ library.name }}</span>

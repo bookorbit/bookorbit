@@ -32,6 +32,7 @@ function makeContext(
   overrides: Partial<{
     permissions: string[]
     showBookRequests: boolean
+    achievementsEnabled: boolean
     bookDockTotal: number
     outstandingRequestTotal: number
     outstandingRequestLabel: string
@@ -43,6 +44,7 @@ function makeContext(
   return {
     hasPermission: (name: string) => permissions.includes(name),
     showBookRequests: overrides.showBookRequests,
+    achievementsEnabled: overrides.achievementsEnabled,
     bookDockTotal: overrides.bookDockTotal ?? 0,
     outstandingRequestTotal: overrides.outstandingRequestTotal ?? 0,
     outstandingRequestLabel: overrides.outstandingRequestLabel ?? '',
@@ -71,7 +73,7 @@ describe('sidebar nav registry', () => {
   })
 
   it('shows only ungated destinations to a user with no permissions', () => {
-    expect(allowedIds(makeContext())).toEqual(['dashboard', 'authors', 'series', 'annotations'])
+    expect(allowedIds(makeContext())).toEqual(['dashboard', 'statistics', 'achievements', 'authors', 'series', 'annotations'])
   })
 
   it('places Dashboard, Book Dock, Requests, Tools and the podcast Queue in the primary zone, above the entity sections', () => {
@@ -80,11 +82,20 @@ describe('sidebar nav registry', () => {
     expect(primary).toEqual(['dashboard', 'book-dock', 'book-requests', 'tools', 'podcast-queue'])
   })
 
-  it('leaves Statistics and Achievements to the header', () => {
-    const ids = SIDEBAR_NAV_REGISTRY.map((candidate) => candidate.id)
+  it('groups Statistics, Achievements and Annotations in the Reading zone', () => {
+    const reading = SIDEBAR_NAV_REGISTRY.filter((candidate) => candidate.zone === 'reading').map((candidate) => candidate.id)
 
-    expect(ids).not.toContain('statistics')
-    expect(ids).not.toContain('achievements')
+    expect(reading).toEqual(['statistics', 'achievements', 'annotations'])
+  })
+
+  it('hides Achievements when the user has turned achievements off', () => {
+    expect(allowedIds(makeContext({ achievementsEnabled: false }))).not.toContain('achievements')
+    expect(allowedIds(makeContext({ achievementsEnabled: true }))).toContain('achievements')
+  })
+
+  it('marks Statistics active on the statistics route and anchors the tour step there', () => {
+    expect(entry('statistics').isActive(makeRoute('statistics'))).toBe(true)
+    expect(entry('statistics').tourId).toBe('statistics-btn')
   })
 
   it('shows Book Dock once the user holds book_dock_access', () => {
@@ -147,6 +158,15 @@ describe('sidebar nav registry', () => {
     expect(resolveNavEntry(entry('book-dock'), makeContext(), makeRoute('dashboard'), 'Book Dock').badge).toBeNull()
   })
 
+  it('marks only the rows that count work waiting on the user as returning when hidden', () => {
+    expect(SIDEBAR_NAV_REGISTRY.filter((candidate) => candidate.returnsWithWork).map((candidate) => candidate.id)).toEqual([
+      'book-dock',
+      'book-requests',
+    ])
+    expect(resolveNavEntry(entry('book-dock'), makeContext(), makeRoute('dashboard'), 'Book Dock').returnsWithWork).toBe(true)
+    expect(resolveNavEntry(entry('series'), makeContext(), makeRoute('dashboard'), 'Series').returnsWithWork).toBe(false)
+  })
+
   it('exposes the Requests badge only when requests are outstanding', () => {
     const context = makeContext({
       permissions: ['book_request_access'],
@@ -199,7 +219,7 @@ describe('sidebar nav registry', () => {
 
     expect(new Set(ids).size).toBe(ids.length)
     for (const candidate of SIDEBAR_NAV_REGISTRY) {
-      expect(['primary', 'browse']).toContain(candidate.zone)
+      expect(['primary', 'browse', 'reading']).toContain(candidate.zone)
     }
   })
 
@@ -225,7 +245,17 @@ describe('sidebar nav registry', () => {
     const podcastModeIds = SIDEBAR_NAV_REGISTRY.filter((candidate) => entryVisibleInMode(candidate, 'podcasts')).map((candidate) => candidate.id)
     const booksModeIds = SIDEBAR_NAV_REGISTRY.filter((candidate) => entryVisibleInMode(candidate, 'books')).map((candidate) => candidate.id)
 
-    expect(podcastModeIds).toEqual(['dashboard', 'podcast-queue'])
-    expect(booksModeIds).toEqual(['dashboard', 'book-dock', 'book-requests', 'tools', 'authors', 'series', 'annotations'])
+    expect(podcastModeIds).toEqual(['dashboard', 'statistics', 'achievements', 'podcast-queue'])
+    expect(booksModeIds).toEqual([
+      'dashboard',
+      'statistics',
+      'achievements',
+      'book-dock',
+      'book-requests',
+      'tools',
+      'authors',
+      'series',
+      'annotations',
+    ])
   })
 })

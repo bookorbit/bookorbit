@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
 import type { SelectionDetail } from './epub/composables/useFoliateSelection'
-import { useReaderProgress } from './shared/composables/useReaderProgress'
+import { useReaderProgress, type NewerPosition } from './shared/composables/useReaderProgress'
 import { useReadingSession } from './shared/composables/useReadingSession'
 import { useReaderPageTitle } from './shared/composables/useReaderPageTitle'
 import { useReaderState } from './epub/composables/useReaderState'
@@ -17,6 +17,7 @@ import { useFullscreen } from './shared/composables/useFullscreen'
 import { useBookmarks } from './epub/composables/useBookmarks'
 import { useAnnotations } from './epub/composables/useAnnotations'
 import { useReaderAnnotationActions } from './epub/composables/useReaderAnnotationActions'
+import { useReaderMarksRefresh } from './epub/composables/useReaderMarksRefresh'
 import { useToc } from './epub/composables/useToc'
 import { useSearch, type FoliateView } from './epub/composables/useSearch'
 import { useReaderSelection } from './epub/composables/useReaderSelection'
@@ -30,7 +31,7 @@ import { useTtsPosition } from '@/features/tts/composables/useTtsPosition'
 import { useTtsKeyboard } from '@/features/tts/composables/useTtsKeyboard'
 import { getProviders, getVoices } from '@/features/tts/api/tts.api'
 import { useMediaOverlay } from './media-overlay/composables/useMediaOverlay'
-import { resolveMediaOverlayResume, type MediaOverlayResumePosition } from './media-overlay/lib/media-overlay-resume'
+import { mediaOverlayFragmentSeconds, resolveMediaOverlayResume, type MediaOverlayResumePosition } from './media-overlay/lib/media-overlay-resume'
 import { injectMediaOverlayHighlightCss, MEDIA_OVERLAY_DEFAULT_ACTIVE_CLASS } from './media-overlay/lib/media-overlay-highlight'
 import { startMediaOverlayWithFallback } from './media-overlay/lib/media-overlay-start'
 import { mediaOverlayEntriesOverlapping } from './media-overlay/lib/media-overlay-range'
@@ -39,6 +40,7 @@ import ReaderHeader from './epub/components/ReaderHeader.vue'
 import ReaderFooter from './epub/components/ReaderFooter.vue'
 import ReaderSidebar from './epub/components/ReaderSidebar.vue'
 import ReaderSettingsPanel from './epub/components/ReaderSettingsPanel.vue'
+import NewerPositionDialog from './epub/components/NewerPositionDialog.vue'
 import SelectionPopup from './epub/components/SelectionPopup.vue'
 import ReaderSearchPanel from './epub/components/ReaderSearchPanel.vue'
 import NoteDialog from './shared/components/NoteDialog.vue'
@@ -70,7 +72,9 @@ useReaderPageTitle(bookId)
 const normalizedFileFormat = fileFormat.toLowerCase()
 const isAudioFormat = getFormatGroup(fileFormat) === 'audio'
 const isPdfFormat = fileFormat === 'pdf'
-const isComicFormat = fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7'
+const isDjvuFormat = normalizedFileFormat === 'djvu'
+const isComicFormat = fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7' || isDjvuFormat
+const pageImageSource = isDjvuFormat ? 'djvu' : 'cbz'
 const isPeekMode = computed(() => {
   const mode = route.query.mode
   return (Array.isArray(mode) ? mode[0] : mode) === 'peek'
@@ -135,6 +139,8 @@ const { onActivity, elapsedMinutes } = useReadingSession(
 
 const progress = useReaderProgress(bookId, fileId, elapsedMinutes, 0, {
   trackingEnabled,
+  narrationSeconds: narrationSecondsAt,
+  onNarrationMovedBack: handleNarrationMovedBack,
 })
 const { cfi, chapterTitle, sectionIndex, totalSections, fraction, locationTotal, footerMode, cycleFooterMode, updateHeadsFeet } = progress
 
@@ -155,6 +161,16 @@ const { results: searchResults, isSearching, search: doSearch, clear: clearSearc
 
 const selection = useReaderSelection()
 const { isSidebarPinned, toggleSidebarPinned, shouldCloseAfterNavigation } = useReaderSidebarPin(fileId)
+
+async function toggleBookmark() {
+  const wasBookmarked = bookmarks.isCurrentCfiBookmarked.value
+  const saved = await bookmarks.toggle(bookId, cfi.value ?? '', chapterTitle.value, fileId)
+  if (!saved) toast.error(t(wasBookmarked ? 'reader.toast.bookmarkDeleteFailed' : 'reader.toast.bookmarkSaveFailed'))
+}
+
+function handleToggleBookmark() {
+  void toggleBookmark()
+}
 
 function closeAnyPanel() {
   if (showTapZones.value) {
@@ -177,9 +193,7 @@ const { showHelpModal } = useReaderKeyboardShortcuts({
   toggleSearch: () => {
     showSearch.value = !showSearch.value
   },
-  toggleBookmark: () => {
-    bookmarks.toggle(bookId, cfi.value ?? '', chapterTitle.value)
-  },
+  toggleBookmark: handleToggleBookmark,
   toggleFullscreen,
   cycleFooterMode,
   closePanel: closeAnyPanel,
@@ -244,6 +258,7 @@ function handleTranslate() {
 }
 
 const bookMeta = ref<BookDetail | null>(null)
+const initialNavigationPending = ref(true)
 
 const {
   foliateReady,
@@ -267,7 +282,10 @@ let mediaOverlayStartId = 0
 const isMediaOverlayAvailable = computed(() => isTtsAvailable && hasMediaOverlay.value)
 const isTtsActive = computed(() => isActive.value && currentBook.value?.bookFileId === fileId)
 const isNavigationLocked = computed(
-  () => (isTtsActive.value && playbackState.value === 'playing') || (mediaOverlay.isActive.value && mediaOverlay.isPlaying.value),
+  () =>
+    initialNavigationPending.value ||
+    (isTtsActive.value && playbackState.value === 'playing') ||
+    (mediaOverlay.isActive.value && mediaOverlay.isPlaying.value),
 )
 
 useTtsKeyboard(() => mediaOverlay.isActive.value, {
@@ -281,28 +299,15 @@ const isOverlayFooterVisible = computed(() => footerVisible.value && !showTapZon
 const showTtsResumePrompt = ref(false)
 const clearingSavedTtsPosition = ref(false)
 const pendingTtsChapterNavigation = ref<number | null>(null)
-const isTtsRelocating = ref(false)
 const lastNavigationBlockedToastAt = ref(0)
-let initialOpenCompleted = false
-let pendingManualNavigationClearsMediaOverlay = false
-let pendingManualNavigationClearTimer: ReturnType<typeof setTimeout> | null = null
 let mediaOverlayPlaylistPromise: Promise<EpubMediaOverlayPlaylist | null> | null = null
+// A paused narration can still finish loading its page. Keep its relocations separate from
+// reading progress until the reader explicitly navigates, rather than relying on playback state.
+let relocationSource: 'text' | 'narration' = 'text'
 
-function withTtsRelocation(fn: () => void | Promise<void>) {
-  isTtsRelocating.value = true
-  const res = fn()
-  if (res instanceof Promise) {
-    void res.finally(() => {
-      setTimeout(() => {
-        isTtsRelocating.value = false
-      }, 150)
-    })
-  } else {
-    setTimeout(() => {
-      isTtsRelocating.value = false
-    }, 150)
-  }
-}
+watch(mediaOverlay.isPlaying, (playing) => {
+  if (playing) relocationSource = 'narration'
+})
 
 function ensureTtsAvailable(): boolean {
   if (isTtsAvailable) return true
@@ -385,9 +390,7 @@ watch([isTtsActive, foliateReady, sectionIndex], () => {
     pendingTtsChapterNavigation.value = null
     return
   }
-  withTtsRelocation(() => {
-    syncFoliateHighlightToCurrentBlock()
-  })
+  syncFoliateHighlightToCurrentBlock()
 })
 
 watch([foliateReady, isTtsActive, sectionIndex, () => ttsPosition.savedPosition.value?.cfi], ([ready, active, , savedCfi], previous) => {
@@ -400,24 +403,22 @@ watch([foliateReady, isTtsActive, sectionIndex, () => ttsPosition.savedPosition.
 })
 
 // Keep the Foliate overlay in lockstep with TTS block changes.
-watch([currentChapterIndex, currentBlockIndex], ([chapterIdx]) => {
+watch([currentChapterIndex, currentBlockIndex], async ([chapterIdx]) => {
   if (!isTtsActive.value || !foliateReady.value) return
 
-  withTtsRelocation(async () => {
-    // Keep the visual reader chapter aligned with the TTS chapter before
-    // highlighting; otherwise chapter rollover can jump backwards. The highlight
-    // for the new chapter is applied by the foliateReady/sectionIndex watcher
-    // once navigation settles and the new document's block ranges are ready.
-    if (sectionIndex.value !== chapterIdx) {
-      if (pendingTtsChapterNavigation.value !== chapterIdx) {
-        pendingTtsChapterNavigation.value = chapterIdx
-        await goToSection(chapterIdx)
-      }
-      return
+  // Keep the visual reader chapter aligned with the TTS chapter before
+  // highlighting; otherwise chapter rollover can jump backwards. The highlight
+  // for the new chapter is applied by the foliateReady/sectionIndex watcher
+  // once navigation settles and the new document's block ranges are ready.
+  if (sectionIndex.value !== chapterIdx) {
+    if (pendingTtsChapterNavigation.value !== chapterIdx) {
+      pendingTtsChapterNavigation.value = chapterIdx
+      await goToSection(chapterIdx)
     }
-    pendingTtsChapterNavigation.value = null
-    syncFoliateHighlightToCurrentBlock()
-  })
+    return
+  }
+  pendingTtsChapterNavigation.value = null
+  syncFoliateHighlightToCurrentBlock()
 })
 
 /**
@@ -579,14 +580,12 @@ async function resolveSavedNarrationPos(): Promise<MediaOverlayResumePosition | 
 }
 
 // Persist the exact narrated sentence so playback can resume there after reload.
-watch(
-  () => mediaOverlay.currentFragment.value,
-  (fragment) => {
-    if (!mediaOverlay.isActive.value || !fragment) return
-    saveNarrationPos(sectionIndex.value, fragment)
-    progress.setMediaOverlayProgress(fragment, sectionIndex.value)
-  },
-)
+watch([mediaOverlay.currentFragment, mediaOverlay.currentSectionIndex], ([fragment, narratedSection]) => {
+  if (!mediaOverlay.isActive.value || !fragment || narratedSection === null) return
+  relocationSource = 'narration'
+  saveNarrationPos(narratedSection, fragment)
+  progress.setMediaOverlayProgress(fragment, narratedSection)
+})
 
 // When narration is stopped (mini player closed), foliate clears its highlight.
 // Re-mark the last sentence so the resume point stays visible.
@@ -611,6 +610,8 @@ async function beginNarration(sectionIdx: number, matches: ((item: { text: strin
   if (!book) return
 
   clearResumeNarrationHighlight()
+
+  relocationSource = 'narration'
 
   await mediaOverlay.start(
     mo,
@@ -746,15 +747,7 @@ async function handlePlayFromCurrentPage() {
 }
 
 function onRelocateHandler(detail: RelocateDetail) {
-  progress.onRelocate(detail)
-  if (initialOpenCompleted && !mediaOverlay.isActive.value && !isTtsRelocating.value && pendingManualNavigationClearsMediaOverlay) {
-    progress.clearMediaOverlayProgress()
-    pendingManualNavigationClearsMediaOverlay = false
-    if (pendingManualNavigationClearTimer) {
-      clearTimeout(pendingManualNavigationClearTimer)
-      pendingManualNavigationClearTimer = null
-    }
-  }
+  progress.onRelocate(detail, relocationSource)
   onActivity()
   bookmarks.setCfi(detail?.cfi ?? null)
   toc.setActiveHref(detail?.tocItem?.href ?? '')
@@ -770,13 +763,97 @@ function onApplyStylesHandler(renderer: FoliateRenderer) {
   }
 }
 
+// A reader left open while another device reads on would save its old page over the newer one at
+// its next turn. Coming back to the tab asks the server first, and the reader chooses, as on iOS.
+const NEWER_POSITION_CHECK_INTERVAL_MS = 5000
+let lastNewerPositionCheckAt = 0
+const newerPosition = ref<NewerPosition | null>(null)
+const newerPositionLocalPercentage = ref(0)
+
+async function offerNewerPosition() {
+  if (document.visibilityState !== 'visible' || initialNavigationPending.value || newerPosition.value) return
+  if (mediaOverlay.isPlaying.value || isTtsActive.value) return
+  const now = Date.now()
+  if (now - lastNewerPositionCheckAt < NEWER_POSITION_CHECK_INTERVAL_MS) return
+  lastNewerPositionCheckAt = now
+  const newer = await progress.checkForNewerPosition().catch(() => null)
+  if (!newer || newerPosition.value) return
+  newerPositionLocalPercentage.value = progress.percentage.value
+  newerPosition.value = newer
+}
+
+async function narrationSecondsAt(fragment: string, section: number | null): Promise<number | null> {
+  const playlist = await loadMediaOverlayPlaylist()
+  return playlist ? mediaOverlayFragmentSeconds(playlist, fragment, section) : null
+}
+
+let resumeNarrationAfterStay = false
+let askedOverNarration = false
+
+/** A narration save held back because another device sent narration well behind it: pause and ask. */
+function handleNarrationMovedBack(newer: NewerPosition) {
+  if (newerPosition.value) return
+  askedOverNarration = true
+  if (mediaOverlay.isPlaying.value) {
+    mediaOverlay.pause()
+    resumeNarrationAfterStay = true
+  }
+  newerPositionLocalPercentage.value = progress.percentage.value
+  newerPosition.value = newer
+}
+
+function handleFollowNewerPosition() {
+  const newer = newerPosition.value
+  newerPosition.value = null
+  resumeNarrationAfterStay = false
+  askedOverNarration = false
+  if (newer) void goToNewerPosition(newer)
+}
+
+function handleStayAtCurrentPosition() {
+  const newer = newerPosition.value
+  newerPosition.value = null
+  if (newer) void progress.keepCurrentPosition(newer, askedOverNarration ? 'narration' : 'text')
+  if (resumeNarrationAfterStay) mediaOverlay.resume()
+  resumeNarrationAfterStay = false
+  askedOverNarration = false
+}
+
+async function goToNewerPosition(newer: NewerPosition) {
+  relocationSource = 'text'
+  await progress.adoptNewerPosition(newer, async () => {
+    // A paused narration resumes from its own sentence, so it gives way to the one adopted.
+    if (mediaOverlay.isActive.value) mediaOverlay.stop()
+    try {
+      if (progress.cfi.value) await goTo(progress.cfi.value)
+      else await goToFraction(newer.percentage / 100)
+    } catch {
+      toast.error(t('reader.toast.newerPositionError'))
+    }
+  })
+  const narration = getCurrentNarrationPos()
+  if (narration) saveNarrationPos(narration.section, narration.fragment)
+}
+
+function handleReaderReturn() {
+  void offerNewerPosition()
+  if (document.visibilityState === 'visible') void refreshMarks()
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', handleReaderReturn)
+  window.addEventListener('focus', handleReaderReturn)
+})
+
 function onMiddleTapHandler() {
   handleMiddleTap()
 }
 
 function canRunManualNavigation(): boolean {
+  if (initialNavigationPending.value) return false
+
   if (!isNavigationLocked.value) {
-    markManualNavigation()
+    relocationSource = 'text'
     return true
   }
 
@@ -787,15 +864,6 @@ function canRunManualNavigation(): boolean {
   }
 
   return false
-}
-
-function markManualNavigation() {
-  pendingManualNavigationClearsMediaOverlay = true
-  if (pendingManualNavigationClearTimer) clearTimeout(pendingManualNavigationClearTimer)
-  pendingManualNavigationClearTimer = setTimeout(() => {
-    pendingManualNavigationClearsMediaOverlay = false
-    pendingManualNavigationClearTimer = null
-  }, 2_500)
 }
 
 function handleBlockedPageInteraction() {
@@ -828,7 +896,13 @@ const {
   getMediaActiveClass,
 } = useFoliate(() => containerRef.value, onRelocateHandler, onApplyStylesHandler, onMiddleTapHandler, onChapterLoadHandler, canRunManualNavigation)
 
-const { handleHighlight, handleOpenNoteDialog, handleSaveNote } = useReaderAnnotationActions({
+const {
+  isSaving: isSavingAnnotation,
+  handleHighlight,
+  handleOpenNoteDialog,
+  handleSaveNote,
+  handleDeleteAnnotation: deleteReaderAnnotation,
+} = useReaderAnnotationActions({
   bookId,
   fileId,
   chapterTitle,
@@ -836,6 +910,19 @@ const { handleHighlight, handleOpenNoteDialog, handleSaveNote } = useReaderAnnot
   selection,
   addAnnotation,
   redrawAnnotation,
+  deleteAnnotation,
+})
+
+const marksDrawn = ref(false)
+const { refreshMarks } = useReaderMarksRefresh({
+  bookId,
+  fileId,
+  annotations,
+  bookmarks,
+  canRefresh: () => marksDrawn.value && !isSavingAnnotation.value && !initialNavigationPending.value,
+  addAnnotation,
+  redrawAnnotation,
+  deleteAnnotation,
 })
 
 function handleTextSelected(detail: SelectionDetail) {
@@ -899,13 +986,12 @@ onMounted(async () => {
     fixedLayoutSpread: state.value.fixedLayoutSpread,
     mediaOverlayFragment: savedNarration?.fragment,
     mediaOverlaySectionIndex: savedNarration?.section,
-    preferMediaOverlay: savedNarration != null,
   })
-  initialOpenCompleted = true
   setChapters(getChapters())
   sectionFractions.value = getSectionFractions()
-  await bookmarks.load(bookId)
-  await annotations.load(bookId)
+  await bookmarks.load(bookId, fileId)
+  await annotations.load(bookId, fileId)
+  if (bookmarks.loadError.value || annotations.loadError.value) toast.error(t('reader.toast.marksLoadFailed'))
   const drawableAnnotations = annotations.annotations.value.filter((a): a is typeof a & { cfi: string } => a.cfi != null)
   if (drawableAnnotations.length > 0) {
     addAnnotations(
@@ -916,6 +1002,7 @@ onMounted(async () => {
       })),
     )
   }
+  marksDrawn.value = true
   void hydrateSidebarLocationMeta()
 
   if (deepLinkCfi) {
@@ -925,6 +1012,8 @@ onMounted(async () => {
       toast.error(t('reader.toast.linkedHighlightError'))
     }
   }
+
+  initialNavigationPending.value = error.value !== null
 
   const resumedPercentage = resumeTarget.checkpointPercentage ?? (hadProgress ? progress.percentage.value : null)
   if (resumedPercentage !== null) {
@@ -1059,24 +1148,20 @@ watch(() => [customFonts.fonts.value, customFonts.serverFonts.value], refreshFon
 watch(() => state.value.fontFamily, refreshFontFaces)
 
 function handleDeleteAnnotation(id: number) {
-  const ann = annotations.annotations.value.find((a) => a.id === id)
-  if (ann) {
-    if (ann.cfi) deleteAnnotation(ann.cfi)
-    annotations.remove(bookId, id)
-  }
+  void deleteReaderAnnotation(id)
   selection.dismiss()
 }
 
 function handleSidebarDeleteAnnotation(id: number) {
-  const ann = annotations.annotations.value.find((a) => a.id === id)
-  if (ann) {
-    if (ann.cfi) deleteAnnotation(ann.cfi)
-    annotations.remove(bookId, id)
-  }
+  void deleteReaderAnnotation(id)
 }
 
-function handleSidebarDeleteBookmark(id: number) {
-  bookmarks.remove(bookId, id)
+async function handleSidebarDeleteBookmark(id: number) {
+  if (!(await bookmarks.remove(bookId, id))) toast.error(t('reader.toast.bookmarkDeleteFailed'))
+}
+
+async function handleSidebarEditBookmark(id: number, title: string, note: string | null) {
+  if (!(await bookmarks.update(bookId, id, { title, note }))) toast.error(t('reader.toast.bookmarkUpdateFailed'))
 }
 
 function getSidebarCfiTargets(): string[] {
@@ -1226,8 +1311,9 @@ watch(
 )
 
 onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleReaderReturn)
+  window.removeEventListener('focus', handleReaderReturn)
   mediaOverlayStartId++
-  if (pendingManualNavigationClearTimer) clearTimeout(pendingManualNavigationClearTimer)
   setReaderFooterVisible(false)
   mediaOverlay.stop()
 })
@@ -1235,7 +1321,7 @@ onUnmounted(() => {
 
 <template>
   <PdfV4ReaderView v-if="isPdfFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
-  <CbzReaderView v-else-if="isComicFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
+  <CbzReaderView v-else-if="isComicFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" :source="pageImageSource" />
   <AudiobookReaderView v-else-if="isAudioFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
   <div
     v-else
@@ -1260,7 +1346,7 @@ onUnmounted(() => {
       @back="router.back()"
       @toggleSidebar="showSidebar = !showSidebar"
       @toggleSearch="showSearch = !showSearch"
-      @toggleBookmark="bookmarks.toggle(bookId, cfi ?? '', chapterTitle)"
+      @toggleBookmark="handleToggleBookmark"
       @update:settings-open="setSettingsOpen"
       @toggleFullscreen="toggleFullscreen"
       @toggleHelp="toggleHelpModal"
@@ -1592,6 +1678,7 @@ onUnmounted(() => {
       @navigateAnnotation="navigateFromSidebar"
       @navigateAnnotationChapter="navigateAnnotationChapterFromSidebar"
       @deleteBookmark="handleSidebarDeleteBookmark"
+      @editBookmark="handleSidebarEditBookmark"
       @deleteAnnotation="handleSidebarDeleteAnnotation"
       @toggleExpand="toggleExpand"
     />
@@ -1612,6 +1699,7 @@ onUnmounted(() => {
       v-if="selection.showNoteDialog.value"
       :selectedText="selection.text.value"
       :modelValue="selection.noteText.value"
+      :saving="isSavingAnnotation"
       @update:modelValue="selection.noteText.value = $event"
       @save="handleSaveNote"
       @cancel="selection.showNoteDialog.value = false"
@@ -1649,6 +1737,14 @@ onUnmounted(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <NewerPositionDialog
+      :open="newerPosition !== null"
+      :remotePercentage="newerPosition?.percentage ?? 0"
+      :localPercentage="newerPositionLocalPercentage"
+      @follow="handleFollowNewerPosition"
+      @stay="handleStayAtCurrentPosition"
+    />
 
     <DictionaryPopover
       v-if="showDictionary"

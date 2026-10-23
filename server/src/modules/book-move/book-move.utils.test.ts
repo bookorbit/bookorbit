@@ -46,6 +46,8 @@ import {
   pathExists,
   removeEmptyDirs,
   withCollisionSuffix,
+  selectMovedPrimary,
+  type MovedPrimaryCandidate,
 } from './book-move.utils';
 
 let workDir: string;
@@ -298,5 +300,39 @@ describe('isCrossDeviceError', () => {
     expect(isCrossDeviceError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
     expect(isCrossDeviceError(new Error('x'))).toBe(false);
     expect(isCrossDeviceError(null)).toBe(false);
+  });
+});
+
+describe('selectMovedPrimary', () => {
+  const file = (id: number, format: string, overrides: Partial<MovedPrimaryCandidate> = {}): MovedPrimaryCandidate => ({
+    id,
+    role: 'content',
+    format,
+    sizeBytes: 100,
+    sortOrder: id,
+    mediaOverlayAvailable: false,
+    ...overrides,
+  });
+
+  it('picks what the target ranks first, as a scan of it would', () => {
+    const files = [file(1, 'epub'), file(2, 'm4b')];
+    expect(selectMovedPrimary(files, 1, { formatPriority: ['m4b', 'epub'], allowedFormats: [] })?.id).toBe(2);
+    expect(selectMovedPrimary(files, 2, { formatPriority: ['epub', 'm4b'], allowedFormats: [] })?.id).toBe(1);
+  });
+
+  it('chooses only among the formats the target allows', () => {
+    const files = [file(1, 'epub'), file(2, 'm4b')];
+    expect(selectMovedPrimary(files, 1, { formatPriority: ['epub', 'm4b'], allowedFormats: ['M4B'] })?.id).toBe(2);
+    expect(selectMovedPrimary(files, 1, { formatPriority: ['epub'], allowedFormats: ['pdf'] })).toBeNull();
+  });
+
+  it('keeps the current primary when another file only ties with it', () => {
+    const files = [file(1, 'epub'), file(2, 'epub')];
+    expect(selectMovedPrimary(files, 2, { formatPriority: ['epub'], allowedFormats: [] })?.id).toBe(2);
+  });
+
+  it('ignores covers, sidecars and empty files', () => {
+    const files = [file(1, 'jpg', { role: 'cover' }), file(2, 'm4b', { sizeBytes: 0 }), file(3, 'epub')];
+    expect(selectMovedPrimary(files, null, { formatPriority: ['m4b', 'epub'], allowedFormats: [] })?.id).toBe(3);
   });
 });

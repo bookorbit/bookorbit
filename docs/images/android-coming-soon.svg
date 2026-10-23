@@ -1,0 +1,36 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="119.66407"
+  height="40"
+  viewBox="0 0 161.5465 54"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">BookOrbit for Android: coming soon</title>
+  <rect
+    x="0.5"
+    y="0.5"
+    width="160.5465"
+    height="53"
+    rx="7"
+    fill="#000"
+    stroke="#a6a6a6"
+  />
+  <g fill="#3ddc84" stroke="#3ddc84" stroke-width="2" stroke-linecap="round">
+    <path d="M17 17 13 11M35 17l4-6" fill="none" />
+    <path d="M11 31a15 15 0 0 1 30 0Z" stroke="none" />
+    <rect x="11" y="33" width="30" height="9" rx="2" stroke="none" />
+  </g>
+  <g fill="#000">
+    <circle cx="19" cy="24" r="1.5" />
+    <circle cx="33" cy="24" r="1.5" />
+  </g>
+  <g
+    fill="#fff"
+    font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-weight="400"
+  >
+    <text x="48" y="19" font-size="11.5">Coming soon on</text>
+    <text x="47" y="42" font-size="25.5">Android</text>
+  </g>
+</svg>

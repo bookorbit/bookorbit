@@ -1,0 +1,1 @@
+ALTER TABLE "reading_sessions" ADD COLUMN "sync_interval_started_at" timestamp with time zone;

@@ -15,7 +15,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride, AddedAtSource } from '@bookorbit/types';
+import { FieldPreferenceOverrides, BookMetadataFetchConfigOverride, AddedAtSource, RegexMetadataConfig } from '@bookorbit/types';
 
 export const libraries = pgTable(
   'libraries',
@@ -38,6 +38,7 @@ export const libraries = pgTable(
       .$type<string[]>()
       .notNull()
       .default(['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar']),
+    regexMetadata: jsonb('regex_metadata').$type<RegexMetadataConfig>(),
     formatPriority: jsonb('format_priority')
       .$type<string[]>()
       .notNull()
@@ -66,6 +67,9 @@ export const libraries = pgTable(
     fileWriteKindleMaxFileSizeMb: integer('file_write_kindle_max_file_size_mb').notNull().default(100),
     fileWriteAudioEnabled: boolean('file_write_audio_enabled').notNull().default(false),
     fileWriteAudioMaxFileSizeMb: integer('file_write_audio_max_file_size_mb').notNull().default(500),
+    fileWriteAllFiles: boolean('file_write_all_files').notNull().default(false),
+    fileWriteReadAlongEnabled: boolean('file_write_read_along_enabled').notNull().default(false),
+    fileWriteReadAlongMaxFileSizeMb: integer('file_write_read_along_max_file_size_mb').notNull().default(1000),
     fileRenameEnabled: boolean('file_rename_enabled').notNull().default(false),
 
     // File naming pattern for uploads (null = use global default)
@@ -85,6 +89,7 @@ export const libraries = pgTable(
     scanMode: varchar('scan_mode', { length: 20 }).notNull().default('auto'),
     pollInterval: integer('poll_interval_seconds').default(300),
 
+    koreaderHashRevision: bigint('koreader_hash_revision', { mode: 'number' }).notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

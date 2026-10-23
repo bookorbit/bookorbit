@@ -45,8 +45,8 @@ const consistencyLabel = computed(() => {
     </div>
 
     <div v-if="loading" class="flex flex-1 flex-col gap-2">
-      <div class="flex-1 animate-pulse rounded bg-muted" />
-      <div class="h-3 w-20 animate-pulse rounded bg-muted" />
+      <div class="flex-1 animate-pulse rounded-xs bg-muted" />
+      <div class="h-3 w-20 animate-pulse rounded-xs bg-muted" />
     </div>
 
     <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">

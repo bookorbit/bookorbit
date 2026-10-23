@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowLeft, Loader2, Pencil, X } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import type { BookCard } from '@bookorbit/types'
-import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../lib/cover-aspect-ratio'
+import { useBookCoverAspectRatio } from '../../composables/useBookCoverAspectRatio'
 import { useBookDetail } from '../../composables/useBookDetail'
 import { useMetadataLocks } from '../../composables/useMetadataLocks'
 import { useCoverVersions } from '../../composables/useCoverVersions'
@@ -31,10 +31,10 @@ const mode = ref<'view' | 'edit'>('view')
 const { detail, loading, fetch } = useBookDetail()
 const { lockedFields, toggle, load: loadLocks } = useMetadataLocks()
 const { coverUrl } = useCoverVersions()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const editor = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 
 const currentDetail = computed(() => (detail.value && detail.value.id === props.book?.id ? detail.value : null))
+const coverAspectRatio = useBookCoverAspectRatio(() => currentDetail.value ?? props.book)
 const hasCoverResolved = computed(() => (currentDetail.value ? currentDetail.value.coverSource !== null : (props.book?.hasCover ?? false)))
 const coverVersion = computed(() => currentDetail.value?.coverVersion ?? props.book?.coverVersion ?? null)
 

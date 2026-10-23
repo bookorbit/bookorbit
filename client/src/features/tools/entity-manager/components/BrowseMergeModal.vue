@@ -73,7 +73,7 @@ function handleCancel(): void {
         </div>
 
         <label class="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer shrink-0 mt-4">
-          <input v-model="writeFiles" type="checkbox" class="rounded accent-primary" />
+          <input v-model="writeFiles" type="checkbox" class="rounded-xs accent-primary" />
           {{ t('tools.entityManager.writeChangesToFiles') }}
         </label>
       </div>

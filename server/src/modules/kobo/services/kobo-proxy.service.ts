@@ -4,8 +4,13 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { decodeSyncToken } from './kobo-sync-token';
 
-const KOBO_API_BASE = 'https://storeapi.kobo.com';
-const KOBO_API_HOSTNAME = 'storeapi.kobo.com';
+/** The Kobo services a device is relayed to: its store API, and the reading services that hold its notebooks. */
+export type KoboUpstream = 'store' | 'readingServices';
+
+const KOBO_UPSTREAMS: Record<KoboUpstream, { base: string; hostname: string }> = {
+  store: { base: 'https://storeapi.kobo.com', hostname: 'storeapi.kobo.com' },
+  readingServices: { base: 'https://readingservices.kobo.com', hostname: 'readingservices.kobo.com' },
+};
 
 // Headers that must never be forwarded. Connection-specific headers are defined by RFC 7230 as
 // scoped to a single hop and reset by every proxy, and `host` would otherwise point Kobo at the
@@ -63,6 +68,7 @@ export type KoboProxyRequestOptions = {
   /** Drops headers the device would otherwise copy. */
   omitHeaders?: string[];
   timeoutMs?: number;
+  upstream?: KoboUpstream;
 };
 
 /**
@@ -86,7 +92,7 @@ export class KoboProxyService {
 
   /** Calls Kobo with the device's own credentials and hands the response back instead of piping it. */
   async request(req: FastifyRequest, deviceToken: string, options: KoboProxyRequestOptions = {}): Promise<KoboProxyResponse> {
-    const targetUrl = this.resolveTargetUrl(req, deviceToken);
+    const targetUrl = this.resolveTargetUrl(req, deviceToken, options.upstream);
 
     // Fastify lowercases header keys, but defensive: lowercase the lookup keys too.
     const sourceHeaders = req.headers as Record<string, string | string[] | undefined>;
@@ -128,7 +134,7 @@ export class KoboProxyService {
       body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
 
-    // codeql[js/request-forgery] - hostname validated by buildTargetUrl() to KOBO_API_HOSTNAME
+    // codeql[js/request-forgery] - hostname validated by buildTargetUrl() to the chosen Kobo upstream
     const upstream = await fetch(targetUrl, {
       method: req.method,
       headers,
@@ -150,15 +156,15 @@ export class KoboProxyService {
    * `PX.<base64>` and treats it as a fresh cursor, so a borrow call that uses it lands Kobo in a
    * state where the device has an entitlement BookOrbit never sees on this iteration.
    */
-  async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string): Promise<void> {
+  async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string, upstream: KoboUpstream = 'store'): Promise<void> {
     const startedAt = Date.now();
-    const targetUrl = this.resolveTargetUrl(req, deviceToken);
+    const targetUrl = this.resolveTargetUrl(req, deviceToken, upstream);
     const deviceId = (req as unknown as { koboDevice?: { deviceId: number } }).koboDevice?.deviceId;
 
     this.logger.debug(`[kobo.proxy] [start] deviceId=${deviceId ?? 'unknown'} - upstream Kobo relay started`);
 
     try {
-      const response = await this.request(req, deviceToken);
+      const response = await this.request(req, deviceToken, { upstream });
       this.sendUpstream(reply, response);
       this.logger.debug(
         `[kobo.proxy] [end] deviceId=${deviceId ?? 'unknown'} durationMs=${Date.now() - startedAt} upstreamStatus=${response.status} - upstream Kobo relay completed`,
@@ -187,21 +193,22 @@ export class KoboProxyService {
     reply.send(response.body);
   }
 
-  private resolveTargetUrl(req: FastifyRequest, deviceToken: string): string {
+  private resolveTargetUrl(req: FastifyRequest, deviceToken: string, upstream: KoboUpstream = 'store'): string {
     const rawUrl = req.url;
     const prefix = `/api/v1/kobo/${deviceToken}`;
     const koboPath = rawUrl.startsWith(prefix) ? rawUrl.slice(prefix.length) : rawUrl;
-    return this.buildTargetUrl(koboPath);
+    return this.buildTargetUrl(koboPath, upstream);
   }
 
-  private buildTargetUrl(koboPath: string): string {
+  private buildTargetUrl(koboPath: string, upstream: KoboUpstream = 'store'): string {
+    const { base, hostname } = KOBO_UPSTREAMS[upstream];
     let parsed: URL;
     try {
-      parsed = new URL(koboPath, KOBO_API_BASE);
+      parsed = new URL(koboPath, base);
     } catch {
       throw new BadRequestException('Invalid proxy path');
     }
-    if (parsed.hostname !== KOBO_API_HOSTNAME) {
+    if (parsed.hostname !== hostname) {
       throw new BadRequestException('Invalid proxy path');
     }
     return parsed.toString();

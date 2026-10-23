@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import type { UserReadingSessionTimeline, UserReadingSessionTimelineItem, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 
-import { useThemeStore } from '@/stores/theme'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import {
   DEFAULT_BREAKDOWN_DIMENSION,
@@ -67,8 +67,8 @@ interface PointerOffset {
 const { t } = useI18n()
 const { filters } = useStatisticsConfig()
 const { coverUrl } = useCoverVersions()
-const themeStore = useThemeStore()
-const themeKey = computed(() => `${themeStore.resolvedTheme}:${themeStore.accent}`)
+const chartTokens = useChartTokens()
+const themeKey = computed(() => chartTokens.value.key)
 const dimension = ref<BreakdownDimension>(DEFAULT_BREAKDOWN_DIMENSION)
 
 const now = new Date()

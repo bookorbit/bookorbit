@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PodcastPlaybackPreferences } from '@bookorbit/types'
+import { stubInsecureOriginCrypto, UUID_V4 } from '@/lib/__tests__/insecure-origin'
 import { createPodcastPlayerPersistence } from './podcast-player-persistence'
 
 describe('createPodcastPlayerPersistence', () => {
@@ -105,6 +106,25 @@ describe('createPodcastPlayerPersistence', () => {
         }),
       }),
     )
+  })
+
+  /** A self-hosted install opened over plain HTTP has no `crypto.randomUUID`. */
+  it('starts and closes a listening session with a generated id on a plain-HTTP origin', async () => {
+    const insecure = stubInsecureOriginCrypto()
+    try {
+      const request = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>().mockResolvedValue(new Response(null, { status: 204 }))
+      const persistence = createPodcastPlayerPersistence(request)
+      persistence.startListeningSession()
+      vi.setSystemTime(new Date('2026-08-01T12:01:00.000Z'))
+
+      await persistence.closeListeningSession(42, 60)
+
+      const [, init] = request.mock.calls[0]!
+      expect(JSON.parse(String(init?.body)).sessionId).toMatch(UUID_V4)
+      expect(insecure.getRandomValues).toHaveBeenCalledOnce()
+    } finally {
+      insecure.restore()
+    }
   })
 
   it('does not persist sub-second or discarded listening sessions', async () => {

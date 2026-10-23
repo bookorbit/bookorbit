@@ -16,7 +16,7 @@ vi.mock('../../composables/useCoverVersions', () => ({
   }),
 }))
 
-type LightboxBook = Pick<BookDetail, 'id' | 'title' | 'covers' | 'coverVersion'>
+type LightboxBook = Pick<BookDetail, 'id' | 'title' | 'covers' | 'coverVersion' | 'coverAspectRatio'>
 
 function slot(updatedAt: string): BookCoverSlot {
   return { source: 'extracted', updatedAt, width: null, height: null }
@@ -69,6 +69,13 @@ describe('BookCoverLightbox', () => {
     await flushPromises()
 
     expect(image().getAttribute('src')).toBe('/api/v1/books/3/cover?t=e1&medium=ebook')
+  })
+
+  it("opens on the book's own face rather than the surrounding view's shape", async () => {
+    mountLightbox({ book: { ...bothSlots, coverAspectRatio: '1/1' } }, '2/3')
+    await flushPromises()
+
+    expect(image().getAttribute('src')).toBe('/api/v1/books/3/cover?t=a1&medium=audio')
   })
 
   it('moves between the slots with the arrow keys', async () => {

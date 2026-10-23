@@ -153,7 +153,7 @@ void loadVoices()
       <div class="flex flex-wrap items-center gap-2">
         <div class="flex items-center gap-1 bg-muted/50 p-1 rounded-md border border-border">
           <button
-            class="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+            class="px-2.5 py-1 rounded-xs text-xs font-medium transition-colors"
             :class="activeProviderId === '' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
             :aria-pressed="activeProviderId === ''"
             @click="handleShowAllProviders"
@@ -163,7 +163,7 @@ void loadVoices()
           <button
             v-for="provider in providers"
             :key="provider.id"
-            class="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+            class="px-2.5 py-1 rounded-xs text-xs font-medium transition-colors"
             :class="activeProviderId === provider.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
             :aria-pressed="activeProviderId === provider.id"
             @click="handleSelectProvider(provider.id)"

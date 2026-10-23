@@ -4,6 +4,13 @@ import { buildPatternTokens, patternReferencesToken } from './pattern-tokens.uti
 
 describe('pattern-tokens.utils', () => {
   describe('buildPatternTokens', () => {
+    it('uses either ISBN for the naming token and prefers ISBN-13', () => {
+      const input = { authors: [], originalStem: 'book', format: 'mobi' };
+      expect(buildPatternTokens({ ...input, metadata: { isbn10: '097522980X' } }).isbn).toBe('097522980X');
+      expect(buildPatternTokens({ ...input, metadata: { isbn10: '0306406152', isbn13: '9780306406157' } }).isbn).toBe('9780306406157');
+      expect(buildPatternTokens({ ...input, metadata: { isbn10: '0306406152', isbn13: ' ' } }).isbn).toBe('0306406152');
+    });
+
     const metadata = {
       title: 'Dune',
       subtitle: 'A Novel',

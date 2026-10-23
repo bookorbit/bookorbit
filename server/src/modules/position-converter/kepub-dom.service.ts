@@ -59,7 +59,8 @@ export class KepubDomService {
     const normalized = normalizeChapterPath(chapterFilename);
     if (!normalized) return null;
     const lower = normalized.toLowerCase();
-    const hrefs = entry.spine.hrefs;
+    // The Kobo reports a chapter by its manifest href, encoded or not, so compare both sides decoded.
+    const hrefs = entry.spine.hrefs.map(normalizeChapterPath);
 
     let index = hrefs.findIndex((href) => href === normalized);
     if (index < 0) index = hrefs.findIndex((href) => href.toLowerCase() === lower);

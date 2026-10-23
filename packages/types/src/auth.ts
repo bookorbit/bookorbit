@@ -33,6 +33,7 @@ export const ProvisioningMethod = {
 export type ProvisioningMethod = (typeof ProvisioningMethod)[keyof typeof ProvisioningMethod];
 
 export interface UserSettings {
+  metadataReminderPreferences?: import("./metadata-reminders").MetadataReminderPreferences;
   showBookRequests?: boolean;
   syncReaderPreferences?: boolean;
   syncThemePreferences?: boolean;
@@ -46,6 +47,8 @@ export interface UserSettings {
   /** Separate from dashboardConfig so legacy clients replacing it preserve shelf preferences. */
   dashboardShelfConfig?: import("./dashboard").DashboardShelfConfig;
   sidebarConfig?: import("./sidebar").SidebarConfig;
+  /** Separate from sidebarConfig so an older client rewriting that key cannot wipe the layout. */
+  sidebarLayout?: import("./sidebar").SidebarLayout | null;
   achievementPreferences?: {
     enabled?: boolean;
   };

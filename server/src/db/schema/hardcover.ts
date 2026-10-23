@@ -39,6 +39,8 @@ export const hardcoverBookState = pgTable(
     hardcoverUserBookId: integer('hardcover_user_book_id'),
     hardcoverReadId: integer('hardcover_read_id'),
     matchMethod: varchar('match_method', { length: 20 }),
+    // Identifiers the current link was resolved from; null on links made before it was recorded.
+    matchBasis: text('match_basis'),
     matchError: text('match_error'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     lastSyncedStatus: varchar('last_synced_status', { length: 20 }),

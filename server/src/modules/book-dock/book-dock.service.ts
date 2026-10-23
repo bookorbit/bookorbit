@@ -15,6 +15,7 @@ import { BookDockGateway } from './book-dock.gateway';
 import { normalizeBookDockMetadata, normalizeBookDockMetadataSources } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWatcherService } from './book-dock-watcher.service';
+import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
 import type { BookDockFileRow, BookDockUnitFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -49,9 +50,17 @@ export class BookDockService {
     };
   }
 
-  async getFile(id: number, userId: number, canManageAll: boolean): Promise<BookDockFile> {
+  async getFile(id: number, userId: number, canManageAll: boolean, options: { readAlong?: boolean } = {}): Promise<BookDockFile> {
     const row = await this.findFileForUser(id, userId, canManageAll);
-    return toDto(row, await this.repo.findUnitFiles(row.id));
+    const dto = toDto(row, await this.repo.findUnitFiles(row.id));
+    if (!options.readAlong || row.format?.toLowerCase() !== 'epub') return dto;
+    const startedAt = Date.now();
+    const { mediaOverlayAvailable } = await inspectEpubMediaOverlayFields(row.absolutePath, row.format, (err) => {
+      this.logger.warn(
+        `[book_dock.media_overlay_capability] [fail] path="${sanitizeLogValue(row.absolutePath)}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - EPUB media-overlay inspection failed`,
+      );
+    });
+    return { ...dto, readAlong: mediaOverlayAvailable };
   }
 
   async getCoverPath(id: number, userId: number, canManageAll: boolean): Promise<string> {

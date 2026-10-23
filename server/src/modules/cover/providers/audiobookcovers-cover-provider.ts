@@ -21,11 +21,14 @@ export class AudiobookCoversCoverProvider implements CoverProvider {
   async search(params: CoverSearchParams): Promise<CoverSearchResult[]> {
     if (!params.isAudiobook) return [];
 
-    const query = this.buildQuery(params);
+    const title = params.title?.trim() ?? '';
+    const author = params.author?.trim() ?? '';
+    const query = author ? `${title} ${author}`.trim() : title;
     if (!query) return [];
 
     const url = new URL(AudiobookCoversCoverProvider.SEARCH_URL);
-    url.searchParams.set('q', query);
+    url.searchParams.set('title', title);
+    if (author) url.searchParams.set('author', author);
 
     try {
       const response = await fetch(url.toString(), {
@@ -68,11 +71,5 @@ export class AudiobookCoversCoverProvider implements CoverProvider {
     }
 
     return results;
-  }
-
-  private buildQuery(params: CoverSearchParams): string {
-    const title = params.title?.trim() ?? '';
-    const author = params.author?.trim() ?? '';
-    return author ? `${title} ${author}`.trim() : title;
   }
 }

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lt, lte, max, min, notLike, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lt, lte, max, min, notLike, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -8,8 +8,9 @@ import type {
   BookReadingSessionStats,
   BookReadingSourceSlice,
   ReadingSessionSource,
+  ReadingSessionType,
 } from '@bookorbit/types';
-import { READING_SESSION_SOURCE_BUCKETS, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
+import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_TYPES, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
 import {
   aggregateReadingSessionDailyStats,
   getDayRangeForDateKeys,
@@ -17,17 +18,50 @@ import {
   splitReadingSessionByDay,
   type ReadingDailyStatsSegment,
 } from '../../common/utils/reading-daily-stats.utils';
+import { parseKoreaderSessionId } from '../../common/utils/koreader-session-id.utils';
 import { resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, books, readingSessionSyncCursors, readingSessions, userReadingDailyStats } from '../../db/schema';
+import { bookFiles, books, koreaderSessionTombstones, readingSessionSyncCursors, readingSessions, userReadingDailyStats } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const MIN_READING_SESSION_SECONDS = 10;
+
+// The column is a free varchar, so anything unexpected reads as plain reading rather than leaking
+// an unknown value to clients that switch on it.
+function toReadingSessionType(value: string | null | undefined): ReadingSessionType {
+  return (READING_SESSION_TYPES as readonly string[]).includes(value ?? '') ? (value as ReadingSessionType) : 'read';
+}
 const ESTIMATE_CLEANUP_PAGE_SIZE = 500;
 const CLEANUP_DAILY_STATS_MAX_SPAN_DAYS = 31;
+// Cumulative device counters tick in whole minutes, so less than one tick left is rounding, not reading.
+const SYNC_COUNTER_RESOLUTION_SECONDS = 60;
+
+// A device can push its counter while a book is open, on waking or on a manual sync, so a counter
+// interval can begin or end inside a measured session. The session's seconds are split by how much
+// of its wall-clock span falls in each interval rather than given whole to the one holding its start.
+// `measuredSecondsInWindow` and `measuredShareOfWindow` must apply the same rule.
+function measuredSecondsInWindow(windowStart: Date, windowEnd: Date): SQL<number> {
+  return sql<number>`case when ${readingSessions.endedAt} > ${readingSessions.startedAt} then round(
+    ${readingSessions.durationSeconds} * greatest(0, extract(epoch from (
+      least(${readingSessions.endedAt}, ${windowEnd}::timestamptz) - greatest(${readingSessions.startedAt}, ${windowStart}::timestamptz)
+    ))) / extract(epoch from (${readingSessions.endedAt} - ${readingSessions.startedAt}))
+  ) else ${readingSessions.durationSeconds} end`;
+}
+
+function measuredShareOfWindow(session: { seconds: number; startedAt: Date; endedAt: Date }, windowStart: Date, windowEnd: Date): number {
+  const spanMs = session.endedAt.getTime() - session.startedAt.getTime();
+  if (spanMs <= 0) return session.seconds;
+  const overlapMs = Math.min(session.endedAt.getTime(), windowEnd.getTime()) - Math.max(session.startedAt.getTime(), windowStart.getTime());
+  return Math.round((session.seconds * Math.max(0, overlapMs)) / spanMs);
+}
+
+function scaleProgressDelta(progressDelta: number | null, keptSeconds: number, totalSeconds: number): number | null {
+  if (progressDelta === null || keptSeconds === totalSeconds) return progressDelta;
+  return Math.round(((progressDelta * keptSeconds) / totalSeconds) * 100) / 100;
+}
 
 function groupDateKeysByMaxSpan(days: Iterable<string>): string[][] {
   const sorted = [...new Set(days)].sort();
@@ -62,7 +96,7 @@ export type SaveReadingSessionResult =
 
 export type RecordCumulativeReadingSessionResult =
   | { kind: 'baseline' | 'unchanged' | 'reset' | 'stale' }
-  | { kind: 'saved'; durationSeconds: number; sessionId: string }
+  | { kind: 'saved'; durationSeconds: number; progressDelta: number | null; sessionId: string }
   | {
       kind: 'skipped';
       reason: 'book_file_not_found' | 'duplicate_session_id' | 'measured_session_present';
@@ -228,7 +262,7 @@ export class ReadingSessionRepository {
       }
 
       if (sync?.estimateSessionIdPrefix) {
-        await this.deleteOverlappingSyncEstimates(tx, {
+        await this.reconcileSyncEstimates(tx, {
           userId,
           bookId,
           libraryId,
@@ -238,6 +272,7 @@ export class ReadingSessionRepository {
           startedAt,
           endedAt,
           timeZone,
+          newlyMeasuredSeconds: result.kind === 'saved' ? durationSeconds : result.kind === 'superseded' ? result.addedSeconds : 0,
         });
       }
 
@@ -292,11 +327,14 @@ export class ReadingSessionRepository {
         return { kind: 'reset' };
       }
 
-      const durationSeconds = (params.counter - cursor.counter) * 60;
-      const startedAt = new Date(params.endedAt.getTime() - durationSeconds * 1000);
+      // The counter covers everything read since the previous push, however long ago that reading
+      // was: a device that read offline only pushes with its next sync. The share of measured
+      // sessions that falls in that interval is subtracted rather than taken as proof the whole
+      // delta is covered, so reading the device did not measure is kept.
+      const counterSeconds = (params.counter - cursor.counter) * 60;
 
       const [measured] = await tx
-        .select({ id: readingSessions.id })
+        .select({ seconds: sql<number>`coalesce(sum(${measuredSecondsInWindow(cursor.lastModified, params.endedAt)}), 0)::int` })
         .from(readingSessions)
         .where(
           and(
@@ -306,15 +344,18 @@ export class ReadingSessionRepository {
             eq(readingSessions.sourceDeviceKey, params.sourceDeviceKey),
             notLike(readingSessions.sessionId, `${params.sessionIdPrefix}%`),
             lt(readingSessions.startedAt, params.endedAt),
-            gt(readingSessions.endedAt, startedAt),
+            gt(readingSessions.endedAt, cursor.lastModified),
           ),
-        )
-        .limit(1);
+        );
 
-      if (measured) {
+      const durationSeconds = counterSeconds - (measured?.seconds ?? 0);
+      if (durationSeconds < SYNC_COUNTER_RESOLUTION_SECONDS) {
         await this.updateSyncCursor(tx, params, cursor.generation);
         return { kind: 'skipped', reason: 'measured_session_present' };
       }
+
+      const startedAt = new Date(params.endedAt.getTime() - durationSeconds * 1000);
+      const progressDelta = scaleProgressDelta(params.progressDelta, durationSeconds, counterSeconds);
 
       if (params.bookFileId === null) return { kind: 'skipped', reason: 'book_file_not_found' };
 
@@ -341,8 +382,9 @@ export class ReadingSessionRepository {
           startedAt,
           endedAt: params.endedAt,
           durationSeconds,
-          progressDelta: params.progressDelta,
+          progressDelta,
           endProgress: params.endProgress,
+          syncIntervalStartedAt: cursor.lastModified,
         })
         .onConflictDoNothing({ target: [readingSessions.userId, readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
@@ -356,11 +398,11 @@ export class ReadingSessionRepository {
         startedAt,
         endedAt: params.endedAt,
         durationSeconds,
-        progressDelta: params.progressDelta,
+        progressDelta,
         timeZone: params.timeZone,
       });
 
-      return { kind: 'saved', durationSeconds, sessionId };
+      return { kind: 'saved', durationSeconds, progressDelta, sessionId };
     });
   }
 
@@ -483,6 +525,7 @@ export class ReadingSessionRepository {
           format: sql<string | null>`nullif(${bookFiles.format}, '')`,
           source: readingSessions.source,
           attemptId: readingSessions.attemptId,
+          sessionType: readingSessions.sessionType,
         })
         .from(readingSessions)
         .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
@@ -618,6 +661,7 @@ export class ReadingSessionRepository {
       format: r.format ?? null,
       source: r.source ?? null,
       attemptId: r.attemptId ?? null,
+      sessionType: toReadingSessionType(r.sessionType),
     }));
 
     return { items, total, page, pageSize, stats };
@@ -628,6 +672,9 @@ export class ReadingSessionRepository {
       const [row] = await tx
         .select({
           id: readingSessions.id,
+          sessionId: readingSessions.sessionId,
+          source: readingSessions.source,
+          bookFileId: readingSessions.bookFileId,
           startedAt: readingSessions.startedAt,
           endedAt: readingSessions.endedAt,
           durationSeconds: readingSessions.durationSeconds,
@@ -645,6 +692,15 @@ export class ReadingSessionRepository {
       const affectedDays = getReadingSessionDayKeys({ startedAt, endedAt, durationSeconds, progressDelta: progressDelta ?? null }, timeZone);
 
       await tx.delete(readingSessions).where(eq(readingSessions.id, sessionId));
+
+      // A KOReader session is derived from page events that stay stored, so without this the next
+      // event within the session gap, or a plugin uploading its history again, re-derives it.
+      const derived = row.source === 'koreader' ? parseKoreaderSessionId(row.sessionId) : null;
+      const startTime = Math.floor(startedAt.getTime() / 1000);
+      const endTime = Math.ceil(endedAt.getTime() / 1000);
+      if (derived && row.bookFileId != null && endTime > startTime) {
+        await tx.insert(koreaderSessionTombstones).values({ userId, bookFileId: row.bookFileId, deviceKey: derived.deviceKey, startTime, endTime });
+      }
 
       await this.recomputeDailyStats(tx, userId, libraryId, affectedDays, timeZone);
 
@@ -801,7 +857,20 @@ export class ReadingSessionRepository {
     await tx.execute(sql`select pg_advisory_xact_lock(${userId}::int, hashtext(${`${sourceDeviceKey}:${bookId}`})::int)`);
   }
 
-  private async deleteOverlappingSyncEstimates(
+  /**
+   * Reconciles the counter-derived estimates of a device with a session it also measured.
+   *
+   * An estimate stands for whatever was read between two counter pushes, and it is dated on the
+   * minutes leading up to the push. That is only when the reading happened if the device pushed
+   * right after it; after offline reading the push comes with the next sync. So the measured
+   * session is matched to every estimate whose counter interval it overlaps, and each takes the
+   * share of its seconds that falls in that interval. They are taken once, when first stored: a
+   * replay takes nothing, and the shares never add up to more than the session. What is left
+   * stays as reading the device did not measure, unless it is below the counter resolution.
+   *
+   * Estimates written before the interval was recorded keep the overlap rule they were created under.
+   */
+  private async reconcileSyncEstimates(
     tx: Tx,
     params: {
       userId: number;
@@ -813,28 +882,37 @@ export class ReadingSessionRepository {
       startedAt: Date;
       endedAt: Date;
       timeZone: string;
+      newlyMeasuredSeconds: number;
     },
   ): Promise<void> {
     const affectedDays = new Set<string>();
+    const estimateColumns = {
+      id: readingSessions.id,
+      startedAt: readingSessions.startedAt,
+      endedAt: readingSessions.endedAt,
+      durationSeconds: readingSessions.durationSeconds,
+      progressDelta: readingSessions.progressDelta,
+    };
+    const sameDeviceEstimate = and(
+      eq(readingSessions.userId, params.userId),
+      eq(readingSessions.bookId, params.bookId),
+      eq(readingSessions.source, params.source),
+      eq(readingSessions.sourceDeviceKey, params.sourceDeviceKey),
+      like(readingSessions.sessionId, `${params.estimateSessionIdPrefix}%`),
+    );
+    const collectAffectedDays = (row: { startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null }) => {
+      for (const day of getReadingSessionDayKeys(row, params.timeZone)) affectedDays.add(day);
+    };
     let cursor = 0;
 
     for (;;) {
       const rows = await tx
-        .select({
-          id: readingSessions.id,
-          startedAt: readingSessions.startedAt,
-          endedAt: readingSessions.endedAt,
-          durationSeconds: readingSessions.durationSeconds,
-          progressDelta: readingSessions.progressDelta,
-        })
+        .select(estimateColumns)
         .from(readingSessions)
         .where(
           and(
-            eq(readingSessions.userId, params.userId),
-            eq(readingSessions.bookId, params.bookId),
-            eq(readingSessions.source, params.source),
-            eq(readingSessions.sourceDeviceKey, params.sourceDeviceKey),
-            like(readingSessions.sessionId, `${params.estimateSessionIdPrefix}%`),
+            sameDeviceEstimate,
+            isNull(readingSessions.syncIntervalStartedAt),
             lt(readingSessions.startedAt, params.endedAt),
             gt(readingSessions.endedAt, params.startedAt),
             gt(readingSessions.id, cursor),
@@ -846,19 +924,7 @@ export class ReadingSessionRepository {
       if (rows.length === 0) break;
       cursor = rows[rows.length - 1]!.id;
 
-      for (const row of rows) {
-        for (const day of getReadingSessionDayKeys(
-          {
-            startedAt: row.startedAt,
-            endedAt: row.endedAt,
-            durationSeconds: row.durationSeconds,
-            progressDelta: row.progressDelta ?? null,
-          },
-          params.timeZone,
-        )) {
-          affectedDays.add(day);
-        }
-      }
+      for (const row of rows) collectAffectedDays(row);
 
       await tx.delete(readingSessions).where(
         and(
@@ -871,6 +937,47 @@ export class ReadingSessionRepository {
       );
 
       if (rows.length < ESTIMATE_CLEANUP_PAGE_SIZE) break;
+    }
+
+    if (params.newlyMeasuredSeconds > 0) {
+      const measured = { seconds: params.newlyMeasuredSeconds, startedAt: params.startedAt, endedAt: params.endedAt };
+      const overlapping = await tx
+        .select({ ...estimateColumns, syncIntervalStartedAt: readingSessions.syncIntervalStartedAt })
+        .from(readingSessions)
+        .where(
+          and(
+            sameDeviceEstimate,
+            isNotNull(readingSessions.syncIntervalStartedAt),
+            lt(readingSessions.syncIntervalStartedAt, params.endedAt),
+            gt(readingSessions.endedAt, params.startedAt),
+          ),
+        )
+        .orderBy(asc(readingSessions.endedAt), asc(readingSessions.id));
+
+      for (const estimate of overlapping) {
+        const share = measuredShareOfWindow(measured, estimate.syncIntervalStartedAt!, estimate.endedAt);
+        if (share <= 0) continue;
+
+        const ownEstimate = and(eq(readingSessions.userId, params.userId), eq(readingSessions.id, estimate.id));
+        const remainingSeconds = estimate.durationSeconds - share;
+        collectAffectedDays(estimate);
+
+        if (remainingSeconds < SYNC_COUNTER_RESOLUTION_SECONDS) {
+          await tx.delete(readingSessions).where(ownEstimate);
+        } else {
+          const shortened = {
+            startedAt: new Date(estimate.endedAt.getTime() - remainingSeconds * 1000),
+            endedAt: estimate.endedAt,
+            durationSeconds: remainingSeconds,
+            progressDelta: scaleProgressDelta(estimate.progressDelta, remainingSeconds, estimate.durationSeconds),
+          };
+          await tx
+            .update(readingSessions)
+            .set({ startedAt: shortened.startedAt, durationSeconds: shortened.durationSeconds, progressDelta: shortened.progressDelta })
+            .where(ownEstimate);
+          collectAffectedDays(shortened);
+        }
+      }
     }
 
     if (affectedDays.size > 0) {

@@ -2,12 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { audibleApiOrigin } from '../../../../common/utils/metadata-provider-hosts.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { audiobookGate, pickSearchInputs, providerCacheContext } from '../provider-cache';
 import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { allowsAudiobookProviders, buildRequestSignal } from '../provider-utils';
 import { mapAudibleProduct } from './audible.mapper';
@@ -23,6 +26,17 @@ export class AudibleProvider implements IdentifiableProvider {
   readonly mediaKinds = ['audiobook'] as const;
 
   private readonly logger = new Logger(AudibleProvider.name);
+
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: true,
+    context: async () => {
+      const { enabled, domain } = (await this.providerConfig.getConfig()).audible;
+      return providerCacheContext(enabled, { domain });
+    },
+    describeSearch: (params) => ({ inputs: { ...pickSearchInputs(params, ['title', 'author']), audiobook: audiobookGate(params) } }),
+    describeLookup: (providerId) => ({ inputs: { id: providerId } }),
+  };
 
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
@@ -54,6 +68,7 @@ export class AudibleProvider implements IdentifiableProvider {
         return [];
       }
       const body = (await res.json()) as AudibleSearchResponse;
+      if (!Array.isArray(body.products)) markProviderFailed('audible.search: response without products');
       const results = (body.products ?? []).map(mapAudibleProduct);
       this.logger.log(
         `[audible] [end] op=search query="${safeQuery}" status=${res.status} resultCount=${results.length} durationMs=${Date.now() - startedAt}`,
@@ -64,6 +79,7 @@ export class AudibleProvider implements IdentifiableProvider {
         this.logger.warn(`[audible] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
+      markProviderFailed('audible.search: unusable response');
       this.logger.error(
         `[audible] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
@@ -93,6 +109,7 @@ export class AudibleProvider implements IdentifiableProvider {
         return null;
       }
       const body = (await res.json()) as { product: AudibleSearchResponse['products'][0] };
+      if (!body.product) markProviderFailed('audible.lookup: response without product');
       const result = body.product ? mapAudibleProduct(body.product) : null;
       this.logger.log(
         `[audible] [end] op=lookup providerId="${providerId}" status=${res.status} found=${result != null} durationMs=${Date.now() - startedAt}`,
@@ -103,6 +120,7 @@ export class AudibleProvider implements IdentifiableProvider {
         this.logger.warn(`[audible] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
+      markProviderFailed('audible.lookup: unusable response');
       this.logger.error(
         `[audible] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );

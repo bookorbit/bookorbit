@@ -14,8 +14,11 @@ const MIN_SPEED = 0.25
 const MAX_SPEED = 4.0
 const SPEED_STEP = 0.25
 const SCHEDULE_LATENCY = 0.05
+// Long enough to fold a speed-slider drag into one round of requests.
+const SETTINGS_RESYNC_DELAY_MS = 300
 
 type TextSourceFn = (chapterIndex: number) => Promise<string[]>
+type ScheduledSource = { source: AudioBufferSourceNode; blockIdx: number; endTime: number; generation: number }
 
 const playbackState = ref<TtsPlaybackState>('idle')
 const currentBook = ref<TtsCurrentBook | null>(null)
@@ -28,7 +31,7 @@ const currentProviderId = ref('')
 const currentVoiceId = ref('')
 
 let audioCtx: AudioContext | null = null
-let scheduledSources: Array<{ source: AudioBufferSourceNode; blockIdx: number; endTime: number }> = []
+let scheduledSources: ScheduledSource[] = []
 let nextScheduleTime = 0
 const decodedQueue = new Map<number, AudioBuffer>()
 let lastScheduledBlockIdx = -1
@@ -37,6 +40,10 @@ let getTextBlocks: TextSourceFn | null = null
 let chapterBlocks: string[] = []
 const pendingPrefetches = new Set<number>()
 let prefetchGeneration = 0
+let synthesisAbort = new AbortController()
+// The block playback is waiting for, until its audio is scheduled.
+let awaitedBlockIdx: number | null = null
+let settingsResyncTimer: ReturnType<typeof setTimeout> | null = null
 
 const positionComposable = useTtsPosition()
 const mediaSession = useTtsMediaSession()
@@ -52,14 +59,21 @@ function flushCurrentPositionSave() {
   void positionComposable.flushPendingSave()
 }
 
-function getOrCreateAudioContext(): AudioContext {
+function ensureAudioContext(): AudioContext {
   if (!audioCtx) audioCtx = new AudioContext()
-  if (audioCtx.state === 'suspended') void audioCtx.resume()
   return audioCtx
 }
 
+// A paused player stays silent: audio that arrives during the pause waits for the listener to resume.
+function getOrCreateAudioContext(): AudioContext {
+  const ctx = ensureAudioContext()
+  if (ctx.state === 'suspended' && playbackState.value !== 'paused') void ctx.resume()
+  return ctx
+}
+
 function primeAudioContext(): void {
-  getOrCreateAudioContext()
+  const ctx = ensureAudioContext()
+  if (ctx.state === 'suspended') void ctx.resume()
 }
 
 function internalReset(): void {
@@ -92,21 +106,37 @@ async function decodeAudioBlob(blob: Blob): Promise<AudioBuffer> {
   return ctx.decodeAudioData(ab)
 }
 
-function stopAllSources(): void {
-  for (const { source } of scheduledSources) {
-    source.onended = null
-    try {
-      source.stop(0)
-    } catch {
-      // Source may have already ended naturally
-    }
+function cancelSettingsResync(): void {
+  if (settingsResyncTimer === null) return
+  clearTimeout(settingsResyncTimer)
+  settingsResyncTimer = null
+}
+
+function invalidateSynthesis(): void {
+  prefetchGeneration++
+  pendingPrefetches.clear()
+  synthesisAbort.abort()
+  synthesisAbort = new AbortController()
+  cancelSettingsResync()
+}
+
+function stopSource(source: AudioBufferSourceNode): void {
+  source.onended = null
+  try {
+    source.stop(0)
+  } catch {
+    // Source may have already ended naturally
   }
+}
+
+function stopAllSources(): void {
+  for (const { source } of scheduledSources) stopSource(source)
   scheduledSources = []
   decodedQueue.clear()
   nextScheduleTime = 0
   lastScheduledBlockIdx = -1
-  pendingPrefetches.clear()
-  prefetchGeneration++
+  awaitedBlockIdx = null
+  invalidateSynthesis()
 }
 
 function stopAndResetFor(blockIdx: number): void {
@@ -114,21 +144,21 @@ function stopAndResetFor(blockIdx: number): void {
   lastScheduledBlockIdx = blockIdx - 1
 }
 
-function stopScheduledExcept(keepBlockIdx: number): void {
-  const toStop = scheduledSources.filter((s) => s.blockIdx !== keepBlockIdx)
-  for (const { source } of toStop) {
-    source.onended = null
-    try {
-      source.stop(0)
-    } catch {
-      // Source may have already ended naturally
-    }
-  }
-  scheduledSources = scheduledSources.filter((s) => s.blockIdx === keepBlockIdx)
+/**
+ * Drops audio queued after the playing block. That block finishes as it was synthesized and is
+ * moved into the current generation, so its end still hands over to the next block.
+ */
+function stopScheduledAfter(currentIdx: number): void {
   decodedQueue.clear()
-  lastScheduledBlockIdx = keepBlockIdx
-  const currentEntry = scheduledSources[0]
-  if (currentEntry) nextScheduleTime = currentEntry.endTime
+  const current = scheduledSources.find((entry) => entry.blockIdx === currentIdx)
+  if (!current) return
+  for (const entry of scheduledSources) {
+    if (entry !== current) stopSource(entry.source)
+  }
+  scheduledSources = [current]
+  current.generation = prefetchGeneration
+  lastScheduledBlockIdx = currentIdx
+  nextScheduleTime = current.endTime
 }
 
 function pausePlayback() {
@@ -154,11 +184,12 @@ export function useTtsPlayer() {
     source.start(startTime)
     const endTime = startTime + buffer.duration
     nextScheduleTime = endTime
-    scheduledSources.push({ source, blockIdx, endTime })
-    const capturedGen = prefetchGeneration
+    const entry: ScheduledSource = { source, blockIdx, endTime, generation: prefetchGeneration }
+    scheduledSources.push(entry)
+    if (blockIdx === awaitedBlockIdx) awaitedBlockIdx = null
     source.onended = () => {
-      scheduledSources = scheduledSources.filter((s) => s.source !== source)
-      if (prefetchGeneration !== capturedGen) return
+      scheduledSources = scheduledSources.filter((s) => s !== entry)
+      if (entry.generation !== prefetchGeneration) return
       if (playbackState.value !== 'playing') return
       void onBlockEnded(blockIdx)
     }
@@ -233,39 +264,48 @@ export function useTtsPlayer() {
     }
   }
 
-  async function fetchAndPlay(blockIdx: number) {
+  async function fetchAndPlay(blockIdx: number, { keepPaused = false } = {}) {
     if (!currentBook.value) return
-    playbackState.value = 'loading'
+    cancelSettingsResync()
+    if (!keepPaused || playbackState.value !== 'paused') playbackState.value = 'loading'
     const text = chapterBlocks[blockIdx]
     if (!text) {
       await advanceChapter()
       return
     }
     const gen = prefetchGeneration
+    const { signal } = synthesisAbort
+    awaitedBlockIdx = blockIdx
     try {
-      const blob = await fetchAudio(text)
+      const blob = await fetchAudio(text, signal)
       if (prefetchGeneration !== gen) return
       const buffer = await decodeAudioBlob(blob)
       if (prefetchGeneration !== gen) return
       scheduleIfNext(blockIdx, buffer)
       currentBlockIndex.value = blockIdx
-      playbackState.value = 'playing'
-      mediaSession.setPlaybackState('playing')
+      if (playbackState.value !== 'paused') {
+        playbackState.value = 'playing'
+        mediaSession.setPlaybackState('playing')
+      }
       queueCurrentPositionSave(blockIdx)
       prefetchAhead(blockIdx)
     } catch (err) {
+      if (prefetchGeneration !== gen) return
       handleError(err)
     }
   }
 
-  async function fetchAudio(text: string): Promise<Blob> {
-    const res = await ttsApi.synthesize({
-      text,
-      voiceId: currentVoiceId.value,
-      providerId: currentProviderId.value,
-      speed: speed.value,
-      format: 'mp3',
-    })
+  async function fetchAudio(text: string, signal: AbortSignal): Promise<Blob> {
+    const res = await ttsApi.synthesize(
+      {
+        text,
+        voiceId: currentVoiceId.value,
+        providerId: currentProviderId.value,
+        speed: speed.value,
+        format: 'mp3',
+      },
+      signal,
+    )
     if (!res.ok) throw new Error(`Synthesis failed: ${res.status}`)
     return res.blob()
   }
@@ -280,13 +320,16 @@ export function useTtsPlayer() {
     currentBlockIndex.value = next
     queueCurrentPositionSave(next)
     prefetchAhead(next)
-    if (next > lastScheduledBlockIdx && !pendingPrefetches.has(next) && !decodedQueue.has(next)) {
+    if (next <= lastScheduledBlockIdx) return
+    awaitedBlockIdx = next
+    if (!pendingPrefetches.has(next) && !decodedQueue.has(next)) {
       await fetchAndPlay(next)
     }
   }
 
   function prefetchAhead(currentIdx: number) {
     const gen = prefetchGeneration
+    const { signal } = synthesisAbort
     for (let i = 1; i <= PREFETCH_AHEAD; i++) {
       const idx = currentIdx + i
       if (idx >= chapterBlocks.length) break
@@ -299,19 +342,21 @@ export function useTtsPlayer() {
         pendingPrefetches.delete(idx)
         continue
       }
-      fetchAudio(text)
-        .then((blob) => {
-          if (prefetchGeneration !== gen) {
-            pendingPrefetches.delete(idx)
-            return
-          }
-          return decodeAudioBlob(blob).then((buffer) => {
-            pendingPrefetches.delete(idx)
-            if (prefetchGeneration !== gen) return
-            scheduleIfNext(idx, buffer)
-          })
+      // A superseded generation must leave pendingPrefetches alone: it was cleared, and may
+      // already hold the replacement request for the same block.
+      fetchAudio(text, signal)
+        .then(async (blob) => {
+          if (prefetchGeneration !== gen) return
+          const buffer = await decodeAudioBlob(blob)
+          if (prefetchGeneration !== gen) return
+          pendingPrefetches.delete(idx)
+          scheduleIfNext(idx, buffer)
         })
-        .catch(() => pendingPrefetches.delete(idx))
+        .catch(() => {
+          if (prefetchGeneration !== gen) return
+          pendingPrefetches.delete(idx)
+          if (idx === awaitedBlockIdx) void fetchAndPlay(idx, { keepPaused: true })
+        })
     }
   }
 
@@ -377,19 +422,37 @@ export function useTtsPlayer() {
     const nextSpeed = Math.min(MAX_SPEED, Math.max(MIN_SPEED, newSpeed))
     if (nextSpeed === speed.value) return
     speed.value = nextSpeed
-    if (!isActive.value) return
-    prefetchGeneration++
-    pendingPrefetches.clear()
-    stopScheduledExcept(currentBlockIndex.value)
+    applySynthesisSettings()
   }
 
   function setVoice(providerId: string, voiceId: string) {
+    if (providerId === currentProviderId.value && voiceId === currentVoiceId.value) return
     currentProviderId.value = providerId
     currentVoiceId.value = voiceId
+    applySynthesisSettings()
+  }
+
+  /**
+   * The playing block finishes as it was synthesized; everything after it is cancelled and asked
+   * for again once the settings stop changing. A block playback is still waiting for is fetched again.
+   */
+  function applySynthesisSettings() {
     if (!isActive.value) return
-    prefetchGeneration++
-    pendingPrefetches.clear()
-    stopScheduledExcept(currentBlockIndex.value)
+    invalidateSynthesis()
+    stopScheduledAfter(currentBlockIndex.value)
+    settingsResyncTimer = setTimeout(resyncAfterSettingsChange, SETTINGS_RESYNC_DELAY_MS)
+  }
+
+  function resyncAfterSettingsChange() {
+    settingsResyncTimer = null
+    if (awaitedBlockIdx !== null) {
+      const blockIdx = awaitedBlockIdx
+      stopAndResetFor(blockIdx)
+      void fetchAndPlay(blockIdx, { keepPaused: true })
+      return
+    }
+    const currentIdx = currentBlockIndex.value
+    if (scheduledSources.some((entry) => entry.blockIdx === currentIdx)) prefetchAhead(currentIdx)
   }
 
   function increaseSpeed() {
@@ -401,6 +464,7 @@ export function useTtsPlayer() {
   }
 
   function handleError(err: unknown) {
+    awaitedBlockIdx = null
     flushCurrentPositionSave()
     const message = err instanceof Error ? err.message : i18n.global.t('tts.errors.generic')
     error.value = message

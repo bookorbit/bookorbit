@@ -1,6 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { BookMetadataFetchConfig, BookMetadataFetchConfigOverride, BookMetadataFetchLibraryConfig } from '@bookorbit/types';
-import { eq } from 'drizzle-orm';
+import type {
+  BookMetadataFetchConfig,
+  BookMetadataFetchConfigOverride,
+  BookMetadataFetchLibraryConfig,
+  BookMetadataFetchLibraryConfigEntry,
+} from '@bookorbit/types';
+import { asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -75,6 +80,41 @@ export class BookMetadataFetchConfigService {
       lastRunAt: library?.bookMetadataFetchLastRunAt?.toISOString() ?? null,
       lastQueuedCount: library?.bookMetadataFetchLastQueuedCount ?? null,
     };
+  }
+
+  /** Every books library with its effective config, its stored override and its last run. */
+  async listLibraryConfigs(): Promise<BookMetadataFetchLibraryConfigEntry[]> {
+    const [global, rows] = await Promise.all([
+      this.getGlobalConfig(),
+      this.db
+        .select({
+          id: libraries.id,
+          name: libraries.name,
+          override: libraries.bookMetadataFetchConfig,
+          lastRunAt: libraries.bookMetadataFetchLastRunAt,
+          lastQueuedCount: libraries.bookMetadataFetchLastQueuedCount,
+        })
+        .from(libraries)
+        .where(eq(libraries.type, 'books'))
+        // The sidebar's order, so the tabs read the same way as Field Rules'.
+        .orderBy(asc(libraries.displayOrder), asc(libraries.name)),
+    ]);
+    return rows.map((row) => {
+      const override = (row.override as BookMetadataFetchConfigOverride | null) ?? null;
+      return {
+        libraryId: row.id,
+        libraryName: row.name,
+        ...this.deepMerge(global, override),
+        override,
+        lastRunAt: row.lastRunAt?.toISOString() ?? null,
+        lastQueuedCount: row.lastQueuedCount ?? null,
+      };
+    });
+  }
+
+  async bookLibraryIds(): Promise<number[]> {
+    const rows = await this.db.select({ id: libraries.id }).from(libraries).where(eq(libraries.type, 'books')).orderBy(asc(libraries.id));
+    return rows.map((row) => row.id);
   }
 
   async recordLibraryRun(libraryId: number, queuedCount: number): Promise<void> {

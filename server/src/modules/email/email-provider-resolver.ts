@@ -35,6 +35,12 @@ export class EmailProviderResolver {
       return this.fromProvider(provider);
     }
 
+    const sharedDefault = await this.providerService.getSharedDefaultWithDecryptedPassword();
+    if (sharedDefault) {
+      this.logger.debug(`[${this.event}] [end] userId=${user.id} providerId=${sharedDefault.id} source=shared-default - provider resolved`);
+      return this.fromProvider(sharedDefault);
+    }
+
     throw new BadRequestException('No email provider configured. Add a provider in email settings.');
   }
 

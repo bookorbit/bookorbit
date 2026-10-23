@@ -37,6 +37,7 @@ describe('BulkRenameRepository', () => {
           subtitle: null,
           publisher: null,
           language: 'en',
+          isbn10: '0306406152',
           isbn13: null,
           publishedYear: 2001,
           seriesName: null,
@@ -100,7 +101,7 @@ describe('BulkRenameRepository', () => {
         absolutePath: '/lib/old/a.epub',
         authors: ['Author One', 'Author Two'],
         narrators: ['Narrator One'],
-        metadata: { language: 'en', publishedYear: 2001 },
+        metadata: { language: 'en', publishedYear: 2001, isbn10: '0306406152', isbn13: null },
       });
       expect(result[1]).toMatchObject({ bookId: 2, authors: ['Author Three'], narrators: ['Narrator Two', 'Narrator Three'] });
 

@@ -1,3 +1,4 @@
+import type { RegexMetadataConfig } from "./regex-metadata";
 import type { LibraryLastScan } from "./scanner";
 
 export type OrganizationMode = "book_per_file" | "book_per_folder";
@@ -20,6 +21,7 @@ export const DEFAULT_FORMAT_PRIORITY = [
   "azw3",
   "azw",
   "fb2",
+  "djvu",
   "m4b",
   "mp3",
   "m4a",
@@ -58,6 +60,7 @@ export interface Library {
   watchLocalFolders?: boolean;
   autoScanCronExpression?: string | null;
   metadataPrecedence: string[];
+  regexMetadata?: RegexMetadataConfig | null;
   formatPriority: string[];
   allowedFormats: string[];
   organizationMode: OrganizationMode;
@@ -80,6 +83,11 @@ export interface Library {
   fileWriteKindleMaxFileSizeMb: number;
   fileWriteAudioEnabled: boolean;
   fileWriteAudioMaxFileSizeMb: number;
+  /** Write metadata into every content file of a book, not just its primary file or audio tracks. */
+  fileWriteAllFiles: boolean;
+  /** EPUBs with synced narration have their own toggle and limit: they embed audio and run large. */
+  fileWriteReadAlongEnabled: boolean;
+  fileWriteReadAlongMaxFileSizeMb: number;
   fileRenameEnabled: boolean;
   folders: LibraryFolder[];
   bookCount?: number;

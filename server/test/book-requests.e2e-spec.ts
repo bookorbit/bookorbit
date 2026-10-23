@@ -2,9 +2,17 @@ import { randomUUID } from 'crypto';
 
 import { and, eq } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
-import type { BookRequestBulkResult, BookRequestItem, BookRequestPage, BookRequestSubmitResult, IndexerItem } from '@bookorbit/types';
+import type {
+  BookRequestBulkResult,
+  BookRequestItem,
+  BookRequestPage,
+  BookRequestPairSubmitResult,
+  BookRequestSubmitResult,
+  IndexerItem,
+} from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
+import { IndexerConfigService } from '../src/modules/book-request/indexers/indexer-config.service';
 import {
   authHeader,
   closeAuthorizationMatrixE2EContext,
@@ -40,7 +48,7 @@ const SELF_FULFIL_PERMISSIONS = [Permission.BookRequestAccess, Permission.BookRe
 
 interface SubmitOptions {
   title?: string;
-  mediaKind?: 'ebook' | 'audiobook' | 'comic';
+  mediaKind?: 'ebook' | 'audiobook';
   targetLibraryId?: number | null;
   selfServe?: boolean;
   userId?: number;
@@ -517,6 +525,276 @@ describe('Book requests (e2e)', () => {
     );
   });
 
+  describe('ebook and audiobook pairs', () => {
+    function submitPair(session: TestUserSession, title: string, overrides: Record<string, unknown> = {}) {
+      return inject('POST', '/book-requests/pairs', session, {
+        title,
+        authors: ['Fixture Author'],
+        ebook: { targetLibraryId: library.libraryId },
+        audiobook: { targetLibraryId: library.libraryId },
+        ...overrides,
+      });
+    }
+
+    async function submitPairOk(
+      session: TestUserSession,
+      title: string,
+      overrides: Record<string, unknown> = {},
+    ): Promise<BookRequestPairSubmitResult> {
+      const response = await submitPair(session, title, overrides);
+      expect(response.statusCode).toBe(201);
+      return response.json() as BookRequestPairSubmitResult;
+    }
+
+    /** One content file, in a library that keeps one book per folder. */
+    async function seedEbookBook(target: CreatedLibrary, format = 'epub'): Promise<number> {
+      const folderPath = `${target.folderPath}/${randomUUID()}`;
+      const [book] = await ctx.db
+        .insert(schema.books)
+        .values({ libraryId: target.libraryId, libraryFolderId: target.libraryFolderId, folderPath })
+        .returning({ id: schema.books.id });
+      await ctx.db.insert(schema.bookFiles).values({
+        bookId: book!.id,
+        libraryFolderId: target.libraryFolderId,
+        absolutePath: `${folderPath}/book.${format}`,
+        ino: BigInt(Math.floor(Math.random() * 1_000_000_000)),
+        format,
+        role: 'content',
+      });
+      return book!.id;
+    }
+
+    it(
+      'files both halves as requests of their own that name each other',
+      async () => {
+        const { ebook, audiobook } = await submitPairOk(requester, `Pair ${randomUUID()}`);
+
+        expect(ebook.subscribed).toBe(false);
+        expect(audiobook.subscribed).toBe(false);
+        expect(ebook.request.mediaKind).toBe('ebook');
+        expect(audiobook.request.mediaKind).toBe('audiobook');
+        expect(ebook.request.status).toBe('pending');
+        expect(audiobook.request.status).toBe('pending');
+        expect(ebook.request.companionRequestId).toBe(audiobook.request.id);
+        expect(audiobook.request.companionRequestId).toBe(ebook.request.id);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'lists a pair as one entry led by its ebook when asked to group, and as two entries otherwise',
+      async () => {
+        const { ebook, audiobook } = await submitPairOk(requester, `Pair ${randomUUID()}`);
+
+        const grouped = (await inject('GET', '/book-requests?groupPairs=true&limit=100', requester)).json() as BookRequestPage;
+        const lead = grouped.items.find((item) => item.id === ebook.request.id);
+        expect(lead?.companion?.id).toBe(audiobook.request.id);
+        expect(grouped.items.some((item) => item.id === audiobook.request.id)).toBe(false);
+
+        const flat = (await inject('GET', '/book-requests?limit=100', requester)).json() as BookRequestPage;
+        const ids = flat.items.map((item) => item.id);
+        expect(ids).toEqual(expect.arrayContaining([ebook.request.id, audiobook.request.id]));
+        // A client that never asked to group must not be handed the nested shape.
+        expect(flat.items.find((item) => item.id === ebook.request.id)).not.toHaveProperty('companion');
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'keeps a grouped pair on a filtered queue when only one half matches the filter',
+      async () => {
+        const { ebook, audiobook } = await submitPairOk(requester, `Pair ${randomUUID()}`);
+        const approved = await inject('POST', `/admin/book-requests/${audiobook.request.id}/approve`, moderator, {});
+        expect(approved.statusCode).toBe(200);
+
+        const queue = (await inject('GET', '/admin/book-requests?groupPairs=true&status=approved&limit=100', moderator)).json() as BookRequestPage;
+        const lead = queue.items.find((item) => item.id === ebook.request.id);
+        expect(lead?.status).toBe('pending');
+        expect(lead?.companion?.status).toBe('approved');
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'joins a half somebody already asked for and links it to the half it created',
+      async () => {
+        const title = `Pair ${randomUUID()}`;
+        const existing = await submitOk(secondRequester, { title });
+
+        const { ebook, audiobook } = await submitPairOk(requester, title);
+
+        expect(ebook.subscribed).toBe(true);
+        expect(ebook.request.id).toBe(existing.request.id);
+        expect(audiobook.subscribed).toBe(false);
+        expect(ebook.request.companionRequestId).toBe(audiobook.request.id);
+        expect(audiobook.request.companionRequestId).toBe(existing.request.id);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'refuses the whole pair, writing neither half, when the rules refuse one of them',
+      async () => {
+        const title = `Pair ${randomUUID()}`;
+        const response = await submitPair(requester, title, { audiobook: { targetLibraryId: otherLibrary.libraryId } });
+
+        expect(response.statusCode).toBe(403);
+        expect((response.json() as { errorCode?: string }).errorCode).toBe('SUBMIT_LIBRARY_FORBIDDEN');
+        const rows = await ctx.db.select({ id: schema.bookRequests.id }).from(schema.bookRequests).where(eq(schema.bookRequests.title, title));
+        expect(rows).toHaveLength(0);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'files a missing format against the book it was asked from, and refuses a format the book already has',
+      async () => {
+        const folderLibrary = await createLibraryWithFolder(ctx, { mode: 'book_per_folder', name: `book-requests-folder-${randomUUID()}` });
+        await grantLibraryAccess(ctx, requester.userId, folderLibrary.libraryId, 'viewer');
+        const bookId = await seedEbookBook(folderLibrary);
+
+        const added = await inject('POST', '/book-requests', requester, {
+          title: `Joined ${randomUUID()}`,
+          mediaKind: 'audiobook',
+          authors: ['Fixture Author'],
+          targetBookId: bookId,
+          targetLibraryId: library.libraryId,
+        });
+        expect(added.statusCode).toBe(201);
+        const { request } = added.json() as BookRequestSubmitResult;
+        expect(request.targetBookId).toBe(bookId);
+        // The book decides where the format lands, whatever library the form had selected.
+        expect(request.targetLibraryId).toBe(folderLibrary.libraryId);
+
+        const duplicate = await inject('POST', '/book-requests', requester, {
+          title: `Joined ${randomUUID()}`,
+          mediaKind: 'ebook',
+          targetBookId: bookId,
+        });
+        expect(duplicate.statusCode).toBe(400);
+        expect((duplicate.json() as { errorCode?: string }).errorCode).toBe('SUBMIT_TARGET_BOOK_HAS_MEDIUM');
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it.each(['cbz', 'cbr', 'cb7', 'cbx'])(
+      'recognizes an existing %s comic as the non-audio half and still allows its audiobook',
+      async (format) => {
+        const folderLibrary = await createLibraryWithFolder(ctx, { mode: 'book_per_folder', name: `book-requests-comic-${randomUUID()}` });
+        await grantLibraryAccess(ctx, requester.userId, folderLibrary.libraryId, 'viewer');
+        const bookId = await seedEbookBook(folderLibrary, format);
+        const duplicate = await inject('POST', '/book-requests', requester, {
+          title: `Comic ${randomUUID()}`,
+          mediaKind: 'ebook',
+          preferredFormats: [format],
+          targetBookId: bookId,
+        });
+        expect(duplicate.statusCode).toBe(400);
+        expect(duplicate.json()).toMatchObject({ errorCode: 'SUBMIT_TARGET_BOOK_HAS_MEDIUM' });
+
+        const added = await inject('POST', '/book-requests', requester, {
+          title: `Comic ${randomUUID()}`,
+          mediaKind: 'audiobook',
+          targetBookId: bookId,
+        });
+        expect(added.statusCode).toBe(201);
+        expect(added.json()).toMatchObject({ request: { mediaKind: 'audiobook', targetBookId: bookId, targetLibraryId: folderLibrary.libraryId } });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'accepts comic preferences on ebook requests and scopes comic availability to accessible libraries',
+      async () => {
+        const title = `Comic ${randomUUID()}`;
+        const created = await submitOk(requester, { title, preferredFormats: ['cbz', 'epub'] });
+        expect(created.request).toMatchObject({ mediaKind: 'ebook', preferredFormats: ['cbz', 'epub'] });
+
+        const bookId = await seedEbookBook(library, 'cbz');
+        const ownedTitle = `Owned comic ${randomUUID()}`;
+        await ctx.db.insert(schema.bookMetadata).values({ bookId, title: ownedTitle });
+        const queries = [
+          { title: ownedTitle, mediaKind: 'ebook' },
+          { title: ownedTitle, mediaKind: 'audiobook' },
+        ];
+        const visible = await inject('POST', '/book-requests/availability', requester, { items: queries });
+        expect(visible.statusCode).toBe(200);
+        expect(visible.json()).toMatchObject([{ ownedBookId: bookId }, { ownedBookId: null }]);
+
+        const stranger = await createUserAndLogin(ctx, { permissions: REQUESTER_PERMISSIONS });
+        const hidden = await inject('POST', '/book-requests/availability', stranger, { items: queries });
+        expect(hidden.statusCode).toBe(200);
+        expect(hidden.json()).toMatchObject([{ ownedBookId: null }, { ownedBookId: null }]);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'treats a book in a library the requester cannot reach as one that does not exist',
+      async () => {
+        const hidden = await createLibraryWithFolder(ctx, { mode: 'book_per_folder', name: `book-requests-hidden-${randomUUID()}` });
+        const bookId = await seedEbookBook(hidden);
+
+        const response = await inject('POST', '/book-requests', requester, {
+          title: `Joined ${randomUUID()}`,
+          mediaKind: 'audiobook',
+          targetBookId: bookId,
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((response.json() as { errorCode?: string }).errorCode).toBe('SUBMIT_TARGET_BOOK_NOT_FOUND');
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+  });
+
+  describe('the retired comic medium', () => {
+    it(
+      'refuses a new comic request, writing nothing',
+      async () => {
+        const title = `Retired ${randomUUID()}`;
+        const response = await inject('POST', '/book-requests', requester, { title, mediaKind: 'comic', targetLibraryId: library.libraryId });
+
+        expect(response.statusCode).toBe(400);
+        const rows = await ctx.db.select({ id: schema.bookRequests.id }).from(schema.bookRequests).where(eq(schema.bookRequests.title, title));
+        expect(rows).toHaveLength(0);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    /** Released iOS builds decode `comic` here as required; leaving it out breaks their whole request screen. */
+    it(
+      'still answers comic, with no destination, among the default destinations',
+      async () => {
+        const response = await inject('GET', '/book-requests/default-destinations', requester);
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({ comic: { libraryId: null, libraryName: null, folderId: null } });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'keeps an existing comic request readable and closable, but will not approve it',
+      async () => {
+        const created = await submitOk(requester);
+        await ctx.db.update(schema.bookRequests).set({ mediaKind: 'comic' }).where(eq(schema.bookRequests.id, created.request.id));
+
+        const read = await inject('GET', `/book-requests/${created.request.id}`, requester);
+        expect((read.json() as BookRequestItem).mediaKind).toBe('comic');
+
+        const approve = await inject('POST', `/admin/book-requests/${created.request.id}/approve`, moderator, {});
+        expect(approve.statusCode).toBe(400);
+        expect(await statusOf(created.request.id)).toBe('pending');
+
+        const cancel = await inject('POST', `/book-requests/${created.request.id}/cancel`, requester, {});
+        expect(cancel.statusCode).toBe(200);
+        expect(await statusOf(created.request.id)).toBe('cancelled');
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+  });
+
   describe('held imports', () => {
     it(
       'discards a held import, removing the dock entry and failing the request',
@@ -804,6 +1082,101 @@ describe('Book requests (e2e)', () => {
 
         expect(response.statusCode).toBe(403);
         expect(response.json()).toMatchObject({ errorCode: 'SUBMIT_LIBRARY_FORBIDDEN' });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+  });
+  describe('managed source seed policy', () => {
+    it(
+      'honors the current manager toggle over unsynchronized legacy source rows',
+      async () => {
+        const [manager] = await ctx.db
+          .insert(schema.requestIndexerManagers)
+          .values({
+            name: `seed-policy-manager-${randomUUID()}`,
+            type: 'prowlarr',
+            baseUrl: 'http://127.0.0.1:9696',
+            credentialsEnc: 'unused-fixture-credential',
+            inheritSeedLimits: true,
+          })
+          .returning();
+        try {
+          const [source] = await ctx.db
+            .insert(schema.requestIndexers)
+            .values({
+              name: `seed-policy-source-${randomUUID()}`,
+              adapterType: 'torznab',
+              baseUrl: 'http://127.0.0.1:9696/1',
+              managerId: manager.id,
+              managerExternalId: '1',
+              managerMetadata: { displayName: 'Seed policy fixture', implementation: 'Torznab', protocol: 'torrent', priority: 25 },
+              applyTrackerSeedGoals: true,
+              seedRatioGoal: 1,
+              seedTimeMinutes: 4320,
+            })
+            .returning();
+          const service = ctx.app.get(IndexerConfigService);
+          await expect(service.resolveSeedPolicy(source.id)).resolves.toMatchObject({
+            applyTrackerSeedGoals: true,
+            seedRatioGoal: 1,
+            seedTimeMinutes: 4320,
+          });
+
+          await ctx.db
+            .update(schema.requestIndexerManagers)
+            .set({ inheritSeedLimits: false })
+            .where(eq(schema.requestIndexerManagers.id, manager.id));
+          await expect(service.resolveSeedPolicy(source.id)).resolves.toEqual({
+            id: source.id,
+            adapterType: 'torznab',
+            seedsBack: true,
+            applyTrackerSeedGoals: false,
+            seedRatioGoal: null,
+            seedTimeMinutes: null,
+          });
+          const [unchanged] = await ctx.db.select().from(schema.requestIndexers).where(eq(schema.requestIndexers.id, source.id));
+          expect(unchanged).toMatchObject({ applyTrackerSeedGoals: true, seedRatioGoal: 1, seedTimeMinutes: 4320 });
+
+          await ctx.db.update(schema.requestIndexers).set({ applyTrackerSeedGoals: false }).where(eq(schema.requestIndexers.id, source.id));
+          await ctx.db.update(schema.requestIndexerManagers).set({ inheritSeedLimits: true }).where(eq(schema.requestIndexerManagers.id, manager.id));
+          await expect(service.resolveSeedPolicy(source.id)).resolves.toMatchObject({
+            applyTrackerSeedGoals: true,
+            seedRatioGoal: 1,
+            seedTimeMinutes: 4320,
+          });
+        } finally {
+          await ctx.db.delete(schema.requestIndexerManagers).where(eq(schema.requestIndexerManagers.id, manager.id));
+        }
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'preserves standalone manual goals when the manager join has no row',
+      async () => {
+        const [source] = await ctx.db
+          .insert(schema.requestIndexers)
+          .values({
+            name: `standalone-seed-policy-${randomUUID()}`,
+            adapterType: 'torznab',
+            baseUrl: 'http://127.0.0.1:9117',
+            applyTrackerSeedGoals: false,
+            seedRatioGoal: 2,
+            seedTimeMinutes: 90,
+          })
+          .returning();
+        try {
+          await expect(ctx.app.get(IndexerConfigService).resolveSeedPolicy(source.id)).resolves.toEqual({
+            id: source.id,
+            adapterType: 'torznab',
+            seedsBack: true,
+            applyTrackerSeedGoals: false,
+            seedRatioGoal: 2,
+            seedTimeMinutes: 90,
+          });
+        } finally {
+          await ctx.db.delete(schema.requestIndexers).where(eq(schema.requestIndexers.id, source.id));
+        }
       },
       SCENARIO_TIMEOUT_MS,
     );

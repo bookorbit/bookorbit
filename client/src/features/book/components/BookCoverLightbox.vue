@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import type { BookDetail, CoverMedium } from '@bookorbit/types'
 import { useCoverVersions } from '../composables/useCoverVersions'
-import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
+import { useBookCoverAspectRatio } from '../composables/useBookCoverAspectRatio'
 import { faceMedium } from '../lib/cover-slots'
 import CoverMediumSwitch from './CoverMediumSwitch.vue'
 
 const props = defineProps<{
   open: boolean
-  book: Pick<BookDetail, 'id' | 'title' | 'covers' | 'coverVersion'>
+  book: Pick<BookDetail, 'id' | 'title' | 'covers' | 'coverVersion' | 'coverAspectRatio'>
   /** The slot to open on. Without one the lightbox opens on the face, as the page shows it. */
   medium?: CoverMedium | null
   /** Unsaved editor images, shown in place of the saved slot they would replace. */
@@ -21,7 +21,7 @@ const emit = defineEmits<{ 'update:open': [open: boolean] }>()
 
 const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const coverAspectRatio = useBookCoverAspectRatio(() => props.book)
 
 function hasImage(medium: CoverMedium): boolean {
   return Boolean(props.previews?.[medium]) || props.book.covers[medium] !== null

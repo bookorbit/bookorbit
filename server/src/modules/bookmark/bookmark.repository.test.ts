@@ -1,3 +1,6 @@
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+
 import { BookmarkRepository } from './bookmark.repository';
 
 function makeRow(overrides?: Record<string, unknown>) {
@@ -21,12 +24,13 @@ function makeRow(overrides?: Record<string, unknown>) {
 function makeDb() {
   const selectResult = { from: vi.fn() };
   const fromResult = { where: vi.fn() };
-  const whereResult = { orderBy: vi.fn() };
+  const whereResult = { orderBy: vi.fn(), limit: vi.fn() };
   const orderByResult = { limit: vi.fn() };
 
   selectResult.from.mockReturnValue(fromResult);
   fromResult.where.mockReturnValue(whereResult);
   whereResult.orderBy.mockResolvedValue([]);
+  whereResult.limit.mockResolvedValue([]);
   orderByResult.limit.mockResolvedValue([]);
 
   const insertResult = { values: vi.fn() };
@@ -138,7 +142,7 @@ describe('BookmarkRepository', () => {
 
       const result = await repo.create(10, 5, { cfi: null, title: '00:00:15', positionSeconds: 15 });
 
-      expect(db._insert.values).toHaveBeenCalledWith({ userId: 10, bookId: 5, cfi: null, title: '00:00:15', positionSeconds: 15 });
+      expect(db._insert.values).toHaveBeenCalledWith({ userId: 10, bookId: 5, bookFileId: null, cfi: null, title: '00:00:15', positionSeconds: 15 });
       expect(db._values.onConflictDoNothing).toHaveBeenCalledTimes(1);
       expect(result).toEqual(row);
     });
@@ -169,6 +173,7 @@ describe('BookmarkRepository', () => {
       expect(db._update.set).toHaveBeenCalledWith({
         title: 'Chapter 1',
         origin: 'koreader',
+        bookFileId: null,
         devicePos: '/body/DocFragment[2]',
         pageno: 12,
         deletedAt: null,
@@ -212,6 +217,63 @@ describe('BookmarkRepository', () => {
     });
   });
 
+  describe('findLive and update', () => {
+    const liveConditionsSql = (call: unknown) => new PgDialect().sqlToQuery(call as SQL);
+
+    it('finds only a live, located bookmark the user owns on that book', async () => {
+      const { repo, db } = makeRepository();
+      db._where.limit.mockResolvedValue([makeRow()]);
+
+      await expect(repo.findLive(5, 1, 10)).resolves.toEqual(makeRow());
+
+      const fromResult = db.select.mock.results[0].value.from.mock.results[0].value as { where: ReturnType<typeof vi.fn> };
+      const compiled = liveConditionsSql(fromResult.where.mock.calls[0][0]);
+      expect(compiled.sql).toContain('"bookmarks"."id" = $1');
+      expect(compiled.sql).toContain('"bookmarks"."book_id" = $2');
+      expect(compiled.sql).toContain('"bookmarks"."user_id" = $3');
+      expect(compiled.sql).toContain('"bookmarks"."cfi" is not null');
+      expect(compiled.sql).toContain('"bookmarks"."deleted_at" is null');
+      expect(compiled.params).toEqual([1, 5, 10]);
+    });
+
+    it('returns null from findLive when nothing matches', async () => {
+      const { repo } = makeRepository();
+      await expect(repo.findLive(5, 1, 10)).resolves.toBeNull();
+    });
+
+    it('updates the title and note and stamps updatedAt so device exchange can see the change', async () => {
+      const { repo, db } = makeRepository();
+      const updated = makeRow({ title: 'Renamed', note: 'note' });
+      db._updateWhere.returning.mockResolvedValue([updated]);
+
+      await expect(repo.update(5, 1, 10, { title: 'Renamed', note: 'note' })).resolves.toEqual(updated);
+
+      expect(db._update.set).toHaveBeenCalledWith({ title: 'Renamed', note: 'note', updatedAt: expect.any(Date) });
+      const setResult = db._update.set.mock.results[0].value as { where: ReturnType<typeof vi.fn> };
+      const compiled = liveConditionsSql(setResult.where.mock.calls[0][0]);
+      expect(compiled.sql).toContain('"bookmarks"."deleted_at" is null');
+      expect(compiled.params).toEqual([1, 5, 10]);
+    });
+
+    it.each([
+      ['captureSourceFile', (repo: BookmarkRepository) => repo.captureSourceFile(10, 1, 'epubcfi(/6/2)', 77)],
+      ['captureSourceFileById', (repo: BookmarkRepository) => repo.captureSourceFileById(10, 1, 77)],
+    ])('%s records the source file without moving updatedAt', async (_name, capture) => {
+      const { repo, db } = makeRepository();
+
+      await capture(repo);
+
+      const [set] = db._update.set.mock.calls[0] as [{ bookFileId: number; updatedAt: SQL }];
+      expect(set.bookFileId).toBe(77);
+      expect(new PgDialect().sqlToQuery(set.updatedAt).sql).toBe('"bookmarks"."updated_at"');
+    });
+
+    it('returns null from update for a missing, tombstoned or foreign bookmark', async () => {
+      const { repo } = makeRepository();
+      await expect(repo.update(5, 99, 10, { note: null })).resolves.toBeNull();
+    });
+  });
+
   describe('sync operations', () => {
     it('lists a bounded, tombstone-inclusive working set', async () => {
       const { repo, db } = makeRepository();
@@ -240,11 +302,13 @@ describe('BookmarkRepository', () => {
       expect(db._insert.values).toHaveBeenCalledWith({
         userId: 10,
         bookId: 5,
+        bookFileId: null,
         cfi: 'epubcfi(/6/2)',
         title: 'Chapter 1',
         origin: 'koreader',
         devicePos: '/body/DocFragment[2]/body/p[3]/text().0',
         pageno: 12,
+        note: null,
       });
       expect(result).toEqual(row);
     });

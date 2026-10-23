@@ -3,12 +3,13 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookRequestItem, DownloadDelivery, ReleaseCandidateItem, ReleaseFileInspection } from '@bookorbit/types'
 
-const { toastMock } = vi.hoisted(() => ({
+const { toastMock, pushMock } = vi.hoisted(() => ({
   toastMock: { error: vi.fn<(title: string, options?: unknown) => void>(), success: vi.fn<(title: string) => void>() },
+  pushMock: vi.fn<(to: unknown) => void>(),
 }))
 vi.mock('vue-sonner', () => ({ toast: toastMock }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ push: vi.fn<() => void>() }) }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ push: pushMock }) }))
 
 import { useReleaseGrab, type ReleaseGrabOutcome } from '../composables/useReleaseGrab'
 
@@ -31,6 +32,7 @@ function makeGrab(
     grab?: ReturnType<typeof vi.fn>
     inspectRelease?: ReturnType<typeof vi.fn>
     deliveryFor?: (release: ReleaseCandidateItem) => DownloadDelivery
+    afterGrab?: (item: BookRequestItem) => void
   } = {},
 ) {
   const grab = overrides.grab ?? vi.fn<() => Promise<ReleaseGrabOutcome>>().mockResolvedValue({ item: request, reason: null, errorCode: null })
@@ -47,6 +49,7 @@ function makeGrab(
       inspectRelease: inspectRelease as never,
       setFilesExpanded,
       deliveryFor: overrides.deliveryFor ?? (() => 'torrent'),
+      afterGrab: overrides.afterGrab,
     }),
     grab,
     inspectRelease,
@@ -58,6 +61,25 @@ function makeGrab(
 describe('useReleaseGrab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('returns to the request a release was sent for', async () => {
+    const picker = makeGrab()
+
+    await picker.handleGrab(release())
+
+    expect(pushMock).toHaveBeenCalledWith({ name: 'book-request-detail', params: { id: 7 }, query: {} })
+  })
+
+  it('leaves where to go next to the picker when it asks to decide', async () => {
+    const afterGrab = vi.fn<(item: BookRequestItem) => void>()
+    const picker = makeGrab({ afterGrab })
+
+    await picker.handleGrab(release())
+
+    expect(afterGrab).toHaveBeenCalledWith(request)
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(toastMock.success).toHaveBeenCalledWith('bookRequests.toasts.grabbed')
   })
 
   it('inspects a release and sends it', async () => {

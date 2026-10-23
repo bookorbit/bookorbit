@@ -1,6 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 
 import { esc, fileMimeType, OPDS_MIME_ACQ, OPDS_MIME_ATOM, OPDS_MIME_NAV, OPDS_MIME_SEARCH, xmlEl, xmlLink } from './opds-xml.helpers';
+import { htmlToPlainText } from '../../common/utils/html-to-text.utils';
+import { DeliverySelectionService } from '../book/delivery-selection.service';
+import type { OpdsRequestUser } from './opds-auth.guard';
 import type { OpdsBookEntry } from './opds-book.service';
 
 const BASE = '/api/v1/opds';
@@ -8,6 +11,7 @@ const SEARCH_TEMPLATE = `${BASE}/catalog?q={searchTerms}`;
 
 @Injectable()
 export class OpdsService {
+  constructor(@Optional() private readonly selections?: DeliverySelectionService) {}
   generateRootNavigation(): string {
     const now = new Date().toISOString();
     return this.wrapFeed(
@@ -119,6 +123,7 @@ export class OpdsService {
     size: number,
     selfPath: string,
     coverToken: string,
+    profile?: OpdsRequestUser,
   ): string {
     const now = new Date().toISOString();
     const totalPages = Math.max(1, Math.ceil(total / size));
@@ -139,7 +144,7 @@ export class OpdsService {
       links.push(xmlLink('last', pageUrl(totalPages), OPDS_MIME_ACQ));
     }
 
-    const entries = books.map((book) => this.bookEntry(book, coverToken));
+    const entries = books.map((book) => this.bookEntry(book, coverToken, profile));
 
     return this.wrapFeed(title, feedId, now, links, entries, total);
   }
@@ -157,7 +162,7 @@ export class OpdsService {
     ].join('\n');
   }
 
-  private bookEntry(book: OpdsBookEntry, coverToken: string): string {
+  private bookEntry(book: OpdsBookEntry, coverToken: string, profile?: OpdsRequestUser): string {
     const lines: string[] = [];
     lines.push('<entry>');
     lines.push(`  ${xmlEl('title', book.title)}`);
@@ -168,8 +173,12 @@ export class OpdsService {
       lines.push(`  <author>${xmlEl('name', author)}</author>`);
     }
 
-    if (book.description) {
-      lines.push(`  <content type="text">${esc(book.description)}</content>`);
+    // Descriptions are stored as HTML. Clients that honour type="text" show markup literally,
+    // and type="html" would hand unsanitized markup from book files and providers to clients
+    // that render it, so the feed carries the text alone.
+    const description = book.description ? htmlToPlainText(book.description, { preserveLineBreaks: true }) : '';
+    if (description) {
+      lines.push(`  <content type="text">${esc(description)}</content>`);
     } else {
       lines.push('  <content type="text"/>');
     }
@@ -199,11 +208,45 @@ export class OpdsService {
       );
     }
 
-    for (const file of book.files) {
+    const variant = profile?.readAloudDelivery;
+    const selectedFiles =
+      variant === 'original'
+        ? [...(book.allFiles ?? book.files)]
+        : book.files.map((file) => book.allFiles?.find((candidate) => candidate.id === file.id) ?? file);
+    if (variant === 'original') {
+      const epubs = selectedFiles
+        .filter((file) => file.format.toLowerCase() === 'epub')
+        .sort(
+          (a, b) => Number('mediaOverlayAvailable' in b && b.mediaOverlayAvailable) - Number('mediaOverlayAvailable' in a && a.mediaOverlayAvailable),
+        );
+      let index = 0;
+      for (let i = 0; i < selectedFiles.length; i++) if (selectedFiles[i].format.toLowerCase() === 'epub') selectedFiles[i] = epubs[index++];
+    }
+    for (const file of selectedFiles) {
+      const fileVariant = file.format.toLowerCase() === 'epub' ? variant : undefined;
+      const narrated = 'mediaOverlayAvailable' in file && file.mediaOverlayAvailable;
+      const selection =
+        profile && this.selections && file.format.toLowerCase() === 'epub'
+          ? this.selections.descriptor(
+              profile.userId,
+              `opds:${profile.opdsUserId}`,
+              file.id,
+              fileVariant ?? null,
+              'contentVersion' in file ? String(file.contentVersion) : '',
+            )
+          : undefined;
+      const href = `${BASE}/${book.id}/download?fileId=${file.id}${fileVariant ? `&variant=${fileVariant}` : ''}${selection ? `&selection=${encodeURIComponent(selection)}` : ''}`;
+      const label =
+        file.format.toUpperCase() +
+        (fileVariant
+          ? narrated && fileVariant === 'original'
+            ? ' (with narration)'
+            : fileVariant === 'audioless_epub'
+              ? ' (text only)'
+              : ' (original)'
+          : '');
       const mime = fileMimeType(file.format);
-      lines.push(
-        `  ${xmlLink('http://opds-spec.org/acquisition', `${BASE}/${book.id}/download?fileId=${file.id}`, mime, file.format.toUpperCase())}`,
-      );
+      lines.push(`  ${xmlLink('http://opds-spec.org/acquisition', href, mime, label)}`);
     }
 
     lines.push('</entry>');

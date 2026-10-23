@@ -1,5 +1,5 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
-import { bookRequestWorkKey, canonicalizeBookRequestIsbn, languagesAgree } from '@bookorbit/types'
+import { BOOK_REQUEST_MEDIA_KINDS, bookRequestWorkKey, canonicalizeBookRequestIsbn, languagesAgree } from '@bookorbit/types'
 import type { BookRequestAvailability, BookRequestMediaKind, MetadataCandidate, MetadataProviderKey } from '@bookorbit/types'
 import { candidateTitle } from './useRequestSubmission'
 
@@ -26,6 +26,19 @@ export interface CandidateGroup {
   publishedYear: number | null
   providers: MetadataProviderKey[]
   availability: BookRequestAvailability | null
+  /**
+   * The same answer for each medium of a pair, present only while the search asks for both. Each
+   * half is its own question: owning the ebook says nothing about the audiobook.
+   */
+  pairAvailability: Record<BookRequestMediaKind, BookRequestAvailability | null> | null
+  /** Covers ordered by the Audiobook cover rule, so the audiobook half of a pair shows square art. */
+  audioCoverUrls: string[]
+}
+
+/** Asking for both media at once, and which providers' art the audiobook half prefers. */
+export interface CandidatePairOptions {
+  enabled: Ref<boolean> | ComputedRef<boolean>
+  audioCoverProviderOrder: Ref<readonly MetadataProviderKey[]> | ComputedRef<readonly MetadataProviderKey[]>
 }
 
 export interface CandidateIsbnChoice {
@@ -62,7 +75,10 @@ function compareText(left: string, right: string): number {
  * The strongest claim any record in the group carries. Requesting one edition of a work claims the
  * work, so an answer about one record answers for its siblings too.
  */
-function mergeAvailability(members: MetadataCandidate[], getAvailability: (candidate: MetadataCandidate) => BookRequestAvailability | null) {
+function mergeAvailability(
+  members: MetadataCandidate[],
+  getAvailability: (candidate: MetadataCandidate) => BookRequestAvailability | null,
+): BookRequestAvailability | null {
   const known = members.map(getAvailability).filter((entry): entry is BookRequestAvailability => entry !== null)
   if (known.length === 0) return null
 
@@ -75,6 +91,19 @@ function mergeAvailability(members: MetadataCandidate[], getAvailability: (candi
   }
 }
 
+/** Every distinct cover the records offer, the rule's providers first and the fullest records next. */
+function orderedCoverUrls(members: MetadataCandidate[], providerOrder: readonly MetadataProviderKey[]): string[] {
+  const priorities = new Map(providerOrder.map((provider, index) => [provider, index]))
+  return [...members]
+    .sort((a, b) => {
+      const aPriority = priorities.get(a.provider) ?? Number.MAX_SAFE_INTEGER
+      const bPriority = priorities.get(b.provider) ?? Number.MAX_SAFE_INTEGER
+      return aPriority - bPriority || completeness(b) - completeness(a)
+    })
+    .flatMap((member) => (member.coverUrl ? [member.coverUrl] : []))
+    .filter((url, index, urls) => urls.indexOf(url) === index)
+}
+
 /**
  * Collapses search results into the works they describe, keyed exactly as the server dedupes a
  * request. Without this a title carried by five providers reads as five different books, and
@@ -83,10 +112,11 @@ function mergeAvailability(members: MetadataCandidate[], getAvailability: (candi
 export function useCandidateGroups(
   results: Ref<MetadataCandidate[]> | ComputedRef<MetadataCandidate[]>,
   mediaKind: Ref<BookRequestMediaKind>,
-  getAvailability: (candidate: MetadataCandidate) => BookRequestAvailability | null,
+  getAvailability: (candidate: MetadataCandidate, kind?: BookRequestMediaKind) => BookRequestAvailability | null,
   coverProviderOrder?: Ref<readonly MetadataProviderKey[]> | ComputedRef<readonly MetadataProviderKey[]>,
   requestedLanguage?: Ref<string | null> | ComputedRef<string | null>,
   resultProviderOrder?: Ref<readonly MetadataProviderKey[]> | ComputedRef<readonly MetadataProviderKey[]>,
+  pair?: CandidatePairOptions,
 ): { groups: ComputedRef<CandidateGroup[]> } {
   const groups = computed<CandidateGroup[]>(() => {
     const providerPriorities = new Map((resultProviderOrder?.value ?? []).map((provider, index) => [provider, index]))
@@ -167,15 +197,8 @@ export function useCandidateGroups(
             a.yearDistance - b.yearDistance ||
             compareText(a.isbn, b.isbn),
         )
-      const coverPriorities = new Map((coverProviderOrder?.value ?? []).map((provider, index) => [provider, index]))
-      const coverUrls = [...members]
-        .sort((a, b) => {
-          const aPriority = coverPriorities.get(a.provider) ?? Number.MAX_SAFE_INTEGER
-          const bPriority = coverPriorities.get(b.provider) ?? Number.MAX_SAFE_INTEGER
-          return aPriority - bPriority || completeness(b) - completeness(a)
-        })
-        .flatMap((member) => (member.coverUrl ? [member.coverUrl] : []))
-        .filter((url, index, urls) => urls.indexOf(url) === index)
+      const coverUrls = orderedCoverUrls(members, coverProviderOrder?.value ?? [])
+      const pairing = pair?.enabled.value === true
 
       return {
         key,
@@ -191,7 +214,13 @@ export function useCandidateGroups(
         // The earliest edition dates the work; a reprint year only says when this record was made.
         publishedYear: workYear,
         providers: [...new Set(members.map((member) => member.provider))],
-        availability: mergeAvailability(members, getAvailability),
+        availability: mergeAvailability(members, (candidate) => getAvailability(candidate)),
+        pairAvailability: pairing
+          ? (Object.fromEntries(
+              BOOK_REQUEST_MEDIA_KINDS.map((kind) => [kind, mergeAvailability(members, (candidate) => getAvailability(candidate, kind))]),
+            ) as Record<BookRequestMediaKind, BookRequestAvailability | null>)
+          : null,
+        audioCoverUrls: pairing ? orderedCoverUrls(members, pair.audioCoverProviderOrder.value) : [],
       }
     })
   })

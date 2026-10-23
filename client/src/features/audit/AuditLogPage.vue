@@ -1,400 +1,408 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMediaQuery } from '@vueuse/core'
-import type { AuditLogEntry } from '@bookorbit/types'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RefreshCw, Search, SlidersHorizontal, X } from '@lucide/vue'
-import { formatDateTime, formatRelativeTimeFromNow } from '@/i18n/formatters'
-import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
-import AuditActionPicker from './AuditActionPicker.vue'
-import AuditActorPicker from './AuditActorPicker.vue'
-import AuditCategoryBadge from './AuditCategoryBadge.vue'
-import AuditEntryDetails from './AuditEntryDetails.vue'
-import AuditResourcePicker from './AuditResourcePicker.vue'
-import { getAuditActionLabelKey } from './audit-actions'
-import { getAuditCategory, getAuditTarget } from './audit-display'
-import { getBookDeletionAuditMeta } from './audit-meta'
-import { getAuditResourceBadgeClass, getAuditResourceLabelKey } from './audit-resources'
-import { useAuditLog } from './useAuditLog'
+import { toast } from 'vue-sonner'
+import { ChevronLeft, ChevronRight, Search, TriangleAlert, X } from '@lucide/vue'
+import { AUDIT_SECURITY_GROUP_KEYS, Permission, type AuditLogEntry, type AuditSecurityGroup } from '@bookorbit/types'
+import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { formatNumber } from '@/i18n/formatters'
+import { getAuditPerson } from './audit-display'
+import { foldAuditEvents, localDayKey, type AuditEventSet } from './audit-sets'
+import { AUDIT_PAGE_SIZE, useAuditLog, type AuditRangePreset, type AuditView } from './useAuditLog'
+import { useAuditFormat } from './useAuditFormat'
+import AuditCategoryTile from './components/AuditCategoryTile.vue'
+import AuditDateRangeMenu from './components/AuditDateRangeMenu.vue'
+import AuditEventSheet from './components/AuditEventSheet.vue'
+import AuditFiltersMenu from './components/AuditFiltersMenu.vue'
+import AuditHeaderActions from './components/AuditHeaderActions.vue'
+import AuditLedgerList from './components/AuditLedgerList.vue'
+import AuditLedgerTable from './components/AuditLedgerTable.vue'
+import AuditPersonLabel from './components/AuditPersonLabel.vue'
+import AuditSignInTable from './components/AuditSignInTable.vue'
 
-type FilterKey = 'search' | 'action' | 'actorUsername' | 'resource' | 'dateFrom' | 'dateTo'
+const HEADER_ACTIONS_TARGET = '#settings-header-actions'
+const VIEWS: AuditView[] = ['changes', 'signins', 'security', 'all']
 
-const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 const { t } = useI18n()
-const { entries, actors, total, page, pageSize, loading, error, filters, fetchPage, fetchActors, applyFilters, clearFilters, goToPage } =
-  useAuditLog()
+const format = useAuditFormat()
+const { hasPermission } = usePermissions()
+const audit = useAuditLog()
+const {
+  view,
+  search,
+  person,
+  category,
+  securityGroup,
+  target,
+  ip,
+  range,
+  page,
+  entries,
+  total,
+  signIns,
+  signInTotal,
+  summary,
+  actors,
+  loading,
+  loaded,
+  error,
+  activeFilterCount,
+  totalPages,
+} = audit
+const isNarrow = useMediaQuery('(max-width: 767px)')
+const headerSlotAvailable = ref(false)
+const openSet = ref<AuditEventSet | null>(null)
 
-const totalPages = computed(() => Math.ceil(total.value / pageSize))
-const isMobile = useMediaQuery('(max-width: 767px)')
-const filtersOpen = ref(true)
-const expandedDetailsIds = ref<number[]>([])
-const currentTime = ref(Date.now())
-let clockTimer: ReturnType<typeof setInterval> | undefined
+const canEditRetention = computed(() => hasPermission(Permission.ManageAppSettings))
+const sets = computed(() => foldAuditEvents(entries.value))
+const unit = computed(() => (view.value === 'changes' ? 'changes' : 'events'))
+const rowCount = computed(() => (view.value === 'signins' ? signIns.value.length : sets.value.length))
+const listTotal = computed(() => (view.value === 'signins' ? signInTotal.value : total.value))
+const hasFilters = computed(() => activeFilterCount.value > 0 || !!search.value.trim() || range.preset !== 'all' || !!securityGroup.value)
 
-const activeFilterChips = computed(() => {
-  const chips: { key: FilterKey; label: string; toneClass?: string }[] = []
-  if (filters.search) chips.push({ key: 'search', label: t('audit.chips.search', { value: filters.search }) })
-  if (filters.action) chips.push({ key: 'action', label: t('audit.chips.eventType', { value: t(getAuditActionLabelKey(filters.action)) }) })
-  if (filters.actorUsername) chips.push({ key: 'actorUsername', label: t('audit.chips.actor', { value: filters.actorUsername }) })
-  if (filters.resource) {
-    chips.push({
-      key: 'resource',
-      label: t('audit.chips.targetType', { value: t(getAuditResourceLabelKey(filters.resource)) }),
-      toneClass: getAuditResourceBadgeClass(filters.resource),
-    })
-  }
-  if (filters.dateFrom) chips.push({ key: 'dateFrom', label: t('audit.chips.from', { value: filters.dateFrom }) })
-  if (filters.dateTo) chips.push({ key: 'dateTo', label: t('audit.chips.to', { value: filters.dateTo }) })
-  return chips
+const securityChips = computed(() =>
+  AUDIT_SECURITY_GROUP_KEYS.map((group) => ({ group, count: summary.value?.securityGroups[group] ?? 0 })).filter(
+    (chip) => chip.count > 0 || chip.group === securityGroup.value,
+  ),
+)
+
+const pagerText = computed(() => {
+  if (view.value === 'signins')
+    return t('audit.signIns.footer', { events: formatNumber(summary.value?.kinds.signins ?? 0), count: signInTotal.value })
+  const from = (page.value - 1) * AUDIT_PAGE_SIZE + 1
+  const to = Math.min(page.value * AUDIT_PAGE_SIZE, total.value)
+  return t(`audit.pager.${unit.value}`, { from: formatNumber(from), to: formatNumber(to), count: total.value })
 })
 
-const hasFilters = computed(() => activeFilterChips.value.length > 0)
+/** Up to five page buttons around the current page. */
+const pageNumbers = computed(() => {
+  const last = totalPages.value
+  const start = Math.max(1, Math.min(page.value - 2, last - 4))
+  return Array.from({ length: Math.min(5, last) }, (_, index) => start + index)
+})
 
-function relativeTimestamp(value: string): string {
-  return formatRelativeTimeFromNow(value, { now: currentTime.value })
+function viewCount(item: AuditView): number | null {
+  if (!summary.value) return null
+  return summary.value.kinds[item]
 }
 
-function exactTimestamp(value: string): string {
-  return formatDateTime(new Date(value))
+function selectView(item: AuditView) {
+  view.value = item
+  openSet.value = null
 }
 
-function targetSummary(entry: AuditLogEntry): string {
-  return getAuditTarget(
-    entry,
-    t('audit.untitledBook'),
-    (count) => t('audit.targetAdditional', { count }),
-    (resource) => t(getAuditResourceLabelKey(resource)),
-  )
+function selectGroup(group: AuditSecurityGroup | null) {
+  securityGroup.value = securityGroup.value === group ? null : group
 }
 
-function impactSummary(entry: AuditLogEntry): string {
-  const deletion = getBookDeletionAuditMeta(entry)
-  return deletion ? t('audit.bookImpact', { count: deletion.total }) : '-'
+function showAllSecurity() {
+  selectGroup(null)
 }
 
-function detailRegionId(entryId: number, layout: 'desktop' | 'mobile') {
-  return `audit-entry-${entryId}-${layout}-details`
+function changeRange(next: { preset: AuditRangePreset; from: string; to: string }) {
+  range.preset = next.preset
+  range.from = next.from
+  range.to = next.to
 }
 
-function toggleDetails(id: number) {
-  expandedDetailsIds.value = expandedDetailsIds.value.includes(id)
-    ? expandedDetailsIds.value.filter((entryId) => entryId !== id)
-    : [...expandedDetailsIds.value, id]
+function openEvent(set: AuditEventSet) {
+  openSet.value = set
 }
 
-function isDetailsOpen(id: number) {
-  return expandedDetailsIds.value.includes(id)
+function closeEvent() {
+  openSet.value = null
 }
 
-function handleSearch() {
-  void applyFilters()
+function selectEntry(entry: AuditLogEntry) {
+  openSet.value = { id: entry.id, first: entry, items: [entry], actions: [{ action: entry.action, count: 1 }], day: localDayKey(entry.createdAt) }
 }
 
-function handleClear() {
-  void clearFilters()
+function onlyPerson(entry: AuditLogEntry) {
+  const who = getAuditPerson(entry)
+  person.value = { username: entry.actorUsername, name: who.kind === 'system' ? t('audit.person.system') : who.name }
+  openSet.value = null
 }
 
-function handleRefresh() {
-  void fetchPage()
+function onlyTarget(entry: AuditLogEntry, label: string) {
+  if (!entry.resource || entry.resourceId === null) return
+  target.value = { resource: entry.resource, resourceId: entry.resourceId, label }
+  openSet.value = null
 }
 
-function toggleFilters() {
-  filtersOpen.value = !filtersOpen.value
+function onlyIp(address: string) {
+  ip.value = address
+  openSet.value = null
 }
 
-function handlePreviousPage() {
-  void goToPage(page.value - 1)
+function removePerson() {
+  person.value = null
 }
 
-function handleNextPage() {
-  void goToPage(page.value + 1)
+function removeCategory() {
+  category.value = null
 }
 
-function filterActor(entry: AuditLogEntry) {
-  filters.actorUsername = entry.actorUsername
-  handleSearch()
+function removeTarget() {
+  target.value = null
 }
 
-function removeFilter(key: FilterKey) {
-  filters[key] = ''
-  handleSearch()
+function removeIp() {
+  ip.value = null
 }
 
-function localDateValue(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+function clearAll() {
+  audit.clearFilters()
 }
 
-function applyDatePreset(days: number) {
-  const to = new Date()
-  const from = new Date()
-  from.setDate(from.getDate() - days + 1)
-  filters.dateFrom = localDateValue(from)
-  filters.dateTo = localDateValue(to)
-  handleSearch()
+function loadActors() {
+  if (actors.value.length === 0) void audit.fetchActors()
 }
 
-function handleToday() {
-  applyDatePreset(1)
+function previousPage() {
+  if (page.value > 1) page.value--
 }
 
-function handleSevenDays() {
-  applyDatePreset(7)
+function nextPage() {
+  if (page.value < totalPages.value) page.value++
 }
 
-function handleThirtyDays() {
-  applyDatePreset(30)
+function goToPage(number: number) {
+  page.value = number
+}
+
+async function handleExport(kind: 'csv' | 'json') {
+  try {
+    await audit.exportLog(kind)
+  } catch (reason) {
+    toast.error(reason instanceof Error ? reason.message : t('audit.export.failed'))
+  }
+}
+
+async function handleSaveRetention(days: number) {
+  try {
+    await audit.saveRetention(days)
+    toast.success(t('audit.retention.saved', { count: days }))
+  } catch (reason) {
+    toast.error(reason instanceof Error ? reason.message : t('audit.retention.saveFailed'))
+  }
 }
 
 onMounted(() => {
-  void Promise.all([fetchPage(), fetchActors()])
-  clockTimer = setInterval(() => {
-    currentTime.value = Date.now()
-  }, 60_000)
+  headerSlotAvailable.value = document.getElementById(HEADER_ACTIONS_TARGET.slice(1)) !== null
+  void audit.refresh()
+  void audit.fetchActors()
 })
-
-onUnmounted(() => {
-  if (clockTimer) clearInterval(clockTimer)
-})
-
-watch(
-  isMobile,
-  (mobile) => {
-    filtersOpen.value = !mobile
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
-  <SettingsPageHeader v-if="!props.embedded" class="hidden md:flex" :title="t('audit.pageTitle')" :subtitle="t('audit.pageSubtitle')" />
-  <div v-if="!props.embedded" class="px-1 md:hidden">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('audit.pageTitle') }}</h1>
-    <p class="mt-1 text-sm leading-5 text-muted-foreground">{{ t('audit.pageSubtitle') }}</p>
-  </div>
+  <div class="space-y-4">
+    <Teleport :to="HEADER_ACTIONS_TARGET" defer :disabled="!headerSlotAvailable">
+      <AuditHeaderActions
+        :retention-days="summary?.retentionDays ?? null"
+        :oldest-at="summary?.oldestAt ?? null"
+        :can-edit-retention="canEditRetention"
+        @save-retention="handleSaveRetention"
+        @export="handleExport"
+      />
+    </Teleport>
 
-  <div class="space-y-4" :class="{ 'mt-5 md:mt-0': !props.embedded }">
-    <section class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
-      <div>
+    <div class="flex flex-wrap items-center gap-2">
+      <label class="relative block min-w-0 flex-1 basis-60">
+        <span class="sr-only">{{ t('audit.search.label') }}</span>
+        <Search :size="15" class="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <input
+          id="audit-search"
+          v-model="search"
+          type="search"
+          class="input-field h-9 w-full ps-9 pe-3"
+          :placeholder="isNarrow ? t('audit.search.placeholderShort') : t('audit.search.placeholder')"
+        />
+      </label>
+      <div
+        role="group"
+        :aria-label="t('audit.views.label')"
+        class="flex min-w-0 gap-0.5 overflow-x-auto rounded-lg border border-border bg-muted p-0.5 max-md:order-last max-md:basis-full"
+      >
         <button
+          v-for="item in VIEWS"
+          :key="item"
           type="button"
-          class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-controls="audit-filters"
-          :aria-expanded="filtersOpen"
-          @click="toggleFilters"
+          class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:flex-1 max-md:justify-center max-md:px-2"
+          :class="view === item ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+          :aria-pressed="view === item"
+          @click="selectView(item)"
         >
-          <div class="flex min-w-0 items-center gap-2">
-            <SlidersHorizontal :size="15" class="text-muted-foreground" aria-hidden="true" />
-            <p class="text-sm font-medium text-foreground">{{ t('audit.filters') }}</p>
-            <span v-if="!hasFilters" class="text-xs text-muted-foreground">{{ t('audit.noActiveFilters') }}</span>
-          </div>
-          <ChevronUp v-if="filtersOpen" :size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-          <ChevronDown v-else :size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-        </button>
-        <div v-if="hasFilters" class="flex flex-wrap gap-1.5 px-3 pb-2.5">
-          <button
-            v-for="chip in activeFilterChips"
-            :key="chip.key"
-            type="button"
-            class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] hover:text-foreground"
-            :class="chip.toneClass ?? 'border-transparent bg-muted text-muted-foreground'"
-            :aria-label="t('audit.removeFilter', { value: chip.label })"
-            @click.stop="removeFilter(chip.key)"
+          {{ t(`audit.views.${item}`) }}
+          <span
+            v-if="viewCount(item) !== null"
+            class="rounded-xs px-1 text-xs tabular-nums"
+            :class="view === item ? 'bg-primary/15 text-primary' : 'bg-foreground/8 text-muted-foreground max-md:hidden'"
           >
-            {{ chip.label }}
-            <X :size="11" aria-hidden="true" />
-          </button>
-        </div>
+            {{ formatNumber(viewCount(item) ?? 0) }}
+          </span>
+        </button>
       </div>
+      <AuditDateRangeMenu :preset="range.preset" :from="range.from" :to="range.to" :oldest-at="summary?.oldestAt ?? null" @change="changeRange" />
+      <AuditFiltersMenu
+        v-model:category="category"
+        v-model:person="person"
+        :category-counts="summary?.categories ?? {}"
+        :actors="actors"
+        :active-count="(person ? 1 : 0) + (category ? 1 : 0)"
+        @clear="clearAll"
+        @opened="loadActors"
+      />
+    </div>
 
-      <div v-if="filtersOpen" id="audit-filters" class="space-y-2.5 border-t border-border p-3">
-        <div class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <label for="audit-search" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.search') }}</label>
-            <div class="relative mt-1">
-              <Search :size="15" class="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <input
-                id="audit-search"
-                v-model="filters.search"
-                class="h-9 w-full rounded-md border border-input bg-background ps-9 pe-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                :placeholder="t('audit.filterPlaceholders.search')"
-                @keydown.enter="handleSearch"
-              />
-            </div>
-          </div>
-          <div>
-            <label for="audit-action" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.eventType') }}</label>
-            <AuditActionPicker id="audit-action" v-model="filters.action" />
-          </div>
-          <div>
-            <label for="audit-actor" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.actor') }}</label>
-            <AuditActorPicker id="audit-actor" v-model="filters.actorUsername" :actors="actors" />
-          </div>
-          <div>
-            <label for="audit-resource" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.targetType') }}</label>
-            <AuditResourcePicker id="audit-resource" v-model="filters.resource" />
-          </div>
-        </div>
+    <div v-if="activeFilterCount > 0" class="-mt-1.5 flex flex-wrap items-center gap-1.5">
+      <button
+        v-if="person"
+        type="button"
+        class="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full border border-border bg-card ps-1 pe-2 text-[13px] font-medium text-foreground hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="t('audit.removeFilter', { value: person.name })"
+        @click="removePerson"
+      >
+        <AuditPersonLabel
+          :person="{ kind: person.username === 'system' ? 'system' : 'user', name: person.name, username: person.username }"
+          size="xs"
+          :show-meta="false"
+          class="min-w-0"
+        />
+        <X :size="12" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+      </button>
+      <button
+        v-if="category"
+        type="button"
+        class="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-card ps-1 pe-2 text-[13px] font-medium text-foreground hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="t('audit.removeFilter', { value: t(`audit.categories.${category}`) })"
+        @click="removeCategory"
+      >
+        <AuditCategoryTile :category="category" size="xs" />
+        {{ t(`audit.categories.${category}`) }}
+        <X :size="12" class="text-muted-foreground" aria-hidden="true" />
+      </button>
+      <button
+        v-if="target"
+        type="button"
+        class="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full border border-border bg-card ps-2.5 pe-2 text-[13px] font-medium text-foreground hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="t('audit.removeFilter', { value: target.label })"
+        @click="removeTarget"
+      >
+        <span class="truncate">{{ t('audit.activeFilters.target', { type: format.resourceLabel(target.resource), name: target.label }) }}</span>
+        <X :size="12" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+      </button>
+      <button
+        v-if="ip"
+        type="button"
+        class="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 text-[13px] font-medium text-foreground hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="t('audit.removeFilter', { value: ip })"
+        @click="removeIp"
+      >
+        <span class="font-mono text-xs">{{ ip }}</span>
+        <X :size="12" class="text-muted-foreground" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="rounded-sm px-1.5 text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        @click="clearAll"
+      >
+        {{ t('audit.activeFilters.clearAll') }}
+      </button>
+    </div>
 
-        <div class="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
-          <div class="grid flex-1 gap-2.5 sm:grid-cols-2 xl:max-w-3xl xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <div>
-              <label for="audit-from" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.from') }}</label>
-              <input
-                id="audit-from"
-                v-model="filters.dateFrom"
-                type="date"
-                class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label for="audit-to" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.to') }}</label>
-              <input
-                id="audit-to"
-                v-model="filters.dateTo"
-                type="date"
-                class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <span class="text-xs text-muted-foreground">{{ t('audit.quickDates') }}</span>
-              <div class="mt-1 flex gap-1">
-                <Button variant="outline" size="sm" type="button" class="h-9 px-2.5" @click="handleToday">{{ t('audit.today') }}</Button>
-                <Button variant="outline" size="sm" type="button" class="h-9 px-2.5" @click="handleSevenDays">{{ t('audit.sevenDays') }}</Button>
-                <Button variant="outline" size="sm" type="button" class="h-9 px-2.5" @click="handleThirtyDays">{{ t('audit.thirtyDays') }}</Button>
-              </div>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <Button size="sm" type="button" @click="handleSearch">
-              <Search :size="14" aria-hidden="true" />
-              {{ t('common.search') }}
-            </Button>
-            <Button variant="outline" size="sm" v-if="hasFilters" type="button" @click="handleClear">
-              <X :size="14" aria-hidden="true" />
-              {{ t('audit.clear') }}
-            </Button>
-            <Button variant="outline" size="icon-sm" type="button" :aria-label="t('audit.refresh')" :disabled="loading" @click="handleRefresh">
-              <RefreshCw :size="14" :class="{ 'animate-spin': loading }" aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
+    <div
+      v-if="view === 'security' && summary"
+      role="group"
+      :aria-label="t('audit.securityGroups.label')"
+      class="-mt-1 flex flex-wrap gap-1.5 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4"
+    >
+      <button
+        type="button"
+        class="inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :class="!securityGroup ? 'border-primary/50 bg-primary/8 text-primary' : 'border-border bg-card text-foreground hover:bg-accent'"
+        :aria-pressed="!securityGroup"
+        @click="showAllSecurity"
+      >
+        {{ t('audit.securityGroups.all') }}
+        <span class="rounded-xs px-1 text-xs tabular-nums" :class="!securityGroup ? 'bg-primary/15' : 'bg-foreground/8 text-muted-foreground'">{{
+          formatNumber(summary.kinds.security)
+        }}</span>
+      </button>
+      <button
+        v-for="chip in securityChips"
+        :key="chip.group"
+        type="button"
+        class="inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :class="
+          securityGroup === chip.group ? 'border-primary/50 bg-primary/8 text-primary' : 'border-border bg-card text-foreground hover:bg-accent'
+        "
+        :aria-pressed="securityGroup === chip.group"
+        @click="selectGroup(chip.group)"
+      >
+        <TriangleAlert v-if="chip.group === 'failed'" :size="13" class="text-[var(--pill-warning)]" aria-hidden="true" />
+        {{ t(`audit.securityGroups.${chip.group}`) }}
+        <span
+          class="rounded-xs px-1 text-xs tabular-nums"
+          :class="securityGroup === chip.group ? 'bg-primary/15' : 'bg-foreground/8 text-muted-foreground'"
+          >{{ formatNumber(chip.count) }}</span
+        >
+      </button>
+    </div>
 
     <p v-if="error" role="alert" class="settings-error-state">{{ error }}</p>
-
-    <div class="hidden overflow-hidden rounded-lg border border-border bg-card shadow-xs md:block">
-      <table class="w-full table-fixed text-sm">
-        <thead class="sticky top-0 z-10 bg-muted/70 backdrop-blur">
-          <tr>
-            <th class="w-32 px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.when') }}</th>
-            <th class="w-44 px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.actor') }}</th>
-            <th class="hidden w-36 px-3 py-2.5 text-start font-medium text-muted-foreground xl:table-cell">{{ t('audit.detailCategory') }}</th>
-            <th class="w-[38%] px-3 py-2.5 text-start font-medium text-muted-foreground xl:w-[30%]">{{ t('audit.columns.event') }}</th>
-            <th class="px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.target') }}</th>
-            <th class="w-24 px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.impact') }}</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-if="loading">
-            <td colspan="6" class="px-4 py-10 text-center text-muted-foreground">{{ t('common.loading') }}</td>
-          </tr>
-          <tr v-else-if="entries.length === 0">
-            <td colspan="6" class="px-4 py-10 text-center text-muted-foreground">{{ t('audit.empty') }}</td>
-          </tr>
-          <template v-else v-for="entry in entries" :key="entry.id">
-            <tr class="group transition-colors hover:bg-muted/30">
-              <td class="px-3 py-2.5 text-xs text-muted-foreground">
-                <time :datetime="entry.createdAt" :title="exactTimestamp(entry.createdAt)">{{ relativeTimestamp(entry.createdAt) }}</time>
-              </td>
-              <td class="px-3 py-2.5">
-                <Button variant="link" size="sm" type="button" class="h-auto p-0" @click="filterActor(entry)">
-                  {{ entry.actorUsername }}
-                </Button>
-                <span v-if="entry.userId !== null" class="ms-1 text-[11px] text-muted-foreground">{{
-                  t('audit.userIdCompact', { id: entry.userId })
-                }}</span>
-              </td>
-              <td class="hidden px-3 py-2.5 xl:table-cell">
-                <AuditCategoryBadge :category="getAuditCategory(entry.action)" />
-              </td>
-              <td class="px-3 py-2.5">
-                <div class="flex min-w-0 items-center gap-2">
-                  <AuditCategoryBadge class="shrink-0 xl:hidden" :category="getAuditCategory(entry.action)" />
-                  <p class="min-w-0 flex-1 truncate font-medium text-foreground" :title="entry.description">{{ entry.description }}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    class="shrink-0"
-                    :aria-expanded="isDetailsOpen(entry.id)"
-                    :aria-controls="detailRegionId(entry.id, 'desktop')"
-                    @click="toggleDetails(entry.id)"
-                  >
-                    {{ isDetailsOpen(entry.id) ? t('audit.hideDetails') : t('audit.details') }}
-                  </Button>
-                </div>
-              </td>
-              <td class="px-3 py-2.5 text-sm text-muted-foreground">{{ targetSummary(entry) }}</td>
-              <td class="px-3 py-2.5 text-xs font-medium text-foreground">{{ impactSummary(entry) }}</td>
-            </tr>
-            <tr v-if="isDetailsOpen(entry.id)">
-              <td colspan="6" class="bg-muted/20 px-4 py-3">
-                <AuditEntryDetails :id="detailRegionId(entry.id, 'desktop')" :entry="entry" />
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+    <p v-else-if="!loaded" role="status" class="settings-loading-state">{{ t('common.loading') }}</p>
+    <div v-else-if="rowCount === 0" class="settings-empty-state text-sm text-muted-foreground">
+      {{ hasFilters ? t('audit.emptyFiltered') : t('audit.empty') }}
+    </div>
+    <div v-else :aria-busy="loading">
+      <AuditSignInTable v-if="view === 'signins'" :groups="signIns" />
+      <template v-else>
+        <AuditLedgerTable :sets="sets" :open-id="openSet?.id ?? null" :unit="unit" @open="openEvent" />
+        <AuditLedgerList :sets="sets" @open="openEvent" />
+      </template>
     </div>
 
-    <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs md:hidden">
-      <div v-if="loading" class="px-4 py-10 text-center text-sm text-muted-foreground">{{ t('common.loading') }}</div>
-      <div v-else-if="entries.length === 0" class="px-4 py-10 text-center text-sm text-muted-foreground">{{ t('audit.empty') }}</div>
-      <article v-else v-for="entry in entries" :key="entry.id" class="px-4 py-3">
-        <div class="flex items-start justify-between gap-3">
-          <AuditCategoryBadge :category="getAuditCategory(entry.action)" />
-          <time :datetime="entry.createdAt" :title="exactTimestamp(entry.createdAt)" class="text-xs text-muted-foreground">
-            {{ relativeTimestamp(entry.createdAt) }}
-          </time>
-        </div>
-        <p class="mt-2 font-medium text-foreground">{{ entry.description }}</p>
-        <p class="mt-1 text-sm text-muted-foreground">{{ targetSummary(entry) }}</p>
-        <div class="mt-2 flex items-center justify-between gap-3">
-          <Button variant="link" size="sm" type="button" class="h-auto p-0" @click="filterActor(entry)">
-            {{ entry.actorUsername }}
-          </Button>
-          <Button
-            variant="link"
-            size="sm"
-            type="button"
-            class="h-auto p-0"
-            :aria-expanded="isDetailsOpen(entry.id)"
-            :aria-controls="detailRegionId(entry.id, 'mobile')"
-            @click="toggleDetails(entry.id)"
-          >
-            {{ isDetailsOpen(entry.id) ? t('audit.hideDetails') : t('audit.details') }}
-          </Button>
-        </div>
-        <AuditEntryDetails v-if="isDetailsOpen(entry.id)" :id="detailRegionId(entry.id, 'mobile')" class="mt-2" :entry="entry" />
-      </article>
-    </div>
-
-    <div v-if="totalPages > 1" class="flex items-center justify-between text-sm text-muted-foreground">
-      <span>{{ t('audit.showing', { from: (page - 1) * pageSize + 1, to: Math.min(page * pageSize, total), total }) }}</span>
-      <div class="flex items-center gap-1">
-        <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('audit.prev')" :disabled="page <= 1" @click="handlePreviousPage">
-          <ChevronLeft :size="16" aria-hidden="true" />
+    <div v-if="loaded && listTotal > 0" class="-mt-1 flex items-center justify-between gap-3 text-sm text-muted-foreground max-md:text-[13px]">
+      <span class="tabular-nums">{{ pagerText }}</span>
+      <nav v-if="totalPages > 1" :aria-label="t('audit.pager.label')" class="flex items-center gap-1">
+        <Button variant="ghost" size="icon-sm" type="button" :disabled="page <= 1" :aria-label="t('audit.pager.previous')" @click="previousPage">
+          <ChevronLeft :size="16" class="rtl:rotate-180" aria-hidden="true" />
         </Button>
-        <span class="px-2">{{ page }} / {{ totalPages }}</span>
-        <Button variant="outline" size="sm" type="button" :aria-label="t('common.next')" :disabled="page >= totalPages" @click="handleNextPage">
-          <ChevronRight :size="16" aria-hidden="true" />
+        <button
+          v-for="number in pageNumbers"
+          :key="number"
+          type="button"
+          class="inline-grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="[
+            number === page
+              ? 'border border-border bg-card text-foreground shadow-xs'
+              : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+            number !== page ? 'max-md:hidden' : '',
+          ]"
+          :aria-current="number === page ? 'page' : undefined"
+          :aria-label="t('audit.pager.page', { page: number })"
+          @click="goToPage(number)"
+        >
+          {{ formatNumber(number) }}
+        </button>
+        <Button variant="ghost" size="icon-sm" type="button" :disabled="page >= totalPages" :aria-label="t('audit.pager.next')" @click="nextPage">
+          <ChevronRight :size="16" class="rtl:rotate-180" aria-hidden="true" />
         </Button>
-      </div>
+      </nav>
     </div>
+
+    <AuditEventSheet
+      :set="openSet"
+      :load-around="audit.fetchAround"
+      :load-history="audit.fetchHistory"
+      @close="closeEvent"
+      @select="selectEntry"
+      @only-person="onlyPerson"
+      @only-target="onlyTarget"
+      @only-ip="onlyIp"
+    />
   </div>
 </template>

@@ -7,6 +7,7 @@ import {
   INDEXER_MEDIA_KINDS,
   INDEXER_SEEDS_BACK,
   INDEXER_USES_CATEGORIES,
+  isBookRequestMediaKind,
   type IndexerAdapterDescriptor,
   type IndexerAdapterType,
   type IndexerCategoryMap,
@@ -17,7 +18,16 @@ import { PluginIndexerAdapter } from './plugins/plugin-host';
 import { PluginLoaderService } from './plugins/plugin-loader.service';
 
 /** What an adapter this build no longer has, or one that declares none, searches with. */
-const EMPTY_CATEGORIES: IndexerCategoryMap = { ebook: [], audiobook: [], comic: [] };
+const EMPTY_CATEGORIES: IndexerCategoryMap = { ebook: [], audiobook: [] };
+
+/**
+ * A plugin's categories for the media BookOrbit requests. Read field by field rather than taken
+ * whole, because a plugin written before comics were retired still declares a `comic` list, and
+ * that list must never reach an indexer row.
+ */
+function pluginCategories(plugin: PluginIndexerAdapter['plugin']): IndexerCategoryMap {
+  return { ebook: [...(plugin.defaultCategories?.ebook ?? [])], audiobook: [...(plugin.defaultCategories?.audiobook ?? [])] };
+}
 
 /**
  * Every adapter this install can use, built-in or loaded from disk.
@@ -110,7 +120,7 @@ export class IndexerRegistry implements OnModuleInit {
    */
   defaultCategories(type: IndexerAdapterType | string): IndexerCategoryMap {
     const adapter = this.find(type);
-    if (adapter instanceof PluginIndexerAdapter) return adapter.plugin.defaultCategories ?? EMPTY_CATEGORIES;
+    if (adapter instanceof PluginIndexerAdapter) return pluginCategories(adapter.plugin);
     if (adapter) return DEFAULT_INDEXER_CATEGORIES[adapter.type];
     return EMPTY_CATEGORIES;
   }
@@ -161,13 +171,13 @@ function describePlugin(adapter: PluginIndexerAdapter): IndexerAdapterDescriptor
     ...(plugin.update ? { updateable: true } : {}),
     requiresCredential: plugin.requiresCredential,
     credentialKind: plugin.credentialKind,
-    mediaKinds: [...plugin.mediaKinds],
+    mediaKinds: plugin.mediaKinds.filter(isBookRequestMediaKind),
     usesCategories: plugin.usesCategories,
     seedsBack: plugin.seedsBack,
     delivery: plugin.seedsBack ? 'torrent' : 'file',
     // The adapter's, not the plugin's: a plugin may leave the field off entirely.
     supportsIsbnSearch: adapter.supportsIsbnSearch,
-    defaultCategories: plugin.defaultCategories ?? { ebook: [], audiobook: [], comic: [] },
+    defaultCategories: pluginCategories(plugin),
     ...(plugin.defaultBaseUrl ? { defaultBaseUrl: plugin.defaultBaseUrl } : {}),
     ...(plugin.baseUrlHint ? { baseUrlHint: plugin.baseUrlHint } : {}),
     settingsFields: [...(plugin.settingsFields ?? [])],

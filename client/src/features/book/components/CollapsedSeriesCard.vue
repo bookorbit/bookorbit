@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getBookMediaProfile, type BookCard } from '@bookorbit/types'
+import { getBookMediaProfile, type BookCard, type CoverAspectRatio } from '@bookorbit/types'
 import { Library } from '@lucide/vue'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
-import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, coverAspectRatioValue, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useDisplaySettings, type GridCardLabelField } from '@/composables/useDisplaySettings'
 import { fetchAuthors } from '@/features/author/api/author'
@@ -16,6 +16,8 @@ const STACK_COVER_STEP_PCT = 8
 
 const props = defineProps<{
   book: BookCard
+  /** A grid's own tile shape, which wins over the book's. */
+  coverAspectRatio?: CoverAspectRatio
   showLabel?: boolean
   selectionMode?: boolean
 }>()
@@ -23,15 +25,15 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
-const coverAspectRatio = computed(() => props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
+const effectiveCoverAspectRatio = computed(() => props.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
 const { coverUrl } = useCoverVersions()
-const { seriesCardCoverMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, cardOverlays } = useDisplaySettings()
+const { seriesCardCoverMode, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, cardOverlays } = useDisplaySettings()
 
 const collapsed = computed(() => props.book.collapsedSeries!)
 const seriesName = computed(() => props.book.seriesName ?? '')
 const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
-const hoverTitleClampClass = computed(() => (coverAspectRatio.value === '1/1' ? 'line-clamp-1' : 'line-clamp-2'))
+const hoverTitleClampClass = computed(() => (effectiveCoverAspectRatio.value === '1/1' ? 'line-clamp-1' : 'line-clamp-2'))
 const showHoverText = computed(() => cardInfoMode.value === 'hover-overlay')
 const overlayBackground = computed(() => (cardInfoMode.value === 'hover-overlay' ? 'bg-black/70' : 'bg-black/20'))
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar'))
@@ -67,12 +69,17 @@ const resolvedCoverId = computed<number | null>(() => {
   }
 })
 
-const singleCoverFailed = ref(false)
-const singleCoverLoaded = ref(false)
+const showSingleCover = computed(() => !isStack.value && !isMosaic.value && resolvedCoverId.value != null)
+const singleCoverRatio = ref<number | null>(null)
+const coverSlotRatio = computed(() => coverAspectRatioValue(String(effectiveCoverAspectRatio.value)))
+// In natural-bottom the single cover shrinks to its own shape, so the badges and hover overlay follow it.
+const coverOverlayFrameStyle = computed(() => {
+  if (bookCoverDisplayMode.value !== 'natural-bottom' || !showSingleCover.value || singleCoverRatio.value === null) return { inset: '0' }
+  return fittedCoverFrameStyle(singleCoverRatio.value, coverSlotRatio.value, 'bottom')
+})
 
 watch(resolvedCoverId, () => {
-  singleCoverFailed.value = false
-  singleCoverLoaded.value = false
+  singleCoverRatio.value = null
 })
 watch(
   allCoverIds,
@@ -96,14 +103,12 @@ function handleCoverError(bookId: number) {
   failedCovers.value = new Set([...failedCovers.value, bookId])
 }
 
-function handleSingleCoverLoad() {
-  singleCoverLoaded.value = true
-  singleCoverFailed.value = false
+function handleSingleCoverLoad(ratio: number | null) {
+  singleCoverRatio.value = ratio
 }
 
 function handleSingleCoverError() {
-  singleCoverLoaded.value = false
-  singleCoverFailed.value = true
+  singleCoverRatio.value = null
 }
 
 function coverVersionFor(bookId: number): string | null | undefined {
@@ -172,7 +177,7 @@ const stackCoverStyles = computed(() =>
       right: `${STACK_COVER_STEP_PCT * index}%`,
       bottom: `${STACK_COVER_STEP_PCT * index}%`,
       width: `${coverWidth}%`,
-      aspectRatio: coverAspectRatio.value,
+      aspectRatio: effectiveCoverAspectRatio.value,
       zIndex: 100 - index,
       boxShadow:
         index === 0
@@ -206,12 +211,12 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
     <!-- Cover -->
     <div class="group">
       <BookCoverSurface
-        class="relative w-full rounded-sm overflow-hidden transition-[box-shadow,transform] duration-150 will-change-transform group-hover:scale-[1.02]"
-        :class="isStack ? 'book-cover-surface--spine-fitted' : ''"
+        class="relative w-full rounded-sm overflow-hidden transition-[box-shadow,transform] duration-150 will-change-transform group-hover:[transform:var(--cover-hover-transform)] motion-reduce:group-hover:[transform:none]"
+        :class="isStack || showSingleCover ? 'book-cover-surface--spine-fitted' : ''"
         interactive
         :disable-spine="isAudiobook"
         :is-comic="isComic"
-        :style="{ aspectRatio: coverAspectRatio, ...(isStack ? { backgroundColor: 'transparent', boxShadow: 'none' } : {}) }"
+        :style="{ aspectRatio: effectiveCoverAspectRatio, ...(isStack ? { backgroundColor: 'transparent', boxShadow: 'none' } : {}) }"
       >
         <div v-if="isStack" class="absolute inset-0 isolate overflow-hidden" data-testid="series-cover-stack">
           <div class="absolute inset-x-[12%] bottom-[5%] h-5 rounded-full bg-black/12 blur-2xl opacity-45" />
@@ -228,6 +233,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
               :title="seriesName"
               :author-line="authorLine"
               :seed="`series-${bookId}`"
+              :frame-aspect-ratio="effectiveCoverAspectRatio"
               alt=""
               loading="lazy"
               decoding="async"
@@ -256,24 +262,21 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
 
         <!-- Single cover mode -->
         <div v-else-if="!isMosaic && resolvedCoverId != null" class="absolute inset-0" data-testid="series-single-cover">
-          <div
-            class="absolute inset-0 transition-opacity duration-200 ease-out"
-            :class="singleCoverLoaded && !singleCoverFailed ? 'opacity-0 pointer-events-none' : 'opacity-100'"
-            aria-hidden="true"
-          >
-            <BookCoverPlaceholder title="" author-line="" :is-audio="false" :seed="`series-${resolvedCoverId}`" />
-          </div>
-          <img
-            v-if="!singleCoverFailed"
+          <BookCoverArtwork
             :src="coverUrl(resolvedCoverId, 'thumbnail', coverVersionFor(resolvedCoverId))"
-            class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out"
-            :class="singleCoverLoaded ? 'opacity-100' : 'opacity-0'"
-            loading="lazy"
+            :has-cover="true"
+            :title="seriesName"
+            :author-line="authorLine"
+            :seed="`series-${resolvedCoverId}`"
+            :frame-aspect-ratio="effectiveCoverAspectRatio"
             alt=""
+            loading="lazy"
+            decoding="async"
+            :spine="!isAudiobook"
+            :is-comic="isComic"
             @load="handleSingleCoverLoad"
             @error="handleSingleCoverError"
           />
-          <span v-if="!singleCoverLoaded && !singleCoverFailed" class="absolute inset-0 z-[1] animate-pulse bg-foreground/5" />
         </div>
 
         <!-- Adaptive cover mosaic -->
@@ -305,52 +308,56 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
           </div>
         </div>
 
-        <!-- Count badge -->
         <div
           v-if="!isStack"
-          class="absolute right-1.5 top-1.5 z-10 rounded-sm bg-black/70 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white group-hover:opacity-0 transition-opacity duration-150"
-          data-testid="series-count-badge"
+          data-testid="series-overlay-frame"
+          class="absolute z-10 overflow-hidden rounded-[inherit]"
+          :style="coverOverlayFrameStyle"
         >
-          {{ collapsed.bookCount }}
-        </div>
-
-        <!-- Series type badge -->
-        <div
-          v-if="!isStack"
-          class="absolute bottom-1.5 left-1.5 z-10 rounded-sm bg-black/70 p-1 text-white group-hover:opacity-0 transition-opacity duration-150"
-          data-testid="series-type-badge"
-        >
-          <Library :size="10" />
-        </div>
-
-        <!-- Hover overlay -->
-        <div
-          v-if="!isStack"
-          class="absolute inset-0 flex flex-col p-2 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 pointer-events-none group-hover:pointer-events-auto group-active:pointer-events-auto"
-          :class="overlayBackground"
-        >
-          <div class="flex-1 flex items-center justify-center">
-            <button
-              class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 group-hover:scale-100"
-              data-testid="series-hover-action"
-              @click.stop="handleClick"
-            >
-              <Library class="size-[16cqi]" />
-            </button>
+          <!-- Count badge -->
+          <div
+            class="absolute right-1.5 top-1.5 z-10 rounded-sm bg-black/70 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white group-hover:opacity-0 transition-opacity duration-150"
+            data-testid="series-count-badge"
+          >
+            {{ collapsed.bookCount }}
           </div>
-          <div v-if="showHoverText" class="shrink-0 flex flex-col">
-            <p class="text-xs font-semibold text-white leading-tight" :class="hoverTitleClampClass">
-              {{ seriesName }}
-            </p>
-            <p v-if="authorLine" class="text-[10px] text-white/70 truncate mt-0.5">
-              {{ authorLine }}
-            </p>
-          </div>
-        </div>
 
-        <!-- Read progress bar -->
-        <div v-if="!isStack && showProgressBar" class="absolute bottom-0 left-0 right-0 h-[3px] z-20 bg-white/20" data-testid="series-progress-bar">
-          <div class="h-full bg-primary" :style="{ width: `${progressPercent}%` }" data-testid="series-progress-fill" />
+          <!-- Series type badge -->
+          <div
+            class="absolute bottom-1.5 left-1.5 z-10 rounded-sm bg-black/70 p-1 text-white group-hover:opacity-0 transition-opacity duration-150"
+            data-testid="series-type-badge"
+          >
+            <Library :size="10" />
+          </div>
+
+          <!-- Hover overlay -->
+          <div
+            class="absolute inset-0 flex flex-col p-2 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 pointer-events-none group-hover:pointer-events-auto group-active:pointer-events-auto"
+            :class="overlayBackground"
+          >
+            <div class="flex-1 flex items-center justify-center">
+              <button
+                class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 group-hover:scale-100"
+                data-testid="series-hover-action"
+                @click.stop="handleClick"
+              >
+                <Library class="size-[16cqi]" />
+              </button>
+            </div>
+            <div v-if="showHoverText" class="shrink-0 flex flex-col">
+              <p class="text-xs font-semibold text-white leading-tight" :class="hoverTitleClampClass">
+                {{ seriesName }}
+              </p>
+              <p v-if="authorLine" class="text-[10px] text-white/70 truncate mt-0.5">
+                {{ authorLine }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Read progress bar -->
+          <div v-if="showProgressBar" class="absolute bottom-0 left-0 right-0 h-[3px] z-20 bg-white/20" data-testid="series-progress-bar">
+            <div class="h-full bg-primary" :style="{ width: `${progressPercent}%` }" data-testid="series-progress-fill" />
+          </div>
         </div>
       </BookCoverSurface>
     </div>

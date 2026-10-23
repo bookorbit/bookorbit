@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { mergedMediaOrder, ownedInOrder } from '../sidebar-order'
+import { describe, expect, it, vi } from 'vitest'
+import { mediaOrderPersisters, mergedMediaOrder, ownedInOrder, type DisplayOrderEntry } from '../sidebar-order'
 
 /**
  * The sidebar's reorder persistence shipped two real bugs this covers: it sent scopes owned by
@@ -65,5 +65,75 @@ describe('mergedMediaOrder', () => {
     const merged = mergedMediaOrder([{ id: 2 }, { id: 1 }], [{ id: 11 }, { id: 10 }])
 
     expect(merged.map((entry) => entry.id)).toEqual([2, 1, 11, 10])
+  })
+})
+
+describe('mediaOrderPersisters', () => {
+  function setup(books = [{ id: 1 }, { id: 2 }], podcasts = [{ id: 10 }, { id: 11 }]) {
+    const reorder = vi.fn<(order: DisplayOrderEntry[]) => Promise<void>>().mockResolvedValue(undefined)
+    const persist = mediaOrderPersisters({ books: () => books, podcasts: () => podcasts, reorder })
+    return { reorder, persist }
+  }
+
+  it('rewrites the whole run with the reordered books ahead of the podcasts', async () => {
+    const { reorder, persist } = setup()
+
+    await persist.books([
+      { id: 2, displayOrder: 0 },
+      { id: 1, displayOrder: 1 },
+    ])
+
+    expect(reorder).toHaveBeenCalledWith([
+      { id: 2, displayOrder: 0 },
+      { id: 1, displayOrder: 1 },
+      { id: 10, displayOrder: 2 },
+      { id: 11, displayOrder: 3 },
+    ])
+  })
+
+  it('keeps the books in place when the podcasts are reordered', async () => {
+    const { reorder, persist } = setup()
+
+    await persist.podcasts([
+      { id: 11, displayOrder: 0 },
+      { id: 10, displayOrder: 1 },
+    ])
+
+    expect(reorder).toHaveBeenCalledWith([
+      { id: 1, displayOrder: 0 },
+      { id: 2, displayOrder: 1 },
+      { id: 11, displayOrder: 2 },
+      { id: 10, displayOrder: 3 },
+    ])
+  })
+
+  it('leaves out rows the user may not reorder', async () => {
+    const { reorder, persist } = setup([{ id: 1 }, { id: 2 }])
+
+    await persist.books([
+      { id: 3, displayOrder: 0 },
+      { id: 2, displayOrder: 1 },
+      { id: 1, displayOrder: 2 },
+    ])
+
+    expect(reorder.mock.calls[0]?.[0].map((entry) => entry.id)).toEqual([2, 1, 10, 11])
+  })
+
+  it("sends nothing when none of the reordered rows are the user's", async () => {
+    const { reorder, persist } = setup([{ id: 1 }])
+
+    await persist.books([{ id: 9, displayOrder: 0 }])
+
+    expect(reorder).not.toHaveBeenCalled()
+  })
+
+  it('reads both lists when persisting, so a list that changed since setup is not overwritten', async () => {
+    const podcasts = [{ id: 10 }]
+    const { reorder, persist } = setup([{ id: 1 }], podcasts)
+    podcasts.push({ id: 12 })
+
+    await persist.books([{ id: 1, displayOrder: 0 }])
+
+    expect(reorder.mock.calls[0]?.[0].map((entry) => entry.id)).toEqual([1, 10, 12])
   })
 })

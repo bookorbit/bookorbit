@@ -6,6 +6,7 @@ import { EmailRecipientController } from './email-recipient.controller';
 import type { CreateEmailRecipientDto } from './dto/create-email-recipient.dto';
 import type { UpdateEmailRecipientDto } from './dto/update-email-recipient.dto';
 import { EmailRecipientService } from './email-recipient.service';
+import { EmailRecipientTestService } from './email-recipient-test.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailRecipientController', () => {
@@ -35,7 +36,9 @@ describe('EmailRecipientController', () => {
     setDefault: vi.fn(),
   } as unknown as EmailRecipientService;
 
-  const controller = new EmailRecipientController(service);
+  const testService = { send: vi.fn() } as unknown as EmailRecipientTestService;
+
+  const controller = new EmailRecipientController(service, testService);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,6 +67,11 @@ describe('EmailRecipientController', () => {
 
     expect(service.create).toHaveBeenCalledWith(createDto, user);
     expect(service.update).toHaveBeenCalledWith(4, updateDto, user);
+  });
+
+  it("delegates a test email with the client's localized text", async () => {
+    await controller.sendTest(4, { subject: 'BookOrbit test', text: 'It works.' }, user);
+    expect(testService.send).toHaveBeenCalledWith(4, 'BookOrbit test', 'It works.', user);
   });
 
   it('delegates remove and setDefault', async () => {

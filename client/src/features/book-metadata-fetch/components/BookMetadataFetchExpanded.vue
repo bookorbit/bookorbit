@@ -81,7 +81,7 @@ async function handleCancelConfirm() {
       <button
         v-if="!props.status.paused && (props.status.queued > 0 || props.status.processing > 0)"
         :disabled="acting"
-        class="flex items-center gap-1 px-2 py-1 text-xs rounded border border-border hover:bg-muted disabled:opacity-50"
+        class="flex items-center gap-1 px-2 py-1 text-xs rounded-xs border border-border hover:bg-muted disabled:opacity-50"
         @click="handlePause"
       >
         <Square :size="12" />
@@ -90,7 +90,7 @@ async function handleCancelConfirm() {
       <button
         v-if="props.status.paused && (props.status.queued > 0 || props.status.processing > 0)"
         :disabled="acting"
-        class="flex items-center gap-1 px-2 py-1 text-xs rounded border border-border hover:bg-muted disabled:opacity-50"
+        class="flex items-center gap-1 px-2 py-1 text-xs rounded-xs border border-border hover:bg-muted disabled:opacity-50"
         @click="handleResume"
       >
         <Play :size="12" />
@@ -99,7 +99,7 @@ async function handleCancelConfirm() {
       <button
         v-if="props.status.queued > 0"
         :disabled="acting"
-        class="px-2 py-1 text-xs rounded border border-border hover:bg-muted text-destructive disabled:opacity-50"
+        class="px-2 py-1 text-xs rounded-xs border border-border hover:bg-muted text-destructive disabled:opacity-50"
         @click="confirmingCancel = true"
       >
         {{ t('bookMetadataFetch.actions.cancelQueued') }}
@@ -114,12 +114,12 @@ async function handleCancelConfirm() {
       <div class="flex gap-1.5">
         <button
           :disabled="acting"
-          class="px-2 py-1 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+          class="px-2 py-1 text-xs rounded-xs bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
           @click="handleCancelConfirm"
         >
           {{ t('bookMetadataFetch.cancel.confirm') }}
         </button>
-        <button class="px-2 py-1 text-xs rounded border border-border hover:bg-muted" @click="confirmingCancel = false">
+        <button class="px-2 py-1 text-xs rounded-xs border border-border hover:bg-muted" @click="confirmingCancel = false">
           {{ t('bookMetadataFetch.cancel.keepRunning') }}
         </button>
       </div>

@@ -126,7 +126,7 @@ onUnmounted(() => {
       v-if="hasSelection"
       type="button"
       :aria-label="t('annotations.combobox.clearBookFilter')"
-      class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       @mousedown.prevent="clear"
     >
       <X :size="14" />

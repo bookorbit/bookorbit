@@ -58,6 +58,8 @@ export type TtsPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'erro
 export interface TtsPosition {
   cfi: string;
   chapterIndex: number | null;
+  /** When the position was saved. Clients compare it with their own copy. */
+  updatedAt?: string;
 }
 
 // Synthesis

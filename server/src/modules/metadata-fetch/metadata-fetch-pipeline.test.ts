@@ -9,14 +9,14 @@ import {
   MetadataProviderKey,
   ProviderConfigurations,
 } from '@bookorbit/types';
-import { of } from 'rxjs';
+import { map, of } from 'rxjs';
 
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
-import { MetadataFetchService } from './metadata-fetch.service';
+import { MetadataFetchService, type MetadataSearchEvent } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import type { MetadataProvider } from './providers/metadata-provider';
@@ -76,6 +76,10 @@ describe('MetadataFetchPipeline', () => {
       search: vi.fn(),
       searchCandidates: vi.fn(),
     } as unknown as Mocked<MetadataFetchService>;
+    // The pipeline reads the full event stream; tests describe candidates, so wrap them as events.
+    (fetchService as unknown as { search: unknown }).search = vi.fn((params: MetadataSearchParams, keys: MetadataProviderKey[]) =>
+      (fetchService.searchCandidates(params, keys) ?? of()).pipe(map((candidate): MetadataSearchEvent => ({ kind: 'candidate', candidate }))),
+    );
 
     preferencesService = {
       getGlobal: vi.fn(),
@@ -113,6 +117,105 @@ describe('MetadataFetchPipeline', () => {
       providerConfig,
       seriesExpectedCount as unknown as SeriesExpectedCountService,
     );
+  });
+
+  describe('ISBN resolution', () => {
+    function primeIsbns(mergeStrategy: FieldPreference['mergeStrategy'] = 'fillMissing', enabled = true) {
+      const preferences = createPreferences((fields) => {
+        fields.isbn = { enabled, providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY], mergeStrategy };
+      });
+      preferencesService.getGlobal.mockResolvedValue(preferences);
+      resolver.resolve.mockReturnValue(preferences);
+      resolver.withForwardCompatibility.mockReturnValue(preferences);
+      registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    }
+
+    it('fills a normalized pair from one provider in priority order', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0-306-40615-2', isbn13: '978-0-306-40615-7' }),
+          candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { isbn13: '9781635766264' }),
+        ),
+      );
+      const { resolved, sources } = await pipeline.runWithSources({ title: SHARED_CANDIDATE_TITLE }, {});
+      expect(resolved).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' });
+      expect(sources).toMatchObject({ isbn10: 'google', isbn13: 'google' });
+    });
+
+    it.each([
+      { input: { isbn10: '0-9752298-0-x' }, expected: { isbn10: '097522980X' } },
+      { input: { isbn13: '978-0-306-40615-7' }, expected: { isbn13: '9780306406157' } },
+      { input: { isbn13: '9798896602590' }, expected: { isbn13: '9798896602590' } },
+    ])('keeps a single provider identifier in its own field: $expected', async ({ input, expected }) => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', input)));
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: ' ', isbn13: '' });
+      expect({ isbn10: resolved.isbn10, isbn13: resolved.isbn13 }).toEqual(expected);
+      expect(resolved.isbn).toBeUndefined();
+    });
+
+    it('uses a fallback with the same edition to fill a missing counterpart', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn13: '9781635766264' }),
+          candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { isbn10: '0306406152', isbn13: '9780306406157' }),
+        ),
+      );
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: '0-306-40615-2' });
+      expect(resolved.isbn10).toBeUndefined();
+      expect(resolved.isbn13).toBe('9780306406157');
+    });
+
+    it('does not combine different editions or accept malformed provider ISBNs', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0306406152', isbn13: '9781635766264' }),
+          candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { isbn13: '9780306406158' }),
+        ),
+      );
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, {});
+      expect(resolved.isbn10).toBeUndefined();
+      expect(resolved.isbn13).toBeUndefined();
+    });
+
+    it('does not borrow a missing ISBN from another edition', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn13: '9781635766264' })));
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: '0306406152' });
+      expect(resolved.isbn13).toBeUndefined();
+    });
+
+    it('does not change the edition of a locked ISBN when overwrite is configured', async () => {
+      primeIsbns('overwriteIfProvided');
+      fetchService.searchCandidates.mockReturnValue(
+        of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0306406152', isbn13: '9780306406157' })),
+      );
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn13: '9781635766264', lockedFields: ['isbn13'] });
+      expect(resolved.isbn10).toBeUndefined();
+      expect(resolved.isbn13).toBeUndefined();
+    });
+
+    it('keeps existing ISBNs by default and supports disabling the rule', async () => {
+      primeIsbns();
+      fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn13: '9781635766264' })));
+      const resolved = await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, { isbn10: '0306406152', isbn13: '9780306406157' });
+      expect(resolved.isbn13).toBeUndefined();
+      primeIsbns('fillMissing', false);
+      expect((await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, {})).isbn13).toBeUndefined();
+    });
+
+    it('replaces a complete pair only when configured and respects preserve-existing mode', async () => {
+      primeIsbns('overwriteIfProvided');
+      fetchService.searchCandidates.mockReturnValue(
+        of(candidate(MetadataProviderKey.GOOGLE, 'g1', { isbn10: '0306406152', isbn13: '9780306406157' })),
+      );
+      const existing = { isbn13: '9781635766264' };
+      expect(await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, existing)).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' });
+      expect((await pipeline.run({ title: SHARED_CANDIDATE_TITLE }, existing, undefined, { preserveExisting: true })).isbn10).toBeUndefined();
+    });
   });
 
   it('derives enabled provider keys from active fields, filters unknown providers, and de-duplicates keys', async () => {
@@ -385,9 +488,78 @@ describe('MetadataFetchPipeline', () => {
 
     const { diagnostics } = await pipeline.runWithSources({ title: 'Query' }, {});
 
-    expect(fetchService.searchCandidates).not.toHaveBeenCalled();
+    // A provider in cooldown is asked of the cache only; with nothing cached it still contributes nothing.
+    const search = (fetchService as unknown as { search: ReturnType<typeof vi.fn> }).search;
+    expect(search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE], {
+      directiveByProvider: { [MetadataProviderKey.GOOGLE]: { policy: 'only-if-cached', allowFallback: false } },
+    });
     expect(diagnostics.reason).toBe('providers_throttled');
     expect(diagnostics.throttledProviders).toEqual([MetadataProviderKey.GOOGLE]);
+    expect(diagnostics.activeProviders).toEqual([]);
+  });
+
+  describe('metadata cache', () => {
+    function useTitleRule(providers: MetadataProviderKey[]) {
+      const global = createPreferences((fields) => {
+        fields.title = { enabled: true, providers, mergeStrategy: 'overwriteIfProvided' };
+      });
+      preferencesService.getGlobal.mockResolvedValue(global);
+      resolver.resolve.mockReturnValue(global);
+      resolver.withForwardCompatibility.mockReturnValue(global);
+      registry.all.mockReturnValue(providers.map((key) => ({ key })) as never);
+    }
+
+    function searchMock() {
+      return (fetchService as unknown as { search: ReturnType<typeof vi.fn> }).search;
+    }
+
+    it('resolves fields from a provider in cooldown when the cache holds its answer', async () => {
+      useTitleRule([MetadataProviderKey.GOOGLE]);
+      throttleTracker.isThrottled.mockReturnValue(true);
+      searchMock().mockReturnValue(
+        of<MetadataSearchEvent>(
+          { kind: 'candidate', candidate: { provider: MetadataProviderKey.GOOGLE, providerId: 'g1', title: 'Cached Title' } },
+          {
+            kind: 'run',
+            run: {
+              provider: MetadataProviderKey.GOOGLE,
+              served: { provider: MetadataProviderKey.GOOGLE, source: 'fallback', stale: true, cachedAt: '2026-01-01T00:00:00.000Z' },
+              outboundRequests: 0,
+            },
+          },
+        ),
+      );
+
+      const { resolved, diagnostics, cache } = await pipeline.runWithSources({ title: 'Query' }, {});
+
+      expect(resolved.title).toBe('Cached Title');
+      expect(diagnostics.reason).toBeNull();
+      expect(diagnostics.cacheServedProviders).toEqual([
+        { provider: MetadataProviderKey.GOOGLE, source: 'fallback', stale: true, cachedAt: '2026-01-01T00:00:00.000Z' },
+      ]);
+      expect(cache.outboundRequests).toBe(0);
+    });
+
+    it('forwards the cache directive and sums outbound requests across providers', async () => {
+      useTitleRule([MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
+      searchMock().mockReturnValue(
+        of<MetadataSearchEvent>(
+          { kind: 'candidate', candidate: { provider: MetadataProviderKey.GOOGLE, providerId: 'g1', title: 'Live Title' } },
+          { kind: 'run', run: { provider: MetadataProviderKey.GOOGLE, served: null, outboundRequests: 2 } },
+          { kind: 'run', run: { provider: MetadataProviderKey.OPEN_LIBRARY, served: null, outboundRequests: 3 } },
+        ),
+      );
+      const directive = { policy: 'refresh' as const, allowFallback: true };
+
+      const { cache, diagnostics } = await pipeline.runWithSources({ title: 'Query' }, {}, undefined, { cacheDirective: directive });
+
+      expect(searchMock()).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY], {
+        directive,
+        directiveByProvider: {},
+      });
+      expect(cache).toEqual({ servedProviders: [], outboundRequests: 5 });
+      expect(diagnostics.cacheServedProviders).toBeUndefined();
+    });
   });
 
   it('returns diagnostics when active providers return no candidates', async () => {
@@ -1034,11 +1206,43 @@ describe('MetadataFetchPipeline', () => {
 
     const { resolved } = await pipeline.runWithSources({ title: 'Arkham Asylum #12' }, {});
 
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ requireUnambiguousMatch: true }),
+      expect.arrayContaining([MetadataProviderKey.COMICVINE]),
+    );
+
     expect(resolved.comicMetadata).toEqual({
       issueNumber: '12',
       volumeName: 'Arkham Asylum',
       pencillers: ['Jock'],
     });
+  });
+
+  it('requires unambiguous ComicVine matches even when callers request one candidate or disable the safeguard', async () => {
+    const prefs = createPreferences((fields) => {
+      for (const field of ALL_METADATA_FIELDS) fields[field].providers = [MetadataProviderKey.COMICVINE];
+    });
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.COMICVINE }] as never);
+    fetchService.searchCandidates.mockReturnValue(of());
+
+    const { resolved, providerIds } = await pipeline.runWithSources(
+      {
+        title: 'Generation X #01',
+        maxCandidatesPerProvider: 1,
+        requireUnambiguousMatch: false,
+      },
+      {},
+    );
+
+    expect(fetchService.searchCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ requireUnambiguousMatch: true, maxCandidatesPerProvider: 1 }),
+      [MetadataProviderKey.COMICVINE],
+    );
+    expect(resolved).toEqual({});
+    expect(providerIds).toEqual({});
   });
 
   it('merges genres from selected providers when genre merge mode is enabled', async () => {
@@ -1856,10 +2060,36 @@ describe('MetadataFetchPipeline', () => {
       expect(resolved.hardcoverEditionId).toBe('ebook-edition');
     });
 
+    it("keeps a book's own chapters under a fill-missing narrators rule, and replaces them otherwise", async () => {
+      const chapters = [{ title: 'From Audnexus', startMs: 0 }];
+      register(MetadataProviderKey.AUDNEXUS);
+      answer({ [MetadataProviderKey.AUDNEXUS]: { audio: { title: 'Dune', authors: ['Frank Herbert'], chapters } } });
+      const existing = { chapters: [{ title: 'Own chapter', startMs: 0 }] };
+
+      usePreferences((preferences) => {
+        preferences.fields.narrators = { enabled: true, providers: [MetadataProviderKey.AUDNEXUS], mergeStrategy: 'fillMissing' };
+      });
+      const kept = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, existing, undefined, { coverMedia: AUDIO_ONLY });
+      expect(kept.resolved.chapters).toBeUndefined();
+
+      usePreferences((preferences) => {
+        preferences.fields.narrators = { enabled: true, providers: [MetadataProviderKey.AUDNEXUS], mergeStrategy: 'overwriteIfProvided' };
+      });
+      const replaced = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, existing, undefined, { coverMedia: AUDIO_ONLY });
+      expect(replaced.resolved.chapters).toEqual(chapters);
+
+      usePreferences((preferences) => {
+        preferences.fields.narrators = { enabled: true, providers: [MetadataProviderKey.AUDNEXUS], mergeStrategy: 'fillMissing' };
+      });
+      const filled = await pipeline.runWithSources({ title: 'Dune', isAudiobook: true }, { chapters: [] }, undefined, { coverMedia: AUDIO_ONLY });
+      expect(filled.resolved.chapters).toEqual(chapters);
+    });
+
     it('takes nothing but art from a provider only a cover rule brought in, apart from an audiobook id', async () => {
       usePreferences((preferences) => {
-        // Community ratings name Audible and Hardcover by default, which would make them full providers.
+        // Community ratings and the audiobook fields name Audible by default, which would make it a full provider.
         preferences.fields.communityRating.providers = [MetadataProviderKey.GOOGLE];
+        for (const field of ['narrators', 'duration', 'abridged'] as const) preferences.fields[field].providers = [MetadataProviderKey.GOOGLE];
         preferences.fields.audioCover.providers = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.HARDCOVER];
       });
       register(MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE, MetadataProviderKey.HARDCOVER);
@@ -1893,6 +2123,7 @@ describe('MetadataFetchPipeline', () => {
     it('lets a cover-only provider be checked against the anchor without choosing it', async () => {
       usePreferences((preferences) => {
         preferences.fields.communityRating.providers = [MetadataProviderKey.GOOGLE];
+        for (const field of ['narrators', 'duration', 'abridged'] as const) preferences.fields[field].providers = [MetadataProviderKey.GOOGLE];
         preferences.fields.audioCover.providers = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.GOOGLE];
       });
       register(MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE);

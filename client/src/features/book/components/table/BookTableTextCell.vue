@@ -190,7 +190,7 @@ function handleClick() {
       ref="inputRef"
       v-model="draft"
       type="text"
-      class="w-full rounded border border-primary/50 bg-background px-1.5 py-0.5 text-sm text-foreground outline-none focus:border-primary/70"
+      class="w-full rounded-xs border border-primary/50 bg-background px-1.5 py-0.5 text-sm text-foreground outline-none focus:border-primary/70"
       :role="searchFn ? 'combobox' : undefined"
       :aria-expanded="searchFn ? showDropdown : undefined"
       :aria-controls="searchFn && showDropdown ? 'text-cell-suggestions' : undefined"
@@ -224,7 +224,7 @@ function handleClick() {
     </Teleport>
     <div v-if="!isActive" class="group/text-cell relative w-full min-w-0">
       <span
-        class="block min-h-[20px] min-w-0 truncate rounded px-1 text-sm transition-[padding-right] duration-150"
+        class="block min-h-[20px] min-w-0 truncate rounded-xs px-1 text-sm transition-[padding-right] duration-150"
         :class="[
           isReadOnly ? 'text-foreground' : 'cursor-pointer hover:bg-primary/5',
           value ? 'text-foreground' : 'text-muted-foreground',
@@ -241,7 +241,7 @@ function handleClick() {
       <RouterLink
         v-if="openLink"
         :to="openLink"
-        class="absolute right-0.5 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-opacity hover:bg-primary/10 hover:text-primary"
+        class="absolute right-0.5 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-xs text-muted-foreground transition-opacity hover:bg-primary/10 hover:text-primary"
         :class="
           alwaysShowOpenLinkIcon
             ? 'opacity-100'

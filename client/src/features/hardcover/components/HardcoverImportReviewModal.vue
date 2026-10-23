@@ -334,7 +334,7 @@ function normalizeSearch(value: string): string {
               <input
                 v-model="importProgressModel"
                 type="checkbox"
-                class="size-4 rounded border-border text-primary focus:ring-primary/40"
+                class="size-4 rounded-xs border-border text-primary focus:ring-primary/40"
                 :disabled="applying"
               />
               <span>{{ t('hardcover.review.importProgress') }}</span>
@@ -395,7 +395,7 @@ function normalizeSearch(value: string): string {
               <div class="flex items-start">
                 <input
                   type="checkbox"
-                  class="mt-1 size-4 rounded border-border text-primary focus:ring-primary/40 disabled:opacity-30"
+                  class="mt-1 size-4 rounded-xs border-border text-primary focus:ring-primary/40 disabled:opacity-30"
                   :checked="selectedIds.has(row.hardcoverUserBookId)"
                   :disabled="!isImportableRow(row) || applying"
                   :aria-label="t('hardcover.review.selectRowAriaLabel', { title: rowTitle(row) })"

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { EDITION_DISPLAY_LIMIT, HardcoverBookMatchService } from './hardcover-book-match.service';
+import { buildHardcoverMatchBasis } from './hardcover-id.utils';
 
 const mockRepo = {
   findBookState: vi.fn(),
   upsertBookState: vi.fn(),
+  relinkBook: vi.fn(),
 };
 
 const mockClient = {
@@ -31,10 +33,14 @@ const baseBook = {
   format: null,
 };
 
+// A link whose identifiers are unchanged since it was made, so the cached path runs untouched.
+const BASE_BASIS = buildHardcoverMatchBasis(baseBook);
+
 describe('HardcoverBookMatchService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRepo.upsertBookState.mockResolvedValue({});
+    mockRepo.relinkBook.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -46,6 +52,7 @@ describe('HardcoverBookMatchService', () => {
       hardcoverBookId: 100,
       hardcoverEditionId: 200,
       matchError: null,
+      matchBasis: BASE_BASIS,
     });
     mockClient.query.mockResolvedValue({
       books: [{ id: 100, editions: [{ id: 200, pages: 320 }] }],
@@ -67,6 +74,7 @@ describe('HardcoverBookMatchService', () => {
       hardcoverBookId: 100,
       hardcoverEditionId: 200,
       matchError: null,
+      matchBasis: BASE_BASIS,
     });
     mockClient.query.mockResolvedValue({
       books: [
@@ -97,6 +105,7 @@ describe('HardcoverBookMatchService', () => {
       hardcoverBookId: 100,
       hardcoverEditionId: 200,
       matchError: null,
+      matchBasis: BASE_BASIS,
     });
     mockClient.query.mockResolvedValue({
       books: [{ id: 100, editions: [{ id: 200, pages: null, audio_seconds: 3600 }] }],
@@ -116,6 +125,7 @@ describe('HardcoverBookMatchService', () => {
       hardcoverBookId: 100,
       hardcoverEditionId: 200,
       matchError: null,
+      matchBasis: BASE_BASIS,
     });
     mockClient.query.mockResolvedValue({
       books: [{ id: 100, editions: [{ id: 301, pages: 410, isbn_13: '9781234567890', isbn_10: null, audio_seconds: null }] }],
@@ -134,6 +144,7 @@ describe('HardcoverBookMatchService', () => {
       hardcoverBookId: 100,
       hardcoverEditionId: 9999,
       matchError: null,
+      matchBasis: BASE_BASIS,
     });
     const cappedWindow = Array.from({ length: 50 }, (_, index) => ({
       id: index + 1,
@@ -168,6 +179,7 @@ describe('HardcoverBookMatchService', () => {
       hardcoverBookId: 100,
       hardcoverEditionId: 200,
       matchError: null,
+      matchBasis: BASE_BASIS,
     });
     mockClient.query.mockImplementation((_userId, _token, query: string) => {
       if (query.includes('FindBookEditionMetricsById')) {
@@ -193,6 +205,7 @@ describe('HardcoverBookMatchService', () => {
       hardcoverBookId: 100,
       hardcoverEditionId: null,
       matchError: null,
+      matchBasis: BASE_BASIS,
     });
     mockClient.query.mockResolvedValue({
       books: [{ id: 100, editions: [{ id: 301, pages: 410, isbn_13: null, isbn_10: null, audio_seconds: null }] }],
@@ -441,6 +454,364 @@ describe('HardcoverBookMatchService', () => {
       editionPages: 405,
       editionAudioSeconds: null,
       matchMethod: 'title',
+    });
+  });
+
+  it('records the identifiers a new link was resolved from', async () => {
+    mockRepo.findBookState.mockResolvedValue(undefined);
+    mockClient.query.mockResolvedValue({ books: [{ id: 5, editions: [{ id: 6 }] }] });
+
+    await makeService().matchBook(1, 'tok', baseBook);
+
+    expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ hardcoverBookId: 5, matchBasis: BASE_BASIS }));
+  });
+
+  it('records no basis when nothing matched', async () => {
+    mockRepo.findBookState.mockResolvedValue(undefined);
+    mockClient.query.mockResolvedValue({ books: [] });
+
+    await makeService().matchBook(1, 'tok', baseBook);
+
+    expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ matchError: 'no_match', matchBasis: null }));
+  });
+
+  describe('when the identifiers change after a link was made', () => {
+    const WRONG_BOOK = 1554702;
+    const WRONG_EDITION = 31616496;
+    const RIGHT_BOOK = 2973670;
+    const RIGHT_EDITION = 33314466;
+    const staleBook = { ...baseBook, title: 'ok, amen', hardcoverMetadataId: 'hell-be-ok-growing-gorgeous-boys-into-good-men', isbn13: null };
+    const correctedBook = {
+      ...staleBook,
+      hardcoverMetadataId: 'ok-amen',
+      hardcoverEditionId: String(RIGHT_EDITION),
+      isbn13: '9789146223856',
+      format: 'epub',
+    };
+    const rightBookAnswer = {
+      books: [{ id: RIGHT_BOOK, editions: [{ id: RIGHT_EDITION, pages: 321, isbn_13: '9789146223856', isbn_10: null, audio_seconds: null }] }],
+    };
+    const wrongBookMetrics = {
+      books: [{ id: WRONG_BOOK, editions: [{ id: WRONG_EDITION, pages: 217, isbn_13: null, isbn_10: null, audio_seconds: null }] }],
+    };
+
+    function answer(routes: Record<string, unknown>) {
+      mockClient.query.mockImplementation((_userId: number, _token: string, query: string) => {
+        const route = Object.keys(routes).find((name) => query.includes(name));
+        if (!route) return Promise.reject(new Error(`unexpected query ${query.trim().split('(')[0]}`));
+        const value = routes[route];
+        return value instanceof Error ? Promise.reject(value) : Promise.resolve(value);
+      });
+    }
+
+    function queryNames(): string[] {
+      return mockClient.query.mock.calls.map((call) => /query (\w+)/.exec(call[2] as string)?.[1] ?? '');
+    }
+
+    function silenceWarnings(service: HardcoverBookMatchService) {
+      const logger = Reflect.get(service, 'logger') as { warn: (message: string) => void; log: (message: string) => void };
+      vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      vi.spyOn(logger, 'log').mockImplementation(() => undefined);
+      return logger;
+    }
+
+    it('moves the link to the book the corrected metadata identifies (issue 1488)', async () => {
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: WRONG_BOOK,
+        hardcoverEditionId: WRONG_EDITION,
+        matchError: null,
+        matchBasis: buildHardcoverMatchBasis(staleBook),
+      });
+      answer({ 'query FindBookBySlug': rightBookAnswer });
+      const service = makeService();
+      const logger = silenceWarnings(service);
+
+      const result = await service.matchBook(1, 'tok', correctedBook);
+
+      expect(result).toEqual({
+        hardcoverBookId: RIGHT_BOOK,
+        hardcoverEditionId: RIGHT_EDITION,
+        editionPages: 321,
+        editionAudioSeconds: null,
+        matchMethod: 'metadata_id',
+        replacedHardcoverBookId: WRONG_BOOK,
+      });
+      expect(mockRepo.relinkBook).toHaveBeenCalledWith({
+        userId: 1,
+        bookId: 42,
+        hardcoverBookId: RIGHT_BOOK,
+        hardcoverEditionId: RIGHT_EDITION,
+        matchMethod: 'metadata_id',
+        matchBasis: buildHardcoverMatchBasis(correctedBook),
+      });
+      expect(queryNames()).toEqual(['FindBookBySlug']);
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
+      expect(logger.log).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `[hardcover.book_relink] [end] userId=1 bookId=42 previousHardcoverBookId=${WRONG_BOOK} hardcoverBookId=${RIGHT_BOOK}`,
+        ),
+      );
+    });
+
+    it('heals a link recorded before its basis existed when the Hardcover ID disagrees with it', async () => {
+      // The reporter's row: the corrected edition was written onto the stale book by the metadata save.
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: WRONG_BOOK,
+        hardcoverEditionId: RIGHT_EDITION,
+        matchError: null,
+        matchBasis: null,
+      });
+      answer({ 'query FindBookBySlug': rightBookAnswer });
+      const service = makeService();
+      silenceWarnings(service);
+      const result = await service.matchBook(1, 'tok', correctedBook);
+
+      expect(result).toMatchObject({ hardcoverBookId: RIGHT_BOOK, hardcoverEditionId: RIGHT_EDITION, replacedHardcoverBookId: WRONG_BOOK });
+      expect(mockRepo.relinkBook).toHaveBeenCalledWith(expect.objectContaining({ hardcoverBookId: RIGHT_BOOK, hardcoverEditionId: RIGHT_EDITION }));
+    });
+
+    it('lets only the Hardcover ID move a link recorded before its basis existed', async () => {
+      // Import may have confirmed such a link against an ISBN that disagrees with it.
+      const isbnOnlyBook = { ...baseBook, isbn13: '9789146223856' };
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: WRONG_BOOK,
+        hardcoverEditionId: WRONG_EDITION,
+        matchError: null,
+        matchBasis: null,
+      });
+      answer({ FindBookEditionMetricsById: wrongBookMetrics });
+
+      const result = await makeService().matchBook(1, 'tok', isbnOnlyBook);
+
+      expect(result).toMatchObject({ hardcoverBookId: WRONG_BOOK, hardcoverEditionId: WRONG_EDITION, matchMethod: 'cached' });
+      expect(queryNames()).toEqual(['FindBookEditionMetricsById']);
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith({ userId: 1, bookId: 42, matchBasis: buildHardcoverMatchBasis(isbnOnlyBook) });
+      expect(mockRepo.relinkBook).not.toHaveBeenCalled();
+    });
+
+    it('moves a recorded link when a changed ISBN resolves to another book', async () => {
+      const before = { ...baseBook, isbn13: '9780000000001' };
+      const after = { ...baseBook, isbn13: '9789146223856' };
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: WRONG_BOOK,
+        hardcoverEditionId: WRONG_EDITION,
+        matchError: null,
+        matchBasis: buildHardcoverMatchBasis(before),
+      });
+      answer({ FindBookByISBN13: rightBookAnswer });
+      const service = makeService();
+      silenceWarnings(service);
+
+      const result = await service.matchBook(1, 'tok', after);
+
+      expect(result).toMatchObject({
+        hardcoverBookId: RIGHT_BOOK,
+        hardcoverEditionId: RIGHT_EDITION,
+        matchMethod: 'isbn',
+        replacedHardcoverBookId: WRONG_BOOK,
+      });
+      expect(mockRepo.relinkBook).toHaveBeenCalledWith(expect.objectContaining({ matchMethod: 'isbn', matchBasis: buildHardcoverMatchBasis(after) }));
+    });
+
+    it("keeps the link and the user's edition when the changed identifiers resolve to the same book", async () => {
+      const before = { ...baseBook, hardcoverMetadataId: '100', isbn13: '9780000000001' };
+      const after = { ...before, isbn13: '9780000000002' };
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: 100,
+        hardcoverEditionId: 200,
+        matchError: null,
+        matchBasis: buildHardcoverMatchBasis(before),
+      });
+      answer({
+        'query FindBookById': {
+          books: [{ id: 100, editions: [{ id: 201, pages: 300, isbn_13: '9780000000002', isbn_10: null, audio_seconds: null }] }],
+        },
+        FindBookEditionMetricsById: { books: [{ id: 100, editions: [{ id: 200, pages: 320, isbn_13: null, isbn_10: null, audio_seconds: null }] }] },
+      });
+
+      const result = await makeService().matchBook(1, 'tok', after);
+
+      expect(result).toEqual({ hardcoverBookId: 100, hardcoverEditionId: 200, editionPages: 320, editionAudioSeconds: null, matchMethod: 'cached' });
+      // The Hardcover ID outranks the ISBN, so the ISBN is never looked up.
+      expect(queryNames()).toEqual(['FindBookById', 'FindBookEditionMetricsById']);
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith({ userId: 1, bookId: 42, matchBasis: buildHardcoverMatchBasis(after) });
+      expect(mockRepo.relinkBook).not.toHaveBeenCalled();
+    });
+
+    it('keeps the link when Hardcover knows none of the corrected identifiers, and settles the check', async () => {
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: WRONG_BOOK,
+        hardcoverEditionId: WRONG_EDITION,
+        matchError: null,
+        matchBasis: buildHardcoverMatchBasis(staleBook),
+      });
+      answer({ 'query FindBookBySlug': { books: [] }, FindBookByISBN13: { books: [] }, FindBookEditionMetricsById: wrongBookMetrics });
+
+      const result = await makeService().matchBook(1, 'tok', correctedBook);
+
+      expect(result).toMatchObject({ hardcoverBookId: WRONG_BOOK, matchMethod: 'cached' });
+      expect(queryNames()).toEqual(['FindBookBySlug', 'FindBookByISBN13', 'FindBookEditionMetricsById']);
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith({ userId: 1, bookId: 42, matchBasis: buildHardcoverMatchBasis(correctedBook) });
+      expect(mockRepo.relinkBook).not.toHaveBeenCalled();
+    });
+
+    it('falls through to the ISBN when Hardcover does not know the corrected Hardcover ID', async () => {
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: WRONG_BOOK,
+        hardcoverEditionId: WRONG_EDITION,
+        matchError: null,
+        matchBasis: buildHardcoverMatchBasis(staleBook),
+      });
+      answer({ 'query FindBookBySlug': { books: [] }, FindBookByISBN13: rightBookAnswer });
+      const service = makeService();
+      silenceWarnings(service);
+
+      const result = await service.matchBook(1, 'tok', correctedBook);
+
+      expect(result).toMatchObject({ hardcoverBookId: RIGHT_BOOK, matchMethod: 'isbn', replacedHardcoverBookId: WRONG_BOOK });
+    });
+
+    it('retries on a later sync instead of letting a weaker identifier decide when a lookup fails', async () => {
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: WRONG_BOOK,
+        hardcoverEditionId: WRONG_EDITION,
+        matchError: null,
+        matchBasis: buildHardcoverMatchBasis(staleBook),
+      });
+      answer({
+        'query FindBookBySlug': new Error('Hardcover unavailable'),
+        FindBookByISBN13: rightBookAnswer,
+        FindBookEditionMetricsById: wrongBookMetrics,
+      });
+      const service = makeService();
+      silenceWarnings(service);
+
+      const result = await service.matchBook(1, 'tok', correctedBook);
+
+      expect(result).toMatchObject({ hardcoverBookId: WRONG_BOOK, matchMethod: 'cached' });
+      expect(queryNames()).toEqual(['FindBookBySlug', 'FindBookEditionMetricsById']);
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
+      expect(mockRepo.relinkBook).not.toHaveBeenCalled();
+    });
+
+    it('never lets a title search move a link', async () => {
+      const before = { ...baseBook, isbn13: '9780000000001' };
+      const cleared = { ...baseBook, isbn13: null };
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: 100,
+        hardcoverEditionId: 200,
+        matchError: null,
+        matchBasis: buildHardcoverMatchBasis(before),
+      });
+      answer({ FindBookEditionMetricsById: { books: [{ id: 100, editions: [{ id: 200, pages: 320 }] }] } });
+
+      const result = await makeService().matchBook(1, 'tok', cleared);
+
+      expect(result).toMatchObject({ hardcoverBookId: 100, hardcoverEditionId: 200, matchMethod: 'cached' });
+      expect(queryNames()).toEqual(['FindBookEditionMetricsById']);
+      expect(mockRepo.relinkBook).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('metadata edition', () => {
+    const editions = [
+      { id: 900, pages: null, isbn_13: null, isbn_10: null, audio_seconds: 36000 },
+      { id: 901, pages: 512, isbn_13: '9781234567890', isbn_10: null, audio_seconds: null },
+      { id: 902, pages: 300, isbn_13: null, isbn_10: null, audio_seconds: null },
+    ];
+
+    it('wins over the best-guess edition on a fresh Hardcover ID match', async () => {
+      mockRepo.findBookState.mockResolvedValue(undefined);
+      mockClient.query.mockResolvedValue({ books: [{ id: 700, editions }] });
+
+      const result = await makeService().matchBook(1, 'tok', { ...baseBook, hardcoverMetadataId: '700', hardcoverEditionId: '902', format: 'epub' });
+
+      expect(result).toEqual({
+        hardcoverBookId: 700,
+        hardcoverEditionId: 902,
+        editionPages: 300,
+        editionAudioSeconds: null,
+        matchMethod: 'metadata_id',
+      });
+      expect(mockClient.query).toHaveBeenCalledTimes(1);
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ hardcoverBookId: 700, hardcoverEditionId: 902 }));
+    });
+
+    it('is looked up directly when it sits past the capped edition list', async () => {
+      mockRepo.findBookState.mockResolvedValue(undefined);
+      mockClient.query.mockImplementation((_userId, _token, query: string) =>
+        Promise.resolve(
+          query.includes('FindBookEditionMetricsById')
+            ? { books: [{ id: 700, editions: [{ id: 9999, pages: 250, isbn_13: null, isbn_10: null, audio_seconds: null }] }] }
+            : { books: [{ id: 700, editions }] },
+        ),
+      );
+
+      const result = await makeService().matchBook(1, 'tok', { ...baseBook, hardcoverMetadataId: '700', hardcoverEditionId: '9999' });
+
+      expect(result).toMatchObject({ hardcoverEditionId: 9999, editionPages: 250 });
+      expect(mockClient.query).toHaveBeenCalledWith(1, 'tok', expect.stringContaining('FindBookEditionMetricsById'), { id: 700, editionId: 9999 });
+    });
+
+    it('is ignored when it belongs to another book', async () => {
+      mockRepo.findBookState.mockResolvedValue(undefined);
+      mockClient.query.mockImplementation((_userId, _token, query: string) =>
+        Promise.resolve(query.includes('FindBookEditionMetricsById') ? { books: [{ id: 700, editions: [] }] } : { books: [{ id: 700, editions }] }),
+      );
+
+      const result = await makeService().matchBook(1, 'tok', { ...baseBook, hardcoverMetadataId: '700', hardcoverEditionId: '31616496' });
+
+      expect(result).toMatchObject({ hardcoverBookId: 700, hardcoverEditionId: 901 });
+    });
+
+    it("wins over the ISBN's own edition on an ISBN match", async () => {
+      mockRepo.findBookState.mockResolvedValue(undefined);
+      mockClient.query.mockImplementation((_userId, _token, query: string) =>
+        Promise.resolve(
+          query.includes('FindBookEditionMetricsById')
+            ? { books: [{ id: 88, editions: [{ id: 12, pages: 350, isbn_13: null, isbn_10: null, audio_seconds: null }] }] }
+            : { books: [{ id: 88, editions: [{ id: 11, pages: 200 }] }] },
+        ),
+      );
+
+      const result = await makeService().matchBook(1, 'tok', { ...baseBook, hardcoverEditionId: '12' });
+
+      expect(result).toEqual({ hardcoverBookId: 88, hardcoverEditionId: 12, editionPages: 350, editionAudioSeconds: null, matchMethod: 'isbn' });
+    });
+
+    it('falls back without failing the match when its lookup fails', async () => {
+      mockRepo.findBookState.mockResolvedValue(undefined);
+      mockClient.query.mockImplementation((_userId, _token, query: string) =>
+        query.includes('FindBookEditionMetricsById') ? Promise.reject(new Error('boom')) : Promise.resolve({ books: [{ id: 700, editions }] }),
+      );
+      const service = makeService();
+      const warn = vi.spyOn(Reflect.get(service, 'logger') as { warn: (message: string) => void }, 'warn').mockImplementation(() => undefined);
+
+      const result = await service.matchBook(1, 'tok', { ...baseBook, hardcoverMetadataId: '700', hardcoverEditionId: '9999' });
+
+      expect(result).toMatchObject({ hardcoverBookId: 700, hardcoverEditionId: 901, matchMethod: 'metadata_id' });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('method=metadata_edition'));
+    });
+
+    it('fills a cached link that has no edition yet', async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 700, hardcoverEditionId: null, matchError: null, matchBasis: BASE_BASIS });
+      mockClient.query.mockResolvedValue({ books: [{ id: 700, editions }] });
+
+      const result = await makeService().matchBook(1, 'tok', { ...baseBook, hardcoverEditionId: '902' });
+
+      expect(result).toMatchObject({ hardcoverBookId: 700, hardcoverEditionId: 902, matchMethod: 'cached' });
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ hardcoverEditionId: 902, matchMethod: 'cached' }));
+    });
+
+    it("leaves a user's cached edition alone", async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 700, hardcoverEditionId: 901, matchError: null, matchBasis: BASE_BASIS });
+      mockClient.query.mockResolvedValue({ books: [{ id: 700, editions: [editions[1]] }] });
+
+      const result = await makeService().matchBook(1, 'tok', { ...baseBook, hardcoverEditionId: '902' });
+
+      expect(result).toMatchObject({ hardcoverEditionId: 901, matchMethod: 'cached' });
+      expect(mockClient.query).toHaveBeenCalledTimes(1);
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
     });
   });
 

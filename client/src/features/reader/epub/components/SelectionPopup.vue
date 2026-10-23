@@ -35,10 +35,10 @@ const copied = ref(false)
 const colors = ANNOTATION_HIGHLIGHT_COLORS
 
 const styles = [
-  { id: 'highlight', label: 'H' },
-  { id: 'underline', label: 'U' },
-  { id: 'strikethrough', label: 'S' },
-  { id: 'squiggly', label: '~' },
+  { id: 'highlight', label: 'H', nameKey: 'reader.selection.styles.highlight' },
+  { id: 'underline', label: 'U', nameKey: 'reader.selection.styles.underline' },
+  { id: 'strikethrough', label: 'S', nameKey: 'reader.selection.styles.strikethrough' },
+  { id: 'squiggly', label: '~', nameKey: 'reader.selection.styles.squiggly' },
 ]
 
 const selectedColor = ref('#FACC15')
@@ -91,6 +91,7 @@ async function onCopy() {
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
                   :class="copied ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'"
+                  :aria-label="copied ? t('reader.selection.copied') : t('reader.selection.copy')"
                   @click="onCopy"
                 >
                   <Check v-if="copied" :size="15" />
@@ -105,6 +106,7 @@ async function onCopy() {
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
                   :class="showColorPicker ? 'bg-yellow-100 text-yellow-600' : 'text-muted-foreground hover:text-foreground'"
+                  :aria-label="t('reader.selection.highlight')"
                   @click="onHighlightClick"
                 >
                   <Highlighter :size="15" />
@@ -117,6 +119,7 @@ async function onCopy() {
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  :aria-label="t('common.search')"
                   @click="emit('search')"
                 >
                   <Search :size="15" />
@@ -129,6 +132,7 @@ async function onCopy() {
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  :aria-label="t('reader.selection.translate')"
                   @click="emit('translate')"
                 >
                   <Languages :size="15" />
@@ -141,6 +145,7 @@ async function onCopy() {
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  :aria-label="t('reader.selection.define')"
                   @click="emit('define')"
                 >
                   <BookA :size="15" />
@@ -153,6 +158,7 @@ async function onCopy() {
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  :aria-label="t('reader.note.title')"
                   @click="emit('note')"
                 >
                   <FileText :size="15" />
@@ -165,6 +171,7 @@ async function onCopy() {
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-destructive hover:text-destructive"
+                  :aria-label="t('reader.selection.deleteAnnotation')"
                   @click="emit('deleteAnnotation', overlappingAnnotationId!)"
                 >
                   <Trash2 :size="15" />
@@ -177,12 +184,13 @@ async function onCopy() {
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  :aria-label="t('reader.selection.readFromHere')"
                   @click="emit('readFromHere')"
                 >
                   <Headphones :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Read from here</TooltipContent>
+              <TooltipContent>{{ t('reader.selection.readFromHere') }}</TooltipContent>
             </Tooltip>
           </div>
 
@@ -204,16 +212,18 @@ async function onCopy() {
               <button
                 v-for="s in styles"
                 :key="s.id"
-                class="w-6 h-6 rounded text-xs font-bold transition-colors border"
+                class="w-6 h-6 rounded-xs text-xs font-bold transition-colors border"
                 :class="
                   selectedStyle === s.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted text-muted-foreground'
                 "
+                :aria-label="t('reader.selection.style', { style: t(s.nameKey) })"
+                :aria-pressed="selectedStyle === s.id"
                 @click="selectedStyle = s.id"
               >
                 {{ s.label }}
               </button>
               <button
-                class="flex-1 ml-1 px-2 py-0.5 rounded text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                class="flex-1 ml-1 px-2 py-0.5 rounded-xs text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                 @click="applyHighlight(selectedColor, selectedStyle)"
               >
                 {{ t('reader.selection.apply') }}

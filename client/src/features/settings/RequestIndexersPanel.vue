@@ -1065,7 +1065,7 @@ function handleTestCurrent() {
         </SettingsSection>
 
         <details class="border-t border-border pt-4" :open="Boolean(draft.resolvers.length || draft.proxyUrl)">
-          <summary class="settings-label cursor-pointer rounded focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none">
+          <summary class="settings-label cursor-pointer rounded-xs focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none">
             {{ t('settings.system.requests.indexers.network.title') }}
           </summary>
           <p class="settings-hint mt-1">

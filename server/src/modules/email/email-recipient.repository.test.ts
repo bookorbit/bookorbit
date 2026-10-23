@@ -116,42 +116,6 @@ describe('EmailRecipientRepository', () => {
     expect(updateBuilder.returning).toHaveBeenCalled();
   });
 
-  it('clears default recipient only for the owner', () => {
-    const { db, updateBuilder } = makeDb();
-    const repo = new EmailRecipientRepository(db as never);
-
-    void repo.clearDefault(3);
-
-    expect(db.update).toHaveBeenCalledWith(emailRecipients);
-    expect(updateBuilder.set).toHaveBeenCalledWith({ isDefault: false });
-    expect(eq).toHaveBeenCalledWith(emailRecipients.userId, 3);
-    expect(eq).toHaveBeenCalledWith(emailRecipients.isDefault, true);
-    expect(updateBuilder.where).toHaveBeenCalledWith({
-      op: 'and',
-      clauses: [
-        { op: 'eq', left: emailRecipients.userId, right: 3 },
-        { op: 'eq', left: emailRecipients.isDefault, right: true },
-      ],
-    });
-  });
-
-  it('sets default recipient only for the owner and returns row', () => {
-    const { db, updateBuilder } = makeDb();
-    const repo = new EmailRecipientRepository(db as never);
-
-    void repo.setDefault(11, 3);
-
-    expect(db.update).toHaveBeenCalledWith(emailRecipients);
-    expect(updateBuilder.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isDefault: expect.objectContaining({ op: 'sql', parts: expect.any(Array), values: [emailRecipients.id, 11] }),
-        updatedAt: expect.objectContaining({ op: 'sql', parts: expect.any(Array), values: [] }),
-      }),
-    );
-    expect(updateBuilder.where).toHaveBeenCalledWith({ op: 'eq', left: emailRecipients.userId, right: 3 });
-    expect(updateBuilder.returning).toHaveBeenCalled();
-  });
-
   it('deletes only matching owner rows', () => {
     const { db, deleteBuilder } = makeDb();
     const repo = new EmailRecipientRepository(db as never);

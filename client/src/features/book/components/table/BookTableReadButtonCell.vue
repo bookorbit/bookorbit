@@ -88,7 +88,7 @@ function peekPrimaryFile() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-48">
           <DropdownMenuItem v-for="file in openableFiles" :key="file.id" class="gap-2" @select="openFile(file)">
-            <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="rounded px-1.5 py-0.5 text-[10px] tracking-wide" />
+            <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="rounded-xs px-1.5 py-0.5 text-[10px] tracking-wide" />
             <span class="flex-1 truncate text-xs">{{ actionLabel(file) }}</span>
             <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary">{{ t('book.table.read.primary') }}</span>
           </DropdownMenuItem>

@@ -105,7 +105,7 @@ const rows = computed<RecordRow[]>(() => {
     </div>
     <dl v-else class="px-3 py-0.5">
       <div v-for="row in rows" :key="row.key" class="flex h-7 items-center gap-2 border-t border-border/60 first:border-t-0">
-        <span class="inline-flex size-4.5 shrink-0 items-center justify-center rounded bg-primary/15 text-primary">
+        <span class="inline-flex size-4.5 shrink-0 items-center justify-center rounded-xs bg-primary/15 text-primary">
           <component :is="row.icon" class="size-3" />
         </span>
         <dt class="truncate text-[11px] leading-4 text-muted-foreground">{{ row.label }}</dt>

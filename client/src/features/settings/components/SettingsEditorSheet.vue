@@ -34,6 +34,11 @@ const props = defineProps<{
   removeConsequence?: string
   /** Anything acting on what the record is built on rather than on the record itself. */
   menuActions?: EditorMenuAction[]
+  /**
+   * A menu entry to arm as the sheet opens, for a list row whose own menu offers the same action:
+   * the record opens with the question already asked, instead of a second click to find it.
+   */
+  armedAction?: string | null
 }>()
 
 const emit = defineEmits<{ save: []; cancel: []; remove: []; action: [id: string] }>()
@@ -75,9 +80,10 @@ const confirmBar = ref<HTMLElement | null>(null)
 
 watch(
   () => props.open,
-  () => {
-    pendingId.value = null
+  (open) => {
+    pendingId.value = open ? (props.armedAction ?? null) : null
   },
+  { immediate: true },
 )
 
 /** The menu closes as it arms, so the answer to its question has to take the focus it left behind. */

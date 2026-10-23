@@ -87,7 +87,7 @@ onMounted(() => loadPage(1))
         <div class="flex items-center gap-2">
           <button
             :disabled="page <= 1"
-            class="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-40"
+            class="px-2 py-1 text-xs border border-border rounded-xs hover:bg-muted disabled:opacity-40"
             @click="loadPage(page - 1)"
           >
             {{ t('common.previous') }}
@@ -95,7 +95,7 @@ onMounted(() => loadPage(1))
           <span class="text-xs text-muted-foreground">{{ page }} / {{ Math.ceil(data.total / limit) }}</span>
           <button
             :disabled="page >= Math.ceil(data.total / limit)"
-            class="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-40"
+            class="px-2 py-1 text-xs border border-border rounded-xs hover:bg-muted disabled:opacity-40"
             @click="loadPage(page + 1)"
           >
             {{ t('common.next') }}
@@ -103,7 +103,7 @@ onMounted(() => loadPage(1))
         </div>
         <button
           :disabled="retrying"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-xs hover:bg-primary/90 disabled:opacity-50"
           @click="handleRetryAll"
         >
           <RefreshCw :size="12" :class="retrying ? 'animate-spin' : ''" />

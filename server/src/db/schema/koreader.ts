@@ -31,13 +31,20 @@ export const koreaderUsers = pgTable(
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     passwordMd5: varchar('password_md5', { length: 32 }),
     syncEnabled: boolean('sync_enabled').notNull().default(true),
+    readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
+    // KOReader cannot play audio, so the plugin catalog leaves out books whose only content files are audio.
+    hideAudioOnlyBooks: boolean('hide_audio_only_books').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [uniqueIndex('koreader_users_user_id_uidx').on(t.userId), uniqueIndex('koreader_users_username_uidx').on(t.username)],
+  (t) => [
+    uniqueIndex('koreader_users_user_id_uidx').on(t.userId),
+    uniqueIndex('koreader_users_username_uidx').on(t.username),
+    check('koreader_users_delivery_chk', sql`${t.readAloudDelivery} in ('original', 'audioless_epub')`),
+  ],
 );
 
 export type KoreaderUser = typeof koreaderUsers.$inferSelect;
@@ -150,7 +157,7 @@ export const bookFileHashHistory = pgTable(
   (t) => [
     uniqueIndex('book_file_hash_history_book_file_id_file_hash_idx').on(t.bookFileId, t.fileHash),
     index('book_file_hash_history_file_hash_idx').on(t.fileHash),
-    check('book_file_hash_history_reason_chk', sql`${t.reason} in ('file_write', 'external_change', 'rescan')`),
+    check('book_file_hash_history_reason_chk', sql`${t.reason} in ('file_write', 'external_change', 'rescan', 'kobo_download')`),
   ],
 );
 
@@ -200,6 +207,7 @@ export const koreaderUnmatchedBooks = pgTable(
     lastOpen: bigint('last_open', { mode: 'number' }),
     source: varchar('source', { length: 20 }).notNull().default('statistics'),
     metadataAmbiguous: boolean('metadata_ambiguous').notNull().default(false),
+    manualLinkRequested: boolean('manual_link_requested').notNull().default(false),
     firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -295,6 +303,37 @@ export const koreaderPageStats = pgTable(
 
 export type KoreaderPageStat = typeof koreaderPageStats.$inferSelect;
 export type NewKoreaderPageStat = typeof koreaderPageStats.$inferInsert;
+
+/**
+ * Spans of page events whose derived session the reader deleted. Sessions are re-derived from the
+ * stored page events whenever a nearby event arrives, and a plugin can upload its history again,
+ * so deleting the session row alone does not stick: derivation skips events inside these spans.
+ *
+ * Keyed on the device key a KOReader session id carries rather than the full device id, because
+ * that is all a deleted session row records about the device that produced it.
+ */
+export const koreaderSessionTombstones = pgTable(
+  'koreader_session_tombstones',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    deviceKey: varchar('device_key', { length: 100 }).notNull(),
+    // Unix seconds on the device clock, half-open: [startTime, endTime).
+    startTime: bigint('start_time', { mode: 'number' }).notNull(),
+    endTime: bigint('end_time', { mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('kst_user_file_device_start_idx').on(t.userId, t.bookFileId, t.deviceKey, t.startTime),
+    index('koreader_session_tombstones_book_file_id_idx').on(t.bookFileId),
+    check('koreader_session_tombstones_range_chk', sql`${t.endTime} > ${t.startTime}`),
+  ],
+);
 
 export const koreaderDeviceSweeps = pgTable(
   'koreader_device_sweeps',
@@ -418,3 +457,25 @@ export const koreaderProgressResetDevices = pgTable(
 
 export type KoreaderProgressResetDevice = typeof koreaderProgressResetDevices.$inferSelect;
 export type NewKoreaderProgressResetDevice = typeof koreaderProgressResetDevices.$inferInsert;
+
+export const koreaderDeviceDeliverySettings = pgTable(
+  'koreader_device_delivery_settings',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    credentialId: integer('credential_id')
+      .notNull()
+      .references(() => koreaderUsers.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    readAloudDelivery: varchar('read_aloud_delivery', { length: 20 }).$type<'original' | 'audioless_epub'>(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.deviceId] }),
+    check('koreader_device_delivery_chk', sql`${t.readAloudDelivery} in ('original', 'audioless_epub')`),
+  ],
+);

@@ -166,7 +166,7 @@ function onDiscard() {
       <Info :size="16" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
       <p class="text-xs leading-relaxed text-muted-foreground">
         <span class="font-medium text-foreground">{{ t('settings.metadata.fieldRules.howItWorks.title') }}</span>
-        {{ ' ' }}{{ t('settings.metadata.fieldRules.howItWorks.summary') }}
+        {{ ' ' }}{{ t('settings.metadata.fieldRules.howItWorks.summaryByMedium') }}
       </p>
     </div>
 

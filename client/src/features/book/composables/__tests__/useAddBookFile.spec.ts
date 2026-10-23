@@ -86,6 +86,13 @@ describe('useAddBookFile', () => {
       expect(files.value[0].file.name).toBe('book.epub')
     })
 
+    it('accepts DjVu as an additional edition regardless of extension case', () => {
+      const { files, addFiles } = useAddBookFile()
+      addFiles([makeFile('scanned-book.DJVU')])
+      expect(files.value[0].status).toBe('pending')
+      expect(files.value[0].validationError).toBe(false)
+    })
+
     it('marks unsupported format as error without attempting upload', () => {
       const { files, addFiles } = useAddBookFile()
       addFiles([makeFile('book.xyz')])

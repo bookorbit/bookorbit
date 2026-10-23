@@ -65,7 +65,7 @@ const pieces = computed<(Fold | Segment)[]>(() => {
     <template v-for="(piece, index) in pieces" v-else :key="index">
       <span v-if="index > 0" class="px-px text-path-fold">/</span>
 
-      <span v-if="piece.type === 'fold'" class="rounded bg-muted px-1.5 text-path-fold" :title="piece.title">
+      <span v-if="piece.type === 'fold'" class="rounded-xs bg-muted px-1.5 text-path-fold" :title="piece.title">
         {{ t('tools.bulkRename.detail.foldedFolders', { count: piece.count }) }}
       </span>
 

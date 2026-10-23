@@ -81,6 +81,18 @@ export class UserPreferencesController {
     await this.userPreferencesService.upsertServerFontPreferences(user.id, dto.settings);
   }
 
+  @Get('annotation-colors')
+  async getAnnotationColorNamePreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getAnnotationColorNamePreferences(user.id);
+    return { settings };
+  }
+
+  @Put('annotation-colors')
+  @HttpCode(204)
+  async upsertAnnotationColorNamePreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertAnnotationColorNamePreferences(user.id, dto.settings);
+  }
+
   @Get('whats-new')
   async getWhatsNewPreferences(@CurrentUser() user: RequestUser) {
     const settings = await this.userPreferencesService.getWhatsNewPreferences(user.id);

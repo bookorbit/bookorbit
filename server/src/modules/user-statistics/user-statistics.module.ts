@@ -1,3 +1,4 @@
+import { ReadingAttemptEventsModule } from '../user-book-status/reading-attempt-events.module';
 import { Module } from '@nestjs/common';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
@@ -9,7 +10,7 @@ import { UserStatisticsRepository } from './user-statistics.repository';
 import { UserStatisticsService } from './user-statistics.service';
 
 @Module({
-  imports: [AppSettingsModule],
+  imports: [AppSettingsModule, ReadingAttemptEventsModule],
   controllers: [UserStatisticsController],
   providers: [UserStatisticsService, UserStatisticsRepository, UserStatisticsAggregationJob, UserReadingStatsTimeZoneBackfillService],
   exports: [UserStatisticsService],

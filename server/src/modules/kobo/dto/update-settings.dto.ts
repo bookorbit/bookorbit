@@ -1,6 +1,11 @@
-import { IsNumber, IsOptional, IsInt, IsBoolean, Max, Min } from 'class-validator';
+import { READ_ALOUD_DELIVERY_VARIANTS, type ReadAloudDeliveryPreference } from '@bookorbit/types';
+import { IsIn, IsNumber, IsOptional, IsInt, IsBoolean, Max, Min } from 'class-validator';
 
 export class UpdateSettingsDto {
+  @IsOptional()
+  @IsIn(READ_ALOUD_DELIVERY_VARIANTS)
+  readAloudDelivery?: ReadAloudDeliveryPreference;
+
   @IsOptional()
   @IsNumber()
   @Min(0.5)
@@ -32,6 +37,10 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsBoolean()
   storeSync?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  fullSizeCovers?: boolean;
 
   @IsOptional()
   @IsInt()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Check, GripVertical, MoreVertical, Plus } from '@lucide/vue'
+import { ChevronDown, Check, GripVertical, MoreVertical, Plus, SlidersHorizontal } from '@lucide/vue'
 import { SIDEBAR_CAP_OPTIONS, type SidebarCap } from '@bookorbit/types'
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatCompactNumber, formatNumber } from '@/i18n/formatters'
+import { useSidebarCustomizeMode } from '@/composables/useSidebarCustomizeMode'
 import { useThemeStore } from '@/stores/theme'
 
 const props = withDefaults(
@@ -28,14 +29,17 @@ const props = withDefaults(
     isReordering?: boolean
     /** Rail popovers show the body unconditionally, so the toggle becomes a plain label. */
     collapsible?: boolean
+    /** Every section menu can open sidebar edit mode, which is how users find it. */
+    canCustomize?: boolean
   }>(),
-  { collapsible: true },
+  { collapsible: true, canCustomize: true },
 )
 
 const emit = defineEmits<{ toggle: []; add: []; 'update:cap': [SidebarCap]; 'toggle-reorder': [] }>()
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
+const { startCustomizing } = useSidebarCustomizeMode()
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 
 function handleToggle() {
@@ -54,7 +58,12 @@ function handleToggleReorder() {
   emit('toggle-reorder')
 }
 
-const hasMenu = computed(() => props.canChangeCap || props.canReorder)
+function handleCustomize() {
+  startCustomizing()
+}
+
+const hasSectionItems = computed(() => props.canChangeCap || props.canReorder)
+const hasMenu = computed(() => hasSectionItems.value || props.canCustomize)
 
 function capLabel(cap: SidebarCap): string {
   return cap === 'all' ? t('components.sidebar.sectionHeader.showAll') : t('components.sidebar.sectionHeader.showCount', { count: formatNumber(cap) })
@@ -73,11 +82,8 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
       :aria-controls="contentId"
       @click="handleToggle"
     >
-      <span class="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{{ label }}</span>
-      <span
-        v-if="showCount"
-        class="shrink-0 rounded-md bg-(--shell-accent-tint) px-1.5 text-[11px] font-semibold tabular-nums text-sidebar-count-foreground"
-      >
+      <span class="sidebar-section-label min-w-0 truncate">{{ label }}</span>
+      <span v-if="showCount" class="sidebar-count shrink-0 rounded-md px-1.5 tabular-nums">
         {{ formatCompactNumber(count ?? 0) }}
       </span>
       <ChevronDown
@@ -88,7 +94,7 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
         :class="isOpen ? 'rotate-0' : '-rotate-90'"
       />
     </button>
-    <p v-else class="min-w-0 flex-1 truncate px-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{{ label }}</p>
+    <p v-else class="sidebar-section-label min-w-0 flex-1 truncate px-2">{{ label }}</p>
 
     <button
       v-if="canAdd"
@@ -115,7 +121,8 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
           <DropdownMenuLabel>{{ t('components.sidebar.sectionHeader.rowsShown') }}</DropdownMenuLabel>
           <DropdownMenuItem v-for="option in SIDEBAR_CAP_OPTIONS" :key="String(option)" @click="selectCap(option)">
             <Check v-if="cap === option" :size="13" class="text-primary" />
-            <span v-else class="w-[13px]" />
+            <!-- Menu items size their svgs to 16px, so the spacer matches or unchecked labels sit 3px left. -->
+            <span v-else class="w-4" />
             {{ capLabel(option) }}
           </DropdownMenuItem>
         </template>
@@ -124,6 +131,11 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
           <Check v-if="isReordering" :size="13" class="text-primary" />
           <GripVertical v-else :size="13" />
           {{ isReordering ? t('components.sidebar.sectionHeader.doneReordering') : t('components.sidebar.sectionHeader.reorder') }}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator v-if="canCustomize && hasSectionItems" />
+        <DropdownMenuItem v-if="canCustomize" @click="handleCustomize">
+          <SlidersHorizontal :size="13" />
+          {{ t('components.sidebar.customize.open') }}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

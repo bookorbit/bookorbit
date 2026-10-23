@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AUTHOR_PROVIDER_SUPPORTED_FIELDS, AuthorMetadataCandidate, AuthorMetadataField, AuthorMetadataProviderKey } from '@bookorbit/types';
 
+import { canonicalId, canonicalText } from '../../../../../common/provider-cache/canonicalize';
+import { markProviderDegraded, markProviderFailed } from '../../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../../common/utils/log-sanitize.utils';
 import { ProviderConfigService } from '../../../../metadata-preferences/provider-config.service';
+import { authorProviderFetch, authorRequestSignal } from '../author-fetch';
 import { AuthorMetadataProviderError, AuthorMetadataSearchParams, IdentifiableAuthorMetadataProvider } from '../author-metadata-provider';
+import { authorProviderCacheContext } from '../author-provider-cache';
 import { authorRefsFromAutocomplete, parseGoodreadsAuthorPage, parseGoodreadsAuthorSearch } from './goodreads-author.scraper';
 import { GoodreadsAuthorAutocompleteItem, GoodreadsAuthorRef } from './goodreads.types';
 
@@ -36,6 +41,22 @@ export class GoodreadsAuthorMetadataProvider implements IdentifiableAuthorMetada
 
   private readonly logger = new Logger(GoodreadsAuthorMetadataProvider.name);
 
+  // A scraper cannot prove an empty page is a genuine "no results", so empty answers are never kept.
+  readonly cache: ProviderCacheSpec<AuthorMetadataSearchParams> = {
+    version: 1,
+    trustEmpty: false,
+    context: async () => authorProviderCacheContext(await this.isEnabled()),
+    describeSearch: (params) => {
+      const name = canonicalText(params.name);
+      if (!name) return null;
+      return { inputs: { name }, maxCandidates: this.normalizeLimit(params.limit) };
+    },
+    describeLookup: (providerId) => {
+      const id = canonicalId(providerId);
+      return id ? { inputs: { id } } : null;
+    },
+  };
+
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
   async search(params: AuthorMetadataSearchParams): Promise<AuthorMetadataCandidate[]> {
@@ -50,24 +71,27 @@ export class GoodreadsAuthorMetadataProvider implements IdentifiableAuthorMetada
     // resolves most names without touching a rendered page. Authors whose name
     // does not surface in book autocomplete (or differs by a middle initial)
     // still need the heavier search page.
-    let refs = authorRefsFromAutocomplete(await this.fetchAutocomplete(name));
+    let refs = authorRefsFromAutocomplete(await this.fetchAutocomplete(name, params.signal));
     if (refs.length === 0) {
       await this.sleep(BETWEEN_REQUESTS_MS);
-      refs = parseGoodreadsAuthorSearch(await this.fetchSearchPage(name));
+      refs = parseGoodreadsAuthorSearch(await this.fetchSearchPage(name, params.signal));
     }
 
     return refs.slice(0, limit).map((ref) => this.toShallowCandidate(ref));
   }
 
-  async lookupById(providerId: string): Promise<AuthorMetadataCandidate | null> {
+  async lookupById(providerId: string, _region?: string, signal?: AbortSignal): Promise<AuthorMetadataCandidate | null> {
     if (!(await this.isEnabled())) return null;
 
     const id = providerId.trim();
     if (!id) return null;
 
-    const html = await this.fetchText(`${BASE_URL}/author/show/${encodeURIComponent(id)}`, 'lookup', HTML_HEADERS);
+    const html = await this.fetchText(`${BASE_URL}/author/show/${encodeURIComponent(id)}`, 'lookup', HTML_HEADERS, signal);
     const parsed = parseGoodreadsAuthorPage(html ?? '');
-    if (!parsed) return null;
+    if (!parsed) {
+      markProviderDegraded('goodreads_unparseable_author_page');
+      return null;
+    }
 
     return {
       provider: this.key,
@@ -100,28 +124,34 @@ export class GoodreadsAuthorMetadataProvider implements IdentifiableAuthorMetada
     return config.goodreads.enabled;
   }
 
-  private async fetchAutocomplete(name: string): Promise<GoodreadsAuthorAutocompleteItem[]> {
+  private async fetchAutocomplete(name: string, signal?: AbortSignal): Promise<GoodreadsAuthorAutocompleteItem[]> {
     const url = `${BASE_URL}/book/auto_complete?${new URLSearchParams({ format: 'json', q: name }).toString()}`;
-    const body = await this.fetchText(url, 'autocomplete', JSON_HEADERS);
-    if (!body) return [];
+    const body = await this.fetchText(url, 'autocomplete', JSON_HEADERS, signal);
+    if (!body) {
+      markProviderFailed('goodreads_malformed_autocomplete');
+      return [];
+    }
     try {
       const parsed: unknown = JSON.parse(body);
-      return Array.isArray(parsed) ? (parsed as GoodreadsAuthorAutocompleteItem[]) : [];
+      if (Array.isArray(parsed)) return parsed as GoodreadsAuthorAutocompleteItem[];
+      markProviderFailed('goodreads_malformed_autocomplete');
+      return [];
     } catch {
+      markProviderFailed('goodreads_malformed_autocomplete');
       return [];
     }
   }
 
-  private async fetchSearchPage(name: string): Promise<string> {
+  private async fetchSearchPage(name: string, signal?: AbortSignal): Promise<string> {
     const query = new URLSearchParams({ q: name, 'search[field]': 'author' }).toString();
-    return (await this.fetchText(`${BASE_URL}/search?${query}`, 'search', HTML_HEADERS)) ?? '';
+    return (await this.fetchText(`${BASE_URL}/search?${query}`, 'search', HTML_HEADERS, signal)) ?? '';
   }
 
-  private async fetchText(url: string, op: FetchOp, headers: HeadersInit): Promise<string | null> {
+  private async fetchText(url: string, op: FetchOp, headers: HeadersInit, signal?: AbortSignal): Promise<string | null> {
     const startedAt = Date.now();
     this.logger.log(`[goodreads_author] [start] op=${op} method=GET`);
     try {
-      const res = await fetch(url, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      const res = await authorProviderFetch(url, { headers, signal: authorRequestSignal(REQUEST_TIMEOUT_MS, signal) });
       if (!res.ok) {
         const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'));
         const message = `[goodreads_author] [fail] op=${op} method=GET status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`;
@@ -133,6 +163,7 @@ export class GoodreadsAuthorMetadataProvider implements IdentifiableAuthorMetada
         });
       }
       const body = await res.text();
+      if (isWafChallenge(res.status, body)) markProviderDegraded('goodreads_challenge_page');
       this.logger.log(`[goodreads_author] [end] op=${op} method=GET status=${res.status} durationMs=${Date.now() - startedAt}`);
       return body;
     } catch (error) {
@@ -152,6 +183,11 @@ export class GoodreadsAuthorMetadataProvider implements IdentifiableAuthorMetada
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+}
+
+// AWS WAF answers a gated page with a JavaScript token challenge, usually under a 202 status.
+function isWafChallenge(status: number, html: string): boolean {
+  return status === 202 || /awsWafCookieDomainList|AwsWafIntegration|id=["']challenge-container["']/.test(html);
 }
 
 function parseRetryAfterMs(value: string | null): number | null {

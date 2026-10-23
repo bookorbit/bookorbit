@@ -47,7 +47,7 @@ function select(value: MetadataMergeStrategy) {
       :aria-label="`${option.label}. ${option.description}`"
       :title="`${option.label} - ${option.description}`"
       :disabled="disabled"
-      class="inline-flex h-6 min-w-0 items-center gap-1.5 rounded px-2 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:cursor-not-allowed"
+      class="inline-flex h-6 min-w-0 grow items-center justify-center gap-1.5 rounded-xs px-2 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:cursor-not-allowed"
       :class="
         modelValue === option.value
           ? 'bg-background font-semibold text-foreground shadow-xs'

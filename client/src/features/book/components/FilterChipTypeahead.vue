@@ -96,7 +96,7 @@ function onBlur() {
     <span
       v-for="chip in modelValue"
       :key="chip"
-      class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
+      class="flex items-center gap-1 h-5 px-1.5 rounded-xs bg-primary/15 text-primary text-xs font-medium shrink-0"
     >
       {{ chip }}
       <button type="button" @click="removeChip(chip)" class="text-primary hover:text-primary leading-none">

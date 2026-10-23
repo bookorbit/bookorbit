@@ -33,7 +33,7 @@ end
 function TransferPolicy.maxBytes(expected_bytes)
     local size = tonumber(expected_bytes)
     if not size or size <= 0 then return MAX_TRANSFER_BYTES end
-    return math.min(MAX_TRANSFER_BYTES, math.ceil(size * SIZE_MARGIN) + SIZE_SLACK_BYTES)
+    return math.min(8 * 1024 * 1024 * 1024, math.ceil(size * SIZE_MARGIN) + SIZE_SLACK_BYTES)
 end
 
 return TransferPolicy

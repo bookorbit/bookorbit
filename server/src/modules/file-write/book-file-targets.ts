@@ -132,6 +132,30 @@ export function findSiblingOccupiedTarget(files: TargetBookFile[], targets: Map<
   return null;
 }
 
+export interface WorkIdentity {
+  title: string | null;
+  primaryAuthor: string | null;
+}
+
+/**
+ * Whether two books are the same work, so one may be folded into the other's folder.
+ *
+ * In folder-as-book mode a folder is a book, and a rename that lands in another book's folder
+ * either merges the two or has to be refused. Merging is right for an ebook landing beside its own
+ * audiobook. It is wrong for a pattern that files a whole series under one folder: that would fold
+ * every later volume into the first and delete each one's reading history with its book row. The
+ * folder path cannot tell those apart, so the books' own title and primary author decide.
+ */
+export function isSameWork(a: WorkIdentity, b: WorkIdentity): boolean {
+  const title = normalizeIdentity(a.title);
+  if (!title || title !== normalizeIdentity(b.title)) return false;
+  return normalizeIdentity(a.primaryAuthor) === normalizeIdentity(b.primaryAuthor);
+}
+
+function normalizeIdentity(value: string | null): string {
+  return (value ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 function resolveRelPathFor(file: TargetBookFile, input: BookFileTargetsInput): string | null {
   const extension = extname(file.absolutePath);
   const format = (file.format ?? extension.slice(1)).toLowerCase();

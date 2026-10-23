@@ -30,7 +30,7 @@ function ariaLabel(): string {
   <div class="flex h-full w-full items-center px-1">
     <button
       type="button"
-      class="flex h-5 w-5 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      class="flex h-5 w-5 items-center justify-center rounded-xs border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       :class="[
         value === true
           ? 'border-primary bg-primary text-primary-foreground'

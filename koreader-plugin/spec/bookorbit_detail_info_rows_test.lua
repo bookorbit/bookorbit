@@ -59,16 +59,9 @@ package.loaded["ffi/util"] = {
     end,
 }
 package.loaded["gettext"] = setmetatable({}, { __call = function(_, value) return value end })
-local widget_stub = stubWidget()
-package.loaded["bookorbit_catalog_widgets"] = {
-    buildCoverWidget = function() return widget_stub:new() end,
-    buildDetailPill = function() return widget_stub:new() end,
-    buildDetailProgressBar = function() return widget_stub:new() end,
-    detailRatingStarWidth = function() return 20 end,
-    DetailRelatedCard = stubWidget(),
-    DetailTabButton = stubWidget(),
-    DetailRatingStar = stubWidget(),
-}
+package.loaded["bookorbit_catalog_widgets"] = { focusable = identity }
+-- The page itself is drawn by bookorbit_detail_view; these rows never touch it.
+package.loaded["bookorbit_detail_view"] = {}
 
 local CatalogDetail = require("bookorbit_catalog_detail")
 
@@ -106,15 +99,12 @@ assertEqual(CatalogDetail.detailSeriesText({ seriesName = "Discworld", seriesInd
 assertEqual(CatalogDetail.detailSeriesText({ seriesName = "Discworld" }), "Discworld",
     "a series with no index shows just the name")
 assertEqual(CatalogDetail.detailSeriesText({ seriesIndex = 3 }), nil, "an index without a name is not a series line")
-assertEqual(CatalogDetail.detailSeriesLine({ seriesName = "Discworld", seriesIndex = 3 }), "Discworld #3  \u{203A}",
-    "the hero line carries the tap chevron")
-assertEqual(CatalogDetail.detailSeriesLine({}), nil, "no series means no hero line")
 
 -- Series navigation params
 
 local by_id = CatalogDetail.detailSeriesParams({ seriesId = 12, seriesName = "Discworld" })
 assertEqual(by_id.seriesId, 12, "a series id drives the books context")
-assertEqual(by_id.sort, "series", "a series list sorts by series order")
+assertEqual(by_id.sort, "title", "a series list sorts by title")
 local by_name = CatalogDetail.detailSeriesParams({ seriesName = "Discworld" })
 assertEqual(by_name.series, "Discworld", "without an id the name drives the context")
 assertEqual(by_name.seriesId, nil, "no id is invented")
@@ -201,37 +191,17 @@ assertEqual(menu:downloadButtonLabel({ { format = "epub", sizeBytes = 2411724 } 
 assertEqual(menu:downloadButtonLabel({ { format = "epub" } }), "Download (EPUB)",
     "an unknown size leaves the original label untouched")
 
--- Hero series line
---
--- Asserted through buildDetailHeader rather than against the helper directly:
--- the helper is a plain function, and the header used to call it as a method,
--- which passed the catalog as the detail and silently dropped the line from
--- every book page. Only the real call path catches that.
-
-local header_menu = setmetatable({
-    available_height = 800,
-    inner_dimen = { w = 600, h = 900 },
-    on_device = {},
-    current_context = { supported_files = {} },
-}, { __index = CatalogDetail })
-function header_menu:thumbnailDisplay() return nil, "failed" end
-function header_menu:isOnDevice() return false end
-function header_menu:readStatusLabel() return nil end
-function header_menu:supportedFiles() return {} end
-function header_menu:onDeviceFilePath() return nil end
-function header_menu:downloadButtonLabel() return "Download" end
-
-header_menu:buildDetailHeader({
-    title = "The Left Hand of Darkness",
-    authors = { "Ursula K. Le Guin" },
-    seriesName = "Hainish Cycle",
-    seriesIndex = 4,
-}, 600)
-assertEqual(header_menu.detail_series_line ~= nil, true,
-    "a book in a series renders its hero series line")
-
-header_menu:buildDetailHeader({ title = "Standalone", authors = { "Someone" } }, 600)
-assertEqual(header_menu.detail_series_line, nil,
-    "a book with no series renders no series line")
+-- A read-along EPUB delivered without its narration says so; a plain EPUB
+-- delivered the same way is just an EPUB, with the stored file's size.
+local readalong = CatalogDetail.bookInfoRows({ files = {
+    { format = "epub", downloadVariant = "audioless_epub", sourceMediaOverlayAvailable = true, sizeBytes = nil, sourceSizeBytes = 99999999 },
+} })
+assertEqual(rowValue(readalong, "File"), "EPUB (text only)", "a text-only read-along names itself and hides the audio size")
+local plain = CatalogDetail.bookInfoRows({ files = {
+    { format = "epub", downloadVariant = "audioless_epub", sourceMediaOverlayAvailable = false, sizeBytes = nil, sourceSizeBytes = 708549 },
+} })
+assertEqual(rowValue(plain, "File"), "EPUB - 692 KB", "a plain EPUB is not called read-along and shows its size")
+assertEqual(menu:downloadButtonLabel({ { format = "epub", downloadVariant = "audioless_epub", sourceMediaOverlayAvailable = false, sourceSizeBytes = 708549 } }),
+    "Download EPUB - 692 KB", "the list sheet's download label follows the same rule")
 
 print("bookorbit_detail_info_rows_test.lua: ok")

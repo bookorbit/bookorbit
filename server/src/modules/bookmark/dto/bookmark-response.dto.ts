@@ -7,6 +7,11 @@ export class BookmarkResponseDto {
   title!: string;
   positionSeconds!: number | null;
   createdAt!: Date;
+  note!: string | null;
+  updatedAt!: Date;
+  clientId!: string;
+  origin!: string;
+  chapterId!: string | null;
 
   static from(row: BookmarkRow): BookmarkResponseDto {
     const dto = new BookmarkResponseDto();
@@ -16,6 +21,11 @@ export class BookmarkResponseDto {
     dto.title = row.title;
     dto.positionSeconds = row.positionSeconds ?? null;
     dto.createdAt = row.createdAt;
+    dto.note = row.note ?? null;
+    dto.updatedAt = row.updatedAt;
+    dto.clientId = row.clientId;
+    dto.origin = row.origin;
+    dto.chapterId = row.chapterId ?? null;
     return dto;
   }
 }

@@ -39,6 +39,8 @@ export interface ReleaseGrabOptions {
   setFilesExpanded: (release: ReleaseCandidateItem, expanded: boolean) => void
   /** Which download path this release uses. */
   deliveryFor: (release: ReleaseCandidateItem) => DownloadDelivery
+  /** Where a sent release leaves the approver, when that is not the request it belongs to. */
+  afterGrab?: (item: BookRequestItem) => void
 }
 
 /**
@@ -51,7 +53,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  const { request, requestId, grab, setRequest, inspectRelease, setFilesExpanded, deliveryFor } = options
+  const { request, requestId, grab, setRequest, inspectRelease, setFilesExpanded, deliveryFor, afterGrab } = options
 
   const manualOpen = ref(false)
   const refusals = ref<GrabRefusal[]>([])
@@ -65,6 +67,12 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
    * called yet while the inspections run.
    */
   const grabbing = ref(false)
+  /**
+   * Whether whatever this picker sends waits in review once it lands, whatever its score. One
+   * choice for the visit rather than one per row: the doubt it answers is about the request, and
+   * a magnet pasted by hand is just as likely to be the wrong edition as a ranked release.
+   */
+  const holdForReview = ref(false)
 
   function openManual() {
     manualOpen.value = true
@@ -79,10 +87,10 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     refusals.value = []
   }
 
-  /** A sent release leaves nothing to pick, so the drawer pops back to the request it belongs to. */
+  /** A sent release leaves nothing to pick, so the drawer pops back to the request it belongs to, unless told otherwise. */
   async function sendGrab(body: GrabBookRequestPayload, delivery: DownloadDelivery) {
     if (!request.value) return
-    const outcome = await grab(request.value.id, body)
+    const outcome = await grab(request.value.id, holdForReview.value ? { ...body, holdForReview: true } : body)
     if (!outcome.item) {
       rememberRefusal(body, delivery, outcome.errorCode)
       toast.error(t('bookRequests.errors.grabFailed'), outcome.reason ? { description: outcome.reason } : undefined)
@@ -91,7 +99,8 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     setRequest(outcome.item)
     manualOpen.value = false
     toast.success(t('bookRequests.toasts.grabbed'))
-    void router.push({ name: 'book-request-detail', params: { id: request.value.id }, query: route.query })
+    if (afterGrab) afterGrab(outcome.item)
+    else void router.push({ name: 'book-request-detail', params: { id: request.value.id }, query: route.query })
   }
 
   async function submitGrab(body: GrabBookRequestPayload) {
@@ -147,5 +156,18 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     return key ? t(`bookRequests.releases.refused.${key}`) : null
   }
 
-  return { manualOpen, grabbing, refusals, openManual, closeManual, forgetRefusals, submitGrab, handleGrab, handleManualGrab, isRefused, refusalText }
+  return {
+    manualOpen,
+    grabbing,
+    holdForReview,
+    refusals,
+    openManual,
+    closeManual,
+    forgetRefusals,
+    submitGrab,
+    handleGrab,
+    handleManualGrab,
+    isRefused,
+    refusalText,
+  }
 }

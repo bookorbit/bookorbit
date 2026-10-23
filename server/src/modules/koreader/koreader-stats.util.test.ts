@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildSessionId, buildSessionIdPrefix } from '../../common/utils/koreader-session-id.utils';
 import {
-  buildSessionId,
-  buildSessionIdPrefix,
   clusterPageStats,
   computeClusterMetrics,
   deriveKoreaderSessions,
+  excludeTombstonedEvents,
   type KoreaderPageEvent,
 } from './koreader-stats.util';
 
@@ -82,10 +82,10 @@ describe('computeClusterMetrics', () => {
 
   it('builds deterministic session ids that fit varchar(64)', () => {
     const session = computeClusterMetrics([event(1000)], DEVICE_ID, FILE_ID);
-    expect(session.sessionId).toBe('kor:abcdef12:42:1000');
+    expect(session.sessionId).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:42:1000');
 
     const longest = buildSessionId(DEVICE_ID, 2147483647, 2147483647);
-    expect(longest).toBe('kor:abcdef12:2147483647:2147483647');
+    expect(longest).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:2147483647:2147483647');
     expect(longest.length).toBeLessThanOrEqual(64);
   });
 });
@@ -112,6 +112,52 @@ describe('deriveKoreaderSessions', () => {
   });
 
   it('builds a prefix that scopes ids per device and file', () => {
-    expect(buildSessionIdPrefix(DEVICE_ID, FILE_ID)).toBe('kor:abcdef12:42:');
+    expect(buildSessionIdPrefix(DEVICE_ID, FILE_ID)).toBe('kor:v2-b0a45058c4b94c71d047d1b1e532f5c9:42:');
+  });
+});
+
+describe('excludeTombstonedEvents', () => {
+  const sitting = [event(1000, 60, 1), event(1060, 60, 2), event(1120, 60, 3)];
+
+  it('returns the same array when nothing is tombstoned', () => {
+    expect(excludeTombstonedEvents(sitting, [])).toBe(sitting);
+  });
+
+  it('drops every event that starts inside a span', () => {
+    expect(excludeTombstonedEvents(sitting, [{ startTime: 1000, endTime: 1180 }])).toEqual([]);
+  });
+
+  it('treats the span start as inside and the span end as outside', () => {
+    const atEnd = event(1180, 60, 4);
+    const beforeStart = event(999, 1, 0);
+    const kept = excludeTombstonedEvents([beforeStart, ...sitting, atEnd], [{ startTime: 1000, endTime: 1180 }]);
+    expect(kept).toEqual([beforeStart, atEnd]);
+  });
+
+  it('keeps an event that started before a span even when it runs into it', () => {
+    const longPage = event(900, 300, 0);
+    expect(excludeTombstonedEvents([longPage], [{ startTime: 1000, endTime: 1180 }])).toEqual([longPage]);
+  });
+
+  it('applies several spans at once', () => {
+    const events = [event(100), event(200), event(300), event(400), event(500)];
+    const kept = excludeTombstonedEvents(events, [
+      { startTime: 150, endTime: 250 },
+      { startTime: 400, endTime: 401 },
+    ]);
+    expect(kept.map((e) => e.startTime)).toEqual([100, 300, 500]);
+  });
+
+  it('leaves the reading after a deleted sitting as its own session', () => {
+    const deleted = [event(1000, 60, 1), event(1060, 60, 2), event(1120, 60, 3)];
+    const readOn = [event(1780, 60, 4), event(1840, 60, 5)];
+    const all = [...deleted, ...readOn];
+
+    expect(deriveKoreaderSessions(all, DEVICE_ID, FILE_ID).map((s) => s.sessionId)).toEqual([buildSessionId(DEVICE_ID, FILE_ID, 1000)]);
+
+    const sessions = deriveKoreaderSessions(excludeTombstonedEvents(all, [{ startTime: 1000, endTime: 1180 }]), DEVICE_ID, FILE_ID);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.sessionId).toBe(buildSessionId(DEVICE_ID, FILE_ID, 1780));
+    expect(sessions[0]!.durationSeconds).toBe(120);
   });
 });

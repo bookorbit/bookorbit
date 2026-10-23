@@ -74,7 +74,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
   }
 
   beforeAll(async () => {
-    ctx = await createE2EContext();
+    ctx = await createE2EContext({ isolateAppData: true });
     const [admin] = await ctx.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.username, 'scanner-e2e-admin')).limit(1);
     adminUserId = admin.id;
     const library = await seedLibrary(ctx.db, { rootPath: E2E_ROOT, mode: 'book_per_file', watch: false });
@@ -117,6 +117,79 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(history.items[0]?.outcome).toBe('completed');
   });
 
+  it('uses a historical KOReader finish day for the book and completion statistics without overwriting later manual edits', async () => {
+    const book = await createBook();
+    const fileHash = randomUUID().replaceAll('-', '');
+    await ctx.db.update(schema.bookFiles).set({ fileHash }).where(eq(schema.bookFiles.id, book.fileId));
+    const username = `attempt-date-${randomUUID()}`;
+    const password = 'HistoricalFinish123';
+    const credentials = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/credentials',
+      headers: auth(ctx.adminToken),
+      payload: { username, password },
+    });
+    expect(credentials.statusCode).toBe(201);
+
+    const year = new Date().getUTCFullYear() - 1;
+    const finishedOn = `${year}-08-22`;
+    const startTime = Date.parse(`${finishedOn}T18:00:00.000Z`) / 1000;
+    const deviceFields = { deviceId: 'historical-finish-e2e', deviceModel: 'E2E', pluginVersion: '1.7.0' };
+    const deviceHeaders = { 'x-auth-user': username, 'x-auth-key': password };
+    const stats = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/koreader/plugin/page-stats',
+      headers: deviceHeaders,
+      payload: {
+        ...deviceFields,
+        books: [{ hash: fileHash, events: [{ page: 100, totalPages: 100, startTime, durationSeconds: 60 }] }],
+      },
+    });
+    expect(stats.statusCode).toBe(201);
+    expect(stats.json().results[0].accepted).toBe(1);
+
+    const timeline = async () => {
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/user-statistics/completion-timeline?days=3650',
+        headers: auth(ctx.adminToken),
+      });
+      expect(response.statusCode).toBe(200);
+      return response.json() as Array<{ year: number; month: number; count: number }>;
+    };
+    const before = await timeline();
+    const uploadState = () =>
+      ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/koreader/plugin/book-states',
+        headers: deviceHeaders,
+        payload: { ...deviceFields, books: [{ hash: fileHash, status: 'complete', statusModified: finishedOn }] },
+      });
+    expect((await uploadState()).statusCode).toBe(201);
+    expect((await uploadState()).statusCode).toBe(201);
+
+    const history = await listAttempts(book.bookId);
+    expect(history.total).toBe(1);
+    expect(history.items[0]).toMatchObject({ outcome: 'completed', endedOn: finishedOn });
+    const detail = await ctx.app.inject({ method: 'GET', url: `/api/v1/books/${book.bookId}`, headers: auth(ctx.adminToken) });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json().readStatus.finishedAt).toBe(`${finishedOn}T00:00:00.000Z`);
+    const after = await timeline();
+    expect(after.find((point) => point.year === year && point.month === 8)?.count).toBe(
+      (before.find((point) => point.year === year && point.month === 8)?.count ?? 0) + 1,
+    );
+    const now = new Date();
+    expect(after.find((point) => point.year === now.getUTCFullYear() && point.month === now.getUTCMonth() + 1)?.count).toBe(
+      before.find((point) => point.year === now.getUTCFullYear() && point.month === now.getUTCMonth() + 1)?.count,
+    );
+
+    expect((await patchStatus(book.bookId, { finishedAt: `${year}-08-23` })).statusCode).toBe(200);
+    expect((await uploadState()).statusCode).toBe(201);
+    const editedHistory = await listAttempts(book.bookId);
+    expect(editedHistory.total).toBe(1);
+    expect(editedHistory.items[0]?.endedOn).toBe(`${year}-08-23`);
+  });
+
   it('3. starts a manual reread and resets progress without deleting history', async () => {
     const book = await createBook();
     await patchStatus(book.bookId, { status: 'read', startedAt: '2024-01-01', finishedAt: '2024-01-10' });
@@ -148,6 +221,55 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(response.json()).toMatchObject({ status: 'rereading' });
     const [progress] = await ctx.db.select().from(schema.readingProgress).where(eq(schema.readingProgress.bookFileId, book.fileId));
     expect(progress.percentage).toBe(100);
+  });
+
+  // A reread on a book never finished here records the read it implies as an undated completed attempt,
+  // created after the read in progress. Taken as the latest by id, its missing dates replaced the dates
+  // of that read once finished, the next time a session landed; a past read added later did the same.
+  it('4a. keeps the latest read dates over an undated earlier read and a past read added later', async () => {
+    const book = await createBook();
+    await patchStatus(book.bookId, { status: 'reading', startedAt: '2026-08-17' });
+    const reread = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${book.bookId}/reading-attempts/start-reread`,
+      headers: auth(ctx.adminToken),
+      payload: { resetProgress: false },
+    });
+    expect(reread.json()).toMatchObject({ status: 'rereading' });
+    await patchStatus(book.bookId, { status: 'read', finishedAt: '2026-10-17' });
+    const bookDates = async () => {
+      const [row] = await ctx.db
+        .select()
+        .from(schema.userBookStatus)
+        .where(and(eq(schema.userBookStatus.userId, adminUserId), eq(schema.userBookStatus.bookId, book.bookId)));
+      return { status: row?.status, startedOn: row?.startedAt?.toISOString().slice(0, 10), finishedOn: row?.finishedAt?.toISOString().slice(0, 10) };
+    };
+    const finished = { status: 'read', startedOn: '2026-08-17', finishedOn: '2026-10-17' };
+    expect(await bookDates()).toEqual(finished);
+
+    const session = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/files/${book.fileId}/sessions`,
+      headers: auth(ctx.adminToken),
+      payload: {
+        sessionId: `reread-dates-${book.bookId}`,
+        startedAt: '2026-10-17T18:12:00.000Z',
+        endedAt: '2026-10-17T18:19:30.000Z',
+        durationSeconds: 450,
+        endProgress: 100,
+      },
+    });
+    expect(session.statusCode).toBe(204);
+    expect(await bookDates()).toEqual(finished);
+
+    const past = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${book.bookId}/reading-attempts`,
+      headers: auth(ctx.adminToken),
+      payload: { startedOn: '2019-03-01', endedOn: '2019-03-20', outcome: 'completed' },
+    });
+    expect(past.statusCode).toBe(201);
+    expect(await bookDates()).toEqual(finished);
   });
 
   it('5. adds and edits partial historical attempts without duplicating them', async () => {
@@ -273,6 +395,34 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     const book = await createBook();
     await patchStatus(book.bookId, { status: 'read', startedAt: '2024-01-01', finishedAt: '2024-01-10' });
     const kobo = ctx.app.get(KoboReadingStateService);
+    const device = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/kobo/devices',
+      headers: auth(ctx.adminToken),
+      payload: { name: 'Attempt simulation Kobo' },
+    });
+    expect(device.statusCode).toBe(201);
+    const deviceId = (device.json() as { id: number }).id;
+    // The device holds this copy, so the positions it reports are its reader's, not an unknown copy's.
+    await ctx.db.insert(schema.koboDeviceDeliveries).values({
+      userId: adminUserId,
+      deviceId,
+      bookId: book.bookId,
+      sourceFileId: book.fileId,
+      metadata: {
+        artifactId: 'simulated',
+        sourceRevision: 'simulated',
+        requestedVariant: null,
+        actualVariant: 'original',
+        format: 'epub',
+        sizeBytes: 1024,
+        sha256: 'simulated',
+        fileHash: 'simulated',
+        outcome: 'original',
+      },
+      options: { hyphenate: false, converterVersion: null },
+      state: 'transfer_observed',
+    });
     await kobo.upsertState(
       adminUserId,
       book.bookId,
@@ -284,7 +434,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       1,
       98,
       false,
-      1,
+      deviceId,
     );
     await kobo.upsertState(
       adminUserId,
@@ -297,7 +447,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       1,
       98,
       false,
-      1,
+      deviceId,
     );
     const history = await listAttempts(book.bookId);
     expect(history.total).toBe(2);
@@ -627,6 +777,136 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     const sync = await hardcover.findBookSyncData(adminUserId, book.bookId);
 
     expect(sync?.attemptsUpdatedAt ?? null).toBeNull();
+  });
+
+  it('25a. moves a Hardcover link to another book and releases only its live read links', async () => {
+    const book = await createBook();
+    const attempts = ctx.app.get(ReadingAttemptService);
+    const hardcover = ctx.app.get(HardcoverRepository);
+    const finished = await attempts.createHistorical(adminUserId, book.bookId, {
+      startedOn: '2025-01-01',
+      endedOn: '2025-01-09',
+      outcome: 'completed',
+    });
+    const removed = await attempts.createHistorical(adminUserId, book.bookId, {
+      startedOn: '2025-02-01',
+      endedOn: '2025-02-09',
+      outcome: 'completed',
+    });
+    const otherProvider = await attempts.createHistorical(adminUserId, book.bookId, {
+      startedOn: '2025-03-01',
+      endedOn: '2025-03-09',
+      outcome: 'completed',
+    });
+    await hardcover.linkReadingAttempt(adminUserId, finished.id, 9601);
+    await hardcover.linkReadingAttempt(adminUserId, removed.id, 9602);
+    await attempts.delete(adminUserId, book.bookId, removed.id);
+    await ctx.db
+      .update(schema.readingAttempts)
+      .set({ externalProvider: 'storygraph', externalId: 'sg-1' })
+      .where(eq(schema.readingAttempts.id, otherProvider.id));
+    await hardcover.upsertBookState({
+      userId: adminUserId,
+      bookId: book.bookId,
+      hardcoverBookId: 1554702,
+      hardcoverEditionId: 31616496,
+      hardcoverUserBookId: 19544253,
+      hardcoverReadId: 9601,
+      matchMethod: 'cached',
+      matchBasis: '["hell-be-ok",null,null]',
+      syncOverride: 'included',
+      lastSyncedAt: new Date('2026-10-01T00:00:00Z'),
+      lastSyncedProgress: 13.82,
+    });
+
+    const released = await hardcover.relinkBook({
+      userId: adminUserId,
+      bookId: book.bookId,
+      hardcoverBookId: 2973670,
+      hardcoverEditionId: 33314466,
+      matchMethod: 'metadata_id',
+      matchBasis: '["ok-amen","9789146223856",null]',
+    });
+
+    expect(released).toBe(1);
+    await expect(hardcover.findBookState(adminUserId, book.bookId)).resolves.toMatchObject({
+      hardcoverBookId: 2973670,
+      hardcoverEditionId: 33314466,
+      hardcoverUserBookId: null,
+      hardcoverReadId: null,
+      matchMethod: 'metadata_id',
+      matchBasis: '["ok-amen","9789146223856",null]',
+      syncOverride: 'included',
+      lastSyncedAt: null,
+      lastSyncedProgress: 13.82,
+    });
+    const rows = await ctx.db.select().from(schema.readingAttempts).where(eq(schema.readingAttempts.bookId, book.bookId));
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get(finished.id)).toMatchObject({ externalProvider: null, externalId: null });
+    // The soft-deleted attempt stays a tombstone, and another provider's link is not ours to drop.
+    expect(byId.get(removed.id)).toMatchObject({ externalProvider: 'hardcover', externalId: '9602' });
+    expect(byId.get(otherProvider.id)).toMatchObject({ externalProvider: 'storygraph', externalId: 'sg-1' });
+    await expect(hardcover.findClaimedHardcoverReadIds(adminUserId, book.bookId)).resolves.toEqual([9602]);
+    await expect(hardcover.linkReadingAttempt(adminUserId, finished.id, 9603)).resolves.toBe('linked');
+  });
+
+  it('25b. releases one attempt link only while it still points at the rejected read', async () => {
+    const book = await createBook();
+    const attempts = ctx.app.get(ReadingAttemptService);
+    const hardcover = ctx.app.get(HardcoverRepository);
+    const attempt = await attempts.createHistorical(adminUserId, book.bookId, {
+      startedOn: '2025-04-01',
+      endedOn: '2025-04-09',
+      outcome: 'completed',
+    });
+    await hardcover.linkReadingAttempt(adminUserId, attempt.id, 9701);
+
+    await expect(hardcover.unlinkReadingAttempt(adminUserId, attempt.id, 9799)).resolves.toBe(false);
+    await expect(hardcover.findClaimedHardcoverReadIds(adminUserId, book.bookId)).resolves.toEqual([9701]);
+
+    await expect(hardcover.unlinkReadingAttempt(adminUserId, attempt.id, 9701)).resolves.toBe(true);
+    const [row] = await ctx.db.select().from(schema.readingAttempts).where(eq(schema.readingAttempts.id, attempt.id));
+    expect(row).toMatchObject({ externalProvider: null, externalId: null });
+  });
+
+  it('25c. lets a Hardcover link cleared down to its provider be claimed again', async () => {
+    const book = await createBook();
+    const attempts = ctx.app.get(ReadingAttemptService);
+    const hardcover = ctx.app.get(HardcoverRepository);
+    const halfCleared = await attempts.createHistorical(adminUserId, book.bookId, {
+      startedOn: '2025-05-01',
+      endedOn: '2025-05-09',
+      outcome: 'completed',
+    });
+    const otherProvider = await attempts.createHistorical(adminUserId, book.bookId, {
+      startedOn: '2025-06-01',
+      endedOn: '2025-06-09',
+      outcome: 'completed',
+    });
+    await ctx.db
+      .update(schema.readingAttempts)
+      .set({ externalProvider: 'hardcover', externalId: null })
+      .where(eq(schema.readingAttempts.id, halfCleared.id));
+    await ctx.db
+      .update(schema.readingAttempts)
+      .set({ externalProvider: 'storygraph', externalId: null })
+      .where(eq(schema.readingAttempts.id, otherProvider.id));
+
+    await expect(hardcover.linkReadingAttempt(adminUserId, halfCleared.id, 9801)).resolves.toBe('linked');
+    await expect(hardcover.linkReadingAttempt(adminUserId, otherProvider.id, 9802)).resolves.toBe('conflict');
+  });
+
+  it('25d. carries the metadata Hardcover edition into the sync snapshot', async () => {
+    const book = await createBook();
+    const hardcover = ctx.app.get(HardcoverRepository);
+    await ctx.db
+      .insert(schema.bookMetadata)
+      .values({ bookId: book.bookId, title: 'ok, amen', hardcoverId: 'ok-amen', hardcoverEditionId: '33314466' });
+
+    await expect(hardcover.findBookSyncData(adminUserId, book.bookId)).resolves.toMatchObject({
+      hardcoverMetadataId: 'ok-amen',
+      hardcoverEditionId: '33314466',
+    });
   });
 
   it('26. lets lifecycle dates create and complete attempts through the status API', async () => {
@@ -969,5 +1249,94 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(monthsThisYear.reduce((sum, month) => sum + month.count, 0)).toBe(5);
     const monthsLastYear = overview.completion.months.filter((month) => month.year === thisYear - 1);
     expect(monthsLastYear.reduce((sum, month) => sum + month.count, 0)).toBe(1);
+  });
+
+  it('refreshes cached dashboard and statistics counts immediately after reading history and status date edits', async () => {
+    const book = await createBook();
+    let dashboardBaseline: number | undefined;
+    let statisticsBaseline: number | undefined;
+    async function readingGoal() {
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/dashboard/widgets/reading-goal',
+        headers: auth(ctx.adminToken),
+      });
+      expect(response.statusCode).toBe(200);
+      const goal = response.json() as { completedBooks: number; year: number };
+      const statistics = await ctx.app.inject({ method: 'GET', url: '/api/v1/user-statistics/activity-overview', headers: auth(ctx.adminToken) });
+      expect(statistics.statusCode).toBe(200);
+      const completed = statistics.json().goal.completedBooks as number;
+      dashboardBaseline ??= goal.completedBooks;
+      statisticsBaseline ??= completed;
+      expect(completed - statisticsBaseline).toBe(goal.completedBooks - dashboardBaseline);
+      return goal;
+    }
+    const baseline = await readingGoal();
+    const thisYearEnd = `${baseline.year}-01-15`;
+    const lastYearEnd = `${baseline.year - 1}-12-15`;
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${book.bookId}/reading-attempts`,
+      headers: auth(ctx.adminToken),
+      payload: { endedOn: thisYearEnd, outcome: 'completed' },
+    });
+    expect(created.statusCode).toBe(201);
+    const attempt = created.json() as { id: number };
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+
+    const backdated = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/books/${book.bookId}/reading-attempts/${attempt.id}`,
+      headers: auth(ctx.adminToken),
+      payload: { endedOn: lastYearEnd },
+    });
+    expect(backdated.statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+
+    expect((await patchStatus(book.bookId, { finishedAt: thisYearEnd })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+    expect((await patchStatus(book.bookId, { finishedAt: null })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+    expect((await patchStatus(book.bookId, { finishedAt: thisYearEnd })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+
+    const deleted = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/books/${book.bookId}/reading-attempts/${attempt.id}`,
+      headers: auth(ctx.adminToken),
+    });
+    expect(deleted.statusCode).toBe(204);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+
+    expect((await patchStatus(book.bookId, { status: 'read', finishedAt: thisYearEnd })).statusCode).toBe(200);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks + 1);
+    const reset = await ctx.app.inject({ method: 'POST', url: `/api/v1/books/${book.bookId}/reset-reading-state`, headers: auth(ctx.adminToken) });
+    expect(reset.statusCode).toBe(201);
+    expect((await readingGoal()).completedBooks).toBe(baseline.completedBooks);
+  });
+  it('refreshes currently-reading after automatic activity resumes a manually paused book', async () => {
+    const book = await createBook();
+    await ctx.db.insert(schema.bookMetadata).values({ bookId: book.bookId, title: 'Paused book' });
+    expect((await patchStatus(book.bookId, { status: 'on_hold', startedAt: '2026-01-01' })).statusCode).toBe(200);
+    const current = async () => {
+      const response = await ctx.app.inject({ method: 'GET', url: '/api/v1/dashboard/widgets/currently-reading', headers: auth(ctx.adminToken) });
+      expect(response.statusCode).toBe(200);
+      return response.json().books as Array<{ bookId: number }>;
+    };
+    expect((await current()).some((row) => row.bookId === book.bookId)).toBe(false);
+    const before = await listAttempts(book.bookId);
+    await ctx.app.get(ReadingAttemptService).recordActivity({
+      userId: adminUserId,
+      bookId: book.bookId,
+      occurredOn: '2026-01-02',
+      origin: 'kobo',
+      progress: 25,
+      finishThreshold: 98,
+      strongRereadEvidence: false,
+      meaningfulActivity: true,
+    });
+    const after = await listAttempts(book.bookId);
+    expect(after).toEqual(before);
+    expect((await current()).some((row) => row.bookId === book.bookId)).toBe(true);
   });
 });

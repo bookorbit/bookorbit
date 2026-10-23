@@ -30,6 +30,7 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     gridCardPrimaryLabel: 'hidden',
     gridCardSecondaryLabel: 'hidden',
     thumbnailClickAction: 'reader',
+    placeholderCoverStyle: 'bauhaus',
     ...overrides,
   }
 }

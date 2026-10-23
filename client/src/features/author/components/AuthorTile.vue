@@ -101,12 +101,11 @@ function handleDelete() {
       >
         <AuthorPortrait :author="author" :shape="shape" :cover-fallback="coverFallback" />
 
-        <!-- Resting state stays quiet; the numbers are one hover away rather than
-             printed over every tile in the grid. -->
+        <!-- A 16% inset keeps the text box inside the circle's inscribed square. -->
         <span
           v-if="!selectionMode"
-          class="pointer-events-none absolute inset-0 z-20 hidden flex-col justify-end gap-0.5 bg-linear-to-t from-black/75 via-black/30 to-transparent p-2 opacity-0 transition-opacity duration-150 group-focus-within/tile:opacity-100 group-hover/tile:opacity-100 @[4.5rem]:flex"
-          :class="shape === 'circle' ? 'rounded-full' : 'rounded-[10px]'"
+          class="pointer-events-none absolute inset-0 z-20 hidden flex-col justify-end gap-0.5 bg-linear-to-t from-black/75 via-black/30 to-transparent opacity-0 transition-opacity duration-150 group-focus-within/tile:opacity-100 group-hover/tile:opacity-100 @[4.5rem]:flex"
+          :class="shape === 'circle' ? 'rounded-full p-[16%] text-center' : 'rounded-[10px] p-2'"
         >
           <span class="truncate text-[11px] font-bold leading-tight text-white">{{ countLine }}</span>
           <span v-if="lastAdded" class="hidden truncate text-[10px] leading-tight text-white/75 @[5.5rem]:block">{{ lastAdded }}</span>

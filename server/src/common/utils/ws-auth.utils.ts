@@ -1,6 +1,8 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { Socket } from 'socket.io';
 
+import type { RequestUser } from '../types/request-user';
+
 export const WS_UNAUTHORIZED_EVENT = 'unauthorized';
 
 /**
@@ -32,4 +34,29 @@ export function rejectSocketConnection(client: Socket, cause: unknown): void {
     client.emit(WS_UNAUTHORIZED_EVENT, { reason: 'invalid_token' });
   }
   client.disconnect();
+}
+
+const handshakes = new WeakMap<Socket, Promise<RequestUser | null>>();
+
+/**
+ * Records a gateway's handshake so its message handlers can wait for it.
+ *
+ * socket.io tells the client it is connected before Nest calls `handleConnection`, and Nest starts
+ * delivering the socket's messages without waiting for that call to finish. A client that subscribes
+ * the moment it connects therefore reaches a handler while its token is still being checked, and
+ * reading `client.data.user` there sees an anonymous socket and drops the subscription. Call this
+ * synchronously at the top of `handleConnection`, before anything is awaited.
+ *
+ * The handshake must resolve to null rather than reject when it refuses the socket.
+ */
+export function trackSocketHandshake(client: Socket, handshake: Promise<RequestUser | null>): Promise<RequestUser | null> {
+  handshakes.set(client, handshake);
+  return handshake;
+}
+
+/** The socket's authenticated user, once its handshake has finished; null when it was refused. */
+export async function resolveSocketUser(client: Socket): Promise<RequestUser | null> {
+  const handshake = handshakes.get(client);
+  if (handshake) return handshake;
+  return (client.data as { user?: RequestUser } | undefined)?.user ?? null;
 }

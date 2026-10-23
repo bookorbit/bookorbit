@@ -4,6 +4,7 @@ import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AnnotationModule } from '../annotation/annotation.module';
+import { AuthorsModule } from '../authors/authors.module';
 import { BookmarkModule } from '../bookmark/bookmark.module';
 import { BookModule } from '../book/book.module';
 import { BrowseCountsModule } from '../browse-counts/browse-counts.module';
@@ -31,6 +32,8 @@ import { KoreaderPluginController } from './koreader-plugin.controller';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderPluginService } from './koreader-plugin.service';
 import { KoreaderRepository } from './koreader.repository';
+import { KoreaderDeliveryService } from './koreader-delivery.service';
+import { KoreaderDeliveryController } from './koreader-delivery.controller';
 import { KoreaderService } from './koreader.service';
 import { KoreaderStatsService } from './koreader-stats.service';
 import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cleanup.service';
@@ -44,6 +47,7 @@ import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cle
     AchievementModule,
     AppSettingsModule,
     AnnotationModule,
+    AuthorsModule,
     BookModule,
     BookmarkModule,
     BrowseCountsModule,
@@ -53,8 +57,9 @@ import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cle
     ReadingSessionModule,
     RecommendationModule,
   ],
-  controllers: [KoreaderController, KoreaderPluginController, KoreaderCatalogController],
+  controllers: [KoreaderDeliveryController, KoreaderController, KoreaderPluginController, KoreaderCatalogController],
   providers: [
+    KoreaderDeliveryService,
     KoreaderService,
     KoreaderHashLinkService,
     KoreaderRepository,

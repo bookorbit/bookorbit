@@ -12,6 +12,7 @@ import {
   bookRequestConfig,
   coverSlotsConfig,
   dbConfig,
+  djvuConfig,
   emailConfig,
   fileWriteConfig,
   migrationConfig,
@@ -24,10 +25,7 @@ import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
 import { SeriesIdentityModule } from './common/series-identity.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { LibraryAccessGuard } from './common/guards/library-access.guard';
-import { PermissionGuard } from './common/guards/permission.guard';
-import { SensitiveEndpointThrottlerGuard } from './common/guards/sensitive-endpoint-throttler.guard';
+import { GLOBAL_GUARDS } from './common/guards/global-guards';
 import { DbModule } from './db/db.module';
 import { AnnotationModule } from './modules/annotation/annotation.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -36,7 +34,10 @@ import { AppSettingsModule } from './modules/app-settings/app-settings.module';
 import { CollectionModule } from './modules/collection/collection.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CbzModule } from './modules/reader/cbz/cbz.module';
+import { DjvuModule } from './modules/reader/djvu/djvu.module';
 import { BookmarkModule } from './modules/bookmark/bookmark.module';
+import { BookJournalModule } from './modules/book-journal/book-journal.module';
+import { NotebookModule } from './modules/notebook/notebook.module';
 import { BookModule } from './modules/book/book.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CoverModule } from './modules/cover/cover.module';
@@ -115,6 +116,7 @@ import { PodcastModule } from './modules/podcast/podcast.module';
         oidcRuntimeConfig,
         podcastConfig,
         audiolessEpubConfig,
+        djvuConfig,
       ],
     }),
     ScheduleModule.forRoot(),
@@ -157,10 +159,13 @@ import { PodcastModule } from './modules/podcast/podcast.module';
     KoboModule,
     OpdsModule,
     BookmarkModule,
+    BookJournalModule,
     AnnotationModule,
+    NotebookModule,
     DashboardModule,
     HealthModule,
     CbzModule,
+    DjvuModule,
     ReaderPreferencesModule,
     UserPreferencesModule,
     EpubModule,
@@ -198,12 +203,6 @@ import { PodcastModule } from './modules/podcast/podcast.module';
     WatchDownloadModule,
     PodcastModule,
   ],
-  providers: [
-    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
-    { provide: APP_GUARD, useClass: SensitiveEndpointThrottlerGuard },
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: PermissionGuard },
-    { provide: APP_GUARD, useClass: LibraryAccessGuard },
-  ],
+  providers: [{ provide: APP_INTERCEPTOR, useClass: AuditInterceptor }, ...GLOBAL_GUARDS.map((useClass) => ({ provide: APP_GUARD, useClass }))],
 })
 export class AppModule {}

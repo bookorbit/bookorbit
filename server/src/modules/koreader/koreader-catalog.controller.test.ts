@@ -18,6 +18,7 @@ function makeController() {
     setReadStatus: vi.fn().mockResolvedValue({ readStatus: 'reading' }),
     setRating: vi.fn().mockResolvedValue({ rating: 4 }),
     streamThumbnail: vi.fn().mockResolvedValue(undefined),
+    streamAuthorPhoto: vi.fn().mockResolvedValue(undefined),
     streamFile: vi.fn().mockResolvedValue(undefined),
   };
   return { controller: new KoreaderCatalogController(catalogService as never), catalogService };
@@ -47,17 +48,19 @@ describe('KoreaderCatalogController', () => {
     await expect(controller.setReadStatus(user, 10, { status: 'reading' } as never)).resolves.toEqual({ readStatus: 'reading' });
     await expect(controller.setRating(user, 10, { rating: 4 } as never)).resolves.toEqual({ rating: 4 });
     await controller.thumbnail(user, 10, reply, '"etag"');
+    await controller.authorPhoto(user, 134, reply, '"photo-etag"');
     await controller.download(user, 100, reply);
 
     expect(catalogService.getDashboard).toHaveBeenCalledWith(user, undefined);
     expect(catalogService.getSectionEntries).toHaveBeenCalledWith(user, 'libraries', sectionQuery);
     expect(catalogService.getBooksPage).toHaveBeenCalledWith(user, query);
-    expect(catalogService.getBookDetail).toHaveBeenCalledWith(user, 10, 'device-1');
+    expect(catalogService.getBookDetail).toHaveBeenCalledWith(user, 10, 'device-1', undefined);
     expect(catalogService.getBulkManifest).toHaveBeenCalledWith(user, manifestQuery);
     expect(catalogService.setReadStatus).toHaveBeenCalledWith(user, 10, 'reading');
     expect(catalogService.setRating).toHaveBeenCalledWith(user, 10, 4);
     expect(catalogService.streamThumbnail).toHaveBeenCalledWith(user, 10, reply, '"etag"');
-    expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply);
+    expect(catalogService.streamAuthorPhoto).toHaveBeenCalledWith(user, 134, reply, '"photo-etag"');
+    expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply, undefined, undefined);
   });
 
   it('forwards an unread reset rather than treating it as a missing status', async () => {

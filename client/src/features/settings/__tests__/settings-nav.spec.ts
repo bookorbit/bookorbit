@@ -50,7 +50,9 @@ describe('settings navigation model', () => {
 
 describe('visibleSettingsNav', () => {
   it('drops groups with no reachable destination', () => {
-    expect(visibleSettingsNav(NOBODY).map((group) => group.id)).toEqual(['you'])
+    expect(visibleSettingsNav(NOBODY).map((group) => group.id)).toEqual(['you', 'library'])
+    const library = visibleSettingsNav(NOBODY).find((group) => group.id === 'library')
+    expect(library?.items.flatMap((item) => item.children?.map((child) => child.id) ?? [item.id])).toEqual(['metadata-reminders'])
   })
 
   it('keeps every group for a superuser', () => {
@@ -100,9 +102,6 @@ describe('visibleSettingsNav', () => {
   })
 
   it('drops a grouping row once every child behind it is hidden', () => {
-    const library = visibleSettingsNav({ ...NOBODY, permissions: ['manage_app_settings'] }).find((group) => group.id === 'library')
-    expect(library?.items.map((item) => item.id)).not.toContain('metadata')
-
     const server = visibleSettingsNav({ ...NOBODY, permissions: [Permission.ManageBookDock] }).find((group) => group.id === 'server')
     expect(server?.items.map((item) => item.id)).not.toContain('users-access')
   })

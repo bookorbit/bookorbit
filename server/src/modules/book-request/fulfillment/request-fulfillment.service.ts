@@ -58,6 +58,7 @@ import { DownloadClientRegistry } from '../download-clients/download-client-regi
 import { ADD_PATH_MAPPING_HINT } from '../download-clients/path-mapping.service';
 import {
   IndexerSearchException,
+  IndexerRetryExhaustedException,
   type IndexerAdapter,
   type ReleaseCandidate,
   type ReleaseFile,
@@ -264,6 +265,8 @@ export class RequestFulfillmentService {
         automated: user === null,
         releaseTitle: grab.releaseTitle,
         releaseGuid: grab.releaseGuid ?? null,
+        releaseInfoUrl: grab.releaseInfoUrl ?? null,
+        holdForReview: dto.holdForReview === true,
         releaseSizeBytes: grab.releaseSizeBytes,
         releaseSeeders: grab.releaseSeeders ?? null,
         releaseFormat: grab.releaseFormat ?? null,
@@ -345,7 +348,9 @@ export class RequestFulfillmentService {
     try {
       return await run();
     } catch (error) {
-      if (!automated || !isTransientGrabFailure(error)) throw error;
+      if (!automated || !isTransientGrabFailure(error) || (error instanceof HttpException && error.cause instanceof IndexerRetryExhaustedException)) {
+        throw error;
+      }
 
       const code = grabFailureCode(error) ?? (phase === 'client' ? 'GRAB_CLIENT_UNAVAILABLE' : 'GRAB_SOURCE_UNAVAILABLE');
       this.logger.warn(
@@ -382,6 +387,7 @@ export class RequestFulfillmentService {
         automated: user === null,
         releaseTitle: release.title.slice(0, 500),
         releaseGuid,
+        releaseInfoUrl: release.infoUrl ?? null,
         releaseSizeBytes: release.sizeBytes,
         releaseSeeders: release.seeders,
         releaseFormat: resolveFormat(release)?.slice(0, 20) ?? null,
@@ -640,6 +646,7 @@ export class RequestFulfillmentService {
       indexerAdapterType: indexer.adapterType,
       releaseGuid: release.guid,
       releaseTitle: release.title.slice(0, 500),
+      releaseInfoUrl: release.infoUrl ?? null,
       releaseSizeBytes: release.sizeBytes,
       releaseSeeders: release.seeders,
       // The resolved format, not the raw field: most indexers state none and it is read off the
@@ -857,7 +864,10 @@ async function resolveReleaseFile(adapter: IndexerAdapter, release: ReleaseCandi
  */
 function indexerRefusal(error: IndexerSearchException, release: ReleaseCandidate): HttpException {
   if (RETRYABLE_INDEXER_FAILURES.includes(error.failure)) {
-    return grabUnavailable('GRAB_SOURCE_UNAVAILABLE', error.message);
+    return new ServiceUnavailableException(
+      { message: error.message, errorCode: 'GRAB_SOURCE_UNAVAILABLE' satisfies GrabFailureCode, statusCode: HttpStatus.SERVICE_UNAVAILABLE },
+      { cause: error },
+    );
   }
   return grabError(release.vipOnly === true ? 'GRAB_VIP_REQUIRED' : 'GRAB_SOURCE_REFUSED', error.message);
 }
@@ -953,6 +963,8 @@ interface ResolvedGrab extends ParsedGrab {
   indexerName?: string;
   indexerAdapterType?: string;
   releaseGuid?: string;
+  /** Vetted by the search that produced the release, so it is safe to keep and show. */
+  releaseInfoUrl?: string | null;
   releaseSeeders?: number | null;
   releaseFormat?: string | null;
   freeleech?: boolean;

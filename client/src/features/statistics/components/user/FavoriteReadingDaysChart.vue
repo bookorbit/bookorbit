@@ -5,7 +5,7 @@ import VChart from 'vue-echarts'
 import { CalendarDays } from '@lucide/vue'
 import type { ReadingSessionSourceBucket } from '@bookorbit/types'
 
-import { useThemeStore } from '@/stores/theme'
+import { useChartTokens } from '@/composables/useChartTokens'
 import { DEFAULT_BREAKDOWN_DIMENSION, getBreakdownSeries, type BreakdownDimension } from '../../lib/breakdown'
 import { useUserFavoriteReadingDays } from '../../composables/useUserFavoriteReadingDays'
 import BreakdownSelect from '../BreakdownSelect.vue'
@@ -16,7 +16,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MIN_EVENTS = 14
 const DAYS_WINDOW = 365
 
-const themeStore = useThemeStore()
+const chartTokens = useChartTokens()
 const { t } = useI18n()
 
 const { data, loading, error } = useUserFavoriteReadingDays()
@@ -46,7 +46,7 @@ watchEffect(() => {
   const weekdayCounts = weekdayOccurrencesInWindow(DAYS_WINDOW)
   const denominatorFor = (dayOfWeek: number) => Math.max(1, weekdayCounts[dayOfWeek] ?? 1)
   const formatKeys = [...new Set(data.value.flatMap((item) => Object.keys(item.byFormat)))].sort()
-  const seriesMeta = getBreakdownSeries(dimension.value, `${themeStore.resolvedTheme}:${themeStore.accent}`, formatKeys)
+  const seriesMeta = getBreakdownSeries(dimension.value, chartTokens.value.key, formatKeys)
 
   const series = seriesMeta.map((meta) => ({
     type: 'bar',

@@ -117,6 +117,7 @@ export const bookMetadata = pgTable(
     index('bm_language_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.language}) gin_trgm_ops`),
     index('bm_published_date_idx').on(t.publishedDate),
     index('bm_published_year_idx').on(t.publishedYear),
+    index('bm_page_count_idx').on(t.pageCount),
     index('bm_published_date_sort_idx').on(sql`coalesce(${t.publishedDate}, make_date(${t.publishedYear}, 1, 1))`),
     index('bm_series_name_index_idx').on(
       t.seriesName,
@@ -182,6 +183,8 @@ export const authors = pgTable(
     influences: text('influences').array(),
     metadataProvider: varchar('metadata_provider', { length: 50 }),
     metadataProviderId: varchar('metadata_provider_id', { length: 128 }),
+    /** Set when a user chose this provider match; enrichment then looks the id up instead of searching by name. */
+    metadataProviderPinned: boolean('metadata_provider_pinned').notNull().default(false),
     lastEnrichedAt: timestamp('last_enriched_at', { withTimezone: true }),
   },
   (t) => [
@@ -224,6 +227,8 @@ export const authorEnrichmentQueue = pgTable(
     lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
     lastError: text('last_error'),
     lastHttpStatus: integer('last_http_status'),
+    /** Set by a run that asked to bypass cached provider answers; survives requeues. */
+    ignoreCache: boolean('ignore_cache').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -324,6 +329,8 @@ export const bookMetadataFetchQueue = pgTable(
     lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
     lastError: text('last_error'),
     lastHttpStatus: integer('last_http_status'),
+    /** Set by a run that asked to bypass cached provider answers; survives requeues. */
+    ignoreCache: boolean('ignore_cache').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()

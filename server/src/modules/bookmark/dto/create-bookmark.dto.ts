@@ -1,6 +1,11 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class CreateBookmarkDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  bookFileId?: number;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(2000)

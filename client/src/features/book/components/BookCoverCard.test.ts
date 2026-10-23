@@ -40,7 +40,10 @@ vi.mock('@/features/book/lib/book-card-mapper', () => ({
 
 const mockHasPermission = vi.fn<() => boolean>().mockReturnValue(true)
 vi.mock('@/features/auth/composables/usePermissions', () => ({
-  usePermissions: () => ({ hasPermission: mockHasPermission }),
+  usePermissions: () => ({ hasPermission: mockHasPermission, isSuperuser: ref(false) }),
+}))
+vi.mock('@/features/library/composables/useLibraries', () => ({
+  useLibraries: () => ({ libraries: ref([{ id: 7, accessLevel: 'editor' }]) }),
 }))
 
 const mockFetchAuthors = vi.hoisted(() =>
@@ -139,6 +142,7 @@ function makeFile(overrides: Partial<{ id: number; format: string; role: string;
 function makeBook(overrides: Partial<BookCard> = {}): BookCard {
   return {
     id: 1,
+    libraryId: 7,
     status: 'present',
     coverAspectRatio: '2/3',
     title: 'Dune',

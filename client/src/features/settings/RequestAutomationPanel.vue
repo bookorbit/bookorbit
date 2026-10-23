@@ -116,7 +116,7 @@ onMounted(fetchIndexers)
 onMounted(fetchManagedIndexers)
 
 watch(loading, async (isLoading) => {
-  if (isLoading || !/^#release-profile-(ebook|audiobook|comic)$/.test(window.location.hash)) return
+  if (isLoading || !/^#release-profile-(ebook|audiobook)$/.test(window.location.hash)) return
   await nextTick()
   document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
 })

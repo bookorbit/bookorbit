@@ -602,3 +602,217 @@ describe('AudiobookEbookProgressSyncService sibling EPUBs without an audiobook',
     expect(bookRepo.upsertSyncedEpubProgressIfNewer).toHaveBeenCalledOnce();
   });
 });
+
+describe('AudiobookEbookProgressSyncService narration following the text', () => {
+  const NARRATED_AT = new Date('2026-09-19T11:00:00.000Z');
+
+  function makeNarrationFixture(progress: Record<string, unknown> | null) {
+    const fixture = makeFixture(100, makeFilesWithoutAudio());
+    Object.assign(fixture.bookRepo, {
+      findProgress: vi.fn().mockResolvedValue(progress),
+      advanceNarrationMarker: vi.fn().mockResolvedValue(true),
+    });
+    return fixture as typeof fixture & {
+      bookRepo: typeof fixture.bookRepo & { findProgress: ReturnType<typeof vi.fn>; advanceNarrationMarker: ReturnType<typeof vi.fn> };
+    };
+  }
+
+  const marker = (fragment: string) => ({
+    positionSeconds: null,
+    mediaOverlayFragment: `OPS/chapter.xhtml#${fragment}`,
+    mediaOverlaySectionIndex: 0,
+    narrationUpdatedAt: NARRATED_AT,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStat.mockResolvedValue({ mtimeMs: 1234 } as never);
+    mockBuildPlaylist.mockResolvedValue(makePlaylist());
+  });
+
+  const reading = { userId: 7, bookId: 5, bookFileId: 30, percentage: 60, cfi: 'epubcfi(/6/4!/4/90/1:0)', sourceUpdatedAt: SOURCE_TIME };
+
+  // A page reached on a Kobo, a phone or the web is where listening should pick up.
+  it('moves the marker to the sentence a newer page reached', async () => {
+    const { service, bookRepo, positionConverter } = makeNarrationFixture(marker('first'));
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(true);
+
+    expect(positionConverter.nearestFragmentForPosition).toHaveBeenCalledWith(
+      expect.objectContaining({ bookFileId: 30, cfi: reading.cfi, sourceBookFileId: 30 }),
+    );
+    expect(bookRepo.advanceNarrationMarker).toHaveBeenCalledWith({
+      userId: 7,
+      fileId: 30,
+      mediaOverlayFragment: 'OPS/chapter.xhtml#second',
+      mediaOverlaySectionIndex: 0,
+      percentage: 60,
+      sourceUpdatedAt: SOURCE_TIME,
+    });
+  });
+
+  // A page starts behind the sentence being narrated on it; turning to it must not replay audio.
+  it('leaves a marker the page has not passed', async () => {
+    const { service, bookRepo } = makeNarrationFixture(marker('second'));
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(false);
+    expect(bookRepo.advanceNarrationMarker).not.toHaveBeenCalled();
+  });
+
+  it('leaves a marker less than a page ahead of a newer page', async () => {
+    const { service, bookRepo, positionConverter } = makeNarrationFixture(marker('second'));
+    positionConverter.nearestFragmentForPosition.mockResolvedValueOnce({ status: 'exact', fragment: 'first', chapterIndex: 0 });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(false);
+    expect(bookRepo.advanceNarrationMarker).not.toHaveBeenCalled();
+  });
+
+  // Going back pages to read them again takes the narration along.
+  it('pulls the marker back to a newer page well behind it', async () => {
+    const { service, bookRepo, positionConverter } = makeNarrationFixture(marker('second'));
+    const playlist = makePlaylist();
+    mockBuildPlaylist.mockResolvedValueOnce({
+      ...playlist,
+      durationSeconds: 300,
+      items: [
+        { ...playlist.items[0]!, clipEndSeconds: 150, durationSeconds: 150 },
+        { ...playlist.items[1]!, clipBeginSeconds: 150, clipEndSeconds: 300, durationSeconds: 150 },
+      ],
+    });
+    positionConverter.nearestFragmentForPosition.mockResolvedValueOnce({ status: 'exact', fragment: 'first', chapterIndex: 0 });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(true);
+    expect(bookRepo.advanceNarrationMarker).toHaveBeenCalledWith(expect.objectContaining({ mediaOverlayFragment: 'OPS/chapter.xhtml#first' }));
+  });
+
+  it('pulls the marker back to a newer page in an earlier chapter', async () => {
+    const { service, bookRepo, positionConverter } = makeNarrationFixture({ ...marker('second'), mediaOverlaySectionIndex: 1 });
+    const playlist = makePlaylist();
+    mockBuildPlaylist.mockResolvedValueOnce({
+      ...playlist,
+      items: [playlist.items[0]!, { ...playlist.items[1]!, sectionIndex: 1, textHref: 'OPS/chapter.xhtml' }],
+    });
+    positionConverter.nearestFragmentForPosition.mockResolvedValueOnce({ status: 'exact', fragment: 'first', chapterIndex: 0 });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(true);
+    expect(bookRepo.advanceNarrationMarker).toHaveBeenCalledWith(expect.objectContaining({ mediaOverlaySectionIndex: 0 }));
+  });
+
+  it('leaves narration saved after the page', async () => {
+    const { service, bookRepo } = makeNarrationFixture({ ...marker('first'), narrationUpdatedAt: new Date('2026-09-19T12:30:00.000Z') });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(false);
+    expect(bookRepo.advanceNarrationMarker).not.toHaveBeenCalled();
+  });
+
+  it('starts a file that was never narrated at the sentence the reader reached', async () => {
+    const { service, bookRepo } = makeNarrationFixture({
+      positionSeconds: null,
+      mediaOverlayFragment: null,
+      mediaOverlaySectionIndex: null,
+      narrationUpdatedAt: null,
+    });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(true);
+    expect(bookRepo.advanceNarrationMarker).toHaveBeenCalledWith(expect.objectContaining({ mediaOverlayFragment: 'OPS/chapter.xhtml#second' }));
+  });
+
+  it('places a marker saved only as seconds by its sentence', async () => {
+    const { service, bookRepo } = makeNarrationFixture({ ...marker('first'), mediaOverlayFragment: null, positionSeconds: 75 });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(false);
+    expect(bookRepo.advanceNarrationMarker).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for a file without narration', async () => {
+    const { service, bookRepo } = makeNarrationFixture(marker('first'));
+
+    await expect(service.advanceNarrationToText({ ...reading, bookFileId: 20 })).resolves.toBe(false);
+    expect(bookRepo.findProgress).not.toHaveBeenCalled();
+    expect(bookRepo.advanceNarrationMarker).not.toHaveBeenCalled();
+  });
+
+  it('reports a failure without throwing', async () => {
+    const { service, bookRepo, positionConverter } = makeNarrationFixture(marker('first'));
+    positionConverter.nearestFragmentForPosition.mockRejectedValueOnce(new Error('unreadable chapter'));
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(false);
+    expect(bookRepo.advanceNarrationMarker).not.toHaveBeenCalled();
+  });
+
+  // The cover has no narration of its own; a reader back on it is before the first sentence.
+  it('pulls the marker back to the first narrated sentence for a page on the cover', async () => {
+    const { service, bookRepo, positionConverter } = makeNarrationFixture({ ...marker('second'), mediaOverlaySectionIndex: 2 });
+    const playlist = makePlaylist();
+    mockBuildPlaylist.mockResolvedValueOnce({
+      ...playlist,
+      items: [
+        { ...playlist.items[0]!, sectionIndex: 1 },
+        { ...playlist.items[1]!, sectionIndex: 2 },
+      ],
+    });
+    positionConverter.nearestFragmentForPosition.mockResolvedValueOnce({ status: 'failed', reason: 'no_candidate_fragments', chapterIndex: 0 });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(true);
+    expect(bookRepo.advanceNarrationMarker).toHaveBeenCalledWith(
+      expect.objectContaining({ mediaOverlayFragment: 'OPS/chapter.xhtml#first', mediaOverlaySectionIndex: 1 }),
+    );
+  });
+
+  it('carries the marker to the last narrated sentence for a page past the narration', async () => {
+    const { service, bookRepo, positionConverter } = makeNarrationFixture(marker('first'));
+    positionConverter.nearestFragmentForPosition.mockResolvedValueOnce({ status: 'failed', reason: 'no_candidate_fragments', chapterIndex: 5 });
+
+    await expect(service.advanceNarrationToText(reading)).resolves.toBe(true);
+    expect(bookRepo.advanceNarrationMarker).toHaveBeenCalledWith(expect.objectContaining({ mediaOverlayFragment: 'OPS/chapter.xhtml#second' }));
+  });
+});
+
+describe('AudiobookEbookProgressSyncService narration after a reset', () => {
+  const RESET_AT = new Date('2026-10-17T16:00:00.000Z');
+
+  function makeResetFixture() {
+    const fixture = makeFixture(100, makeFiles());
+    const startNarrationAfterReset = vi.fn().mockResolvedValue(true);
+    Object.assign(fixture.bookRepo, { startNarrationAfterReset });
+    return { ...fixture, startNarrationAfterReset };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStat.mockResolvedValue({ mtimeMs: 1234 } as never);
+    mockBuildPlaylist.mockResolvedValue(makePlaylist());
+  });
+
+  // A player paused before the reset compares its own marker with this one, so it asks first.
+  it('leaves each read-along on its first narrated sentence, stamped with the reset', async () => {
+    const { service, startNarrationAfterReset } = makeResetFixture();
+
+    await service.startNarrationAfterReset({ userId: 7, bookId: 5, resetAt: RESET_AT });
+
+    expect(startNarrationAfterReset).toHaveBeenCalledOnce();
+    expect(startNarrationAfterReset).toHaveBeenCalledWith({
+      userId: 7,
+      fileId: 30,
+      mediaOverlayFragment: 'OPS/chapter.xhtml#first',
+      mediaOverlaySectionIndex: 0,
+      resetAt: RESET_AT,
+    });
+  });
+
+  it('leaves a read-along alone when only another file was reset', async () => {
+    const { service, startNarrationAfterReset } = makeResetFixture();
+
+    await service.startNarrationAfterReset({ userId: 7, bookId: 5, fileIds: [20], resetAt: RESET_AT });
+
+    expect(startNarrationAfterReset).not.toHaveBeenCalled();
+  });
+
+  it('reports a failure without throwing', async () => {
+    const { service, startNarrationAfterReset } = makeResetFixture();
+    mockBuildPlaylist.mockRejectedValueOnce(new Error('unreadable package'));
+
+    await expect(service.startNarrationAfterReset({ userId: 7, bookId: 5, resetAt: RESET_AT })).resolves.toBeUndefined();
+    expect(startNarrationAfterReset).not.toHaveBeenCalled();
+  });
+});

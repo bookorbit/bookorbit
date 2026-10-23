@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+
 import { TtsSynthesisService } from './tts-synthesis.service';
 import type { ITtsProvider } from './providers/tts-provider.interface';
 
@@ -22,7 +24,7 @@ describe('TtsSynthesisService', () => {
     it('should call provider.synthesize and return audio buffer', async () => {
       const result = await service.synthesize(provider, '1', 'af_heart', 1.0, 'Hello world', 'mp3');
       expect(result).toBeInstanceOf(Buffer);
-      expect(provider.synthesize).toHaveBeenCalledWith('Hello world', 'af_heart', 1.0, 'mp3');
+      expect(provider.synthesize).toHaveBeenCalledWith('Hello world', 'af_heart', 1.0, 'mp3', undefined);
     });
 
     it('should cache the result with provider+voice+speed+text as key', async () => {
@@ -47,6 +49,27 @@ describe('TtsSynthesisService', () => {
       await service.synthesize(provider, '1', 'af_heart', 1.0, 'Hello', 'mp3');
       await service.synthesize(provider, '1', 'af_heart', 1.5, 'Hello', 'mp3');
       expect(provider.synthesize).toHaveBeenCalledTimes(2);
+    });
+
+    it('passes the abort signal on to the provider', async () => {
+      const { signal } = new AbortController();
+      await service.synthesize(provider, '1', 'af_heart', 1.0, 'Hello', 'mp3', signal);
+      expect(provider.synthesize).toHaveBeenCalledWith('Hello', 'af_heart', 1.0, 'mp3', signal);
+    });
+
+    it('treats a synthesis cancelled by the client as an outcome, not an error, and caches nothing', async () => {
+      const errorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const controller = new AbortController();
+      (provider.synthesize as vi.Mock).mockImplementation(() => {
+        controller.abort();
+        return Promise.reject(new DOMException('Aborted', 'AbortError'));
+      });
+
+      await expect(service.synthesize(provider, '1', 'af_heart', 1.0, 'Hello', 'mp3', controller.signal)).rejects.toThrow('Aborted');
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(service.getCacheSize()).toBe(0);
+      errorSpy.mockRestore();
     });
 
     it('should propagate provider errors', async () => {
@@ -145,7 +168,7 @@ describe('TtsSynthesisService', () => {
     it('should synthesize a preview sentence', async () => {
       const result = await service.previewVoice(provider, '1', 'af_heart');
       expect(result).toBeInstanceOf(Buffer);
-      expect(provider.synthesize).toHaveBeenCalledWith(expect.any(String), 'af_heart', 1.0, 'mp3');
+      expect(provider.synthesize).toHaveBeenCalledWith(expect.any(String), 'af_heart', 1.0, 'mp3', undefined);
     });
   });
 

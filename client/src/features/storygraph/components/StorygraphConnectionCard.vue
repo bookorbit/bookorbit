@@ -130,8 +130,8 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
         </li>
         <li>Open Developer Tools (F12) and go to Application/Storage &rarr; Cookies for that site.</li>
         <li>
-          Copy the values of the <code class="px-1 rounded bg-muted">_storygraph_session</code> and
-          <code class="px-1 rounded bg-muted">remember_user_token</code> cookies below.
+          Copy the values of the <code class="px-1 rounded-xs bg-muted">_storygraph_session</code> and
+          <code class="px-1 rounded-xs bg-muted">remember_user_token</code> cookies below.
         </li>
       </ol>
 

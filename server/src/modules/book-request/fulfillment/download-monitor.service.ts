@@ -24,9 +24,8 @@ import { RequestImportService } from './request-import.service';
 const MISSING_CLIENT_ITEM_GRACE_MS = 2 * 60 * 1000;
 
 /**
- * A tracker that is briefly down is indistinguishable from one that is refusing us, and only the
- * second is worth failing a request over. Short enough to beat the watchdog's twelve hours by a
- * wide margin, long enough that a tracker restart does not cost anybody their download.
+ * Give a newly grabbed torrent time to announce before acting on an explicit tracker rejection.
+ * Transport failures and unknown tracker errors stay recoverable until the stalled watchdog.
  */
 const TRACKER_ERROR_GRACE_MS = 5 * 60 * 1000;
 const DIRECT_PROGRESS_INTERVAL_MS = 1_000;
@@ -286,10 +285,15 @@ export class DownloadMonitorService implements OnModuleDestroy {
       return;
     }
 
-    // A refused announce is not a client-level error, so the torrent sits in an ordinary stalled
-    // state that reads as a healthy download. Left alone it would occupy the queue until the
-    // watchdog gave up on it half a day later, with nothing on the request saying why.
-    if (status.trackerError && status.downloadedBytes === 0 && this.olderThan(row, TRACKER_ERROR_GRACE_MS)) {
+    // A tracker timeout does not end the torrent in the client. Failing it here would remove it
+    // from polling and miss a later completion, so only an explicit rejection ends the attempt.
+    if (
+      status.state !== 'completed' &&
+      status.trackerError &&
+      isTrackerRejection(status.trackerError) &&
+      status.downloadedBytes === 0 &&
+      this.olderThan(row, TRACKER_ERROR_GRACE_MS)
+    ) {
       await this.fulfillment.failDownload(row, `The tracker rejected this download: ${status.trackerError}`);
       return;
     }
@@ -347,4 +351,14 @@ export class DownloadMonitorService implements OnModuleDestroy {
  */
 function pollTargetFor(row: BookRequestDownloadRow): PollTarget | null {
   return row.source === 'direct_url' ? DIRECT : row.downloadClientId;
+}
+
+/** Unknown messages, including localized ones, must not turn a recoverable outage into a failure. */
+function isTrackerRejection(message: string): boolean {
+  return (
+    /\b(?:unrecognized|invalid|incorrect|unknown|missing|bad)\s+(?:host\/)?pass\s*key\b/i.test(message) ||
+    /\b(?:unregistered|unknown|invalid)\s+torrent\b|\btorrent\s+(?:not found|not registered|unregistered)\b/i.test(message) ||
+    /\b(?:unauthori[sz]ed|forbidden|access denied)\b|^\s*denied[.!]?\s*$/i.test(message) ||
+    /\bHTTP(?:\s+(?:response(?:\s+code)?|status(?:\s+code)?|error|code))?\s*[:=]?\s*(?:401|403)\b/i.test(message)
+  );
 }

@@ -3,6 +3,7 @@ import { DEFAULT_INDEXER_CATEGORIES, INDEXER_COLORS } from '@bookorbit/types';
 
 import type { RequestIndexerManagerRow, RequestIndexerRow } from '../../../db/schema';
 import { IndexerConfigService } from './indexer-config.service';
+import { PluginIndexerAdapter } from './plugins/plugin-host';
 
 function indexerRow(overrides: Partial<RequestIndexerRow> = {}): RequestIndexerRow {
   return {
@@ -54,6 +55,8 @@ function makeService(
     findAssignedColors: vi.fn().mockResolvedValue([null]),
     findById: vi.fn().mockResolvedValue(indexerRow()),
     findSeedPolicyById: vi.fn().mockResolvedValue({
+      managerId: null,
+      inheritSeedLimits: null,
       id: 9,
       adapterType: 'torznab',
       applyTrackerSeedGoals: true,
@@ -289,6 +292,102 @@ describe('IndexerConfigService', () => {
     expect(credentials.decrypt).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      name: 'disabled manager with stale inherited values',
+      managerId: 3,
+      inheritSeedLimits: false,
+      applyTrackerSeedGoals: true,
+      expectedTracker: false,
+      expectedRatio: null,
+      expectedTime: null,
+    },
+    {
+      name: 'enabled manager with a stale disabled source',
+      managerId: 3,
+      inheritSeedLimits: true,
+      applyTrackerSeedGoals: false,
+      expectedTracker: true,
+      expectedRatio: 1,
+      expectedTime: 4320,
+    },
+    {
+      name: 'missing manager',
+      managerId: 3,
+      inheritSeedLimits: null,
+      applyTrackerSeedGoals: true,
+      expectedTracker: false,
+      expectedRatio: null,
+      expectedTime: null,
+    },
+    {
+      name: 'standalone source with tracker fallback',
+      managerId: null,
+      inheritSeedLimits: null,
+      applyTrackerSeedGoals: true,
+      expectedTracker: true,
+      expectedRatio: 1,
+      expectedTime: 4320,
+    },
+    {
+      name: 'standalone source with manual overrides only',
+      managerId: null,
+      inheritSeedLimits: null,
+      applyTrackerSeedGoals: false,
+      expectedTracker: false,
+      expectedRatio: 1,
+      expectedTime: 4320,
+    },
+  ])(
+    'resolves seed policy for a $name',
+    async ({ managerId, inheritSeedLimits, applyTrackerSeedGoals, expectedTracker, expectedRatio, expectedTime }) => {
+      const { service, credentials, managers } = makeService({
+        repo: {
+          findSeedPolicyById: vi.fn().mockResolvedValue({
+            id: 9,
+            adapterType: 'torznab',
+            managerId,
+            inheritSeedLimits,
+            applyTrackerSeedGoals,
+            seedRatioGoal: 1,
+            seedTimeMinutes: 4320,
+          }),
+        },
+      });
+
+      await expect(service.resolveSeedPolicy(9)).resolves.toEqual({
+        id: 9,
+        adapterType: 'torznab',
+        seedsBack: true,
+        applyTrackerSeedGoals: expectedTracker,
+        seedRatioGoal: expectedRatio,
+        seedTimeMinutes: expectedTime,
+      });
+      expect(credentials.decrypt).not.toHaveBeenCalled();
+      expect(managers.findById).not.toHaveBeenCalled();
+      expect(managers.findRowById).not.toHaveBeenCalled();
+    },
+  );
+
+  it('uses the current manager toggle on each grab without waiting for a source synchronization', async () => {
+    const row = {
+      id: 9,
+      adapterType: 'torznab',
+      managerId: 3,
+      inheritSeedLimits: true,
+      applyTrackerSeedGoals: true,
+      seedRatioGoal: 1,
+      seedTimeMinutes: 4320,
+    };
+    const { service } = makeService({ repo: { findSeedPolicyById: vi.fn().mockImplementation(() => Promise.resolve({ ...row })) } });
+
+    await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: true, seedRatioGoal: 1, seedTimeMinutes: 4320 });
+    row.inheritSeedLimits = false;
+    await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: false, seedRatioGoal: null, seedTimeMinutes: null });
+    row.inheritSeedLimits = true;
+    await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: true, seedRatioGoal: 1, seedTimeMinutes: 4320 });
+  });
+
   it('assigns a random unused color when a new indexer does not name one', async () => {
     const existing = INDEXER_COLORS.filter((color) => color !== 'teal');
     const { service, repo } = makeService({ repo: { findAssignedColors: vi.fn().mockResolvedValue(existing) } });
@@ -395,12 +494,47 @@ describe('IndexerConfigService', () => {
     expect(adapter.forget).not.toHaveBeenCalled();
   });
 
+  /** A plugin's in-memory session otherwise outranks the stored credential until the process restarts. */
+  it('drops a plugin-backed session when its connection details change', async () => {
+    const forget = vi.fn();
+    const adapter = new PluginIndexerAdapter(
+      {
+        apiVersion: 1,
+        type: 'demo-tracker',
+        label: 'Demo Tracker',
+        requiresCredential: true,
+        credentialKind: 'sessionId',
+        mediaKinds: ['ebook'],
+        usesCategories: false,
+        seedsBack: true,
+        search: () => Promise.resolve([]),
+        test: () => Promise.resolve({ success: true }),
+        fetchTorrentFile: () => Promise.resolve(new Uint8Array()),
+        forget,
+      },
+      {} as never,
+    );
+    const { service } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(indexerRow({ adapterType: 'demo-tracker' })) },
+      registry: { require: vi.fn().mockReturnValue(adapter), find: vi.fn().mockReturnValue(adapter) },
+    });
+
+    await service.update(9, { credential: 'a-new-session' });
+    await service.update(9, { baseUrl: 'http://203.0.113.11:9117' });
+    await service.update(9, { allowPrivateAddress: true });
+    expect(forget.mock.calls).toEqual([[9], [9], [9]]);
+
+    forget.mockClear();
+    await service.update(9, { name: 'renamed', enabled: false });
+    expect(forget).not.toHaveBeenCalled();
+  });
+
   it('falls back to the adapter default categories for a medium left blank', async () => {
     const { service, repo } = makeService();
 
     await service.create({ ...createDto, categories: { ebook: [8010] } });
 
-    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [8010], audiobook: [3030], comic: [7030] } }));
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [8010], audiobook: [3030] } }));
   });
 
   /** A key for one tracker is not a key for another, and its settings are the old adapter's. */
@@ -440,12 +574,12 @@ describe('IndexerConfigService', () => {
   /** A plugin declares its own; the compile-time map only knows the built-ins. */
   it('falls back to a plugin adapter default categories rather than to nothing', async () => {
     const { service, repo } = makeService({
-      registry: { defaultCategories: vi.fn().mockReturnValue({ ebook: [4040], audiobook: [4050], comic: [] }) },
+      registry: { defaultCategories: vi.fn().mockReturnValue({ ebook: [4040], audiobook: [4050] }) },
     });
 
     await service.create({ ...createDto, adapterType: 'librivox' as never, categories: undefined });
 
-    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [4040], audiobook: [4050], comic: [] } }));
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ categories: { ebook: [4040], audiobook: [4050] } }));
   });
 
   it('reports a duplicate name as a conflict rather than a 500', async () => {

@@ -204,7 +204,7 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
           <p v-if="!book.storygraphBookId" class="flex items-start gap-1.5 text-[11px] text-muted-foreground leading-relaxed">
             <HelpCircle class="size-3.5 shrink-0 mt-0.5" />
             This book couldn't be matched to StoryGraph automatically. Use "Try auto-match" to search again, or paste the book's StoryGraph URL, or
-            its StoryGraph book ID (the code after <code class="px-1 rounded bg-muted">/books/</code> in the URL, not an ISBN), below for an exact
+            its StoryGraph book ID (the code after <code class="px-1 rounded-xs bg-muted">/books/</code> in the URL, not an ISBN), below for an exact
             link.
           </p>
           <div class="flex gap-2">

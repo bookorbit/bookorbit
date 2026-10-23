@@ -18,7 +18,22 @@ export class EmailSendLogController {
 
   @Get()
   findForUser(@Query() query: QuerySendLogDto, @CurrentUser() user: RequestUser) {
-    return this.logService.findForUser(user, query.page ?? 0, query.size ?? 20, query.bookId);
+    return this.logService.findForUser(user, query.page ?? 0, query.size ?? 20, {
+      bookId: query.bookId,
+      status: query.status,
+      recipientId: query.recipientId,
+    });
+  }
+
+  @Get('summary')
+  summary(@CurrentUser() user: RequestUser) {
+    return this.logService.summary(user);
+  }
+
+  /** Failed sends from the last week that no later send has replaced. */
+  @Get('attention')
+  attention(@CurrentUser() user: RequestUser) {
+    return this.logService.findAttention(user);
   }
 
   @Delete(':id')

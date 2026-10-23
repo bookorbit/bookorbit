@@ -91,6 +91,11 @@ export interface ReleaseCandidate {
   downloadUrl?: string;
   magnet?: string;
   infoHash?: string;
+  /**
+   * The release's page on its source, as the adapter read it. Untrusted until the search service
+   * has run it through `safeReleaseInfoUrl`, which is the only thing that may hand it to a client.
+   */
+  infoUrl?: string;
   sizeBytes: number | null;
   /**
    * Null means the indexer reported no swarm counts, which must not be read as zero seeders: the
@@ -152,6 +157,9 @@ export class IndexerSearchException extends Error {
     this.name = 'IndexerSearchException';
   }
 }
+
+/** The transport already spent its retry budget, so callers must not start another one. */
+export class IndexerRetryExhaustedException extends IndexerSearchException {}
 
 /** One file, resolved from a release that is served over plain HTTP rather than as a torrent. */
 export interface ReleaseFile {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import type { BookCard } from '@bookorbit/types'
+import { COVER_ASPECT_RATIO_KEY } from '../lib/cover-aspect-ratio'
 import VirtualBookGrid from './VirtualBookGrid.vue'
 
 const scrollToItemMock = vi.fn<(index: number, options?: { align?: string }) => void>()
@@ -38,9 +39,9 @@ vi.mock('./BookCoverCard.vue', () => ({
 vi.mock('./CollapsedSeriesCard.vue', () => ({
   default: {
     name: 'CollapsedSeriesCard',
-    props: ['book', 'showLabel', 'selectionMode'],
+    props: ['book', 'showLabel', 'selectionMode', 'coverAspectRatio'],
     template:
-      '<div data-testid="collapsed-series-card" :data-selection-mode="String(selectionMode)">{{ book.id }}<span v-if="showLabel" data-testid="series-card-label-slot" /></div>',
+      '<div data-testid="collapsed-series-card" :data-selection-mode="String(selectionMode)" :data-cover-ratio="coverAspectRatio || \'\'">{{ book.id }}<span v-if="showLabel" data-testid="series-card-label-slot" /></div>',
   },
 }))
 
@@ -176,6 +177,24 @@ describe('VirtualBookGrid', () => {
     const updatedBook = updateEvent?.[0]?.[0] as BookCard | undefined
     expect(updatedBook).toBeDefined()
     expect(updatedBook?.title).toBe('Updated')
+  })
+
+  it("gives every virtualized tile the grid's shape, whatever the book's own", () => {
+    const series = makeBook(3, {
+      coverAspectRatio: '2/3',
+      collapsedSeries: { bookCount: 2, readCount: 0, coverBookIds: [3], seriesLatestAddedAt: null },
+    })
+    const wrapper = mount(VirtualBookGrid, {
+      props: {
+        books: [makeBook(1, { coverAspectRatio: '2/3' }), makeBook(2, { coverAspectRatio: '1/1' }), series],
+        coverSize: 120,
+        gridGap: 12,
+      },
+      global: { provide: { [COVER_ASPECT_RATIO_KEY as symbol]: ref('1/1') } },
+    })
+
+    expect(wrapper.findAll('[data-testid="book-card"]').map((card) => card.attributes('data-cover-ratio'))).toEqual(['1/1', '1/1'])
+    expect(wrapper.get('[data-testid="collapsed-series-card"]').attributes('data-cover-ratio')).toBe('1/1')
   })
 
   it.each([false, true])('forwards selection mode to collapsed series cards when virtualized=%s', (virtualized) => {

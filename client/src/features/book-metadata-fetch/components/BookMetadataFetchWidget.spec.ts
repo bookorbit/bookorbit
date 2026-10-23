@@ -135,6 +135,15 @@ describe('BookMetadataFetchWidget', () => {
     expect(wrapper.text()).toContain('Author enrichment finished')
   })
 
+  it('leaves the book card to a page that shows the queue itself, and still shows author work', () => {
+    bookStatus.value = idleBookStatus({ queued: 4, sessionTotal: 4 })
+    authorStatus.value = idleAuthorStatus({ queued: 2, total: 2, sessionTotal: 2 })
+    const wrapper = shallowMount(BookMetadataFetchWidget, { props: { hideBookCard: true } })
+
+    expect(wrapper.text()).not.toContain('Fetching metadata')
+    expect(wrapper.text()).toContain('Enriching authors')
+  })
+
   it('keeps a dismissed card hidden for the current run and restores it for later work', async () => {
     authorStatus.value = idleAuthorStatus({ queued: 2, total: 2, sessionTotal: 2 })
     const wrapper = shallowMount(BookMetadataFetchWidget)

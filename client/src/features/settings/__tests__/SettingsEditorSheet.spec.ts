@@ -15,7 +15,9 @@ const DROPDOWN_STUBS = {
   DropdownMenuSeparator: { template: '<hr />' },
 }
 
-function mountSheet(props: { dirty?: boolean; removable?: boolean; removeConfirm?: string; menuActions?: EditorMenuAction[] } = {}) {
+function mountSheet(
+  props: { dirty?: boolean; removable?: boolean; removeConfirm?: string; menuActions?: EditorMenuAction[]; armedAction?: string | null } = {},
+) {
   return mount(SettingsEditorSheet, {
     props: { open: true, title: 'My Prowlarr', description: 'Settings for this indexer.', ...props },
     slots: { default: '<p>form body</p>' },
@@ -96,6 +98,19 @@ describe('SettingsEditorSheet', () => {
 
     expect(wrapper.emitted('remove')).toBeUndefined()
     expect(textOf('[role="alert"]')).toContain('Delete this source?')
+
+    clickByText('Delete', confirmation())
+    await flushPromises()
+
+    expect(wrapper.emitted('remove')).toHaveLength(1)
+  })
+
+  it('opens with the question already asked when a list row armed it', async () => {
+    const wrapper = mountSheet({ removable: true, removeConfirm: 'Delete this source?', armedAction: 'remove' })
+    await flushPromises()
+
+    expect(textOf('[role="alert"]')).toContain('Delete this source?')
+    expect(wrapper.emitted('remove')).toBeUndefined()
 
     clickByText('Delete', confirmation())
     await flushPromises()

@@ -11,12 +11,17 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import { RouteConfig } from '@nestjs/platform-fastify';
+import type { FastifyReply } from 'fastify';
+import { createReadStream } from 'fs';
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookRequestService } from './book-request.service';
 import { DownloadClientConfigService } from './download-clients/download-client-config.service';
@@ -26,7 +31,7 @@ import { RequestSeedService } from './fulfillment/request-seed.service';
 import { RequestVerificationService } from './fulfillment/request-verification.service';
 import { BulkBookRequestsDto, BulkRejectBookRequestsDto } from './dto/bulk-book-requests.dto';
 import { DecideBookRequestDto } from './dto/decide-book-request.dto';
-import { GrabBookRequestDto } from './dto/grab-book-request.dto';
+import { GRAB_BODY_LIMIT_BYTES, GrabBookRequestDto } from './dto/grab-book-request.dto';
 import { InspectBookRequestReleaseDto } from './dto/inspect-book-request-release.dto';
 import { FulfillBookRequestDto } from './dto/fulfill-book-request.dto';
 import { ListAllBookRequestsDto } from './dto/list-book-requests.dto';
@@ -195,6 +200,14 @@ export class BookRequestAdminController {
     return this.verification.getReview(id);
   }
 
+  @Get(':id/review/cover')
+  async getReviewCover(@Param('id', ParseIntPipe) id: number, @Res() reply: FastifyReply) {
+    const coverPath = await this.verification.getReviewCoverPath(id);
+    reply.header('Content-Type', imageContentTypeFromPath(coverPath));
+    reply.header('Cache-Control', 'private, no-cache');
+    return reply.send(createReadStream(coverPath));
+  }
+
   /** The approver disagrees with the score. Files the held import exactly as a pass would have. */
   @Post(':id/force-file')
   @HttpCode(HttpStatus.OK)
@@ -232,6 +245,7 @@ export class BookRequestAdminController {
    * .torrent by hand. All three go down the same pipeline from here.
    */
   @Post(':id/grab')
+  @RouteConfig({ bodyLimit: GRAB_BODY_LIMIT_BYTES })
   @HttpCode(HttpStatus.OK)
   @Auditable({
     action: AuditAction.BookRequestGrab,

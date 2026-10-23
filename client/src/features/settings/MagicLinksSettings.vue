@@ -323,7 +323,7 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                       <TooltipTrigger as-child>
                         <button
                           type="button"
-                          class="rounded p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          class="rounded-xs p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           :class="copiedId === token.id ? 'text-[var(--pill-success)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
                           :aria-label="t('settings.magicLinks.copyLinkAria', { label: token.label })"
                           @click="copyMagicUrl(token.id, token.rawToken)"
@@ -402,7 +402,7 @@ function isExpired(expiresAt: string | null | undefined): boolean {
             <div class="mt-3 flex items-center gap-1 border-t border-border pt-3">
               <button
                 type="button"
-                class="rounded p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="rounded-xs p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 :class="copiedId === token.id ? 'text-[var(--pill-success)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
                 :aria-label="t('settings.magicLinks.copyLinkAria', { label: token.label })"
                 @click="copyMagicUrl(token.id, token.rawToken)"

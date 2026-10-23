@@ -35,7 +35,12 @@ export class BookRequestMetadataSourceDto {
   isbn13?: string | null;
 }
 
-export class CreateBookRequestDto {
+/**
+ * Everything that describes the work and who is asking for it, shared by a single request and by
+ * an ebook and audiobook pair. What differs per medium - the medium itself, where it lands and
+ * which formats are preferred - is declared by each subclass.
+ */
+export class BookRequestWorkDto {
   /**
    * File this as somebody else, for a front end that its users sign into instead of this one.
    *
@@ -52,9 +57,6 @@ export class CreateBookRequestDto {
   @IsString()
   @MaxLength(500)
   title!: string;
-
-  @IsIn(BOOK_REQUEST_MEDIA_KINDS)
-  mediaKind!: BookRequestMediaKind;
 
   @IsOptional()
   @IsString()
@@ -134,16 +136,21 @@ export class CreateBookRequestDto {
   metadataSources?: BookRequestMetadataSourceDto[];
 
   @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
+}
+
+export class CreateBookRequestDto extends BookRequestWorkDto {
+  @IsIn(BOOK_REQUEST_MEDIA_KINDS)
+  mediaKind!: BookRequestMediaKind;
+
+  @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
   @IsString({ each: true })
   @MaxLength(20, { each: true })
   preferredFormats?: string[];
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  note?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -156,4 +163,14 @@ export class CreateBookRequestDto {
   @IsInt()
   @Min(1)
   targetFolderId?: number;
+
+  /**
+   * The book the arriving files should join, for a format that book does not have yet. Optional
+   * and new, so a client only sends it to a server advertising `book-request-pairs`.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  targetBookId?: number;
 }

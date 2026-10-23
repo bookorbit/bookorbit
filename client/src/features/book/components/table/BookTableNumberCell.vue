@@ -103,13 +103,13 @@ function handleClick() {
       v-model="draft"
       :type="allowDecimal ? 'text' : 'number'"
       :inputmode="allowDecimal ? 'decimal' : undefined"
-      class="w-full rounded border border-primary/50 bg-background px-1.5 py-0.5 text-sm text-foreground outline-none focus:border-primary/70"
+      class="w-full rounded-xs border border-primary/50 bg-background px-1.5 py-0.5 text-sm text-foreground outline-none focus:border-primary/70"
       @blur="handleBlur"
       @keydown="handleKeydown"
     />
     <span
       v-else
-      class="block min-h-[20px] truncate rounded px-1 text-sm"
+      class="block min-h-[20px] truncate rounded-xs px-1 text-sm"
       :class="[isReadOnly ? 'text-foreground' : 'cursor-pointer hover:bg-primary/5', value != null ? 'text-foreground' : 'text-muted-foreground']"
       :title="value != null ? String(value) : ''"
       :tabindex="isReadOnly ? -1 : 0"

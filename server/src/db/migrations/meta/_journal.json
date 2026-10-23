@@ -719,8 +719,169 @@
     {
       "idx": 102,
       "version": "7",
-      "when": 1791121374848,
-      "tag": "0102_add_mangabaka_columns",
+      "when": 1791126075111,
+      "tag": "0102_add_book_journal_and_annotation_stars",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1791330236442,
+      "tag": "0103_fix_kobo_koreader_download_matching",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1791351760200,
+      "tag": "0104_add_library_file_write_all_files",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1791388600818,
+      "tag": "0105_add_library_file_write_read_along",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1791429899868,
+      "tag": "0106_add_book_request_pairs",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1791658522588,
+      "tag": "0107_add_provider_metadata_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1791684796856,
+      "tag": "0108_add_read_aloud_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1791821546946,
+      "tag": "0109_add_hardcover_match_basis",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1791838145626,
+      "tag": "0110_add_email_provider_test_result",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1791853301183,
+      "tag": "0111_add_koreader_session_tombstones",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1791941743914,
+      "tag": "0112_add_server_connection_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1792002996105,
+      "tag": "0113_add_djvu_email_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1792163623360,
+      "tag": "0114_add_book_metadata_page_count_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1792168359342,
+      "tag": "0115_add_audit_resource_label",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1792185442568,
+      "tag": "0116_regex_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1792191772317,
+      "tag": "0117_add_reading_session_sync_interval",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1792201109071,
+      "tag": "0118_add_kobo_bookmark_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1792206724086,
+      "tag": "0119_add_kobo_full_size_covers",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1792209194389,
+      "tag": "0120_record_kobo_snapshot_cover_ids",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1792444043652,
+      "tag": "0121_add_device_annotation_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1792511452628,
+      "tag": "0122_add_release_info_url_and_review_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1792512356419,
+      "tag": "0123_add_koreader_hide_audio_only_books",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1792516862510,
+      "tag": "0124_add_author_metadata_provider_pinned",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1792757252154,
+      "tag": "0125_add_mangabaka_columns",
       "breakpoints": true
     }
   ]

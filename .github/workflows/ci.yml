@@ -518,7 +518,7 @@ jobs:
           steps.has-changes.outputs.run == 'true' &&
           hashFiles(format('test-results/{0}/junit.xml', matrix.package)) != '' &&
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: EnricoMi/publish-unit-test-result-action@d0a4676d0e0b938bc201470d88276b7c74c712b3 # v2
+        uses: EnricoMi/publish-unit-test-result-action@7622c5bf3d112a72ab4fa3951c2aa5723d8ab92d # v2
         with:
           check_name: ${{ matrix.package == 'server' && 'Server Unit Tests' || 'Client Unit Tests' }}
           files: ${{ format('test-results/{0}/junit.xml', matrix.package) }}
@@ -531,7 +531,7 @@ jobs:
           steps.has-changes.outputs.run == 'true' &&
           hashFiles(format('test-results/{0}/junit.xml', matrix.package)) != '' &&
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-report-${{ matrix.package }}
           path: test-results/${{ matrix.package }}
@@ -580,7 +580,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 

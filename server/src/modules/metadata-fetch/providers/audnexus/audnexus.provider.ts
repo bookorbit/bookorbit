@@ -2,12 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { markProviderFailed } from '../../../../common/provider-cache/provider-call-context';
+import type { ProviderCacheSpec } from '../../../../common/provider-cache/provider-cache-spec';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { normalizeAudibleDomain } from '../audible/normalize-audible-domain';
 import { MetadataProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { audiobookGate, pickSearchInputs, providerCacheContext } from '../provider-cache';
 import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { allowsAudiobookProviders, buildRequestSignal } from '../provider-utils';
 import { mapAudNexusBook } from './audnexus.mapper';
@@ -32,6 +35,26 @@ export class AudnexusProvider implements MetadataProvider {
 
   private readonly logger = new Logger(AudnexusProvider.name);
 
+  readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
+    version: 1,
+    trustEmpty: true,
+    context: async () => {
+      const config = await this.providerConfig.getConfig();
+      return providerCacheContext(config.audnexus.enabled, { domain: config.audible.domain });
+    },
+    // A stored Audible id skips the title search entirely, so title and author only matter without one.
+    describeSearch: (params) => {
+      const audibleId = params.existingProviderIds?.[MetadataProviderKey.AUDIBLE];
+      return {
+        inputs: {
+          ...(audibleId != null ? { audibleId } : pickSearchInputs(params, ['title', 'author'])),
+          audiobook: audiobookGate(params),
+        },
+      };
+    },
+    describeLookup: () => null,
+  };
+
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
@@ -48,6 +71,7 @@ export class AudnexusProvider implements MetadataProvider {
       return result ? [result] : [];
     } catch (err) {
       if (err instanceof ProviderThrottleError) throw err;
+      markProviderFailed('audnexus.search: unusable response');
       this.logger.error(`AudNexus search failed: ${err instanceof Error ? err.message : String(err)}`);
       return [];
     }
@@ -78,6 +102,7 @@ export class AudnexusProvider implements MetadataProvider {
         return null;
       }
       const body = (await res.json()) as AudibleSearchResponse;
+      if (!Array.isArray(body.products)) markProviderFailed('audnexus.resolve-asin: response without products');
       const asin = body.products?.[0]?.asin?.trim() || null;
       this.logger.log(
         `[audnexus] [end] op=resolve-asin method=GET query="${safeQuery}" status=${res.status} found=${asin != null} durationMs=${Date.now() - startedAt}`,
@@ -90,6 +115,7 @@ export class AudnexusProvider implements MetadataProvider {
         );
         throw err;
       }
+      markProviderFailed('audnexus.resolve-asin: unusable response');
       this.logger.error(
         `[audnexus] [fail] op=resolve-asin method=GET query="${safeQuery}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
@@ -108,9 +134,8 @@ export class AudnexusProvider implements MetadataProvider {
     try {
       const [bookRes, chaptersRes] = await Promise.all([
         fetchWithThrottle(bookUrl, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) }),
-        fetchWithThrottle(chaptersUrl, {
-          signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal),
-        }),
+        // Many titles have no chapter data; Audnexus answers 404 for those, which is a complete answer.
+        fetchWithThrottle(chaptersUrl, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) }, { acceptedStatuses: [404] }),
       ]);
 
       if (!bookRes.ok) {
@@ -134,6 +159,7 @@ export class AudnexusProvider implements MetadataProvider {
       }
 
       const book = (await bookRes.json()) as AudNexusBook;
+      if (!book?.asin) markProviderFailed('audnexus.lookup-book: response without asin');
       const chapters = chaptersRes.ok ? ((await chaptersRes.json()) as AudNexusChaptersResponse) : undefined;
 
       return mapAudNexusBook(book, chapters);
@@ -144,6 +170,7 @@ export class AudnexusProvider implements MetadataProvider {
         );
         throw err;
       }
+      markProviderFailed('audnexus.lookup-asin: unusable response');
       this.logger.error(
         `[audnexus] [fail] op=lookup-asin method=GET providerId="${asin}" durationMs=${Date.now() - bookStartedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );

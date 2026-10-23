@@ -33,6 +33,7 @@ function makeService(db: any = {}) {
     bufferBooksUnavailableNotification: vi.fn(),
     bufferBooksRestoredNotification: vi.fn(),
     reconcileCoverSlotsAsync: vi.fn(),
+    refreshRegexMetadataAfterMoveAsync: vi.fn(),
   } as unknown as ScannerService;
 
   const selfWriteRegistry = new SelfWriteRegistry();
@@ -164,6 +165,7 @@ describe('process()', () => {
 
     expect((gateway as any).emitBookMoved).toHaveBeenCalledWith({ libraryId: 1, bookIds: [5] });
     expect(scheduleFolderScanSpy).toHaveBeenCalledWith('/books/moved.epub', 1);
+    expect(scannerService.refreshRegexMetadataAfterMoveAsync).toHaveBeenCalledWith([5]);
     expect(scannerService.startScanAsync).not.toHaveBeenCalled();
   });
 

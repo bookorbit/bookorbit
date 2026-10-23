@@ -1,5 +1,6 @@
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
 import type { CoverMedium } from "./book";
+import type { MetadataCacheServedProvider, MetadataCandidateCacheInfo } from "./metadata-cache";
 import type { SeriesIndex } from "./series-index";
 
 export const MetadataProviderKey = {
@@ -131,6 +132,12 @@ export interface MetadataCandidate {
   mangabakaSeriesId?: string;
 }
 
+/**
+ * A candidate as a search stream sends it. `cache` is present only when the metadata cache answered
+ * for the candidate's provider; it is never part of the candidate itself.
+ */
+export type MetadataSearchCandidateEvent = MetadataCandidate & { cache?: MetadataCandidateCacheInfo };
+
 export interface MetadataProviderInfo {
   key: MetadataProviderKey;
   label: string;
@@ -147,6 +154,13 @@ export interface MetadataProviderInfo {
  * client that only reads candidates is unaffected by a provider reporting how it stopped.
  */
 export const METADATA_PROVIDER_STATUS_EVENT = "provider-status";
+
+/**
+ * The most ranked candidates one provider may contribute to a metadata search stream. A search for
+ * one book's match keeps the server's small default; a search that browses, such as finding a book
+ * to request, asks for up to this many with `resultsPerProvider`.
+ */
+export const METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER = 20;
 
 /** Why a provider stopped before finishing, so an interrupted search is not read as an empty one. */
 export type MetadataProviderSearchOutcome = "timeout" | "throttled" | "failed";
@@ -190,6 +204,8 @@ export interface MetadataFetchDiagnostics {
   resolvedFieldCount: number;
   /** One entry per cover slot the fetch applied to; a slot outside the book's media is absent. */
   coverSlots?: Partial<Record<CoverMedium, MetadataFetchCoverSlotDiagnostics>>;
+  /** Providers the metadata cache answered for. Absent on servers without the cache. */
+  cacheServedProviders?: MetadataCacheServedProvider[];
 }
 
 export interface ProviderThrottleRuntimeState {

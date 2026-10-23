@@ -22,6 +22,12 @@ describe('selectEmbeddedCoverSources', () => {
     expect(sources.audio?.absolutePath).toBe('/b/Part 1.mp3');
   });
 
+  it('takes the first track of the first disc when discs reuse file names', () => {
+    const files = [file('/b/CD 2/01.mp3'), file('/b/CD 1/02.mp3'), file('/b/CD 1/01.mp3')];
+
+    expect(selectEmbeddedCoverSources(files, ['mp3']).audio?.absolutePath).toBe('/b/CD 1/01.mp3');
+  });
+
   it('gives a read-along EPUB no audio source, because its art is the book cover', () => {
     const sources = selectEmbeddedCoverSources([file('/b/book.epub', { mediaOverlayAvailable: true })], ['epub']);
 

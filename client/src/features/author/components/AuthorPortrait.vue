@@ -125,7 +125,7 @@ function handleCoverError() {
 
     <span
       v-if="source === 'cover' && showSourceBadge"
-      class="pointer-events-none absolute hidden size-4 place-items-center rounded bg-black/45 text-white/85 backdrop-blur-[2px] @[3.5rem]:grid"
+      class="pointer-events-none absolute hidden size-4 place-items-center rounded-xs bg-black/45 text-white/85 backdrop-blur-[2px] @[3.5rem]:grid"
       :class="badgeInset"
       :title="t('author.portrait.fromTheirBook')"
     >

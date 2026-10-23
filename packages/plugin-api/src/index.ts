@@ -14,7 +14,12 @@
 /** Bumped when a change to this contract would break a plugin written against the old one. */
 export const PLUGIN_API_VERSION = 1;
 
-export type PluginMediaKind = "ebook" | "audiobook" | "comic";
+/**
+ * What BookOrbit asks a plugin to search for. Comics are no longer requested: a plugin written
+ * before they were retired may still declare `comic` and its categories, and the loader accepts
+ * and ignores them, so nothing has to change for that plugin to keep working.
+ */
+export type PluginMediaKind = "ebook" | "audiobook";
 
 /** Distinct enough to act on: a rejected credential must not look like "nothing found". */
 export type PluginSearchFailure = "unauthorized" | "throttled" | "timeout" | "unreachable" | "unsupportedMedium" | "error";
@@ -25,7 +30,6 @@ export type PluginCredentialKind = "apiKey" | "sessionId" | null;
 export interface PluginCategoryMap {
   ebook: number[];
   audiobook: number[];
-  comic: number[];
 }
 
 /** A signed update feed controlled by the plugin publisher. */
@@ -95,6 +99,12 @@ export interface PluginReleaseCandidate {
   downloadUrl?: string;
   magnet?: string;
   infoHash?: string;
+  /**
+   * The release's page on the source, for an approver to read before sending it. An http(s) URL
+   * that needs no credential: the host drops one carrying the indexer's credential or a key-like
+   * query parameter rather than showing it. Ignored by hosts older than the field.
+   */
+  infoUrl?: string;
   sizeBytes: number | null;
   /**
    * Null means the source reported no swarm counts, which must not be read as zero: the
@@ -242,4 +252,11 @@ export interface IndexerPlugin {
   resolveFile?(release: PluginReleaseCandidate, config: PluginIndexerConfig, host: PluginHost, signal: AbortSignal): Promise<PluginReleaseFile>;
   /** Sources whose session expires on its own clock, called on a schedule while enabled. */
   keepalive?(config: PluginIndexerConfig, host: PluginHost): Promise<void>;
+  /**
+   * Drop anything held in memory for this indexer, such as a live session. Called when an operator
+   * changes its base URL, credential or private-address setting, so the next call starts from the
+   * stored config. Not awaited, and a failure is logged rather than reported. Never called by hosts
+   * older than the hook.
+   */
+  forget?(indexerId: number): void | Promise<void>;
 }

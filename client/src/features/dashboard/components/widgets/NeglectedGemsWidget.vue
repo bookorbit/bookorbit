@@ -47,8 +47,8 @@ async function addToQueue() {
 
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col items-center justify-center gap-3">
-      <div class="h-16 w-12 animate-pulse rounded bg-muted" />
-      <div class="h-3 w-20 animate-pulse rounded bg-muted" />
+      <div class="h-16 w-12 animate-pulse rounded-xs bg-muted" />
+      <div class="h-3 w-20 animate-pulse rounded-xs bg-muted" />
     </div>
 
     <!-- Error -->
@@ -70,7 +70,7 @@ async function addToQueue() {
         tag="button"
         type="button"
         size="mini"
-        class="book-cover-surface--spine-fitted h-19 w-13 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
+        class="book-cover-surface--spine-fitted h-19 w-13 cursor-pointer overflow-hidden rounded-xs transition-opacity hover:opacity-80"
         @click="goToBook"
       >
         <BookCoverArtwork

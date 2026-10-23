@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import KoreaderSettings from '../KoreaderSettings.vue'
 import type { BookCard, KoreaderCredentials, KoreaderManualHashLink, KoreaderSyncStatus, KoreaderUnmatchedBook } from '@bookorbit/types'
 import { copyToClipboard } from '@/lib/clipboard'
+import { toast } from 'vue-sonner'
 
 const routerState = vi.hoisted(() => ({
   currentQuery: {} as Record<string, string>,
@@ -78,6 +79,7 @@ function makeCredentials(overrides: Partial<KoreaderCredentials> = {}): Koreader
   return {
     username: 'reader-user',
     syncEnabled: true,
+    hideAudioOnlyBooks: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
@@ -316,7 +318,7 @@ describe('KoreaderSettings', () => {
     expect(koreaderMock.createCredentials).toHaveBeenCalledWith({ username: 'new-reader', password: 'secret1' })
   })
 
-  it('renders configured status, setup, device, activity, guide, and danger sections', async () => {
+  it('renders configured status, plugin library, setup, device, activity, guide, and danger sections', async () => {
     const status = makeSyncStatus()
     koreaderMock.credentials.value = status.credentials
     koreaderMock.syncStatus.value = status
@@ -326,10 +328,11 @@ describe('KoreaderSettings', () => {
 
     expect(wrapper.findAll('.settings-group-label').map((label) => label.text())).toEqual([
       'KOReader Status',
+      'Plugin Library',
       'Setup',
       'Devices',
       'Plugin Activity',
-      'Unmatched KOReader Books',
+      'KOReader Books to Review',
       'Manual KOReader Links',
       'Setup Guide',
       'Danger Zone',
@@ -346,7 +349,8 @@ describe('KoreaderSettings', () => {
     expect(wrapper.text()).toContain('Update available')
     expect(wrapper.text()).toContain('latest plugin v1.6.0')
     expect(wrapper.text()).toContain('Matched books')
-    expect(wrapper.text()).toContain('No unmatched KOReader books.')
+    expect(wrapper.text()).toContain('No KOReader books to review.')
+    expect(wrapper.text()).toContain('Unlinked books can still sync through an automatic match.')
     expect(wrapper.text()).toContain('No manual KOReader links.')
     expect(wrapper.text()).toContain('2 deleted highlights awaiting KOReader plugin acknowledgement.')
     expect(wrapper.text()).toContain('3 highlight positions need attention.')
@@ -561,6 +565,47 @@ describe('KoreaderSettings', () => {
     expect(koreaderMock.deleteCredentials).toHaveBeenCalledTimes(1)
   })
 
+  it('names the audiobook-only switch and saves the reader turning it off', async () => {
+    const status = makeSyncStatus()
+    koreaderMock.credentials.value = status.credentials
+    koreaderMock.syncStatus.value = status
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const toggle = wrapper.get('[aria-labelledby="koreader-hide-audio-only-label"]')
+    expect(toggle.attributes('role')).toBe('switch')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+    expect(wrapper.get('#koreader-hide-audio-only-label').text()).toBe('Hide audiobook-only books')
+    expect(wrapper.find(`#${toggle.attributes('aria-describedby')}`).exists()).toBe(true)
+
+    await toggle.trigger('click')
+    await flushPromises()
+
+    expect(koreaderMock.updateCredentials).toHaveBeenCalledWith({ hideAudioOnlyBooks: false })
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Audiobook-only books shown in the plugin')
+    expect(toggle.attributes('disabled')).toBeUndefined()
+  })
+
+  it('reports a failed audiobook-only switch and lets the reader try again', async () => {
+    const status = makeSyncStatus()
+    koreaderMock.credentials.value = { ...status.credentials!, hideAudioOnlyBooks: false }
+    koreaderMock.syncStatus.value = status
+    koreaderMock.updateCredentials.mockRejectedValueOnce(new Error('offline'))
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const toggle = wrapper.get('[aria-labelledby="koreader-hide-audio-only-label"]')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+    await toggle.trigger('click')
+    await flushPromises()
+
+    expect(koreaderMock.updateCredentials).toHaveBeenCalledWith({ hideAudioOnlyBooks: true })
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to update the plugin library setting')
+    expect(toggle.attributes('disabled')).toBeUndefined()
+  })
+
   it('opens the unmatched link dialog and submits the selected BookOrbit book', async () => {
     const status = makeSyncStatus({ pluginTotals: { ...makeSyncStatus().pluginTotals, unmatchedBooks: 1 } })
     koreaderMock.credentials.value = status.credentials
@@ -677,8 +722,8 @@ describe('KoreaderSettings', () => {
 
     await buttonByText(wrapper, 'Dismiss all')!.trigger('click')
 
-    expect(wrapper.text()).toContain('Dismiss all 2 unmatched books?')
-    expect(wrapper.text()).toContain('clears your entire unmatched books list')
+    expect(wrapper.text()).toContain('Dismiss all 2 books to review?')
+    expect(wrapper.text()).toContain('clears your entire books to review list')
 
     const dismissAllButtons = wrapper.findAll('button').filter((button) => button.text() === 'Dismiss all')
     await dismissAllButtons[dismissAllButtons.length - 1]!.trigger('click')
@@ -700,7 +745,7 @@ describe('KoreaderSettings', () => {
     await buttonByText(wrapper, 'Cancel')!.trigger('click')
 
     expect(koreaderMock.dismissAllUnmatchedBooks).not.toHaveBeenCalled()
-    expect(wrapper.text()).not.toContain('clears your entire unmatched books list')
+    expect(wrapper.text()).not.toContain('clears your entire books to review list')
   })
 
   it('keeps the confirm dialog open and reports an error when dismissing all unmatched books fails', async () => {
@@ -719,7 +764,7 @@ describe('KoreaderSettings', () => {
     await flushPromises()
 
     expect(koreaderMock.dismissAllUnmatchedBooks).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('clears your entire unmatched books list')
+    expect(wrapper.text()).toContain('clears your entire books to review list')
   })
 
   it('loads more BookOrbit search results from the link dialog', async () => {
@@ -778,6 +823,7 @@ describe('KoreaderSettings', () => {
     await buttonByText(wrapper, 'Unlink')!.trigger('click')
 
     expect(wrapper.text()).toContain('Unlink KOReader book?')
+    expect(wrapper.text()).toContain('Future syncs will use an automatic match if one exists.')
     expect(wrapper.text()).toContain('Already synced stats will stay on their current BookOrbit book.')
 
     const unlinkButtons = wrapper.findAll('button').filter((button) => button.text() === 'Unlink')

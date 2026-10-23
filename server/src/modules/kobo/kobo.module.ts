@@ -7,6 +7,8 @@ import { BookModule } from '../book/book.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
+import { EpubModule } from '../reader/epub/epub.module';
+import { BookmarkModule } from '../bookmark/bookmark.module';
 import { ReadingSessionModule } from '../reading-session/reading-session.module';
 import { SmartScopeModule } from '../smart-scope/smart-scope.module';
 import { UserModule } from '../user/user.module';
@@ -24,6 +26,15 @@ import { KoboAnnotationExchangeService } from './services/kobo-annotation-exchan
 import { KoboAnnotationMaterializerService } from './services/kobo-annotation-materializer.service';
 import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboDownloadService } from './services/kobo-download.service';
+import { KoboReadingProgressRepository } from './kobo-reading-progress.repository';
+import { KoboDeliveryRepository } from './kobo-delivery.repository';
+import { KoboAnnotationServeRepository } from './kobo-annotation-serve.repository';
+import { KoboBookmarkLinkRepository } from './kobo-bookmark-link.repository';
+import { KoboDeliveryService } from './services/kobo-delivery.service';
+import { KoboDownloadRepository } from './kobo-download.repository';
+import { KoboDownloadHashRegistrationService } from './services/kobo-download-hash-registration.service';
+import { KoboDownloadHashBackfillService } from './services/kobo-download-hash-backfill.service';
+import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { KoboKepubContextService } from './services/kobo-kepub-context.service';
 import { KoboPositionRebuildService } from './services/kobo-position-rebuild.service';
 import { KoboProgressBridgeService } from './services/kobo-progress-bridge.service';
@@ -39,13 +50,16 @@ import { KoboAnalyticsService } from './services/kobo-analytics.service';
 
 @Module({
   imports: [
+    AppSettingsModule,
     CommonModule,
     AchievementModule,
     AnnotationModule,
     BookModule,
+    BookmarkModule,
     BookCoverStoreModule,
     MetadataModule,
     PositionConverterModule,
+    EpubModule,
     UserModule,
     UserBookStatusModule,
     ReadingSessionModule,
@@ -70,6 +84,14 @@ import { KoboAnalyticsService } from './services/kobo-analytics.service';
     KoboSyncHistoryService,
     KoboThumbnailService,
     KoboDownloadService,
+    KoboDownloadRepository,
+    KoboDeliveryRepository,
+    KoboBookmarkLinkRepository,
+    KoboAnnotationServeRepository,
+    KoboReadingProgressRepository,
+    KoboDeliveryService,
+    KoboDownloadHashBackfillService,
+    KoboDownloadHashRegistrationService,
     KoboProxyService,
     KoboAnalyticsResolverService,
     KoboAnalyticsService,

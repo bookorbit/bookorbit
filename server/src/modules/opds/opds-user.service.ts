@@ -32,6 +32,7 @@ export class OpdsUserService {
         userId: schema.opdsUsers.userId,
         username: schema.opdsUsers.username,
         sortOrder: schema.opdsUsers.sortOrder,
+        readAloudDelivery: schema.opdsUsers.readAloudDelivery,
         createdAt: schema.opdsUsers.createdAt,
       })
       .from(schema.opdsUsers)
@@ -49,12 +50,14 @@ export class OpdsUserService {
           username: dto.username,
           passwordHash,
           sortOrder: dto.sortOrder ?? 'recent',
+          readAloudDelivery: dto.readAloudDelivery ?? null,
         })
         .returning({
           id: schema.opdsUsers.id,
           userId: schema.opdsUsers.userId,
           username: schema.opdsUsers.username,
           sortOrder: schema.opdsUsers.sortOrder,
+          readAloudDelivery: schema.opdsUsers.readAloudDelivery,
           createdAt: schema.opdsUsers.createdAt,
         });
       return created;
@@ -68,13 +71,18 @@ export class OpdsUserService {
 
   async update(userId: number, opdsUserId: number, dto: UpdateOpdsUserDto) {
     await this.verifyOwnership(userId, opdsUserId);
-    const [updated] = await this.db.update(schema.opdsUsers).set({ sortOrder: dto.sortOrder }).where(eq(schema.opdsUsers.id, opdsUserId)).returning({
-      id: schema.opdsUsers.id,
-      userId: schema.opdsUsers.userId,
-      username: schema.opdsUsers.username,
-      sortOrder: schema.opdsUsers.sortOrder,
-      createdAt: schema.opdsUsers.createdAt,
-    });
+    const [updated] = await this.db
+      .update(schema.opdsUsers)
+      .set({ sortOrder: dto.sortOrder, readAloudDelivery: dto.readAloudDelivery })
+      .where(eq(schema.opdsUsers.id, opdsUserId))
+      .returning({
+        id: schema.opdsUsers.id,
+        userId: schema.opdsUsers.userId,
+        username: schema.opdsUsers.username,
+        sortOrder: schema.opdsUsers.sortOrder,
+        readAloudDelivery: schema.opdsUsers.readAloudDelivery,
+        createdAt: schema.opdsUsers.createdAt,
+      });
     if (!updated) throw new NotFoundException('OPDS user not found');
     return updated;
   }

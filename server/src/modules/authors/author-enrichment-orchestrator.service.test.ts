@@ -85,6 +85,8 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       provider: 'audnexus',
       descriptionUpdated: true,
       imageUpdated: false,
+      outboundRequests: 1,
+      cacheServed: [],
     });
 
     metadataPreferences.getPreferences.mockResolvedValue(new AuthorMetadataPreferenceResolver().getDefaultPreferences());
@@ -127,12 +129,137 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     await (service as any).pollOnce();
 
     expect(queueRepo.markProcessing).toHaveBeenCalledWith(22);
-    expect(executor.execute).toHaveBeenCalledWith({
-      authorId: 22,
-      preferences: expect.objectContaining({ fields: expect.any(Object) }),
-    });
+    expect(executor.execute).toHaveBeenCalledWith(
+      {
+        authorId: 22,
+        preferences: expect.objectContaining({ fields: expect.any(Object) }),
+      },
+      { policy: 'default', allowFallback: false },
+    );
     expect(queueRepo.markDone).toHaveBeenCalledWith(22, false);
     expect(queueRepo.markFailed).not.toHaveBeenCalled();
+  });
+
+  describe('metadata cache directive', () => {
+    it('uses the cache without fallback before the final attempt', async () => {
+      await (service as any).processOne(10, 0);
+      await (service as any).processOne(11, 4);
+
+      expect(executor.execute).toHaveBeenNthCalledWith(1, expect.anything(), { policy: 'default', allowFallback: false });
+      expect(executor.execute).toHaveBeenNthCalledWith(2, expect.anything(), { policy: 'default', allowFallback: false });
+    });
+
+    it('allows a saved answer to stand in for a failing provider only on the final attempt', async () => {
+      await (service as any).processOne(12, 5);
+
+      expect(executor.execute).toHaveBeenCalledWith(expect.anything(), { policy: 'default', allowFallback: true });
+    });
+
+    it('still requeues a transient failure before the final attempt', async () => {
+      executor.execute.mockResolvedValue({
+        kind: 'failed',
+        message: 'provider unavailable',
+        provider: 'audnexus',
+        httpStatus: 503,
+        retryAfterMs: null,
+        transient: true,
+        descriptionUpdated: false,
+        imageUpdated: false,
+        outboundRequests: 1,
+        cacheServed: [],
+      });
+
+      await (service as any).processOne(13, 4);
+
+      expect(queueRepo.markFailed).toHaveBeenCalledWith(expect.objectContaining({ authorId: 13, nextAttemptAt: expect.any(Date) }));
+    });
+
+    it('goes live for rows queued with ignore_cache', async () => {
+      queueRepo.fetchDue.mockResolvedValue([{ authorId: 23, attemptCount: 0, authorName: null, reason: 'manual_backfill', ignoreCache: true }]);
+      vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
+
+      await (service as any).pollOnce();
+
+      expect(executor.execute).toHaveBeenCalledWith(expect.objectContaining({ authorId: 23 }), { policy: 'refresh', allowFallback: false });
+    });
+
+    it('keeps fallback on the final attempt of an ignore_cache row', async () => {
+      await (service as any).processOne(24, 5, null, AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, true);
+
+      expect(executor.execute).toHaveBeenCalledWith(expect.anything(), { policy: 'refresh', allowFallback: true });
+    });
+  });
+
+  describe('pacing', () => {
+    it('skips the provider delay when an item made no outbound requests', async () => {
+      queueRepo.fetchDue.mockResolvedValue([{ authorId: 30, attemptCount: 0, authorName: null, reason: 'manual_backfill', ignoreCache: false }]);
+      executor.execute.mockResolvedValue({
+        kind: 'done',
+        provider: 'audnexus',
+        descriptionUpdated: true,
+        imageUpdated: false,
+        outboundRequests: 0,
+        cacheServed: [{ provider: 'audnexus', source: 'cache', stale: false, cachedAt: '2026-09-01T00:00:00.000Z' }],
+      });
+      const randomDelay = vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
+      const cacheOnlyYield = vi.spyOn(service as any, 'cacheOnlyYield').mockResolvedValue(undefined);
+
+      await (service as any).pollOnce();
+
+      expect(cacheOnlyYield).toHaveBeenCalledTimes(1);
+      expect(randomDelay).not.toHaveBeenCalled();
+    });
+
+    it('keeps the provider delay when an item went out', async () => {
+      queueRepo.fetchDue.mockResolvedValue([{ authorId: 31, attemptCount: 0, authorName: null, reason: 'manual_backfill', ignoreCache: false }]);
+      executor.execute.mockResolvedValue({
+        kind: 'skipped',
+        reason: 'no_match',
+        provider: null,
+        descriptionUpdated: false,
+        imageUpdated: false,
+        outboundRequests: 2,
+        cacheServed: [],
+      });
+      const randomDelay = vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
+      const cacheOnlyYield = vi.spyOn(service as any, 'cacheOnlyYield').mockResolvedValue(undefined);
+
+      await (service as any).pollOnce();
+
+      expect(randomDelay).toHaveBeenCalledTimes(1);
+      expect(cacheOnlyYield).not.toHaveBeenCalled();
+    });
+
+    it('yields for about 100 ms instead of the 1-3 s provider delay', async () => {
+      vi.useFakeTimers();
+      try {
+        let resolved = false;
+        void (service as any).cacheOnlyYield().then(() => {
+          resolved = true;
+        });
+        await vi.advanceTimersByTimeAsync(99);
+        expect(resolved).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(resolved).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it('backfills pass ignoreCache through to the queue', async () => {
+    queueRepo.enqueueEligibleLinkedAuthors.mockResolvedValue(2);
+    queueRepo.enqueueAllLinkedAuthors.mockResolvedValue(3);
+
+    await service.backfillLinkedAuthors({ ignoreCache: true });
+    await service.backfillAllLinkedAuthors({ ignoreCache: true });
+    await service.backfillLinkedAuthors();
+
+    expect(queueRepo.enqueueEligibleLinkedAuthors).toHaveBeenNthCalledWith(1, AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, expect.any(Object), {
+      ignoreCache: true,
+    });
+    expect(queueRepo.enqueueAllLinkedAuthors).toHaveBeenCalledWith(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, { ignoreCache: true });
+    expect(queueRepo.enqueueEligibleLinkedAuthors).toHaveBeenNthCalledWith(2, AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, expect.any(Object), {});
   });
 
   it('marks rate-limited failures for retry with delayed nextAttemptAt', async () => {

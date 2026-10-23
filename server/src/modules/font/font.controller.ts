@@ -8,6 +8,7 @@ import { ForbidPermission } from '../../common/decorators/forbid-permission.deco
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { FontService } from './font.service';
+import { RenameFontFamilyDto } from './dto/rename-font-family.dto';
 import { UpdateFontDto } from './dto/update-font.dto';
 
 @Controller('fonts')
@@ -17,6 +18,18 @@ export class FontController {
   @Get()
   async list(@CurrentUser() user: RequestUser) {
     return this.fontService.list(user.id);
+  }
+
+  /** How this reader uses each custom font, so the Fonts page can say what removing or hiding one costs. */
+  @Get('usage')
+  async usage(@CurrentUser() user: RequestUser) {
+    return this.fontService.usage(user.id);
+  }
+
+  @Patch('families')
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot manage fonts')
+  async renameFamily(@Body() dto: RenameFontFamilyDto, @CurrentUser() user: RequestUser) {
+    return this.fontService.renameFamily(user, dto.familyName, dto.newFamilyName);
   }
 
   @Post('upload')

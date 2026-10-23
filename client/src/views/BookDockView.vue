@@ -14,6 +14,7 @@ import { useBookDockUpload, SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT } from '
 import { useBookDockConflicts } from '@/features/book-dock/composables/useBookDockConflicts'
 import { refetchBookDockMetadata } from '@/features/book-dock/api/book-dock.api'
 import BookDockActionCluster from '@/features/book-dock/components/BookDockActionCluster.vue'
+import BookDockUploadFailures from '@/features/book-dock/components/BookDockUploadFailures.vue'
 import BookDockFilterBar from '@/features/book-dock/components/BookDockFilterBar.vue'
 import BookDockFileListView from '@/features/book-dock/components/BookDockFileListView.vue'
 import BookDockListBar from '@/features/book-dock/components/BookDockListBar.vue'
@@ -23,6 +24,7 @@ import BookDockBulkEditDialog from '@/features/book-dock/components/BookDockBulk
 import BookDockSetDestinationDialog from '@/features/book-dock/components/BookDockSetDestinationDialog.vue'
 import BookDockDiscardDialog from '@/features/book-dock/components/BookDockDiscardDialog.vue'
 import PaginationNav from '@/components/PaginationNav.vue'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 
 type ApplyFetchedResult = {
   total: number
@@ -435,16 +437,9 @@ function onDrop(e: DragEvent) {
   e.preventDefault()
   dragCounter = 0
   dragOver.value = false
+  // Unsupported files go through too, so the upload failures panel can say why they were refused.
   const files = e.dataTransfer?.files
-  if (files?.length) {
-    const valid = [...files].filter((f) => {
-      const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
-      return SUPPORTED_FORMATS.includes(ext)
-    })
-    if (valid.length) {
-      addFiles(valid)
-    }
-  }
+  if (files?.length) addFiles(files)
 }
 
 watch(isUploading, (uploading, was) => {
@@ -484,81 +479,75 @@ onUnmounted(() => {
   <div>
     <main class="flex-1" @dragover="onDragOver" @dragenter="onDragEnter" @dragleave="onDragLeave" @drop="onDrop">
       <input ref="emptyUploadInput" type="file" :accept="SUPPORTED_FORMATS_ACCEPT" multiple class="hidden" @change="onEmptyUploadSelected" />
-      <div class="flex w-full max-w-420 flex-col gap-4 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="flex items-center justify-center size-9 rounded-lg bg-primary/10">
-            <PackageOpen class="size-4.5 text-primary" />
-          </div>
-          <h1 class="text-xl font-semibold text-foreground tracking-tight">{{ t('views.bookDock.title') }}</h1>
-          <span
-            v-if="summary.total > 0"
-            class="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-xs font-semibold tabular-nums"
-          >
-            {{ summary.total }}
-          </span>
-          <span
-            v-if="summary.paused"
-            class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-medium"
-          >
-            <span class="size-1.5 rounded-full bg-current" />
-            Paused
-          </span>
-          <Transition name="fade">
+      <div class="flex w-full max-w-420 flex-col gap-4 pt-2 pb-4">
+        <PageTitleRow :title="t('views.bookDock.title')" :icon="PackageOpen" inline-grow>
+          <template #inline>
+            <BookDockFilterBar class="w-full" :active-view="activeView" :summary="summary" @view="setView" @search="setSearch" />
+          </template>
+          <template #facts>
             <span
-              v-if="newFilesDetected"
-              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-medium"
-            >
-              <span class="size-1.5 rounded-full bg-current animate-pulse" />
-              {{ t('views.bookDock.newFilesDetected') }}
-            </span>
-          </Transition>
-          <Transition name="fade">
-            <span
-              v-if="applyFetchedResult"
+              v-if="summary.paused"
               class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-medium"
             >
-              <CheckCircle2 class="size-3.5" />
-              {{ applyFetchedResultMessage(applyFetchedResult) }}
+              <span class="size-1.5 rounded-full bg-current" />
+              Paused
             </span>
-          </Transition>
-          <Transition name="fade">
-            <span
-              v-if="retryQueued !== null"
-              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-primary/15 text-primary text-xs font-medium"
-            >
-              <CheckCircle2 class="size-3.5" />
-              {{ retryQueued === 0 ? t('views.bookDock.retry.noneToRetry') : t('views.bookDock.retry.retrying', { count: retryQueued }) }}
-            </span>
-          </Transition>
-          <Transition name="fade">
-            <span
-              v-if="!socketConnected"
-              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-muted text-muted-foreground text-xs font-medium"
-            >
-              <span class="size-1.5 rounded-full bg-muted-foreground animate-pulse" />
-              {{ t('views.bookDock.reconnecting') }}
-            </span>
-          </Transition>
-          <Transition name="fade">
-            <span
-              v-if="rescanFailed"
-              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
-            >
-              <AlertCircle class="size-3.5" />
-              {{ t('views.bookDock.rescanFailed') }}
-            </span>
-          </Transition>
-          <Transition name="fade">
-            <span
-              v-if="processingStateFailed"
-              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
-            >
-              <AlertCircle class="size-3.5" />
-              {{ t('bookDock.layout.pauseUpdateFailed') }}
-            </span>
-          </Transition>
-
-          <div class="ml-auto">
+            <Transition name="fade">
+              <span
+                v-if="newFilesDetected"
+                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-medium"
+              >
+                <span class="size-1.5 rounded-full bg-current animate-pulse" />
+                {{ t('views.bookDock.newFilesDetected') }}
+              </span>
+            </Transition>
+            <Transition name="fade">
+              <span
+                v-if="applyFetchedResult"
+                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-medium"
+              >
+                <CheckCircle2 class="size-3.5" />
+                {{ applyFetchedResultMessage(applyFetchedResult) }}
+              </span>
+            </Transition>
+            <Transition name="fade">
+              <span
+                v-if="retryQueued !== null"
+                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-primary/15 text-primary text-xs font-medium"
+              >
+                <CheckCircle2 class="size-3.5" />
+                {{ retryQueued === 0 ? t('views.bookDock.retry.noneToRetry') : t('views.bookDock.retry.retrying', { count: retryQueued }) }}
+              </span>
+            </Transition>
+            <Transition name="fade">
+              <span
+                v-if="!socketConnected"
+                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-muted text-muted-foreground text-xs font-medium"
+              >
+                <span class="size-1.5 rounded-full bg-muted-foreground animate-pulse" />
+                {{ t('views.bookDock.reconnecting') }}
+              </span>
+            </Transition>
+            <Transition name="fade">
+              <span
+                v-if="rescanFailed"
+                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
+              >
+                <AlertCircle class="size-3.5" />
+                {{ t('views.bookDock.rescanFailed') }}
+              </span>
+            </Transition>
+            <Transition name="fade">
+              <span
+                v-if="processingStateFailed"
+                class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
+              >
+                <AlertCircle class="size-3.5" />
+                {{ t('bookDock.layout.pauseUpdateFailed') }}
+              </span>
+            </Transition>
+          </template>
+          <template #actions>
             <BookDockActionCluster
               :paused="summary.paused"
               @pause="handleProcessingStateChanged"
@@ -568,10 +557,10 @@ onUnmounted(() => {
               @rescan="refresh"
               @rescan-error="handleRescanError"
             />
-          </div>
-        </div>
+          </template>
+        </PageTitleRow>
 
-        <BookDockFilterBar :active-view="activeView" :summary="summary" @view="setView" @search="setSearch" />
+        <BookDockUploadFailures />
 
         <!-- Statistics bar -->
         <div v-if="statistics && statistics.byFormat.length > 1" class="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">

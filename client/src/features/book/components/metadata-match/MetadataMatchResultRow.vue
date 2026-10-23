@@ -2,8 +2,9 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Barcode, Link } from '@lucide/vue'
-import type { MetadataCandidate, MetadataProviderInfo } from '@bookorbit/types'
+import type { MetadataCandidate, MetadataCandidateCacheInfo, MetadataProviderInfo } from '@bookorbit/types'
 import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
+import MetadataCacheBadge from '@/features/metadata-cache/components/MetadataCacheBadge.vue'
 import { getProviderLabel, hideOnError, providerBadgeStyle, resolveCandidateDisplayTitle, toDisplayCoverUrl } from '../../lib/metadata-fetch'
 import type { MatchAssessment } from '../../lib/metadata-match'
 import type { DifferenceSummary } from '../../lib/metadata-diff-fields'
@@ -17,6 +18,8 @@ const props = defineProps<{
   selected: boolean
   stagedCount: number
   coverRatio: string
+  /** Set when the metadata cache answered for this result's provider. */
+  cache?: MetadataCandidateCacheInfo | null
 }>()
 
 const emit = defineEmits<{ select: [MetadataCandidate] }>()
@@ -66,6 +69,7 @@ function handleSelect() {
         <span class="inline-flex h-[18px] items-center rounded-md px-1.5 text-[10.5px] font-bold" :style="providerBadgeStyle(candidate.provider)">
           {{ providerLabel }}
         </span>
+        <MetadataCacheBadge v-if="cache" :info="cache" />
         <span
           v-if="assessment.linked"
           class="inline-flex h-[18px] items-center gap-1 rounded-md bg-primary/15 px-1.5 text-[10.5px] font-semibold text-primary"

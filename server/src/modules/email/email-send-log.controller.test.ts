@@ -25,6 +25,8 @@ describe('EmailSendLogController', () => {
 
   const logService = {
     findForUser: vi.fn(),
+    summary: vi.fn(),
+    findAttention: vi.fn(),
     remove: vi.fn(),
   } as unknown as EmailSendLogService;
 
@@ -40,17 +42,34 @@ describe('EmailSendLogController', () => {
 
   it('uses default pagination values when query is empty', async () => {
     await controller.findForUser({} as QuerySendLogDto, user);
-    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, undefined);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, { bookId: undefined, status: undefined, recipientId: undefined });
   });
 
   it('forwards explicit pagination values', async () => {
     await controller.findForUser({ page: 4, size: 5 }, user);
-    expect(logService.findForUser).toHaveBeenCalledWith(user, 4, 5, undefined);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 4, 5, { bookId: undefined, status: undefined, recipientId: undefined });
   });
 
   it('forwards the book filter', async () => {
     await controller.findForUser({ bookId: 965 }, user);
-    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, 965);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, { bookId: 965, status: undefined, recipientId: undefined });
+  });
+
+  it('forwards the status filter', async () => {
+    await controller.findForUser({ status: 'failed' }, user);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, { bookId: undefined, status: 'failed', recipientId: undefined });
+  });
+
+  it('forwards the recipient filter', async () => {
+    await controller.findForUser({ recipientId: 7 }, user);
+    expect(logService.findForUser).toHaveBeenCalledWith(user, 0, 20, { bookId: undefined, status: undefined, recipientId: 7 });
+  });
+
+  it("delegates summary and attention to the caller's own log", async () => {
+    await controller.summary(user);
+    await controller.attention(user);
+    expect(logService.summary).toHaveBeenCalledWith(user);
+    expect(logService.findAttention).toHaveBeenCalledWith(user);
   });
 
   it('delegates remove', async () => {

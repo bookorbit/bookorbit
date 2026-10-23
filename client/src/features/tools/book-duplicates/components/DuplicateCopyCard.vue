@@ -56,13 +56,13 @@ function handleKeep(): void {
         </span>
         {{ keeper ? t('tools.bookDuplicates.keeping') : t('tools.bookDuplicates.willDelete') }}
       </span>
-      <span class="rounded border border-border px-1 font-mono text-[10px] leading-[15px] text-muted-foreground" aria-hidden="true">{{
+      <span class="rounded-xs border border-border px-1 font-mono text-[10px] leading-[15px] text-muted-foreground" aria-hidden="true">{{
         index + 1
       }}</span>
     </span>
 
     <span class="flex gap-2.5">
-      <span class="grid h-[74px] w-[52px] shrink-0 place-items-center overflow-hidden rounded border border-border bg-muted">
+      <span class="grid h-[74px] w-[52px] shrink-0 place-items-center overflow-hidden rounded-xs border border-border bg-muted">
         <BookCoverImage v-if="book.hasCover" :book-id="book.id" class="h-full w-full object-cover" alt="" />
         <BookOpen v-else class="size-5 text-muted-foreground" aria-hidden="true" />
       </span>

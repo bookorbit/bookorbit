@@ -10,7 +10,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from '../auth/auth.service';
 import { MigrationRepository } from './migration.repository';
 import { sanitizeRunForApi } from './core/api-sanitizers';
-import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
+import { rejectSocketConnection, resolveSocketUser, trackSocketHandshake } from '../../common/utils/ws-auth.utils';
 import { appConfig } from '../../config/config';
 
 @WebSocketGateway({ namespace: '/migration', cors: { credentials: true } })
@@ -38,6 +38,10 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
   }
 
   async handleConnection(client: Socket): Promise<void> {
+    await trackSocketHandshake(client, this.authenticate(client));
+  }
+
+  private async authenticate(client: Socket): Promise<RequestUser | null> {
     try {
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new UnauthorizedException('No token provided');
@@ -49,11 +53,13 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
       this.assertCanViewMigrationProgress(user);
       (client.data as Record<string, unknown>).user = user;
       this.logger.debug(`[migration.ws_connection] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
+      return user;
     } catch (err) {
       this.logger.warn(
         `[migration.ws_connection] [fail] socketId=${client.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - websocket rejected`,
       );
       rejectSocketConnection(client, err);
+      return null;
     }
   }
 
@@ -63,7 +69,7 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
 
   @SubscribeMessage('subscribe:run')
   async handleSubscribeRun(client: Socket, runId: number): Promise<void> {
-    const user = (client.data as { user?: RequestUser }).user;
+    const user = await resolveSocketUser(client);
     if (!user) return;
     void client.join(`run:${runId}`);
 

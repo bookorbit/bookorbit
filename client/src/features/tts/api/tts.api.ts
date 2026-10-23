@@ -43,11 +43,12 @@ async function assertOk(res: Response): Promise<void> {
 
 // ---- Synthesis ----
 
-export async function synthesize(params: TtsSynthesisRequest): Promise<Response> {
+export async function synthesize(params: TtsSynthesisRequest, signal?: AbortSignal): Promise<Response> {
   return api('/api/v1/tts/synthesize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
+    signal,
   })
 }
 

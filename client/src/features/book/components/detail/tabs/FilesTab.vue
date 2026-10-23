@@ -5,12 +5,14 @@ import { useI18n } from 'vue-i18n'
 import { useElementSize } from '@vueuse/core'
 import { FilePlus, Files, X } from '@lucide/vue'
 import type { BookDetail } from '@bookorbit/types'
-import { getPrimaryBookFile, isAudioFormat, Permission } from '@bookorbit/types'
+import { Permission } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useBookFileTree, type SortKey, type TreeFile } from '@/features/book/composables/useBookFileTree'
+import { findFileWriteTarget } from '@/features/book/lib/file-write-targets'
 import FilesHeroBar from '../files/FilesHeroBar.vue'
 import FileListCard from '../files/FileListCard.vue'
 import FileDetailCard from '../files/FileDetailCard.vue'
@@ -24,6 +26,8 @@ const { t } = useI18n()
 const router = useRouter()
 const { downloadFile: downloadBookFile } = useBookDownload()
 const { hasPermission } = usePermissions()
+const { hasLibraryPermission } = useLibraryPermissions()
+const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 
 const book = toRef(props, 'book')
 const {
@@ -44,7 +48,7 @@ const {
 
 const canUpload = computed(() => hasPermission(Permission.LibraryUpload))
 const canDownload = computed(() => hasPermission('library_download'))
-const canEdit = computed(() => hasPermission('library_edit_metadata'))
+const canEdit = canEditMetadata
 const canDelete = computed(() => hasPermission('library_delete_books'))
 
 /**
@@ -95,15 +99,9 @@ const runtimeLabel = computed(() => {
   return t('book.detail.files.duration.minutes', { minutes: Math.max(minutes, 1) })
 })
 
-/** Write-back goes to the primary file, or to every track when the primary is an audiobook. */
-const isWriteTarget = computed(() => {
-  const file = selectedFile.value
-  if (!file?.formatKey) return false
-  if (!(props.book.fileWriteStatus?.writableFormats ?? []).includes(file.formatKey as never)) return false
-  if (file.role === 'primary') return true
-  const primaryFormat = getPrimaryBookFile(props.book.files)?.format
-  return file.isAudio && primaryFormat != null && isAudioFormat(primaryFormat)
-})
+const selectedWriteTarget = computed(() => (selectedFile.value ? findFileWriteTarget(props.book.fileWriteStatus, selectedFile.value.id) : null))
+const isWriteTarget = computed(() => selectedWriteTarget.value?.writable === true)
+const writeSkipReason = computed(() => (selectedWriteTarget.value?.writable === false ? selectedWriteTarget.value.reason : null))
 
 function handleSort(key: SortKey) {
   toggleSort(key)
@@ -310,6 +308,7 @@ async function confirmDelete() {
             :is-multi-track-audio="isMultiTrackAudio"
             :runtime-seconds="runtimeSeconds"
             :is-write-target="isWriteTarget"
+            :write-skip-reason="writeSkipReason"
             :can-download="canDownload"
             :can-edit="canEdit"
             :can-delete="canDelete"
@@ -392,7 +391,13 @@ async function confirmDelete() {
     </div>
   </div>
 
-  <AddBookFileModal v-if="addFileModalOpen" :book-id="book.id" @close="closeAddFileModal" @uploaded="onFilesAdded" />
+  <AddBookFileModal
+    v-if="addFileModalOpen"
+    :book-id="book.id"
+    :can-rename-files="canEditMetadata"
+    @close="closeAddFileModal"
+    @uploaded="onFilesAdded"
+  />
 </template>
 
 <style scoped>

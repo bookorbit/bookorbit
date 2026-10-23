@@ -120,10 +120,12 @@ end
 local bounded = checkpoint:save({
     source_key = "filter|sort=title",
     completed = wide_completed,
+    linked_paths = wide_completed,
     failures = wide_failures,
     counts = {},
 })
 assertEqual(countKeys(bounded.completed), BulkCheckpoint.MAX_COMPLETED, "completed destinations stay bounded")
+assertEqual(countKeys(bounded.linked_paths), BulkCheckpoint.MAX_COMPLETED, "linked destinations stay bounded")
 assertEqual(#bounded.failures, BulkCheckpoint.MAX_FAILURES, "failure summaries stay bounded")
 
 -- A failed publish reports the failure and leaves nothing half-written.

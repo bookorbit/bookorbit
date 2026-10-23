@@ -35,7 +35,7 @@ const AUDIO_FORMAT_SQL = sql.join(
   sql`, `,
 );
 
-type OuterBookId = number | typeof books.id | typeof bookMetadata.bookId;
+type OuterBookId = number | typeof books.id | typeof bookMetadata.bookId | typeof bookCovers.bookId;
 
 /**
  * Drizzle leaves a column unqualified when the outer query reads a single table, and inside these
@@ -91,6 +91,14 @@ export type BookCoverContext = {
   media: CoverMedia;
   files: Array<{ id: number; format: string | null; role: string; mediaOverlayAvailable: boolean }>;
   slots: BookCoverSlotRow[];
+};
+
+export type BookCoverFaceRow = {
+  bookId: number;
+  libraryCoverAspectRatio: string;
+  primaryFormat: string | null;
+  media: CoverMedia;
+  legacyVersion: string;
 };
 
 export type BookCoverSourceFile = {
@@ -203,6 +211,37 @@ export class BookCoverStoreRepository {
       result.set(row.bookId, list);
     }
     return result;
+  }
+
+  /** What `BookCoverStore.facesFor` needs per book, for lists that carry no files of their own. */
+  async findFaceRows(bookIds: readonly number[]): Promise<BookCoverFaceRow[]> {
+    if (bookIds.length === 0) return [];
+    const outer = outerBookIdSql(books.id);
+    const rows = await this.db
+      .select({
+        bookId: books.id,
+        coverAspectRatio: libraries.coverAspectRatio,
+        primaryFormat: sql<string | null>`coalesce(
+          ${bookFiles.format},
+          (select first_content.format from ${bookFiles} as first_content
+            where first_content.book_id = ${outer} and first_content.role in ('content', 'primary')
+            order by first_content.id limit 1)
+        )`,
+        updatedAt: books.updatedAt,
+        addedAt: books.addedAt,
+        ...coverMediaSql(books.id),
+      })
+      .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(inArray(books.id, [...bookIds]));
+    return rows.map((row) => ({
+      bookId: row.bookId,
+      libraryCoverAspectRatio: row.coverAspectRatio,
+      primaryFormat: row.primaryFormat,
+      media: { hasEbook: row.hasEbook, hasAudio: row.hasAudio },
+      legacyVersion: (row.updatedAt ?? row.addedAt).toISOString(),
+    }));
   }
 
   async applySlotMutation(

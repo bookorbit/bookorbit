@@ -73,9 +73,11 @@ function buildAudioMetadataArgs(payload: BookWritePayload, options: FormatWriteO
 
   if (canWriteField(payload, options, 'title')) {
     pushFormatMetadata(metadata, 'album', textValue(payload.title));
-    pushFormatMetadata(metadata, 'title', options.isMultiTrackAudio ? textValue(options.trackTitle) : textValue(payload.title));
-    if (options.isMultiTrackAudio && options.trackNumber && options.trackTotal) {
-      pushFormatMetadata(metadata, 'track', `${options.trackNumber}/${options.trackTotal}`);
+    if (!options.preserveTrackIdentity) {
+      pushFormatMetadata(metadata, 'title', options.isMultiTrackAudio ? textValue(options.trackTitle) : textValue(payload.title));
+      if (options.isMultiTrackAudio && options.trackNumber && options.trackTotal) {
+        pushFormatMetadata(metadata, 'track', `${options.trackNumber}/${options.trackTotal}`);
+      }
     }
   }
 

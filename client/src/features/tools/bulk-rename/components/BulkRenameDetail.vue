@@ -263,10 +263,10 @@ function handleNext(): void {
       </div>
 
       <p class="hidden text-xs text-muted-foreground lg:block">
-        <kbd class="rounded border border-b-2 border-border bg-background px-1 text-[0.6875rem] font-semibold">↑</kbd>
-        <kbd class="ms-0.5 rounded border border-b-2 border-border bg-background px-1 text-[0.6875rem] font-semibold">↓</kbd>
+        <kbd class="rounded-xs border border-b-2 border-border bg-background px-1 text-[0.6875rem] font-semibold">↑</kbd>
+        <kbd class="ms-0.5 rounded-xs border border-b-2 border-border bg-background px-1 text-[0.6875rem] font-semibold">↓</kbd>
         {{ t('tools.bulkRename.review.keyboardHint') }} ·
-        <kbd class="rounded border border-b-2 border-border bg-background px-1 text-[0.6875rem] font-semibold">S</kbd>
+        <kbd class="rounded-xs border border-b-2 border-border bg-background px-1 text-[0.6875rem] font-semibold">S</kbd>
         {{ t('tools.bulkRename.review.keyboardSkip') }}
       </p>
 

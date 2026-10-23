@@ -16,7 +16,14 @@
     "yes": "Tak",
     "no": "Nie",
     "show": "Pokaż",
-    "hide": "Ukryj"
+    "hide": "Ukryj",
+    "undo": "Cofnij",
+    "pagination": {
+      "pageOf": "Strona {page} z {totalPages}",
+      "previousPage": "Poprzednia strona",
+      "nextPage": "Następna strona",
+      "goToPage": "Przejdź do strony {page}"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -99,9 +106,19 @@
       },
       "theme": {
         "title": "Motyw",
+        "style": {
+          "label": "Styl",
+          "hint": "Ogólny wygląd aplikacji. Tryb, akcent, narożniki i tło zachowują swoje ustawienia.",
+          "bookorbit": {
+            "label": "BookOrbit"
+          }
+        },
         "colorScheme": {
           "label": "Schemat kolorów",
           "hint": "Jasny lub ciemny interfejs"
+        },
+        "topGlow": {
+          "value": "{value}%"
         },
         "accents": {
           "grey": "Szary",
@@ -175,7 +192,12 @@
         },
         "cornerRadius": {
           "label": "Promień narożnika",
-          "hint": "Zaokrąglenie kart i elementów interfejsu użytkownika"
+          "hint": "Zaokrąglenie kart i elementów interfejsu użytkownika",
+          "options": {
+            "sharp": "Ostre",
+            "default": "Domyślne",
+            "rounded": "Zaokrąglone"
+          }
         },
         "surfaceBrightness": {
           "label": "Jasność powierzchni",
@@ -194,7 +216,8 @@
           "structural": "Strukturalny",
           "ambient": "Otoczenie",
           "refractive": "Refrakcyjne"
-        }
+        },
+        "syncSaveFailed": "Nie udało się zapisać ustawień motywu"
       },
       "storage": {
         "title": "Gdzie zapisać preferencje wyglądu",
@@ -419,6 +442,11 @@
         "collapseSeries": {
           "label": "Domyślnie zwiń serię",
           "hint": "Grupuj książki z tej samej serii w jedną kartę w widokach biblioteki i kolekcji"
+        },
+        "bookRequests": {
+          "label": "Pokaż zapytania o książkę",
+          "hint": "Pokaż strony zapytań, komunikaty i ustawienia na tym koncie. Istniejące żądania nadal pracują w tle.",
+          "saveFailed": "Nie można zaktualizować widoczności zapytań o książkę"
         }
       },
       "icons": {
@@ -732,6 +760,8 @@
       "test": {
         "connected": "Połączono - {issuer}",
         "connectionFailed": "Połączenie nie powiodło się",
+        "privateIssuerAddress": "Adres URL wystawcy wskazuje na adres z prywatnej lub lokalnej sieci, dlatego serwer odmówił połączenia. Aby na to zezwolić, ustaw zmienną OIDC_ALLOW_LOCAL_ISSUERS=true na serwerze BookOrbit.",
+        "tlsCertificateUntrusted": "BookOrbit nie mógł zweryfikować certyfikatu TLS dostawcy OIDC. Jeśli dostawca korzysta z prywatnego urzędu certyfikacji, zamontuj plik PEM zawierający certyfikaty CA, ustaw zmienną NODE_EXTRA_CA_CERTS na ścieżkę do tego pliku wewnątrz kontenera, a następnie uruchom ponownie BookOrbit.",
         "hide": "Ukryj",
         "details": "Szczegóły",
         "supported": "obsługiwane",
@@ -789,6 +819,7 @@
         "migrationCompleted": "Migracja zakończona",
         "migrationFailed": "Migracja nie powiodła się",
         "importDescription": "Jednorazowy import książek, metadanych i postępu czytania z poprzedniej instalacji Booklore.",
+        "migrationDescription": "Jednorazowy import książek, metadanych i postępu czytania z innej aplikacji bibliotecznej.",
         "configuredDescription": "Źródło: {name}. Nie przeprowadzono jeszcze migracji - kontynuuj konfigurację, aby uruchomić import.",
         "runningDescription": "Etap: {stage} - rozpoczęty {started}",
         "completedDescription": "Od {name} - ukończono {date}",
@@ -830,6 +861,7 @@
       "migration": {
         "title": "Migracja",
         "subtitle": "Jednorazowy import Booklore: podłącz źródło, zmapuj użytkowników, wykonaj próbę próbną, rozpocznij migrację i wyeksportuj raport.",
+        "genericSubtitle": "Jednorazowy import biblioteki: połącz źródło, przyporządkuj użytkowników, uruchom próbę migracji, rozpocznij migrację i wyeksportuj raport.",
         "progress": "Postęp",
         "stepSourceConnection": "Połączenie źródłowe",
         "stepUserPathMapping": "Mapowanie użytkowników i ścieżek",
@@ -1112,6 +1144,7 @@
         "filterClear": "Wyczyść filtry",
         "sortLabel": "Sortuj",
         "neverScanned": "Nigdy nie skanowane",
+        "neverScannedHint": "Uruchom skan, aby zindeksować foldery",
         "scanFailedAt": "Nieudane {time}",
         "scanningPercent": "Skanowanie {pct}%",
         "scanCounting": "Liczenie plików",

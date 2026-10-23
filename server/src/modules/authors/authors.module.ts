@@ -9,6 +9,7 @@ import { BookModule } from '../book/book.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { LibraryModule } from '../library/library.module';
 import { MetadataModule } from '../metadata/metadata.module';
+import { MetadataCacheModule } from '../metadata-cache/metadata-cache.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { NotificationModule } from '../notification/notification.module';
 import { AuthorImageStorageService } from './author-image-storage.service';
@@ -41,6 +42,7 @@ const AUTHOR_PROVIDER_CLASSES = [AudnexusAuthorMetadataProvider, GoodreadsAuthor
     LibraryModule,
     AppSettingsModule,
     MetadataModule,
+    MetadataCacheModule,
     MetadataPreferencesModule,
     MetadataScoreModule,
     forwardRef(() => NotificationModule),

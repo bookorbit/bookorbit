@@ -272,32 +272,32 @@ function handleClose() {
                   <input
                     v-model="editForm.id"
                     :aria-label="t('settings.admin.tts.curation.columnId')"
-                    class="px-2 py-1 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    class="px-2 py-1 text-xs bg-background border border-border rounded-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                   <input
                     v-model="editForm.name"
                     :aria-label="t('settings.admin.tts.curation.columnName')"
-                    class="px-2 py-1 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    class="px-2 py-1 text-xs bg-background border border-border rounded-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                   <input
                     v-model="editForm.locale"
                     placeholder="en-US"
                     :aria-label="t('settings.admin.tts.curation.columnLocale')"
-                    class="px-2 py-1 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    class="px-2 py-1 text-xs bg-background border border-border rounded-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                   <select
                     v-model="editForm.gender"
                     :aria-label="t('settings.admin.tts.curation.columnGender')"
-                    class="px-2 py-1 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    class="px-2 py-1 text-xs bg-background border border-border rounded-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
                     <option v-for="g in GENDER_OPTIONS" :key="g" :value="g">{{ genderLabel(g) }}</option>
                   </select>
                   <div class="flex items-center gap-1">
-                    <button class="p-1 rounded text-primary hover:bg-accent text-xs font-medium" @click="handleSaveEdit">
+                    <button class="p-1 rounded-xs text-primary hover:bg-accent text-xs font-medium" @click="handleSaveEdit">
                       {{ t('common.save') }}
                     </button>
                     <button
-                      class="p-1 rounded text-muted-foreground hover:bg-accent text-xs"
+                      class="p-1 rounded-xs text-muted-foreground hover:bg-accent text-xs"
                       :aria-label="t('settings.admin.tts.curation.cancelEdit')"
                       @click="handleCancelEdit"
                     >
@@ -316,7 +316,7 @@ function handleClose() {
                   <div class="flex items-center gap-1">
                     <button
                       type="button"
-                      class="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                      class="p-1 rounded-xs text-muted-foreground hover:text-foreground hover:bg-accent"
                       :aria-label="
                         playingVoiceId === voice.id
                           ? t('settings.admin.tts.curation.stopPreview', { name: voice.name })
@@ -330,14 +330,14 @@ function handleClose() {
                       <Volume2 v-else class="w-3.5 h-3.5" />
                     </button>
                     <button
-                      class="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                      class="p-1 rounded-xs text-muted-foreground hover:text-foreground hover:bg-accent"
                       :aria-label="t('settings.admin.tts.curation.editVoice', { name: voice.name })"
                       @click="handleStartEdit(idx)"
                     >
                       <Pencil class="w-3.5 h-3.5" />
                     </button>
                     <button
-                      class="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      class="p-1 rounded-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       :aria-label="t('settings.admin.tts.curation.deleteVoice', { name: voice.name })"
                       @click="handleDeleteVoice(idx)"
                     >

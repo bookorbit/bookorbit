@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, exists, getTableColumns, inArray, isNotNull, isNull, notExists, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, getTableColumns, gt, inArray, isNotNull, isNull, lt, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -21,6 +21,10 @@ import type { AnnotationPositionFormat, AnnotationSyncSource } from './annotatio
 type Db = NodePgDatabase<typeof schema>;
 export type DbTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Executor = Db | DbTx;
+
+// updated_at has an $onUpdateFn, which Drizzle applies to every builder update that does
+// not set it. Bookkeeping writes set it to itself so the row does not look edited.
+const keepUpdatedAt = sql`${annotations.updatedAt}`;
 
 export interface CanonicalWithPosition {
   annotation: AnnotationRow;
@@ -93,6 +97,18 @@ export class AnnotationSyncRepository {
     return row ?? null;
   }
 
+  async findContentByIds(
+    userId: number,
+    annotationIds: number[],
+    ex: Executor = this.db,
+  ): Promise<Pick<AnnotationRow, 'id' | 'version' | 'note' | 'color' | 'style'>[]> {
+    if (annotationIds.length === 0) return [];
+    return ex
+      .select({ id: annotations.id, version: annotations.version, note: annotations.note, color: annotations.color, style: annotations.style })
+      .from(annotations)
+      .where(and(eq(annotations.userId, userId), inArray(annotations.id, annotationIds)));
+  }
+
   async findDevicePosition(annotationId: number, format: AnnotationPositionFormat, ex: Executor = this.db): Promise<AnnotationPosition | null> {
     const [row] = await ex
       .select()
@@ -122,7 +138,11 @@ export class AnnotationSyncRepository {
     return rows;
   }
 
-  async insertState(state: NewAnnotationSyncState, ex: Executor = this.db): Promise<AnnotationSyncStateRow> {
+  async insertState(
+    state: NewAnnotationSyncState,
+    ex: Executor = this.db,
+    opts: { keepNewerVersion?: boolean } = {},
+  ): Promise<AnnotationSyncStateRow> {
     const [row] = await ex
       .insert(annotationSyncState)
       .values(state)
@@ -131,7 +151,11 @@ export class AnnotationSyncRepository {
         set: {
           externalKey: sql`excluded.external_key`,
           externalCreatedAt: sql`excluded.external_created_at`,
-          lastAppliedVersion: sql`excluded.last_applied_version`,
+          lastAppliedVersion: opts.keepNewerVersion
+            ? sql`greatest(excluded.last_applied_version, ${annotationSyncState.lastAppliedVersion})`
+            : sql`excluded.last_applied_version`,
+          deviceContent: sql`coalesce(excluded.device_content, ${annotationSyncState.deviceContent})`,
+          servedClock: sql`greatest(excluded.served_clock, ${annotationSyncState.servedClock})`,
           deleteAckedAt: sql`excluded.delete_acked_at`,
           lastSyncedAt: new Date(),
         },
@@ -140,9 +164,20 @@ export class AnnotationSyncRepository {
     return row;
   }
 
+  async lockAnnotationForSync(annotationId: number, ex: Executor): Promise<void> {
+    await ex.select({ id: annotations.id }).from(annotations).where(eq(annotations.id, annotationId)).for('update');
+  }
+
+  async insertStateIfMissing(state: NewAnnotationSyncState, ex: Executor): Promise<void> {
+    await ex
+      .insert(annotationSyncState)
+      .values(state)
+      .onConflictDoNothing({ target: [annotationSyncState.annotationId, annotationSyncState.source, annotationSyncState.deviceId] });
+  }
+
   async updateState(
     stateId: number,
-    patch: Partial<Pick<AnnotationSyncStateRow, 'externalKey' | 'externalCreatedAt' | 'lastAppliedVersion' | 'deleteAckedAt'>>,
+    patch: Partial<Pick<AnnotationSyncStateRow, 'externalKey' | 'externalCreatedAt' | 'lastAppliedVersion' | 'deleteAckedAt' | 'deviceContent'>>,
     ex: Executor = this.db,
   ): Promise<void> {
     await ex
@@ -173,7 +208,9 @@ export class AnnotationSyncRepository {
   /** Applies a content patch and bumps the version; returns the new version. */
   async applyContentPatch(
     annotationId: number,
-    patch: Partial<Pick<AnnotationRow, 'text' | 'note' | 'color' | 'style' | 'chapterTitle' | 'deviceUpdatedAt' | 'deviceCreatedAt'>>,
+    patch: Partial<
+      Pick<AnnotationRow, 'text' | 'note' | 'color' | 'style' | 'chapterTitle' | 'deviceUpdatedAt' | 'deviceCreatedAt' | 'contentUpdatedAt'>
+    >,
     ex: Executor = this.db,
   ): Promise<number> {
     const [row] = await ex
@@ -203,6 +240,34 @@ export class AnnotationSyncRepository {
       .where(and(eq(annotationPositions.annotationId, annotationId), eq(annotationPositions.format, format)));
   }
 
+  /** Marks every live row this device applied for the book as unapplied; returns how many. */
+  async resetAppliedVersionsForDeviceBook(
+    userId: number,
+    source: AnnotationSyncSource,
+    deviceId: string,
+    bookId: number,
+    ex: Executor = this.db,
+  ): Promise<number> {
+    const liveInBook = ex
+      .select({ id: annotations.id })
+      .from(annotations)
+      .where(and(eq(annotations.userId, userId), eq(annotations.bookId, bookId), isNull(annotations.deletedAt)));
+    const rows = await ex
+      .update(annotationSyncState)
+      .set({ lastAppliedVersion: 0 })
+      .where(
+        and(
+          eq(annotationSyncState.userId, userId),
+          eq(annotationSyncState.source, source),
+          eq(annotationSyncState.deviceId, deviceId),
+          gt(annotationSyncState.lastAppliedVersion, 0),
+          inArray(annotationSyncState.annotationId, liveInBook),
+        ),
+      )
+      .returning({ id: annotationSyncState.id });
+    return rows.length;
+  }
+
   /** Unacked sync states for one device and book, used for device-deletion detection. */
   async findStatesForDeviceBook(
     userId: number,
@@ -223,6 +288,54 @@ export class AnnotationSyncRepository {
           eq(annotations.bookId, bookId),
         ),
       );
+  }
+
+  /**
+   * Which (device, book) pairs have something for the device: a delete it has not acknowledged, an
+   * edit past the version it verified, or an add it can place. Edits applied to a closed book and not
+   * yet verified, and adds whose device position already failed at this converter version, wait for
+   * the book to be opened; counting them would bring the book back on every sweep.
+   */
+  async findPendingDeviceBooks(
+    userId: number,
+    source: AnnotationSyncSource,
+    pairs: { deviceId: string; bookId: number }[],
+    devicePositionFormat: AnnotationPositionFormat,
+    converterVersion: number,
+  ): Promise<Set<string>> {
+    if (pairs.length === 0) return new Set();
+    const rows = await this.db.execute<{ device_id: string; book_id: number }>(sql`
+      select p.device_id, p.book_id
+      from (values ${sql.join(
+        pairs.map((pair) => sql`(${pair.deviceId}::text, ${pair.bookId}::int)`),
+        sql`, `,
+      )}) as p(device_id, book_id)
+      where exists (
+          select 1 from ${annotationSyncState} s
+          inner join ${annotations} a on a.id = s.annotation_id
+          where s.user_id = ${userId} and s.source = ${source} and s.device_id = p.device_id and a.book_id = p.book_id
+            and ((a.deleted_at is not null and s.delete_acked_at is null)
+              or (a.deleted_at is null and s.last_applied_version > 0 and a.version > s.last_applied_version))
+        )
+        or exists (
+          select 1 from ${annotations} a
+          where a.user_id = ${userId} and a.book_id = p.book_id and a.deleted_at is null
+            and not exists (
+              select 1 from ${annotationSyncState} s
+              where s.annotation_id = a.id and s.source = ${source} and s.device_id = p.device_id
+            )
+            and exists (
+              select 1 from ${annotationPositions} ap
+              where ap.annotation_id = a.id and ap.format in (${devicePositionFormat}, 'cfi') and ap.status <> 'failed'
+            )
+            and not exists (
+              select 1 from ${annotationPositions} ap
+              where ap.annotation_id = a.id and ap.format = ${devicePositionFormat} and ap.status = 'failed'
+                and ap.converter_version >= ${converterVersion}
+            )
+        )
+    `);
+    return new Set(rows.rows.map((row) => `${row.device_id}:${row.book_id}`));
   }
 
   /** Active annotations of the book with no sync state for this device (push-down adds). */
@@ -330,7 +443,7 @@ export class AnnotationSyncRepository {
 
   /** Bookkeeping writes that must NOT bump the version (no device-visible change). */
   async setDeviceIdentitySilent(annotationId: number, deviceCreatedAt: string, ex: Executor = this.db): Promise<void> {
-    await ex.update(annotations).set({ deviceCreatedAt }).where(eq(annotations.id, annotationId));
+    await ex.update(annotations).set({ deviceCreatedAt, updatedAt: keepUpdatedAt }).where(eq(annotations.id, annotationId));
   }
 
   async setDeviceIdentitiesSilent(entries: { annotationId: number; deviceCreatedAt: string }[], ex: Executor = this.db): Promise<void> {
@@ -347,13 +460,13 @@ export class AnnotationSyncRepository {
   }
 
   async setDeviceUpdatedAtSilent(annotationId: number, deviceUpdatedAt: string | null, ex: Executor = this.db): Promise<void> {
-    await ex.update(annotations).set({ deviceUpdatedAt }).where(eq(annotations.id, annotationId));
+    await ex.update(annotations).set({ deviceUpdatedAt, updatedAt: keepUpdatedAt }).where(eq(annotations.id, annotationId));
   }
 
   async setSourceCreatedAtSilent(annotationId: number, sourceCreatedAt: Date, ex: Executor = this.db): Promise<void> {
     await ex
       .update(annotations)
-      .set({ sourceCreatedAt })
+      .set({ sourceCreatedAt, updatedAt: keepUpdatedAt })
       .where(and(eq(annotations.id, annotationId), isNull(annotations.sourceCreatedAt)));
   }
 
@@ -392,6 +505,10 @@ export class AnnotationSyncRepository {
       .update(annotationSyncState)
       .set({ deleteAckedAt: sql`now()`, lastSyncedAt: sql`now()` })
       .where(eq(annotationSyncState.id, stateId));
+  }
+
+  async deleteState(stateId: number, ex: Executor = this.db): Promise<void> {
+    await ex.delete(annotationSyncState).where(eq(annotationSyncState.id, stateId));
   }
 
   async findStateByAnnotationAndDevice(
@@ -497,7 +614,7 @@ export class AnnotationSyncRepository {
   async findBookIdsWithPendingKoboChanges(
     userId: number,
     deviceId: string,
-    opts: { includeAllOrigins: boolean; resolverVersion: number },
+    opts: { includeAllOrigins: boolean; resolverVersion: number; servedClock: number },
   ): Promise<number[]> {
     const source: AnnotationSyncSource = 'kobo';
     const bookIds = new Set<number>();
@@ -527,7 +644,10 @@ export class AnnotationSyncRepository {
           eq(annotationSyncState.source, source),
           eq(annotationSyncState.deviceId, deviceId),
           isNull(annotations.deletedAt),
-          sql`${annotations.version} > ${annotationSyncState.lastAppliedVersion}`,
+          or(
+            sql`${annotations.version} > ${annotationSyncState.lastAppliedVersion}`,
+            and(lt(annotationSyncState.servedClock, opts.servedClock), isNotNull(annotations.contentUpdatedAt)),
+          ),
         ),
       );
     for (const row of edits) bookIds.add(row.bookId);

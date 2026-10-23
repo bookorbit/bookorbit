@@ -67,9 +67,9 @@ export interface DownloadStatus {
   seed?: SeedInfo;
   errorMessage?: string;
   /**
-   * The tracker's own refusal, where every tracker on a torrent that is getting nowhere reports
-   * one. A private tracker rejecting the announce leaves the torrent in a perfectly healthy-looking
-   * stalled state, so without this the only symptom is a download that never starts.
+   * The tracker's error, which may be a transient transport failure or an explicit rejection.
+   * A failed announce can leave the torrent in a healthy-looking stalled state; the monitor
+   * classifies the message before deciding whether the attempt is over.
    */
   trackerError?: string;
 }

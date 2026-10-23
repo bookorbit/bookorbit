@@ -32,7 +32,8 @@ const props = defineProps<{
   documentId: string
   bookId: number
   fileId: number
-  initialPage: number
+  initialPage: number | null
+  initialPercentage?: number
   settings: PdfReaderSettings
   peekMode?: boolean
 }>()
@@ -41,7 +42,7 @@ const { t } = useI18n()
 
 const emit = defineEmits<{
   back: []
-  pageChange: [pageNumber: number, totalPages: number]
+  pageChange: [pageNumber: number, totalPages: number, restored: boolean]
   retry: []
   settingsChange: [patch: Partial<PdfReaderSettings>]
   startReading: []
@@ -61,6 +62,7 @@ const sidebar = usePdfSidebarLayout()
 const settingsOpen = ref(false)
 const pendingExternalUrl = ref<URL | null>(null)
 const restoredInitialPage = ref(false)
+let restoringPage: number | null = null
 const viewerSurface = ref<HTMLElement | null>(null)
 const selectionPopup = ref<{ getElement: () => HTMLElement | null } | null>(null)
 const currentScrollMode = ref<PdfReaderSettings['scrollMode']>(props.settings.scrollMode)
@@ -250,6 +252,17 @@ function handleRetryDocument() {
   emit('retry')
 }
 
+// A percentage without a page number was written by a client that tracks no pages, so the page
+// is estimated from it the way the iOS reader does.
+function resolveInitialPage(totalPages: number) {
+  const total = Math.max(totalPages, 1)
+  const percentage = props.initialPercentage ?? 0
+  let page = 1
+  if (props.initialPage !== null) page = props.initialPage
+  else if (Number.isFinite(percentage) && percentage > 0) page = Math.round((percentage / 100) * total)
+  return Math.min(Math.max(page, 1), total)
+}
+
 function hasDocumentPages(documentState: DocumentState) {
   return (documentState.document?.pageCount ?? 0) > 0
 }
@@ -326,14 +339,22 @@ watch(
       if (event.documentId !== props.documentId || !event.isInitial) return
       highlights.renderAll()
       if (restoredInitialPage.value) return
-      const page = Math.min(Math.max(props.initialPage, 1), event.totalPages || 1)
+      const page = resolveInitialPage(event.totalPages)
       restoredInitialPage.value = true
-      if (page > 1) scroll.value?.scrollToPage({ pageNumber: page })
+      if (page > 1) {
+        restoringPage = page
+        // Instant, because a fit zoom refits on the first viewport resize (a classic scrollbar
+        // appearing) from the current offset, which cancels a smooth scroll that has not started
+        // and strands the reader on page 1, so the next scroll saves page 1 over the position.
+        scroll.value?.scrollToPage({ pageNumber: page, behavior: 'instant' })
+      }
     })
     const unsubscribePage = capability.onPageChange((event) => {
       if (event.documentId !== props.documentId || !restoredInitialPage.value) return
+      const restored = event.pageNumber === restoringPage
+      restoringPage = null
       const range = getPageRange(event.pageNumber, event.totalPages)
-      emit('pageChange', range.end, event.totalPages)
+      emit('pageChange', range.end, event.totalPages, restored)
     })
     onCleanup(() => {
       unsubscribeLayout()

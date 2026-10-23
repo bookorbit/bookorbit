@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   check,
@@ -30,7 +31,9 @@ export const books = pgTable(
     libraryFolderId: integer('library_folder_id')
       .notNull()
       .references(() => libraryFolders.id, { onDelete: 'cascade' }),
-    primaryFileId: integer('primary_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
+    // Annotated because book_files references books back: an inferred return makes the two
+    // table types circular, and depending on check order one of them silently becomes any.
+    primaryFileId: integer('primary_file_id').references((): AnyPgColumn => bookFiles.id, { onDelete: 'set null' }),
     primaryAuthorSortName: varchar('primary_author_sort_name', { length: 500 }),
     folderPath: varchar('folder_path', { length: 4096 }).notNull(),
     status: varchar('status', { length: 20 }).notNull().default('present'),
@@ -102,6 +105,7 @@ export const bookFiles = pgTable(
     uniqueIndex('book_files_public_id_uidx').on(t.publicId),
     uniqueIndex('book_files_absolute_path_uidx').on(t.absolutePath),
     index('book_files_book_id_idx').on(t.bookId),
+    index('book_files_change_timestamp_idx').on(sql`greatest(${t.createdAt}, ${t.updatedAt}) desc`),
     index('book_files_library_folder_id_idx').on(t.libraryFolderId),
     index('book_files_file_hash_idx').on(t.fileHash),
     index('book_files_ino_idx').on(t.ino),

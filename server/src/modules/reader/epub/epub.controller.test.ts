@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { FASTIFY_ROUTE_CONFIG_METADATA } from '@nestjs/platform-fastify/constants.js';
 import { PassThrough } from 'stream';
 
 import { EpubController } from './epub.controller';
@@ -73,15 +74,17 @@ describe('EpubController', () => {
     expect(epubService.getMediaOverlayPlaylist).toHaveBeenCalledWith(11, 12, user);
   });
 
-  it('sets range headers for media-overlay audio files', async () => {
+  it('sets range headers for media-overlay audio files and streams the body', async () => {
     const user = { id: 1, isSuperuser: false, permissions: [] } as any;
     const reply = {
       code: vi.fn().mockReturnThis(),
       header: vi.fn(),
       send: vi.fn(),
     };
+    const body = new PassThrough();
     epubService.streamMediaOverlayFile.mockResolvedValue({
-      data: Buffer.from('2345'),
+      body,
+      length: 4,
       contentType: 'audio/mpeg',
       size: 10,
       status: 206,
@@ -92,10 +95,77 @@ describe('EpubController', () => {
 
     expect(epubService.streamMediaOverlayFile).toHaveBeenCalledWith(9, 'OPS/audio/ch1.mp3', 13, 'bytes=2-5', user);
     expect(reply.code).toHaveBeenCalledWith(206);
+    expect(reply.header).toHaveBeenCalledWith('Content-Type', 'audio/mpeg');
     expect(reply.header).toHaveBeenCalledWith('Accept-Ranges', 'bytes');
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 4);
     expect(reply.header).toHaveBeenCalledWith('Content-Range', 'bytes 2-5/10');
-    expect(reply.send).toHaveBeenCalledWith(Buffer.from('2345'));
+    expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'private, max-age=3600');
+    expect(reply.header).not.toHaveBeenCalledWith('X-Content-Length-Full', expect.anything());
+    expect(reply.send).toHaveBeenCalledWith(body);
   });
+
+  // A streamed body the compressor took would lose the Content-Length the ranges are read against.
+  it('opts the media-overlay audio route out of response compression', () => {
+    expect(Reflect.getMetadata(FASTIFY_ROUTE_CONFIG_METADATA, EpubController.prototype.getMediaOverlayFile)).toEqual({ compress: false });
+  });
+
+  it('answers an unsatisfiable media-overlay range with 416 and an empty body', async () => {
+    const reply = { code: vi.fn().mockReturnThis(), header: vi.fn(), send: vi.fn() };
+    epubService.streamMediaOverlayFile.mockResolvedValue({
+      body: Buffer.alloc(0),
+      length: 0,
+      contentType: 'audio/mpeg',
+      size: 10,
+      status: 416,
+      contentRange: 'bytes */10',
+    });
+
+    await controller.getMediaOverlayFile(9, 'OPS/audio/ch1.mp3', '13', { id: 1 } as any, { headers: { range: 'bytes=20-' } } as any, reply as any);
+
+    expect(reply.code).toHaveBeenCalledWith(416);
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 0);
+    expect(reply.header).toHaveBeenCalledWith('Content-Range', 'bytes */10');
+    expect(reply.send).toHaveBeenCalledWith(Buffer.alloc(0));
+  });
+
+  it('names the full length of a whole media-overlay file', async () => {
+    const reply = { code: vi.fn().mockReturnThis(), header: vi.fn(), send: vi.fn() };
+    epubService.streamMediaOverlayFile.mockResolvedValue({
+      body: new PassThrough(),
+      length: 10,
+      contentType: 'audio/mpeg',
+      size: 10,
+      status: 200,
+      contentRange: null,
+    });
+
+    await controller.getMediaOverlayFile(9, 'OPS/audio/ch1.mp3', '13', { id: 1 } as any, { headers: {} } as any, reply as any);
+
+    expect(reply.code).toHaveBeenCalledWith(200);
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 10);
+    expect(reply.header).toHaveBeenCalledWith('X-Content-Length-Full', 10);
+    expect(reply.header).not.toHaveBeenCalledWith('Content-Range', expect.anything());
+  });
+
+  // The router has decoded the wildcard: `%25` arrived as a literal `%`, which a second pass rejected.
+  it.each(['OPS/audio/50% off.mp3', 'OPS/audio/track%201.mp3', 'OPS/audio/日本語 1.mp3'])(
+    'passes the media-overlay path %s on as the router decoded it',
+    async (filePath) => {
+      const reply = { code: vi.fn().mockReturnThis(), header: vi.fn(), send: vi.fn() };
+      epubService.streamMediaOverlayFile.mockResolvedValue({
+        body: Buffer.from('x'),
+        length: 1,
+        contentType: 'audio/mpeg',
+        size: 1,
+        status: 200,
+        contentRange: null,
+      });
+
+      await controller.getMediaOverlayFile(9, filePath, '13', { id: 1 } as any, { headers: {} } as any, reply as any);
+
+      expect(epubService.streamMediaOverlayFile).toHaveBeenCalledWith(9, filePath, 13, undefined, { id: 1 });
+    },
+  );
 
   it('does not set content-length when size is zero', async () => {
     const user = { id: 1, isSuperuser: false, permissions: [] } as any;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, onUnmounted, ref } from 'vue'
 import { ScrollStrategy } from '@embedpdf/plugin-scroll'
 import { SpreadMode } from '@embedpdf/plugin-spread'
 import { ZoomMode } from '@embedpdf/plugin-zoom'
@@ -54,11 +54,17 @@ vi.mock('../../shared/composables/useReaderProgress', () => ({
 }))
 
 const mockOnActivity = vi.fn<() => void>()
+type SessionSnapshot = { percentage: number; pageNumber?: number | null }
+const sessionEndSnapshots: SessionSnapshot[] = []
+// Like the real composable, the session ends from an unmounted hook registered before the view's own.
 vi.mock('../../shared/composables/useReadingSession', () => ({
-  useReadingSession: () => ({
-    onActivity: mockOnActivity,
-    elapsedMinutes: ref(0),
-  }),
+  useReadingSession: (_fileId: number, getProgress: () => SessionSnapshot) => {
+    onUnmounted(() => sessionEndSnapshots.push(getProgress()))
+    return {
+      onActivity: mockOnActivity,
+      elapsedMinutes: ref(0),
+    }
+  },
 }))
 
 const mockUsePdfiumEngine = vi.fn<() => unknown>(() => ({
@@ -129,6 +135,7 @@ describe('PdfV4ReaderView', () => {
     mockRegistry.isDestroyed.mockReturnValue(false)
     mockRegistry.getPlugin.mockReturnValue({ provides: () => mockDocumentManager })
     mockRoute.query = {}
+    sessionEndSnapshots.length = 0
     mockProgressPageNumber.value = 5
     mockProgressPercentage.value = 25
     mockEffective.value = {
@@ -147,7 +154,7 @@ describe('PdfV4ReaderView', () => {
         stubs: {
           PdfReaderContent: {
             name: 'PdfReaderContent',
-            props: ['documentId', 'initialPage', 'settings', 'peekMode'],
+            props: ['documentId', 'initialPage', 'initialPercentage', 'settings', 'peekMode'],
             emits: ['back', 'pageChange', 'retry', 'settingsChange', 'startReading'],
             template: '<div class="mock-reader-content" />',
           },
@@ -278,6 +285,57 @@ describe('PdfV4ReaderView', () => {
     const wrapper = await mountReader()
 
     expect(wrapper.getComponent({ name: 'PdfReaderContent' }).props('initialPage')).toBe(12)
+  })
+
+  it('opens at a saved page number before its percentage', async () => {
+    const wrapper = await mountReader()
+
+    expect(wrapper.getComponent({ name: 'PdfReaderContent' }).props('initialPage')).toBe(5)
+  })
+
+  it('passes a percentage-only position through for the page estimate', async () => {
+    mockProgressPageNumber.value = null
+    mockProgressPercentage.value = 37.5
+    const wrapper = await mountReader()
+
+    const content = wrapper.getComponent({ name: 'PdfReaderContent' })
+    expect(content.props('initialPage')).toBeNull()
+    expect(content.props('initialPercentage')).toBe(37.5)
+  })
+
+  it('treats a zero page number as no page so the percentage still places the reader', async () => {
+    mockProgressPageNumber.value = 0
+    mockProgressPercentage.value = 60
+    const wrapper = await mountReader()
+
+    expect(wrapper.getComponent({ name: 'PdfReaderContent' }).props('initialPage')).toBeNull()
+  })
+
+  it('does not write progress for the page the reader opened on', async () => {
+    vi.useFakeTimers()
+    mockProgressPageNumber.value = null
+    mockProgressPercentage.value = 37.5
+    const wrapper = await mountReader()
+    wrapper.getComponent({ name: 'PdfReaderContent' }).vm.$emit('pageChange', 4, 10, true)
+    await vi.advanceTimersByTimeAsync(2000)
+    wrapper.unmount()
+
+    expect(mockProgressSave).not.toHaveBeenCalled()
+    expect(mockProgressPageNumber.value).toBe(4)
+    expect(mockProgressPercentage.value).toBe(40)
+    vi.useRealTimers()
+  })
+
+  it('flushes a debounced page turn before the reading session ends', async () => {
+    vi.useFakeTimers()
+    const wrapper = await mountReader()
+    wrapper.getComponent({ name: 'PdfReaderContent' }).vm.$emit('pageChange', 8, 20)
+    await vi.advanceTimersByTimeAsync(500)
+    wrapper.unmount()
+
+    expect(sessionEndSnapshots).toEqual([{ percentage: 40, pageNumber: 8 }])
+    expect(mockProgressSave).toHaveBeenCalledOnce()
+    vi.useRealTimers()
   })
 
   it('debounces page progress saves', async () => {

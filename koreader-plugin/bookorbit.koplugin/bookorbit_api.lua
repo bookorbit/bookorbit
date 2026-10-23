@@ -183,9 +183,11 @@ BookOrbitApi.decodeResponse = decodeResponse
 -- Normalizes a user-entered server address to the API base, e.g.
 -- "https://books.example.com/" -> "https://books.example.com/api/v1".
 function BookOrbitApi.normalizeServerUrl(input)
-    if not input then return nil end
+    if type(input) ~= "string" then return nil end
     local url = util.trim(input)
-    if url == "" then return nil end
+    if url == "" or url:find("[%s%c%?#]") then return nil end
+    local parsed = parseHttpUrl(url)
+    if not parsed or parsed.port < 1 or parsed.port > 65535 then return nil end
     url = url:gsub("/+$", "")
     url = url:gsub("/api/v1/koreader$", "/api/v1")
     if not url:match("/api/v1$") then
@@ -386,7 +388,7 @@ function BookOrbitApi:query(path, params)
 
     local keys = {}
     for key, value in pairs(params) do
-        if value ~= nil and value ~= "" then
+        if key ~= "on_device_filter" and value ~= nil and value ~= "" then
             table.insert(keys, key)
         end
     end
@@ -500,13 +502,15 @@ function BookOrbitApi:downloadBlocking(path, local_path, opts)
                 end
             end
 
+            local content_length = headers and tonumber(headers["content-length"] or headers["Content-Length"])
+            if (content_length and received ~= content_length) or (opts.expected_bytes and received ~= opts.expected_bytes) then return fail(out, "size_mismatch") end
             if progress_writer then progress_writer(received, true) end
 
             -- The parent owns publishing for user-cancellable transfers: a
             -- dismissed subprocess cannot be stopped once it starts renaming,
             -- which is harmless for a cover but wrong for a cancelled book.
             if opts.publish == "parent" then
-                local result = { temp_path = temp_path, bytes = received }
+                local result = { temp_path = temp_path, bytes = received, server_hash = headers and headers["x-bookorbit-file-hash"], artifact_id = headers and headers["x-bookorbit-artifact"] }
                 -- Hashing here keeps the digest off the UI thread and lets the
                 -- caller compare it to the manifest without a match request.
                 if opts.hash == "partial_md5" then
@@ -638,6 +642,10 @@ function BookOrbitApi:exchangeAnnotations(books)
     return self:request("POST", "/koreader/plugin/annotations/exchange", self:withDevice({ books = books }))
 end
 
+function BookOrbitApi:annotationPendingBooks(hashes)
+    return self:request("POST", "/koreader/plugin/annotations/pending", self:withDevice({ hashes = hashes }))
+end
+
 function BookOrbitApi:exchangeAck(books)
     return self:request("POST", "/koreader/plugin/annotations/exchange-ack", self:withDevice({ books = books }))
 end
@@ -715,12 +723,24 @@ function BookOrbitApi:catalogManifest(params)
     return self:request("GET", self:query("/koreader/plugin/catalog/manifest", params))
 end
 
-function BookOrbitApi:catalogBook(book_id)
-    return self:request("GET", self:query("/koreader/plugin/catalog/books/" .. tostring(book_id), { deviceId = self.device_id }))
+function BookOrbitApi:getDeliverySettings()
+    return self:request("GET", "/koreader/plugin/delivery-settings/" .. util.urlEncode(tostring(self.device_id)))
+end
+
+function BookOrbitApi:setDeliverySettings(variant, migrate_only)
+    return self:request("PUT", "/koreader/plugin/delivery-settings/" .. util.urlEncode(tostring(self.device_id)), {
+        readAloudDelivery = variant or rapidjson.null,
+        migrateOnly = migrate_only == true,
+    })
+end
+
+function BookOrbitApi:catalogBook(book_id, variant)
+    return self:request("GET", self:query("/koreader/plugin/catalog/books/" .. tostring(book_id), { deviceId = self.device_id, variant = variant }))
 end
 
 function BookOrbitApi:downloadCatalogFile(file_id, local_path, opts)
-    return self:download("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", local_path, opts)
+    opts = opts or {}
+    return self:download(self:query("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", { variant = opts.variant, selection = opts.selection }), local_path, opts)
 end
 
 function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path, opts)
@@ -728,6 +748,14 @@ function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path, opts)
     opts.accept = "image/jpeg,image/*"
     opts.expect_content_type = "image/"
     return self:download("/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/thumbnail", local_path, opts)
+end
+
+-- An author's portrait, from servers advertising catalogListsV2.
+function BookOrbitApi:downloadCatalogAuthorPhoto(author_id, local_path, opts)
+    opts = opts or {}
+    opts.accept = "image/jpeg,image/*"
+    opts.expect_content_type = "image/"
+    return self:download("/koreader/plugin/catalog/authors/" .. tostring(author_id) .. "/photo", local_path, opts)
 end
 
 -- Plugin self-update endpoints

@@ -19,7 +19,7 @@ import { BookService } from '../book/book.service';
 import { HARDCOVER_STATUS } from './hardcover.constants';
 import { HardcoverBookMatchService } from './hardcover-book-match.service';
 import { HardcoverClientService } from './hardcover-client.service';
-import { parseHardcoverBookId } from './hardcover-id.utils';
+import { buildHardcoverMatchBasis, parseHardcoverBookId } from './hardcover-id.utils';
 import {
   attemptOwnedReadId,
   type HardcoverReadCandidate,
@@ -113,11 +113,21 @@ query FindUserBookReads($userBookId: Int!) {
   }
 }`;
 
+// Answers which user book a read belongs to, for a linked read the window above did not return.
+const FIND_USER_BOOK_READ_OWNER_QUERY = `
+query FindUserBookReadOwner($id: Int!) {
+  user_book_reads(where: { id: { _eq: $id } }, limit: 1) {
+    id
+    user_book_id
+  }
+}`;
+
 type InsertUserBookResult = { insert_user_book: { user_book: { id: number } | null; error: string | null } };
 type UpdateUserBookResult = { update_user_book: { user_book: { id: number } | null; error: string | null } };
 type FindUserBookResult = { me: { user_books: { id: number }[] } };
 type InsertUserBookReadResult = { insert_user_book_read: { user_book_read: { id: number } | null; error: string | null } };
 type UpdateUserBookReadResult = { update_user_book_read: { user_book_read: { id: number } | null; error: string | null } };
+type FindUserBookReadOwnerResult = { user_book_reads: Array<{ id: number; user_book_id: number | null }> };
 type FindUserBookReadsResult = {
   user_book_reads: Array<{
     id: number;
@@ -533,7 +543,7 @@ export class HardcoverSyncService {
       const syncState = activeInitialState ?? state;
       const startDate = toDateString(book.startedAt);
       const endDate = toDateString(book.finishedAt);
-      let hardcoverReadId: number | null = syncState?.hardcoverReadId ?? null;
+      let hardcoverReadId: number | null = match.replacedHardcoverBookId != null ? null : (syncState?.hardcoverReadId ?? null);
       let progressSynced = true;
 
       const localAttempts = typeof this.repo.findReadingAttempts === 'function' ? await this.repo.findReadingAttempts(userId, book.bookId) : [];
@@ -794,7 +804,15 @@ export class HardcoverSyncService {
         editionId: input.editionId,
       });
 
-    const owned = attempt ? attemptOwnedReadId(attempt) : null;
+    let owned = attempt ? attemptOwnedReadId(attempt) : null;
+    if (owned != null && attempt && (await this.readBelongsToAnotherUserBook(userId, token, input.userBookId, input.reads, owned))) {
+      // Hardcover rejects edits to a read filed under another book, so the link could never sync again.
+      await this.repo.unlinkReadingAttempt(userId, attempt.id, owned);
+      this.logger.log(
+        `[hardcover.read_unlink] [end] userId=${userId} attemptId=${attempt.id} hardcoverReadId=${owned} hardcoverUserBookId=${input.userBookId} - released a read that belongs to another Hardcover book`,
+      );
+      owned = null;
+    }
     if (owned != null && attempt) {
       input.reserved.add(owned);
       const readId = await write(owned);
@@ -826,6 +844,30 @@ export class HardcoverSyncService {
       throw new Error('read_link_conflict');
     }
     return created;
+  }
+
+  /**
+   * Only a read missing from the fetched window is checked, and only Hardcover naming a different
+   * user book counts: a read it cannot place keeps the link, as before.
+   */
+  private async readBelongsToAnotherUserBook(
+    userId: number,
+    token: string,
+    userBookId: number,
+    reads: readonly HardcoverReadCandidate[],
+    readId: number,
+  ): Promise<boolean> {
+    if (reads.some((read) => read.id === readId)) return false;
+    try {
+      const data = await this.client.query<FindUserBookReadOwnerResult>(userId, token, FIND_USER_BOOK_READ_OWNER_QUERY, { id: readId });
+      const owner = data.user_book_reads?.[0]?.user_book_id;
+      return owner != null && owner !== userBookId;
+    } catch (err) {
+      this.logger.warn(
+        `[hardcover.read_owner] [fail] userId=${userId} hardcoverReadId=${readId} errorClass=${err?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - read owner lookup failed`,
+      );
+      return false;
+    }
   }
 
   private async updateAdditionalOpenReads(
@@ -865,8 +907,13 @@ export class HardcoverSyncService {
     if (!state?.lastSyncedAt) return true;
     if (book.attemptsUpdatedAt && book.attemptsUpdatedAt > state.lastSyncedAt) return true;
     if (book.hardcoverMetadataId && state.syncError === 'no_match') return true;
-    const metadataHardcoverId = parseHardcoverBookId(book.hardcoverMetadataId);
-    if (metadataHardcoverId !== null && metadataHardcoverId !== state.hardcoverBookId) return true;
+    if (state.matchBasis != null) {
+      // Corrected identifiers have to reach the match even when nothing else changed.
+      if (state.hardcoverBookId != null && state.matchBasis !== buildHardcoverMatchBasis(book)) return true;
+    } else {
+      const metadataHardcoverId = parseHardcoverBookId(book.hardcoverMetadataId);
+      if (metadataHardcoverId !== null && metadataHardcoverId !== state.hardcoverBookId) return true;
+    }
     if (book.status !== state.lastSyncedStatus) return true;
     if (book.progress !== state.lastSyncedProgress) return true;
     if (book.rating !== state.lastSyncedRating) return true;

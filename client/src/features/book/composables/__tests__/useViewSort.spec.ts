@@ -164,3 +164,27 @@ describe('useViewSort', () => {
     expect(mockStorage.has('bookorbit:sort:library:1')).toBe(false)
   })
 })
+
+describe('useViewSort with a default that arrives later', () => {
+  it('re-reads once the default is known, and a stored sort still wins', () => {
+    const sort = ref<SortSpec[]>([])
+    const entityId = ref<number | null>(3)
+    const scopeDefault = ref<SortSpec[]>([{ field: 'title', dir: 'asc' }])
+
+    const { sortModel, isDefaultSort, loadSort, resetSort } = useViewSort(sort, 'smartScope', entityId, scopeDefault)
+    expect(sortModel.value).toEqual([{ field: 'title', dir: 'asc' }])
+
+    scopeDefault.value = [{ field: 'addedAt', dir: 'desc' }]
+    loadSort()
+    expect(sortModel.value).toEqual([{ field: 'addedAt', dir: 'desc' }])
+    expect(isDefaultSort.value).toBe(true)
+
+    sortModel.value = [{ field: 'author', dir: 'asc' }]
+    loadSort()
+    expect(sortModel.value).toEqual([{ field: 'author', dir: 'asc' }])
+    expect(isDefaultSort.value).toBe(false)
+
+    resetSort()
+    expect(sortModel.value).toEqual([{ field: 'addedAt', dir: 'desc' }])
+  })
+})

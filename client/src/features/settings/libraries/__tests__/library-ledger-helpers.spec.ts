@@ -38,6 +38,9 @@ function library(overrides: Partial<Library> & Pick<Library, 'id' | 'name'>): Li
     fileWriteKindleMaxFileSizeMb: 100,
     fileWriteAudioEnabled: false,
     fileWriteAudioMaxFileSizeMb: 500,
+    fileWriteAllFiles: false,
+    fileWriteReadAlongEnabled: false,
+    fileWriteReadAlongMaxFileSizeMb: 1000,
     fileRenameEnabled: false,
     folders: [],
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -62,7 +65,8 @@ describe('formatFamily', () => {
 
   it('is case insensitive and falls back for unknown extensions', () => {
     expect(formatFamily('EPUB')).toBe('ebook')
-    expect(formatFamily('djvu')).toBe('other')
+    expect(formatFamily('DJVU')).toBe('document')
+    expect(formatFamily('unknown')).toBe('other')
   })
 })
 

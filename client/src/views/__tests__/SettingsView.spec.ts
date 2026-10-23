@@ -32,16 +32,49 @@ describe('SettingsView shell', () => {
     expect(wrapper.findComponent({ name: 'SettingsNav' }).exists()).toBe(false)
   })
 
-  it('builds a breadcrumb from the group and parent of the active page', () => {
-    const text = mountView('settings-appearance-layout').text()
-    expect(text).toContain('You')
-    expect(text).toContain('Display')
+  it('builds a breadcrumb from the settings root, group and parent of the active page', () => {
+    const wrapper = mountView('settings-appearance-layout')
+    const crumbs = wrapper.findAll('[data-testid="settings-breadcrumb-item"]').map((item) => item.text())
+    expect(crumbs).toEqual(['Settings', 'You', 'Display'])
+    expect(wrapper.get('nav').attributes('aria-label')).toBe('Breadcrumb')
   })
 
-  it('shows the page title and description for pages without their own header', () => {
-    const text = mountView('settings-metadata-providers').text()
-    expect(text).toContain('Providers')
-    expect(text).toContain('Enable external metadata sources')
+  it('keeps only the nearest crumb on phones', () => {
+    const items = mountView('settings-appearance-layout').findAll('[data-testid="settings-breadcrumb-item"]')
+    expect(items.map((item) => item.classes().includes('max-sm:hidden'))).toEqual([true, true, false])
+  })
+
+  it.each([
+    [
+      'settings-koreader',
+      'KOReader',
+      'Sync progress, reading activity and highlights with KOReader, get the sync URL and plugin, and manage the devices that connect.',
+    ],
+    [
+      'settings-libraries',
+      'Libraries',
+      'Every library at a glance: its folders, what it holds, how it is scanned and when it last ran. Add, edit or rescan libraries here.',
+    ],
+    [
+      'settings-metadata-providers',
+      'Providers',
+      'Turn metadata sources on or off, add API keys or cookies where a source needs them, and test the credentials against the live service.',
+    ],
+  ])('puts the %s title on the breadcrumb line with its description below', (routeName, title, description) => {
+    const wrapper = mountView(routeName)
+    const heading = wrapper.get('[data-testid="settings-page-title"]')
+    expect(heading.element.tagName).toBe('H2')
+    expect(heading.text()).toBe(title)
+    expect(wrapper.get('nav').element.contains(heading.element)).toBe(false)
+    expect(wrapper.get('[data-testid="settings-page-description"]').text()).toBe(description)
+  })
+
+  it('leaves the description line out for a page without one', () => {
+    expect(mountView('settings-podcasts').find('[data-testid="settings-page-description"]').exists()).toBe(false)
+  })
+
+  it('keeps the teleport target for page header actions', () => {
+    expect(mountView('settings-libraries').find('#settings-header-actions').exists()).toBe(true)
   })
 
   it('uses compact, consistent spacing below the shared page header', () => {
@@ -50,19 +83,6 @@ describe('SettingsView shell', () => {
     expect(content.classes()).toContain('pt-4')
     expect(content.classes()).toContain('md:pt-5')
     expect(content.classes()).toContain('pb-6')
-  })
-
-  it.each([
-    ['settings-reader-fonts', 'Fonts available while reading.'],
-    ['settings-libraries', 'Scan paths, watched folders, and ingest rules.'],
-    ['settings-kobo', 'Sync endpoint, store proxy, and shelf mapping.'],
-    ['settings-koreader', 'Progress sync and document matching.'],
-    ['settings-opds', 'Catalog feeds for third-party reading apps.'],
-    ['settings-email', 'SMTP delivery and send-to-device addresses.'],
-  ])('renders the shared shell header for %s', (routeName, description) => {
-    const wrapper = mountView(routeName)
-    expect(wrapper.find('.settings-title').exists()).toBe(true)
-    expect(wrapper.find('.settings-subtitle').text()).toBe(description)
   })
 
   it('applies the route width so wide pages are not squeezed', () => {

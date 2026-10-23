@@ -22,6 +22,7 @@ import {
   bookMetadata,
   bookMetadataFetchQueue,
   bookNarrators,
+  bookTags,
   books,
   comicMetadata,
   genres,
@@ -29,6 +30,7 @@ import {
   libraryFolders,
   narrators,
   scanJobs,
+  tags,
 } from '../../../src/db/schema';
 import { COVER_CUSTOM_FILE_PREFIX, COVER_EXTRACTED_FILE_PREFIX } from '../../../src/modules/cover/constants';
 import { coverDirPath } from '../../../src/modules/metadata/lib/cover';
@@ -94,6 +96,8 @@ export interface BookMutationState {
     publishedYear: number | null;
     language: string | null;
     pageCount: number | null;
+    isbn10: string | null;
+    isbn13: string | null;
     coverSource: string | null;
     goodreadsId: string | null;
     openLibraryId: string | null;
@@ -104,6 +108,7 @@ export interface BookMutationState {
     lastMetadataFetchAt: Date | null;
   } | null;
   genres: string[];
+  tags: string[];
   narrators: string[];
   comicMetadata: {
     issueNumber: string | null;
@@ -267,7 +272,7 @@ export async function locateBookFileByRelPath(ctx: MetadataLockE2EContext, libra
 }
 
 export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId: number): Promise<BookMutationState> {
-  const [metadataRows, genreRows, narratorRows, comicRows] = await Promise.all([
+  const [metadataRows, genreRows, tagRows, narratorRows, comicRows] = await Promise.all([
     ctx.db
       .select({
         title: bookMetadata.title,
@@ -277,6 +282,8 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
         publishedYear: bookMetadata.publishedYear,
         language: bookMetadata.language,
         pageCount: bookMetadata.pageCount,
+        isbn10: bookMetadata.isbn10,
+        isbn13: bookMetadata.isbn13,
         coverSource: bookMetadata.coverSource,
         goodreadsId: bookMetadata.goodreadsId,
         openLibraryId: bookMetadata.openLibraryId,
@@ -290,6 +297,7 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
       .where(eq(bookMetadata.bookId, bookId))
       .limit(1),
     ctx.db.select({ name: genres.name }).from(bookGenres).innerJoin(genres, eq(genres.id, bookGenres.genreId)).where(eq(bookGenres.bookId, bookId)),
+    ctx.db.select({ name: tags.name }).from(bookTags).innerJoin(tags, eq(tags.id, bookTags.tagId)).where(eq(bookTags.bookId, bookId)),
     ctx.db
       .select({ name: narrators.name })
       .from(bookNarrators)
@@ -311,6 +319,8 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
           publishedYear: meta.publishedYear,
           language: meta.language,
           pageCount: meta.pageCount,
+          isbn10: meta.isbn10,
+          isbn13: meta.isbn13,
           coverSource: meta.coverSource,
           goodreadsId: meta.goodreadsId,
           openLibraryId: meta.openLibraryId,
@@ -322,6 +332,7 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
         }
       : null,
     genres: genreRows.map((row) => row.name).sort(),
+    tags: tagRows.map((row) => row.name).sort(),
     narrators: narratorRows.map((row) => row.name),
     comicMetadata: comic
       ? {

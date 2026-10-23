@@ -1,5 +1,22 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Patch, Post, Res, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import {
+  All,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -9,6 +26,8 @@ import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { KoboAnnotationExchangeService, KoboContentNotFoundException } from './services/kobo-annotation-exchange.service';
 import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
+import { KoboProxyService } from './services/kobo-proxy.service';
+import { KoboSettingsService } from './services/kobo-settings.service';
 
 @Controller(['kobo/:deviceToken', ''])
 @Public()
@@ -17,6 +36,8 @@ export class KoboReadingServicesController {
   constructor(
     private readonly exchangeService: KoboAnnotationExchangeService,
     private readonly historyService: KoboSyncHistoryService,
+    private readonly proxyService: KoboProxyService,
+    private readonly settingsService: KoboSettingsService,
   ) {}
 
   @Get('api/v3/content/:contentId/annotations')
@@ -58,18 +79,12 @@ export class KoboReadingServicesController {
     }
     reply.header('ETag', result.etag);
 
-    // This Kobo firmware never echoes our ETag back (it always sends If-None-Match: W/"0" and drives
-    // sync via checkforchanges), so the 304 path is never reached. Mark the content seen once the
-    // response is flushed on both 200 and 304, otherwise checkforchanges reports every annotated book
-    // as changed on every sync and the device never converges (downloads run detached and never apply).
-    reply.raw.once('finish', () => {
-      void this.exchangeService.markServedSeen(user.id, device.deviceId, result.servedAck).catch(() => undefined);
-    });
-
     if (result.notModified) {
+      await this.exchangeService.markServedSeen(user.id, device.deviceId, result.servedAck);
       reply.status(HttpStatus.NOT_MODIFIED).send();
       return;
     }
+    await this.exchangeService.rememberServe(user.id, device.deviceId, result.bookId, result.etag, result.servedAck);
     reply.send(result.response);
   }
 
@@ -116,12 +131,31 @@ export class KoboReadingServicesController {
 
   @Post('api/v3/content/checkforchanges')
   @HttpCode(HttpStatus.OK)
-  async checkForChanges(@CurrentUser() user: RequestUser, @KoboDevice() device: KoboDeviceContext) {
-    return this.exchangeService.getChangedContentIds(user.id, device.deviceId);
+  async checkForChanges(@Body() body: unknown, @CurrentUser() user: RequestUser, @KoboDevice() device: KoboDeviceContext) {
+    return this.exchangeService.getChangedContentIds(user.id, device.deviceId, body);
   }
 
-  @Get('api/UserStorage/Metadata')
-  getUserStorageMetadata() {
-    return { continuationToken: null, metadata: [] };
+  /**
+   * Notebooks sync through Kobo's own UserStorage service, which BookOrbit does not hold. With store titles
+   * on, the device is signed in to Kobo and already talks to it for its store library, so its notebook
+   * calls are relayed there too. Otherwise an empty listing keeps the device's notebook sync quiet.
+   */
+  @All('api/UserStorage/*')
+  async userStorage(
+    @CurrentUser() user: RequestUser,
+    @KoboDevice() device: KoboDeviceContext,
+    @Req() req: FastifyRequest,
+    @Res() reply: FastifyReply,
+  ) {
+    const storeSync = await this.settingsService
+      .getSettings(user.id)
+      .then((settings) => settings.storeSync)
+      .catch(() => false);
+    if (storeSync) return this.proxyService.forward(req, reply, device.deviceToken, 'readingServices');
+    if (req.method === 'GET' && req.url.split('?')[0].endsWith('/api/UserStorage/Metadata')) {
+      reply.send({ continuationToken: null, metadata: [] });
+      return;
+    }
+    throw new NotFoundException();
   }
 }

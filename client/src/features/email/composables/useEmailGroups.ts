@@ -43,6 +43,21 @@ export function useEmailGroups() {
     return created
   }
 
+  async function updateGroup(id: number, patch: { name?: string; defaultTemplateId?: number | null }): Promise<EmailGroup> {
+    const res = await api(`/api/v1/email/recipient-groups/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error((err as { message?: string }).message ?? 'Failed to update group')
+    }
+    const updated: EmailGroup = await res.json()
+    groups.value = groups.value.map((g) => (g.id === id ? { ...g, ...updated, members: updated.members ?? g.members } : g))
+    return updated
+  }
+
   async function deleteGroup(id: number): Promise<void> {
     const res = await api(`/api/v1/email/recipient-groups/${id}`, { method: 'DELETE' })
     if (!res.ok) throw new Error('Failed to delete group')
@@ -69,5 +84,5 @@ export function useEmailGroups() {
     groups.value = groups.value.map((g) => (g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== recipientId) } : g))
   }
 
-  return { groups, fetchGroups, createGroup, deleteGroup, addMember, removeMember }
+  return { groups, fetchGroups, createGroup, updateGroup, deleteGroup, addMember, removeMember }
 }

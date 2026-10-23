@@ -2,17 +2,28 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate, formatNumber } from '@/i18n/formatters'
-import type { AuthorDetail } from '@bookorbit/types'
-import { MoreHorizontal, Pencil, RefreshCcw, Trash2, UsersRound, X } from '@lucide/vue'
+import type { AuthorDetail, MetadataCandidateCacheInfo } from '@bookorbit/types'
+import { MoreHorizontal, Pencil, RefreshCcw, Trash2, UserRoundSearch, UsersRound, X } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { toDisplayCoverUrl } from '@/features/book/lib/metadata-fetch'
+import MetadataCacheBadge from '@/features/metadata-cache/components/MetadataCacheBadge.vue'
+import MetadataCacheNotice from '@/features/metadata-cache/components/MetadataCacheNotice.vue'
+import SearchFreshButton from '@/features/metadata-cache/components/SearchFreshButton.vue'
+import type { MetadataCacheSummary } from '@/features/metadata-cache/lib/metadata-cache'
+import { isSafeWebsite, lifeDateLabel } from '../lib/author-facts'
+import { authorProviderLabel, authorProviderSourceUrl } from '../lib/author-metadata-match'
 
 const props = defineProps<{
   author: AuthorDetail
   imageUrl?: string | null
   previewDescription?: string | null
   previewProvider?: string | null
+  /** Set when the metadata cache answered for the previewed candidate. */
+  previewCache?: MetadataCandidateCacheInfo | null
+  cacheSummary?: MetadataCacheSummary | null
   loadingPreview?: boolean
+  /** The metadata lookup behind the preview has finished, whether or not it found anything. */
+  previewSearched?: boolean
   canUpdate?: boolean
   canMerge?: boolean
   canDelete?: boolean
@@ -23,6 +34,8 @@ const emit = defineEmits<{
   edit: []
   merge: []
   refresh: []
+  searchFresh: []
+  findMatch: []
   delete: []
 }>()
 
@@ -35,27 +48,19 @@ const initials = computed(() => {
   return `${parts[0]!.charAt(0)}${parts[1]!.charAt(0)}`.toUpperCase()
 })
 
-// Goodreads supplies a full date for most authors and only a year for older
-// ones, so fall back to the year rather than showing nothing.
-function lifeDateLabel(date: string | null, year: number | null): string | null {
-  if (date) {
-    const parsed = new Date(date)
-    // Birth and death are plain yyyy-MM-dd, which Date parses as UTC midnight.
-    // Formatting that in a timezone behind UTC would render the previous day,
-    // so read it back in UTC too.
-    if (!Number.isNaN(parsed.getTime())) {
-      return formatDate(parsed, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
-    }
-  }
-  // A year is not a quantity: grouping would render 1929 as "1,929".
-  return year !== null ? formatNumber(year, { useGrouping: false }) : null
-}
-
 const bornLabel = computed(() => lifeDateLabel(props.author.birthDate, props.author.birthYear))
 const diedLabel = computed(() => lifeDateLabel(props.author.deathDate, props.author.deathYear))
 const genres = computed(() => props.author.genres ?? [])
 const influences = computed(() => props.author.influences ?? [])
-const hasFacts = computed(() => !!(bornLabel.value || diedLabel.value || props.author.website || genres.value.length))
+const websiteIsLink = computed(() => isSafeWebsite(props.author.website))
+const sourceLabel = computed(() => (props.author.metadataProvider ? authorProviderLabel(props.author.metadataProvider) : null))
+const sourceUrl = computed(() => {
+  const { metadataProvider, metadataProviderId } = props.author
+  return metadataProvider && metadataProviderId ? authorProviderSourceUrl(metadataProvider, metadataProviderId) : null
+})
+const hasFacts = computed(
+  () => !!(bornLabel.value || diedLabel.value || props.author.website || genres.value.length || influences.value.length || sourceLabel.value),
+)
 
 const resolvedBio = computed(() => {
   const local = props.author.description?.trim()
@@ -64,6 +69,16 @@ const resolvedBio = computed(() => {
 })
 
 const usesPreviewBio = computed(() => !props.author.description?.trim() && !!props.previewDescription?.trim())
+const usesPreviewImage = computed(() => !props.author.imageUrl && !!props.imageUrl)
+const showCacheNotice = computed(() => (usesPreviewBio.value || usesPreviewImage.value) && (props.cacheSummary?.cachedCount ?? 0) > 0)
+// A saved "nothing found" leaves no preview to mark, so a fresh lookup is offered wherever the preview would show.
+const offersSearchFresh = computed(
+  () => !!props.previewSearched && !props.loadingPreview && (usesPreviewBio.value || usesPreviewImage.value || !resolvedBio.value),
+)
+
+function handleSearchFresh() {
+  emit('searchFresh')
+}
 
 const lastAddedLabel = computed(() => {
   if (!props.author.lastAddedAt) return t('author.header.never')
@@ -72,11 +87,11 @@ const lastAddedLabel = computed(() => {
   return formatDate(date, { year: 'numeric', month: 'short', day: 'numeric' })
 })
 
-const previewProviderLabel = computed(() => {
-  if (!props.previewProvider) return ''
-  if (props.previewProvider === 'audnexus') return 'Audnexus'
-  return props.previewProvider
-})
+const previewProviderLabel = computed(() => (props.previewProvider ? authorProviderLabel(props.previewProvider) : ''))
+
+function handleFindMatch() {
+  emit('findMatch')
+}
 
 const showMenu = computed(() => props.canUpdate || props.canMerge || props.canDelete)
 
@@ -146,6 +161,10 @@ watch(resolvedBio, () => {
                   <RefreshCcw class="mr-2 h-4 w-4" :class="refreshing ? 'animate-spin' : ''" />
                   {{ refreshing ? t('author.header.refreshing') : t('author.header.refreshMetadata') }}
                 </DropdownMenuItem>
+                <DropdownMenuItem v-if="canUpdate" @click="handleFindMatch">
+                  <UserRoundSearch class="mr-2 h-4 w-4" />
+                  {{ t('author.header.findMatch') }}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator v-if="canDelete && (canUpdate || canMerge)" />
                 <DropdownMenuItem v-if="canDelete" class="text-destructive focus:text-destructive" @click="emit('delete')">
                   <Trash2 class="mr-2 h-4 w-4" />
@@ -175,9 +194,14 @@ watch(resolvedBio, () => {
             </button>
             <p v-else-if="loadingPreview" class="text-sm text-muted-foreground">{{ t('author.header.lookingUpMetadata') }}</p>
             <p v-else class="text-sm text-muted-foreground">{{ t('author.header.noBiography') }}</p>
-            <p v-if="usesPreviewBio && previewProviderLabel" class="mt-1.5 text-xs text-muted-foreground">
-              {{ t('author.header.previewFrom', { provider: previewProviderLabel }) }}
+            <p v-if="usesPreviewBio && previewProviderLabel" class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{{ t('author.header.previewFrom', { provider: previewProviderLabel }) }}</span>
+              <MetadataCacheBadge v-if="previewCache" :info="previewCache" />
             </p>
+            <MetadataCacheNotice v-if="showCacheNotice && cacheSummary" class="mt-1.5" :summary="cacheSummary" @search-fresh="handleSearchFresh" />
+            <div v-else-if="offersSearchFresh" class="mt-1.5">
+              <SearchFreshButton @search-fresh="handleSearchFresh" />
+            </div>
           </div>
 
           <dl v-if="hasFacts" class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -192,9 +216,16 @@ watch(resolvedBio, () => {
             <div v-if="author.website" class="flex gap-1.5 min-w-0">
               <dt class="text-muted-foreground">{{ t('author.header.website') }}</dt>
               <dd class="min-w-0 truncate">
-                <a :href="author.website" target="_blank" rel="noopener noreferrer" class="text-foreground underline underline-offset-2">
+                <a
+                  v-if="websiteIsLink"
+                  :href="author.website"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-foreground underline underline-offset-2"
+                >
                   {{ author.website }}
                 </a>
+                <span v-else class="text-foreground">{{ author.website }}</span>
               </dd>
             </div>
             <div v-if="genres.length" class="flex gap-1.5 min-w-0">
@@ -204,6 +235,18 @@ watch(resolvedBio, () => {
             <div v-if="influences.length" class="flex gap-1.5 min-w-0">
               <dt class="text-muted-foreground">{{ t('author.header.influences') }}</dt>
               <dd class="min-w-0 text-foreground">{{ influences.join(', ') }}</dd>
+            </div>
+            <div v-if="sourceLabel" class="flex gap-1.5 min-w-0" data-testid="author-source">
+              <dt class="text-muted-foreground">{{ t('author.header.source') }}</dt>
+              <dd class="flex min-w-0 items-center gap-1.5">
+                <a v-if="sourceUrl" :href="sourceUrl" target="_blank" rel="noopener noreferrer" class="text-foreground underline underline-offset-2">
+                  {{ sourceLabel }}
+                </a>
+                <span v-else class="text-foreground">{{ sourceLabel }}</span>
+                <span v-if="author.metadataProviderPinned" class="rounded bg-primary/10 px-1.5 text-[11px] font-medium text-primary">
+                  {{ t('author.header.pinned') }}
+                </span>
+              </dd>
             </div>
           </dl>
 

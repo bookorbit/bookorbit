@@ -73,6 +73,10 @@ vi.mock('@/features/library/composables/useLibraries', () => ({
   useLibraries: () => ({ libraries: ref([]), fetchLibraries: mocks.fetchLibraries }),
 }))
 
+vi.mock('@/features/library/composables/useLibraryPermissions', () => ({
+  useLibraryPermissions: () => ({ hasLibraryPermission: () => true, hasPermissionInAnyLibrary: () => true }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: () => true, isSuperuser: ref(false) }),
 }))
@@ -182,6 +186,7 @@ function makeAuthor(overrides: Partial<AuthorDetail> = {}): AuthorDetail {
     influences: [],
     metadataProvider: null,
     metadataProviderId: null,
+    metadataProviderPinned: false,
     ...overrides,
   }
 }
@@ -200,8 +205,14 @@ async function mountView() {
         AuthorHeader: {
           name: 'AuthorHeader',
           props: ['author'],
-          emits: ['edit', 'merge', 'refresh', 'delete'],
+          emits: ['edit', 'merge', 'refresh', 'delete', 'find-match'],
           template: '<div data-test="author-header">{{ author.bookCount }}</div>',
+        },
+        AuthorMatchSheet: {
+          name: 'AuthorMatchSheet',
+          props: ['author'],
+          emits: ['close', 'updated'],
+          template: '<div data-test="author-match-sheet" />',
         },
         AuthorConfirmDialog: {
           name: 'AuthorConfirmDialog',
@@ -266,13 +277,21 @@ describe('AuthorDetailView', () => {
     return wrapper
   }
 
+  function inputLabelled(wrapper: Awaited<ReturnType<typeof mountView>>, key: string) {
+    const label = i18n.global.t(key)
+    const match = wrapper.findAll('label').find((candidate) => candidate.text().startsWith(label))
+    expect(match, `no field labelled "${label}"`).toBeDefined()
+    return match!.get('input')
+  }
+
   function editFields(wrapper: Awaited<ReturnType<typeof mountView>>) {
-    const textInputs = wrapper.findAll('input:not([type="file"])')
-    expect(textInputs).toHaveLength(2)
     return {
-      name: textInputs[0],
-      sortName: textInputs[1],
+      name: inputLabelled(wrapper, 'author.detail.edit.name'),
+      sortName: inputLabelled(wrapper, 'author.detail.edit.sortName'),
       description: wrapper.get('textarea'),
+      website: inputLabelled(wrapper, 'author.detail.edit.website'),
+      born: inputLabelled(wrapper, 'author.detail.edit.born'),
+      died: inputLabelled(wrapper, 'author.detail.edit.died'),
     }
   }
 
@@ -405,7 +424,7 @@ describe('AuthorDetailView', () => {
   })
 
   it('stops treating the form as unsaved once the edits are saved', async () => {
-    vi.mocked(updateAuthor).mockImplementation(async (_id, payload) => makeAuthor({ ...payload }))
+    vi.mocked(updateAuthor).mockImplementation(async (_id, payload) => makeAuthor({ ...(payload as Partial<AuthorDetail>) }))
     vi.mocked(refreshAuthorMetadata).mockResolvedValue(makeAuthor({ description: 'Provider biography' }))
 
     const wrapper = await openEditPanel()
@@ -422,6 +441,80 @@ describe('AuthorDetailView', () => {
     await flushPromises()
 
     expect((editFields(wrapper).description.element as HTMLTextAreaElement).value).toBe('Provider biography')
+  })
+
+  it('sends only the facts that were changed, as a date and its year', async () => {
+    mocks.author = ref(makeAuthor({ website: 'not a url', birthYear: 1950, genres: ['Journalism'] }))
+    vi.mocked(updateAuthor).mockResolvedValue(makeAuthor())
+
+    const wrapper = await openEditPanel()
+    const fields = editFields(wrapper)
+    expect((fields.born.element as HTMLInputElement).value).toBe('1950')
+    await fields.born.setValue('1965-03-14')
+    await fields.died.setValue('2020')
+
+    await findButtonByLabel(wrapper, 'common.save').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(updateAuthor)).toHaveBeenCalledWith(7, {
+      name: 'Author',
+      sortName: null,
+      description: null,
+      birthDate: '1965-03-14',
+      birthYear: 1965,
+      deathDate: null,
+      deathYear: 2020,
+    })
+  })
+
+  it('adds https to a bare website and clears an emptied one', async () => {
+    mocks.author = ref(makeAuthor({ website: 'https://old.example' }))
+    vi.mocked(updateAuthor).mockResolvedValue(makeAuthor())
+
+    const wrapper = await openEditPanel()
+    await editFields(wrapper).website.setValue('johnreid.example')
+    await findButtonByLabel(wrapper, 'common.save').trigger('click')
+    await flushPromises()
+    expect(vi.mocked(updateAuthor)).toHaveBeenLastCalledWith(7, expect.objectContaining({ website: 'https://johnreid.example' }))
+  })
+
+  it('keeps the panel open and flags a life date it cannot read', async () => {
+    const wrapper = await openEditPanel()
+    const born = editFields(wrapper).born
+    await born.setValue('14 March 1965')
+
+    await findButtonByLabel(wrapper, 'common.save').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(updateAuthor)).not.toHaveBeenCalled()
+    expect(born.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.text()).toContain(i18n.global.t('author.detail.edit.lifeDateInvalid'))
+
+    await born.setValue('1965')
+    await flushPromises()
+
+    expect(born.attributes('aria-invalid')).toBeUndefined()
+    expect(wrapper.text()).not.toContain(i18n.global.t('author.detail.edit.lifeDateInvalid'))
+  })
+
+  it('opens the match picker and adopts the author it returns', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-test="author-match-sheet"]').exists()).toBe(false)
+
+    await wrapper.getComponent({ name: 'AuthorHeader' }).vm.$emit('find-match')
+    await flushPromises()
+    const sheet = wrapper.getComponent({ name: 'AuthorMatchSheet' })
+
+    await sheet.vm.$emit(
+      'updated',
+      makeAuthor({ description: 'Scottish novelist.', metadataProvider: 'goodreads', metadataProviderId: '2222', metadataProviderPinned: true }),
+    )
+    await sheet.vm.$emit('close')
+    await flushPromises()
+
+    expect(mocks.author.value?.description).toBe('Scottish novelist.')
+    expect(mocks.loadMetadataPreview).toHaveBeenCalled()
+    expect(wrapper.find('[data-test="author-match-sheet"]').exists()).toBe(false)
   })
 
   it('deletes a book from the author grid menu action', async () => {

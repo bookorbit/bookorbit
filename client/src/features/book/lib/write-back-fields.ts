@@ -40,15 +40,15 @@ function plainText(html: string | null): string | null {
  * sync; it has never been able to say what they contain, which is the question you ask before
  * letting something rewrite your library.
  */
-export function resolveWriteBackFields(book: BookDetail, fields: readonly BookFileWriteField[]): WriteBackField[] {
+export function resolveWriteBackFields(book: BookDetail, fields: readonly BookFileWriteField[], format?: string | null): WriteBackField[] {
   return fields.map((field) => ({
     field,
     label: BOOK_FILE_WRITE_FIELD_LABELS[field] ?? field,
-    value: resolveValue(book, field),
+    value: resolveValue(book, field, format),
   }))
 }
 
-function resolveValue(book: BookDetail, field: BookFileWriteField): string | null {
+function resolveValue(book: BookDetail, field: BookFileWriteField, format: string | null | undefined): string | null {
   switch (field) {
     case 'authors':
       return joinNames(book.authors)
@@ -61,7 +61,7 @@ function resolveValue(book: BookDetail, field: BookFileWriteField): string | nul
     case 'description':
       return plainText(book.description)
     case 'coverBytes':
-      return writtenCoverSource(book)
+      return writtenCoverSource(book, format)
     case 'seriesIndex':
       return book.seriesIndex != null ? String(book.seriesIndex) : null
     case 'seriesName':
@@ -88,12 +88,13 @@ function resolveValue(book: BookDetail, field: BookFileWriteField): string | nul
 
 /**
  * Write-back embeds only the written file's own medium: the EPUB gets the book cover and the audio
- * tracks the audiobook cover. A book with no slots yet still serves its one legacy cover.
+ * tracks the audiobook cover. Without a format, the primary file's medium stands for the book. A
+ * book with no slots yet still serves its one legacy cover.
  */
-function writtenCoverSource(book: BookDetail): string | null {
+function writtenCoverSource(book: BookDetail, format: string | null | undefined): string | null {
   const covers = book.covers ?? { ebook: null, audio: null }
   if (!covers.ebook && !covers.audio) return book.coverSource
-  const format = getPrimaryBookFile(book.files ?? [])?.format?.toLowerCase()
-  const medium: CoverMedium = format && isAudioFormat(format) ? 'audio' : 'ebook'
+  const target = (format ?? getPrimaryBookFile(book.files ?? [])?.format)?.toLowerCase()
+  const medium: CoverMedium = target && isAudioFormat(target) ? 'audio' : 'ebook'
   return covers[medium]?.source ?? null
 }

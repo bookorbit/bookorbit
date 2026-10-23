@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { useSavedViews } from '../useSavedViews'
+import { stubInsecureOriginCrypto, UUID_V4 } from '@/lib/__tests__/insecure-origin'
 
 const mockStorage: Record<string, string> = {}
 
@@ -95,5 +96,25 @@ describe('useSavedViews', () => {
     expect(imported).toBe(1)
     expect(savedViews.savedViews.value).toHaveLength(1)
     expect(savedViews.savedViews.value[0]?.name).toBe('Imported')
+  })
+
+  /** A self-hosted install opened over plain HTTP has no `crypto.randomUUID`. */
+  it('creates distinct view ids on a plain-HTTP origin', () => {
+    const insecure = stubInsecureOriginCrypto()
+    try {
+      const savedViews = useSavedViews('library', ref<number | null>(4))
+      const layout = { columnOrder: ['title'], hiddenColumns: [], columnWidths: {} }
+
+      expect(savedViews.saveView({ name: 'Saved', layout, sort: [] })).toBe(true)
+      savedViews.duplicateView(savedViews.savedViews.value[0]!.id)
+      savedViews.importViews([{ id: 'saved_view_import', name: 'Imported', layout, sort: [] }])
+
+      const ids = savedViews.savedViews.value.map((view) => view.id)
+      expect(savedViews.savedViews.value.map((view) => view.name)).toEqual(['Saved', 'Saved Copy', 'Imported'])
+      expect(ids.every((id) => UUID_V4.test(id.replace(/^saved_view_/, '')))).toBe(true)
+      expect(new Set(ids).size).toBe(3)
+    } finally {
+      insecure.restore()
+    }
   })
 })

@@ -60,7 +60,7 @@ function onCoverLoad(event: Event) {
         <button
           type="button"
           data-testid="book-dock-cover-current"
-          class="relative flex h-[57px] w-[38px] cursor-zoom-in items-center justify-center overflow-hidden rounded bg-muted ring-1 ring-border transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          class="relative flex h-[57px] w-[38px] cursor-zoom-in items-center justify-center overflow-hidden rounded-xs bg-muted ring-1 ring-border transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           :aria-label="t('bookDock.fileList.currentCoverAlt', { title: props.title })"
           @click="openCurrent"
         >
@@ -72,7 +72,7 @@ function onCoverLoad(event: Event) {
           <button
             type="button"
             data-testid="book-dock-cover-proposed"
-            class="relative flex h-[57px] w-[38px] cursor-zoom-in items-center justify-center overflow-hidden rounded border transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            class="relative flex h-[57px] w-[38px] cursor-zoom-in items-center justify-center overflow-hidden rounded-xs border transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             :class="props.applied ? 'border-emerald-500/45 bg-emerald-500/5' : 'border-amber-500/45 bg-amber-500/5'"
             :aria-label="t('bookDock.fileList.newCoverAlt', { title: props.title })"
             @click="openProposed"

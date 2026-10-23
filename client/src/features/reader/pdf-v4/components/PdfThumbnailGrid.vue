@@ -146,14 +146,14 @@ watch(
             v-for="pageIndex in item.pageIndexes"
             :key="pageIndex"
             type="button"
-            class="flex shrink-0 flex-col items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            class="flex shrink-0 flex-col items-center gap-1 rounded-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             :style="{ width: `${cellWidth}px` }"
             :aria-label="t('reader.pdf.sidebar.goToPage', { page: pageIndex + 1 })"
             :aria-current="props.currentPage === pageIndex + 1 ? 'page' : undefined"
             @click="handleSelect(pageIndex)"
           >
             <span
-              class="flex items-center justify-center overflow-hidden rounded border-2 bg-background transition-colors"
+              class="flex items-center justify-center overflow-hidden rounded-xs border-2 bg-background transition-colors"
               :class="
                 props.currentPage === pageIndex + 1 ? 'border-primary ring-2 ring-primary/15' : 'border-border hover:border-muted-foreground/50'
               "

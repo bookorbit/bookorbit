@@ -197,7 +197,7 @@ function handleClearFilters() {
         </Button>
         <button
           type="button"
-          class="grid size-7 place-items-center rounded text-muted-foreground hover:text-foreground"
+          class="grid size-7 place-items-center rounded-xs text-muted-foreground hover:text-foreground"
           :aria-label="t('annotations.bulk.clear')"
           @click="handleClearSelection"
         >
@@ -233,7 +233,7 @@ function handleClearFilters() {
       <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5">
         <button
           type="button"
-          class="inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[11px] font-semibold transition-colors"
+          class="inline-flex h-6 items-center gap-1.5 rounded-xs px-2.5 text-[11px] font-semibold transition-colors"
           :class="notesOnly ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
           :aria-pressed="notesOnly"
           @click="handleToggleNotes"
@@ -245,7 +245,7 @@ function handleClearFilters() {
         <button
           v-if="reviewCount > 0"
           type="button"
-          class="inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[11px] font-semibold transition-colors"
+          class="inline-flex h-6 items-center gap-1.5 rounded-xs px-2.5 text-[11px] font-semibold transition-colors"
           :class="needsReviewOnly ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
           :aria-pressed="needsReviewOnly"
           @click="handleToggleReview"

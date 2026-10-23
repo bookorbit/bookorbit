@@ -28,8 +28,8 @@ function goToBook() {
 
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col gap-2">
-      <div class="h-16 w-full animate-pulse rounded bg-muted" />
-      <div class="h-3 w-2/3 animate-pulse rounded bg-muted" />
+      <div class="h-16 w-full animate-pulse rounded-xs bg-muted" />
+      <div class="h-3 w-2/3 animate-pulse rounded-xs bg-muted" />
     </div>
 
     <!-- Error -->
@@ -53,7 +53,7 @@ function goToBook() {
         "{{ data.text.length > 200 ? data.text.slice(0, 200) + '...' : data.text }}"
       </blockquote>
       <button class="flex cursor-pointer items-center gap-2 rounded-lg pb-1 pl-1 text-left transition-colors hover:bg-muted/40" @click="goToBook">
-        <BookCoverSurface size="mini" class="book-cover-surface--spine-fitted h-9 w-6 shrink-0 overflow-hidden rounded">
+        <BookCoverSurface size="mini" class="book-cover-surface--spine-fitted h-9 w-6 shrink-0 overflow-hidden rounded-xs">
           <BookCoverArtwork
             :src="coverUrl(data.bookId)"
             :has-cover="data.hasCover"

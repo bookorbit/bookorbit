@@ -308,15 +308,17 @@ describe('useAnnotationsHub', () => {
       expect(apiMock).toHaveBeenCalledWith('/api/v1/annotations/7', { method: 'DELETE' })
     })
 
-    it('purge surfaces the conflict message on 409', async () => {
-      apiMock.mockResolvedValueOnce(makeResponse({ message: 'Still queued' }, { ok: false, status: 409 }))
+    it('purge reports a pending device sync from the error code, not the message', async () => {
+      apiMock.mockResolvedValueOnce(
+        makeResponse({ errorCode: 'ANNOTATION_PURGE_PENDING_DEVICE_SYNC', message: 'Still queued' }, { ok: false, status: 409 }),
+      )
 
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
       const result = await hub.purge(7)
 
-      expect(result).toEqual({ ok: false, message: 'Still queued' })
+      expect(result).toEqual({ ok: false, pendingDeviceSync: true })
     })
 
     it('purge returns a generic failure on other errors', async () => {
@@ -327,7 +329,7 @@ describe('useAnnotationsHub', () => {
 
       const result = await hub.purge(7)
 
-      expect(result).toEqual({ ok: false })
+      expect(result).toEqual({ ok: false, pendingDeviceSync: false })
     })
   })
 

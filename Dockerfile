@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:26.8.1-alpine3.23@sha256:871eb674ad6e692c91330a8959f1ce2f80ba3f445cdc54e306869d2ea265e42d
+ARG NODE_IMAGE=node:26.11.1-alpine3.23@sha256:f1394b3ffc021bc3f4aaf363e70a8d9667f7a9a63538bc824d7cc583129fffad
 
 FROM ${NODE_IMAGE} AS base
 RUN npm install -g pnpm@11.22.0
@@ -58,7 +58,7 @@ COPY server/requirements/kobo-cloudscraper.txt /tmp/kobo-cloudscraper-requiremen
 # pip is build-only here. Leaving it installed also leaves pip/_vendor/vendor.txt,
 # which Trivy reads as installed msgpack and setuptools and fails the image scan on.
 RUN apk upgrade --no-cache && \
-    apk add --no-cache poppler-utils su-exec ffmpeg python3 py3-pip tini tzdata && \
+    apk add --no-cache 'libexpat>=2.9.0-r0' poppler-utils djvulibre util-linux su-exec ffmpeg python3 py3-pip tini tzdata && \
     python3 -m venv /opt/bookorbit-python && \
     /opt/bookorbit-python/bin/python -m pip install --no-cache-dir -r /tmp/kobo-cloudscraper-requirements.txt && \
     /opt/bookorbit-python/bin/python -m pip uninstall -y pip && \

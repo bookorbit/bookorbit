@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { ArrowUpDown, Plus, Search, X } from '@lucide/vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import AppIcon from '@/components/AppIcon.vue'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 import { formatNumber } from '@/i18n/formatters'
 import { entityCount } from '@/lib/entity-count'
 
@@ -115,14 +116,11 @@ function itemCountText(item: EntityIndexItem): string {
 
 <template>
   <div class="flex h-full flex-col">
-    <div class="mb-3 flex flex-wrap items-center gap-2">
-      <div class="flex min-w-0 flex-1 items-center gap-2">
-        <AppIcon :icon="titleIcon" :fallback="fallbackIcon" :size="18" class="shrink-0 text-primary" />
-        <h1 class="min-w-0 truncate text-lg font-semibold text-foreground">{{ title }}</h1>
-        <span class="shrink-0 text-sm text-muted-foreground tabular-nums">{{ resultSummary }}</span>
-      </div>
-
-      <div class="flex items-center gap-2">
+    <PageTitleRow class="mt-2 mb-3" :eyebrow="t('components.sidebar.zones.browse')" :title="title" :icon="titleIcon" :fallback-icon="fallbackIcon">
+      <template #facts>
+        <span class="tabular-nums">{{ resultSummary }}</span>
+      </template>
+      <template #actions>
         <div class="flex h-8 w-48 items-center gap-1.5 rounded-md border border-input bg-background px-2.5 sm:w-64">
           <Search :size="13" aria-hidden="true" class="shrink-0 text-muted-foreground" />
           <label class="sr-only" :for="`entity-index-search-${routeName}`">{{ searchPlaceholder }}</label>
@@ -197,8 +195,8 @@ function itemCountText(item: EntityIndexItem): string {
           <Plus :size="13" aria-hidden="true" />
           <span>{{ addLabel }}</span>
         </button>
-      </div>
-    </div>
+      </template>
+    </PageTitleRow>
 
     <main class="min-h-0 flex-1 overflow-y-auto pr-2">
       <div v-if="loading && items.length === 0" class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">

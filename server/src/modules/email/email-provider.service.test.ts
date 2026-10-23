@@ -3,6 +3,7 @@ import { EmailProviderService } from './email-provider.service';
 import { EmailProviderRepository } from './email-provider.repository';
 import { EmailEncryptionService } from './email-encryption.service';
 import { EmailTransportService } from './email-transport.service';
+import { EmailPreferencesRepository } from './email-preferences.repository';
 import type { RequestUser } from '../../common/types/request-user';
 import { EMPTY_CONTENT_FILTER_RULES, Permission } from '@bookorbit/types';
 
@@ -11,6 +12,7 @@ describe('EmailProviderService', () => {
   let repo: EmailProviderRepository;
   let encryption: EmailEncryptionService;
   let transport: EmailTransportService;
+  let preferences: EmailPreferencesRepository;
 
   const mockUser: RequestUser = {
     id: 1,
@@ -61,11 +63,11 @@ describe('EmailProviderService', () => {
     repo = {
       findAllForUser: vi.fn().mockResolvedValue([mockProvider]),
       findById: vi.fn().mockResolvedValue([mockProvider]),
+      findSharedDefault: vi.fn().mockResolvedValue([]),
       insert: vi.fn().mockResolvedValue([mockProvider]),
       update: vi.fn().mockResolvedValue([mockProvider]),
       delete: vi.fn(),
-      clearDefault: vi.fn(),
-      setDefault: vi.fn().mockResolvedValue([mockProvider]),
+      recordTestResult: vi.fn().mockResolvedValue([mockProvider]),
       setSharedByOwner: vi.fn().mockResolvedValue([{ ...mockProvider, isShared: true }]),
       setSystemProvider: vi.fn().mockResolvedValue({ ...mockProvider, isSystemProvider: true }),
       clearSystemProvider: vi.fn(),
@@ -81,7 +83,9 @@ describe('EmailProviderService', () => {
       verifyTransporter: vi.fn(),
     } as unknown as EmailTransportService;
 
-    service = new EmailProviderService(repo, encryption, transport);
+    preferences = { setDefaults: vi.fn().mockResolvedValue({}) } as unknown as EmailPreferencesRepository;
+
+    service = new EmailProviderService(repo, encryption, transport, preferences);
   });
 
   describe('findAll', () => {
@@ -178,10 +182,16 @@ describe('EmailProviderService', () => {
   });
 
   describe('setDefault', () => {
-    it('should set default provider', async () => {
+    it('writes the preference, which is what sending reads', async () => {
       const result = await service.setDefault(10, mockUser);
-      expect(repo.setDefault).toHaveBeenCalledWith(10, 1);
+      expect(preferences.setDefaults).toHaveBeenCalledWith(1, { defaultProviderId: 10 });
       expect(result.id).toBe(10);
+    });
+
+    it('refuses a provider the caller does not own', async () => {
+      (repo.findById as vi.Mock).mockResolvedValue([{ ...mockProvider, userId: 2, isShared: true }]);
+      await expect(service.setDefault(10, mockUser)).rejects.toThrow(ForbiddenException);
+      expect(preferences.setDefaults).not.toHaveBeenCalled();
     });
   });
 
@@ -189,6 +199,34 @@ describe('EmailProviderService', () => {
     it('should return provider with plain password', async () => {
       const result = await service.getProviderWithDecryptedPassword(10, mockUser);
       expect(result.plainPassword).toBe('decrypted');
+    });
+  });
+
+  describe('getSharedDefaultWithDecryptedPassword', () => {
+    it('returns the shared default with its decrypted password', async () => {
+      (repo.findSharedDefault as vi.Mock).mockResolvedValue([{ ...mockProvider, id: 22, userId: 9, isShared: true, isDefault: true }]);
+
+      const result = await service.getSharedDefaultWithDecryptedPassword();
+
+      expect(repo.findSharedDefault).toHaveBeenCalledOnce();
+      expect(encryption.decrypt).toHaveBeenCalledWith('encrypted');
+      expect(result).toMatchObject({ id: 22, plainPassword: 'decrypted' });
+    });
+
+    it('returns null without decrypting when no shared default exists', async () => {
+      const result = await service.getSharedDefaultWithDecryptedPassword();
+
+      expect(result).toBeNull();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('preserves a missing password as null', async () => {
+      (repo.findSharedDefault as vi.Mock).mockResolvedValue([{ ...mockProvider, passwordEnc: null, isShared: true, isDefault: true }]);
+
+      const result = await service.getSharedDefaultWithDecryptedPassword();
+
+      expect(result?.plainPassword).toBeNull();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
     });
   });
 
@@ -245,6 +283,16 @@ describe('EmailProviderService', () => {
       const result = await service.testConnection(10, mockUser);
       expect(result.success).toBe(false);
       expect(result.error).toBe('Connection failed');
+    });
+
+    it('keeps the outcome on the provider so the page can show it later', async () => {
+      (transport.verifyTransporter as vi.Mock).mockResolvedValueOnce(undefined);
+      await service.testConnection(10, mockUser);
+      expect(repo.recordTestResult).toHaveBeenLastCalledWith(10, true, null);
+
+      (transport.verifyTransporter as vi.Mock).mockRejectedValueOnce(new Error('connect ECONNREFUSED 127.0.0.1:1025'));
+      await service.testConnection(10, mockUser);
+      expect(repo.recordTestResult).toHaveBeenLastCalledWith(10, false, 'connect ECONNREFUSED 127.0.0.1:1025');
     });
 
     it('should pass tlsRejectUnauthorized to the transporter builder', async () => {

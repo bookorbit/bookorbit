@@ -20,6 +20,8 @@ local LIBRARY_VERSION_TOUCH_INTERVAL = 3600
 local shared
 local generation = 0
 local active_mutation
+local account_identity
+local account_epoch = 0
 local maps
 local maps_generation = -1
 
@@ -110,7 +112,7 @@ end
 
 local function ensure()
     if not shared then
-        shared = BookOrbitState.open()
+        shared = BookOrbitState.open(account_identity)
         shared.on_flush = publish
         publish()
     end
@@ -173,6 +175,9 @@ local function refreshSession(session)
 end
 
 local function commitSession(session)
+    if session.manager_account_epoch ~= account_epoch then
+        return nil, "stale_account"
+    end
     local state = ensure()
     local scope = session.manager_scope
     local base = session.manager_base
@@ -220,7 +225,23 @@ function StateManager.session(opts)
     session.manager_scope = scope
     session.manager_base = deepCopy(initial)
     session.manager_generation = generation
+    session.manager_account_epoch = account_epoch
     return session
+end
+
+function StateManager.setAccount(api)
+    local identity = "anonymous"
+    if api and api.server_url and api.username and api.userkey then
+        identity = tostring(api.server_url):gsub("/+$", "") .. "|" .. tostring(api.username)
+    end
+    if identity == account_identity then return false end
+    account_identity = identity
+    account_epoch = account_epoch + 1
+    shared = nil
+    active_mutation = nil
+    publish()
+    ensure()
+    return true
 end
 
 -- Compatibility alias for older callers. It returns an isolated session, not
@@ -343,7 +364,7 @@ end
 -- JSON subprocess envelope, so the child returns sequential records and the
 -- parent rebuilds lookup maps only if the generation is still current.
 function StateManager.computeOnDeviceMaps()
-    local state = shared or BookOrbitState.open()
+    local state = shared or BookOrbitState.open(account_identity)
     local by_book_id, by_file_id = state:matchedFileMaps()
     return {
         bookEntries = mapToEntries(by_book_id),
@@ -453,6 +474,8 @@ function StateManager.reset()
     maps_generation = -1
     generation = 0
     active_mutation = nil
+    account_identity = nil
+    account_epoch = account_epoch + 1
 end
 
 return StateManager

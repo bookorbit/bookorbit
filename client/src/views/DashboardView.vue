@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { getDashboardGreetingLabel } from '@/features/dashboard/lib/greeting'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 import DashboardPodcastScroller from '@/features/dashboard/components/DashboardPodcastScroller.vue'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
@@ -112,7 +113,26 @@ onUnmounted(() => {
   <div>
     <main class="relative flex-none">
       <!-- Scrollers / Welcome -->
-      <div class="space-y-5 pb-8 pt-4 sm:pr-2">
+      <div class="space-y-5 pb-8 pt-2 sm:pr-2">
+        <PageTitleRow class="animate-fade-up" style="animation-delay: 40ms" :eyebrow="t('components.sidebar.dashboard')" :icon="Sparkles">
+          <template #title>
+            <span class="block truncate text-[19px] leading-[25px] font-bold tracking-[-0.015em] text-foreground sm:text-[22px] sm:leading-[27px]">
+              {{ greetingText }}<span class="ms-1.5 text-primary">{{ greetingName }}</span>
+            </span>
+          </template>
+          <template v-if="libraryState === 'ready'" #actions>
+            <!-- Icon-only below sm so the greeting keeps its width; the label stays available to assistive tech. -->
+            <button
+              type="button"
+              :aria-label="t('views.dashboard.customize')"
+              class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-input px-3 text-[13px] font-medium whitespace-nowrap text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-sm:px-2"
+              @click="handleOpenSettings"
+            >
+              <Settings2 :size="14" class="text-muted-foreground" aria-hidden="true" />
+              <span class="hidden sm:inline">{{ t('views.dashboard.customize') }}</span>
+            </button>
+          </template>
+        </PageTitleRow>
         <div v-if="libraryState === 'loading'" role="status" class="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
           <Loader2 :size="18" class="animate-spin" aria-hidden="true" />
           <span>{{ t('common.loading') }}</span>
@@ -137,26 +157,6 @@ onUnmounted(() => {
         </div>
         <DashboardWelcome v-else-if="libraryState === 'empty'" :can-create="hasPermission('manage_libraries')" />
         <template v-else>
-          <div class="animate-fade-up flex items-center justify-between gap-3 px-1" style="animation-delay: 40ms">
-            <div class="flex min-w-0 items-center gap-2">
-              <Sparkles :size="16" class="shrink-0 text-primary" />
-              <p class="truncate text-[1.05rem] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[1.18rem]">
-                <span class="text-foreground">{{ greetingText }}</span>
-                <span class="ml-1 font-semibold text-primary">{{ greetingName }}</span>
-              </p>
-            </div>
-            <!-- Icon-only below sm so the greeting keeps its width; the label stays available to assistive tech. -->
-            <button
-              type="button"
-              :aria-label="t('views.dashboard.customize')"
-              class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-primary/40 bg-card/40 px-2 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/70 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-2.5"
-              @click="handleOpenSettings"
-            >
-              <Settings2 :size="15" aria-hidden="true" />
-              <span class="hidden sm:inline">{{ t('views.dashboard.customize') }}</span>
-            </button>
-          </div>
-
           <DashboardWidgetRow :key="`widgets-${dashboardRevision}`" class="animate-fade-up" />
           <div v-if="enabledScrollers.length > 0" :class="shelfLayoutClass">
             <template v-for="(shelf, index) in shelves" :key="`${dashboardRevision}-${shelf.key}`">

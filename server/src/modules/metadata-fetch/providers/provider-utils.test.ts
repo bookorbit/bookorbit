@@ -1,9 +1,11 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
+import { ProviderCallRecord, runWithProviderCallRecord } from '../../../common/provider-cache/provider-call-context';
 import { ProviderThrottleError } from '../provider-throttle.error';
 import {
   allowsAudiobookProviders,
   buildRequestSignal,
+  createSearchDeadline,
   normalizeMaxCandidates,
   rethrowWithPartialCandidates,
   sleep,
@@ -87,6 +89,52 @@ describe('provider-utils', () => {
       controller.abort();
 
       expect(signal.aborted).toBe(true);
+    });
+  });
+
+  describe('createSearchDeadline', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('reports a search cut short when the budget runs out', async () => {
+      vi.useFakeTimers();
+      const record = new ProviderCallRecord();
+
+      await runWithProviderCallRecord(record, async () => {
+        const deadline = createSearchDeadline(1_000);
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(deadline.signal.aborted).toBe(true);
+        deadline.dispose();
+      });
+
+      expect(record.truncated).toBe(true);
+    });
+
+    it('reports a search cut short when the caller sees the budget spent before the timer fires', async () => {
+      const record = new ProviderCallRecord();
+
+      await runWithProviderCallRecord(record, () => {
+        const deadline = createSearchDeadline(0);
+        expect(deadline.expired()).toBe(true);
+        deadline.dispose();
+        return Promise.resolve();
+      });
+
+      expect(record.truncated).toBe(true);
+    });
+
+    it('leaves a search that finished within budget untruncated', async () => {
+      const record = new ProviderCallRecord();
+
+      await runWithProviderCallRecord(record, () => {
+        const deadline = createSearchDeadline(60_000);
+        expect(deadline.expired()).toBe(false);
+        deadline.dispose();
+        return Promise.resolve();
+      });
+
+      expect(record.truncated).toBe(false);
     });
   });
 

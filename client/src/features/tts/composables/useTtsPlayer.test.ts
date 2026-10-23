@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
+import type { TtsSynthesisRequest } from '@bookorbit/types'
 
 // ─── AudioContext mock ────────────────────────────────────────────────────────
 
@@ -141,6 +142,56 @@ function simulateBlockEnd(sourceIndex: number) {
   if (src?.onended) src.onended()
 }
 
+function okSynthesisResponse() {
+  return {
+    ok: true,
+    blob: vi.fn<() => Promise<unknown>>().mockResolvedValue({
+      arrayBuffer: vi.fn<() => Promise<ArrayBuffer>>().mockResolvedValue(new ArrayBuffer(8)),
+    }),
+  }
+}
+
+type PendingSynthesis = {
+  text: string
+  voiceId: string
+  speed: number
+  signal: AbortSignal
+  resolve: () => void
+  reject: (err: Error) => void
+}
+
+/** Holds every synthesis request open until the test settles it; aborting one rejects it like fetch does. */
+function deferSynthesis(): PendingSynthesis[] {
+  const pending: PendingSynthesis[] = []
+  ;(ttsApi.synthesize as Mock).mockImplementation(
+    (params: TtsSynthesisRequest, signal: AbortSignal) =>
+      new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+        pending.push({
+          text: params.text,
+          voiceId: params.voiceId,
+          speed: params.speed,
+          signal,
+          resolve: () => resolve(okSynthesisResponse()),
+          reject,
+        })
+      }),
+  )
+  return pending
+}
+
+function synthesisRequests() {
+  return (ttsApi.synthesize as Mock).mock.calls.map(([params]) => {
+    const { text, voiceId, speed } = params as TtsSynthesisRequest
+    return { text, voiceId, speed }
+  })
+}
+
+/** Lets every pending promise chain run without moving the (possibly faked) clock. */
+function settle(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve))
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('useTtsPlayer (AudioContext)', () => {
@@ -205,7 +256,7 @@ describe('useTtsPlayer (AudioContext)', () => {
   describe('startPlayback', () => {
     it('fetches and schedules first block on start', async () => {
       await startWithBlocks(['Hello world.'])
-      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Hello world.', voiceId: 'voice1' }))
+      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Hello world.', voiceId: 'voice1' }), expect.any(AbortSignal))
       expect(mockCtxInstance.createBufferSource).toHaveBeenCalled()
     })
 
@@ -245,7 +296,7 @@ describe('useTtsPlayer (AudioContext)', () => {
       // scheduled (lastScheduledBlockIdx stayed at -1), so nothing ever played.
       expect(mockCtxInstance.createdSources.length).toBe(1)
       expect(mockCtxInstance.createdSources[0]!.start).toHaveBeenCalled()
-      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'B2.' }))
+      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'B2.' }), expect.any(AbortSignal))
     })
 
     it('clamps an out-of-range start block to the last block', async () => {
@@ -254,7 +305,7 @@ describe('useTtsPlayer (AudioContext)', () => {
       expect(player.currentBlockIndex.value).toBe(1)
       expect(player.playbackState.value).toBe('playing')
       expect(mockCtxInstance.createdSources.length).toBeGreaterThanOrEqual(1)
-      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'B1.' }))
+      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'B1.' }), expect.any(AbortSignal))
     })
   })
 
@@ -388,7 +439,7 @@ describe('useTtsPlayer (AudioContext)', () => {
           .mockResolvedValue({ arrayBuffer: vi.fn<() => Promise<ArrayBuffer>>().mockResolvedValue(new ArrayBuffer(8)) }),
       })
       await player.nextBlock()
-      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Block 1.' }))
+      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Block 1.' }), expect.any(AbortSignal))
       expect(player.currentBlockIndex.value).toBe(1)
     })
 
@@ -402,7 +453,7 @@ describe('useTtsPlayer (AudioContext)', () => {
           .mockResolvedValue({ arrayBuffer: vi.fn<() => Promise<ArrayBuffer>>().mockResolvedValue(new ArrayBuffer(8)) }),
       })
       await player.prevBlock()
-      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Block 0.' }))
+      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Block 0.' }), expect.any(AbortSignal))
       expect(player.currentBlockIndex.value).toBe(0)
     })
 
@@ -472,6 +523,282 @@ describe('useTtsPlayer (AudioContext)', () => {
     })
   })
 
+  describe('voice and speed changes during playback', () => {
+    const RESYNC_DELAY_MS = 300
+    const FIVE_BLOCKS = ['B0.', 'B1.', 'B2.', 'B3.', 'B4.']
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    })
+
+    afterEach(() => {
+      useTtsPlayer().stopPlayback()
+      vi.useRealTimers()
+    })
+
+    async function startPrefetched(): Promise<ReturnType<typeof useTtsPlayer>> {
+      const player = await startWithBlocks(FIVE_BLOCKS)
+      await settle()
+      expect(mockCtxInstance.createdSources).toHaveLength(4)
+      ;(ttsApi.synthesize as Mock).mockClear()
+      return player
+    }
+
+    async function startDeferred(blocks = FIVE_BLOCKS) {
+      const pending = deferSynthesis()
+      const player = useTtsPlayer()
+      const started = player.startPlayback(makeBook(), 'provider1', 'voice1', 1.0, makeTextSource([blocks]))
+      await settle()
+      return { player, pending, started }
+    }
+
+    async function passResyncDelay(): Promise<void> {
+      await vi.advanceTimersByTimeAsync(RESYNC_DELAY_MS)
+      await settle()
+    }
+
+    it.each([
+      ['voice', (player: ReturnType<typeof useTtsPlayer>) => player.setVoice('provider2', 'voice2'), { voiceId: 'voice2', speed: 1 }],
+      ['speed', (player: ReturnType<typeof useTtsPlayer>) => player.setSpeed(1.5), { voiceId: 'voice1', speed: 1.5 }],
+    ])('moves on to the next block after a %s change once the playing block ends', async (_, change, expected) => {
+      const player = await startPrefetched()
+
+      change(player)
+      const [playing, ...queued] = mockCtxInstance.createdSources
+      expect(playing!.stop).not.toHaveBeenCalled()
+      for (const source of queued) expect(source.stop).toHaveBeenCalled()
+
+      simulateBlockEnd(0)
+      await settle()
+
+      expect(player.currentBlockIndex.value).toBe(1)
+      expect(player.playbackState.value).toBe('playing')
+      expect(synthesisRequests()).toContainEqual({ text: 'B1.', ...expected })
+      expect(mockCtxInstance.createdSources.length).toBeGreaterThan(4)
+      expect(mockCtxInstance.createdSources[4]!.start).toHaveBeenCalled()
+    })
+
+    it('prefetches the following blocks in the new voice so they play straight after the current one', async () => {
+      const player = await startPrefetched()
+
+      player.setVoice('provider2', 'voice2')
+      await passResyncDelay()
+
+      expect(synthesisRequests()).toEqual([
+        { text: 'B1.', voiceId: 'voice2', speed: 1 },
+        { text: 'B2.', voiceId: 'voice2', speed: 1 },
+        { text: 'B3.', voiceId: 'voice2', speed: 1 },
+      ])
+      const [playing, , , , nextBlock] = mockCtxInstance.createdSources
+      const playingStart = (playing!.start as Mock).mock.calls[0]![0] as number
+      expect((nextBlock!.start as Mock).mock.calls[0]![0]).toBeCloseTo(playingStart + 1.0, 5)
+
+      simulateBlockEnd(0)
+      await settle()
+      expect(player.currentBlockIndex.value).toBe(1)
+      expect(synthesisRequests().slice(3)).toEqual([{ text: 'B4.', voiceId: 'voice2', speed: 1 }])
+    })
+
+    it('sends one round of requests for a burst of speed changes, at the final speed', async () => {
+      const player = await startPrefetched()
+
+      player.setSpeed(1.25)
+      player.setSpeed(1.5)
+      player.setSpeed(1.75)
+      await settle()
+      expect(synthesisRequests()).toEqual([])
+
+      await passResyncDelay()
+      expect(synthesisRequests()).toEqual([
+        { text: 'B1.', voiceId: 'voice1', speed: 1.75 },
+        { text: 'B2.', voiceId: 'voice1', speed: 1.75 },
+        { text: 'B3.', voiceId: 'voice1', speed: 1.75 },
+      ])
+    })
+
+    it('cancels the requests still in flight for the old voice', async () => {
+      const { player, pending, started } = await startDeferred()
+      pending[0]!.resolve()
+      await started
+      await settle()
+      const prefetches = pending.slice(1)
+      expect(prefetches.map((request) => request.text)).toEqual(['B1.', 'B2.', 'B3.'])
+
+      player.setVoice('provider2', 'voice2')
+      await settle()
+
+      for (const request of prefetches) expect(request.signal.aborted).toBe(true)
+      expect(player.playbackState.value).toBe('playing')
+      expect(player.error.value).toBeNull()
+    })
+
+    it('fetches the loading block again in the new voice instead of staying in loading', async () => {
+      const { player, pending, started } = await startDeferred()
+      expect(player.playbackState.value).toBe('loading')
+
+      player.setVoice('provider2', 'voice2')
+      await started
+      expect(pending[0]!.signal.aborted).toBe(true)
+      expect(player.error.value).toBeNull()
+
+      await passResyncDelay()
+      expect(pending[1]).toMatchObject({ text: 'B0.', voiceId: 'voice2' })
+      pending[1]!.resolve()
+      await settle()
+
+      expect(player.playbackState.value).toBe('playing')
+      expect(player.currentBlockIndex.value).toBe(0)
+      expect(mockCtxInstance.createdSources).toHaveLength(1)
+    })
+
+    it('fetches the block Next was loading again in the new voice', async () => {
+      const player = await startWithBlocks(['B0.', 'B1.', 'B2.'])
+      await settle()
+      const pending = deferSynthesis()
+      void player.nextBlock()
+      await settle()
+      expect(pending[0]).toMatchObject({ text: 'B1.', voiceId: 'voice1' })
+
+      player.setVoice('provider2', 'voice2')
+      await passResyncDelay()
+      expect(pending[0]!.signal.aborted).toBe(true)
+      expect(pending[1]).toMatchObject({ text: 'B1.', voiceId: 'voice2' })
+      pending[1]!.resolve()
+      await settle()
+
+      expect(player.currentBlockIndex.value).toBe(1)
+      expect(player.playbackState.value).toBe('playing')
+    })
+
+    it('fetches the block playback was waiting on again when its prefetch is cancelled', async () => {
+      const { player, pending, started } = await startDeferred()
+      pending[0]!.resolve()
+      await started
+      await settle()
+      simulateBlockEnd(0)
+      await settle()
+      expect(player.currentBlockIndex.value).toBe(1)
+      expect(mockCtxInstance.createdSources).toHaveLength(1)
+
+      player.setVoice('provider2', 'voice2')
+      await passResyncDelay()
+      const refetch = pending.find((request) => request.text === 'B1.' && request.voiceId === 'voice2')
+      expect(refetch).toBeDefined()
+      refetch!.resolve()
+      await settle()
+
+      expect(mockCtxInstance.createdSources).toHaveLength(2)
+      expect(player.playbackState.value).toBe('playing')
+    })
+
+    it('stays paused when the voice changes during a pause, and continues in it on resume', async () => {
+      const player = await startPrefetched()
+      player.pausePlayback()
+      mockCtxInstance.resume.mockClear()
+
+      player.setVoice('provider2', 'voice2')
+      await passResyncDelay()
+
+      expect(synthesisRequests()).toHaveLength(3)
+      expect(mockCtxInstance.resume).not.toHaveBeenCalled()
+      expect(player.playbackState.value).toBe('paused')
+
+      player.resumePlayback()
+      simulateBlockEnd(0)
+      await settle()
+      expect(player.currentBlockIndex.value).toBe(1)
+      expect(player.playbackState.value).toBe('playing')
+    })
+
+    it('does not unpause when a prefetched block arrives during a pause', async () => {
+      const { player, pending, started } = await startDeferred()
+      pending[0]!.resolve()
+      await started
+      await settle()
+      player.pausePlayback()
+      mockCtxInstance.resume.mockClear()
+
+      pending[1]!.resolve()
+      await settle()
+
+      expect(mockCtxInstance.createdSources).toHaveLength(2)
+      expect(mockCtxInstance.resume).not.toHaveBeenCalled()
+      expect(mockCtxInstance.state).toBe('suspended')
+      expect(player.playbackState.value).toBe('paused')
+    })
+
+    it('stays paused when paused while a block is loading', async () => {
+      const { player, pending, started } = await startDeferred()
+      player.pausePlayback()
+
+      pending[0]!.resolve()
+      await started
+      await settle()
+
+      expect(player.playbackState.value).toBe('paused')
+      expect(mockCtxInstance.resume).not.toHaveBeenCalled()
+      player.resumePlayback()
+      expect(player.playbackState.value).toBe('playing')
+      expect(mockCtxInstance.createdSources[0]!.start).toHaveBeenCalled()
+    })
+
+    it('ignores picking the voice that is already playing', async () => {
+      const player = await startPrefetched()
+
+      player.setVoice('provider1', 'voice1')
+      await passResyncDelay()
+
+      expect(synthesisRequests()).toEqual([])
+      for (const source of mockCtxInstance.createdSources) expect(source.stop).not.toHaveBeenCalled()
+    })
+
+    it('starts the next chapter in a voice picked while that chapter was loading', async () => {
+      let releaseChapter: (blocks: string[]) => void = () => {}
+      const textSource = (idx: number) => (idx === 0 ? Promise.resolve(['Only.']) : new Promise<string[]>((resolve) => (releaseChapter = resolve)))
+      const player = useTtsPlayer()
+      await player.startPlayback(makeBook(), 'provider1', 'voice1', 1.0, textSource)
+      ;(ttsApi.synthesize as Mock).mockClear()
+      simulateBlockEnd(0)
+      await settle()
+
+      player.setVoice('provider2', 'voice2')
+      releaseChapter(['C1.', 'C2.'])
+      await settle()
+      await passResyncDelay()
+
+      expect(player.currentChapterIndex.value).toBe(1)
+      expect(player.currentBlockIndex.value).toBe(0)
+      expect(player.playbackState.value).toBe('playing')
+      expect(synthesisRequests()).toEqual([
+        { text: 'C1.', voiceId: 'voice2', speed: 1 },
+        { text: 'C2.', voiceId: 'voice2', speed: 1 },
+      ])
+      const [, firstOfChapter, secondOfChapter] = mockCtxInstance.createdSources
+      expect(firstOfChapter!.start).toHaveBeenCalled()
+      expect(secondOfChapter!.start).toHaveBeenCalled()
+    })
+
+    it('fetches the block playback was waiting on directly when its prefetch fails', async () => {
+      const { player, pending, started } = await startDeferred()
+      pending[0]!.resolve()
+      await started
+      await settle()
+      simulateBlockEnd(0)
+      await settle()
+
+      pending[1]!.reject(new Error('Synthesis failed: 500'))
+      await settle()
+      const retry = pending.slice(2).find((request) => request.text === 'B1.')
+      expect(retry).toBeDefined()
+      retry!.resolve()
+      await settle()
+
+      expect(mockCtxInstance.createdSources).toHaveLength(2)
+      expect(player.playbackState.value).toBe('playing')
+      expect(player.error.value).toBeNull()
+    })
+  })
+
   describe('startFromPosition', () => {
     it('jumps to specified block in same chapter', async () => {
       const player = await startWithBlocks(['B0.', 'B1.', 'B2.'])
@@ -483,7 +810,7 @@ describe('useTtsPlayer (AudioContext)', () => {
           .mockResolvedValue({ arrayBuffer: vi.fn<() => Promise<ArrayBuffer>>().mockResolvedValue(new ArrayBuffer(8)) }),
       })
       await player.startFromPosition(0, 2)
-      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'B2.' }))
+      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'B2.' }), expect.any(AbortSignal))
       expect(player.currentBlockIndex.value).toBe(2)
     })
 
@@ -500,7 +827,7 @@ describe('useTtsPlayer (AudioContext)', () => {
       })
       await player.startFromPosition(1, 1)
       expect(player.currentChapterIndex.value).toBe(1)
-      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Ch2 B1.' }))
+      expect(ttsApi.synthesize).toHaveBeenCalledWith(expect.objectContaining({ text: 'Ch2 B1.' }), expect.any(AbortSignal))
     })
   })
 

@@ -1,6 +1,6 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { canonicalizeBookRequestIsbn, MAX_BOOK_REQUEST_SEARCH_ISBNS, normalizeBookRequestIsbn } from '@bookorbit/types'
+import { canonicalizeBookRequestIsbn, isBookRequestMediaKind, MAX_BOOK_REQUEST_SEARCH_ISBNS, normalizeBookRequestIsbn } from '@bookorbit/types'
 import type { BookRequestItem, ReleaseSearchCriteria, ReleaseSearchOverrides } from '@bookorbit/types'
 
 import { searchAttemptKey, TITLE_AUTHOR_SEARCH_KEY } from './useReleasePicker'
@@ -70,7 +70,8 @@ export function useReleaseSearchEditor(options: ReleaseSearchEditorOptions) {
       isbn13: value.isbn13,
       activeIsbn: isbns[0] ?? null,
       isbns: [...new Set(isbns)].slice(0, MAX_BOOK_REQUEST_SEARCH_ISBNS),
-      mediaKind: value.mediaKind,
+      // A retired medium is never searched; the server refuses it, so this only has to type-check.
+      mediaKind: isBookRequestMediaKind(value.mediaKind) ? value.mediaKind : 'ebook',
       language: value.language,
       preferredFormats: [...value.preferredFormats],
     }

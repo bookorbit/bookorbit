@@ -64,6 +64,7 @@ import { RequestFulfillmentService } from './fulfillment/request-fulfillment.ser
 import { RequestImportService } from './fulfillment/request-import.service';
 import { RequestSeedService } from './fulfillment/request-seed.service';
 import { RequestUserCleanupService } from './fulfillment/request-user-cleanup.service';
+import { RequestCompanionService } from './fulfillment/request-companion.service';
 import { RequestVerificationService } from './fulfillment/request-verification.service';
 import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
 
@@ -156,6 +157,7 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     DownloadRemovalService,
     RequestFulfillmentService,
     RequestImportService,
+    RequestCompanionService,
     RequestVerificationService,
     RequestSeedService,
     RequestUserCleanupService,

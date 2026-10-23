@@ -392,4 +392,42 @@ describe('epub-cover-handler', () => {
     expect(result.updatedOpfXml).not.toContain('<meta name="cover"');
     expect(result.updatedOpfXml).not.toContain('<item id="bookorbit-cover-image"');
   });
+
+  describe('text outside the cover declarations', () => {
+    const opf = `
+      <package version="3.0" unique-identifier="uid" xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <metadata>
+          <dc:identifier id="uid">0441172717</dc:identifier>
+          <meta refines="#uid" property="identifier-type" scheme="onix:codelist5">02</meta>
+          <dc:rights>&#169; 2020 Caf&#xE9; &amp; Bar</dc:rights>
+          <dc:type>&amp;#233; &amp;amp;</dc:type>
+          <meta name="calibre:title_sort" content="Caf&#233; &amp; Bar" />
+        </metadata>
+        <manifest>
+          <item id="cover" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image" />
+        </manifest>
+      </package>
+    `;
+    const expected = [
+      '<dc:identifier id="uid">0441172717</dc:identifier>',
+      '<meta refines="#uid" property="identifier-type" scheme="onix:codelist5">02</meta>',
+      '<dc:rights>© 2020 Café &amp; Bar</dc:rights>',
+      '<dc:type>&amp;#233; &amp;amp;</dc:type>',
+      '<meta name="calibre:title_sort" content="Café &amp; Bar"></meta>',
+    ];
+
+    it('survives injecting a cover', () => {
+      const result = inject(opf, '', webpImage, []);
+
+      expect(expected.filter((element) => !result.updatedOpfXml.includes(element))).toEqual([]);
+    });
+
+    it('survives replacing the cover with another format', () => {
+      const slot = { entryPath: 'images/cover.jpg', mediaType: 'image/jpeg', manifestItemId: 'cover' };
+
+      const result = replace(opf, '', slot, webpImage, ['images/cover.jpg']);
+
+      expect(expected.filter((element) => !result!.updatedOpfXml.includes(element))).toEqual([]);
+    });
+  });
 });

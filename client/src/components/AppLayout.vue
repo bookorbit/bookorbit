@@ -3,14 +3,17 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/AppSidebar.vue'
-import AppHeader from '@/components/AppHeader.vue'
+import MobileShellBar from '@/components/MobileShellBar.vue'
+import CommandPalette from '@/features/command-palette/components/CommandPalette.vue'
 import BookMetadataFetchWidget from '@/features/book-metadata-fetch/components/BookMetadataFetchWidget.vue'
-import { useThemeStore, BACKGROUND_OPTIONS } from '@/stores/theme'
+import { useAppStyleScope } from '@/composables/useAppStyleScope'
+import { useShellServices } from '@/composables/useShellServices'
+import { useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
 const themeStore = useThemeStore()
-
-const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === themeStore.background)?.cssClass ?? '')
+useAppStyleScope()
+useShellServices()
 
 const BOOK_ROUTE_NAMES = new Set(['book-detail'])
 
@@ -50,19 +53,21 @@ const viewKey = computed(() => {
 </script>
 
 <template>
-  <SidebarProvider class="app-shell glow-wrapper min-h-svh" :class="backgroundClass">
+  <SidebarProvider class="app-shell min-h-svh" :class="themeStore.appliedBackgroundClass">
     <AppSidebar />
     <SidebarInset class="app-shell-inset flex flex-col h-svh overflow-hidden relative bg-transparent pb-(--shell-gap)">
-      <!-- 1. Global App Header: Fixed at the top, independent of views -->
-      <AppHeader />
+      <div aria-hidden="true" class="shell-glow" />
+      <!-- No global header: the sidebar holds the shell controls. Phones get a slim bar only on
+           pages that do not open with their own title row. -->
+      <MobileShellBar />
 
       <!--
-        2. Independent View Area: Everything below the header scrolls here. The bottom padding is the
+        Independent View Area: every page scrolls here. The bottom padding is the
         floating podcast player's measured height, so scrolled-to-bottom content clears it without a
         document-level scrollbar.
       -->
       <div
-        class="app-shell-scroll px-(--shell-content-gutter) pt-(--shell-gap) pb-[var(--podcast-mini-player-clearance,0px)] flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent"
+        class="app-shell-scroll ps-(--shell-content-gutter) pe-(--shell-gap) pt-(--shell-gap) pb-[var(--podcast-mini-player-clearance,0px)] flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent"
       >
         <router-view v-slot="{ Component }">
           <Transition name="page" mode="out-in">
@@ -73,7 +78,8 @@ const viewKey = computed(() => {
         </router-view>
       </div>
     </SidebarInset>
-    <BookMetadataFetchWidget />
+    <BookMetadataFetchWidget :hide-book-card="route.name === 'settings-metadata-auto-fetch'" />
+    <CommandPalette />
   </SidebarProvider>
 </template>
 

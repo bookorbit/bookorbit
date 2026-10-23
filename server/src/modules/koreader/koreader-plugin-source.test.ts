@@ -10,120 +10,117 @@ async function readPluginFile(name: string): Promise<string> {
 }
 
 describe('KOReader plugin update source wiring', () => {
-  it('keeps top-level actions separate from nested settings', async () => {
+  it("opens BookOrbit from KOReader's menu bar and keeps Tools to two rows", async () => {
     const menu = await readPluginFile('bookorbit_main_menu.lua');
+    const pin = await readPluginFile('bookorbit_menu_pin.lua');
     const updater = await readPluginFile('bookorbit_updater.lua');
-    const dashboardIndex = menu.indexOf('id = "open_dashboard"');
-    const updateRowIndex = menu.indexOf('self:updateCheckMenuText()');
-    const syncThisIndex = menu.indexOf('text = _("Sync current book now")');
-    const autoSyncIndex = menu.indexOf('text = _("Auto sync current book")');
-    const syncAllIndex = menu.indexOf('text = _("Sync all books now")');
-    const topLevelSettingsIndex = menu.indexOf('text = _("Settings")', dashboardIndex);
-    const settingsMenuIndex = menu.indexOf('function MainMenu:settingsMenu');
-    const dashboardSettingsIndex = menu.indexOf('text = _("Dashboard")', settingsMenuIndex);
-    const syncSettingsIndex = menu.indexOf('text = _("Sync")', settingsMenuIndex);
-    const pluginSettingsIndex = menu.indexOf('text = _("Plugin")', settingsMenuIndex);
-    const accountIndex = menu.indexOf('text = _("Account & setup")');
-    const topLevelActionBlock = menu.slice(dashboardIndex, topLevelSettingsIndex);
-    const dashboardMenuBlock = menu.slice(menu.indexOf('function MainMenu:dashboardMenuItems'), menu.indexOf('function MainMenu:showDashboardMenu'));
-    const dashboardSettingsBlock = menu.slice(
-      menu.indexOf('function MainMenu:dashboardSettingsMenu'),
-      menu.indexOf('function MainMenu:syncSettingsMenu'),
+    const toolsBlock = menu.slice(
+      menu.indexOf('function MainMenu:addToMainMenu(menu_items)'),
+      menu.indexOf('-- ----------------------------------------------------------------- openers'),
     );
-    const syncSettingsBlock = menu.slice(menu.indexOf('function MainMenu:syncSettingsMenu'), menu.indexOf('function MainMenu:pluginSettingsMenu'));
-    const pluginSettingsBlock = menu.slice(menu.indexOf('function MainMenu:pluginSettingsMenu'), settingsMenuIndex);
+
+    expect(toolsBlock).toContain('id = "open_dashboard"');
+    expect(toolsBlock).toContain('text = _("Open BookOrbit")');
+    expect(toolsBlock).toContain('id = "this_book"');
+    expect(toolsBlock).toContain('id = "settings"');
+    expect(toolsBlock).toContain('sorting_hint = "tools"');
+    expect(toolsBlock).toContain('menu_items.bookorbit_tab = {');
+    expect(toolsBlock).toContain('remember = false');
+    expect(toolsBlock).toContain('callback = function() self:onMenuBarIcon() end');
+    expect(toolsBlock).toContain('if self:menuBarIconEnabled() then');
+    expect(menu).toContain('UIManager:tickAfterNext(function()');
+    expect(menu).toContain('return string.rep("../", 32) .. path:gsub("^/+", ""):gsub("%.svg$", "")');
+    expect(menu).not.toContain('Account & setup');
+    expect(menu).not.toContain('Open dashboard');
+    expect(menu).not.toContain('function MainMenu:dashboardMenuItems');
+    expect(menu).not.toContain('function MainMenu:showDashboardMenu');
+
+    expect(pin).toContain('local TAB_ID = "bookorbit_tab"');
+    expect(pin).toContain('local function normalizeButtons(buttons, with_tab)');
+    expect(pin).toContain('local function normalizeRuntimeOrder(order)');
+    expect(pin).toContain('local function migrateOverride(prefix)');
+    expect(pin).toContain('normalizeRuntimeOrder(order)');
+    expect(pin).not.toContain('order[BUTTONS] = copyList');
 
     expect(updater).toContain('function UpdateCheck:updateCheckMenuText()');
-    expect(dashboardIndex).toBeGreaterThan(0);
-    expect(dashboardIndex).toBeLessThan(syncThisIndex);
-    expect(syncThisIndex).toBeLessThan(autoSyncIndex);
-    expect(autoSyncIndex).toBeLessThan(syncAllIndex);
-    expect(syncThisIndex).toBeLessThan(syncAllIndex);
-    expect(syncAllIndex).toBeLessThan(topLevelSettingsIndex);
-    expect(topLevelSettingsIndex).toBeLessThan(accountIndex);
-    expect(dashboardSettingsIndex).toBeGreaterThan(settingsMenuIndex);
-    expect(dashboardSettingsIndex).toBeLessThan(syncSettingsIndex);
-    expect(syncSettingsIndex).toBeLessThan(pluginSettingsIndex);
-    expect(topLevelActionBlock).not.toContain('self:updateCheckMenuText()');
-    expect(topLevelActionBlock).toContain('id = "sync_current_book"');
-    expect(topLevelActionBlock).toContain('id = "auto_sync_current_book"');
-    expect(topLevelActionBlock).toContain('text = _("Auto sync current book")');
-    expect(topLevelActionBlock).toContain('self:onBookOrbitToggleAutoSync(nil, true)');
-    expect(dashboardSettingsBlock).toContain('return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())');
-    expect(syncSettingsBlock).not.toContain('text = _("Auto sync current book")');
-    expect(syncSettingsBlock).toContain('text = _("Two-way highlights & bookmarks")');
-    expect(syncSettingsBlock).toContain('text = _("Skip auto-sync when offline")');
-    expect(syncSettingsBlock).not.toContain('return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())');
-    expect(syncSettingsBlock).toContain('return T(_("Periodically sync every # pages (%1)")');
-    expect(syncSettingsBlock).toContain('return T(_("Sync to a newer state (%1)"), getNameStrategy(self.settings.sync_forward))');
-    expect(syncSettingsBlock).toContain('return T(_("Sync to an older state (%1)"), getNameStrategy(self.settings.sync_backward))');
-    expect(updateRowIndex).toBeGreaterThan(menu.indexOf('function MainMenu:pluginSettingsMenu'));
-    expect(pluginSettingsBlock).toContain('self:updateCheckMenuText()');
-    expect(pluginSettingsBlock).toContain('self:checkForUpdate()');
-    expect(dashboardMenuBlock).toContain('local plugin_update = self:pluginSettingsMenu()[1]');
-    expect(dashboardMenuBlock).toContain('plugin_update.separator = true');
-    expect(dashboardMenuBlock).toContain('item.id ~= "sync_current_book"');
-    expect(dashboardMenuBlock).toContain('item.id ~= "auto_sync_current_book"');
-    expect(dashboardMenuBlock).toContain('include_plugin = false');
-
-    expect(menu.indexOf('self:checkForUpdate()')).toBeGreaterThan(0);
     expect(updater).toContain('return T(_("Plugin update available: v%1 -> v%2"), PLUGIN_VERSION, self.settings.update_latest_version)');
     expect(updater).toContain('return T(_("Installed plugin: v%1 (Check for update)"), PLUGIN_VERSION)');
     expect(updater).toContain('return T(_("Installed plugin: v%1 (Login required)"), PLUGIN_VERSION)');
     expect(updater).not.toContain('return T(_("Installed plugin: v%1"), PLUGIN_VERSION)');
   });
 
-  it('keeps manual sync actions above advanced sync settings', async () => {
+  it("keeps every setting one level deep on BookOrbit's own settings page", async () => {
+    const settings = await readPluginFile('bookorbit_settings_page.lua');
+    const sheet = await readPluginFile('bookorbit_menu_sheet.lua');
     const menu = await readPluginFile('bookorbit_main_menu.lua');
-    const dashboardIndex = menu.indexOf('id = "open_dashboard"');
-    const settingsIndex = menu.indexOf('text = _("Settings")', dashboardIndex);
-    const syncSettingsBlock = menu.slice(menu.indexOf('function MainMenu:syncSettingsMenu'), menu.indexOf('function MainMenu:pluginSettingsMenu'));
 
-    expect(menu.indexOf('text = _("Sync current book now")')).toBeLessThan(settingsIndex);
-    expect(menu.indexOf('text = _("Auto sync current book")')).toBeLessThan(settingsIndex);
-    expect(menu.indexOf('text = _("Sync all books now")')).toBeLessThan(settingsIndex);
-    expect(syncSettingsBlock).not.toContain('text = _("Sync current book now")');
-    expect(syncSettingsBlock).not.toContain('text = _("Auto sync current book")');
-    expect(syncSettingsBlock).not.toContain('text = _("Sync all books now")');
+    expect(settings).toContain('function Settings.open(plugin, catalog, view)');
+    expect(settings).toContain('{ kind = "toggle-auto" }');
+    expect(settings).toContain('{ kind = "flag", key = "skip_sync_when_offline" }');
+    expect(settings).toContain('{ kind = "flag", key = "annotation_sync" }');
+    expect(settings).toContain('act("sync_forward")');
+    expect(settings).toContain('act("sync_backward")');
+    expect(settings).toContain('settings.catalog_auto_open = action.mode');
+    expect(settings).toContain('"home"');
+    expect(settings).toContain('plugin:checkForUpdate()');
+    expect(settings).toContain('plugin:showDiagnostics()');
+    expect(sheet).toContain('{ kind = "settings" }');
+    expect(sheet).toContain('{ kind = "status" }');
+    expect(menu).toContain('function MainMenu:diagnosticsRows()');
+  });
+
+  it("puts this book's sync in the This book sheet", async () => {
+    const sheet = await readPluginFile('bookorbit_book_sheet.lua');
+    const main = await readPluginFile('main.lua');
+    const progress = await readPluginFile('bookorbit_progress_sync.lua');
+
+    expect(sheet).toContain('plugin:onBookOrbitSyncBook({');
+    expect(sheet).toContain('quiet = true');
+    expect(sheet).toContain('plugin:onBookOrbitToggleAutoSync(nil, true, true)');
+    expect(sheet).toContain('plugin:syncToProgress(remote.progress, remote.percentage)');
+    expect(main).toContain('event = "BookOrbitThisBook"');
+    expect(main).toContain('title = _("BookOrbit: open")');
+    expect(progress).toContain('function ProgressSync:fetchRemoteProgress(digest, on_done, force)');
+    expect(progress).toContain('self:rememberRemoteProgress(digest, body)');
   });
 
   it('renders the canonical account reading streak on the device dashboard', async () => {
-    const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
+    const boardData = await readPluginFile('bookorbit_board_data.lua');
     const catalogUtil = await readPluginFile('bookorbit_catalog_util.lua');
 
     expect(catalogUtil).toContain('function CatalogUtil.readingStreakDays(dashboard, fallback)');
     expect(catalogUtil).toContain('dashboard and dashboard.readingStreak');
     expect(catalogUtil).toContain('reading_streak and tonumber(reading_streak.currentStreak)');
-    expect(dashboard).toContain('local streak_days = readingStreakDays(dashboard, summary.streak_days)');
-    expect(dashboard).toContain('value = tostring(streak_days),\n            label = _("Day streak"),');
-    expect(dashboard).not.toContain('tostring(summary.streak_days');
+    expect(boardData).toContain('current = CatalogUtil.readingStreakDays(body, 0),');
+    expect(boardData).not.toContain('streak_days');
   });
 
-  it('uses tall detail space for measured related-book grids', async () => {
+  it('fits the book detail page to the screen with the shelf on the main page', async () => {
+    const view = await readPluginFile('bookorbit_detail_view.lua');
+    const data = await readPluginFile('bookorbit_detail_data.lua');
+
+    expect(view).toContain('function DetailView.build(ctx)');
+    expect(view).toContain('local order = { spec = 1, about = 2, chips = 3, series = 4, similar = 5 }');
+    expect(view).toContain('local function fill(avail, gap, parts)');
+    expect(view).toContain('local pager = page == 1 and DetailView.pager(d, w) or nil');
+    expect(data).toContain('local tagged = #(detail.genres or {}) + #(detail.tags or {}) > 0');
+    expect(data).toContain('function DetailData.mainShelf(detail, shelves, author, chosen)');
+    expect(data).toContain('DetailData.mainShelf(detail, shelves, d.author_first, context.detail_shelf)');
+    expect(data).toContain('type(detail.seriesMembers) == "table"');
+  });
+
+  it('names read-along EPUBs only when they carry narration', async () => {
     const detail = await readPluginFile('bookorbit_catalog_detail.lua');
+    const data = await readPluginFile('bookorbit_detail_data.lua');
 
-    expect(detail).toContain('local DETAIL_RELATED_TALL_ASPECT_RATIO = 1.55');
-    expect(detail).toContain('local DETAIL_RELATED_MAX_ROWS = 2');
-    expect(detail).toContain('function CatalogDetail:detailTallLayout()');
-    expect(detail).toContain('if self:detailTallLayout() then');
-    expect(detail).toContain('local book_rows = math.ceil(#books / slots)');
-    expect(detail).toContain('rows = math.min(DETAIL_RELATED_MAX_ROWS, math.max(1, book_rows))');
-    expect(detail).toContain('while layout.rows > 1 and layout.total_h > height do');
-    expect(detail).toContain('local page_count = math.max(1, math.ceil(#books / layout.page_size))');
-    expect(detail).toContain('local focus_rows = { is_grid = true }');
-    expect(detail).toContain('if section_focus.is_grid then');
+    expect(detail).toContain('return file.downloadVariant == "audioless_epub" and file.sourceMediaOverlayAvailable == true');
+    expect(detail).toContain('label = T(_("%1 (text only)"), label)');
+    expect(detail).not.toContain('Read Along (audio removed)');
+    expect(data).toContain('local read_along = fmt == "epub" and file.sourceMediaOverlayAvailable == true');
+    expect(data).toContain('if bytes == nil and not read_along then bytes = file.sourceSizeBytes end');
   });
 
-  it('labels derived read-along EPUB downloads without showing an original archive size', async () => {
-    const detail = await readPluginFile('bookorbit_catalog_detail.lua');
-
-    expect(detail).toContain('file.downloadVariant == "audioless_epub"');
-    expect(detail).toContain('_("Read Along (audio removed)")');
-    expect(detail).toContain('local label = fileFormatLabel(file)');
-    expect(detail).toContain('local format_label = fileFormatLabel(file)');
-  });
-
-  it('reconciles remote progress before manual book sync uploads progress', async () => {
+  it('syncs book data first and asks about remote progress before the position goes up', async () => {
     const main = await readPluginFile('main.lua');
     const menu = await readPluginFile('bookorbit_main_menu.lua');
     const progress = await readPluginFile('bookorbit_progress_sync.lua');
@@ -132,9 +129,11 @@ describe('KOReader plugin update source wiring', () => {
     expect(progress).toContain('function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)');
     expect(progress).toContain('client:getProgress(digest)');
     expect(progress).toContain('local local_timestamp = self.last_page_turn_timestamp or 0');
-    expect(progress).toContain('cancel_callback = function()');
+    expect(progress).toContain('openPrompt(self, body, remote_newer, true, function()');
     expect(progress).toContain('on_done(remote_newer)');
-    expect(main).toContain('self:reconcileProgressBeforeBookSync(snap.digest, run_book_sync)');
+    expect(main).toContain('self:syncBookThenProgress(snap.digest, run_book_sync)');
+    expect(progress).toContain('run_book_sync(true, function()');
+    expect(progress).toContain('if not skip_progress then self:pushProgressAfterBookSync(digest) end');
     expect(main).toContain('local latest_snap = BookOrbitBookSync.capture(self)');
     expect(main).toContain('skip_progress = skip_progress');
     expect(main).toContain('event = "BookOrbitPullProgress"');
@@ -150,25 +149,28 @@ describe('KOReader plugin update source wiring', () => {
   it('keeps book action downloads compact without duplicating download options', async () => {
     const detail = await readPluginFile('bookorbit_catalog_detail.lua');
     const download = await readPluginFile('bookorbit_catalog_download.lua');
+    const peek = await readPluginFile('bookorbit_book_peek.lua');
     const detailActionsBlock = detail.slice(
       detail.indexOf('function CatalogDetail:showBookActionSheet(detail, opts)'),
-      detail.indexOf('function CatalogDetail:showDetailActions()'),
+      detail.indexOf('function CatalogDetail:showBookActionSheetForEntry(item)'),
     );
-    const detailHeaderBlock = detail.slice(
-      detail.indexOf('function CatalogDetail:buildDetailButtons'),
-      detail.indexOf('function CatalogDetail:updateDetailItems'),
+    const primaryBlock = detail.slice(
+      detail.indexOf('function CatalogDetail:detailPrimary(d, detail, from_cover)'),
+      detail.indexOf('function CatalogDetail:showDetailHighlights(d)'),
     );
 
-    expect(detailActionsBlock).toContain('text = self:downloadButtonLabel(supported_files)');
-    expect(detailActionsBlock).toContain('self:downloadDefaultFile(detail, supported_files[1])');
-    expect(detailActionsBlock).toContain('self:showFileChoices(detail)');
-    expect(detailActionsBlock).toContain('text = _("Download options")');
-    expect(detailActionsBlock).toContain('self:showDownloadOptions(detail)');
-    expect(detailHeaderBlock).not.toContain('if #supported_files == 1 then');
-    expect(detailHeaderBlock).not.toContain('self:downloadDefaultFile(detail, supported_files[1])');
-    expect(detailHeaderBlock).not.toContain('self:showFileChoices(detail)');
-    expect(detailHeaderBlock).toContain('self:showDownloadOptions(detail)');
+    // The long-press sheet downloads the file it names; the choices live in
+    // the download sheet behind Download options.
+    expect(detailActionsBlock).toContain('require("bookorbit_book_peek").open(self, detail, { allow_select = opts.allow_select })');
+    expect(peek).toContain('catalog:downloadDefaultFile(detail, d.file)');
+    expect(peek).toContain('label = _("Download options")');
+    expect(peek).toContain('catalog:showDownloadOptions(detail)');
+    // The page's action downloads the file it names; the choices live in the menu.
+    expect(primaryBlock).toContain('return self:downloadDefaultFile(detail, p.entry.file)');
+    expect(primaryBlock).not.toContain('self:showFileChoices(detail)');
+    expect(detail).toContain('action = { kind = "download-options" }');
     expect(download).toContain('function Catalog:downloadDefaultFile(detail, file)');
+    expect(download).toContain('DownloadSheet.open(self, detail)');
   });
 
   it('throttles automatic update prompts and does not interrupt the catalog browser', async () => {
@@ -185,10 +187,15 @@ describe('KOReader plugin update source wiring', () => {
 
   it('renders the server version with exactly one v prefix in update dialogs', async () => {
     const updater = await readPluginFile('bookorbit_updater.lua');
+    const sheet = await readPluginFile('bookorbit_update_sheet.lua');
 
     expect(updater).toContain('local server_ver = tostring(body.serverVersion or "unknown"):gsub("^v", "")');
-    expect(updater).toContain('Plugin is up to date (v%1).\\nServer: v%2');
-    expect(updater).toContain('Update available: v%1 -> v%2\\nServer: v%3');
+    expect(updater).toContain('BookOrbit is up to date, v%1"), tostring(PLUGIN_VERSION):gsub("^v", "")');
+    expect(updater).toContain(
+      'require("bookorbit_update_sheet").open(self, { current = PLUGIN_VERSION, latest = plugin_latest, server = server_ver })',
+    );
+    // Every version the update sheet shows gets exactly one v.
+    expect(sheet).toContain('return "v" .. version:gsub("^v", "")');
   });
 
   it('runs a throttled update check after successful full-library sweeps', async () => {
@@ -208,6 +215,8 @@ describe('KOReader plugin update source wiring', () => {
     const menu = await readPluginFile('bookorbit_main_menu.lua');
     const main = await readPluginFile('main.lua');
     const widgets = await readPluginFile('bookorbit_catalog_widgets.lua');
+    const sheet = await readPluginFile('bookorbit_menu_sheet.lua');
+    const bulkSheet = await readPluginFile('bookorbit_bulk_sheet.lua');
     const downloadIcon = await readPluginFile('assets/bookorbit.download.svg');
     const refreshTapBlock = catalog.slice(
       catalog.indexOf('function BookOrbitCatalog:onRefreshButtonTap()'),
@@ -220,10 +229,12 @@ describe('KOReader plugin update source wiring', () => {
     expect(catalog).toContain('text = _("Select books")');
     expect(catalog).toContain('text = _("Download...")');
     expect(catalog).toContain('function BookOrbitCatalog:showDownloadActions()');
-    expect(catalog).toContain('text = _("Download selected")');
-    expect(catalog).toContain('text = _("Download this page")');
-    expect(catalog).toContain('text = _("Download all in this list")');
-    expect(catalog).toContain('text = _("Settings")');
+    // Download... opens one plan sheet offering the selection, the page and
+    // the whole list.
+    expect(catalog).toContain('label = _("The books you selected")');
+    expect(catalog).toContain('label = _("This page")');
+    expect(catalog).toContain('label = _("Everything in this list")');
+    expect(catalog).toContain('require("bookorbit_bulk_sheet").openPlan(self, {');
     expect(catalog).toContain('catalog_mosaic_show_titles');
     expect(catalog).toContain('function BookOrbitCatalog:setMosaicShowTitles(show_titles)');
     expect(catalog).toContain('text = titles_label');
@@ -257,13 +268,12 @@ describe('KOReader plugin update source wiring', () => {
     expect(bulk).toContain('function Catalog:confirmBulkAllMatching()');
     expect(bulk).toContain('function Catalog:bulkClearSelectedBooks(redraw)');
     expect(bulk).toContain('function Catalog:bulkQueueStep(ctx)');
-    expect(bulk).toContain('_("Cancel after current file")');
-    expect(bulk).toContain('text = _("Retry failed")');
+    expect(bulkSheet).toContain('_("Stop after this book")');
+    expect(bulkSheet).toContain('MenuUI.pill(_("Retry failed")');
     expect(bulk).toContain('label = _("EPUB first")');
     expect(bulk).toContain('label = _("PDF first")');
     expect(bulk).toContain('label = _("Comics first")');
     expect(bulk).toContain('label = _("Skip existing")');
-    expect(bulk).toContain('text = _("Close BookOrbit")');
     expect(bulk).not.toContain('function Catalog:showDashboardActions()');
     expect(bulk).not.toContain('Download Continue reading');
     expect(bulk).not.toContain('Download Discover');
@@ -279,7 +289,7 @@ describe('KOReader plugin update source wiring', () => {
     expect(download).toContain('elseif self.updateItems and on_catalog_page then');
     expect(download).toContain('local Transfer = require("bookorbit_download_transfer")');
 
-    expect(menu).toContain('text = _("Close BookOrbit")');
+    expect(sheet).toContain('_("Close BookOrbit")');
     expect(menu).toContain('catalog:onCloseAllMenus()');
     expect(main).toContain('path = self.path');
     expect(main).toContain('catalog_mosaic_show_titles = false');
@@ -292,12 +302,12 @@ describe('KOReader plugin update source wiring', () => {
     expect(widgets).toContain('local label_text = shortText(book and book.title or _("Untitled"), 30)');
     expect(widgets).not.toContain('local label_text = self.menu:cellLabel(book)');
     expect(widgets).toContain('local function mosaicLabelFontSize(text, width, height)');
-    expect(widgets).toContain('face = Font:getFace("cfont", mosaicLabelFontSize(label_text, label_w, label_h))');
+    expect(widgets).toContain('face = BoardMetrics.namedFace("cfont", mosaicLabelFontSize(label_text, label_w, label_h))');
     expect(widgets).toContain('local SELECTED_BACKGROUND = Blitbuffer.COLOR_LIGHT_GRAY');
     expect(widgets).toContain('fgcolor = selectedTextColor(selected)');
     expect(widgets).toContain('bgcolor = selectedTextBgColor(selected)');
     expect(widgets).toContain('background = selectedBackground(selected)');
-    expect(widgets).toContain('function DashboardCoverCard:onHoldSelect()');
+    expect(detail).toContain('return self:showBookActionSheetForEntry({ kind = "dashboard-book", book_id = action.book_id })');
     expect(widgets).toContain('self.menu:onMenuHoldSelect(self.entry)');
     expect(widgets).toContain('self.menu:bulkIsBookSelected(book)');
     expect(widgets).toContain('self.menu:isOnDevice(book)');
@@ -374,5 +384,21 @@ describe('KOReader plugin update source wiring', () => {
     expect(sweep).toContain('for _, row in ipairs(cand.stats_rows or {}) do');
     expect(sweep).toContain('if item.book_file_id then upload.bookFileId = item.book_file_id end');
     expect(sweep).toContain('%1 books need to be opened and synced once to recover their reading history.');
+  });
+
+  it('takes account fields and list filters in the BookOrbit text panel', async () => {
+    const signIn = await readPluginFile('bookorbit_signin_page.lua');
+    const menu = await readPluginFile('bookorbit_main_menu.lua');
+    const catalog = await readPluginFile('bookorbit_catalog.lua');
+    const entry = await readPluginFile('bookorbit_text_entry.lua');
+
+    for (const source of [signIn, menu, catalog]) {
+      expect(source).not.toContain('InputDialog:new');
+    }
+    expect(entry).toContain('show_password_toggle = false');
+    expect(entry).toContain('{ kind = "reveal" }');
+    expect(signIn).toContain('password = { title = _("Password"), icon = "key-round", password = true }');
+    expect(menu).toContain('require("bookorbit_text_entry").open{');
+    expect(catalog).toContain('title = _("Filter this list")');
   });
 });

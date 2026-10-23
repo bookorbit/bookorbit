@@ -1,3 +1,6 @@
+import { DrizzleQueryError } from 'drizzle-orm';
+import { DatabaseError } from 'pg';
+
 import { MigrationExecutorService } from './migration-executor.service';
 
 function makeExecutorService() {
@@ -16,6 +19,7 @@ function makeExecutorService() {
   const config = { get: vi.fn().mockReturnValue('/app-data') };
   const encryption = { decryptConfig: vi.fn((value: unknown) => value) };
   const progressGateway = { emitProgress: vi.fn() };
+  const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
 
   const service = new MigrationExecutorService(
     repo as never,
@@ -25,10 +29,10 @@ function makeExecutorService() {
     config as never,
     encryption as never,
     progressGateway as never,
-    { notify: vi.fn().mockResolvedValue(undefined) } as never,
+    notificationService as never,
   );
 
-  return { service, repo, sharedOverlays, covers, userState, progressGateway };
+  return { service, repo, sharedOverlays, covers, userState, progressGateway, notificationService };
 }
 
 describe('MigrationExecutorService core orchestration', () => {
@@ -263,6 +267,61 @@ describe('MigrationExecutorService core orchestration', () => {
 
     const emittedStates = progressGateway.emitProgress.mock.calls.map((call) => call[0].state);
     expect(emittedStates).toEqual(['running', 'running', 'completed']);
+  });
+
+  describe('when a stage fails', () => {
+    const constraintMessage = 'new row for relation "user_book_status" violates check constraint "user_book_status_finished_after_started_chk"';
+
+    function setUpFailingRun(error: unknown) {
+      const harness = makeExecutorService();
+      harness.repo.findRunById.mockResolvedValue({
+        id: 13,
+        state: 'running',
+        sourceId: 1,
+        planArtifactId: 45,
+        currentStage: 'user_state',
+        triggeredByUserId: 3,
+      });
+      harness.repo.findPlanArtifactById.mockResolvedValue({
+        id: 45,
+        plan: { matchedBooks: [], unresolvedBooks: [] },
+        sourceData: { books: [] },
+      });
+      harness.repo.findSourceById.mockResolvedValue({
+        id: 1,
+        type: 'audiobookshelf',
+        connectionConfig: { mode: 'api', baseUrl: 'http://abs.local', apiToken: 'token', allowPrivateNetwork: true },
+      });
+      harness.userState.import.mockRejectedValue(error);
+      return harness;
+    }
+
+    it("records the database's reason rather than the failed SQL and its row values", async () => {
+      // Issue 1678: the stored message was Drizzle's query text, whose params listed `read`, so the
+      // report blamed the status value instead of the violated constraint.
+      const queryError = new DrizzleQueryError(
+        'insert into "user_book_status" ("user_id", "book_id", "status") values ($1, $2, $3)',
+        [1, 2159, 'read'],
+        Object.assign(new DatabaseError(constraintMessage, 0, 'error'), { code: '23514' }),
+      );
+      const { service, repo, notificationService } = setUpFailingRun(queryError);
+
+      await (service as never).execute(13);
+
+      expect(repo.updateRunState).toHaveBeenCalledWith(13, 'failed', expect.objectContaining({ errorMessage: constraintMessage }));
+      expect(notificationService.notify).toHaveBeenCalledWith(expect.objectContaining({ message: constraintMessage, meta: { runId: 13 } }));
+    });
+
+    it('records a non-query failure by its own message', async () => {
+      const { service, repo, notificationService } = setUpFailingRun(
+        new Error('Audiobookshelf request failed', { cause: new Error('socket hang up') }),
+      );
+
+      await (service as never).execute(13);
+
+      expect(repo.updateRunState).toHaveBeenCalledWith(13, 'failed', expect.objectContaining({ errorMessage: 'Audiobookshelf request failed' }));
+      expect(notificationService.notify).toHaveBeenCalledWith(expect.objectContaining({ message: 'Audiobookshelf request failed' }));
+    });
   });
 
   it('execute exits cleanly without failing the run when interrupted', async () => {

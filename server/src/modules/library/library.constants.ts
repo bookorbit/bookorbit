@@ -1,6 +1,7 @@
 import type { AccessLevel, AddedAtSource, CoverAspectRatio, OrganizationMode } from '@bookorbit/types';
 
 export const LIBRARY_ACCESS_LEVELS = ['viewer', 'editor', 'owner'] as const satisfies readonly AccessLevel[];
+export const EDITOR_ACCESS_LEVELS = ['editor', 'owner'] as const satisfies readonly AccessLevel[];
 export const LIBRARY_COVER_ASPECT_RATIOS = ['2/3', '1/1'] as const satisfies readonly CoverAspectRatio[];
 export const LIBRARY_ORGANIZATION_MODES = ['book_per_file', 'book_per_folder'] as const satisfies readonly OrganizationMode[];
 export const LIBRARY_ADDED_AT_SOURCES = ['imported', 'file_modified', 'file_created'] as const satisfies readonly AddedAtSource[];
@@ -17,7 +18,7 @@ export const LIBRARY_MARK_AS_FINISHED_MIN = 90;
 export const LIBRARY_MARK_AS_FINISHED_MAX = 100;
 
 export const LIBRARY_BOOK_STATUS_PRESENT = 'present';
-export const LIBRARY_METADATA_PRECEDENCE_DEFAULT = ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar'] as const;
+export const LIBRARY_METADATA_PRECEDENCE_DEFAULT = ['folderStructure', 'embedded', 'nfoFile', 'opfFile', 'sidecar', 'regex'] as const;
 
 export const LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN = 1;
 export const LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX = 10000;

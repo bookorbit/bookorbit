@@ -25,6 +25,11 @@ interface CaptionedSpeechRequest extends OpenAiSpeechRequest {
 
 const CAPTIONED_SPEECH_PATH = '/dev/captioned_speech';
 const CAPTIONED_REQUEST_TIMEOUT_MS = 120_000;
+/** Plain synthesis is held to the captioned path's limit: a provider that never answers would
+ * otherwise hold the request, and the reader waiting on it, for as long as Node lets it. */
+const SPEECH_REQUEST_TIMEOUT_MS = 120_000;
+/** Listing voices and testing a connection should answer in seconds. */
+const DISCOVERY_REQUEST_TIMEOUT_MS = 30_000;
 const CAPTIONED_MAX_RESPONSE_BYTES = 24 * 1024 * 1024;
 
 export interface StaticVoiceConfig {
@@ -89,7 +94,7 @@ export class OpenAiCompatibleProvider implements ITtsProvider {
     this.supportsVoiceDiscovery = config.supportsVoiceDiscovery ?? true;
   }
 
-  async synthesize(text: string, voiceId: string, speed: number, format: string): Promise<Buffer> {
+  async synthesize(text: string, voiceId: string, speed: number, format: string, signal?: AbortSignal): Promise<Buffer> {
     const event = 'tts.openai.synthesize';
     const startMs = Date.now();
     this.logger.log(
@@ -103,10 +108,12 @@ export class OpenAiCompatibleProvider implements ITtsProvider {
         speed: Math.min(4.0, Math.max(0.25, speed)),
         response_format: format === 'mp3' ? 'mp3' : format,
       };
+      const timeout = AbortSignal.timeout(SPEECH_REQUEST_TIMEOUT_MS);
       const response = await fetch(`${this.baseUrl}/audio/speech`, {
         method: 'POST',
         headers: this.buildHeaders(),
         body: JSON.stringify(body),
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
@@ -119,6 +126,12 @@ export class OpenAiCompatibleProvider implements ITtsProvider {
       );
       return result;
     } catch (err) {
+      if (signal?.aborted) {
+        this.logger.log(
+          `[${event}] [end] providerId=${this.providerId} voiceId=${voiceId} durationMs=${Date.now() - startMs} outcome=cancelled - openai-compatible synthesis cancelled`,
+        );
+        throw err;
+      }
       const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
       const error = err instanceof Error ? sanitizeLogValue(err.message) : 'unknown';
       this.logger.error(
@@ -242,6 +255,7 @@ export class OpenAiCompatibleProvider implements ITtsProvider {
     try {
       const response = await fetch(`${this.baseUrl}/audio/voices`, {
         headers: this.buildHeaders(),
+        signal: AbortSignal.timeout(DISCOVERY_REQUEST_TIMEOUT_MS),
       });
       if (!response.ok) {
         if (response.status === 404) {
@@ -285,6 +299,7 @@ export class OpenAiCompatibleProvider implements ITtsProvider {
     try {
       const response = await fetch(`${this.baseUrl}/models`, {
         headers: this.buildHeaders(),
+        signal: AbortSignal.timeout(DISCOVERY_REQUEST_TIMEOUT_MS),
       });
       if (!response.ok) {
         // The voice listing is the fallback reachability probe, so it has to hit the network here
@@ -301,6 +316,7 @@ export class OpenAiCompatibleProvider implements ITtsProvider {
   async discoverVoicesLive(): Promise<TtsVoice[] | null> {
     const response = await fetch(`${this.baseUrl}/audio/voices`, {
       headers: this.buildHeaders(),
+      signal: AbortSignal.timeout(DISCOVERY_REQUEST_TIMEOUT_MS),
     });
     if (response.status === 404) return null;
     if (!response.ok) {

@@ -25,7 +25,7 @@ const traitColors: Record<string, string> = {
 
     <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col items-center justify-center gap-3">
-      <div class="h-4 w-32 animate-pulse rounded bg-muted" />
+      <div class="h-4 w-32 animate-pulse rounded-xs bg-muted" />
       <div v-for="n in 5" :key="n" class="h-2 w-full animate-pulse rounded-full bg-muted" />
     </div>
 

@@ -133,6 +133,129 @@ describe('ComicVineProvider', () => {
   // ---------------------------------------------------------------------------
 
   describe('search - structured path', () => {
+    function sameNamedVolumes(count: number) {
+      return Array.from({ length: count }, (_, index) => ({ ...mockVolume, id: index + 1, start_year: String(2020 - index) }));
+    }
+
+    function mockIssuesForVolumes(volumeIds: number[]) {
+      vi.mocked(client.searchIssuesInVolume).mockImplementation((volumeId) =>
+        Promise.resolve(volumeIds.includes(volumeId) ? [{ ...mockIssue, id: 100 + volumeId, volume: { id: volumeId, name: mockVolume.name } }] : []),
+      );
+    }
+
+    it('offers tied runs across batch boundaries instead of stopping after the first hit', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(4));
+      mockIssuesForVolumes([1, 4]);
+
+      const results = await provider.search({ title: 'Batman #01' });
+
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(4);
+      expect(results.map((candidate) => candidate.providerId)).toEqual(['101', '104']);
+    });
+
+    it('does not probe or return lower-ranked collections once matching runs were found', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue([
+        ...sameNamedVolumes(2),
+        { ...mockVolume, id: 3, name: 'Batman Collection', start_year: '2025' },
+      ]);
+      mockIssuesForVolumes([1, 2, 3]);
+
+      const results = await provider.search({ title: 'Batman #1' });
+
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(2);
+      expect(results.map((candidate) => candidate.providerId)).toEqual(['101', '102']);
+    });
+
+    it('continues to lower-ranked volumes when the better-ranked volumes have no issue', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue([
+        ...sameNamedVolumes(2),
+        { ...mockVolume, id: 3, name: 'Batman Collection', start_year: '2025' },
+      ]);
+      mockIssuesForVolumes([3]);
+
+      expect((await provider.search({ title: 'Batman #1' })).map((candidate) => candidate.providerId)).toEqual(['103']);
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not let a one-result limit hide ambiguity during automatic matching', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(4));
+      mockIssuesForVolumes([1, 4]);
+
+      expect(await provider.search({ title: 'Batman #1', maxCandidatesPerProvider: 1, requireUnambiguousMatch: true })).toEqual([]);
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(4);
+    });
+
+    it('accepts a unique issue after checking every tied run', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(4));
+      mockIssuesForVolumes([4]);
+
+      const results = await provider.search({ title: 'Batman #1', maxCandidatesPerProvider: 1, requireUnambiguousMatch: true });
+
+      expect(results.map((candidate) => candidate.providerId)).toEqual(['104']);
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(4);
+    });
+
+    it('preserves manual result limits after probing tied volumes', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(4));
+      mockIssuesForVolumes([1, 4]);
+
+      expect(await provider.search({ title: 'Batman #1', maxCandidatesPerProvider: 1 })).toHaveLength(1);
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(4);
+    });
+
+    it.each([true, false])('bounds probing to eight volumes when automatic matching is %s', async (automatic) => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(20));
+      mockIssuesForVolumes([1]);
+
+      const results = await provider.search({ title: 'Batman #1', requireUnambiguousMatch: automatic });
+
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(8);
+      expect(results).toHaveLength(automatic ? 0 : 1);
+    });
+
+    it('does not accept an automatic match when a tied probe fails', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(2));
+      vi.mocked(client.searchIssuesInVolume).mockResolvedValueOnce([mockIssue]).mockRejectedValueOnce(new Error('upstream unavailable'));
+
+      expect(await provider.search({ title: 'Batman #1', requireUnambiguousMatch: true })).toEqual([]);
+    });
+
+    it('does not accept a lower-ranked automatic match after a higher-ranked probe fails', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue([mockVolume, { ...mockVolume, id: 2, name: 'Batman Collection' }]);
+      vi.mocked(client.searchIssuesInVolume).mockRejectedValueOnce(new Error('upstream unavailable')).mockResolvedValueOnce([mockIssue]);
+
+      expect(await provider.search({ title: 'Batman #1', requireUnambiguousMatch: true })).toEqual([]);
+    });
+
+    it('does not accept an automatic match after a tied probe is throttled', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(4));
+      vi.mocked(client.searchIssuesInVolume)
+        .mockResolvedValueOnce([mockIssue])
+        .mockRejectedValueOnce(new ProviderThrottleError())
+        .mockResolvedValueOnce([]);
+
+      expect(await provider.search({ title: 'Batman #1', requireUnambiguousMatch: true })).toEqual([]);
+      expect(client.searchIssuesInVolume).toHaveBeenCalledTimes(3);
+      expect(throttleTracker.record).toHaveBeenCalled();
+    });
+
+    it('deduplicates issue IDs before deciding whether a match is ambiguous', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue([mockVolume]);
+      vi.mocked(client.searchIssuesInVolume).mockResolvedValue([mockIssue, mockIssue]);
+
+      expect(await provider.search({ title: 'Batman #1', requireUnambiguousMatch: true })).toHaveLength(1);
+    });
+
+    it('skips issue detail enrichment when an automatic search is ambiguous', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue(sameNamedVolumes(2));
+      vi.mocked(client.searchIssuesInVolume).mockImplementation((volumeId) =>
+        Promise.resolve([{ ...mockIssue, id: 100 + volumeId, volume: { id: volumeId, name: 'Batman' }, person_credits: [] }]),
+      );
+
+      expect(await provider.search({ title: 'Batman #1', requireUnambiguousMatch: true })).toEqual([]);
+      expect(client.getIssueById).not.toHaveBeenCalled();
+    });
+
     it('calls searchVolumes then searchIssuesInVolume for a parsed title', async () => {
       vi.spyOn(client, 'searchVolumes').mockResolvedValue([mockVolume]);
       vi.spyOn(client, 'searchIssuesInVolume').mockResolvedValue([mockIssue]);

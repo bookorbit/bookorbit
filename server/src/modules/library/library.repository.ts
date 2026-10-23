@@ -1,3 +1,4 @@
+import { deleteLibraryFoldersWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, getTableColumns, gt, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -96,11 +97,16 @@ export class LibraryRepository {
       .orderBy(libraries.id);
   }
 
-  findAccessibleIdsForUser(userId: number) {
+  findAccessibleIdsForUser(userId: number, accessLevels?: readonly AccessLevel[]) {
+    const accessJoin = and(
+      eq(schema.userLibraryAccess.libraryId, libraries.id),
+      eq(schema.userLibraryAccess.userId, userId),
+      accessLevels ? inArray(schema.userLibraryAccess.accessLevel, [...accessLevels]) : undefined,
+    );
     return this.db
       .select({ id: libraries.id })
       .from(libraries)
-      .innerJoin(schema.userLibraryAccess, and(eq(schema.userLibraryAccess.libraryId, libraries.id), eq(schema.userLibraryAccess.userId, userId)))
+      .innerJoin(schema.userLibraryAccess, accessJoin)
       .where(visibleLibraryCondition)
       .orderBy(libraries.displayOrder, libraries.name);
   }
@@ -283,11 +289,11 @@ export class LibraryRepository {
   }
 
   deleteFolder(id: number) {
-    return this.db.delete(libraryFolders).where(eq(libraryFolders.id, id));
+    return deleteLibraryFoldersWithHashInvalidation(this.db, eq(libraryFolders.id, id));
   }
 
   deleteFoldersByLibrary(libraryId: number) {
-    return this.db.delete(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
+    return deleteLibraryFoldersWithHashInvalidation(this.db, eq(libraryFolders.libraryId, libraryId));
   }
 
   async updateDisplayOrders(order: { id: number; displayOrder: number }[]) {

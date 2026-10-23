@@ -1,8 +1,9 @@
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, type RouteLocationNormalizedLoaded, type RouteLocationRaw } from 'vue-router'
-import { BookPlus, Highlighter, LayoutDashboard, Library, ListMusic, PackageOpen, Users, Wrench } from '@lucide/vue'
+import { BarChart3, BookPlus, Highlighter, LayoutDashboard, Library, ListMusic, PackageOpen, Trophy, Users, Wrench } from '@lucide/vue'
 import { Permission, type BrowseCounts, type LibraryType, type SidebarSectionId } from '@bookorbit/types'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -10,12 +11,14 @@ import { useBrowseCounts } from '@/composables/useBrowseCounts'
 import { useMediaMode } from '@/composables/useMediaMode'
 import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
 
-export const SIDEBAR_ZONE_IDS = ['primary', 'browse'] as const
+/** `primary` is pinned on top; useSidebarLayout places the others among the list sections in the user's order. */
+export const SIDEBAR_ZONE_IDS = ['primary', 'browse', 'reading'] as const
 export type SidebarZoneId = (typeof SIDEBAR_ZONE_IDS)[number]
 
 interface NavContext {
   hasPermission: (name: string) => boolean
   showBookRequests?: boolean
+  achievementsEnabled?: boolean
   bookDockTotal: number
   outstandingRequestTotal: number
   outstandingRequestLabel: string
@@ -43,6 +46,8 @@ export interface SidebarNavEntry {
   permission?: string | string[]
   visible?: (context: NavContext) => boolean
   badge?: (context: NavContext) => SidebarNavBadge | null
+  /** A hidden row comes back while its accent badge counts work waiting on the user. */
+  returnsWithWork?: boolean
   tourId?: string
 }
 
@@ -53,6 +58,7 @@ export interface ResolvedSidebarNavEntry {
   to: RouteLocationRaw
   isActive: boolean
   badge: SidebarNavBadge | null
+  returnsWithWork: boolean
   tourId?: string
 }
 
@@ -66,12 +72,14 @@ export interface SidebarNavZone {
 const ZONE_LABEL_KEYS: Record<SidebarZoneId, string | null> = {
   primary: null,
   browse: 'components.sidebar.zones.browse',
+  reading: 'components.sidebar.zones.reading',
 }
 
 /** Zones with a section id remember whether the user collapsed them; the rest always render. */
 const ZONE_SECTION_IDS: Record<SidebarZoneId, SidebarSectionId | null> = {
   primary: null,
   browse: 'browse',
+  reading: 'reading',
 }
 
 function routeNameStartsWith(route: RouteLocationNormalizedLoaded, prefix: string): boolean {
@@ -96,6 +104,24 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     isActive: (route) => route.name === 'dashboard',
   },
   {
+    id: 'statistics',
+    labelKey: 'components.appHeader.statistics',
+    icon: BarChart3,
+    zone: 'reading',
+    to: { name: 'statistics' },
+    isActive: (route) => route.name === 'statistics',
+    tourId: 'statistics-btn',
+  },
+  {
+    id: 'achievements',
+    labelKey: 'components.appHeader.achievements',
+    icon: Trophy,
+    zone: 'reading',
+    to: { name: 'achievements' },
+    isActive: (route) => route.name === 'achievements',
+    visible: (context) => context.achievementsEnabled !== false,
+  },
+  {
     id: 'book-dock',
     labelKey: 'components.appHeader.bookDock',
     icon: PackageOpen,
@@ -105,6 +131,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     isActive: (route) => route.name === 'book-dock',
     permission: 'book_dock_access',
     badge: (context) => (context.bookDockTotal > 0 ? { value: context.bookDockTotal, tone: 'accent' } : null),
+    returnsWithWork: true,
     tourId: 'book-dock-btn',
   },
   {
@@ -120,6 +147,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     visible: (context) => context.showBookRequests !== false,
     badge: (context) =>
       context.outstandingRequestTotal > 0 ? { value: context.outstandingRequestTotal, label: context.outstandingRequestLabel, tone: 'accent' } : null,
+    returnsWithWork: true,
   },
   {
     id: 'tools',
@@ -166,7 +194,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     id: 'annotations',
     labelKey: 'components.appHeader.annotations',
     icon: Highlighter,
-    zone: 'browse',
+    zone: 'reading',
     modes: ['books'],
     to: { name: 'annotations' },
     isActive: (route) => route.name === 'annotations',
@@ -194,6 +222,7 @@ export function resolveNavEntry(entry: SidebarNavEntry, context: NavContext, rou
     to: typeof entry.to === 'function' ? entry.to(context) : entry.to,
     isActive: entry.isActive(route),
     badge: entry.badge ? entry.badge(context) : null,
+    returnsWithWork: entry.returnsWithWork === true,
     tourId: entry.tourId,
   } satisfies ResolvedSidebarNavEntry
 }
@@ -202,6 +231,7 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
   const { t } = useI18n()
   const route = useRoute()
   const { hasPermission } = usePermissions()
+  const { user } = useAuth()
   const { summary: bookDockSummary } = useBookDockSummary()
   const { counts: browseCounts } = useBrowseCounts()
   const { libraries } = useLibraries()
@@ -217,6 +247,7 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
     return {
       hasPermission,
       showBookRequests: showBookRequests.value,
+      achievementsEnabled: user.value?.settings?.achievementPreferences?.enabled !== false,
       bookDockTotal: bookDockSummary.value.total,
       outstandingRequestTotal,
       outstandingRequestLabel: t(outstandingRequestLabelKey, { count: outstandingRequestTotal }),

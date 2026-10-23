@@ -1,18 +1,24 @@
 import type { Library } from '@bookorbit/types'
 
-/** File kinds BookOrbit can write metadata into; audio counts only when it may also embed the cover. */
+/**
+ * File kinds BookOrbit can write metadata into. Audio tags are written whether or not the cover is,
+ * so audio counts on its own toggle. The all-files scope widens which files are written, not which
+ * kinds, so it does not count here.
+ */
 export const WRITE_FAMILY_FLAGS = [
   'fileWriteEpubEnabled',
   'fileWriteFb2Enabled',
   'fileWritePdfEnabled',
   'fileWriteCbxEnabled',
   'fileWriteKindleEnabled',
+  'fileWriteAudioEnabled',
+  'fileWriteReadAlongEnabled',
 ] as const
 
-export type FileWriteFlags = Pick<Library, (typeof WRITE_FAMILY_FLAGS)[number] | 'fileWriteAudioEnabled' | 'fileWriteWriteCover'>
+export type FileWriteFlags = Pick<Library, (typeof WRITE_FAMILY_FLAGS)[number]>
 
 export function writtenKindCount(flags: FileWriteFlags): number {
-  return WRITE_FAMILY_FLAGS.filter((flag) => flags[flag]).length + (flags.fileWriteAudioEnabled && flags.fileWriteWriteCover ? 1 : 0)
+  return WRITE_FAMILY_FLAGS.filter((flag) => flags[flag]).length
 }
 
 export type SchedulePreset = 'hourly' | 'every6Hours' | 'every12Hours' | 'daily' | 'weekly'
