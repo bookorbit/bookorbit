@@ -28,6 +28,8 @@ import { RanobeDbClient } from './providers/ranobedb/ranobedb.client';
 import { RanobeDbProvider } from './providers/ranobedb/ranobedb.provider';
 import { LubimyczytacProvider } from './providers/lubimyczytac/lubimyczytac.provider';
 import { AladinProvider } from './providers/aladin/aladin.provider';
+import { MangabakaClient } from './providers/mangabaka/mangabaka.client';
+import { MangabakaProvider } from './providers/mangabaka/mangabaka.provider';
 
 const PROVIDER_CLASSES = [
   GoogleProvider,
@@ -44,6 +46,7 @@ const PROVIDER_CLASSES = [
   KoboProvider,
   LubimyczytacProvider,
   AladinProvider,
+  MangabakaProvider,
 ];
 
 @Module({
@@ -58,6 +61,7 @@ const PROVIDER_CLASSES = [
     HardcoverClient,
     ComicVineClient,
     RanobeDbClient,
+    MangabakaClient,
     ProviderRegistry,
     ProviderThrottleTracker,
     MetadataFetchRepository,

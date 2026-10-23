@@ -6779,6 +6779,23 @@
           "searchInterruptedHint": "Încercați din nou, sau restrângeți domeniul de căutare.",
           "searchPrompt": "Caută mai sus, apoi dă click pe rezultat pentru a începe compararea metadatelor."
         },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        },
         "match": {
           "sheetDescription": "Caută furnizori de metadate și alege ce să copiezi în această carte.",
           "mediumAudiobook": "Audiobok",

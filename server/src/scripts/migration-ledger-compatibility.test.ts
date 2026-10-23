@@ -1,7 +1,7 @@
 import type { MigrationMeta } from 'drizzle-orm/migrator';
 import type { Pool } from 'pg';
 
-import { dropUnreleasedMigrationRows, reconcileMigrationLedgerTimestamps } from './migration-ledger-compatibility';
+import { dropUnreleasedMigrationRows, reconcileMigrationLedgerTimestamps, rewindRenumberedMigrationRows } from './migration-ledger-compatibility';
 
 const migrations = [
   { hash: 'first', folderMillis: 100 },
@@ -58,6 +58,84 @@ describe('reconcileMigrationLedgerTimestamps', () => {
     const pool = { connect: vi.fn(() => Promise.resolve({ query, release })) } as unknown as Pick<Pool, 'connect'>;
 
     await expect(reconcileMigrationLedgerTimestamps(pool, migrations)).rejects.toThrow('ledger unavailable');
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK');
+    expect(release).toHaveBeenCalledOnce();
+  });
+});
+
+describe('rewindRenumberedMigrationRows', () => {
+  const journal: Array<Pick<MigrationMeta, 'hash' | 'folderMillis' | 'sql'>> = [
+    { hash: 'base', folderMillis: 100, sql: ['CREATE TABLE "books" ("id" integer);'] },
+    { hash: 'pending', folderMillis: 200, sql: ['CREATE TABLE "upload_sessions" ("id" uuid);'] },
+    {
+      hash: 'mangabaka',
+      folderMillis: 900,
+      sql: ['ALTER TABLE "book_metadata" ADD COLUMN IF NOT EXISTS "mangabaka_id" varchar(50);'],
+    },
+  ];
+
+  it('drops a renumbered migration that hides the pending entries before it', async () => {
+    const { pool, query, release } = createPool('drizzle.__drizzle_migrations', [
+      { id: 1, hash: 'base', createdAt: '100' },
+      { id: 2, hash: 'mangabaka', createdAt: '900' },
+    ]);
+
+    await expect(rewindRenumberedMigrationRows(pool, journal)).resolves.toEqual({ removedRows: 1 });
+    expect(query).toHaveBeenCalledWith('DELETE FROM drizzle.__drizzle_migrations WHERE id = ANY($1::int[])', [[2]]);
+    expect(query).toHaveBeenLastCalledWith('COMMIT');
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('also drops an older copy the journal no longer owns', async () => {
+    const { pool, query } = createPool('drizzle.__drizzle_migrations', [
+      { id: 1, hash: 'base', createdAt: '100' },
+      { id: 2, hash: 'old-mangabaka', createdAt: '800' },
+      { id: 3, hash: 'mangabaka', createdAt: '900' },
+    ]);
+
+    await expect(rewindRenumberedMigrationRows(pool, journal)).resolves.toEqual({ removedRows: 1 });
+    expect(query).toHaveBeenCalledWith('DELETE FROM drizzle.__drizzle_migrations WHERE id = ANY($1::int[])', [[2, 3]]);
+  });
+
+  it('keeps rows at or before the last contiguous migration', async () => {
+    const { pool, query } = createPool('drizzle.__drizzle_migrations', [
+      { id: 1, hash: 'base', createdAt: '100' },
+      { id: 2, hash: 'mangabaka', createdAt: '50' },
+    ]);
+
+    await expect(rewindRenumberedMigrationRows(pool, journal)).resolves.toEqual({ removedRows: 0 });
+    expect(query.mock.calls.some(([statement]) => statement.startsWith('DELETE'))).toBe(false);
+  });
+
+  it('does nothing when the journal is fully applied', async () => {
+    const { pool } = createPool('drizzle.__drizzle_migrations', [
+      { id: 1, hash: 'base', createdAt: '100' },
+      { id: 2, hash: 'pending', createdAt: '200' },
+      { id: 3, hash: 'mangabaka', createdAt: '900' },
+    ]);
+
+    await expect(rewindRenumberedMigrationRows(pool, journal)).resolves.toEqual({ removedRows: 0 });
+    expect(pool.connect).toHaveBeenCalledOnce();
+  });
+
+  it('does nothing before Drizzle has created its ledger table', async () => {
+    const { pool, query } = createPool(null);
+
+    await expect(rewindRenumberedMigrationRows(pool, journal)).resolves.toEqual({ removedRows: 0 });
+    expect(query.mock.calls.some(([statement]) => statement.startsWith('DELETE'))).toBe(false);
+  });
+
+  it('rolls back and releases the client when the rewind fails', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error('ledger unavailable'))
+      .mockResolvedValueOnce({ rows: [] });
+    const release = vi.fn();
+    const pool = { connect: vi.fn(() => Promise.resolve({ query, release })) } as unknown as Pick<Pool, 'connect'>;
+
+    await expect(rewindRenumberedMigrationRows(pool, journal)).rejects.toThrow('ledger unavailable');
     expect(query).toHaveBeenLastCalledWith('ROLLBACK');
     expect(release).toHaveBeenCalledOnce();
   });

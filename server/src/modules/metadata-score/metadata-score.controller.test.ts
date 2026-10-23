@@ -58,6 +58,9 @@ describe('MetadataScoreController', () => {
       openLibraryId: 1,
       itunesId: 1,
       koboId: 1,
+      aladinId: 1,
+      mangabakaId: 1,
+      mangabakaSeriesId: 1,
     };
     service.updateWeights.mockResolvedValue(dto);
 

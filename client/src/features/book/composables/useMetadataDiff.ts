@@ -167,6 +167,8 @@ export interface MetadataPatch {
   ranobedbId?: string | null
   lubimyczytacId?: string | null
   aladinId?: string | null
+  mangabakaId?: string | null
+  mangabakaSeriesId?: string | null
   comicMetadata?: ComicMetadataFields
   customMetadata?: CustomMetadataBookValueInput[]
 }

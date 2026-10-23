@@ -29,6 +29,8 @@ export const IDENTIFIER_INPUT_KIND_BY_FIELD = {
   ranobedbId: "provider-id",
   lubimyczytacId: "provider-id",
   aladinId: "provider-id",
+  mangabakaId: "provider-id",
+  mangabakaSeriesId: "provider-id",
 } as const satisfies Record<string, IdentifierInputKind>;
 
 export type IdentifierInputField = keyof typeof IDENTIFIER_INPUT_KIND_BY_FIELD;

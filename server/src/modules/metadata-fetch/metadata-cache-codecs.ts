@@ -11,6 +11,7 @@ const CANDIDATE_FIELDS: Record<keyof MetadataCandidate, CacheFieldKind> = {
   provider: 'string',
   providerId: 'string',
   hardcoverEditionId: 'string',
+  mangabakaSeriesId: 'string',
   title: 'string',
   displayTitle: 'string',
   subtitle: 'string',

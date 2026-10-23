@@ -20,6 +20,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKeyType, string> = {
   [MetadataProviderKey.KOBO]: 'Kobo',
   [MetadataProviderKey.LUBIMYCZYTAC]: 'LubimyCzytac',
   [MetadataProviderKey.ALADIN]: 'Aladin',
+  [MetadataProviderKey.MANGABAKA]: 'MangaBaka',
 }
 
 /** A display name for a provider key, including the author providers that share the book registry's names. */

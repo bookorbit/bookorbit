@@ -70,6 +70,7 @@ export class BookDetailDto {
   coverAspectRatio: CoverAspectRatio;
   coverVersion: string;
   hardcoverEditionId: string | null;
+  mangabakaSeriesId: string | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
   genres: string[];

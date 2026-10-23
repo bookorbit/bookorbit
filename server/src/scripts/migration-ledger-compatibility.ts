@@ -65,6 +65,86 @@ type LedgerRow = {
   createdAt: string;
 };
 
+const RENUMBERED_MIGRATION_MARKERS = ['"mangabaka_id"', '"mangabaka_series_id"'];
+
+function isRenumberedMigration(migration: Pick<MigrationMeta, 'sql'>): boolean {
+  return migration.sql.some((statement) => RENUMBERED_MIGRATION_MARKERS.some((marker) => statement.includes(marker)));
+}
+
+/**
+ * A fork migration that is renumbered on every upstream sync keeps its SQL, so its hash still
+ * matches the row an older build recorded at a later position. Reconciling that row to the new
+ * folderMillis makes it the newest ledger row, which hides every migration the journal inserted
+ * before it, because Drizzle only applies entries newer than the newest recorded row.
+ *
+ * Drop the recorded row for the renumbered migration, and any older copy the journal no longer
+ * owns, so Drizzle applies the pending entries in order and then replays the idempotent
+ * renumbered one.
+ */
+export async function rewindRenumberedMigrationRows(
+  pool: Pick<Pool, 'connect'>,
+  migrations: readonly Pick<MigrationMeta, 'hash' | 'folderMillis' | 'sql'>[],
+): Promise<{ removedRows: number }> {
+  const client = await pool.connect();
+  const startedAt = Date.now();
+
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('bookorbit'), hashtext('migration-ledger-compatibility'))`);
+    const table = await client.query<{ tableName: string | null }>(`SELECT to_regclass('drizzle.__drizzle_migrations')::text AS "tableName"`);
+    if (table.rows[0]?.tableName === null || table.rows.length === 0) {
+      await client.query('COMMIT');
+      return { removedRows: 0 };
+    }
+
+    const ledger = await client.query<LedgerRow>(`
+      SELECT id, hash, created_at::text AS "createdAt"
+      FROM drizzle.__drizzle_migrations
+      ORDER BY id
+    `);
+    const appliedHashes = new Set(ledger.rows.map((row) => row.hash));
+    const firstUnapplied = migrations.findIndex((migration) => !appliedHashes.has(migration.hash));
+    if (firstUnapplied === -1) {
+      await client.query('COMMIT');
+      return { removedRows: 0 };
+    }
+
+    const prefixMillis = firstUnapplied === 0 ? -1 : migrations[firstUnapplied - 1].folderMillis;
+    const journalIndexByHash = new Map(migrations.map((migration, index) => [migration.hash, index]));
+    const removableIds = ledger.rows
+      .filter((row) => Number(row.createdAt) > prefixMillis)
+      .filter((row) => {
+        const journalIndex = journalIndexByHash.get(row.hash);
+        if (journalIndex === undefined) return true;
+        return journalIndex > firstUnapplied && isRenumberedMigration(migrations[journalIndex]);
+      })
+      .map((row) => row.id);
+
+    if (removableIds.length === 0) {
+      await client.query('COMMIT');
+      return { removedRows: 0 };
+    }
+
+    const removed = await client.query(`DELETE FROM drizzle.__drizzle_migrations WHERE id = ANY($1::int[])`, [removableIds]);
+    await client.query('COMMIT');
+    const removedRows = removed.rowCount ?? removableIds.length;
+    console.warn(
+      `[db.migration-ledger-compatibility] [end] durationMs=${Date.now() - startedAt} removed=${removedRows} - renumbered migration records rewound`,
+    );
+    return { removedRows };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    const errorClass = error instanceof Error ? error.name : typeof error;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[db.migration-ledger-compatibility] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${sanitizeLogValue(message)}" - renumbered migration records could not be rewound`,
+    );
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function reconcileMigrationLedgerTimestamps(
   pool: Pick<Pool, 'connect'>,
   migrations: readonly Pick<MigrationMeta, 'folderMillis' | 'hash'>[],

@@ -65,6 +65,8 @@ export interface BookDockMetadata {
   ranobedbId?: string | null;
   lubimyczytacId?: string | null;
   aladinId?: string | null;
+  mangabakaId?: string | null;
+  mangabakaSeriesId?: string | null;
   comicMetadata?: ComicMetadataFields | null;
 }
 

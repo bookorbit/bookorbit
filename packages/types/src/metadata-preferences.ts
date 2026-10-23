@@ -66,6 +66,9 @@ export interface MetadataFetchOptions {
     maxCount: number | null;
   };
   saveProviderIds: boolean;
+  /** When true, MangaBaka volume titles use "Series, Vol. NN: Subtitle, Ch NNNN"
+   *  format with subtitle and chapter. When false, uses simpler "Series, Vol. NN - Ch NNN". */
+  richTitleFormat?: boolean;
   providerIdMode: ProviderIdFetchMode;
 }
 
@@ -133,6 +136,10 @@ export interface AladinProviderConfig {
   ttbKey: string;
 }
 
+export interface MangabakaProviderConfig {
+  enabled: boolean;
+}
+
 export interface ProviderConfigurations {
   google: GoogleProviderConfig;
   amazon: AmazonProviderConfig;
@@ -148,6 +155,7 @@ export interface ProviderConfigurations {
   kobo: KoboProviderConfig;
   lubimyczytac: SimpleProviderConfig;
   aladin: AladinProviderConfig;
+  mangabaka: MangabakaProviderConfig;
 }
 
 export interface ProviderStatus {
@@ -317,6 +325,22 @@ export const METADATA_PROVIDER_SUPPORTED_FIELDS: Record<MetadataProviderKey, rea
   ],
   [MetadataProviderKey.COMICVINE]: ["title", "description", "cover", "authors", "publisher", "publishedYear", "seriesName", "seriesIndex"],
   [MetadataProviderKey.RANOBEDB]: [
+    "title",
+    "subtitle",
+    "description",
+    "cover",
+    "authors",
+    "publisher",
+    "isbn",
+    "publishedYear",
+    "language",
+    "pageCount",
+    "communityRating",
+    "seriesName",
+    "seriesIndex",
+    "genres",
+  ],
+  [MetadataProviderKey.MANGABAKA]: [
     "title",
     "subtitle",
     "description",

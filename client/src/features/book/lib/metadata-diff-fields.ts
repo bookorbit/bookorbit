@@ -36,6 +36,7 @@ export type ProviderIdPatchField =
   | 'ranobedbId'
   | 'lubimyczytacId'
   | 'aladinId'
+  | 'mangabakaId'
 
 export type DiffFieldKey =
   | 'title'
@@ -60,6 +61,7 @@ export type DiffFieldKey =
   | 'hardcoverEditionId'
   | ProviderIdPatchField
   | 'sourceUrl'
+  | 'mangabakaSeriesId'
   | ComicDiffFieldKey
 
 const FIELD_LABEL_PREFIX = 'book.detail.editMetadata.diff.fields'
@@ -85,6 +87,8 @@ export const FIELD_DEFS: { key: DiffFieldKey; labelKey: string }[] = (
     'durationSeconds',
     'abridged',
     'hardcoverEditionId',
+    'mangabakaId',
+    'mangabakaSeriesId',
   ] as const
 ).map((key) => ({ key, labelKey: `${FIELD_LABEL_PREFIX}.${key}` }))
 
@@ -133,6 +137,7 @@ export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField
   kobo: 'koboId',
   lubimyczytac: 'lubimyczytacId',
   aladin: 'aladinId',
+  mangabaka: 'mangabakaId',
 }
 
 const PROVIDER_ID_PATCH_FIELDS = new Set<string>(Object.values(PROVIDER_ID_FIELD).filter((v): v is ProviderIdPatchField => v !== undefined))

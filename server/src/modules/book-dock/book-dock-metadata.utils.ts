@@ -31,6 +31,8 @@ const PASSTHROUGH_FIELDS = [
   'ranobedbId',
   'lubimyczytacId',
   'aladinId',
+  'mangabakaId',
+  'mangabakaSeriesId',
 ] as const satisfies readonly (keyof BookDockMetadata)[];
 
 const BOOK_DOCK_METADATA_FIELDS = new Set<keyof BookDockMetadata>([

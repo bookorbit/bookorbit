@@ -123,6 +123,12 @@ const PROVIDER_LINK_DEFINITIONS: readonly ProviderLinkDefinition[] = [
     url: (id) => `https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=${encoded(id)}`,
     fallback: '알',
   },
+  {
+    key: MetadataProviderKey.MANGABAKA,
+    label: 'MangaBaka',
+    url: (id) => `https://mangabaka.org/${encoded(id)}`,
+    fallback: 'MB',
+  },
 ]
 
 export function createBookProviderLinks(providerIds: ProviderIds, settings: ProviderLinkSettings = DEFAULT_LINK_SETTINGS): BookProviderLink[] {

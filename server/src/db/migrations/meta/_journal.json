@@ -876,6 +876,13 @@
       "when": 1792516862510,
       "tag": "0124_add_author_metadata_provider_pinned",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1792757252154,
+      "tag": "0125_add_mangabaka_columns",
+      "breakpoints": true
     }
   ]
 }

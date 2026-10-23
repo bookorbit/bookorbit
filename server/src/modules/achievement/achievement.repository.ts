@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, asc, count, countDistinct, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql, sum } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -41,6 +41,8 @@ export type CelebrationAcknowledgementResult = 'acknowledged' | 'foreign' | 'mis
 
 @Injectable()
 export class AchievementRepository {
+  private readonly logger = new Logger(AchievementRepository.name);
+
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async upsertCatalogue(seed: NewAchievement[]): Promise<void> {
@@ -77,6 +79,25 @@ export class AchievementRepository {
   }
 
   async backfillExistingCelebrations(): Promise<number> {
+    // Databases upgraded from images predating migration 0091 can record the
+    // migration as applied while missing the celebrated_at column. Probing first
+    // keeps this best-effort backfill from failing startup; returning 0 without
+    // writing the marker retries on the next boot, so it self-heals once the
+    // column exists.
+    const probe = await this.db.execute<{ exists: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'user_achievements'
+          AND column_name = 'celebrated_at'
+      ) AS "exists"
+    `);
+    if (!probe.rows[0]?.exists) {
+      this.logger.warn(
+        '[achievement.celebration_backfill] [fail] errorClass=UndefinedColumn error="user_achievements.celebrated_at is missing; migration 0091_add_read_aloud_and_podcasts was not applied" - celebration backfill skipped, startup continues',
+      );
+      return 0;
+    }
     return this.db.transaction(async (tx) => {
       const [marker] = await tx
         .insert(appSettings)

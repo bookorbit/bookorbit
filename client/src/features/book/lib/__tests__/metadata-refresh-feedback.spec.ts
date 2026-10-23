@@ -32,6 +32,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     covers: { ebook: null, audio: null },
     coverVersion: 'legacy:2024-01-01T00:00:00.000Z',
     hardcoverEditionId: null,
+    mangabakaSeriesId: null,
     providerIds: {},
     authors: [{ id: 1, name: 'Hanya Yanagihara', sortName: null }],
     genres: [],

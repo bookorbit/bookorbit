@@ -6776,6 +6776,23 @@
           "searchInterruptedHint": "再試行するか、検索範囲を絞り込みます。",
           "searchPrompt": "上記の検索結果をクリックして、メタデータの比較を開始します。"
         },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        },
         "match": {
           "sheetDescription": "メタデータプロバイダを検索し、この本にコピーする内容を選択します。",
           "mediumAudiobook": "オーディオブック",

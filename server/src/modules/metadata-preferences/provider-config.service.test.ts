@@ -77,6 +77,7 @@ describe('ProviderConfigService', () => {
       kobo: { enabled: false, country: 'us', language: 'en' },
       lubimyczytac: { enabled: false },
       aladin: { enabled: false, ttbKey: '' },
+      mangabaka: { enabled: false },
     });
   });
 
@@ -372,6 +373,7 @@ describe('ProviderConfigService', () => {
       kobo: { enabled: false, country: 'us', language: 'en' },
       lubimyczytac: { enabled: false },
       aladin: { enabled: false, ttbKey: '' },
+      mangabaka: { enabled: false },
     });
 
     expect(statuses.map((s) => s.key)).toEqual([
@@ -389,6 +391,7 @@ describe('ProviderConfigService', () => {
       MetadataProviderKey.KOBO,
       MetadataProviderKey.LUBIMYCZYTAC,
       MetadataProviderKey.ALADIN,
+      MetadataProviderKey.MANGABAKA,
     ]);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.configured).toBe(false);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.hint).toContain('API key required');
@@ -416,6 +419,7 @@ describe('ProviderConfigService', () => {
       kobo: { enabled: false, country: 'us', language: 'en' },
       lubimyczytac: { enabled: false },
       aladin: { enabled: false, ttbKey: '' },
+      mangabaka: { enabled: false },
     });
 
     expect(statuses.find((s) => s.key === MetadataProviderKey.HARDCOVER)?.configured).toBe(true);

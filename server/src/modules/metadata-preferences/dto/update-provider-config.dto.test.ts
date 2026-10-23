@@ -20,6 +20,7 @@ describe('UpdateProviderConfigDto', () => {
       itunes: { coverResolution: 'standard' },
       librofm: { enabled: true },
       aladin: { ttbKey: 'ttb-test-key' },
+      mangabaka: { enabled: true },
     });
 
     expect(errors).toHaveLength(0);

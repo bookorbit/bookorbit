@@ -13,6 +13,7 @@ import { ITunesProvider } from './providers/itunes/itunes.provider';
 import { KoboProvider } from './providers/kobo/kobo.provider';
 import { LibroFmProvider } from './providers/librofm/librofm.provider';
 import { LubimyczytacProvider } from './providers/lubimyczytac/lubimyczytac.provider';
+import { MangabakaProvider } from './providers/mangabaka/mangabaka.provider';
 import { OpenLibraryProvider } from './providers/open-library/open-library.provider';
 import { RanobeDbProvider } from './providers/ranobedb/ranobedb.provider';
 
@@ -36,6 +37,7 @@ const PROVIDER_CLASSES = [
   KoboProvider,
   LubimyczytacProvider,
   AladinProvider,
+  MangabakaProvider,
 ];
 
 // Declarations are plain class fields, so dependencies that are never called can be empty stand-ins.

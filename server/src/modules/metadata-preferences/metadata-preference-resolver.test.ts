@@ -68,6 +68,7 @@ describe('MetadataPreferenceResolver', () => {
       MetadataProviderKey.RANOBEDB,
       MetadataProviderKey.AMAZON,
       MetadataProviderKey.AUDIBLE,
+      MetadataProviderKey.MANGABAKA,
     ]);
 
     expect(defaults.fields.subtitle.providers).toEqual([
