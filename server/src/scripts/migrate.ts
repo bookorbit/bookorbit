@@ -6,7 +6,9 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 
 import { createPostgresClientConfig } from '../db/postgres-connection-config';
+import { sanitizeLogValue } from '../common/utils/log-sanitize.utils';
 import { dropUnreleasedMigrationRows, reconcileMigrationLedgerTimestamps, rewindRenumberedMigrationRows } from './migration-ledger-compatibility';
+import { applyPendingMigrationsTolerantly } from './migration-recovery';
 import { installPostgresExtensions } from './postgres-extensions';
 import { prepareLegacySeriesIndexColumns } from './series-index-migration-compatibility';
 
@@ -48,9 +50,19 @@ async function runMigrations() {
     await reconcileMigrationLedgerTimestamps(pool, migrationFiles);
     await prepareLegacySeriesIndexColumns(pool);
 
-    await migrate(drizzle(pool), { migrationsFolder });
-
-    console.log(`Migrations applied successfully from ${migrationsFolder}`);
+    const startedAt = Date.now();
+    try {
+      await migrate(drizzle(pool), { migrationsFolder });
+      console.log(`Migrations applied successfully from ${migrationsFolder}`);
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : typeof error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[db.migrate] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${sanitizeLogValue(message)}" - strict migration failed; retrying tolerantly`,
+      );
+      await applyPendingMigrationsTolerantly(pool, migrationFiles);
+      console.log(`Migrations applied successfully from ${migrationsFolder} after tolerant recovery`);
+    }
   } finally {
     await pool.end();
   }
