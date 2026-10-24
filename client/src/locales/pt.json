@@ -2474,7 +2474,7 @@
             "example": "42"
           },
           "date": {
-            "label": "Encontro",
+            "label": "Data",
             "hint": "Um dia do calendário",
             "example": "2024-03-09"
           },
@@ -3407,6 +3407,12 @@
         "syncEnabled": "Sincronização KOReader ativada",
         "syncDisabled": "Sincronização KOReader desativada",
         "toggleSyncFailed": "Falha ao alternar a sincronização",
+        "pluginLibrary": "Biblioteca de Plugins",
+        "hideAudioOnlyBooks": "Ocultar livros com somente audiobook",
+        "hideAudioOnlyBooksHint": "KOReader não pode reproduzir áudio, então livros com apenas arquivos de áudio permanecem fora das listas do plugin, pesquisa e downloads, assim como uma biblioteca que não mantém nada mais. Livros que também têm um ebook ainda são exibidos.",
+        "audioOnlyBooksHidden": "Livros somente do Audiobook ocultos no plugin",
+        "audioOnlyBooksShown": "Livros somente do Audiobook exibidos no plugin",
+        "toggleAudioOnlyBooksFailed": "Falha ao atualizar a configuração da biblioteca de plugins",
         "syncUrlCopied": "URL de sincronização copiada para a área de transferência",
         "syncUrlCopyFailed": "Falha ao copiar a URL de sincronização",
         "statusRefreshed": "Status de sincronização atualizado",
@@ -4391,7 +4397,7 @@
     "units": {
       "books": {
         "progress": "{current} / {threshold} para ",
-        "toGo": "{count, plural, one {# reservas para ir} other {# livros para ir}}"
+        "toGo": "{count, plural, one {# livro restante} other {# livros restantes}}"
       },
       "pages": {
         "progress": "{current} / {threshold} páginas",
@@ -5071,7 +5077,8 @@
         "bulkRestored": "{count, plural, =0 {Nenhuma anotação restaurada} one {Restaurada # anotação} many {Restauradas # anotações} other {Restauradas # anotações}}",
         "bulkRecolored": "{count, plural, =0 {Nenhuma anotação recolorida} one {Recolorida # anotação} many {Recoloridas # anotações} other {Recoloridas # anotações}}",
         "bulkRestyled": "{count, plural, =0 {Estilo não alterado} one {Alterado o estilo de # anotação} many {Alterado o estilo de # anotações} other {Alterado o estilo de # anotações}}",
-        "noteSaved": "Nota salva"
+        "noteSaved": "Nota salva",
+        "purgePendingDeviceSync": "Um dispositivo sincronizado ainda precisa remover esta anotação. Sincronize o dispositivo e/ou apague-o para sempre."
       },
       "railTitle": "{marks} marcas · {books} livros",
       "lastTwelveMonths": "Últimos 12 meses",
@@ -5116,10 +5123,16 @@
       },
       "activitySummary": "{count, plural, one {# destaque entre {from} e {to}} other {# destaques entre {from} e {to}}}",
       "book": "Livro",
-      "needsReview": "Requer revisão"
+      "needsReview": "Requer revisão",
+      "trashToggle": "{count, plural, one {Lixo, # anotações} other {Lixo, # anotações}}",
+      "purgeDialog": {
+        "title": "Excluir permanentemente?",
+        "description": "Esta anotação e sua nota foram removidas. Ela não pode ser restaurada da lixeira."
+      }
     },
     "sources": {
       "web": "Web",
+      "bookorbit": "BookOrbit",
       "koreader": "KOReader",
       "kobo": "Kobo"
     },
@@ -5714,6 +5727,12 @@
       "errors": {
         "noToken": "Nenhum token fornecido"
       }
+    },
+    "reconnect": {
+      "heading": "Aguardando o servidor",
+      "description": "O BookOrbit não pode acessar o seu servidor no momento. Esta página continua por conta própria assim que o servidor responder.",
+      "retry": "Tentar novamente agora",
+      "retrying": "Tentando novamente..."
     }
   },
   "author": {
@@ -5754,7 +5773,10 @@
       "died": "Falecido em",
       "website": "Site",
       "genres": "Gênero",
-      "influences": "Influências"
+      "influences": "Influências",
+      "findMatch": "Encontre o Autor Correto",
+      "source": "Fonte",
+      "pinned": "Fixado"
     },
     "list": {
       "title": "Autores",
@@ -5826,7 +5848,17 @@
         "removing": "Removendo...",
         "removeImage": "Remover imagem",
         "imageHint": "PNG/JPEG/WEBP/GIF/BMP de até {size} MB",
-        "saving": "Salvando..."
+        "saving": "Salvando...",
+        "website": "Website",
+        "websitePlaceholder": "https://example.com",
+        "websiteInvalid": "Insira um endereço web como example.com.",
+        "born": "Nascido em",
+        "died": "Falecido em",
+        "lifeDatePlaceholder": "1965 ou 1965-03-14",
+        "lifeDateHint": "Data de nascimento e falecimento recebem um ano ou um dia, mês e ano.",
+        "lifeDateInvalid": "Insira um ano ou uma data real como dia, mês e ano.",
+        "genres": "Gêneros",
+        "influences": "Influências"
       },
       "merge": {
         "searchPlaceholder": "Busque autores para mesclar a este autor",
@@ -5891,6 +5923,56 @@
       "actionsFor": "Ações para {name}",
       "refreshing": "Atualizando metadados do {name}",
       "deleting": "Excluindo {name}"
+    },
+    "match": {
+      "title": "Encontre o autor correto",
+      "description": "Escolha a pessoa por trás de {name}, a partir de uma busca de nome ou de um trazido de Goodreads ou link audível.",
+      "search": {
+        "label": "Nome",
+        "submit": "Buscar"
+      },
+      "reference": {
+        "label": "Link ou ID do Goodread ou Audible",
+        "placeholder": "goodreads.com/author/show/12345",
+        "submit": "Consultar",
+        "unrecognised": "Cole um link do autor no Goodreads ou Audible, um ID dos Goodreads ou um ASIN.",
+        "notFound": "Nenhum autor tem esse ID.",
+        "failed": "A pesquisa falhou. Tente novamente dentro de instantes."
+      },
+      "results": {
+        "label": "Correspondências",
+        "count": "{count, plural, =0 {Sem resultados} one {# correspondente} other {# correspondentes}}",
+        "searching": "Buscando...",
+        "empty": "Nenhum autor encontrado. Tente outra ortografia ou cole um link.",
+        "failed": "A pesquisa falhou. Tente novamente dentro de instantes.",
+        "current": "Atual",
+        "born": "Nascido em {year}",
+        "lifeSpan": "{born}–{died}"
+      },
+      "detail": {
+        "empty": "Escolha uma combinação para ver quem é.",
+        "loading": "Carregando detalhes...",
+        "noBio": "Sem biografia.",
+        "viewOn": "Ver em {provider}",
+        "back": "Voltar às correspondências",
+        "use": "Usar este autor",
+        "unpin": "Desafixar",
+        "pinnedHint": "Fixo: atualiza esse autor por ID ao invés de procurar pelo nome.",
+        "currentHint": "O autor é o correspondente a esta pessoa agora. Use-o para fixar a correspondência."
+      },
+      "confirm": {
+        "title": "Usar este autor {provider}?",
+        "description": "O bio, foto, datas, website, gêneros e influências são substituídos pelo deste autor e depois é atualizada a lista para esta pessoa.",
+        "confirm": "Usar este autor"
+      },
+      "toast": {
+        "pinned": "Correspondência de {name} em {provider}",
+        "unpinned": "Desafixado. Atualiza busca pelo nome novamente.",
+        "notFound": "{provider} não tem mais autor com esse ID.",
+        "providerDown": "Não foi possível encontrar o {provider}. Tente novamente daqui a pouco.",
+        "failed": "Não foi possível utilizar este autor.",
+        "unpinFailed": "Não foi possível desfixar a correspondência."
+      }
     }
   },
   "book": {
@@ -6098,6 +6180,7 @@
         "before": "antes",
         "after": "depois",
         "withinLast": "dentro do último",
+        "moreThanAgo": "mais do que",
         "isMissing": "está faltando",
         "isPresent": "está presente",
         "isUnread": "não é lido",
@@ -6120,6 +6203,7 @@
       "withinLastPlaceholder": "ex: 7",
       "unit": {
         "days": "dias",
+        "daysAgo": "dias atrás",
         "weeks": "semanas",
         "months": "meses",
         "megabytes": "MB"
@@ -6463,6 +6547,13 @@
             "unavailable": "Indisponível",
             "epubCopiesOnly": "Somente cópias EPUB"
           },
+          "chip": {
+            "enabled": "Sincronizado",
+            "partial": "Parcialmente sincronizado",
+            "disabled": "Sincronização desativada",
+            "unavailable": "Problema de sincronização"
+          },
+          "chipAria": "Sincronização de progresso da leitura em voz alta: {status}",
           "enabledDescription": "As posições em Audiobook, leitor web, Kobo e KOReader permanecem em sincronia.",
           "disabledDescription": "Cada formato mantém a sua própria posição de leitura.",
           "epubCopiesDescription": "O progresso de leitura no Web reader, Kobo e KOReader permanece sincronizado entre as cópias em EPUB. Adicione os arquivos de audiolivro correspondentes para sincronizar o audiolivro também.",
@@ -7076,7 +7167,7 @@
           "formatNotSupported": "Não gravado: formato não suportado",
           "formatDisabled": "Não gravado: formato desligado",
           "fileExceedsSizeLimit": "Não gravado: acima do limite de tamanho",
-          "notContentFile": "Não gravado: conteúdo não reservado"
+          "notContentFile": "Não gravado: não tem conteúdo de livro"
         },
         "enabled": "Ativado",
         "disabled": "Desligado",
@@ -8098,6 +8189,10 @@
       "noResultsHint": "Tente um título ou autor diferente.",
       "noResultsIndexerHint": "Tente um título ou autor diferente, ou pesquise os índices por \"{title}\" e escolha um lançamento por si mesmo.",
       "freeTextAction": "Procurar indexadores",
+      "noResultsRequestHint": "Tente um título ou autor diferente, ou solicite \"{title}\" conforme digitado. Uma nota para o aprovador em Mais opções ajuda eles a encontrar o livro certo.",
+      "noResultsRequestAutoHint": "Tente um título ou autor diferente, ou solicite \"{title}\" conforme digitado.",
+      "requestAnywayAction": "Solicitar mesmo assim",
+      "searchAuthor": "Mostrar livros por {author}",
       "manualSearchAction": "Pesquisar indexadores manualmente",
       "yearUnknown": "Ano desconhecido",
       "sourceCount": "{count, plural, one {# fonte} other {# fontes}}",
@@ -8479,6 +8574,8 @@
         "clientUnavailable": "Seu cliente de download não respondeu a um lançamento anterior"
       },
       "singleFileNote": "O lançamento pode ser um livro em vários formatos, um audioobook em partes, ou um arquivo com todos eles e são importados como um único livro. Um lançamento contendo vários livros separados, você deve escolher qual manter.",
+      "holdForReview": "Revisar o download antes de ser arquivado",
+      "releasePageLabel": "{title}, página de lançamento em {indexer}",
       "searching": "Procurando indexadores...",
       "refresh": "Buscar novamente",
       "cached": "Mostrando a última busca. Procure novamente por novos resultados.",
@@ -8796,6 +8893,7 @@
       "scoreShort": "O arquivo importado marcou {score} em relação a esta solicitação, abaixo do {threshold} necessário para arquivar automaticamente.",
       "scoreClears": "O arquivo importado marcou {score}, que limpa o {threshold} necessário para arquivá-lo automaticamente.",
       "verificationOff": "Verificação de importação está desligada, então este arquivo nunca foi avaliado como solicitação.",
+      "heldOnRequest": "Esta versão foi enviada para ser verificada antes de ser arquivada, por isso está aguardando por você.",
       "reason": {
         "isbn_match": "O ISBN é um que foi solicitado.",
         "above_threshold": "Parece que o livro que foi solicitado.",
@@ -8815,8 +8913,24 @@
       },
       "requested": "Pedido",
       "imported": "Importado",
+      "releasePage": "Abra a página de lançamento",
       "absent": "Nem o pedido nem o arquivo tem um.",
       "notSet": "Não definido",
+      "editionTitle": "O que o arquivo diz é",
+      "edition": {
+        "publisher": "Editora",
+        "published": "Publicado",
+        "language": "Idioma",
+        "pages": "Páginas",
+        "isbn10": "ISBN-10",
+        "narrators": "Narrado por",
+        "length": "Duração",
+        "version": "Versão",
+        "chapters": "Capítulos"
+      },
+      "abridged": "Resumido",
+      "unabridged": "Integral",
+      "importedCover": "Capa encontrada no arquivo importado",
       "filesTitle": "O que chegou",
       "fileCount": "{count, plural, one {# arquivo} other {# arquivos}}",
       "role": {
@@ -8826,6 +8940,8 @@
       },
       "fileAnyway": "Arquivo mesmo assim",
       "fileAnywayHint": "Registra isso na biblioteca de destino e marca a solicitação disponível, exatamente como uma pontuação para aprovação teria.",
+      "fileIt": "Arquivar isto",
+      "fileItHint": "Arquiva isso na biblioteca de destino e marca a solicitação como disponível.",
       "noDestination": "Esta requisição não tem nenhuma biblioteca de destino com uma pasta nela, portanto ainda não há onde arquivar o livro.",
       "openDock": "Abra a Dock de Livro",
       "missingEntry": "O arquivo associado a esta solicitação não está mais no Book Dock. Ele foi importado ou descartado manualmente, portanto não há nada restante para revisão aqui.",
@@ -9047,6 +9163,19 @@
         "dropped": "{name} caiu na posição {position} de {total}",
         "cancelled": "Reordenação cancelada. {name} retornou à posição {position} de {total}.",
         "filteredHint": "Limpar o filtro para reordenar"
+      },
+      "customize": {
+        "open": "Personalizar barra lateral",
+        "title": "Personalizar barra lateral",
+        "hint": "Arraste para reordenar. Páginas ocultas permanecem em Pesquisa.",
+        "reset": "Restaurar padrão",
+        "done": "Concluído",
+        "resetDone": "Barra lateral redefinida para o padrão",
+        "showInSidebar": "Exibir {name} na barra lateral",
+        "show": "Mostrar",
+        "hide": "Ocultar",
+        "alwaysShown": "{name} é sempre mostrado",
+        "returnsWithWork": "Mostra quando o trabalho está em espera"
       },
       "podcastImportProgress": "{processed} / {total} arquivos",
       "podcastImportCounting": "Contando arquivos…",
@@ -9839,7 +9968,7 @@
       "all": "TODOS",
       "attention": "Precisa de atenção",
       "active": "Em Execução",
-      "book": "Reservar",
+      "book": "Livro",
       "sentTo": "Enviado para",
       "file": "Arquivo",
       "status": "SItuação",
@@ -10006,7 +10135,7 @@
         "name": "Nome",
         "subject": "Cargo",
         "message": "mensagem",
-        "groupBook": "Reservar",
+        "groupBook": "Livro",
         "groupFile": "Arquivo",
         "groupOther": "Outros",
         "insertHint": "Entra com o cursor, no assunto ou na mensagem. Valores vazios não imprimem nada.",
@@ -11517,7 +11646,21 @@
     },
     "toast": {
       "linkedHighlightError": "Não foi possível abrir a posição vinculada ao destaque",
-      "resumed": "Retomado em {pct}% - {label}"
+      "resumed": "Retomado em {pct}% - {label}",
+      "newerPositionError": "Não foi possível abrir seu novo lugar",
+      "highlightSaveFailed": "Não foi possível salvar o destaque",
+      "noteSaveFailed": "Não foi possível salvar a nota",
+      "highlightDeleteFailed": "Não foi possível excluir o destaque",
+      "bookmarkSaveFailed": "Não foi possível adicionar o marcador",
+      "bookmarkDeleteFailed": "Não foi possível remover o marcador",
+      "bookmarkUpdateFailed": "Não foi possível salvar o marcador",
+      "marksLoadFailed": "Não foi possível carregar seus destaques e favoritos"
+    },
+    "newerPositionDialog": {
+      "title": "Continuar de outro dispositivo?",
+      "description": "Este livro foi lido em {remote} um outro dispositivo enquanto estava aberto aqui em {local}.",
+      "follow": "Ir para {pct}",
+      "stay": "Ficar em {pct}"
     },
     "header": {
       "goBack": "Voltar",
@@ -11659,6 +11802,7 @@
       "allChapters": "Todos os capítulos",
       "notesOnly": "Apenas anotações",
       "deleteBookmark": "Excluir marcador",
+      "editBookmark": "Editar favorito",
       "deleteHighlight": "Excluir destaque",
       "approximatePosition": "Sincronizado a partir do dispositivo; a posição exata não está disponível, pula para o capítulo",
       "sort": {
@@ -11674,6 +11818,7 @@
       "translate": "Traduzir",
       "define": "Definir",
       "deleteAnnotation": "Excluir anotação",
+      "readFromHere": "Ler a partir daqui",
       "apply": "Aplicar",
       "color": "Cor de destaque: {color}",
       "style": "Estilo do destaque: {style}",
@@ -11824,6 +11969,12 @@
       "hideControls": "Ocultar controles",
       "stop": "Parar narração",
       "error": "Erro de reprodução de Narração"
+    },
+    "bookmarkEdit": {
+      "title": "Editar favorito",
+      "titleLabel": "Título",
+      "noteLabel": "Nota",
+      "notePlaceholder": "Nota opcional"
     }
   },
   "scanner": {
