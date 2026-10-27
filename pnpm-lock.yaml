@@ -500,8 +500,8 @@ importers:
         specifier: ^0.12.5
         version: 0.12.5
       zod:
-        specifier: ^4.6.5
-        version: 4.6.5
+        specifier: ^4.6.6
+        version: 4.6.6
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3.3.7
@@ -3412,7 +3412,7 @@ packages:
   '@robingenz/zli@0.2.0':
     resolution: {integrity: sha512-LME7G4xkEFuqyVg/MYTB3xoJnvWb955aEfZ7J7yRstzyULs3HBdxz0l5QiP8gmMMMZ434cb8Wn/DdHqeNTT2fA==}
     engines: {node: '>=16.0.0'}
-    deprecated: Renamed to zodline - install zodline instead.
+    deprecated: Renamed to zodline — install zodline instead.
     hasBin: true
     peerDependencies:
       zod: ^4.0.0
@@ -9713,6 +9713,9 @@ packages:
 
   zod@4.6.5:
     resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
   zrender@6.1.0:
     resolution: {integrity: sha512-oEGMDB6pOP2S6OwRR4PdVv610zrjnA3Bh+JnSG12fYJlBKjtNAoEb5fSUoCOOINlH96I2fU38/A2UpRKs67xYQ==}
@@ -18976,6 +18979,8 @@ snapshots:
       zod: 4.6.5
 
   zod@4.6.5: {}
+
+  zod@4.6.6: {}
 
   zrender@6.1.0:
     dependencies:

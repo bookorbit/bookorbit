@@ -108,7 +108,7 @@
     "socket.io": "^4.8.4",
     "undici": "^8.11.2",
     "unzipper": "^0.12.5",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
