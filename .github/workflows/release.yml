@@ -320,11 +320,17 @@ jobs:
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
+      BUILDX_GIT_LABELS: "1"
     steps:
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release.outputs.tag }}
+
+      - name: Prepare image metadata
+        id: image-meta
+        shell: bash
+        run: echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
@@ -351,6 +357,9 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           build-args: APP_VERSION=v${{ needs.release.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ steps.image-meta.outputs.created }}
           cache-from: |
             type=gha,scope=container-image-yml-amd64
             type=gha,scope=container-image-yml-arm64
@@ -367,6 +376,9 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:latest
           build-args: APP_VERSION=v${{ needs.release.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ steps.image-meta.outputs.created }}
           cache-from: type=gha,scope=release-read-aloud-worker
           cache-to: type=gha,mode=max,scope=release-read-aloud-worker
 

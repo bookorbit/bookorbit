@@ -26,6 +26,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  BUILDX_GIT_LABELS: "1"
 
 jobs:
   # Main push path: resolve context once, then build multi-arch natively in parallel.
@@ -44,6 +45,7 @@ jobs:
     outputs:
       source_sha: ${{ steps.ctx.outputs.source_sha }}
       source_sha_short: ${{ steps.ctx.outputs.source_sha_short }}
+      created: ${{ steps.ctx.outputs.created }}
       update_main: ${{ steps.ctx.outputs.update_main }}
       skip_build: ${{ steps.ctx.outputs.skip_build }}
     steps:
@@ -71,8 +73,11 @@ jobs:
             echo "update_main=false" >> "$GITHUB_OUTPUT"
           fi
           SOURCE_SHA_SHORT="${SOURCE_SHA:0:12}"
-          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
-          echo "source_sha_short=${SOURCE_SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          {
+            echo "source_sha=${SOURCE_SHA}"
+            echo "source_sha_short=${SOURCE_SHA_SHORT}"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
           IMAGE_LOWER=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
           HTTP_STATUS_SHORT=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
@@ -128,6 +133,9 @@ jobs:
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           platforms: linux/amd64
           build-args: APP_VERSION=sha-${{ needs.prepare.outputs.source_sha_short }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ needs.prepare.outputs.created }}
           cache-from: type=gha,scope=container-image-yml-amd64
           cache-to: type=gha,mode=max,scope=container-image-yml-amd64
 
@@ -182,6 +190,9 @@ jobs:
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           platforms: linux/arm64
           build-args: APP_VERSION=sha-${{ needs.prepare.outputs.source_sha_short }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ needs.prepare.outputs.created }}
           cache-from: type=gha,scope=container-image-yml-arm64
           cache-to: type=gha,mode=max,scope=container-image-yml-arm64
 
