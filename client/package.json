@@ -76,7 +76,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cronstrue": "^3.31.0",
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.4.17",
     "driver.js": "^1.9.0",
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
