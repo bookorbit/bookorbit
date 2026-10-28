@@ -87,7 +87,7 @@
     "drizzle-orm": "^0.45.4",
     "fast-xml-parser": "^5.11.2",
     "fastest-levenshtein": "^1.0.16",
-    "fastify": "^5.12.5",
+    "fastify": "^5.12.6",
     "iconv-lite": "^0.7.3",
     "jose": "^6.2.12",
     "langs": "^2.0.0",
