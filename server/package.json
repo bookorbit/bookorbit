@@ -95,7 +95,7 @@
     "mysql2": "^3.24.5",
     "nestjs-pino": "^5.3.1",
     "node-unrar-js": "^2.0.2",
-    "nodemailer": "^10.0.16",
+    "nodemailer": "^10.1.4",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdf-lib": "^1.17.1",

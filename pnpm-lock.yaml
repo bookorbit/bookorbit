@@ -465,8 +465,8 @@ importers:
         specifier: ^2.0.2
         version: 2.0.2
       nodemailer:
-        specifier: ^10.0.16
-        version: 10.0.16
+        specifier: ^10.1.4
+        version: 10.1.4
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -3416,7 +3416,7 @@ packages:
   '@robingenz/zli@0.2.0':
     resolution: {integrity: sha512-LME7G4xkEFuqyVg/MYTB3xoJnvWb955aEfZ7J7yRstzyULs3HBdxz0l5QiP8gmMMMZ434cb8Wn/DdHqeNTT2fA==}
     engines: {node: '>=16.0.0'}
-    deprecated: Renamed to zodline - install zodline instead.
+    deprecated: Renamed to zodline — install zodline instead.
     hasBin: true
     peerDependencies:
       zod: ^4.6.6
@@ -7487,8 +7487,8 @@ packages:
     resolution: {integrity: sha512-hLNmoJzqaKJnod8yiTVGe9hnlNRHotUi0CreSv/8HtfRi/3JnRC8DvsmKfeGGguRjTEulhZK6zXX5PXoVuDZ2w==}
     engines: {node: '>=10.0.0'}
 
-  nodemailer@10.0.16:
-    resolution: {integrity: sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==}
+  nodemailer@10.1.4:
+    resolution: {integrity: sha512-EsMnOR2oRv4LGnWvHgcVYkkQ4O2j8KO4WTw6l+PHR4sOXo8SAgIraxtEnGDmotjbhv0hDsu3IuDIFZm8iXwO4A==}
     engines: {node: '>=20.0.0'}
 
   nopt@10.0.1:
@@ -16567,7 +16567,7 @@ snapshots:
 
   node-unrar-js@2.0.2: {}
 
-  nodemailer@10.0.16: {}
+  nodemailer@10.1.4: {}
 
   nopt@10.0.1:
     dependencies:
