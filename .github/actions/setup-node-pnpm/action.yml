@@ -63,7 +63,11 @@ runs:
       shell: bash
       run: pnpm fetch --frozen-lockfile
 
+    # onnxruntime-node's postinstall otherwise downloads its CUDA provider on Linux x64. Nothing in CI
+    # uses it, and the CPU binding the read-aloud worker tests load ships in the npm package itself.
     - name: Install dependencies
       if: ${{ inputs.install == 'true' }}
       shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
       run: pnpm install --frozen-lockfile

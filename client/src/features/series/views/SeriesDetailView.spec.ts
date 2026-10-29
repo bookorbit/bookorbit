@@ -3,6 +3,7 @@ import { computed, defineComponent, nextTick, reactive, ref, type PropType } fro
 import { flushPromises, mount } from '@vue/test-utils'
 import type { BookCard, SeriesBooksPage, SeriesDetail } from '@bookorbit/types'
 import SeriesDetailView from './SeriesDetailView.vue'
+import SeriesCompletionBar from '../components/SeriesCompletionBar.vue'
 
 const GROUP_BY_MEDIA_STORAGE_KEY = 'bookorbit:series-detail:group-by-media'
 
@@ -319,7 +320,7 @@ describe('SeriesDetailView', () => {
     expect(wrapper.find('[data-testid="series-media-group-books"]').exists()).toBe(true)
   })
 
-  it('shows the ownership bar only once a provider has supplied a series total', async () => {
+  it('falls back to book counts when a server does not return volume counts', async () => {
     mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 4, expectedBookCount: 7 }))
 
     const wrapper = mountView()
@@ -328,7 +329,35 @@ describe('SeriesDetailView', () => {
     const bar = wrapper.get('[role="progressbar"]')
     expect(bar.attributes('aria-valuenow')).toBe('4')
     expect(bar.attributes('aria-valuemax')).toBe('7')
+    expect(wrapper.text()).toContain('4 volumes')
+    const completion = wrapper.getComponent(SeriesCompletionBar)
+    expect(completion.props('readCount')).toBe(0)
+    expect(completion.props('totalCount')).toBe(4)
     expect(wrapper.text()).toContain('4 of 7')
+  })
+
+  it('uses logical volume counts for the header, reading progress, and ownership', async () => {
+    mocks.seriesInfo = ref(
+      makeSeriesInfo({
+        bookCount: 4,
+        readCount: 2,
+        ownedVolumeCount: 2,
+        readVolumeCount: 1,
+        expectedBookCount: 7,
+      }),
+    )
+
+    const wrapper = mountView()
+    await nextTick()
+
+    expect(wrapper.text()).toContain('2 volumes')
+    const completion = wrapper.getComponent(SeriesCompletionBar)
+    expect(completion.props('readCount')).toBe(1)
+    expect(completion.props('totalCount')).toBe(2)
+    const ownership = wrapper.get('[role="progressbar"]')
+    expect(ownership.attributes('aria-valuenow')).toBe('2')
+    expect(ownership.attributes('aria-valuemax')).toBe('7')
+    expect(wrapper.text()).toContain('2 of 7')
   })
 
   it('hides the ownership bar when no provider total is known', async () => {

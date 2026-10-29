@@ -2,6 +2,7 @@ import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, eq, gt, inArray, like, lt, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { preserveOutgoingChapters } from '../../../db/preserve-audiobook-revision';
 import { DB } from '../../../db';
 import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../../db/book-author-sort-key';
 import * as schema from '../../../db/schema';
@@ -80,6 +81,11 @@ const BOOK_METADATA_COLUMN_BY_PROPERTY = {
   itunesId: 'itunes_id',
   durationSeconds: 'duration_seconds',
   abridged: 'abridged',
+  chapters: 'chapters',
+  chaptersSource: 'chapters_source',
+  chaptersUpdatedAt: 'chapters_updated_at',
+  chaptersUpdatedBy: 'chapters_updated_by',
+  manifestLegacyRecorded: 'manifest_legacy_recorded',
 } as const;
 
 function bookMetadataConflictSet(item: Record<string, unknown>): Record<string, unknown> {
@@ -95,6 +101,7 @@ function bookMetadataConflictSet(item: Record<string, unknown>): Record<string, 
 
 @Injectable()
 export class MigrationImportRepository {
+  private inTransaction = false;
   constructor(
     @Inject(DB) private readonly db: Db,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
@@ -102,17 +109,21 @@ export class MigrationImportRepository {
   ) {}
 
   async withTransaction<T>(handler: (repo: MigrationImportRepository) => Promise<T>): Promise<T> {
-    return this.db.transaction(async (tx) =>
-      handler(new MigrationImportRepository(tx as unknown as Db, this.seriesIdentity, this.seriesMemberships)),
-    );
+    return this.db.transaction(async (tx) => {
+      const repo = new MigrationImportRepository(tx as unknown as Db, this.seriesIdentity, this.seriesMemberships);
+      repo.inTransaction = true;
+      return handler(repo);
+    });
   }
 
   // --- Metadata ---
 
   async upsertBookMetadata(bookId: number, values: Partial<typeof schema.bookMetadata.$inferInsert>): Promise<void> {
+    if (!this.inTransaction && Object.prototype.hasOwnProperty.call(values, 'chapters'))
+      return this.withTransaction((repo) => repo.upsertBookMetadata(bookId, values));
     const shouldSyncSeries =
       Object.prototype.hasOwnProperty.call(values, 'seriesName') || Object.prototype.hasOwnProperty.call(values, 'seriesIndex');
-    const patch = (await this.seriesIdentity?.resolveMetadataPatch(values, this.db)) ?? values;
+    const patch = await preserveOutgoingChapters(this.db, bookId, (await this.seriesIdentity?.resolveMetadataPatch(values, this.db)) ?? values, true);
     await this.db
       .insert(schema.bookMetadata)
       .values({ bookId, ...patch })
@@ -364,11 +375,16 @@ export class MigrationImportRepository {
 
   async batchUpsertBookMetadata(items: Array<{ bookId: number } & Partial<typeof schema.bookMetadata.$inferInsert>>): Promise<void> {
     if (items.length === 0) return;
+    if (!this.inTransaction && items.some((item) => Object.prototype.hasOwnProperty.call(item, 'chapters')))
+      return this.withTransaction((repo) => repo.batchUpsertBookMetadata(items));
     for (const batch of chunk(items, BATCH_CHUNK_SIZE)) {
       for (const item of batch) {
         const shouldSyncSeries =
           Object.prototype.hasOwnProperty.call(item, 'seriesName') || Object.prototype.hasOwnProperty.call(item, 'seriesIndex');
-        const patch = (await this.seriesIdentity?.resolveMetadataPatch(item, this.db)) ?? item;
+        const patch = {
+          ...(await preserveOutgoingChapters(this.db, item.bookId, (await this.seriesIdentity?.resolveMetadataPatch(item, this.db)) ?? item, true)),
+          bookId: item.bookId,
+        };
         const set = bookMetadataConflictSet(patch);
         await this.db.insert(schema.bookMetadata).values(patch).onConflictDoUpdate({
           target: schema.bookMetadata.bookId,

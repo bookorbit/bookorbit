@@ -1,0 +1,33 @@
+{
+  "name": "@bookorbit/read-aloud-worker",
+  "version": "0.0.1",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "files": [
+    "dist",
+    "assets"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "pretest": "pnpm --filter @bookorbit/types build",
+    "test": "pnpm build && node --test test/*.test.mjs",
+    "pretype-check": "pnpm --filter @bookorbit/types build",
+    "type-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bookorbit/types": "workspace:*",
+    "@storyteller-platform/align": "0.2.13",
+    "@storyteller-platform/ghost-story": "0.3.4",
+    "onnxruntime-node": "1.31.1",
+    "pino": "^10.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^6.0.3"
+  }
+}

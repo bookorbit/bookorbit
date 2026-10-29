@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
-import { DEFAULT_KOREADER_DEVICE_PATTERN, resolveUploadPath } from '@bookorbit/types';
+import { appendToPathStem, DEFAULT_KOREADER_DEVICE_PATTERN, resolveUploadPath } from '@bookorbit/types';
 import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import type {
   AchievementItem,
@@ -645,7 +645,15 @@ export class KoreaderCatalogService {
         selection:
           variant && userId ? this.deliverySelection?.descriptor(userId, 'koreader', file.id, variant, file.contentVersion.toISOString()) : undefined,
         downloadUrl: this.downloadUrl(file.id, variant, userId, file.contentVersion.toISOString()),
-        devicePath: this.variantDevicePath(devicePath, downloadVariant, hasSameFormatSibling, variant ? file.id : undefined),
+        devicePath: variant
+          ? this.deliveryDevicePath(
+              devicePath,
+              extension,
+              downloadVariant,
+              file.mediaOverlayAvailable,
+              this.laterSiblingId(row.files, file.id, extension),
+            )
+          : this.variantDevicePath(devicePath, downloadVariant, hasSameFormatSibling),
       };
     });
 
@@ -1208,7 +1216,7 @@ export class KoreaderCatalogService {
     const title = detail.title ?? (basename(detail.folderPath) || `Book ${detail.id}`);
     const files = detail.files
       .filter((file) => file.role === 'primary' || file.role === 'content')
-      .map<KoreaderCatalogFile>((file) => {
+      .map<KoreaderCatalogFile>((file, _index, deliverable) => {
         const extension = this.normalizeFormat(file.format);
         const downloadVariant =
           extension === 'epub' && variant !== 'original' && (file.mediaOverlay?.available === true || variant === 'audioless_epub')
@@ -1258,7 +1266,15 @@ export class KoreaderCatalogService {
           selection:
             variant && userId ? this.deliverySelection?.descriptor(userId, 'koreader', file.id, variant, file.contentVersion ?? '') : undefined,
           downloadUrl: this.downloadUrl(file.id, variant, userId, file.contentVersion ?? ''),
-          devicePath: this.variantDevicePath(devicePath, downloadVariant, hasSameFormatSibling, variant ? file.id : undefined),
+          devicePath: variant
+            ? this.deliveryDevicePath(
+                devicePath,
+                extension,
+                downloadVariant,
+                file.mediaOverlay?.available === true,
+                this.laterSiblingId(deliverable, file.id, extension),
+              )
+            : this.variantDevicePath(devicePath, downloadVariant, hasSameFormatSibling),
         };
       });
 
@@ -1323,10 +1339,29 @@ export class KoreaderCatalogService {
     return `${CATALOG_BASE}/files/${fileId}/download?variant=${variant}&selection=${encodeURIComponent(selection)}`;
   }
 
-  private variantDevicePath(path: string, variant: KoreaderCatalogFile['downloadVariant'], hasSameFormatSibling: boolean, fileId?: number): string {
-    if (fileId) return path.replace(/\.([^./]+)$/, ` - bo-${fileId}-${variant}.$1`);
+  // Naming for plugins that never request a variant. Their released builds keep these names.
+  private variantDevicePath(path: string, variant: KoreaderCatalogFile['downloadVariant'], hasSameFormatSibling: boolean): string {
     if (variant !== 'audioless_epub' || !hasSameFormatSibling) return path;
     return /\.epub$/i.test(path) ? path.replace(/\.epub$/i, ' - Read Along.epub') : `${path} - Read Along.epub`;
+  }
+
+  // A variant-aware plugin keeps the configured name and renames only copies that would
+  // otherwise share a path: the text-only form of a narrated EPUB, and every same-format file
+  // after a book's first. Those carry their file id, so adding a file never renames another.
+  private deliveryDevicePath(
+    path: string,
+    extension: string,
+    variant: KoreaderCatalogFile['downloadVariant'],
+    narrated: boolean,
+    laterSiblingId: number | null,
+  ): string {
+    let named = variant === 'audioless_epub' && narrated ? appendToPathStem(path, ' - Text Only', extension) : path;
+    if (laterSiblingId !== null) named = appendToPathStem(named, ` [${laterSiblingId}]`, extension);
+    return named;
+  }
+
+  private laterSiblingId(files: readonly { id: number; format: string | null }[], fileId: number, extension: string): number | null {
+    return files.some((candidate) => candidate.id < fileId && this.normalizeFormat(candidate.format) === extension) ? fileId : null;
   }
 
   private async buildRelatedSections(

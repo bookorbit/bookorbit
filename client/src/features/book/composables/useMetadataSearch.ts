@@ -1,5 +1,6 @@
 import { computed, onUnmounted, reactive, ref, shallowReactive } from 'vue'
 import { api } from '@/lib/api'
+import { registerProviderAppearance } from '@/lib/provider-appearance'
 import { METADATA_PROVIDER_STATUS_EVENT } from '@bookorbit/types'
 import type {
   ConcreteBookMediaKind,
@@ -57,6 +58,7 @@ export function useMetadataSearch() {
     const res = await api(`/api/v1/metadata-fetch/providers${query}`)
     if (res.ok) {
       providers.value = (await res.json()) as MetadataProviderInfo[]
+      registerProviderAppearance(providers.value)
       selectAllProviders()
     }
   }

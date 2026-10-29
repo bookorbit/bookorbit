@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { sliceChaptersAcrossFiles } from '../../../common/utils/audiobook-chapters.utils';
 import { chaptersReachLastFile, mergeAudioChapters, type AudioChapterSource } from './audio-chapter-merge';
 
 function source(overrides: Partial<AudioChapterSource> & Pick<AudioChapterSource, 'absolutePath'>): AudioChapterSource {
@@ -198,6 +199,104 @@ describe('mergeAudioChapters', () => {
 
     const startTimes = merged.map((chapter) => chapter.startMs);
     expect(startTimes).toEqual([...startTimes].sort((a, b) => a - b));
+  });
+});
+
+describe('mergeAudioChapters with continuation markers', () => {
+  it('folds a marker repeating a chapter that began partway through the previous file', () => {
+    const merged = mergeAudioChapters([
+      source({
+        absolutePath: '/library/book/Part 1.m4b',
+        durationMs: 60_000,
+        chapters: [
+          { title: 'One', startMs: 0 },
+          { title: 'Two', startMs: 40_000 },
+        ],
+      }),
+      source({
+        absolutePath: '/library/book/Part 2.m4b',
+        durationMs: 60_000,
+        chapters: [
+          { title: 'Two', startMs: 4 },
+          { title: 'Three', startMs: 30_000 },
+        ],
+      }),
+    ]);
+
+    expect(merged).toEqual([
+      { title: 'One', startMs: 0 },
+      { title: 'Two', startMs: 40_000 },
+      { title: 'Three', startMs: 90_000 },
+    ]);
+  });
+
+  it('keeps one chapter per file when every file is titled after the book', () => {
+    const merged = mergeAudioChapters([
+      source({ absolutePath: '/library/book/Part 1.mp3', durationMs: 60_000, chapters: [{ title: 'The Book', startMs: 0 }] }),
+      source({ absolutePath: '/library/book/Part 2.mp3', durationMs: 60_000, chapters: [{ title: 'The Book', startMs: 0 }] }),
+      source({ absolutePath: '/library/book/Part 3.mp3', durationMs: 60_000, chapters: [{ title: 'The Book', startMs: 0 }] }),
+    ]);
+
+    expect(merged).toEqual([
+      { title: 'The Book', startMs: 0 },
+      { title: 'The Book', startMs: 60_000 },
+      { title: 'The Book', startMs: 120_000 },
+    ]);
+  });
+
+  it('adds nothing for a file that holds only the marker of a chapter running through it', () => {
+    const merged = mergeAudioChapters([
+      source({
+        absolutePath: '/library/book/Part 1.m4b',
+        durationMs: 60_000,
+        chapters: [
+          { title: 'One', startMs: 0 },
+          { title: 'Two', startMs: 40_000 },
+        ],
+      }),
+      source({ absolutePath: '/library/book/Part 2.m4b', durationMs: 60_000, chapters: [{ title: 'Two', startMs: 0 }] }),
+      source({
+        absolutePath: '/library/book/Part 3.m4b',
+        durationMs: 60_000,
+        chapters: [
+          { title: 'Two', startMs: 0 },
+          { title: 'Three', startMs: 30_000 },
+        ],
+      }),
+    ]);
+
+    expect(merged).toEqual([
+      { title: 'One', startMs: 0 },
+      { title: 'Two', startMs: 40_000 },
+      { title: 'Three', startMs: 150_000 },
+    ]);
+  });
+
+  it('reads back the chapters a write laid across the files', () => {
+    const chapters = [
+      { title: 'Opening', startMs: 0 },
+      { title: 'Crossing', startMs: 40_000 },
+      { title: 'Marathon', startMs: 80_000 },
+      { title: 'Late', startMs: 200_000 },
+      { title: 'On the boundary', startMs: 240_000 },
+    ];
+    const lengths = [60_000, 60_000, 60_000, 60_000, 30_000];
+    const files = lengths.map((actualDurationMs, index) => ({
+      id: index + 1,
+      timelineStartMs: lengths.slice(0, index).reduce((sum, length) => sum + length, 0),
+      actualDurationMs,
+    }));
+
+    const slices = sliceChaptersAcrossFiles(chapters, files);
+    const merged = mergeAudioChapters(
+      files.map((file) => ({
+        absolutePath: `/library/book/Part ${file.id}.m4b`,
+        durationMs: file.actualDurationMs,
+        chapters: slices.get(file.id)!.map(({ title, startMs }) => ({ title, startMs })),
+      })),
+    );
+
+    expect(merged).toEqual(chapters);
   });
 });
 

@@ -15,7 +15,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { providerChipStyle, providerShortLabel } from '@/lib/provider-colors'
 import { BULK_REORDER_EXEMPT_FIELDS, providerUsageCount, skipReasonFor, type ProviderBulkAction } from '../lib/field-rules'
 
 const { t } = useI18n()
@@ -42,7 +42,7 @@ const entries = computed(() =>
       return {
         key,
         label: status.label,
-        short: PROVIDER_SHORT_LABELS[key] ?? key,
+        short: providerShortLabel(key, status.label),
         usage: providerUsageCount(props.fields, key),
         skipReason: skipReasonFor(status),
         keepsExemptOrder: [...BULK_REORDER_EXEMPT_FIELDS].some((field) => props.fields[field]?.providers.includes(key)),

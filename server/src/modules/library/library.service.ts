@@ -15,7 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { readdir, realpath, rm, stat } from 'fs/promises';
 import { dirname, isAbsolute, join, relative } from 'path';
 
-import { APP_FEATURES, DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
+import { APP_FEATURES, DEFAULT_FORMAT_PRIORITY, resolveRegexMetadataConfig } from '@bookorbit/types';
 import type {
   AccessLevel,
   LibraryFileSyncProgressEvent,
@@ -208,7 +208,8 @@ export class LibraryService {
     }
     if (libraryType === 'podcasts') this.assertNoBookOnlyFields(dto);
     else this.assertNoPodcastOnlyFields(dto);
-    await this.regexMetadata.validate(dto.regexMetadata);
+    const regexMetadata = resolveRegexMetadataConfig(dto.regexMetadata);
+    await this.regexMetadata.validate(regexMetadata);
     await this.assertNameAvailable(dto.name);
     const folderInputs = resolveLibraryFolderRoles(
       libraryType,
@@ -228,7 +229,7 @@ export class LibraryService {
       watch: libraryType === 'books' ? (dto.watch ?? false) : false,
       watchLocalFolders: libraryType === 'podcasts' ? (dto.watchLocalFolders ?? true) : false,
       autoScanCronExpression: libraryType === 'books' ? (dto.autoScanCronExpression ?? null) : null,
-      regexMetadata: dto.regexMetadata ?? null,
+      regexMetadata,
       metadataPrecedence: libraryType === 'books' ? (dto.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT]) : [],
       formatPriority: libraryType === 'books' ? (dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY]) : [],
       allowedFormats: libraryType === 'books' ? (dto.allowedFormats ?? []) : [],
@@ -282,10 +283,15 @@ export class LibraryService {
     if (existing.type === 'podcasts') this.assertNoBookOnlyFields(dto);
     else this.assertNoPodcastOnlyFields(dto);
 
-    const regexRules = (config: RegexMetadataConfig | null | undefined) => config?.rules.map(({ pattern, flags }) => [pattern, flags]) ?? null;
+    // Compared as the rules that would run: a preset runs its current rules whatever copy is stored,
+    // so re-sending a preset is no change even after the preset itself was updated.
+    const regexRules = (config: RegexMetadataConfig | null | undefined) =>
+      config ? [config.preset ?? null, config.rules.map(({ pattern, flags }) => [pattern, flags])] : null;
+    const incomingRegexMetadata = dto.regexMetadata === undefined ? undefined : resolveRegexMetadataConfig(dto.regexMetadata);
     const regexMetadataChanged =
-      dto.regexMetadata !== undefined && !isDeepStrictEqual(regexRules(dto.regexMetadata), regexRules(existing.regexMetadata));
-    if (regexMetadataChanged) await this.regexMetadata.validate(dto.regexMetadata);
+      incomingRegexMetadata !== undefined &&
+      !isDeepStrictEqual(regexRules(incomingRegexMetadata), regexRules(resolveRegexMetadataConfig(existing.regexMetadata)));
+    if (regexMetadataChanged) await this.regexMetadata.validate(incomingRegexMetadata);
 
     const existingOrganizationMode = normalizeOrganizationMode(existing.organizationMode);
     if (dto.organizationMode !== undefined && dto.organizationMode !== existingOrganizationMode) {
@@ -300,6 +306,7 @@ export class LibraryService {
 
     const { folders: rawFolderPaths, localFolders: rawLocalFolderPaths, ...fields } = dto;
     if (!regexMetadataChanged) delete fields.regexMetadata;
+    else fields.regexMetadata = incomingRegexMetadata;
     let existingFolders: Awaited<ReturnType<LibraryRepository['findFoldersByLibrary']>> | undefined;
     let folderInputs: LibraryFolderInput[] | undefined;
     if (rawFolderPaths !== undefined || rawLocalFolderPaths !== undefined) {

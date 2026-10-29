@@ -205,6 +205,34 @@ describe('UserPreferencesService', () => {
     expect(repo.upsert).not.toHaveBeenCalled();
   });
 
+  it('getReadAloudPreferences returns no language when nothing was saved', async () => {
+    await expect(service.getReadAloudPreferences(7)).resolves.toEqual({ defaultLanguage: null });
+    expect(repo.findByCategory).toHaveBeenCalledWith(7, 'read-aloud');
+  });
+
+  it('getReadAloudPreferences returns the saved language, and none when the stored row is malformed', async () => {
+    repo.findByCategory.mockResolvedValueOnce({ data: { defaultLanguage: 'fr' } } as never);
+    await expect(service.getReadAloudPreferences(7)).resolves.toEqual({ defaultLanguage: 'fr' });
+
+    repo.findByCategory.mockResolvedValueOnce({ data: { defaultLanguage: 'English' } } as never);
+    await expect(service.getReadAloudPreferences(7)).resolves.toEqual({ defaultLanguage: null });
+  });
+
+  it('upsertReadAloudPreferences saves and clears the default language', async () => {
+    await expect(service.upsertReadAloudPreferences(11, { defaultLanguage: 'de' })).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'read-aloud', { defaultLanguage: 'de' });
+
+    await expect(service.upsertReadAloudPreferences(11, { defaultLanguage: null })).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenLastCalledWith(11, 'read-aloud', { defaultLanguage: null });
+  });
+
+  it('upsertReadAloudPreferences rejects a language name, a full tag and unknown fields', async () => {
+    for (const settings of [{ defaultLanguage: 'English' }, { defaultLanguage: 'en-US' }, { defaultLanguage: 'en', unexpected: true }]) {
+      await expect(service.upsertReadAloudPreferences(11, settings)).rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
   it('getBookRequestPreferences returns no language when nothing was saved', async () => {
     await expect(service.getBookRequestPreferences(7)).resolves.toEqual({ defaultLanguage: null });
     expect(repo.findByCategory).toHaveBeenCalledWith(7, 'book-requests');

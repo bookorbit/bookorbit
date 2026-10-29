@@ -8,17 +8,71 @@ import { formatTimeRemaining, useReaderProgress, type NewerPosition } from './us
 
 const mockApi = vi.mocked(api)
 
+/** A `GET /reading-progress` answer for file 42, built from the flat field names the reader works in. */
 function makeOkResponse(data: Record<string, unknown>) {
-  return { ok: true, json: async () => data } as Response
+  const entry = {
+    fileId: 42,
+    percentage: data.percentage,
+    updatedAt: data.updatedAt ?? null,
+    text: { cfi: data.cfi, page: data.pageNumber, updatedAt: data.textUpdatedAt },
+    narration: {
+      seconds: data.positionSeconds,
+      fragment: data.mediaOverlayFragment,
+      sectionIndex: data.mediaOverlaySectionIndex,
+      percentage: data.narrationPercentage,
+      updatedAt: data.narrationUpdatedAt,
+    },
+    kobo: {
+      source: data.koboLocationSource,
+      type: data.koboLocationType,
+      value: data.koboLocationValue,
+      contentPercent: data.koboContentSourceProgressPercent,
+    },
+    koreader: data.koreaderProgress,
+  }
+  return { ok: true, json: async () => ({ items: [entry] }) } as Response
+}
+
+type SentWrite = {
+  kind?: string
+  percentage?: number
+  text?: { cfi?: unknown; page?: unknown }
+  narration?: { seconds?: unknown; fragment?: unknown; sectionIndex?: unknown }
+  kobo?: { source?: unknown; type?: unknown; value?: unknown; contentPercent?: unknown }
+  koreader?: unknown
+}
+
+function sentWrite(callIndex = 0): SentWrite {
+  const [, opts] = mockApi.mock.calls[callIndex]!
+  const { writes } = JSON.parse((opts as RequestInit).body as string) as { writes: SentWrite[] }
+  return writes[0]!
 }
 
 function makeErrorResponse() {
   return { ok: false } as Response
 }
 
+/** The write a save sent, read back under the flat field names the reader works in. */
 function postedProgressBody(callIndex = 0): Record<string, unknown> {
-  const [, opts] = mockApi.mock.calls[callIndex]!
-  return JSON.parse((opts as RequestInit).body as string) as Record<string, unknown>
+  const write = sentWrite(callIndex)
+  return {
+    cfi: write.text?.cfi,
+    pageNumber: write.text?.page,
+    percentage: write.percentage,
+    koboLocationSource: write.kobo?.source,
+    koboLocationType: write.kobo?.type,
+    koboLocationValue: write.kobo?.value,
+    koboContentSourceProgressPercent: write.kobo?.contentPercent,
+    koreaderProgress: write.koreader,
+    ...(write.narration
+      ? {
+          positionSeconds: write.narration.seconds,
+          mediaOverlayFragment: write.narration.fragment,
+          mediaOverlaySectionIndex: write.narration.sectionIndex,
+        }
+      : {}),
+    source: write.kind,
+  }
 }
 
 describe('formatTimeRemaining', () => {
@@ -95,7 +149,7 @@ describe('useReaderProgress', () => {
 
       await load()
 
-      expect(mockApi).toHaveBeenCalledWith('/api/v1/books/files/42/progress')
+      expect(mockApi).toHaveBeenCalledWith('/api/v1/reading-progress?fileId=42')
     })
 
     it('sets state from response data on ok response', async () => {
@@ -260,7 +314,7 @@ describe('useReaderProgress', () => {
 
     describe('positions it did not move to (#1136)', () => {
       function postCount() {
-        return mockApi.mock.calls.filter(([, opts]) => (opts as RequestInit | undefined)?.method === 'POST').length
+        return mockApi.mock.calls.filter(([, opts]) => (opts as RequestInit | undefined)?.method === 'PUT').length
       }
 
       async function openWith(saved: Record<string, unknown>) {
@@ -392,7 +446,7 @@ describe('useReaderProgress', () => {
         await vi.advanceTimersByTimeAsync(2500)
 
         expect(progress.mediaOverlayFragment.value).toBe('c.xhtml#s40')
-        expect(mockApi.mock.calls.some(([, opts]) => (opts as RequestInit | undefined)?.method === 'POST')).toBe(false)
+        expect(mockApi.mock.calls.some(([, opts]) => (opts as RequestInit | undefined)?.method === 'PUT')).toBe(false)
       })
 
       it('saves its own page as reading when it stays, and does not offer the other again', async () => {
@@ -404,9 +458,12 @@ describe('useReaderProgress', () => {
 
         await progress.keepCurrentPosition(newer)
 
-        const posts = mockApi.mock.calls.filter(([, opts]) => (opts as RequestInit | undefined)?.method === 'POST')
+        const posts = mockApi.mock.calls.filter(([, opts]) => (opts as RequestInit | undefined)?.method === 'PUT')
         expect(posts).toHaveLength(1)
-        expect(JSON.parse((posts[0]![1] as RequestInit).body as string)).toMatchObject({ cfi: 'epubcfi(/6/4!/4/2/1:0)', source: 'text' })
+        expect(JSON.parse((posts[0]![1] as RequestInit).body as string).writes[0]).toMatchObject({
+          text: { cfi: 'epubcfi(/6/4!/4/2/1:0)' },
+          kind: 'text',
+        })
         mockApi.mockResolvedValueOnce(elsewhere)
         expect(await progress.checkForNewerPosition()).toBeNull()
       })
@@ -425,7 +482,7 @@ describe('useReaderProgress', () => {
       }
 
       function posts() {
-        return mockApi.mock.calls.filter(([, opts]) => (opts as RequestInit | undefined)?.method === 'POST')
+        return mockApi.mock.calls.filter(([, opts]) => (opts as RequestInit | undefined)?.method === 'PUT')
       }
 
       async function narrating(movedBack = vi.fn<(position: NewerPosition) => void>()) {
@@ -499,7 +556,10 @@ describe('useReaderProgress', () => {
         await progress.keepCurrentPosition(newer, 'narration')
 
         expect(posts()).toHaveLength(1)
-        expect(JSON.parse((posts()[0]![1] as RequestInit).body as string)).toMatchObject({ mediaOverlayFragment: 'c.xhtml#s9', source: 'narration' })
+        expect(JSON.parse((posts()[0]![1] as RequestInit).body as string).writes[0]).toMatchObject({
+          narration: { fragment: 'c.xhtml#s9' },
+          kind: 'narration',
+        })
       })
 
       async function savedAt(progress: ReturnType<typeof useReaderProgress>, fragment: string, date: string) {
@@ -706,7 +766,7 @@ describe('useReaderProgress', () => {
 
       expect(mockApi).not.toHaveBeenCalled()
       vi.advanceTimersByTime(2000)
-      expect(mockApi).toHaveBeenCalledWith('/api/v1/books/files/42/progress', expect.objectContaining({ method: 'POST' }))
+      expect(mockApi).toHaveBeenCalledWith('/api/v1/reading-progress', expect.objectContaining({ method: 'PUT' }))
     })
 
     it('does not schedule save when trackingEnabled is false', () => {
@@ -739,7 +799,7 @@ describe('useReaderProgress', () => {
   })
 
   describe('save()', () => {
-    it('calls api POST with all progress fields', async () => {
+    it('puts the write to the progress route', async () => {
       mockApi.mockResolvedValue(makeOkResponse({}))
       const elapsedMinutes = ref(0)
       const { save } = useReaderProgress(1, 42, elapsedMinutes)
@@ -747,13 +807,40 @@ describe('useReaderProgress', () => {
       await save()
 
       expect(mockApi).toHaveBeenCalledWith(
-        '/api/v1/books/files/42/progress',
+        '/api/v1/reading-progress',
         expect.objectContaining({
-          method: 'POST',
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: expect.stringContaining('"cfi"'),
+          body: expect.stringContaining('"writes"'),
         }),
       )
+    })
+
+    it('groups a page turn by position and leaves narration out of it', async () => {
+      mockApi.mockResolvedValue(makeOkResponse({}))
+      const elapsedMinutes = ref(0)
+      const { onRelocate, save } = useReaderProgress(1, 42, elapsedMinutes)
+
+      onRelocate({
+        cfi: 'epubcfi(/6/2)',
+        fraction: 0.25,
+        source: 'OEBPS/c2.xhtml',
+        koboLocationValue: 'kobo.2.1',
+        koboLocationType: 'KoboSpan',
+        contentSourceProgressPercent: 40,
+        koreaderProgress: '/body/p[1]',
+      } as never)
+      vi.clearAllTimers()
+      await save()
+
+      expect(sentWrite()).toEqual({
+        fileId: 42,
+        kind: 'text',
+        percentage: 25,
+        text: { cfi: 'epubcfi(/6/2)', page: null },
+        kobo: { source: 'OEBPS/c2.xhtml', type: 'KoboSpan', value: 'kobo.2.1', contentPercent: 40 },
+        koreader: '/body/p[1]',
+      })
     })
 
     it('does not call api when trackingEnabled is false', async () => {

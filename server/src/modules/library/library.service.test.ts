@@ -22,7 +22,7 @@ vi.mock('@bookorbit/types', async (importOriginal) => {
 });
 
 import { BadRequestException, ConflictException, ForbiddenException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, FOLDER_SERIES_REGEX_METADATA } from '@bookorbit/types';
 import { readdir, realpath, rm, stat } from 'fs/promises';
 
 import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
@@ -245,6 +245,21 @@ describe('LibraryService', () => {
       expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
       expect(regexMetadata.validate).toHaveBeenCalledWith(changed);
       expect(libraryRepo.update).toHaveBeenCalledWith(2, { regexMetadata: changed });
+    });
+
+    it('stores a preset as its current rules, whatever rules came with it', async () => {
+      await service.update(2, { regexMetadata: { preset: 'folder_series', rules: [first, second] } });
+      expect(regexMetadata.validate).toHaveBeenCalledWith(FOLDER_SERIES_REGEX_METADATA);
+      expect(libraryRepo.update).toHaveBeenCalledWith(2, { regexMetadata: FOLDER_SERIES_REGEX_METADATA });
+    });
+
+    it('treats a re-sent preset as unchanged after the preset itself changed', async () => {
+      libraryRepo.findById.mockResolvedValue([
+        { id: 2, type: 'books', icon: 'BookOpen', regexMetadata: { preset: 'folder_series', rules: [first] } },
+      ]);
+      await service.update(2, plainToInstance(UpdateLibraryDto, { coverAspectRatio: '1/1', regexMetadata: FOLDER_SERIES_REGEX_METADATA }));
+      expect(regexMetadata.validate).not.toHaveBeenCalled();
+      expect(libraryRepo.update).toHaveBeenCalledWith(2, { coverAspectRatio: '1/1' });
     });
 
     it('does not persist a change that fails validation', async () => {

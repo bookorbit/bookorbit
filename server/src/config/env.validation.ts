@@ -97,6 +97,30 @@ const envSchema = z.object({
   AUDIOLESS_EPUB_MAX_SOURCE_ENTRIES: z.coerce.number().int().positive().optional(),
   AUDIOLESS_EPUB_MAX_METADATA_BYTES: z.coerce.number().int().positive().optional(),
   AUDIOLESS_EPUB_MAX_OUTPUT_BYTES: z.coerce.number().int().positive().optional(),
+  READ_ALOUD_WORKER_URL: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || /^https?:\/\//i.test(value), 'READ_ALOUD_WORKER_URL must use http or https')
+    .optional(),
+  // docker-compose.yml passes this as `${READ_ALOUD_WORKER_TOKEN:-}`, so every install that has not
+  // opted in starts with an empty value; empty means unset, as it does for the worker URL.
+  READ_ALOUD_WORKER_TOKEN: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || value.length >= 16, 'READ_ALOUD_WORKER_TOKEN must contain at least 16 characters')
+    .optional(),
+  READ_ALOUD_MAX_OUTPUT_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100 * 1024 * 1024 * 1024)
+    .optional(),
+  READ_ALOUD_WORKER_REQUEST_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(5 * 60_000)
+    .optional(),
   CLIENT_URL: z.string().url().optional(),
   APP_URL: z.string().url().default(DEV_CLIENT_ORIGIN),
   TRUST_PROXY: trustProxyEnv(),
@@ -150,7 +174,19 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.trim())
     .optional(),
+  METADATA_PROVIDER_DIRECTORY_URL: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === '' || value.toLowerCase() === 'off' || /^https:\/\//i.test(value),
+      'METADATA_PROVIDER_DIRECTORY_URL must be an https URL or off',
+    )
+    .optional(),
   KOREADER_PLUGIN_PATH: z
+    .string()
+    .transform((val) => val.trim())
+    .optional(),
+  FFMPEG_PATH: z
     .string()
     .transform((val) => val.trim())
     .optional(),
@@ -170,6 +206,11 @@ export function validateEnv(config: Record<string, unknown>) {
   // feature its users cannot reach, and podcastConfig already falls back when it is absent.
   if (APP_FEATURES.podcasts && result.data.NODE_ENV === 'production' && !result.data.PODCAST_ENCRYPTION_KEY) {
     throw new Error('Environment validation failed:\n  PODCAST_ENCRYPTION_KEY: PODCAST_ENCRYPTION_KEY is required in production');
+  }
+  if (result.data.READ_ALOUD_WORKER_URL && !result.data.READ_ALOUD_WORKER_TOKEN) {
+    throw new Error(
+      'Environment validation failed:\n  READ_ALOUD_WORKER_TOKEN: READ_ALOUD_WORKER_TOKEN is required when the worker URL is configured',
+    );
   }
   return result.data;
 }

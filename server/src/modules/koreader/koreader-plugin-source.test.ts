@@ -37,7 +37,10 @@ describe('KOReader plugin update source wiring', () => {
 
     expect(pin).toContain('local TAB_ID = "bookorbit_tab"');
     expect(pin).toContain('local function normalizeButtons(buttons, with_tab)');
-    expect(pin).toContain('if BookOrbitMenuPin.tab then order[TAB_ID] = {} end');
+    expect(pin).toContain('local function normalizeRuntimeOrder(order)');
+    expect(pin).toContain('local function migrateOverride(prefix)');
+    expect(pin).toContain('normalizeRuntimeOrder(order)');
+    expect(pin).not.toContain('order[BUTTONS] = copyList');
 
     expect(updater).toContain('function UpdateCheck:updateCheckMenuText()');
     expect(updater).toContain('return T(_("Plugin update available: v%1 -> v%2"), PLUGIN_VERSION, self.settings.update_latest_version)');
@@ -346,7 +349,7 @@ describe('KOReader plugin update source wiring', () => {
     expect(bookSync).toContain('if not ctx.snap.stats_row_ambiguous then return book and book.fileId or nil end');
     expect(bookSync).toContain('metadata_ambiguous = ctx.snap.metadata_ambiguous');
     expect(bookSync).toContain('if ctx.snap.stats_metadata_ambiguous then');
-    expect(bookSync).toContain('ctx.state:setMatched(match.hash, match.bookFileId, match.bookId, ctx.snap.file)');
+    expect(bookSync).toContain('ctx.state:setMatched(match.hash, match.bookFileId, match.bookId, ctx.snap.file, nil, match.positionCompatible)');
     expect(bookSync).toContain('if ctx.snap.stats_row_ambiguous then upload.bookFileId = stats_target.bookFileId end');
     expect(bookSync).not.toContain(
       'if book then\n        if ctx.snap.file and not book.file then\n            book.file = ctx.snap.file\n        end\n        return step(ctx, stepStats)\n    end',

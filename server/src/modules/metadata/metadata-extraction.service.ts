@@ -7,7 +7,7 @@ import { AudioFormatExtractor } from './extractors/audio-format.extractor';
 import { ComicFormatExtractor } from './extractors/comic-format.extractor';
 import { EpubFormatExtractor } from './extractors/epub-format.extractor';
 import { Fb2FormatExtractor } from './extractors/fb2-format.extractor';
-import type { FormatExtractor, ParsedBookData } from './extractors/format-extractor.interface';
+import type { FormatExtractOptions, FormatExtractor, ParsedBookData } from './extractors/format-extractor.interface';
 import { MobiFormatExtractor } from './extractors/mobi-format.extractor';
 import { OpfFormatExtractor } from './extractors/opf-format.extractor';
 import { PdfFormatExtractor } from './extractors/pdf-format.extractor';
@@ -56,8 +56,9 @@ export class MetadataExtractionService {
     return format === 'djvu' || this.extractors.has(format);
   }
 
-  async extract(absolutePath: string, format: string): Promise<ParsedBookData | null> {
+  async extract(absolutePath: string, format: string, options?: FormatExtractOptions): Promise<ParsedBookData | null> {
     if (format === 'djvu') {
+      if (options?.cover === false) return { ...(await this.extractDjvuDetails(absolutePath)), authors: [], genres: [], cover: null };
       const { pageCount, cover } = await this.djvu.extractMetadata(absolutePath);
       const filename = parseBookFilename(absolutePath);
       return {
@@ -69,7 +70,9 @@ export class MetadataExtractionService {
         cover,
       };
     }
-    return (await this.extractors.get(format)?.extract(absolutePath)) ?? null;
+    const extractor = this.extractors.get(format);
+    if (!extractor) return null;
+    return (await (options ? extractor.extract(absolutePath, options) : extractor.extract(absolutePath))) ?? null;
   }
 
   /** What a DjVu file supplies, read without rendering its cover. */

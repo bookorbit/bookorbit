@@ -30,12 +30,15 @@ type SeriesSummaryRow = {
   libraryNames: string[];
 };
 
-/** One book of a series, as the list needs it to draw the volume ladder. */
-export type SeriesMemberRow = {
-  bookId: number;
+export type SeriesVolumeMember = {
   seriesIndex: string | null;
-  title: string | null;
   status: string | null;
+};
+
+/** One book of a series, as the list needs it to draw the volume ladder. */
+export type SeriesMemberRow = SeriesVolumeMember & {
+  bookId: number;
+  title: string | null;
 };
 
 export type SeriesFacetRow = {
@@ -69,6 +72,7 @@ type SeriesDetailRow = {
   expectedBookCount: number | null;
   authors: string[];
   indices: string[];
+  members: SeriesVolumeMember[];
 };
 
 @Injectable()
@@ -281,18 +285,20 @@ export class SeriesRepository {
 
     const row = rows[0];
 
-    const [authorsMap, indicesRows] = await Promise.all([
+    const [authorsMap, memberRows] = await Promise.all([
       this.fetchAuthorsForSeries([params.seriesId], params.libraryIds, params.contentFilters),
       this.db
-        .select({ idx: bookSeriesMemberships.seriesIndex })
+        .select({
+          seriesIndex: bookSeriesMemberships.seriesIndex,
+          status: userBookStatus.status,
+        })
         .from(books)
         .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
-        .where(
-          and(eq(bookSeriesMemberships.seriesId, params.seriesId), libraryFilter, ...filterClauses, isNotNull(bookSeriesMemberships.seriesIndex)),
-        ),
+        .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
+        .where(and(eq(bookSeriesMemberships.seriesId, params.seriesId), libraryFilter, ...filterClauses)),
     ]);
 
-    const indices = indicesRows.map((r) => r.idx!);
+    const indices = memberRows.map((row) => row.seriesIndex).filter((index): index is string => index !== null);
 
     return {
       id: row.id,
@@ -302,6 +308,7 @@ export class SeriesRepository {
       expectedBookCount: row.expectedBookCount ?? null,
       authors: authorsMap.get(params.seriesId) ?? [],
       indices,
+      members: memberRows,
     };
   }
 

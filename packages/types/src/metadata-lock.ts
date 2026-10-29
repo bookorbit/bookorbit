@@ -18,6 +18,7 @@ export const BOOK_METADATA_LOCK_FIELDS = [
   "narrators",
   "durationSeconds",
   "abridged",
+  "chapters",
   "googleBooksId",
   "goodreadsId",
   "amazonId",

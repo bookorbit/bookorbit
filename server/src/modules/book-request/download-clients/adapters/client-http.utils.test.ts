@@ -98,6 +98,26 @@ describe('fetchClient', () => {
     });
   });
 
+  it('says why the connection failed instead of "fetch failed"', async () => {
+    const refused = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8082'), { code: 'ECONNREFUSED' });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause: refused })));
+
+    await expect(fetchClient(url, {}, 'qBittorrent')).rejects.toMatchObject({ message: 'Could not reach qBittorrent: connection refused' });
+  });
+
+  it('reads the cause from an aggregate of several addresses', async () => {
+    const cause = new AggregateError([Object.assign(new Error('connect EHOSTUNREACH'), { code: 'EHOSTUNREACH' })]);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause })));
+
+    await expect(fetchClient(url, {}, 'Deluge')).rejects.toMatchObject({ message: 'Could not reach Deluge: host unreachable' });
+  });
+
+  it('keeps the original message when the cause is not one it knows', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    await expect(fetchClient(url, {}, 'NZBGet')).rejects.toMatchObject({ message: 'Could not reach NZBGet: fetch failed' });
+  });
+
   /**
    * `fetch` reports a timeout and a refusal as the same opaque `TypeError`, so the abort has to be
    * told apart from every other failure here or the operator is handed "fetch failed" either way.

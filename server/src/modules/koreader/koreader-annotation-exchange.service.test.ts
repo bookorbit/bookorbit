@@ -127,8 +127,9 @@ describe('KoreaderAnnotationExchangeService', () => {
       books: [{ hash: HASH_A, applied: [], deleted: [] }],
     });
 
-    expect(result).toEqual({ results: [], unmatched: [HASH_A] });
-    expect(ack).toEqual({ results: [], unmatched: [HASH_A] });
+    // Reported apart from `unmatched`: plugins drop the match of a book listed there.
+    expect(result).toEqual({ results: [], unmatched: [], positionIncompatible: [HASH_A] });
+    expect(ack).toEqual({ results: [], unmatched: [], positionIncompatible: [HASH_A] });
     expect(annotationSync.ingestDeviceAnnotations).not.toHaveBeenCalled();
     expect(annotationSync.applyExchangeAck).not.toHaveBeenCalled();
   });

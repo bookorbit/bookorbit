@@ -14,11 +14,12 @@ import {
   X,
   type LucideIcon,
 } from '@lucide/vue'
+import { Permission, type LibraryType } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import Badge from '@/components/ui/badge/Badge.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
-import { formatDate, formatDateTime, formatNumber } from '@/i18n/formatters'
+import { formatDate, formatDateTime, formatList, formatNumber } from '@/i18n/formatters'
 import StatusPill from './components/StatusPill.vue'
 import UserPermissionsSection from './components/UserPermissionsSection.vue'
 import UserRestrictionsSection from './components/UserRestrictionsSection.vue'
@@ -27,6 +28,7 @@ import { useUserForm, type UserFormSection, type UserFormTarget } from './compos
 interface LibraryOption {
   id: number
   name: string
+  type?: LibraryType
   bookCount?: number
 }
 
@@ -57,6 +59,7 @@ const {
   isSharedAccount,
   selectedPermissionNames,
   selectedLibraryIds,
+  editorLibraryIds,
   includeTagItems,
   excludeTagItems,
   includeGenreItems,
@@ -181,6 +184,25 @@ const libraryReach = computed(() => {
   const total = counted.reduce((sum, library) => sum + (library.bookCount ?? 0), 0)
   const selected = counted.filter((library) => selectedLibraryIds.value.has(library.id)).reduce((sum, library) => sum + (library.bookCount ?? 0), 0)
   return { selected: formatNumber(selected), total: formatNumber(total) }
+})
+
+/**
+ * Edit metadata only works on book libraries where the account is Editor or Owner, which is set on
+ * each library rather than here. Say so wherever that leaves the permission short of the selection.
+ */
+const permissionNotes = computed(() => {
+  if (isSuperuserTarget.value || !selectedPermissionNames.value.has(Permission.LibraryEditMetadata)) return {}
+  const bookLibraries = props.libraries.filter((library) => library.type !== 'podcasts' && selectedLibraryIds.value.has(library.id))
+  const viewerOnly = bookLibraries.filter((library) => !editorLibraryIds.value.has(library.id))
+  if (bookLibraries.length > 0 && viewerOnly.length === 0) return {}
+  const note =
+    viewerOnly.length === bookLibraries.length
+      ? { text: t('adminFeature.userForm.permissionNotes.editMetadataNowhere'), warning: true }
+      : {
+          text: t('adminFeature.userForm.permissionNotes.editMetadataExcept', { libraries: formatList(viewerOnly.map((library) => library.name)) }),
+          warning: false,
+        }
+  return { [Permission.LibraryEditMetadata]: note }
 })
 
 const errorMessage = computed(() => {
@@ -540,6 +562,7 @@ async function handleSubmit() {
               :selected="selectedPermissionNames"
               :granted="grantedCount"
               :total="totalPermissions"
+              :notes="permissionNotes"
               @toggle="togglePermission"
               @preset="applyPreset"
             />

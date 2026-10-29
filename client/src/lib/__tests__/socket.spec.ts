@@ -5,22 +5,35 @@ import { getValidToken, refreshAccessToken } from '@/lib/api'
 
 const listeners = new Map<string, ((...args: unknown[]) => void)[]>()
 const connect = vi.fn<() => void>()
+const disconnect = vi.fn<() => void>()
 const ioOptions: Record<string, unknown>[] = []
 
-const fakeSocket = {
-  on(event: string, handler: (...args: unknown[]) => void) {
-    const existing = listeners.get(event) ?? []
-    existing.push(handler)
-    listeners.set(event, existing)
-    return fakeSocket
-  },
-  connect,
+/** A fresh fake per socket, since the helper decorates the instance it is given. */
+function makeFakeSocket() {
+  const socket = {
+    on(event: string, handler: (...args: unknown[]) => void) {
+      const existing = listeners.get(event) ?? []
+      existing.push(handler)
+      listeners.set(event, existing)
+      return socket
+    },
+    connect,
+    disconnect() {
+      disconnect()
+      return socket
+    },
+    // As in socket.io: an alias that goes through whatever `disconnect` the instance now has.
+    close() {
+      return socket.disconnect()
+    },
+  }
+  return socket
 }
 
 vi.mock('socket.io-client', () => ({
   io: (_namespace: string, options: Record<string, unknown>) => {
     ioOptions.push(options)
-    return fakeSocket
+    return makeFakeSocket()
   },
 }))
 
@@ -45,6 +58,7 @@ describe('createAuthenticatedSocket', () => {
     listeners.clear()
     ioOptions.length = 0
     connect.mockClear()
+    disconnect.mockClear()
     vi.mocked(getValidToken).mockResolvedValue('fresh-token')
     vi.mocked(refreshAccessToken).mockResolvedValue('fresh-token')
   })
@@ -150,6 +164,58 @@ describe('createAuthenticatedSocket', () => {
     // A healthy connection resets the ladder, so the next rejection waits 1s again rather than 2s.
     rejectHandshake()
     await vi.advanceTimersByTimeAsync(1_000)
+    expect(connect).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not reopen a socket its owner closed while a retry was pending', async () => {
+    const socket = createAuthenticatedSocket('/read-aloud')
+
+    rejectHandshake()
+    socket.disconnect()
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    expect(disconnect).toHaveBeenCalledTimes(1)
+    expect(refreshAccessToken).not.toHaveBeenCalled()
+    expect(connect).not.toHaveBeenCalled()
+  })
+
+  it('does not reopen a socket its owner closed while the token was refreshing', async () => {
+    let refreshed!: (token: string) => void
+    vi.mocked(refreshAccessToken).mockReturnValueOnce(new Promise<string>((resolve) => (refreshed = resolve)))
+    const socket = createAuthenticatedSocket('/read-aloud')
+
+    rejectHandshake()
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1)
+
+    socket.close()
+    refreshed('fresh-token')
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    expect(connect).not.toHaveBeenCalled()
+  })
+
+  it('retries again once its owner reconnects a closed socket', async () => {
+    const socket = createAuthenticatedSocket('/read-aloud')
+    rejectHandshake()
+    socket.disconnect()
+
+    fire('connect')
+    rejectHandshake()
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    expect(connect).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries again when its owner reopens a closed socket that is then refused', async () => {
+    const socket = createAuthenticatedSocket('/read-aloud')
+    socket.disconnect()
+
+    socket.connect()
+    rejectHandshake()
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1)
     expect(connect).toHaveBeenCalledTimes(2)
   })
 

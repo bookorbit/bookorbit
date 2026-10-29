@@ -1,3 +1,6 @@
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+
 import { FileRenameRepository } from './file-rename.repository';
 
 describe('FileRenameRepository', () => {
@@ -254,7 +257,12 @@ describe('FileRenameRepository', () => {
       expect.objectContaining({ bookId: 99, libraryFolderId: 7, absolutePath: '/library/Author/Book/old.opf', relPath: 'Author/Book/old.opf' }),
       expect.objectContaining({ primaryFileId: 10, status: 'present' }),
     ]);
-    expect(tx.execute).toHaveBeenCalledTimes(1);
+    // The source copy's reads go first: a merged-away duplicate's reads are not history.
+    const dialect = new PgDialect();
+    const statements = tx.execute.mock.calls.map(([query]) => dialect.sqlToQuery(query as SQL).sql);
+    expect(statements).toHaveLength(2);
+    expect(statements[0]).toContain('delete from "reading_attempts"');
+    expect(statements[1]).toContain('delete from "books"');
     expect(tx.delete).not.toHaveBeenCalled();
   });
 

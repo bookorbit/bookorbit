@@ -37,7 +37,7 @@ local function bottomGap()
 end
 
 local function maxWidth()
-    local W = BoardMetrics.get().W
+    local W = BoardMetrics.layoutW()
     local mx = px(W >= 900 and 28 or W >= 700 and 24 or W >= 560 and 20 or 16)
     return Screen:getWidth() - 2 * mx
 end

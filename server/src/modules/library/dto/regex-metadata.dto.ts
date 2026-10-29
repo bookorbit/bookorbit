@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsDefined,
+  IsIn,
   IsInt,
   IsObject,
   IsOptional,
@@ -14,7 +15,13 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { REGEX_METADATA_LIMITS, type RegexMetadataConfig, type RegexMetadataRule } from '@bookorbit/types';
+import {
+  REGEX_METADATA_LIMITS,
+  REGEX_METADATA_PRESETS,
+  type RegexMetadataConfig,
+  type RegexMetadataPreset,
+  type RegexMetadataRule,
+} from '@bookorbit/types';
 
 export class RegexMetadataRuleDto implements RegexMetadataRule {
   @IsString()
@@ -34,6 +41,10 @@ export class RegexMetadataConfigDto implements RegexMetadataConfig {
   @ValidateNested({ each: true })
   @Type(() => RegexMetadataRuleDto)
   rules: RegexMetadataRuleDto[];
+
+  @IsOptional()
+  @IsIn(REGEX_METADATA_PRESETS)
+  preset?: RegexMetadataPreset;
 }
 
 export class RegexMetadataValidationDto {

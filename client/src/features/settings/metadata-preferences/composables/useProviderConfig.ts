@@ -1,7 +1,8 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
-import { MetadataProviderKey } from '@bookorbit/types'
+import { registerProviderAppearance } from '@/lib/provider-appearance'
+import { isBuiltInMetadataProviderKey, MetadataProviderKey } from '@bookorbit/types'
 import type { ProviderConfigurations, ProviderConnectionTestResult, ProviderStatus } from '@bookorbit/types'
 import { stripBearerPrefix } from '../lib/provider-token'
 
@@ -15,6 +16,8 @@ export function useProviderConfig() {
   const passingTestSignatureByKey = ref<Partial<Record<MetadataProviderKey, string>>>({})
 
   function normalizePatchForSignature(key: MetadataProviderKey, patch: Partial<ProviderConfigurations>): unknown {
+    // External providers have their own settings and never reach this built-in config form.
+    if (!isBuiltInMetadataProviderKey(key)) return null
     const value = patch[key]
     if (!value) return null
     if (key !== MetadataProviderKey.HARDCOVER) return value
@@ -43,6 +46,7 @@ export function useProviderConfig() {
       const data: { config: ProviderConfigurations; statuses: ProviderStatus[] } = await res.json()
       config.value = data.config
       statuses.value = data.statuses
+      registerProviderAppearance(data.statuses.filter((status) => status.source === 'external'))
     } finally {
       loading.value = false
     }

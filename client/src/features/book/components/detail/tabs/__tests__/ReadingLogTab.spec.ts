@@ -191,6 +191,7 @@ function makeAttempt(overrides: Partial<ReadingAttempt> = {}): ReadingAttempt {
     origin: 'koreader',
     externalProvider: null,
     externalId: null,
+    rating: null,
     totalSessions: 0,
     totalSeconds: 0,
     createdAt: '2026-09-07T00:00:00.000Z',
@@ -240,6 +241,7 @@ function routeApi(
     if (url.includes('/sessions')) {
       return Promise.resolve(jsonResponse({ items: sessions, total: sessions.length, page: 1, pageSize: 25, stats: makeStats(sessions) }))
     }
+    if (url.startsWith('/api/v1/reading-progress')) return Promise.resolve(jsonResponse({ items: [] }))
     if (url.includes('/progress')) return Promise.resolve(jsonResponse([]))
     return Promise.resolve(jsonResponse({}))
   }
@@ -507,7 +509,8 @@ describe('ReadingLogTab', () => {
           held = []
           return Promise.resolve({ ok: true, status: 204, json: async () => ({}) } as Response)
         }
-        if (url === '/api/v1/books/10/progress') return Promise.resolve(jsonResponse(held.length ? [] : [{ fileId: 17, percentage: 26.67 }]))
+        if (url === '/api/v1/reading-progress?bookId=10')
+          return Promise.resolve(jsonResponse({ items: held.length ? [] : [{ fileId: 17, percentage: 26.67 }] }))
         return routeApi({ sessions: [makeSession({ source: 'koreader' })], koreader: () => makeKoreaderProgress({ heldByReset: held }) })(input)
       })
       const wrapper = mountTab()
@@ -522,7 +525,7 @@ describe('ReadingLogTab', () => {
       expect(releaseCall?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ deviceId: 'kindle-1' }) })
 
       const urls = mocks.api.mock.calls.map((call) => String(call[0]))
-      expect(urls).toContain('/api/v1/books/10/progress')
+      expect(urls).toContain('/api/v1/reading-progress?bookId=10')
       expect(urls.some((url) => url.startsWith('/api/v1/books/10/sessions?'))).toBe(true)
       expect(urls.some((url) => url.includes('/api/v1/books/10/reading-attempts'))).toBe(true)
       expect(wrapper.emitted('refetch')).toHaveLength(1)

@@ -30,3 +30,22 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     textarea.remove()
   }
 }
+
+/** Images have no legacy fallback: they copy only where the async clipboard and `ClipboardItem` exist (secure origins). */
+export function canCopyImages(): boolean {
+  return typeof window !== 'undefined' && window.isSecureContext && typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write
+}
+
+/**
+ * Copies a PNG. Takes the blob as a promise so the `ClipboardItem` is made inside the click that
+ * asked for it, which Safari requires; resolves false when the browser refuses.
+ */
+export async function copyImageToClipboard(png: Promise<Blob>): Promise<boolean> {
+  if (!canCopyImages()) return false
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+    return true
+  } catch {
+    return false
+  }
+}

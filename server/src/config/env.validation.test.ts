@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { APP_FEATURES } from '@bookorbit/types';
 
 import { validateEnv } from './env.validation';
@@ -218,6 +220,68 @@ describe('validateEnv', () => {
 
   it('accepts a dedicated podcast encryption key in production either way', () => {
     expect(() => validateEnv({ ...PRODUCTION_ENV, PODCAST_ENCRYPTION_KEY: '1234567890abcdef' })).not.toThrow();
+  });
+
+  it('accepts the provider directory URL only as https or off', () => {
+    for (const value of ['', 'off', 'OFF', 'https://example.com/directory.json']) {
+      expect(() => validateEnv({ ...BASE_ENV, METADATA_PROVIDER_DIRECTORY_URL: value })).not.toThrow();
+    }
+    expect(() => validateEnv({ ...BASE_ENV, METADATA_PROVIDER_DIRECTORY_URL: 'http://example.com/directory.json' })).toThrow(
+      'METADATA_PROVIDER_DIRECTORY_URL',
+    );
+  });
+
+  describe('read-aloud worker settings', () => {
+    const TOKEN = '1234567890abcdef';
+
+    it.each([undefined, '', '   '])('treats a worker token of %j as unset, as compose passes it to installs that have not opted in', (token) => {
+      expect(() => validateEnv({ ...BASE_ENV, READ_ALOUD_WORKER_TOKEN: token, READ_ALOUD_WORKER_URL: '' })).not.toThrow();
+      expect(() => validateEnv({ ...PRODUCTION_ENV, READ_ALOUD_WORKER_TOKEN: token, READ_ALOUD_WORKER_URL: '' })).not.toThrow();
+    });
+
+    it('accepts a configured worker URL with a long enough token', () => {
+      expect(() =>
+        validateEnv({
+          ...BASE_ENV,
+          READ_ALOUD_WORKER_URL: 'http://read-aloud-worker:8787',
+          READ_ALOUD_WORKER_TOKEN: TOKEN,
+          READ_ALOUD_MAX_OUTPUT_BYTES: String(100 * 1024 * 1024 * 1024),
+          READ_ALOUD_WORKER_REQUEST_TIMEOUT_MS: String(5 * 60_000),
+        }),
+      ).not.toThrow();
+    });
+
+    it.each(['short', '  0123456789abcde  '])('rejects a non-empty token shorter than 16 characters: %j', (token) => {
+      expect(() => validateEnv({ ...BASE_ENV, READ_ALOUD_WORKER_TOKEN: token })).toThrow(
+        'READ_ALOUD_WORKER_TOKEN must contain at least 16 characters',
+      );
+    });
+
+    it.each([undefined, '', '   '])('requires a token once the worker URL is set, even when the token is %j', (token) => {
+      expect(() => validateEnv({ ...BASE_ENV, READ_ALOUD_WORKER_URL: 'http://read-aloud-worker:8787', READ_ALOUD_WORKER_TOKEN: token })).toThrow(
+        'READ_ALOUD_WORKER_TOKEN is required when the worker URL is configured',
+      );
+    });
+
+    it.each([
+      ['READ_ALOUD_WORKER_URL', 'ftp://worker'],
+      ['READ_ALOUD_MAX_OUTPUT_BYTES', String(100 * 1024 * 1024 * 1024 + 1)],
+      ['READ_ALOUD_WORKER_REQUEST_TIMEOUT_MS', String(5 * 60_000 + 1)],
+    ])('rejects an invalid %s setting', (name, value) => {
+      expect(() => validateEnv({ ...BASE_ENV, READ_ALOUD_WORKER_TOKEN: TOKEN, [name]: value })).toThrow(name);
+    });
+
+    it('boots with every read-aloud default docker-compose.yml gives the app', () => {
+      const compose = readFileSync(resolve(__dirname, '../../../docker-compose.yml'), 'utf8');
+      const appStart = compose.indexOf('\n  app:\n');
+      const nextService = compose.slice(appStart + 1).search(/\n {2}[a-z][\w-]*:\n/);
+      const appService = compose.slice(appStart, nextService < 0 ? undefined : appStart + 1 + nextService);
+      const defaults = [...appService.matchAll(/^\s+(READ_ALOUD_\w+): \$\{\1:-([^}]*)\}$/gm)].map(([, name, value]) => [name!, value!] as const);
+      expect(defaults.map(([name]) => name)).toEqual(expect.arrayContaining(['READ_ALOUD_WORKER_URL', 'READ_ALOUD_WORKER_TOKEN']));
+
+      const env = { ...PRODUCTION_ENV, PODCAST_ENCRYPTION_KEY: TOKEN, ...Object.fromEntries(defaults) };
+      expect(() => validateEnv(env)).not.toThrow();
+    });
   });
 
   it.each([

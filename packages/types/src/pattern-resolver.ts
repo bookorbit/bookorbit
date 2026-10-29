@@ -3,7 +3,7 @@ export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE =
 export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER =
   "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. ><{title}|{originalFilename}>< ({year})>/<{seriesIndex}. ><{title}|{originalFilename}>< ({year})>";
 export const DEFAULT_DOWNLOAD_PATTERN = "{originalFilename}";
-export const DEFAULT_KOREADER_DEVICE_PATTERN = "<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}";
+export const DEFAULT_KOREADER_DEVICE_PATTERN = "<Series/{series}/|Standalone/{authors:first} - |Standalone/><{seriesIndex:fixed2} - >{title}";
 
 export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   title: "Neuromancer",
@@ -143,18 +143,17 @@ export interface PlaceholderResolution {
 export function resolvePlaceholders(pattern: string, values: Record<string, string>): PlaceholderResolution {
   let usedFallback = false;
   let droppedOptional = false;
-  // Handle optional blocks with else clause: <primary|fallback>
+  // Optional blocks: <primary|fallback|...|default>. The first branch whose placeholders all
+  // fill wins; the last branch of a block with a fallback is used as-is, as a lone fallback is.
   const resolved = pattern.replace(/<([^<>]+)>/g, (_, blockContent: string) => {
-    const pipeIndex = blockContent.indexOf("|");
-    const primary = pipeIndex >= 0 ? blockContent.substring(0, pipeIndex) : blockContent;
-    const fallback = pipeIndex >= 0 ? blockContent.substring(pipeIndex + 1) : null;
+    const branches = blockContent.split("|");
+    const conditional = branches.length > 1 ? branches.slice(0, -1) : branches;
+    const filled = conditional.findIndex((branch) => checkAllPlaceholdersPresent(branch, values));
 
-    if (checkAllPlaceholdersPresent(primary, values)) {
-      return resolveModifierPlaceholders(primary, values);
-    }
-    if (fallback != null) {
+    if (filled === 0) return resolveModifierPlaceholders(branches[0], values);
+    if (branches.length > 1) {
       usedFallback = true;
-      return resolveModifierPlaceholders(fallback, values);
+      return resolveModifierPlaceholders(filled > 0 ? branches[filled] : branches[branches.length - 1], values);
     }
     droppedOptional = true;
     return "";
@@ -326,6 +325,17 @@ export function resolveUploadPath(pattern: string, values: Record<string, string
   }
 
   return limitPathSegmentBytes(ensurePathLastSegmentExtension(resolved, dotExt), dotExt);
+}
+
+/**
+ * Appends text to the file stem of a resolved path, before its extension, keeping the last
+ * segment within the byte limit. A segment that has to be shortened ends in a hash of the full
+ * name, so two suffixed names stay distinct even when the suffix itself is cut.
+ */
+export function appendToPathStem(path: string, suffix: string, ext: string): string {
+  const dotExt = normalizeDotExt(ext);
+  const extension = dotExt && path.toLowerCase().endsWith(dotExt.toLowerCase()) ? path.slice(-dotExt.length) : "";
+  return limitPathSegmentBytes(`${path.slice(0, path.length - extension.length)}${suffix}${extension}`, dotExt);
 }
 
 /**

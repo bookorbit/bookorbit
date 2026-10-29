@@ -1,7 +1,7 @@
 import { realignAudioTrackOrder } from '../../db/audio-track-order';
 import { recordBookFileHashHistory, deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -163,6 +163,38 @@ export class ScannerRepository {
       })
       .from(books)
       .where(eq(books.libraryFolderId, libraryFolderId));
+  }
+
+  /** Books filed under a library folder but located at `folderPath`, with their content files. */
+  async findBooksAtFolderPath(libraryFolderId: number, folderPath: string) {
+    const rows = await this.db
+      .select({ id: books.id, libraryId: books.libraryId, primaryFileId: books.primaryFileId })
+      .from(books)
+      .where(and(eq(books.libraryFolderId, libraryFolderId), eq(books.folderPath, folderPath)));
+    if (rows.length === 0) return [];
+    const files = await this.db
+      .select({ id: bookFiles.id, bookId: bookFiles.bookId, absolutePath: bookFiles.absolutePath })
+      .from(bookFiles)
+      .where(
+        and(
+          inArray(
+            bookFiles.bookId,
+            rows.map((row) => row.id),
+          ),
+          eq(bookFiles.role, 'content'),
+        ),
+      )
+      .orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id));
+    return rows.map((row) => ({ ...row, contentFiles: files.filter((file) => file.bookId === row.id) }));
+  }
+
+  async bookExistsAtFolderPath(libraryId: number, folderPath: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), eq(books.folderPath, folderPath)))
+      .limit(1);
+    return !!row;
   }
 
   async findPrimaryBookFilesByLibrary(libraryId: number) {
@@ -669,6 +701,24 @@ export class ScannerRepository {
   async findBookById(bookId: number) {
     const [row] = await this.db.select().from(books).where(eq(books.id, bookId)).limit(1);
     return row ?? null;
+  }
+
+  /** Present books of a library, counted once up front so a re-apply job reports a stable total. */
+  async getRuleReapplyBounds(libraryId: number): Promise<{ total: number; maxId: number }> {
+    const [row] = await this.db
+      .select({ total: sql<number>`count(*)::int`, maxId: sql<number>`coalesce(max(${books.id}), 0)::int` })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), eq(books.status, 'present')));
+    return { total: row?.total ?? 0, maxId: row?.maxId ?? 0 };
+  }
+
+  async findRuleReapplyBookBatch(libraryId: number, afterId: number, maxId: number, limit: number) {
+    return this.db
+      .select({ id: books.id, primaryFileId: books.primaryFileId })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), eq(books.status, 'present'), gt(books.id, afterId), lte(books.id, maxId)))
+      .orderBy(asc(books.id))
+      .limit(limit);
   }
 
   async findBooksByIds(bookIds: number[]) {

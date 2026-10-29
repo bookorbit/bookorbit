@@ -17,6 +17,7 @@ import type {
   AudiobookshelfAuthorRecord,
   AudiobookshelfBookmarkRecord,
   AudiobookshelfBookRecord,
+  AudiobookshelfChapterRecord,
   AudiobookshelfEbookFileRecord,
   AudiobookshelfLibraryItemRecord,
   AudiobookshelfMediaProgressRecord,
@@ -131,8 +132,11 @@ const TABLE_INFO_SQL: Record<string, string> = {
 
 const USER_SQL = 'SELECT id, username, email, isActive, bookmarks FROM users ORDER BY id LIMIT ? OFFSET ?';
 const LIBRARY_ITEM_SQL = 'SELECT id, libraryId, libraryFolderId, path, relPath, mediaType, mediaId FROM libraryItems ORDER BY id LIMIT ? OFFSET ?';
-const BOOK_SQL =
-  'SELECT id, title, subtitle, publishedYear, publisher, description, isbn, asin, language, abridged, duration, narrators, audioFiles, ebookFile, tags, genres FROM books ORDER BY id LIMIT ? OFFSET ?';
+// `chapters` is projected only when the backup's books table has it.
+function buildBookSql(availableBookColumns: Set<string>): string {
+  const chapters = availableBookColumns.has('chapters') ? ', chapters' : '';
+  return `SELECT id, title, subtitle, publishedYear, publisher, description, isbn, asin, language, abridged, duration, narrators, audioFiles, ebookFile, tags, genres${chapters} FROM books ORDER BY id LIMIT ? OFFSET ?`;
+}
 const MEDIA_PROGRESS_SQL =
   'SELECT id, mediaItemId, mediaItemType, duration, currentTime, isFinished, ebookLocation, ebookProgress, finishedAt, extraData, userId, createdAt, updatedAt FROM mediaProgresses ORDER BY id LIMIT ? OFFSET ?';
 // `lastFirst` and `description` are enrichment columns, not identity: older and newer
@@ -371,7 +375,7 @@ function readSourceRecords(database: DatabaseSync, sourceVersion: string | null)
   const authorsByBook = groupByBook(authorLinks);
   const seriesByBook = groupByBook(seriesLinks);
   const booksById = new Map(
-    readBatched(database, BOOK_SQL)
+    readBatched(database, buildBookSql(getColumns(database, 'books')))
       .flatMap((row) => mapBook(row, authorsByBook, seriesByBook, warnings))
       .map((book) => [book.id, book]),
   );
@@ -525,6 +529,7 @@ function mapBook(
   const tags = parseJsonArray(row.tags, `book ${id} tags`, warnings).flatMap((value) => (typeof value === 'string' ? [value] : []));
   const audioFiles = parseJsonArray(row.audioFiles, `book ${id} audioFiles`, warnings).flatMap((value) => mapAudioFile(value, id, warnings));
   const ebookFile = mapEbookFile(parseJsonObject(row.ebookFile, `book ${id} ebookFile`, warnings), id, warnings);
+  const chapters = parseJsonArray(row.chapters, `book ${id} chapters`, warnings).flatMap(mapChapter);
   return [
     {
       id,
@@ -540,6 +545,7 @@ function mapBook(
       language: nullableText(row.language),
       duration: finiteNumber(row.duration),
       abridged: sqliteBoolean(row.abridged),
+      chapters,
       genres,
       tags,
       series: (seriesByBook.get(id) ?? []).map((entry) => entry.series),
@@ -547,6 +553,12 @@ function mapBook(
       ebookFile,
     },
   ];
+}
+
+function mapChapter(value: unknown): AudiobookshelfChapterRecord[] {
+  const row = asRecord(value);
+  const start = finiteNumber(row.start);
+  return start === null ? [] : [{ start, title: nullableText(row.title) }];
 }
 
 function mapAudioFile(value: unknown, bookId: string, warnings: WarningCollector): AudiobookshelfAudioFileRecord[] {

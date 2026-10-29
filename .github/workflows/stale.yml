@@ -1,4 +1,4 @@
-name: Stale Issues
+name: Stale Issues and Pull Requests
 
 on:
   schedule:
@@ -8,11 +8,11 @@ on:
 permissions:
   actions: write
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   stale:
-    name: Mark and Close Stale Issues
+    name: Mark and Close Stale Issues and Pull Requests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -21,11 +21,11 @@ jobs:
           operations-per-run: 1000
           days-before-issue-stale: 60
           days-before-issue-close: 14
-          days-before-pr-stale: -1
-          days-before-pr-close: -1
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
           stale-issue-label: stale
           stale-pr-label: stale
-          remove-pr-stale-when-updated: false
+          remove-pr-stale-when-updated: true
           exempt-issue-labels: "pinned,security,discussion"
           stale-issue-message: >
             This issue has been inactive for 60 days. It will be closed in 14 days
@@ -33,3 +33,8 @@ jobs:
             comment or update the issue.
           close-issue-message: >
             Closing due to inactivity. Feel free to reopen if this is still relevant.
+          stale-pr-message: >
+            This pull request has been inactive for 30 days. It will be closed in 7 days
+            unless there is new activity.
+          close-pr-message: >
+            Closing due to inactivity. Feel free to reopen when this is ready to continue.

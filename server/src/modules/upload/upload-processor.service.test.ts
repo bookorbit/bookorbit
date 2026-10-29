@@ -690,12 +690,13 @@ describe('UploadProcessorService', () => {
   });
 
   describe('deleteUnitBookRecords', () => {
-    it('clears the file rows before the books that own them', async () => {
+    it("clears the file rows, then the rolled-back books' reads, before the books that own them", async () => {
       await service.deleteUnitBookRecords({ bookIds: [42], createdBookIds: [42], attachedFileIds: [777], replacedPrimaries: [] });
 
       expect(dialect.sqlToQuery(tx.execute.mock.calls[0]![0]).sql).toContain('delete from "book_files"');
       expect(dialect.sqlToQuery(tx.execute.mock.calls[1]![0]).sql).toContain('delete from "book_files"');
-      expect(dialect.sqlToQuery(tx.execute.mock.calls[2]![0]).sql).toContain('delete from "books"');
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[2]![0]).sql).toContain('delete from "reading_attempts"');
+      expect(dialect.sqlToQuery(tx.execute.mock.calls[3]![0]).sql).toContain('delete from "books"');
     });
 
     const dialect = new PgDialect();

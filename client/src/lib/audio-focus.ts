@@ -1,9 +1,10 @@
 /**
- * Single-audible-source policy for the three players that can share the bottom edge.
- * Deliberately unreactive: owners register an imperative pause callback and the player
- * that is about to produce sound claims focus, pausing everyone else.
+ * Single-audible-source policy for the players that can produce sound at once: the three that share
+ * the bottom edge and the chapter editor's preview. Deliberately unreactive: owners register an
+ * imperative pause callback and the player that is about to produce sound claims focus, pausing
+ * everyone else.
  */
-export type AudioFocusOwner = 'podcast' | 'tts' | 'media-overlay'
+export type AudioFocusOwner = 'podcast' | 'tts' | 'media-overlay' | 'chapter-preview'
 
 const owners = new Map<AudioFocusOwner, () => void>()
 

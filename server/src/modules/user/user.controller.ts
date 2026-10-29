@@ -277,6 +277,12 @@ export class UserController {
     return this.userService.getLibraryIds(id);
   }
 
+  @Get(':id/library-access')
+  @RequirePermission(Permission.ManageUsers)
+  getLibraryGrants(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.getLibraryGrants(id);
+  }
+
   @Put(':id/libraries')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.ManageUsers)

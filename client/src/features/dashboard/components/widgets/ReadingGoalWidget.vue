@@ -2,7 +2,7 @@
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
-import { Target, Pencil } from '@lucide/vue'
+import { ArrowRight, Target, Pencil } from '@lucide/vue'
 
 import { useChartTokens } from '@/composables/useChartTokens'
 import { useReadingGoalWidget } from '../../composables/useReadingGoalWidget'
@@ -23,6 +23,12 @@ const percentage = computed(() => {
   const goal = goalBooks.value
   if (!data.value || goal == null || goal <= 0) return 0
   return Math.min(100, Math.round((data.value.completedBooks / goal) * 100))
+})
+
+/** The reads behind the count, on History for the goal's year. */
+const historyRoute = computed(() => {
+  const year = data.value?.year
+  return { name: 'reading-history', query: year && year !== new Date().getFullYear() ? { year: String(year) } : {} }
 })
 
 const option = shallowRef({})
@@ -157,7 +163,15 @@ function handleCancelEdit() {
         </div>
       </div>
       <div class="flex items-center justify-between">
-        <p class="text-xs text-muted-foreground">{{ t('dashboard.widgets.readingGoal.percentComplete', { percentage }) }}</p>
+        <RouterLink
+          v-if="data?.completedBooks"
+          :to="historyRoute"
+          class="inline-flex items-center gap-1 rounded-xs text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :title="t('dashboard.widgets.readingGoal.percentComplete', { percentage })"
+        >
+          {{ t('readingHistory.links.goalReads', { count: data.completedBooks }) }}<ArrowRight :size="12" aria-hidden="true" />
+        </RouterLink>
+        <p v-else class="text-xs text-muted-foreground">{{ t('dashboard.widgets.readingGoal.percentComplete', { percentage }) }}</p>
         <button
           class="flex h-6 w-6 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
           :title="t('dashboard.widgets.readingGoal.editGoal')"

@@ -51,7 +51,9 @@ export function registerRouteTitleHook(router: Router): void {
     }
   }
 
-  router.afterEach((to) => {
+  router.afterEach((to, _from, failure) => {
+    // A guard that cancels the navigation (unsaved edits) leaves the page where it was, title included.
+    if (failure) return
     updateTitle(to)
 
     if (import.meta.env.DEV && needsTitleWarning(to)) {

@@ -8,7 +8,6 @@ import type { CacheKeyDescriptor } from '../../../common/provider-cache/provider
 import type { appConfig } from '../../../config/config';
 import type { ProviderConfigService } from '../../metadata-preferences/provider-config.service';
 import { ProviderThrottleTracker } from '../provider-throttle.tracker';
-import { AladinProvider } from './aladin/aladin.provider';
 import { AmazonProvider } from './amazon/amazon.provider';
 import { AudibleProvider } from './audible/audible.provider';
 import { AudnexusProvider } from './audnexus/audnexus.provider';
@@ -22,7 +21,6 @@ import { ITunesProvider } from './itunes/itunes.provider';
 import { fetchKoboHtmlWithCloudscraper } from './kobo/kobo-cloudscraper.fetcher';
 import { KoboProvider } from './kobo/kobo.provider';
 import { LibroFmProvider } from './librofm/librofm.provider';
-import { LubimyczytacProvider } from './lubimyczytac/lubimyczytac.provider';
 import { isIdentifiable, MetadataProvider } from './metadata-provider';
 import { MetadataSearchParams } from './metadata-search-params';
 import { OpenLibraryProvider } from './open-library/open-library.provider';
@@ -49,11 +47,9 @@ const CONFIG: ProviderConfigurations = {
   comicvine: { enabled: true, apiKey: 'comicvine-secret' },
   ranobedb: { enabled: true },
   kobo: { enabled: true, country: 'ca', language: 'fr' },
-  lubimyczytac: { enabled: true },
-  aladin: { enabled: true, ttbKey: 'aladin-secret' },
 };
 
-const SECRETS = ['google-secret', 'amazon-secret', 'hardcover-secret', 'comicvine-secret', 'aladin-secret'];
+const SECRETS = ['google-secret', 'amazon-secret', 'hardcover-secret', 'comicvine-secret'];
 
 function buildProvider(key: MetadataProviderKey, config: ProviderConfigurations = CONFIG): MetadataProvider {
   const providerConfig = { getConfig: () => Promise.resolve(config) } as unknown as ProviderConfigService;
@@ -74,16 +70,12 @@ function buildProvider(key: MetadataProviderKey, config: ProviderConfigurations 
       return new AudnexusProvider(providerConfig);
     case MetadataProviderKey.AUDIBLE:
       return new AudibleProvider(providerConfig);
-    case MetadataProviderKey.LUBIMYCZYTAC:
-      return new LubimyczytacProvider(providerConfig);
     case MetadataProviderKey.HARDCOVER:
       return new HardcoverProvider(new HardcoverClient(), providerConfig);
     case MetadataProviderKey.COMICVINE:
       return new ComicVineProvider(new ComicVineClient(), providerConfig, new ProviderThrottleTracker());
     case MetadataProviderKey.OPEN_LIBRARY:
       return new OpenLibraryProvider(providerConfig);
-    case MetadataProviderKey.ALADIN:
-      return new AladinProvider(providerConfig);
     case MetadataProviderKey.RANOBEDB:
       return new RanobeDbProvider(new RanobeDbClient(), providerConfig);
     default:
@@ -236,15 +228,6 @@ const CASES: DeclarationCase[] = [
     fingerprint: { domain: 'co.uk' },
   },
   {
-    key: MetadataProviderKey.LUBIMYCZYTAC,
-    withIsbn: { query: 'Dune', author: 'Frank Herbert' },
-    withoutIsbn: { query: 'Dune', author: 'Frank Herbert' },
-    searchReads: ['maxCandidatesPerProvider'],
-    honoursMax: true,
-    lookup: LOOKUP_ID,
-    fingerprint: {},
-  },
-  {
     key: MetadataProviderKey.HARDCOVER,
     withIsbn: { ...TITLE_AUTHOR, ...ISBN_ONLY, isAudiobook: true, hardcoverEditionId: '42' },
     withoutIsbn: { ...TITLE_AUTHOR, isAudiobook: true, hardcoverEditionId: '42' },
@@ -270,15 +253,6 @@ const CASES: DeclarationCase[] = [
     withIsbn: ISBN_ONLY,
     withoutIsbn: TITLE_AUTHOR,
     searchReads: ['resultsPerProvider'],
-    honoursMax: false,
-    lookup: LOOKUP_ID,
-    fingerprint: {},
-  },
-  {
-    key: MetadataProviderKey.ALADIN,
-    withIsbn: ISBN_ONLY,
-    withoutIsbn: TITLE_AUTHOR,
-    searchReads: [],
     honoursMax: false,
     lookup: LOOKUP_ID,
     fingerprint: {},
@@ -316,11 +290,9 @@ describe('provider cache declarations', () => {
         MetadataProviderKey.LIBROFM,
         MetadataProviderKey.AUDNEXUS,
         MetadataProviderKey.AUDIBLE,
-        MetadataProviderKey.LUBIMYCZYTAC,
         MetadataProviderKey.HARDCOVER,
         MetadataProviderKey.COMICVINE,
         MetadataProviderKey.OPEN_LIBRARY,
-        MetadataProviderKey.ALADIN,
         MetadataProviderKey.RANOBEDB,
       ].sort(),
     );
@@ -329,7 +301,7 @@ describe('provider cache declarations', () => {
   describe.each(CASES)('$key', (testCase) => {
     it('declares the current mapping version', () => {
       const bumped: Partial<Record<MetadataProviderKey, number>> = {
-        [MetadataProviderKey.COMICVINE]: 2,
+        [MetadataProviderKey.COMICVINE]: 3,
         [MetadataProviderKey.HARDCOVER]: 2,
       };
       expect(specOf(testCase.key).version).toBe(bumped[testCase.key] ?? 1);
@@ -391,7 +363,6 @@ describe('provider cache declarations', () => {
       [MetadataProviderKey.GOOGLE, { ...CONFIG, google: { enabled: true, apiKey: '   ' } }],
       [MetadataProviderKey.HARDCOVER, { ...CONFIG, hardcover: { enabled: true, apiKey: '' } }],
       [MetadataProviderKey.COMICVINE, { ...CONFIG, comicvine: { enabled: true, apiKey: '' } }],
-      [MetadataProviderKey.ALADIN, { ...CONFIG, aladin: { enabled: true, ttbKey: ' ' } }],
     ])('%s is unavailable without its credential', async (key, config) => {
       expect((await specOf(key, config).context()).available).toBe(false);
     });
@@ -444,11 +415,6 @@ describe('provider cache declarations', () => {
       expect(descriptorKey(spec.describeSearch({ ...params, title: 'Other' }))).toBe(descriptorKey(spec.describeSearch(params)));
     });
 
-    it('keys LubimyCzytac on the ISBN when no title is given', () => {
-      const spec = specOf(MetadataProviderKey.LUBIMYCZYTAC);
-      expect(spec.describeSearch({ ...BASE, title: undefined })?.inputs).toEqual({ query: '9780441172719', author: 'Frank Herbert' });
-    });
-
     it('keys the audiobook gate for audiobook-only providers', () => {
       for (const key of [MetadataProviderKey.AUDIBLE, MetadataProviderKey.AUDNEXUS, MetadataProviderKey.LIBROFM]) {
         const spec = specOf(key);
@@ -460,13 +426,7 @@ describe('provider cache declarations', () => {
 
     it('declares trustEmpty only for API providers', () => {
       const trusting = CASES.filter((c) => specOf(c.key).trustEmpty).map((c) => c.key);
-      for (const scraper of [
-        MetadataProviderKey.AMAZON,
-        MetadataProviderKey.GOODREADS,
-        MetadataProviderKey.KOBO,
-        MetadataProviderKey.LUBIMYCZYTAC,
-        MetadataProviderKey.LIBROFM,
-      ]) {
+      for (const scraper of [MetadataProviderKey.AMAZON, MetadataProviderKey.GOODREADS, MetadataProviderKey.KOBO, MetadataProviderKey.LIBROFM]) {
         expect(trusting).not.toContain(scraper);
       }
     });

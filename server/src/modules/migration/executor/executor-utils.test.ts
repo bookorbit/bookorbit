@@ -155,6 +155,40 @@ describe('migration executor utils', () => {
     });
   });
 
+  it('carries migrated chapters, cleaned and marked as migrated, only when the source has some', () => {
+    const base = {
+      title: null,
+      subtitle: null,
+      isbn10: null,
+      isbn13: null,
+      description: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      presentFields: ['chapters'],
+    };
+
+    expect(
+      buildMetadataPatch({
+        ...base,
+        chapters: [
+          { title: 'Two', startMs: 2_000 },
+          { title: '', startMs: 0 },
+        ],
+      }),
+    ).toEqual({
+      chapters: [
+        { title: 'Chapter 1', startMs: 0 },
+        { title: 'Two', startMs: 2_000 },
+      ],
+      chaptersSource: 'migration',
+      chaptersUpdatedAt: expect.any(Date),
+      chaptersUpdatedBy: null,
+    });
+    expect(buildMetadataPatch({ ...base, chapters: [] })).toEqual({});
+    expect(buildMetadataPatch({ ...base, chapters: [{ title: 'Ignored', startMs: 0 }], presentFields: [] })).toEqual({});
+  });
+
   it('maps Kobo provider IDs when present in source metadata', () => {
     const patch = buildMetadataPatch({
       title: null,

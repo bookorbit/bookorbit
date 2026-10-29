@@ -10,10 +10,10 @@ import {
   type BookDetailFile,
 } from '@bookorbit/types'
 import { bookFormatEntries, fileFormatKey } from '@/features/book/lib/book-formats'
-import { api } from '@/lib/api'
+import { fetchBookProgress } from '@/lib/reading-progress'
 import { applyCommonStem } from '@/features/book/lib/filename-stem'
 
-/** Per-file reading position. Mirrors the row shape `GET /api/v1/books/:id/progress` returns. */
+/** Per-file reading position, as `GET /api/v1/reading-progress?bookId=` reports it. */
 export type FileProgress = {
   percentage: number
   updatedAt: string | null
@@ -205,10 +205,8 @@ export function useBookFileTree(book: Ref<BookDetail>) {
   async function loadProgress() {
     const requestId = ++progressRequestId
     try {
-      const response = await api(`/api/v1/books/${book.value.id}/progress`)
-      if (!response.ok) return
-      const rows = (await response.json()) as { fileId: number; percentage: number; updatedAt: string | null }[]
-      if (requestId !== progressRequestId) return
+      const rows = await fetchBookProgress(book.value.id)
+      if (!rows || requestId !== progressRequestId) return
       const next: Record<number, FileProgress> = {}
       for (const row of rows) {
         if (!Number.isFinite(row.fileId)) continue

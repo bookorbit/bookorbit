@@ -250,6 +250,38 @@ describe('AudiobookshelfNormalizer books and users', () => {
     }
   });
 
+  it('carries curated chapters over in whole milliseconds and declares them present', () => {
+    const result = normalizer.normalize(
+      source({
+        libraryItems: [
+          bookItem({
+            chapters: [
+              { start: 0, title: 'Opening Credits' },
+              { start: 11.264, title: '  Chapter 1  ' },
+              { start: -3, title: 'Broken' },
+              { start: 30.5, title: null },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    const book = result.data.books[0];
+    expect(book?.chapters).toEqual([
+      { title: 'Opening Credits', startMs: 0 },
+      { title: 'Chapter 1', startMs: 11_264 },
+      { title: '', startMs: 30_500 },
+    ]);
+    expect(book?.presentFields).toContain('chapters');
+  });
+
+  it('leaves chapters undeclared when Audiobookshelf has none, so stored ones survive', () => {
+    const result = normalizer.normalize(source({ libraryItems: [bookItem({ chapters: [] })] }));
+
+    expect(result.data.books[0]?.chapters).toBeUndefined();
+    expect(result.data.books[0]?.presentFields).not.toContain('chapters');
+  });
+
   it('keeps a falsy but explicit metadata value present', () => {
     const result = normalizer.normalize(source({ libraryItems: [bookItem({ abridged: false, duration: 0 })] }));
 

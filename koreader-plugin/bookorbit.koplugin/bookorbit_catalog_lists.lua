@@ -152,6 +152,69 @@ function CatalogLists:listSavedPage(query, err)
     return ok and saved or nil
 end
 
+-- A series is drawn as one local list, while the API deliberately caps each
+-- response. Keep requesting bounded server pages before the local paginator
+-- takes over.
+function CatalogLists:listFetchCompleteSeries(query, first_body, title)
+    if not (query.seriesId or query.series) then return first_body end
+
+    local items, seen = {}, {}
+    local function append(body)
+        local added = 0
+        for _i, book in ipairs(body.items or {}) do
+            local key = book.id ~= nil and tostring(book.id) or nil
+            if not key or not seen[key] then
+                if key then seen[key] = true end
+                table.insert(items, book)
+                added = added + 1
+            end
+        end
+        return added
+    end
+
+    append(first_body)
+    local body = first_body
+    local total = tonumber(body.total)
+    local page = tonumber(body.page) or tonumber(query.page) or 1
+    local offline_saved_at
+    local has_next = body.hasNext == true or (total and #items < total)
+
+    while has_next do
+        page = page + 1
+        local page_query = cloneParams(query)
+        page_query.page = page
+        page_query.offset = nil
+        local next_body, err = self:fetch(title and T(_("Opening %1…"), title) or _("Opening books…"), function()
+            return self.client:catalogBooks(page_query)
+        end)
+        if not next_body then
+            local saved = self:listSavedPage(page_query, err)
+            if not saved then return nil, err end
+            next_body = saved.body
+            local saved_at = tonumber(saved.saved_at) or 0
+            offline_saved_at = offline_saved_at and math.min(offline_saved_at, saved_at) or saved_at
+        else
+            self:listSavePage(page_query, next_body)
+        end
+
+        if append(next_body) == 0 then return nil, "incomplete series response" end
+        body = next_body
+        total = tonumber(body.total) or total
+        has_next = body.hasNext == true or (total and #items < total)
+    end
+
+    local complete = {}
+    for key, value in pairs(first_body) do complete[key] = value end
+    complete.items = items
+    complete.total = math.max(total or 0, #items)
+    complete.page = 1
+    complete.hasNext = false
+    complete.hasPrevious = false
+    complete.nextUrl = nil
+    complete.previousUrl = nil
+    return complete, nil, offline_saved_at
+end
+
 -- The server page size for a book list. A series or an author page draws
 -- all its books (local pages when there are more than fit).
 function CatalogLists:listBookPageSize(params)
@@ -1133,10 +1196,6 @@ function CatalogLists:listBody(kind, context)
     if kind == "search" then
         local m = { results = context.results, query = context.query, scope = context.scope or "all", screen_w = sw, screen_h = sh,
             action = function(b) return { kind = "open-book", book = b } end }
-        for _i, a in ipairs(context.results.authors or {}) do
-            local pb = self:listPhotoBook(a)
-            a.photo_path = pb and self:thumbnailDisplay(pb) or nil
-        end
         return function(f) return ListPages.searchBody(m, f) end, nil
     end
     if kind == "seriespage" then
@@ -1162,6 +1221,9 @@ function CatalogLists:listBody(kind, context)
         local m = {
             entries = books, view = self:listView(kind), screen_w = sw, screen_h = sh, local_page = context.local_page,
             offline = context.list_offline and {} or nil,
+            select = self:isBulkSelectionActive(),
+            selected = function(b) return self.bulk_select_all or self:bulkIsBookSelected(b) end,
+            order_label = (context.params or {}).sort == "title" and _("Title A–Z") or _("Reading order"),
             states = states, indexes = indexes, current_index = cur, next_book = next_book,
             range = #books > 0 and T(_("Books %1 – %2"), first, last) or nil,
             next_minutes = next_book and self:listMinutesLeft(next_book),

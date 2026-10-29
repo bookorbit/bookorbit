@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { X, FolderSync, PackageOpen, Mail, ArrowRightLeft, FileDown, TriangleAlert, BookOpenCheck } from '@lucide/vue'
 import { NOTIFICATION_TYPE_META, NotificationSeverity, type NotificationItem, type NotificationTypeMeta } from '@bookorbit/types'
+import { readAloudNotificationCopy } from '@/features/read-aloud/lib/read-aloud'
 import { useNotifications } from '../composables/useNotifications'
 import { NOTIFICATION_CATEGORY_ICONS } from '../lib/notification-category-groups'
 
@@ -10,7 +12,13 @@ const props = defineProps<{ notification: NotificationItem }>()
 const emit = defineEmits<{ read: [id: number]; dismiss: [id: number] }>()
 
 const router = useRouter()
+const { t, te } = useI18n()
 const { formatRelativeTime } = useNotifications()
+
+/** Types the client can phrase itself render in the reader's locale; the rest show the server's text. */
+const copy = computed(
+  () => readAloudNotificationCopy(props.notification, t, te) ?? { title: props.notification.title, message: props.notification.message },
+)
 
 // Only types whose icon should differ from their category's. Everything else falls back to the
 // category icon, so a new type can never render as the wrong thing by being forgotten here.
@@ -85,7 +93,7 @@ function handleDismiss(e: Event) {
       <div class="min-w-0 flex-1">
         <div class="flex items-start justify-between gap-2">
           <p class="truncate text-sm leading-tight" :class="notification.read ? 'text-foreground' : 'font-semibold text-foreground'">
-            {{ notification.title }}
+            {{ copy.title }}
           </p>
           <div class="flex shrink-0 items-center gap-1.5">
             <span
@@ -98,8 +106,8 @@ function handleDismiss(e: Event) {
             <span class="text-[11px] text-muted-foreground">{{ relativeTime }}</span>
           </div>
         </div>
-        <p v-if="notification.message" class="mt-1 truncate text-xs text-muted-foreground">
-          {{ notification.message }}
+        <p v-if="copy.message" class="mt-1 truncate text-xs text-muted-foreground">
+          {{ copy.message }}
         </p>
       </div>
     </button>

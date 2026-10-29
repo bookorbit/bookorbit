@@ -167,4 +167,13 @@ w = ListData.windowPaging(5, 12, nil, true)
 assertEqual(w.pages, nil, "an unknown total leaves the count open")
 assertEqual(w.has_next, true, "and trusts the server's next")
 
+local share = ListData.shareRows(8, { 242, 5, 12 })
+assertEqual(table.concat(share, ","), "3,3,2", "eight rows split evenly, the spare ones to the first sections")
+share = ListData.shareRows(8, { 242, 1, 12 })
+assertEqual(table.concat(share, ","), "4,1,3", "a section never takes more rows than it holds")
+share = ListData.shareRows(3, { 10, 10, 10 })
+assertEqual(table.concat(share, ","), "1,1,1", "every section gets one row before any gets two")
+share = ListData.shareRows(9, { 1, 2 })
+assertEqual(table.concat(share, ","), "1,2", "rows left over stay unused")
+
 print("bookorbit_list_data_test.lua: ok")

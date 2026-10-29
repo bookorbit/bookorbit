@@ -85,6 +85,69 @@ local function actionsBlock(page, w, actions)
     return MenuUI.section(w, _("Run from here"), MenuUI.group(w, rows))
 end
 
+local function slice(list, first, last)
+    local out = {}
+    for index = first, last or #list do table.insert(out, list[index]) end
+    return out
+end
+
+-- The sections in columns body_h tall. A section that does not fit the room
+-- left splits between its rows, its title over the rest, so a page does not
+-- end in a band of nothing; each part keeps at least two rows.
+local function packColumns(page, cw, body_h, gap)
+    local d = page.data
+    local columns, col, room = {}, {}, body_h
+    local function close()
+        if #col > 0 then table.insert(columns, col) end
+        col, room = {}, body_h
+    end
+    local function place(block)
+        if #col > 0 then room = room - gap end
+        table.insert(col, block)
+        room = room - hOf(block)
+    end
+    local function avail() return #col > 0 and room - gap or room end
+    for _i, section in ipairs(d.sections) do
+        local rows = section.rows
+        local first = 1
+        while first <= #rows do
+            local block = sectionBlock(cw, { title = section.title, rows = slice(rows, first) })
+            if hOf(block) <= avail() then
+                place(block)
+                first = #rows + 1
+            else
+                local left = #rows - first + 1
+                local part
+                for k = left - 2, 2, -1 do
+                    local try = sectionBlock(cw, { title = section.title, rows = slice(rows, first, first + k - 1) })
+                    if hOf(try) <= avail() then part = try; first = first + k; break end
+                    try:free()
+                end
+                if part then
+                    block:free()
+                    place(part)
+                    close()
+                elseif #col > 0 then
+                    block:free()
+                    close()
+                else
+                    -- Taller than a page and too short to split: drawn whole.
+                    place(block)
+                    first = #rows + 1
+                end
+            end
+        end
+    end
+    if #d.actions > 0 then
+        local block = actionsBlock(page, cw, d.actions)
+        if #col > 0 and hOf(block) > avail() then close() end
+        place(block)
+    end
+    close()
+    if #columns == 0 then columns = { {} } end
+    return columns
+end
+
 local function build(page, sw, sh)
     local d = page.data
     local mx = MenuUI.mx()
@@ -92,35 +155,41 @@ local function build(page, sw, sh)
     local top, bottom = px(6), px(8)
     local header = MenuUI.pageHeader(w, _("Technical details"), { sub = _("Everything the sync knows, for bug reports") })
     local body_h = sh - top - bottom - hOf(header) - px(8) - px(8) - px(40)
-    local ncol = MenuUI.wide() and 2 or 1
     local gutter = px(24)
-    local cw = ncol == 2 and math.floor((w - gutter) / 2) or w
     local gap = px(16)
-
-    local blocks = {}
-    for _i, section in ipairs(d.sections) do table.insert(blocks, sectionBlock(cw, section)) end
-    if #d.actions > 0 then table.insert(blocks, actionsBlock(page, cw, d.actions)) end
-    local heights = {}
-    for _i, b in ipairs(blocks) do table.insert(heights, hOf(b)) end
-    local columns = TextPages.pack(heights, body_h, gap)
+    local function blocksAt(cw)
+        local out = {}
+        for _i, section in ipairs(d.sections) do table.insert(out, sectionBlock(cw, section)) end
+        if #d.actions > 0 then table.insert(out, actionsBlock(page, cw, d.actions)) end
+        return out
+    end
+    -- Two columns on a wide screen, unless a column is too narrow for its
+    -- rows at this interface size.
+    local ncol = 1
+    if MenuUI.wide() then
+        local clean = BoardUI.fits(function() return BoardUI.collectHits(function() return blocksAt(math.floor((w - gutter) / 2)) end) end)
+        if clean then ncol = 2 end
+    end
+    local cw = ncol == 2 and math.floor((w - gutter) / 2) or w
+    local columns = packColumns(page, cw, body_h, gap)
     page.count = math.max(1, math.ceil(#columns / ncol))
     if page.index > page.count then page.index = page.count end
 
-    local cols, shown = {}, {}
+    local cols = {}
     for c = 1, ncol do
-        local range = columns[(page.index - 1) * ncol + c]
+        local column = columns[(page.index - 1) * ncol + c]
         local items = {}
-        if range then
-            for index = range.first, range.last do
-                if #items > 0 then table.insert(items, space(nil, gap)) end
-                table.insert(items, blocks[index])
-                shown[index] = true
-            end
+        for _i, block in ipairs(column or {}) do
+            if #items > 0 then table.insert(items, space(nil, gap)) end
+            table.insert(items, block)
         end
         table.insert(cols, vstack({ w = cw, h = body_h }, #items > 0 and items or { space(cw, 1) }))
     end
     -- Blocks on other pages were only measured.
-    for index, b in ipairs(blocks) do if not shown[index] then b:free() end end
+    for index, column in ipairs(columns) do
+        local on_page = index > (page.index - 1) * ncol and index <= page.index * ncol
+        if not on_page then for _i, block in ipairs(column) do block:free() end end
+    end
     local body = ncol == 2 and hstack({ w = w, gap = gutter, valign = "top" }, cols) or cols[1]
     local items = { header, space(nil, px(8)), body, space(nil, px(8)) }
     table.insert(items, page.count > 1 and TextPages.pager(w, page.index, page.count) or space(nil, px(40)))

@@ -7,7 +7,7 @@ describe('FilterFormatPicker', () => {
   it('offers read-along beside the physical book formats', async () => {
     const wrapper = mount(FilterFormatPicker, { props: { modelValue: [] } })
     const buttons = wrapper.findAll('button')
-    const readAlong = buttons.find((button) => button.attributes('aria-label') === 'Read-along EPUB')
+    const readAlong = buttons.find((button) => button.attributes('aria-label') === 'Read-aloud EPUB')
 
     expect(buttons).toHaveLength(BOOK_FORMATS.length + 1)
     expect(readAlong).toBeDefined()

@@ -126,6 +126,23 @@ describe('KoreaderPluginService', () => {
       expect(result.libraryVersion).toMatch(/^[0-9a-f]{16}$/);
     });
 
+    it('marks a match whose device copy cannot place positions, and only that one', async () => {
+      koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(
+        new Map([
+          [HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1, progressCompatible: false }],
+          [HASH_B, { bookFileId: 11, bookId: 21, libraryId: 1 }],
+        ]),
+      );
+      const dto = { ...deviceFields(), hashes: [HASH_A, HASH_B] } as MatchCheckDto;
+
+      const result = await service.matchCheck(makeUser(), dto);
+
+      expect(result.matches).toEqual([
+        { hash: HASH_A, bookId: 20, bookFileId: 10, positionCompatible: false },
+        { hash: HASH_B, bookId: 21, bookFileId: 11 },
+      ]);
+    });
+
     it('links an explicitly downloaded catalog file when its hash resolved to another file', async () => {
       koreaderRepo.resolveBookFilesByHashes
         .mockResolvedValueOnce(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]]))

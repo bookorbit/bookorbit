@@ -476,9 +476,11 @@ describe('useNotifications', () => {
     it('disconnect calls socket.disconnect and clears socket', async () => {
       const useNotifications = await loadModule()
       const { subscribe, disconnect } = useNotifications()
+      // The socket helper decorates `disconnect` on the instance; the original still has to run.
+      const socketDisconnect = mockSocket.disconnect
       subscribe()
       disconnect()
-      expect(mockSocket.disconnect).toHaveBeenCalled()
+      expect(socketDisconnect).toHaveBeenCalled()
     })
 
     it('subscribe is idempotent (socket created only once)', async () => {

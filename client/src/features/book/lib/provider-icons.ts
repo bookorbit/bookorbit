@@ -1,3 +1,5 @@
+import { providerAppearance } from '@/lib/provider-appearance'
+
 const PROVIDER_ICON_BASE_PATH = '/assets/provider-icons'
 
 const PROVIDER_ICON_PATHS = {
@@ -21,6 +23,9 @@ export function providerIconPath(provider: ProviderIconKey): string {
   return PROVIDER_ICON_PATHS[provider]
 }
 
+/** A built-in's bundled icon, else the icon BookOrbit serves for an external provider, else null. */
 export function providerIconPathSafe(provider: string): string | null {
-  return Object.prototype.hasOwnProperty.call(PROVIDER_ICON_PATHS, provider) ? PROVIDER_ICON_PATHS[provider as ProviderIconKey] : null
+  return Object.prototype.hasOwnProperty.call(PROVIDER_ICON_PATHS, provider)
+    ? PROVIDER_ICON_PATHS[provider as ProviderIconKey]
+    : (providerAppearance(provider)?.iconUrl ?? null)
 }

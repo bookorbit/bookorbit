@@ -1438,3 +1438,58 @@ describe('KoreaderRepository', () => {
     });
   });
 });
+
+describe('KoreaderRepository.findBooksByTitleKeys', () => {
+  it('short-circuits without a title or an accessible library', async () => {
+    const captured = createCapturingDb();
+    const repository = await makeRepository(captured.db);
+
+    await expect(repository.findBooksByTitleKeys([], null, null, 26)).resolves.toEqual([]);
+    await expect(repository.findBooksByTitleKeys(['lab alpha'], [], null, 26)).resolves.toEqual([]);
+    expect(captured.queries).toHaveLength(0);
+  });
+
+  it('looks titles up by the indexed lowercase title, capped per title and scoped to present books in the libraries', async () => {
+    const captured = createCapturingDb();
+    const repository = await makeRepository(captured.db);
+
+    await repository.findBooksByTitleKeys(['lab alpha', 'lab beta'], [3, 4], null, 26);
+
+    expect(captured.queries).toHaveLength(1);
+    const query = captured.queries[0]!;
+    expect(query.sql).toContain('lower("book_metadata"."title") in');
+    expect(query.sql).toContain('row_number() over (partition by lower("book_metadata"."title")');
+    expect(query.sql).toContain('"books"."status" =');
+    expect(query.sql).toContain('"books"."library_id" in');
+    expect(query.sql).toContain('"books"."primary_file_id"');
+    expect(query.sql).not.toContain('"book_tags"');
+    expect(query.params).toEqual(expect.arrayContaining(['lab alpha', 'lab beta', 'present', 3, 4, 26]));
+  });
+
+  it('applies the content filters it is given', async () => {
+    const captured = createCapturingDb();
+    const repository = await makeRepository(captured.db);
+
+    await repository.findBooksByTitleKeys(
+      ['lab alpha'],
+      null,
+      { includeTagIds: [9], includeGenreIds: [], excludeTagIds: [], excludeGenreIds: [] },
+      26,
+    );
+
+    expect(captured.queries[0]!.sql).toContain('"book_tags"');
+    expect(captured.queries[0]!.sql).not.toContain('"books"."library_id" in');
+  });
+});
+
+describe('KoreaderRepository.listBookHashLinks', () => {
+  it('reports whether each linked copy can place positions in the linked file', async () => {
+    const captured = createCapturingDb();
+    const repository = await makeRepository(captured.db);
+
+    await repository.listBookHashLinks(7, 100, [1]);
+
+    expect(captured.queries[0]!.sql).toContain('"book_files"."file_hash" = "koreader_book_hash_links"."hash"');
+    expect(captured.queries[0]!.sql).toContain("'kobo_download'");
+  });
+});

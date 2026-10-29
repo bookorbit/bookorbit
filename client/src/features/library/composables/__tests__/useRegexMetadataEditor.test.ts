@@ -1,5 +1,6 @@
 import { effectScope } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { FOLDER_SERIES_REGEX_METADATA } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useRegexMetadataEditor } from '../useRegexMetadataEditor'
 
@@ -154,5 +155,26 @@ describe('useRegexMetadataEditor', () => {
     vi.mocked(api).mockResolvedValueOnce(new Response(JSON.stringify({ valid: true, diagnostics: [] })))
     await state.validateRules()
     expect(state.canApply.value).toBe(true)
+  })
+
+  it('replaces the draft with the folder-as-series rules and enables them', () => {
+    const state = editor()
+    state.enabled.value = false
+
+    state.applyFolderSeriesPreset()
+
+    expect(state.enabled.value).toBe(true)
+    expect(state.value()).toEqual(FOLDER_SERIES_REGEX_METADATA)
+    expect(state.value()!.rules[0]).not.toBe(FOLDER_SERIES_REGEX_METADATA.rules[0])
+  })
+
+  it('opens a preset saved with older rules on its current rules and keeps it marked', () => {
+    const state = editor({ preset: 'folder_series', rules: [{ pattern: '^(?<series>[^/]+)/', flags: '' }] } as never)
+
+    expect(state.rules.value).toEqual(FOLDER_SERIES_REGEX_METADATA.rules)
+    expect(state.value()).toEqual(FOLDER_SERIES_REGEX_METADATA)
+
+    state.rules.value[0]!.flags = 'i'
+    expect(state.value()).not.toHaveProperty('preset')
   })
 })

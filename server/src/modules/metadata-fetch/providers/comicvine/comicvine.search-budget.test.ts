@@ -45,7 +45,6 @@ const providerConfig: ProviderConfigurations = {
   comicvine: { enabled: true, apiKey: 'test-key' },
   ranobedb: { enabled: false },
   kobo: { enabled: false, country: 'us', language: 'en' },
-  lubimyczytac: { enabled: false },
 };
 
 function volume(id: number, name: string, startYear: string, countOfIssues: number): ComicVineVolume {

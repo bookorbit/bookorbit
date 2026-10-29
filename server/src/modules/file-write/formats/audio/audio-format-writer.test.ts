@@ -172,6 +172,49 @@ describe('AudioFormatWriter', () => {
     expect(embedder.embedMetadata).toHaveBeenCalledWith('/books/audio/book.flac', 'flac', expect.objectContaining({ coverBytes: null }));
   });
 
+  it('writes only the chapters when a chapter write passes them with an empty field mask', async () => {
+    const { writer, embedder } = makeWriter('m4b');
+    const chapters = [
+      { title: 'One', startMs: 0, endMs: 1_000 },
+      { title: 'Two', startMs: 1_000, endMs: 2_000 },
+    ];
+
+    const result = await writer.write('/books/audio/Part 1.m4b', {}, { dryRun: false, fieldMask: new Set(), chapters });
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success', fieldsWritten: ['chapters'] }));
+    expect(embedder.embedMetadata).toHaveBeenCalledWith('/books/audio/Part 1.m4b', 'm4b', { coverBytes: null, metadata: [], chapters });
+  });
+
+  it('lists the chapters after the tags written alongside them', async () => {
+    const { writer } = makeWriter('mp3');
+
+    const result = await writer.write(
+      '/books/audio/book.mp3',
+      { title: 'Dune' },
+      { dryRun: false, fieldMask: new Set(['title']), chapters: [{ title: 'One', startMs: 0, endMs: 1_000 }] },
+    );
+
+    expect(result.fieldsWritten).toEqual(['title', 'chapters']);
+  });
+
+  it('reports chapters for a dry run without touching the file', async () => {
+    const { writer, embedder } = makeWriter('m4b');
+
+    const result = await writer.write('/books/audio/book.m4b', {}, { dryRun: true, fieldMask: new Set(), chapters: [] });
+
+    expect(result).toEqual(expect.objectContaining({ status: 'skipped', reason: 'dry-run', fieldsWritten: ['chapters'] }));
+    expect(embedder.embedMetadata).not.toHaveBeenCalled();
+  });
+
+  it('passes no chapters on an ordinary metadata write, so the file keeps its own', async () => {
+    const { writer, embedder } = makeWriter('m4b');
+
+    const result = await writer.write('/books/audio/book.m4b', { title: 'Dune' }, { dryRun: false, fieldMask: new Set(['title']) });
+
+    expect(result.fieldsWritten).toEqual(['title']);
+    expect(embedder.embedMetadata).toHaveBeenCalledWith('/books/audio/book.m4b', 'm4b', expect.objectContaining({ chapters: null }));
+  });
+
   describe('track argument snapshots', () => {
     const payload = { title: 'The Book', authors: [{ name: 'An Author', sortName: null }] };
     const fieldMask = new Set(['title', 'authors'] as const);

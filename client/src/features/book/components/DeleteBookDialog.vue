@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Loader2, Trash2 } from '@lucide/vue'
+import { History, Loader2, Trash2 } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 
 defineProps<{ open: boolean; deleting: boolean }>()
@@ -21,6 +21,10 @@ const { t } = useI18n()
             <h2 class="text-base font-semibold text-foreground">{{ t('book.deleteDialog.title') }}</h2>
             <p class="text-sm text-muted-foreground mt-1">
               {{ t('book.deleteDialog.description') }}
+            </p>
+            <p class="mt-3 flex gap-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-[12.5px] leading-[17px] text-foreground">
+              <History class="mt-px shrink-0 text-primary" :size="14" aria-hidden="true" />
+              {{ t('book.deleteDialog.keepsHistory') }}
             </p>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import type { AudiobookChapter } from '@bookorbit/types';
+
 export interface SourceValidationResult {
   ok: boolean;
   sourceType: string;
@@ -70,6 +72,8 @@ export interface SourceBook {
   comicvineId?: string | null;
   durationSeconds?: number | null;
   abridged?: boolean | null;
+  /** Book-timeline chapters, whole milliseconds. */
+  chapters?: AudiobookChapter[] | null;
   authors?: SourceContributor[];
   narrators?: SourceContributor[];
   filePath: string | null;

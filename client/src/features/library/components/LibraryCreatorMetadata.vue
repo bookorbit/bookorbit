@@ -2,8 +2,9 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, FileCode, FileText, GripVertical, Headphones, RotateCcw } from '@lucide/vue'
-import type { RegexMetadataConfig } from '@bookorbit/types'
+import type { OrganizationMode, RegexMetadataConfig, RegexMetadataReapplyJob } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
+import LibraryRegexReapply from './LibraryRegexReapply.vue'
 import RegexMetadataDialog from './RegexMetadataDialog.vue'
 import { DEFAULT_FORMAT_PRIORITY, isReadAlongFormatKey, withReadAlongFormatPriority } from '@bookorbit/types'
 import { formatNumber } from '@/i18n/formatters'
@@ -26,8 +27,15 @@ const props = withDefaults(
     formatPriority: string[]
     allowedFormats?: string[]
     formatCounts?: Record<string, number> | null
+    organizationMode?: OrganizationMode
+    /** True once the library exists, so saved rules can be applied to the books already in it. */
+    canReapplyRules?: boolean
+    storedRegexMetadata?: RegexMetadataConfig | null
+    reapplyingRules?: boolean
+    reapplyJob?: RegexMetadataReapplyJob | null
+    reapplyErrorKey?: string | null
   }>(),
-  { allowedFormats: () => [], formatCounts: null },
+  { allowedFormats: () => [], formatCounts: null, storedRegexMetadata: null, reapplyJob: null, reapplyErrorKey: null },
 )
 
 const emit = defineEmits<{
@@ -35,6 +43,7 @@ const emit = defineEmits<{
   'update:regexOpen': [value: boolean]
   'update:metadataPrecedence': [value: string[]]
   'update:formatPriority': [value: string[]]
+  reapply: []
 }>()
 
 const regexOpen = ref(false)
@@ -185,6 +194,10 @@ function applyRegex(config: RegexMetadataConfig | null) {
   closeRegex()
 }
 
+function reapplyRules() {
+  emit('reapply')
+}
+
 function sourceTitle(source: string) {
   return t(
     source === 'regex'
@@ -329,7 +342,23 @@ function sourceHint(source: string) {
         </li>
       </ol>
       <p class="mt-2.5 text-xs text-muted-foreground">{{ t('library.creator.metadata.regex.precedenceHint') }}</p>
+      <LibraryRegexReapply
+        v-if="canReapplyRules && (storedRegexMetadata || regexMetadata)"
+        :stored="storedRegexMetadata"
+        :pending="regexMetadata ?? null"
+        :running="reapplyingRules ?? false"
+        :job="reapplyJob"
+        :error-key="reapplyErrorKey"
+        @reapply="reapplyRules"
+      />
     </LibraryCreatorCard>
-    <RegexMetadataDialog v-if="regexOpen" :config="regexMetadata ?? null" :library-id="libraryId" @close="closeRegex" @apply="applyRegex" />
+    <RegexMetadataDialog
+      v-if="regexOpen"
+      :config="regexMetadata ?? null"
+      :library-id="libraryId"
+      :organization-mode="organizationMode"
+      @close="closeRegex"
+      @apply="applyRegex"
+    />
   </div>
 </template>

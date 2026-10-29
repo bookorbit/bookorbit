@@ -68,6 +68,7 @@ function BookSheet.data(plugin)
         author = props.authors or "",
         digest = digest,
         matched = book ~= nil,
+        incompatible = book ~= nil and book.positionIncompatible == true,
         book_id = book and book.bookId or nil,
         synced = mark and MenuUI.ago(mark) or nil,
         local_pct = local_pct,
@@ -171,7 +172,8 @@ local function promptBody(page, w)
         table.insert(items, space(nil, px(10)))
         table.insert(items, hstack({ w = w, gap = px(8), valign = "top" }, {
             icon("info", px(16), { sw = 2.25 }),
-            text(_("Highlights, bookmarks and reading time sync either way."), { s = 13, col = INK.g3, w = w - px(24), lines = 2 }),
+            text(d.incompatible and _("Reading time syncs either way. Highlights and bookmarks don't sync for this copy.")
+                or _("Highlights, bookmarks and reading time sync either way."), { s = 13, col = INK.g3, w = w - px(24), lines = 2 }),
         }))
     end
     table.insert(items, space(nil, px(8)))
@@ -220,7 +222,18 @@ local function body(page, w)
     if page.sync and page.sync.err then
         outcome = hstack({ w = w, gap = px(6) }, {
             icon("triangle-alert", px(16), { sw = 2.25 }),
-            text(T(_("Could not sync: %1"), page.sync.err), { s = 13, b = true, w = w - px(22), data = true }),
+            text(T(_("Could not sync: %1"), page.sync.err), { s = 13, b = true, w = w - px(16) - px(6), data = true }),
+        })
+    end
+
+    -- A matched copy whose bytes differ from the library file syncs progress as a
+    -- percentage and nothing that needs an exact position.
+    local copy_note
+    if d.incompatible then
+        copy_note = hstack({ w = w, gap = px(6), valign = "top" }, {
+            icon("info", px(16), { sw = 2 }),
+            text(_("This copy is a different file from the one in BookOrbit. Progress syncs as a percentage. Highlights and bookmarks don't sync. Download the book from BookOrbit to sync everything."),
+                { s = 13, col = INK.g3, w = w - px(16) - px(6), lines = 4 }),
         })
     end
 
@@ -249,6 +262,8 @@ local function body(page, w)
         buttons,
         outcome and space(nil, px(10)) or false,
         outcome or false,
+        copy_note and space(nil, px(10)) or false,
+        copy_note or false,
         space(nil, px(14)),
         vstack({ w = w }, list),
     }
@@ -256,7 +271,7 @@ end
 
 local function build(page, sw, sh)
     local mx = MenuUI.mx()
-    local wide = BoardMetrics.get().W >= 700
+    local wide = BoardMetrics.layoutW() >= 700
     local panel_w = wide and math.min(px(520), sw - 2 * mx) or sw
     local pad = wide and px(20) or mx
     local w = panel_w - 2 * pad

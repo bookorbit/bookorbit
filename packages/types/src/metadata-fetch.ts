@@ -1,8 +1,13 @@
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
-import type { CoverMedium } from "./book";
+import type { ConcreteBookMediaKind, CoverMedium } from "./book";
 import type { MetadataCacheServedProvider, MetadataCandidateCacheInfo } from "./metadata-cache";
 import type { SeriesIndex } from "./series-index";
 
+/**
+ * Every provider key BookOrbit has a dedicated id field for. Most are built in; the ones in
+ * `MOVED_METADATA_PROVIDERS` are not, and keep their id columns and the API fields released clients
+ * send.
+ */
 export const MetadataProviderKey = {
   GOOGLE: "google",
   GOODREADS: "goodreads",
@@ -31,7 +36,11 @@ export const COMMUNITY_RATING_PROVIDER_KEYS = [
   MetadataProviderKey.AUDIBLE,
 ] as const;
 
-export type CommunityRatingProviderKey = (typeof COMMUNITY_RATING_PROVIDER_KEYS)[number];
+/**
+ * Any provider whose ratings can be filtered on. External providers are named at runtime, so the
+ * list above only seeds defaults; it is not the set of valid values.
+ */
+export type CommunityRatingProviderKey = MetadataProviderKey;
 
 export interface ComicMetadataFields {
   issueNumber?: string;
@@ -47,7 +56,111 @@ export interface ComicMetadataFields {
   storyArcs?: string[];
 }
 
-export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof MetadataProviderKey];
+/**
+ * Providers that used to be compiled into BookOrbit. One with an `image` now runs as its own service
+ * under the same key, so stored ids, ratings and field rules carry over once an admin adds it. One
+ * without has closed: its ids and links stay on books, and there is nothing to run.
+ */
+export const MOVED_METADATA_PROVIDERS: Readonly<Record<"lubimyczytac" | "aladin", { label: string; image: string | null }>> = {
+  lubimyczytac: { label: "LubimyCzytac", image: "ghcr.io/bookorbit/lubimyczytac-provider" },
+  // Aladin stopped issuing Open API keys on 2026-09-04 and ends the API on 2026-10-30, with no replacement.
+  aladin: { label: "Aladin", image: null },
+};
+
+export type MovedMetadataProviderKey = keyof typeof MOVED_METADATA_PROVIDERS;
+
+/** A key with its own id column and API field, built in or moved out. */
+export type KnownMetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof MetadataProviderKey];
+
+/** A provider compiled into BookOrbit. Maps that only make sense for these are keyed by this type. */
+export type BuiltInMetadataProviderKey = Exclude<KnownMetadataProviderKey, MovedMetadataProviderKey>;
+
+/**
+ * A provider an admin registered at runtime: an HTTP service speaking the book-metadata-provider
+ * spec. Its key is only known once registered, so any string that passes
+ * `EXTERNAL_METADATA_PROVIDER_KEY_PATTERN` and is not reserved can be one.
+ */
+export type ExternalMetadataProviderKey = string & { readonly __externalMetadataProviderKey?: never };
+
+/**
+ * Any provider, built-in or external. A `Record` over this type is not exhaustive (it collapses to a
+ * string index), so a map that must list every provider is keyed by `BuiltInMetadataProviderKey`
+ * instead, and everything else is a `Partial` with a fallback. A guard test enforces it.
+ */
+export type MetadataProviderKey = KnownMetadataProviderKey | ExternalMetadataProviderKey;
+
+/** Display names of the built-in providers, the one list every surface reads. */
+export const BUILT_IN_METADATA_PROVIDER_LABELS: Record<BuiltInMetadataProviderKey, string> = {
+  google: "Google Books",
+  goodreads: "Goodreads",
+  amazon: "Amazon",
+  hardcover: "Hardcover",
+  openLibrary: "Open Library",
+  itunes: "iTunes",
+  audible: "Audible",
+  audnexus: "AudNexus",
+  librofm: "Libro.fm",
+  comicvine: "ComicVine",
+  ranobedb: "RanobeDB",
+  kobo: "Kobo",
+};
+
+/** At most 32 characters, which fits every column and DTO that carries a provider key. */
+export const EXTERNAL_METADATA_PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
+
+const KNOWN_METADATA_PROVIDER_KEYS: ReadonlySet<string> = new Set(Object.values(MetadataProviderKey));
+const BUILT_IN_METADATA_PROVIDER_KEYS: ReadonlySet<string> = new Set(
+  Object.values(MetadataProviderKey).filter((key) => !(key in MOVED_METADATA_PROVIDERS)),
+);
+
+/**
+ * Keys an external provider may not take: every built-in, the author and cover-search sources, and
+ * pseudo-providers the clients use for themselves (the iOS editor files auto-fill results under
+ * `autofill`, Book Dock uses `auto`, the match view `fetched`).
+ */
+export const RESERVED_METADATA_PROVIDER_KEYS: readonly string[] = [
+  ...BUILT_IN_METADATA_PROVIDER_KEYS,
+  "openlibrary",
+  "googlebooks",
+  "duckduckgo",
+  "any",
+  "all",
+  "none",
+  "auto",
+  "autofill",
+  "fetched",
+  "file",
+  "manual",
+  "custom",
+  "unknown",
+  "builtin",
+  "external",
+];
+
+const RESERVED_KEY_SET: ReadonlySet<string> = new Set(RESERVED_METADATA_PROVIDER_KEYS.map((key) => key.toLowerCase()));
+
+export function isBuiltInMetadataProviderKey(key: string): key is BuiltInMetadataProviderKey {
+  return BUILT_IN_METADATA_PROVIDER_KEYS.has(key);
+}
+
+/** Whether the key's ids live in their own column and API field, rather than with other external ids. */
+export function isKnownMetadataProviderKey(key: string): key is KnownMetadataProviderKey {
+  return KNOWN_METADATA_PROVIDER_KEYS.has(key);
+}
+
+export function isMovedMetadataProviderKey(key: string): key is MovedMetadataProviderKey {
+  return Object.prototype.hasOwnProperty.call(MOVED_METADATA_PROVIDERS, key);
+}
+
+/** Syntax only: whether `key` could name an external provider. Registration also checks collisions. */
+export function isExternalMetadataProviderKeySyntax(key: string): boolean {
+  return EXTERNAL_METADATA_PROVIDER_KEY_PATTERN.test(key) && !RESERVED_KEY_SET.has(key);
+}
+
+/** Whether `key` is a built-in or could name an external provider. Says nothing about registration. */
+export function isMetadataProviderKeySyntax(key: unknown): key is MetadataProviderKey {
+  return typeof key === "string" && (isBuiltInMetadataProviderKey(key) || isExternalMetadataProviderKeySyntax(key));
+}
 
 export interface MetadataSeriesMembership {
   seriesName: string;
@@ -125,6 +238,11 @@ export interface MetadataCandidate {
   comicMetadata?: ComicMetadataFields;
   communityRating?: number;
   communityRatingCount?: number;
+  /**
+   * The medium the provider says this record is, where it says: a light novel and its manga share a
+   * title, and this tells them apart. Absent from older servers and from providers that do not say.
+   */
+  mediaKind?: ConcreteBookMediaKind;
 }
 
 /**
@@ -133,10 +251,21 @@ export interface MetadataCandidate {
  */
 export type MetadataSearchCandidateEvent = MetadataCandidate & { cache?: MetadataCandidateCacheInfo };
 
+/** Whether a provider is compiled into BookOrbit or registered at runtime over HTTP. */
+export type MetadataProviderSource = "builtin" | "external";
+
 export interface MetadataProviderInfo {
   key: MetadataProviderKey;
   label: string;
   identifiable: boolean;
+  /** Absent on servers older than external providers. */
+  source?: MetadataProviderSource;
+  /**
+   * An external provider's icon, served by BookOrbit, and its brand colour (`#rrggbb`). Absent for
+   * built-ins, whose clients bundle their own, and for a provider that declares none.
+   */
+  iconUrl?: string;
+  color?: string;
   selectedByFieldRules?: boolean;
   /** Zero-based priority for the effective Cover field rule. Absent when the provider is not used for covers. */
   coverPriority?: number;

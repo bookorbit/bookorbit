@@ -1,6 +1,6 @@
 import { extractFb2Cover } from '../lib/cover-fb2';
 import { parseFb2File } from '../lib/fb2-parser';
-import type { FormatExtractor, ParsedBookData } from './format-extractor.interface';
+import type { FormatExtractOptions, FormatExtractor, ParsedBookData } from './format-extractor.interface';
 
 function toNumber(value: string | undefined): number | null {
   if (!value) return null;
@@ -9,8 +9,11 @@ function toNumber(value: string | undefined): number | null {
 }
 
 export class Fb2FormatExtractor implements FormatExtractor {
-  async extract(absolutePath: string): Promise<ParsedBookData | null> {
-    const [fb2, cover] = await Promise.all([parseFb2File(absolutePath), extractFb2Cover(absolutePath).catch(() => null)]);
+  async extract(absolutePath: string, options?: FormatExtractOptions): Promise<ParsedBookData | null> {
+    const [fb2, cover] = await Promise.all([
+      parseFb2File(absolutePath),
+      options?.cover === false ? null : extractFb2Cover(absolutePath).catch(() => null),
+    ]);
     if (!fb2) return null;
 
     const custom = fb2.custom;

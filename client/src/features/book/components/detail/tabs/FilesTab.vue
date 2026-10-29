@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, toRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useElementSize } from '@vueuse/core'
 import { FilePlus, Files, X } from '@lucide/vue'
-import type { BookDetail } from '@bookorbit/types'
+import type { BookDetail, CreateReadAloudJobRequest, ReadAloudDecisions, ReadAloudJobInput } from '@bookorbit/types'
 import { Permission } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { useBookFileTree, type SortKey, type TreeFile } from '@/features/book/composables/useBookFileTree'
 import { findFileWriteTarget } from '@/features/book/lib/file-write-targets'
 import FilesHeroBar from '../files/FilesHeroBar.vue'
@@ -18,16 +19,22 @@ import FileListCard from '../files/FileListCard.vue'
 import FileDetailCard from '../files/FileDetailCard.vue'
 import WriteBackCard from '../files/WriteBackCard.vue'
 import AddBookFileModal from './AddBookFileModal.vue'
+import ReadAloudDialog from '@/features/read-aloud/components/ReadAloudDialog.vue'
+import ReadAloudJobCard from '@/features/read-aloud/components/ReadAloudJobCard.vue'
+import { useReadAloud } from '@/features/read-aloud/composables/useReadAloud'
+import { isCompletedJob, readAloudEntryNote, resolveReadAloudEntry } from '@/features/read-aloud/lib/read-aloud'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ refetch: [] }>()
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const { downloadFile: downloadBookFile } = useBookDownload()
-const { hasPermission } = usePermissions()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { hasLibraryPermission } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
+const { user } = useAuth()
 
 const book = toRef(props, 'book')
 const {
@@ -50,6 +57,50 @@ const canUpload = computed(() => hasPermission(Permission.LibraryUpload))
 const canDownload = computed(() => hasPermission('library_download'))
 const canEdit = canEditMetadata
 const canDelete = computed(() => hasPermission('library_delete_books'))
+/** Demo accounts are refused by every read-aloud route, so they never see the entry or probe for it. */
+const canGenerateReadAloud = computed(() => hasPermission(Permission.LibraryGenerateReadAloud) && !isDemoRestrictedAccount.value)
+const readAloudBookId = computed(() => props.book.id)
+const readAloudFileIds = computed(() => props.book.files.map((file) => file.id))
+const viewerId = computed(() => user.value?.id ?? null)
+const readAloud = useReadAloud({
+  bookId: readAloudBookId,
+  enabled: canGenerateReadAloud,
+  fileIds: readAloudFileIds,
+  viewerId,
+  onJobCompleted: handleReadAloudCompleted,
+})
+const readAloudDialogOpen = ref(false)
+/** A previous job's input when the dialog opens for "Start over"; null for a fresh start. */
+const readAloudDialogInitial = ref<ReadAloudJobInput | null>(null)
+const readAloudCreateError = ref<string | null>(null)
+
+const readAloudEntry = computed(() =>
+  resolveReadAloudEntry({
+    enabled: canGenerateReadAloud.value,
+    capability: readAloud.capability.value,
+    loadFailed: readAloud.loadFailed.value,
+    job: readAloud.job.value,
+  }),
+)
+
+/**
+ * The card a job earns on this tab: dismissed jobs are gone everywhere, and a finished job whose
+ * file was deleted has nothing left to point at.
+ */
+const readAloudCardJob = computed(() => {
+  const job = readAloud.job.value
+  if (!job || job.dismissedAt !== null) return null
+  if (isCompletedJob(job) && job.outputFileId === null) return null
+  return job
+})
+
+const readAloudNote = computed(() =>
+  readAloudEntryNote(readAloudEntry.value, { failedChecks: readAloud.failedChecks.value, jobCardShown: readAloudCardJob.value !== null }, t),
+)
+
+function handleReadAloudCompleted() {
+  emit('refetch')
+}
 
 /**
  * The rail turns into a sheet on the CSS side at 40rem of *tab* width, so the decision to open one
@@ -77,6 +128,9 @@ watch(
   () => props.book.id,
   () => {
     sheetOpen.value = false
+    readAloudDialogOpen.value = false
+    readAloudDialogInitial.value = null
+    readAloudCreateError.value = null
   },
 )
 watch(isPhone, (phone) => {
@@ -158,6 +212,103 @@ const deleteError = ref<string | null>(null)
 function openAddFileModal() {
   addFileModalOpen.value = true
 }
+
+function openReadAloudDialog() {
+  if (readAloudEntry.value.kind !== 'available') return
+  readAloudDialogInitial.value = null
+  readAloudCreateError.value = null
+  readAloudDialogOpen.value = true
+}
+
+function startOverReadAloud() {
+  const job = readAloud.job.value
+  if (!job || readAloudEntry.value.kind !== 'available') return
+  readAloudDialogInitial.value = job.input
+  readAloudCreateError.value = null
+  readAloudDialogOpen.value = true
+}
+
+function closeReadAloudDialog() {
+  if (readAloud.action.value !== 'create') readAloudDialogOpen.value = false
+}
+
+/**
+ * The Details tab offers a read-aloud and lands here with the request in the URL. The dialog opens
+ * once the availability answer is in, only when it says yes, and the request is consumed either way
+ * so a reload or a later visit does not reopen it.
+ */
+let pendingReadAloudCreate = route.query.readAloud === 'create'
+
+function consumeReadAloudRequest() {
+  pendingReadAloudCreate = false
+  const query = { ...route.query }
+  delete query.readAloud
+  void router.replace({ query })
+}
+
+watch(
+  () => [readAloudEntry.value.kind, readAloud.capability.value, readAloud.loadFailed.value, canGenerateReadAloud.value] as const,
+  ([kind, capability, failed, allowed]) => {
+    if (!pendingReadAloudCreate) return
+    if (!allowed) {
+      consumeReadAloudRequest()
+      return
+    }
+    if (kind === 'available') {
+      consumeReadAloudRequest()
+      openReadAloudDialog()
+      return
+    }
+    if (capability !== null || failed) consumeReadAloudRequest()
+  },
+  { immediate: true },
+)
+
+function retryReadAloudCheck() {
+  if (!readAloud.loading.value) void readAloud.reload()
+}
+
+async function createReadAloud(input: CreateReadAloudJobRequest) {
+  readAloudCreateError.value = null
+  const result = await readAloud.create(input)
+  if (result.ok) readAloudDialogOpen.value = false
+  else readAloudCreateError.value = result.errorKey
+}
+
+function cancelReadAloud() {
+  void readAloud.cancel()
+}
+
+function publishReadAloud() {
+  void readAloud.publish()
+}
+
+function retryReadAloud() {
+  void readAloud.retry()
+}
+
+function resyncReadAloud(decisions: ReadAloudDecisions) {
+  void readAloud.resync(decisions)
+}
+
+function dismissReadAloud() {
+  void readAloud.dismiss()
+}
+
+function openReadAloudOutput(fileId: number) {
+  router.push({ name: 'reader', params: { bookId: props.book.id, fileId }, query: { format: 'epub' } })
+}
+
+/** Selects the new file and brings its row into view, with the keyboard on it. */
+async function showReadAloudOutput(fileId: number) {
+  selectFile(fileId)
+  await nextTick()
+  const row = tabRoot.value?.querySelector<HTMLElement>('.files-list [aria-current="true"]')
+  if (!row) return
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  row.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' })
+  row.focus({ preventScroll: true })
+}
 function closeAddFileModal() {
   addFileModalOpen.value = false
 }
@@ -209,6 +360,9 @@ function closeDeleteModal() {
 async function confirmDelete() {
   const target = deleteTarget.value
   if (!target || deleting.value) return
+  const deletesReadAloud =
+    target.id === readAloud.job.value?.outputFileId ||
+    (readAloud.capability.value?.existingReadAlongs.some((file) => file.fileId === target.id) ?? false)
   deleting.value = true
   deleteError.value = null
   try {
@@ -216,6 +370,7 @@ async function confirmDelete() {
     if (!response.ok) throw new Error(t('book.detail.files.deleteFailed'))
     deleteTarget.value = null
     sheetOpen.value = false
+    if (deletesReadAloud) void readAloud.reload()
     emit('refetch')
   } catch (error) {
     deleteError.value = error instanceof Error ? error.message : t('book.detail.files.deleteFailed')
@@ -235,11 +390,36 @@ async function confirmDelete() {
       :format-shares="formatShares"
       :folder-segments="folderSegments.relative"
       :can-upload="canUpload"
+      :show-read-aloud="readAloudEntry.kind !== 'hidden'"
+      :read-aloud-available="readAloudEntry.kind === 'available'"
+      :read-aloud-note="readAloudNote"
+      :read-aloud-retryable="readAloudEntry.kind === 'loadFailed'"
+      :read-aloud-checking="readAloud.loading.value"
       :sort-key="sortKey"
       :sort-direction="sortDirection"
       :sort-options="sortOptions"
       @sort="handleSort"
       @add-file="openAddFileModal"
+      @generate-read-aloud="openReadAloudDialog"
+      @retry-read-aloud="retryReadAloudCheck"
+    />
+
+    <ReadAloudJobCard
+      v-if="readAloudCardJob"
+      :key="readAloudCardJob.id"
+      :job="readAloudCardJob"
+      :action="readAloud.action.value"
+      :error-key="readAloud.jobErrorKey.value"
+      :can-start-over="readAloudEntry.kind === 'available'"
+      :viewer-id="viewerId"
+      @cancel="cancelReadAloud"
+      @publish="publishReadAloud"
+      @retry="retryReadAloud"
+      @resync="resyncReadAloud"
+      @dismiss="dismissReadAloud"
+      @start-over="startOverReadAloud"
+      @open-output="openReadAloudOutput"
+      @show-output="showReadAloudOutput"
     />
 
     <!-- Empty state -->
@@ -325,6 +505,18 @@ async function confirmDelete() {
     </div>
 
     <p v-if="copiedPathFileId != null" role="status" class="sr-only">{{ t('book.detail.files.pathCopied') }}</p>
+
+    <ReadAloudDialog
+      v-if="readAloud.capability.value"
+      :open="readAloudDialogOpen"
+      :capability="readAloud.capability.value"
+      :default-language="book.language"
+      :initial="readAloudDialogInitial"
+      :busy="readAloud.action.value === 'create'"
+      :error="readAloudCreateError"
+      @close="closeReadAloudDialog"
+      @create="createReadAloud"
+    />
 
     <!-- Rename -->
     <div v-if="renameTarget" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeRenameModal">

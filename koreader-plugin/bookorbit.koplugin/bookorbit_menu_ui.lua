@@ -23,12 +23,12 @@ local MenuUI = {}
 
 -- Page margins step with width, like the board's.
 function MenuUI.mx()
-    local W = BoardMetrics.get().W
+    local W = BoardMetrics.layoutW()
     return px(W >= 900 and 28 or W >= 700 and 24 or W >= 560 and 20 or 16)
 end
 
 function MenuUI.wide()
-    return BoardMetrics.get().W >= 760
+    return BoardMetrics.layoutW() >= 760
 end
 
 function MenuUI.landscape()
@@ -227,9 +227,22 @@ function MenuUI.row(w, o)
     local right_w = right and (right:getSize().w + px(12)) or 0
     local text_w = math.max(px(10), w - icon_w - right_w)
     local lines = o.sublines or 1
-    local col_items = { text(o.label, { s = o.s or 16, b = o.bold, w = text_w, data = o.data }) }
+    local s = o.s or 16
+    local label_s = BoardUI.fitSize(o.label, { s = s, b = o.bold }, text_w, s - 2)
+    -- Like a subtitle, an interface label too long even two sizes down
+    -- takes a second line rather than an ellipsis.
+    local label_lines = (not o.data and BoardUI.fitSize(o.label, { s = s - 2, b = o.bold }, text_w, s - 3) < s - 2) and 2 or nil
+    if label_lines then label_s = s - 2 end
+    local col_items = { text(o.label, { s = label_s, b = o.bold, w = text_w, lines = label_lines, data = o.data }) }
     if o.sub then
-        table.insert(col_items, text(o.sub, { s = 13, col = INK.g4, w = text_w, lines = lines, data = o.sub_data }))
+        local sub_s = 13
+        if lines == 1 then
+            sub_s = BoardUI.fitSize(o.sub, { s = 13 }, text_w, 12)
+            -- Interface copy too long for one line even at 12 takes a second
+            -- line rather than an ellipsis.
+            if not o.sub_data and BoardUI.fitSize(o.sub, { s = 12 }, text_w, 11) < 12 then lines, sub_s = 2, 13 end
+        end
+        table.insert(col_items, text(o.sub, { s = sub_s, col = INK.g4, w = text_w, lines = lines, data = o.sub_data }))
     end
     local column = vstack({ w = text_w }, col_items)
     local min_h = px(o.h or (o.sub and (lines > 1 and 72 or 60) or 52))

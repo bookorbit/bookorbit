@@ -107,8 +107,15 @@ describe('MetadataFetchController', () => {
     ] as never);
 
     await expect(controller.listProviders({}, user)).resolves.toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 4, audioCoverPriority: 6 },
-      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, coverPriority: 5, audioCoverPriority: 7 },
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, source: 'builtin', coverPriority: 4, audioCoverPriority: 6 },
+      {
+        key: MetadataProviderKey.OPEN_LIBRARY,
+        label: 'OpenLibrary',
+        identifiable: false,
+        source: 'builtin',
+        coverPriority: 5,
+        audioCoverPriority: 7,
+      },
     ]);
   });
 
@@ -139,6 +146,7 @@ describe('MetadataFetchController', () => {
         key: MetadataProviderKey.GOOGLE,
         label: 'Google Books',
         identifiable: true,
+        source: 'builtin',
         selectedByFieldRules: true,
         coverPriority: 4,
         audioCoverPriority: 6,
@@ -147,11 +155,20 @@ describe('MetadataFetchController', () => {
         key: MetadataProviderKey.OPEN_LIBRARY,
         label: 'OpenLibrary',
         identifiable: false,
+        source: 'builtin',
         selectedByFieldRules: false,
         coverPriority: 5,
         audioCoverPriority: 7,
       },
-      { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true, selectedByFieldRules: true, coverPriority: 2, audioCoverPriority: 4 },
+      {
+        key: MetadataProviderKey.KOBO,
+        label: 'Kobo',
+        identifiable: true,
+        source: 'builtin',
+        selectedByFieldRules: true,
+        coverPriority: 2,
+        audioCoverPriority: 4,
+      },
     ]);
   });
 
@@ -169,8 +186,8 @@ describe('MetadataFetchController', () => {
     const result = await controller.listProviders({}, user);
 
     expect(result).toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 1, audioCoverPriority: 0 },
-      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, coverPriority: 0 },
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, source: 'builtin', coverPriority: 1, audioCoverPriority: 0 },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, source: 'builtin', coverPriority: 0 },
     ]);
   });
 
@@ -351,6 +368,29 @@ describe('MetadataFetchController', () => {
     expect(service.search.mock.calls[1][0].resultsPerProvider).toBeUndefined();
   });
 
+  it("searches as the book's own medium unless the caller states one", async () => {
+    service.getStoredProviderContext.mockResolvedValue({
+      libraryId: 5,
+      title: null,
+      seriesName: null,
+      seriesIndex: null,
+      providerIds: {},
+      textMediaKind: 'comic',
+    });
+    pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.GOOGLE]);
+    service.search.mockReturnValue(of());
+
+    const run = async (dto: Parameters<typeof controller.stream>[0]) => {
+      await firstValueFrom((await controller.stream(dto, user)).pipe(toArray()));
+      return service.search.mock.calls.at(-1)?.[0].mediaKind;
+    };
+
+    expect(await run({ bookId: 12, title: 'Berserk Vol. 3' })).toBe('comic');
+    expect(await run({ bookId: 12, title: 'Berserk Vol. 3', isAudiobook: true })).toBe('audiobook');
+    expect(await run({ bookId: 12, title: 'Berserk Vol. 3', mediaKind: 'ebook' })).toBe('ebook');
+    expect(await run({ title: 'Berserk Vol. 3' })).toBeUndefined();
+  });
+
   it('does not treat the prefilled book title as a query the user typed', async () => {
     service.getStoredProviderContext.mockResolvedValue({
       libraryId: 5,
@@ -391,7 +431,6 @@ describe('MetadataFetchController', () => {
         audible: { enabled: false, domain: 'com' },
         audnexus: { enabled: false },
         kobo: { enabled: true, country: 'us', language: 'en' },
-        lubimyczytac: { enabled: false },
       }),
     );
     service.search.mockReturnValue(of(candidateEvent({ provider: MetadataProviderKey.KOBO, providerId: 'dune-1', title: 'Dune' })));
@@ -796,7 +835,5 @@ function makeProviderConfig(overrides: Partial<ProviderConfigurations> = {}): Pr
     comicvine: { enabled: false, apiKey: '', ...overrides.comicvine },
     ranobedb: { enabled: false, ...overrides.ranobedb },
     kobo: { enabled: true, country: 'us', language: 'en', ...overrides.kobo },
-    lubimyczytac: { enabled: false, ...overrides.lubimyczytac },
-    aladin: { enabled: false, ttbKey: '', ...overrides.aladin },
   };
 }

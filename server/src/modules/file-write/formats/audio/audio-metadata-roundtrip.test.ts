@@ -46,7 +46,7 @@ describe('audio metadata round-trip', () => {
     const filePath = join(tempDir, 'fixture.mp3');
     await generateAudioFixture(filePath);
 
-    const writer = new Mp3AudioFormatWriter(new AudioMetadataEmbedder());
+    const writer = new Mp3AudioFormatWriter(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
     await writer.write(
       filePath,
       {
@@ -113,7 +113,7 @@ describe('audio metadata round-trip', () => {
     const filePath = join(tempDir, `fixture.${format}`);
     await generateAudioFixture(filePath, 'aac');
 
-    const writer = new Writer(new AudioMetadataEmbedder());
+    const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
     await writer.write(
       filePath,
       {
@@ -179,7 +179,7 @@ describe('audio metadata round-trip', () => {
     await generateAudioFixture(filePath, 'aac');
     await generateCoverFixture(coverPath);
 
-    const writer = new Writer(new AudioMetadataEmbedder());
+    const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
     await writer.write(
       filePath,
       {
@@ -237,7 +237,7 @@ describe('audio metadata round-trip', () => {
     const coverPath = join(tempDir, 'cover.jpg');
     await generateAudioFixture(filePath, 'aac');
     await generateCoverFixture(coverPath);
-    const writer = new M4bAudioFormatWriter(new AudioMetadataEmbedder());
+    const writer = new M4bAudioFormatWriter(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
     await writer.write(
       filePath,
       { title: 'Old Title', coverBytes: await readFile(coverPath) },
@@ -274,7 +274,7 @@ describe('audio metadata round-trip', () => {
     await generateAudioFixture(filePath, 'aac');
     await generateCoverFixture(coverPath);
 
-    const writer = new Writer(new AudioMetadataEmbedder());
+    const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
     await writer.write(
       filePath,
       {
@@ -334,7 +334,7 @@ describe('audio metadata round-trip', () => {
     await generateChapteredAudioFixture(filePath, coverPath);
     const artBefore = await extractArt(filePath);
 
-    const writer = new Writer(new AudioMetadataEmbedder());
+    const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
     await expect(
       writer.write(filePath, { title: 'Chaptered Title', coverBytes: null }, { dryRun: false, fieldMask: createBookWriteFieldMask() }),
     ).resolves.toEqual(expect.objectContaining({ status: 'success' }));
@@ -355,7 +355,7 @@ describe('audio metadata round-trip', () => {
       await generateCoverFixture(coverPath);
       await generateChapteredAudioFixture(filePath, coverPath, 'libmp3lame');
 
-      const writer = new Writer(new AudioMetadataEmbedder());
+      const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
       await expect(
         writer.write(
           filePath,
@@ -391,7 +391,7 @@ describe('audio metadata round-trip', () => {
       await generateChapteredAudioFixture(filePath, coverPath, 'libmp3lame');
       const artBefore = await extractArt(filePath);
 
-      const writer = new Writer(new AudioMetadataEmbedder());
+      const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
       await expect(
         writer.write(
           filePath,
@@ -412,7 +412,7 @@ describe('audio metadata round-trip', () => {
       await generateChapteredAudioFixture(filePath, coverPath, 'libmp3lame');
       vi.stubEnv('FFPROBE_PATH', join(tempDir, 'missing-ffprobe'));
 
-      const writer = new Writer(new AudioMetadataEmbedder());
+      const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
       await expect(
         writer.write(
           filePath,
@@ -445,7 +445,7 @@ describe('audio metadata round-trip', () => {
         filePath,
       ]);
 
-      const writer = new Writer(new AudioMetadataEmbedder());
+      const writer = new Writer(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
       await expect(
         writer.write(filePath, { title: 'Bare Title', subtitle: 'Bare Subtitle' }, { dryRun: false, fieldMask: createBookWriteFieldMask() }),
       ).resolves.toEqual(expect.objectContaining({ status: 'success' }));
@@ -461,7 +461,7 @@ describe('audio metadata round-trip', () => {
     await generateCoverFixture(coverPath);
     await generateChapteredAudioFixture(filePath, coverPath, 'aac');
 
-    const writer = new M4bAudioFormatWriter(new AudioMetadataEmbedder());
+    const writer = new M4bAudioFormatWriter(new AudioMetadataEmbedder({ ffmpegPath, ffprobePath }));
     await writer.write(
       filePath,
       { title: 'Branded', coverBytes: await readFile(coverPath) },

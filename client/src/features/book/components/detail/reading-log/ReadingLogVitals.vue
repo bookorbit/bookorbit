@@ -6,6 +6,7 @@ import type { BookDetail, BookReadingSessionStats, ReadStatus, UserBookStatus } 
 import { isAudioFormat } from '@bookorbit/types'
 import { bookFormatEntries, formatKeyName } from '@/features/book/lib/book-formats'
 import { api } from '@/lib/api'
+import { fetchBookProgress } from '@/lib/reading-progress'
 import { formatDate, formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { STATUS_COLORS, STATUS_ICONS, STATUS_OPTIONS, useBookStatus } from '@/features/book/composables/useBookStatus'
@@ -186,18 +187,15 @@ async function loadProgress(silent = false) {
   const bookId = props.book.id
   const hasAudio = props.book.files.some((file) => file.format != null && isAudioFormat(file.format))
   try {
-    const [progressRes, audioRes] = await Promise.all([
-      api(`/api/v1/books/${bookId}/progress`).catch(() => null),
+    const [progressRows, audioRes] = await Promise.all([
+      fetchBookProgress(bookId).catch(() => null),
       hasAudio ? api(`/api/v1/audiobooks/${bookId}/playback-state`).catch(() => null) : Promise.resolve(null),
     ])
     if (bookId !== props.book.id) return
 
     let max = 0
-    if (progressRes?.ok) {
-      const rows = (await progressRes.json()) as { fileId: number; percentage: number }[]
-      for (const row of rows) {
-        if (Number.isFinite(row.percentage)) max = Math.max(max, row.percentage)
-      }
+    for (const row of progressRows ?? []) {
+      if (Number.isFinite(row.percentage)) max = Math.max(max, row.percentage)
     }
     if (audioRes?.ok) {
       const data = (await audioRes.json()) as { percentage?: number } | null

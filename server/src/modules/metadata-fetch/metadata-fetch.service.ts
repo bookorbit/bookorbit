@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import {
   CoverMedia,
   MetadataCacheServedProvider,
@@ -13,9 +13,11 @@ import { filter, from, map, merge, Observable, switchMap } from 'rxjs';
 import { canonicalId } from '../../common/provider-cache/canonicalize';
 import { DEFAULT_CACHE_DIRECTIVE, type CacheDirective } from '../../common/provider-cache/provider-cache-spec';
 import type { RequestUser } from '../../common/types/request-user';
+import { resolveTextMediaKind } from '../../common/utils/book-media.utils';
 import { ProviderOperationExecutor } from '../metadata-cache/provider-operation-executor.service';
 import { filterAndRank } from './candidate-relevance';
 import { MetadataFetchRepository, StoredProviderIdsRow } from './metadata-fetch.repository';
+import { ProviderIdStore } from './provider-ids/provider-id.store';
 import { ProviderRun, type RunOperation } from './metadata-provider-run';
 import { canonicalizeSearchParams } from './metadata-search-canonical';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
@@ -76,6 +78,8 @@ export interface StoredProviderContext {
   seriesIndex: string | null;
   providerIds: Partial<Record<MetadataProviderKey, string>>;
   coverMedia: CoverMedia;
+  /** What the book is read as, audio aside; undefined when no file says. */
+  textMediaKind: 'ebook' | 'comic' | undefined;
 }
 
 @Injectable()
@@ -88,6 +92,7 @@ export class MetadataFetchService {
     private readonly throttleTracker: ProviderThrottleTracker,
     private readonly metadataFetchRepository: MetadataFetchRepository,
     private readonly executor: ProviderOperationExecutor,
+    @Optional() private readonly providerIdStore?: ProviderIdStore,
   ) {}
 
   search(params: MetadataSearchParams, keys?: MetadataProviderKey[], options?: MetadataSearchOptions): Observable<MetadataSearchEvent> {
@@ -142,8 +147,9 @@ export class MetadataFetchService {
       title: row.title,
       seriesName: row.seriesName,
       seriesIndex: row.seriesIndex,
-      providerIds: this.mapStoredProviderIds(row),
+      providerIds: { ...this.mapStoredProviderIds(row), ...(await this.providerIdStore?.read(bookId)) },
       coverMedia: row.coverMedia,
+      textMediaKind: resolveTextMediaKind(row.mediaFiles, row.primaryFileId),
     };
   }
 

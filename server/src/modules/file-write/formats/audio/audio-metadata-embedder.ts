@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
+import { audioToolsConfig } from '../../../../config/config';
 import { execFile as execFileCallback } from 'child_process';
 import { randomUUID } from 'crypto';
 import { unlink, writeFile } from 'fs/promises';
@@ -6,6 +8,7 @@ import { dirname, join } from 'path';
 import sharp from 'sharp';
 import { promisify } from 'util';
 
+import type { FileChapterSpan } from '../../../../common/utils/audiobook-chapters.utils';
 import { FORMAT_M4A, FORMAT_M4B, FORMAT_MP3 } from '../../file-write.constants';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
 import { FfmpegStalledError, runFfmpeg } from './ffmpeg-runner';
@@ -31,6 +34,8 @@ export interface AudioMetadataArg {
 export interface AudioMetadataWriteInput {
   coverBytes?: Buffer | null;
   metadata: AudioMetadataArg[];
+  /** Replaces the file's chapters when given; otherwise they are carried over untouched. */
+  chapters?: FileChapterSpan[] | null;
 }
 
 @Injectable()
@@ -41,28 +46,34 @@ export class AudioMetadataEmbedder {
    */
   private readonly normalizedCovers = new WeakMap<Buffer, Promise<Buffer>>();
 
+  constructor(@Inject(audioToolsConfig.KEY) private readonly config: ConfigType<typeof audioToolsConfig>) {}
+
   async embedMetadata(filePath: string, format: string, input: AudioMetadataWriteInput): Promise<void> {
     const dir = dirname(filePath);
     const id = randomUUID();
     const coverPath = input.coverBytes ? join(dir, `.bookorbit-cover-${id}.jpg`) : null;
+    const chaptersPath = input.chapters ? join(dir, `.bookorbit-chapters-${id}.ffmeta`) : null;
     const tempPath = join(dir, `.bookorbit-write-${id}.${format.toLowerCase()}`);
 
     try {
       if (coverPath && input.coverBytes) {
         await writeFile(coverPath, await this.normalizedCover(input.coverBytes));
       }
-      const streams = isMp4Format(format) ? await probeStreams(filePath) : null;
+      if (chaptersPath && input.chapters) {
+        await writeFile(chaptersPath, buildChapterMetadata(input.chapters), 'utf8');
+      }
+      const streams = isMp4Format(format) ? await probeStreams(filePath, this.config.ffprobePath) : null;
       const useMp4MetadataTags = shouldUseMp4MetadataTags(format, coverPath, streams);
       const muxer = outputMuxer(format, streams);
       const ffmpegArgs = (outputFormat: string | undefined) =>
-        buildFfmpegArgs(filePath, coverPath, tempPath, format, input.metadata, { useMp4MetadataTags, muxer: outputFormat });
+        buildFfmpegArgs(filePath, coverPath, tempPath, format, input.metadata, { useMp4MetadataTags, muxer: outputFormat, chaptersPath });
       try {
-        await runFfmpeg(resolveFfmpegPath(), ffmpegArgs(muxer));
+        await runFfmpeg(this.config.ffmpegPath, ffmpegArgs(muxer));
       } catch (error) {
         // Unprobed, the file may hold audio the ipod muxer refuses, such as MP3; the mp4 muxer takes any of
         // it. A stalled write is not a muxer refusal, and a second attempt would only double the wait.
         if (!isMp4Format(format) || streams || error instanceof FfmpegStalledError) throw error;
-        await runFfmpeg(resolveFfmpegPath(), ffmpegArgs(MP4_MUXER)).catch(() => {
+        await runFfmpeg(this.config.ffmpegPath, ffmpegArgs(MP4_MUXER)).catch(() => {
           throw error;
         });
       }
@@ -76,6 +87,9 @@ export class AudioMetadataEmbedder {
     } finally {
       if (coverPath) {
         await removeFileIfPresent(coverPath);
+      }
+      if (chaptersPath) {
+        await removeFileIfPresent(chaptersPath);
       }
     }
   }
@@ -97,19 +111,28 @@ function buildFfmpegArgs(
   tempPath: string,
   format: string,
   metadata: AudioMetadataArg[],
-  options?: { useMp4MetadataTags?: boolean; muxer?: string },
+  options?: { useMp4MetadataTags?: boolean; muxer?: string; chaptersPath?: string | null },
 ): string[] {
   const args = ['-v', 'error', '-y', '-i', filePath];
+  const chaptersPath = options?.chaptersPath ?? null;
 
   if (coverPath) {
-    args.push('-i', coverPath, '-map', '0:a', '-map', '0:s?', '-map', '1:v:0');
+    args.push('-i', coverPath);
+  }
+  if (chaptersPath) {
+    args.push('-f', 'ffmetadata', '-i', chaptersPath);
+  }
+
+  if (coverPath) {
+    args.push('-map', '0:a', '-map', '0:s?', '-map', '1:v:0');
   } else {
     // Data streams are never copied: an M4B chapter track cannot be stream-copied into a new MP4, which
     // failed every tag-only write of an audiobook with chapters. -map_chapters rebuilds that track.
     args.push('-map', '0:a', '-map', '0:v?', '-map', '0:s?');
   }
 
-  args.push('-map_metadata', '0', '-map_chapters', '0', '-c', 'copy');
+  const chaptersInput = chaptersPath ? (coverPath ? 2 : 1) : 0;
+  args.push('-map_metadata', '0', '-map_chapters', String(chaptersInput), '-c', 'copy');
 
   if (format.toLowerCase() === FORMAT_MP3) {
     args.push('-id3v2_version', '3');
@@ -167,13 +190,11 @@ function outputMuxer(format: string, streams: ProbedStream[] | null): string | u
   return ipodRejectsAudio ? MP4_MUXER : undefined;
 }
 
-async function probeStreams(filePath: string): Promise<ProbedStream[] | null> {
+async function probeStreams(filePath: string, ffprobePath: string): Promise<ProbedStream[] | null> {
   try {
-    const { stdout } = await execFile(
-      resolveFfprobePath(),
-      ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'json', filePath],
-      { timeout: FFPROBE_TIMEOUT_MS },
-    );
+    const { stdout } = await execFile(ffprobePath, ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'json', filePath], {
+      timeout: FFPROBE_TIMEOUT_MS,
+    });
     const parsed = JSON.parse(String(stdout)) as { streams?: Array<{ codec_type?: unknown; codec_name?: unknown }> };
     if (!Array.isArray(parsed.streams)) return null;
     return parsed.streams.map((stream) => ({
@@ -185,16 +206,46 @@ async function probeStreams(filePath: string): Promise<ProbedStream[] | null> {
   }
 }
 
+/** An ffmpeg metadata file holding only chapters, in milliseconds. */
+function buildChapterMetadata(chapters: readonly FileChapterSpan[]): string {
+  const lines = [';FFMETADATA1'];
+  for (const chapter of chapters) {
+    lines.push(
+      '[CHAPTER]',
+      'TIMEBASE=1/1000',
+      `START=${Math.round(chapter.startMs)}`,
+      `END=${Math.round(chapter.endMs)}`,
+      `title=${escapeMetadataValue(chapter.title)}`,
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function escapeMetadataValue(value: string): string {
+  return value.replace(/\r\n?/g, '\n').replace(/[\\=;#\n]/g, (character) => `\\${character}`);
+}
+
+/** The exact length of an audio file, which the stored whole seconds only approximate. */
+export async function probeAudioDurationMs(filePath: string, ffprobePath?: string): Promise<number | null> {
+  try {
+    const { stdout } = await execFile(
+      ffprobePath?.trim() || resolveFfprobePath(),
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', filePath],
+      { timeout: 30_000, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 },
+    );
+    const seconds = Number(String(stdout).trim());
+    return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function normalizeCoverJpeg(coverBytes: Buffer): Promise<Buffer> {
   return sharp(coverBytes).jpeg({ quality: 92 }).toBuffer();
 }
 
-function resolveFfmpegPath(): string {
-  return process.env.FFMPEG_PATH || 'ffmpeg';
-}
-
 function resolveFfprobePath(): string {
-  return process.env.FFPROBE_PATH || 'ffprobe';
+  return process.env.FFPROBE_PATH?.trim() || 'ffprobe';
 }
 
 async function removeFileIfPresent(path: string): Promise<void> {
@@ -208,4 +259,5 @@ async function removeFileIfPresent(path: string): Promise<void> {
 export const testing = {
   buildFfmpegArgs,
   outputMuxer,
+  buildChapterMetadata,
 };

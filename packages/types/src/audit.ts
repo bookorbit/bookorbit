@@ -43,6 +43,7 @@ export enum AuditAction {
   LibraryWriteMetadataToFiles = "library.write_metadata_to_files",
   LibraryBulkRename = "library.bulk_rename",
   LibraryRecomputeAddedAt = "library.recompute_added_at",
+  LibraryReapplyRegexMetadata = "library.reapply_regex_metadata",
 
   PodcastCreate = "podcast.create",
   PodcastUpdate = "podcast.update",
@@ -107,6 +108,10 @@ export enum AuditAction {
   RequestIndexerPluginInstall = "request_indexer.plugin.install",
   RequestIndexerPluginRemove = "request_indexer.plugin.remove",
 
+  MetadataHttpProviderCreate = "metadata_http_provider.create",
+  MetadataHttpProviderUpdate = "metadata_http_provider.update",
+  MetadataHttpProviderDelete = "metadata_http_provider.delete",
+
   AuthorUpdate = "author.update",
   AuthorDelete = "author.delete",
   AuthorMerge = "author.merge",
@@ -167,6 +172,7 @@ export enum AuditResource {
   BookRequest = "book_request",
   DownloadClient = "download_client",
   RequestIndexer = "request_indexer",
+  MetadataHttpProvider = "metadata_http_provider",
   Author = "author",
   AppSettings = "app_settings",
   Genre = "genre",
@@ -243,7 +249,7 @@ export const AUDIT_CATEGORY_PREFIXES: Record<Exclude<AuditCategory, "other">, re
   requests: ["book_request.", "download_client.", "request_indexer."],
   collections: ["collection.", "smart_scope."],
   devices: ["kobo.", "email."],
-  settings: ["app_settings.", "entity_manager.", "author.", "maintenance."],
+  settings: ["app_settings.", "entity_manager.", "author.", "maintenance.", "metadata_http_provider."],
 };
 
 export function getAuditCategory(action: string): AuditCategory {
@@ -273,7 +279,12 @@ export const AUDIT_SECURITY_GROUPS = {
     AuditAction.UserUnlock,
     AuditAction.OidcUserProvisioned,
   ],
-  passwords: [AuditAction.AuthPasswordChange, AuditAction.AuthPasswordResetRequest, AuditAction.AuthPasswordReset, AuditAction.AuthPasswordAdminReset],
+  passwords: [
+    AuditAction.AuthPasswordChange,
+    AuditAction.AuthPasswordResetRequest,
+    AuditAction.AuthPasswordReset,
+    AuditAction.AuthPasswordAdminReset,
+  ],
   permissions: [AuditAction.UserPermissionSet, AuditAction.UserSuperuserEnable, AuditAction.UserSuperuserDisable],
   access: [
     AuditAction.UserContentFiltersSet,

@@ -1,8 +1,17 @@
 import { computed, onScopeDispose, ref, watch } from 'vue'
-import { REGEX_METADATA_LIMITS, type RegexMetadataConfig, type RegexMetadataPreview, type RegexMetadataValidation } from '@bookorbit/types'
+import {
+  FOLDER_SERIES_REGEX_METADATA,
+  isFolderSeriesRegexMetadata,
+  REGEX_METADATA_LIMITS,
+  resolveRegexMetadataConfig,
+  type RegexMetadataConfig,
+  type RegexMetadataPreview,
+  type RegexMetadataValidation,
+} from '@bookorbit/types'
 import { api } from '@/lib/api'
 
-export function useRegexMetadataEditor(config: RegexMetadataConfig | null, libraryId?: number) {
+export function useRegexMetadataEditor(saved: RegexMetadataConfig | null, libraryId?: number) {
+  const config = resolveRegexMetadataConfig(saved)
   const enabled = ref(config !== null)
   const rules = ref(config?.rules.map((rule) => ({ ...rule })) ?? [{ pattern: '', flags: '' }])
   const relativePath = ref('')
@@ -120,8 +129,16 @@ export function useRegexMetadataEditor(config: RegexMetadataConfig | null, libra
     moveRule(index, 1)
   }
 
+  function applyFolderSeriesPreset() {
+    enabled.value = true
+    rules.value = FOLDER_SERIES_REGEX_METADATA.rules.map((rule) => ({ ...rule }))
+  }
+
   function value(): RegexMetadataConfig | null {
-    return enabled.value ? { rules: rules.value.map((rule) => ({ ...rule })) } : null
+    if (!enabled.value) return null
+    const config: RegexMetadataConfig = { rules: rules.value.map((rule) => ({ ...rule })) }
+    // Unedited preset rules stay marked as the preset, so the library keeps getting its fixes.
+    return isFolderSeriesRegexMetadata(config) ? { preset: 'folder_series', ...config } : config
   }
 
   async function preview() {
@@ -172,6 +189,7 @@ export function useRegexMetadataEditor(config: RegexMetadataConfig | null, libra
     removeRule,
     moveUp,
     moveDown,
+    applyFolderSeriesPreset,
     value,
     preview,
   }

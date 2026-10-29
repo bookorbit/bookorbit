@@ -7,7 +7,6 @@ import type { appConfig } from '../../../config/config';
 import type { ProviderConfigService } from '../../metadata-preferences/provider-config.service';
 import { ProviderThrottleError } from '../provider-throttle.error';
 import { ProviderThrottleTracker } from '../provider-throttle.tracker';
-import { AladinProvider } from './aladin/aladin.provider';
 import { AmazonProvider } from './amazon/amazon.provider';
 import { ComicVineClient } from './comicvine/comicvine.client';
 import { ComicVineProvider } from './comicvine/comicvine.provider';
@@ -19,7 +18,6 @@ import { ITunesProvider } from './itunes/itunes.provider';
 import { fetchKoboHtmlWithCloudscraper } from './kobo/kobo-cloudscraper.fetcher';
 import { KoboProvider } from './kobo/kobo.provider';
 import { LibroFmProvider } from './librofm/librofm.provider';
-import { LubimyczytacProvider } from './lubimyczytac/lubimyczytac.provider';
 
 vi.mock('./provider-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./provider-utils')>()),
@@ -47,8 +45,6 @@ const CONFIG: ProviderConfigurations = {
   comicvine: { enabled: true, apiKey: 'comicvine-key' },
   ranobedb: { enabled: true },
   kobo: { enabled: true, country: 'us', language: 'en' },
-  lubimyczytac: { enabled: true },
-  aladin: { enabled: true, ttbKey: 'aladin-key' },
 };
 
 const providerConfig = { getConfig: () => Promise.resolve(CONFIG) } as unknown as ProviderConfigService;
@@ -193,19 +189,6 @@ describe('amazon markers', () => {
   });
 });
 
-describe('lubimyczytac markers', () => {
-  it('marks a book page that does not parse as degraded', async () => {
-    const searchPage = '<a class="book-card__title" href="/ksiazka/123/dune">Dune</a>';
-    routeEgress((url) => html(url.pathname.startsWith('/szukaj') ? searchPage : EMPTY_PAGE));
-
-    const { record, value } = await runRecorded(() => new LubimyczytacProvider(providerConfig).search({ title: 'Dune' }));
-
-    expect(value).toEqual([]);
-    expect(record.unsuccessfulRequests()).toEqual([]);
-    expect(record.degradationReasons.length).toBeGreaterThan(0);
-  });
-});
-
 describe('librofm markers', () => {
   it('marks an audiobook whose details come back empty as degraded', async () => {
     routeEgress((url) =>
@@ -256,24 +239,6 @@ describe('api provider markers', () => {
     const { record } = await runRecorded(() => new GoogleProvider(providerConfig).lookupById('abc'));
 
     expect(record.failureReasons.length).toBeGreaterThan(0);
-  });
-
-  it('marks an Aladin body with neither items nor a result count as failed', async () => {
-    routeEgress(() => json({ version: '20131101' }));
-
-    const { record, value } = await runRecorded(() => new AladinProvider(providerConfig).search({ title: 'Dune' }));
-
-    expect(value).toEqual([]);
-    expect(record.failureReasons).toContain('aladin.search: response without results');
-  });
-
-  it('accepts an Aladin answer of no results without marking it', async () => {
-    routeEgress(() => json({ version: '20131101', totalResults: 0, item: [] }));
-
-    const { record, value } = await runRecorded(() => new AladinProvider(providerConfig).search({ title: 'Dune' }));
-
-    expect(value).toEqual([]);
-    expect(record.failureReasons).toEqual([]);
   });
 
   it('marks a Google total without items as degraded', async () => {

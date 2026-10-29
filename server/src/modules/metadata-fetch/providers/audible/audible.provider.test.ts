@@ -40,8 +40,6 @@ const baseConfig: ProviderConfigurations = {
   comicvine: { enabled: false, apiKey: '' },
   ranobedb: { enabled: false },
   kobo: { enabled: false, country: 'us', language: 'en' },
-  lubimyczytac: { enabled: false },
-  aladin: { enabled: false, ttbKey: '' },
 };
 
 function makeProvider(config: ProviderConfigurations = baseConfig): {

@@ -1,4 +1,11 @@
-import { getBookMediaKind, getBookMediaProfile, isAudioFormat, type CoverMedia, type CoverMedium } from '@bookorbit/types';
+import {
+  getBookMediaKind,
+  getBookMediaProfile,
+  isAudioFormat,
+  type ConcreteBookMediaKind,
+  type CoverMedia,
+  type CoverMedium,
+} from '@bookorbit/types';
 
 import { compareBookFilePaths } from './audio-track-order.utils';
 
@@ -34,6 +41,30 @@ export function resolveIsAudiobook(
   const primaryMediaKind = primary ? getBookMediaKind(primary.format) : files?.length ? getBookMediaProfile(files).primaryMediaKind : 'unknown';
   if (primaryMediaKind !== 'unknown') return primaryMediaKind === 'audiobook';
   return meta?.durationSeconds != null || !!meta?.audibleId || !!meta?.librofmId;
+}
+
+/**
+ * What the book is read as, leaving any audio aside: a comic when its readable files are comics, an
+ * ebook otherwise. A manga in EPUB is an ebook here, since only its format is known. Undefined when
+ * no readable file states a format.
+ */
+export function resolveTextMediaKind(files: readonly BookMediaFileRow[] | undefined, primaryFileId?: number | null): 'ebook' | 'comic' | undefined {
+  const primary = primaryFileId == null ? undefined : files?.find((file) => file.id === primaryFileId);
+  const primaryKind = primary ? getBookMediaKind(primary.format) : undefined;
+  if (primaryKind === 'ebook' || primaryKind === 'comic') return primaryKind;
+  const kinds = (files ?? []).filter((file) => file.role === 'content' || file.role === 'primary').map((file) => getBookMediaKind(file.format));
+  if (kinds.includes('ebook')) return 'ebook';
+  if (kinds.includes('comic')) return 'comic';
+  return undefined;
+}
+
+/** The medium a metadata search is run as: the audiobook when it is for the audio side, else the book's reading medium. */
+export function resolveSearchMediaKind(
+  files: readonly BookMediaFileRow[] | undefined,
+  isAudiobook: boolean,
+  primaryFileId?: number | null,
+): ConcreteBookMediaKind | undefined {
+  return isAudiobook ? 'audiobook' : resolveTextMediaKind(files, primaryFileId);
 }
 
 /** The pipeline's view of the slots: each is an existing field when filled, and locked slots are skipped. */

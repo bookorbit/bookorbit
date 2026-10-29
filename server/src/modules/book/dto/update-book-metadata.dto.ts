@@ -1,6 +1,8 @@
-import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { MetadataProviderKey, SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type SeriesIndex } from '@bookorbit/types';
+import { SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type MetadataProviderKey, type SeriesIndex } from '@bookorbit/types';
+import { IsExternalProviderMap } from '../../../common/decorators/is-external-provider-map.decorator';
+import { IsMetadataProviderKey } from '../../../common/decorators/is-metadata-provider-key.decorator';
 import { MAX_SERIES_TOTAL_BOOKS } from '../../../common/utils/series-total-books.utils';
 import { PROVIDER_ID_MAX_LENGTHS } from '../../../common/utils/provider-id.utils';
 import { NormalizeIdentifier } from '../../../common/decorators/normalize-identifier.decorator';
@@ -41,8 +43,13 @@ export class BookSeriesMembershipDto {
   @IsOptional() @IsInt() @Min(1) @Max(MAX_SERIES_TOTAL_BOOKS) expectedBookCount?: number | null;
 }
 
+const MAX_EXTERNAL_PROVIDER_ID_LENGTH = 512;
+const MAX_EXTERNAL_PROVIDER_LINK_LENGTH = 2048;
+
 export class CommunityRatingDto {
-  @IsIn(Object.values(MetadataProviderKey)) provider!: MetadataProviderKey;
+  // Any provider key, not only built-ins: released iOS builds send back every rating they were
+  // given, including an external provider's, whenever one rating changes.
+  @IsMetadataProviderKey() provider!: MetadataProviderKey;
   @IsNumber() @Min(0) @Max(5) rating!: number;
   @IsOptional() @IsInt() @Min(0) ratingCount?: number | null;
 }
@@ -82,6 +89,14 @@ export class UpdateBookMetadataDto {
   @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.ranobedbId) ranobedbId?: string | null;
   @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.lubimyczytacId) lubimyczytacId?: string | null;
   @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.aladinId) aladinId?: string | null;
+  /** Ids from external providers, keyed by provider. Null clears one; an absent key is left alone. */
+  @IsOptional()
+  @IsExternalProviderMap(MAX_EXTERNAL_PROVIDER_ID_LENGTH)
+  externalProviderIds?: Partial<Record<string, string | null>>;
+  /** The record page each external id was taken from, for the book page's links. */
+  @IsOptional()
+  @IsExternalProviderMap(MAX_EXTERNAL_PROVIDER_LINK_LENGTH)
+  externalProviderLinks?: Partial<Record<string, string | null>>;
   @IsOptional() @ValidateNested() @Type(() => ComicMetadataDto) comicMetadata?: ComicMetadataDto;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CustomMetadataValueDto) customMetadata?: CustomMetadataValueDto[];
 }

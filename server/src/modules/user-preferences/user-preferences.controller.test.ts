@@ -93,6 +93,8 @@ describe('UserPreferencesController', () => {
       upsertLocalePreferences: vi.fn(),
       upsertCoverSearchPreferences: vi.fn(),
       upsertBookRequestPreferences: vi.fn(),
+      getReadAloudPreferences: vi.fn(),
+      upsertReadAloudPreferences: vi.fn(),
       getAnnotationColorNamePreferences: vi.fn(),
       upsertAnnotationColorNamePreferences: vi.fn(),
     } as unknown as Mocked<UserPreferencesService>;
@@ -185,6 +187,20 @@ describe('UserPreferencesController', () => {
 
     await expect(controller.upsertBookRequestPreferences(dto, makeUser({ id: 42 }))).resolves.toBeUndefined();
     expect(service.upsertBookRequestPreferences).toHaveBeenCalledWith(42, dto.settings);
+  });
+
+  it("GET /read-aloud returns the current user's saved default language", async () => {
+    service.getReadAloudPreferences.mockResolvedValueOnce({ defaultLanguage: 'en' });
+
+    await expect(controller.getReadAloudPreferences(makeUser({ id: 11 }))).resolves.toEqual({ settings: { defaultLanguage: 'en' } });
+    expect(service.getReadAloudPreferences).toHaveBeenCalledWith(11);
+  });
+
+  it('PUT /read-aloud forwards the current user id and settings', async () => {
+    const dto = { settings: { defaultLanguage: 'de' } };
+
+    await expect(controller.upsertReadAloudPreferences(dto, makeUser({ id: 42 }))).resolves.toBeUndefined();
+    expect(service.upsertReadAloudPreferences).toHaveBeenCalledWith(42, dto.settings);
   });
 
   it('GET /locale returns null settings when no saved preferences exist', async () => {

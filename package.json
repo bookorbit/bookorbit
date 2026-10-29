@@ -12,7 +12,7 @@
     "url": "https://github.com/bookorbit/bookorbit/issues"
   },
   "private": true,
-  "packageManager": "pnpm@11.22.0",
+  "packageManager": "pnpm@11.28.9",
   "scripts": {
     "setup": "bash ./scripts/bootstrap/local.sh",
     "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @bookorbit/types dev\" \"pnpm run dev:server\" \"pnpm run dev:client\"",
@@ -23,17 +23,19 @@
     "verify:strict": "pnpm run format:check && pnpm run lint:check && pnpm run typecheck:full && pnpm run test",
     "build:client": "pnpm --filter client build",
     "build:server": "pnpm --filter server build",
-    "typecheck": "pnpm run typecheck:server && pnpm run typecheck:client",
-    "typecheck:full": "pnpm run typecheck:server && pnpm run typecheck:client",
+    "typecheck": "pnpm run typecheck:server && pnpm run typecheck:client && pnpm run typecheck:worker",
+    "typecheck:full": "pnpm run typecheck:server && pnpm run typecheck:client && pnpm run typecheck:worker",
     "typecheck:server": "pnpm --filter server type-check",
     "typecheck:client": "pnpm --filter client type-check",
+    "typecheck:worker": "pnpm --filter @bookorbit/read-aloud-worker type-check",
     "lint:check": "pnpm --filter server lint:check && pnpm --filter client lint:check",
     "lint:fix": "pnpm --filter server lint:fix && pnpm --filter client lint:fix",
     "format": "pnpm --filter server format && pnpm --filter client format",
     "format:check": "pnpm --filter server format:check && pnpm --filter client format:check",
-    "test": "pnpm run test:charts && pnpm run test:pr-policy && pnpm run test:server && pnpm run test:client",
+    "test": "pnpm run test:charts && pnpm run test:pr-policy && pnpm run test:worker && pnpm run test:server && pnpm run test:client",
     "test:charts": "node --test scripts/star-history/generate.test.mjs scripts/crowdin-stats/generate.test.mjs",
     "test:pr-policy": "node --test scripts/validate-locale-pr.test.mjs scripts/stale-prs/*.test.mjs",
+    "test:worker": "pnpm --filter @bookorbit/read-aloud-worker test",
     "test:server": "pnpm --filter server test",
     "test:client": "pnpm --filter client test:unit --run",
     "e2e:run": "node ./scripts/e2e/run-suite.mjs",
@@ -59,8 +61,8 @@
     "pnpm": ">=11"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/github": "^12.0.10",
     "@semantic-release/release-notes-generator": "^14.1.1",
@@ -68,7 +70,7 @@
     "conventional-changelog-conventionalcommits": "^10.4.1",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "semantic-release": "^25.0.9"
   },
   "lint-staged": {

@@ -104,9 +104,19 @@ export class RegexMetadataService implements OnModuleDestroy {
     if (this.stopped) return;
     for (const slot of this.slots) {
       if (!slot.ready || slot.discarding || slot.task || !this.queue.length) continue;
-      slot.task = this.queue.shift()!;
-      slot.timer = setTimeout(() => this.discard(slot, 'timeout'), 100);
-      slot.worker.postMessage(slot.task.input);
+      const task = this.queue.shift()!;
+      slot.task = task;
+      // The limit is timed on the main thread, so a stalled event loop runs it out while the answer
+      // already waits to be read. setImmediate runs after pending worker messages are handled, so
+      // only a task still unanswered by then counts as slow.
+      slot.timer = setTimeout(
+        () =>
+          setImmediate(() => {
+            if (slot.task === task) this.discard(slot, 'timeout');
+          }),
+        100,
+      );
+      slot.worker.postMessage(task.input);
     }
     if (this.queue.length && this.slots.size < 2) this.spawn();
   }

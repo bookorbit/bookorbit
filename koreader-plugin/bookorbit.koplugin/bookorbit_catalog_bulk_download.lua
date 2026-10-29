@@ -413,7 +413,7 @@ function CatalogBulkDownload.install(Catalog)
     function Catalog:showBulkExistingPolicyDialog(on_done)
         local current = self:bulkExistingPolicy().id
         local options = {}
-        for _, policy in ipairs(EXISTING_POLICIES) do
+        for _i, policy in ipairs(EXISTING_POLICIES) do
             table.insert(options, { label = policy.label, sub = policy.id == "overwrite" and _("Can move a book's place and highlights") or nil, selected = current == policy.id })
         end
         DialogUI.choose{
@@ -626,7 +626,7 @@ function CatalogBulkDownload.install(Catalog)
             for key, value in pairs(resumed.counts or {}) do
                 if ctx.counts[key] ~= nil then ctx.counts[key] = value end
             end
-            for _, failure in ipairs(resumed.failures or {}) do
+            for _i, failure in ipairs(resumed.failures or {}) do
                 if #ctx.failed_titles < FAILED_TITLES_LIMIT then
                     table.insert(ctx.failed_titles, failure.title or _("Untitled"))
                 end

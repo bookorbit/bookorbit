@@ -12,7 +12,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AudiolessEpubService } from './audioless-epub.service';
 import { FileLockService } from '../file-write/file-lock.service';
 import { DeliveryArtifactRepository } from './delivery-artifact.repository';
-import { inspectDeliveryEpub } from './epub-delivery-validation';
+import { hasMultimediaEntries, inspectDeliveryEpub } from './epub-delivery-validation';
 
 const DELIVERY_DETECTOR_VERSION = 'overlay-inspection-v3';
 export const DELIVERY_TRANSFORM_VERSION = 'text-only-v3';
@@ -262,10 +262,13 @@ export class DeliveryArtifactService {
       await publish;
       return { ...metadata, path: join(directory, 'book.epub') };
     } catch (error) {
-      if (requestedVariant !== null || error instanceof ConflictException) throw error;
-      this.logger.warn(
-        `[delivery.prepare] [fail] fileId=${source.id} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - inherited delivery uses original fallback`,
-      );
+      if (error instanceof ConflictException) throw error;
+      const failure = `fileId=${source.id} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}"`;
+      if (requestedVariant !== null) {
+        this.logger.warn(`[delivery.prepare] [fail] ${failure} - text-only delivery refused`);
+        throw error;
+      }
+      this.logger.warn(`[delivery.prepare] [fail] ${failure} - inherited delivery uses original fallback`);
       return this.prepareOriginal(source, sourceRevision, requestedVariant, 'legacy_fallback');
     } finally {
       await rm(temporary, { recursive: true, force: true });
@@ -279,12 +282,22 @@ export class DeliveryArtifactService {
       if (cached.state === 'verified_present') return true;
       if (cached.retryAt && cached.retryAt > new Date()) throw new BadRequestException({ code: 'DELIVERY_INSPECTION_FAILED' });
     }
+    const startedAt = Date.now();
     try {
-      const present = await inspectDeliveryEpub(
-        await unzipper.Open.file(source.absolutePath),
-        this.limits.maxSourceEntries,
-        this.limits.maxMetadataBytes,
-      );
+      const zip = await unzipper.Open.file(source.absolutePath);
+      let present: boolean;
+      try {
+        present = await inspectDeliveryEpub(zip, this.limits.maxSourceEntries, this.limits.maxMetadataBytes);
+      } catch (error) {
+        // The strict checks guard the narration rewrite. A book with no narration is never rewritten,
+        // so a fault they trip on (duplicate ids, a missing resource, an oversized chapter) must not
+        // make it undeliverable: it goes out as stored, exactly as an original request would.
+        if (!(error instanceof BadRequestException) || source.mediaOverlayAvailable === true || hasMultimediaEntries(zip.files)) throw error;
+        this.logger.warn(
+          `[delivery.inspect] [fail] fileId=${source.id} durationMs=${Date.now() - startedAt} errorClass=${error.name} error="${sanitizeLogValue(error.message)}" - no narration present; delivering the original`,
+        );
+        present = false;
+      }
       await this.assertSourceRevision(source, sourceRevision);
       await this.repository.saveInspection({
         bookFileId: source.id,

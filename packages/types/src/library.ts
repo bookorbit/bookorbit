@@ -148,6 +148,11 @@ export interface LibraryAccessEntry {
   accessLevel: AccessLevel;
 }
 
+export interface UserLibraryGrant {
+  libraryId: number;
+  accessLevel: AccessLevel;
+}
+
 export interface DefaultLibraryAccessConfig {
   libraryIds: number[];
 }

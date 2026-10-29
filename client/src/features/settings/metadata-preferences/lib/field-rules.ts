@@ -1,4 +1,4 @@
-import { ALL_METADATA_FIELDS, providerFieldSupport } from '@bookorbit/types'
+import { ALL_METADATA_FIELDS, isBuiltInMetadataProviderKey, providerFieldSupport } from '@bookorbit/types'
 import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 
 /** Display grouping for the rule table. Every metadata field belongs to exactly one group. */
@@ -40,7 +40,7 @@ export function skipReasonFor(
 ): ProviderSkipReason | null {
   if (status && !status.enabled) return 'disabled'
   if (status && !status.configured) return 'notConfigured'
-  if (field && provider && providerFieldSupport(provider, field) === 'never') return 'neverSupplies'
+  if (field && provider && providerFieldSupport(provider, field, status?.supportedFields) === 'never') return 'neverSupplies'
   return null
 }
 
@@ -49,26 +49,32 @@ export function skipReasonFor(
  * empty slot when nothing else can. The server tries it after every provider whose art can fit,
  * whatever its place in the order, so it ranks there too.
  */
-export function providerHasOtherShape(provider: MetadataProviderKey, field: MetadataField | undefined): boolean {
-  return field !== undefined && providerFieldSupport(provider, field) === 'otherShape'
+export function providerHasOtherShape(
+  provider: MetadataProviderKey,
+  field: MetadataField | undefined,
+  declaredFields?: readonly MetadataField[] | null,
+): boolean {
+  return field !== undefined && providerFieldSupport(provider, field, declaredFields) === 'otherShape'
 }
 
 /**
- * A provider with no status entry counts as usable: an unknown key is stale data rather
- * than a broken provider, and hiding it would leave no way to remove it.
+ * A built-in with no status entry counts as usable: that is stale data rather than a broken
+ * provider. An external provider with none has been removed, and the server skips it, so it is
+ * shown as skipped; it stays listed either way, so it can still be taken out of the order.
  */
 export function isProviderUsable(provider: MetadataProviderKey, statuses: ProviderStatus[], field?: MetadataField): boolean {
-  if (field && providerFieldSupport(provider, field) === 'never') return false
   const status = statuses.find((entry) => entry.key === provider)
-  return status ? status.enabled && status.configured : true
+  if (field && providerFieldSupport(provider, field, status?.supportedFields) === 'never') return false
+  return status ? status.enabled && status.configured : isBuiltInMetadataProviderKey(provider)
 }
 
 /** The providers that will actually be consulted, in the order the server tries them. */
 export function resolvedProviders(providers: MetadataProviderKey[], statuses: ProviderStatus[], field?: MetadataField): MetadataProviderKey[] {
   const usable = providers.filter((provider) => isProviderUsable(provider, statuses, field))
+  const declared = (provider: MetadataProviderKey) => statuses.find((entry) => entry.key === provider)?.supportedFields
   return [
-    ...usable.filter((provider) => !providerHasOtherShape(provider, field)),
-    ...usable.filter((provider) => providerHasOtherShape(provider, field)),
+    ...usable.filter((provider) => !providerHasOtherShape(provider, field, declared(provider))),
+    ...usable.filter((provider) => providerHasOtherShape(provider, field, declared(provider))),
   ]
 }
 

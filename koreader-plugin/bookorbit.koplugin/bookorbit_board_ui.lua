@@ -16,6 +16,7 @@ data (titles, authors, quotes) may be shortened; pass data = true for those.
 
 local BD = require("ui/bidi")
 local CenterContainer = require("ui/widget/container/centercontainer")
+local Screen = require("device").screen
 local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
@@ -40,6 +41,35 @@ local px = BoardMetrics.px
 local BoardUI = {}
 BoardUI.INK = INK
 BoardUI.px = px
+
+-- KOReader's plain painters turn an RGB colour into its gray; RGB colours
+-- (the board's colour schemes) go through the RGB32 painters instead.
+local Blitbuffer = package.loaded["ffi/blitbuffer"] or select(2, pcall(require, "ffi/blitbuffer"))
+if type(Blitbuffer) ~= "table" then Blitbuffer = {} end
+
+-- A truthiness test, never == nil: LuaJIT hands a colour's comparison with
+-- nil to its __eq, which indexes the other side.
+local function isRGB(c)
+    if not c or not Blitbuffer.isColor8 then return false end
+    return not Blitbuffer.isColor8(c)
+end
+BoardUI.isRGB = isRGB
+
+local function paintBorder(bb, x, y, w, h, bw, c, r)
+    if isRGB(c) and bb.paintBorderRGB32 then
+        bb:paintBorderRGB32(x, y, w, h, bw, c, r)
+    else
+        bb:paintBorder(x, y, w, h, bw, c, r)
+    end
+end
+
+local function paintRoundedRect(bb, x, y, w, h, c, r)
+    if isRGB(c) and bb.paintRoundedRectRGB32 then
+        bb:paintRoundedRectRGB32(x, y, w, h, c, r)
+    else
+        bb:paintRoundedRect(x, y, w, h, c, r)
+    end
+end
 
 -- ------------------------------------------------------------- fit checks
 local fit_stack = {}
@@ -127,6 +157,41 @@ local function faceKind(o)
     return o.i and "sans_italic" or "sans"
 end
 
+-- One line of text in an RGB colour. TextWidget paints glyphs in gray only,
+-- so the line is set white on black once, which is its coverage mask, and
+-- blitted in the colour. (Blitbuffer:invert only flips a flag that the C
+-- blitter ignores when both buffers carry it, as a night-mode screen does.)
+local ColourLine = Widget:extend{ line = nil, color = nil }
+
+function ColourLine:getSize()
+    return self.line:getSize()
+end
+
+function ColourLine:isTruncated()
+    return self.line:isTruncated()
+end
+
+function ColourLine:paintTo(bb, x, y)
+    local size = self.line:getSize()
+    self.dimen = Geom:new{ x = x, y = y, w = size.w, h = size.h }
+    if not self.mask then
+        local canvas = Blitbuffer.new(size.w, size.h, Blitbuffer.TYPE_BB8)
+        canvas:fill(Blitbuffer.COLOR_BLACK)
+        self.line:paintTo(canvas, 0, 0)
+        self.mask = canvas
+    end
+    if bb.colorblitFromRGB32 then
+        bb:colorblitFromRGB32(self.mask, x, y, 0, 0, size.w, size.h, self.color)
+    else
+        bb:colorblitFrom(self.mask, x, y, 0, 0, size.w, size.h, self.color)
+    end
+end
+
+function ColourLine:free()
+    if self.mask then self.mask:free(); self.mask = nil end
+    if self.line and self.line.free then self.line:free() end
+end
+
 -- A single line, or o.lines lines when o.lines > 1. o: s (nominal size),
 -- b, i, serif, col, w (box width), align, lines, data.
 function BoardUI.text(str, o)
@@ -159,20 +224,37 @@ function BoardUI.text(str, o)
         if tb.line_with_ellipsis and not o.data then problem("clamped", str) end
         return tb
     end
+    local rgb = isRGB(o.col) and Blitbuffer.TYPE_BB8 ~= nil
     local tw = TextWidget:new{
         text = str,
         padding = 0,
         face = face,
         bold = o.b == true,
-        fgcolor = o.col or INK.black,
+        fgcolor = rgb and INK.white or (o.col or INK.black),
         max_width = o.w,
     }
     if o.w and tw:isTruncated() and not o.data then problem("ellipsis", str .. " w=" .. o.w .. " need=" .. tw:getSize().w) end
+    if rgb then tw = ColourLine:new{ line = tw, color = o.col } end
     if not o.w then return tw end
     local dimen = Geom:new{ w = o.w, h = tw:getSize().h }
     if o.align == "center" then return CenterContainer:new{ dimen = dimen, tw } end
     if o.align == "right" then return RightContainer:new{ dimen = dimen, tw } end
     return LeftContainer:new{ dimen = dimen, tw }
+end
+
+-- The largest size from o.s down to min_s at which str fits one line of w,
+-- so a label in a narrow column steps down before it is cut.
+function BoardUI.fitSize(str, o, w, min_s)
+    local size = o.s or 14
+    local face_kind = faceKind(o)
+    while size > (min_s or size) do
+        local tw = TextWidget:new{ text = BD.auto(tostring(str or "")), face = BoardMetrics.face(size, face_kind), bold = o.b == true, padding = 0 }
+        local fits = tw:getSize().w <= w
+        tw:free()
+        if fits then break end
+        size = size - 1
+    end
+    return size
 end
 
 -- The largest of `sizes` at which `str` fits in max_lines lines and max_h
@@ -190,8 +272,20 @@ function BoardUI.fitTitle(str, o, width, sizes, max_lines, max_h)
     return { s = result.s, lines = result.lines }
 end
 
+-- The widest single word of str at size s: a box narrower than it breaks
+-- the word across lines.
+local function widestWord(str, o, s)
+    local widest = 0
+    for word in tostring(str or ""):gmatch("%S+") do
+        local tw = TextWidget:new{ text = BD.auto(word), face = BoardMetrics.face(s, faceKind(o or {})), bold = o and o.b == true, padding = 0 }
+        widest = math.max(widest, tw:getSize().w)
+        tw:free()
+    end
+    return widest
+end
+
 function BoardUI._fitTitle(str, o, width, sizes, max_lines, max_h)
-    for _i, s in ipairs(sizes) do
+    for index, s in ipairs(sizes) do
         local tb = TextBoxWidget:new{
             text = BD.auto(tostring(str or "")),
             face = BoardMetrics.face(s, faceKind(o or {})),
@@ -200,7 +294,9 @@ function BoardUI._fitTitle(str, o, width, sizes, max_lines, max_h)
         }
         local lines = math.max(1, math.floor(tb:getSize().h / BoardMetrics.lh(s) + 0.5))
         tb:free()
-        if lines <= max_lines and (not max_h or lines * BoardMetrics.lh(s) <= max_h) then
+        -- A size that would split a word goes to the next one down.
+        if lines <= max_lines and (not max_h or lines * BoardMetrics.lh(s) <= max_h)
+                and (index == #sizes or lines == 1 or widestWord(str, o, s) <= width) then
             return { s = s, lines = lines }
         end
     end
@@ -304,14 +400,16 @@ function BoardUI.vstack(o, items)
             else
                 local w, h = sizeOf(item)
                 fixed = fixed + h
-                -- Content may run into the padding, never past the box.
                 if w > iw + pr + 1 then problem("overflow-x", "vstack child w=" .. w .. " iw=" .. iw) end
             end
         end
     end
     local ih = o.h and (o.h - pt - pb) or (fixed + flex_min)
     local remaining = ih - fixed
-    local padding_slack = o.strict_padding and 0 or pb
+    -- Content may overhang the bottom padding by a text line's own leading
+    -- (2dp), never more: a fuller layout loses to a smaller one before a
+    -- card's bottom margin looks thinner than its top.
+    local padding_slack = o.strict_padding and 0 or math.min(pb, px(2))
     if remaining + padding_slack < flex_min - 0.5 then problem("overflow-y", "vstack need=" .. (fixed + flex_min) .. " have=" .. ih) end
     local left = math.max(0, remaining)
     local share = flexes > 0 and math.floor(left / flexes) or 0
@@ -401,10 +499,31 @@ function BoardUI.spread(w, left, right, h)
 end
 
 -- ----------------------------------------------------------------- frames
+-- An RGB border painted over a frame of the same size.
+local ColourRing = Widget:extend{ bw = 1, color = nil, radius = 0 }
+
+function ColourRing:getSize()
+    return self.dimen
+end
+
+function ColourRing:paintTo(bb, x, y)
+    self.dimen.x, self.dimen.y = x, y
+    paintBorder(bb, x, y, self.dimen.w, self.dimen.h, self.bw, self.color, self.radius)
+end
+
 -- A fixed box with an optional fill, radius and inner border.
 function BoardUI.box(o, child)
     local border = o.border or 0
     local inner_w, inner_h = o.w - 2 * border, o.h - 2 * border
+    if border > 0 and isRGB(o.border_col) then
+        local plain = {}
+        for k, v in pairs(o) do plain[k] = v end
+        plain.border_col = INK.white
+        return BoardUI.overlay(o.w, o.h, {
+            { widget = BoardUI.box(plain, child) },
+            { widget = ColourRing:new{ dimen = Geom:new{ w = o.w, h = o.h }, bw = border, color = o.border_col, radius = o.radius or 0 } },
+        })
+    end
     return FrameContainer:new{
         margin = 0,
         padding = 0,
@@ -514,6 +633,19 @@ function BoardUI.hit(child, action)
     local sink = hit_sinks[#hit_sinks]
     if sink then table.insert(sink, area) end
     return area
+end
+
+-- How many hit areas the current build has made, and dropping the ones made
+-- after a mark: a layout built, measured and then rebuilt another way.
+function BoardUI.hitMark()
+    local sink = hit_sinks[#hit_sinks]
+    return sink and #sink or 0
+end
+
+function BoardUI.hitTrim(mark)
+    local sink = hit_sinks[#hit_sinks]
+    if not sink then return end
+    for i = #sink, mark + 1, -1 do table.remove(sink, i) end
 end
 
 -- Runs fn and returns its result plus the hit areas it created.
@@ -637,7 +769,8 @@ function BoardCover:paintTo(bb, x, y)
         local px_, py_ = x + math.floor((w - img.w) / 2), y + math.floor((h - img.h) / 2)
         bb:blitFrom(img.bb, px_, py_, 0, 0, img.w, img.h)
         if self.dim then bb:lightenRect(x, y, w, h, 0.55) end
-        if self.border > 0 then bb:paintBorder(px_, py_, img.w, img.h, self.border, self.border_col or INK.gb) end
+        if Screen.night_mode then bb:invertRect(px_, py_, img.w, img.h) end
+        if self.border > 0 then paintBorder(bb, px_, py_, img.w, img.h, self.border, self.border_col or INK.gb) end
         return
     end
     local dx, dy, dw, dh
@@ -658,14 +791,45 @@ function BoardCover:paintTo(bb, x, y)
     elseif self.lighten then
         bb:lightenRect(dx, dy, dw, dh, self.lighten)
     end
+    if Screen.night_mode then
+        bb:invertRect(dx, dy, dw, dh)
+    end
     if self.border > 0 then
-        bb:paintBorder(dx, dy, dw, dh, self.border, self.border_col or INK.gb)
+        paintBorder(bb, dx, dy, dw, dh, self.border, self.border_col or INK.gb)
     end
 end
 
 -- A book cover at an exact box. o: border (px), border_col, dim, lighten, path,
 -- valign ("top" or the default "bottom") for an image of another shape,
 -- placeholder title when there is no image.
+-- The placeholder title's size: the largest at which every word (split
+-- after hyphens, where lines may break) fits the cover's width, so a narrow
+-- cover never breaks a word in two.
+local PLACEHOLDER_SIZES = { 14, 13, 12, 11, 10, 9 }
+local placeholder_cache, placeholder_count = {}, 0
+
+local function placeholderSize(title, w)
+    local key = title .. "|" .. w .. "|" .. BoardMetrics.get().dp
+    local hit = placeholder_cache[key]
+    if hit then return hit end
+    local result = PLACEHOLDER_SIZES[#PLACEHOLDER_SIZES]
+    for _i, s in ipairs(PLACEHOLDER_SIZES) do
+        local face = BoardMetrics.face(s, "serif")
+        local fits = true
+        for word in title:gmatch("[^%s%-]+%-?") do
+            local tw = TextWidget:new{ text = word, face = face, bold = true, padding = 0 }
+            local word_w = tw:getSize().w
+            tw:free()
+            if word_w > w then fits = false; break end
+        end
+        if fits then result = s; break end
+    end
+    if placeholder_count > 400 then placeholder_cache, placeholder_count = {}, 0 end
+    placeholder_cache[key] = result
+    placeholder_count = placeholder_count + 1
+    return result
+end
+
 function BoardUI.cover(book, w, h, o)
     o = o or {}
     if o.path then
@@ -685,11 +849,14 @@ function BoardUI.cover(book, w, h, o)
     local pad = px(8)
     local frame_b = math.max(1, px(1))
     local inner = {}
+    local title = book and book.title or ""
+    local tw = w - 2 * pad - 2 * frame_b
+    local s = placeholderSize(title, tw)
     -- The title takes the lines the cover has room for, up to four; a cover
     -- too small for one line stays an empty frame.
-    local lines = math.min(4, math.floor((h - 2 * frame_b - 2 * pad) / BoardMetrics.lh(14)))
+    local lines = math.min(4, math.floor((h - 2 * frame_b - 2 * pad) / BoardMetrics.lh(s)))
     if o.loading ~= true and w > px(48) and lines >= 1 then
-        inner = { BoardUI.flex(0), BoardUI.text(book and book.title or "", { s = 14, b = true, serif = true, lines = lines, w = w - 2 * pad - 2 * frame_b, align = "center", data = true }), BoardUI.flex(0) }
+        inner = { BoardUI.flex(0), BoardUI.text(title, { s = s, b = true, serif = true, lines = lines, w = tw, align = "center", data = true, bg = INK.ge }), BoardUI.flex(0) }
     end
     return BoardUI.box({ w = w, h = h, border = frame_b, border_col = INK.black, bg = INK.ge },
         BoardUI.vstack({ w = w - 2 * frame_b, h = h - 2 * frame_b, pad = pad, align = "center" }, inner))
@@ -718,10 +885,12 @@ function CellGrid:paintTo(bb, x, y)
             bb:paintRoundedRect(x + cell.x - ring, y + cell.y - ring, s + 2 * ring, s + 2 * ring, INK.black, r + ring)
             bb:paintRoundedRect(x + cell.x - gap, y + cell.y - gap, s + 2 * gap, s + 2 * gap, INK.white, r + gap)
         end
-        if cell.border then
+        if cell.border and isRGB(cell.col) and bb.paintBorderRGB32 then
+            bb:paintBorderRGB32(x + cell.x, y + cell.y, s, s, cell.border, cell.col, r, true)
+        elseif cell.border then
             bb:paintBorder(x + cell.x, y + cell.y, s, s, cell.border, cell.col, r, true)
         else
-            bb:paintRoundedRect(x + cell.x, y + cell.y, s, s, cell.col, r)
+            paintRoundedRect(bb, x + cell.x, y + cell.y, s, s, cell.col, r)
         end
     end
 end
@@ -776,7 +945,11 @@ function BoardUI.snapshot(key, full_w, full_h, w, h, build)
     if not snapshot_cache[key] then
         local Screen = require("device").screen
         local Blitbuffer_ = require("ffi/blitbuffer")
-        local canvas = Blitbuffer_.new(full_w, full_h, Screen.bb:getType())
+        -- KOReader's MuPDF scaler keeps the 16-bit stride when it widens RGB565 and throws, so the
+        -- reMarkable's RGB565 screen draws its thumbnails in RGB32 instead.
+        local canvas_type = Screen.bb:getType()
+        if canvas_type == Blitbuffer_.TYPE_BBRGB16 then canvas_type = Blitbuffer_.TYPE_BBRGB32 end
+        local canvas = Blitbuffer_.new(full_w, full_h, canvas_type)
         canvas:fill(INK.white)
         -- Built in a sink of its own: a thumbnail's buttons are not tappable.
         local widget = BoardUI.collectHits(build)

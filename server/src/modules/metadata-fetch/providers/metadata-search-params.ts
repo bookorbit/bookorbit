@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from '@bookorbit/types';
+import { MetadataProviderKey, type ConcreteBookMediaKind } from '@bookorbit/types';
 
 export interface MetadataSearchParams {
   title?: string;
@@ -23,6 +23,10 @@ export interface MetadataSearchParams {
   // Media type of the edition being searched. Providers that carry both editions of a title use it to
   // pick one (e.g. the iTunes ebook vs audiobook entity), so it must describe the book, not the provider set.
   isAudiobook?: boolean;
+  // The medium of the book the search is for, when known. Ranking prefers a candidate of that medium
+  // over one its provider says is another (a light novel over its manga, for an EPUB), and never
+  // drops a candidate for it.
+  mediaKind?: ConcreteBookMediaKind;
   // Lets audiobook-only providers run for a book that is not an audiobook, for the flows where they were
   // explicitly asked for. Defaults to isAudiobook.
   includeAudiobookProviders?: boolean;

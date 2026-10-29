@@ -63,7 +63,7 @@ end
 
 -- A one-line outcome under a field: found, or what went wrong.
 local function outcome(w, glyph, str)
-    return hstack({ w = w, gap = px(6), valign = "top" }, { icon(glyph, px(16), { sw = 2.25 }), text(str, { s = 13, b = true, w = w - px(22), lines = 3, data = true }) })
+    return hstack({ w = w, gap = px(6), valign = "top" }, { icon(glyph, px(16), { sw = 2.25 }), text(str, { s = 13, b = true, w = w - px(16) - px(6), lines = 3, data = true }) })
 end
 
 local function build(page, sw, sh)
@@ -71,64 +71,119 @@ local function build(page, sw, sh)
     local mx = MenuUI.mx()
     local top, bottom = px(6), px(12)
     local w = sw - 2 * mx
-    local card_w = math.min(w, px(560))
     local pad = px(18)
-    local iw = card_w - 2 * pad
-
-    local status
-    if s.test == "found" then
-        status = outcome(iw, "circle-check", _("BookOrbit found"))
-    elseif s.test == "failed" then
-        status = outcome(iw, "triangle-alert", s.test_message or _("No BookOrbit server answered there"))
-    end
-    local server = vstack({ w = iw, pad = { px(16), 0, px(16), 0 } }, {
-        text(_("Server"), { s = 13, b = true }),
-        space(nil, px(8)),
-        field(iw, MenuUI.serverHost(s.server) or "", { icon = "globe", placeholder = "books.example.com", action = { kind = "edit", field = "server" },
-            trail = MenuUI.pill(_("Test"), { kind = "outline", h = 32, s = 13, pad_x = 12, action = { kind = "test" } }) }),
-        status and space(nil, px(8)) or false,
-        status or false,
-    })
-
-    local qr_size = px(88)
     local url = SignIn.settingsUrl(BookOrbitApi.normalizeServerUrl(s.server))
-    local code = url and qr(url, qr_size)
-    local help_w = iw - (code and (qr_size + px(14)) or 0)
-    local help = vstack({ w = help_w }, {
-        text(_("No KOReader login yet?"), { s = 14, b = true, w = help_w }),
-        space(nil, px(2)),
-        text(code and _("Scan to create one in BookOrbit on your phone, or open Settings, KOReader on the web.")
-            or _("Create one in BookOrbit on the web: Settings, KOReader."), { s = 13, col = INK.g4, lines = 3, w = help_w }),
-    })
-    local login = vstack({ w = iw, pad = { px(16), 0, px(16), 0 } }, {
-        text(_("KOReader login"), { s = 13, b = true }),
-        space(nil, px(8)),
-        field(iw, s.username or "", { icon = "circle-user-round", placeholder = _("Username"), action = { kind = "edit", field = "username" }, focus = s.focus == "username" }),
-        space(nil, px(8)),
-        field(iw, s.password and string.rep("•", #s.password) or "", { icon = "key-round", placeholder = _("Password"), action = { kind = "edit", field = "password" }, focus = s.focus == "password" }),
-        s.error and space(nil, px(8)) or false,
-        s.error and outcome(iw, "triangle-alert", s.error) or false,
-        space(nil, px(12)),
-        code and hstack({ w = iw, gap = px(14) }, { help, code }) or help,
-    })
-    local card = MenuUI.card(card_w, { server, BoardUI.rect(iw, MenuUI.hair(), INK.gb), login }, { pad = 18, strong = true })
-    local body = vstack({ w = card_w }, {
-        card,
-        space(nil, px(14)),
-        MenuUI.pill(_("Sign in"), { h = 50, s = 16, w = card_w, action = { kind = "sign-in" } }),
-        space(nil, px(8)),
-        hstack({ w = card_w }, { flex(0), MenuUI.pill(_("Not now"), { kind = "ghost", h = 40, s = 14, action = { kind = "close" } }), flex(0) }),
-    })
+
+    -- The card's parts at an inner width iw; gap is the room above and
+    -- below each part, tighter on a short screen.
+    local function serverPart(iw, gap)
+        local status
+        if s.test == "found" then
+            status = outcome(iw, "circle-check", _("BookOrbit found"))
+        elseif s.test == "failed" then
+            status = outcome(iw, "triangle-alert", s.test_message or _("No BookOrbit server answered there"))
+        end
+        return vstack({ w = iw, pad = { gap, 0, gap, 0 } }, {
+            text(_("Server"), { s = 13, b = true }),
+            space(nil, px(8)),
+            field(iw, MenuUI.serverHost(s.server) or "", { icon = "globe", placeholder = "books.example.com", action = { kind = "edit", field = "server" },
+                trail = MenuUI.pill(_("Test"), { kind = "outline", h = 32, s = 13, pad_x = 12, action = { kind = "test" } }) }),
+            status and space(nil, px(8)) or false,
+            status or false,
+        })
+    end
+    local function helpPart(iw)
+        local qr_size = px(88)
+        local code = url and qr(url, qr_size)
+        local help_w = iw - (code and (qr_size + px(14)) or 0)
+        local help = vstack({ w = help_w }, {
+            text(_("No KOReader login yet?"), { s = 14, b = true, w = help_w }),
+            space(nil, px(2)),
+            text(code and _("Scan to create one in BookOrbit on your phone, or open Settings, KOReader on the web.")
+                or _("Create one in BookOrbit on the web: Settings, KOReader."), { s = 13, col = INK.g4, lines = 3, w = help_w }),
+        })
+        return code and hstack({ w = iw, gap = px(14) }, { help, code }) or help
+    end
+    local function loginPart(iw, gap, with_help)
+        return vstack({ w = iw, pad = { gap, 0, gap, 0 } }, {
+            text(_("KOReader login"), { s = 13, b = true }),
+            space(nil, px(8)),
+            field(iw, s.username or "", { icon = "circle-user-round", placeholder = _("Username"), action = { kind = "edit", field = "username" }, focus = s.focus == "username" }),
+            space(nil, px(8)),
+            field(iw, s.password and string.rep("•", #s.password) or "", { icon = "key-round", placeholder = _("Password"), action = { kind = "edit", field = "password" }, focus = s.focus == "password" }),
+            s.error and space(nil, px(8)) or false,
+            s.error and outcome(iw, "triangle-alert", s.error) or false,
+            with_help and space(nil, px(12)) or false,
+            with_help and helpPart(iw) or false,
+        })
+    end
+    local function actions(card_w)
+        return {
+            MenuUI.pill(_("Sign in"), { h = 50, s = 16, w = card_w, action = { kind = "sign-in" } }),
+            space(nil, px(8)),
+            hstack({ w = card_w }, { flex(0), MenuUI.pill(_("Not now"), { kind = "ghost", h = 40, s = 14, action = { kind = "close" } }), flex(0) }),
+        }
+    end
+    -- One card: the server over the login, Sign in under it.
+    local function oneColumn(with_help)
+        local card_w = math.min(w, px(560))
+        local iw = card_w - 2 * pad
+        local card = MenuUI.card(card_w, { serverPart(iw, px(16)), BoardUI.rect(iw, MenuUI.hair(), INK.gb), loginPart(iw, px(16), with_help) }, { pad = 18, strong = true })
+        local items = { card, space(nil, px(14)) }
+        for _i, item in ipairs(actions(card_w)) do table.insert(items, item) end
+        return vstack({ w = card_w }, items)
+    end
+    -- A wide, short screen: the server (and the help) beside the login and
+    -- Sign in.
+    local function twoColumns(with_help, gap)
+        local col_gap = px(24)
+        local col_w = math.min(math.floor((w - col_gap) / 2), px(460))
+        local iw = col_w - 2 * pad
+        local left_items = { serverPart(iw, gap) }
+        if with_help then
+            table.insert(left_items, BoardUI.rect(iw, MenuUI.hair(), INK.gb))
+            table.insert(left_items, vstack({ w = iw, pad = { gap, 0, gap, 0 } }, { helpPart(iw) }))
+        end
+        local left = MenuUI.card(col_w, left_items, { pad = 18, strong = true })
+        local right_items = { MenuUI.card(col_w, { loginPart(iw, gap, false) }, { pad = 18, strong = true }), space(nil, px(14)) }
+        for _i, item in ipairs(actions(col_w)) do table.insert(right_items, item) end
+        return hstack({ gap = col_gap, valign = "top" }, { left, vstack({ w = col_w }, right_items) })
+    end
+
     local header = MenuUI.pageHeader(w, _("Sign in to BookOrbit"), {
         back = false, sub = _("Sync progress and highlights, and browse your library"),
         right = MenuUI.iconButton("x", { kind = "close" }), right_inset = MenuUI.tapInset(24),
     })
+    local footer = text(_("The BookOrbit icon stays in KOReader's menu bar, so you can sign in later."), { s = 13, col = INK.g4, w = w, lines = 2, align = "center" })
+    -- On a short screen the note under the page goes first, then the help
+    -- beside the QR code; a wide one then sets the login beside the server,
+    -- tightening its gaps last. The fields and Sign in always stay.
+    local room = sh - top - bottom - header:getSize().h - 2 * px(8)
+    local variants = {
+        function() return oneColumn(true) end,
+        function() return oneColumn(false) end,
+    }
+    if MenuUI.wide() then
+        table.insert(variants, function() return twoColumns(true, px(16)) end)
+        table.insert(variants, function() return twoColumns(false, px(16)) end)
+        table.insert(variants, function() return twoColumns(false, px(8)) end)
+    end
+    local pick, pick_h = #variants, nil
+    for index, make in ipairs(variants) do
+        local clean, probe = BoardUI.fits(function() return BoardUI.collectHits(make) end)
+        local h = probe and probe.getSize and probe:getSize().h or math.huge
+        if probe and probe.free then probe:free() end
+        if index == 1 then pick_h = h end
+        if clean and h <= room then pick, pick_h = index, h; break end
+    end
+    local with_footer = pick == 1 and pick_h + footer:getSize().h <= room
+    local body = variants[pick]()
     return vstack({ w = sw, h = sh, pad = { top, mx, bottom, mx } }, {
         header,
         flex(px(8)),
         hstack({ w = w }, { flex(0), body, flex(0) }),
         flex(px(8)),
-        text(_("The BookOrbit icon stays in KOReader's menu bar, so you can sign in later."), { s = 13, col = INK.g4, w = w, lines = 2, align = "center" }),
+        with_footer and footer or false,
     })
 end
 

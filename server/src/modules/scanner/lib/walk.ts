@@ -146,6 +146,8 @@ async function collectByDir(
       //    that turn this dir into a stem-named subdir needing flattening).
       //    Root is exempt: root-level files are never stem-merged into a parent (see
       //    buildBookCandidates: parent === libraryFolderPath is explicitly skipped).
+      // A disc-named library folder is no longer flattened, but it stays unskippable: libraries
+      // scanned while it was are regrouped by their next scan, whatever its mtime.
       const hasDiscSubdirs = subdirectoryPaths.some((s) => isDiscDirectory(basename(s)));
       const canSkip = knownDirMtimes && unchangedDirs && dirMtimes && filePaths.length > 0 && !isDiscDirectory(basename(dir)) && !hasDiscSubdirs;
 
@@ -207,9 +209,11 @@ export async function findBookCandidates(
 
   // Flatten disc subdirectories (e.g. "CD 1", "Disc 2") into their parent.
   // Collect disc dirs first to avoid mutating the map while iterating.
+  // The library folder itself is never flattened, whatever its name: unRAID mounts its drives
+  // as /mnt/disk1, and folding one would file its books under the folder above the library.
   const discDirs: string[] = [];
   for (const [dir] of byDir) {
-    if (isDiscDirectory(basename(dir))) {
+    if (dir !== libraryFolderPath && isDiscDirectory(basename(dir))) {
       discDirs.push(dir);
     }
   }

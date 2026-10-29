@@ -402,6 +402,20 @@ function nextTrack() {
   session.onActivity()
 }
 
+/**
+ * `?at=<ms>` opens the book at a point on its whole timeline, such as a chapter picked on the book
+ * page. It is consumed once, so a reload resumes from wherever listening got to instead.
+ */
+function requestedStart(): { fileIndex: number; posInFile: number } | null {
+  const raw = route.query.at
+  const ms = typeof raw === 'string' && /^\d{1,10}$/.test(raw) ? Number(raw) : null
+  if (ms === null) return null
+  const query = { ...route.query }
+  delete query.at
+  void router.replace({ name: 'reader', params: route.params, query })
+  return fileAndOffsetForSeconds(ms / 1000)
+}
+
 function fileAndOffsetForSeconds(targetSecs: number): { fileIndex: number; posInFile: number } | null {
   let offset = 0
   for (let i = 0; i < audioFiles.value.length; i++) {
@@ -804,8 +818,12 @@ onMounted(async () => {
 
   let startAssetId = audioFiles.value[0]!.assetId
   let startPosition = 0
+  const requested = requestedStart()
 
-  if (progress.loaded.value && progress.resumeAssetId.value !== null) {
+  if (requested) {
+    startAssetId = audioFiles.value[requested.fileIndex]!.assetId
+    startPosition = requested.posInFile
+  } else if (progress.loaded.value && progress.resumeAssetId.value !== null) {
     startAssetId = progress.resumeAssetId.value
     startPosition = progress.resumePosition.value
   } else {

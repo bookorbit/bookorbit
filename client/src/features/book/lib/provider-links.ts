@@ -1,4 +1,4 @@
-import { MetadataProviderKey, type ProviderIds } from '@bookorbit/types'
+import { isKnownMetadataProviderKey, MetadataProviderKey, type ProviderIds } from '@bookorbit/types'
 import { normalizeAmazonDomain } from '@/lib/amazon-domain'
 import { providerIconPathSafe } from './provider-icons'
 
@@ -139,5 +139,22 @@ export function createBookProviderLinks(providerIds: ProviderIds, settings: Prov
         fallback: definition.fallback,
       },
     ]
+  })
+}
+
+/**
+ * Links for external providers' ids. The server sends the page each id was applied from, or one
+ * built from the provider's own template, so nothing here knows any external provider.
+ */
+export function createExternalProviderLinks(
+  providerIds: ProviderIds,
+  links: Partial<Record<string, string>> | undefined,
+  labels: Partial<Record<string, string>> = {},
+): BookProviderLink[] {
+  return Object.entries(providerIds).flatMap(([key, id]) => {
+    const url = links?.[key]
+    if (isKnownMetadataProviderKey(key) || !id?.trim() || !url) return []
+    const label = labels[key] ?? key
+    return [{ key, label, url, iconUrl: providerIconPathSafe(key), fallback: label.slice(0, 2).toUpperCase() }]
   })
 }

@@ -7,7 +7,18 @@ import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, books, genres, libraries, userLibraryAccess } from '../../db/schema';
+import {
+  authors,
+  bookAuthors,
+  bookFiles,
+  bookGenres,
+  bookMetadata,
+  bookProviderIds,
+  books,
+  genres,
+  libraries,
+  userLibraryAccess,
+} from '../../db/schema';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -740,7 +751,8 @@ export class StatisticsRepository {
       ${bookMetadata.comicvineId} is not null or
       ${bookMetadata.ranobedbId} is not null or
       ${bookMetadata.lubimyczytacId} is not null or
-      ${bookMetadata.aladinId} is not null
+      ${bookMetadata.aladinId} is not null or
+      exists (select 1 from ${bookProviderIds} where ${bookProviderIds.bookId} = ${bookMetadata.bookId})
     )`;
 
     const [row] = await this.db

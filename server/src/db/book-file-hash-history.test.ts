@@ -27,15 +27,17 @@ describe('hash identity revision writes', () => {
     expect(query.params).toEqual([HASH, 'external_change', 22]);
   });
 
+  // Book and folder deletions first settle the reading history of the books they take (the
+  // reading-attempt-retention tests cover those statements), so the delete is the last statement.
   it.each([
-    { table: 'book_files', run: deleteBookFilesWithHashInvalidation, filter: eq(schema.bookFiles.id, 22) },
-    { table: 'books', run: deleteBooksWithHashInvalidation, filter: eq(schema.books.id, 22) },
-    { table: 'library_folders', run: deleteLibraryFoldersWithHashInvalidation, filter: eq(schema.libraryFolders.id, 22) },
-  ])('commits $table deletion and invalidation together, including cascading history deletion', async ({ table, run, filter }) => {
+    { table: 'book_files', run: deleteBookFilesWithHashInvalidation, filter: eq(schema.bookFiles.id, 22), statements: 1 },
+    { table: 'books', run: deleteBooksWithHashInvalidation, filter: eq(schema.books.id, 22), statements: 2 },
+    { table: 'library_folders', run: deleteLibraryFoldersWithHashInvalidation, filter: eq(schema.libraryFolders.id, 22), statements: 3 },
+  ])('commits $table deletion and invalidation together, including cascading history deletion', async ({ table, run, filter, statements }) => {
     const { db, queries } = createCapturingDb();
     await run(db, filter);
-    expect(queries).toHaveLength(1);
-    const query = queries[0]!;
+    expect(queries).toHaveLength(statements);
+    const query = queries.at(-1)!;
     expect(query.sql).toContain('with deleted as');
     expect(query.sql).toContain(`delete from "${table}" where`);
     expect(query.sql).toContain('update "libraries"');

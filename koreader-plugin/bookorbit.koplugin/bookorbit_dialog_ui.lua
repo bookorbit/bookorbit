@@ -43,7 +43,7 @@ function DialogUI.topSheet(page, sw, sh, build, o)
     o = o or {}
     local mx = MenuUI.mx()
     local pad = px(16)
-    local wide = BoardMetrics.get().W >= 760
+    local wide = BoardMetrics.layoutW() >= 760
     local pw = wide and math.min(px(o.pop_w or 560), sw - 2 * mx) or sw
     local pad_x = wide and pad or mx
     local inner = pw - 2 * pad_x
@@ -226,7 +226,7 @@ end
 -- Text at width w on as many lines as it needs, up to max_lines.
 function DialogUI.lines(str, o, w, max_lines)
     local single = text(str, o)
-    if wOf(single) <= w then
+    if wOf(single) <= w and not str:find("\n") then
         single:free()
         return text(str, { s = o.s, b = o.b, col = o.col, w = w, data = o.data })
     end
@@ -271,6 +271,22 @@ function DialogUI.confirm(o)
             if not page.confirmed and o.on_cancel then o.on_cancel() end
         end,
     }
+end
+
+-- Something to read and acknowledge, too long for a toast: a title, a few
+-- lines and OK. o: title, text, ok_label. Tapping outside and Back close it.
+function DialogUI.notice(o)
+    local build = function(page, sw, sh)
+        return DialogUI.sheet(page, sw, sh, function(w)
+            local items = { DialogUI.lines(o.title, { s = 18, b = true }, w, 3) }
+            if o.text then
+                table.insert(items, DialogUI.lines(o.text, { s = 14, col = INK.g3 }, w, 8))
+            end
+            table.insert(items, MenuUI.pill(o.ok_label or _("OK"), { w = w, action = { kind = "close" } }))
+            return items
+        end, { pop_w = 420 })
+    end
+    return DialogUI.open{ name = "bookorbit_notice", build = build }
 end
 
 -- One choice from a short list, as radio rows. o: title, sub, options

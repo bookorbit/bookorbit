@@ -140,8 +140,10 @@ end
 -- folder merge re-parents a file to another book without changing its id. The
 -- token the match was verified against is stored alongside the time so one
 -- library change does not force a request on every later book sync until the
--- user runs a full sweep.
-function BookOrbitState:setMatched(md5, book_file_id, book_id, file, verified_version)
+-- user runs a full sweep. `position_compatible` is the match's positionCompatible
+-- field: false marks a copy whose bytes differ from the library file, which the
+-- server matches but cannot place highlights or exact positions in.
+function BookOrbitState:setMatched(md5, book_file_id, book_id, file, verified_version, position_compatible)
     local previous = self.books[md5]
     local identity_changed = previous ~= nil
         and (previous.fileId ~= book_file_id or previous.bookId ~= book_id)
@@ -154,6 +156,7 @@ function BookOrbitState:setMatched(md5, book_file_id, book_id, file, verified_ve
     book.annCount = book.annCount or 0
     book.matchVerifiedAt = os.time()
     book.matchVerifiedVersion = verified_version or (self.global and self.global.libraryVersion) or nil
+    book.positionIncompatible = position_compatible == false or nil
     self.books[md5] = book
     self.unmatched[md5] = nil
 end
@@ -199,6 +202,14 @@ function BookOrbitState.applyLibraryVersion(state, version, now)
     global.libraryVersion = version
     global.libraryVersionCheckedAt = now or os.time()
     return changed
+end
+
+-- A highlight or bookmark exchange that learns the copy is position
+-- incompatible records it here, so later exchanges skip the book until the next
+-- match check says otherwise.
+function BookOrbitState:markPositionIncompatible(md5)
+    local book = self.books[md5]
+    if book then book.positionIncompatible = true end
 end
 
 function BookOrbitState:setUnmatched(md5)

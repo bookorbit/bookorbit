@@ -26,6 +26,7 @@ describe('KoreaderHashLinkService', () => {
     findBookFileIdByBookId: ReturnType<typeof vi.fn>;
     dismissUnmatchedBook: ReturnType<typeof vi.fn>;
     dismissAllUnmatchedBooks: ReturnType<typeof vi.fn>;
+    findBooksByTitleKeys: ReturnType<typeof vi.fn>;
   };
   let mockBookService: {
     verifyBookAccess: ReturnType<typeof vi.fn>;
@@ -69,6 +70,7 @@ describe('KoreaderHashLinkService', () => {
       findBookFileIdByBookId: vi.fn(),
       dismissUnmatchedBook: vi.fn().mockResolvedValue(null),
       dismissAllUnmatchedBooks: vi.fn().mockResolvedValue(0),
+      findBooksByTitleKeys: vi.fn().mockResolvedValue([]),
     };
 
     mockBookService = {
@@ -161,6 +163,149 @@ describe('KoreaderHashLinkService', () => {
         },
       ]);
       expect(mockRepo.clearUnmatchedBooks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listUnmatchedBookSuggestions', () => {
+    function makeLibraryBook(overrides: Record<string, unknown> = {}) {
+      return {
+        bookId: 501,
+        titleKey: 'lab alpha',
+        title: 'Lab Alpha',
+        subtitle: null,
+        language: 'en',
+        publishedYear: 2026,
+        format: 'epub',
+        role: 'content',
+        libraryName: 'Novels',
+        authors: ['Ada Tester'],
+        ...overrides,
+      };
+    }
+
+    it('suggests the one library book with the same title and the same set of authors', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: '  Lab   ALPHA ', authors: 'Bo Sample\nAda Tester' })]);
+      mockRepo.findBooksByTitleKeys.mockResolvedValue([makeLibraryBook({ authors: ['Ada Tester', 'Bo Sample'] })]);
+
+      await expect(service.listUnmatchedBookSuggestions(user)).resolves.toEqual([
+        {
+          hash: HASH_A,
+          candidates: [
+            {
+              bookId: 501,
+              title: 'Lab Alpha',
+              subtitle: null,
+              authors: ['Ada Tester', 'Bo Sample'],
+              format: 'epub',
+              language: 'en',
+              publishedYear: 2026,
+              libraryName: 'Novels',
+            },
+          ],
+          moreCandidates: false,
+        },
+      ]);
+      expect(mockRepo.findBooksByTitleKeys).toHaveBeenCalledWith(['lab alpha'], [1, 2], null, 26);
+    });
+
+    it('lists every edition that shares the title and authors, so none is presented as the only match', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: 'Lab Alpha', authors: 'Ada Tester' })]);
+      mockRepo.findBooksByTitleKeys.mockResolvedValue([
+        makeLibraryBook({ bookId: 501 }),
+        makeLibraryBook({ bookId: 502, subtitle: 'Second edition' }),
+      ]);
+
+      const [suggestion] = await service.listUnmatchedBookSuggestions(user);
+
+      expect(suggestion!.candidates.map((candidate) => candidate.bookId)).toEqual([501, 502]);
+      expect(suggestion!.moreCandidates).toBe(false);
+    });
+
+    it('suggests nothing when the author sets differ in any way', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([
+        makeUnmatchedRow({ hash: HASH_A, title: 'Lab Alpha', authors: 'Ada Tester' }),
+        makeUnmatchedRow({ hash: HASH_B, title: 'Lab Alpha', authors: 'Ada Tester\nBo Sample\nCy Third' }),
+      ]);
+      mockRepo.findBooksByTitleKeys.mockResolvedValue([makeLibraryBook({ authors: ['Ada Tester', 'Bo Sample'] })]);
+
+      await expect(service.listUnmatchedBookSuggestions(user)).resolves.toEqual([]);
+    });
+
+    it('suggests nothing for a different title, even with the same author', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: 'Lab Alpha!', authors: 'Ada Tester' })]);
+      mockRepo.findBooksByTitleKeys.mockResolvedValue([makeLibraryBook({ titleKey: 'lab alpha!', title: 'Lab Alpha' })]);
+
+      await expect(service.listUnmatchedBookSuggestions(user)).resolves.toEqual([]);
+    });
+
+    it('only considers rows a link would accept, with a title and authors', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([
+        makeUnmatchedRow({ hash: 'c'.repeat(32), source: 'statistics' }),
+        makeUnmatchedRow({ hash: 'd'.repeat(32), metadataAmbiguous: true }),
+        makeUnmatchedRow({ hash: 'e'.repeat(32), manualLinkRequested: true }),
+        makeUnmatchedRow({ hash: 'f'.repeat(32), title: null }),
+        makeUnmatchedRow({ hash: '1'.repeat(32), authors: '  ' }),
+      ]);
+
+      await expect(service.listUnmatchedBookSuggestions(user)).resolves.toEqual([]);
+      expect(mockRepo.findBooksByTitleKeys).not.toHaveBeenCalled();
+      expect(mockRepo.getAccessibleLibraryIds).not.toHaveBeenCalled();
+    });
+
+    it('never offers a book whose primary file is audio or not content, because the link targets that file', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: 'Lab Alpha', authors: 'Ada Tester' })]);
+      mockRepo.findBooksByTitleKeys.mockResolvedValue([
+        makeLibraryBook({ bookId: 601, format: 'm4b' }),
+        makeLibraryBook({ bookId: 602, role: 'supplement' }),
+        makeLibraryBook({ bookId: 603, format: 'pdf' }),
+      ]);
+
+      const [suggestion] = await service.listUnmatchedBookSuggestions(user);
+
+      expect(suggestion!.candidates.map((candidate) => candidate.bookId)).toEqual([603]);
+    });
+
+    it('flags more candidates when the title was shared by more books than were checked', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: 'Lab Alpha', authors: 'Ada Tester' })]);
+      const others = Array.from({ length: 25 }, (_, index) => makeLibraryBook({ bookId: 700 + index, authors: ['Someone Else'] }));
+      mockRepo.findBooksByTitleKeys.mockResolvedValue([makeLibraryBook({ bookId: 699 }), ...others]);
+
+      const [suggestion] = await service.listUnmatchedBookSuggestions(user);
+
+      expect(suggestion!.candidates.map((candidate) => candidate.bookId)).toEqual([699]);
+      expect(suggestion!.moreCandidates).toBe(true);
+    });
+
+    it('caps the candidates and reports that more exist', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: 'Lab Alpha', authors: 'Ada Tester' })]);
+      mockRepo.findBooksByTitleKeys.mockResolvedValue(Array.from({ length: 7 }, (_, index) => makeLibraryBook({ bookId: 800 + index })));
+
+      const [suggestion] = await service.listUnmatchedBookSuggestions(user);
+
+      expect(suggestion!.candidates).toHaveLength(5);
+      expect(suggestion!.moreCandidates).toBe(true);
+    });
+
+    it('applies content filters for regular users and skips them for superusers', async () => {
+      const filters = { includeTagIds: [3], includeGenreIds: [], excludeTagIds: [], excludeGenreIds: [] };
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: 'Lab Alpha', authors: 'Ada Tester' })]);
+
+      await service.listUnmatchedBookSuggestions({ id: 7, settings: {}, contentFilters: filters } as never);
+      await service.listUnmatchedBookSuggestions({ id: 7, settings: {}, contentFilters: filters, isSuperuser: true } as never);
+
+      expect(mockRepo.findBooksByTitleKeys).toHaveBeenNthCalledWith(1, ['lab alpha'], [1, 2], filters, 26);
+      expect(mockRepo.findBooksByTitleKeys).toHaveBeenNthCalledWith(2, ['lab alpha'], [1, 2], null, 26);
+    });
+
+    it('never writes', async () => {
+      mockRepo.listUnmatchedBooks.mockResolvedValue([makeUnmatchedRow({ title: 'Lab Alpha', authors: 'Ada Tester' })]);
+      mockRepo.findBooksByTitleKeys.mockResolvedValue([makeLibraryBook()]);
+
+      await service.listUnmatchedBookSuggestions(user);
+
+      expect(mockRepo.upsertBookHashLink).not.toHaveBeenCalled();
+      expect(mockRepo.clearUnmatchedBooks).not.toHaveBeenCalled();
+      expect(mockRepo.resolveBookFilesByHashes).not.toHaveBeenCalled();
     });
   });
 
@@ -258,6 +403,7 @@ describe('KoreaderHashLinkService', () => {
           koreaderTitle: 'KOReader Title',
           koreaderAuthors: 'KOReader Author',
           koreaderLastOpen: 100,
+          positionCompatible: false,
           createdAt,
           updatedAt,
         },
@@ -273,6 +419,7 @@ describe('KoreaderHashLinkService', () => {
           koreaderTitle: 'KOReader Title',
           koreaderAuthors: 'KOReader Author',
           koreaderLastOpen: 100,
+          positionCompatible: false,
           createdAt: '2026-06-01T10:00:00.000Z',
           updatedAt: '2026-06-02T11:00:00.000Z',
         },

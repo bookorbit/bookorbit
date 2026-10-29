@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { findGrabRefusal, releaseInspectionBlocksGrab } from '@bookorbit/types'
 import type {
+  BookRequestFailureMeta,
   BookRequestItem,
   DownloadDelivery,
   GrabBookRequestPayload,
@@ -13,13 +14,31 @@ import type {
   ReleaseFileInspection,
 } from '@bookorbit/types'
 
-/** Only the refusals that rule another release out get a note; the rest are about one row. */
+/**
+ * Only the refusals that rule another release out get a note; the rest are about one row. A client
+ * refusal is not about any row, so it is said once above the list instead of on every one.
+ */
 const REFUSAL_KEYS: Partial<Record<GrabFailureCode, string>> = {
   GRAB_SOURCE_REFUSED: 'sourceRefused',
   GRAB_SOURCE_UNAVAILABLE: 'sourceUnavailable',
   GRAB_VIP_REQUIRED: 'vipRequired',
-  GRAB_CLIENT_REFUSED: 'clientRefused',
-  GRAB_CLIENT_UNAVAILABLE: 'clientUnavailable',
+}
+
+type ClientFailureCode = Extract<GrabFailureCode, 'GRAB_CLIENT_REFUSED' | 'GRAB_CLIENT_UNAVAILABLE'>
+
+function isClientFailure(code: GrabFailureCode | null): code is ClientFailureCode {
+  return code === 'GRAB_CLIENT_REFUSED' || code === 'GRAB_CLIENT_UNAVAILABLE'
+}
+
+/** The download client that failed the last send, and that send, so it can be tried once more. */
+export interface ClientProblem {
+  code: ClientFailureCode
+  /** The client's configured name, when the server said which one. */
+  client: string | null
+  /** The client's own words. Only shown for a refusal: "not responding" is all an outage needs. */
+  reason: string | null
+  body: GrabBookRequestPayload
+  delivery: DownloadDelivery
 }
 
 /** The refusal travels back with the call it belongs to, so one grab cannot describe another. */
@@ -27,6 +46,7 @@ export interface ReleaseGrabOutcome {
   item: BookRequestItem | null
   reason: string | null
   errorCode: GrabFailureCode | null
+  errorMeta?: BookRequestFailureMeta | null
 }
 
 export interface ReleaseGrabOptions {
@@ -57,6 +77,7 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
 
   const manualOpen = ref(false)
   const refusals = ref<GrabRefusal[]>([])
+  const clientProblem = ref<ClientProblem | null>(null)
   /**
    * One release at a time, from the click rather than from the request.
    *
@@ -85,6 +106,16 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
   /** A fresh search is also how an approver retries a source that was merely slow. */
   function forgetRefusals() {
     refusals.value = []
+    clientProblem.value = null
+  }
+
+  function clientName(meta: BookRequestFailureMeta | null | undefined): string | null {
+    const name = meta?.client
+    return typeof name === 'string' && name.trim() ? name : null
+  }
+
+  function clientUnavailableText(client: string | null): string {
+    return client ? t('bookRequests.releases.clientProblem.unavailable', { client }) : t('bookRequests.releases.clientProblem.unavailableUnnamed')
   }
 
   /** A sent release leaves nothing to pick, so the drawer pops back to the request it belongs to, unless told otherwise. */
@@ -93,9 +124,18 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     const outcome = await grab(request.value.id, holdForReview.value ? { ...body, holdForReview: true } : body)
     if (!outcome.item) {
       rememberRefusal(body, delivery, outcome.errorCode)
+      const code = outcome.errorCode
+      if (isClientFailure(code)) {
+        const client = clientName(outcome.errorMeta)
+        clientProblem.value = { code, client, reason: outcome.reason, body, delivery }
+        const description = code === 'GRAB_CLIENT_UNAVAILABLE' ? clientUnavailableText(client) : outcome.reason
+        toast.error(t('bookRequests.errors.grabFailed'), description ? { description } : undefined)
+        return
+      }
       toast.error(t('bookRequests.errors.grabFailed'), outcome.reason ? { description: outcome.reason } : undefined)
       return
     }
+    clientProblem.value = null
     setRequest(outcome.item)
     manualOpen.value = false
     toast.success(t('bookRequests.toasts.grabbed'))
@@ -136,6 +176,23 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     void submitGrab(payload.body)
   }
 
+  /**
+   * The same release again, once the client is back. Re-searching was the only way out before,
+   * which asked every tracker again to undo something none of them had said.
+   */
+  async function retryClient(): Promise<void> {
+    const problem = clientProblem.value
+    if (!problem || grabbing.value) return
+    refusals.value = refusals.value.filter((refusal) => !isClientFailure(refusal.code))
+    clientProblem.value = null
+    grabbing.value = true
+    try {
+      await sendGrab(problem.body, problem.delivery)
+    } finally {
+      grabbing.value = false
+    }
+  }
+
   /** Only a refusal the server classified; anything else says nothing about the other releases. */
   function rememberRefusal(body: GrabBookRequestPayload, delivery: DownloadDelivery, code: GrabFailureCode | null) {
     if (!code) return
@@ -161,12 +218,14 @@ export function useReleaseGrab(options: ReleaseGrabOptions) {
     grabbing,
     holdForReview,
     refusals,
+    clientProblem,
     openManual,
     closeManual,
     forgetRefusals,
     submitGrab,
     handleGrab,
     handleManualGrab,
+    retryClient,
     isRefused,
     refusalText,
   }

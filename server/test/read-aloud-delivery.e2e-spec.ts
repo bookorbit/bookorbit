@@ -37,10 +37,10 @@ describe('Read-aloud delivery contracts (e2e)', { timeout: 180_000 }, () => {
       headers: authHeader(owner.accessToken),
       ...(payload !== undefined ? { payload: payload as Record<string, unknown> } : {}),
     });
-  async function detail(variant: string) {
+  async function detail(variant?: string) {
     const response = await ctx.app.inject({
       method: 'GET',
-      url: `/api/v1/koreader/plugin/catalog/books/${book.bookId}?variant=${variant}`,
+      url: `/api/v1/koreader/plugin/catalog/books/${book.bookId}${variant ? `?variant=${variant}` : ''}`,
       headers: koHeaders(),
     });
     expect(response.statusCode).toBe(200);
@@ -258,7 +258,10 @@ describe('Read-aloud delivery contracts (e2e)', { timeout: 180_000 }, () => {
     const text = await detail('audioless_epub');
     expect(original.sizeBytes).toBe(sourceBytes.length);
     expect(text.sizeBytes).toBeNull();
-    expect(original.devicePath).not.toBe(text.devicePath);
+    const configured = (await detail()).devicePath;
+    expect(configured).toMatch(/\.epub$/);
+    expect(original.devicePath).toBe(configured);
+    expect(text.devicePath).toBe(configured.replace(/\.epub$/, ' - Text Only.epub'));
     const response = await acquire(original.downloadUrl);
     expect(response.statusCode).toBe(200);
     expect(response.rawPayload).toEqual(sourceBytes);

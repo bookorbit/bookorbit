@@ -175,6 +175,12 @@ export class KoreaderController {
   }
 
   @RequirePermission(Permission.KoreaderSync)
+  @Get('unmatched-books/suggestions')
+  listUnmatchedBookSuggestions(@CurrentUser() user: RequestUser) {
+    return this.hashLinkService.listUnmatchedBookSuggestions(user);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
   @Post('unmatched-books/:hash/link')
   linkUnmatchedBook(@CurrentUser() user: RequestUser, @Param('hash') hash: string, @Body() dto: LinkKoreaderUnmatchedBookDto) {
     return this.hashLinkService.linkUnmatchedBook(user, hash, dto.bookId);

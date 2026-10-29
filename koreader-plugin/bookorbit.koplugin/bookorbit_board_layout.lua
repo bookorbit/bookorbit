@@ -51,7 +51,9 @@ function BoardLayout.marginFor(width_dp)
     return 16
 end
 
--- px: the dp-to-pixel function. Returns everything in pixels.
+-- px: the dp-to-pixel function. Returns everything in pixels. width_dp is
+-- the screen's width at interface size 1, so a page keeps its columns at
+-- every interface size.
 function BoardLayout.geometry(px, screen_w, screen_h, width_dp)
     local g = {}
     g.mx = px(BoardLayout.marginFor(width_dp))
@@ -141,13 +143,15 @@ end
 
 -- Fits one page: drops trailing widgets until rows are at least MIN_ROW, then
 -- adds extras that cost no row (or keep rows comfortable) and leave no new
--- holes. Returns the packing plus the row height to draw it at. The first
--- widget always stays: two rows at MIN_ROW fit every screen.
+-- holes. Returns the packing plus the row height to draw it at, and the
+-- widgets dropped for room. The first widget always stays: two rows at
+-- MIN_ROW fit every screen.
 function BoardLayout.fitPage(g, base, extras)
     local items = {}
     for _i, it in ipairs(base or {}) do table.insert(items, it) end
+    local dropped = {}
     while #items > 1 and BoardLayout.rowHeight(g, BoardLayout.pack(items, g.cols).rows) < g.min_row do
-        table.remove(items)
+        table.insert(dropped, 1, table.remove(items))
     end
     for _i, ex in ipairs(extras or {}) do
         local before = BoardLayout.pack(items, g.cols)
@@ -163,6 +167,7 @@ function BoardLayout.fitPage(g, base, extras)
     local packed = BoardLayout.pack(items, g.cols)
     packed.row_h = math.min(g.max_row, BoardLayout.rowHeight(g, packed.rows))
     packed.grid_h = packed.rows * packed.row_h + math.max(0, packed.rows - 1) * g.gap
+    packed.dropped = dropped
     return packed
 end
 

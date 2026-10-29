@@ -198,31 +198,47 @@ function Pages.seriesBody(m, f)
         local pad = math.floor((sw - seg_w) / 2)
         table.insert(seg_row, BoardUI.overlay(seg_w, px(10), { { widget = s, x = -pad, y = math.floor((px(10) - hOf(s)) / 2) } }))
     end
-    local ruler = vstack({ w = tw }, {
-        hstack({ gap = gap, h = px(10) }, seg_row),
-        #nums > 0 and space(nil, px(4)) or false,
-        #nums > 0 and hstack({ gap = gap }, nums) or false,
-    })
     local p = m.progress
-    local summary = {
-        runs({ { t = T(_("%1 of %2 read"), p.finished, p.count), b = true, col = INK.black, s = 19 }, { t = "   " .. T(_("%1 in progress"), p.reading) } }, { s = 13, col = INK.g4, w = tw }),
-        space(nil, px(8)), ruler, space(nil, px(8) + px(4) + px(8)),
-    }
-    if next_book then
-        table.insert(summary, text(T(_("Up next · Book %1"), tostring(next_book.seriesIndex or "")), { s = 12, b = true, col = INK.g4, w = tw }))
-        table.insert(summary, space(nil, px(8)))
-        table.insert(summary, text(next_book.title or "", { s = 16, b = true, lines = 2, w = tw, data = true }))
-        table.insert(summary, space(nil, px(8)))
-        local cont = region(ListView.pill(ListData.stateOf(next_book) == "reading" and _("Continue") or T(_("Start book %1"), tostring(next_book.seriesIndex or "")), { icon = "book-open", h = 40, s = 14, pad_x = 18 }),
-            { kind = "open-book", book = next_book }, "series-hero", "continue")
-        local right = nil
-        if ListData.stateOf(next_book) == "reading" then
-            local left = m.next_minutes and (" · " .. T(_("%1 left"), ListData.duration(m.next_minutes))) or (" · " .. (require("bookorbit_board_data").relativeDay(next_book.lastReadAt) or ""))
-            right = runs({ { t = ListData.pctLabel(next_book) or "0%", b = true, col = INK.black }, { t = left } }, { s = 13, col = INK.g4, data = true })
+    -- level 1 gives the next title one line, level 2 also drops the ruler's
+    -- numbers: a short screen at a large interface size keeps the summary
+    -- inside its band instead of pushing it into the header. live = false
+    -- measures without making the button tappable.
+    local function summaryOf(level, live)
+        local with_nums = #nums > 0 and level < 2
+        local ruler = vstack({ w = tw }, {
+            hstack({ gap = gap, h = px(10) }, seg_row),
+            with_nums and space(nil, px(4)) or false,
+            with_nums and hstack({ gap = gap }, nums) or false,
+        })
+        local summary = {
+            runs({ { t = T(_("%1 of %2 read"), p.finished, p.count), b = true, col = INK.black, s = 19 }, { t = "   " .. T(_("%1 in progress"), p.reading) } }, { s = 13, col = INK.g4, w = tw }),
+            space(nil, px(8)), ruler, space(nil, level > 0 and px(12) or (px(8) + px(4) + px(8))),
+        }
+        if next_book then
+            table.insert(summary, text(next_book.seriesIndex and T(_("Up next · Book %1"), tostring(next_book.seriesIndex)) or _("Up next"), { s = 12, b = true, col = INK.g4, w = tw }))
+            table.insert(summary, space(nil, px(level > 0 and 4 or 8)))
+            table.insert(summary, text(next_book.title or "", { s = 16, b = true, lines = level == 0 and 2 or nil, w = tw, data = true }))
+            table.insert(summary, space(nil, px(8)))
+            local pill = ListView.pill(ListData.stateOf(next_book) == "reading" and _("Continue") or (next_book.seriesIndex and T(_("Start book %1"), tostring(next_book.seriesIndex)) or _("Start book")), { icon = "book-open", h = 40, s = 14, pad_x = 18 })
+            local cont = live and region(pill, { kind = "open-book", book = next_book }, "series-hero", "continue") or pill
+            local right = nil
+            if ListData.stateOf(next_book) == "reading" then
+                local left = m.next_minutes and (" · " .. T(_("%1 left"), ListData.duration(m.next_minutes))) or (" · " .. (require("bookorbit_board_data").relativeDay(next_book.lastReadAt) or ""))
+                right = runs({ { t = ListData.pctLabel(next_book) or "0%", b = true, col = INK.black }, { t = left } }, { s = 13, col = INK.g4, data = true })
+            end
+            table.insert(summary, hstack({ gap = px(12) }, { cont, right or false }))
         end
-        table.insert(summary, hstack({ gap = px(12) }, { cont, right or false }))
+        return vstack({ w = tw }, summary)
     end
-    local summary_col = vstack({ w = tw }, summary)
+    local level = 0
+    if not side then
+        while level < 2 do
+            -- Measured only; its ruler pieces are reused, so it is not freed.
+            if hOf(summaryOf(level, false)) <= hero_h then break end
+            level = level + 1
+        end
+    end
+    local summary_col = summaryOf(level, true)
     local deck = region(hstack({ w = side and side_w or deck_w, h = deck_h, valign = "bottom" }, { side and space(1, 1) or flex(0), ListView.stackFit(m.deck or books, deck_w, deck_h), flex(0) }),
         next_book and { kind = "open-book", book = next_book } or { kind = "noop" }, "series-hero", "deck")
     local hero
@@ -231,7 +247,7 @@ function Pages.seriesBody(m, f)
     else
         hero = hstack({ w = f.w, h = hero_h, gap = px(20) }, { deck, vstack({ w = tw, h = hero_h }, { flex(0), summary_col, flex(0) }) })
     end
-    local head = ListView.sectionHead(list_w, { icon = "layers-2", label = _("Reading order"), count = #all_books, right = ListView.viewToggle(m.view, "series-head") })
+    local head = ListView.sectionHead(list_w, { icon = "layers-2", label = m.order_label or _("Reading order"), count = #all_books, right = ListView.viewToggle(m.view, "series-head") })
     local list_h = page == 1 and layout.list_h1 or layout.list_hn
     local content
     if m.view == "grid" then
@@ -239,7 +255,9 @@ function Pages.seriesBody(m, f)
         local short = ListData.distinctTitles(books)
         content = ListView.cellsGrid(list_w, g, books, function(b)
             return ListView.bookCell(g, b, {
-                title = function(x) return tostring(x.seriesIndex or "") .. ". " .. (short[x.id] or x.title or "") end,
+                select = m.select,
+                selected = m.selected and m.selected(b),
+                title = function(x) return x.seriesIndex and (tostring(x.seriesIndex) .. ". " .. (short[x.id] or x.title or "")) or (short[x.id] or x.title or "") end,
                 meta = function(x)
                     local st = ListData.stateOf(x)
                     if st == "reading" then
@@ -256,7 +274,12 @@ function Pages.seriesBody(m, f)
         content = ListView.indexList(list_w, list_h, {
             entries = books, rows_per_col = rows.n, row_h = rows.rh, cols = 1, gutter = 34, rail = false,
             groupOf = function(b) return "#" .. tostring(b.seriesIndex or "") end, group_rules = false,
-            row = function(w, hh, b) return ListView.bookRow(w, hh, b, { context = "series" }) end, action = m.action,
+            row = function(w, hh, b) return ListView.bookRow(w, hh, b, {
+                select = m.select,
+                selected = m.selected and m.selected(b),
+                context = "series",
+            }) end,
+            action = m.action,
         })
     end
     local list = vstack({ w = list_w }, { head, space(nil, px(8)), content })
@@ -278,7 +301,8 @@ local function authorGeometry(m, f)
     local book_w = side and (f.w - card_w - gap_s) or f.w
     local pad = px(14)
     local ph = px(side and 88 or 64)
-    local top_h = side and math.max(ph, lh1(15) + 3 * lh1(13) + px(8)) or math.max(ph, lh1(15) + lh1(13) + px(4))
+    local photo_h = (m.author and m.author.hasPhoto) and ph or 0
+    local top_h = side and math.max(photo_h, lh1(15) + 3 * lh1(13) + px(8)) or math.max(photo_h, lh1(15) + lh1(13) + px(4))
     local card_fixed = 2 * pad + top_h + px(12) + px(34)
     return { side = side, gap_s = gap_s, card_w = card_w, book_w = book_w, pad = pad, ph = ph, top_h = top_h, card_fixed = card_fixed }
 end
@@ -393,12 +417,46 @@ function Pages.authorBody(m, f)
         local tw = w - (pic and (ph + px(14)) or 0)
         local col
         if side then
+            local rest = #facts > 1 and table.concat({ unpack(facts, 2) }, " · ") or nil
+            local lines = {
+                { ListData.bookCount(count), { s = 15, b = true } },
+                rest and { rest, { s = 13, b = true } } or false,
+                { on_dev, { s = 13, col = INK.g4 } },
+                a.birth_year and { T(_("Born %1"), a.birth_year), { s = 13, col = INK.g4 } } or false,
+            }
+            -- The narrow side card: each line steps down before it is cut,
+            -- and the photo gives way (to 56dp, then out) before a line is.
+            if pic then
+                local need = 0
+                for _i, l in ipairs(lines) do
+                    if l then
+                        local probe = text(l[1], { s = l[2].s - 2, b = l[2].b })
+                        need = math.max(need, probe:getSize().w)
+                        if probe.free then probe:free() end
+                    end
+                end
+                if need > tw then
+                    local small = w - px(14) - need
+                    if pic.free then pic:free() end
+                    if small >= px(56) then
+                        pic = ListView.photo(a, math.min(ph, small))
+                        tw = w - math.min(ph, small) - px(14)
+                    else
+                        pic = nil
+                        tw = w
+                    end
+                end
+            end
+            local function line(l)
+                local str, o = l[1], l[2]
+                return text(str, { s = BoardUI.fitSize(str, o, tw, o.s - 2), b = o.b, col = o.col, w = tw })
+            end
             col = vstack({ w = tw }, {
-                text(ListData.bookCount(count), { s = 15, b = true, w = tw }),
-                #facts > 1 and text(table.concat({ unpack(facts, 2) }, " · "), { s = 13, b = true, w = tw }) or false,
+                line(lines[1]),
+                lines[2] and line(lines[2]) or false,
                 space(nil, px(4)),
-                text(on_dev, { s = 13, col = INK.g4, w = tw }),
-                a.birth_year and text(T(_("Born %1"), a.birth_year), { s = 13, col = INK.g4, w = tw }) or false,
+                line(lines[3]),
+                lines[4] and line(lines[4]) or false,
             })
         else
             local sub = on_dev .. (a.birth_year and (" · " .. T(_("born %1"), a.birth_year)) or "")
@@ -406,10 +464,28 @@ function Pages.authorBody(m, f)
         end
         return hstack({ w = w, gap = px(14) }, { pic or false, col })
     end
+    -- Download all and Full bio side by side, Full bio tighter when the row
+    -- is short of room, and under Download all when it still is. Measured
+    -- with plain pills: a region joins the D-pad rows once it is built.
+    local dl_o = { kind = "outline", icon = "download", h = 34, s = 13, pad_x = 14 }
+    local bio_pad
+    do
+        local probe = ListView.pill(T(_("Download all %1"), count), dl_o)
+        local room = iw - probe:getSize().w - px(8)
+        if probe.free then probe:free() end
+        for _i, pad_x in ipairs({ 10, 4 }) do
+            local pill = ListView.pill(_("Full bio"), { kind = "ghost", h = 34, s = 13, pad_x = pad_x })
+            if not bio_pad and pill:getSize().w <= room then bio_pad = pad_x end
+            if pill.free then pill:free() end
+        end
+    end
+    local buttons_h = bio_pad and px(34) or (2 * px(34) + px(4))
     local function buttons(with_bio)
-        local dl = region(ListView.pill(T(_("Download all %1"), count), { kind = "outline", icon = "download", h = 34, s = 13, pad_x = 14 }), { kind = "download-all" }, "author-card", "download-all")
-        local bio = with_bio and region(ListView.pill(_("Full bio"), { kind = "ghost", h = 34, s = 13, pad_x = 10 }), { kind = "full-bio" }, "author-card", "full-bio") or nil
-        return hstack({ gap = px(8) }, { dl, bio or false })
+        local dl = region(ListView.pill(T(_("Download all %1"), count), dl_o), { kind = "download-all" }, "author-card", "download-all")
+        if not with_bio then return dl end
+        local bio = region(ListView.pill(_("Full bio"), { kind = "ghost", h = 34, s = 13, pad_x = bio_pad or 4 }), { kind = "full-bio" }, "author-card", "full-bio")
+        if bio_pad then return hstack({ gap = px(8) }, { dl, bio }) end
+        return vstack({}, { dl, space(nil, px(4)), bio })
     end
     -- What the page's books take, so the bio can have the rest.
     local function blocksH()
@@ -431,7 +507,7 @@ function Pages.authorBody(m, f)
     if page == 1 or side then
         if side then
             card_h = f.content_h
-            local room = card_h - 2 * pad - 2 * MenuUI.line() - geo.top_h - px(16) - px(34) - px(16)
+            local room = card_h - 2 * pad - 2 * MenuUI.line() - geo.top_h - px(16) - buttons_h - px(16)
             local desc_lines = a.description and bioLines(room, 18) or 0
             local bio = desc_lines >= 2 and text(a.description, { s = 13, serif = true, col = INK.g2, lines = desc_lines, w = iw, data = true }) or nil
             card = MenuUI.card(card_w, { vstack({ w = iw, h = card_h - 2 * pad - 2 * MenuUI.line() }, { topRow(iw), bio and space(nil, px(16)) or false, bio or false, flex(px(16)), buttons(bio ~= nil) }) }, { pad = 14, vpad = 14 })
@@ -439,6 +515,10 @@ function Pages.authorBody(m, f)
             local room = f.content_h - geo.card_fixed - px(16) - blocksH() - px(12)
             local desc_lines = a.description and bioLines(room, 8) or 0
             if desc_lines < 2 then desc_lines = 0 end
+            -- A short bio takes only the lines it needs.
+            if desc_lines > 0 then
+                desc_lines = math.min(desc_lines, require("bookorbit_text_pages").linesNeeded(a.description, { s = 13, serif = true }, iw))
+            end
             card_h = geo.card_fixed + (desc_lines > 0 and (px(12) + BoardMetrics.textBoxHeight(desc_lines, 13)) or 0)
             local bio = desc_lines > 0 and text(a.description, { s = 13, serif = true, col = INK.g2, lines = desc_lines, w = iw, data = true }) or nil
             card = MenuUI.card(card_w, { vstack({ w = iw, h = card_h - 2 * pad - 2 * MenuUI.line() }, { flex(0), topRow(iw), bio and space(nil, px(12)) or false, bio or false, space(nil, px(12)), buttons(bio ~= nil), flex(0) }) }, { pad = 14, vpad = 14 })
@@ -486,80 +566,11 @@ function Pages.authorBody(m, f)
 end
 
 -- -------------------------------------------------------------- search
--- An author is their name over their covers; a series its books in order;
--- books are a cover grid. Landscape sets authors and series side by side.
-local function blockCover(b, cw, ch)
-    return ListView.markedCover(b, cw, ch)
-end
-
-local function authorBlock(a, cw, lh_block)
-    local ch = math.floor(cw * 1.5 + 0.5)
-    local gap = px(6)
-    local books = {}
-    for i = 1, math.min(4, #(a.previewBooks or {})) do books[i] = a.previewBooks[i] end
-    local photo_w = 0
-    local photo_path = a.photo_path
-    if photo_path then photo_w = math.floor(ch * 0.72 + 0.5) end
-    local covers_w = (photo_w > 0 and (photo_w + gap) or 0) + #books * cw + math.max(0, #books - 1) * gap
-    local count = tonumber(a.count) or 0
-    local more = count > #books and (" · +" .. (count - #books)) or ""
-    local meta = (tonumber(a.readingCount) or 0) > 0 and { { t = ListData.bookCount(count) }, { t = " · " .. T(_("%1 reading"), a.readingCount), b = true, col = INK.black } } or { { t = ListData.bookCount(count) .. more } }
-    local name_w = ListView.textWidth(a.title or "", { s = 13, b = true }) + 1
-    local meta_w = ListView.runsWidth(meta, { s = 11 }) + 1
-    local w = math.max(covers_w, math.min(math.max(name_w, meta_w), px(150)))
-    local row = {}
-    if photo_path then
-        table.insert(row, ListView.photoRect(photo_path, photo_w, ch, px(8)))
-    end
-    for _i, b in ipairs(books) do table.insert(row, blockCover(b, cw, ch)) end
-    return vstack({ w = w, h = lh_block }, {
-        text(a.title or "", { s = 13, b = true, w = w, data = true }),
-        runs(meta, { s = 11, col = INK.g4, w = w, data = true }),
-        space(nil, px(6)),
-        hstack({ gap = gap, valign = "top" }, row),
-    }), w
-end
-
-local function seriesBlock(s, cw, lh_block, max_w)
-    local ch = math.floor(cw * 1.5 + 0.5)
-    local gap = px(5)
-    local members = s.previewBooks or {}
-    local n = #members
-    local fit_n = math.max(1, math.floor((max_w + gap) / (cw + gap)))
-    local more = (tonumber(s.count) or n) > n and ((tonumber(s.count) or n) - n) or 0
-    if n > fit_n then more = more + (n - fit_n + 1); n = fit_n - 1 end
-    local tiles = n + (more > 0 and 1 or 0)
-    local covers_w = tiles * cw + math.max(0, tiles - 1) * gap
-    local meta = ListData.seriesMeta(s)
-    local styled = {}
-    for _i, p in ipairs(meta) do table.insert(styled, { t = p.t, b = p.b, col = p.b and INK.black or INK.g4 }) end
-    local name_w = ListView.textWidth(s.title or "", { s = 13, b = true }) + 1
-    local meta_w = ListView.runsWidth(styled, { s = 11 }) + 1
-    local w = math.min(max_w, math.max(covers_w, math.min(math.max(name_w, meta_w), px(170))))
-    local row = {}
-    for i = 1, n do table.insert(row, blockCover(members[i], cw, ch)) end
-    if more > 0 then
-        table.insert(row, BoardUI.box({ w = cw, h = ch, radius = px(6), bg = INK.ge }, hstack({ w = cw, h = ch }, { flex(0), text("+" .. more, { s = 14, b = true }), flex(0) })))
-    end
-    return vstack({ w = w, h = lh_block }, {
-        text(s.title or "", { s = 13, b = true, w = w, data = true }),
-        runs(styled, { s = 11, col = INK.g4, w = w, data = true }),
-        space(nil, px(6)),
-        hstack({ gap = gap, valign = "top" }, row),
-    }), w
-end
-
-local function blockLine(w, blocks, gap)
-    local items, used = {}, 0
-    for _i, b in ipairs(blocks) do
-        local bw = wOf(b.widget)
-        if #items > 0 and used + gap + bw > w then break end
-        if #items > 0 then table.insert(items, space(gap, 1)) end
-        table.insert(items, b.widget)
-        used = used + (#items > 1 and gap or 0) + bw
-    end
-    return hstack({ w = w, valign = "top" }, items)
-end
+-- Authors, series and books are the list rows their own lists use, so a
+-- search reads like the lists it opens. The rows that fit are shared out
+-- evenly between the sections that found something, a spare row going to
+-- books first; each section says See all when it holds more. Landscape sets
+-- authors and series in one column and books in the other.
 
 function Pages.searchBody(m, f)
     local r = m.results
@@ -571,7 +582,8 @@ function Pages.searchBody(m, f)
         region(hstack({ w = px(44), h = px(40) }, { flex(0), icon("x", px(18), { sw = 2 }), flex(0) }), { kind = "search-clear" }, "search-field", "search-clear"),
     })
     local field = region(BoardUI.box({ w = f.w, h = field_h, radius = math.floor(field_h / 2), border = math.max(1, px(1.5)), border_col = INK.black, bg = INK.white }, field_inner), { kind = "search-edit" }, "search-field", "search-field")
-    local total = #r.authors + #r.series + (r.books_total or #r.books)
+    local books_total = r.books_total or #r.books
+    local total = #r.authors + #r.series + books_total
     local function chip(label, on, scope)
         return region(MenuUI.chip(label, { h = 30, ink = on }), { kind = "search-scope", scope = scope }, "search-chips", "chip-" .. scope)
     end
@@ -579,55 +591,93 @@ function Pages.searchBody(m, f)
         chip(T(_("Everything %1"), total), m.scope == "all", "all"),
         chip(T(_("Authors %1"), #r.authors), m.scope == "authors", "authors"),
         chip(T(_("Series %1"), #r.series), m.scope == "series", "series"),
-        chip(T(_("Books %1"), r.books_total or #r.books), m.scope == "books", "books"),
+        chip(T(_("Books %1"), books_total), m.scope == "books", "books"),
     })
-    local cw = px(46)
-    local lh_block = lh1(13) + lh1(11) + px(6) + math.floor(cw * 1.5 + 0.5) + px(7)
-    local function blocksFor(list, make, max_w)
-        local out = {}
-        for i, e in ipairs(list) do
-            local widget = make(e, max_w)
-            table.insert(out, { widget = region(widget, { kind = e._kind == "series" and "open-series" or "open-author", entry = e }, "search-" .. (e._kind or "author"), (e._kind or "author") .. "-" .. i) })
-        end
-        return out
-    end
-    local function aBlock(a) local w = authorBlock(a, cw, lh_block); return w end
-    local function sBlock(s, max_w) local w = seriesBlock(s, cw, lh_block, max_w); return w end
-    local sec = px(36) + px(10)
-    local top = field_h + px(10) + px(30) + px(6)
-    local side = BoardMetrics.get().w > BoardMetrics.get().h
-    local used = top + (side and 1 or 2) * (sec + lh_block + px(14)) + sec
-    local book_room = f.content_h - used
-    local std = ListView.stdGeom(m.screen_w, m.screen_h)
-    local cols = ListView.gridCols(f.w)
-    local fit_rows = math.max(1, math.floor((book_room + px(18)) / (std.cover_h + ListView.CAP() + px(18))))
-    local shown = {}
-    for i = 1, math.min(#r.books, cols * fit_rows) do shown[i] = r.books[i] end
-    local g = ListView.fitStd(m.screen_w, m.screen_h, f.w, book_room, #shown)
-    local more = (#shown < (r.books_total or #r.books)) and region(hstack({ gap = px(2) }, { text(_("See all"), { s = 13, b = true }), icon("chevron-right", px(14), { sw = 2.5 }) }), { kind = "search-scope", scope = "books" }, "search-books-head", "see-all") or nil
-    for _i, e in ipairs(r.series) do e._kind = "series" end
     local kids = { field, space(nil, px(10)), chips, space(nil, px(6)) }
-    if side then
-        local aw = math.floor((f.w - px(28)) * 0.62)
-        local sw = math.floor((f.w - px(28)) * 0.38)
-        table.insert(kids, hstack({ w = f.w, valign = "top", gap = px(28) }, {
-            vstack({ w = aw }, { ListView.sectionHead(aw, { icon = "feather", label = _("Authors"), count = #r.authors }), space(nil, px(10)), blockLine(aw, blocksFor(r.authors, aBlock, aw), px(22)) }),
-            vstack({ w = sw }, { ListView.sectionHead(sw, { icon = "layers-2", label = _("Series"), count = #r.series }), space(nil, px(10)), blockLine(sw, blocksFor(r.series, sBlock, sw), px(22)) }),
-        }))
-        table.insert(kids, space(nil, px(14)))
-    else
-        table.insert(kids, ListView.sectionHead(f.w, { icon = "feather", label = _("Authors"), count = #r.authors }))
-        table.insert(kids, space(nil, px(10)))
-        table.insert(kids, blockLine(f.w, blocksFor(r.authors, aBlock, f.w), px(22)))
-        table.insert(kids, space(nil, px(14)))
-        table.insert(kids, ListView.sectionHead(f.w, { icon = "layers-2", label = _("Series"), count = #r.series }))
-        table.insert(kids, space(nil, px(10)))
-        table.insert(kids, blockLine(f.w, blocksFor(r.series, sBlock, f.w), px(22)))
-        table.insert(kids, space(nil, px(14)))
+    local room = f.content_h - field_h - px(10) - hOf(chips) - px(6)
+
+    local row_h = px(ListView.ROW)
+    local head_h = px(36)
+    local gap_s = px(14)
+    local sections = {
+        { kind = "authors", list = r.authors, total = #r.authors, icon = "feather", label = _("Authors"),
+            row = function(w, e) return ListView.authorRow(w, row_h, e) end,
+            action = function(e) return { kind = "open-author", entry = e } end },
+        { kind = "series", list = r.series, total = #r.series, icon = "layers-2", label = _("Series"),
+            row = function(w, e) return ListView.seriesRow(w, row_h, e) end,
+            action = function(e) return { kind = "open-series", entry = e } end },
+        { kind = "books", list = r.books, total = books_total, icon = "book", label = _("Books"),
+            row = function(w, b) return ListView.bookRow(w, row_h, b) end,
+            action = m.action },
+    }
+    local found = {}
+    for _i, sec in ipairs(sections) do if #sec.list > 0 then table.insert(found, sec) end end
+
+    -- When not every section gets a row, series step aside, then authors.
+    local function rowsFor(list, col_room)
+        local function rowsLeft() return math.floor((col_room - #list * head_h - math.max(0, #list - 1) * gap_s) / row_h) end
+        for _i, kind in ipairs({ "series", "authors" }) do
+            if #list > 1 and rowsLeft() < #list then
+                for i = #list, 1, -1 do if list[i].kind == kind then table.remove(list, i) end end
+            end
+        end
+        local n = math.max(1, rowsLeft())
+        -- Books take a spare row first, then authors, then series.
+        local order = {}
+        for _i, sec in ipairs(list) do if sec.kind == "books" then table.insert(order, sec) end end
+        for _i, sec in ipairs(list) do if sec.kind ~= "books" then table.insert(order, sec) end end
+        local counts = {}
+        for i, sec in ipairs(order) do counts[i] = #sec.list end
+        local share = ListData.shareRows(n, counts)
+        local used = 0
+        for i, sec in ipairs(order) do sec.n = share[i]; used = used + share[i] end
+        -- Rows the room limits grow to fill it, as a list's rows do; rows
+        -- the results run out of keep their height.
+        local rh = row_h
+        if used == rowsLeft() then
+            rh = math.floor((col_room - #list * head_h - math.max(0, #list - 1) * gap_s) / used)
+        end
+        for _i, sec in ipairs(list) do sec.rh = rh end
     end
-    table.insert(kids, ListView.sectionHead(f.w, { icon = "book", label = _("Books"), count = r.books_total or #r.books, right = more }))
-    table.insert(kids, space(nil, px(10)))
-    table.insert(kids, ListView.cellsGrid(f.w, g, shown, function(b) return ListView.bookCell(g, b) end, m.action))
+    local function sectionBlock(sec, w)
+        local items = { ListView.sectionHead(w, {
+            icon = sec.icon, label = sec.label, count = sec.total,
+            right = sec.total > sec.n and region(hstack({ gap = px(2) }, { text(_("See all"), { s = 13, b = true }), icon("chevron-right", px(14), { sw = 2.5 }) }),
+                { kind = "search-scope", scope = sec.kind }, "search-" .. sec.kind .. "-head", "see-all-" .. sec.kind) or nil,
+        }) }
+        for i = 1, sec.n do
+            local e = sec.list[i]
+            local inner = vstack({ w = w, h = sec.rh or row_h }, { i > 1 and ListView.rule(w) or false, flex(0), sec.row(w, e), flex(0) })
+            table.insert(items, region(inner, sec.action(e), "search-" .. sec.kind .. "-" .. i, sec.kind .. "-" .. i))
+        end
+        return vstack({ w = w }, items)
+    end
+    local function column(list, w)
+        local items = {}
+        for i, sec in ipairs(list) do
+            if i > 1 then table.insert(items, space(nil, gap_s)) end
+            table.insert(items, sectionBlock(sec, w))
+        end
+        return vstack({ w = w }, items)
+    end
+
+    local side = BoardMetrics.get().w > BoardMetrics.get().h
+    local people, books = {}, {}
+    for _i, sec in ipairs(found) do table.insert(sec.kind == "books" and books or people, sec) end
+    if side and #people > 0 and #books > 0 then
+        local gutter = px(28)
+        local lw = math.floor((f.w - gutter) / 2)
+        local rw = f.w - gutter - lw
+        rowsFor(people, room)
+        rowsFor(books, room)
+        table.insert(kids, hstack({ w = f.w, valign = "top", gap = gutter }, { column(people, lw), column(books, rw) }))
+    elseif #found > 0 then
+        rowsFor(found, room)
+        table.insert(kids, column(found, f.w))
+    else
+        table.insert(kids, ListView.empty(f.w, room, { icon = "search", title = T(_("Nothing matches “%1”"), m.query or ""),
+            body = _("Check the spelling, or try fewer or different words.") }))
+    end
     return vstack({ w = f.w }, kids)
 end
 

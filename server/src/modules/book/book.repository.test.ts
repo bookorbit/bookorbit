@@ -176,7 +176,10 @@ describe('BookRepository', () => {
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(tx.update).toHaveBeenCalledTimes(1);
     expect(tx.delete).toHaveBeenCalledTimes(1);
-    expect(tx.execute).toHaveBeenCalledTimes(1);
+    // Unfinished reads dropped, finished ones kept with a snapshot, then the books deleted.
+    expect(tx.execute).toHaveBeenCalledTimes(3);
+    expect(new PgDialect().sqlToQuery(tx.execute.mock.calls[1]![0]).sql).toContain('book_title_snapshot');
+    expect(new PgDialect().sqlToQuery(tx.execute.mock.calls[2]![0]).sql).toContain('delete from "books"');
     const invalidationQuery = new PgDialect().sqlToQuery(stateDeleteWhere.mock.calls[0]![0]);
     expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."library_folder_id" = $1');
     expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."dir_path" in');
@@ -223,7 +226,7 @@ describe('BookRepository', () => {
     await repo.deleteByIdsAndInvalidateScanState(bookRows.map((row) => row.id));
 
     expect(tx.delete).toHaveBeenCalledTimes(2);
-    expect(tx.execute).toHaveBeenCalledTimes(1);
+    expect(tx.execute).toHaveBeenCalledTimes(3);
   });
 
   it('findCards loads card rows and related collections for the current user', async () => {
@@ -1008,8 +1011,8 @@ describe('BookRepository', () => {
 
     await repo.deleteByIds([10, 11]);
     await repo.updateMetadataFields(10, { title: 'Updated' });
-    expect(db.execute).toHaveBeenCalledTimes(1);
-    expect(new PgDialect().sqlToQuery(db.execute.mock.calls[0]![0]).sql).toContain('delete from "books"');
+    expect(db.execute).toHaveBeenCalledTimes(3);
+    expect(new PgDialect().sqlToQuery(db.execute.mock.calls[2]![0]).sql).toContain('delete from "books"');
     expect(db.update).toHaveBeenCalledTimes(2);
     expect(updateBuilder.set).toHaveBeenNthCalledWith(1, { title: 'Updated' });
     expect(updateBuilder.set).toHaveBeenNthCalledWith(2, expect.objectContaining({ updatedAt: expect.any(Date) }));
@@ -1963,20 +1966,31 @@ describe('BookRepository', () => {
 
   describe('bulkSetRating', () => {
     it('does nothing for an empty book id list', async () => {
-      const db = { insert: vi.fn() };
+      const db = { insert: vi.fn(), transaction: vi.fn() };
       const repo = new BookRepository(db as never);
 
       await repo.bulkSetRating([], 4, 7);
 
       expect(db.insert).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
     });
 
-    it('upserts a rating row per book id', async () => {
+    function ratingDb(insertChain: ReturnType<typeof makeInsertChain>) {
+      const tx = { insert: vi.fn().mockReturnValue(insertChain), execute: vi.fn().mockResolvedValue(undefined) };
+      return { tx, db: { transaction: vi.fn((callback: (executor: typeof tx) => Promise<void>) => callback(tx)) } };
+    }
+
+    it('upserts a rating row per book id and gives each book the same stars on its latest finished read', async () => {
       const insertChain = makeInsertChain();
-      const db = { insert: vi.fn().mockReturnValue(insertChain) };
+      const { tx, db } = ratingDb(insertChain);
       const repo = new BookRepository(db as never);
 
       await repo.bulkSetRating([10, 20], 4, 7);
+
+      const readUpdate = new PgDialect().sqlToQuery(tx.execute.mock.calls[0]![0]);
+      expect(readUpdate.sql).toContain('update "reading_attempts" set rating =');
+      expect(readUpdate.sql).toContain('order by ra.book_id, ra.ended_on desc nulls last, ra.id desc');
+      expect(readUpdate.params).toEqual([4, 7, 10, 20]);
 
       expect(insertChain.values).toHaveBeenCalledWith([
         { userId: 7, bookId: 10, rating: 4 },
@@ -1991,7 +2005,7 @@ describe('BookRepository', () => {
 
     it('upserts a null rating tombstone instead of deleting the row', async () => {
       const insertChain = makeInsertChain();
-      const db = { insert: vi.fn().mockReturnValue(insertChain) };
+      const { db } = ratingDb(insertChain);
       const repo = new BookRepository(db as never);
 
       await repo.bulkSetRating([10], null, 7);

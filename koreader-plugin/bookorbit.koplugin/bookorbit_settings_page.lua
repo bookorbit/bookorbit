@@ -11,6 +11,7 @@ local Device = require("device")
 local Geom = require("ui/geometry")
 local IconWidget = require("ui/widget/iconwidget")
 local UIManager = require("ui/uimanager")
+local VerticalSpan = require("ui/widget/verticalspan")
 local _ = require("gettext")
 local T = require("ffi/util").template
 
@@ -32,6 +33,7 @@ local STRATEGY = { SILENT = 2, PROMPT = 1, DISABLE = 3 }
 local STRATEGY_ORDER = { STRATEGY.SILENT, STRATEGY.PROMPT, STRATEGY.DISABLE }
 local PRESETS = { "reader", "stats", "library" }
 local TILES = { "outline", "soft", "ink" }
+local COLOURS = BoardStore.COLOURS
 
 local function scaleLabel(value)
     return string.format("%.2f", value):gsub("0$", "") .. "x"
@@ -160,8 +162,9 @@ local function settingsList(page, w, compact)
 end
 
 -- ---------------------------------------------------------------- bodies
-local function segRow(w, label, sub, options, selected, action_for)
-    return vstack({ w = w, pad = { px(12), 0, px(12), 0 } }, {
+local function segRow(w, label, sub, options, selected, action_for, tight)
+    local pad = px(tight and 8 or 12)
+    return vstack({ w = w, pad = { pad, 0, pad, 0 } }, {
         text(label, { s = 16, w = w }),
         sub and text(sub, { s = 13, col = INK.g4, w = w }) or false,
         space(nil, px(8)),
@@ -170,8 +173,10 @@ local function segRow(w, label, sub, options, selected, action_for)
 end
 
 local function menuBarStrip(page, w)
-    local s = px(30)
     local names = { "appbar.filebrowser", "appbar.settings", "appbar.tools", "appbar.search", "bookorbit", "appbar.menu" }
+    -- Six cells across, smaller in a narrow column.
+    local cell_s = math.min(px(44), math.floor(w / #names))
+    local s = math.min(px(30), cell_s - px(8))
     local cells = {}
     for _i, name in ipairs(names) do
         local glyph
@@ -180,11 +185,11 @@ local function menuBarStrip(page, w)
         else
             glyph = IconWidget:new{ icon = name, width = s, height = s }
         end
-        local cell = hstack({ w = px(44), h = px(44) }, { flex(0), glyph, flex(0) })
+        local cell = hstack({ w = cell_s, h = cell_s }, { flex(0), glyph, flex(0) })
         if name == "bookorbit" then
-            cell = BoardUI.overlay(px(44), px(44), {
+            cell = BoardUI.overlay(cell_s, cell_s, {
                 { widget = cell },
-                { widget = BoardUI.box({ w = px(44), h = px(44), radius = px(10), border = math.max(1, px(1.5)), border_col = INK.black }) },
+                { widget = BoardUI.box({ w = cell_s, h = cell_s, radius = px(10), border = math.max(1, px(1.5)), border_col = INK.black }) },
             })
         end
         table.insert(cells, cell)
@@ -215,15 +220,15 @@ local function openingBody(page, w, embedded)
         local pill = MenuUI.pill(g and _("Change") or _("Pick one"), { kind = "outline", h = 36, s = 14, pad_x = 14, action = { kind = "view", view = "shortcut" } })
         local illus = MenuUI.gesture(g and g.kind or "none", px(44))
         local mid_w = iw - illus:getSize().w - pill:getSize().w - 2 * px(14)
+        local sub = g and (g.reader_only and _("Opens BookOrbit from any book") or _("Opens BookOrbit from the file browser and from any book")) or _("Pick a gesture to open BookOrbit")
+        -- A narrow column gives the note a third line and the row the height.
+        local sub_lines = math.max(2, math.min(3, require("bookorbit_text_pages").linesNeeded(sub, { s = 13 }, mid_w)))
+        local mid = vstack({ w = mid_w }, {
+            text(g and g.label() or _("No shortcut"), { s = 16, b = true, w = mid_w }),
+            text(sub, { s = 13, col = INK.g4, w = mid_w, lines = sub_lines }),
+        })
         shortcut_card = BoardUI.hit(MenuUI.card(w, {
-            hstack({ w = iw, h = px(84), gap = px(14) }, {
-                illus,
-                vstack({ w = mid_w }, {
-                    text(g and g.label() or _("No shortcut"), { s = 16, b = true, w = mid_w }),
-                    text(g and (g.reader_only and _("Opens BookOrbit from any book") or _("Opens BookOrbit from the file browser and from any book")) or _("Pick a gesture to open BookOrbit"), { s = 13, col = INK.g4, w = mid_w, lines = 2 }),
-                }),
-                pill,
-            }),
+            hstack({ w = iw, h = math.max(px(84), mid:getSize().h + px(16)), gap = px(14) }, { illus, mid, pill }),
         }), { kind = "view", view = "shortcut" })
     end
 
@@ -293,19 +298,78 @@ local function homeBody(page, w, embedded)
     })
     local preset_labels = { _("Reader"), _("Stats"), _("Library") }
     local tile_labels = { _("Outline"), _("Soft"), _("Ink") }
+    -- Colour only on a screen that shows it.
+    local colour_labels = Device.screen:isColorEnabled() and { _("Accents"), _("Tinted"), _("Off") } or nil
+    local function colourRow(rw, tight)
+        local row = segRow(rw, _("Colour"), nil, colour_labels, indexOf(COLOURS, state.colour, 1),
+            function(index) return { kind = "colour", value = COLOURS[index] } end, tight)
+        row._no_icon = true
+        return row
+    end
+    -- Colour sits beside Tile style when half a row holds both controls'
+    -- labels, so the page keeps the height it has on a black-and-white screen.
+    local function pairsWithTiles(half)
+        local seg = math.floor((half - 2 * math.max(1, px(1.5))) / 3) - px(8)
+        for _i, list in ipairs({ tile_labels, colour_labels }) do
+            for _j, label in ipairs(list) do
+                local t = text(label, { s = 14, b = true })
+                local wide = t:getSize().w > seg
+                t:free()
+                if wide then return false end
+            end
+        end
+        return true
+    end
     local scale_labels = {}
     for index, scale in ipairs(BoardMetrics.UI_SCALES) do
         scale_labels[index] = scaleLabel(scale)
     end
     local a = segRow(iw, _("Starting layout"), _("Replaces your pages with a starter set"), preset_labels, indexOf(PRESETS, state.preset, 1),
         function(index) return { kind = "preset", value = PRESETS[index] } end)
-    local b = segRow(iw, _("Tile style"), nil, tile_labels, indexOf(TILES, state.tiles, 1),
+    local look_gap = px(16)
+    local look_half = math.floor((iw - look_gap) / 2)
+    local pair_colour = colour_labels ~= nil and not page.compact and pairsWithTiles(look_half)
+    local b = segRow(pair_colour and look_half or iw, _("Tile style"), nil, tile_labels, indexOf(TILES, state.tiles, 1),
         function(index) return { kind = "tiles", value = TILES[index] } end)
     local c = segRow(iw, _("Interface size"), _("Text and controls across BookOrbit"), scale_labels,
         indexOf(BoardMetrics.UI_SCALES, BoardMetrics.normalizeUserScale(settings.ui_scale), 1),
         function(index) return { kind = "ui-scale", value = BoardMetrics.UI_SCALES[index] } end)
     a._no_icon, b._no_icon, c._no_icon = true, true, true
-    local look = MenuUI.group(w, { a, b, c }, { inset = 0 })
+    local look
+    if pair_colour then
+        local pair = hstack({ w = iw, gap = look_gap, valign = "top" }, { b, colourRow(iw - look_half - look_gap) })
+        pair._no_icon = true
+        look = MenuUI.group(w, { a, pair, c }, { inset = 0 })
+    else
+        look = MenuUI.group(w, { a, b, c }, { inset = 0 })
+    end
+    -- Too narrow to share Tile style's row: Colour is a card of its own after
+    -- the first, which a two-column page can set beside Look.
+    local colour_card = colour_labels and not pair_colour and MenuUI.group(w, { colourRow(iw, page.compact ~= nil) }, { inset = 0 }) or nil
+    -- On a short, wide screen whose columns cannot hold the full card
+    -- (page.compact, set by build): without the notes, and at level 1 the
+    -- layout and tile style sharing a row when each half has room.
+    if page.compact then
+        look:free()
+        local gap = px(16)
+        local half = math.floor((iw - gap) / 2)
+        local paired = page.compact == 1 and half >= px(180)
+        a = segRow(paired and half or iw, _("Starting layout"), nil, preset_labels, indexOf(PRESETS, state.preset, 1),
+            function(index) return { kind = "preset", value = PRESETS[index] } end, true)
+        b = segRow(paired and (iw - half - gap) or iw, _("Tile style"), nil, tile_labels, indexOf(TILES, state.tiles, 1),
+            function(index) return { kind = "tiles", value = TILES[index] } end, true)
+        c = segRow(iw, _("Interface size"), nil, scale_labels,
+            indexOf(BoardMetrics.UI_SCALES, BoardMetrics.normalizeUserScale(settings.ui_scale), 1),
+            function(index) return { kind = "ui-scale", value = BoardMetrics.UI_SCALES[index] } end, true)
+        a._no_icon, b._no_icon, c._no_icon = true, true, true
+        if paired then
+            local pair = hstack({ w = iw, gap = gap, valign = "top" }, { a, b })
+            pair._no_icon = true
+            look = MenuUI.group(w, { pair, c }, { inset = 0 })
+        else
+            look = MenuUI.group(w, { a, b, c }, { inset = 0 })
+        end
+    end
     local reset = MenuUI.group(w, {
         MenuUI.row(iw, { icon = "rotate-ccw", label = _("Reset Home"), sub = _("Back to the starting layout and outline tiles"), action = { kind = "reset-home" } }),
     })
@@ -313,6 +377,8 @@ local function homeBody(page, w, embedded)
         embedded and text(_("Home"), { s = 18, b = true, w = w }) or false,
         embedded and space(nil, px(12)) or false,
         top,
+        colour_card and space(nil, px(16)) or false,
+        colour_card or false,
         space(nil, px(16)),
         MenuUI.section(w, _("Look"), look),
         space(nil, px(16)),
@@ -415,15 +481,18 @@ local function bodyFor(page, view, w, avail, embedded)
 end
 
 -- --------------------------------------------------------------- shortcut
-local function shortcutBody(page, w)
+local function shortcutCards(page, w, illus_max, with_note)
     local options = Shortcut.available(Device:hasMultitouch())
     local current = Shortcut.current(page.gestures_data)
-    local W = BoardMetrics.get().W
+    local W = BoardMetrics.layoutW()
     local total = #options + 1
     local cols = W >= 900 and math.min(total, 5) or W >= 700 and 3 or 2
     local gap = px(10)
+    -- A card keeps room for its two-line name: a larger interface size takes
+    -- a column away rather than squeeze them.
+    while cols > 2 and math.floor((w - (cols - 1) * gap) / cols) < px(170) do cols = cols - 1 end
     local cw = math.floor((w - (cols - 1) * gap) / cols)
-    local illus = math.min(px(64), math.floor(cw * 0.42))
+    local illus = math.min(px(illus_max), math.floor(cw * 0.42))
     local pad = px(14)
     local name_of = function(binding)
         local ok, name = pcall(function() return require("dispatcher"):menuTextFunc(binding) end)
@@ -433,6 +502,7 @@ local function shortcutBody(page, w)
     local entries = {}
     for _i, g in ipairs(options) do table.insert(entries, { id = g.id, kind = g.kind, label = g.label() }) end
     table.insert(entries, { id = false, kind = "none", label = _("No shortcut") })
+    local inners = {}
     for _i, e in ipairs(entries) do
         local on = (e.id or nil) == current
         local note, warn
@@ -453,7 +523,17 @@ local function shortcutBody(page, w)
             space(nil, px(10)),
             note_row,
         })
-        local h = inner:getSize().h
+        table.insert(inners, { inner = inner, entry = e, on = on, warn = warn, note = note })
+    end
+    -- The cards of a row share the height of the tallest one.
+    local row_h = {}
+    for index, it in ipairs(inners) do
+        local r = math.floor((index - 1) / cols)
+        row_h[r] = math.max(row_h[r] or 0, it.inner:getSize().h)
+    end
+    for index, it in ipairs(inners) do
+        local inner, e, on, warn, note = it.inner, it.entry, it.on, it.warn, it.note
+        local h = row_h[math.floor((index - 1) / cols)]
         local border = on and math.max(2, px(2.5)) or MenuUI.line()
         local card = BoardUI.overlay(cw, h, {
             { widget = BoardUI.box({ w = cw, h = h, radius = px(12), border = border, border_col = on and INK.black or INK.g8, bg = INK.white }) },
@@ -470,36 +550,189 @@ local function shortcutBody(page, w)
         table.insert(rows, hstack({ gap = gap, valign = "top" }, items))
     end
     local iw = MenuUI.rowsIn(w)
+    if not with_note then return { vstack({ w = w }, rows) } end
     return {
         vstack({ w = w }, rows),
         space(nil, px(16)),
         MenuUI.card(w, {
             hstack({ w = iw, gap = px(12), valign = "top" }, {
                 vstack({}, { space(nil, px(12)), icon("info", px(20), { sw = 2 }) }),
-                vstack({ w = iw - px(32), pad = { px(12), 0, px(12), 0 } }, {
-                    text(_("Top-left hold and top-right tap work in books only. Other choices also work in the file browser. Existing actions are named before replacement."), { s = 13, col = INK.g4, lines = 4, w = iw - px(32), bg = INK.ge }),
+                vstack({ w = iw - px(20) - px(12), pad = { px(12), 0, px(12), 0 } }, {
+                    text(_("Top-left hold and top-right tap work in books only. Other choices also work in the file browser. Existing actions are named before replacement."), { s = 13, col = INK.g4, lines = 4, w = iw - px(20) - px(12), bg = INK.ge }),
                 }),
             }),
         }, { fill = true }),
     }
 end
 
+-- The cards and the note at the largest drawing that fits avail: smaller
+-- gesture drawings first, then without the note.
+local function shortcutBody(page, w, avail)
+    local function height(items)
+        local h = 0
+        for _i, item in ipairs(items) do h = h + item:getSize().h end
+        return h
+    end
+    for _i, illus in ipairs({ 64, 48, 36 }) do
+        -- A draft in a sink of its own, so its cards are not tappable.
+        local items = BoardUI.collectHits(function() return shortcutCards(page, w, illus, true) end)
+        if height(items) <= avail then return shortcutCards(page, w, illus, true) end
+        for _j, item in ipairs(items) do if item.free then item:free() end end
+    end
+    return shortcutCards(page, w, 36, false)
+end
+
 -- ------------------------------------------------------------------ build
+local GROUPS = { "opening", "sync", "home", "downloads", "account", "about" }
+
+local function paneWidths(w)
+    local left_w = math.floor(math.min(px(300), w * 0.36))
+    local gutter = px(24)
+    return left_w, gutter, w - left_w - gutter
+end
+
+-- Wide screens show a group beside the list, when the list and every group
+-- fit the screen side by side at this interface size; otherwise each group
+-- is a page of its own. Decided once per screen size, so taps and Back
+-- agree with what is drawn.
+local function twoPane(page, w, avail)
+    if not MenuUI.wide() then return false end
+    local key = w .. "x" .. avail .. "@" .. BoardMetrics.get().dp
+    if page._two_pane_key == key then return page._two_pane end
+    local left_w, _gutter, right_w = paneWidths(w)
+    -- Measured in a sink of its own: these drafts are never drawn or tapped.
+    -- Two panes also need room across: a pane that cuts its own text does
+    -- not fit either.
+    local clean, fits = BoardUI.fits(function()
+        return BoardUI.collectHits(function()
+            local room = avail - MenuUI.pageHeader(w, _("Settings"), {}):getSize().h - px(8)
+            if vstack({ w = left_w }, settingsList(page, left_w, true)):getSize().h > room then return false end
+            for _i, view in ipairs(GROUPS) do
+                if vstack({ w = right_w }, bodyFor(page, view, right_w, avail - px(72), true)):getSize().h > room then return false end
+            end
+            return true
+        end)
+    end)
+    fits = clean and fits
+    page._two_pane_key, page._two_pane = key, fits
+    return fits
+end
+
+-- A page taller than the screen (a short landscape screen at a large
+-- interface size) turns into pages under its header, like the other
+-- BookOrbit pages, never running off the screen. items[1] and items[2] are
+-- the header and the gap under it.
+local function paged(page, view, items, w, avail)
+    local function h(item) return (not item or item._flex) and 0 or item:getSize().h end
+    local total = 0
+    for _i, item in ipairs(items) do total = total + h(item) end
+    if total <= avail then
+        page.sub = nil
+        return items
+    end
+    local TextPages = require("bookorbit_text_pages")
+    local blocks, heights = {}, {}
+    for index = 3, #items do
+        local item = items[index]
+        if item and not item._flex then
+            table.insert(blocks, item)
+            table.insert(heights, item:getSize().h)
+        end
+    end
+    local body_h = avail - h(items[1]) - h(items[2]) - px(8) - px(40)
+    local pages = TextPages.pack(heights, body_h, 0)
+    if not page.sub or page.sub.view ~= view then page.sub = { view = view, index = 1 } end
+    page.sub.count = #pages
+    page.sub.index = math.min(page.sub.index, #pages)
+    local range = pages[page.sub.index]
+    local out = { items[1], items[2] }
+    for index = range.first, range.last do
+        -- A page never starts on a gap.
+        if not (index == range.first and getmetatable(blocks[index]) == VerticalSpan) then table.insert(out, blocks[index]) end
+    end
+    -- Blocks on other pages were only measured.
+    for index, block in ipairs(blocks) do
+        if (index < range.first or index > range.last) and block.free then block:free() end
+    end
+    table.insert(out, flex(px(8)))
+    table.insert(out, TextPages.pager(w, page.sub.index, #pages))
+    return out
+end
+
+-- A page too tall for a wide screen: its blocks side by side, split where
+-- the taller column is shortest, when both columns hold them at this
+-- interface size. nil when they do not, and the page turns instead.
+-- build(cw) returns the blocks at a column's width.
+local function columns(build, w, body_h)
+    if not MenuUI.wide() then return nil end
+    local gutter, gap = px(24), px(16)
+    local cw = math.floor((w - gutter) / 2)
+    local function blocksAt()
+        local out = {}
+        for _i, item in ipairs(build(cw)) do
+            if item and not item._flex and getmetatable(item) ~= VerticalSpan then table.insert(out, item) end
+        end
+        return out
+    end
+    if not BoardUI.fits(function() return BoardUI.collectHits(blocksAt) end) then return nil end
+    local blocks = blocksAt()
+    local function span(first, last)
+        local h = 0
+        for index = first, last do h = h + blocks[index]:getSize().h + (index > first and gap or 0) end
+        return h
+    end
+    local split, split_h
+    for k = 1, #blocks - 1 do
+        local tall = math.max(span(1, k), span(k + 1, #blocks))
+        if tall <= body_h and (not split_h or tall < split_h) then split, split_h = k, tall end
+    end
+    if not split then
+        for _i, block in ipairs(blocks) do block:free() end
+        return nil
+    end
+    local function column(first, last)
+        local items = {}
+        for index = first, last do
+            if #items > 0 then table.insert(items, space(nil, gap)) end
+            table.insert(items, blocks[index])
+        end
+        return vstack({ w = cw }, items)
+    end
+    return hstack({ w = w, gap = gutter, valign = "top" }, { column(1, split), column(split + 1, #blocks) })
+end
+
+local function turn(page, delta)
+    local sub = page.sub
+    if not sub then return false end
+    local index = math.max(1, math.min(sub.count, sub.index + delta))
+    if index ~= sub.index then
+        sub.index = index
+        page:refresh(Device:hasEinkScreen() and "partial" or "ui")
+    end
+    return true
+end
+
 local function build(page, sw, sh)
     local mx = MenuUI.mx()
     local top, bottom = px(6), px(12)
     local w = sw - 2 * mx
     local avail = sh - top - bottom
+    page.compact = nil
+    local two_pane = twoPane(page, w, avail)
+    -- The group Settings was opened on: beside the list, or on top of it.
+    if page.open_view then
+        if two_pane then page.detail = page.open_view else table.insert(page.stack, page.open_view) end
+        page.open_view = nil
+    end
     local view = page.stack[#page.stack]
     local items
     if view == "shortcut" then
-        items = { MenuUI.pageHeader(w, _("Shortcut"), { sub = _("Choose where to open BookOrbit") }), space(nil, px(8)) }
-        for _i, item in ipairs(shortcutBody(page, w)) do table.insert(items, item) end
-    elseif MenuUI.wide() then
+        local header = MenuUI.pageHeader(w, _("Shortcut"), { sub = _("Choose where to open BookOrbit") })
+        items = { header, space(nil, px(8)) }
+        for _i, item in ipairs(shortcutBody(page, w, avail - header:getSize().h - px(8))) do table.insert(items, item) end
+    elseif two_pane then
         page.detail = view ~= "root" and view or page.detail or "opening"
-        local left_w = math.floor(math.min(px(300), w * 0.36))
-        local gutter = px(24)
-        local right_w = w - left_w - gutter
+        local left_w, gutter, right_w = paneWidths(w)
         local left = vstack({ w = left_w }, settingsList(page, left_w, true))
         local right = vstack({ w = right_w }, bodyFor(page, page.detail, right_w, avail - px(72), true))
         local split_h = math.max(left:getSize().h, right:getSize().h)
@@ -515,13 +748,51 @@ local function build(page, sw, sh)
             }),
         }
     elseif view == "root" then
-        items = { MenuUI.pageHeader(w, _("Settings"), { sub = _("BookOrbit") }), space(nil, px(8)) }
-        for _i, item in ipairs(settingsList(page, w, false)) do table.insert(items, item) end
-        table.insert(items, flex(px(8)))
-        table.insert(items, text(T(_("BookOrbit for KOReader %1"), page.plugin.PLUGIN_VERSION), { s = 13, col = INK.g4, w = w, align = "center" }))
+        local header = MenuUI.pageHeader(w, _("Settings"), { sub = _("BookOrbit") })
+        local footer = text(T(_("BookOrbit for KOReader %1"), page.plugin.PLUGIN_VERSION), { s = 13, col = INK.g4, w = w, align = "center" })
+        items = { header, space(nil, px(8)) }
+        local total = header:getSize().h + px(8) + px(8) + footer:getSize().h
+        for _i, item in ipairs(settingsList(page, w, false)) do
+            table.insert(items, item)
+            if item and not item._flex then total = total + item:getSize().h end
+        end
+        local side = total > avail and columns(function(cw) return settingsList(page, cw, false) end, w,
+            avail - header:getSize().h - px(8) - px(8) - footer:getSize().h)
+        if side then
+            for index = 3, #items do if items[index] and items[index].free then items[index]:free() end end
+            page.sub = nil
+            items = { header, space(nil, px(8)), side, flex(px(8)), footer }
+        else
+            table.insert(items, flex(px(8)))
+            table.insert(items, footer)
+            items = paged(page, view, items, w, avail)
+        end
     else
-        items = { MenuUI.pageHeader(w, titleOf(view), { sub = _("Settings") }), space(nil, px(8)) }
-        for _i, item in ipairs(bodyFor(page, view, w, avail - px(72), false)) do table.insert(items, item) end
+        local header = MenuUI.pageHeader(w, titleOf(view), { sub = _("Settings") })
+        items = { header, space(nil, px(8)) }
+        local total = header:getSize().h + px(8)
+        for _i, item in ipairs(bodyFor(page, view, w, avail - px(72), false)) do
+            table.insert(items, item)
+            if item and not item._flex then total = total + item:getSize().h end
+        end
+        local function columnsAt()
+            return columns(function(cw) return bodyFor(page, view, cw, avail - px(72), false) end, w, avail - header:getSize().h - px(8))
+        end
+        local side = total > avail and columnsAt()
+        -- Columns that cannot hold a block try its compact forms first.
+        for level = 1, 2 do
+            if side or total <= avail then break end
+            page.compact = level
+            side = columnsAt()
+        end
+        if not side then page.compact = nil end
+        if side then
+            for index = 3, #items do if items[index] and items[index].free then items[index]:free() end end
+            page.sub = nil
+            items = { header, space(nil, px(8)), side }
+        else
+            items = paged(page, view, items, w, avail)
+        end
     end
     page.panel_rect = Geom:new{ x = 0, y = 0, w = sw, h = sh }
     return vstack({ w = sw, h = sh, pad = { top, mx, bottom, mx } }, items)
@@ -536,8 +807,10 @@ local function onAction(page, action)
     local plugin, catalog = page.plugin, page.catalog
     local settings = plugin.settings
     local kind = action.kind
-    if kind == "view" then
-        if MenuUI.wide() and action.view ~= "shortcut" then
+    if kind == "page" then
+        turn(page, action.delta)
+    elseif kind == "view" then
+        if page._two_pane and action.view ~= "shortcut" then
             page.detail = action.view
             page.stack = { "root" }
         else
@@ -582,6 +855,9 @@ local function onAction(page, action)
         end)
     elseif kind == "tiles" then
         plugin:applyBoardTiles(catalog, action.value)
+        page:refresh()
+    elseif kind == "colour" then
+        plugin:applyBoardColour(catalog, action.value)
         page:refresh()
     elseif kind == "ui-scale" then
         if settings.ui_scale == action.value then return true end
@@ -652,19 +928,25 @@ end
 -- view: nil for the root, or a group id ("opening", "sync", "home",
 -- "downloads", "account", "about", "shortcut").
 function Settings.open(plugin, catalog, view)
-    -- On wide screens a group opens beside the list rather than on top of it;
-    -- only the shortcut picker is a page of its own there.
+    -- The shortcut picker is always a page of its own; other groups open
+    -- beside the list when it is two panes (see twoPane).
     local stack = { "root" }
-    if view and view ~= "root" and (view == "shortcut" or not MenuUI.wide()) then table.insert(stack, view) end
+    if view == "shortcut" then table.insert(stack, view) end
     local page = MenuPage:new{
         name = "bookorbit_settings",
         build = build,
         on_action = onAction,
         on_back = onBack,
+        on_swipe = function(page, ges)
+            if ges.direction == "west" then return turn(page, 1) end
+            if ges.direction == "east" then return turn(page, -1) end
+            return false
+        end,
+        on_page_key = function(page, delta) turn(page, delta) end,
         plugin = plugin,
         catalog = catalog,
         stack = stack,
-        detail = view and view ~= "root" and view ~= "shortcut" and view or nil,
+        open_view = view and view ~= "root" and view ~= "shortcut" and view or nil,
         gestures_data = plugin:gesturesData(),
     }
     UIManager:show(page, "ui")

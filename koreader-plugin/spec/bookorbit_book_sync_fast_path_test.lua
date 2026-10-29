@@ -17,8 +17,8 @@ local stored_stats_row
 local match_fresh = false
 local exchange_skippable = false
 
-package.loaded["ui/widget/infomessage"] = { new = function(_, opts) return opts end }
-package.loaded["ui/widget/notification"] = { notify = function() end }
+package.loaded["bookorbit_toast"] = { show = function() end, error = function() end }
+package.loaded["bookorbit_dialog_ui"] = { notice = function() end }
 package.loaded["ui/trapper"] = { wrap = function(_, callback) callback() end }
 package.loaded["ui/uimanager"] = {
     scheduleIn = function(_, delay, callback) scheduler:scheduleIn(delay, callback) end,

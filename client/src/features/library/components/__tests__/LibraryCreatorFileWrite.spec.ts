@@ -80,7 +80,7 @@ describe('LibraryCreatorFileWrite', () => {
     await checkbox(wrapper, 'Write comic archive metadata').setValue(false)
     await checkbox(wrapper, 'Write Kindle metadata').setValue(false)
     await checkbox(wrapper, 'Write audio metadata').setValue(false)
-    await checkbox(wrapper, 'Write read-along EPUB metadata').setValue(false)
+    await checkbox(wrapper, 'Write read-aloud EPUB metadata').setValue(false)
 
     expect(wrapper.emitted('update:fileWriteEpubEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteFb2Enabled')).toEqual([[false]])
@@ -116,9 +116,9 @@ describe('LibraryCreatorFileWrite', () => {
   it('shows read-along EPUBs as their own row, off by default, without a library count', () => {
     const wrapper = mountComponent({ fileWriteEnabled: true, formatCounts: { epub: 378 } })
 
-    const row = wrapper.findAll('li').find((node) => node.text().includes('Read-along EPUB'))!
+    const row = wrapper.findAll('li').find((node) => node.text().includes('Read-aloud EPUB'))!
     expect(row.text()).toContain('synced narration')
-    expect((checkbox(wrapper, 'Write read-along EPUB metadata').element as HTMLInputElement).checked).toBe(false)
+    expect((checkbox(wrapper, 'Write read-aloud EPUB metadata').element as HTMLInputElement).checked).toBe(false)
     expect(wrapper.get('#readAlong-max-size').attributes('disabled')).toBeDefined()
     expect(row.text()).toContain('–')
   })

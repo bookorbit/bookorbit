@@ -1,16 +1,29 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFile, stat } from 'fs/promises';
 
-import type { BookFileWriteStatus, CoverMedium, WriteResult, WriteResultFileCounts } from '@bookorbit/types';
-import { NotificationType } from '@bookorbit/types';
+import type {
+  AudiobookChapter,
+  BookChapterWriteBack,
+  BookFileWriteDisabledReason,
+  BookFileWriteStatus,
+  CoverMedium,
+  WriteBookChaptersResult,
+  WriteResult,
+  WriteResultFileCounts,
+} from '@bookorbit/types';
+import { BOOK_CHAPTERS_ERROR_CODES, CHAPTER_WRITE_FORMATS, NotificationType } from '@bookorbit/types';
+import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapters.service';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
+import { sliceChaptersAcrossFiles } from '../../common/utils/audiobook-chapters.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { NotificationService } from '../notification/notification.service';
+import { probeAudioChapters } from '../metadata/extractors/audio.extractor';
 import { computeFileHash } from '../scanner/lib/hash';
 import {
   resolveBookFileWriteStatus,
+  resolveChapterWriteStatus,
   writeTargetModeFor,
   type FileWriteCapabilityFile,
   type FileWriteCapabilityLibraryConfig,
@@ -20,7 +33,9 @@ import { FileLockService, bookOperationLockKey } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FormatWriterRegistry } from './format-writer.registry';
 import { inspectCoverImage } from './formats/shared/cover-image';
+import { probeAudioDurationMs } from './formats/audio/audio-metadata-embedder';
 import type { BookWritePayload } from './interfaces/book-write-payload.interface';
+import type { FormatWriteOptions } from './interfaces/format-write-options.interface';
 import { describeWriteFailure } from './write-failure-reason';
 import {
   coverMediumForFormat,
@@ -41,6 +56,8 @@ const FILE_WRITE_EVENT = 'file_write.write';
 const FILE_WRITE_SCHEDULE_EVENT = 'file_write.schedule';
 const FILE_WRITE_COVER_EVENT = 'file_write.cover_load';
 const FILE_WRITE_SKIP_LOG_EVENT = 'file_write.skip_log';
+const FILE_WRITE_CHAPTERS_EVENT = 'file_write.chapters';
+const CHAPTER_WRITE_FORMAT_SET = new Set<string>(CHAPTER_WRITE_FORMATS);
 const UNKNOWN_FORMAT = 'unknown';
 const DEFAULT_WRITE_DEBOUNCE_MS = 3_000;
 const DEFAULT_MAX_CONCURRENT_WRITES = 2;
@@ -63,6 +80,15 @@ type PrimaryFileWriteTarget = FileWriteTarget & { fileWriteAllFiles?: boolean | 
 
 /** A file the run considered, with the result it was skipped with, or null when it is to be written. */
 type PlannedTarget = { file: FileWriteTarget; skip: WriteResult | null };
+type FileChapterSpanList = NonNullable<FormatWriteOptions['chapters']>;
+
+/** A chapter write that cannot start, with the reason the editor shows. */
+export class ChapterWriteUnavailableError extends Error {
+  constructor(readonly reason: BookFileWriteDisabledReason) {
+    super(`Chapters cannot be written to these files: ${reason}`);
+    this.name = 'ChapterWriteUnavailableError';
+  }
+}
 
 @Injectable()
 export class FileWriteService implements OnModuleDestroy {
@@ -83,6 +109,7 @@ export class FileWriteService implements OnModuleDestroy {
     private readonly notificationService: NotificationService,
     private readonly selfWriteRegistry: SelfWriteRegistry,
     private readonly coverStore: BookCoverStore,
+    private readonly audiobookChapters: AudiobookChaptersService,
   ) {
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_WRITE_DEBOUNCE_MS);
     this.maxConcurrentWrites = resolvePositiveInteger(this.config.get('fileWrite.maxConcurrentWrites'), DEFAULT_MAX_CONCURRENT_WRITES);
@@ -241,6 +268,7 @@ export class FileWriteService implements OnModuleDestroy {
       const audioTrackContexts = resolveAudioTrackContexts(sizedTargets, primaryFile);
 
       await this.insertSkipLogsIfSync(bookId, skipped, triggeredBy, userId);
+      if (!dryRun) await this.audiobookChapters.recordCurrentRevision(bookId, true);
       const targetResults: WriteResult[] = skipped.map((entry) => entry.skip!);
       const suppressPaths = dryRun ? [] : sizedTargets.map((target) => target.absolutePath);
       this.selfWriteRegistry.begin(suppressPaths);
@@ -286,6 +314,179 @@ export class FileWriteService implements OnModuleDestroy {
     } finally {
       this.releaseWriteSlot();
     }
+  }
+
+  /** Whether a book's chapters can be written into its audio files. It is every file or none. */
+  async resolveChapterWriteStatus(bookId: number, orderedFileIds: readonly number[]): Promise<BookChapterWriteBack> {
+    const targets = await this.findChapterWriteTargets(bookId, orderedFileIds);
+    const libConfig = targets[0] ? await this.fileWriteRepo.findLibraryFileWriteConfig(targets[0].libraryId) : null;
+    return this.chapterWriteStatus(libConfig, targets);
+  }
+
+  /**
+   * Writes a book's chapters into its audio files, each file getting the chapters that start in it
+   * on its own clock. Every file is checked before any is touched, and a failure stops the rest, so
+   * a book is never left half written without the result saying how far it got. Other tags, the
+   * cover and the audio are copied through unchanged.
+   */
+  async writeChapters(
+    bookId: number,
+    files: readonly { id: number; timelineStartMs: number }[],
+    chapters: readonly AudiobookChapter[],
+    userId: number,
+    prepare?: () => Promise<{ files: readonly { id: number; timelineStartMs: number }[]; chapters: readonly AudiobookChapter[] }>,
+    onProgress?: (written: number, total: number) => Promise<void>,
+  ): Promise<WriteBookChaptersResult> {
+    return this.lockService.withLock(bookOperationLockKey(bookId), async () => {
+      await this.acquireWriteSlot();
+      const startedAt = Date.now();
+      this.logger.log(
+        `[${FILE_WRITE_CHAPTERS_EVENT}] [start] bookId=${bookId} userId=${userId} files=${files.length} chapters=${chapters.length} - chapter write started`,
+      );
+      try {
+        await this.audiobookChapters.recordCurrentRevision(bookId, true);
+        return await this.audiobookChapters.withWriteSnapshot(bookId, async (markWritten) => {
+          if (prepare) ({ files, chapters } = await prepare());
+          const targets = await this.findChapterWriteTargets(
+            bookId,
+            files.map((file) => file.id),
+          );
+          const libConfig = targets[0] ? await this.fileWriteRepo.findLibraryFileWriteConfig(targets[0].libraryId) : null;
+          const status = this.chapterWriteStatus(libConfig, targets);
+          if (targets.length !== files.length)
+            throw new ConflictException({ message: 'Audio files changed', errorCode: BOOK_CHAPTERS_ERROR_CODES.stale });
+          if (!status.available) throw new ChapterWriteUnavailableError(status.reason ?? 'format_not_supported');
+
+          await onProgress?.(0, targets.length);
+          const durations: (number | null)[] = [];
+          for (const target of targets)
+            durations.push(await probeAudioDurationMs(target.absolutePath, this.config.get<string>('audioTools.ffprobePath')));
+          if (durations.some((duration) => duration === null)) {
+            this.logger.warn(
+              `[${FILE_WRITE_CHAPTERS_EVENT}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=UnreadableFile error="a file length could not be read" - nothing written`,
+            );
+            return { status: 'failed', filesWritten: 0, filesTotal: targets.length };
+          }
+          const slices = sliceChaptersAcrossFiles(
+            chapters,
+            targets.map((target, index) => ({ id: target.id, timelineStartMs: files[index]!.timelineStartMs, actualDurationMs: durations[index]! })),
+          );
+
+          let failed = false;
+          let filesWritten = 0;
+          const paths = targets.map((target) => target.absolutePath);
+          this.selfWriteRegistry.begin(paths);
+          try {
+            for (const target of targets) {
+              const written = await this.writeChapterTarget(bookId, target, slices.get(target.id) ?? [], userId);
+              if (written.diskWritten) filesWritten += 1;
+              try {
+                await onProgress?.(filesWritten, targets.length);
+              } catch (error) {
+                failed = true;
+                this.logWriteFail(bookId, 'audio', 'sync', userId, false, startedAt, error, describeWriteFailure(error, target.absolutePath));
+                break;
+              }
+              if (!written.complete) {
+                failed = true;
+                break;
+              }
+            }
+          } finally {
+            this.selfWriteRegistry.end(paths);
+          }
+
+          if (filesWritten > 0) {
+            try {
+              await markWritten();
+            } catch (error) {
+              failed = true;
+              this.logWriteFail(bookId, 'audio', 'sync', userId, false, startedAt, error, describeWriteFailure(error, paths[0]!));
+            }
+          }
+          const result: WriteBookChaptersResult = {
+            status: !failed && filesWritten === targets.length ? 'success' : 'failed',
+            filesWritten,
+            filesTotal: targets.length,
+          };
+          this.logger.log(
+            `[${FILE_WRITE_CHAPTERS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} status=${result.status} filesWritten=${filesWritten} filesTotal=${targets.length} - chapter write finished`,
+          );
+          return result;
+        });
+      } finally {
+        this.releaseWriteSlot();
+      }
+    });
+  }
+
+  private async findChapterWriteTargets(bookId: number, orderedFileIds: readonly number[]): Promise<FileWriteTarget[]> {
+    const rows = await this.fileWriteRepo.findFilesForBook(bookId);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return orderedFileIds.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [row] : [];
+    });
+  }
+
+  private chapterWriteStatus(libConfig: FileWriteCapabilityLibraryConfig, targets: readonly FileWriteTarget[]): BookChapterWriteBack {
+    return resolveChapterWriteStatus(libConfig, targets, (format) => CHAPTER_WRITE_FORMAT_SET.has(format) && this.supports(format));
+  }
+
+  private async writeChapterTarget(
+    bookId: number,
+    target: FileWriteTarget,
+    chapters: FileChapterSpanList,
+    userId: number,
+  ): Promise<{ diskWritten: boolean; complete: boolean }> {
+    let diskWritten = false;
+    const format = normalizeWriteFormat(target.format);
+    const writer = this.registry.get(format)!;
+    if (target.fileHash) await this.fileWriteRepo.recordHashHistory(target.id, target.fileHash, 'file_write');
+
+    let result: WriteResult;
+    try {
+      result = await this.lockService.withLock(target.absolutePath, () =>
+        writer.write(target.absolutePath, {}, { fieldMask: new Set(), dryRun: false, chapters }),
+      );
+      diskWritten = result.status === 'success';
+      if (diskWritten) {
+        const embedded = await probeAudioChapters(target.absolutePath);
+        const stats = await stat(target.absolutePath);
+        if (
+          embedded.durationMs === null ||
+          embedded.chapters.length !== chapters.length ||
+          embedded.chapters.some(
+            (chapter, index) =>
+              chapter.title !== chapters[index]!.title.replace(/\r\n?/g, '\n') || Math.abs(chapter.startMs - chapters[index]!.startMs) > 5,
+          )
+        ) {
+          throw new Error('Written chapters could not be verified');
+        }
+        await this.fileWriteRepo.recordChapterWriteProvenance(bookId, target.id, {
+          mtimeMs: stats.mtime.getTime(),
+          sizeBytes: stats.size,
+          chapters: embedded.chapters,
+          startsMs: chapters.map((chapter) => chapter.startMs),
+          continuation: chapters[0]?.continuation === true,
+        });
+      }
+      if (diskWritten && !(await this.updateTargetFileState(bookId, target))) {
+        result = { ...result, status: 'failed', reason: 'post-write file state refresh failed' };
+      }
+    } catch (error) {
+      result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason: describeWriteFailure(error, target.absolutePath) };
+      this.logger.warn(
+        `[${FILE_WRITE_CHAPTERS_EVENT}] [fail] bookId=${bookId} bookFileId=${target.id} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeErrorMessage(result.reason ?? '')}" - file could not be written`,
+      );
+    }
+    try {
+      await this.fileWriteRepo.insertLog({ bookId, bookFileId: target.id, userId, format, result, triggeredBy: 'sync' });
+    } catch (error) {
+      this.logWriteFail(bookId, format, 'sync', userId, false, Date.now(), error, describeWriteFailure(error, target.absolutePath));
+      return { diskWritten, complete: false };
+    }
+    return { diskWritten, complete: result.status === 'success' };
   }
 
   findWriteLog(bookId: number, limit = 20) {

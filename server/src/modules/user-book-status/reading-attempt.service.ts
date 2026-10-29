@@ -383,7 +383,7 @@ export class ReadingAttemptService {
   async list(userId: number, bookId: number, page = 1, pageSize = 20): Promise<ReadingAttemptListResponse> {
     const result = await this.repo.list(userId, bookId, page, pageSize);
     return {
-      items: result.items.map((row) => this.toDto(row)),
+      items: result.items.map((row) => this.toDto(row, bookId)),
       page,
       pageSize,
       total: result.total,
@@ -407,7 +407,7 @@ export class ReadingAttemptService {
       }),
     );
     await this.rebuildProjection(userId, bookId);
-    return this.toDto({ ...row, totalSessions: 0, totalSeconds: 0 });
+    return this.toDto({ ...row, totalSessions: 0, totalSeconds: 0 }, bookId);
   }
 
   async importExternalRead(
@@ -469,7 +469,7 @@ export class ReadingAttemptService {
       return { row, changed };
     });
     await this.rebuildProjection(userId, bookId, changed);
-    return this.toDto({ ...row, totalSessions: 0, totalSeconds: 0 });
+    return this.toDto({ ...row, totalSessions: 0, totalSeconds: 0 }, bookId);
   }
 
   async delete(userId: number, bookId: number, attemptId: number): Promise<void> {
@@ -525,20 +525,24 @@ export class ReadingAttemptService {
     }
   }
 
-  private toDto(row: {
-    id: number;
-    bookId: number;
-    startedOn: string | null;
-    endedOn: string | null;
-    outcome: ReadingAttemptOutcome | null;
-    origin: ReadingAttemptOrigin;
-    externalProvider: string | null;
-    externalId: string | null;
-    totalSessions: number;
-    totalSeconds: number;
-    createdAt: Date;
-    updatedAt: Date;
-  }): ReadingAttempt {
-    return { ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  /** `bookId` comes from the route: these attempts are always listed and edited through their book. */
+  private toDto(
+    row: {
+      id: number;
+      startedOn: string | null;
+      endedOn: string | null;
+      outcome: ReadingAttemptOutcome | null;
+      origin: ReadingAttemptOrigin;
+      externalProvider: string | null;
+      externalId: string | null;
+      rating?: number | null;
+      totalSessions: number;
+      totalSeconds: number;
+      createdAt: Date;
+      updatedAt: Date;
+    },
+    bookId: number,
+  ): ReadingAttempt {
+    return { ...row, bookId, rating: row.rating ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
   }
 }

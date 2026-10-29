@@ -6,7 +6,7 @@ vi.mock('fs/promises', () => ({
 }));
 
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { readdir, lstat, mkdir } from 'fs/promises';
+import { readdir, lstat, mkdir, realpath } from 'fs/promises';
 
 import { PathService } from './path.service';
 
@@ -39,6 +39,7 @@ describe('PathService', () => {
     pathPolicy.getBrowseRoot.mockReturnValue('/tmp/books');
     pathPolicy.resolveBrowsePath.mockImplementation((path?: string) => Promise.resolve(path || '/tmp/books'));
     pathPolicy.assertWithinBrowseRoot.mockImplementation((path: string) => Promise.resolve(path));
+    vi.mocked(realpath).mockImplementation((path) => Promise.resolve(String(path)));
     service = new PathService(pathPolicy as never);
   });
 

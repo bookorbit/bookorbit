@@ -43,7 +43,8 @@ const READ_STATUS_TO_DEVICE_STATUS: Record<ReadStatus, string> = {
 };
 
 export interface MatchCheckResult {
-  matches: { hash: string; bookId: number; bookFileId: number }[];
+  /** `positionCompatible: false` marks a copy whose bytes differ from the library file: progress syncs as a percentage and highlights do not sync. */
+  matches: { hash: string; bookId: number; bookFileId: number; positionCompatible?: false }[];
   libraryVersion: string;
 }
 
@@ -140,6 +141,7 @@ export class KoreaderPluginService {
       hash,
       bookId: match.bookId,
       bookFileId: match.bookFileId,
+      ...(match.progressCompatible === false ? { positionCompatible: false as const } : {}),
     }));
     const libraryVersion = await this.computeLibraryVersion(user.id, accessibleLibraryIds);
 

@@ -55,11 +55,14 @@ export interface BookmarkExchangeBookResult {
 export interface BookmarkExchangeResponse {
   results: BookmarkExchangeBookResult[];
   unmatched: string[];
+  /** Matched books whose device copy differs from the library file; see the annotation exchange. */
+  positionIncompatible: string[];
 }
 
 export interface BookmarkExchangeAckResponse {
   results: { hash: string; acked: number }[];
   unmatched: string[];
+  positionIncompatible: string[];
 }
 
 /** The device identity of a bookmark: md5 of `${datetime}|${pos}`, matching the plugin. */
@@ -89,13 +92,18 @@ export class KoreaderBookmarkExchangeService {
       const matches = await this.resolveBooks(user.id, dto.books);
       const results: BookmarkExchangeBookResult[] = [];
       const unmatched: string[] = [];
+      const positionIncompatible: string[] = [];
       let pushedTotal = 0;
 
       for (const book of dto.books) {
         const hash = book.hash.toLowerCase();
         const match = matches.get(hash);
-        if (!match || match.progressCompatible === false) {
+        if (!match) {
           unmatched.push(hash);
+          continue;
+        }
+        if (match.progressCompatible === false) {
+          positionIncompatible.push(hash);
           continue;
         }
         const result = await this.exchangeBook(user.id, exchangeDeviceId(dto.deviceId, hash), hash, match.bookId, match.bookFileId, book);
@@ -106,9 +114,9 @@ export class KoreaderBookmarkExchangeService {
       await this.purgeExpiredTombstones(user.id);
 
       this.logger.log(
-        `[${EXCHANGE_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} pushed=${pushedTotal} unmatched=${unmatched.length} - bookmark exchange completed`,
+        `[${EXCHANGE_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} pushed=${pushedTotal} unmatched=${unmatched.length} positionIncompatible=${positionIncompatible.length} - bookmark exchange completed`,
       );
-      return { results, unmatched };
+      return { results, unmatched, positionIncompatible };
     } catch (error) {
       this.logFailure(EXCHANGE_EVENT, user.id, dto.deviceId, startedAtMs, error);
       throw error;
@@ -121,12 +129,17 @@ export class KoreaderBookmarkExchangeService {
       const matches = await this.resolveBooks(user.id, dto.books);
       const results: { hash: string; acked: number }[] = [];
       const unmatched: string[] = [];
+      const positionIncompatible: string[] = [];
 
       for (const book of dto.books) {
         const hash = book.hash.toLowerCase();
         const match = matches.get(hash);
-        if (!match || match.progressCompatible === false) {
+        if (!match) {
           unmatched.push(hash);
+          continue;
+        }
+        if (match.progressCompatible === false) {
+          positionIncompatible.push(hash);
           continue;
         }
         const acked = await this.ackBook(user.id, exchangeDeviceId(dto.deviceId, hash), match.bookId, book);
@@ -134,9 +147,9 @@ export class KoreaderBookmarkExchangeService {
       }
 
       this.logger.log(
-        `[${ACK_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} unmatched=${unmatched.length} - bookmark exchange ack applied`,
+        `[${ACK_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} unmatched=${unmatched.length} positionIncompatible=${positionIncompatible.length} - bookmark exchange ack applied`,
       );
-      return { results, unmatched };
+      return { results, unmatched, positionIncompatible };
     } catch (error) {
       this.logFailure(ACK_EVENT, user.id, dto.deviceId, startedAtMs, error);
       throw error;

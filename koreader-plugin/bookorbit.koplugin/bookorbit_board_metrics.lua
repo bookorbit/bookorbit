@@ -113,10 +113,35 @@ function BoardMetrics.refresh()
         adj = adj,
         scale = user_scale,
         dp = base * adj * user_scale,
+        layout_dp = base * adj,
     }
     cache.W = w / cache.dp
     cache.H = h / cache.dp
+    -- The screen at interface size 1. Layout choices (columns, margins, one
+    -- or two column pages) are made on these, so a larger interface size
+    -- draws the device's own layout bigger instead of a smaller device's.
+    cache.LW = w / cache.layout_dp
+    cache.LH = h / cache.layout_dp
     return cache
+end
+
+-- The screen width layout choices are made on, rounded so an exact 600 dp
+-- screen is not 599.9994.
+function BoardMetrics.layoutW()
+    return math.floor(BoardMetrics.get().LW * 1000 + 0.5) / 1000
+end
+
+-- A pixel width in layout dp, for comparing a box against a layout
+-- breakpoint.
+function BoardMetrics.layoutDp(w_px)
+    return w_px / BoardMetrics.get().layout_dp
+end
+
+-- dp to pixels at interface size 1, for layout limits that must not move
+-- with the interface size.
+function BoardMetrics.lpx(n)
+    if not n or n <= 0 then return 0 end
+    return math.ceil(n * BoardMetrics.get().layout_dp - 1e-7)
 end
 
 function BoardMetrics.get()

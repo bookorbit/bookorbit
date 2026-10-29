@@ -23,12 +23,11 @@ local T = require("ffi/util").template
 local _ = require("gettext")
 
 local BoardArt = require("bookorbit_board_art")
+local BoardColour = require("bookorbit_board_colour")
 local BoardData = require("bookorbit_board_data")
 local BoardIcons = require("bookorbit_board_icons")
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")
-local SPRITES = require("bookorbit_board_sprites")
-local ANIMAL_SPRITES = require("bookorbit_board_animal_sprites")
 
 local INK = BoardMetrics.INK
 local px, lh1 = BoardMetrics.px, BoardMetrics.lh1
@@ -39,6 +38,12 @@ local Decor = {}
 
 -- Set by install: the board's own header row and number formatting.
 local head, formatCount
+
+-- A hex for decor art: `colour` on a screen showing the Colour setting, the
+-- grey otherwise.
+local function artHex(ctx, grey, colour)
+    return BoardColour.on(ctx) and BoardColour.hex(colour) or grey
+end
 
 local function clamp(v, lo, hi)
     if v < lo then return lo end
@@ -137,10 +142,11 @@ local function bubble(w, lines, s, tail, second_is_data)
     local bw = math.max(1, px(1.5))
     local pad_x, pad_y = px(10), px(7)
     local tw = w - 2 * pad_x - 2 * bw
-    local items = { text(lines[1], { s = s, b = true, w = tw, lines = 2 }) }
+    -- The bubble is white whatever the tile under it is, and so is its text's ground.
+    local items = { text(lines[1], { s = s, b = true, w = tw, lines = 2, bg = INK.white }) }
     if lines[2] then
         table.insert(items, space(nil, px(2)))
-        table.insert(items, text(lines[2], { s = math.max(11, s - 2), col = INK.g4, w = tw, lines = 2, data = second_is_data }))
+        table.insert(items, text(lines[2], { s = math.max(11, s - 2), col = INK.g4, w = tw, lines = 2, data = second_is_data, bg = INK.white }))
     end
     local inner = vstack({ w = tw }, items)
     local h = inner:getSize().h + 2 * pad_y + 2 * bw
@@ -157,9 +163,20 @@ local function bubble(w, lines, s, tail, second_is_data)
     return overlay(w, h + t - bw, { { widget = frame }, { widget = tail_art, x = round(w * 0.42) - t, y = h - bw } }), 0, h
 end
 
-local function shadow(sw, k)
-    local sh_w, sh_h = round(sw * 0.62), math.max(3, round(k * 1.6))
+local function shadow(sw)
+    local sh_w, sh_h = round(sw * 0.62), math.max(3, round(sw * 0.05))
     return svg(sh_w, sh_h, '<ellipse cx="' .. n(sh_w / 2) .. '" cy="' .. n(sh_h / 2) .. '" rx="' .. n(sh_w / 2) .. '" ry="' .. n(sh_h / 2) .. '" fill="#dddddd"/>')
+end
+
+-- The pets, one module each (bookorbit_pets), loaded the first time a tile
+-- shows one. A name this plugin does not know shows the cat.
+Decor.PETS = { "cat", "dog", "rabbit", "owl", "penguin", "robot", "vampire", "dragon", "ghost",
+    "mimic", "mummy", "witch", "skeleton", "candle", "alien" }
+local KNOWN_PETS = {}
+for _i, name in ipairs(Decor.PETS) do KNOWN_PETS[name] = true end
+
+function Decor.pet(name)
+    return require("bookorbit_pets." .. (KNOWN_PETS[name] and name or "cat"))
 end
 
 function Decor.buddy(ctx, w, hh, props)
@@ -167,32 +184,38 @@ function Decor.buddy(ctx, w, hh, props)
     local pad = px(12)
     local iw, ih = w - 2 * pad, hh - 2 * pad
     local pose = Decor.buddyPose(d)
-    local sprites = ANIMAL_SPRITES[props and props.animal] or SPRITES
-    local rows = sprites[pose]
+    local pet = Decor.pet(props and props.animal)
+    local rows, palette = pet[pose], pet.palette
     local SW, SH = #rows[1], #rows
     local lines, data2 = buddyLines(pose, d)
-    local function scaleFor(aw, ah) return math.max(1, math.floor(math.min(aw / SW, ah / SH))) end
+    -- Half steps, so a 64-cell pet has a size between 64 and 128 pixels.
+    local function scaleFor(aw, ah) return math.max(1, math.floor(math.min(aw / SW, ah / SH) * 2) / 2) end
+    local function size(k) return BoardArt.spriteEdge(SW, k), BoardArt.spriteEdge(SH, k) end
+    local function sprite(k) return BoardArt.sprite(rows, k, palette) end
+    -- The floor shadow is a twentieth of the sprite's width.
+    local with_shadow = 1 + 0.05 * SW / SH
     local variants = {}
     local wide = iw > ih * 1.6
     local tall = ih > iw * 0.6 and ih > px(150)
     if tall then
         -- Near-square tiles: the bubble above, the companion on the floor under it,
         -- when that gives a bigger companion than sitting side by side.
-        local side_k = scaleFor(math.min(iw * 0.6, iw - px(10) - px(124)), (ih - px(2)) / (1 + 1.6 / SH))
+        local side_k = scaleFor(math.min(iw * 0.6, iw - px(10) - px(124)), (ih - px(2)) / with_shadow)
         for _i, s in ipairs({ 15, 14 }) do
             table.insert(variants, function()
                 local bw = math.min(iw, math.max(px(200), round(iw * 0.72)))
                 local bub, _ox, bh = bubble(bw, lines, s, "down", data2)
                 local gap_v = px(14)
-                local k = scaleFor(iw * 0.8, (ih - bh - gap_v) / (1 + 1.6 / SH))
+                local k = scaleFor(iw * 0.8, (ih - bh - gap_v) / with_shadow)
                 if k <= side_k then return skip("stacked companion no bigger") end
-                local sh, sh_h, sw = SH * k, math.max(3, round(k * 1.6)), SW * k
+                local sw, sh = size(k)
+                local sh_h = math.max(3, round(sw * 0.05))
                 local top = round((ih - (bh + gap_v + sh + sh_h)) / 2)
                 if top < 0 then return skip("stack too tall") end
                 return padded(w, hh, { overlay(iw, ih, {
                     { widget = bub, x = round((iw - bw) / 2), y = top },
-                    { widget = shadow(sw, k), x = round((iw - round(sw * 0.62)) / 2), y = top + bh + gap_v + sh - round(sh_h / 2) },
-                    { widget = BoardArt.sprite(rows, k), x = round((iw - sw) / 2), y = top + bh + gap_v },
+                    { widget = shadow(sw), x = round((iw - round(sw * 0.62)) / 2), y = top + bh + gap_v + sh - round(sh_h / 2) },
+                    { widget = sprite(k), x = round((iw - sw) / 2), y = top + bh + gap_v },
                 }) })
             end)
         end
@@ -200,17 +223,20 @@ function Decor.buddy(ctx, w, hh, props)
         for _i, s in ipairs({ 15, 14, 13 }) do
             table.insert(variants, function()
                 local gap = px(10)
-                local k = scaleFor(math.min(iw * 0.6, iw - gap - px(124)), (ih - px(2)) / (1 + 1.6 / SH))
-                if k < 3 then return skip("companion too small") end
-                local sw, sh, sh_h = SW * k, SH * k, math.max(3, round(k * 1.6))
+                local k = scaleFor(math.min(iw * 0.6, iw - gap - px(124)), (ih - px(2)) / with_shadow)
+                local sw, sh = size(k)
+                -- Floors are sprite widths in pixels, not scales, so they mean the
+                -- same for every canvas size.
+                if sw < 96 then return skip("companion too small") end
+                local sh_h = math.max(3, round(sw * 0.05))
                 local bw = iw - sw - gap
                 local bub, ox, bh = bubble(bw, lines, s, "left", data2)
                 if bh > ih then return skip("bubble too tall") end
                 local top = round((ih - sh - sh_h / 2) / 2)
                 local btop = clamp(top + round(sh * 0.22) - px(14), 0, ih - bh)
                 return padded(w, hh, { overlay(iw, ih, {
-                    { widget = shadow(sw, k), x = round((sw - round(sw * 0.62)) / 2), y = top + sh - round(sh_h / 2) },
-                    { widget = BoardArt.sprite(rows, k), x = 0, y = top },
+                    { widget = shadow(sw), x = round((sw - round(sw * 0.62)) / 2), y = top + sh - round(sh_h / 2) },
+                    { widget = sprite(k), x = 0, y = top },
                     { widget = bub, x = sw + gap - ox, y = btop },
                 }) })
             end)
@@ -222,14 +248,14 @@ function Decor.buddy(ctx, w, hh, props)
             for _j, two in ipairs({ true, false }) do
                 table.insert(variants, function()
                     local k = scaleFor(iw * 0.42, ih)
-                    local sw = SW * k
+                    local sw = size(k)
                     local gap = px(14)
                     local bw = iw - sw - gap
                     if bw < px(96) then return skip("bubble too narrow") end
                     local bub, ox = bubble(bw, two and lines or { lines[1] }, s, "left", data2)
                     return padded(w, hh, {
                         hstack({ w = iw, h = ih }, {
-                            vstack({ w = sw, h = ih }, { flex(0), BoardArt.sprite(rows, k) }),
+                            vstack({ w = sw, h = ih }, { flex(0), sprite(k) }),
                             space(gap - ox, 1),
                             bub,
                         }),
@@ -242,17 +268,17 @@ function Decor.buddy(ctx, w, hh, props)
     table.insert(variants, function()
         local cap_h = lh1(12) + px(4)
         local k = scaleFor(iw, ih - cap_h)
-        if k < 2 then return skip("companion too small") end
-        return padded(w, hh, { flex(0), BoardArt.sprite(rows, k), space(nil, px(4)), text(lines[1], { s = 12, b = true, w = iw, align = "center" }) }, "center")
+        if size(k) < 64 then return skip("companion too small") end
+        return padded(w, hh, { flex(0), sprite(k), space(nil, px(4)), text(lines[1], { s = 12, b = true, w = iw, align = "center" }) }, "center")
     end)
     table.insert(variants, function()
-        return padded(w, hh, { flex(0), BoardArt.sprite(rows, scaleFor(iw, ih)), flex(0) }, "center")
+        return padded(w, hh, { flex(0), sprite(scaleFor(iw, ih)), flex(0) }, "center")
     end)
     return pick(variants)
 end
 
 -- ================================================================ analog clock
-local function clockFace(dia, hour, minute)
+local function clockFace(dia, hour, minute, accent)
     local r = dia / 2
     local cx, cy = r, r
     local body = { '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(r - 0.5) .. '" fill="#ffffff"/>' }
@@ -262,7 +288,7 @@ local function clockFace(dia, hour, minute)
         local r1 = r - px(major and 4 or 5)
         local r2 = r - (major and r * 0.2 or r * 0.12) - px(3)
         table.insert(body, '<line x1="' .. n(cx + r1 * math.sin(a)) .. '" y1="' .. n(cy - r1 * math.cos(a)) .. '" x2="' .. n(cx + r2 * math.sin(a))
-            .. '" y2="' .. n(cy - r2 * math.cos(a)) .. '" stroke="' .. (major and "#000000" or "#555555") .. '" stroke-width="'
+            .. '" y2="' .. n(cy - r2 * math.cos(a)) .. '" stroke="' .. (major and accent or "#555555") .. '" stroke-width="'
             .. n(major and math.max(2, px(2.5)) or math.max(1, px(1.25))) .. '" stroke-linecap="round"/>')
     end
     local ah = ((hour % 12) + minute / 60) * math.pi / 6
@@ -273,13 +299,14 @@ local function clockFace(dia, hour, minute)
     end
     table.insert(body, hand(ah, r * 0.5, math.max(3, px(4.5)), r * 0.08))
     table.insert(body, hand(am, r * 0.76, math.max(2, px(2.75)), r * 0.1))
-    table.insert(body, '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(math.max(3, px(4))) .. '" fill="#000000"/>')
+    table.insert(body, '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(math.max(3, px(4))) .. '" fill="' .. accent .. '"/>')
     table.insert(body, '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(math.max(1, px(1.25))) .. '" fill="#ffffff"/>')
     return svg(round(dia), round(dia), table.concat(body))
 end
 
 function Decor.analog(ctx, w, hh)
     local d = ctx.d
+    local accent = BoardColour.artHex(ctx, "#000000", "ink", "red")
     local pad = px(12)
     local iw, ih = w - 2 * pad, hh - 2 * pad
     local now = d.now or os.time()
@@ -293,12 +320,12 @@ function Decor.analog(ctx, w, hh)
                 if tw < px(70) then return skip("no room for the date") end
                 return padded(w, hh, {
                     hstack({ w = iw, h = ih, gap = px(14) }, {
-                        clockFace(dia, hour, minute),
+                        clockFace(dia, hour, minute, accent),
                         vstack({ w = tw }, {
                             text(d.weekday, { s = s, b = true, w = tw, col = INK.white }),
-                            text(d.day_month, { s = 13, w = tw, col = INK.gc }),
+                            text(d.day_month, { s = 13, w = tw, col = BoardColour.onInk(ctx, INK.gc) }),
                             space(nil, px(4)),
-                            text(d.clock, { s = 13, b = true, w = tw, col = INK.gc }),
+                            text(d.clock, { s = 13, b = true, w = tw, col = BoardColour.onInk(ctx, INK.gc) }),
                         }),
                     }),
                 })
@@ -306,7 +333,7 @@ function Decor.analog(ctx, w, hh)
         end
     end
     table.insert(variants, function()
-        return padded(w, hh, { flex(0), clockFace(math.max(1, math.min(iw, ih)), hour, minute), flex(0) }, "center")
+        return padded(w, hh, { flex(0), clockFace(math.max(1, math.min(iw, ih)), hour, minute, accent), flex(0) }, "center")
     end)
     return pick(variants)
 end
@@ -325,10 +352,10 @@ end
 -- Procellarum and Nubium, drawn only where wholly in the light.
 local MARIA = { { -0.26, -0.36, 0.24, 0.17, -0.3 }, { 0.2, -0.3, 0.13, 0.12, 0 }, { 0.32, -0.02, 0.15, 0.12, 0.4 }, { -0.5, 0.06, 0.15, 0.3, 0.1 }, { -0.08, 0.42, 0.15, 0.09, 0.2 } }
 
-local function moonDisc(dia, m)
+local function moonDisc(dia, m, ctx)
     local R = dia / 2 - math.max(1, px(1))
     local cx, cy = dia / 2, dia / 2
-    local body = { '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(R) .. '" fill="#222222" stroke="#666666" stroke-width="' .. n(math.max(1, px(1))) .. '"/>' }
+    local body = { '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(R) .. '" fill="' .. artHex(ctx, "#222222", "#2a3062") .. '" stroke="' .. artHex(ctx, "#666666", "#5a628f") .. '" stroke-width="' .. n(math.max(1, px(1))) .. '"/>' }
     if m.lit > 0.004 then
         local k = math.cos(2 * math.pi * m.p)
         local waxing = m.p < 0.5
@@ -338,7 +365,7 @@ local function moonDisc(dia, m)
         if waxing then term_sweep = k > 0 and 0 or 1 else term_sweep = k > 0 and 1 or 0 end
         local trx = math.max(0.01, math.abs(k) * R)
         table.insert(body, '<path d="M' .. top .. ' A' .. n(R) .. ' ' .. n(R) .. ' 0 0 ' .. limb_sweep .. ' ' .. bottom .. ' A' .. n(trx) .. ' ' .. n(R)
-            .. ' 0 0 ' .. term_sweep .. ' ' .. top .. ' Z" fill="#ffffff"/>')
+            .. ' 0 0 ' .. term_sweep .. ' ' .. top .. ' Z" fill="' .. artHex(ctx, "#ffffff", "#f7efcf") .. '"/>')
         for _i, mare in ipairs(MARIA) do
             local mx, my, ex, ey, rot = mare[1], mare[2], mare[3], mare[4], mare[5]
             local ok = true
@@ -350,7 +377,7 @@ local function moonDisc(dia, m)
             end
             if ok then
                 table.insert(body, '<ellipse cx="' .. n(cx + mx * R) .. '" cy="' .. n(cy + my * R) .. '" rx="' .. n(ex * R) .. '" ry="' .. n(ey * R)
-                    .. '" transform="rotate(' .. n(rot * 57.3) .. ' ' .. n(cx + mx * R) .. ' ' .. n(cy + my * R) .. ')" fill="#dddddd"/>')
+                    .. '" transform="rotate(' .. n(rot * 57.3) .. ' ' .. n(cx + mx * R) .. ' ' .. n(cy + my * R) .. ')" fill="' .. artHex(ctx, "#dddddd", "#e2d3a2") .. '"/>')
             end
         end
     end
@@ -397,13 +424,13 @@ function Decor.moon(ctx, w, hh)
                 if tw < px(80) then return skip("no room for words") end
                 local words = vstack({ w = tw }, {
                     text(m.name, { s = v[1], b = true, w = tw, col = INK.white }),
-                    text(T(_("%1% lit"), lit), { s = 13, w = tw, col = INK.gc }),
+                    text(T(_("%1% lit"), lit), { s = 13, w = tw, col = BoardColour.onInk(ctx, INK.gc, "moon") }),
                     space(nil, px(4)),
-                    text(m.next, { s = 12, w = tw, col = INK.gc }),
+                    text(m.next, { s = 12, w = tw, col = BoardColour.onInk(ctx, INK.gc, "moon") }),
                 })
                 return overlay(w, hh, {
                     { widget = sky(w, hh, { x = pad + dia / 2, y = hh / 2, r = dia / 2 }, { x = pad + dia, y = 0, w = w, h = hh }) },
-                    { widget = moonDisc(dia, m), x = pad, y = round((hh - dia) / 2) },
+                    { widget = moonDisc(dia, m, ctx), x = pad, y = round((hh - dia) / 2) },
                     { widget = vstack({ w = tw, h = hh }, { flex(0), words, flex(0) }), x = pad + dia + px(16), y = 0 },
                 })
             end)
@@ -418,7 +445,7 @@ function Decor.moon(ctx, w, hh)
             local top = pad + (ih - cap_h - dia) / 2
             local layers = {
                 { widget = sky(w, hh, { x = w / 2, y = top + dia / 2, r = dia / 2 }, caption and { x = 0, y = hh - pad - lh1(12), w = w, h = lh1(12) } or nil) },
-                { widget = moonDisc(dia, m), x = round((w - dia) / 2), y = round(top) },
+                { widget = moonDisc(dia, m, ctx), x = round((w - dia) / 2), y = round(top) },
             }
             if caption then
                 table.insert(layers, { widget = text(m.name, { s = 12, b = true, w = iw, col = INK.white, align = "center" }), x = pad, y = hh - pad - lh1(12) })
@@ -432,7 +459,7 @@ end
 -- ================================================================ odometer
 -- The last wheel, caught mid-turn: the bottom of its digit and the top of
 -- the next, both drawn into the wheel's own box so neither spills out.
-local RollingWheel = Widget:extend{ digit = 0, size = 10, roll = 0, pitch = 0 }
+local RollingWheel = Widget:extend{ digit = 0, size = 10, roll = 0, pitch = 0, color = nil }
 
 function RollingWheel:getSize()
     return self.dimen
@@ -449,7 +476,7 @@ function RollingWheel:paintTo(bb, x, y)
         local gy = y + round(center_y - gh / 2)
         local top, bottom = math.max(gy, y), math.min(gy + gh, y + h)
         if bottom <= top then return end
-        bb:colorblitFrom(g.bb, gx, top, 0, top - gy, gw, bottom - top, INK.black)
+        bb:colorblitFrom(g.bb, gx, top, 0, top - gy, gw, bottom - top, self.color or INK.black)
     end
     draw(self.digit, h / 2 - self.roll)
     if self.roll > 0 then draw((self.digit + 1) % 10, h / 2 - self.roll + self.pitch) end
@@ -464,14 +491,15 @@ function Decor.odometer(ctx, w, hh)
     local digits = string.format("%06d", total)
     local count = #digits
     local g = px(3)
+    local hot = BoardColour.on(ctx)
     local function drums(dw, dh)
         local fs = math.floor(dh * 0.62 / BoardMetrics.get().dp)
         local items = {}
         for i = 1, count do
             local ch = digits:sub(i, i)
-            local shade_col = i < count and INK.g3 or INK.gd
+            local shade_col = i < count and INK.g3 or (hot and BoardColour.paint(BoardColour.mix(BoardColour.fam(ctx).ink, "#ffffff", 0.3)) or INK.gd)
             local layers = {
-                { widget = BoardUI.box({ w = dw, h = dh, radius = px(3), bg = i < count and INK.black or INK.white }) },
+                { widget = BoardUI.box({ w = dw, h = dh, radius = px(3), bg = i < count and INK.black or BoardColour.ink(ctx, INK.white) }) },
                 { widget = BoardUI.rect(dw, math.max(1, px(1)), shade_col), y = round(dh * 0.16) },
                 { widget = BoardUI.rect(dw, math.max(1, px(1)), shade_col), y = round(dh * 0.84) },
             }
@@ -481,8 +509,10 @@ function Decor.odometer(ctx, w, hh)
                 local pitch = dh * 0.8
                 -- Nothing read today: the wheel rests on its digit.
                 local roll = today > 0 and round(pitch * 0.3) or 0
-                table.insert(layers, { widget = RollingWheel:new{ digit = tonumber(ch), size = BoardMetrics.fs(fs), roll = roll, pitch = pitch, dimen = Geom:new{ w = dw, h = dh } } })
-                table.insert(layers, { widget = BoardUI.box({ w = dw, h = dh, radius = px(3), border = math.max(1, px(1.5)), border_col = INK.black }) })
+                table.insert(layers, { widget = RollingWheel:new{ digit = tonumber(ch), size = BoardMetrics.fs(fs), roll = roll, pitch = pitch, color = hot and INK.white or INK.black, dimen = Geom:new{ w = dw, h = dh } } })
+                if not hot then
+                    table.insert(layers, { widget = BoardUI.box({ w = dw, h = dh, radius = px(3), border = math.max(1, px(1.5)), border_col = INK.black }) })
+                end
             end
             table.insert(items, overlay(dw, dh, layers))
         end
@@ -513,7 +543,7 @@ function Decor.odometer(ctx, w, hh)
             local dw_fit = math.min(dw, round(dh / 1.32))
             local right = nil
             if mode == "beside" then right = todayRuns(12)
-            elseif mode ~= "bare" then right = icon("book-open", px(17), { sw = 2.25 }) end
+            elseif mode ~= "bare" then right = icon("book-open", px(17), BoardColour.icon(ctx, 2.25)) end
             return padded(w, hh, {
                 head(iw, _("Pages turned"), right),
                 flex(0),
@@ -527,8 +557,10 @@ function Decor.odometer(ctx, w, hh)
 end
 
 -- ================================================================ glyph
-local function glyphArt(g, max_w, max_h)
-    return BoardArt.glyph(g.font, g.cp, math.max(1, max_w), math.max(1, max_h))
+local function glyphArt(g, max_w, max_h, col)
+    local art = BoardArt.glyph(g.font, g.cp, math.max(1, max_w), math.max(1, max_h))
+    if art then art.color = col end
+    return art
 end
 
 -- A line of the alphabet in the glyph's own font.
@@ -555,7 +587,7 @@ function Decor.glyph(ctx, w, hh)
         for _i, s in ipairs({ 15, 14 }) do
             table.insert(variants, function()
                 local gw_max = math.min(ih, round(iw * 0.4))
-                local art = glyphArt(g, gw_max, ih - px(4))
+                local art = glyphArt(g, gw_max, ih - px(4), BoardColour.ink(ctx, INK.black))
                 if not art then return skip("no glyph") end
                 local tw = iw - gw_max - px(14)
                 if tw < px(90) then return skip("no room for words") end
@@ -576,7 +608,7 @@ function Decor.glyph(ctx, w, hh)
     if ih > px(150) then
         table.insert(variants, function()
             local foot = lh1(15) + lh1(12) + (g.sample and lh1(14) + px(8) or 0) + px(10)
-            local art = glyphArt(g, iw - px(20), ih - foot - px(10))
+            local art = glyphArt(g, iw - px(20), ih - foot - px(10), BoardColour.ink(ctx, INK.black))
             if not art then return skip("no glyph") end
             return padded(w, hh, {
                 flex(0), art, flex(0),
@@ -590,7 +622,7 @@ function Decor.glyph(ctx, w, hh)
     for _i, two in ipairs({ true, false }) do
         table.insert(variants, function()
             local foot = lh1(12) + (two and lh1(11) or 0) + px(6)
-            local art = glyphArt(g, iw, ih - foot)
+            local art = glyphArt(g, iw, ih - foot, BoardColour.ink(ctx, INK.black))
             if not art then return skip("no glyph") end
             return padded(w, hh, {
                 flex(0), art, flex(0),
@@ -600,7 +632,7 @@ function Decor.glyph(ctx, w, hh)
         end)
     end
     table.insert(variants, function()
-        local art = glyphArt(g, iw, ih) or text(name, { s = 14, b = true, w = iw, align = "center" })
+        local art = glyphArt(g, iw, ih, BoardColour.ink(ctx, INK.black)) or text(name, { s = 14, b = true, w = iw, align = "center" })
         return padded(w, hh, { flex(0), art, flex(0) }, "center")
     end)
     return pick(variants)
@@ -610,7 +642,16 @@ end
 -- One ring a month, the oldest at the pith; a ring is as wide as that
 -- month's reading. The pith sits a little off centre and every ring wobbles
 -- a little, as in real wood.
-local function ringsArt(dia, months, seed)
+-- Bark, rings and heartwood: wood colours on a colour screen, grays otherwise.
+local function woodColours(ctx)
+    return {
+        bark = artHex(ctx, "#444444", "#6b4426"), edge = artHex(ctx, "#000000", "#3b2512"), ring = artHex(ctx, "#ffffff", "#f4e4c6"),
+        peak = artHex(ctx, "#dddddd", "#e2b56a"), line = artHex(ctx, "#666666", "#a37a52"), pith = artHex(ctx, "#555555", "#7a4f2c"),
+        crack = artHex(ctx, "#222222", "#3b2512"),
+    }
+end
+
+local function ringsArt(dia, months, seed, wood)
     local r = rng(seed)
     local bark = math.max(3, px(5))
     -- Room for the wobble and the off-centre pith, so the bark never clips.
@@ -648,26 +689,26 @@ local function ringsArt(dia, months, seed)
     for i, m in ipairs(months) do
         if m.min > months[peak].min then peak = i end
     end
-    local body = { '<path d="' .. loop(R, bark) .. '" fill="#444444" stroke="#000000" stroke-width="' .. n(math.max(1, px(1.25))) .. '"/>' }
+    local body = { '<path d="' .. loop(R, bark) .. '" fill="' .. wood.bark .. '" stroke="' .. wood.edge .. '" stroke-width="' .. n(math.max(1, px(1.25))) .. '"/>' }
     for i = #months, 1, -1 do
-        table.insert(body, '<path d="' .. loop(bounds[i]) .. '" fill="' .. (i == peak and "#dddddd" or "#ffffff") .. '" stroke="#666666" stroke-width="'
+        table.insert(body, '<path d="' .. loop(bounds[i]) .. '" fill="' .. (i == peak and wood.peak or wood.ring) .. '" stroke="' .. wood.line .. '" stroke-width="'
             .. n(math.max(1, px(i == #months and 1.25 or 1))) .. '"/>')
     end
-    table.insert(body, '<path d="' .. loop(pith_r * 0.9) .. '" fill="#555555"/>')
+    table.insert(body, '<path d="' .. loop(pith_r * 0.9) .. '" fill="' .. wood.pith .. '"/>')
     -- A drying check: a thin crack from the bark towards the heart.
     local ca = -0.62
     local x1, y1 = cx + (R + bark) * math.cos(ca), cy + (R + bark) * math.sin(ca)
     local x2, y2 = cx + R * 0.45 * math.cos(ca + 0.05), cy + R * 0.45 * math.sin(ca + 0.05)
     local nx, ny = -math.sin(ca) * px(1.6), math.cos(ca) * px(1.6)
-    table.insert(body, '<path d="M' .. n(x1 - nx) .. ' ' .. n(y1 - ny) .. ' L' .. n(x2) .. ' ' .. n(y2) .. ' L' .. n(x1 + nx) .. ' ' .. n(y1 + ny) .. ' Z" fill="#222222"/>')
+    table.insert(body, '<path d="M' .. n(x1 - nx) .. ' ' .. n(y1 - ny) .. ' L' .. n(x2) .. ' ' .. n(y2) .. ' L' .. n(x1 + nx) .. ' ' .. n(y1 + ny) .. ' Z" fill="' .. wood.crack .. '"/>')
     return svg(round(dia), round(dia), table.concat(body))
 end
 
-local function sapling(dia)
+local function sapling(dia, wood)
     local h = dia / 2
-    return svg(dia, dia, '<circle cx="' .. n(h) .. '" cy="' .. n(h) .. '" r="' .. n(h - 1) .. '" fill="#444444" stroke="#000000" stroke-width="' .. n(math.max(1, px(1)))
-        .. '"/><circle cx="' .. n(h) .. '" cy="' .. n(h) .. '" r="' .. n(h - math.max(3, px(4))) .. '" fill="#ffffff" stroke="#666666" stroke-width="' .. n(math.max(1, px(1)))
-        .. '"/><circle cx="' .. n(h) .. '" cy="' .. n(h) .. '" r="' .. n(math.max(2, dia * 0.08)) .. '" fill="#555555"/>')
+    return svg(dia, dia, '<circle cx="' .. n(h) .. '" cy="' .. n(h) .. '" r="' .. n(h - 1) .. '" fill="' .. wood.bark .. '" stroke="' .. wood.edge .. '" stroke-width="' .. n(math.max(1, px(1)))
+        .. '"/><circle cx="' .. n(h) .. '" cy="' .. n(h) .. '" r="' .. n(h - math.max(3, px(4))) .. '" fill="' .. wood.ring .. '" stroke="' .. wood.line .. '" stroke-width="' .. n(math.max(1, px(1)))
+        .. '"/><circle cx="' .. n(h) .. '" cy="' .. n(h) .. '" r="' .. n(math.max(2, dia * 0.08)) .. '" fill="' .. wood.pith .. '"/>')
 end
 
 function Decor.rings(ctx, w, hh)
@@ -690,7 +731,7 @@ function Decor.rings(ctx, w, hh)
                     space(nil, px(6)),
                     text(_("A ring grows for every month you read."), { s = 13, col = INK.g4, lines = 3, w = iw }),
                     with_art and flex(0) or false,
-                    with_art and hstack({ w = iw }, { flex(0), sapling(dia), flex(0) }) or false,
+                    with_art and hstack({ w = iw }, { flex(0), sapling(dia, woodColours(ctx)), flex(0) }) or false,
                     with_art and flex(0) or false,
                 })
             end)
@@ -719,7 +760,7 @@ function Decor.rings(ctx, w, hh)
                 if tw < px(100) then return skip("no room for words") end
                 return padded(w, hh, {
                     hstack({ w = iw, h = ih, gap = px(14) }, {
-                        ringsArt(dia, months, 3),
+                        ringsArt(dia, months, 3, woodColours(ctx)),
                         vstack({ w = tw }, {
                             text(_("Tree rings"), { s = v[1], b = true, w = tw }),
                             v[2] and text(_("One ring a month"), { s = 12, col = INK.g4, w = tw }) or false,
@@ -741,7 +782,7 @@ function Decor.rings(ctx, w, hh)
             return padded(w, hh, {
                 head(iw, _("Tree rings"), text(_("12 months"), { s = 12, col = INK.g4 })),
                 flex(0),
-                ringsArt(dia, months, 3),
+                ringsArt(dia, months, 3, woodColours(ctx)),
                 flex(0),
                 caption and labelRuns(_("Widest ring"), peak, true, 12, iw, "center") or false,
             }, "center")
@@ -782,16 +823,16 @@ local function lineArt(w, cs, o)
     local track_y = px(10)
     local art_h = px(20)
     local body = {
-        '<line x1="' .. n(train_x) .. '" y1="' .. track_y .. '" x2="' .. n(x1) .. '" y2="' .. track_y .. '" stroke="#bbbbbb" stroke-width="' .. lw .. '" stroke-linecap="round"/>',
-        '<line x1="' .. n(x0) .. '" y1="' .. track_y .. '" x2="' .. n(train_x) .. '" y2="' .. track_y .. '" stroke="#000000" stroke-width="' .. lw .. '" stroke-linecap="round"/>',
+        '<line x1="' .. n(train_x) .. '" y1="' .. track_y .. '" x2="' .. n(x1) .. '" y2="' .. track_y .. '" stroke="' .. (o.ahead or "#bbbbbb") .. '" stroke-width="' .. lw .. '" stroke-linecap="round"/>',
+        '<line x1="' .. n(x0) .. '" y1="' .. track_y .. '" x2="' .. n(train_x) .. '" y2="' .. track_y .. '" stroke="' .. (o.line or "#000000") .. '" stroke-width="' .. lw .. '" stroke-linecap="round"/>',
     }
     for i, stop in ipairs(cs.stops) do
         local past = stop.pct <= cs.pos
         local last = i == count
         local rr = math.min(last and r * 1.25 or r, (x1 - x0) / (count - 1) * 0.36)
-        table.insert(body, '<circle cx="' .. n(xi(i)) .. '" cy="' .. track_y .. '" r="' .. n(rr) .. '" fill="' .. (past and "#000000" or "#ffffff")
-            .. '" stroke="#000000" stroke-width="' .. n(math.max(1, px(1.5))) .. '"/>')
-        if last then table.insert(body, '<circle cx="' .. n(xi(i)) .. '" cy="' .. track_y .. '" r="' .. n(rr * 0.42) .. '" fill="#000000"/>') end
+        table.insert(body, '<circle cx="' .. n(xi(i)) .. '" cy="' .. track_y .. '" r="' .. n(rr) .. '" fill="' .. (past and (o.line or "#000000") or "#ffffff")
+            .. '" stroke="' .. (o.line or "#000000") .. '" stroke-width="' .. n(math.max(1, px(1.5))) .. '"/>')
+        if last then table.insert(body, '<circle cx="' .. n(xi(i)) .. '" cy="' .. track_y .. '" r="' .. n(rr * 0.42) .. '" fill="' .. (o.line or "#000000") .. '"/>') end
     end
     table.insert(body, tram(train_x, track_y, 1))
     local layers = { { widget = svg(w, art_h, table.concat(body)) } }
@@ -825,7 +866,7 @@ end
 -- The next stations as a timetable down a vertical line, with how long
 -- until each. The stretch the train is on is taller, so the car stands
 -- clear of both its stations. Nil when fewer than three rows fit.
-local function timetable(w, avail, cs)
+local function timetable(w, avail, cs, line_col, ahead_col)
     local row_h = lh1(14) + px(6)
     local stretch = 0.7
     local rows = math.floor(avail / row_h - stretch)
@@ -846,22 +887,22 @@ local function timetable(w, avail, cs)
     local clear = r + t_h / 2 + px(1)
     local seg = cy(1) - cy(0)
     local ty = clamp(cy(0) + seg * trainFraction(cs), cy(0) + clear, cy(1) - clear)
-    local body = { '<line x1="' .. lx .. '" y1="' .. n(cy(0)) .. '" x2="' .. lx .. '" y2="' .. n(ty) .. '" stroke="#000000" stroke-width="' .. lw .. '"/>' }
+    local body = { '<line x1="' .. lx .. '" y1="' .. n(cy(0)) .. '" x2="' .. lx .. '" y2="' .. n(ty) .. '" stroke="' .. line_col .. '" stroke-width="' .. lw .. '"/>' }
     local last_y = cy(#list - 1)
     if show_end then
         local gap_y = cy(#list - 2)
-        table.insert(body, '<line x1="' .. lx .. '" y1="' .. n(ty) .. '" x2="' .. lx .. '" y2="' .. n(gap_y) .. '" stroke="#bbbbbb" stroke-width="' .. lw .. '"/>')
-        table.insert(body, '<line x1="' .. lx .. '" y1="' .. n(gap_y) .. '" x2="' .. lx .. '" y2="' .. n(last_y) .. '" stroke="#bbbbbb" stroke-width="' .. lw
+        table.insert(body, '<line x1="' .. lx .. '" y1="' .. n(ty) .. '" x2="' .. lx .. '" y2="' .. n(gap_y) .. '" stroke="' .. ahead_col .. '" stroke-width="' .. lw .. '"/>')
+        table.insert(body, '<line x1="' .. lx .. '" y1="' .. n(gap_y) .. '" x2="' .. lx .. '" y2="' .. n(last_y) .. '" stroke="' .. ahead_col .. '" stroke-width="' .. lw
             .. '" stroke-dasharray="' .. px(2) .. ' ' .. px(4) .. '"/>')
     else
-        table.insert(body, '<line x1="' .. lx .. '" y1="' .. n(ty) .. '" x2="' .. lx .. '" y2="' .. n(last_y) .. '" stroke="#bbbbbb" stroke-width="' .. lw .. '"/>')
+        table.insert(body, '<line x1="' .. lx .. '" y1="' .. n(ty) .. '" x2="' .. lx .. '" y2="' .. n(last_y) .. '" stroke="' .. ahead_col .. '" stroke-width="' .. lw .. '"/>')
     end
     for k, i in ipairs(list) do
         local last = i == last_i
         local rr = last and r * 1.2 or r
-        table.insert(body, '<circle cx="' .. lx .. '" cy="' .. n(cy(k - 1)) .. '" r="' .. n(rr) .. '" fill="' .. (k == 1 and "#000000" or "#ffffff")
-            .. '" stroke="#000000" stroke-width="' .. n(math.max(1, px(1.5))) .. '"/>')
-        if last then table.insert(body, '<circle cx="' .. lx .. '" cy="' .. n(cy(k - 1)) .. '" r="' .. n(rr * 0.42) .. '" fill="#000000"/>') end
+        table.insert(body, '<circle cx="' .. lx .. '" cy="' .. n(cy(k - 1)) .. '" r="' .. n(rr) .. '" fill="' .. (k == 1 and line_col or "#ffffff")
+            .. '" stroke="' .. line_col .. '" stroke-width="' .. n(math.max(1, px(1.5))) .. '"/>')
+        if last then table.insert(body, '<circle cx="' .. lx .. '" cy="' .. n(cy(k - 1)) .. '" r="' .. n(rr * 0.42) .. '" fill="' .. line_col .. '"/>') end
     end
     local car_w, win = px(11), px(3.2)
     table.insert(body, '<rect x="' .. n(lx - car_w / 2) .. '" y="' .. n(ty - t_h / 2) .. '" width="' .. n(car_w) .. '" height="' .. n(t_h) .. '" rx="' .. n(px(3))
@@ -884,10 +925,11 @@ local function timetable(w, avail, cs)
 end
 
 function Decor.chapters(ctx, w, hh)
+    local line, ahead = BoardColour.artHex(ctx, "#000000", "ink"), BoardColour.artHex(ctx, "#bbbbbb", "tint")
     local cs = ctx.d.chapters
     local pad = px(12)
     local iw, ih = w - 2 * pad, hh - 2 * pad
-    local function train() return icon("train-front", px(17), { sw = 2.25 }) end
+    local function train() return icon("train-front", px(17), BoardColour.icon(ctx, 2.25)) end
     if not cs then
         return emptyTile(w, hh, _("Next stop"), train, _("Open a book and its chapters line up here."), _("Open a book to start."))
     end
@@ -902,7 +944,7 @@ function Decor.chapters(ctx, w, hh)
     if ih > px(150) and iw < ih * 1.9 then
         table.insert(variants, function()
             local foot = lh1(12) + px(10)
-            local tt = timetable(iw, ih - lh1(13) - px(12) - foot, cs)
+            local tt = timetable(iw, ih - lh1(13) - px(12) - foot, cs, line, ahead)
             if not tt then return skip("timetable needs three rows") end
             return padded(w, hh, {
                 head(iw, cs.book.title or "", text(BoardData.pctLabel(cs.book) or "", { s = 12, col = INK.g4 })),
@@ -917,7 +959,7 @@ function Decor.chapters(ctx, w, hh)
     for _i, v in ipairs({ { 16, true, true }, { 16, false, true }, { 15, false, false }, { 14, false, false } }) do
         table.insert(variants, function()
             if iw < px(220) then return skip("too narrow for the line") end
-            local art = lineArt(iw, cs, { labels = v[2], max = iw > px(500) and 6 or 3 })
+            local art = lineArt(iw, cs, { labels = v[2], max = iw > px(500) and 6 or 3, line = line, ahead = ahead })
             local foot = false
             if v[3] then
                 local left = endRuns(12)
@@ -943,7 +985,7 @@ function Decor.chapters(ctx, w, hh)
                 text(when, { s = 20, b = true, w = iw }),
                 with_name and text(cs.stops[cs.next].title, { s = 12, b = true, serif = true, w = iw, data = true }) or false,
                 flex(0),
-                lineArt(iw, cs, {}),
+                lineArt(iw, cs, { line = line, ahead = ahead }),
             })
         end)
     end
@@ -963,7 +1005,8 @@ local RARITY = {
 
 -- The medal: rarity shows in the rim (plain, double, beaded, sunburst). A
 -- badge in progress wears a progress ring; an earned one hangs on ribbons.
-local function medal(D0, b, earned)
+-- rf: the rarity's hex shades on a colour screen, nil for grays.
+local function medal(D0, b, earned, rf)
     local cx = D0 / 2
     local ring_w = earned and 0 or math.max(3, px(5))
     local gap = earned and 0 or px(4)
@@ -977,7 +1020,7 @@ local function medal(D0, b, earned)
             local y0, y1 = cy + R * 0.3, cy + R + ribbon_h
             local wr = R * 0.34
             return '<path d="M' .. n(x0 - wr / 2) .. ' ' .. n(y0) .. ' L' .. n(x0 + wr / 2) .. ' ' .. n(y0) .. ' L' .. n(x1 + wr / 2) .. ' ' .. n(y1)
-                .. ' L' .. n(x1) .. ' ' .. n(y1 - wr * 0.45) .. ' L' .. n(x1 - wr / 2) .. ' ' .. n(y1) .. ' Z" fill="#555555" stroke="#000000" stroke-width="'
+                .. ' L' .. n(x1) .. ' ' .. n(y1 - wr * 0.45) .. ' L' .. n(x1 - wr / 2) .. ' ' .. n(y1) .. ' Z" fill="' .. (rf and rf.ribbon or "#555555") .. '" stroke="#000000" stroke-width="'
                 .. n(math.max(1, px(1.25))) .. '" stroke-linejoin="round"/>'
         end
         table.insert(body, tail(-1))
@@ -985,14 +1028,14 @@ local function medal(D0, b, earned)
     else
         local pr = R + gap + ring_w / 2
         local p = (b.threshold and b.threshold > 0 and b.progress) and clamp(b.progress / b.threshold, 0, 0.9999) or 0
-        table.insert(body, '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(pr) .. '" fill="none" stroke="#dddddd" stroke-width="' .. ring_w .. '"/>')
+        table.insert(body, '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(pr) .. '" fill="none" stroke="' .. (rf and rf.tint or "#dddddd") .. '" stroke-width="' .. ring_w .. '"/>')
         if p > 0.005 then
             local a = p * 2 * math.pi
             table.insert(body, '<path d="M' .. n(cx) .. ' ' .. n(cy - pr) .. ' A' .. n(pr) .. ' ' .. n(pr) .. ' 0 ' .. (p > 0.5 and 1 or 0) .. ' 1 '
-                .. n(cx + pr * math.sin(a)) .. ' ' .. n(cy - pr * math.cos(a)) .. '" fill="none" stroke="#000000" stroke-width="' .. ring_w .. '" stroke-linecap="round"/>')
+                .. n(cx + pr * math.sin(a)) .. ' ' .. n(cy - pr * math.cos(a)) .. '" fill="none" stroke="' .. (rf and rf.ink or "#000000") .. '" stroke-width="' .. ring_w .. '" stroke-linecap="round"/>')
         end
     end
-    local face, ink = earned and "#000000" or "#ffffff", earned and "#ffffff" or "#000000"
+    local face, ink = earned and (rf and rf.deep or "#000000") or "#ffffff", earned and "#ffffff" or "#000000"
     local sw = math.max(1, px(1.5))
     if b.rarity == "legendary" then
         local pts = {}
@@ -1000,7 +1043,7 @@ local function medal(D0, b, earned)
             local a, rr = i * math.pi / 16, (i % 2 == 1) and R * 0.9 or R * 1.06
             table.insert(pts, (i == 0 and "M" or "L") .. n(cx + rr * math.sin(a)) .. " " .. n(cy - rr * math.cos(a)))
         end
-        table.insert(body, '<path d="' .. table.concat(pts) .. 'Z" fill="#000000"/>')
+        table.insert(body, '<path d="' .. table.concat(pts) .. 'Z" fill="' .. (rf and rf.ink or "#000000") .. '"/>')
         table.insert(body, '<circle cx="' .. n(cx) .. '" cy="' .. n(cy) .. '" r="' .. n(R * 0.84) .. '" fill="' .. face .. '" stroke="' .. (earned and "#ffffff" or "#000000")
             .. '" stroke-width="' .. n(sw) .. '"/>')
     else
@@ -1025,9 +1068,15 @@ end
 
 function Decor.badge(ctx, w, hh)
     local data = ctx.d.badges or { missing = true }
+    -- A badge's rarity colours, the same in every scheme.
+    local function rarity(r)
+        if not BoardColour.on(ctx) then return nil end
+        local f = BoardColour.rarity(r)
+        return { ink = BoardColour.hex(f.ink), deep = BoardColour.hex(f.deep), tint = BoardColour.hex(f.tint), ribbon = BoardColour.hex(BoardColour.rarity("ribbon").ink) }
+    end
     local pad = px(12)
     local iw, ih = w - 2 * pad, hh - 2 * pad
-    local function award() return icon("award", px(17), { sw = 2.25 }) end
+    local function award() return icon("award", px(17), BoardColour.icon(ctx, 2.25)) end
     if data.missing then
         return emptyTile(w, hh, _("Next badge"), award, _("Badges show up here with a newer BookOrbit server."), _("Needs a newer server."))
     end
@@ -1062,7 +1111,7 @@ function Decor.badge(ctx, w, hh)
                     head(iw, label, text(T(_("%1 of %2"), data.earned, data.total), { s = 12, col = INK.g4 })),
                     space(nil, px(12)),
                     hstack({ w = iw, h = room, gap = px(14) }, {
-                        medal(dia, b, false),
+                        medal(dia, b, false, rarity(b.rarity)),
                         vstack({ w = tw }, {
                             v[2] and text((RARITY[b.rarity] or RARITY.common)(), { s = 12, col = INK.g4, w = tw }) or false,
                             text(b.name, { s = 16, b = true, w = tw, lines = 2, data = true }),
@@ -1079,7 +1128,7 @@ function Decor.badge(ctx, w, hh)
                     table.insert(items, BoardUI.rect(iw, math.max(1, px(0.75)), INK.gc))
                     table.insert(items, space(nil, px(10)))
                     table.insert(items, hstack({ w = iw, h = px(36), gap = px(10) }, {
-                        medal(px(36), latest, true),
+                        medal(px(36), latest, true, rarity(latest.rarity)),
                         vstack({ w = iw - px(46) }, {
                             text(latest.name, { s = 13, b = true, w = iw - px(46), data = true }),
                             text(latest.when or "", { s = 12, col = INK.g4, w = iw - px(46) }),
@@ -1100,12 +1149,14 @@ function Decor.badge(ctx, w, hh)
                 local dia = math.min(ih, round(iw * 0.36))
                 local tw = iw - dia - px(14)
                 if tw < px(110) then return skip("no room for words") end
+                -- The badge's name steps down to 12 before it is cut.
+                local name_s = BoardUI.fitSize(b.name, { s = v[1], b = true }, tw, 12)
                 return padded(w, hh, {
                     hstack({ w = iw, h = ih, gap = px(14) }, {
-                        medal(dia, b, earned),
+                        medal(dia, b, earned, rarity(b.rarity)),
                         vstack({ w = tw }, {
                             v[4] and text(label, { s = 12, col = INK.g4, w = tw }) or false,
-                            text(b.name, { s = v[1], b = true, w = tw, data = true }),
+                            text(b.name, { s = name_s, b = true, w = tw, data = true }),
                             v[2] > 0 and text(b.desc, { s = 12, col = INK.g4, w = tw, lines = v[2], data = true }) or false,
                             space(nil, px(4)),
                             progressRuns(12),
@@ -1122,11 +1173,12 @@ function Decor.badge(ctx, w, hh)
             local dia = math.min(iw, ih - cap_h)
             if dia < px(44) and with_name then return skip("medal too small") end
             dia = math.max(1, dia)
+            local name_s = BoardUI.fitSize(b.name, { s = 12, b = true }, iw, 10)
             return padded(w, hh, {
                 flex(0),
-                medal(dia, b, earned),
+                medal(dia, b, earned, rarity(b.rarity)),
                 with_name and space(nil, px(6)) or false,
-                with_name and text(b.name, { s = 12, b = true, w = iw, align = "center", data = true }) or false,
+                with_name and text(b.name, { s = name_s, b = true, w = iw, align = "center", data = true }) or false,
                 with_name and hstack({ w = iw }, { flex(0), progressRuns(12), flex(0) }) or false,
                 flex(0),
             }, "center")
@@ -1193,12 +1245,12 @@ local function dustArt(cw, ch, seed)
     return svg(round(cw), round(ch), table.concat(body))
 end
 
-local function dustyCover(book, cw, ch)
+local function dustyCover(book, cw, ch, edge)
     local cov = BoardUI.cover(book, cw, ch, {
         path = book.cover_path,
         loading = book.cover_state == "loading",
         border = math.max(1, px(1)),
-        border_col = INK.gb,
+        border_col = edge or INK.gb,
         -- A film of dust: the cover a shade paler.
         lighten = 0.22,
     })
@@ -1256,7 +1308,7 @@ function Decor.dust(ctx, w, hh)
                     head(iw, _("Gathering dust"), text(T(_.ngettext("%1 book", "%1 books", dd.count), dd.count), { s = 12, col = INK.g4 })),
                     space(nil, px(10)),
                     hstack({ w = iw, gap = px(14), valign = "top" }, {
-                        dustyCover(book, cw, ch),
+                        dustyCover(book, cw, ch, BoardColour.coverEdge(ctx, INK.gb)),
                         vstack({ w = tw }, {
                             text(book.title or "", { s = 16, b = true, serif = true, lines = 3, w = tw, data = true }),
                             text(book.authors and book.authors[1] or "", { s = 13, col = INK.g4, w = tw, data = true }),
@@ -1283,7 +1335,7 @@ function Decor.dust(ctx, w, hh)
                 if tw < px(150) then return skip("no room for words") end
                 return padded(w, hh, {
                     hstack({ w = iw, h = ih, gap = px(12) }, {
-                        dustyCover(book, cw, ch),
+                        dustyCover(book, cw, ch, BoardColour.coverEdge(ctx, INK.gb)),
                         vstack({ w = tw, h = ih }, {
                             v[4] and text(_("Gathering dust"), { s = 12, col = INK.g4, w = tw }) or false,
                             text(book.title or "", { s = 14, b = true, serif = true, lines = v[1], w = tw, data = true }),
@@ -1304,7 +1356,7 @@ function Decor.dust(ctx, w, hh)
             if ch < px(50) and with_caption then return skip("cover too small") end
             ch, cw = math.max(1, ch), math.max(1, cw)
             return padded(w, hh, {
-                dustyCover(book, cw, ch),
+                dustyCover(book, cw, ch, BoardColour.coverEdge(ctx, INK.gb)),
                 with_caption and space(nil, px(6)) or false,
                 with_caption and text(caption, { s = 12, b = true, w = iw, align = "center" }) or false,
             }, "center")

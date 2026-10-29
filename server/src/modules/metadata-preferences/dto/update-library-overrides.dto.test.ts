@@ -53,7 +53,7 @@ describe('UpdateLibraryOverridesDto', () => {
       overrides: {
         title: {
           enabled: true,
-          providers: ['not-a-provider'],
+          providers: ['Not A Provider'],
           mergeStrategy: 'fillMissing',
         },
       },

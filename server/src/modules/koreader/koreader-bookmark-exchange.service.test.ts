@@ -100,7 +100,23 @@ describe('KoreaderBookmarkExchangeService', () => {
       const result = await service.exchange(makeUser(), makeExchangeDto([makeBook({ hash: HASH_B })]));
 
       expect(result.unmatched).toEqual([HASH_B]);
+      expect(result.positionIncompatible).toEqual([]);
       expect(result.results).toEqual([]);
+      expect(bookmarkSync.listForSync).not.toHaveBeenCalled();
+    });
+
+    it('reports a matched copy whose bytes differ from the library file apart from unmatched books', async () => {
+      koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(
+        new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1, progressCompatible: false }]]),
+      );
+
+      const result = await service.exchange(
+        makeUser(),
+        makeExchangeDto([makeBook({ changes: [{ datetime: DATETIME, pos: POS, pageno: 42, chapter: 'Chapter 3' }] }), makeBook({ hash: HASH_B })]),
+      );
+
+      expect(result).toEqual({ results: [], unmatched: [HASH_B], positionIncompatible: [HASH_A] });
+      expect(bookmarkSync.upsertFromDevice).not.toHaveBeenCalled();
       expect(bookmarkSync.listForSync).not.toHaveBeenCalled();
     });
 
@@ -372,6 +388,20 @@ describe('KoreaderBookmarkExchangeService', () => {
     function makeAckDto(books: BookmarkExchangeAckDto['books']): BookmarkExchangeAckDto {
       return { deviceId: DEVICE_ID, deviceModel: 'Kobo', pluginVersion: '0.5.0', books } as BookmarkExchangeAckDto;
     }
+
+    it('acknowledges nothing for a copy whose bytes differ from the library file', async () => {
+      koreaderRepo.resolveBookFilesByHashes.mockResolvedValue(
+        new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1, progressCompatible: false }]]),
+      );
+
+      const result = await service.exchangeAck(
+        makeUser(),
+        makeAckDto([{ hash: HASH_A, applied: [{ serverId: 100, status: 'applied', key: 'f'.repeat(32), datetime: DATETIME }], deleted: [] }]),
+      );
+
+      expect(result).toEqual({ results: [], unmatched: [], positionIncompatible: [HASH_A] });
+      expect(bookmarkRepo.upsertLink).not.toHaveBeenCalled();
+    });
 
     it('links an applied bookmark under the identity the device reported', async () => {
       bookmarkSync.listForSync.mockResolvedValue([makeBookmarkRow()]);

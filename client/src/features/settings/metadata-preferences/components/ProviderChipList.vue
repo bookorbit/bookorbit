@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical, Slash, X } from '@lucide/vue'
 import type { MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
-import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { providerChipStyle, providerShortLabel } from '@/lib/provider-colors'
 import { PROVIDER_DND_GROUP, toProviderDragItems } from '../lib/provider-drag'
 import { isProviderUsable, providerHasOtherShape, providerRank, skipReasonFor } from '../lib/field-rules'
 
@@ -61,7 +61,7 @@ const chips = computed(() =>
         props.field,
       ),
       label: status?.label ?? item.key,
-      short: PROVIDER_SHORT_LABELS[item.key] ?? item.key,
+      short: providerShortLabel(item.key, status?.label),
       usable: isProviderUsable(item.key, props.statuses, props.field),
     }
   }),

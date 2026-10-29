@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import BookDetailTabs from './BookDetailTabs.vue'
 import { useBookNavigation } from '../../composables/useBookNavigation'
 
-const props = defineProps<{ bookId: number; canEditMetadata?: boolean; parentLibrary?: { id: number; name: string } | null }>()
+const props = defineProps<{ bookId: number; canEditMetadata?: boolean; hasAudio?: boolean; parentLibrary?: { id: number; name: string } | null }>()
 
 const { t } = useI18n()
 const route = useRoute()
@@ -48,7 +48,7 @@ async function navigateToBook(id: number) {
       </RouterLink>
       <span class="me-2 h-4 w-px shrink-0 self-center bg-border" aria-hidden="true" />
     </template>
-    <BookDetailTabs :book-id="bookId" :can-edit-metadata="canEditMetadata" />
+    <BookDetailTabs :book-id="bookId" :can-edit-metadata="canEditMetadata" :has-audio="hasAudio" />
 
     <div v-if="hasContext" class="hidden sm:flex items-center gap-1 ml-4 border-l pl-4">
       <span v-if="index !== -1" class="text-xs text-muted-foreground mr-2 font-medium tabular-nums">

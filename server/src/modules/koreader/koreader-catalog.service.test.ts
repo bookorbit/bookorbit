@@ -1224,6 +1224,15 @@ describe('KoreaderCatalogService', () => {
     expect(fallback.files[0]?.devicePath).toBe('Default/Dune.epub');
   });
 
+  it('files a standalone book without an author under the default pattern by title alone', async () => {
+    const { service, bookService } = makeService();
+    bookService.getDetail.mockResolvedValue(makeDetail({ seriesId: null, seriesName: null, seriesIndex: null, authors: [] }));
+
+    const detail = await service.getBookDetail(makeUser(), 10);
+
+    expect(detail.files[0]?.devicePath).toBe('Standalone/Dune.epub');
+  });
+
   it('streams thumbnails with access checks and etags', async () => {
     const { service, bookService } = makeService();
     const reply = makeReply();
@@ -2088,6 +2097,116 @@ describe('KoreaderCatalogService', () => {
 
       await expect(manifestDevicePath(seriesIndex, defaultOrganization)).resolves.toBe(expected);
       await expect(detailDevicePath(seriesIndex, defaultOrganization)).resolves.toBe(expected);
+    });
+  });
+
+  describe('device paths for variant requests', () => {
+    const organization = { fileNamingPattern: '{authors}/{title}', seriesFileNamingPattern: '', standaloneFileNamingPattern: '' };
+
+    function detailFile(id: number, narrated: boolean, role = 'content') {
+      return {
+        id,
+        format: 'epub',
+        role,
+        sizeBytes: 1234,
+        absolutePath: `/books/dune-${id}.epub`,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        filename: `dune-${id}.epub`,
+        durationSeconds: null,
+        mediaOverlay: narrated ? { available: true, durationSeconds: 100 } : null,
+      };
+    }
+
+    function manifestFile(id: number, narrated: boolean) {
+      return {
+        id,
+        format: 'epub',
+        mediaOverlayAvailable: narrated,
+        sizeBytes: 1234,
+        fileHash: `${id}-hash`,
+        filename: `dune-${id}.epub`,
+        contentVersion: new Date('2026-02-01T00:00:00.000Z'),
+      };
+    }
+
+    async function devicePaths(
+      variant: 'original' | 'audioless_epub' | undefined,
+      files: { id: number; narrated: boolean; role?: string }[],
+      overrides: Record<string, unknown> = {},
+      deviceOrganization: typeof organization | null = organization,
+    ) {
+      const { service, opdsBookService, bookService } = makeService(deviceOrganization);
+      const contentFiles = files.filter((file) => file.role !== 'supplement');
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({
+        rows: [makeManifestRow({ ...overrides, files: contentFiles.map((file) => manifestFile(file.id, file.narrated)) })],
+        hasNext: false,
+      });
+      bookService.getDetail.mockResolvedValueOnce(
+        makeDetail({ ...overrides, files: files.map((file) => detailFile(file.id, file.narrated, file.role)) }),
+      );
+
+      const [manifest, detail] = await Promise.all([
+        service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1', variant })),
+        service.getBookDetail(makeUser({ id: 7 }), 10, 'device-1', variant),
+      ]);
+      const byId = (list: { id: number; devicePath: string }[]) => Object.fromEntries(list.map((file) => [file.id, file.devicePath]));
+      const detailPaths = byId(detail.files);
+      expect(byId(manifest.items[0]!.files)).toEqual(detailPaths);
+      return detailPaths;
+    }
+
+    it.each(['original', 'audioless_epub'] as const)('keeps the configured name for a plain EPUB requested as %s', async (variant) => {
+      await expect(devicePaths(variant, [{ id: 100, narrated: false }])).resolves.toEqual({ 100: 'Frank Herbert/Dune.epub' });
+    });
+
+    it('names a single-file book exactly as a request without a variant does', async () => {
+      const legacy = await devicePaths(undefined, [{ id: 100, narrated: false }], {}, null);
+
+      expect(legacy).toEqual({ 100: 'Series/Dune/01.00 - Dune.epub' });
+      await expect(devicePaths('original', [{ id: 100, narrated: false }], {}, null)).resolves.toEqual(legacy);
+      await expect(devicePaths('audioless_epub', [{ id: 100, narrated: false }], {}, null)).resolves.toEqual(legacy);
+    });
+
+    it('keeps the configured name for a narrated original and marks only its text-only copy', async () => {
+      await expect(devicePaths('original', [{ id: 100, narrated: true }])).resolves.toEqual({ 100: 'Frank Herbert/Dune.epub' });
+      await expect(devicePaths('audioless_epub', [{ id: 100, narrated: true }])).resolves.toEqual({
+        100: 'Frank Herbert/Dune - Text Only.epub',
+      });
+    });
+
+    it('keeps the configured name for the first same-format file and marks later ones by file id', async () => {
+      const files = [
+        { id: 101, narrated: true },
+        { id: 100, narrated: false },
+      ];
+
+      await expect(devicePaths('original', files)).resolves.toEqual({
+        100: 'Frank Herbert/Dune.epub',
+        101: 'Frank Herbert/Dune [101].epub',
+      });
+      await expect(devicePaths('audioless_epub', files)).resolves.toEqual({
+        100: 'Frank Herbert/Dune.epub',
+        101: 'Frank Herbert/Dune - Text Only [101].epub',
+      });
+    });
+
+    it('does not count a supplement of the same format as a sibling', async () => {
+      await expect(
+        devicePaths('original', [
+          { id: 99, narrated: false, role: 'supplement' },
+          { id: 100, narrated: false, role: 'primary' },
+        ]),
+      ).resolves.toEqual({ 100: 'Frank Herbert/Dune.epub' });
+    });
+
+    it('keeps a marked long name within the segment limit and distinct from the original', async () => {
+      const overrides = { title: 'Long Title '.repeat(30).trim() };
+      const original = (await devicePaths('original', [{ id: 100, narrated: true }], overrides))[100]!;
+      const textOnly = (await devicePaths('audioless_epub', [{ id: 100, narrated: true }], overrides))[100]!;
+
+      expect(textOnly).not.toBe(original);
+      expect(textOnly.endsWith('.epub')).toBe(true);
+      expect(Buffer.byteLength(textOnly.split('/').pop()!, 'utf8')).toBeLessThanOrEqual(255);
     });
   });
 

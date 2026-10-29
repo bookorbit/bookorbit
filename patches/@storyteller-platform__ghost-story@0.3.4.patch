@@ -1,0 +1,14 @@
+diff --git a/dist/utilities/FileSystem.js b/dist/utilities/FileSystem.js
+index b8a491d..0e9019f 100644
+--- a/dist/utilities/FileSystem.js
++++ b/dist/utilities/FileSystem.js
+@@ -11,7 +11,8 @@ export function getAppDataDir(appName) {
+         dataDir = join(homeDir, "Library", "Application Support", appName);
+     }
+     else if (platform === "linux") {
+-        dataDir = join(homeDir, ".local", "share", appName);
++        const dataHome = process.env["XDG_DATA_HOME"] ?? join(homeDir, ".local", "share");
++        dataDir = join(dataHome, appName);
+     }
+     else {
+         throw new Error(`Unsupport platform ${platform}`);

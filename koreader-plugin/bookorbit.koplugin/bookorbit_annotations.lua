@@ -717,6 +717,12 @@ local function hasPending(to_apply)
     return to_apply and (#(to_apply.add or {}) > 0 or #(to_apply.edit or {}) > 0 or #(to_apply.delete or {}) > 0)
 end
 
+-- The server matches a copy whose bytes differ from the library file but cannot
+-- place its highlights, so nothing is exchanged and nothing failed.
+local function incompatibleResult()
+    return { uploaded = 0, applied = 0, deleted = 0, failed = 0, unverified = 0, had_errors = false, incompatible = 1 }
+end
+
 --[[--
 Full annotation exchange for one matched book. Blocking; callers run it from a
 step machine or a scheduled task.
@@ -735,11 +741,13 @@ opts:
 - file: book file path (required for apply_mode "sidecar")
 
 Returns a result table { uploaded, applied, deleted, failed, had_errors } or
-nil, err for auth/network level failures.
+nil, err for auth/network level failures. A position-incompatible copy returns
+a result with `incompatible = 1` and exchanges nothing.
 ]]
 function BookOrbitAnnotations.exchangeBook(opts)
     local book = opts.state:getBook(opts.digest)
     if not book then return nil, "unmatched" end
+    if book.positionIncompatible then return incompatibleResult() end
 
     local keys = BookOrbitAnnotations.collectKeys(opts.key_annotations or opts.annotations)
     local keys_complete = opts.keys_complete ~= false and #keys <= MAX_KEYS_PER_BOOK
@@ -804,6 +812,12 @@ function BookOrbitAnnotations.exchangeBook(opts)
             if hash == opts.digest then
                 opts.state:setUnmatched(opts.digest)
                 return nil, "unmatched"
+            end
+        end
+        for _, hash in ipairs(body.positionIncompatible or {}) do
+            if hash == opts.digest then
+                opts.state:markPositionIncompatible(opts.digest)
+                return incompatibleResult()
             end
         end
         response = body.results and body.results[1] or nil

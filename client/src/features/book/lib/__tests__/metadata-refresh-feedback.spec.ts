@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MetadataProviderKey, type BookDetail, type MetadataFetchDiagnostics } from '@bookorbit/types'
-import { metadataRefreshAppliedMessage, metadataRefreshEmptyMessage } from '../metadata-refresh-feedback'
+import { metadataProviderLabel, metadataRefreshAppliedMessage, metadataRefreshEmptyMessage } from '../metadata-refresh-feedback'
 
 function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
@@ -134,5 +134,13 @@ describe('metadataRefreshAppliedMessage', () => {
     expect(message).toBe(
       'Auto-filled 3 fields. Matched Google Books or Libro.fm. Not queried because they are not selected in Field Rules: AudNexus.',
     )
+  })
+})
+
+describe('metadataProviderLabel', () => {
+  it('names built-in sources and the ones that moved out, and falls back to the key', () => {
+    expect(metadataProviderLabel('openLibrary')).toBe('Open Library')
+    expect(metadataProviderLabel('lubimyczytac')).toBe('LubimyCzytac')
+    expect(metadataProviderLabel('fantlab')).toBe('fantlab')
   })
 })

@@ -1,16 +1,20 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
+import { isAudioFormat } from '@bookorbit/types';
 import type {
   DismissAllKoreaderUnmatchedBooksResult,
   DismissKoreaderUnmatchedBookResult,
+  KoreaderLinkSuggestionCandidate,
   KoreaderManualHashLink,
   KoreaderUnmatchedBook,
+  KoreaderUnmatchedBookSuggestion,
   LinkKoreaderUnmatchedBookResult,
   UnlinkKoreaderManualHashLinkResult,
 } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
 import { KoreaderRepository } from './koreader.repository';
+import { authorKeys, koreaderAuthorKeys, linkSuggestionTextKey, sameAuthorKeys } from './koreader-link-suggestion.utils';
 
 const MD5_HEX = /^[0-9a-f]{32}$/;
 const UNMATCHED_BOOK_LIMIT = 100;
@@ -20,6 +24,10 @@ const HASH_LINK_UPDATE_EVENT = 'koreader.hash_link_update';
 const HASH_LINK_DELETE_EVENT = 'koreader.hash_link_delete';
 const UNMATCHED_BOOK_DISMISS_EVENT = 'koreader.unmatched_book_dismiss';
 const UNMATCHED_BOOK_DISMISS_ALL_EVENT = 'koreader.unmatched_book_dismiss_all';
+const HASH_LINK_SUGGEST_EVENT = 'koreader.hash_link_suggest';
+const SUGGESTION_CANDIDATE_LIMIT = 5;
+/** Books checked per title. A title shared by more books than this never yields a single suggestion. */
+const SUGGESTION_TITLE_SCAN_LIMIT = 25;
 
 /**
  * Manages the KOReader "unmatched book" queue and the manual hash links used
@@ -58,6 +66,72 @@ export class KoreaderHashLinkService {
         firstSeenAt: row.firstSeenAt.toISOString(),
         lastSeenAt: row.lastSeenAt.toISOString(),
       }));
+  }
+
+  /**
+   * Library books with the same title and the same set of authors as a linkable book to review. Read
+   * only: nothing is linked until the user confirms, through the same route as a manual link.
+   */
+  async listUnmatchedBookSuggestions(user: RequestUser): Promise<KoreaderUnmatchedBookSuggestion[]> {
+    const startedAtMs = Date.now();
+    const rows = await this.repo.listUnmatchedBooks(user.id, UNMATCHED_BOOK_LIMIT);
+    const wanted = rows.flatMap((row) => {
+      if (row.manualLinkRequested || !isLinkableUnmatchedBook(row)) return [];
+      const titleKey = linkSuggestionTextKey(row.title);
+      const authors = koreaderAuthorKeys(row.authors);
+      return titleKey && authors.length > 0 ? [{ hash: row.hash, titleKey, authors }] : [];
+    });
+    if (wanted.length === 0) return [];
+
+    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(user.id);
+    const books = await this.repo.findBooksByTitleKeys(
+      [...new Set(wanted.map((entry) => entry.titleKey))],
+      accessibleLibraryIds,
+      user.isSuperuser ? null : user.contentFilters,
+      SUGGESTION_TITLE_SCAN_LIMIT + 1,
+    );
+    const booksByTitle = new Map<string, typeof books>();
+    for (const book of books) {
+      const list = booksByTitle.get(book.titleKey) ?? [];
+      list.push(book);
+      booksByTitle.set(book.titleKey, list);
+    }
+
+    const suggestions: KoreaderUnmatchedBookSuggestion[] = [];
+    for (const entry of wanted) {
+      const titleBooks = booksByTitle.get(entry.titleKey) ?? [];
+      const truncated = titleBooks.length > SUGGESTION_TITLE_SCAN_LIMIT;
+      const candidates: KoreaderLinkSuggestionCandidate[] = titleBooks
+        .slice(0, SUGGESTION_TITLE_SCAN_LIMIT)
+        .filter(
+          (book) =>
+            book.role === 'content' &&
+            !(book.format && isAudioFormat(book.format)) &&
+            linkSuggestionTextKey(book.title) === entry.titleKey &&
+            sameAuthorKeys(authorKeys(book.authors), entry.authors),
+        )
+        .map((book) => ({
+          bookId: book.bookId,
+          title: book.title ?? null,
+          subtitle: book.subtitle ?? null,
+          authors: book.authors,
+          format: book.format ?? null,
+          language: book.language ?? null,
+          publishedYear: book.publishedYear ?? null,
+          libraryName: book.libraryName ?? null,
+        }));
+      if (candidates.length === 0) continue;
+      suggestions.push({
+        hash: entry.hash,
+        candidates: candidates.slice(0, SUGGESTION_CANDIDATE_LIMIT),
+        moreCandidates: truncated || candidates.length > SUGGESTION_CANDIDATE_LIMIT,
+      });
+    }
+
+    this.logger.log(
+      `[${HASH_LINK_SUGGEST_EVENT}] [end] userId=${user.id} reviewed=${wanted.length} suggested=${suggestions.length} single=${suggestions.filter((entry) => entry.candidates.length === 1 && !entry.moreCandidates).length} durationMs=${Date.now() - startedAtMs} - link suggestions listed`,
+    );
+    return suggestions;
   }
 
   async linkUnmatchedBook(user: RequestUser, hash: string, bookId: number): Promise<LinkKoreaderUnmatchedBookResult> {
@@ -105,6 +179,7 @@ export class KoreaderHashLinkService {
       koreaderTitle: row.koreaderTitle ?? null,
       koreaderAuthors: row.koreaderAuthors ?? null,
       koreaderLastOpen: row.koreaderLastOpen ?? null,
+      positionCompatible: row.positionCompatible !== false,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));

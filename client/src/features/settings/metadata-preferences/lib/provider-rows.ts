@@ -5,9 +5,9 @@ export { AMAZON_DOMAINS } from '@/lib/amazon-domain'
  * The medium a source supplies metadata for. Sources are picked by medium ("I want
  * audiobook narrators"), not alphabetically, so the list is sectioned the same way.
  */
-export type ProviderGroupId = 'books' | 'audiobooks' | 'comics' | 'regional'
+export type ProviderGroupId = 'books' | 'audiobooks' | 'comics'
 
-export const PROVIDER_GROUP_ORDER: ProviderGroupId[] = ['books', 'audiobooks', 'comics', 'regional']
+export const PROVIDER_GROUP_ORDER: ProviderGroupId[] = ['books', 'audiobooks', 'comics']
 
 export interface ProviderFieldDef {
   key: string

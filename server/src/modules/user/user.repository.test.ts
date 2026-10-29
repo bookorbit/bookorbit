@@ -851,6 +851,11 @@ describe('UserRepository', () => {
 
     await expect(repo.findLibraryIdsByUserId(2)).resolves.toEqual([10, 11]);
 
+    where.mockResolvedValueOnce([{ libraryId: 10, accessLevel: 'editor' }]);
+    await expect(repo.findLibraryGrantsByUserId(2)).resolves.toEqual([{ libraryId: 10, accessLevel: 'editor' }]);
+    expect(select).toHaveBeenLastCalledWith({ libraryId: schema.userLibraryAccess.libraryId, accessLevel: schema.userLibraryAccess.accessLevel });
+    expect(where).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'eq', left: schema.userLibraryAccess.userId, right: 2 }));
+
     const txDeleteWhere = vi.fn().mockResolvedValue(undefined);
     const txDelete = vi.fn().mockReturnValue({ where: txDeleteWhere });
     const txOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);

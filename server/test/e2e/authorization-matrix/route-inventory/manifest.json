@@ -1,18 +1,18 @@
 {
-  "totalRoutes": 667,
+  "totalRoutes": 721,
   "byPermission": {
-    "(none)": 287,
-    "Permission.ManageMetadataConfig": 41,
+    "(none)": 298,
+    "Permission.ManageMetadataConfig": 47,
     "Permission.EmailSend": 34,
-    "Permission.LibraryEditMetadata": 37,
+    "Permission.LibraryEditMetadata": 54,
     "Permission.BookDockAccess": 17,
     "Permission.ManageAppSettings": 62,
-    "Permission.ManageLibraries": 24,
-    "Permission.ManageUsers": 13,
+    "Permission.ManageLibraries": 33,
+    "Permission.ManageUsers": 14,
     "Permission.ManageEmail": 8,
     "Permission.KoboSync": 13,
     "Permission.NotificationAccess": 6,
-    "Permission.DemoRestricted": 6,
+    "Permission.DemoRestricted": 16,
     "Permission.KoreaderSync": 9,
     "Permission.OpdsAccess": 4,
     "Permission.ViewAuditLog": 4,
@@ -32,11 +32,12 @@
     "Permission.PodcastManageRetention": 1,
     "Permission.PodcastEditMetadata": 5,
     "Permission.PodcastPurge": 5,
-    "Permission.PodcastDownload": 4
+    "Permission.PodcastDownload": 4,
+    "Permission.LibraryGenerateReadAloud": 10
   },
   "byLibraryAccess": {
     "'viewer'": 10,
-    "'editor'": 15,
+    "'editor'": 17,
     "'owner'": 4
   },
   "routeChunks": [

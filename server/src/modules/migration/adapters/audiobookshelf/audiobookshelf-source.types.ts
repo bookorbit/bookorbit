@@ -45,6 +45,12 @@ export interface AudiobookshelfEbookFileRecord {
   metadata: AudiobookshelfFileMetadataRecord;
 }
 
+export interface AudiobookshelfChapterRecord {
+  /** Seconds from the start of the book. */
+  start: number | null;
+  title: string | null;
+}
+
 export interface AudiobookshelfBookRecord {
   id: string;
   title?: string | null;
@@ -60,6 +66,7 @@ export interface AudiobookshelfBookRecord {
   language?: string | null;
   duration?: number | null;
   abridged?: boolean | null;
+  chapters?: AudiobookshelfChapterRecord[] | null;
   genres?: string[] | null;
   tags?: string[] | null;
   series?: AudiobookshelfSeriesRecord[];

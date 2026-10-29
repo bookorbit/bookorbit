@@ -17,6 +17,9 @@ local COUNT_FIELDS = {
     "failed",
     "skipped",
     "touched_books",
+    -- Books whose device copy differs from the library file: matched, but
+    -- highlights and bookmarks cannot be placed in it, so none were exchanged.
+    "incompatible",
 }
 
 -- Bookmarks are counted separately from highlights: they are a different user
@@ -141,6 +144,9 @@ function HighlightSummary.message(summary)
     end
     if summary.touched_books > 0 then
         text = text .. "\n" .. T(_("%1 closed book(s) updated."), summary.touched_books)
+    end
+    if summary.incompatible > 0 then
+        text = text .. "\n" .. T(_("%1 book(s) skipped: the copy on this device is a different file from the one in BookOrbit."), summary.incompatible)
     end
     return text
 end

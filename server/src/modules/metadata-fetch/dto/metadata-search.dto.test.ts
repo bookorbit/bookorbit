@@ -109,10 +109,10 @@ describe('MetadataSearchDto', () => {
     }
   });
 
-  it('rejects unknown provider keys after normalization', async () => {
+  it('rejects provider values that cannot be a key after normalization', async () => {
     const { errors } = await validateInput({
       title: 'Dune',
-      providers: `${MetadataProviderKey.GOOGLE},unknown-provider`,
+      providers: `${MetadataProviderKey.GOOGLE},Not A Provider`,
     });
 
     expect(errors).toEqual(
@@ -120,10 +120,16 @@ describe('MetadataSearchDto', () => {
         expect.objectContaining({
           property: 'providers',
           constraints: expect.objectContaining({
-            isEnum: expect.stringContaining('providers'),
+            isMetadataProviderKey: expect.stringContaining('providers'),
           }),
         }),
       ]),
     );
+  });
+
+  it('accepts external provider keys beside built-ins', async () => {
+    const { errors, dto } = await validateInput({ title: 'Dune', providers: `${MetadataProviderKey.GOOGLE},fantlab` });
+    expect(errors).toEqual([]);
+    expect(dto.providers).toEqual([MetadataProviderKey.GOOGLE, 'fantlab']);
   });
 });

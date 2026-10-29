@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { mkdtemp, mkdir, rm, symlink } from 'fs/promises';
+import { mkdtemp, mkdir, realpath, rm, symlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 
@@ -81,6 +81,22 @@ describe('PathPolicyService', () => {
 
     await expect(service.assertWithinBrowseRoot(join(root, 'loop'))).rejects.toBeInstanceOf(ForbiddenException);
     await expect(service.isWithinBrowseRoot(join(root, 'loop'))).resolves.toBe(false);
+  });
+
+  it('resolves a symlinked data folder to the real path listings report', async () => {
+    const root = await makeTempRoot();
+    await mkdir(join(root, 'real-data'));
+    await symlink(join(root, 'real-data'), join(root, 'data'));
+    const service = new PathPolicyService({ libraryBrowseRoot: root, appDataPath: join(root, 'data') } as never);
+
+    expect(service.getAppDataPath()).toBe(join(root, 'data'));
+    await expect(service.getCanonicalAppDataPath()).resolves.toBe(await realpath(join(root, 'real-data')));
+  });
+
+  it('has no data folder when none is configured', async () => {
+    const service = makeService(await makeTempRoot());
+
+    await expect(service.getCanonicalAppDataPath()).resolves.toBeNull();
   });
 
   async function makeTempRoot(): Promise<string> {

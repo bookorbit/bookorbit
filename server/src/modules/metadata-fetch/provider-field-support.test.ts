@@ -1,7 +1,12 @@
-import { COMMUNITY_RATING_PROVIDER_KEYS, METADATA_PROVIDER_SUPPORTED_FIELDS, MetadataProviderKey, type MetadataField } from '@bookorbit/types';
+import {
+  COMMUNITY_RATING_PROVIDER_KEYS,
+  isBuiltInMetadataProviderKey,
+  METADATA_PROVIDER_SUPPORTED_FIELDS,
+  MetadataProviderKey,
+  type MetadataField,
+} from '@bookorbit/types';
 
 import type { MetadataProvider } from './providers/metadata-provider';
-import { AladinProvider } from './providers/aladin/aladin.provider';
 import { AmazonProvider } from './providers/amazon/amazon.provider';
 import { AudibleProvider } from './providers/audible/audible.provider';
 import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
@@ -12,7 +17,6 @@ import { HardcoverProvider } from './providers/hardcover/hardcover.provider';
 import { ITunesProvider } from './providers/itunes/itunes.provider';
 import { KoboProvider } from './providers/kobo/kobo.provider';
 import { LibroFmProvider } from './providers/librofm/librofm.provider';
-import { LubimyczytacProvider } from './providers/lubimyczytac/lubimyczytac.provider';
 import { OpenLibraryProvider } from './providers/open-library/open-library.provider';
 import { RanobeDbProvider } from './providers/ranobedb/ranobedb.provider';
 
@@ -34,8 +38,6 @@ const PROVIDER_CLASSES = [
   ComicVineProvider,
   RanobeDbProvider,
   KoboProvider,
-  LubimyczytacProvider,
-  AladinProvider,
 ];
 
 // Declarations are plain class fields, so dependencies that are never called can be empty stand-ins.
@@ -47,6 +49,7 @@ const providers = PROVIDER_CLASSES.map(
     ) as MetadataProvider,
 );
 const AUDIOBOOK_ONLY_FIELDS: MetadataField[] = ['narrators', 'duration', 'abridged'];
+const BUILT_IN_KEYS = Object.values(MetadataProviderKey).filter(isBuiltInMetadataProviderKey).sort();
 
 describe('METADATA_PROVIDER_SUPPORTED_FIELDS', () => {
   it('marks community ratings for exactly the providers the pipeline collects them from', () => {
@@ -56,9 +59,9 @@ describe('METADATA_PROVIDER_SUPPORTED_FIELDS', () => {
     expect(marked.sort()).toEqual([...COMMUNITY_RATING_PROVIDER_KEYS].sort());
   });
 
-  it('has an entry for every provider and every provider key', () => {
-    expect(providers.map((provider) => provider.key).sort()).toEqual(Object.values(MetadataProviderKey).sort());
-    expect(Object.keys(METADATA_PROVIDER_SUPPORTED_FIELDS).sort()).toEqual(Object.values(MetadataProviderKey).sort());
+  it('has an entry for every provider and every built-in key', () => {
+    expect(providers.map((provider) => provider.key).sort()).toEqual(BUILT_IN_KEYS);
+    expect(Object.keys(METADATA_PROVIDER_SUPPORTED_FIELDS).sort()).toEqual(BUILT_IN_KEYS);
   });
 
   it.each(providers.map((provider) => [provider.key, provider] as const))('matches the cover shape %s declares', (_key, provider) => {

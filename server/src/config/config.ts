@@ -13,6 +13,7 @@ export const appConfig = registerAs('app', () => ({
   version: process.env.APP_VERSION ?? 'Local build',
   githubReleasesRepo: process.env.GITHUB_RELEASES_REPO?.trim() || 'bookorbit/bookorbit',
   githubReleasesToken: process.env.GITHUB_RELEASES_TOKEN?.trim() || undefined,
+  metadataProviderDirectoryUrl: parseDirectoryUrl(process.env.METADATA_PROVIDER_DIRECTORY_URL),
   oidcAllowLocalIssuers: parseBooleanFlag(process.env.OIDC_ALLOW_LOCAL_ISSUERS, false),
   swaggerEnabled: parseBooleanFlag(process.env.SWAGGER_ENABLED, false),
   koboCloudscraperPython: process.env.KOBO_CLOUDSCRAPER_PYTHON?.trim() || undefined,
@@ -67,6 +68,23 @@ export const audiolessEpubConfig = registerAs('audiolessEpub', () => ({
   maxOutputBytes: parsePositiveInteger(process.env.AUDIOLESS_EPUB_MAX_OUTPUT_BYTES, 2 * 1024 * 1024 * 1024),
 }));
 
+export const readAloudConfig = registerAs('readAloud', () => {
+  const appDataPath = resolve(process.env.APP_DATA_PATH ?? '/data');
+  return {
+    workerUrl: process.env.READ_ALOUD_WORKER_URL?.trim().replace(/\/$/, '') || undefined,
+    workerToken: process.env.READ_ALOUD_WORKER_TOKEN?.trim() || undefined,
+    workRoot: join(appDataPath, 'read-aloud', 'jobs'),
+    maxOutputBytes: parsePositiveInteger(process.env.READ_ALOUD_MAX_OUTPUT_BYTES, 20 * 1024 * 1024 * 1024),
+    requestTimeoutMs: parsePositiveInteger(process.env.READ_ALOUD_WORKER_REQUEST_TIMEOUT_MS, 30_000),
+  };
+});
+
+/** External audio tools. The binaries are looked up on PATH unless an absolute path is given. */
+export const audioToolsConfig = registerAs('audioTools', () => ({
+  ffmpegPath: process.env.FFMPEG_PATH?.trim() || 'ffmpeg',
+  ffprobePath: process.env.FFPROBE_PATH?.trim() || 'ffprobe',
+}));
+
 export const emailConfig = registerAs('email', () => ({
   encryptionKey: process.env.EMAIL_ENCRYPTION_KEY ?? '',
 }));
@@ -116,4 +134,13 @@ function parseBooleanFlag(value: string | undefined, fallback: boolean): boolean
   if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
   if (['false', '0', 'no', 'off'].includes(normalized)) return false;
   return fallback;
+}
+
+const DEFAULT_METADATA_PROVIDER_DIRECTORY_URL = 'https://raw.githubusercontent.com/bookorbit/bookorbit-metadata-providers/main/directory.json';
+
+/** Null when the online list of ready-made metadata providers is turned off. */
+function parseDirectoryUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return DEFAULT_METADATA_PROVIDER_DIRECTORY_URL;
+  return trimmed.toLowerCase() === 'off' ? null : trimmed;
 }

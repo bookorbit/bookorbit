@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Plus, Trash2, X } from '@lucide/vue'
 import {
   COMMUNITY_RATING_PROVIDER_KEYS,
+  isBuiltInMetadataProviderKey,
   CUSTOM_FIELD_OPERATORS,
   CUSTOM_FIELD_TYPE_OPERATORS,
   FIELD_OPERATORS,
@@ -24,7 +25,8 @@ import { READ_STATUSES } from '@bookorbit/types'
 import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
 import { fieldLabel, operatorLabel } from '@/features/book/lib/filter-labels'
 import { providerIconPathSafe } from '@/features/book/lib/provider-icons'
-import { PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { providerShortLabel } from '@/lib/provider-colors'
+import { useMetadataProviderLabels } from '@/features/book/composables/useMetadataProviderLabels'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import FilterChipTypeahead from './FilterChipTypeahead.vue'
 import FilterFormatPicker from './FilterFormatPicker.vue'
@@ -97,13 +99,18 @@ const READ_STATUS_LABELS = computed<Record<string, string>>(() => ({
   abandoned: t('book.readStatus.abandoned'),
 }))
 
-const COMMUNITY_RATING_PROVIDER_OPTIONS = computed<{ value: CommunityRatingProvider; label: string }[]>(() => [
-  { value: 'any', label: t('book.filter.anyProvider') },
-  ...COMMUNITY_RATING_PROVIDER_KEYS.map((provider) => ({
-    value: provider,
-    label: PROVIDER_SHORT_LABELS[provider] ?? provider,
-  })),
-])
+const { labels: providerLabels } = useMetadataProviderLabels()
+// External providers' ratings can be filtered on too; they join the built-in list once known.
+const COMMUNITY_RATING_PROVIDER_OPTIONS = computed<{ value: CommunityRatingProvider; label: string }[]>(() => {
+  const external = Object.keys(providerLabels.value).filter((key) => !isBuiltInMetadataProviderKey(key))
+  return [
+    { value: 'any', label: t('book.filter.anyProvider') },
+    ...[...COMMUNITY_RATING_PROVIDER_KEYS, ...external].map((provider) => ({
+      value: provider,
+      label: providerShortLabel(provider, providerLabels.value[provider]),
+    })),
+  ]
+})
 
 const ENDPOINT_BY_FIELD: Partial<Record<RuleField, string>> = {
   author: '/api/v1/metadata/authors',

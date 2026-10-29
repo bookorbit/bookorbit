@@ -261,6 +261,7 @@ jobs:
           filters: |
             server:
               - 'server/**'
+              - 'workers/**'
               # Server tests assert against the plugin sources, so plugin-only
               # changes can break them.
               - 'koreader-plugin/**'
@@ -414,6 +415,7 @@ jobs:
         run: |
           if [[ "$PACKAGE" == "server" ]]; then
             pnpm --filter server type-check
+            pnpm --filter @bookorbit/read-aloud-worker type-check
           else
             pnpm --filter @bookorbit/types build
             pnpm --filter client type-check
@@ -487,6 +489,15 @@ jobs:
           else
             pnpm --filter client exec vitest --run --coverage --reporter=default --reporter=junit --outputFile="$JUNIT_OUTPUT"
           fi
+
+      # The worker's control process, runner and resume logic run against a fake pipeline; the real
+      # STAlign smoke run stays opt-in (READ_ALOUD_SMOKE=1).
+      - name: Run read-aloud worker tests
+        if: steps.has-changes.outputs.run == 'true' && matrix.package == 'server'
+        shell: bash
+        run: |
+          pnpm --filter @bookorbit/types build
+          pnpm --filter @bookorbit/read-aloud-worker test
 
       - name: Upload coverage reports to Codecov
         if: steps.has-changes.outputs.run == 'true' && env.CODECOV_TOKEN != ''
@@ -678,6 +689,28 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pr-meta.outputs.scan_tag }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Build read-aloud worker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./workers/read-aloud/Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:${{ steps.pr-meta.outputs.scan_tag }}
+          platforms: linux/amd64
+          cache-from: type=gha,scope=ci-yml-pr-read-aloud-worker
+          cache-to: type=gha,mode=max,scope=ci-yml-pr-read-aloud-worker
+
+      - name: Scan read-aloud worker image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:${{ steps.pr-meta.outputs.scan_tag }}
           format: table
           vuln-type: os,library
           severity: CRITICAL,HIGH

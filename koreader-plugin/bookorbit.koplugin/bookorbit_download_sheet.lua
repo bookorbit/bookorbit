@@ -191,7 +191,7 @@ local function build(page, sw, sh)
     if state == "choose" then
         -- Wide and short (landscape): the book and its editions beside where
         -- it goes, when one column would not fit.
-        local W = BoardMetrics.get().W
+        local W = BoardMetrics.layoutW()
         local one = DialogUI.sheet(page, sw, sh, function(w) return chooseBody(page, w) end, { pop_w = 500 })
         local rect = page.panel_rect
         if W < 760 or (rect.y >= px(8) and rect.y + rect.h <= sh) then return one end

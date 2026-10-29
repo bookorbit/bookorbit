@@ -21,11 +21,15 @@ const pageTitle = computed(() => {
 usePageTitle(pageTitle)
 
 watch(bookId, (id) => fetch(id), { immediate: true })
+
+function handleRefetch(): void {
+  void fetch(bookId.value)
+}
 </script>
 
 <template>
   <BookDetailLayout :book-id="bookId">
-    <FilesTab v-if="detail" :book="detail" />
+    <FilesTab v-if="detail" :book="detail" @refetch="handleRefetch" />
     <div v-else-if="loading" class="space-y-3">
       <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-pulse" />
     </div>

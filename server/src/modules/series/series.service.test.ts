@@ -339,6 +339,35 @@ describe('SeriesService', () => {
       expect(result.total).toBe(3);
     });
 
+    it('reports logical volume counts without changing raw book counts', async () => {
+      seriesRepo.findDetail.mockResolvedValue({
+        id: 42,
+        name: 'Two formats',
+        bookCount: 4,
+        readCount: 2,
+        authors: [],
+        indices: ['1', '1', '2', '2'],
+        expectedBookCount: 3,
+        members: [
+          { seriesIndex: '1', status: null },
+          { seriesIndex: '1', status: 'read' },
+          { seriesIndex: '2', status: 'reading' },
+          { seriesIndex: '2', status: 'read' },
+        ],
+      });
+      seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 4 });
+
+      const result = await service.findBooks(reqUser(), 42, {});
+
+      expect(result.seriesInfo).toMatchObject({
+        bookCount: 4,
+        readCount: 2,
+        ownedVolumeCount: 2,
+        readVolumeCount: 2,
+        possibleGaps: [3],
+      });
+    });
+
     it('preserves book order from repository', async () => {
       seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: ['1', '2'] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [20, 10], total: 2 });
@@ -453,6 +482,8 @@ describe('SeriesService', () => {
       expect(result.seriesInfo.authors).toEqual(['Frank Herbert']);
       expect(result.seriesInfo.possibleGaps).toEqual([]);
       expect(result.seriesInfo.bookCount).toBe(0);
+      expect(result.seriesInfo.ownedVolumeCount).toBe(0);
+      expect(result.seriesInfo.readVolumeCount).toBe(0);
     });
 
     it('throws 404 when series does not exist in any library', async () => {

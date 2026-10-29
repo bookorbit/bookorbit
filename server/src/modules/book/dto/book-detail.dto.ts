@@ -1,5 +1,6 @@
 import type {
   AudiobookChapter,
+  AudiobookChapterSource,
   BookFileWriteStatus,
   BookSeriesMembership,
   BookMetadataLockField,
@@ -35,6 +36,8 @@ export class AudioMetadataDto {
   durationSeconds: number | null;
   abridged: boolean;
   chapters: AudiobookChapter[] | null;
+  chaptersSource: AudiobookChapterSource | null;
+  chaptersUpdatedAt: string | null;
 }
 
 export class BookDetailDto {
@@ -71,6 +74,8 @@ export class BookDetailDto {
   coverVersion: string;
   hardcoverEditionId: string | null;
   providerIds: ProviderIds;
+  /** Record links for external providers' ids. See `BookDetail.providerLinks`. */
+  providerLinks?: Partial<Record<string, string>>;
   authors: { id: number; name: string; sortName: string | null }[];
   genres: string[];
   tags: string[];

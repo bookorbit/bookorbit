@@ -28,7 +28,6 @@ describe('KoboProvider', () => {
     comicvine: { enabled: false, apiKey: '' },
     ranobedb: { enabled: false },
     kobo: { enabled: true, country: 'us', language: 'en' },
-    lubimyczytac: { enabled: false },
   };
 
   beforeEach(async () => {
@@ -63,7 +62,6 @@ describe('KoboProvider', () => {
     vi.spyOn(providerConfig, 'getConfig').mockResolvedValue({
       ...mockConfig,
       kobo: { enabled: false, country: 'us', language: 'en' },
-      lubimyczytac: { enabled: false },
     });
 
     await expect(provider.search({ title: 'Fourth Wing' })).resolves.toEqual([]);

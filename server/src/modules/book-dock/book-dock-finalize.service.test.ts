@@ -1879,9 +1879,10 @@ describe('BookDockFinalizeService', () => {
     expect(patch).not.toHaveProperty('durationSeconds');
     expect(patch.chapters).toEqual([
       { title: 'Good', startMs: 1000 },
-      { title: '', startMs: 2000 },
+      { title: 'Chapter 2', startMs: 2000 },
       { title: 'Stringy', startMs: 3001 },
     ]);
+    expect(patch).toMatchObject({ chaptersSource: 'embedded', chaptersUpdatedAt: expect.any(Date), chaptersUpdatedBy: null });
     expect(metadataService.replaceNarrators).not.toHaveBeenCalled();
   });
 

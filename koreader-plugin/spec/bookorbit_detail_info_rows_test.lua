@@ -104,7 +104,7 @@ assertEqual(CatalogDetail.detailSeriesText({ seriesIndex = 3 }), nil, "an index 
 
 local by_id = CatalogDetail.detailSeriesParams({ seriesId = 12, seriesName = "Discworld" })
 assertEqual(by_id.seriesId, 12, "a series id drives the books context")
-assertEqual(by_id.sort, "series", "a series list sorts by series order")
+assertEqual(by_id.sort, "title", "a series list sorts by title")
 local by_name = CatalogDetail.detailSeriesParams({ seriesName = "Discworld" })
 assertEqual(by_name.series, "Discworld", "without an id the name drives the context")
 assertEqual(by_name.seriesId, nil, "no id is invented")

@@ -15,6 +15,7 @@ import { MetadataModule } from '../metadata/metadata.module';
 import { NotificationModule } from '../notification/notification.module';
 import { FileEventProcessorService } from './file-event-processor.service';
 import { FileWatcherService } from './file-watcher.service';
+import { RegexMetadataReapplyService } from './regex-metadata-reapply.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
 import { ScannerController } from './scanner.controller';
@@ -42,6 +43,7 @@ describe('ScannerModule', () => {
       ScanJobStore,
       FileEventProcessorService,
       FileWatcherService,
+      RegexMetadataReapplyService,
     ]);
     expect(Reflect.getMetadata('exports', ScannerModule)).toEqual([ScannerService, FileWatcherService, ScanGateway]);
   });

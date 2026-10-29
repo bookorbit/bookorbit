@@ -1058,6 +1058,7 @@ describe('BookService', () => {
             [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
           },
           isAudiobook: false,
+          mediaKind: 'ebook',
           maxCandidatesPerProvider: 1,
         },
         {
@@ -1120,7 +1121,7 @@ describe('BookService', () => {
         1,
         { title: 'Resolved', authors: ['A'], genres: ['G'], isbn10: '0306406152', isbn13: '9780306406157' },
         user,
-        { postSaveMode: 'schedule' },
+        { postSaveMode: 'schedule', chaptersSource: 'provider' },
       );
       expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith([{ url: 'https://img/c.jpg' }], 1, 'ebook');
       expect(getDetailSpy).toHaveBeenCalledWith(1, user);
@@ -1170,6 +1171,25 @@ describe('BookService', () => {
       expect(metadataService.downloadAndSaveCover).toHaveBeenCalledTimes(1);
       expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith(audioCoverChoices, 1, 'audio');
       expect(getDetailSpy).toHaveBeenCalledWith(1, user);
+    });
+
+    it('refreshMetadata hands the stored chapters to the pipeline so a fetch only fills a book without any', async () => {
+      const { service, bookRepo, pipeline, coverStore } = makeService();
+      const chapters = [{ title: 'Stored', startMs: 0 }];
+      bookRepo.findById.mockResolvedValue({
+        book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old', chapters } },
+        authorRows: [],
+        genreRows: [],
+        narratorRows: [],
+        communityRatingRows: [],
+        fileRows: [{ format: 'm4b', role: 'content', mediaOverlayAvailable: false }],
+      });
+      pipeline.runWithSources.mockResolvedValue({ resolved: {}, sources: {}, providerIds: {} });
+      coverStore.fetchState.mockResolvedValue({ media: { hasEbook: false, hasAudio: true }, filled: { ebook: false, audio: true }, locked: [] });
+
+      await service.refreshMetadata(1, true, makeUser());
+
+      expect(pipeline.runWithSources).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ chapters }), 7, expect.any(Object));
     });
 
     it('refreshMetadata answers not found when the book disappears before its cover state is read', async () => {
@@ -1441,7 +1461,7 @@ describe('BookService', () => {
           openLibraryId: 'ol-id',
         },
         user,
-        { postSaveMode: 'schedule' },
+        { postSaveMode: 'schedule', chaptersSource: 'provider' },
       );
     });
 
@@ -1482,7 +1502,7 @@ describe('BookService', () => {
           hardcoverId: 'the-name-of-the-wind',
         },
         user,
-        { postSaveMode: 'schedule' },
+        { postSaveMode: 'schedule', chaptersSource: 'provider' },
       );
     });
 
@@ -1570,7 +1590,7 @@ describe('BookService', () => {
           communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: null }],
         },
         user,
-        { postSaveMode: 'schedule' },
+        { postSaveMode: 'schedule', chaptersSource: 'provider' },
       );
     });
 
@@ -1619,7 +1639,7 @@ describe('BookService', () => {
           ],
         },
         user,
-        { postSaveMode: 'schedule' },
+        { postSaveMode: 'schedule', chaptersSource: 'provider' },
       );
     });
 
@@ -1668,7 +1688,7 @@ describe('BookService', () => {
           },
         },
         user,
-        { postSaveMode: 'schedule' },
+        { postSaveMode: 'schedule', chaptersSource: 'provider' },
       );
     });
 
@@ -1717,7 +1737,7 @@ describe('BookService', () => {
           },
         },
         user,
-        { postSaveMode: 'schedule' },
+        { postSaveMode: 'schedule', chaptersSource: 'provider' },
       );
     });
 
@@ -1755,7 +1775,7 @@ describe('BookService', () => {
 
       await service.refreshMetadata(1, false, user);
 
-      expect(updateSpy).toHaveBeenCalledWith(1, { authors: ['A'] }, user, { postSaveMode: 'schedule' });
+      expect(updateSpy).toHaveBeenCalledWith(1, { authors: ['A'] }, user, { postSaveMode: 'schedule', chaptersSource: 'provider' });
       expect(metadataService.downloadAndSaveCover).not.toHaveBeenCalled();
     });
 
@@ -1925,6 +1945,67 @@ describe('BookService', () => {
       const options = { previousSeriesIds: new Set([31]) };
       expect(seriesExpectedCount.setManual).toHaveBeenNthCalledWith(1, 'Harry Potter', 7, expect.anything(), options);
       expect(seriesExpectedCount.setManual).toHaveBeenNthCalledWith(2, 'Hogwarts Library', null, expect.anything(), options);
+    });
+
+    it('updateMetadata cleans chapters instead of rejecting them and records who changed them', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const audiobookChapters = { recordCurrentRevision: vi.fn().mockResolvedValue(undefined) };
+      Object.assign(service, { audiobookChapters });
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(
+        5,
+        {
+          audioMetadata: {
+            chapters: [
+              { title: 'Two', startMs: 2_000 },
+              { title: '', startMs: 0 },
+              { title: 'Again', startMs: 2_000 },
+            ],
+          },
+        },
+        user,
+      );
+
+      expect(bookRepo.updateMetadataFields).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({
+          chapters: [
+            { title: 'Chapter 1', startMs: 0 },
+            { title: 'Two', startMs: 2_000 },
+          ],
+          chaptersSource: 'manual',
+          chaptersUpdatedBy: user.id,
+          chaptersUpdatedAt: expect.any(Date),
+        }),
+        expect.anything(),
+      );
+      expect(audiobookChapters.recordCurrentRevision).toHaveBeenCalledWith(5);
+    });
+
+    it('updateMetadata stores provider chapters without naming a person, and clears the source with the list', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { audioMetadata: { chapters: [{ title: 'One', startMs: 0 }] } }, user, { chaptersSource: 'provider' });
+      await service.updateMetadata(5, { audioMetadata: { chapters: [] } }, user);
+
+      expect(bookRepo.updateMetadataFields).toHaveBeenNthCalledWith(
+        1,
+        5,
+        expect.objectContaining({ chaptersSource: 'provider', chaptersUpdatedBy: null }),
+        expect.anything(),
+      );
+      expect(bookRepo.updateMetadataFields).toHaveBeenNthCalledWith(
+        2,
+        5,
+        expect.objectContaining({ chapters: null, chaptersSource: null, chaptersUpdatedBy: null }),
+        expect.anything(),
+      );
     });
 
     it('updateMetadata with empty communityRatings clears all existing ratings', async () => {
@@ -5155,6 +5236,39 @@ describe('BookService', () => {
         { title: 'Bonus', startMs: 90_000 },
       ]);
       expect(result.files.map((file) => file.filename)).toEqual(['Bonus.mp3', 'Part 01.mp3', 'Part 02.mp3']);
+      expect(result.audioMetadata).toMatchObject({ chaptersSource: 'tracks', chaptersUpdatedAt: null });
+    });
+
+    it('serves a stored chapter list cleaned for clients, with its source', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockAudiobookDetail(bookRepo, [
+        { id: 1, updatedAt: new Date('2026-01-01'), absolutePath: '/audio/Book.m4b', durationSeconds: 600, sortOrder: null },
+      ]);
+      const found = await bookRepo.findById(21);
+      found.book.book_metadata = {
+        title: 'Tracks',
+        durationSeconds: 600,
+        chapters: [
+          { title: 'Later', startMs: 5_000, durationMs: 100 },
+          { title: '', startMs: 0 },
+          { title: 'Duplicate', startMs: 5_000 },
+        ],
+        chaptersSource: 'provider',
+        chaptersUpdatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      };
+      bookRepo.findById.mockResolvedValue(found);
+
+      const result = await service.getDetail(21, makeUser());
+
+      expect(result.audioMetadata).toMatchObject({
+        chapters: [
+          { title: 'Chapter 1', startMs: 0 },
+          { title: 'Later', startMs: 5_000 },
+        ],
+        chaptersSource: 'provider',
+        chaptersUpdatedAt: '2026-03-01T00:00:00.000Z',
+      });
     });
 
     it('does not synthesize chapters while any track duration is unknown', async () => {

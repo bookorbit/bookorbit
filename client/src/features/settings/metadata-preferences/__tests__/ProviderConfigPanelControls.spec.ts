@@ -25,8 +25,6 @@ function makeConfig(overrides: Partial<ProviderConfigurations> = {}): ProviderCo
     comicvine: { enabled: false, apiKey: '' },
     ranobedb: { enabled: false },
     kobo: { enabled: false, country: 'us', language: 'en' },
-    lubimyczytac: { enabled: false },
-    aladin: { enabled: false, ttbKey: '' },
     ...overrides,
   }
 }
@@ -48,8 +46,6 @@ function makeStatuses(): ProviderStatus[] {
     configured('comicvine', false, false),
     configured('ranobedb', false),
     configured('kobo', false),
-    configured('lubimyczytac', false),
-    configured('aladin', false, false),
   ]
 }
 
@@ -95,7 +91,7 @@ describe('ProviderConfigPanel browsing', () => {
     const wrapper = mountPanel()
 
     const headings = wrapper.findAll('h3').map((heading) => heading.text())
-    expect(headings).toEqual(['General book catalogues', 'Audiobooks', 'Comics & light novels', 'Regional catalogues'])
+    expect(headings).toEqual(['General book catalogues', 'Audiobooks', 'Comics & light novels'])
     wrapper.unmount()
   })
 
@@ -113,7 +109,7 @@ describe('ProviderConfigPanel browsing', () => {
 
     await clickFilter(wrapper, 'Needs setup')
 
-    expect(providerNames(wrapper)).toEqual(['Hardcover', 'ComicVine', 'Aladin'])
+    expect(providerNames(wrapper)).toEqual(['Hardcover', 'ComicVine'])
     wrapper.unmount()
   })
 
@@ -124,8 +120,8 @@ describe('ProviderConfigPanel browsing', () => {
     await search.setValue('kobo')
     expect(providerNames(wrapper)).toEqual(['Kobo'])
 
-    await search.setValue('korean')
-    expect(providerNames(wrapper)).toEqual(['Aladin'])
+    await search.setValue('japanese')
+    expect(providerNames(wrapper)).toEqual(['RanobeDB'])
 
     await search.setValue('nothing matches this')
     expect(wrapper.findAll('[role="switch"]')).toHaveLength(0)
@@ -133,7 +129,7 @@ describe('ProviderConfigPanel browsing', () => {
 
     const clear = wrapper.findAll('button').find((candidate) => candidate.text() === 'Clear filters')
     await clear?.trigger('click')
-    expect(wrapper.findAll('[role="switch"]')).toHaveLength(14)
+    expect(wrapper.findAll('[role="switch"]')).toHaveLength(12)
     wrapper.unmount()
   })
 })

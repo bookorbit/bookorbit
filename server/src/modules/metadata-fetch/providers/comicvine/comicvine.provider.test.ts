@@ -20,7 +20,6 @@ const mockConfig: ProviderConfigurations = {
   comicvine: { enabled: true, apiKey: 'test-key' },
   ranobedb: { enabled: false },
   kobo: { enabled: false, country: 'us', language: 'en' },
-  lubimyczytac: { enabled: false },
 };
 
 const mockVolume = {

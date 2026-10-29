@@ -104,6 +104,7 @@ export interface BookMutationState {
     durationSeconds: number | null;
     abridged: boolean;
     chapters: unknown;
+    chaptersSource: string | null;
     lockedFields: string[];
     lastMetadataFetchAt: Date | null;
   } | null;
@@ -290,6 +291,7 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
         durationSeconds: bookMetadata.durationSeconds,
         abridged: bookMetadata.abridged,
         chapters: bookMetadata.chapters,
+        chaptersSource: bookMetadata.chaptersSource,
         lockedFields: bookMetadata.lockedFields,
         lastMetadataFetchAt: bookMetadata.lastMetadataFetchAt,
       })
@@ -327,6 +329,7 @@ export async function readBookMutationState(ctx: MetadataLockE2EContext, bookId:
           durationSeconds: meta.durationSeconds,
           abridged: meta.abridged,
           chapters: meta.chapters,
+          chaptersSource: meta.chaptersSource,
           lockedFields: [...meta.lockedFields],
           lastMetadataFetchAt: meta.lastMetadataFetchAt,
         }

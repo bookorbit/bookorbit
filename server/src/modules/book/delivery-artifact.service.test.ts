@@ -7,6 +7,7 @@ import { mkdtemp, readFile, rm, writeFile, symlink, mkdir, stat, open } from 'fs
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { createHash } from 'crypto';
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ZipArchive } from 'archiver';
 import { createWriteStream } from 'fs';
@@ -16,12 +17,12 @@ import { FileLockService } from '../file-write/file-lock.service';
 import { DeliveryArtifactRepository } from './delivery-artifact.repository';
 import { DeliveryArtifactService } from './delivery-artifact.service';
 
-async function fixture(path: string, overlay: boolean, unsafe = false): Promise<void> {
+async function fixture(path: string, overlay: boolean, unsafe = false, extraManifest = ''): Promise<void> {
   const archive = new ZipArchive();
   archive.append('application/epub+zip', { name: 'mimetype', store: true });
   archive.append('<container><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>', { name: 'META-INF/container.xml' });
   archive.append(
-    `<package><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" ${overlay ? 'media-overlay="overlay"' : ''}/>${overlay ? '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/><item id="audio" href="audio.mp3" media-type="audio/mpeg"/>' : ''}</manifest><spine><itemref idref="chapter"/></spine></package>`,
+    `<package><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" ${overlay ? 'media-overlay="overlay"' : ''}/>${overlay ? '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/><item id="audio" href="audio.mp3" media-type="audio/mpeg"/>' : ''}${extraManifest}</manifest><spine><itemref idref="chapter"/></spine></package>`,
     { name: 'OPS/book.opf' },
   );
   archive.append('<html><body><span id="sentence-1">Hello</span></body></html>', { name: 'OPS/chapter.xhtml' });
@@ -117,6 +118,39 @@ describe('DeliveryArtifactService', () => {
     expect(artifact.actualVariant).toBe('original');
     expect(artifact.requestedVariant).toBe('audioless_epub');
     await artifact.release();
+  });
+
+  it('delivers a plain EPUB that fails inspection as the original and logs why', async () => {
+    const path = join(directory, 'plain.epub');
+    await fixture(path, false, false, '<item id="chapter" href="missing.xhtml" media-type="application/xhtml+xml"/>');
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const spy = vi.spyOn(stripper, 'writeArchive');
+    const artifact = await service.prepare({ id: 12, absolutePath: path, format: 'epub', mediaOverlayAvailable: false }, 'audioless_epub');
+    expect(artifact.path).toBe(path);
+    expect(artifact.outcome).toBe('verified_plain');
+    expect(artifact.actualVariant).toBe('original');
+    expect(spy).not.toHaveBeenCalled();
+    expect(repository.saveInspection).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 12, state: 'verified_absent' }));
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^\[delivery\.inspect\] \[fail\] fileId=12 .*error="Ambiguous manifest IDs"/));
+    await artifact.release();
+  });
+
+  it('still refuses text-only for a narrated EPUB that fails inspection and logs why', async () => {
+    const path = join(directory, 'narrated.epub');
+    await fixture(path, true, false, '<item id="chapter" href="missing.xhtml" media-type="application/xhtml+xml"/>');
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    await expect(service.prepare({ id: 13, absolutePath: path, format: 'epub' }, 'audioless_epub')).rejects.toThrow('Ambiguous manifest IDs');
+    expect(repository.saveInspection).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 13, state: 'failed' }));
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^\[delivery\.prepare\] \[fail\] fileId=13 .* - text-only delivery refused$/));
+  });
+
+  it('trusts a recorded read-along over an archive without narration-named entries', async () => {
+    const path = join(directory, 'flagged.epub');
+    await fixture(path, false, false, '<item id="chapter" href="missing.xhtml" media-type="application/xhtml+xml"/>');
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    await expect(service.prepare({ id: 14, absolutePath: path, format: 'epub', mediaOverlayAvailable: true }, 'audioless_epub')).rejects.toThrow(
+      'Ambiguous manifest IDs',
+    );
   });
 
   it('explicit text-only fails while inherited preparation preserves its original fallback', async () => {

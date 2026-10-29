@@ -6,7 +6,14 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcryptjs';
 
 import { Permission, withRequiredPermissions } from '@bookorbit/types';
-import type { UserAttentionReason, UserListSortDirection, UserListSortField, UserListState, UserListSummary } from '@bookorbit/types';
+import type {
+  UserAttentionReason,
+  UserLibraryGrant,
+  UserListSortDirection,
+  UserListSortField,
+  UserListState,
+  UserListSummary,
+} from '@bookorbit/types';
 import { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -669,6 +676,13 @@ export class UserRepository {
       .from(schema.userLibraryAccess)
       .where(eq(schema.userLibraryAccess.userId, userId));
     return rows.map((r) => r.libraryId);
+  }
+
+  findLibraryGrantsByUserId(userId: number): Promise<UserLibraryGrant[]> {
+    return this.db
+      .select({ libraryId: schema.userLibraryAccess.libraryId, accessLevel: schema.userLibraryAccess.accessLevel })
+      .from(schema.userLibraryAccess)
+      .where(eq(schema.userLibraryAccess.userId, userId));
   }
 
   async findExistingLibraryIds(libraryIds: number[]): Promise<number[]> {

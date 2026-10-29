@@ -4,6 +4,7 @@ export enum Permission {
   LibraryUpload = "library_upload",
   LibraryEditMetadata = "library_edit_metadata",
   LibraryDeleteBooks = "library_delete_books",
+  LibraryGenerateReadAloud = "library_generate_read_aloud",
   BookDockAccess = "book_dock_access",
   BookRequestAccess = "book_request_access",
   PodcastManageFeeds = "podcast_manage_feeds",
@@ -47,6 +48,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.LibraryUpload]: "Upload books",
   [Permission.LibraryEditMetadata]: "Edit metadata",
   [Permission.LibraryDeleteBooks]: "Delete books",
+  [Permission.LibraryGenerateReadAloud]: "Generate read-aloud books",
   [Permission.BookDockAccess]: "Book Dock",
   [Permission.BookRequestAccess]: "Request books",
   [Permission.PodcastManageFeeds]: "Manage podcast feeds",
@@ -86,6 +88,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
  * the claim the authorization matrix exists to make and would no longer be true.
  */
 export const PERMISSION_REQUIRES: Partial<Record<Permission, readonly Permission[]>> = {
+  [Permission.LibraryGenerateReadAloud]: [Permission.LibraryUpload],
   // Self-fulfilment adds a way to fulfil a request. Listing, viewing and the live queue all
   // answer to `BookRequestAccess`, so granting one without the other buys nothing at all.
   [Permission.BookRequestSelfFulfill]: [Permission.BookRequestAccess],

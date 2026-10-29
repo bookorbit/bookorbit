@@ -1,4 +1,4 @@
-import type { AudiobookChapter, ComicMetadataFields, NarratorRef, UserBookStatus } from '@bookorbit/types';
+import type { AudiobookChapter, AudiobookChapterSource, ComicMetadataFields, NarratorRef, UserBookStatus } from '@bookorbit/types';
 import type { BookDetailDto } from '../dto/book-detail.dto';
 
 type NarratorRow = {
@@ -10,6 +10,8 @@ type NarratorRow = {
 type AudioMetaSource = {
   durationSeconds: number | null | undefined;
   abridged: boolean | null | undefined;
+  chaptersSource?: AudiobookChapterSource | null;
+  chaptersUpdatedAt?: Date | null;
 };
 
 type ComicMetaSource = {
@@ -59,6 +61,8 @@ function buildAudioMetadata(
     durationSeconds: audioMeta.durationSeconds ?? null,
     abridged: audioMeta.abridged ?? false,
     chapters,
+    chaptersSource: audioMeta.chaptersSource ?? null,
+    chaptersUpdatedAt: audioMeta.chaptersUpdatedAt?.toISOString() ?? null,
   };
 }
 

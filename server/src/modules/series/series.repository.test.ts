@@ -275,8 +275,12 @@ describe('SeriesRepository', () => {
 
     it('returns detail row with authors and indices when series is found', async () => {
       const mainChain = makeChain([{ id: 42, name: 'Dune', bookCount: 6, readCount: 2 }]);
-      const indicesChain = makeChain([{ idx: 1 }, { idx: 2 }, { idx: 3 }]);
-      db.select.mockReturnValueOnce(mainChain).mockReturnValueOnce(indicesChain);
+      const membersChain = makeChain([
+        { seriesIndex: '1', status: 'read' },
+        { seriesIndex: '2', status: 'reading' },
+        { seriesIndex: null, status: null },
+      ]);
+      db.select.mockReturnValueOnce(mainChain).mockReturnValueOnce(membersChain);
 
       const authorsMap = new Map([[42, ['Frank Herbert']]]);
       vi.spyOn(repo as never, 'fetchAuthorsForSeries').mockResolvedValue(authorsMap);
@@ -289,7 +293,12 @@ describe('SeriesRepository', () => {
       expect(result!.bookCount).toBe(6);
       expect(result!.readCount).toBe(2);
       expect(result!.authors).toEqual(['Frank Herbert']);
-      expect(result!.indices).toEqual([1, 2, 3]);
+      expect(result!.indices).toEqual(['1', '2']);
+      expect(result!.members).toEqual([
+        { seriesIndex: '1', status: 'read' },
+        { seriesIndex: '2', status: 'reading' },
+        { seriesIndex: null, status: null },
+      ]);
     });
 
     it('returns empty authors when map has no entry for seriesId', async () => {
@@ -303,6 +312,7 @@ describe('SeriesRepository', () => {
 
       expect(result!.authors).toEqual([]);
       expect(result!.indices).toEqual([]);
+      expect(result!.members).toEqual([]);
     });
   });
 

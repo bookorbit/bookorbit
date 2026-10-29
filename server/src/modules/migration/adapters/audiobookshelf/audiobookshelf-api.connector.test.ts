@@ -111,6 +111,11 @@ describe('AudiobookshelfApiConnector validation and field selection', () => {
                 metadata: { path: '/books/title/track.mp3', relPath: 'track.mp3', filename: 'track.mp3', ext: '.mp3' },
               },
             ],
+            chapters: [
+              { id: 0, start: 0, end: 60, title: 'Opening' },
+              { id: 1, start: 60, end: 120, title: 'Ending' },
+              { id: 2, end: 130, title: 'No start' },
+            ],
           },
         },
       ],
@@ -126,6 +131,10 @@ describe('AudiobookshelfApiConnector validation and field selection', () => {
           title: 'Title',
           authors: [{ id: 'a1', name: 'Author' }],
           audioFiles: [expect.objectContaining({ ino: '77', format: 'MP3' })],
+          chapters: [
+            { start: 0, title: 'Opening' },
+            { start: 60, title: 'Ending' },
+          ],
         }),
       }),
     ]);

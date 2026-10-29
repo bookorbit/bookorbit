@@ -46,6 +46,7 @@ describe('Docker file-backed environment values', () => {
     'JWT_SECRET',
     'MIGRATION_ENCRYPTION_KEY',
     'PODCAST_ENCRYPTION_KEY',
+    'READ_ALOUD_WORKER_TOKEN',
     'POSTGRES_PASSWORD',
     'SETUP_BOOTSTRAP_TOKEN',
   ])('loads %s from a mounted file', (name) => {

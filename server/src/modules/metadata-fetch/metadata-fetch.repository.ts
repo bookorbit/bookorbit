@@ -1,12 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { CoverMedia } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookMetadata, books, userLibraryAccess } from '../../db/schema';
+import { bookFiles, bookMetadata, books, userLibraryAccess } from '../../db/schema';
 import { coverMediaSql } from '../book-cover-store/book-cover-store.repository';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -30,6 +30,9 @@ export interface StoredProviderIdsRow {
   lubimyczytacId: string | null;
   aladinId: string | null;
   coverMedia: CoverMedia;
+  primaryFileId: number | null;
+  /** The book's readable and audio files, which say what medium it is. */
+  mediaFiles: { id: number; format: string | null; role: string }[];
 }
 
 @Injectable()
@@ -59,6 +62,7 @@ export class MetadataFetchRepository {
         aladinId: bookMetadata.aladinId,
         hasEbook: media.hasEbook,
         hasAudio: media.hasAudio,
+        primaryFileId: books.primaryFileId,
       })
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -66,8 +70,12 @@ export class MetadataFetchRepository {
       .limit(1);
 
     if (!row) return null;
+    const mediaFiles = await this.db
+      .select({ id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+      .from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), inArray(bookFiles.role, ['content', 'primary'])));
     const { hasEbook, hasAudio, ...stored } = row;
-    return { ...stored, coverMedia: { hasEbook: hasEbook === true, hasAudio: hasAudio === true } };
+    return { ...stored, mediaFiles, coverMedia: { hasEbook: hasEbook === true, hasAudio: hasAudio === true } };
   }
 
   async hasLibraryAccess(userId: number, libraryId: number): Promise<boolean> {

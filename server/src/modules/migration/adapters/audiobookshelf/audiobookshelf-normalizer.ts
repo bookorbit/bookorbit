@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { parseSeriesIndex } from '@bookorbit/types';
+import { parseSeriesIndex, type AudiobookChapter } from '@bookorbit/types';
 
 import type {
   SourceBook,
@@ -13,6 +13,7 @@ import type {
   AudiobookshelfAudioFileRecord,
   AudiobookshelfBookLibraryItemRecord,
   AudiobookshelfBookRecord,
+  AudiobookshelfChapterRecord,
   AudiobookshelfEbookFileRecord,
   AudiobookshelfMediaProgressRecord,
   AudiobookshelfNormalizationCounters,
@@ -311,7 +312,12 @@ function normalizeBook(item: AudiobookshelfBookLibraryItemRecord): NormalizedBoo
   // Audiobookshelf metadata is frequently sparser than an enriched BookOrbit library, so a
   // field only counts as present when it carries a value. Listing it unconditionally would
   // overlay NULL and erase good target metadata.
-  const presentFields = [...METADATA_PRESENT_FIELDS.filter((field) => metadata[field] !== null), ...(asin ? [asinMetadataField] : [])];
+  const chapters = normalizeChapters(item.book.chapters ?? []);
+  const presentFields = [
+    ...METADATA_PRESENT_FIELDS.filter((field) => metadata[field] !== null),
+    ...(asin ? [asinMetadataField] : []),
+    ...(chapters.length > 0 ? ['chapters'] : []),
+  ];
 
   const sourceBook: SourceBook = {
     sourceBookId,
@@ -321,6 +327,7 @@ function normalizeBook(item: AudiobookshelfBookLibraryItemRecord): NormalizedBoo
     ...(asin ? (asinMetadataField === 'audibleId' ? { audibleId: asin } : { amazonId: asin }) : {}),
     authors,
     narrators,
+    ...(chapters.length > 0 ? { chapters } : {}),
     filePath: normalizeNullableText(item.path),
     fileHash: null,
     files,
@@ -407,6 +414,16 @@ function normalizeAuthors(book: AudiobookshelfBookRecord): SourceContributor[] {
   const legacyName = normalizeRequiredText(book.authorName);
   if (!legacyName) return [];
   return [{ sourceContributorId: null, name: legacyName, sortName: null, description: null, displayOrder: 0 }];
+}
+
+// Chapters people curated in Audiobookshelf: its seconds become whole milliseconds on the same
+// book timeline, which is the shape BookOrbit stores.
+function normalizeChapters(chapters: AudiobookshelfChapterRecord[]): AudiobookChapter[] {
+  return chapters.flatMap((chapter) =>
+    chapter.start !== null && Number.isFinite(chapter.start) && chapter.start >= 0
+      ? [{ title: normalizeNullableText(chapter.title) ?? '', startMs: Math.round(chapter.start * 1000) }]
+      : [],
+  );
 }
 
 function normalizeNarrators(narrators: string[]): SourceContributor[] {

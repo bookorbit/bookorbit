@@ -1,4 +1,6 @@
+import { isKnownMetadataProviderKey } from '@bookorbit/types'
 import type {
+  KnownMetadataProviderKey,
   ComicMetadataFields,
   MetadataCandidate,
   MetadataProviderKey,
@@ -118,7 +120,11 @@ export function isComicDiffFieldKey(key: DiffFieldKey): key is ComicDiffFieldKey
   return key in COMIC_KEY_MAP
 }
 
-export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | undefined> = {
+/**
+ * The providers with an id field of their own: the built-ins, and the ones that moved out but kept
+ * theirs. Other external providers' ids travel in `externalProviderIds` instead.
+ */
+export const PROVIDER_ID_FIELD: Record<KnownMetadataProviderKey, ProviderIdPatchField | undefined> = {
   google: 'googleBooksId',
   goodreads: 'goodreadsId',
   amazon: 'amazonId',
@@ -136,6 +142,11 @@ export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField
 }
 
 const PROVIDER_ID_PATCH_FIELDS = new Set<string>(Object.values(PROVIDER_ID_FIELD).filter((v): v is ProviderIdPatchField => v !== undefined))
+
+/** The named id field a provider's id lives in; undefined for an external provider without one. */
+export function providerIdFieldFor(provider: MetadataProviderKey): ProviderIdPatchField | undefined {
+  return isKnownMetadataProviderKey(provider) ? PROVIDER_ID_FIELD[provider] : undefined
+}
 
 export function isProviderIdPatchField(key: DiffFieldKey): key is ProviderIdPatchField {
   return PROVIDER_ID_PATCH_FIELDS.has(key)
@@ -480,7 +491,7 @@ export function summarizeDifferences(current: MetadataSource, candidate: Metadat
   if (candidate.comicMetadata) {
     for (const def of COMIC_FIELD_DEFS) count(classifyField(def.key, current, candidate).kind)
   }
-  if (PROVIDER_ID_FIELD[candidate.provider] && candidate.providerId) {
+  if (providerIdFieldFor(candidate.provider) && candidate.providerId) {
     count(classifyIdentifier(existingProviderId(providerIds, candidate.provider), candidate.providerId).kind)
   }
   return summary

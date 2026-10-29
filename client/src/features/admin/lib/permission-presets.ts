@@ -15,7 +15,7 @@ export interface PermissionGroup {
 export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     id: 'libraryBooks',
-    use: [Permission.LibraryDownload, Permission.LibraryUpload, Permission.LibraryEditMetadata],
+    use: [Permission.LibraryDownload, Permission.LibraryUpload, Permission.LibraryEditMetadata, Permission.LibraryGenerateReadAloud],
     manage: [Permission.LibraryDeleteBooks],
   },
   {

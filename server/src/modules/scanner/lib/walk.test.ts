@@ -414,6 +414,28 @@ describe('disc folder flattening', () => {
     expect(candidates).toHaveLength(2);
   });
 
+  it("never folds a library folder whose own name looks like a disc folder, such as unRAID's disk1", async () => {
+    await file('disk1/Dune.epub');
+    await file('disk1/Emma.epub');
+    await file('disk1/Saga/Saga 001.cbz');
+    const library = join(root, 'disk1');
+
+    const { candidates } = await findBookCandidates(library);
+
+    expect(candidatePaths(candidates)).toEqual([join(library, 'Dune.epub'), join(library, 'Emma.epub'), join(library, 'Saga')]);
+  });
+
+  it('still reads disc folders directly inside a disc-named library folder as loose files', async () => {
+    await file('Part 1/Intro.mp3');
+    await file('Part 1/CD 1/01.mp3');
+    await file('Part 1/CD 1/02.mp3');
+    const library = join(root, 'Part 1');
+
+    const { candidates } = await findBookCandidates(library);
+
+    expect(candidatePaths(candidates)).toEqual([join(library, 'CD 1', '01.mp3'), join(library, 'CD 1', '02.mp3'), join(library, 'Intro.mp3')]);
+  });
+
   it('does NOT treat names like "Discography" as disc directories', async () => {
     await file('AudioBook/Discography/01.mp3');
     await file('AudioBook/cover.jpg');

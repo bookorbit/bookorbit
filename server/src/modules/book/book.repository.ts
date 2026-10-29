@@ -28,6 +28,7 @@ import { SeriesIdentityService } from '../../common/services/series-identity.ser
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { letterJumpBucketExpr } from './jump-bucket-expr';
+import { preserveOutgoingChapters } from '../../db/preserve-audiobook-revision';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import {
@@ -1699,6 +1700,9 @@ export class BookRepository {
         koboLocationValue: readingProgress.koboLocationValue,
         koboContentSourceProgressPercent: readingProgress.koboContentSourceProgressPercent,
         koreaderProgress: readingProgress.koreaderProgress,
+        narrationPercentage: readingProgress.narrationPercentage,
+        narrationUpdatedAt: readingProgress.narrationUpdatedAt,
+        textUpdatedAt: readingProgress.textUpdatedAt,
         updatedAt: readingProgress.updatedAt,
         lastReadAt: readingProgress.lastReadAt,
       })
@@ -2215,7 +2219,7 @@ export class BookRepository {
   }
 
   async deleteByIds(bookIds: number[]): Promise<void> {
-    await deleteBooksWithHashInvalidation(this.db, inArray(books.id, bookIds));
+    await deleteBooksWithHashInvalidation(this.db, inArray(books.id, bookIds), { keepFinishedReads: true });
   }
 
   async deleteByIdsAndInvalidateScanState(bookIds: number[]): Promise<void> {
@@ -2275,20 +2279,36 @@ export class BookRepository {
           books.id,
           rows.map((row) => row.id),
         ),
+        { keepFinishedReads: true },
       );
     });
   }
 
+  /** A book's rating is its latest completed read's, so that read takes the same stars. */
   async bulkSetRating(bookIds: number[], rating: number | null, userId: number): Promise<void> {
     if (bookIds.length === 0) return;
 
-    await this.db
-      .insert(userBookRatings)
-      .values(bookIds.map((bookId) => ({ userId, bookId, rating })))
-      .onConflictDoUpdate({
-        target: [userBookRatings.userId, userBookRatings.bookId],
-        set: { rating, updatedAt: new Date() },
-      });
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(userBookRatings)
+        .values(bookIds.map((bookId) => ({ userId, bookId, rating })))
+        .onConflictDoUpdate({
+          target: [userBookRatings.userId, userBookRatings.bookId],
+          set: { rating, updatedAt: new Date() },
+        });
+      await tx.execute(sql`
+        update ${schema.readingAttempts} set rating = ${rating}
+        where ${schema.readingAttempts.id} in (
+          select distinct on (ra.book_id) ra.id from ${schema.readingAttempts} ra
+          where ra.user_id = ${userId} and ra.book_id in (${sql.join(
+            bookIds.map((bookId) => sql`${bookId}`),
+            sql`, `,
+          )})
+            and ra.outcome = 'completed' and ra.deleted_at is null
+          order by ra.book_id, ra.ended_on desc nulls last, ra.id desc
+        )
+      `);
+    });
   }
 
   async findTagsByBookIds(bookIds: number[], executor: MetadataReadExecutor = this.db): Promise<Map<number, string[]>> {
@@ -2362,9 +2382,17 @@ export class BookRepository {
     fields: Partial<typeof bookMetadata.$inferInsert>,
     executor: MetadataUpdateExecutor = this.db,
   ): Promise<void> {
+    if (executor === this.db && Object.prototype.hasOwnProperty.call(fields, 'chapters')) {
+      return this.db.transaction((tx) => this.updateMetadataFields(bookId, fields, tx));
+    }
     const shouldSyncSeries =
       Object.prototype.hasOwnProperty.call(fields, 'seriesName') || Object.prototype.hasOwnProperty.call(fields, 'seriesIndex');
-    const patch = (await this.seriesIdentity?.resolveMetadataPatch(fields, executor)) ?? fields;
+    const patch = await preserveOutgoingChapters(
+      executor,
+      bookId,
+      (await this.seriesIdentity?.resolveMetadataPatch(fields, executor)) ?? fields,
+      fields.chaptersSource !== 'manual',
+    );
     await executor.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
     if (shouldSyncSeries) {
       await this.seriesMemberships?.syncPrimaryFromMetadata(bookId, executor);

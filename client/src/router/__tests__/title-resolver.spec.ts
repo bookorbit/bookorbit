@@ -55,4 +55,21 @@ describe('resolveRouteTitle', () => {
     await nextTick()
     expect(document.title).toBe('Auteurs · BookOrbit')
   })
+
+  it('keeps the current title when a guard cancels the navigation', () => {
+    type AfterEachHook = (to: RouteLocationNormalizedLoaded, from: RouteLocationNormalizedLoaded, failure?: unknown) => void
+    let afterEachHook: AfterEachHook | undefined
+    const router = {
+      currentRoute: ref(routeWithMeta('Authors')),
+      afterEach: vi.fn<(hook: AfterEachHook) => void>((hook) => {
+        afterEachHook = hook
+      }),
+    } as unknown as Router
+    registerRouteTitleHook(router)
+    document.title = 'Chapters · Book · BookOrbit'
+
+    afterEachHook?.(routeWithMeta('Somewhere else'), routeWithMeta('Authors'), new Error('aborted'))
+
+    expect(document.title).toBe('Chapters · Book · BookOrbit')
+  })
 })

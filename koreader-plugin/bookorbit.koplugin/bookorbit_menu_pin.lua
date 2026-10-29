@@ -1,14 +1,14 @@
 --[[--
 Pins the BookOrbit menu entry onto the first page of the Tools menu, right
 below calibre, and puts BookOrbit's icon in KOReader's menu bar just before
-the main menu, by maintaining user menu-order override files.
+the main menu.
 
-KOReader merges <settings_dir>/<prefix>_menu_order.lua over the bundled order
-tables per top-level key, so the generated files must carry the complete tools
-list. Files created here start with a marker comment and are regenerated from
-the bundled order on every startup, so KOReader updates never drift. A
-hand-maintained file only ever gets old BookOrbit ids replaced by the current
-one.
+KOReader caches its bundled menu-order tables and lets plugins extend them
+before the menu is built. Mutating those shared tables preserves entries added
+by every plugin regardless of load order. Older BookOrbit releases instead
+wrote complete user override lists, which hid entries added by later plugins;
+those marker-owned files are removed during migration. A hand-maintained file
+keeps its other entries and only has BookOrbit ids normalized.
 ]]
 
 local DataStorage = require("datastorage")
@@ -34,6 +34,8 @@ local PREFIXES = {
     { prefix = "reader", order_module = "ui/elements/reader_menu_order" },
     { prefix = "filemanager", order_module = "ui/elements/filemanager_menu_order" },
 }
+
+local EMPTY_OVERRIDE = MARKER .. "\nreturn {}\n"
 
 local BookOrbitMenuPin = {
     done = false,
@@ -92,30 +94,14 @@ local function normalizeButtons(buttons, with_tab)
 end
 BookOrbitMenuPin.normalizeButtons = normalizeButtons
 
-local function copyList(list)
-    local out = {}
-    for _, id in ipairs(list) do table.insert(out, id) end
-    return out
-end
-
-local function desiredOrder(order_module)
-    local bundled = require(order_module)
-    if type(bundled) ~= "table" or type(bundled.tools) ~= "table" then
-        return nil
-    end
-    local order = { tools = copyList(bundled.tools) }
+local function normalizeRuntimeOrder(order)
+    if type(order) ~= "table" or type(order.tools) ~= "table" then return end
     normalizeBookOrbitIds(order.tools)
-    if type(bundled[BUTTONS]) == "table" then
-        order[BUTTONS] = copyList(bundled[BUTTONS])
+    if type(order[BUTTONS]) == "table" then
         normalizeButtons(order[BUTTONS], BookOrbitMenuPin.tab)
         -- MenuSorter treats a button as a tab only when it has an order list.
-        if BookOrbitMenuPin.tab then order[TAB_ID] = {} end
+        order[TAB_ID] = BookOrbitMenuPin.tab and {} or nil
     end
-    return order
-end
-
-local function serializeOurs(order)
-    return MARKER .. "\nreturn " .. dump(order, nil, true) .. "\n"
 end
 
 local function isGeneratedByUs(existing)
@@ -130,19 +116,9 @@ local function isGeneratedByUs(existing)
     return false
 end
 
-local function ensureOne(prefix, order_module)
-    local order = desiredOrder(order_module)
-    if not order then return end
-
+local function migrateOverride(prefix)
     local path = DataStorage:getSettingsDir() .. "/" .. prefix .. "_menu_order.lua"
-
-    if not lfs.attributes(path) then
-        local ok, err = util.writeToFile(serializeOurs(order), path, true)
-        if not ok then
-            logger.warn("BookOrbit: cannot write menu order file", path, err)
-        end
-        return
-    end
+    if not lfs.attributes(path) then return end
 
     local existing = util.readFromFile(path, "r")
     if not existing then
@@ -151,11 +127,11 @@ local function ensureOne(prefix, order_module)
     end
 
     if isGeneratedByUs(existing) then
-        local content = serializeOurs(order)
-        if content ~= existing then
-            local ok, err = util.writeToFile(content, path, true)
-            if not ok then
-                logger.warn("BookOrbit: cannot update menu order file", path, err)
+        local ok, err = os.remove(path)
+        if not ok then
+            local cleared, clear_err = util.writeToFile(EMPTY_OVERRIDE, path, true)
+            if not cleared then
+                logger.warn("BookOrbit: cannot clear generated menu order file", path, err, clear_err)
             end
         end
         return
@@ -169,20 +145,27 @@ local function ensureOne(prefix, order_module)
     end
     if type(user.tools) == "table" then
         normalizeBookOrbitIds(user.tools)
-    else
-        user.tools = order.tools
     end
-    -- A hand-kept menu bar keeps its own order; only BookOrbit's tab moves.
     if type(user[BUTTONS]) == "table" then
         normalizeButtons(user[BUTTONS], BookOrbitMenuPin.tab)
-    elseif order[BUTTONS] then
-        user[BUTTONS] = order[BUTTONS]
+        user[TAB_ID] = BookOrbitMenuPin.tab and {} or nil
+    else
+        user[TAB_ID] = nil
     end
-    user[TAB_ID] = BookOrbitMenuPin.tab and {} or nil
     local ok, err = util.writeToFile(dump(user, nil, true), path, true, true)
     if not ok then
         logger.warn("BookOrbit: cannot update user menu order file", path, err)
     end
+end
+
+local function ensureOne(prefix, order_module)
+    local ok, order = pcall(require, order_module)
+    if not ok then
+        logger.warn("BookOrbit: cannot load menu order", order_module, order)
+        return
+    end
+    normalizeRuntimeOrder(order)
+    migrateOverride(prefix)
 end
 
 local function ensureAll()
@@ -201,7 +184,7 @@ function BookOrbitMenuPin.ensure(with_tab)
     ensureAll()
 end
 
--- Rewrites both order files after the menu bar setting changes.
+-- Updates both cached orders after the menu bar setting changes.
 function BookOrbitMenuPin.refresh(with_tab)
     BookOrbitMenuPin.tab = with_tab ~= false
     BookOrbitMenuPin.done = true

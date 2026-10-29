@@ -880,8 +880,57 @@
     {
       "idx": 125,
       "version": "7",
-      "when": 1792576114687,
-      "tag": "0125_torbox_download_client",
+      "when": 1792562365254,
+      "tag": "0125_add_read_aloud_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1792562395825,
+      "tag": "0126_add_read_aloud_job_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1792639172417,
+      "tag": "0127_add_audiobook_chapter_editor",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1792649881231,
+      "tag": "0128_add_reading_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1792693992005,
+      "tag": "0129_add_external_metadata_providers",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1792705454131,
+      "tag": "0130_add_metadata_provider_icons",
+      "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "7",
+      "when": 1792810767351,
+      "tag": "0131_restore_metadata_editor_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1793266587916,
+      "tag": "0132_torbox_download_client",
       "breakpoints": true
     }
   ]

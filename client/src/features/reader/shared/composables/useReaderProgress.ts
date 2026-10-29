@@ -1,5 +1,5 @@
 import { computed, onUnmounted, ref, unref, type MaybeRef, type Ref } from 'vue'
-import { api } from '@/lib/api'
+import { fetchFileProgress, saveReadingProgress } from '@/lib/reading-progress'
 import type { FoliateRenderer, RelocateDetail } from '../../epub/composables/useFoliate'
 
 export type FooterDisplayMode = 0 | 1 | 2
@@ -143,9 +143,8 @@ export function useReaderProgress(
 
   async function load() {
     if (!unref(trackingEnabled)) return
-    const res = await api(`/api/v1/books/files/${fileId}/progress`)
-    if (!res.ok) return
-    const data = await res.json()
+    const data = await fetchFileProgress(fileId)
+    if (!data) return
     hadSavedPosition =
       normalizeString(data.cfi) !== null ||
       normalizeString(data.koboLocationValue) !== null ||
@@ -254,9 +253,8 @@ export function useReaderProgress(
     const secondsOf = options.narrationSeconds
     const fragment = mediaOverlayFragment.value
     if (!secondsOf || !fragment) return null
-    const res = await api(`/api/v1/books/files/${fileId}/progress`).catch(() => null)
-    if (!res?.ok) return null
-    const data = (await res.json()) as Record<string, unknown>
+    const data = await fetchFileProgress(fileId).catch(() => null)
+    if (!data) return null
     const stamp = positionStamp(data)
     const serverFragment = normalizeString(data.mediaOverlayFragment)
     if (!serverFragment || serverFragment === fragment) return null
@@ -279,29 +277,29 @@ export function useReaderProgress(
   }
 
   function postProgress(safePercentage: number) {
-    return api(`/api/v1/books/files/${fileId}/progress`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cfi: cfi.value,
-        pageNumber: normalizePageNumber(pageNumber.value),
-        percentage: safePercentage,
-        koboLocationSource: koboLocationSource.value,
-        koboLocationType: koboLocationType.value,
-        koboLocationValue: koboLocationValue.value,
-        koboContentSourceProgressPercent: normalizeNullablePercentage(koboContentSourceProgressPercent.value),
-        koreaderProgress: koreaderProgress.value,
-        // Left out of a page turn, which says nothing about narration: sent along, the marker this
-        // reader read when it opened went back over a newer one another device had saved since.
-        ...(pendingSource.value === 'narration'
-          ? {
-              positionSeconds: positionSeconds.value,
-              mediaOverlayFragment: mediaOverlayFragment.value,
-              mediaOverlaySectionIndex: mediaOverlaySectionIndex.value,
-            }
-          : {}),
-        source: pendingSource.value,
-      }),
+    return saveReadingProgress({
+      fileId,
+      kind: pendingSource.value,
+      percentage: safePercentage,
+      text: { cfi: cfi.value, page: normalizePageNumber(pageNumber.value) },
+      kobo: {
+        source: koboLocationSource.value,
+        type: koboLocationType.value,
+        value: koboLocationValue.value,
+        contentPercent: normalizeNullablePercentage(koboContentSourceProgressPercent.value),
+      },
+      koreader: koreaderProgress.value,
+      // Left out of a page turn, which says nothing about narration: sent along, the marker this
+      // reader read when it opened went back over a newer one another device had saved since.
+      ...(pendingSource.value === 'narration'
+        ? {
+            narration: {
+              seconds: positionSeconds.value,
+              fragment: mediaOverlayFragment.value,
+              sectionIndex: mediaOverlaySectionIndex.value,
+            },
+          }
+        : {}),
     })
   }
 
@@ -312,9 +310,8 @@ export function useReaderProgress(
    */
   async function checkForNewerPosition(): Promise<NewerPosition | null> {
     if (!unref(trackingEnabled) || saveTimer || saving) return null
-    const res = await api(`/api/v1/books/files/${fileId}/progress`)
-    if (!res.ok || saveTimer || saving) return null
-    const data = (await res.json()) as Record<string, unknown>
+    const data = await fetchFileProgress(fileId)
+    if (!data || saveTimer || saving) return null
     const stamp = positionStamp(data)
     if (stamp <= knownServerStamp) return null
     if (normalizeString(data.cfi) === cfi.value && normalizeString(data.mediaOverlayFragment) === mediaOverlayFragment.value) {

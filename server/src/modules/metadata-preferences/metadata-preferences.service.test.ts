@@ -209,6 +209,18 @@ describe('MetadataPreferencesService', () => {
     await expect(service.resetLibraryToGlobal(50)).rejects.toThrow(NotFoundException);
   });
 
+  it('collects the providers named by the global rules and by every library override', async () => {
+    vi.spyOn(service, 'getGlobal').mockResolvedValue({
+      fields: { title: { enabled: true, mergeStrategy: 'overwrite', providers: [MetadataProviderKey.GOOGLE] } },
+    } as never);
+    db.__selectChain.where.mockResolvedValue([
+      { overrides: { cover: { enabled: true, mergeStrategy: 'fillMissing', providers: ['aladin', 'fantlab'] } } },
+      { overrides: {} },
+    ]);
+
+    await expect(service.providersNamedInRules()).resolves.toEqual(new Set(['google', 'aladin', 'fantlab']));
+  });
+
   describe('seedAudioCoverRules', () => {
     const cover = { enabled: false, mergeStrategy: 'fillMissing', providers: [MetadataProviderKey.AMAZON] };
 

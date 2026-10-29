@@ -14,15 +14,16 @@ package.loaded["ffi/util"] = {
 package.loaded["ui/widget/confirmbox"] = {}
 package.loaded["device"] = {}
 package.loaded["ui/event"] = { new = function() return {} end }
-package.loaded["ui/widget/infomessage"] = { new = function(_, opts) return opts end }
 package.loaded["optmath"] = { roundPercent = function(value) return value end }
 package.loaded["ui/network/manager"] = {}
 
 local shown_texts = {}
+package.loaded["bookorbit_toast"] = {
+    error = function(text) table.insert(shown_texts, text) end,
+    show = function(text) table.insert(shown_texts, text) end,
+}
 package.loaded["ui/uimanager"] = {
-    show = function(_, message)
-        table.insert(shown_texts, message.text)
-    end,
+    show = function() end,
     scheduleIn = function() end,
     unschedule = function() end,
     getElapsedTimeSinceBoot = function() return 0 end,
@@ -108,8 +109,8 @@ end
 assertEqual(plugin:reconcileProgressBeforeBookSync("digest", function() end), false, "manual book sync rejects missing UI")
 plugin:updateProgress(false, true)
 plugin:getProgress(false, true)
-assertEqual(shown_texts[1], "No reader book is open.", "manual book sync explains missing reader book")
-assertEqual(shown_texts[2], "No reader book is open.", "interactive push explains missing reader book")
-assertEqual(shown_texts[3], "No reader book is open.", "interactive pull explains missing reader book")
+assertEqual(shown_texts[1], "No book is open", "manual book sync explains missing reader book")
+assertEqual(shown_texts[2], "No book is open", "interactive push explains missing reader book")
+assertEqual(shown_texts[3], "No book is open", "interactive pull explains missing reader book")
 
 print("bookorbit_progress_digest_test.lua: ok")

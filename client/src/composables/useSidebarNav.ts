@@ -1,7 +1,7 @@
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, type RouteLocationNormalizedLoaded, type RouteLocationRaw } from 'vue-router'
-import { BarChart3, BookPlus, Highlighter, LayoutDashboard, Library, ListMusic, PackageOpen, Trophy, Users, Wrench } from '@lucide/vue'
+import { BarChart3, BookPlus, Highlighter, History, LayoutDashboard, Library, ListMusic, PackageOpen, Trophy, Users, Wrench } from '@lucide/vue'
 import { Permission, type BrowseCounts, type LibraryType, type SidebarSectionId } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -113,6 +113,15 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     tourId: 'statistics-btn',
   },
   {
+    id: 'reading-history',
+    labelKey: 'components.appHeader.readingHistory',
+    icon: History,
+    zone: 'reading',
+    modes: ['books'],
+    to: { name: 'reading-history' },
+    isActive: (route) => route.name === 'reading-history',
+  },
+  {
     id: 'achievements',
     labelKey: 'components.appHeader.achievements',
     icon: Trophy,
@@ -155,9 +164,15 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     icon: Wrench,
     zone: 'primary',
     modes: ['books'],
-    to: (context) => ({ name: context.hasPermission('manage_libraries') ? 'tools-entity-manager' : 'tools-duplicate-books' }),
+    to: (context) => ({
+      name: context.hasPermission('manage_libraries')
+        ? 'tools-entity-manager'
+        : context.hasPermission('library_delete_books')
+          ? 'tools-duplicate-books'
+          : 'tools-chapter-health',
+    }),
     isActive: (route) => routeNameStartsWith(route, 'tools-'),
-    permission: ['manage_libraries', 'library_delete_books'],
+    permission: ['manage_libraries', 'library_delete_books', 'library_edit_metadata'],
   },
   {
     id: 'podcast-queue',

@@ -6,6 +6,7 @@ import { Readable } from 'stream';
 
 import { isAudioFormat, MetadataProviderKey, resolveBookDockSearchTitle, type BookDockMetadata } from '@bookorbit/types';
 import type { BookDockFileRow } from '../../db/schema';
+import { resolveSearchMediaKind } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { canonicalIsbn13, normalizeMetadataIsbn } from '../../common/text-match/isbn-normalize';
 import { waitForDirectoryStability } from '../../common/utils/fs-stability.utils';
@@ -13,6 +14,7 @@ import { SUPPORTED_BOOK_FORMATS, UploadValidatorService } from '../upload/upload
 import { UploadStorageService } from '../upload/upload-storage.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { MetadataFetchPipeline } from '../metadata-fetch/metadata-fetch-pipeline';
+import { isExternalProviderIdKey } from '../metadata-fetch/provider-ids/provider-id.store';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
 import { interpretRelease } from '../scanner/lib/release-plan';
 import { buildSingleBookCandidate } from '../scanner/lib/walk';
@@ -373,6 +375,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       author: meta?.authors?.[0] ?? undefined,
       isbn: meta?.isbn13?.trim() || meta?.isbn10?.trim() || undefined,
       isAudiobook: row.format != null && isAudioFormat(row.format),
+      mediaKind: resolveSearchMediaKind([{ format: row.format, role: 'content' }], row.format != null && isAudioFormat(row.format)),
     };
     if (!params.title && !params.isbn) return;
     // The same field rules the book will be refreshed by once it is on a shelf: the library it is
@@ -413,10 +416,15 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       delete sources.audioCoverUrl;
       const fetched = normalizeBookDockMetadata(resolved) ?? {};
       for (const [provider, providerId] of Object.entries(providerIds)) {
+        if (!providerId) continue;
         const field = BOOK_DOCK_PROVIDER_ID_FIELDS[provider as MetadataProviderKey];
-        if (!field || !providerId) continue;
-        (fetched as Record<string, unknown>)[field] = providerId;
-        sources[field] = provider;
+        if (field) {
+          (fetched as Record<string, unknown>)[field] = providerId;
+          sources[field] = provider;
+        } else if (isExternalProviderIdKey(provider)) {
+          // No column to name: an external provider's id rides along until the book is filed.
+          fetched.externalProviderIds = { ...fetched.externalProviderIds, [provider]: providerId };
+        }
       }
       const fetchedMetadataSources = normalizeBookDockMetadataSources(sources);
       const updates =

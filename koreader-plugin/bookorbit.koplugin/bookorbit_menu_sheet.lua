@@ -118,9 +118,18 @@ local function navGrid(w, d, ncols)
             local count = d.counts[entry.count]
             local right = here and MenuUI.chip(_("Here"), { h = 22 })
                 or text(count and tostring(count) or "", { s = 14, col = INK.g4 })
+            local label_w = cw - px(20) - 2 * px(12) - right:getSize().w
+            local label_s = BoardUI.fitSize(entry.label(), { s = 15, b = here }, label_w, 13)
+            -- In a narrow cell the Here tag gives way; the bold label and
+            -- icon still mark the current place.
+            if here and text(entry.label(), { s = label_s, b = true }):getSize().w > label_w then
+                right = space(1, 1)
+                label_w = cw - px(20) - 2 * px(12) - 1
+                label_s = BoardUI.fitSize(entry.label(), { s = 15, b = true }, label_w, 13)
+            end
             local cell = hstack({ w = cw, h = rh, gap = px(12) }, {
                 icon(entry.icon, px(20), { sw = here and 2.5 or 2 }),
-                text(entry.label(), { s = 15, b = here, w = cw - px(20) - 2 * px(12) - right:getSize().w }),
+                text(entry.label(), { s = label_s, b = here, w = label_w }),
                 right,
             })
             table.insert(cells, BoardUI.hit(cell, { kind = "link", link = entry.link }))
@@ -192,12 +201,15 @@ function MenuSheet.body(d, w, o)
         or tile(last_w, th, "folder-open", _("Files"), _("Close BookOrbit"), { kind = "exit" })
     local tiles = hstack({ w = w, gap = gap }, { first, second, third })
 
-    local iw = MenuUI.rowsIn(w)
+    -- side_rows: a short screen sets the rows beside Go to, not under it.
+    local nav_w = o.side_rows and math.floor((w - px(20)) * 0.6) or w
+    local rows_w = o.side_rows and (w - nav_w - px(20)) or w
+    local iw = MenuUI.rowsIn(rows_w)
     local rows = {}
     if d.list then
-        table.insert(rows, MenuUI.row(iw, { icon = "list-filter", label = _("Sort, filter and view"), sub = d.list, sub_data = true, chevron = true, action = { kind = "list-options" } }))
+        table.insert(rows, MenuUI.row(iw, { icon = "list-filter", label = _("Sort, filter and view"), sub = not o.side_rows and d.list or nil, sub_data = true, chevron = true, action = { kind = "list-options" } }))
     end
-    table.insert(rows, MenuUI.row(iw, { icon = "sliders-horizontal", label = _("Settings"), sub = _("Opening, sync, Home, downloads"), chevron = true, action = { kind = "settings" } }))
+    table.insert(rows, MenuUI.row(iw, { icon = "sliders-horizontal", label = _("Settings"), sub = not o.side_rows and _("Opening, sync, Home, downloads") or nil, chevron = true, action = { kind = "settings" } }))
     local status_summary
     if not d.signed_in then
         status_summary = _("Not signed in")
@@ -209,10 +221,10 @@ function MenuSheet.body(d, w, o)
         status_summary = d.synced and _("All synced") or _("Not synced yet")
     end
     table.insert(rows, MenuUI.row(iw, { icon = "activity", label = _("Sync status"),
-        sub = status_summary,
+        sub = not o.side_rows and status_summary or nil,
         chevron = true, action = { kind = "status" } }))
     table.insert(rows, MenuUI.row(iw, { icon = "circle-help", label = _("Help & about"),
-        sub = d.update and T(_("Version %1 is ready"), d.update) or T(_("Version %1"), d.version),
+        sub = not o.side_rows and (d.update and T(_("Version %1 is ready"), d.update) or T(_("Version %1"), d.version)) or nil,
         trail = d.update and MenuUI.chip(_("New"), { ink = true }) or nil,
         chevron = true, action = { kind = "about" } }))
 
@@ -240,9 +252,13 @@ function MenuSheet.body(d, w, o)
         banner and space(nil, px(12)) or false,
         tiles,
         space(nil, px(16)),
-        MenuUI.section(w, _("Go to"), navGrid(w, d, o.cols or 2)),
-        space(nil, px(16)),
-        MenuUI.group(w, rows),
+        o.side_rows and hstack({ w = w, gap = px(20), valign = "top" }, {
+            MenuUI.section(nav_w, _("Go to"), navGrid(nav_w, d, 2)),
+            -- Level with the Go to grid under its label.
+            vstack({ w = rows_w }, { space(nil, MenuUI.label(rows_w, _("Go to")):getSize().h + px(8)), MenuUI.group(rows_w, rows) }),
+        }) or MenuUI.section(w, _("Go to"), navGrid(w, d, o.cols or 2)),
+        not o.side_rows and space(nil, px(16)) or false,
+        not o.side_rows and MenuUI.group(w, rows) or false,
     }
 end
 
@@ -253,13 +269,25 @@ local function build(page, sw, sh)
     if MenuUI.wide() then
         local pw = math.min(px(MenuUI.landscape() and 620 or 460), sw - 2 * mx)
         local pad = px(18)
-        local content = vstack({ w = pw - 2 * MenuUI.line(), pad = { px(4), pad - MenuUI.line(), pad, pad - MenuUI.line() } },
-            MenuSheet.body(d, pw - 2 * pad, { popover = true, cols = MenuUI.landscape() and 3 or 2 }))
+        local function contentFor(width, side_rows)
+            return vstack({ w = width - 2 * MenuUI.line(), pad = { px(4), pad - MenuUI.line(), pad, pad - MenuUI.line() } },
+                MenuSheet.body(d, width - 2 * pad, { popover = true, cols = MenuUI.landscape() and 3 or 2, side_rows = side_rows }))
+        end
+        local mark = BoardUI.hitMark()
+        local content = contentFor(pw, false)
+        -- Taller than a short, wide screen: wider, with the rows beside Go to.
+        if content:getSize().h + 2 * MenuUI.line() > sh - px(16) and MenuUI.landscape() then
+            content:free()
+            BoardUI.hitTrim(mark)
+            pw = math.min(math.floor(pw * 1.5 + 0.5), sw - 2 * mx)
+            content = contentFor(pw, true)
+        end
         local ph = content:getSize().h + 2 * MenuUI.line()
         local panel = BoardUI.box({ w = pw, h = ph, radius = px(16), border = math.max(1, px(1.5)), border_col = INK.black, bg = INK.white }, content)
-        -- Under the button it came from: top right on Home and on the lists.
+        -- Under the button it came from: top right on Home and on the lists,
+        -- raised as far as it needs to stay on a short screen.
         local x = sw - mx - pw
-        local y = px(52)
+        local y = math.max(px(8), math.min(px(52), sh - px(8) - ph))
         page.panel_rect = require("ui/geometry"):new{ x = x, y = y, w = pw, h = ph }
         return BoardUI.overlay(sw, sh, { { widget = panel, x = x, y = y } })
     end

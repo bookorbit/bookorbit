@@ -4,7 +4,9 @@ function makeRepository() {
   const limit = vi.fn();
   const where = vi.fn().mockReturnValue({ limit });
   const leftJoin = vi.fn().mockReturnValue({ where });
-  const from = vi.fn().mockReturnValue({ leftJoin });
+  // The book's media files are a second, plain select.
+  const filesWhere = vi.fn().mockResolvedValue([]);
+  const from = vi.fn().mockReturnValue({ leftJoin, where: filesWhere });
   const select = vi.fn().mockReturnValue({ from });
   const findFirst = vi.fn();
 
@@ -20,6 +22,7 @@ function makeRepository() {
   return {
     repo: new MetadataFetchRepository(db as never),
     limit,
+    filesWhere,
     where,
     leftJoin,
     from,
@@ -30,9 +33,12 @@ function makeRepository() {
 
 describe('MetadataFetchRepository', () => {
   it('returns provider-id row for a known book', async () => {
-    const { repo, limit } = makeRepository();
+    const { repo, limit, filesWhere } = makeRepository();
+    const files = [{ id: 3, format: 'cbz', role: 'content' }];
+    filesWhere.mockResolvedValue(files);
     const row = {
       libraryId: 5,
+      primaryFileId: 3,
       googleBooksId: 'google-1',
       goodreadsId: 'goodreads-1',
       amazonId: 'amazon-1',
@@ -46,6 +52,7 @@ describe('MetadataFetchRepository', () => {
 
     await expect(repo.findStoredProviderIdsRow(99)).resolves.toEqual({
       ...row,
+      mediaFiles: files,
       coverMedia: { hasEbook: true, hasAudio: false },
     } satisfies Partial<StoredProviderIdsRow>);
   });

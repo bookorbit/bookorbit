@@ -631,6 +631,12 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: '/history',
+        name: 'reading-history',
+        component: () => import('@/features/reading-history/views/ReadingHistoryView.vue'),
+        meta: { titleRow: true, title: () => t('titles.readingHistory') },
+      },
+      {
         path: '/achievements',
         name: 'achievements',
         component: () => import('@/views/AchievementsView.vue'),
@@ -729,6 +735,12 @@ export const routes: RouteRecordRaw[] = [
             name: 'tools-missing-resources',
             component: () => import('@/features/tools/missing-resources/views/MissingResourcesView.vue'),
             meta: { title: () => t('titles.missingResources') },
+          },
+          {
+            path: 'chapter-health',
+            name: 'tools-chapter-health',
+            component: () => import('@/features/tools/chapter-health/views/ChapterHealthView.vue'),
+            meta: { title: () => t('titles.chapterHealth') },
           },
           {
             path: ':pathMatch(.*)*',

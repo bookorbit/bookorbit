@@ -690,7 +690,7 @@ local function stepMatchNext(ctx)
         -- stored, so these books stay on the fast path after the sweep records
         -- a changed library version.
         ctx.state:setMatched(match.hash, match.bookFileId, match.bookId,
-            cand and cand.file or nil, body.libraryVersion)
+            cand and cand.file or nil, body.libraryVersion, match.positionCompatible)
     end
     for _, md5 in ipairs(batch) do
         if not matched[md5] then
@@ -1063,7 +1063,8 @@ local function stepAnnotationsNext(ctx)
 
     local bookmarks_done = exchangeBookmarksForEntry(ctx, entry, apply_mode, pending)
     if aborted(ctx) then return end
-    if bookmarks_done and not result.had_errors and apply_mode == "sidecar" and entry.sidecar_marked == false
+    if bookmarks_done and not result.had_errors and not result.incompatible
+            and apply_mode == "sidecar" and entry.sidecar_marked == false
             and BookOrbitSidecar.markFile(entry.file) and pending then
         -- The marker is this sweep's own write; without this the next sweep would
         -- see a changed sidecar and exchange the book again for nothing.
@@ -1283,7 +1284,11 @@ local function stepDone(ctx)
             if ann_done and state_done and progress_done then
                 book.sidecarMtime = pending.mtime
                 book.annCount = pending.ann_count
-                BookOrbitAnnotations.advanceWatermark(book, pending.ann_max_datetime, device_now)
+                -- A copy the server cannot place highlights in sent none, so its
+                -- watermark stays behind them for a later compatible match.
+                if not book.positionIncompatible then
+                    BookOrbitAnnotations.advanceWatermark(book, pending.ann_max_datetime, device_now)
+                end
                 if state_done and pending.need_state then
                     if not pending.state_used_server then
                         book.statusSyncedModified = pending.status_modified or book.statusSyncedModified

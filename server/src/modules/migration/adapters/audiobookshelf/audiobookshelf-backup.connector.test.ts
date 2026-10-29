@@ -53,6 +53,10 @@ describe('AudiobookshelfBackupConnector', () => {
         series: [{ id: 'series-1', name: 'Examples', sequence: '2' }],
         audioFiles: [{ ino: '101', index: 0, duration: 120 }],
         ebookFile: { ino: '102', ebookFormat: 'epub' },
+        chapters: [
+          { start: 0, title: 'Opening' },
+          { start: 61.5, title: 'One' },
+        ],
       },
     });
     expect(records.mediaProgress).toEqual([
@@ -116,7 +120,7 @@ describe('AudiobookshelfBackupConnector', () => {
 
     expect(records.authorsAvailable).toBe(true);
     expect(records.libraryItems[0]).toMatchObject({
-      book: { authors: [{ id: 'author-1', name: 'Ada Author', sortName: null, description: null }] },
+      book: { authors: [{ id: 'author-1', name: 'Ada Author', sortName: null, description: null }], chapters: [] },
     });
   });
 
@@ -229,7 +233,16 @@ function createCompleteDatabase(path: string): void {
       timeListening INTEGER, userId TEXT, extraData TEXT, createdAt TEXT, updatedAt TEXT
     );
     CREATE TABLE libraryFolders (id TEXT PRIMARY KEY, libraryId TEXT, path TEXT);
+    ALTER TABLE books ADD COLUMN chapters TEXT;
   `);
+  database.prepare('UPDATE books SET chapters = ? WHERE id = ?').run(
+    JSON.stringify([
+      { id: 0, start: 0, end: 61.5, title: 'Opening' },
+      { id: 1, start: 61.5, end: 120, title: 'One' },
+      { id: 2, title: 'No start' },
+    ]),
+    'book-1',
+  );
   database.prepare('INSERT INTO authors VALUES (?, ?, ?, ?)').run('author-1', 'Ada Author', 'Author, Ada', 'Bio');
   database.prepare('INSERT INTO bookAuthors VALUES (?, ?, ?, ?)').run('book-author-1', 'book-1', 'author-1', '2026-01-01');
   database.prepare('INSERT INTO series VALUES (?, ?)').run('series-1', 'Examples');

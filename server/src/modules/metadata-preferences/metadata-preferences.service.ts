@@ -121,6 +121,22 @@ export class MetadataPreferencesService implements OnApplicationBootstrap {
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
   }
 
+  /** Every provider a field rule names, in the global rules or in any library's overrides. */
+  async providersNamedInRules(): Promise<Set<string>> {
+    const [global, libraryRows] = await Promise.all([
+      this.getGlobal(),
+      this.db
+        .select({ overrides: schema.libraries.metadataFetchPreferences })
+        .from(schema.libraries)
+        .where(isNotNull(schema.libraries.metadataFetchPreferences)),
+    ]);
+    const named = new Set<string>();
+    for (const rules of [global.fields, ...libraryRows.map((row) => row.overrides ?? {})]) {
+      for (const rule of Object.values(rules)) for (const provider of rule?.providers ?? []) named.add(provider);
+    }
+    return named;
+  }
+
   async getForLibrary(libraryId: number, global?: MetadataFetchPreferences): Promise<LibraryMetadataPreferences> {
     const library = await this.db.query.libraries.findFirst({
       where: eq(schema.libraries.id, libraryId),

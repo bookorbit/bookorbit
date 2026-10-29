@@ -10,8 +10,7 @@ ack-gated semantics of the full sweep, and both write the same state file
 under mutual exclusion, so sweep and snapshot never double-upload.
 ]]
 
-local InfoMessage = require("ui/widget/infomessage")
-local Notification = require("ui/widget/notification")
+local Toast = setmetatable({}, { __index = function(_t, key) return require("bookorbit_toast")[key] end })
 local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
@@ -206,26 +205,24 @@ local function finish(ctx, err)
     end
 
     if err == "auth" then
-        if ctx.interactive and not ctx.quiet then
-            UIManager:show(InfoMessage:new{ text = _("BookOrbit sync: login failed. Check your credentials."), timeout = 4 })
-        elseif not ctx.quiet then
-            Notification:notify(_("BookOrbit sync: login failed"))
+        if not ctx.quiet then
+            Toast.error(_("BookOrbit sign-in failed. Check your account"))
         end
     elseif err == "network" then
         if ctx.interactive and not ctx.quiet then
-            UIManager:show(InfoMessage:new{ text = _("BookOrbit sync: server not reachable."), timeout = 4 })
+            Toast.error(_("BookOrbit server not reachable"))
         end
         logger.dbg("BookOrbit: book sync aborted, server not reachable")
     elseif err == "unmatched" then
         if ctx.interactive and not ctx.quiet then
-            UIManager:show(InfoMessage:new{ text = _("This book is not in your BookOrbit library."), timeout = 4 })
+            Toast.show(_("This book is not in your BookOrbit library"), { icon = "info" })
         end
         logger.dbg("BookOrbit: book sync skipped, book unmatched:", ctx.snap.digest)
     elseif err == "outbox" then
         logger.err("BookOrbit: lifecycle sync stopped because its durable state could not be updated")
     else
         if ctx.interactive and not ctx.quiet then
-            local text = T(_("BookOrbit: book synced. %1 reading events."), ctx.counts.page_stats)
+            local text = T(_("%1 reading events."), ctx.counts.page_stats)
             if ctx.highlight_summary and BookOrbitHighlightSummary.hasCounts(ctx.highlight_summary) then
                 text = text .. "\n" .. BookOrbitHighlightSummary.message(ctx.highlight_summary)
             else
@@ -244,7 +241,7 @@ local function finish(ctx, err)
             if ctx.had_errors then
                 text = text .. "\n" .. _("Some uploads failed and will retry on the next sync.")
             end
-            UIManager:show(InfoMessage:new{ text = text, timeout = 4 })
+            require("bookorbit_dialog_ui").notice{ title = _("Book synced"), text = text }
         end
         logger.info(string.format(
             "BookOrbit: book sync done reason=%s pageStats=%d annotations=%d applied=%d deleted=%d errors=%s",
@@ -343,7 +340,7 @@ stepMatch = function(ctx)
 
     for _, match in ipairs(body.matches or {}) do
         if match.hash == ctx.snap.digest then
-            ctx.state:setMatched(match.hash, match.bookFileId, match.bookId, ctx.snap.file)
+            ctx.state:setMatched(match.hash, match.bookFileId, match.bookId, ctx.snap.file, nil, match.positionCompatible)
             bindStatsRow(ctx, ctx.state:getBook(ctx.snap.digest))
             if not acknowledge(ctx, "match") then return end
             return step(ctx, stepStats)
@@ -564,7 +561,8 @@ stepAnnotations = function(ctx)
         closed_book = apply_mode == "sidecar",
     })
     if not result.had_errors then
-        ctx.sidecar_ann_done = true
+        -- An incompatible copy exchanged nothing, so its sidecar is not marked as known.
+        if not result.incompatible then ctx.sidecar_ann_done = true end
         book.annCount = ctx.snap.ann_count
         -- Only park remote changes when the user actually wants them applied;
         -- with two-way highlights off there is nothing to come back for.
@@ -719,7 +717,11 @@ stepBookmarks = function(ctx)
         return step(ctx, stepState)
     end
 
-    if result.had_errors then ctx.had_errors = true else ctx.sidecar_bm_done = true end
+    if result.had_errors then
+        ctx.had_errors = true
+    elseif not result.incompatible then
+        ctx.sidecar_bm_done = true
+    end
     ctx.counts.bookmarks = (ctx.counts.bookmarks or 0) + result.uploaded
     ctx.highlight_summary = BookOrbitHighlightSummary.addBookmarks(ctx.highlight_summary, result)
     if not result.had_errors and result.remote_pending and ctx.on_remote_pending then
@@ -872,7 +874,7 @@ end
 function BookOrbitBookSync.run(opts)
     if BookOrbitBookSync.running or BookOrbitSweep.isRunning() then
         if opts.interactive then
-            UIManager:show(InfoMessage:new{ text = _("BookOrbit sync is already running."), timeout = 2 })
+            Toast.show(_("BookOrbit sync is already running"), { icon = "hourglass" })
         end
         return false
     end
@@ -883,7 +885,7 @@ function BookOrbitBookSync.run(opts)
     local client = BookOrbitApi.new(opts.api)
     if not client:isConfigured() then
         if opts.interactive then
-            UIManager:show(InfoMessage:new{ text = _("Please configure the BookOrbit server and login first."), timeout = 3 })
+            Toast.error(_("Sign in to BookOrbit first"))
         end
         return false
     end

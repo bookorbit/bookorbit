@@ -51,7 +51,7 @@ function handleLoadMore() {
           <Button
             variant="ghost"
             size="icon"
-            class="relative h-8 w-8 border border-(--shell-accent-line) text-foreground transition-colors duration-150 hover:bg-(--shell-accent-wash)"
+            class="relative size-(--dock-control,2rem) border border-(--shell-accent-line) text-foreground transition-colors duration-150 hover:bg-(--shell-accent-wash)"
             :class="iconRadiusClass"
             :aria-label="t('notifications.title')"
           >

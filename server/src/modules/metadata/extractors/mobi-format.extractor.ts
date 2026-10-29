@@ -1,11 +1,14 @@
 import { extractMobiCover, parseMobiFile } from '../lib/mobi-parser';
 import { splitMetadataIsbn } from '../../../common/text-match/isbn-normalize';
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../common/utils/published-date.utils';
-import type { FormatExtractor, ParsedBookData } from './format-extractor.interface';
+import type { FormatExtractOptions, FormatExtractor, ParsedBookData } from './format-extractor.interface';
 
 export class MobiFormatExtractor implements FormatExtractor {
-  async extract(absolutePath: string): Promise<ParsedBookData | null> {
-    const [mobi, cover] = await Promise.all([parseMobiFile(absolutePath), extractMobiCover(absolutePath).catch(() => null)]);
+  async extract(absolutePath: string, options?: FormatExtractOptions): Promise<ParsedBookData | null> {
+    const [mobi, cover] = await Promise.all([
+      parseMobiFile(absolutePath),
+      options?.cover === false ? null : extractMobiCover(absolutePath).catch(() => null),
+    ]);
     if (!mobi) return null;
 
     const publishedDate = parsePublishedDateKey(mobi.publishedDate ?? undefined) ?? null;

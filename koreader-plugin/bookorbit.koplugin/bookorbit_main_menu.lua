@@ -153,6 +153,7 @@ function MainMenu:diagnosticsSections()
             annotation_sync = self.settings.annotation_sync,
             has_open_book = has_open_book,
             matched = self.isOpenBookMatched and self:isOpenBookMatched(digest) or false,
+            position_incompatible = self.isOpenBookPositionIncompatible and self:isOpenBookPositionIncompatible(digest) or false,
             scheduler_status = scheduler,
             last_highlight_sync = self.settings.last_highlight_sync,
         } },
@@ -559,6 +560,15 @@ function MainMenu:applyBoardTiles(catalog, tiles)
         catalog:boardSetTiles(tiles)
     else
         self.settings[BoardStore.SETTING_KEY] = BoardStore.withTiles(self.settings, tiles)
+        G_reader_settings:flush()
+    end
+end
+
+function MainMenu:applyBoardColour(catalog, colour)
+    if catalog and catalog.boardSetColour then
+        catalog:boardSetColour(colour)
+    else
+        self.settings[BoardStore.SETTING_KEY] = BoardStore.withColour(self.settings, colour)
         G_reader_settings:flush()
     end
 end

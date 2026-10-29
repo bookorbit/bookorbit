@@ -1,9 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lte, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { ReadAloudDeliveryPreference } from '@bookorbit/types';
+import type { ContentFilterRules, ReadAloudDeliveryPreference } from '@bookorbit/types';
 import { chunk } from '../../common/utils/batch.utils';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
@@ -500,6 +501,7 @@ export class KoreaderRepository {
         koreaderTitle: schema.koreaderBookHashLinks.koreaderTitle,
         koreaderAuthors: schema.koreaderBookHashLinks.koreaderAuthors,
         koreaderLastOpen: schema.koreaderBookHashLinks.koreaderLastOpen,
+        positionCompatible: compatibleProgressHash(schema.koreaderBookHashLinks.hash),
         createdAt: schema.koreaderBookHashLinks.createdAt,
         updatedAt: schema.koreaderBookHashLinks.updatedAt,
       })
@@ -530,6 +532,80 @@ export class KoreaderRepository {
     }
 
     return rows.map((row) => ({ ...row, bookAuthors: authorsByBook.get(row.bookId) ?? [] }));
+  }
+
+  /**
+   * Present books in the given libraries whose lowercased title is one of `titleKeys`, at most
+   * `perTitleLimit` per title (lowest ids first), with their primary file and authors. Pass
+   * `contentFilters` for a non-superuser so hidden books are never offered.
+   */
+  async findBooksByTitleKeys(
+    titleKeys: string[],
+    accessibleLibraryIds: number[] | null,
+    contentFilters: ContentFilterRules | null,
+    perTitleLimit: number,
+  ) {
+    if (titleKeys.length === 0) return [];
+    if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return [];
+
+    const titleKey = sql<string>`lower(${schema.bookMetadata.title})`;
+    const ranked = this.db
+      .select({
+        bookId: sql<number>`${schema.books.id}`.as('ranked_book_id'),
+        titleKey: sql<string>`lower(${schema.bookMetadata.title})`.as('ranked_title_key'),
+        rank: sql<number>`row_number() over (partition by lower(${schema.bookMetadata.title}) order by ${schema.books.id})`.as('ranked_rank'),
+      })
+      .from(schema.bookMetadata)
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookMetadata.bookId))
+      .where(
+        and(
+          inArray(titleKey, titleKeys),
+          eq(schema.books.status, 'present'),
+          accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined,
+          ...(contentFilters ? buildContentFilterClauses(contentFilters, this.db) : []),
+        ),
+      )
+      .as('ranked');
+
+    const rows = await this.db
+      .select({
+        bookId: ranked.bookId,
+        titleKey: ranked.titleKey,
+        title: schema.bookMetadata.title,
+        subtitle: schema.bookMetadata.subtitle,
+        language: schema.bookMetadata.language,
+        publishedYear: schema.bookMetadata.publishedYear,
+        format: schema.bookFiles.format,
+        role: schema.bookFiles.role,
+        libraryName: schema.libraries.name,
+      })
+      .from(ranked)
+      .innerJoin(schema.books, eq(schema.books.id, ranked.bookId))
+      .innerJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.books.id))
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+      .innerJoin(schema.libraries, eq(schema.libraries.id, schema.books.libraryId))
+      .where(lte(ranked.rank, perTitleLimit))
+      .orderBy(asc(ranked.bookId));
+
+    const authorsByBook = new Map<number, string[]>();
+    for (const ids of chunk(
+      rows.map((row) => row.bookId),
+      BATCH_QUERY_SIZE,
+    )) {
+      const authorRows = await this.db
+        .select({ bookId: schema.bookAuthors.bookId, name: schema.authors.name })
+        .from(schema.bookAuthors)
+        .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
+        .where(inArray(schema.bookAuthors.bookId, ids))
+        .orderBy(schema.bookAuthors.bookId, schema.bookAuthors.displayOrder);
+      for (const row of authorRows) {
+        const list = authorsByBook.get(row.bookId) ?? [];
+        list.push(row.name);
+        authorsByBook.set(row.bookId, list);
+      }
+    }
+
+    return rows.map((row) => ({ ...row, authors: authorsByBook.get(row.bookId) ?? [] }));
   }
 
   async upsertBookHashLink(userId: number, hash: string, bookFileId: number, metadata: KoreaderHashLinkMetadata = {}) {

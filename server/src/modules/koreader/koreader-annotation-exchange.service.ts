@@ -88,11 +88,17 @@ export interface ExchangeBookResult {
 export interface ExchangeResponse {
   results: ExchangeBookResult[];
   unmatched: string[];
+  /**
+   * Matched books whose device copy differs from the library file, so its positions cannot be placed.
+   * Reported apart from `unmatched`, which plugins read as "not in your library" and act on.
+   */
+  positionIncompatible: string[];
 }
 
 export interface ExchangeAckResponse {
   results: { hash: string; acked: number }[];
   unmatched: string[];
+  positionIncompatible: string[];
 }
 
 @Injectable()
@@ -125,13 +131,18 @@ export class KoreaderAnnotationExchangeService {
 
       const results: ExchangeBookResult[] = [];
       const unmatched: string[] = [];
+      const positionIncompatible: string[] = [];
       let pushedTotal = 0;
 
       for (const book of dto.books) {
         const hash = book.hash.toLowerCase();
         const match = matches.get(hash);
-        if (!match || match.progressCompatible === false) {
+        if (!match) {
           unmatched.push(hash);
+          continue;
+        }
+        if (match.progressCompatible === false) {
+          positionIncompatible.push(hash);
           continue;
         }
         const result = await this.exchangeBook(
@@ -149,9 +160,9 @@ export class KoreaderAnnotationExchangeService {
       }
 
       this.logger.log(
-        `[${EXCHANGE_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} pushed=${pushedTotal} unmatched=${unmatched.length} - annotation exchange completed`,
+        `[${EXCHANGE_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} pushed=${pushedTotal} unmatched=${unmatched.length} positionIncompatible=${positionIncompatible.length} - annotation exchange completed`,
       );
-      return { results, unmatched };
+      return { results, unmatched, positionIncompatible };
     } catch (error) {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
       this.logger.warn(
@@ -198,11 +209,16 @@ export class KoreaderAnnotationExchangeService {
 
       const results: { hash: string; acked: number }[] = [];
       const unmatched: string[] = [];
+      const positionIncompatible: string[] = [];
       for (const book of dto.books) {
         const hash = book.hash.toLowerCase();
         const match = matches.get(hash);
-        if (!match || match.progressCompatible === false) {
+        if (!match) {
           unmatched.push(hash);
+          continue;
+        }
+        if (match.progressCompatible === false) {
+          positionIncompatible.push(hash);
           continue;
         }
         const { acked } = await this.annotationSync.applyExchangeAck({
@@ -229,9 +245,9 @@ export class KoreaderAnnotationExchangeService {
       }
 
       this.logger.log(
-        `[${ACK_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} unmatched=${unmatched.length} - annotation exchange ack applied`,
+        `[${ACK_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} books=${results.length} unmatched=${unmatched.length} positionIncompatible=${positionIncompatible.length} - annotation exchange ack applied`,
       );
-      return { results, unmatched };
+      return { results, unmatched, positionIncompatible };
     } catch (error) {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
       this.logger.warn(

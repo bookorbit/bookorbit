@@ -29,6 +29,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { api } from '@/lib/api'
+import { registerProviderAppearance } from '@/lib/provider-appearance'
 import { metadataScoreColor } from '@/lib/metadata-score-color'
 import ChipInput from '@/components/ui/ChipInput.vue'
 import IdentifierInput from '@/components/ui/IdentifierInput.vue'
@@ -176,6 +177,7 @@ const {
   isLocked,
   isUpdating: isUpdatingLock,
   replace: replaceLocks,
+  persist: persistLocks,
   toggle,
   lockAll,
   unlockAll,
@@ -193,6 +195,20 @@ const coverPanel = ref<InstanceType<typeof CoverEditorPanel> | null>(null)
 const searchOpen = ref(false)
 const availableMetadataProviders = ref<MetadataProviderInfo[] | null>(null)
 const visibleProviderIdFields = computed(() => filterProviderIdFields(availableMetadataProviders.value))
+/**
+ * External providers' ids: one row per registered external provider, plus any id the book still
+ * holds from a provider that has since been removed, so it can be read and cleared.
+ */
+const externalProviderIdRows = computed(() => {
+  const rows = new Map<string, { key: string; label: string; registered: boolean }>()
+  for (const provider of availableMetadataProviders.value ?? []) {
+    if (provider.source === 'external') rows.set(provider.key, { key: provider.key, label: provider.label, registered: true })
+  }
+  for (const key of Object.keys(form.externalProviderIds)) {
+    if (!rows.has(key)) rows.set(key, { key, label: key, registered: false })
+  }
+  return [...rows.values()]
+})
 let providerLoadToken = 0
 
 async function loadAvailableMetadataProviders(bookId: number) {
@@ -202,6 +218,7 @@ async function loadAvailableMetadataProviders(bookId: number) {
     const res = await api(`/api/v1/metadata-fetch/providers?bookId=${bookId}`)
     if (!res.ok) return
     const providers = (await res.json()) as MetadataProviderInfo[]
+    registerProviderAppearance(providers)
     if (token === providerLoadToken) availableMetadataProviders.value = providers
   } catch {
     // non-fatal: keep all provider ID fields visible when provider availability cannot be loaded
@@ -293,7 +310,8 @@ const filledProviderIdSummary = computed(() => {
     const value = form[entry.field]
     return typeof value === 'string' && value.trim().length > 0
   }).length
-  return `${filled}/${visibleProviderIdFields.value.length}`
+  const filledExternal = externalProviderIdRows.value.filter((row) => (form.externalProviderIds[row.key] ?? '').trim().length > 0).length
+  return `${filled + filledExternal}/${visibleProviderIdFields.value.length + externalProviderIdRows.value.length}`
 })
 
 const comicCreditFields = computed(
@@ -326,30 +344,54 @@ const communityRatingLines = computed(() =>
   form.communityRatings.map((rating) => formatCommunityRatingLine(rating, availableMetadataProviders.value ?? [])),
 )
 
+// Held while a save runs, so the parent's refetch reads the book after every write, locks included.
+let heldCoverChanges: (CoverMedium | null)[] | null = null
+
+async function submit() {
+  if (submitDisabled.value) return
+  heldCoverChanges = []
+  try {
+    await saveFormAndCovers()
+  } finally {
+    const held = new Set(heldCoverChanges)
+    heldCoverChanges = null
+    for (const medium of held) emit('coverChanged', medium)
+  }
+}
+
 /**
  * Locks here save with the form, so a pending cover whose slot is locked on the server can only be
  * written after the form has unlocked it. Every other pending cover is written first, and a failure
- * there stops the form save.
+ * there stops the form save. A cover staged while its slot was unlocked here, then locked again, is
+ * still written: the form save leaves that slot open, and it is locked again once the write ends.
  */
-async function submit() {
-  if (submitDisabled.value) return
+async function saveFormAndCovers() {
   const panel = coverPanel.value
   const pendingMedia = panel?.pendingMedia ?? []
   const lockedOnServer = (medium: CoverMedium | null) => props.book.lockedFields.includes(coverLockField(medium))
   if (panel && !(await panel.confirm(pendingMedia.filter((medium) => !lockedOnServer(medium))))) return
 
+  const writeAfterSave = pendingMedia.filter(lockedOnServer)
+  const relockFields: BookMetadataLockField[] = writeAfterSave.map(coverLockField).filter((field) => isLocked(field))
   const locksChanged = locksDirty.value
-  const result = await save(props.book.id, lockedFields.value)
+  const result = await save(
+    props.book.id,
+    lockedFields.value.filter((field) => !relockFields.includes(field)),
+  )
   if (!result) return
   markLocksPersisted(result.book.lockedFields)
+  if (relockFields.length > 0) await replaceLocks(props.book.id, [...result.book.lockedFields, ...relockFields], 'all')
   emit('saved', result.book)
-  if (locksChanged) emit('locksChanged', result.book.lockedFields)
   showSaveResultToast(result.write, result.libraryAutoWriteEnabled)
 
-  const unlockedBySave = pendingMedia.filter((medium) => lockedOnServer(medium) && !result.book.lockedFields.includes(coverLockField(medium)))
-  if (!panel || unlockedBySave.length === 0) return
-  await nextTick()
-  await panel.confirm(unlockedBySave)
+  const unlockedBySave = writeAfterSave.filter((medium) => !result.book.lockedFields.includes(coverLockField(medium)))
+  if (panel && unlockedBySave.length > 0) {
+    await nextTick()
+    await panel.confirm(unlockedBySave)
+  }
+  const relocked = relockFields.length > 0 ? await persistLocks(props.book.id) : null
+  if (relocked) emit('saved', relocked)
+  if (locksChanged) emit('locksChanged', (relocked ?? result.book).lockedFields)
 }
 
 function handleReset() {
@@ -575,6 +617,24 @@ function applyCustomMetadataPatch(formPatch: MetadataPatch): number {
   return updated
 }
 
+/** An empty id is sent as null on save, which clears it. */
+function clearExternalProviderId(key: string) {
+  form.externalProviderIds = { ...form.externalProviderIds, [key]: '' }
+}
+
+/** External ids have no lock, so a linked candidate's id always lands, with the page it came from. */
+function applyExternalProviderIdsPatch(formPatch: MetadataPatch): number {
+  let updated = 0
+  for (const [key, id] of Object.entries(formPatch.externalProviderIds ?? {})) {
+    if (!id || form.externalProviderIds[key] === id) continue
+    form.externalProviderIds = { ...form.externalProviderIds, [key]: id }
+    const link = formPatch.externalProviderLinks?.[key]
+    if (link) form.externalProviderLinks = { ...form.externalProviderLinks, [key]: link }
+    updated++
+  }
+  return updated
+}
+
 type FetchedCovers = Partial<Record<CoverMedium, string>>
 
 function applyPatchToForm(formPatch: MetadataPatch, covers: FetchedCovers): { skippedFields: BookMetadataLockField[]; updatedCount: number } {
@@ -591,6 +651,7 @@ function applyPatchToForm(formPatch: MetadataPatch, covers: FetchedCovers): { sk
   updatedCount += applyComicPatch(formPatch, skippedFields)
   updatedCount += applyAudioPatch(formPatch, skippedFields)
   updatedCount += applyCustomMetadataPatch(formPatch)
+  updatedCount += applyExternalProviderIdsPatch(formPatch)
 
   for (const [medium, url] of Object.entries(covers) as [CoverMedium, string | undefined][]) {
     if (!url) continue
@@ -684,6 +745,13 @@ function showSaveResultToast(write: WriteResult | null, libraryAutoWriteEnabled:
   toast.info(reason ? t('book.detail.editMetadata.savedWriteSkippedReason', { reason }) : t('book.detail.editMetadata.savedWriteSkipped'))
 }
 
+function externalIdsFromPreview(preview: MetadataRefreshPreview): MetadataPatch['externalProviderIds'] {
+  const ids = Object.entries(preview.externalProviderIds ?? {}).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== '',
+  )
+  return ids.length > 0 ? Object.fromEntries(ids) : undefined
+}
+
 function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
   return {
     isbn10: preview.isbn10,
@@ -716,6 +784,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     ranobedbId: preview.ranobedbId,
     lubimyczytacId: preview.lubimyczytacId,
     aladinId: preview.aladinId,
+    externalProviderIds: externalIdsFromPreview(preview),
     comicMetadata: preview.comicMetadata,
     narrators: preview.audioMetadata?.narrators,
     durationSeconds: preview.audioMetadata?.durationSeconds ?? undefined,
@@ -830,7 +899,8 @@ async function handleUnlockAll() {
 }
 
 function handleCoverChanged(medium: CoverMedium | null) {
-  emit('coverChanged', medium)
+  if (heldCoverChanges) heldCoverChanges.push(medium)
+  else emit('coverChanged', medium)
 }
 </script>
 
@@ -1354,7 +1424,10 @@ function handleCoverChanged(medium: CoverMedium | null) {
                 </div>
               </MetadataFieldLabel>
 
-              <div v-if="visibleProviderIdFields.length > 0" class="col-span-2 flex flex-col gap-1 border-t border-border pt-2.5">
+              <div
+                v-if="visibleProviderIdFields.length > 0 || externalProviderIdRows.length > 0"
+                class="col-span-2 flex flex-col gap-1 border-t border-border pt-2.5"
+              >
                 <div class="flex items-center gap-2">
                   <h4 class="text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase">
                     {{ t('book.detail.editMetadata.providerIds') }}
@@ -1397,6 +1470,37 @@ function handleCoverChanged(medium: CoverMedium | null) {
                       <Lock v-else-if="isLocked(field)" class="size-3" aria-hidden="true" />
                       <LockOpen v-else class="size-3" aria-hidden="true" />
                     </button>
+                  </div>
+                  <div v-for="row in externalProviderIdRows" :key="`external-${row.key}`" class="flex items-center gap-2 border-b border-border/60">
+                    <label
+                      :for="`provider-id-external-${row.key}`"
+                      class="w-[5.25rem] shrink-0 truncate text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+                      :title="row.registered ? row.label : t('book.detail.editMetadata.externalProviderUnavailable', { provider: row.label })"
+                    >
+                      {{ row.label }}
+                    </label>
+                    <input
+                      :id="`provider-id-external-${row.key}`"
+                      v-model="form.externalProviderIds[row.key]"
+                      type="text"
+                      autocomplete="off"
+                      spellcheck="false"
+                      maxlength="512"
+                      :readonly="!row.registered"
+                      class="h-8 min-w-0 flex-1 rounded-xs border border-transparent bg-transparent px-1.5 font-mono text-xs transition-shadow outline-none hover:border-input focus:border-input focus:bg-background focus:ring-1 focus:ring-ring sm:h-7"
+                    />
+                    <!-- A removed provider's id cannot be edited, since the server refuses a new value for it, but it can be cleared. -->
+                    <button
+                      v-if="!row.registered && form.externalProviderIds[row.key]"
+                      type="button"
+                      class="inline-flex size-6 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      :aria-label="t('book.detail.editMetadata.clearExternalProviderId', { provider: row.label })"
+                      :title="t('book.detail.editMetadata.clearExternalProviderId', { provider: row.label })"
+                      @click="clearExternalProviderId(row.key)"
+                    >
+                      <X class="size-3" aria-hidden="true" />
+                    </button>
+                    <span v-else class="size-6 shrink-0" aria-hidden="true" />
                   </div>
                 </div>
               </div>

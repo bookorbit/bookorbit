@@ -156,26 +156,5 @@ export function useProviderRows(): ComputedRef<ProviderRowDef[]> {
       },
     },
     { key: 'ranobedb', label: 'RanobeDB', group: 'comics', hint: t('settings.metadata.providers.hints.ranobedb'), fields: [] },
-    { key: 'lubimyczytac', label: 'LubimyCzytac', group: 'regional', hint: t('settings.metadata.providers.hints.lubimyczytac'), fields: [] },
-    {
-      key: 'aladin',
-      label: 'Aladin',
-      group: 'regional',
-      hint: t('settings.metadata.providers.hints.aladin'),
-      fields: [
-        {
-          key: 'ttbKey',
-          label: t('settings.metadata.providers.fields.ttbKey'),
-          type: 'password',
-          placeholder: 'ttb...',
-          alwaysEditable: true,
-          widthClass: SECRET_WIDTH,
-        },
-      ],
-      enableRequirement: {
-        isConfigured: (c) => !!c.aladin.ttbKey.trim(),
-        blockedMessage: t('settings.metadata.providers.blocked.aladin'),
-      },
-    },
   ])
 }

@@ -121,3 +121,50 @@ export function toRequestLanguage(value: string | null | undefined): string | nu
   const code = normalizeLanguage(value.trim());
   return /^[a-z]{2}$/.test(code) ? code : null;
 }
+
+/** Codes that say there is no single language, which no language-specific model can use. */
+const NO_LANGUAGE_SUBTAGS = new Set(["und", "mul", "mis", "zxx"]);
+
+let englishLanguageNames: Intl.DisplayNames | null = null;
+const languageNamesByCode = new Map<string, readonly string[]>();
+
+/** A code's name in English and in the language itself, lowercased. */
+function languageNamesOf(code: string): readonly string[] {
+  let names = languageNamesByCode.get(code);
+  if (names) return names;
+  englishLanguageNames ??= new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });
+  const found = new Set<string>();
+  try {
+    const english = englishLanguageNames.of(code);
+    if (english) found.add(english.toLowerCase());
+    const own = new Intl.DisplayNames([code], { type: "language", fallback: "none" }).of(code);
+    if (own) found.add(own.toLowerCase());
+  } catch {
+    // Not a language code; nothing to match by name.
+  }
+  names = [...found];
+  languageNamesByCode.set(code, names);
+  return names;
+}
+
+/**
+ * The language subtag a stored language value names ("en" for "en-GB", "eng" or "English"), or null.
+ *
+ * Book metadata states a language as a tag, a three-letter code or a name, and a name is not a tag:
+ * `Intl.Locale` accepts "english" as a well-formed subtag and hands it straight back. Names are
+ * matched in English and in the language's own name, against the request languages plus
+ * `extraCodes` for anything those do not list.
+ */
+export function languageSubtagOf(value: string | null | undefined, extraCodes: readonly string[] = []): string | null {
+  const lowered = value?.trim().toLowerCase();
+  if (!lowered) return null;
+  const named = [...REQUEST_LANGUAGE_CODES, ...extraCodes].find((code) => languageNamesOf(code).includes(lowered));
+  if (named) return named;
+  let language: string | undefined;
+  try {
+    language = new Intl.Locale(lowered).language;
+  } catch {
+    return null;
+  }
+  return language && /^[a-z]{2,3}$/.test(language) && !NO_LANGUAGE_SUBTAGS.has(language) ? language : null;
+}

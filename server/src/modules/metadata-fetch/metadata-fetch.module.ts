@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { MetadataCacheModule } from '../metadata-cache/metadata-cache.module';
+import { MetadataHttpProviderModule } from '../metadata-http-provider/metadata-http-provider.module';
 import { MetadataPreferencesModule } from '../metadata-preferences/metadata-preferences.module';
 import { BookProviderCacheRegistrar } from './book-provider-cache.registrar';
 import { METADATA_PROVIDERS } from './constants';
@@ -9,6 +10,8 @@ import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { MetadataProvider } from './providers/metadata-provider';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { MetadataFetchRepository } from './metadata-fetch.repository';
+import { ProviderIdRepository } from './provider-ids/provider-id.repository';
+import { ProviderIdStore } from './provider-ids/provider-id.store';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { AmazonProvider } from './providers/amazon/amazon.provider';
@@ -26,8 +29,6 @@ import { ComicVineProvider } from './providers/comicvine/comicvine.provider';
 import { KoboProvider } from './providers/kobo/kobo.provider';
 import { RanobeDbClient } from './providers/ranobedb/ranobedb.client';
 import { RanobeDbProvider } from './providers/ranobedb/ranobedb.provider';
-import { LubimyczytacProvider } from './providers/lubimyczytac/lubimyczytac.provider';
-import { AladinProvider } from './providers/aladin/aladin.provider';
 
 const PROVIDER_CLASSES = [
   GoogleProvider,
@@ -42,12 +43,10 @@ const PROVIDER_CLASSES = [
   ComicVineProvider,
   RanobeDbProvider,
   KoboProvider,
-  LubimyczytacProvider,
-  AladinProvider,
 ];
 
 @Module({
-  imports: [MetadataPreferencesModule, MetadataCacheModule],
+  imports: [MetadataPreferencesModule, MetadataCacheModule, MetadataHttpProviderModule],
   providers: [
     ...PROVIDER_CLASSES,
     {
@@ -61,11 +60,13 @@ const PROVIDER_CLASSES = [
     ProviderRegistry,
     ProviderThrottleTracker,
     MetadataFetchRepository,
+    ProviderIdRepository,
+    ProviderIdStore,
     MetadataFetchService,
     MetadataFetchPipeline,
     BookProviderCacheRegistrar,
   ],
   controllers: [MetadataFetchController],
-  exports: [MetadataFetchService, MetadataFetchPipeline, ProviderRegistry, ProviderThrottleTracker],
+  exports: [MetadataFetchService, MetadataFetchPipeline, ProviderRegistry, ProviderThrottleTracker, ProviderIdStore],
 })
 export class MetadataFetchModule {}

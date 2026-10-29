@@ -34,6 +34,7 @@ describe('UserController', () => {
     setPermissions: vi.fn(),
     setSuperuser: vi.fn(),
     getLibraryIds: vi.fn(),
+    getLibraryGrants: vi.fn(),
     setLibraries: vi.fn(),
     adminResetPassword: vi.fn(),
     unlockUser: vi.fn(),
@@ -174,6 +175,7 @@ describe('UserController', () => {
     await controller.setPermissions(8, dto as any, requester);
     await controller.setSuperuser(8, { isSuperuser: true }, requester);
     await controller.getLibraries(8);
+    await controller.getLibraryGrants(8);
     await controller.setLibraries(8, setLibrariesDto as any, requester);
     await controller.adminResetPassword(8, requester);
     await controller.unlockUser(8, requester);
@@ -185,6 +187,7 @@ describe('UserController', () => {
     expect(userService.setPermissions).toHaveBeenCalledWith(8, dto, requester);
     expect(userService.setSuperuser).toHaveBeenCalledWith(8, true, requester);
     expect(userService.getLibraryIds).toHaveBeenCalledWith(8);
+    expect(userService.getLibraryGrants).toHaveBeenCalledWith(8);
     expect(userService.setLibraries).toHaveBeenCalledWith(8, [1, 2], requester);
     expect(userService.adminResetPassword).toHaveBeenCalledWith(8, requester);
     expect(userService.unlockUser).toHaveBeenCalledWith(8, requester);

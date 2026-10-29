@@ -258,111 +258,21 @@ export class UploadService {
       // a file that a concurrent upload may have written to the same path.
       shouldCleanupDestination = false;
 
-      const fileStat = await stat(destination, { bigint: true });
-      const ino = fileStat.ino;
-      const relPath = relative(bookRow.libraryFolderPath, destination);
-      const mediaOverlayFields = await this.inspectMediaOverlayFields(destination, format);
-      // The transaction callback cannot see the narrowing of the outer `let`.
-      const absolutePath = destination;
-
-      const { inserted, isPrimary, finalStatus } = await this.db.transaction(async (tx) => {
-        const [lockedBook] = await tx
-          .select({
-            primaryFileId: books.primaryFileId,
-            status: books.status,
-            formatPriority: libraries.formatPriority,
-          })
-          .from(books)
-          .innerJoin(libraries, eq(books.libraryId, libraries.id))
-          .where(eq(books.id, bookId))
-          .for('update', { of: books })
-          .limit(1);
-
-        if (!lockedBook) throw new NotFoundException(`Book ${bookId} not found`);
-
-        const [inserted] = await tx
-          .insert(bookFiles)
-          .values({
-            bookId,
-            libraryFolderId: bookRow.libraryFolderId,
-            absolutePath,
-            relPath,
-            ino,
-            sizeBytes,
-            mtime: fileStat.mtime,
-            fileHash,
-            format,
-            role: 'content',
-            ...mediaOverlayFields,
-          })
-          .returning({
-            id: bookFiles.id,
-            format: bookFiles.format,
-            role: bookFiles.role,
-            sizeBytes: bookFiles.sizeBytes,
-            absolutePath: bookFiles.absolutePath,
-            createdAt: bookFiles.createdAt,
-            durationSeconds: bookFiles.durationSeconds,
-          });
-
-        if (!inserted) throw new Error('Failed to insert book file record');
-        // A track added by hand has no number yet, which would play it after every other track.
-        if (isAudioFormat(format)) await realignAudioTrackOrder(tx, bookId);
-
-        const contentFiles = await tx
-          .select({
-            id: bookFiles.id,
-            format: bookFiles.format,
-            sizeBytes: bookFiles.sizeBytes,
-            mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
-          })
-          .from(bookFiles)
-          .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'content')))
-          .orderBy(asc(bookFiles.id));
-
-        const winner = selectPrimaryFileKeepingCurrent(contentFiles, lockedBook.primaryFileId, lockedBook.formatPriority);
-        const nextPrimaryFileId = winner?.id ?? null;
-        const needsPrimaryUpdate = nextPrimaryFileId !== lockedBook.primaryFileId;
-        const needsStatusUpdate = lockedBook.status === 'missing';
-
-        if (needsPrimaryUpdate || needsStatusUpdate) {
-          await tx
-            .update(books)
-            .set({
-              ...(needsPrimaryUpdate ? { primaryFileId: nextPrimaryFileId } : {}),
-              ...(needsStatusUpdate ? { status: 'present' } : {}),
-              updatedAt: new Date(),
-            })
-            .where(eq(books.id, bookId));
-        }
-
-        return {
-          inserted,
-          isPrimary: inserted.id === nextPrimaryFileId,
-          finalStatus: needsStatusUpdate ? 'present' : lockedBook.status,
-        };
+      const result = await this.registerBookFile({
+        bookId,
+        libraryFolderId: bookRow.libraryFolderId,
+        libraryFolderPath: bookRow.libraryFolderPath,
+        destination,
+        sizeBytes,
+        fileHash,
+        format,
       });
 
-      this.processor.extractAudioDurationAsync(bookId, destination, format);
-      this.processor.extractAddedAudioChaptersAsync(bookId, format);
-      this.processor.reconcileCoversAsync([bookId]);
-
       this.logger.log(
-        `[${event}] [end] bookId=${bookId} userId=${user.id} fileId=${inserted.id} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - add file to book completed`,
+        `[${event}] [end] bookId=${bookId} userId=${user.id} fileId=${result.id} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - add file to book completed`,
       );
 
-      return {
-        id: inserted.id,
-        format: inserted.format,
-        role: isPrimary ? 'primary' : inserted.role,
-        sizeBytes: inserted.sizeBytes,
-        absolutePath: inserted.absolutePath,
-        createdAt: inserted.createdAt.toISOString(),
-        filename: basename(destination),
-        durationSeconds: inserted.durationSeconds,
-        mediaOverlay: mediaOverlayCapabilityFromFields({ format: inserted.format, ...mediaOverlayFields }),
-        bookStatus: finalStatus,
-      };
+      return result;
     } catch (caught) {
       let err = caught;
       if (err instanceof UploadDestinationExistsError) {
@@ -379,6 +289,122 @@ export class UploadService {
       ]);
       throw err;
     }
+  }
+
+  /**
+   * Records a file that is already in place inside the book folder: inserts the row, re-picks the
+   * primary file and queues the same follow-ups an upload gets. Shared by uploads and by files the
+   * server generates itself, which must not go through the upload size limit.
+   */
+  async registerBookFile(params: {
+    bookId: number;
+    libraryFolderId: number;
+    libraryFolderPath: string;
+    destination: string;
+    sizeBytes: number;
+    fileHash: string;
+    format: string;
+  }): Promise<AddBookFileResult> {
+    const { bookId, libraryFolderId, libraryFolderPath, destination, sizeBytes, fileHash, format } = params;
+    const fileStat = await stat(destination, { bigint: true });
+    const ino = fileStat.ino;
+    const relPath = relative(libraryFolderPath, destination);
+    const mediaOverlayFields = await this.inspectMediaOverlayFields(destination, format);
+
+    const { inserted, isPrimary, finalStatus } = await this.db.transaction(async (tx) => {
+      const [lockedBook] = await tx
+        .select({
+          primaryFileId: books.primaryFileId,
+          status: books.status,
+          formatPriority: libraries.formatPriority,
+        })
+        .from(books)
+        .innerJoin(libraries, eq(books.libraryId, libraries.id))
+        .where(eq(books.id, bookId))
+        .for('update', { of: books })
+        .limit(1);
+
+      if (!lockedBook) throw new NotFoundException(`Book ${bookId} not found`);
+
+      const [inserted] = await tx
+        .insert(bookFiles)
+        .values({
+          bookId,
+          libraryFolderId,
+          absolutePath: destination,
+          relPath,
+          ino,
+          sizeBytes,
+          mtime: fileStat.mtime,
+          fileHash,
+          format,
+          role: 'content',
+          ...mediaOverlayFields,
+        })
+        .returning({
+          id: bookFiles.id,
+          format: bookFiles.format,
+          role: bookFiles.role,
+          sizeBytes: bookFiles.sizeBytes,
+          absolutePath: bookFiles.absolutePath,
+          createdAt: bookFiles.createdAt,
+          durationSeconds: bookFiles.durationSeconds,
+        });
+
+      if (!inserted) throw new Error('Failed to insert book file record');
+      // A track added by hand has no number yet, which would play it after every other track.
+      if (isAudioFormat(format)) await realignAudioTrackOrder(tx, bookId);
+
+      const contentFiles = await tx
+        .select({
+          id: bookFiles.id,
+          format: bookFiles.format,
+          sizeBytes: bookFiles.sizeBytes,
+          mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+        })
+        .from(bookFiles)
+        .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'content')))
+        .orderBy(asc(bookFiles.id));
+
+      const winner = selectPrimaryFileKeepingCurrent(contentFiles, lockedBook.primaryFileId, lockedBook.formatPriority);
+      const nextPrimaryFileId = winner?.id ?? null;
+      const needsPrimaryUpdate = nextPrimaryFileId !== lockedBook.primaryFileId;
+      const needsStatusUpdate = lockedBook.status === 'missing';
+
+      if (needsPrimaryUpdate || needsStatusUpdate) {
+        await tx
+          .update(books)
+          .set({
+            ...(needsPrimaryUpdate ? { primaryFileId: nextPrimaryFileId } : {}),
+            ...(needsStatusUpdate ? { status: 'present' } : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(books.id, bookId));
+      }
+
+      return {
+        inserted,
+        isPrimary: inserted.id === nextPrimaryFileId,
+        finalStatus: needsStatusUpdate ? 'present' : lockedBook.status,
+      };
+    });
+
+    this.processor.extractAudioDurationAsync(bookId, destination, format);
+    this.processor.extractAddedAudioChaptersAsync(bookId, format);
+    this.processor.reconcileCoversAsync([bookId]);
+
+    return {
+      id: inserted.id,
+      format: inserted.format,
+      role: isPrimary ? 'primary' : inserted.role,
+      sizeBytes: inserted.sizeBytes,
+      absolutePath: inserted.absolutePath,
+      createdAt: inserted.createdAt.toISOString(),
+      filename: basename(destination),
+      durationSeconds: inserted.durationSeconds,
+      mediaOverlay: mediaOverlayCapabilityFromFields({ format: inserted.format, ...mediaOverlayFields }),
+      bookStatus: finalStatus,
+    };
   }
 
   async renameBookFiles(bookId: number, user: RequestUser): Promise<void> {

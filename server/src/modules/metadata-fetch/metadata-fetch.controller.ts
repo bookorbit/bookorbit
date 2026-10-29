@@ -109,6 +109,8 @@ export class MetadataFetchController {
       onlyAudiobookProviders ||
       Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE] || existingProviderIds[MetadataProviderKey.LIBROFM]);
     const isAudiobook = dto.isAudiobook ?? (leadMediaKind ? leadMediaKind === 'audiobook' : inferredIsAudiobook);
+    // The medium ranking prefers: a stated one, else the side of the book being searched.
+    const mediaKind = leadMediaKind ?? (isAudiobook ? 'audiobook' : storedContext?.textMediaKind);
 
     const searchTitle = normalizeSearchTitle(dto.title);
     const params: MetadataSearchParams = {
@@ -120,6 +122,7 @@ export class MetadataFetchController {
       titleIsExplicitQuery: isExplicitQuery(searchTitle, storedContext?.title),
       existingProviderIds,
       isAudiobook,
+      mediaKind,
       includeAudiobookProviders: isAudiobook || providerKeys.some(servesOnlyAudiobooks),
       validateCoverPlaceholders: true,
       resultsPerProvider: dto.resultsPerProvider,
@@ -208,6 +211,9 @@ export class MetadataFetchController {
           key: p.key,
           label: p.label,
           identifiable: p.identifiable,
+          source: p.source ?? 'builtin',
+          ...(p.iconUrl ? { iconUrl: p.iconUrl } : {}),
+          ...(p.color ? { color: p.color } : {}),
           ...(fieldRuleProviderKeys ? { selectedByFieldRules: fieldRuleProviderKeys.has(p.key) } : {}),
           ...(coverPriority !== undefined ? { coverPriority } : {}),
           ...(audioCoverPriority !== undefined ? { audioCoverPriority } : {}),

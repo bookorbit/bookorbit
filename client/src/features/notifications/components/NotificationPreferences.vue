@@ -4,8 +4,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Save, Sparkles } from '@lucide/vue'
-import { NOTIFICATION_CATEGORY_IDS, NotificationLevel, resolveNotificationLevel, type NotificationCategory } from '@bookorbit/types'
+import { NOTIFICATION_CATEGORY_IDS, NotificationLevel, Permission, resolveNotificationLevel, type NotificationCategory } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import { api } from '@/lib/api'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
@@ -20,6 +21,9 @@ const { t } = useI18n()
 
 const { user, me } = useAuth()
 const { showBookRequests } = useBookRequestVisibility()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
+/** Only someone who can start a read-aloud ever receives one of its notifications. */
+const showReadAloud = computed(() => hasPermission(Permission.LibraryGenerateReadAloud) && !isDemoRestrictedAccount.value)
 const { popupEnabled, setPopupEnabled, loadPrefs } = useWhatsNew()
 
 const saving = ref(false)
@@ -56,10 +60,16 @@ const hasChanges = computed(() => {
   return NOTIFICATION_CATEGORY_IDS.some((key) => preferences.value[key] !== resolveNotificationLevel(userPrefs?.[key]))
 })
 
+function isCategoryVisible(category: NotificationCategory): boolean {
+  if (category === 'bookRequests') return showBookRequests.value
+  if (category === 'readAloud') return showReadAloud.value
+  return true
+}
+
 const visibleGroups = computed(() =>
   NOTIFICATION_CATEGORY_GROUPS.map((group) => ({
     ...group,
-    categories: group.categories.filter((category) => category !== 'bookRequests' || showBookRequests.value),
+    categories: group.categories.filter(isCategoryVisible),
   })).filter((group) => group.categories.length > 0),
 )
 const visibleCategoryIds = computed(() => visibleGroups.value.flatMap((group) => group.categories))

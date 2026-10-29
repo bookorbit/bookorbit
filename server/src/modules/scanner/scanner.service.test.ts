@@ -154,6 +154,7 @@ const mockGateway = {
 const mockMetadata = {
   extractAndSave: vi.fn().mockResolvedValue(undefined),
   extractAndSaveWithRegex: vi.fn().mockResolvedValue(undefined),
+  applyRegexMetadataRules: vi.fn().mockResolvedValue('unchanged'),
   refreshCoverForBook: vi.fn().mockResolvedValue(false),
   extractAudioFileDuration: vi.fn().mockResolvedValue(undefined),
   aggregateAudioDuration: vi.fn().mockResolvedValue(undefined),
@@ -4723,5 +4724,61 @@ describe('regex metadata outside a scan', () => {
     selfWriteRegistry.end([primary.absolutePath]);
     expect(regexMetadata.evaluate).not.toHaveBeenCalled();
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+  });
+
+  describe('applying saved rules to a book already in the library', () => {
+    const rules = { config: regexConfig, precedence: ['embedded', 'regex'] };
+
+    it('writes only rule-decided fields through the metadata service', async () => {
+      const { service, regexMetadata } = makeService(rulesRepo(regexConfig));
+      regexMetadata.evaluate.mockResolvedValue({ matched: true, metadata: { seriesName: 'Series' }, diagnostics: [] });
+      mockMetadata.applyRegexMetadataRules.mockResolvedValueOnce('updated');
+
+      await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('updated');
+      expect(regexMetadata.evaluate).toHaveBeenCalledWith(regexConfig, 'Series/Book/book.epub');
+      expect(mockMetadata.applyRegexMetadataRules).toHaveBeenCalledWith(
+        7,
+        [{ key: 'embedded', absolutePath: '/library/Series/Book/book.epub', format: 'epub' }],
+        { seriesName: 'Series' },
+        ['embedded', 'regex'],
+      );
+      expect(mockMetadata.extractAndSaveWithRegex).not.toHaveBeenCalled();
+    });
+
+    it('reports an unchanged book when the rules decide what it already has', async () => {
+      const { service, regexMetadata } = makeService(rulesRepo(regexConfig));
+      regexMetadata.evaluate.mockResolvedValue({ matched: true, metadata: { seriesName: 'Series' }, diagnostics: [] });
+
+      await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('unchanged');
+    });
+
+    it('reports a book whose files could not be read', async () => {
+      const { service, regexMetadata } = makeService(rulesRepo(regexConfig));
+      regexMetadata.evaluate.mockResolvedValue({ matched: true, metadata: { seriesName: 'Series' }, diagnostics: [] });
+      mockMetadata.applyRegexMetadataRules.mockResolvedValueOnce('unreadable');
+
+      await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('file_unavailable');
+    });
+
+    it('skips a book no rule matches, one without a primary file, and one being written', async () => {
+      const { service, regexMetadata, selfWriteRegistry } = makeService(rulesRepo(regexConfig));
+      regexMetadata.evaluate.mockResolvedValue({ matched: false, metadata: {}, diagnostics: [] });
+      await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('skipped');
+      await expect(service.applyLibraryRulesToBook({ ...book, primaryFileId: null }, [primary] as never, rules)).resolves.toBe('skipped');
+      selfWriteRegistry.begin([primary.absolutePath]);
+      await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('skipped');
+      selfWriteRegistry.end([primary.absolutePath]);
+      expect(regexMetadata.evaluate).toHaveBeenCalledTimes(1);
+      expect(mockMetadata.applyRegexMetadataRules).not.toHaveBeenCalled();
+    });
+
+    it('tells a pool failure apart from rules that cannot run', async () => {
+      const { service, regexMetadata } = makeService(rulesRepo(regexConfig));
+      regexMetadata.evaluate.mockResolvedValueOnce({ matched: false, metadata: {}, diagnostics: [{ code: 'timeout' }] });
+      regexMetadata.evaluate.mockResolvedValueOnce({ matched: false, metadata: {}, diagnostics: [{ code: 'invalid_pattern', ruleIndex: 0 }] });
+
+      await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('rules_unavailable');
+      await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('rules_invalid');
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { dropReads, retainFinishedReads } from './reading-attempt-retention';
 import * as schema from './schema';
 
 export async function recordBookFileHashHistory(
@@ -46,7 +47,16 @@ export async function deleteBookFilesWithHashInvalidation(db: Pick<NodePgDatabas
   `);
 }
 
-export async function deleteBooksWithHashInvalidation(db: Pick<NodePgDatabase<typeof schema>, 'execute'>, filter: SQL): Promise<void> {
+/**
+ * `keepFinishedReads` is for books leaving the library for good (a user's delete, files gone from
+ * disk): their finished reads stay in each reader's history. Merges and rollbacks leave it off.
+ */
+export async function deleteBooksWithHashInvalidation(
+  db: Pick<NodePgDatabase<typeof schema>, 'execute'>,
+  filter: SQL,
+  options: { keepFinishedReads?: boolean } = {},
+): Promise<void> {
+  await (options.keepFinishedReads ? retainFinishedReads(db, filter) : dropReads(db, filter));
   await db.execute(sql`
     with deleted as (
       delete from ${schema.books} where ${filter} returning library_id
@@ -58,6 +68,11 @@ export async function deleteBooksWithHashInvalidation(db: Pick<NodePgDatabase<ty
 }
 
 export async function deleteLibraryFoldersWithHashInvalidation(db: Pick<NodePgDatabase<typeof schema>, 'execute'>, filter: SQL): Promise<void> {
+  // The folder's books go with it by cascade; their finished reads stay in history.
+  await retainFinishedReads(
+    db,
+    sql`${schema.books.libraryFolderId} in (select ${schema.libraryFolders.id} from ${schema.libraryFolders} where ${filter})`,
+  );
   await db.execute(sql`
     with deleted as (
       delete from ${schema.libraryFolders} where ${filter} returning library_id

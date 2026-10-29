@@ -6,12 +6,16 @@ export interface AudioChapterSource {
   absolutePath: string;
   chapters: AudiobookChapter[];
   durationMs: number | null;
+  continuation?: boolean;
 }
 
 // Per-file lengths are stored rounded to whole seconds, so offsets derived from them drift from the
 // exact millisecond offsets a merge writes. A second of slack per file keeps a freshly merged list
 // from reading as short and being rebuilt on every scan.
 const COVERAGE_SLACK_MS_PER_FILE = 1000;
+
+/** A file's opening marker this close to zero still counts as sitting at its start. */
+const CONTINUATION_SLACK_MS = 5;
 
 /**
  * Builds one chapter list for an audiobook split across several files.
@@ -29,21 +33,40 @@ export function mergeAudioChapters(sources: AudioChapterSource[]): AudiobookChap
 
   const merged: AudiobookChapter[] = [];
   let offsetMs = 0;
+  // Where the last merged chapter starts inside its own file.
+  let lastLocalStartMs = 0;
 
   for (const [index, source] of sources.entries()) {
     const isLast = index === sources.length - 1;
     if (source.durationMs === null && !isLast) return null;
 
     const ordered = source.chapters.filter((chapter) => chapter.startMs >= 0).sort((a, b) => a.startMs - b.startMs);
+    // A chapter running on from partway through an earlier file is marked again at this file's
+    // start under the same title, so a player that reads one file at a time names its opening. On
+    // the book's timeline that is the same chapter, not a new one. A title repeated from a chapter
+    // that began at the very start of its file is kept: per-file chapters all named after the book
+    // look exactly like that, and each still marks where a file starts.
+    const first = ordered[0];
+    const continues =
+      first !== undefined &&
+      index > 0 &&
+      first.startMs <= CONTINUATION_SLACK_MS &&
+      (source.continuation === true || lastLocalStartMs > 0) &&
+      first.title === merged.at(-1)?.title;
+    if (continues) ordered.shift();
 
     if (ordered.length > 0) {
       for (const chapter of ordered) {
         merged.push({ title: chapter.title, startMs: offsetMs + chapter.startMs });
+        lastLocalStartMs = chapter.startMs;
       }
+    } else if (continues) {
+      // Only the continuation marker: the whole file belongs to the chapter before it.
     } else {
       // A file with no chapters of its own still gets one, so the previous file's last chapter ends
       // where this file starts instead of swallowing it.
       merged.push({ title: fileStem(source.absolutePath), startMs: offsetMs });
+      lastLocalStartMs = 0;
     }
 
     offsetMs += source.durationMs ?? 0;

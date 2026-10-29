@@ -8,7 +8,7 @@ For the contribution process (issues, PRs, review), see [CONTRIBUTING.md](CONTRI
 
 ## Architecture Overview
 
-BookOrbit is a pnpm monorepo with three workspaces: a Vue 3 single-page app, a NestJS API server, and a shared types package.
+BookOrbit is a pnpm monorepo with a Vue 3 single-page app, a NestJS API server, shared packages, and optional worker processes.
 
 ```mermaid
 graph LR
@@ -17,10 +17,12 @@ graph LR
     DB["PostgreSQL<br/><small>Drizzle ORM</small>"]
     WS["WebSocket<br/><small>Socket.IO</small>"]
     Types["Shared Types<br/><small>@bookorbit/types</small>"]
+    Worker["Read-aloud worker<br/><small>STAlign + QuartzNet</small>"]
 
     Client -- "HTTP (fetch)" --> Server
     Client <-. "real-time events" .-> WS
     Server --> DB
+    Server -. "private HTTP" .-> Worker
     Server --> WS
     Types -.- Client
     Types -.- Server
@@ -33,6 +35,7 @@ graph LR
 | Database     | PostgreSQL 18, pgvector         | Docker container  |
 | Shared types | TypeScript                      | `packages/types/` |
 | Real-time    | Socket.IO                       | Server + Client   |
+| Workers      | Node.js sidecars                | `workers/`        |
 
 ---
 
@@ -61,6 +64,8 @@ bookorbit/
 ├── packages/
 │   └── types/               # Shared TypeScript types
 │       └── src/             # Exported via @bookorbit/types
+├── workers/
+│   └── read-aloud/          # Optional STAlign and QuartzNet worker
 ├── scripts/                 # Bootstrap, DB reset, E2E orchestration
 ├── docker/                  # Postgres init scripts (extensions)
 ├── .github/                 # CI workflows, PR/issue templates
@@ -310,6 +315,7 @@ pnpm run db:seed
 | `pnpm run test`                  | Server + client unit tests       |
 | `pnpm run test:server`           | Server unit tests only           |
 | `pnpm run test:client`           | Client unit tests only           |
+| `pnpm run test:worker`           | Read-aloud worker tests only     |
 | `cd server && pnpm test:watch`   | Server tests in watch mode       |
 | `pnpm run e2e:run -- <suite-id>` | Run a single E2E suite           |
 | `pnpm run e2e:all`               | Run all E2E suites sequentially  |
@@ -528,6 +534,7 @@ All commands are run from the repository root unless noted otherwise.
 | `pnpm run test`                  | Run server + client unit tests   |
 | `pnpm run test:server`           | Run server unit tests            |
 | `pnpm run test:client`           | Run client unit tests            |
+| `pnpm run test:worker`           | Run read-aloud worker tests      |
 | `cd server && pnpm test:watch`   | Server tests in watch mode       |
 | `pnpm run coverage`              | Unit tests with coverage reports |
 | `pnpm run coverage:server`       | Server coverage only             |

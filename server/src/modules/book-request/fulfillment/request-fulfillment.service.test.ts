@@ -228,7 +228,7 @@ describe('RequestFulfillmentService.grab', () => {
 
     await expect(service.grab(7, { magnet: MAGNET }, user())).rejects.toMatchObject({
       status: 503,
-      response: { errorCode: 'GRAB_CLIENT_UNAVAILABLE' },
+      response: { errorCode: 'GRAB_CLIENT_UNAVAILABLE', errorMeta: { client: 'qbit' } },
     });
 
     expect(adapter.add).toHaveBeenCalledTimes(1);

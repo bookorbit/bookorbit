@@ -24,6 +24,11 @@ export class MetadataCacheProviderCatalog {
     }
   }
 
+  /** A provider registered at runtime can leave again; its cached rows then become orphans the sweeper drops. */
+  unregister(namespace: MetadataCacheNamespace, provider: string): void {
+    this.entries.delete(catalogKey(namespace, provider));
+  }
+
   get(namespace: MetadataCacheNamespace, provider: string): CatalogEntry | undefined {
     return this.entries.get(catalogKey(namespace, provider));
   }

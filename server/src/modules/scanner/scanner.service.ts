@@ -22,7 +22,7 @@ import type {
   ScanProgressEvent,
   ScanTriggeredBy,
 } from '@bookorbit/types';
-import { NotificationType } from '@bookorbit/types';
+import { NotificationType, resolveRegexMetadataConfig } from '@bookorbit/types';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
@@ -46,6 +46,7 @@ import {
   findBookCandidates,
   findLooseFileCandidates,
   buildSingleBookCandidate,
+  isDiscDirectory,
   type WalkResult,
 } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
@@ -102,7 +103,7 @@ interface RegexScanContext {
 const REGEX_SCAN_FAILURE_LIMIT = 3;
 
 function createRegexScanContext(config: RegexMetadataConfig | null | undefined): RegexScanContext {
-  return { config: config ?? null, disabled: false, failures: 0 };
+  return { config: resolveRegexMetadataConfig(config), disabled: false, failures: 0 };
 }
 
 interface LibraryScanSettings {
@@ -180,6 +181,28 @@ interface RegisteredFile {
   mediaOverlayAvailable: boolean;
   /** This book's stored sort order for the file before this scan; null when the file is new to it. */
   previousSortOrder: number | null;
+}
+
+type StoredBookFile = Awaited<ReturnType<ScannerRepository['findBookFilesByBookIds']>>[number];
+
+export type LibraryRulesOutcome = 'updated' | 'unchanged' | 'skipped' | 'file_unavailable' | 'rules_unavailable' | 'rules_invalid';
+
+/** Files read back from the database, shaped like a scan that found nothing new about them. */
+function storedFilesAsRegistered(files: StoredBookFile[]): RegisteredFile[] {
+  return files.map((file) => ({
+    fileId: file.id,
+    format: file.format,
+    role: file.role as FileRole,
+    absolutePath: file.absolutePath,
+    sizeBytes: file.sizeBytes ?? 0,
+    durationSeconds: file.durationSeconds,
+    isNew: false,
+    wasReassigned: false,
+    wasChanged: false,
+    wasPathChanged: false,
+    mediaOverlayAvailable: file.mediaOverlayAvailable,
+    previousSortOrder: file.sortOrder,
+  }));
 }
 
 interface MetadataExtractionSource {
@@ -1132,6 +1155,38 @@ export class ScannerService implements OnApplicationBootstrap {
     );
   }
 
+  /**
+   * A library folder named like a disc folder ("disk1", "CD 1") used to be flattened into the folder
+   * above it, so its loose files became one book filed there. Each is now its own book: the old book
+   * moves to its primary file, keeping its progress, notes and edits, and the scan that follows gives
+   * the other files books of their own.
+   */
+  private async repairFlattenedLibraryFolder(libraryId: number, folder: { id: number; path: string }): Promise<void> {
+    if (!isDiscDirectory(basename(folder.path))) return;
+    const event = 'scanner.repair_flattened_library_folder';
+    try {
+      const stranded = await this.scannerRepo.findBooksAtFolderPath(folder.id, dirname(folder.path));
+      for (const book of stranded) {
+        const inside = book.contentFiles.filter((file) => file.absolutePath.startsWith(folder.path + sep));
+        const target = inside.find((file) => file.id === book.primaryFileId) ?? inside[0];
+        if (!target || (await this.scannerRepo.bookExistsAtFolderPath(book.libraryId, target.absolutePath))) {
+          this.logger.warn(
+            `[${event}] [fail] libraryId=${libraryId} bookId=${book.id} fileCount=${book.contentFiles.length} - no free file left to move the book to`,
+          );
+          continue;
+        }
+        await this.scannerRepo.updateBookFolderPath(book.id, target.absolutePath);
+        this.logger.log(
+          `[${event}] [end] libraryId=${libraryId} bookId=${book.id} folder="${sanitizeLogValue(target.absolutePath)}" fileCount=${book.contentFiles.length} - book moved from above its library folder to its primary file`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} libraryFolderId=${folder.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - flattened library folder repair failed`,
+      );
+    }
+  }
+
   private async loadCandidateMaps(folderPath: string, libraryId: number): Promise<ScanLookupMaps> {
     const knownBooks = await this.scannerRepo.findBooksByFolderPath(folderPath, libraryId);
     const knownFiles = await this.scannerRepo.findBookFilesByBookIds(knownBooks.map((b) => b.id));
@@ -1438,6 +1493,7 @@ export class ScannerService implements OnApplicationBootstrap {
       this.emitFromStore(libraryId, jobId, 'running');
 
       for (const folder of folders) {
+        await this.repairFlattenedLibraryFolder(libraryId, folder);
         let candidates: BookCandidate[] = [];
         let skippedDirs = new Set<string>();
         let unchangedDirs = new Set<string>();
@@ -2110,20 +2166,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const files = await this.scannerRepo.findBookFilesByBookId(bookId);
     if (files.some((file) => this.selfWriteRegistry.isSuppressed(file.absolutePath))) return true;
 
-    const registered: RegisteredFile[] = files.map((file) => ({
-      fileId: file.id,
-      format: file.format,
-      role: file.role as FileRole,
-      absolutePath: file.absolutePath,
-      sizeBytes: file.sizeBytes ?? 0,
-      durationSeconds: file.durationSeconds,
-      isNew: false,
-      wasReassigned: false,
-      wasChanged: false,
-      wasPathChanged: false,
-      mediaOverlayAvailable: file.mediaOverlayAvailable,
-      previousSortOrder: file.sortOrder,
-    }));
+    const registered = storedFilesAsRegistered(files);
     const winner = registered.find((file) => file.fileId === book.primaryFileId) ?? null;
     const relativePath = files.find((file) => file.id === book.primaryFileId)?.relPath ?? undefined;
     const precedence = settings.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT];
@@ -2132,6 +2175,36 @@ export class ScannerService implements OnApplicationBootstrap {
     const regexApplied = await this.extractRegexMetadata(book.id, book.libraryId, relativePath, sources, precedence, context);
     if (!regexApplied) await this.extractFirstAvailableMetadataSource(book.id, sources);
     return true;
+  }
+
+  /**
+   * Applies a library's current path rules to a book already in it, writing only the fields the
+   * rules decide. A scan still re-reads everything for files that changed; this is for rules that
+   * changed while the files did not.
+   */
+  async applyLibraryRulesToBook(
+    book: { id: number; primaryFileId: number | null },
+    files: StoredBookFile[],
+    rules: { config: RegexMetadataConfig; precedence: string[] },
+  ): Promise<LibraryRulesOutcome> {
+    const relativePath = files.find((file) => file.id === book.primaryFileId)?.relPath;
+    if (!relativePath || files.some((file) => this.selfWriteRegistry.isSuppressed(file.absolutePath))) return 'skipped';
+
+    const result = await this.regexMetadata.evaluate(rules.config, relativePath);
+    const failure = result.diagnostics.find((entry) => entry.code !== 'invalid_value');
+    if (failure) return isTransientRegexFailure(failure.code) ? 'rules_unavailable' : 'rules_invalid';
+    if (!result.matched) return 'skipped';
+
+    const registered = storedFilesAsRegistered(files);
+    const winner = registered.find((file) => file.fileId === book.primaryFileId) ?? null;
+    const sources = this.buildMetadataExtractionSources(registered, winner, rules.precedence);
+    const written = await this.metadataService.applyRegexMetadataRules(
+      book.id,
+      sources.map((source) => ({ key: source.key, absolutePath: source.file.absolutePath, format: source.format })),
+      result.metadata,
+      rules.precedence,
+    );
+    return written === 'unreadable' ? 'file_unavailable' : written;
   }
 
   /** Re-applies regex rules after the watcher moved these books' files; books in libraries without rules are left alone. */

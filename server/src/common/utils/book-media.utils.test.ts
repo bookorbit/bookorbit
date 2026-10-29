@@ -1,6 +1,6 @@
 import { isAudioFormat } from '@bookorbit/types';
 
-import { compareAudioTracks, planAudioTrackOrderRepair, resolveIsAudiobook } from './book-media.utils';
+import { compareAudioTracks, planAudioTrackOrderRepair, resolveIsAudiobook, resolveSearchMediaKind } from './book-media.utils';
 
 describe('resolveIsAudiobook', () => {
   it('uses the primary file when the book has files', () => {
@@ -36,6 +36,26 @@ describe('resolveIsAudiobook', () => {
     expect(resolveIsAudiobook([], { librofmId: '9781234567890' })).toBe(true);
     expect(resolveIsAudiobook(undefined, { audibleId: 'B0ABC12345' })).toBe(true);
     expect(resolveIsAudiobook(undefined, null)).toBe(false);
+  });
+});
+
+describe('resolveSearchMediaKind', () => {
+  const epub = { id: 1, format: 'epub', role: 'content' };
+  const cbz = { id: 2, format: 'cbz', role: 'content' };
+  const m4b = { id: 3, format: 'm4b', role: 'content' };
+  const cover = { id: 4, format: 'jpg', role: 'cover' };
+
+  it('is the audiobook for the audio side, and the reading medium otherwise', () => {
+    expect(resolveSearchMediaKind([epub, m4b], true, 3)).toBe('audiobook');
+    expect(resolveSearchMediaKind([epub, m4b], false, 3)).toBe('ebook');
+    expect(resolveSearchMediaKind([cbz, cover], false, 2)).toBe('comic');
+  });
+
+  it('reads the files when the primary is audio or missing, and ignores covers', () => {
+    expect(resolveSearchMediaKind([m4b, cbz], false, 3)).toBe('comic');
+    expect(resolveSearchMediaKind([cover, cbz], false)).toBe('comic');
+    expect(resolveSearchMediaKind([cover], false)).toBeUndefined();
+    expect(resolveSearchMediaKind(undefined, false)).toBeUndefined();
   });
 });
 

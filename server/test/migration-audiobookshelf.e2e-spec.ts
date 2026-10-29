@@ -339,6 +339,19 @@ describe('Migration Audiobookshelf live and backup (e2e)', { timeout: 300_000 },
     const glassAudio = audioRows.find((row) => row.userId === scenario.targetUsers.maya.id && row.bookId === scenario.targetBooks.glass.bookId);
     expect(glassAudio?.positionSeconds).toBeCloseTo(15, 0);
 
+    const [glassMetadata] = await ctx.db
+      .select({ chapters: schema.bookMetadata.chapters, chaptersSource: schema.bookMetadata.chaptersSource })
+      .from(schema.bookMetadata)
+      .where(eq(schema.bookMetadata.bookId, scenario.targetBooks.glass.bookId));
+    expect(glassMetadata).toEqual({
+      chapters: [
+        { title: 'Prologue: The Breakwater', startMs: 0 },
+        { title: 'Chapter 1: Low Tide', startMs: 12_500 },
+        { title: 'Chapter 2: Open Water', startMs: 60_000 },
+      ],
+      chaptersSource: 'migration',
+    });
+
     const readingRows = await ctx.db
       .select()
       .from(schema.readingProgress)

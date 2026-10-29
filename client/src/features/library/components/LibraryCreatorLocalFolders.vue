@@ -6,9 +6,15 @@ import FolderPickerModal from './FolderPickerModal.vue'
 
 const { t } = useI18n()
 
-const props = defineProps<{
-  localFolders: string[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    localFolders: string[]
+    libraryName?: string
+    libraryIcon?: string | null
+    libraryId?: number | null
+  }>(),
+  { libraryName: '', libraryIcon: null, libraryId: null },
+)
 
 const emit = defineEmits<{
   'update:localFolders': [value: string[]]
@@ -130,5 +136,14 @@ const {
     </div>
   </section>
 
-  <FolderPickerModal v-if="pickerOpen" :selected-paths="localFolders" @select="addBrowsedFolders" @close="closePicker" />
+  <FolderPickerModal
+    v-if="pickerOpen"
+    :selected-paths="localFolders"
+    kind="podcastLocal"
+    :library-name="libraryName"
+    :library-icon="libraryIcon"
+    :library-id="libraryId"
+    @select="addBrowsedFolders"
+    @close="closePicker"
+  />
 </template>

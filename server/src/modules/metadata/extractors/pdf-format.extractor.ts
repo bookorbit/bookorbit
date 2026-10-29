@@ -1,15 +1,15 @@
 import { parseBookFilename } from '../lib/filename-parser';
 import { parsePdfFile, type PdfParseOptions } from '../lib/pdf-parser';
-import type { FormatExtractor, ParsedBookData } from './format-extractor.interface';
+import type { FormatExtractOptions, FormatExtractor, ParsedBookData } from './format-extractor.interface';
 
 type PdfFormatExtractorOptions = Pick<PdfParseOptions, 'extractCover' | 'onWarning'>;
 
 export class PdfFormatExtractor implements FormatExtractor {
   constructor(private readonly options: PdfFormatExtractorOptions = {}) {}
 
-  async extract(absolutePath: string): Promise<ParsedBookData | null> {
+  async extract(absolutePath: string, options?: FormatExtractOptions): Promise<ParsedBookData | null> {
     const pdf = await parsePdfFile(absolutePath, {
-      extractCover: this.options.extractCover === true,
+      extractCover: this.options.extractCover === true && options?.cover !== false,
       onWarning: this.options.onWarning,
     });
     if (!pdf) return null;

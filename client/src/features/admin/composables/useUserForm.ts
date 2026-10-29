@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
-import { PERMISSION_REQUIRES, type AuthUser, type Permission } from '@bookorbit/types'
+import { PERMISSION_REQUIRES, type AccessLevel, type AuthUser, type Permission, type UserLibraryGrant } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { grantingPermissions, isRestrictionPermission, presetPermissions, type PermissionPreset } from '../lib/permission-presets'
 
@@ -47,6 +47,8 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
   const isSharedAccount = ref(false)
   const selectedPermissionNames = ref<Set<string>>(new Set())
   const selectedLibraryIds = ref<Set<number>>(new Set())
+  /** Saved roles only: a library ticked in this form is granted as a Viewer when it saves. */
+  const savedAccessLevels = ref<Map<number, AccessLevel>>(new Map())
 
   const includeTagItems = ref<NamedItem[]>([])
   const excludeTagItems = ref<NamedItem[]>([])
@@ -72,6 +74,17 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
       excludeTagItems.value.length > 0 ||
       includeGenreItems.value.length > 0 ||
       excludeGenreItems.value.length > 0,
+  )
+
+  /** Selected libraries where the account's role lets Edit metadata take effect. */
+  const editorLibraryIds = computed(
+    () =>
+      new Set(
+        [...selectedLibraryIds.value].filter((libraryId) => {
+          const level = savedAccessLevels.value.get(libraryId)
+          return level === 'editor' || level === 'owner'
+        }),
+      ),
   )
 
   const restrictionPermissionNames = computed(() => [...selectedPermissionNames.value].filter(isRestrictionPermission))
@@ -175,6 +188,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     isSharedAccount.value = target?.provisioningMethod === 'shared'
     selectedPermissionNames.value = new Set(target?.permissions?.filter((permissionName) => permissionName !== '*') ?? [])
     selectedLibraryIds.value = target?.id ? new Set() : new Set(defaultLibraryIds.value ?? [])
+    savedAccessLevels.value = new Map()
     includeTagItems.value = []
     excludeTagItems.value = []
     includeGenreItems.value = []
@@ -195,15 +209,16 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     }
 
     const [librariesRes, filtersRes] = await Promise.all([
-      api(`/api/v1/users/${target.id}/libraries`),
+      api(`/api/v1/users/${target.id}/library-access`),
       target.isSuperuser ? Promise.resolve(null) : api(`/api/v1/users/${target.id}/content-filters`),
     ])
 
     if (user.value?.id !== target.id) return
 
     if (librariesRes.ok) {
-      const libraryIds: number[] = await librariesRes.json()
-      selectedLibraryIds.value = new Set(libraryIds)
+      const grants: UserLibraryGrant[] = await librariesRes.json()
+      selectedLibraryIds.value = new Set(grants.map((grant) => grant.libraryId))
+      savedAccessLevels.value = new Map(grants.map((grant) => [grant.libraryId, grant.accessLevel]))
     }
     if (filtersRes?.ok) {
       const filters = await filtersRes.json()
@@ -344,6 +359,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     isSharedAccount,
     selectedPermissionNames,
     selectedLibraryIds,
+    editorLibraryIds,
     includeTagItems,
     excludeTagItems,
     includeGenreItems,

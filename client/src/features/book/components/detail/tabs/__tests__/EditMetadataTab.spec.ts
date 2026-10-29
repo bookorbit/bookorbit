@@ -412,6 +412,68 @@ describe('EditMetadataTab cover tiles', () => {
     expect(JSON.parse(String(patchCalls()[0]![1]!.body)).lockedFields).toEqual([])
   })
 
+  it('writes a cover staged while its locked slot was opened here, then locks the slot again', async () => {
+    const wrapper = mountTab(makeBook({ lockedFields: ['title', 'audioCover'] }))
+    await flushPromises()
+    const coverPanelStub = wrapper.getComponent(CoverEditorPanelStub)
+    coverPanelStub.vm.$emit('toggleLock', 'audioCover')
+    await flushPromises()
+    panel.hasPending.value = true
+    panel.pendingMedia.value = ['audio']
+    coverPanelStub.vm.$emit('toggleLock', 'audioCover')
+    await flushPromises()
+
+    const order: string[] = []
+    panel.confirm.mockImplementation(async (media) => {
+      if (!media?.length) return true
+      order.push(`covers:${media.join(',')}`)
+      coverPanelStub.vm.$emit('coverChanged', 'audio')
+      return true
+    })
+    const relockedBook = makeBook({ lockedFields: ['title', 'audioCover'] })
+    vi.mocked(api).mockImplementation(async (url, init) => {
+      if (init?.method !== 'PATCH') return json([])
+      const lockedFields = JSON.parse(String(init.body)).lockedFields
+      if (String(url).endsWith('/metadata-locks')) {
+        order.push(`locks:${lockedFields.join(',')}`)
+        return json(relockedBook)
+      }
+      order.push(`form:${lockedFields.join(',')}`)
+      return json({ book: makeBook({ lockedFields: ['title'] }), write: null, libraryAutoWriteEnabled: false })
+    })
+
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(order).toEqual(['form:title', 'covers:audio', 'locks:title,audioCover'])
+    expect(wrapper.emitted('saved')!.at(-1)).toEqual([relockedBook])
+    expect(wrapper.emitted('coverChanged')).toEqual([['audio']])
+    expect(coverPanelStub.props('lockedFields')).toEqual(['title', 'audioCover'])
+  })
+
+  it('locks the slot again when the cover staged in it fails to save', async () => {
+    const wrapper = mountTab(makeBook({ lockedFields: ['audioCover'] }))
+    await flushPromises()
+    const coverPanelStub = wrapper.getComponent(CoverEditorPanelStub)
+    coverPanelStub.vm.$emit('toggleLock', 'audioCover')
+    await flushPromises()
+    panel.hasPending.value = true
+    panel.pendingMedia.value = ['audio']
+    coverPanelStub.vm.$emit('toggleLock', 'audioCover')
+    await flushPromises()
+    panel.confirm.mockImplementation(async (media) => !media?.length)
+    savedBook = makeBook({ lockedFields: [] })
+
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(panel.confirm).toHaveBeenLastCalledWith(['audio'])
+    expect(patchCalls().map(([url, init]) => [String(url).split('/').at(-1), JSON.parse(String(init!.body)).lockedFields])).toEqual([
+      ['metadata-and-locks', []],
+      ['metadata-locks', ['audioCover']],
+    ])
+  })
+
   it('clears the unsaved covers with the rest of the form', async () => {
     const wrapper = mountTab(makeBook())
     await flushPromises()

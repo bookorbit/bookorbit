@@ -236,7 +236,7 @@ describe('BookListRow - present state', () => {
 
     expect(wrapper.text()).toContain('EPUB')
     expect(wrapper.text()).not.toContain('NARR')
-    expect(wrapper.text()).toContain('Open read-along EPUB')
+    expect(wrapper.text()).toContain('Open read-aloud EPUB')
     expect(wrapper.find('.lucide-headphones').exists()).toBe(true)
   })
 

@@ -76,6 +76,7 @@ function makeManualHashLink(overrides: Partial<KoreaderManualHashLink> = {}): Ko
     koreaderTitle: 'KOReader Title',
     koreaderAuthors: 'Device Author',
     koreaderLastOpen: 1700000001,
+    positionCompatible: true,
     createdAt: '2026-06-03T00:00:00.000Z',
     updatedAt: '2026-06-04T00:00:00.000Z',
     ...overrides,
@@ -439,6 +440,72 @@ describe('useKoreaderSync', () => {
     expect(unmatchedBooks.value).toEqual([makeUnmatchedBook({ hash: 'b'.repeat(32) })])
     expect(syncStatus.value).toEqual(refreshedStatus)
     expect(manualHashLinks.value).toEqual(manualLinks)
+  })
+
+  it('fetchLinkSuggestions stores suggestions and treats any failure as none', async () => {
+    const suggestions = [{ hash: 'a'.repeat(32), candidates: [], moreCandidates: false }]
+    apiMock
+      .mockResolvedValueOnce(makeResponse(suggestions))
+      .mockResolvedValueOnce(makeResponse({ message: 'Not Found' }, { ok: false, status: 404 }))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { linkSuggestions, fetchLinkSuggestions } = useKoreaderSync()
+
+    await fetchLinkSuggestions()
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/koreader/unmatched-books/suggestions')
+    expect(linkSuggestions.value).toEqual(suggestions)
+
+    await fetchLinkSuggestions()
+    expect(linkSuggestions.value).toEqual([])
+
+    linkSuggestions.value = suggestions
+    await expect(fetchLinkSuggestions()).resolves.toBeUndefined()
+    expect(linkSuggestions.value).toEqual([])
+  })
+
+  it('linkSuggestedBooks links each pair, keeps failures listed, and refreshes once', async () => {
+    const [hashA, hashB, hashC] = ['a'.repeat(32), 'b'.repeat(32), 'c'.repeat(32)]
+    apiMock.mockImplementation(async (input) => {
+      const url = String(input)
+      if (url.endsWith(`${hashB}/link`)) return makeResponse({ message: 'conflict' }, { ok: false, status: 409 })
+      if (url.endsWith(`${hashC}/link`)) throw new Error('offline')
+      if (url.endsWith('/link')) return makeResponse({ hash: hashA, bookId: 1, bookFileId: 2 })
+      if (url.endsWith('/sync-status')) return makeResponse(makeSyncStatus())
+      return makeResponse([])
+    })
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { unmatchedBooks, linkSuggestions, linkSuggestedBooks } = useKoreaderSync()
+    unmatchedBooks.value = [makeUnmatchedBook({ hash: hashA }), makeUnmatchedBook({ hash: hashB }), makeUnmatchedBook({ hash: hashC })]
+    linkSuggestions.value = [hashA, hashB, hashC].map((hash) => ({ hash, candidates: [], moreCandidates: false }))
+
+    const outcome = await linkSuggestedBooks([
+      { hash: hashA, bookId: 1 },
+      { hash: hashB, bookId: 2 },
+      { hash: hashC, bookId: 3 },
+    ])
+
+    expect(outcome.linked).toBe(1)
+    expect([...outcome.failed].sort()).toEqual([hashB, hashC])
+    expect(unmatchedBooks.value.map((book) => book.hash)).toEqual([hashB, hashC])
+    expect(linkSuggestions.value.map((suggestion) => suggestion.hash)).toEqual([hashB, hashC])
+    const urls = apiMock.mock.calls.map(([input]) => String(input))
+    expect(urls.filter((url) => url.endsWith('/link'))).toHaveLength(3)
+    expect(urls.filter((url) => url.endsWith('/sync-status'))).toHaveLength(1)
+    expect(urls.filter((url) => url.endsWith('/hash-links'))).toHaveLength(1)
+    const [, request] = apiMock.mock.calls.find(([input]) => String(input).endsWith(`${hashA}/link`)) as [string, RequestInit]
+    expect(JSON.parse(String(request.body))).toEqual({ bookId: 1 })
+  })
+
+  it('linkSuggestedBooks skips the refresh when nothing linked', async () => {
+    apiMock.mockResolvedValue(makeResponse({ message: 'gone' }, { ok: false, status: 404 }))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { linkSuggestedBooks } = useKoreaderSync()
+
+    await expect(linkSuggestedBooks([{ hash: 'a'.repeat(32), bookId: 1 }])).resolves.toEqual({ linked: 0, failed: ['a'.repeat(32)] })
+    expect(apiMock).toHaveBeenCalledTimes(1)
   })
 
   it('linkUnmatchedBook throws the server message on failure', async () => {

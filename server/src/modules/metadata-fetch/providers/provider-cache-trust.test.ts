@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCallRecord, runWithProviderCallRecord } from '../../../common/provider-cache/provider-call-context';
 import type { ProviderConfigService } from '../../metadata-preferences/provider-config.service';
 import { ProviderThrottleTracker } from '../provider-throttle.tracker';
-import { AladinProvider } from './aladin/aladin.provider';
 import { AudibleProvider } from './audible/audible.provider';
 import { AudnexusProvider } from './audnexus/audnexus.provider';
 import { ComicVineClient } from './comicvine/comicvine.client';
@@ -43,8 +42,6 @@ const CONFIG: ProviderConfigurations = {
   comicvine: { enabled: true, apiKey: 'comicvine-key' },
   ranobedb: { enabled: true },
   kobo: { enabled: false, country: 'us', language: 'en' },
-  lubimyczytac: { enabled: false },
-  aladin: { enabled: true, ttbKey: 'aladin-key' },
 };
 
 const providerConfig = { getConfig: () => Promise.resolve(CONFIG) } as unknown as ProviderConfigService;
@@ -200,14 +197,6 @@ const SUITES: TrustSuite[] = [
     partialFailure: (url) => (url.pathname.endsWith('/books') ? json({ books: [{ id: 1 }], count: 1, currentPage: 1, totalPages: 1 }) : status(500)),
     genuineEmpty: () => json({ books: [], count: 0, currentPage: 1, totalPages: 0 }),
   },
-  {
-    name: 'aladin',
-    build: () => new AladinProvider(providerConfig),
-    params: TITLE_AUTHOR,
-    apiErrorBody: () => json({ errorCode: 1, errorMessage: 'Invalid TTBKey' }),
-    partialFailure: () => json({ totalResults: 1, item: [null] }),
-    genuineEmpty: () => json({ version: '20131101', totalResults: 0, startIndex: 1, itemsPerPage: 10, item: [] }),
-  },
 ];
 
 describe('trusting empty answers', () => {
@@ -326,7 +315,6 @@ describe('authoritative lookup statuses', () => {
     { name: 'google', build: () => new GoogleProvider(providerConfig) as IdentifiableProvider },
     { name: 'itunes', build: () => new ITunesProvider(providerConfig) as IdentifiableProvider },
     { name: 'audible', build: () => new AudibleProvider(providerConfig) as IdentifiableProvider },
-    { name: 'aladin', build: () => new AladinProvider(providerConfig) as IdentifiableProvider },
     { name: 'hardcover', build: () => new HardcoverProvider(new HardcoverClient(), providerConfig) as IdentifiableProvider },
     { name: 'ranobedb', build: () => new RanobeDbProvider(new RanobeDbClient(), providerConfig) as IdentifiableProvider },
   ])('$name does not pass a malformed lookup body off as an answer', async ({ build }) => {
@@ -340,7 +328,6 @@ describe('authoritative lookup statuses', () => {
 
   it.each([
     { name: 'audible', build: () => new AudibleProvider(providerConfig) as IdentifiableProvider, body: { message: 'error' } },
-    { name: 'aladin', build: () => new AladinProvider(providerConfig) as IdentifiableProvider, body: { errorCode: 8, errorMessage: 'no item' } },
     { name: 'hardcover', build: () => new HardcoverProvider(new HardcoverClient(), providerConfig) as IdentifiableProvider, body: { errors: [{}] } },
   ])('$name does not cache a lookup error body as not found', async ({ build, body }) => {
     routeEgress(() => json(body));

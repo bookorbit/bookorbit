@@ -1,7 +1,6 @@
 import {
   IsArray,
   IsBoolean,
-  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -21,7 +20,9 @@ import {
   ValidatorConstraint,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MetadataProviderKey, SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type SeriesIndex } from '@bookorbit/types';
+import { SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type MetadataProviderKey, type SeriesIndex } from '@bookorbit/types';
+import { IsExternalProviderMap } from '../../../common/decorators/is-external-provider-map.decorator';
+import { IsMetadataProviderKey } from '../../../common/decorators/is-metadata-provider-key.decorator';
 import { NormalizeIdentifier } from '../../../common/decorators/normalize-identifier.decorator';
 
 @ValidatorConstraint({ name: 'hasCompleteDefaultDestination', async: false })
@@ -62,7 +63,7 @@ class BookDockSeriesMembershipDto {
 }
 
 class BookDockCommunityRatingDto {
-  @IsIn(Object.values(MetadataProviderKey)) provider!: MetadataProviderKey;
+  @IsMetadataProviderKey() provider!: MetadataProviderKey;
   @IsNumber() @Min(0) @Max(5) rating!: number;
   @IsOptional() @IsInt() @Min(0) ratingCount?: number | null;
 }
@@ -125,6 +126,7 @@ export class BookDockMetadataFieldsDto {
   @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(50) ranobedbId?: string | null;
   @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(512) lubimyczytacId?: string | null;
   @NormalizeIdentifier() @IsOptional() @IsString() @MaxLength(20) aladinId?: string | null;
+  @IsOptional() @IsExternalProviderMap(512) externalProviderIds?: Record<string, string> | null;
   @IsOptional() @ValidateNested() @Type(() => BookDockComicMetadataDto) comicMetadata?: BookDockComicMetadataDto | null;
 }
 

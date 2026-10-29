@@ -49,7 +49,7 @@ local function clamp(v, lo, hi) if v < lo then return lo end if v > hi then retu
 
 -- The screen's width in dp, rounded as the design mock rounds it.
 local function screenW()
-    return math.floor(BoardMetrics.get().W * 1000 + 0.5) / 1000
+    return BoardMetrics.layoutW()
 end
 ListView.screenW = screenW
 
@@ -180,7 +180,10 @@ function ListView.header(w, o)
     local row_w = w + tap + (select and 0 or tap)
     local lead = select and 0 or (box - px(4))
     local title_w = row_w - lead - right_w
-    local title = text(o.title or "", { s = 22, b = true, w = title_w, data = o.title_data })
+    -- A long title steps down to 18 before it is cut.
+    local title_s = 22
+    while title_s > 18 and textWidth(o.title or "", { s = title_s, b = true }) > title_w do title_s = title_s - 1 end
+    local title = text(o.title or "", { s = title_s, b = true, w = title_w, data = o.title_data })
     local sub
     if o.sub then
         if type(o.sub) == "table" then sub = runs(o.sub, { s = 13, col = INK.g4, w = title_w, data = true })
@@ -716,7 +719,7 @@ end
 -- starts. Wide screens run it in two columns, like a printed index, when
 -- each column keeps a readable title (440dp).
 function ListView.indexColumns(total_w)
-    local W = total_w / BoardMetrics.get().dp
+    local W = BoardMetrics.layoutDp(total_w)
     return ((W - 28) / 2 >= 440) and 2 or 1
 end
 
@@ -783,7 +786,7 @@ local function CAP() return px(8) + lh1(13) + px(1) + lh1(11) end
 ListView.CAP = CAP
 
 function ListView.gridCols(gw_px)
-    local gw = gw_px / BoardMetrics.get().dp
+    local gw = BoardMetrics.layoutDp(gw_px)
     return gw >= 860 and 6 or gw >= 640 and 5 or gw >= 440 and 4 or 3
 end
 
@@ -1001,10 +1004,30 @@ end
 
 -- Replaces the pager while books are chosen.
 function ListView.selectBar(w, count, actions)
-    local items = { runs({ { t = tostring(count), b = true }, { t = " " .. _("selected") } }, { s = 15 }), flex(px(8)) }
+    -- On a narrow screen the buttons lose their icons, then the count its
+    -- word, then the buttons tighten, before anything runs off the edge.
+    local steps = {
+        { icons = true, word = true, s = 14, pad = 14 },
+        { icons = false, word = true, s = 14, pad = 14 },
+        { icons = false, word = false, s = 14, pad = 12 },
+        { icons = false, word = false, s = 13, pad = 10 },
+    }
+    local function count_label(step)
+        return runs({ { t = tostring(count), b = true }, step.word and { t = " " .. _("selected") } or nil }, { s = 15 })
+    end
+    local function pill(a, step)
+        return ListView.pill(a.label, { kind = a.kind or "outline", icon = step.icons and a.icon or nil, h = 40, s = step.s, pad_x = step.pad, disabled = a.disabled })
+    end
+    local chosen = steps[#steps]
+    for _i, step in ipairs(steps) do
+        local need = wOf(count_label(step)) + px(8) + (#actions - 1) * px(8)
+        for _j, a in ipairs(actions) do need = need + wOf(pill(a, step)) end
+        if need <= w then chosen = step; break end
+    end
+    local items = { count_label(chosen), flex(px(8)) }
     for i, a in ipairs(actions) do
         if i > 1 then table.insert(items, space(px(8), 1)) end
-        local p = ListView.pill(a.label, { kind = a.kind or "outline", icon = a.icon, h = 40, s = 14, pad_x = 14, disabled = a.disabled })
+        local p = pill(a, chosen)
         table.insert(items, a.disabled and p or region(p, a.action, "select-bar", "select-" .. i))
     end
     return mark("pager", hstack({ w = w, h = px(48) }, items))
@@ -1048,7 +1071,8 @@ end
 
 -- A sheet head: title and a control on the right.
 local function sheetHead(w, title, right)
-    return hstack({ w = w, h = px(32) }, { text(title, { s = 18, b = true }), flex(px(8)), right or false })
+    local h = math.max(px(32), right and hOf(right) or 0)
+    return hstack({ w = w, h = h }, { text(title, { s = 18, b = true }), flex(px(8)), right or false })
 end
 local function sheetLabel(w, t) return text(t, { s = 13, b = true, col = INK.g4, w = w }) end
 ListView.sheetHead, ListView.sheetLabel = sheetHead, sheetLabel
@@ -1064,13 +1088,21 @@ local function groupRow(w, o)
     local icon_w = o.icon and (px(24) + px(14)) or 0
     local right_w = right and (wOf(right) + px(12)) or 0
     local items = {}
+    local s = o.s or 15
+    local label_w = w - icon_w - right_w
+    local label_s = BoardUI.fitSize(o.label, { s = s, b = o.bold }, label_w, s - 2)
+    -- A label too long even two sizes down takes a second line, and the
+    -- row grows to hold it.
+    local lines = BoardUI.fitSize(o.label, { s = s - 2, b = o.bold }, label_w, s - 3) < s - 2 and 2 or nil
+    local label = text(o.label, { s = label_s, b = o.bold, w = label_w, lines = lines })
+    local h = math.max(px(o.h or 50), label:getSize().h + px(12))
     if o.icon then
-        table.insert(items, hstack({ w = px(24), h = px(o.h or 50) }, { flex(0), icon(o.icon, px(22), { sw = 2 }), flex(0) }))
+        table.insert(items, hstack({ w = px(24), h = h }, { flex(0), icon(o.icon, px(22), { sw = 2 }), flex(0) }))
         table.insert(items, space(px(14), 1))
     end
-    table.insert(items, text(o.label, { s = o.s or 15, b = o.bold, w = w - icon_w - right_w }))
+    table.insert(items, label)
     if right then table.insert(items, flex(px(12))); table.insert(items, right) end
-    return region(hstack({ w = w, h = px(o.h or 50) }, items), o.action, o.row or ("sheet-row-" .. o.label), o.key)
+    return region(hstack({ w = w, h = h }, items), o.action, o.row or ("sheet-row-" .. o.label), o.key)
 end
 ListView.groupRow = groupRow
 
@@ -1098,16 +1130,76 @@ function ListView.sheet(screen_w, screen_h, o)
     -- The tallest body that fits between the header and the bottom edge.
     local header_bottom = px(6) + px(64)
     local max_body = screen_h - header_bottom - px(8) - 2 * pad
-    local body_items = o.build(inner, max_body)
     local gap = px(14)
-    local spaced = {}
-    for _i, item in ipairs(body_items) do
-        if item then
-            if #spaced > 0 then table.insert(spaced, space(nil, gap)) end
-            table.insert(spaced, item)
+    local function stack(items, width)
+        local spaced = {}
+        for _i, item in ipairs(items) do
+            if item then
+                if #spaced > 0 then table.insert(spaced, space(nil, gap)) end
+                table.insert(spaced, item)
+            end
+        end
+        return vstack({ w = width }, spaced)
+    end
+    -- What the build registers, so a draft can be taken back.
+    local hit_mark = BoardUI.hitMark()
+    local rows_mark = {}
+    if env then for key, list in pairs(env.rows) do rows_mark[key] = #list end end
+    local row_list_mark = env and #env.row_list or 0
+    local body = stack(o.build(inner, max_body), inner)
+    local function takeBack()
+        BoardUI.hitTrim(hit_mark)
+        if env then
+            for key, list in pairs(env.rows) do
+                for i = #list, (rows_mark[key] or 0) + 1, -1 do table.remove(list, i) end
+                if #list == 0 and not rows_mark[key] then env.rows[key] = nil; env.row_seen[key] = nil end
+            end
+            for i = #env.row_list, row_list_mark + 1, -1 do table.remove(env.row_list, i) end
         end
     end
-    local body = vstack({ w = inner }, spaced)
+    local col_gap = px(24)
+    local pw2 = math.min(2 * px(o.pop_w or 460) + col_gap, screen_w - 2 * mx)
+    local col_w = math.floor((pw2 - 2 * pad - col_gap) / 2)
+    -- The two columns, split where they come out most even; nil when
+    -- something in them would be cut.
+    local function columns(checked)
+        local function draft()
+            local items = {}
+            for _i, item in ipairs(o.build(col_w, max_body)) do if item then table.insert(items, item) end end
+            local heights, total = {}, 0
+            for i, item in ipairs(items) do heights[i] = hOf(item); total = total + heights[i] end
+            local best, best_h, run = #items, math.huge, 0
+            for k = 1, #items - 1 do
+                run = run + heights[k]
+                local tallest = math.max(run + (k - 1) * gap, total - run + (#items - k - 1) * gap)
+                if tallest < best_h then best, best_h = k, tallest end
+            end
+            local left, right = {}, {}
+            for i, item in ipairs(items) do table.insert(i <= best and left or right, item) end
+            return hstack({ w = pw2 - 2 * pad, gap = col_gap, valign = "top" }, { stack(left, col_w), stack(right, col_w) })
+        end
+        if checked then
+            local clean, probe = BoardUI.fits(function() return BoardUI.collectHits(draft) end)
+            if probe and probe.free then probe:free() end
+            if not clean then return nil end
+        end
+        return draft()
+    end
+    -- A wide, short screen (landscape) sets a sheet too tall for it in two
+    -- columns. Narrower columns are tried too when one column would not fit
+    -- even raised to the header, as long as nothing in them is cut.
+    local raised_max = screen_h - px(8) - header_bottom - 2 * pad
+    if wide and hOf(body) > max_body and (col_w >= px(300) or (hOf(body) > raised_max and col_w >= px(220))) then
+        body:free()
+        takeBack()
+        local split = columns(col_w < px(300))
+        if split then
+            pw, inner = pw2, pw2 - 2 * pad
+            body = split
+        else
+            body = stack(o.build(inner, max_body), inner)
+        end
+    end
     local line = math.max(1, px(1.5))
     local r = px(16)
     local layers, x, y, ph
@@ -1118,8 +1210,11 @@ function ListView.sheet(screen_w, screen_h, o)
         x = o.kind == "top" and (screen_w - mx - pw) or math.floor((screen_w - pw) / 2)
         y = o.kind == "top" and (o.top or px(112)) or (screen_h - px(56) - ph)
         -- On a short screen a tall sheet rises toward the header rather than
-        -- run off the bottom.
-        if y + ph > screen_h - px(8) then y = math.max(header_bottom, screen_h - px(8) - ph) end
+        -- run off the bottom, and over it when it must.
+        if y + ph > screen_h - px(8) then
+            local lowest = screen_h - px(8) - ph
+            y = lowest >= header_bottom and lowest or math.max(px(8), lowest)
+        end
         layers = { { widget = panel, x = x, y = y } }
     else
         local pad_t = o.kind == "top" and px(10) or pad
@@ -1156,7 +1251,7 @@ end
 function ListView.jumpKeys(w, present, current)
     local keys = { "#" }
     for c = string.byte("A"), string.byte("Z") do table.insert(keys, string.char(c)) end
-    local cols = w >= px(560) and 9 or 7
+    local cols = w >= BoardMetrics.lpx(560) and 9 or 7
     local gap = px(6)
     local kw = math.floor((w - (cols - 1) * gap) / cols)
     local kh = px(44)

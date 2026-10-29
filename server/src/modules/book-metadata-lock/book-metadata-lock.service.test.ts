@@ -97,7 +97,7 @@ describe('BookMetadataLockService', () => {
     await expect(service.isFieldLocked(1, 'title')).resolves.toBe(false);
   });
 
-  it('filterResolvedMetadata passes chapters through regardless of lock state', async () => {
+  it('filterResolvedMetadata passes chapters through while they are unlocked', async () => {
     const { service } = makeService(['title', 'cover']);
 
     const chapters = [{ title: 'Ch 1', startMs: 0 }];
@@ -105,6 +105,28 @@ describe('BookMetadataLockService', () => {
 
     expect(result.resolved.chapters).toEqual(chapters);
     expect('title' in result.resolved).toBe(false);
+  });
+
+  it('keeps locked chapters away from provider refreshes and file scans', async () => {
+    const { service } = makeService(['chapters']);
+    const chapters = [{ title: 'Ch 1', startMs: 0 }];
+
+    const resolved = await service.filterResolvedMetadata(1, { title: 'Allowed', chapters }, {});
+    const automated = await service.filterAutomatedBookUpdate(1, { audioMetadata: { chapters, narrators: ['Reader'] } });
+
+    expect(resolved.resolved).toEqual({ title: 'Allowed' });
+    expect(resolved.skippedFields).toEqual(['chapters']);
+    expect(automated.dto).toEqual({ audioMetadata: { narrators: ['Reader'] } });
+    expect(automated.skippedFields).toEqual(['chapters']);
+  });
+
+  it('rejects a plain metadata update that targets locked chapters', async () => {
+    const { service } = makeService(['chapters']);
+
+    await expect(service.assertManualUpdateAllowed(1, { audioMetadata: { chapters: [{ title: 'Ch 1', startMs: 0 }] } })).rejects.toThrow(
+      ConflictException,
+    );
+    await expect(service.assertManualUpdateAllowed(1, { audioMetadata: { narrators: ['Reader'] } })).resolves.toBeUndefined();
   });
 
   it('filters resolved series memberships as a grouped series update', async () => {

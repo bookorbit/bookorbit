@@ -1,6 +1,6 @@
 import { MetadataCandidate } from '@bookorbit/types';
 
-import { matchableTitle, scoreCandidate } from './candidate-relevance';
+import { matchableTitle, rankCandidate } from './candidate-relevance';
 import { candidateHasNormalizedIsbn, candidatesShareIsbn, normalizeMetadataIsbn } from './isbn-match';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 import { scoreTitleMatch, shareSignificantToken } from '../../common/text-match/title-match';
@@ -87,9 +87,9 @@ function selectAnchor(candidates: readonly MetadataCandidate[], params: Metadata
   if (!hasText(params.title) && !hasText(params.author)) return scoreable[0];
 
   let best = scoreable[0];
-  let bestScore = scoreCandidate(best, params);
+  let bestScore = rankCandidate(best, params);
   for (const candidate of scoreable.slice(1)) {
-    const score = scoreCandidate(candidate, params);
+    const score = rankCandidate(candidate, params);
     if (score > bestScore) {
       best = candidate;
       bestScore = score;

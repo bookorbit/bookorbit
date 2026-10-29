@@ -120,8 +120,33 @@ export interface KoreaderManualHashLink {
   koreaderTitle: string | null;
   koreaderAuthors: string | null;
   koreaderLastOpen: number | null;
+  /**
+   * False when the device copy's bytes differ from the linked library file: reading status, rating, reading time
+   * and progress (as a percentage) sync; highlights, bookmarks and exact positions do not.
+   */
+  positionCompatible: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A library book whose title and authors equal an unmatched KOReader book's, offered for the user to confirm. */
+export interface KoreaderLinkSuggestionCandidate {
+  bookId: number;
+  title: string | null;
+  subtitle: string | null;
+  authors: string[];
+  /** Format of the book's primary file, which is what a link targets. */
+  format: string | null;
+  language: string | null;
+  publishedYear: number | null;
+  libraryName: string | null;
+}
+
+export interface KoreaderUnmatchedBookSuggestion {
+  hash: string;
+  candidates: KoreaderLinkSuggestionCandidate[];
+  /** More library books share the title than were checked, so none of the candidates may be presented as the only match. */
+  moreCandidates: boolean;
 }
 
 export interface LinkKoreaderUnmatchedBookPayload {

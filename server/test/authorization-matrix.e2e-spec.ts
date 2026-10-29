@@ -92,6 +92,7 @@ interface Personas {
   koboRevoked: TestUserSession;
   bookDockUser: TestUserSession;
   uploadUser: TestUserSession;
+  readAloudUser: TestUserSession;
   downloadOnlyUser: TestUserSession;
   ownerUser: TestUserSession;
   otherUser: TestUserSession;
@@ -244,6 +245,9 @@ describe('Authorization matrix (e2e)', () => {
       koboRevoked: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       bookDockUser: await createUserAndLogin(ctx, { permissions: [Permission.BookDockAccess, Permission.LibraryUpload] }),
       uploadUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryUpload] }),
+      readAloudUser: await createUserAndLogin(ctx, {
+        permissions: [Permission.LibraryUpload, Permission.LibraryGenerateReadAloud],
+      }),
       downloadOnlyUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryDownload] }),
       ownerUser: await createUserAndLogin(ctx),
       otherUser: await createUserAndLogin(ctx),
@@ -256,6 +260,7 @@ describe('Authorization matrix (e2e)', () => {
       grantLibraryAccess(ctx, personas.allPermsUser.userId, podcastLibrary.libraryId, 'owner'),
       grantLibraryAccess(ctx, personas.metadataEditor.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.bookDockUser.userId, libraryA.libraryId, 'viewer'),
+      grantLibraryAccess(ctx, personas.readAloudUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.downloadOnlyUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.ownerUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.opdsOwner.userId, libraryA.libraryId, 'viewer'),
@@ -688,7 +693,7 @@ describe('Authorization matrix (e2e)', () => {
           query?: string;
           payload?: Record<string, unknown>;
           params?: Record<string, string>;
-          token: 'allPerms' | 'uploadUser';
+          token: 'allPerms' | 'uploadUser' | 'readAloudUser';
         }
       > = {
         [Permission.LibraryDownload]: {
@@ -701,6 +706,12 @@ describe('Authorization matrix (e2e)', () => {
           method: 'POST',
           path: '/libraries/:id/upload',
           token: 'uploadUser',
+        },
+        [Permission.LibraryGenerateReadAloud]: {
+          method: 'GET',
+          path: '/books/:bookId/read-aloud',
+          params: { bookId: String(bookA.bookId) },
+          token: 'readAloudUser',
         },
         [Permission.LibraryEditMetadata]: {
           method: 'GET',
@@ -880,7 +891,7 @@ describe('Authorization matrix (e2e)', () => {
             : await ctx.app.inject({
                 method: probe.method,
                 url: buildUrl(probe.path, probe.query, probe.params),
-                headers: authHeader(personas.allPermsUser.accessToken),
+                headers: authHeader(probe.token === 'readAloudUser' ? personas.readAloudUser.accessToken : personas.allPermsUser.accessToken),
                 payload: probe.method === 'GET' ? undefined : (probe.payload ?? {}),
               });
 
@@ -930,6 +941,8 @@ describe('Authorization matrix (e2e)', () => {
           'POST /libraries/:id/recompute-added-at',
           'POST /libraries/:id/write-metadata-to-files',
           'GET /scanner/libraries/:id/scan-history',
+          'GET /scanner/libraries/:id/reapply-regex-metadata',
+          'POST /scanner/libraries/:id/reapply-regex-metadata',
           'POST /libraries/:id/books/jump-buckets',
           'POST /libraries/:id/books/facets',
           'GET /libraries/:id/bulk-rename/preview',

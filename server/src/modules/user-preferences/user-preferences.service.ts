@@ -18,6 +18,7 @@ import {
   COVER_SEARCH_DEFAULT_PROVIDERS,
   COVER_SIZE_SCOPES,
   DEFAULT_BOOK_REQUEST_PREFERENCES,
+  DEFAULT_READ_ALOUD_PREFERENCES,
   RETIRED_BOOK_REQUEST_PREFERENCE_FIELDS,
   DEFAULT_COVER_SEARCH_PROVIDER,
   FONT_FAMILY_NAME_MAX_LENGTH,
@@ -43,6 +44,7 @@ import {
   type LocalePreferences,
   type PodcastPlaybackPreferences,
   type PodcastPlaylistPreferences,
+  type ReadAloudPreferences,
   type ServerFontPreferences,
   type ThemePreferences,
   type WhatsNewPreferences,
@@ -150,6 +152,20 @@ const BOOK_REQUEST_PREFERENCES_SCHEMA = z.preprocess(
     })
     .strict(),
 );
+
+/**
+ * Any well-formed language subtag, not only the current speech model's: the model's language list
+ * can grow, and the dialog ignores a stored language it cannot offer.
+ */
+const READ_ALOUD_PREFERENCES_SCHEMA = z
+  .object({
+    defaultLanguage: z
+      .string()
+      .regex(/^[a-z]{2,3}$/, 'must be a lowercase language subtag')
+      .nullable()
+      .default(null),
+  })
+  .strict() satisfies z.ZodType<ReadAloudPreferences>;
 
 const LOCALE_PREFERENCES_SCHEMA = z
   .object({
@@ -470,6 +486,24 @@ export class UserPreferencesService {
     }
 
     await this.repo.upsert(userId, 'book-requests', result.data);
+  }
+
+  async getReadAloudPreferences(userId: number): Promise<ReadAloudPreferences> {
+    const row = await this.repo.findByCategory(userId, 'read-aloud');
+    const result = READ_ALOUD_PREFERENCES_SCHEMA.safeParse(row?.data);
+    return result.success ? result.data : { ...DEFAULT_READ_ALOUD_PREFERENCES };
+  }
+
+  async upsertReadAloudPreferences(userId: number, data: Record<string, unknown>): Promise<void> {
+    const result = READ_ALOUD_PREFERENCES_SCHEMA.safeParse(data);
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : 'settings';
+      const issueMessage = firstIssue?.message ?? 'Invalid settings payload';
+      throw new BadRequestException(`Invalid read-aloud preferences at "${issuePath}": ${issueMessage}`);
+    }
+
+    await this.repo.upsert(userId, 'read-aloud', result.data);
   }
 
   async upsertThemePreferences(userId: number, data: Record<string, unknown>): Promise<void> {

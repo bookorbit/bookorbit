@@ -9,7 +9,6 @@ regular methods.
 
 local Device = require("device")
 local Event = require("ui/event")
-local InfoMessage = require("ui/widget/infomessage")
 local Math = require("optmath")
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
@@ -114,9 +113,19 @@ function ProgressSync:syncToProgress(progress, percentage_fallback)
     logger.dbg("BookOrbit: syncing to progress", progress, "percent", percentage_fallback)
     local has_position = progress ~= nil and progress ~= ""
     if not has_position and percentage_fallback then
-        -- No exact position (push came from web/audio sync); jump by percentage.
-        -- kosync percentage is 0-1; GotoPercent expects 0-100.
-        self.ui:handleEvent(Event:new("GotoPercent", percentage_fallback * 100))
+        -- No exact position (web or audio sync, or a different copy of the
+        -- book); jump by percentage. In page mode KOReader reports a place as
+        -- page / pages but GotoPercent floors percent * pages, which lands one
+        -- page short of the page another device sent, so go to the nearest page.
+        local rolling = self.ui.rolling
+        local pages = self.ui.document.info and self.ui.document.info.number_of_pages
+        if rolling and rolling.view and rolling.view.view_mode == "page" and type(pages) == "number" and pages > 0 then
+            local page = math.max(1, math.min(pages, math.floor(percentage_fallback * pages + 0.5)))
+            self.ui:handleEvent(Event:new("GotoPage", page))
+        else
+            -- kosync percentage is 0-1; GotoPercent expects 0-100.
+            self.ui:handleEvent(Event:new("GotoPercent", percentage_fallback * 100))
+        end
         if self.book_sheet then self.book_sheet:refreshProgress() end
         return
     end
@@ -126,6 +135,23 @@ function ProgressSync:syncToProgress(progress, percentage_fallback)
         self.ui:handleEvent(Event:new("GotoXPointer", progress))
     end
     if self.book_sheet then self.book_sheet:refreshProgress() end
+end
+
+-- A place BookOrbit holds without a position (a different copy of the book, or
+-- a web or audio place it could not convert) is reachable only by percentage,
+-- which lands on a page boundary. Within one page of it is the same place; an
+-- exact comparison would offer a jump to where the reader already is on every
+-- sync.
+function ProgressSync:isSamePlace(body, local_percentage, local_progress)
+    if local_percentage == body.percentage or body.progress == local_progress then return true end
+    if body.progress ~= nil and body.progress ~= "" then return false end
+    local doc = self.ui and self.ui.document
+    local pages = doc and doc.getPageCount and doc:getPageCount()
+    if type(pages) ~= "number" or pages <= 0 or type(local_percentage) ~= "number" or type(body.percentage) ~= "number" then
+        return false
+    end
+    -- Plus the 4-decimal rounding both percentages go through on the way.
+    return math.abs(body.percentage - local_percentage) <= 1 / pages + 0.0001
 end
 
 function ProgressSync:remoteProgressIsNewer(body, local_percentage)
@@ -170,11 +196,11 @@ end
 
 function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
     if not self.ui or not self.ui.document then
-        UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+        Toast.error(_("No book is open"))
         return false
     end
     if self:getDocumentDigest() ~= digest then
-        UIManager:show(InfoMessage:new{ text = _("The open book changed. Start the sync again."), timeout = 3 })
+        Toast.error(_("The open book changed. Sync again"))
         return false
     end
 
@@ -207,7 +233,7 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
     local local_progress = self:getLastProgress()
     local local_percentage = self:getLastPercent()
 
-    if local_percentage == body.percentage or body.progress == local_progress then
+    if self:isSamePlace(body, local_percentage, local_progress) then
         self:noteProgressCompared(digest)
         on_done(false)
         return true
@@ -273,7 +299,7 @@ function ProgressSync:updateProgress(ensure_networking, interactive, on_suspend)
     end
     if not self.ui or not self.ui.document then
         if interactive then
-            UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+            Toast.error(_("No book is open"))
         end
         return
     end
@@ -349,7 +375,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
     end
     if not self.ui or not self.ui.document then
         if interactive then
-            UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+            Toast.error(_("No book is open"))
         end
         return
     end
@@ -417,7 +443,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
     local progress = self:getLastProgress()
     local percentage = self:getLastPercent()
 
-    if percentage == body.percentage or body.progress == progress then
+    if self:isSamePlace(body, percentage, progress) then
         self:noteProgressCompared(digest)
         if interactive then
             Toast.show(_("Already in sync"))

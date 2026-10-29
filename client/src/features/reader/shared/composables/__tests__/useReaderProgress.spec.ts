@@ -197,20 +197,17 @@ describe('useReaderProgress', () => {
     await vi.advanceTimersByTimeAsync(2500)
 
     const saveCalls = apiMock.mock.calls.filter(
-      (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('/progress') && (c[1] as { method?: string })?.method === 'POST',
+      (c: unknown[]) => typeof c[0] === 'string' && c[0] === '/api/v1/reading-progress' && (c[1] as { method?: string })?.method === 'PUT',
     )
     expect(saveCalls.length).toBe(1)
     const saveCall = saveCalls[0]
     if (!saveCall) throw new Error('Expected one progress save call')
-    const saveBody = JSON.parse((saveCall[1] as { body: string }).body)
+    const saveBody = JSON.parse((saveCall[1] as { body: string }).body).writes[0]
     expect(saveBody).toEqual(
       expect.objectContaining({
         percentage: 30,
-        koboLocationSource: 'OEBPS/html/ch3.xhtml',
-        koboLocationType: 'KoboSpan',
-        koboLocationValue: 'kobo.25.1',
-        koboContentSourceProgressPercent: 25,
-        koreaderProgress: '/body/DocFragment[3]/body/p[4]/text()[1].2',
+        kobo: { source: 'OEBPS/html/ch3.xhtml', type: 'KoboSpan', value: 'kobo.25.1', contentPercent: 25 },
+        koreader: '/body/DocFragment[3]/body/p[4]/text()[1].2',
       }),
     )
 
@@ -238,20 +235,17 @@ describe('useReaderProgress', () => {
       await progress.save()
 
       const saveCall = apiMock.mock.calls.find(
-        (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('/progress') && (c[1] as { method?: string })?.method === 'POST',
+        (c: unknown[]) => typeof c[0] === 'string' && c[0] === '/api/v1/reading-progress' && (c[1] as { method?: string })?.method === 'PUT',
       )
       if (!saveCall) throw new Error('Expected progress save call')
-      const saveBody = JSON.parse((saveCall[1] as { body: string }).body)
+      const saveBody = JSON.parse((saveCall[1] as { body: string }).body).writes[0]
 
       expect(saveBody).toEqual(
         expect.objectContaining({
-          cfi: 'epubcfi(/6/38!/4,/488/2/1:604,/512/2/1:89)',
+          text: { cfi: 'epubcfi(/6/38!/4,/488/2/1:604,/512/2/1:89)', page: null },
           percentage: 69.604585363819,
-          koboLocationSource: null,
-          koboLocationType: null,
-          koboLocationValue: null,
-          koboContentSourceProgressPercent: 87.5,
-          koreaderProgress: '/body/DocFragment[19]/body/p[222]/font/text().604',
+          kobo: { source: null, type: null, value: null, contentPercent: 87.5 },
+          koreader: '/body/DocFragment[19]/body/p[222]/font/text().604',
         }),
       )
     } finally {

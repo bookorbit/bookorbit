@@ -62,7 +62,7 @@ export class ComicVineProvider implements IdentifiableProvider {
   private readonly logger = new Logger(ComicVineProvider.name);
 
   readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
-    version: 2,
+    version: 3,
     trustEmpty: true,
     // The issue endpoint answers an unknown id with 404.
     authoritativeLookupStatuses: [404],
@@ -105,6 +105,7 @@ export class ComicVineProvider implements IdentifiableProvider {
               maxCandidates,
               deadline,
               params.requireUnambiguousMatch ?? false,
+              parsed.startYear,
             )
           : await this.generalSearch(params.title, apiKey, maxCandidates, deadline);
 
@@ -171,6 +172,7 @@ export class ComicVineProvider implements IdentifiableProvider {
     maxCandidates: number,
     deadline: SearchDeadline,
     requireUnambiguousMatch: boolean,
+    startYear?: number,
   ): Promise<VolumeIssueMatch[]> {
     const startedAt = Date.now();
     const volumes = await this.client.searchVolumes(seriesName, apiKey, deadline.signal);
@@ -179,7 +181,7 @@ export class ComicVineProvider implements IdentifiableProvider {
       return [];
     }
 
-    const ranked = rankVolumes(volumes, seriesName, issueNumber);
+    const ranked = rankVolumes(volumes, seriesName, issueNumber, startYear);
     const matches: VolumeIssueMatch[] = [];
     const seenIssueIds = new Set<number>();
 
@@ -189,9 +191,9 @@ export class ComicVineProvider implements IdentifiableProvider {
         complete = false;
         break;
       }
-      const groupScore = volumeMatchScore(ranked[offset], seriesName, issueNumber);
+      const groupScore = volumeMatchScore(ranked[offset], seriesName, issueNumber, startYear);
       let groupEnd = offset + 1;
-      while (groupEnd < ranked.length && volumeMatchScore(ranked[groupEnd], seriesName, issueNumber) === groupScore) groupEnd++;
+      while (groupEnd < ranked.length && volumeMatchScore(ranked[groupEnd], seriesName, issueNumber, startYear) === groupScore) groupEnd++;
       const waveEnd = Math.min(offset + VOLUME_PROBE_BATCH, groupEnd, VOLUME_PROBE_LIMIT);
       const wave = ranked.slice(offset, waveEnd);
       // Settled rather than all: one probe being throttled or cut off by the deadline must not

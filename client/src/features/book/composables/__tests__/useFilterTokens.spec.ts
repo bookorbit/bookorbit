@@ -99,7 +99,7 @@ describe('ruleToTokenParts', () => {
     expect(ruleToTokenParts({ ...epub, value: [READ_ALONG_FORMAT_PRIORITY] })).toEqual({
       field: 'Format',
       operator: 'is',
-      value: 'Read-along EPUB',
+      value: 'Read-aloud EPUB',
     })
   })
 

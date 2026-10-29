@@ -47,10 +47,33 @@ export async function fetchClient(url: URL, init: RequestInit, label: string, sa
     if (error instanceof Error && error.name === 'AbortError') {
       throw new ServiceUnavailableException(`${label} did not answer in time`);
     }
-    throw new ServiceUnavailableException(`Could not reach ${label}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new ServiceUnavailableException(`Could not reach ${label}: ${transportFailureText(error)}`);
   } finally {
     clearTimeout(timer);
   }
+}
+
+const TRANSPORT_FAILURES: Record<string, string> = {
+  ECONNREFUSED: 'connection refused',
+  ECONNRESET: 'connection reset',
+  ENOTFOUND: 'host not found',
+  EAI_AGAIN: 'host not found',
+  EHOSTUNREACH: 'host unreachable',
+  ENETUNREACH: 'network unreachable',
+  ETIMEDOUT: 'connection timed out',
+  UND_ERR_CONNECT_TIMEOUT: 'connection timed out',
+};
+
+/**
+ * Undici reports every transport failure as `TypeError: fetch failed` and keeps the reason on
+ * `cause`, sometimes inside an `AggregateError` when several addresses were tried. "fetch failed"
+ * is what the attempt history showed for a client that was simply not running.
+ */
+function transportFailureText(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const cause = error instanceof Error ? (error.cause as { code?: unknown; errors?: { code?: unknown }[] } | undefined) : undefined;
+  const code = cause?.code ?? cause?.errors?.[0]?.code;
+  return (typeof code === 'string' && TRANSPORT_FAILURES[code]) || message;
 }
 
 /** Daemon-side failures are temporary; authentication and request refusals remain durable 4xx. */

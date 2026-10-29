@@ -1,6 +1,10 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
+import { eq } from 'drizzle-orm';
+
+import { bookFiles, books } from '../src/db/schema';
+
 import type { FixtureEntry } from './e2e/scanner/scanner-fixture-builder';
 import { createFixtureTree, file } from './e2e/scanner/scanner-fixture-builder';
 import {
@@ -458,6 +462,71 @@ describe('Scanner structures (e2e)', () => {
         SCENARIO_TIMEOUT_MS,
       );
     }
+  });
+
+  describe('a library folder named like a disc folder', () => {
+    // unRAID mounts its drives as /mnt/disk1; such a folder was once flattened into the folder above it.
+    const entries = [file('disk1/Dune.epub'), file('disk1/Emma.epub'), file('disk1/Saga/Saga 001.cbz')];
+    const expected = (library: string) =>
+      [join(library, 'Dune.epub'), join(library, 'Emma.epub'), join(library, 'Saga')].map((folderPath) => ({ folderPath, status: 'present' }));
+
+    it(
+      'reads its loose files as books of their own, inside the library',
+      async () => {
+        if (!context) throw new Error('E2E context not initialized');
+        const fixture = await createFixtureTree(entries, 'scanner-e2e-disc-named-root-');
+        try {
+          const library = join(fixture.rootPath, 'disk1');
+          const { libraryId } = await seedLibrary(context.db, { rootPath: library, mode: 'book_per_folder' });
+
+          await waitForScanCompletion(context.db, await triggerLibraryScan(context, libraryId));
+
+          const state = await loadLibraryBookState(context.db, libraryId);
+          expect(state.map(({ folderPath, status }) => ({ folderPath, status })).sort((a, b) => a.folderPath.localeCompare(b.folderPath))).toEqual(
+            expected(library),
+          );
+          await assertNoIntegrityViolations(context.db);
+        } finally {
+          await fixture.cleanup();
+        }
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'regroups a library scanned while it was flattened, keeping the old book on its primary file',
+      async () => {
+        if (!context) throw new Error('E2E context not initialized');
+        const fixture = await createFixtureTree(entries, 'scanner-e2e-disc-named-root-repair-');
+        try {
+          const library = join(fixture.rootPath, 'disk1');
+          const { libraryId } = await seedLibrary(context.db, { rootPath: library, mode: 'book_per_folder' });
+          await waitForScanCompletion(context.db, await triggerLibraryScan(context, libraryId));
+
+          // Rebuild what the flattening scan stored: one book above the library holding every loose file.
+          const rows = await context.db.select({ id: books.id, folderPath: books.folderPath }).from(books).where(eq(books.libraryId, libraryId));
+          const dune = rows.find((row) => row.folderPath === join(library, 'Dune.epub'))!;
+          const emma = rows.find((row) => row.folderPath === join(library, 'Emma.epub'))!;
+          await context.db.update(bookFiles).set({ bookId: dune.id }).where(eq(bookFiles.bookId, emma.id));
+          await context.db.delete(books).where(eq(books.id, emma.id));
+          await context.db.update(books).set({ folderPath: fixture.rootPath }).where(eq(books.id, dune.id));
+
+          await waitForScanCompletion(context.db, await triggerLibraryScan(context, libraryId));
+
+          const state = await loadLibraryBookState(context.db, libraryId);
+          expect(state.map(({ folderPath, status }) => ({ folderPath, status })).sort((a, b) => a.folderPath.localeCompare(b.folderPath))).toEqual(
+            expected(library),
+          );
+          const [kept] = await context.db.select({ folderPath: books.folderPath }).from(books).where(eq(books.id, dune.id));
+          expect(kept?.folderPath).toBe(join(library, 'Dune.epub'));
+          expect(state.find((book) => book.folderPath === join(library, 'Emma.epub'))?.filePaths).toEqual([join(library, 'Emma.epub')]);
+          await assertNoIntegrityViolations(context.db);
+        } finally {
+          await fixture.cleanup();
+        }
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
   });
 
   describe('organizationMode=book_per_file', () => {

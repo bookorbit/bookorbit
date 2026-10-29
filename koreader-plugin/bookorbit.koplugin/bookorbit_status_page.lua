@@ -6,7 +6,6 @@ numbers, what happened recently, then the fixes. The old key-value list stays
 one tap down as Technical details.
 ]]
 
-local InfoMessage = require("ui/widget/infomessage")
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
@@ -93,23 +92,38 @@ local function hero(d, w, sync)
     }, { pad = 18, vpad = 18, strong = true })
 end
 
-local function statTile(w, value, label, action)
+local function statTile(w, value, label, action, label_s)
     local pad = px(14)
     local iw = w - 2 * pad
     local head = action and hstack({ gap = px(6) }, { text(tostring(value), { s = 26, b = true }), icon("chevron-right", px(16), { sw = 2.5 }) })
         or text(tostring(value), { s = 26, b = true })
-    local card = MenuUI.card(w, { vstack({ w = iw }, { head, space(nil, px(2)), text(label, { s = 13, col = INK.g4, lines = 2, w = iw }) }) }, { pad = 14, vpad = 12 })
+    local card = MenuUI.card(w, { vstack({ w = iw }, { head, space(nil, px(2)), text(label, { s = label_s or 13, col = INK.g4, lines = 2, w = iw }) }) }, { pad = 14, vpad = 12 })
     return action and BoardUI.hit(card, action) or card
 end
 
 local function stats(d, w)
     local gap = px(10)
     local tw = math.floor((w - 2 * gap) / 3)
-    return hstack({ w = w, gap = gap, valign = "top" }, {
-        statTile(tw, d.matched, _("books matched")),
-        statTile(w - 2 * tw - 2 * gap, d.unmatched, _("not in BookOrbit"), d.unmatched > 0 and { kind = "unmatched" } or nil),
-        statTile(tw, d.waiting, _("waiting to send")),
-    })
+    local tiles = {
+        { tw, d.matched, _("books matched") },
+        { w - 2 * tw - 2 * gap, d.unmatched, _("not in BookOrbit"), d.unmatched > 0 and { kind = "unmatched" } or nil },
+        { tw, d.waiting, _("waiting to send") },
+    }
+    -- One caption size for the row, stepped down until every caption fits
+    -- its two lines.
+    local linesNeeded = require("bookorbit_text_pages").linesNeeded
+    local label_s = 13
+    while label_s > 11 do
+        local fits = true
+        for _i, t in ipairs(tiles) do
+            if linesNeeded(t[3], { s = label_s }, t[1] - 2 * px(14)) > 2 then fits = false end
+        end
+        if fits then break end
+        label_s = label_s - 1
+    end
+    local cells = {}
+    for _i, t in ipairs(tiles) do table.insert(cells, statTile(t[1], t[2], t[3], t[4], label_s)) end
+    return hstack({ w = w, gap = gap, valign = "top" }, cells)
 end
 
 -- As many recent events as fit in max_h.
@@ -198,12 +212,33 @@ local function build(page, sw, sh)
         local lw = math.floor((w - gutter) / 2)
         local rw = w - lw - gutter
         local h_hero = hero(d, w, page.sync)
-        local left = vstack({ w = lw }, { stats(d, lw), space(nil, px(10)), actions(d, lw, true, page.sync, page.test), space(nil, px(10)), fixes(lw, true, page.sync) })
-        local avail = sh - top - bottom - px(64) - px(8) - h_hero:getSize().h - px(12) - BoardMetrics.lh1(13)
-        local right = vstack({ w = rw }, { MenuUI.label(rw, _("Recent activity")), space(nil, px(8)), activityList(d, rw, avail - px(8)) })
+        local room = sh - top - bottom - header:getSize().h - px(8) - h_hero:getSize().h - px(12)
+        -- The first arrangement whose left column fits a short screen with
+        -- nothing cut: the buttons stacked, then side by side, then with the
+        -- fixes moved under the recent activity, stacked and side by side.
+        local function left(stacked, with_fixes)
+            return vstack({ w = lw }, {
+                stats(d, lw), space(nil, px(10)), actions(d, lw, stacked, page.sync, page.test),
+                with_fixes and space(nil, px(10)) or false, with_fixes and fixes(lw, true, page.sync) or false,
+            })
+        end
+        local choice
+        for _i, v in ipairs({ { true, true }, { false, true }, { true, false }, { false, false } }) do
+            local clean, probe = BoardUI.fits(function() return BoardUI.collectHits(function() return left(v[1], v[2]) end) end)
+            local h = probe and probe.getSize and probe:getSize().h or math.huge
+            if probe and probe.free then probe:free() end
+            if clean and h <= room then choice = v; break end
+        end
+        choice = choice or { true, false }
+        local right_fixes = not choice[2] and fixes(rw, true, page.sync) or nil
+        local list_room = room - BoardMetrics.lh1(13) - px(8) - (right_fixes and (right_fixes:getSize().h + px(10)) or 0)
+        local right = vstack({ w = rw }, {
+            MenuUI.label(rw, _("Recent activity")), space(nil, px(8)), activityList(d, rw, list_room),
+            right_fixes and space(nil, px(10)) or false, right_fixes or false,
+        })
         return vstack({ w = sw, h = sh, pad = { top, mx, bottom, mx } }, {
             header, space(nil, px(8)), h_hero, space(nil, px(12)),
-            hstack({ w = w, gap = gutter, valign = "top" }, { left, right }),
+            hstack({ w = w, gap = gutter, valign = "top" }, { left(choice[1], choice[2]), right }),
         })
     end
     local fixed = { header, space(nil, px(8)), hero(d, w, page.sync), space(nil, px(10)), stats(d, w), space(nil, px(16)) }
@@ -238,9 +273,10 @@ local function onAction(page, action)
     elseif kind == "diagnostics" then
         plugin:showDiagnostics()
     elseif kind == "unmatched" then
-        UIManager:show(InfoMessage:new{
+        require("bookorbit_dialog_ui").notice{
+            title = _("Books not in BookOrbit"),
             text = _("Some books on this device are not in your BookOrbit library: files copied by hand, or edited since they were downloaded. Recheck all books to try matching them again."),
-        })
+        }
     end
     return true
 end

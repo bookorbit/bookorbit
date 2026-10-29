@@ -49,7 +49,7 @@ end
 -- decimal, so a 600 dp screen measures 599.9994; thresholds compare the
 -- rounded value, as the design mock does.
 local function screenW()
-    return math.floor(BoardMetrics.get().W * 1000 + 0.5) / 1000
+    return BoardMetrics.layoutW()
 end
 
 local function wOf(widget) return widget:getSize().w end
@@ -155,7 +155,15 @@ DetailView.linesNeeded = linesNeeded
 -- one word on its last line.
 local function balancedWidth(str, o, width, lines)
     if lines <= 1 then return width end
-    local lo, hi = math.floor(width * 0.5 + 0.5), width
+    -- Never narrower than the widest word with its punctuation, or a line
+    -- would start on the comma after it.
+    local widest = 0
+    for word in tostring(str or ""):gmatch("%S+") do
+        local w = text(word, o)
+        widest = math.max(widest, wOf(w))
+        if w.free then w:free() end
+    end
+    local lo, hi = math.min(width, math.max(math.floor(width * 0.5 + 0.5), widest + px(2))), width
     while hi - lo > 4 do
         local mid = math.floor((lo + hi) / 2 + 0.5)
         if linesNeeded(str, o, mid) <= lines then hi = mid else lo = mid end
@@ -732,8 +740,8 @@ local function shelfHead(d, w)
 end
 
 local function shelfCount(w)
-    if w >= px(600) then return 6 end
-    if w >= px(480) then return 5 end
+    if w >= BoardMetrics.lpx(600) then return 6 end
+    if w >= BoardMetrics.lpx(480) then return 5 end
     return 4
 end
 
@@ -1046,10 +1054,11 @@ local function detailsParts(d, w, lw, rw, two_col)
     local steps = { 0 }
     if desc then for v = 3, math.min(total, 30) do table.insert(steps, v) end end
     table.insert(parts, { id = "about", col = "l", required = true, grow = true, grow_value = 10, min = 0, max = steps[#steps], steps = steps, node = about, h = measured(about) })
-    -- Genres and tags sit under About, when the page has room left for them.
+    -- Genres and tags sit under About; the description shortens to keep them,
+    -- so they show at every interface size.
     if #(d.chips or {}) > 0 then
         local function chips_part(v) return vstack({ w = lw }, { head(lw, _("Genres and tags")), space(nil, px(10)), chipRows(d, lw, v or 2, "details-chips") }) end
-        table.insert(parts, { id = "chips", col = "l", value = 40, late = true, min = 2, node = chips_part, h = measured(chips_part) })
+        table.insert(parts, { id = "chips", col = "l", value = 40, min = 2, node = chips_part, h = measured(chips_part) })
     end
     -- Your reading: time on this device and highlights.
     local hl = d.highlights
@@ -1057,7 +1066,7 @@ local function detailsParts(d, w, lw, rw, two_col)
     if j or hl then
         local jw = two_col and rw or w
         local done = d.status == "read"
-        local n4 = jw >= px(480) and 4 or 3
+        local n4 = jw >= BoardMetrics.lpx(480) and 4 or 3
         local sw = math.floor((jw - (n4 - 1) * px(12)) / n4)
         local stats = {}
         if j then
@@ -1324,7 +1333,7 @@ function DetailView.build(ctx)
     local m = BoardMetrics.get()
     local d = ctx.d
     local screen_w, screen_h = ctx.screen_w, ctx.screen_h
-    local W = math.floor(screen_w / m.dp * 1000 + 0.5) / 1000
+    local W = math.floor(screen_w / m.layout_dp * 1000 + 0.5) / 1000
     local mx = px(W >= 900 and 28 or W >= 700 and 24 or W >= 560 and 20 or 16)
     local w = screen_w - 2 * mx
     local top = px(6)

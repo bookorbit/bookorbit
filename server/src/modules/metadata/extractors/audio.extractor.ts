@@ -5,8 +5,8 @@ import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } f
 
 const execFile = promisify(execFileCallback);
 
-const FFPROBE_PATH = process.env.FFPROBE_PATH || 'ffprobe';
-const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
+const FFPROBE_PATH = process.env.FFPROBE_PATH?.trim() || 'ffprobe';
+const FFMPEG_PATH = process.env.FFMPEG_PATH?.trim() || 'ffmpeg';
 // A chapter-rich audiobook prints far more than execFile's 1 MB default, and an overflow there
 // would surface as a failed read of a perfectly good file.
 const FFPROBE_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -59,12 +59,12 @@ interface FfprobeOutput {
 
 // Null means the file could not be read, which is not the same as a file that carries no tags:
 // callers persist what they get, so a failed read must never be mistaken for empty metadata.
-export async function extractAudioMetadata(absolutePath: string): Promise<AudioExtractResult | null> {
+export async function extractAudioMetadata(absolutePath: string, options: { cover?: boolean } = {}): Promise<AudioExtractResult | null> {
   try {
     const { stdout } = await execFile(
       FFPROBE_PATH,
       ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', '-show_streams', absolutePath],
-      { maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES },
+      { timeout: 30_000, killSignal: 'SIGKILL', maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES },
     );
 
     const data: FfprobeOutput = JSON.parse(stdout);
@@ -114,7 +114,7 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
 
     const mappedChapters = mapChapters(chapters);
 
-    const coverBytes = await extractCoverBytes(absolutePath, streams);
+    const coverBytes = options.cover === false ? null : await extractCoverBytes(absolutePath, streams);
 
     return {
       title,
@@ -143,6 +143,8 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
 export async function parseAudioDuration(absolutePath: string): Promise<number | null> {
   try {
     const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', absolutePath], {
+      timeout: 30_000,
+      killSignal: 'SIGKILL',
       maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES,
     });
     const data: FfprobeOutput = JSON.parse(stdout);
@@ -157,6 +159,8 @@ export async function parseAudioDuration(absolutePath: string): Promise<number |
 export async function probeAudioChapters(absolutePath: string): Promise<AudioChapterProbe> {
   try {
     const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', absolutePath], {
+      timeout: 30_000,
+      killSignal: 'SIGKILL',
       maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES,
     });
     const data: FfprobeOutput = JSON.parse(stdout);
@@ -178,6 +182,8 @@ function mapChapters(chapters: FfprobeChapter[]): AudiobookChapter[] {
 export async function extractAudioCover(absolutePath: string): Promise<Buffer | null> {
   try {
     const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_streams', absolutePath], {
+      timeout: 30_000,
+      killSignal: 'SIGKILL',
       maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES,
     });
     const data: FfprobeOutput = JSON.parse(stdout);

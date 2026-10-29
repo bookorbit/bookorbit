@@ -1,30 +1,19 @@
 import {
-  MetadataProviderKey,
+  BUILT_IN_METADATA_PROVIDER_LABELS,
+  isMovedMetadataProviderKey,
+  MOVED_METADATA_PROVIDERS,
   type BookDetail,
+  type BuiltInMetadataProviderKey,
   type MetadataFetchDiagnostics,
-  type MetadataProviderKey as MetadataProviderKeyType,
 } from '@bookorbit/types'
+import type { MetadataProviderKey as MetadataProviderKeyType } from '@bookorbit/types'
 
-const PROVIDER_LABELS: Record<MetadataProviderKeyType, string> = {
-  [MetadataProviderKey.GOOGLE]: 'Google Books',
-  [MetadataProviderKey.GOODREADS]: 'Goodreads',
-  [MetadataProviderKey.AMAZON]: 'Amazon',
-  [MetadataProviderKey.HARDCOVER]: 'Hardcover',
-  [MetadataProviderKey.OPEN_LIBRARY]: 'Open Library',
-  [MetadataProviderKey.ITUNES]: 'iTunes',
-  [MetadataProviderKey.AUDIBLE]: 'Audible',
-  [MetadataProviderKey.AUDNEXUS]: 'AudNexus',
-  [MetadataProviderKey.LIBROFM]: 'Libro.fm',
-  [MetadataProviderKey.COMICVINE]: 'ComicVine',
-  [MetadataProviderKey.RANOBEDB]: 'RanobeDB',
-  [MetadataProviderKey.KOBO]: 'Kobo',
-  [MetadataProviderKey.LUBIMYCZYTAC]: 'LubimyCzytac',
-  [MetadataProviderKey.ALADIN]: 'Aladin',
-}
+const PROVIDER_LABELS = BUILT_IN_METADATA_PROVIDER_LABELS
 
 /** A display name for a provider key, including the author providers that share the book registry's names. */
 export function metadataProviderLabel(provider: string): string {
-  return PROVIDER_LABELS[provider as MetadataProviderKeyType] ?? provider
+  if (isMovedMetadataProviderKey(provider)) return MOVED_METADATA_PROVIDERS[provider].label
+  return PROVIDER_LABELS[provider as BuiltInMetadataProviderKey] ?? provider
 }
 
 export function metadataRefreshEmptyMessage(diagnostics: MetadataFetchDiagnostics, book: BookDetail): string {
@@ -86,7 +75,7 @@ function bookSearchLabel(book: BookDetail): string {
 }
 
 function formatProviderList(providers: MetadataProviderKeyType[]): string {
-  return formatTextList(providers.map((provider) => PROVIDER_LABELS[provider] ?? provider))
+  return formatTextList(providers.map((provider) => metadataProviderLabel(provider)))
 }
 
 function formatTextList(items: string[]): string {

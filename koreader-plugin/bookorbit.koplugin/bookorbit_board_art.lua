@@ -7,10 +7,11 @@ it is shown at, then kept in memory by content, so a page flip or a tile
 refresh blits it again instead of rendering. SVG is only ever a file to
 NanoSVG, so each render goes through one scratch file that is overwritten.
 
-Pixel sprites are runs of solid rectangles at a whole-number scale, so they
-stay sharp on every screen. A glyph is one character rendered by FreeType at
-an exact pixel size and drawn as its ink alone, without the line box around
-it, so a large letter can fill a tile.
+Pixel sprites are runs of solid rectangles at a whole or half step of scale,
+so they stay sharp on every screen, in colour on a colour screen and in grey
+on any other. A glyph is one character rendered by FreeType at an exact pixel
+size and drawn as its ink alone, without the line box around it, so a large
+letter can fill a tile.
 ]]
 
 local Blitbuffer = require("ffi/blitbuffer")
@@ -18,12 +19,10 @@ local Device = require("device")
 local Geom = require("ui/geometry")
 local RenderImage = require("ui/renderimage")
 local Widget = require("ui/widget/widget")
+local bit = require("bit")
 local logger = require("logger")
 
-local BoardMetrics = require("bookorbit_board_metrics")
-
 local Screen = Device.screen
-local INK = BoardMetrics.INK
 
 local BoardArt = {}
 
@@ -115,9 +114,59 @@ function BoardArt.n(v)
 end
 
 -- --------------------------------------------------------------- sprites
-local SPRITE_INK = { ["#"] = INK.black, d = INK.g5, m = INK.g9, l = INK.gc, ["."] = INK.white }
+-- Where cell i starts at scale k. Whole pixels, so a half step (1.5x)
+-- alternates one- and two-pixel cells instead of blurring them.
+local function edge(i, k)
+    return math.floor(i * k + 1e-6)
+end
+BoardArt.spriteEdge = edge
 
-local SpriteWidget = Widget:extend{ rows = nil, k = 1 }
+-- Rows become runs of one character once; a repaint only fills rectangles.
+local runs_of = setmetatable({}, { __mode = "k" })
+
+local function runs(rows)
+    local out = runs_of[rows]
+    if out then return out end
+    out = {}
+    for row_index, line in ipairs(rows) do
+        local col, len = 1, #line
+        while col <= len do
+            local ch = line:sub(col, col)
+            local run_end = col
+            while run_end < len and line:sub(run_end + 1, run_end + 1) == ch do run_end = run_end + 1 end
+            if ch ~= " " then table.insert(out, { row_index - 1, col - 1, run_end, ch }) end
+            col = run_end + 1
+        end
+    end
+    runs_of[rows] = out
+    return out
+end
+
+-- Each palette character's ink on this screen: its colour on a colour screen,
+-- its grey otherwise. Night mode inverts the whole screen, so the ink is
+-- inverted first and the pet keeps its own colours, as pictures do.
+local inks_of = setmetatable({}, { __mode = "k" })
+
+local function inks(palette)
+    local colour, night = Screen:isColorEnabled() and true or false, Screen.night_mode and true or false
+    local hit = inks_of[palette]
+    if hit and hit.colour == colour and hit.night == night then return hit.inks, colour end
+    local out = {}
+    for ch, entry in pairs(palette) do
+        if colour then
+            local rgb = entry[1]
+            local r, g, b = bit.rshift(rgb, 16), bit.band(bit.rshift(rgb, 8), 0xFF), bit.band(rgb, 0xFF)
+            if night then r, g, b = 255 - r, 255 - g, 255 - b end
+            out[ch] = Blitbuffer.ColorRGB32(r, g, b, 0xFF)
+        else
+            out[ch] = Blitbuffer.Color8(night and 255 - entry[2] or entry[2])
+        end
+    end
+    inks_of[palette] = { colour = colour, night = night, inks = out }
+    return out, colour
+end
+
+local SpriteWidget = Widget:extend{ rows = nil, palette = nil, k = 1 }
 
 function SpriteWidget:getSize()
     return self.dimen
@@ -126,24 +175,26 @@ end
 function SpriteWidget:paintTo(bb, x, y)
     self.dimen.x, self.dimen.y = x, y
     local k = self.k
-    for row_index, line in ipairs(self.rows) do
-        local col, len = 1, #line
-        while col <= len do
-            local ch = line:sub(col, col)
-            local run_end = col
-            while run_end < len and line:sub(run_end + 1, run_end + 1) == ch do run_end = run_end + 1 end
-            local color = SPRITE_INK[ch]
-            if color then
-                bb:paintRect(x + (col - 1) * k, y + (row_index - 1) * k, (run_end - col + 1) * k, k, color)
+    local ink_of, colour = inks(self.palette)
+    for _i, run in ipairs(runs(self.rows)) do
+        local ink = ink_of[run[4]]
+        if ink then
+            local top, left = edge(run[1], k), edge(run[2], k)
+            local w, h = edge(run[3], k) - left, edge(run[1] + 1, k) - top
+            if colour then
+                bb:paintRectRGB32(x + left, y + top, w, h, ink)
+            else
+                bb:paintRect(x + left, y + top, w, h, ink)
             end
-            col = run_end + 1
         end
     end
 end
 
--- A sprite of character rows (see bookorbit_board_sprites) at scale k.
-function BoardArt.sprite(rows, k)
-    return SpriteWidget:new{ rows = rows, k = k, dimen = Geom:new{ w = #rows[1] * k, h = #rows * k } }
+-- A sprite of character rows at scale k (whole or half steps), inked from a
+-- palette of { colour, grey } per character (see bookorbit_pets).
+function BoardArt.sprite(rows, k, palette)
+    return SpriteWidget:new{ rows = rows, k = k, palette = palette,
+        dimen = Geom:new{ w = edge(#rows[1], k), h = edge(#rows, k) } }
 end
 
 -- ---------------------------------------------------------------- glyphs
@@ -212,7 +263,13 @@ function GlyphWidget:paintTo(bb, x, y)
     self.dimen.x, self.dimen.y = x, y
     local g = renderGlyph(self.file, self.codepoint, self.size)
     if not g then return end
-    bb:colorblitFrom(g.bb, x, y, 0, 0, g.bb:getWidth(), g.bb:getHeight(), self.color or Blitbuffer.COLOR_BLACK)
+    local color = self.color or Blitbuffer.COLOR_BLACK
+    -- The plain colour blit keeps only gray; an RGB colour takes the RGB one.
+    if Blitbuffer.isColor8 and not Blitbuffer.isColor8(color) and bb.colorblitFromRGB32 then
+        bb:colorblitFromRGB32(g.bb, x, y, 0, 0, g.bb:getWidth(), g.bb:getHeight(), color)
+    else
+        bb:colorblitFrom(g.bb, x, y, 0, 0, g.bb:getWidth(), g.bb:getHeight(), color)
+    end
 end
 
 -- One character's bitmap at a pixel size: { bb, l, t }, or nil. Drawn by

@@ -29,6 +29,13 @@ export interface MetadataProvider {
    * cached. Its key inputs must cover every parameter the provider reads, directly or in helpers.
    */
   readonly cache?: ProviderCacheSpec<MetadataSearchParams>;
+  /** `external` for a provider registered at runtime over HTTP; built-ins leave it unset. */
+  readonly source?: 'external';
+  /** An external provider's icon as BookOrbit serves it, and its brand colour. Built-ins' live in the clients. */
+  readonly iconUrl?: string;
+  readonly color?: string;
+  /** A record link for a stored id, for providers that publish a URL template. */
+  bookUrl?(id: string): string | undefined;
   search(params: MetadataSearchParams): Promise<MetadataCandidate[]>;
 }
 

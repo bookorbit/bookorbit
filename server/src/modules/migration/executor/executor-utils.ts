@@ -1,5 +1,6 @@
 import * as schema from '../../../db/schema';
 import { isAudioFormat, isComicFormat } from '@bookorbit/types';
+import { chapterProvenance, normalizeAudiobookChapters } from '../../../common/utils/audiobook-chapters.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../../common/utils/metadata-text-normalize.utils';
 import type { SourceBookFile } from '../adapters/source-adapter.types';
 import { applyPathMappings } from '../planner/matching.service';
@@ -203,6 +204,7 @@ export function buildMetadataPatch(sourceBook: {
   comicvineId?: string | null;
   durationSeconds?: number | null;
   abridged?: boolean | null;
+  chapters?: readonly unknown[] | null;
   presentFields?: string[];
 }): Partial<typeof schema.bookMetadata.$inferInsert> {
   const field = <T>(name: string, value: T | undefined): T | undefined =>
@@ -230,7 +232,16 @@ export function buildMetadataPatch(sourceBook: {
     comicvineId: field('comicvineId', truncateNullableText(sourceBook.comicvineId, 50)),
     durationSeconds: field('durationSeconds', sanitizeNonNegativeInteger(sourceBook.durationSeconds)),
     abridged: field('abridged', sourceBook.abridged === undefined ? undefined : (sourceBook.abridged ?? false)),
+    ...migratedChapters(field('chapters', sourceBook.chapters)),
   });
+}
+
+// Only a non-empty list is carried over: a source with no chapters must not erase the ones
+// BookOrbit read from the files.
+function migratedChapters(chapters: readonly unknown[] | null | undefined): Partial<typeof schema.bookMetadata.$inferInsert> {
+  const normalized = chapters?.length ? normalizeAudiobookChapters(chapters) : [];
+  if (normalized.length === 0) return {};
+  return { chapters: normalized, ...chapterProvenance(normalized, 'migration') };
 }
 
 function sanitizeBoundedInteger(value: number | null | undefined, min: number, max: number): number | null | undefined {

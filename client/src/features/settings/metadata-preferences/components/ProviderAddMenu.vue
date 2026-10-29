@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { Plus } from '@lucide/vue'
 import type { MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { providerChipStyle, providerShortLabel } from '@/lib/provider-colors'
 import { providerHasOtherShape, skipReasonFor } from '../lib/field-rules'
 
 const { t } = useI18n()
@@ -24,18 +24,19 @@ const emit = defineEmits<{ add: [provider: MetadataProviderKey] }>()
 const open = ref(false)
 
 // Usable providers first: an unconfigured one, or one that never fills this field, can still be
-// added, but it is not the choice anyone is looking for.
+// added, but it is not the choice anyone is looking for. A source that moved out and is not
+// registered again is listed only so rules that name it still read; it is not offered.
 const candidates = computed(() => {
-  const available = props.statuses.filter((status) => !props.assigned.includes(status.key as MetadataProviderKey))
+  const available = props.statuses.filter((status) => !status.movedOut && !props.assigned.includes(status.key as MetadataProviderKey))
   return available
     .map((status) => {
       const skipReason = skipReasonFor(status, props.field)
       return {
         key: status.key as MetadataProviderKey,
         label: status.label,
-        short: PROVIDER_SHORT_LABELS[status.key] ?? status.key,
+        short: providerShortLabel(status.key, status.label),
         skipReason,
-        otherShape: !skipReason && providerHasOtherShape(status.key as MetadataProviderKey, props.field),
+        otherShape: !skipReason && providerHasOtherShape(status.key as MetadataProviderKey, props.field, status.supportedFields),
       }
     })
     .sort((a, b) => Number(Boolean(a.skipReason || a.otherShape)) - Number(Boolean(b.skipReason || b.otherShape)))

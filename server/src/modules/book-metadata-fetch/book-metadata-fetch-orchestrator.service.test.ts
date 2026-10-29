@@ -350,6 +350,10 @@ describe('BookMetadataFetchOrchestratorService', () => {
         audibleId: 'a1',
         librofmId: '9781234567890',
         koboId: 'kobo-1',
+        chapters: [{ title: 'Ch 1', startMs: 0 }],
+        chaptersSource: 'provider',
+        chaptersUpdatedAt: expect.any(Date),
+        chaptersUpdatedBy: null,
       }),
     );
     expect(bookReadService.replaceCommunityRatings).toHaveBeenCalledWith(88, [

@@ -69,6 +69,8 @@ The `read-aloud-delivery` E2E suite covers bytes, ranges, authorization, indepen
 
 Set the credential default in Settings > KOReader > Sync Settings > KOReader EPUB delivery. A device can override it, or use the credential default. New credentials created in the supported web interface start with text-only delivery. Existing credentials inherit text-only until configured; the plugin imports an existing local choice once for that device if the server default has not been configured. Import never overwrites a saved device choice or an explicit credential default.
 
+Downloads keep the device's file naming pattern for either variant. Only copies that would otherwise share a path are renamed: the text-only copy of a narrated EPUB adds ` - Text Only`, and each same-format file after a book's first adds its file id in brackets.
+
 Plugin 1.7.0 reads the current server preference before a fresh acquisition. Download > Settings > Read-aloud EPUB delivery edits the same server device setting. Single-download options include Use BookOrbit default and a choice of either EPUB variant. Changes apply to future acquisitions. Issued selections and interrupted bulk checkpoints retain their captured variant, including when a web default changes before resume.
 
 The `koreader-delivery-settings` web feature and `readAloudDeliverySettings` plugin capability gate the new fields and routes. Against older servers, the plugin retains its local default and explicit override compatibility. A failed or invalid settings response does not silently select a different rendition. Credentials remain unique per BookOrbit account; devices sharing them may have independent overrides.

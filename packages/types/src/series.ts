@@ -71,6 +71,10 @@ export type SeriesDetail = {
   name: string;
   bookCount: number;
   readCount: number;
+  /** Logical volumes owned, collapsing book records that share a whole-numbered series position. */
+  ownedVolumeCount?: number;
+  /** Owned logical volumes whose furthest status is read. */
+  readVolumeCount?: number;
   authors: string[];
   possibleGaps: number[];
   /** Total books a metadata provider reports for the series, or null when no provider has told us. */

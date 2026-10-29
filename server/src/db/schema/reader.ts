@@ -67,15 +67,24 @@ export const readingAttempts = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    bookId: integer('book_id')
-      .notNull()
-      .references(() => books.id, { onDelete: 'cascade' }),
+    // Null once the book is deleted: a finished read outlives it, described by the snapshot below.
+    bookId: integer('book_id').references(() => books.id, { onDelete: 'set null' }),
     startedOn: date('started_on', { mode: 'string' }),
     endedOn: date('ended_on', { mode: 'string' }),
     outcome: varchar('outcome', { length: 20 }).$type<ReadingAttemptOutcome>(),
     origin: varchar('origin', { length: 20 }).$type<ReadingAttemptOrigin>().notNull(),
     externalProvider: varchar('external_provider', { length: 40 }),
     externalId: varchar('external_id', { length: 255 }),
+    // This read's own 1-5 stars. The book's rating follows its latest finished read.
+    rating: smallint('rating'),
+    // Written just before the book is deleted, so the read can still be named afterwards.
+    bookTitleSnapshot: varchar('book_title_snapshot', { length: 1000 }),
+    // A JSON array of names: author names can contain commas.
+    bookAuthorsSnapshot: text('book_authors_snapshot'),
+    bookFormatSnapshot: varchar('book_format_snapshot', { length: 20 }),
+    bookPageCountSnapshot: integer('book_page_count_snapshot'),
+    bookLibraryIdSnapshot: integer('book_library_id_snapshot'),
+    bookRemovedAt: timestamp('book_removed_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -97,6 +106,7 @@ export const readingAttempts = pgTable(
     check('reading_attempts_origin_chk', sql`${t.origin} in ('manual', 'bookorbit', 'kobo', 'koreader', 'hardcover', 'migration')`),
     check('reading_attempts_end_after_start_chk', sql`${t.endedOn} is null or ${t.startedOn} is null or ${t.endedOn} >= ${t.startedOn}`),
     check('reading_attempts_closed_has_outcome_chk', sql`${t.endedOn} is null or ${t.outcome} is not null`),
+    check('reading_attempts_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 5)`),
   ],
 );
 
@@ -426,6 +436,22 @@ export const audiobookProgress = pgTable(
 
 export type AudiobookProgress = typeof audiobookProgress.$inferSelect;
 export type NewAudiobookProgress = typeof audiobookProgress.$inferInsert;
+
+// Manifest revisions a client may still hold, keyed to the track layout they describe. A playback
+// write naming an older revision is accepted when its positions key matches today's, because the
+// change (chapters, tags) did not move any audio. Released iOS never recovers from a 412.
+export const audiobookManifestRevisions = pgTable(
+  'audiobook_manifest_revisions',
+  {
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    revision: varchar('revision', { length: 64 }).notNull(),
+    positionsKey: varchar('positions_key', { length: 64 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.bookId, t.revision] }), index('amr_book_created_idx').on(t.bookId, t.createdAt)],
+);
 
 export type BookmarkOrigin = 'web' | 'koreader' | 'kobo';
 

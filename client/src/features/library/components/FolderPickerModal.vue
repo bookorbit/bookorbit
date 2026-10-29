@@ -1,334 +1,585 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, ChevronRight, ChevronUp, Folder, FolderOpen, FolderPlus, HardDrive, Info, Loader2, Search, X } from '@lucide/vue'
-import { RecycleScroller } from 'vue-virtual-scroller'
+import { useEventListener, useMediaQuery } from '@vueuse/core'
+import { Check, ChevronUp, FolderTree, Info, Radio, Undo2, X } from '@lucide/vue'
+import type { OrganizationMode } from '@bookorbit/types'
 import { useModal } from '@/composables/useModal'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useFolderBrowser } from '../composables/useFolderBrowser'
-
-const { t } = useI18n()
+import { formatList } from '@/i18n/formatters'
+import { consolidateFolderPaths, normalizeFolderPath } from '../composables/folder-paths'
+import { FOLDER_PICKER, type FolderPickerContext } from '../composables/folder-picker/folder-picker-context'
+import {
+  ancestorsWithin,
+  booksAs,
+  isAtOrInside,
+  isInside,
+  leafName,
+  parentPath,
+  type FolderPickerKind,
+  type FolderStatus,
+  type PickerLibrary,
+} from '../composables/folder-picker/folder-picker-rules'
+import { rememberRecentFolders } from '../composables/folder-picker/recent-folders'
+import { useFolderPickerData } from '../composables/folder-picker/useFolderPickerData'
+import { useFolderPickerSelection } from '../composables/folder-picker/useFolderPickerSelection'
+import { useFolderPickerTree } from '../composables/folder-picker/useFolderPickerTree'
+import { usePickerPlanWidth } from '../composables/folder-picker/usePickerPlanWidth'
+import FolderPickerDivider from './folder-picker/FolderPickerDivider.vue'
+import FolderPickerPlan from './folder-picker/FolderPickerPlan.vue'
+import FolderPickerTree from './folder-picker/FolderPickerTree.vue'
+import PickerKbd from './folder-picker/PickerKbd.vue'
 
 const props = withDefaults(
   defineProps<{
+    /** Folders the library already reads. */
     selectedPaths?: string[]
+    multiple?: boolean
+    kind?: FolderPickerKind
+    libraryName?: string
+    libraryIcon?: string | null
+    /** The library being edited, left out of the others when checking overlaps. */
+    libraryId?: number | null
+    organizationMode?: OrganizationMode
+    organizationModeLocked?: boolean
   }>(),
   {
     selectedPaths: () => [],
+    multiple: true,
+    kind: 'books',
+    libraryName: '',
+    libraryIcon: null,
+    libraryId: null,
+    organizationMode: 'book_per_folder',
+    organizationModeLocked: false,
   },
 )
 
 const emit = defineEmits<{
   select: [paths: string[]]
   close: []
+  'update:organizationMode': [mode: OrganizationMode]
 }>()
 
-const panel = ref<HTMLElement | null>(null)
-const {
-  currentPath,
-  loading,
-  search,
-  error,
-  selectedPaths,
-  selectionNotice,
-  creatingFolder,
-  newFolderName,
-  createError,
-  createLoading,
-  newFolderInput,
-  filteredEntries,
-  breadcrumbs,
-  canGoUp,
-  selectedCount,
-  navigate,
-  goUp,
-  reloadCurrent,
-  clearSearch,
-  isSelected,
-  existingPathStatus,
-  selectedPathStatus,
-  isSelectionDisabled,
-  toggleSelection,
-  toggleCurrentPath,
-  toggleNewFolder,
-  cancelNewFolder,
-  submitNewFolder,
-  onNewFolderKeydown,
-} = useFolderBrowser(() => props.selectedPaths)
+const FLASH_MS = 1300
 
-const addButtonLabel = computed(() => {
-  if (selectedCount.value === 0) return 'Add folders'
-  return `Add ${selectedCount.value} folder${selectedCount.value === 1 ? '' : 's'}`
+const { t } = useI18n()
+const desktop = useMediaQuery('(min-width: 640px)')
+const phone = computed(() => !desktop.value)
+const panel = ref<HTMLElement | null>(null)
+const grid = ref<HTMLElement | null>(null)
+const treePane = ref<InstanceType<typeof FolderPickerTree> | null>(null)
+const sheetOpen = ref(false)
+const flash = ref<string | null>(null)
+const findQuery = ref('')
+const newFolderName = ref('')
+const newFolderError = ref<string | null>(null)
+const newFolderBusy = ref(false)
+const menuOpen = ref(false)
+const mode = ref<OrganizationMode>(props.organizationMode)
+/** The mode as the picker opened, put back if it is cancelled. */
+const openingMode = props.organizationMode
+let flashTimer: ReturnType<typeof setTimeout> | null = null
+let revealRun = 0
+
+const data = useFolderPickerData()
+const tree = useFolderPickerTree(data, () => [...own.value, ...selection.selected.value])
+const planWidth = usePickerPlanWidth()
+
+const own = computed(() => consolidateFolderPaths(props.selectedPaths))
+const libraryName = computed(() => props.libraryName.trim() || t('library.folderBrowser.unnamedLibrary'))
+const libraries = computed<PickerLibrary[]>(() => {
+  const list: PickerLibrary[] = (data.places.value?.libraries ?? [])
+    .filter((library) => library.id !== props.libraryId)
+    .map((library) => ({ id: library.id, name: library.name, icon: library.icon, folders: library.folders.map(normalizeFolderPath) }))
+  if (own.value.length) list.push({ id: props.libraryId, name: libraryName.value, icon: props.libraryIcon, folders: own.value, self: true })
+  return list
+})
+const others = computed(() => libraries.value.filter((library) => !library.self))
+const multiple = computed(() => props.multiple)
+const kind = computed(() => props.kind)
+const modeLocked = computed(() => props.organizationModeLocked || props.kind !== 'books')
+
+const selection = useFolderPickerSelection({
+  data,
+  own: () => own.value,
+  others: () => others.value,
+  multiple: () => props.multiple,
+  appDataPath: () => data.places.value?.appDataPath ?? null,
+  mode,
+  onModeChange: (next) => emit('update:organizationMode', next),
 })
 
+const selected = selection.selected
+const storage = computed(() => props.kind === 'podcastStorage')
+const title = computed(() => (storage.value ? t('library.folderBrowser.titleStorage') : t('library.folderBrowser.title')))
+const subtitle = computed(() => {
+  if (storage.value) return t('library.folderBrowser.subtitleStorage', { name: libraryName.value })
+  if (props.kind === 'podcastLocal') return t('library.folderBrowser.subtitleLocal', { name: libraryName.value })
+  return t('library.folderBrowser.subtitle', {
+    name: libraryName.value,
+    mode: mode.value === 'book_per_file' ? t('library.folderBrowser.mode.file') : t('library.folderBrowser.mode.folder'),
+  })
+})
+const totalBooks = computed(() => selected.value.reduce((sum, path) => sum + (booksIn(path) ?? 0), 0))
+const addLabel = computed(() => {
+  const count = selected.value.length
+  if (!props.multiple) return t('library.folderBrowser.footer.use')
+  if (phone.value) return count ? t('library.folderBrowser.footer.addShortCount', { count }) : t('library.folderBrowser.footer.addShort')
+  return count ? t('library.folderBrowser.footer.addCount', { count }) : t('library.folderBrowser.footer.add')
+})
+const undoMessage = computed(() => (selection.undo.value ? t(selection.undo.value.notice.key, selection.undo.value.notice.params ?? {}) : null))
+const noticeMessage = computed(() => (selection.notice.value ? t(selection.notice.value.key, selection.notice.value.params ?? {}) : null))
+
+function booksIn(path: string): number | null {
+  const summary = data.summaries.get(normalizeFolderPath(path))
+  if (!summary) return null
+  return props.kind === 'books' ? booksAs(summary, mode.value) : summary.files
+}
+
+function countLabel(count: number): string {
+  return t(props.kind === 'books' ? 'library.folderBrowser.count.books' : 'library.folderBrowser.count.episodes', { count })
+}
+
+function holdsLabel(count: number): string {
+  return t(props.kind === 'books' ? 'library.folderBrowser.plan.holdsBooks' : 'library.folderBrowser.plan.holdsEpisodes', { count })
+}
+
+function describeOverlap(path: string, status: FolderStatus): string {
+  const kind = status.over ?? status.kind
+  if (kind === 'contains') {
+    const libs = status.libraries ?? []
+    if (libs.length === 1) {
+      const folder = libs[0]!.folders.find((own) => isInside(own, path)) ?? libs[0]!.folders[0]!
+      return t('library.folderBrowser.plan.attention.containsOne', { folder: leafName(folder), library: libs[0]!.name })
+    }
+    return t('library.folderBrowser.plan.attention.containsMany', { libraries: formatList(libs.map((library) => library.name)) })
+  }
+  const library = status.library?.name ?? ''
+  if (status.exact)
+    return t('library.folderBrowser.plan.attention.overlapExact', { library, count: data.summaries.get(normalizeFolderPath(path))?.files ?? 0 })
+  return t('library.folderBrowser.plan.attention.overlapInside', { library })
+}
+
+function flashRow(path: string) {
+  flash.value = path
+  if (flashTimer) clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => {
+    if (flash.value === path) flash.value = null
+  }, FLASH_MS)
+}
+
+/** Opens every folder above `path`, waits for them to list, then focuses and tints its row. */
+async function reveal(path: string) {
+  const key = normalizeFolderPath(path)
+  // A later reveal wins, even when this one's listings arrive last.
+  const run = ++revealRun
+  sheetOpen.value = false
+  findQuery.value = ''
+  tree.findResults.value = null
+  tree.reveal(key)
+  for (const folder of [tree.root.value, ...ancestorsWithin(key, tree.root.value)]) await data.ensureListing(folder)
+  if (run !== revealRun) return
+  flashRow(key)
+  await nextTick()
+  void treePane.value?.focusRow(key)
+}
+
+function focusFolder(path: string) {
+  const key = normalizeFolderPath(path)
+  const finding = tree.findResults.value !== null
+  if (!finding && tree.hasChildren(key)) tree.setExpanded(key, tree.focus.value === key ? !tree.expanded.value.has(key) : true)
+  tree.focus.value = key
+  void treePane.value?.focusRow(key)
+}
+
+function toggleFolder(path: string, event?: MouseEvent | KeyboardEvent) {
+  const key = normalizeFolderPath(path)
+  if (event?.shiftKey && props.multiple) {
+    // Only the siblings on screen, so a range across find results never ticks folders it did not show.
+    const parent = parentPath(key)
+    selection.tickRange(
+      key,
+      tree.rows.value.filter((row) => row.type === 'folder' && parentPath(row.path) === parent).map((row) => row.path),
+    )
+  } else {
+    selection.toggle(key)
+  }
+}
+
+function openNewFolder(parent: string) {
+  const key = normalizeFolderPath(parent)
+  findQuery.value = ''
+  tree.findResults.value = null
+  newFolderName.value = ''
+  newFolderError.value = null
+  tree.expanded.value = new Set([...tree.expanded.value, ...ancestorsWithin(key, tree.root.value), key])
+  tree.newFolderParent.value = key
+}
+
+function cancelNewFolder() {
+  tree.newFolderParent.value = null
+  newFolderError.value = null
+}
+
+async function submitNewFolder() {
+  const parent = tree.newFolderParent.value
+  const name = newFolderName.value.trim()
+  if (!parent || newFolderBusy.value) return
+  if (!name) {
+    newFolderError.value = t('library.folderBrowser.newFolder.errors.empty')
+    return
+  }
+  if (/[\\/]/.test(name) || name.startsWith('.')) {
+    newFolderError.value = t('library.folderBrowser.newFolder.errors.invalid')
+    return
+  }
+  newFolderBusy.value = true
+  const result = await data.createFolder(parent, name)
+  newFolderBusy.value = false
+  if ('error' in result) {
+    newFolderError.value = t(`library.folderBrowser.newFolder.errors.${result.error}`, { name })
+    return
+  }
+  tree.newFolderParent.value = null
+  await reveal(result.path)
+  selection.toggle(result.path)
+  // Made inside a folder already read, it is included rather than ticked.
+  const ticked = selection.selected.value.includes(result.path)
+  selection.notice.value = {
+    key: ticked ? 'library.folderBrowser.notice.created' : 'library.folderBrowser.notice.createdOnly',
+    params: { path: result.path },
+  }
+}
+
+const context: FolderPickerContext = {
+  data,
+  tree,
+  selection,
+  kind,
+  multiple,
+  libraries,
+  others,
+  own,
+  libraryName,
+  mode,
+  modeLocked,
+  phone,
+  flash,
+  findQuery,
+  newFolder: { name: newFolderName, error: newFolderError, busy: newFolderBusy },
+  menuOpen,
+  reveal: (path) => void reveal(path),
+  focusFolder,
+  toggleFolder,
+  openNewFolder,
+  submitNewFolder,
+  cancelNewFolder,
+  booksIn,
+  countLabel,
+  holdsLabel,
+  describeOverlap,
+}
+provide(FOLDER_PICKER, context)
+
+function gridWidth(): number {
+  return grid.value?.offsetWidth ?? 0
+}
+
+function onPlanWidth(value: number) {
+  planWidth.width.value = value
+}
+
+function onPlanCommit() {
+  planWidth.save()
+}
+
 function requestClose() {
-  if (createLoading.value) return
+  if (newFolderBusy.value) return
+  // Cancelling undoes everything done in the picker, the organization switch included.
+  if (mode.value !== openingMode) emit('update:organizationMode', openingMode)
   emit('close')
 }
 
-function addSelectedFolders() {
-  if (selectedPaths.value.length === 0) return
-  emit('select', selectedPaths.value)
+function onBackdrop() {
+  requestClose()
+}
+
+function confirm() {
+  if (selected.value.length === 0) return
+  rememberRecentFolders(selected.value)
+  emit('select', [...selected.value])
+}
+
+function onUndo() {
+  selection.restore()
+}
+
+function toggleSheet() {
+  sheetOpen.value = !sheetOpen.value
+}
+
+function closeSheet() {
+  sheetOpen.value = false
+}
+
+function onPanelKeydown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement
+  const typing = target.matches('input[type=text], input:not([type]), textarea')
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'l') {
+    event.preventDefault()
+    const from = tree.focus.value && tree.focus.value !== tree.root.value ? `${tree.focus.value}/` : '/'
+    treePane.value?.focusField(from)
+  } else if (!typing && event.key === '/') {
+    event.preventDefault()
+    treePane.value?.focusField()
+  } else if (event.key === 'Escape' && sheetOpen.value) {
+    // Closes the plan sheet only; the picker's own Escape listener never sees it.
+    event.preventDefault()
+    event.stopPropagation()
+    sheetOpen.value = false
+  }
+}
+
+function clampPlan() {
+  if (gridWidth()) planWidth.width.value = planWidth.clamp(planWidth.width.value, gridWidth())
+}
+
+function retryPlaces() {
+  void open()
 }
 
 useModal({
   container: panel,
   onClose: requestClose,
-  disabled: () => createLoading.value,
+  disabled: () => newFolderBusy.value || menuOpen.value,
+})
+
+watch(
+  () => props.organizationMode,
+  (next) => (mode.value = next),
+)
+
+// The plan keeps its width when the window grows, and gives way when it shrinks.
+watch(desktop, () => void nextTick(clampPlan))
+useEventListener(window, 'resize', clampPlan, { passive: true })
+
+// Leaving find mode, the focused folder may sit in a folded branch: unfold the way to it.
+watch(
+  () => tree.findResults.value,
+  async (now, before) => {
+    const focus = tree.focus.value
+    if (now !== null || !before || !focus) return
+    tree.reveal(focus)
+    for (const folder of [tree.root.value, ...ancestorsWithin(focus, tree.root.value)]) await data.ensureListing(folder)
+    await nextTick()
+    treePane.value?.ensureVisible(focus)
+  },
+)
+
+async function open() {
+  await data.loadPlaces()
+  await nextTick()
+  clampPlan()
+  const places = data.places.value
+  if (!places) return
+  const opened = new Set<string>()
+  const firstMount = places.mounts.find((mount) => !places.appDataPath || !isAtOrInside(mount, places.appDataPath))
+  if (firstMount && firstMount !== normalizeFolderPath(places.root)) opened.add(normalizeFolderPath(firstMount))
+  // With nothing mounted separately, open the way to where the libraries already are.
+  const landmarks = own.value.length ? own.value : opened.size ? [] : others.value.flatMap((library) => library.folders).slice(0, 1)
+  for (const path of landmarks) for (const parent of ancestorsWithin(path, places.root)) opened.add(parent)
+  tree.expanded.value = opened
+  if (props.kind === 'books') void data.loadUnclaimed()
+  // Open on the deepest folder unfolded, so the libraries' landmarks are on screen.
+  const deepest = [...opened].sort((a, b) => b.length - a.length)[0]
+  if (deepest) {
+    for (const folder of [tree.root.value, ...ancestorsWithin(deepest, tree.root.value), deepest]) await data.ensureListing(folder)
+    await nextTick()
+    treePane.value?.scrollToTop(deepest)
+  }
+}
+
+onMounted(open)
+
+onBeforeUnmount(() => {
+  data.dispose()
+  if (flashTimer) clearTimeout(flashTimer)
 })
 </script>
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-[80] flex items-end justify-center bg-scrim sm:items-center sm:p-4" role="presentation" @click.self="requestClose">
+    <div v-if="!phone" class="fixed inset-0 z-[80] flex items-center justify-center bg-scrim p-8" role="presentation" @click.self="onBackdrop">
       <div
         ref="panel"
-        class="flex h-dvh w-full flex-col overflow-hidden bg-background shadow-2xl outline-none sm:h-[min(82dvh,700px)] sm:max-w-xl sm:rounded-lg sm:border sm:border-border"
+        class="flex h-[min(92%,60rem)] w-full max-w-[76rem] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl outline-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="folder-picker-title"
-        aria-describedby="folder-picker-description"
+        aria-describedby="folder-picker-subtitle"
         tabindex="-1"
+        @keydown="onPanelKeydown"
       >
-        <header class="flex shrink-0 items-start justify-between gap-3 border-b border-border bg-card px-4 py-3">
-          <div class="flex min-w-0 items-start gap-2.5">
-            <HardDrive :size="18" class="mt-0.5 shrink-0 text-primary" />
-            <div class="min-w-0">
-              <h2 id="folder-picker-title" class="text-base font-semibold text-foreground">{{ t('library.folderPicker.title') }}</h2>
-              <p id="folder-picker-description" class="text-xs text-muted-foreground">{{ t('library.folderPicker.description') }}</p>
-            </div>
+        <header class="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-3">
+          <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary" aria-hidden="true">
+            <Radio v-if="storage" :size="18" />
+            <FolderTree v-else :size="18" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <h2 id="folder-picker-title" class="truncate text-base font-semibold text-foreground">{{ title }}</h2>
+            <p id="folder-picker-subtitle" class="truncate text-xs text-muted-foreground">{{ subtitle }}</p>
           </div>
           <button
             type="button"
             class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            :aria-label="t('library.folderPicker.closeAria')"
+            :aria-label="t('library.folderBrowser.close')"
             @click="requestClose"
           >
             <X :size="18" />
           </button>
         </header>
-
-        <nav
-          class="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-muted/25 px-3"
-          :aria-label="t('library.folderPicker.currentFolderAria')"
-        >
-          <Tooltip>
-            <TooltipTrigger as-child>
+        <div ref="grid" class="relative grid min-h-0 flex-1" :style="{ gridTemplateColumns: `minmax(0,1fr) ${planWidth.width.value}px` }">
+          <FolderPickerTree ref="treePane" @retry="retryPlaces" />
+          <FolderPickerPlan :width="planWidth.width.value" />
+          <FolderPickerDivider
+            :width="planWidth.width.value"
+            :grid-width="gridWidth"
+            :clamp="planWidth.clamp"
+            @update:width="onPlanWidth"
+            @commit="onPlanCommit"
+          />
+        </div>
+        <footer class="flex shrink-0 items-center gap-2 border-t border-border bg-card px-3 py-2.5">
+          <div class="flex min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground">
+            <template v-if="undoMessage">
+              <Info :size="13" class="shrink-0 text-primary" aria-hidden="true" />
+              <span class="truncate text-foreground" role="status">{{ undoMessage }}</span>
               <button
                 type="button"
-                class="mr-1 flex size-7 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
-                :disabled="!canGoUp"
-                :aria-label="t('library.folderPicker.parentFolder')"
-                @click="goUp"
+                class="ms-1 inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-primary hover:bg-primary/10"
+                @click="onUndo"
               >
-                <ChevronUp :size="14" />
+                <Undo2 :size="13" aria-hidden="true" />
+                {{ t('library.folderBrowser.notice.undo') }}
               </button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('library.folderPicker.parentFolder') }}</TooltipContent>
-          </Tooltip>
-          <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
-            <ChevronRight v-if="index > 0" :size="12" class="shrink-0 text-muted-foreground" />
-            <button
-              type="button"
-              class="shrink-0 whitespace-nowrap rounded-xs px-1.5 py-0.5 text-xs transition-colors"
-              :class="
-                index === breadcrumbs.length - 1
-                  ? 'bg-background font-medium text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              "
-              @click="navigate(crumb.path)"
-            >
-              {{ crumb.label }}
-            </button>
-          </template>
-        </nav>
-
-        <div class="grid shrink-0 gap-2 border-b border-border p-2 sm:grid-cols-[1fr_auto] sm:px-3">
-          <label class="flex h-9 items-center gap-2 rounded-md border border-input bg-background px-2.5 focus-within:ring-1 focus-within:ring-ring">
-            <Search :size="15" class="shrink-0 text-muted-foreground" />
-            <input
-              v-model="search"
-              type="text"
-              :placeholder="t('library.folderPicker.filterPlaceholder')"
-              class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-            <button
-              v-if="search"
-              type="button"
-              class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-              :aria-label="t('library.folderPicker.clearFilterAria')"
-              @click="clearSearch"
-            >
-              <X :size="14" />
-            </button>
-          </label>
+            </template>
+            <template v-else-if="noticeMessage">
+              <Info :size="13" class="shrink-0 text-primary" aria-hidden="true" />
+              <span class="truncate" role="status">{{ noticeMessage }}</span>
+            </template>
+            <i18n-t v-else keypath="library.folderBrowser.footer.hints" scope="global">
+              <template #move><PickerKbd>↑</PickerKbd><PickerKbd>↓</PickerKbd></template>
+              <template #fold><PickerKbd>←</PickerKbd><PickerKbd>→</PickerKbd></template>
+              <template #tick
+                ><PickerKbd>{{ t('library.folderBrowser.keys.space') }}</PickerKbd></template
+              >
+              <template #range><PickerKbd>⇧</PickerKbd></template>
+              <template #find><PickerKbd>/</PickerKbd></template>
+            </i18n-t>
+          </div>
           <button
             type="button"
-            class="flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-            @click="toggleNewFolder"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            @click="requestClose"
           >
-            <FolderPlus :size="15" />
-            {{ t('library.folderPicker.newFolder') }}
+            {{ t('common.cancel') }}
           </button>
-        </div>
-
-        <div v-if="creatingFolder" class="shrink-0 border-b border-border bg-muted/20 p-2 sm:px-3">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label
-              class="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-input bg-background px-2.5 focus-within:ring-1 focus-within:ring-ring"
-            >
-              <FolderPlus :size="15" class="shrink-0 text-primary" />
-              <input
-                ref="newFolderInput"
-                v-model="newFolderName"
-                type="text"
-                :placeholder="t('library.folderPicker.newFolderNamePlaceholder')"
-                class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-                @keydown="onNewFolderKeydown"
-              />
-            </label>
-            <div class="grid grid-cols-2 gap-2 sm:flex">
-              <button
-                type="button"
-                class="flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-                :disabled="!newFolderName.trim() || createLoading"
-                @click="submitNewFolder"
-              >
-                <Loader2 v-if="createLoading" :size="15" class="animate-spin" />
-                {{ t('library.folderPicker.create') }}
-              </button>
-              <button
-                type="button"
-                class="h-9 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                @click="cancelNewFolder"
-              >
-                {{ t('common.cancel') }}
-              </button>
-            </div>
-          </div>
-          <p v-if="createError" class="mt-2 text-sm text-destructive">{{ createError }}</p>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-hidden">
-          <div v-if="loading" class="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-            <Loader2 :size="24" class="animate-spin" />
-            <p class="text-sm">{{ t('library.folderPicker.loading') }}</p>
-          </div>
-
-          <div v-else-if="error" class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-            <FolderOpen :size="30" class="text-muted-foreground" />
-            <p class="text-sm text-muted-foreground">{{ error }}</p>
-            <button type="button" class="h-10 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted" @click="reloadCurrent">
-              {{ t('reader.retry') }}
-            </button>
-          </div>
-
-          <div v-else class="flex h-full min-h-0 flex-col">
-            <label
-              class="flex h-11 shrink-0 cursor-pointer items-center gap-2.5 border-b border-border bg-muted/15 px-3 transition-colors hover:bg-muted/40"
-              :class="[isSelected(currentPath) ? 'bg-primary/10' : '', isSelectionDisabled(currentPath) ? 'cursor-not-allowed opacity-60' : '']"
-            >
-              <input
-                type="checkbox"
-                class="size-4 shrink-0 accent-primary"
-                :checked="isSelected(currentPath)"
-                :disabled="isSelectionDisabled(currentPath)"
-                @change="toggleCurrentPath"
-              />
-              <FolderOpen :size="17" class="shrink-0 text-primary" />
-              <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{{ t('library.folderPicker.selectCurrent') }}</span>
-              <span class="max-w-40 truncate font-mono text-xs text-muted-foreground">{{ currentPath }}</span>
-              <span
-                v-if="existingPathStatus(currentPath) || selectedPathStatus(currentPath)"
-                class="shrink-0 text-xs font-medium text-muted-foreground"
-              >
-                {{ existingPathStatus(currentPath) || selectedPathStatus(currentPath) }}
-              </span>
-            </label>
-
-            <div v-if="filteredEntries.length === 0" class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-              <Folder :size="28" class="text-muted-foreground" />
-              <p class="text-sm font-medium text-foreground">
-                {{ search ? t('library.folderPicker.noMatches') : t('library.folderPicker.empty') }}
-              </p>
-              <p class="text-sm text-muted-foreground">
-                {{ search ? t('library.folderPicker.noMatchesHint') : t('library.folderPicker.emptyHint') }}
-              </p>
-            </div>
-
-            <RecycleScroller v-else class="min-h-0 flex-1 overflow-y-auto" :items="filteredEntries" :item-size="40" key-field="path">
-              <template #default="{ item: entry }">
-                <div class="flex h-10 items-stretch border-b border-border/60 px-1.5 sm:px-2">
-                  <label
-                    class="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-xs px-2 transition-colors hover:bg-muted/50"
-                    :class="isSelectionDisabled(entry.path) ? 'cursor-not-allowed opacity-60' : ''"
-                  >
-                    <input
-                      type="checkbox"
-                      class="size-4 shrink-0 accent-primary"
-                      :checked="isSelected(entry.path)"
-                      :disabled="isSelectionDisabled(entry.path)"
-                      @change="toggleSelection(entry.path)"
-                    />
-                    <Folder :size="16" class="shrink-0 text-primary" />
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate text-sm font-medium text-foreground">{{ entry.name }}</span>
-                      <span
-                        v-if="existingPathStatus(entry.path) || selectedPathStatus(entry.path)"
-                        class="block truncate text-xs text-muted-foreground"
-                      >
-                        {{ existingPathStatus(entry.path) || selectedPathStatus(entry.path) }}
-                      </span>
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    class="flex size-10 shrink-0 items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    :aria-label="t('library.folderPicker.openFolderAria', { name: entry.name })"
-                    @click="navigate(entry.path)"
-                  >
-                    <ChevronRight :size="16" />
-                  </button>
-                </div>
-              </template>
-            </RecycleScroller>
-          </div>
-        </div>
-
-        <footer class="shrink-0 border-t border-border bg-card px-3 py-2.5">
-          <div v-if="selectionNotice" class="mb-2 flex items-start gap-2 text-xs text-muted-foreground">
-            <Info :size="14" class="shrink-0 text-primary" />
-            <span>{{ selectionNotice }}</span>
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <p class="text-sm text-muted-foreground">
-              {{ t('library.folderPicker.selectedCount', { count: selectedCount }) }}
-            </p>
-            <div class="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                class="h-9 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                @click="requestClose"
-              >
-                {{ t('common.cancel') }}
-              </button>
-              <button
-                type="button"
-                class="flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-                :disabled="selectedCount === 0"
-                @click="addSelectedFolders"
-              >
-                <Check :size="16" />
-                {{ addButtonLabel }}
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+            :disabled="selected.length === 0"
+            @click="confirm"
+          >
+            <Check :size="16" aria-hidden="true" />
+            {{ addLabel }}
+          </button>
         </footer>
+      </div>
+    </div>
+
+    <div
+      v-else
+      ref="panel"
+      class="fixed inset-0 z-[80] flex flex-col bg-background outline-none"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="folder-picker-title"
+      aria-describedby="folder-picker-subtitle"
+      tabindex="-1"
+      @keydown="onPanelKeydown"
+    >
+      <header class="flex shrink-0 items-center gap-3 border-b border-border bg-card px-3 py-2.5">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary" aria-hidden="true">
+          <Radio v-if="storage" :size="18" />
+          <FolderTree v-else :size="18" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <h2 id="folder-picker-title" class="truncate text-base font-semibold text-foreground">{{ title }}</h2>
+          <p id="folder-picker-subtitle" class="truncate text-xs text-muted-foreground">{{ subtitle }}</p>
+        </div>
+        <button
+          type="button"
+          class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          :aria-label="t('library.folderBrowser.close')"
+          @click="requestClose"
+        >
+          <X :size="18" />
+        </button>
+      </header>
+      <FolderPickerTree ref="treePane" class="min-h-0 flex-1" @retry="retryPlaces" />
+      <div v-if="undoMessage || noticeMessage" class="flex shrink-0 items-center gap-1.5 border-t border-border bg-card px-3 py-1.5 text-xs">
+        <Info :size="13" class="shrink-0 text-primary" aria-hidden="true" />
+        <span class="min-w-0 flex-1 truncate" :class="undoMessage ? 'text-foreground' : 'text-muted-foreground'" role="status">{{
+          undoMessage ?? noticeMessage
+        }}</span>
+        <button
+          v-if="undoMessage"
+          type="button"
+          class="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-primary hover:bg-primary/10"
+          @click="onUndo"
+        >
+          <Undo2 :size="13" aria-hidden="true" />
+          {{ t('library.folderBrowser.notice.undo') }}
+        </button>
+      </div>
+      <footer class="flex shrink-0 items-center gap-2 border-t border-border bg-card px-3 pb-3 pt-2.5">
+        <button
+          type="button"
+          class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 pe-2 ps-1 text-start hover:bg-muted"
+          :aria-expanded="sheetOpen"
+          @click="toggleSheet"
+        >
+          <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/12 text-xs font-semibold tabular-nums text-primary">{{
+            selected.length
+          }}</span>
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-medium text-foreground">
+              {{ selected.length ? (multiple ? countLabel(totalBooks) : selected[0]) : t('library.folderBrowser.footer.nothingPicked') }}
+            </span>
+            <span class="block truncate text-xs text-muted-foreground">{{ t('library.folderBrowser.footer.seePlan') }}</span>
+          </span>
+          <ChevronUp :size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+          :disabled="selected.length === 0"
+          @click="confirm"
+        >
+          <Check :size="16" aria-hidden="true" />
+          {{ addLabel }}
+        </button>
+      </footer>
+      <div v-if="sheetOpen" class="absolute inset-0 z-40 flex flex-col justify-end bg-scrim" @click.self="closeSheet">
+        <div
+          class="flex h-[82%] flex-col overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-2xl"
+          role="dialog"
+          :aria-label="t('library.folderBrowser.plan.label')"
+        >
+          <div class="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted" aria-hidden="true" />
+          <FolderPickerPlan :width="0" />
+        </div>
       </div>
     </div>
   </Teleport>
 </template>
-
-<style>
-@import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
-</style>

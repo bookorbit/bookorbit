@@ -8,6 +8,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   serial,
@@ -90,6 +91,13 @@ export const bookFiles = pgTable(
     role: varchar('role', { length: 20 }).notNull().default('content'),
     sortOrder: integer('sort_order'),
     durationSeconds: integer('duration_seconds'),
+    chapterWriteProvenance: jsonb('chapter_write_provenance').$type<{
+      mtimeMs: number;
+      sizeBytes: number;
+      chapters: { title: string; startMs: number }[];
+      startsMs: number[];
+      continuation: boolean;
+    }>(),
     // null means "not determined yet"; rows predating this column are backfilled lazily on Kobo sync.
     isFixedLayout: boolean('is_fixed_layout'),
     mediaOverlayAvailable: boolean('media_overlay_available').notNull().default(false),

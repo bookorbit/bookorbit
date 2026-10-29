@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CircleCheck, CircleX, FolderOpen, FolderPlus, FolderSearch, Info, Loader2, Plus, RefreshCw, Trash2, TriangleAlert } from '@lucide/vue'
-import type { LibraryStats, LibraryType } from '@bookorbit/types'
+import type { LibraryStats, LibraryType, OrganizationMode } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 import LibraryFormatBar from '@/features/settings/libraries/components/LibraryFormatBar.vue'
 import type { FolderCheck } from '../composables/useLibraryCreator'
@@ -20,14 +20,28 @@ const props = withDefaults(
     libraryType: LibraryType
     checks?: Record<string, FolderCheck>
     stats?: LibraryStats | null
+    libraryName?: string
+    libraryIcon?: string | null
+    libraryId?: number | null
+    organizationMode?: OrganizationMode
+    organizationModeLocked?: boolean
   }>(),
-  { checks: () => ({}), stats: null },
+  {
+    checks: () => ({}),
+    stats: null,
+    libraryName: '',
+    libraryIcon: null,
+    libraryId: null,
+    organizationMode: 'book_per_folder',
+    organizationModeLocked: false,
+  },
 )
 
 const emit = defineEmits<{
   'update:folders': [value: string[]]
   'update:localFolders': [value: string[]]
   'update:pickerOpen': [value: boolean]
+  'update:organizationMode': [value: OrganizationMode]
   check: [paths: string[]]
 }>()
 
@@ -110,6 +124,10 @@ function handleNestedPickerChange(value: boolean) {
 
 function addBrowsedFolders(paths: string[]) {
   addSelectedFolders(podcast.value ? paths.slice(0, 1) : paths)
+}
+
+function handleOrganizationMode(value: OrganizationMode) {
+  emit('update:organizationMode', value)
 }
 </script>
 
@@ -263,10 +281,26 @@ function addBrowsedFolders(paths: string[]) {
     <LibraryCreatorLocalFolders
       v-if="podcast"
       :local-folders="localFolders"
+      :library-name="libraryName"
+      :library-icon="libraryIcon"
+      :library-id="libraryId"
       @update:local-folders="handleLocalFoldersUpdate"
       @update:picker-open="handleNestedPickerChange"
     />
   </div>
 
-  <FolderPickerModal v-if="pickerOpen" :selected-paths="folders" @select="addBrowsedFolders" @close="closePicker" />
+  <FolderPickerModal
+    v-if="pickerOpen"
+    :selected-paths="folders"
+    :multiple="!podcast"
+    :kind="podcast ? 'podcastStorage' : 'books'"
+    :library-name="libraryName"
+    :library-icon="libraryIcon"
+    :library-id="libraryId"
+    :organization-mode="organizationMode"
+    :organization-mode-locked="organizationModeLocked"
+    @select="addBrowsedFolders"
+    @close="closePicker"
+    @update:organization-mode="handleOrganizationMode"
+  />
 </template>

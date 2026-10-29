@@ -41,6 +41,7 @@ const CANDIDATE_FIELDS: Record<keyof MetadataCandidate, CacheFieldKind> = {
   comicMetadata: 'object',
   communityRating: 'number',
   communityRatingCount: 'number',
+  mediaKind: 'string',
 };
 
 function sanitizeCandidate(candidate: MetadataCandidate): MetadataCandidate {

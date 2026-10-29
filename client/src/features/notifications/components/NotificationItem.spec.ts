@@ -23,7 +23,7 @@ function notification(overrides: Partial<NotificationItem> = {}): NotificationIt
   }
 }
 
-async function mountItem(item: NotificationItem) {
+async function mountItem(item: NotificationItem, options: { locale?: string; messages?: Record<string, unknown> } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -33,7 +33,13 @@ async function mountItem(item: NotificationItem) {
   })
   await router.push('/')
   await router.isReady()
-  const i18n = createI18n({ legacy: false, locale: 'en', fallbackLocale: 'en', messages: { en } })
+  const locale = options.locale ?? 'en'
+  const i18n = createI18n({
+    legacy: false,
+    locale,
+    fallbackLocale: 'en',
+    messages: { en, ...(options.messages ? { [locale]: options.messages } : {}) },
+  })
 
   const wrapper = mount(NotificationItemVue, {
     props: { notification: item },
@@ -88,5 +94,59 @@ describe('NotificationItem', () => {
     expect(wrapper.findAll('button')).toHaveLength(2)
     expect(wrapper.find('button[aria-label="Dismiss notification"]').exists()).toBe(true)
     expect(wrapper.findAll('button')[0].element.tagName).toBe('BUTTON')
+  })
+
+  describe('read-aloud notifications', () => {
+    const readAloud = (overrides: Partial<NotificationItem> = {}) =>
+      notification({
+        type: NotificationType.ReadAloudReady,
+        title: 'Server fallback title',
+        message: 'Server fallback message',
+        actionUrl: '/book/12/files',
+        meta: { jobId: 'job-1', bookId: 12, bookTitle: 'Dune', errorCode: null },
+        ...overrides,
+      })
+
+    it('renders the title in the reader’s locale from the stored book title', async () => {
+      const { wrapper } = await mountItem(readAloud())
+
+      expect(wrapper.text()).toContain('Read-aloud ready: Dune')
+      expect(wrapper.text()).not.toContain('Server fallback')
+    })
+
+    it('follows the active locale rather than the language the server wrote in', async () => {
+      const { wrapper } = await mountItem(readAloud(), {
+        locale: 'fr',
+        messages: { notifications: { readAloud: { readyTitle: 'Lecture synchronisée prête : {title}' } } },
+      })
+
+      expect(wrapper.text()).toContain('Lecture synchronisée prête : Dune')
+    })
+
+    it('explains a failure with the localized reason for its error code', async () => {
+      const { wrapper } = await mountItem(
+        readAloud({
+          type: NotificationType.ReadAloudFailed,
+          meta: { jobId: 'job-1', bookId: 12, bookTitle: 'Dune', errorCode: 'insufficient_storage' },
+        }),
+      )
+
+      expect(wrapper.text()).toContain('Read-aloud failed: Dune')
+      expect(wrapper.text()).toContain(String(en.book.detail.files.readAloud.errors.job.insufficient_storage))
+    })
+
+    it('keeps the server copy for a notification stored before the title was sent', async () => {
+      const { wrapper } = await mountItem(readAloud({ meta: { jobId: 'job-1', bookId: 12, errorCode: null } }))
+
+      expect(wrapper.text()).toContain('Server fallback title')
+      expect(wrapper.text()).toContain('Server fallback message')
+    })
+
+    it('leaves every other type to the server copy', async () => {
+      const { wrapper } = await mountItem(notification({ meta: { bookTitle: 'Dune' } }))
+
+      expect(wrapper.text()).toContain('New book request')
+      expect(wrapper.text()).toContain('Reader requested "Dune"')
+    })
   })
 })

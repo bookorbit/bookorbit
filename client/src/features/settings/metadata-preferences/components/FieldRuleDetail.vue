@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { ArrowRight, ChevronDown, ChevronUp, RotateCcw, TriangleAlert, X } from '@lucide/vue'
 import type { FieldPreference, MetadataField, MetadataMergeStrategy, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
-import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { providerChipStyle, providerShortLabel } from '@/lib/provider-colors'
 import ProviderAddMenu from './ProviderAddMenu.vue'
 import { providerHasOtherShape, resolvedProviders, skippedProviders, skipReasonFor } from '../lib/field-rules'
 
@@ -37,9 +37,9 @@ const rows = computed(() =>
       key,
       index,
       label: status?.label ?? key,
-      short: PROVIDER_SHORT_LABELS[key] ?? key,
+      short: providerShortLabel(key, status?.label),
       skipReason: skipReasonFor(status, props.field, key),
-      otherShape: providerHasOtherShape(key, props.field),
+      otherShape: providerHasOtherShape(key, props.field, status?.supportedFields),
     }
   }),
 )
@@ -221,7 +221,7 @@ function handleClose() {
               <template v-for="(key, index) in resolved" :key="key">
                 <ArrowRight v-if="index > 0" :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span class="provider-chip inline-flex h-6 items-center rounded-xs px-2 text-xs font-medium" :style="providerChipStyle(key)">
-                  {{ PROVIDER_SHORT_LABELS[key] ?? key }}
+                  {{ providerShortLabel(key, providerLabel(key)) }}
                 </span>
               </template>
             </div>

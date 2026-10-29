@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BookImage, BookOpen, Globe, Headphones, Loader2, RotateCcw, Save, Search } from '@lucide/vue'
+import { BookImage, BookOpen, Headphones, Loader2, RotateCcw, Save, Search } from '@lucide/vue'
 import { MetadataProviderKey } from '@bookorbit/types'
-import type { ProviderConfigurations, ProviderConnectionTestResult, ProviderStatus, ProviderThrottleRuntimeState } from '@bookorbit/types'
+import type {
+  BuiltInMetadataProviderKey,
+  ProviderConfigurations,
+  ProviderConnectionTestResult,
+  ProviderStatus,
+  ProviderThrottleRuntimeState,
+} from '@bookorbit/types'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { formatList } from '@/i18n/formatters'
@@ -36,10 +42,9 @@ const GROUP_ICONS: Record<ProviderGroupId, typeof BookOpen> = {
   books: BookOpen,
   audiobooks: Headphones,
   comics: BookImage,
-  regional: Globe,
 }
 
-const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER, MetadataProviderKey.ALADIN]
+const TESTABLE_PROVIDERS: BuiltInMetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER]
 
 const rows = useProviderRows()
 const draft = ref<ProviderConfigurations | null>(null)
@@ -106,11 +111,11 @@ function testResultFor(key: string): ProviderConnectionTestResult | null {
   return props.testResultsByKey?.[key as MetadataProviderKey] ?? null
 }
 
-function isTestable(key: keyof ProviderConfigurations): key is MetadataProviderKey {
-  return TESTABLE_PROVIDERS.includes(key as MetadataProviderKey)
+function isTestable(key: keyof ProviderConfigurations): key is BuiltInMetadataProviderKey {
+  return TESTABLE_PROVIDERS.includes(key)
 }
 
-function currentProviderSignature(key: MetadataProviderKey): string {
+function currentProviderSignature(key: BuiltInMetadataProviderKey): string {
   if (!draft.value) return ''
   if (key !== MetadataProviderKey.HARDCOVER) return JSON.stringify(draft.value[key] ?? null)
   return JSON.stringify({
@@ -119,7 +124,7 @@ function currentProviderSignature(key: MetadataProviderKey): string {
   })
 }
 
-function hasPassingTestForCurrentInput(key: MetadataProviderKey): boolean {
+function hasPassingTestForCurrentInput(key: BuiltInMetadataProviderKey): boolean {
   const expectedSignature = props.passingTestSignatureByKey?.[key]
   const result = testResultFor(key)
   if (!expectedSignature || !result || !result.ok || result.status !== 'success') return false
@@ -131,7 +136,7 @@ function enableBlockedMessage(row: ProviderRowDef): string | null {
   if (!draft.value || !row.enableRequirement) return null
   const requirement = row.enableRequirement
   if (!requirement.isConfigured(draft.value)) return requirement.blockedMessage
-  if (requirement.requiresPassingTest && !hasPassingTestForCurrentInput(row.key as MetadataProviderKey)) {
+  if (requirement.requiresPassingTest && !hasPassingTestForCurrentInput(row.key)) {
     return requirement.missingTestMessage ?? t('settings.metadata.providers.runTestBeforeEnabling')
   }
   return null

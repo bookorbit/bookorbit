@@ -110,6 +110,8 @@ const canEditMetadata = computed(() => hasPermissionInAnyLibrary('library_edit_m
 const safeLeadDescription = useSafeHtml(() => leadBook.value?.description)
 const visibleSeriesAuthors = computed(() => (seriesInfo.value?.authors ?? []).slice(0, 5))
 const hiddenSeriesAuthorsCount = computed(() => Math.max(0, (seriesInfo.value?.authors.length ?? 0) - visibleSeriesAuthors.value.length))
+const ownedVolumeCount = computed(() => seriesInfo.value?.ownedVolumeCount ?? seriesInfo.value?.bookCount ?? 0)
+const readVolumeCount = computed(() => seriesInfo.value?.readVolumeCount ?? seriesInfo.value?.readCount ?? 0)
 const addToCollectionOpen = ref(false)
 const addToCollectionBookId = ref<number | null>(null)
 const leadFallbackStyle = computed(() => {
@@ -538,7 +540,7 @@ defineOptions({ name: 'SeriesDetailView' })
                 <div class="min-w-0">
                   <h1 class="text-xl font-bold text-foreground">{{ seriesInfo.name }}</h1>
                   <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    <span>{{ t('series.detail.bookCount', { count: seriesInfo.bookCount }) }}</span>
+                    <span>{{ t('series.card.volumeCount', { count: ownedVolumeCount }) }}</span>
                     <span v-if="visibleSeriesAuthors.length > 0">
                       {{ t('series.detail.byAuthors', { authors: visibleSeriesAuthors.join(', ') }) }}
                       <span v-if="hiddenSeriesAuthorsCount > 0"> {{ t('series.detail.moreAuthors', { count: hiddenSeriesAuthorsCount }) }}</span>
@@ -558,10 +560,10 @@ defineOptions({ name: 'SeriesDetailView' })
               </div>
 
               <div class="mt-3 grid max-w-md gap-3 sm:grid-cols-2">
-                <SeriesCompletionBar :read-count="seriesInfo.readCount" :total-count="seriesInfo.bookCount" />
+                <SeriesCompletionBar :read-count="readVolumeCount" :total-count="ownedVolumeCount" />
                 <SeriesOwnershipBar
                   v-if="seriesInfo.expectedBookCount !== null"
-                  :owned-count="seriesInfo.bookCount"
+                  :owned-count="ownedVolumeCount"
                   :expected-count="seriesInfo.expectedBookCount"
                 />
               </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, provide, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { BookDetail, BookMetadataLockField } from '@bookorbit/types'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
@@ -22,13 +22,16 @@ import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const loadReadingLogTab = () => import('@/features/book/components/detail/tabs/ReadingLogTab.vue')
 const loadHighlightsTab = () => import('@/features/book/components/detail/tabs/HighlightsTab.vue')
+const loadChaptersTab = () => import('@/features/book/components/detail/tabs/ChaptersTab.vue')
 const ReadingLogTab = defineAsyncComponent(loadReadingLogTab)
 const HighlightsTab = defineAsyncComponent(loadHighlightsTab)
+const ChaptersTab = defineAsyncComponent(loadChaptersTab)
 
-const KEPT_ALIVE_TABS = ['ReadingLogTab', 'HighlightsTab']
+const KEPT_ALIVE_TABS = ['ReadingLogTab', 'HighlightsTab', 'ChaptersTab']
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const { hasLibraryPermission } = useLibraryPermissions()
 const { libraries } = useLibraries()
 
@@ -53,11 +56,20 @@ const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metada
 const parentLibrary = computed(() =>
   detail.value?.libraryId != null && detail.value.libraryName ? { id: detail.value.libraryId, name: detail.value.libraryName } : null,
 )
+const hasAudio = computed(() => detail.value?.audioMetadata != null)
+
+// A chapters link to a book without audio (or one whose audio was removed) lands on the details.
+watch([tab, detail], ([current, book]) => {
+  if (current === 'chapters' && book && book.id === bookId.value && !hasAudio.value) {
+    void router.replace({ name: 'book-detail', params: { bookId: book.id }, query: { ...route.query, tab: 'details' } })
+  }
+})
 const pageTitle = computed(() => {
   const title = detail.value?.title?.trim()
   const base = title || (Number.isFinite(bookId.value) ? t('views.bookDetail.titleWithId', { id: bookId.value }) : t('views.bookDetail.title'))
   if (tab.value === 'edit') return t('views.bookDetail.pageTitle.editMetadata', { base })
   if (tab.value === 'files') return t('views.bookDetail.pageTitle.files', { base })
+  if (tab.value === 'chapters') return t('views.bookDetail.pageTitle.chapters', { base })
   if (tab.value === 'reading-log') return t('views.bookDetail.pageTitle.readingLog', { base })
   if (tab.value === 'highlights') return t('views.bookDetail.pageTitle.highlights', { base })
   return t('views.bookDetail.pageTitle.book', { base })
@@ -115,6 +127,7 @@ onMounted(() => {
   const warm = () => {
     void loadReadingLogTab()
     void loadHighlightsTab()
+    if (hasAudio.value) void loadChaptersTab()
   }
   if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 2000 })
   else setTimeout(warm, 500)
@@ -142,10 +155,20 @@ function handleBookRefetch() {
 function onCoverChanged() {
   void fetch(bookId.value)
 }
+
+function onChaptersChanged() {
+  void fetch(bookId.value)
+}
 </script>
 
 <template>
-  <BookDetailLayout :book-id="bookId" :cover-tint="coverTint" :can-edit-metadata="canEditMetadata" :parent-library="parentLibrary">
+  <BookDetailLayout
+    :book-id="bookId"
+    :cover-tint="coverTint"
+    :can-edit-metadata="canEditMetadata"
+    :parent-library="parentLibrary"
+    :has-audio="hasAudio"
+  >
     <Transition name="content" mode="out-in">
       <div v-if="detail" key="detail" class="@container/book-detail h-full">
         <!--
@@ -163,6 +186,7 @@ function onCoverChanged() {
             @cover-changed="onCoverChanged"
           />
           <FilesTab v-else-if="tab === 'files'" :book="detail" @refetch="fetch(detail.id)" />
+          <ChaptersTab v-else-if="tab === 'chapters' && hasAudio" :book="detail" @changed="onChaptersChanged" />
           <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" @saved="onMetadataSaved" @refetch="handleBookRefetch" />
           <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
         </KeepAlive>
@@ -196,6 +220,10 @@ function onCoverChanged() {
         </div>
         <div v-else-if="tab === 'files'" class="space-y-3">
           <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-shimmer" />
+        </div>
+        <div v-else-if="tab === 'chapters'" class="flex h-full min-h-0 flex-col gap-3.5">
+          <div class="h-[5.25rem] rounded-xl bg-muted animate-shimmer" />
+          <div class="min-h-80 flex-1 rounded-xl bg-muted animate-shimmer" />
         </div>
         <!--
           These two match the box the tab itself puts up while its own first load runs, so the

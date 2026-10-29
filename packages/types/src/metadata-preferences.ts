@@ -1,4 +1,4 @@
-import { MetadataProviderKey } from "./metadata-fetch";
+import { isBuiltInMetadataProviderKey, MetadataProviderKey, type BuiltInMetadataProviderKey, type MetadataProviderSource } from "./metadata-fetch";
 
 export type MetadataField =
   | "title"
@@ -128,11 +128,6 @@ export interface KoboProviderConfig {
   language: string;
 }
 
-export interface AladinProviderConfig {
-  enabled: boolean;
-  ttbKey: string;
-}
-
 export interface ProviderConfigurations {
   google: GoogleProviderConfig;
   amazon: AmazonProviderConfig;
@@ -146,8 +141,6 @@ export interface ProviderConfigurations {
   comicvine: ComicVineProviderConfig;
   ranobedb: SimpleProviderConfig;
   kobo: KoboProviderConfig;
-  lubimyczytac: SimpleProviderConfig;
-  aladin: AladinProviderConfig;
 }
 
 export interface ProviderStatus {
@@ -156,6 +149,18 @@ export interface ProviderStatus {
   configured: boolean;
   enabled: boolean;
   hint?: string;
+  /** Absent on servers older than external providers, which only had built-ins. */
+  source?: MetadataProviderSource;
+  /** An external provider's declared fields; built-ins use `METADATA_PROVIDER_SUPPORTED_FIELDS`. */
+  supportedFields?: MetadataField[] | null;
+  /** An external provider's icon and colour, as on `MetadataProviderInfo`. */
+  iconUrl?: string;
+  color?: string;
+  /**
+   * Set for a provider that used to be built in and is not registered: the image to run, or null when
+   * the source closed and there is none, and whether field rules or stored ids still use it.
+   */
+  movedOut?: { image: string | null; inUse: boolean };
 }
 
 export type ProviderConnectionTestStatus = "success" | "warning" | "fail";
@@ -176,7 +181,7 @@ export interface ProviderConnectionTestResult {
  * The two cover rules list a provider only where its art can be that slot's shape. Audible's art is
  * always square, so it is not under `cover`; it still fills an empty ebook slot as a last resort.
  */
-export const METADATA_PROVIDER_SUPPORTED_FIELDS: Record<MetadataProviderKey, readonly MetadataField[]> = {
+export const METADATA_PROVIDER_SUPPORTED_FIELDS: Record<BuiltInMetadataProviderKey, readonly MetadataField[]> = {
   [MetadataProviderKey.GOOGLE]: [
     "title",
     "subtitle",
@@ -347,41 +352,22 @@ export const METADATA_PROVIDER_SUPPORTED_FIELDS: Record<MetadataProviderKey, rea
     "seriesIndex",
     "genres",
   ],
-  [MetadataProviderKey.LUBIMYCZYTAC]: [
-    "title",
-    "description",
-    "cover",
-    "authors",
-    "publisher",
-    "isbn",
-    "publishedYear",
-    "language",
-    "pageCount",
-    "seriesName",
-    "seriesIndex",
-    "genres",
-  ],
-  [MetadataProviderKey.ALADIN]: [
-    "title",
-    "description",
-    "cover",
-    "authors",
-    "publisher",
-    "isbn",
-    "publishedYear",
-    "language",
-    "pageCount",
-    "seriesName",
-    "genres",
-  ],
 };
 
 /** How a provider stands against one field: it can fill it, its cover art is the other shape, or never. */
 export type ProviderFieldSupport = "supplies" | "otherShape" | "never";
 
-export function providerFieldSupport(provider: MetadataProviderKey, field: MetadataField): ProviderFieldSupport {
-  const fields = METADATA_PROVIDER_SUPPORTED_FIELDS[provider];
-  // An unknown key is stale data, and a hint about it would be a guess.
+/**
+ * `declaredFields` is what an external provider says it fills; built-ins are answered from
+ * `METADATA_PROVIDER_SUPPORTED_FIELDS`.
+ */
+export function providerFieldSupport(
+  provider: MetadataProviderKey,
+  field: MetadataField,
+  declaredFields?: readonly MetadataField[] | null,
+): ProviderFieldSupport {
+  const fields = declaredFields ?? (isBuiltInMetadataProviderKey(provider) ? METADATA_PROVIDER_SUPPORTED_FIELDS[provider] : undefined);
+  // An unknown key, or a provider that did not say, would only get a guess.
   if (!fields || fields.includes(field)) return "supplies";
   if (field === "cover" || field === "audioCover") return "otherShape";
   return "never";

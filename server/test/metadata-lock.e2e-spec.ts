@@ -323,7 +323,8 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
       openLibraryId: null,
       durationSeconds: expected.goodreads.durationSeconds,
       abridged: expected.goodreads.abridged,
-      chapters: expected.goodreads.chapters,
+      chapters: expected.goodreads.chapters?.map(({ title, startMs }) => ({ title, startMs })),
+      chaptersSource: 'provider',
       coverSource: null,
     });
     expect(state.narrators).toEqual(['Locked Narrator']);
@@ -334,6 +335,29 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
     });
     expect(state.metadata?.lastMetadataFetchAt).not.toBeNull();
     await expect(findCoverFilePath(ctx, scanned.bookId)).resolves.toBeNull();
+  });
+
+  it('keeps locked chapters through a provider refresh', async () => {
+    const scanned = await scanSingleEpub('refresh-locked-chapters', { title: 'Locked Chapters Base' });
+
+    const seed = await patchMetadata(scanned.bookId, { audioMetadata: { chapters: [{ title: 'Curated Chapter', startMs: 0 }] } });
+    expect(seed.statusCode).toBe(200);
+    expect((await patchLocks(scanned.bookId, ['chapters'])).statusCode).toBe(200);
+
+    const refresh = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${scanned.bookId}/refresh-metadata`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(refresh.statusCode).toBe(201);
+
+    const state = await readBookMutationState(ctx, scanned.bookId);
+    expect(state.metadata).toMatchObject({
+      chapters: [{ title: 'Curated Chapter', startMs: 0 }],
+      chaptersSource: 'manual',
+      lockedFields: ['chapters'],
+    });
+    expect(state.metadata?.lastMetadataFetchAt).not.toBeNull();
   });
 
   it('keeps locked fields untouched during bulk metadata fetch while persisting unlocked fields', async () => {

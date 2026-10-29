@@ -18,6 +18,9 @@ function HighlightDiagnostics.lastSyncText(summary, format_time)
     local text = T(_("%1 uploaded, %2 applied, %3 deleted, %4 failed, %5 skipped"),
         count(summary.uploaded), count(summary.applied), count(summary.deleted),
         count(summary.failed), count(summary.skipped))
+    if count(summary.incompatible) > 0 then
+        text = T(_("%1, %2 not synced (different copy)"), text, count(summary.incompatible))
+    end
     local at = tonumber(summary.at)
     if at and at > 0 then
         local when = format_time and format_time(at) or os.date("%H:%M", at)
@@ -60,6 +63,9 @@ function HighlightDiagnostics.openHighlightsText(ctx)
 
     local pending = ctx.scheduler_status
     local matched = ctx.matched == true
+    if matched and ctx.position_incompatible == true then
+        return _("not synced: this copy differs from BookOrbit's file")
+    end
     if type(pending) == "table" then
         if matched then
             return _("matched, sync scheduled")

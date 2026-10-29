@@ -1,15 +1,18 @@
-import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
-import { METADATA_CACHE_REQUEST_POLICIES, MetadataProviderKey } from '@bookorbit/types';
+import { METADATA_CACHE_REQUEST_POLICIES, type MetadataProviderKey } from '@bookorbit/types';
+
+import { IsMetadataProviderKey } from '../../../common/decorators/is-metadata-provider-key.decorator';
 import type { MetadataCacheRequestPolicy } from '@bookorbit/types';
 
 export class LookupMetadataDto {
-  @IsEnum(MetadataProviderKey)
+  @IsMetadataProviderKey()
   provider: MetadataProviderKey;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
+  // External providers may use ids up to 512 characters.
+  @MaxLength(512)
   id: string;
 
   /** `refresh` asks the provider live instead of answering from the metadata cache. */

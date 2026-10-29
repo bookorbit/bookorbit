@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 
 import {
-  COMMUNITY_RATING_PROVIDER_KEYS,
+  isMetadataProviderKeySyntax,
   CUSTOM_FIELD_OPERATORS,
   FIELD_OPERATORS,
   RULE_OPERATORS,
@@ -15,8 +15,6 @@ import {
   type StaticRuleField,
 } from '@bookorbit/types';
 import { isDateKey } from '../../../common/utils/timezone.utils';
-
-const COMMUNITY_RATING_PROVIDER_VALUES = ['any', ...COMMUNITY_RATING_PROVIDER_KEYS] as const;
 
 const DATE_VALUE_FIELDS = new Set<StaticRuleField>(['addedAt', 'startedAt', 'finishedAt', 'publishedDate']);
 const DATE_VALUE_OPERATORS = new Set<RuleOperator>(['before', 'after', 'between']);
@@ -93,7 +91,14 @@ const ruleSchema: z.ZodType<Rule> = z
     operator: z.enum(RULE_OPERATORS as unknown as [string, ...string[]]),
     value: z.union([z.string(), z.number(), z.array(z.string().min(1)).min(1).max(20), z.array(z.number()).min(1).max(20)]).optional(),
     valueTo: z.union([z.string(), z.number()]).optional(),
-    provider: z.enum(COMMUNITY_RATING_PROVIDER_VALUES as unknown as [CommunityRatingProvider, ...CommunityRatingProvider[]]).optional(),
+    // Any provider's ratings can be filtered on, including an external provider's; the built-in list
+    // only seeds the picker.
+    provider: z
+      .string()
+      .refine((value): value is CommunityRatingProvider => value === 'any' || isMetadataProviderKeySyntax(value), {
+        message: 'Unknown rating provider',
+      })
+      .optional(),
   })
   .superRefine((rule, ctx) => {
     const custom = isCustomRuleField(rule.field);

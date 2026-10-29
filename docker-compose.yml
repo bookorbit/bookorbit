@@ -31,6 +31,10 @@ services:
       BOOK_DOCK_PATH: ${BOOK_DOCK_PATH:-}
       LIBRARY_BROWSE_ROOT: ${LIBRARY_BROWSE_ROOT:-}
       DISABLE_LOCAL_AUTH: ${DISABLE_LOCAL_AUTH:-false}
+      READ_ALOUD_WORKER_URL: ${READ_ALOUD_WORKER_URL:-}
+      READ_ALOUD_WORKER_TOKEN: ${READ_ALOUD_WORKER_TOKEN:-}
+      READ_ALOUD_WORKER_TOKEN_FILE: ${READ_ALOUD_WORKER_TOKEN_FILE:-}
+      READ_ALOUD_MAX_OUTPUT_BYTES: ${READ_ALOUD_MAX_OUTPUT_BYTES:-21474836480}
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,6 +74,49 @@ services:
         [
           "CMD-SHELL",
           'python -c "import urllib.request;urllib.request.urlopen(''http://127.0.0.1:8880/v1/audio/voices'')"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Opt-in: set COMPOSE_PROFILES=read-aloud, READ_ALOUD_WORKER_URL=http://read-aloud-worker:8787,
+  # and a shared READ_ALOUD_WORKER_TOKEN. The worker is private to the compose network and runs on
+  # CPU. It reads libraries read-only and writes only its own read-aloud folder; libraries mounted
+  # elsewhere in the app need the same read-only mount here and a READ_ALOUD_LIBRARY_ROOTS entry.
+  read-aloud-worker:
+    container_name: bookorbit-read-aloud-worker
+    image: ${READ_ALOUD_WORKER_IMAGE:-ghcr.io/bookorbit/bookorbit-read-aloud-worker:latest}
+    profiles: ["read-aloud"]
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      READ_ALOUD_WORKER_TOKEN: ${READ_ALOUD_WORKER_TOKEN:-}
+      READ_ALOUD_WORKER_TOKEN_FILE: ${READ_ALOUD_WORKER_TOKEN_FILE:-}
+      READ_ALOUD_LIBRARY_ROOTS: ${READ_ALOUD_LIBRARY_ROOTS:-/books}
+      READ_ALOUD_WORK_ROOT: /data/read-aloud/jobs
+      READ_ALOUD_CTC_DEVICE: ${READ_ALOUD_CTC_DEVICE:-auto}
+      READ_ALOUD_CTC_DTYPE: ${READ_ALOUD_CTC_DTYPE:-auto}
+      READ_ALOUD_CTC_BATCH_SIZE: ${READ_ALOUD_CTC_BATCH_SIZE:-}
+    depends_on:
+      app:
+        condition: service_healthy
+    expose:
+      - "8787"
+    volumes:
+      - ${BOOKS_HOST_PATH:-./books}:/books:ro
+      - ./data/app/read-aloud:/data/read-aloud
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 60s
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "const fs=require(''node:fs'');const token=process.env.READ_ALOUD_WORKER_TOKEN||fs.readFileSync(process.env.READ_ALOUD_WORKER_TOKEN_FILE,''utf8'').trim();fetch(''http://127.0.0.1:8787/health'',{headers:{authorization:''Bearer ''+token}}).then(r=>{if(!r.ok)process.exit(1)})"',
         ]
       interval: 30s
       timeout: 10s

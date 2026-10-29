@@ -345,4 +345,23 @@ function ListData.presentLetters(buckets)
     return out
 end
 
+-- Splits n rows between sections holding counts[i] entries: an even share
+-- each, no section more than it holds, a spare row to the earliest.
+function ListData.shareRows(n, counts)
+    local rows, left = {}, n
+    for i = 1, #counts do rows[i] = 0 end
+    local open = true
+    while left > 0 and open do
+        open = false
+        for i = 1, #counts do
+            if left > 0 and rows[i] < counts[i] then
+                rows[i] = rows[i] + 1
+                left = left - 1
+                open = true
+            end
+        end
+    end
+    return rows
+end
+
 return ListData

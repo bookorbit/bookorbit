@@ -111,6 +111,11 @@
   --scrim: oklch(0.2 0.02 var(--tint-h) / 0.35);
   --scrim-media: oklch(0 0 0 / 0.82);
 
+  /* Chips and buttons laid over cover art. The art can be anything from white to black, so the fill
+     is dark and mostly opaque in both themes and the ink near-white: above 7:1 even over a white cover. */
+  --cover-chip: oklch(0.16 0.01 var(--tint-h) / 0.72);
+  --cover-chip-foreground: oklch(0.985 0.002 var(--tint-h));
+
   /* Shadows */
   --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.05);
   --elevation-sm: 0 1px 3px oklch(0 0 0 / 0.08), 0 1px 2px oklch(0 0 0 / 0.06);
@@ -438,6 +443,9 @@
 
   /* A dark surface needs a deeper veil than a light one to read as dimmed at all. */
   --scrim: oklch(0.06 0.01 var(--tint-h) / 0.62);
+  /* Deeper on a dark page so the chip does not glow against the darkened card around the cover. */
+  --cover-chip: oklch(0.12 0.01 var(--tint-h) / 0.78);
+  --cover-chip-foreground: oklch(0.97 0.002 var(--tint-h));
 
   /* Shadows */
   --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.4);

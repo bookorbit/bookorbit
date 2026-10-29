@@ -1,4 +1,5 @@
 import type {
+  BookChapterWriteBack,
   BookFileWriteDisabledReason,
   BookFileWriteField,
   BookFileWriteStatus,
@@ -68,6 +69,27 @@ export function resolveBookFileWriteStatus(
 
   const reasons = targetStatuses.map((status) => status.reason).filter(isBookLevelReason);
   return { ...disabledBookFileWriteStatus(resolveBookFileWriteDisabledReason(reasons)), targets: targetStatuses };
+}
+
+/**
+ * Whether a book's chapters can be written into the given audio files. It is every file or none, so
+ * one file that cannot take them makes the whole write unavailable.
+ */
+export function resolveChapterWriteStatus(
+  libraryConfig: FileWriteCapabilityLibraryConfig,
+  files: readonly FileWriteCapabilityFile[],
+  supports: WriterSupport,
+): BookChapterWriteBack {
+  const unavailable = (reason: BookFileWriteDisabledReason): BookChapterWriteBack => ({ available: false, reason, fileCount: files.length });
+  if (files.length === 0) return unavailable('no_primary_file');
+  if (!isCompleteLibraryFileWriteConfig(libraryConfig) || !libraryConfig.fileWriteEnabled) return unavailable('library_disabled');
+
+  const reasons = files
+    .map((file) => resolveWriteTargetSkip(file, libraryConfig, supports))
+    .filter((skip) => skip !== null)
+    .map(mapTargetSkipReason)
+    .filter(isBookLevelReason);
+  return reasons.length > 0 ? unavailable(resolveBookFileWriteDisabledReason(reasons)) : { available: true, reason: null, fileCount: files.length };
 }
 
 export function isCompleteLibraryFileWriteConfig(config: FileWriteCapabilityLibraryConfig): config is LibraryFileWriteConfig {

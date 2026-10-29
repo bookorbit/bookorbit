@@ -19,7 +19,6 @@ const enabledConfig: ProviderConfigurations = {
   comicvine: { enabled: false, apiKey: '' },
   ranobedb: { enabled: true },
   kobo: { enabled: false, country: 'us', language: 'en' },
-  lubimyczytac: { enabled: false },
 };
 
 const disabledConfig: ProviderConfigurations = {

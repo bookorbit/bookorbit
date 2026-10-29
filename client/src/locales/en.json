@@ -1955,6 +1955,11 @@
         }
       },
       "providers": {
+        "tabs": {
+          "builtIn": "Built-in",
+          "external": "External",
+          "attention": "Needs attention"
+        },
         "availableSources": "Available Sources",
         "saveChanges": "Save Changes",
         "discard": "Discard",
@@ -2026,6 +2031,115 @@
           "aladin": "Aladin requires a TTB Key before it can be enabled"
         }
       },
+      "providerDirectory": {
+        "title": "Available to install",
+        "hint": "Each one runs as a small container beside BookOrbit. Copy its Compose service into the file that runs BookOrbit, start it with docker compose up -d, then choose Add.",
+        "updated": "Updated {time}",
+        "bundled": "List included with this version",
+        "loadFailed": "The list of ready-made providers could not be loaded. You can still add any provider by its address.",
+        "copy": "Copy Compose",
+        "copyLabel": "Copy the Compose service for {name}",
+        "copied": "{name} copied. Paste it under services: in your Compose file, then run docker compose up -d.",
+        "copyFailed": "Could not copy to the clipboard. The provider's docs have the same snippet.",
+        "add": "Add",
+        "addLabel": "Add {name}",
+        "alreadyAdded": "Already added: {names}",
+        "allAdded": "You have added every provider in this list.",
+        "wasBuiltIn": "Was built in",
+        "docs": "Docs",
+        "docsLabel": "{name} documentation, opens in a new tab",
+        "media": {
+          "book": "Books",
+          "audiobook": "Audiobooks",
+          "comic": "Comics"
+        }
+      },
+      "buildYourOwn": {
+        "title": "Build your own",
+        "body": "Missing a source? A provider is a small web service that answers three JSON requests, so any language will do. Start from the Rust or Go starter, check it with the conformance checker, then add it here like any other.",
+        "links": {
+          "guide": "Building guide",
+          "starters": "Starters",
+          "checker": "Conformance checker",
+          "suggest": "Suggest a source"
+        }
+      },
+      "movedProviders": {
+        "title": "Some sources are no longer built in",
+        "description": "Field rules that list these sources skip them for now. The ids and links already on your books are kept.",
+        "run": "{name} now runs as its own provider: run {image}, then add it under External providers.",
+        "closed": "{name} closed the service BookOrbit used, so it cannot be added back. Remove it from your field rules."
+      },
+      "externalProviders": {
+        "title": "External providers",
+        "description": "Metadata services that run outside BookOrbit, such as a container beside it or a hosted service. Add one by its address; once enabled it appears in search, Book Dock and field rules like any other source.",
+        "yourProviders": "Your providers",
+        "emptyWithDirectory": "Nothing added yet. Pick a ready-made provider below, or add one by its address.",
+        "add": "Add provider",
+        "empty": "No external providers yet. Any service that speaks the book-metadata-provider spec can be added here.",
+        "edit": "Edit {name}",
+        "toggle": "Enable {name}",
+        "row": "{host} · version {version}",
+        "useInFieldRules": "Use in field rules",
+        "fieldRulesAdded": "{name} added to {count, plural, =0 {no new field rules; it is already in every rule it can fill} one {# field rule} other {# field rules}}.",
+        "added": "{name} added. It stays off until you enable it.",
+        "saved": "{name} saved.",
+        "removed": "{name} removed. Its stored ids and ratings were kept.",
+        "purged": "{name} removed with its stored ids and ratings.",
+        "status": {
+          "active": "Active",
+          "ready": "Ready",
+          "stale": "Last check failed",
+          "unreachable": "Unreachable",
+          "key_changed": "Key changed",
+          "incompatible": "Incompatible",
+          "authorizationUnreadable": "Header unreadable"
+        },
+        "authorizationUnreadableHint": "The saved authorization header could not be decrypted, so this provider is not searched. Enter the header again.",
+        "sheet": {
+          "createTitle": "Add external provider",
+          "description": "An HTTP service that speaks the book-metadata-provider spec. BookOrbit asks it for metadata; it never runs the provider's code.",
+          "identity": "Key {key} · version {version}",
+          "test": "Test",
+          "testing": "Testing...",
+          "remove": "Remove provider",
+          "removeConfirm": "Remove {name}?",
+          "removeConsequence": "Its stored ids, ratings and field-rule entries stay, so adding it again restores them.",
+          "purge": "Remove and delete its data",
+          "purgeConfirm": "Remove {name} and delete its data?",
+          "purgeConsequence": "Deletes every id and rating stored from it. This cannot be undone."
+        },
+        "fields": {
+          "baseUrl": "Address",
+          "baseUrlHint": "The provider's base URL, such as http://provider:8080 for a container on the same Docker network.",
+          "authorization": "Authorization header",
+          "authorizationHint": "Optional. Sent exactly as entered, such as \"Bearer abc123\". Stored encrypted and never shown again.",
+          "authorizationSaved": "A header is saved. Enter a new one to replace it.",
+          "clearAuthorization": "Remove the saved header",
+          "allowPrivate": "Allow private address",
+          "allowPrivateHint": "Needed for a provider on your own network or in a container beside BookOrbit. Leave it off for a provider on the internet.",
+          "timeout": "Timeout (seconds)",
+          "timeoutHint": "Between {min} and {max} seconds.",
+          "privacy": "The provider receives the titles, authors and ISBNs of the books it is asked about."
+        },
+        "test": {
+          "ok": "{name} answered in {latency} ms with {count, plural, one {# result} other {# results}}.",
+          "sample": "First result: {title}",
+          "failed": "Test failed: {error}"
+        },
+        "errors": {
+          "privateAddress": "That address is on a private network. Turn on Allow private address to reach a provider there.",
+          "unreachable": "BookOrbit could not reach a provider at that address.",
+          "unauthorized": "The provider refused the authorization header.",
+          "invalidInfo": "That address answered, but not with usable provider info.",
+          "invalidUrl": "Enter the provider address as a full http or https URL, without credentials in it.",
+          "keyTaken": "A provider with the same key is already registered.",
+          "keyChanged": "That address serves a different provider. Add it as a new provider instead.",
+          "notReady": "Run a successful test before enabling this provider.",
+          "authorizationUnreadable": "The saved authorization header could not be decrypted. Enter it again before enabling this provider.",
+          "generic": "The request to the provider failed."
+        }
+      },
       "fieldRules": {
         "clearAllProviders": "Clear All Providers",
         "clearAll": "Clear All",
@@ -2048,7 +2162,7 @@
             "overwriteBody": "Replace whenever a provider has data."
           },
           "summary": "Providers are tried top to bottom and the first one that returns a value wins. The merge strategy decides whether that value may replace what the book already has; genres can also append new unique values. Set defaults here, then override individual fields per library.",
-          "summaryByMedium": "Providers are tried top to bottom, and the first one with a value wins; genres in merge mode and community ratings combine every provider instead. The merge strategy decides whether a value may replace what the book already has. Audible, AudNexus and Libro.fm only answer for books with audio, read-along EPUBs included, so putting them first prefers audiobook metadata without touching ebook-only books. Cover art of the wrong shape fills a slot only when nothing else can. A library override replaces that field's whole rule."
+          "summaryByMedium": "Providers are tried top to bottom, and the first one with a value wins; genres in merge mode and community ratings combine every provider instead. The merge strategy decides whether a value may replace what the book already has. Audible, AudNexus and Libro.fm only answer for books with audio, read-aloud EPUBs included, so putting them first prefers audiobook metadata without touching ebook-only books. Cover art of the wrong shape fills a slot only when nothing else can. A library override replaces that field's whole rule."
         },
         "libraryOverrides": {
           "title": "Library Overrides",
@@ -3463,7 +3577,10 @@
             "reviewDismissed": "Book dismissed from review",
             "reviewDismissFailed": "Failed to dismiss book from review",
             "reviewAllDismissed": "{count, plural, =0 {Dismissed no books from review} one {Dismissed # book from review} other {Dismissed # books from review}}",
-            "reviewDismissAllFailed": "Failed to dismiss all books from review"
+            "reviewDismissAllFailed": "Failed to dismiss all books from review",
+            "suggestedLinked": "{count, plural, one {Linked # suggested book} other {Linked # suggested books}}",
+            "suggestedPartlyLinked": "{linked, plural, one {Linked # suggested book.} other {Linked # suggested books.}} {failed, plural, one {# could not be linked and stays in the list.} other {# could not be linked and stay in the list.}}",
+            "suggestedLinkFailed": "Could not link the suggested books"
           },
           "modal": {
             "linkTitle": "Link KOReader book",
@@ -3524,7 +3641,21 @@
           "manualUnlinkConfirmBody": "Remove the manual link to {title} and return this book to the review list. Future syncs will use an automatic match if one exists. Already synced stats will stay on their current BookOrbit book.",
           "reviewDismissConfirmBody": "This removes it from your books to review. Automatic matching and existing sync data are kept. If a device reports the hash again without a match, it can reappear.",
           "reviewDismissAllConfirmTitle": "{count, plural, =0 {No books to review} one {Dismiss all # book to review?} other {Dismiss all # books to review?}}",
-          "reviewDismissAllConfirmBody": "This clears your entire books to review list, including entries on other pages. Automatic matching and existing sync data are kept. If a device reports a hash again without a match, it can reappear."
+          "reviewDismissAllConfirmBody": "This clears your entire books to review list, including entries on other pages. Automatic matching and existing sync data are kept. If a device reports a hash again without a match, it can reappear.",
+          "copyNote": "This KOReader copy is a different file from the one in BookOrbit. Reading status, rating, reading time and progress (as a percentage) will sync. Highlights and bookmarks will not. To sync everything, download the book to KOReader from BookOrbit.",
+          "differentCopyHint": "Different file from the one in BookOrbit: progress syncs as a percentage, and highlights and bookmarks don't sync.",
+          "suggestedMatch": "Suggested match",
+          "possibleMatches": "{count, plural, one {# possible match} other {# possible matches}}",
+          "morePossibleMatches": "{count, plural, one {More than # possible match} other {More than # possible matches}}",
+          "possibleMatchesHint": "Books in your library with the same title and authors. Check the edition before you link.",
+          "reviewMatch": "Review match",
+          "chooseMatch": "Choose match",
+          "linkSuggested": "Link suggested ({count})",
+          "bulkLinkTitle": "{count, plural, one {Link # suggested book?} other {Link # suggested books?}}",
+          "bulkLinkDescription": "Each KOReader book below has the same title and authors as exactly one book in your library. Check the list before linking.",
+          "bulkLinkConfirm": "{count, plural, one {Link # book} other {Link # books}}",
+          "bulkLinkListLabel": "Suggested links",
+          "openCandidate": "Open {title} in a new tab"
         },
         "remove": "Remove",
         "removing": "Removing...",
@@ -4779,6 +4910,10 @@
       "clearAll": "Clear",
       "permissionsHint": "What this account is allowed to do. {granted} of {total} granted.",
       "groupLegend": "{group}: {granted} of {total} granted",
+      "permissionNotes": {
+        "editMetadataNowhere": "No effect yet: it also needs the Editor or Owner role on a library, set in Settings > Libraries > Access.",
+        "editMetadataExcept": "Not in {libraries}, where this account is a Viewer. Set Editor or Owner in Settings > Libraries > Access."
+      },
       "presets": {
         "label": "Permission preset",
         "none": "None",
@@ -5277,6 +5412,7 @@
       "BookRequest": "Book request",
       "DownloadClient": "Download client",
       "RequestIndexer": "Indexer",
+      "MetadataHttpProvider": "Metadata provider",
       "Author": "Author",
       "AppSettings": "Application settings",
       "Genre": "Genre",
@@ -5335,6 +5471,7 @@
       "LibraryWriteMetadataToFiles": "Write metadata to files",
       "LibraryBulkRename": "Rename library files",
       "LibraryRecomputeAddedAt": "Recompute date added",
+      "LibraryReapplyRegexMetadata": "Apply path rules to existing books",
       "PodcastCreate": "Create podcast",
       "PodcastUpdate": "Update podcast",
       "PodcastArchive": "Archive podcast",
@@ -5389,6 +5526,9 @@
       "RequestIndexerPluginInspect": "Indexer plugin inspected",
       "RequestIndexerPluginInstall": "Indexer plugin installed",
       "RequestIndexerPluginRemove": "Indexer plugin deleted",
+      "MetadataHttpProviderCreate": "Metadata provider added",
+      "MetadataHttpProviderUpdate": "Metadata provider updated",
+      "MetadataHttpProviderDelete": "Metadata provider removed",
       "AuthorUpdate": "Update author",
       "AuthorDelete": "Delete author",
       "AuthorMerge": "Merge authors",
@@ -6025,7 +6165,7 @@
       "opus": "Opus audio",
       "ogg": "OGG audio",
       "flac": "FLAC audio",
-      "readAlong": "Read-along EPUB",
+      "readAlong": "Read-aloud EPUB",
       "primary": "Primary format"
     },
     "actions": {
@@ -6049,7 +6189,7 @@
       "sendViaEmail": "Send via Email",
       "rate": "Rate {star}",
       "openAs": "Open as {format}",
-      "openReadAlong": "Open read-along EPUB"
+      "openReadAlong": "Open read-aloud EPUB"
     },
     "refreshMetadata": {
       "success": "Metadata refreshed",
@@ -6232,7 +6372,8 @@
     },
     "deleteDialog": {
       "title": "Delete book?",
-      "description": "This will permanently delete the book and all its metadata, files, reading progress, and bookmarks. This cannot be undone."
+      "description": "This will permanently delete the book and all its metadata, files, reading progress, and bookmarks. This cannot be undone.",
+      "keepsHistory": "Finished reads stay in each reader's history, under the book's title and author."
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Edit metadata - # book} one {Edit metadata - # book} other {Edit metadata - # books}}",
@@ -6393,6 +6534,7 @@
         "details": "Details",
         "editMetadata": "Edit Metadata",
         "files": "Files",
+        "chapters": "Chapters",
         "readingLog": "Reading Log",
         "highlights": "Highlights"
       },
@@ -6534,6 +6676,20 @@
         },
         "editCover": "Edit cover",
         "viewCover": "View larger cover",
+        "coverStack": {
+          "show": {
+            "ebook": "Show the book cover",
+            "audio": "Show the audiobook cover"
+          },
+          "front": {
+            "ebook": "Showing the book cover",
+            "audio": "Showing the audiobook cover"
+          }
+        },
+        "readAloudInvite": {
+          "chip": "Read-aloud",
+          "title": "Create a read-aloud from this book's EPUB and audiobook"
+        },
         "finished": "Finished",
         "resetFileProgress": "Reset file progress",
         "resetEditionProgress": "Reset progress for {format}",
@@ -6558,14 +6714,15 @@
             "unavailable": "Sync issue"
           },
           "chipAria": "Read-aloud progress sync: {status}",
+          "noneYet": "No read-aloud EPUB yet. Create one to sync positions between the audiobook and the text.",
           "enabledDescription": "Audiobook, web reader, Kobo, and KOReader positions stay in sync.",
           "disabledDescription": "Each format keeps its own reading position.",
           "epubCopiesDescription": "Web reader, Kobo, and KOReader positions stay in sync across the EPUB copies. Add matching audiobook files to sync the audiobook too.",
           "reason": {
-            "no_media_overlay_epub": "A read-along EPUB with media overlays is required.",
+            "no_media_overlay_epub": "A read-aloud EPUB with media overlays is required.",
             "no_audio_files": "Matching standalone audiobook files are required.",
             "missing_duration": "Audio duration metadata is incomplete.",
-            "durationMismatch": "Durations do not match closely enough: audiobook {audio}, read-along EPUB {overlay}."
+            "durationMismatch": "Durations do not match closely enough: audiobook {audio}, read-aloud EPUB {overlay}."
           },
           "enable": "Enable",
           "disable": "Disable",
@@ -6719,6 +6876,8 @@
         "durationLabel": "Duration (s)",
         "abridgedLabel": "Abridged",
         "providerIds": "Provider IDs",
+        "externalProviderUnavailable": "{provider} is no longer registered, so this id is kept but not used",
+        "clearExternalProviderId": "Clear the {provider} id",
         "comicDetails": "Comic Details",
         "comicIssueNumberLabel": "Issue Number",
         "comicVolumeLabel": "Volume",
@@ -7078,6 +7237,292 @@
       },
       "files": {
         "title": "Book files",
+        "readAloud": {
+          "action": "Create read-aloud",
+          "loadFailed": "Read-aloud availability couldn't be checked.",
+          "loadFailedAgain": "{count, plural, one {Read-aloud availability still couldn't be checked after # retry.} other {Read-aloud availability still couldn't be checked after # retries.}}",
+          "checkAgain": "Check again",
+          "checking": "Checking…",
+          "reasons": {
+            "worker_unavailable": "The read-aloud worker is offline right now.",
+            "worker_incompatible": "The read-aloud worker needs an update to work with this server.",
+            "book_missing": "Restore this book's missing files to create a read-aloud.",
+            "no_epub": "Add a plain EPUB to this book to create a read-aloud.",
+            "no_epub_existing": "This book already has a read-aloud and no plain EPUB to rebuild it from.",
+            "too_many_audio_files": "This audiobook is split into more files than a read-aloud can be made from.",
+            "epub_not_allowed": "This library doesn't accept EPUB files, so a read-aloud can't be added.",
+            "library_not_mounted": "The read-aloud worker can't reach this library's folder.",
+            "job_active": "A read-aloud is already being created for this book.",
+            "unknown": "A read-aloud can't be created for this book right now."
+          },
+          "dialog": {
+            "title": "Create a read-aloud",
+            "description": "Matches the narration to the ebook text and adds an EPUB that highlights along with the audio.",
+            "sources": "Sources",
+            "ebook": "Ebook",
+            "ebookHint": "Pick the plain EPUB that matches the narration.",
+            "existing": {
+              "title": "{count, plural, one {This book already has a read-aloud} other {This book already has # read-alouds}}",
+              "replace": "Replace {filename}",
+              "keep": "{count, plural, one {Keep both} other {Keep all of them}}",
+              "keepHint": "The new read-aloud is added as another file.",
+              "replaceHint": "The old file is replaced only after the new one passes its checks, and reading positions carry over.",
+              "replaceNotPermitted": "Replacing a read-aloud needs permission to delete books, so the new one is added as another file.",
+              "generated": "Made by BookOrbit",
+              "imported": "Imported"
+            },
+            "audio": "Audiobook",
+            "audioSummary": "{count, plural, one {# track} other {# tracks}}, {order, select, book {in book order} other {in your order}}",
+            "audioSummaryWithDuration": "{count, plural, one {# track} other {# tracks}}, {duration}, {order, select, book {in book order} other {in your order}}",
+            "audioSkipped": "{count, plural, one {# track skipped} other {# tracks skipped}}",
+            "changeOrder": "Change order",
+            "restoreOrder": "Restore book order",
+            "trackList": "Tracks in listening order",
+            "trackLabel": "Track {position} of {total}: {name}",
+            "moveUp": "Move {name} up",
+            "moveDown": "Move {name} down",
+            "moved": "{name} moved to position {position} of {total}",
+            "skipped": "Skipped",
+            "noTracks": "Select at least one track.",
+            "language": "Narration language",
+            "chooseLanguage": "Choose a language",
+            "languageUnsupported": "{language} isn't supported by the speech model.",
+            "languageFromBook": "From this book's details.",
+            "languageIsDefault": "Your default language.",
+            "languageSavedAsDefault": "Saved as your default language.",
+            "setDefaultLanguage": "Set as default",
+            "defaultLanguageFailed": "Couldn't save your default language. Try again.",
+            "granularity": "Highlighting",
+            "sentence": "Sentence",
+            "sentenceHint": "Highlights one sentence at a time. Recommended.",
+            "word": "Word",
+            "wordHint": "Highlights each word. Takes longer and makes a larger file.",
+            "experimental": "Experimental",
+            "model": "Speech model: {model}",
+            "estimatedSize": "Estimated size: {size}",
+            "lowDiskLabel": "Low disk space.",
+            "lowDisk": "This needs about {needed} of working space on the worker, which has {free} free.",
+            "processingNote": "Runs in the background. Long audiobooks can take hours, and the first run for a language downloads its model.",
+            "start": "Start",
+            "starting": "Starting…"
+          },
+          "devices": {
+            "cpu": "Runs on the CPU",
+            "mlx": "Runs on Apple Silicon (MLX)",
+            "cuda": "Runs on an NVIDIA GPU (CUDA)",
+            "webgpu": "Runs on the GPU (WebGPU)",
+            "other": "Runs on {device}"
+          },
+          "job": {
+            "heading": "Read-aloud",
+            "startedBy": "Started by {name}",
+            "startedByUnknown": "Started by another user",
+            "dismiss": "Dismiss",
+            "details": "Details",
+            "queuedTitle": "Waiting to start",
+            "queueAhead": "{count, plural, =0 {Next in line} one {# job ahead} other {# jobs ahead}}",
+            "elapsed": "Running for {duration}",
+            "justStarted": "Just started",
+            "firstRunForLanguage": "First run for this language",
+            "stoppingTitle": "Stopping…",
+            "stoppingDescription": "Finishing the current step, then it stops. Nothing will be added to this book.",
+            "reviewTitle": "Ready for review",
+            "reviewDescription": "{percent} of the text matched the narration. Check the chapters before adding it.",
+            "reviewDescriptionPlain": "Check the chapters before adding it to this book.",
+            "reviewExpires": "Discarded automatically {when} unless you review it.",
+            "completeTitle": "Read-aloud ready",
+            "completeWarningsTitle": "Read-aloud ready, with warnings",
+            "completeAdded": "Added to this book as a new EPUB.",
+            "completeReplaced": "Replaced the previous read-aloud. Reading positions carry over.",
+            "matchedSentences": "{matched} of {total} {count, plural, one {sentence} other {sentences}} matched the narration",
+            "audioUsed": "{percent} of the audio used",
+            "outsideNarration": "Not in the narration, so left without audio: {chapters}.",
+            "outsideMore": "{count, plural, one {# more chapter} other {# more chapters}}",
+            "chaptersHeading": "Chapters",
+            "activityHeading": "Activity",
+            "failedTitle": "Read-aloud failed",
+            "retryUntil": "Retry continues from the last finished step until {date}.",
+            "cancelledTitle": "Generation cancelled",
+            "discardedTitle": "Output discarded",
+            "nothingAdded": "Nothing was added to this book.",
+            "expiredDescription": "It wasn't reviewed within 14 days, so nothing was added to this book.",
+            "progress": "Read-aloud progress",
+            "steps": "Steps",
+            "stepDone": "{step}, done",
+            "stepCurrent": "{step}, in progress",
+            "stepUpcoming": "{step}, not started",
+            "openReadAlong": "Open read-aloud",
+            "showFile": "Show file",
+            "retry": "Retry",
+            "startOver": "Start over",
+            "cancel": "Cancel generation",
+            "cancelPrompt": "Cancel generation?",
+            "keepRunning": "Keep running",
+            "warnings": "Warnings",
+            "live": "Read-aloud: {status}"
+          },
+          "stageDetail": {
+            "file": "File {current} of {total}",
+            "track": "Track {current} of {total}",
+            "chapter": "Chapter {current} of {total}",
+            "step": "Step {current} of {total}"
+          },
+          "stages": {
+            "queued": "Waiting to start",
+            "preparing_audio": "Preparing the audio",
+            "downloading_model": "Downloading the speech model",
+            "generating_emissions": "Listening to the narration",
+            "marking_up_ebook": "Marking up the ebook text",
+            "aligning": "Matching the text to the narration",
+            "validating": "Checking the result",
+            "awaiting_review": "Waiting for review",
+            "publishing": "Adding the read-aloud to this book",
+            "completed": "Done",
+            "working": "Working"
+          },
+          "steps": {
+            "audio": "Audio",
+            "speech": "Speech",
+            "text": "Text",
+            "align": "Align",
+            "check": "Check",
+            "publish": "Publish"
+          },
+          "review": {
+            "heading": "Chapters",
+            "summary": "{count, plural, one {# chapter} other {# chapters}}, {attention, plural, =0 {none need a look} one {# needs a look} other {# need a look}}",
+            "chapter": "Chapter",
+            "part": "Part",
+            "statusLabel": "Status",
+            "status": {
+              "aligned": "Aligned",
+              "notFound": "Not found in the audio",
+              "tooShort": "Too short to match",
+              "excluded": "Excluded",
+              "audioOnly": "Audio only",
+              "outside": "Not in the narration",
+              "unknown": "Unknown"
+            },
+            "matched": "Matched",
+            "matchedValue": "{percent} matched",
+            "zones": {
+              "front": "Front matter",
+              "body": "Body",
+              "back": "Back matter"
+            },
+            "include": "Include {title}",
+            "showText": "Show text from {title}",
+            "hideText": "Hide text from {title}",
+            "preview": "Preview",
+            "firstMatch": "First match",
+            "lastMatch": "Last match",
+            "noText": "No text to show for this chapter.",
+            "noReport": "No chapter report was kept for this job. Run it again to see one.",
+            "loading": "Loading chapters…",
+            "loadFailed": "The chapter report couldn't be loaded.",
+            "tryAgain": "Try again",
+            "pending": "{count, plural, one {# change is not applied yet.} other {# changes are not applied yet.}} Re-sync reruns only the matching step.",
+            "resync": "Re-sync",
+            "publishAnyway": "Publish anyway",
+            "discard": "Discard",
+            "discardPrompt": "Discard this output?",
+            "keep": "Keep it"
+          },
+          "log": {
+            "heading": "Activity",
+            "empty": "No activity yet.",
+            "loading": "Loading activity…",
+            "loadFailed": "The activity log couldn't be loaded.",
+            "tryAgain": "Try again",
+            "warn": "Warning",
+            "error": "Error",
+            "other": "Worker activity",
+            "events": {
+              "job_created": "Job created",
+              "claimed": "Sent to the worker",
+              "job_accepted": "The worker accepted the job",
+              "disk_checked": "Enough free space on the worker",
+              "disk_check_failed": "Not enough free space on the worker",
+              "stage_started": "Started",
+              "stage_finished": "Finished in {duration}",
+              "stage_finished_plain": "Finished",
+              "stage_skipped": "Reused earlier work",
+              "stage_failed": "This step failed",
+              "model_download_started": "Downloading the speech model for this language",
+              "model_download_finished": "Speech model downloaded",
+              "emissions_cached": "Reused speech analysis from an earlier run",
+              "audio_reencoded_cbr": "Converted variable-bitrate MP3 for accurate timing",
+              "stalign_warning": "The aligner reported a warning",
+              "waiting_for_worker": "Waiting for the worker to respond",
+              "worker_reachable_again": "The worker is responding again",
+              "worker_lost_job": "The worker restarted; resuming from earlier work",
+              "requeued": "Will try again shortly",
+              "recovered": "Resuming after a server restart",
+              "output_validated": "Checked the result",
+              "needs_review": "Needs review: part of the text didn't match the audio",
+              "publish_requested": "Adding to the book",
+              "published": "Added to the book",
+              "file_added": "Saved as a new file",
+              "file_replaced": "Replaced the existing read-aloud",
+              "file_already_attached": "The book already had this file",
+              "replace_target_missing": "The read-aloud to replace was gone, so a new file was added",
+              "replace_not_permitted": "Replacing the read-aloud was no longer permitted, so a new file was added",
+              "job_completed": "The worker finished",
+              "cancel_requested": "Cancellation requested",
+              "runner_killed": "Stopped the worker process",
+              "job_cancelled": "The worker stopped",
+              "cancelled": "Cancelled",
+              "discarded": "Discarded at review",
+              "job_failed": "The worker reported a failure",
+              "retry_requested": "Retry requested",
+              "resync_requested": "Re-sync requested",
+              "review_reminder_sent": "Reminder sent: the review expires soon",
+              "review_expired": "Discarded after 14 days without review"
+            }
+          },
+          "warnings": {
+            "unaligned_tracks": "One or more audio tracks could not be aligned.",
+            "unmatched_text": "A noticeable amount of ebook text was not matched to narration.",
+            "interpolated_text": "Some text timing was estimated between confident matches.",
+            "dropped_text": "Some ebook text was omitted from the synchronized sequence."
+          },
+          "errors": {
+            "create": "The read-aloud couldn't be started. Try again.",
+            "createInvalid": "Some selected files are no longer on this book. Check the selection and try again.",
+            "createConflict": "Another read-aloud is already being created for this book.",
+            "createUnavailable": "The read-aloud worker is offline. Try again later.",
+            "forbidden": "You don't have permission to do that.",
+            "gone": "This job no longer exists.",
+            "conflict": "This job had already moved on. It now shows where it is.",
+            "cancel": "The job couldn't be cancelled. Try again.",
+            "publish": "The read-aloud couldn't be added to this book. Try again.",
+            "retry": "The job couldn't be retried. Try again.",
+            "resync": "The re-sync couldn't be started. Try again.",
+            "dismiss": "The card couldn't be dismissed. Try again.",
+            "job": {
+              "worker_unavailable": "The read-aloud worker couldn't be reached.",
+              "worker_incompatible": "The read-aloud worker needs an update to work with this server.",
+              "worker_crashed": "The read-aloud worker stopped unexpectedly.",
+              "library_not_mounted": "The read-aloud worker can't reach this library's folder.",
+              "source_missing": "A selected file is no longer available.",
+              "source_changed": "A selected file changed after the job started.",
+              "invalid_source": "The selected EPUB or audiobook couldn't be read.",
+              "unsupported_language": "The speech model doesn't support the selected language.",
+              "insufficient_storage": "There isn't enough free disk space to finish.",
+              "audio_processing_failed": "The audiobook couldn't be prepared.",
+              "model_download_failed": "The speech model couldn't be downloaded.",
+              "inference_failed": "Speech recognition failed while listening to the narration.",
+              "markup_failed": "The ebook text couldn't be prepared for matching.",
+              "alignment_failed": "The text couldn't be matched to the narration.",
+              "invalid_output": "The generated EPUB failed its checks.",
+              "publication_failed": "The generated EPUB couldn't be added to this book.",
+              "review_expired": "It wasn't reviewed within 14 days.",
+              "discarded": "The read-aloud was discarded at review.",
+              "cancelled": "The job was cancelled.",
+              "unknown": "Something went wrong while creating the read-aloud."
+            }
+          }
+        },
         "stats": {
           "files": "Files",
           "total": "Total",
@@ -7246,6 +7691,365 @@
           "failed": "Write failed",
           "indexed": "{name} indexed",
           "indexedMany": "{count} {format} files indexed"
+        }
+      },
+      "chapters": {
+        "heading": "Chapters",
+        "untitled": "Untitled book",
+        "untitledChapter": "Untitled chapter",
+        "edit": "Edit chapters",
+        "done": "Done",
+        "protected": "Protected",
+        "unprotected": "Not protected",
+        "protectedHint": "Rescans and metadata refreshes leave these chapters alone.",
+        "unprotectedHint": "A rescan or a metadata refresh can replace these chapters.",
+        "stats": {
+          "chapters": "Chapters",
+          "runtime": "Runtime",
+          "average": "Average"
+        },
+        "source": {
+          "embedded": "Read from the audio files",
+          "tracks": "One chapter per audio file, not saved",
+          "provider": "From fetched metadata",
+          "migration": "Imported from Audiobookshelf",
+          "manual": "Edited in BookOrbit",
+          "manualBy": "Edited by {name} {when}",
+          "none": "No chapters yet"
+        },
+        "youAreHere": "You are here",
+        "playFrom": "Listen from {title}",
+        "selectRow": "Select chapter {index}",
+        "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+        "selectAll": "Select all",
+        "selectNone": "Select none",
+        "removeSelected": "Remove selected",
+        "startOf": "Start of chapter {index}",
+        "titleOf": "Title of chapter {index}",
+        "titlePlaceholder": "Chapter title",
+        "retryOperation": "Retry chapter operation",
+        "operationProgress": "Chapter operation in progress: {done} of {total} files processed.",
+        "createFirst": "Add first chapter",
+        "newChapter": "New chapter",
+        "undo": "Undo",
+        "redo": "Redo",
+        "find": "Find chapters",
+        "toolsMenu": "Tools",
+        "export": "Export",
+        "saved": "Chapters saved",
+        "reload": "Reload",
+        "retry": "Try again",
+        "nudge": {
+          "backSecond": "Move the start back one second",
+          "backTenth": "Move the start back a tenth of a second",
+          "forwardTenth": "Move the start forward a tenth of a second",
+          "forwardSecond": "Move the start forward one second"
+        },
+        "issues": {
+          "emptyTitle": "This chapter needs a title.",
+          "firstNotZero": "The first chapter has to start at 0:00.",
+          "notAscending": "This chapter starts at the same time as the one before it.",
+          "pastEnd": "This chapter starts after the audiobook ends.",
+          "tooShort": "This chapter is under a second long."
+        },
+        "player": {
+          "scrubber": "Preview position",
+          "play": "Play preview",
+          "pause": "Pause preview",
+          "back": "Back 15 seconds",
+          "forward": "Forward 15 seconds"
+        },
+        "history": {
+          "heading": "History",
+          "empty": "Saved versions appear here.",
+          "by": "{source} by {name}",
+          "facts": "{when}: {count, plural, one {# chapter} other {# chapters}}",
+          "source": {
+            "embedded": "From the audio files",
+            "tracks": "One per audio file",
+            "provider": "From fetched metadata",
+            "migration": "From Audiobookshelf",
+            "manual": "Edited"
+          }
+        },
+        "revert": {
+          "action": "Revert to the files' chapters",
+          "title": "Revert to the chapters in the files?",
+          "description": "BookOrbit reads the chapters embedded in the audio files again and stops protecting them from rescans. Unsaved edits are lost. The current list stays in the history.",
+          "confirm": "Revert",
+          "done": "Chapters reverted to the audio files"
+        },
+        "discardDialog": {
+          "title": "Discard chapter edits?",
+          "description": "Your changes to the chapters have not been saved.",
+          "confirm": "Discard"
+        },
+        "save": {
+          "action": "Save chapters",
+          "discard": "Discard",
+          "lock": "Protect from rescans",
+          "lockHint": "Keep these chapters when the files are rescanned or metadata is refreshed.",
+          "unsaved": "Unsaved changes",
+          "unsavedWithWarnings": "{count, plural, one {Unsaved changes, # warning} other {Unsaved changes, # warnings}}",
+          "blocked": "{count, plural, one {Fix # problem to save} other {Fix # problems to save}}",
+          "upToDate": "All changes saved",
+          "short": "Save"
+        },
+        "writeFiles": {
+          "more": "More save options",
+          "saveAndWrite": "Save and write to files",
+          "writeSaved": "Write saved chapters to files",
+          "writing": "Writing chapters into the audio files...",
+          "confirmTitle": "Write chapters into the audio files?",
+          "confirmDescription": "{count, plural, one {This rewrites the book's audio file with these chapters.} other {This rewrites the book's # audio files with these chapters.}} The audio itself is copied unchanged. Anyone streaming the book right now may need to restart it, and phones that already downloaded it keep their copy until it is downloaded again.",
+          "confirm": "Write to files",
+          "done": "{count, plural, one {Chapters written into the audio file.} other {Chapters written into all # audio files.}}",
+          "partial": "Chapters were written into {written} of {total} files. The rest were left as they were.",
+          "reasons": {
+            "libraryDisabled": "Writing to files is off for this library. Turn it on in the library's settings.",
+            "noFiles": "This book has no audio files to write to.",
+            "formatNotSupported": "These audio files cannot hold chapters. Only M4B, M4A and MP3 can.",
+            "formatDisabled": "Writing to audio files is turned off for this library.",
+            "tooLarge": "A file is larger than this library's limit for writing to files."
+          }
+        },
+        "formats": {
+          "cue": "CUE sheet",
+          "ffmetadata": "FFmpeg metadata",
+          "audacity": "Audacity labels",
+          "timestamps": "Timestamped text",
+          "titles": "List of titles",
+          "json": "JSON"
+        },
+        "apply": {
+          "label": "How to use these chapters",
+          "action": "Apply to editor",
+          "replace": "Replace all",
+          "replaceHint": "Use these chapters, titles and times.",
+          "titles": "Titles only",
+          "titlesHint": "Keep your start times and take the titles of matching rows.",
+          "times": "Start times only",
+          "timesHint": "Keep your titles and take the start times of matching rows."
+        },
+        "sources": {
+          "description": "Compare them with the list you are editing, then choose what to take.",
+          "loading": "Reading chapters...",
+          "counts": "{incoming, plural, one {# incoming chapter} other {# incoming chapters}}, {current, plural, one {# in the editor} other {# in the editor}}",
+          "pastEnd": "{count, plural, one {# chapter starts after your audiobook ends.} other {# chapters start after your audiobook ends.}}",
+          "currentColumn": "In the editor",
+          "incomingColumn": "Incoming",
+          "deltaColumn": "Shift (s)",
+          "applied": "Applied to the editor. Save to keep it.",
+          "empty": "No chapters were found here.",
+          "files": {
+            "menu": "From the audio files",
+            "title": "Chapters in the audio files"
+          },
+          "tracks": {
+            "menu": "One per audio file",
+            "title": "One chapter per audio file"
+          },
+          "lookup": {
+            "menu": "From Audible...",
+            "title": "Chapters from Audible",
+            "asin": "ASIN",
+            "region": "Store",
+            "action": "Look up",
+            "hint": "Audible's chapters for that edition. Its timings come from Audible's own recording, so they may need an offset or a stretch to line up with your files."
+          },
+          "toc": {
+            "menu": "From the ebook's contents",
+            "title": "Titles from the ebook"
+          },
+          "readAlong": {
+            "menu": "From the read-along EPUB",
+            "title": "Chapters from the read-along"
+          },
+          "import": {
+            "menu": "Import...",
+            "title": "Import chapters",
+            "pasteLabel": "Paste chapters",
+            "placeholder": "00:00:00 Opening Credits\n00:00:14 Dedication\n00:00:23 Chapter 1",
+            "formats": "Reads CUE sheets, FFmpeg metadata, Audacity labels, Audiobookshelf JSON, timestamped lines, or a plain list of titles.",
+            "read": "Read chapters",
+            "chooseFile": "Choose a file",
+            "unreadable": "No chapters could be read from that.",
+            "tooLarge": "That file is too large to be a chapter list.",
+            "skipped": "{count, plural, one {# line skipped} other {# lines skipped}}",
+            "truncated": "Only the first {count} chapters were read."
+          },
+          "version": {
+            "title": "Saved version",
+            "detail": "Saved {when}",
+            "detailBy": "Saved {when} by {name}"
+          }
+        },
+        "review": {
+          "adjust": "Line up the times",
+          "runtimes": "Source runtime {theirs}, this audiobook {ours} ({difference} s)",
+          "accurate": "Audible marks these timings as exact",
+          "offset": "Offset (s)",
+          "suggestIntro": "Skip Audible's intro ({seconds} s)",
+          "suggestMatch": "Match the first chapters ({seconds} s)",
+          "fitPauses": "Fit to pauses",
+          "fitPausesResult": "Fit to pauses ({seconds} s, {hits} of {total})",
+          "fitPausesNone": "No single offset lines these chapters up with pauses in your audio.",
+          "resetOffset": "Reset",
+          "stretch": "Stretch to fit this audiobook",
+          "stretchHint": "Scales every start time by {factor}, which moves the last chapter by {seconds} s.",
+          "parts": "Part headings",
+          "partsOwn": "Keep as chapters",
+          "partsPrefix": "Add to chapter titles",
+          "partsDrop": "Leave out",
+          "match": "Match rows",
+          "matchTime": "By start time",
+          "matchPosition": "In order",
+          "matched": "{count, plural, one {# row matched} other {# rows matched}}",
+          "include": "Include",
+          "includeRow": "Include {title}",
+          "willReplace": "{count, plural, one {Replaces the list with # chapter} other {Replaces the list with # chapters}}",
+          "willChange": "{count, plural, =0 {Nothing would change} one {# chapter changes} other {# chapters change}}"
+        },
+        "tools": {
+          "apply": "Apply",
+          "changes": "{count, plural, =0 {Nothing would change.} one {# chapter will change.} other {# chapters will change.}}",
+          "scope": {
+            "label": "Apply to",
+            "all": "{count, plural, one {The # chapter} other {All # chapters}}",
+            "selected": "{count, plural, one {The # selected chapter} other {The # selected chapters}}",
+            "fromActive": "Chapter {index} to the end"
+          },
+          "shift": {
+            "title": "Shift times",
+            "description": "Move chapter starts earlier or later by the same amount. A chapter at 0:00 stays there.",
+            "amount": "Seconds",
+            "hint": "Negative moves chapters earlier. Use this when a release has a longer or shorter intro.",
+            "invalid": "Enter a number of seconds, such as 4.04 or -2."
+          },
+          "renumber": {
+            "title": "Renumber titles",
+            "description": "Give chapters numbered titles in order.",
+            "pattern": "Title pattern",
+            "hint": "{'{n}'} is replaced by the number.",
+            "defaultPattern": "Chapter {'{n}'}",
+            "start": "First number",
+            "invalid": "Enter a non-negative whole starting number and padding from 0 to 4.",
+            "padding": "Digits"
+          },
+          "replace": {
+            "title": "Find and replace",
+            "description": "Change text in chapter titles.",
+            "find": "Find",
+            "with": "Replace with",
+            "regex": "Regular expression",
+            "caseSensitive": "Match case",
+            "invalidPattern": "That regular expression is not valid."
+          },
+          "mergeShort": {
+            "title": "Merge short chapters",
+            "description": "Fold chapters shorter than a length into the chapter before them.",
+            "threshold": "Shorter than (seconds)",
+            "invalid": "Enter a number of seconds above 0."
+          },
+          "clean": {
+            "title": "Clean up titles",
+            "nothing": "Titles are already clean.",
+            "done": "{count, plural, one {Cleaned # title} other {Cleaned # titles}}"
+          }
+        },
+        "snap": {
+          "menu": "Snap to pauses...",
+          "title": "Snap to pauses",
+          "description": "Move chapter starts onto the nearest pause in the audio, where the narrator stops between chapters.",
+          "radius": "Look for a pause",
+          "radiusOption": "Within {seconds} s either side",
+          "placement": "Place each start",
+          "placementEnd": "Just before the narrator speaks again",
+          "placementMiddle": "In the middle of the pause",
+          "progressive": "Carry each correction forward",
+          "progressiveHint": "For timings that drift further off as the book goes on: each move also shifts where the next start is looked for.",
+          "run": "Find pauses",
+          "running": "Listening for pauses: {done} of {total}",
+          "progressLabel": "Pause search progress",
+          "stop": "Stop",
+          "back": "Change options",
+          "moved": "{count, plural, one {# chapter moves, by {average} s} other {# chapters move, by {average} s on average and {largest} s at most}}",
+          "nothing": "No chapter needs to move.",
+          "notFound": "{count, plural, one {# found no pause nearby} other {# found no pause nearby}}",
+          "blocked": "{count, plural, one {# stays put to keep the chapters in order} other {# stay put to keep the chapters in order}}",
+          "failed": "{count, plural, one {# could not be heard: its audio did not decode} other {# could not be heard: their audio did not decode}}",
+          "movedOne": "Moved to the pause at {time} ({delta} s).",
+          "notFoundOne": "No pause within {seconds} s of this start.",
+          "blockedOne": "The nearest pause would put this chapter out of order.",
+          "alreadyThere": "This start already sits on a pause."
+        },
+        "waveform": {
+          "label": "Chapter start in the audio",
+          "loading": "Loading the audio around this start...",
+          "failed": "The audio here could not be drawn."
+        },
+        "errors": {
+          "operation": "The chapter operation could not complete. Retry to reconnect or check its status.",
+          "load": "Chapters could not be loaded.",
+          "save": "Chapters could not be saved.",
+          "revert": "Chapters could not be reverted.",
+          "readFiles": "The audio files could not be read.",
+          "lookup": "Audible could not be asked for chapters.",
+          "readEbook": "The ebook could not be read.",
+          "analyze": "The audio could not be analyzed.",
+          "writeFiles": "The chapters could not be written into the files.",
+          "versions": "The chapter history could not be loaded.",
+          "preview": "The preview could not start.",
+          "stale": "Someone else changed these chapters. Reload to see their version; your edits are kept until you do."
+        },
+        "addCutTooClose": "Move the playhead at least a second away from a cut first.",
+        "columns": {
+          "chapter": "Chapter",
+          "inBook": "In the book",
+          "starts": "Starts",
+          "length": "Length",
+          "start": "Start",
+          "title": "Title"
+        },
+        "listen": {
+          "resume": "Resume",
+          "start": "Listen",
+          "progress": "{left} left in chapter · {percent} of the book",
+          "notStarted": "Not started",
+          "left": "{time} left"
+        },
+        "timeline": {
+          "label": "Chapters across the book",
+          "listened": "{percent} of the book listened"
+        },
+        "cut": {
+          "heading": "Cut",
+          "label": "Cut between {previous} and {next}",
+          "firstHeading": "Start of the book",
+          "count": "{index} of {total}",
+          "previous": "Previous cut",
+          "next": "Next cut",
+          "ends": "Ends",
+          "starts": "Starts",
+          "saved": "saved",
+          "backToCut": "Back to the cut",
+          "move": "Move the cut",
+          "playCut": "Play across the cut",
+          "playCutHint": "Play a few seconds either side of the cut (P)",
+          "stop": "Stop",
+          "stopHint": "Stop playing (P)",
+          "snap": "Snap to pause",
+          "onPause": "On a pause",
+          "noPause": "{seconds, plural, one {No pause within # second} other {No pause within # seconds}}",
+          "remove": "Remove cut",
+          "removeHint": "{title} joins {previous}",
+          "first": "The first chapter always starts at 0:00, so it has no cut to move. Pick any other chapter to adjust where it begins.",
+          "announce": "Cut at {time}",
+          "moveHere": "Move cut here",
+          "moveHereHint": "Move this cut to {time} (M)",
+          "moveHereOutside": "Put the playhead inside {previous} or {title} to move this cut there.",
+          "newChapterHere": "New chapter here",
+          "newChapterHereHint": "Start a new chapter at {time}"
         }
       },
       "highlights": {
@@ -8577,6 +9381,15 @@
         "clientRefused": "Your download client refused an earlier release",
         "clientUnavailable": "Your download client did not answer an earlier release"
       },
+      "clientProblem": {
+        "unavailable": "{client} is not responding",
+        "unavailableUnnamed": "Your download client is not responding",
+        "unavailableHint": "Releases that use it can't be sent until it answers. Check that it is running, then try again.",
+        "refused": "{client} turned down the release",
+        "refusedUnnamed": "Your download client turned down the release",
+        "refusedHint": "Releases that use it can't be sent until this is fixed.",
+        "retry": "Try again"
+      },
       "singleFileNote": "A release can be one book in several formats, an audiobook in parts, or an archive - all of those import as a single book. A release holding several separate books asks you which one to keep.",
       "holdForReview": "Review the download before it is filed",
       "releasePageLabel": "{title}, release page on {indexer}",
@@ -9081,7 +9894,8 @@
       },
       "surfaceOpacity": "Surface opacity",
       "surfaceOpacityValue": "{value}%",
-      "surfaceBrightnessValue": "{value}%"
+      "surfaceBrightnessValue": "{value}%",
+      "readingHistory": "History"
     },
     "sidebar": {
       "dashboard": "Dashboard",
@@ -9991,7 +10805,7 @@
       "unconfirmed": "unconfirmed",
       "sending": "sending",
       "narration": "Narration",
-      "narrationTitle": "Read-along books keep their narration"
+      "narrationTitle": "Read-aloud books keep their narration"
     },
     "device": {
       "kindle": "Kindle",
@@ -10016,7 +10830,7 @@
       "total": "{size} in total",
       "send": "{count, plural, one {Send} other {Send # emails}}",
       "noFormat": "No {format}, gets {got}",
-      "readAlong": "Read-along, {size}",
+      "readAlong": "Read-aloud, {size}",
       "overKindle": "{size}, over Kindle's 50 MB limit",
       "overGmail": "{size}, over Gmail's 25 MB limit",
       "kindleRejects": "Kindle rejects {format}",
@@ -10053,7 +10867,7 @@
         "formatHint": "A book without this format gets its primary edition.",
         "kindleFormatHint": "Amazon stopped accepting MOBI and AZW3 by email in 2023, so they are not offered for a Kindle. A book without this format gets its primary edition.",
         "kindleLegacyFormat": "Kindle no longer accepts {format} by email. Pick EPUB or PDF.",
-        "readAlong": "Read-along books",
+        "readAlong": "Read-aloud books",
         "readAlongAutomatic": "Automatic",
         "readAlongAutomaticHint": "Text-only when a safe copy can be made, otherwise the original.",
         "readAlongTextOnly": "Text-only EPUB",
@@ -10182,7 +10996,20 @@
       "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
       "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
       "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
-      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
+      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room.",
+      "CHAPTERS_STALE": "Someone else changed these chapters. Reload to see their version.",
+      "CHAPTERS_EMPTY_TITLE": "Every chapter needs a title.",
+      "CHAPTERS_FIRST_NOT_ZERO": "The first chapter has to start at 0:00.",
+      "CHAPTERS_NOT_ASCENDING": "Chapters have to start in order, each after the one before.",
+      "CHAPTERS_PAST_END": "A chapter starts after the audiobook ends.",
+      "CHAPTERS_FILES_UNREADABLE": "An audio file could not be read, so its chapters are unknown.",
+      "CHAPTERS_LOOKUP_NOT_FOUND": "Audible has no chapters for that ASIN in this store.",
+      "CHAPTERS_LOOKUP_UNAVAILABLE": "Audible did not answer. Try again in a moment.",
+      "CHAPTERS_EBOOK_UNAVAILABLE": "That ebook has no chapter list to read.",
+      "CHAPTERS_ANALYSIS_TOO_LARGE": "That is too much audio to analyze at once.",
+      "CHAPTERS_ANALYSIS_UNAVAILABLE": "Finding pauses needs ffmpeg on the server.",
+      "CHAPTERS_WRITE_UNAVAILABLE": "Chapters can't be written into these files.",
+      "CHAPTERS_NOTHING_TO_WRITE": "There are no saved chapters to write."
     }
   },
   "hardcover": {
@@ -10549,6 +11376,10 @@
           "fileAsBook": {
             "title": "File as Book",
             "hint": "Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple files."
+          },
+          "seriesFolders": {
+            "title": "Series folders",
+            "uses": "Uses File as Book"
           }
         },
         "addedAt": {
@@ -10614,8 +11445,11 @@
           "cannotChange": "This is the one setting you cannot change later.",
           "folderHint": "Every folder is one book. Best when a title keeps several formats together, or an audiobook spans many files.",
           "fileHint": "Every file is its own book. Best for flat folders with one format per title.",
+          "fileHintSeries": "Every file is its own book. Best for comics and manga kept in one folder per series, or a flat folder with one format per title.",
           "folderResult": "One book with two formats",
-          "fileResult": "Three books, one per file"
+          "fileResult": "Three books, one per file",
+          "seriesHint": "Every file is its own book, and the folder it sits in is its series, the layout Komga and Kavita use. Best for comics and manga.",
+          "seriesResult": "Two series, one book per file"
         },
         "import": {
           "title": "Import",
@@ -10637,6 +11471,15 @@
           "placeholder": "Type a pattern like **/samples/** and press Enter",
           "placeholderMore": "Add another pattern",
           "remove": "Remove pattern {pattern}"
+        },
+        "series": {
+          "title": "Series",
+          "toggle": "Folders are series",
+          "hintOn": "Each folder becomes a series, and the number in each file name sets the book's place in it, as Komga and Kavita do. A different series named inside a file still comes first.",
+          "hintOff": "Turn this on for comics and manga kept in one folder per series, so each folder names the series of the files inside it.",
+          "replacesCustom": "Turning this on replaces the path rules set under Metadata. Turning it off again before you save brings them back.",
+          "existingBooks": "Books already in this library get these series when you apply the rules to them under Metadata.",
+          "previewSeries": "Series"
         }
       },
       "metadata": {
@@ -10731,6 +11574,38 @@
             "seriesIndex": "Series number",
             "publishedYear": "Published year",
             "publishedDate": "Published date"
+          },
+          "preset": {
+            "title": "Folders are series",
+            "hint": "Rules for one folder per series and one file per volume, chapter or issue, as Komga and Kavita expect. They replace the rules below.",
+            "apply": "Use these rules"
+          },
+          "reapply": {
+            "action": "Apply rules to existing books",
+            "applying": "Applying rules...",
+            "hint": "Updates books already in this library with the fields these rules decide. Nothing else changes, and locked fields are kept.",
+            "saveFirst": "Save your changes first, then apply the rules to existing books.",
+            "confirm": "Apply the saved rules to every book in this library? This runs in the background, and you can close this editor. Only fields the rules decide are written; locked fields and metadata the files supply themselves are kept.",
+            "progressSummary": "Processed {processed} of {total}: {updated} updated, {unchanged} unchanged, {skipped} skipped, {failed} failed.",
+            "jobStatus": {
+              "running": "Applying rules in the background.",
+              "completed": "Rules applied to existing books.",
+              "failed": "Applying stopped before finishing. Changes already made were kept; you can safely run it again."
+            },
+            "errors": {
+              "notConfigured": "Save path rules for this library before applying them.",
+              "alreadyRunning": "The rules are already being applied to this library.",
+              "busy": "Other libraries are applying rules. Try again shortly.",
+              "requestFailed": "Could not reach the server. Close and reopen this editor to check the status.",
+              "interrupted": "The job status is no longer available. It may have been interrupted by a server restart. You can safely run it again."
+            },
+            "failureSample": "Book {bookId}: {reason}",
+            "failureReasons": {
+              "rules_unavailable": "The rules could not be evaluated in time.",
+              "rules_invalid": "The saved rules could not be run. Open Configure, check them, and save again.",
+              "file_unavailable": "The book's file could not be read, so nothing was changed. Check that the library folder is reachable.",
+              "metadata_failed": "The book's metadata could not be saved."
+            }
           }
         }
       },
@@ -10760,9 +11635,9 @@
           "toggleAria": "Write EPUB metadata"
         },
         "readAlong": {
-          "title": "Read-along EPUB",
-          "hint": "EPUBs with synced narration, such as Storyteller read-alongs. They carry their audio, so they are large and need more memory to rewrite.",
-          "toggleAria": "Write read-along EPUB metadata"
+          "title": "Read-aloud EPUB",
+          "hint": "EPUBs with synced narration, such as Storyteller read-alouds. They carry their audio, so they are large and need more memory to rewrite.",
+          "toggleAria": "Write read-aloud EPUB metadata"
         },
         "fb2": {
           "title": "FictionBook (FB2)",
@@ -11001,6 +11876,194 @@
         "connect": "Could not connect",
         "invalidName": "Enter a single folder name without slashes or leading dots",
         "createFolder": "Could not create folder"
+      }
+    },
+    "folderBrowser": {
+      "title": "Choose folders",
+      "titleStorage": "Choose a storage folder",
+      "subtitle": "For {name} · {mode}",
+      "subtitleStorage": "For {name} · one folder; each show gets its own folder inside",
+      "subtitleLocal": "For {name} · folders that already hold episodes",
+      "unnamedLibrary": "the new library",
+      "close": "Close",
+      "mode": {
+        "folder": "Folder as Book",
+        "file": "File as Book"
+      },
+      "field": {
+        "placeholder": "Find a folder, or paste a path",
+        "label": "Find a folder or type a path",
+        "clear": "Clear",
+        "mounted": "Mounted",
+        "libraries": "Libraries",
+        "recent": "Recent",
+        "thisLibrary": "{name} (this library)",
+        "jumpHint": "Type to find a folder by name, or start with {key} to type a path",
+        "inFolder": "In {path}",
+        "completeHint": "{tab} complete {enter} show in tree",
+        "noCompletion": "No folder in {path} starts with that. {key} tries the path as typed.",
+        "pathMissing": "{path} doesn't exist on the server.",
+        "pathMissingSuggest": "{path} doesn't exist on the server. Did you mean {suggestion}?",
+        "pathBlocked": "BookOrbit never opens {path}: it is a system folder.",
+        "findSummary": "{count, plural, one {# folder matches} other {# folders match}} “{query}”, shown with the folders around {count, plural, one {it} other {them}}.",
+        "findEnter": "{key} goes to the first.",
+        "findTruncated": "Showing the first {count} matches.",
+        "findNone": "No folder on the server matches. Try fewer letters."
+      },
+      "view": {
+        "button": "View",
+        "label": "View options",
+        "sort": "Sort",
+        "sortName": "Name",
+        "sortBooks": "Most books first",
+        "show": "Show",
+        "showEmpty": "Folders without books",
+        "showSystem": "System folders"
+      },
+      "newFolder": {
+        "button": "New folder",
+        "label": "New folder in {name}",
+        "placeholder": "New folder in {name}",
+        "inputLabel": "New folder name",
+        "hint": "{enter} create {escape} cancel",
+        "create": "Create",
+        "errors": {
+          "empty": "Enter a folder name.",
+          "invalid": "Use one folder name, without slashes or a leading dot.",
+          "exists": "{name} already exists here.",
+          "denied": "BookOrbit can't write here.",
+          "failed": "The folder could not be created."
+        }
+      },
+      "tree": {
+        "label": "Server folders",
+        "expand": "Expand {name}",
+        "collapse": "Collapse {name}",
+        "select": "Select {name}",
+        "use": "Use {name}",
+        "readsThis": "{name} reads this folder",
+        "thisLibrary": "This library",
+        "librariesInside": "{names} {count, plural, one {reads a folder} other {read folders}} inside",
+        "inside": "{count} inside",
+        "appData": "BookOrbit data",
+        "noAccess": "No access",
+        "loading": "Loading folders",
+        "systemHidden": "{count, plural, one {# system folder} other {# system folders}} hidden at {path}",
+        "moreFolders": "Only the first {count} folders here are listed. Find by name or type a path to reach the rest.",
+        "unreadable": "BookOrbit can't read {path}.",
+        "placesFailed": "BookOrbit could not load the server's folders.",
+        "retry": "Try again"
+      },
+      "count": {
+        "books": "{count, plural, one {# book} other {# books}}",
+        "episodes": "{count, plural, one {# episode} other {# episodes}}",
+        "atLeast": "{count}+",
+        "more": "+{count} more"
+      },
+      "plan": {
+        "label": "What this library will read",
+        "willRead": "{name} will read",
+        "storage": "Episodes will download to",
+        "newFolders": "{count, plural, one {# new folder} other {# new folders}}",
+        "already": "already · {books}",
+        "emptyTitle": "Nothing picked yet",
+        "emptyHint": "Tick folders in the tree. A ticked folder brings everything inside it.",
+        "emptyStorageTitle": "No folder chosen yet",
+        "emptyStorageHint": "Tick one folder in the tree, or make a new one.",
+        "rowSize": "{books} · {size}",
+        "show": "Show {name} in the tree",
+        "showTitle": "Show in the tree",
+        "remove": "Remove {name}",
+        "empty": "Empty",
+        "fit": {
+          "folder": "Each folder holds one book.",
+          "file": "Each file is one book.",
+          "empty": "Empty for now.",
+          "storage": "Empty: a clean place for episodes."
+        },
+        "attention": {
+          "containsOne": "Contains {folder}, which {library} reads. Those books would be in two libraries.",
+          "containsMany": "Contains folders that {libraries} read. Those books would be in two libraries.",
+          "overlapExact": "{library} already reads this folder. Both libraries would import the same {count, plural, one {# book} other {# books}}.",
+          "overlapInside": "This folder is inside {library}'s folder, so its books would be in both libraries.",
+          "merge": "{count, plural, one {# folder here holds} other {# folders here hold}} several books: as Folder as Book each becomes 1 book.",
+          "split": "{count, plural, one {# audiobook here is} other {# audiobooks here are}} in parts: as File as Book each part becomes its own book.",
+          "locked": "Organization is fixed once a library exists.",
+          "notEmpty": "Not empty: episodes would sit beside {what}. An empty folder keeps them apart.",
+          "leaveOutOne": "Leave out {folder}",
+          "leaveOutMany": "Leave them out",
+          "remove": "Remove",
+          "useFile": "Use File as Book",
+          "useFolder": "Use Folder as Book"
+        },
+        "suggestions": "Not in any library yet",
+        "suggestionsMeta": "books no library reads",
+        "add": "Add",
+        "preview": {
+          "label": "Looking at",
+          "ticks": "{key} ticks it",
+          "use": "Use this",
+          "wouldAdd": "Would add {books} · {size}",
+          "empty": "Empty for now",
+          "holds": "Holds {what}",
+          "storageEmpty": "Empty: a clean place for episodes",
+          "storageTip": "Episodes would sit beside what is here. An empty folder keeps them apart.",
+          "storageFine": "Each show gets its own folder inside.",
+          "merge": "Several books share a folder here: as Folder as Book each such folder is 1 book.",
+          "split": "Audiobooks in parts: as File as Book each part is its own book."
+        },
+        "totals": {
+          "books": "{count, plural, one {book} other {books}} · {size}",
+          "booksOnly": "{count, plural, one {book} other {books}}",
+          "shared": "{count} also in other libraries",
+          "organize": "Organize as",
+          "organizeLabel": "Organization",
+          "segmentBooks": "{count, plural, one {# book} other {# books}}",
+          "folderTitle": "Each folder that holds books is one book",
+          "fileTitle": "Each file is one book",
+          "locked": "{mode}, fixed since {name} was created"
+        },
+        "holdsBooks": "{count, plural, one {# book} other {# books}}",
+        "holdsEpisodes": "{count, plural, one {# episode} other {# episodes}}",
+        "holdsFolders": "{count, plural, one {# folder} other {# folders}}",
+        "holdsBoth": "{books} and {folders}"
+      },
+      "reason": {
+        "denied": "BookOrbit can't read this folder. Give the user BookOrbit runs as read access, then reopen it.",
+        "appData": "BookOrbit keeps covers, caches and plugins here. Pick the folder that holds your books instead.",
+        "own": "{name} is already in this library.",
+        "ownCovered": "This library already reads {path}, which includes this folder.",
+        "included": "Included because you selected {path}."
+      },
+      "notice": {
+        "folded": "{path} includes {count, plural, one {{name}} other {# folders you picked}}, so {count, plural, one {it was} other {they were}} folded into it.",
+        "range": "Ticked {count, plural, one {# folder} other {# folders}}, {from} to {to}.",
+        "removed": "Removed {name}",
+        "leftOut": "{name} became {count, plural, one {# folder} other {# folders}} beside the other libraries",
+        "modeFile": "Switched to File as Book; the library's Scanning setting follows",
+        "modeFolder": "Switched to Folder as Book; the library's Scanning setting follows",
+        "created": "Made {path} and ticked it.",
+        "createdOnly": "Made {path}.",
+        "undo": "Undo"
+      },
+      "keys": {
+        "space": "Space",
+        "tab": "Tab",
+        "escape": "Esc"
+      },
+      "footer": {
+        "hints": "{move} move {fold} fold {tick} tick {range} click for a range {find} find",
+        "add": "Add folders",
+        "addCount": "Add {count, plural, one {# folder} other {# folders}}",
+        "addShort": "Add",
+        "addShortCount": "Add {count}",
+        "use": "Use folder",
+        "nothingPicked": "Nothing picked yet",
+        "seePlan": "See the plan"
+      },
+      "divider": {
+        "label": "Resize the plan",
+        "title": "Drag to resize. Double-click to reset."
       }
     },
     "destination": {
@@ -11471,6 +12534,15 @@
     "dismiss": "Dismiss notification",
     "occurrences": "Happened {count} times",
     "occurrencesShort": "x{count}",
+    "readAloud": {
+      "readyTitle": "Read-aloud ready: {title}",
+      "needsReviewTitle": "Read-aloud needs review: {title}",
+      "needsReviewMessage": "Part of the text could not be matched to the audio. Review it before adding it to the book.",
+      "failedTitle": "Read-aloud failed: {title}",
+      "reviewExpiringTitle": "Read-aloud review expires soon: {title}",
+      "reviewExpiringMessage": "The generated read-aloud will be discarded in a few days unless you review it.",
+      "untitledBook": "Untitled book"
+    },
     "preferences": {
       "title": "Notifications",
       "subtitle": "Choose which notification categories you want to receive.",
@@ -11527,6 +12599,10 @@
         "bulkRename": {
           "label": "Bulk rename",
           "description": "When a bulk rename or a move of books between libraries completes or fails."
+        },
+        "readAloud": {
+          "label": "Read-aloud generation",
+          "description": "When a read-aloud you started is ready, needs your review, or fails."
         },
         "migration": {
           "label": "Data migration",
@@ -11981,6 +13057,248 @@
       "notePlaceholder": "Optional note"
     }
   },
+  "readingHistory": {
+    "title": "History",
+    "listLabel": "Finished reads, {period}",
+    "error": "Your reading history could not load.",
+    "retry": "Try again",
+    "actions": {
+      "share": "Share image",
+      "export": "Export"
+    },
+    "period": {
+      "year": "Year",
+      "allTime": "All time",
+      "newerYears": "Show newer years",
+      "olderYears": "Show older years",
+      "quarterGroup": "Quarter",
+      "quarter": "Q{quarter}",
+      "quarterYear": "Q{quarter} {year}"
+    },
+    "toolbar": {
+      "search": "Search books",
+      "searchLabel": "Search titles and authors",
+      "clearSearch": "Clear search",
+      "outcomes": "Outcome",
+      "outcome": {
+        "completed": "Finished",
+        "skimmed": "Skimmed",
+        "abandoned": "Abandoned"
+      },
+      "order": "Order",
+      "newest": "Newest first",
+      "oldest": "Oldest first",
+      "view": "View",
+      "list": "List",
+      "covers": "Covers",
+      "listView": "List view",
+      "coversView": "Covers view",
+      "oneBook": "One book",
+      "clearBook": "Show every book, not only {title}"
+    },
+    "month": {
+      "undated": "No finish date",
+      "reads": "{count, plural, one {# read} other {# reads}}",
+      "rereads": "{count, plural, one {# reread} other {# rereads}}",
+      "hours": "{hours}h"
+    },
+    "duration": {
+      "underMinute": "<1m",
+      "minutes": "{minutes}m",
+      "hoursMinutes": "{hours}h {minutes}m"
+    },
+    "row": {
+      "untitled": "Untitled",
+      "noDate": "No date",
+      "readNumber": "{n, selectordinal, one {#st read} two {#nd read} few {#rd read} other {#th read}}",
+      "readNumberTitle": "{count, plural, one {Finished once in all} other {Finished # times in all}}",
+      "abandoned": "Abandoned",
+      "abandonedAt": "Abandoned at {percent}",
+      "skimmed": "Skimmed",
+      "removed": "Removed from library",
+      "removedShort": "Removed",
+      "removedTitle": "Deleted from the library on {date}. This read stays in your history.",
+      "sameDay": "Same day",
+      "startedSpan": "Started {date} · {count, plural, one {# day} other {# days}}",
+      "finishOnly": "Finish date only",
+      "noDates": "No dates recorded",
+      "sessions": "{count, plural, one {# session} other {# sessions}}",
+      "sessionsTime": "{sessions} · {time}",
+      "sourcesMore": "{names} +{count}",
+      "highlights": "{count, plural, one {# highlight} other {# highlights}}",
+      "journal": "{count, plural, one {# journal entry} other {# journal entries}}",
+      "notesAndRating": "Notes and rating"
+    },
+    "tile": {
+      "label": "{title}, finished {date}",
+      "readNumber": "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}"
+    },
+    "notes": {
+      "loading": "Loading notes from this read",
+      "failed": "The notes from this read could not load.",
+      "note": "Note",
+      "journal": "Journal",
+      "thisRead": "This read",
+      "allHighlights": "{count, plural, one {The highlight from this read} other {All # highlights from this read}}",
+      "readingLog": "Reading log"
+    },
+    "rating": {
+      "group": "Rate this read",
+      "rate": "{count, plural, one {Rate # star} other {Rate # stars}}",
+      "clear": "Clear this read's rating",
+      "ofFive": "{rating} of 5 stars",
+      "notRated": "Not rated",
+      "failed": "The rating could not be saved."
+    },
+    "panel": {
+      "label": "Read of {title}",
+      "close": "Close",
+      "firstRead": "First read",
+      "readOf": "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} read of {count}",
+      "finished": "Finished",
+      "started": "Started",
+      "took": "Took",
+      "timeRead": "Time read",
+      "timeReadValue": "{time} over {count, plural, one {# session} other {# sessions}}",
+      "where": "Where",
+      "notRecorded": "Not recorded"
+    },
+    "rail": {
+      "label": "{period} in numbers",
+      "inNumbers": "{period} in numbers",
+      "totals": "Totals",
+      "reads": "Reads",
+      "books": "Books",
+      "rereads": "Rereads",
+      "pagesLabel": "Pages",
+      "pages": "{count, plural, one {# page} other {# pages}}",
+      "hours": "{hours}h",
+      "daysRead": "{count, plural, one {# day read} other {# days read}}",
+      "rated": "{count, plural, one {# rated} other {# rated}}",
+      "averageRating": "{rating}★",
+      "notCounted": "Plus {count} skimmed or abandoned, not counted.",
+      "byMonth": "By month",
+      "best": "Best: {month} · {count}",
+      "monthBar": "{month}: {count, plural, one {# read} other {# reads}}",
+      "firstReads": "First reads",
+      "quarters": "Quarters",
+      "goal": "Reading goal {year}",
+      "goalProgress": "{reached} of {target} books.",
+      "goalMet": "Met on {date}.",
+      "goalRereads": "Rereads count toward it.",
+      "records": "Records",
+      "fastest": "Fastest",
+      "pagesPerDay": "{count, plural, one {# page a day} other {# pages a day}}",
+      "longestBook": "Longest book",
+      "mostReread": "Most reread",
+      "times": "{count, plural, one {# time} other {# times}}",
+      "longestRead": "Longest read",
+      "days": "{count, plural, one {# day} other {# days}}",
+      "formats": "Formats",
+      "whereYouRead": "Where you read",
+      "undated": "{count, plural, one {# finished read has no date} other {# finished reads have no date}}",
+      "showUndated": "Show them in All time"
+    },
+    "empty": {
+      "title": "No finished reads yet",
+      "body": "Books land here as you finish them, in any reader or app. Mark a book read and it shows up too.",
+      "filteredTitle": "No reads match",
+      "filteredBody": "Try another period, turn on another outcome, or clear the search."
+    },
+    "export": {
+      "title": "Export {period}",
+      "description": "{count, plural, one {# read} other {# reads}}, as the list shows them now.",
+      "close": "Close",
+      "format": "Format",
+      "formats": {
+        "md": {
+          "name": "Markdown",
+          "hint": "For notes apps like Obsidian. One line per read, grouped by month."
+        },
+        "csv": {
+          "name": "CSV",
+          "hint": "For spreadsheets. One row per read with dates, pages, time and rating."
+        },
+        "json": {
+          "name": "JSON",
+          "hint": "Every field, for scripts and backups."
+        }
+      },
+      "includes": "Includes",
+      "includesOthers": "Finished reads, plus the skimmed and abandoned ones the list shows.",
+      "finishedOnly": "Finished reads only. Turn on Skimmed or Abandoned in the list to add them.",
+      "preview": "Preview of {file}",
+      "previewFailed": "The preview could not load. The download still works.",
+      "moreLines": "{count, plural, one {# more line} other {# more lines}}",
+      "download": "Download",
+      "preparing": "Preparing {done} of {total}",
+      "saved": "{count, plural, one {Exported # read} other {Exported # reads}}",
+      "failed": "The export could not be prepared.",
+      "fileHeading": "Reading history, {period}"
+    },
+    "share": {
+      "title": "Share image",
+      "description": "A picture of your reading to post or send. Nothing leaves BookOrbit until you save or copy it.",
+      "close": "Close",
+      "loading": "Gathering your covers",
+      "loadFailed": "The image could not be made. Close this and try again.",
+      "period": "Period",
+      "periods": {
+        "quarter": "Quarter",
+        "month": "Month"
+      },
+      "periodSummary": "{period} · {count, plural, one {# read} other {# reads}}",
+      "monthYear": "{month} {year}",
+      "shape": "Shape",
+      "shapes": {
+        "square": {
+          "name": "Square",
+          "hint": "1080 × 1080, for posts"
+        },
+        "story": {
+          "name": "Story",
+          "hint": "1080 × 1920, for stories"
+        },
+        "wide": {
+          "name": "Wide",
+          "hint": "1600 × 900, for chats and blogs"
+        }
+      },
+      "look": "Look",
+      "looks": {
+        "dark": "Dark",
+        "light": "Light"
+      },
+      "show": "Show",
+      "titles": "Titles on covers",
+      "rereads": "Reread counts",
+      "rereadsHint": "A book read three times shows once, marked ×3.",
+      "ratings": "Your ratings",
+      "fileHint": "{shape} · PNG · {width} × {height}",
+      "copy": "Copy image",
+      "save": "Save PNG",
+      "copied": "Image copied",
+      "copyFailed": "The image could not be copied. Save it instead.",
+      "saved": "Image saved",
+      "saveFailed": "The image could not be saved.",
+      "previewLabel": "Share image of {period}: {count, plural, one {# read} other {# reads}}",
+      "poster": {
+        "eyebrowYear": "{name}'s year in reading",
+        "eyebrowPeriod": "{name}'s {period} in reading",
+        "reads": "{count, plural, one {read} other {reads}}",
+        "books": "{count, plural, one {book} other {books}}",
+        "hours": "{count, plural, one {hour} other {hours}}",
+        "pages": "{count, plural, one {page} other {pages}}",
+        "busiestMonth": "Busiest month",
+        "more": "+{count}"
+      }
+    },
+    "links": {
+      "goalReads": "See {count, plural, one {the # read} other {all # reads}}",
+      "bookReads": "See every read in History",
+      "chartHint": "Select a month to see its reads in History"
+    }
+  },
   "scanner": {
     "filesProgress": "{processed}/{total} files",
     "booksFound": "{count, plural, =0 {no books found} one {# book found} other {# books found}}"
@@ -12376,7 +13694,8 @@
       "entityManager": "Entity Manager",
       "bulkRename": "Bulk Rename",
       "duplicateBooks": "Duplicate Books",
-      "missingResources": "Missing Resources"
+      "missingResources": "Missing Resources",
+      "chapterHealth": "Chapter Health"
     },
     "entityTypes": {
       "authors": "Authors",
@@ -12904,6 +14223,68 @@
         "list": "Could not load these entries.",
         "clean": "Cleanup failed."
       }
+    },
+    "chapterHealth": {
+      "accessDenied": "You need permission to edit metadata to use this tool.",
+      "untitled": "Untitled book",
+      "categoriesLabel": "Chapter problems",
+      "categories": {
+        "no_chapters": "No chapters",
+        "one_per_file": "One per file",
+        "numbered_tracks": "Numbered tracks",
+        "needs_review": "Needs review",
+        "edited": "Edited"
+      },
+      "hints": {
+        "no_chapters": "Audiobooks in a single file with one chapter or none.",
+        "one_per_file": "Audiobooks in several files with no chapters of their own, so each file plays as a chapter.",
+        "numbered_tracks": "Chapters named like files or tracks, such as \"001\" or \"Track 03\", rather than chapters.",
+        "needs_review": "Audible lookups that did not match your files well enough to apply on their own. Review opens the book's chapters with the lookup ready.",
+        "edited": "Chapter lists a person has edited, shown for reference."
+      },
+      "library": "Library",
+      "allLibraries": "All libraries",
+      "found": "{count, plural, =0 {No books here} one {# book} other {# books}}",
+      "emptyTitle": "Nothing here",
+      "clearSelection": "Clear selection",
+      "row": {
+        "select": "Select {title}",
+        "facts": "{files, plural, one {# file} other {# files}}; {chapters, plural, =0 {no chapters} one {# chapter} other {# chapters}}; {library}",
+        "files": "{count, plural, one {# file} other {# files}}",
+        "chapters": "{count, plural, =0 {no chapters} one {# chapter} other {# chapters}}",
+        "noAsin": "No ASIN",
+        "review": "Review",
+        "dismiss": "Dismiss"
+      },
+      "reasons": {
+        "runtime_mismatch": "Audible's runtime differs from your files by {seconds} s.",
+        "runtime_mismatch_long": "Audible's runtime differs from your files by {duration}, so it is probably a different edition.",
+        "runtime_unknown": "Audible does not list a runtime for this book, so its timings could not be checked against your files.",
+        "not_exact": "Audible does not mark these timings as exact.",
+        "implausible": "Audible's list does not look like chapters for this book.",
+        "unknown_length": "This book's length is unknown.",
+        "locked": "This book's chapters are protected, so nothing was replaced."
+      },
+      "lookup": {
+        "title": "Find chapters on Audible",
+        "description": "Looks up each book that has an Audible ASIN. When Audible marks its timings exact and its runtime matches your files, the chapters are applied and protected, and the old list stays in the book's history. Everything else waits under Needs review.",
+        "lookUpCategory": "{count, plural, =0 {No book here has an ASIN} one {Look up the # book with an ASIN} other {Look up the # books with an ASIN}}",
+        "lookUpSelected": "{count, plural, one {Look up # selected book} other {Look up # selected books}}",
+        "waiting": "{count, plural, =0 {Finishing up} one {# book waiting} other {# books waiting}}",
+        "current": "Looking up {title}",
+        "idle": "No lookups waiting.",
+        "finished": "Finished: {applied} applied, {review} to review, {notFound} not found, {failed} failed",
+        "stop": "Stop",
+        "clear": "Clear",
+        "queued": "{count, plural, =0 {No book was queued} one {# book queued} other {# books queued}}",
+        "queuedWithSkipped": "{count, plural, =0 {No book was queued} one {# book queued} other {# books queued}}; {skipped, plural, one {# had no ASIN} other {# had no ASIN}}"
+      },
+      "errors": {
+        "load": "Chapter health could not be loaded.",
+        "enqueue": "The lookups could not be queued.",
+        "cancel": "The lookups could not be changed.",
+        "dismiss": "The review could not be dismissed."
+      }
     }
   },
   "views": {
@@ -12960,6 +14341,7 @@
         "editMetadata": "Edit Metadata · {base}",
         "edit": "Edit · {base}",
         "files": "Files · {base}",
+        "chapters": "Chapters · {base}",
         "readingLog": "Reading Log · {base}",
         "highlights": "Highlights · {base}"
       }
@@ -14040,7 +15422,9 @@
     "bookRequests": "Requests",
     "bookRequestDetail": "Request",
     "bookRequestReleases": "Pick a release",
-    "tts": "Text-to-Speech"
+    "tts": "Text-to-Speech",
+    "chapterHealth": "Chapter Health",
+    "readingHistory": "Reading History"
   },
   "tts": {
     "readerControls": {

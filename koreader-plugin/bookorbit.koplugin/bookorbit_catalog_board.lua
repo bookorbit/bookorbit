@@ -24,6 +24,7 @@ local logger = require("logger")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
+local BoardColour = require("bookorbit_board_colour")
 local BoardData = require("bookorbit_board_data")
 local BoardEdit = require("bookorbit_board_edit")
 local BoardLayout = require("bookorbit_board_layout")
@@ -158,10 +159,15 @@ function CatalogBoard:boardHeader(d, w, mode, page_name)
         local done_inner = hstack({ h = px(40) }, { space(px(20), 1), text(_("Done"), { s = 15, b = true, col = INK.white }), space(px(20), 1) })
         local done = BoardUI.hit(BoardUI.box({ w = done_inner:getSize().w, h = px(40), radius = px(20), bg = INK.black }, done_inner), { kind = "edit-done" })
         local tw = w - done:getSize().w - px(12)
+        local edit_page = self.board_edit and self.board_edit.pages[self:boardPage()]
+        local hidden = edit_page and edit_page.hidden and #edit_page.hidden or 0
+        local hint = hidden > 0
+            and T(_.ngettext("%1 widget does not fit at this interface size", "%1 widgets do not fit at this interface size", hidden), hidden)
+            or _("Tap a widget to move, resize or remove it")
         return hstack({ w = w, h = px(64) }, {
             vstack({ w = tw }, {
                 text(T(_("Edit %1"), page_name), { s = 22, b = true, w = tw }),
-                text(_("Tap a widget to move, resize or remove it"), { s = 13, col = INK.g4, w = tw }),
+                text(hint, { s = 13, col = INK.g4, w = tw }),
             }),
             space(px(12), 1),
             done,
@@ -172,15 +178,23 @@ function CatalogBoard:boardHeader(d, w, mode, page_name)
     local menu = iconButton("menu", { kind = "menu" })
     local right_w = status:getSize().w + px(6) + 2 * box - tap_pad
     local tw = w - right_w
-    local sub
+    local function fits(parts) return runs(parts, { s = 13 }):getSize().w <= tw end
+    local parts
     if d.online or not d.stale then
-        sub = runs({ { t = d.date_long } }, { s = 13, col = INK.g4, w = tw })
+        parts = { { t = d.date_long } }
     else
-        sub = runs({ { t = d.date_long .. " · " }, { t = _("Offline"), b = true, col = INK.black },
-            { t = d.updated and (", " .. T(_("saved %1"), d.updated)) or "" } }, { s = 13, col = INK.g4, w = tw })
+        -- Offline: the date gives way first, then when it was saved.
+        local offline = { t = _("Offline"), b = true, col = INK.black }
+        local saved = { t = d.updated and (", " .. T(_("saved %1"), d.updated)) or "" }
+        parts = { { t = d.date_long .. " · " }, offline, saved }
+        if not fits(parts) then parts = { offline, saved } end
+        if not fits(parts) then parts = { offline } end
     end
+    local sub = runs(parts, { s = 13, col = INK.g4, w = tw })
+    -- A long greeting steps down to 18 before it is cut.
+    local greet_s = BoardUI.fitSize(d.greeting, { s = 22, b = true }, tw, 18)
     return hstack({ w = w + tap_pad, h = px(64) }, {
-        vstack({ w = tw }, { text(d.greeting, { s = 22, b = true, w = tw }), sub }),
+        vstack({ w = tw }, { text(d.greeting, { s = greet_s, b = true, w = tw }), sub }),
         status,
         space(px(6), 1),
         search,
@@ -190,7 +204,7 @@ end
 
 function CatalogBoard:boardFooter(w, page, mode)
     local fh = px(40)
-    local names = self:boardPageNames(self._board_geometry and self._board_geometry.cols or BoardLayout.columnsFor(BoardMetrics.get().W))
+    local names = self:boardPageNames(self._board_geometry and self._board_geometry.cols or BoardLayout.columnsFor(BoardMetrics.layoutW()))
     local function chev(name, enabled, delta)
         local btn = hstack({ w = px(44), h = fh }, { flex(0), icon(name, px(20), { sw = 2.5, col = enabled and "black" or "gb" }), flex(0) })
         return BoardUI.hit(btn, enabled and { kind = "page", delta = delta } or { kind = "noop" })
@@ -271,7 +285,13 @@ end
 function CatalogBoard:boardRegion(build, action)
     local widget, hits = BoardUI.collectHits(build)
     local size = widget:getSize()
-    return BoardTile:new{ dimen = Geom:new{ w = size.w, h = size.h }, item = { action = action }, menu = self, hits = hits, widget }
+    return BoardTile:new{
+        dimen = Geom:new{ w = size.w, h = size.h },
+        item = { action = action },
+        menu = self,
+        hits = hits,
+        CatalogWidgets.focusable(widget),
+    }
 end
 
 -- ---------------------------------------------------------- edit overlays
@@ -348,7 +368,7 @@ function CatalogBoard:boardPreview(ctx, entry, box_w, box_h, g)
     local item = { type = entry.type, cw = cw, rh = rh, chrome = entry.chrome or "line", props = entry.props }
     local key = "preview:" .. entry.type .. ":" .. tostring(entry.props and (entry.props.source or entry.props.link or entry.props.animal) or "") .. ":" .. pw .. "x" .. ph .. ":" .. sw
     local shot = BoardUI.snapshot(key, pw, ph, sw, sh, function()
-        return BoardWidgets.tile({ d = ctx.d, tiles = "outline", menu = self }, item, pw, ph)
+        return BoardWidgets.tile({ d = ctx.d, tiles = "outline", colour = ctx.colour, menu = self }, item, pw, ph)
     end)
     return BoardUI.box({ w = box_w, h = box_h, radius = px(12), bg = INK.ge }, hstack({ w = box_w, h = box_h }, { flex(0), shot, flex(0) }))
 end
@@ -373,14 +393,15 @@ function CatalogBoard:boardSheet(ctx, g, screen_w, screen_h)
         }), { kind = "sheet-tab", tab = tab.id }))
     end
     local tab_row = vstack({ w = w }, {
-        hstack({ w = w, h = px(40), gap = px(BoardMetrics.get().W < 560 and 16 or 22), valign = "bottom" }, tabs),
+        hstack({ w = w, h = px(40), gap = px(BoardMetrics.layoutW() < 560 and 16 or 22), valign = "bottom" }, tabs),
         BoardUI.rect(w, math.max(1, px(1)), INK.gb),
     })
-    local cols_n = BoardMetrics.get().W >= 700 and 3 or 2
+    local cols_n = BoardMetrics.layoutW() >= 700 and 3 or 2
     local gap = px(14)
     local card_w = math.floor((w - (cols_n - 1) * gap) / cols_n)
-    local preview_h = px(122)
-    local function card(entry)
+    local preview_h
+    local stacked = false
+    local function caption(entry)
         local chips = {}
         for _i, code in ipairs(entry.sizes) do
             local label = text(sizeLabel(code), { s = 11, b = true, col = INK.g3 })
@@ -388,21 +409,57 @@ function CatalogBoard:boardSheet(ctx, g, screen_w, screen_h)
                 hstack({ w = label:getSize().w + 2 * px(5) - 2 * math.max(1, px(1)) }, { flex(0), label, flex(0) })))
         end
         local chip_row = hstack({ gap = px(4) }, chips)
-        local name = text(entry.name(), { s = 14, b = true, w = card_w - chip_row:getSize().w - px(6) })
-        return BoardUI.hit(vstack({ w = card_w }, {
-            self:boardPreview(ctx, entry, card_w, preview_h, g),
+        local name_w = card_w - chip_row:getSize().w - px(6)
+        local name_s = BoardUI.fitSize(entry.name(), { s = 14, b = true }, name_w, 12)
+        -- A name that does not fit beside its sizes even at 12 takes the
+        -- line, with the sizes under it, and then so does every name so the
+        -- cards line up on every tab.
+        if text(entry.name(), { s = name_s, b = true }):getSize().w > name_w then stacked = true end
+        local name_row
+        if not stacked then
+            name_row = BoardUI.spread(card_w, text(entry.name(), { s = name_s, b = true, w = name_w }), chip_row)
+        else
+            local s2 = BoardUI.fitSize(entry.name(), { s = 14, b = true }, card_w, 11)
+            name_row = vstack({ w = card_w }, { text(entry.name(), { s = s2, b = true, w = card_w }), space(nil, px(4)), chip_row })
+        end
+        return vstack({ w = card_w }, {
             space(nil, px(6)),
-            BoardUI.spread(card_w, name, chip_row),
+            name_row,
             space(nil, px(6)),
             text(entry.desc(), { s = 12, col = INK.g4, lines = 2, w = card_w }),
+        })
+    end
+    local function card(entry)
+        return BoardUI.hit(vstack({ w = card_w }, {
+            self:boardPreview(ctx, entry, card_w, preview_h, g),
+            caption(entry),
         }), { kind = "sheet-add", entry = entry })
     end
     local head_h = pad + lh1(20) + lh1(13) + px(10) + px(40) + math.max(1, px(1)) + px(16)
     local pager_h = px(52)
-    local sample = card(entries[1] or BoardEdit.LIBRARY[1])
-    local card_h = sample:getSize().h
+    -- Rows are as tall as their tallest caption (a description can take two
+    -- lines). Every widget's caption is measured, not just this tab's, so
+    -- each tab keeps the same rows and cards per page.
+    local text_h = 0
+    local measured = BoardEdit.LIBRARY
+    for _i, entry in ipairs(measured) do
+        local sample = caption(entry)
+        if sample.free then sample:free() end
+    end
+    for _i, entry in ipairs(measured) do
+        local sample = caption(entry)
+        text_h = math.max(text_h, sample:getSize().h)
+        if sample.free then sample:free() end
+    end
     local vgap = px(16)
-    local rows_fit = math.max(1, math.floor((sheet_h - head_h - pager_h + vgap) / (card_h + vgap)))
+    -- As many rows as fit with previews at least 80dp tall, the previews then
+    -- grown to fill the sheet (up to a little taller than a card is wide), so
+    -- a larger interface size leaves no band of empty sheet under the last
+    -- row.
+    local grid_h = sheet_h - head_h - pager_h
+    local rows_fit = math.max(1, math.floor((grid_h + vgap) / (px(80) + text_h + vgap)))
+    local preview_max = math.max(px(150), math.floor(card_w * 1.2))
+    preview_h = math.max(px(64), math.min(preview_max, math.floor((grid_h + vgap) / rows_fit - vgap - text_h)))
     local per_page = rows_fit * cols_n
     local pages = math.max(1, math.ceil(#entries / per_page))
     edit.sheet_page = math.min(edit.sheet_page or 1, pages)
@@ -476,10 +533,18 @@ function CatalogBoard:boardBuildStarter(ctx, g, screen_w, screen_h)
         text(_("Pick a starting layout. Each comes with four pages, Home, Insights, Library and Decor, that you can change any time: hold a widget to edit it."),
             { s = 14, col = INK.g3, lines = 3, w = w }),
     })
-    local gap = px(BoardMetrics.get().W < 560 and 10 or 16)
+    local gap = px(BoardMetrics.layoutW() < 560 and 10 or 16)
     local card_w = math.floor((w - 2 * gap) / 3)
     local btn_h = px(48)
-    local text_h = px(10) + lh1(16) + px(2) + 3 * BoardMetrics.lh(12) + px(8)
+    -- The descriptions take the lines the longest needs on these cards (a
+    -- phone at a large interface size needs four).
+    local desc_lines = 3
+    for _i, info in ipairs(PRESET_INFO) do
+        local tb = require("ui/widget/textboxwidget"):new{ text = info.desc(), face = BoardMetrics.face(12), width = card_w - 2 * px(8) }
+        desc_lines = math.max(desc_lines, math.min(5, math.floor(tb:getSize().h / BoardMetrics.lh(12) + 0.5)))
+        tb:free()
+    end
+    local text_h = px(10) + lh1(16) + px(2) + desc_lines * BoardMetrics.lh(12) + px(8)
     local avail_prev = screen_h - top - head:getSize().h - px(24) - text_h - px(24) - btn_h - px(24)
     local scale = math.min((card_w - px(16)) / screen_w, avail_prev / screen_h)
     local pw, ph = math.floor(screen_w * scale + 0.5), math.floor(screen_h * scale + 0.5)
@@ -508,7 +573,7 @@ function CatalogBoard:boardBuildStarter(ctx, g, screen_w, screen_h)
             space(nil, px(10)),
             hstack({ w = iw, gap = px(8) }, { radio, text(info.name(), { s = 16, b = true, w = iw - px(20) - px(8) }) }),
             space(nil, px(2)),
-            text(info.desc(), { s = 12, col = INK.g4, lines = 3, w = iw }),
+            text(info.desc(), { s = 12, col = INK.g4, lines = desc_lines, w = iw }),
             space(nil, px(8)),
         })
         local size = inner:getSize()
@@ -517,7 +582,8 @@ function CatalogBoard:boardBuildStarter(ctx, g, screen_w, screen_h)
             { widget = inner },
             { widget = BoardUI.box({ w = card_w, h = size.h, radius = px(12), border = sel and px(2.5) or math.max(1, px(1)), border_col = sel and INK.black or INK.gb }) },
         })
-        table.insert(cards, BoardUI.hit(card_box, { kind = "starter-pick", preset = info.id }))
+        table.insert(cards, self:boardRegion(function() return card_box end,
+            { kind = "starter-pick", preset = info.id }))
     end
     local cards_row = hstack({ gap = gap, valign = "top" }, cards)
     local strip_label_h = lh1(13) + px(8)
@@ -548,9 +614,11 @@ function CatalogBoard:boardBuildStarter(ctx, g, screen_w, screen_h)
     end
     local btn_label = text(T(_("Start with %1"), selected_name), { s = 16, b = true, col = INK.white })
     local btn_w = btn_label:getSize().w + 2 * px(28)
-    local button = BoardUI.hit(BoardUI.box({ w = btn_w, h = btn_h, radius = math.floor(btn_h / 2), bg = INK.black },
-        hstack({ w = btn_w, h = btn_h }, { flex(0), btn_label, flex(0) })), { kind = "starter-start", preset = choice })
-    return vstack({ w = screen_w, h = screen_h, pad = { top, mx, top, mx } }, {
+    local button = self:boardRegion(function()
+        return BoardUI.box({ w = btn_w, h = btn_h, radius = math.floor(btn_h / 2), bg = INK.black },
+            hstack({ w = btn_w, h = btn_h }, { flex(0), btn_label, flex(0) }))
+    end, { kind = "starter-start", preset = choice })
+    local screen = vstack({ w = screen_w, h = screen_h, pad = { top, mx, top, mx } }, {
         head,
         space(nil, px(24)),
         cards_row,
@@ -559,6 +627,7 @@ function CatalogBoard:boardBuildStarter(ctx, g, screen_w, screen_h)
         strip and flex(px(16)) or false,
         hstack({ w = w }, { flex(0), button, flex(0) }),
     })
+    return screen, { cards, { button } }
 end
 
 -- ------------------------------------------------------------ the board
@@ -616,7 +685,9 @@ function CatalogBoard:boardBuildScreen(ctx, g, page, screen_w, screen_h, opts)
             end, { kind = "edit-remove", index = entry.item.index })
             table.insert(layers, { widget = b, x = entry.x - px(7), y = entry.y - px(7) })
         end
-        if selected then
+        -- The Add widget sheet covers the bottom of the board; the bar for the
+        -- selected widget comes back when it closes.
+        if selected and not edit.sheet then
             local bar = self:boardRegion(function() return self:boardEditBar(selected.item, selected.index, g) end, { kind = "noop" })
             local bw, bh = bar:getSize().w, bar:getSize().h
             local left = math.max(0, math.min(g.w - bw, selected.x + math.floor((selected.w - bw) / 2)))
@@ -660,20 +731,19 @@ function CatalogBoard:updateDashboardItems(select_number, no_recalculate_dimen)
     local m = BoardMetrics.get()
     local screen_w = self.inner_dimen.w
     local screen_h = self.available_height
-    local g = BoardLayout.geometry(px, screen_w, screen_h, m.W)
+    local g = BoardLayout.geometry(px, screen_w, screen_h, m.LW)
     local page = self:boardPage()
     local d = BoardData.build(self, context, os.time())
     local state = BoardStore.read(self.settings)
-    local ctx = { d = d, tiles = state.tiles, menu = self, tap_resumes = self.settings.catalog_dashboard_tap_resumes ~= false }
+    local ctx = { d = d, tiles = state.tiles, colour = state.colour, menu = self, tap_resumes = self.settings.catalog_dashboard_tap_resumes ~= false }
     self._board_ctx = ctx
     self._board_geometry = g
     local t_data = PROFILE and os.clock()
 
     local screen, rows, packed
     if self:boardShowStarter(state, context) then
-        screen = self:boardRegion(function() return self:boardBuildStarter(ctx, g, screen_w, screen_h) end)
+        screen, rows = self:boardBuildStarter(ctx, g, screen_w, screen_h)
         self._board_tiles, self._board_header = {}, nil
-        rows = { { screen } }
     else
         BoardUI.clearSnapshots("starter:")
         screen, rows, packed = self:boardBuildScreen(ctx, g, page, screen_w, screen_h)
@@ -710,19 +780,49 @@ function CatalogBoard:updateDashboardItems(select_number, no_recalculate_dimen)
     if packed then self:boardDump(d, page) end
     self:boardScheduleClock()
     self:finishCustomUpdate(old_dimen, select_number)
+    self:boardRefreshPets()
+end
+
+-- A colour screen shows colour only through a dithered refresh (on Kaleido,
+-- its colour waveform), and the board's own "ui" refresh is not one. With the
+-- Colour setting on, the whole board gets one; with it off, only the pets,
+-- which are colour pictures, get their own.
+function CatalogBoard:boardRefreshPets()
+    if not Screen:isColorEnabled() then return end
+    if BoardColour.on(self._board_ctx) then
+        UIManager:setDirty(nil, function()
+            if self.dimen and self.dimen.x then return "partial", self.dimen, true end
+        end)
+        return
+    end
+    for _i, entry in ipairs(self._board_tiles or {}) do
+        if entry.item.type == "buddy" then
+            local tile = entry.tile
+            UIManager:setDirty(nil, function()
+                if tile.dimen and tile.dimen.x then return "partial", tile.dimen, true end
+            end)
+        end
+    end
 end
 
 -- Repaints one tile in place: rebuilds its content and refreshes only its
--- rectangle, so a stepper or a hero page does not flash the whole board.
-function CatalogBoard:boardRefreshTile(entry, mode)
+-- rectangle, so a stepper or a hero page does not flash the whole board. A
+-- coloured board's tiles keep their colours through the dithered refresh.
+function CatalogBoard:boardRefreshTile(entry, mode, dither)
     if not entry or not self._board_ctx then return end
+    -- The digital clock is black and white unless tiles are tinted, so its
+    -- minute stays on the fast refresh.
+    local plain_clock = entry.item.type == "clock" and not BoardColour.tinted(self._board_ctx)
+    if BoardColour.on(self._board_ctx) and not plain_clock and (mode == nil or mode == "ui" or mode == "fast") then
+        mode, dither = "partial", true
+    end
     self._board_ctx.d = BoardData.build(self, self.current_context or {}, os.time())
     local fresh = self:boardBuildTile(self._board_ctx, entry.item, entry.w, entry.h)
     entry.tile[1] = fresh[1]
     entry.tile.hits = fresh.hits
     local dimen = entry.tile.dimen
     if dimen and dimen.x then
-        UIManager:setDirty(self.show_parent, function() return mode or "ui", dimen end)
+        UIManager:setDirty(self.show_parent, function() return mode or "ui", dimen, dither end)
     else
         self:updateItems(nil, true)
     end
@@ -762,7 +862,12 @@ function CatalogBoard:boardRefreshClock()
         local t = entry.item.type
         -- The buddy yawns at night and the moon moves on: both change at most
         -- by the hour, so they are redrawn only when one turns.
-        if t == "clock" or t == "analog" or (new_hour and (t == "buddy" or t == "moon")) then
+        if new_hour and t == "buddy" then
+            -- "fast" is black and white only: a shaded pet needs its greys, or
+            -- its colours through the dithered colour refresh.
+            local colour = Screen:isColorEnabled()
+            self:boardRefreshTile(entry, colour and "partial" or "ui", colour or nil)
+        elseif t == "clock" or t == "analog" or (new_hour and t == "moon") then
             self:boardRefreshTile(entry, "fast")
         end
     end
@@ -957,7 +1062,7 @@ end
 -- what some widget will draw.
 function CatalogBoard:boardSources()
     local m = BoardMetrics.get()
-    local cols = BoardLayout.columnsFor(m.W)
+    local cols = BoardLayout.columnsFor(m.LW)
     local sources, names = {}, {}
     local all_pages = {}
     for _i, page in ipairs(self:boardPages(cols)) do table.insert(all_pages, page) end

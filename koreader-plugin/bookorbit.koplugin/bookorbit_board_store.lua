@@ -15,11 +15,13 @@ layout; until then the starter pages are computed fresh, so new widgets and
 device differences (a frontlight or not) apply without a migration.
 
 Stored under catalog_board, keyed by column count plus "l" in landscape:
-  { version = 1, preset = "reader", tiles = "outline", started = true,
+  { version = 1, preset = "reader", tiles = "outline", colour = "accents", started = true,
     custom = { ["4"] = { pages = { { items = {...} }, ... } }, ["4l"] = ... } }
 ]]
 
 local _ = require("gettext")
+
+local BoardColour = require("bookorbit_board_colour")
 
 local BoardStore = {}
 
@@ -27,6 +29,7 @@ BoardStore.SETTING_KEY = "catalog_board"
 BoardStore.VERSION = 1
 BoardStore.PRESETS = { "reader", "stats", "library" }
 BoardStore.TILE_STYLES = { "outline", "soft", "ink" }
+BoardStore.COLOURS = BoardColour.SCHEMES
 BoardStore.PAGE_COUNT = 4
 BoardStore.PAGE_IDS = { "home", "insights", "library", "decor" }
 
@@ -163,12 +166,13 @@ end
 local function readState(settings)
     local stored = settings and settings[BoardStore.SETTING_KEY]
     if type(stored) ~= "table" or stored.version ~= BoardStore.VERSION then
-        return { version = BoardStore.VERSION, preset = "reader", tiles = "outline", started = false, custom = {} }
+        return { version = BoardStore.VERSION, preset = "reader", tiles = "outline", colour = BoardColour.DEFAULT, started = false, custom = {} }
     end
     local state = {
         version = BoardStore.VERSION,
         preset = stored.preset,
         tiles = stored.tiles,
+        colour = BoardColour.normalize(stored.colour),
         started = stored.started == true,
         custom = type(stored.custom) == "table" and stored.custom or {},
     }
@@ -250,6 +254,12 @@ end
 function BoardStore.withTiles(settings, tiles)
     local state = readState(settings)
     state.tiles = tiles
+    return state
+end
+
+function BoardStore.withColour(settings, colour)
+    local state = readState(settings)
+    state.colour = BoardColour.normalize(colour)
     return state
 end
 

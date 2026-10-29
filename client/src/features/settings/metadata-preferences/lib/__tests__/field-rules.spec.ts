@@ -100,8 +100,22 @@ describe('skipReasonFor', () => {
 })
 
 describe('isProviderUsable', () => {
-  it('treats a provider with no status entry as usable so it stays removable', () => {
-    expect(isProviderUsable(key('unknownProvider'), STATUSES)).toBe(true)
+  it('treats a built-in with no status entry as usable, since that is stale data', () => {
+    expect(isProviderUsable(key('openLibrary'), [])).toBe(true)
+  })
+
+  it('treats a removed external provider as skipped, the way the server does', () => {
+    expect(isProviderUsable(key('fantlab'), STATUSES)).toBe(false)
+    expect(skippedProviders([key('fantlab')], STATUSES)).toEqual(['fantlab'])
+  })
+
+  it("reads an external provider's own declared fields", () => {
+    const statuses = [
+      ...STATUSES,
+      { key: key('fantlab'), label: 'FantLab', enabled: true, configured: true, source: 'external' as const, supportedFields: ['title' as const] },
+    ]
+    expect(isProviderUsable(key('fantlab'), statuses, 'title')).toBe(true)
+    expect(isProviderUsable(key('fantlab'), statuses, 'narrators')).toBe(false)
   })
 
   it('rejects a disabled or unconfigured provider', () => {

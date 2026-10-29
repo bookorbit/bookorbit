@@ -355,6 +355,21 @@ jobs:
             type=gha,scope=container-image-yml-amd64
             type=gha,scope=container-image-yml-arm64
 
+      - name: Build and push read-aloud worker image
+        id: build-read-aloud-worker
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./workers/read-aloud/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:latest
+          build-args: APP_VERSION=v${{ needs.release.outputs.version }}
+          cache-from: type=gha,scope=release-read-aloud-worker
+          cache-to: type=gha,mode=max,scope=release-read-aloud-worker
+
       - name: Enrich release notes
         shell: bash
         env:
@@ -407,3 +422,4 @@ jobs:
           echo "- **Version:** \`${VERSION}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Tags:** \`${VERSION}\`, \`latest\` (linux/amd64, linux/arm64)" >> "$GITHUB_STEP_SUMMARY"
           echo "- **APP_VERSION baked:** \`v${VERSION}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Read-aloud worker:** \`${VERSION}\`, \`latest\` (linux/amd64, linux/arm64)" >> "$GITHUB_STEP_SUMMARY"

@@ -1,3 +1,4 @@
+import { finishedReadScope } from '../user-book-status/finished-read-scope';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -232,14 +233,14 @@ export class UserStatisticsRepository {
         count: sql<number>`count(*)::int`,
       })
       .from(readingAttempts)
-      .innerJoin(books, eq(books.id, readingAttempts.bookId))
+      .leftJoin(books, eq(books.id, readingAttempts.bookId))
       .where(
         and(
           eq(readingAttempts.userId, userId),
           eq(readingAttempts.outcome, 'completed'),
           isNotNull(readingAttempts.endedOn),
           isNull(readingAttempts.deletedAt),
-          this.libraryFilter(libraryIds),
+          finishedReadScope(libraryIds),
         ),
       )
       .groupBy(yearExpr, monthExpr)
@@ -836,7 +837,7 @@ export class UserStatisticsRepository {
     days = 1825,
   ): Promise<UserCompletionTimelinePoint[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
+    const libraryIds = this.intersectLibraryIds(accessible, filterLibraryIds);
     const since = this.formatDayKey(this.sinceDateForDays(days));
     const yearExpr = sql<number>`extract(year from ${readingAttempts.endedOn})::int`;
     const monthExpr = sql<number>`extract(month from ${readingAttempts.endedOn})::int`;
@@ -848,7 +849,7 @@ export class UserStatisticsRepository {
         count: sql<number>`count(*)::int`,
       })
       .from(readingAttempts)
-      .innerJoin(books, eq(books.id, readingAttempts.bookId))
+      .leftJoin(books, eq(books.id, readingAttempts.bookId))
       .where(
         and(
           eq(readingAttempts.userId, userId),
@@ -856,7 +857,7 @@ export class UserStatisticsRepository {
           isNotNull(readingAttempts.endedOn),
           isNull(readingAttempts.deletedAt),
           gte(readingAttempts.endedOn, since),
-          libraryFilter,
+          finishedReadScope(libraryIds),
         ),
       )
       .groupBy(yearExpr, monthExpr)

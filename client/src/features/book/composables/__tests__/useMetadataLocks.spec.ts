@@ -174,6 +174,36 @@ describe('useMetadataLocks', () => {
     expect(locksDirty.value).toBe(false)
   })
 
+  it('writes staged lock changes at once when asked, even in deferred mode', async () => {
+    const { load, toggle, persist, lockedFields, locksDirty } = useMetadataLocks({ deferred: true })
+    load(makeBook())
+    await toggle(1, 'cover')
+    apiMock.mockResolvedValueOnce({ ok: true, json: async () => makeBook({ lockedFields: ['cover'] }) })
+
+    const result = await persist(1)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/books/1/metadata-locks',
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ lockedFields: ['cover'] }) }),
+    )
+    expect(result?.lockedFields).toEqual(['cover'])
+    expect(lockedFields.value).toEqual(['cover'])
+    expect(locksDirty.value).toBe(false)
+  })
+
+  it('keeps staged lock changes when writing them at once fails', async () => {
+    const { load, toggle, persist, lockedFields, locksDirty, error } = useMetadataLocks({ deferred: true })
+    load(makeBook())
+    await toggle(1, 'cover')
+    apiMock.mockResolvedValueOnce({ ok: false, status: 500 })
+
+    expect(await persist(1)).toBeNull()
+
+    expect(error.value).toBe('HTTP 500')
+    expect(lockedFields.value).toEqual(['cover'])
+    expect(locksDirty.value).toBe(true)
+  })
+
   it('marks deferred lock changes as persisted after a successful combined save', async () => {
     const { load, toggle, markPersisted, lockedFields, locksDirty } = useMetadataLocks({ deferred: true })
     load(makeBook())

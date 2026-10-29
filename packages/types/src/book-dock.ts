@@ -65,6 +65,8 @@ export interface BookDockMetadata {
   ranobedbId?: string | null;
   lubimyczytacId?: string | null;
   aladinId?: string | null;
+  /** Ids from external providers, keyed by provider. Absent on older servers. */
+  externalProviderIds?: Partial<Record<string, string>> | null;
   comicMetadata?: ComicMetadataFields | null;
 }
 

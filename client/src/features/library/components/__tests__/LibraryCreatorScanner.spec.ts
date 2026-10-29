@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import { BOOK_FORMATS } from '@bookorbit/types'
+import { BOOK_FORMATS, FOLDER_SERIES_REGEX_METADATA } from '@bookorbit/types'
 
 import LibraryCreatorScanner from '../LibraryCreatorScanner.vue'
 
@@ -119,5 +119,102 @@ describe('LibraryCreatorScanner', () => {
     expect(wrapper.emitted('update:addedAtSource')).toEqual([['file_modified']])
     expect(wrapper.get('[role="status"]').text()).toContain('1 failed')
     wrapper.unmount()
+  })
+
+  it('offers series folders as a third layout that sets File as Book with folders as series', async () => {
+    const wrapper = mountScanner()
+    const layouts = wrapper.findAll('input[name="organization-mode"]').map((input) => (input.element as HTMLInputElement).value)
+    expect(layouts).toEqual(['book_per_folder', 'book_per_file', 'series_folders'])
+    expect(wrapper.text()).toContain('Uses File as Book')
+
+    await wrapper.get('input[name="organization-mode"][value="series_folders"]').setValue()
+
+    expect(wrapper.emitted('update:organizationMode')).toEqual([['book_per_file']])
+    expect(wrapper.emitted('update:regexMetadata')).toEqual([[FOLDER_SERIES_REGEX_METADATA]])
+  })
+
+  it('shows series folders as the chosen layout while File as Book uses the folder rules', async () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', regexMetadata: FOLDER_SERIES_REGEX_METADATA })
+    const checked = wrapper.get('input[name="organization-mode"]:checked').element as HTMLInputElement
+    expect(checked.value).toBe('series_folders')
+
+    await wrapper.get('input[name="organization-mode"][value="book_per_file"]').setValue()
+
+    expect(wrapper.emitted('update:organizationMode')).toBeUndefined()
+    expect(wrapper.emitted('update:regexMetadata')).toEqual([[null]])
+  })
+
+  it('drops the folder rules when switching to Folder as Book, where the folder is the book', async () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', regexMetadata: FOLDER_SERIES_REGEX_METADATA })
+
+    await wrapper.get('input[name="organization-mode"][value="book_per_folder"]').setValue()
+
+    expect(wrapper.emitted('update:organizationMode')).toEqual([['book_per_folder']])
+    expect(wrapper.emitted('update:regexMetadata')).toEqual([[null]])
+  })
+
+  it('keeps custom path rules when switching between book layouts', async () => {
+    const custom = { rules: [{ pattern: '(?<series>[^/]+)/', flags: '' }] }
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', regexMetadata: custom })
+
+    await wrapper.get('input[name="organization-mode"][value="book_per_folder"]').setValue()
+
+    expect(wrapper.emitted('update:regexMetadata')).toBeUndefined()
+  })
+
+  it('offers folders as series, in its own card, only when every file is its own book', async () => {
+    expect(mountScanner().find('#series-card-title').exists()).toBe(false)
+
+    const wrapper = mountScanner({ organizationMode: 'book_per_file' })
+    const toggle = wrapper.get('[aria-labelledby="folder-series-title"]')
+    expect(wrapper.get('#series-card-title').text()).toBe('Series')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+    expect(wrapper.text()).toContain('so each folder names the series of the files inside it')
+
+    await toggle.trigger('click')
+
+    expect(wrapper.emitted('update:regexMetadata')).toEqual([[FOLDER_SERIES_REGEX_METADATA]])
+  })
+
+  it('shows the series-folder layout in the Series card once the library exists, and turns it off', async () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', organizationModeLocked: true, regexMetadata: FOLDER_SERIES_REGEX_METADATA })
+    const card = wrapper.get('#series-card-title').element.closest('section')!
+    const toggle = wrapper.get('[aria-labelledby="folder-series-title"]')
+
+    expect(toggle.attributes('aria-checked')).toBe('true')
+    expect(card.textContent).toContain('Saga #01.cbz')
+    expect(wrapper.text()).toContain('Each folder becomes a series')
+    expect(wrapper.text()).toContain('Books already in this library get these series')
+
+    await toggle.trigger('click')
+    expect(wrapper.emitted('update:regexMetadata')).toEqual([[null]])
+  })
+
+  it('describes File as Book as covering series folders once the library exists', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', organizationModeLocked: true })
+
+    expect(wrapper.text()).toContain('Best for comics and manga kept in one folder per series')
+  })
+
+  it('warns that turning folders as series on replaces custom path rules', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', regexMetadata: { rules: [{ pattern: '(?<series>[^/]+)/', flags: '' }] } })
+
+    expect(wrapper.get('[aria-labelledby="folder-series-title"]').attributes('aria-checked')).toBe('false')
+    expect(wrapper.text()).toContain('replaces the path rules set under Metadata')
+  })
+
+  it('keeps the custom rules that Series folders replaced and brings them back when it is left', async () => {
+    const custom = { rules: [{ pattern: '(?<series>[^/]+)/', flags: '' }] }
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', regexMetadata: custom })
+
+    await wrapper.get('input[name="organization-mode"][value="series_folders"]').setValue()
+    expect(wrapper.emitted('update:replacedRegexMetadata')).toEqual([[custom]])
+    expect(wrapper.emitted('update:regexMetadata')).toEqual([[FOLDER_SERIES_REGEX_METADATA]])
+
+    await wrapper.setProps({ regexMetadata: FOLDER_SERIES_REGEX_METADATA, replacedRegexMetadata: custom })
+    await wrapper.get('[aria-labelledby="folder-series-title"]').trigger('click')
+
+    expect(wrapper.emitted('update:regexMetadata')![1]).toEqual([custom])
+    expect(wrapper.emitted('update:replacedRegexMetadata')![1]).toEqual([null])
   })
 })

@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  CircleAlert,
   CircleCheck,
   CircleMinus,
   Download,
@@ -179,17 +180,29 @@ const {
   resetSearchEditorState,
 } = useReleaseSearchEditor({ request, criteria, attempts, requestId, fetchReleases, beforeSearch: startFreshSearch })
 
-const { manualOpen, grabbing, holdForReview, openManual, closeManual, forgetRefusals, handleGrab, handleManualGrab, isRefused, refusalText } =
-  useReleaseGrab({
-    request,
-    requestId,
-    grab: actions.grab,
-    setRequest,
-    inspectRelease,
-    setFilesExpanded,
-    deliveryFor,
-    afterGrab,
-  })
+const {
+  manualOpen,
+  grabbing,
+  holdForReview,
+  clientProblem,
+  openManual,
+  closeManual,
+  forgetRefusals,
+  handleGrab,
+  handleManualGrab,
+  retryClient,
+  isRefused,
+  refusalText,
+} = useReleaseGrab({
+  request,
+  requestId,
+  grab: actions.grab,
+  setRequest,
+  inspectRelease,
+  setFilesExpanded,
+  deliveryFor,
+  afterGrab,
+})
 
 /**
  * Every Send is off while one release is on its way, not only the row being inspected. The
@@ -197,6 +210,20 @@ const { manualOpen, grabbing, holdForReview, openManual, closeManual, forgetRefu
  * request, so `actions` has nothing to be busy about yet.
  */
 const busy = computed(() => grabbing.value || actions.isPending(request.value?.id))
+const clientProblemTitle = computed(() => {
+  const problem = clientProblem.value
+  if (!problem) return ''
+  const kind = problem.code === 'GRAB_CLIENT_UNAVAILABLE' ? 'unavailable' : 'refused'
+  return problem.client
+    ? t(`bookRequests.releases.clientProblem.${kind}`, { client: problem.client })
+    : t(`bookRequests.releases.clientProblem.${kind}Unnamed`)
+})
+const clientProblemHint = computed(() => {
+  const problem = clientProblem.value
+  if (!problem) return ''
+  if (problem.code === 'GRAB_CLIENT_UNAVAILABLE') return t('bookRequests.releases.clientProblem.unavailableHint')
+  return problem.reason ?? t('bookRequests.releases.clientProblem.refusedHint')
+})
 /** A retry is the same picker; only the framing changes, so the approver knows why it reopened. */
 const isRetry = computed(() => request.value?.status === 'failed')
 const failureText = computed(() => (request.value ? requestFailureText(request.value, (key, named) => t(key, named)) : null))
@@ -733,6 +760,10 @@ function startFreshSearch(): void {
   forgetRefusals()
 }
 
+function handleRetryClient() {
+  void retryClient()
+}
+
 function handleRefresh() {
   startFreshSearch()
   if (!Number.isInteger(requestId.value)) return
@@ -1137,6 +1168,26 @@ function showEverySource(): void {
         <p v-if="cached && !loading && !noSourcesEnabled && !finished" class="mt-3 text-xs text-muted-foreground">
           {{ t('bookRequests.releases.cached') }}
         </p>
+
+        <!--
+          One notice for the client rather than a chip on every row it disables: the client is not a
+          property of any release, and the way out is the same whichever row was sent.
+        -->
+        <div
+          v-if="clientProblem && !finished"
+          role="alert"
+          class="mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        >
+          <CircleAlert :size="16" class="mt-0.5 shrink-0 text-destructive" aria-hidden="true" />
+          <div class="min-w-0 flex-1 basis-56">
+            <p class="font-medium text-foreground">{{ clientProblemTitle }}</p>
+            <p class="mt-0.5 text-xs break-words text-muted-foreground">{{ clientProblemHint }}</p>
+          </div>
+          <Button variant="outline" size="sm" :disabled="busy" @click="handleRetryClient">
+            <RefreshCw :size="14" aria-hidden="true" />
+            {{ t('bookRequests.releases.clientProblem.retry') }}
+          </Button>
+        </div>
 
         <!-- Where a pair ends once neither half needs a release: said here, not left to a passing toast. -->
         <div v-if="finished" role="status" class="mt-10 flex flex-col items-center gap-3 text-center">

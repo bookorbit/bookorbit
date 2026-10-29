@@ -7,6 +7,8 @@ const props = defineProps<{
   providerKey: string
   label: string
   enabled: boolean
+  /** For a provider not registered yet, whose colour BookOrbit does not know. */
+  color?: string | null
 }>()
 
 const iconPath = computed(() => providerIconPathSafe(props.providerKey))
@@ -26,7 +28,7 @@ const monogram = computed(() => {
   <span
     class="grid size-8.5 shrink-0 place-items-center rounded-lg"
     :class="enabled ? 'provider-chip' : 'bg-foreground/6 ring-1 ring-border'"
-    :style="enabled ? { '--provider-color': getProviderColor(providerKey) } : undefined"
+    :style="enabled ? { '--provider-color': color ?? getProviderColor(providerKey) } : undefined"
     aria-hidden="true"
   >
     <img

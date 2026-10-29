@@ -141,6 +141,37 @@ describe('candidate-relevance', () => {
     });
   });
 
+  describe("the book's medium", () => {
+    const NOVEL = { ...candidate('The Faraway Paladin: The Boy in the City of the Dead', 'Kanata Yanagino'), mediaKind: 'ebook' as const };
+    const MANGA = { ...candidate('The Faraway Paladin (Manga) Volume 1', 'Kanata Yanagino'), mediaKind: 'comic' as const };
+    const query = { title: 'The Faraway Paladin Volume 1', author: 'Kanata Yanagino' };
+
+    it('puts the novel first for an ebook and the manga first for a comic', () => {
+      expect(filterAndRank([MANGA, NOVEL], { ...query, mediaKind: 'ebook' })[0]).toBe(NOVEL);
+      expect(filterAndRank([NOVEL, MANGA], { ...query, mediaKind: 'comic' })[0]).toBe(MANGA);
+    });
+
+    it('keeps the other medium in the list, below', () => {
+      expect(filterAndRank([MANGA, NOVEL], { ...query, mediaKind: 'ebook' })).toEqual([NOVEL, MANGA]);
+    });
+
+    it('lets a query that names the manga have it, even for an ebook', () => {
+      const result = filterAndRank([NOVEL, MANGA], { ...query, title: 'The Faraway Paladin (Manga) Volume 1', mediaKind: 'ebook' });
+      expect(result[0]).toBe(MANGA);
+    });
+
+    it('changes nothing when the book or the record has no medium', () => {
+      expect(filterAndRank([MANGA, NOVEL], query)[0]).toBe(MANGA);
+      const unlabelled = { ...MANGA, mediaKind: undefined };
+      expect(filterAndRank([unlabelled, NOVEL], { ...query, mediaKind: 'ebook' })[0]).toBe(unlabelled);
+    });
+
+    it('never ranks an ISBN match down for its medium', () => {
+      const edition = { ...MANGA, isbn13: '9781718356719' };
+      expect(filterAndRank([NOVEL, edition], { ...query, isbn: '9781718356719', mediaKind: 'ebook' })[0]).toBe(edition);
+    });
+  });
+
   describe('displayTitle fallback', () => {
     it('matches a candidate via displayTitle when title alone would not match', () => {
       const candidates = [{ ...candidate('The Origin'), displayTitle: 'Batman #12.5 - The Origin' }];

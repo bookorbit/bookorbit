@@ -11,6 +11,7 @@ import type {
   AudiobookshelfAuthorRecord,
   AudiobookshelfBookLibraryItemRecord,
   AudiobookshelfBookmarkRecord,
+  AudiobookshelfChapterRecord,
   AudiobookshelfEbookFileRecord,
   AudiobookshelfLibraryFolderRecord,
   AudiobookshelfLibraryItemRecord,
@@ -551,6 +552,7 @@ function mapLibraryItem(raw: unknown): AudiobookshelfLibraryItemRecord | null {
       language: nullableString(metadata.language),
       duration: finiteNumber(media.duration),
       abridged: typeof metadata.abridged === 'boolean' ? metadata.abridged : null,
+      chapters: asArray(media.chapters).map(mapChapter).filter(isPresent),
       genres: asArray(metadata.genres).map(nullableString).filter(isPresent),
       tags: asArray(media.tags).map(nullableString).filter(isPresent),
       series: asArray(metadata.series).flatMap((series) => {
@@ -576,6 +578,12 @@ function mapItemAuthors(metadata: Record<string, unknown>): AudiobookshelfAuthor
   });
   const sortName = nullableString(metadata.authorNameLF);
   return authors.length === 1 && sortName ? [{ ...authors[0], sortName }] : authors;
+}
+
+function mapChapter(raw: unknown): AudiobookshelfChapterRecord | null {
+  const row = asRecord(raw);
+  const start = finiteNumber(row.start);
+  return start === null ? null : { start, title: nullableString(row.title) };
 }
 
 function mapAudioFile(raw: unknown): AudiobookshelfAudioFileRecord | null {

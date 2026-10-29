@@ -34,6 +34,7 @@ export class AudioFormatWriter implements FormatWriter {
     await this.embedder.embedMetadata(filePath, this.format, {
       coverBytes: hasWritableCover(payload, options) ? payload.coverBytes : null,
       metadata,
+      chapters: options.chapters ?? null,
     });
     return { status: 'success', fieldsWritten, durationMs: Date.now() - start };
   }
@@ -165,6 +166,10 @@ function resolveFieldsWritten(payload: BookWritePayload, options: FormatWriteOpt
 
   if (hasWritableCover(payload, options)) {
     fieldsWritten.push('coverBytes');
+  }
+
+  if (options.chapters) {
+    fieldsWritten.push('chapters');
   }
 
   return fieldsWritten;

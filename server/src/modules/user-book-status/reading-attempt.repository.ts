@@ -222,6 +222,7 @@ export class ReadingAttemptRepository {
           origin: readingAttempts.origin,
           externalProvider: readingAttempts.externalProvider,
           externalId: readingAttempts.externalId,
+          rating: readingAttempts.rating,
           totalSessions: sql<number>`count(${readingSessions.id})::int`,
           totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
           createdAt: readingAttempts.createdAt,

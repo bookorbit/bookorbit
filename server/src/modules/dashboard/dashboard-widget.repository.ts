@@ -1,3 +1,4 @@
+import { finishedReadScope } from '../user-book-status/finished-read-scope';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -93,7 +94,7 @@ export class DashboardWidgetRepository {
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(readingAttempts)
-      .innerJoin(books, eq(books.id, readingAttempts.bookId))
+      .leftJoin(books, eq(books.id, readingAttempts.bookId))
       .where(
         and(
           eq(readingAttempts.userId, userId),
@@ -102,8 +103,7 @@ export class DashboardWidgetRepository {
           isNotNull(readingAttempts.endedOn),
           gte(readingAttempts.endedOn, fromDay),
           lt(readingAttempts.endedOn, untilDay),
-          inArray(books.libraryId, accessibleLibraryIds),
-          ...cfClauses,
+          finishedReadScope(accessibleLibraryIds, cfClauses),
         ),
       );
     return row?.count ?? 0;
@@ -153,7 +153,7 @@ export class DashboardWidgetRepository {
       .groupBy(readingAttempts.bookId)
       .orderBy(desc(sql`max(${readingAttempts.endedOn})`), desc(sql`max(${readingAttempts.id})`))
       .limit(limit);
-    return rows.map((row) => ({ bookId: row.bookId, finishedOn: String(row.finishedOn) }));
+    return rows.flatMap((row) => (row.bookId === null ? [] : [{ bookId: row.bookId, finishedOn: String(row.finishedOn) }]));
   }
 
   async getCurrentlyReadingBooks(

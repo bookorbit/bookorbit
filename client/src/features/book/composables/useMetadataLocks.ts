@@ -54,18 +54,29 @@ export function useMetadataLocks(options: UseMetadataLocksOptions = {}) {
     nextLockedFields: readonly BookMetadataLockField[],
     scope: BookMetadataLockField | 'all',
   ): Promise<BookDetail | null> {
+    if (!options.deferred) return send(bookId, nextLockedFields, scope)
+    lockedFields.value = normalizeLockedFields(nextLockedFields)
+    error.value = null
+    return null
+  }
+
+  /** Writes the staged locks now, for a caller whose locks otherwise wait for its form save. */
+  function persist(bookId: number): Promise<BookDetail | null> {
+    return send(bookId, lockedFields.value, 'all')
+  }
+
+  async function send(
+    bookId: number,
+    nextLockedFields: readonly BookMetadataLockField[],
+    scope: BookMetadataLockField | 'all',
+  ): Promise<BookDetail | null> {
     updatingField.value = scope
     error.value = null
     try {
-      const normalized = normalizeLockedFields(nextLockedFields)
-      if (options.deferred) {
-        lockedFields.value = normalized
-        return null
-      }
       const res = await api(`/api/v1/books/${bookId}/metadata-locks`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lockedFields: normalized }),
+        body: JSON.stringify({ lockedFields: normalizeLockedFields(nextLockedFields) }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const updated: BookDetail = await res.json()
@@ -108,6 +119,7 @@ export function useMetadataLocks(options: UseMetadataLocksOptions = {}) {
     isLocked,
     isUpdating,
     replace,
+    persist,
     toggle,
     lockAll,
     unlockAll,

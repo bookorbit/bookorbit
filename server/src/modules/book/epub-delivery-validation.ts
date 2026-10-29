@@ -4,6 +4,7 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import type * as unzipper from 'unzipper';
 
 const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, htmlEntities: true });
+const MULTIMEDIA_ENTRY = /\.(?:smil|mp3|m4a|m4b|aac|ogg|opus|wav|flac|mp4|webm)$/i;
 const asArray = <T>(value: T | T[] | undefined): T[] => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
 const invalid = (reason: string): never => {
   throw new BadRequestException({ code: 'UNSUPPORTED_TEXT_ONLY_EPUB', message: reason });
@@ -61,6 +62,19 @@ export async function readEpubEntry(entry: unzipper.File, maxBytes: number): Pro
   } finally {
     stream.destroy();
   }
+}
+
+// Judged by entry names alone, so it still answers for a package too malformed to inspect.
+export function hasMultimediaEntries(files: unzipper.File[]): boolean {
+  return files.some((file) => {
+    let decoded = file.path;
+    try {
+      decoded = decodeURIComponent(file.path);
+    } catch {
+      /* the raw name is still tested */
+    }
+    return MULTIMEDIA_ENTRY.test(file.path) || MULTIMEDIA_ENTRY.test(decoded);
+  });
 }
 
 export function validateEpubEntries(files: unzipper.File[], maxEntries: number): Map<string, unzipper.File> {
@@ -124,8 +138,7 @@ export async function inspectDeliveryEpub(zip: unzipper.CentralDirectory, maxEnt
   const audioPaths = new Set(items.filter((item) => /^audio\//i.test(item['@_media-type'] ?? '')).map((item) => resolve(item['@_href'], opfKey)));
   const declared = new Set(items.map((item) => resolve(item['@_href'], opfKey)));
   for (const key of entries.keys()) {
-    if (/\.(?:smil|mp3|m4a|m4b|aac|ogg|opus|wav|flac|mp4|webm)$/i.test(key) && !declared.has(key))
-      return invalid('Undeclared multimedia is unsupported');
+    if (MULTIMEDIA_ENTRY.test(key) && !declared.has(key)) return invalid('Undeclared multimedia is unsupported');
   }
   const overlayAudio = new Set<string>();
   for (const item of overlayItems) {

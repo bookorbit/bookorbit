@@ -1,6 +1,8 @@
 import {
+  appendToPathStem,
   applyModifier,
   DEFAULT_DOWNLOAD_PATTERN,
+  DEFAULT_KOREADER_DEVICE_PATTERN,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
   EXAMPLE_PATTERN_METADATA,
@@ -299,6 +301,24 @@ describe('replacePlaceholders', () => {
     });
   });
 
+  describe('chained fallbacks <primary|fallback|default>', () => {
+    const pattern = '<{series}|{publisher}|Unsorted>';
+
+    it('uses the first branch whose tokens all fill', () => {
+      expect(replacePlaceholders(pattern, FULL)).toBe('Sprawl');
+      expect(replacePlaceholders(pattern, { ...FULL, series: '' })).toBe('Ace Books');
+    });
+
+    it('uses the last branch as-is when no earlier branch fills', () => {
+      expect(replacePlaceholders(pattern, { ...FULL, series: '', publisher: '' })).toBe('Unsorted');
+      expect(replacePlaceholders('<{series}|{publisher}|{language}>', { ...FULL, series: '', publisher: '', language: '' })).toBe('');
+    });
+
+    it('reports a chained group that fell back', () => {
+      expect(resolvePlaceholders(pattern, { ...FULL, series: '' })).toEqual({ text: 'Ace Books', usedFallback: true, droppedOptional: false });
+    });
+  });
+
   describe('author fallback pattern', () => {
     it('uses the author when present', () => {
       expect(replacePlaceholders('<{authors:first}|Unknown Author>', FULL)).toBe('William Gibson');
@@ -376,9 +396,20 @@ describe('resolvePlaceholders', () => {
 
 describe('KOReader device pattern', () => {
   it('routes series and standalone books into separate folders', () => {
-    const pattern = '<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}';
-    expect(resolveUploadPath(pattern, FULL, 'epub')).toBe('Series/Sprawl/01.00 - Neuromancer.epub');
-    expect(resolveUploadPath(pattern, { ...FULL, series: '', seriesIndex: '' }, 'epub')).toBe('Standalone/William Gibson - Neuromancer.epub');
+    expect(resolveUploadPath(DEFAULT_KOREADER_DEVICE_PATTERN, FULL, 'epub')).toBe('Series/Sprawl/01.00 - Neuromancer.epub');
+    expect(resolveUploadPath(DEFAULT_KOREADER_DEVICE_PATTERN, { ...FULL, series: '', seriesIndex: '' }, 'epub')).toBe(
+      'Standalone/William Gibson - Neuromancer.epub',
+    );
+  });
+
+  it('names a standalone book without an author by its title alone', () => {
+    expect(resolveUploadPath(DEFAULT_KOREADER_DEVICE_PATTERN, { ...FULL, series: '', seriesIndex: '', authors: '' }, 'epub')).toBe(
+      'Standalone/Neuromancer.epub',
+    );
+  });
+
+  it('keeps a series book without an author in its series folder', () => {
+    expect(resolveUploadPath(DEFAULT_KOREADER_DEVICE_PATTERN, { ...FULL, authors: '' }, 'epub')).toBe('Series/Sprawl/01.00 - Neuromancer.epub');
   });
 
   it('keeps each library in its own subtree when the pattern starts with the library token', () => {
@@ -662,6 +693,27 @@ describe('path segment byte limits', () => {
     expect(first).not.toBe(second);
     expect(Buffer.byteLength(first!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
     expect(Buffer.byteLength(second!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+  });
+});
+
+describe('appendToPathStem', () => {
+  it('inserts the suffix before the extension, matching it case-insensitively', () => {
+    expect(appendToPathStem('Frank Herbert/Dune.epub', ' - Text Only', 'epub')).toBe('Frank Herbert/Dune - Text Only.epub');
+    expect(appendToPathStem('Dune.EPUB', ' [101]', '.epub')).toBe('Dune [101].EPUB');
+  });
+
+  it('appends the suffix when the path does not end in the extension', () => {
+    expect(appendToPathStem('Books/Dune', ' [101]', 'epub')).toBe('Books/Dune [101]');
+  });
+
+  it('keeps a long suffixed segment within the limit and distinct from its unsuffixed form', () => {
+    const path = resolveUploadPath('{title}', { ...FULL, title: 'Long Title '.repeat(22).trim() }, 'epub')!;
+    const suffixed = appendToPathStem(path, ' - Text Only', 'epub');
+
+    expect(Buffer.byteLength(path, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(Buffer.byteLength(suffixed, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(suffixed.endsWith('.epub')).toBe(true);
+    expect(suffixed).not.toBe(path);
   });
 });
 

@@ -66,6 +66,12 @@ BoardEdit.LIBRARY = {
     { type = "buddy", name = function() return _("Reading vampire") end, desc = function() return _("A tiny night owl with a cape and fangs") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "vampire" } },
     { type = "buddy", name = function() return _("Reading dragon") end, desc = function() return _("A little dragon guarding a hoard of stories") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "dragon" } },
     { type = "buddy", name = function() return _("Reading ghost") end, desc = function() return _("A friendly spirit between the pages") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "ghost" } },
+    { type = "buddy", name = function() return _("Reading mimic") end, desc = function() return _("A book that reads you back") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "mimic" } },
+    { type = "buddy", name = function() return _("Reading mummy") end, desc = function() return _("Three thousand years of catching up") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "mummy" } },
+    { type = "buddy", name = function() return _("Reading witch") end, desc = function() return _("Never without her spellbook") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "witch" } },
+    { type = "buddy", name = function() return _("Reading skeleton") end, desc = function() return _("Reads to the bone") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "skeleton" } },
+    { type = "buddy", name = function() return _("Reading candle") end, desc = function() return _("Burns the midnight oil") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "candle" } },
+    { type = "buddy", name = function() return _("Reading alien") end, desc = function() return _("Came a long way for a good book") end, sizes = { "L", "M", "S" }, tab = "decor", new = true, props = { animal = "alien" } },
     { type = "chapters", name = function() return _("Chapter line") end, desc = function() return _("Your book as a line, chapters as stops") end, sizes = { "L", "M", "W", "S" }, tab = "decor", new = true },
     { type = "badge", name = function() return _("Next badge") end, desc = function() return _("The badge you are closest to earning") end, sizes = { "M", "L", "S" }, tab = "decor", new = true },
     { type = "dust", name = function() return _("Gathering dust") end, desc = function() return _("Books you downloaded and never opened") end, sizes = { "M", "L", "S" }, tab = "decor", new = true },
@@ -128,29 +134,40 @@ end
 function BoardEdit:boardGeometry()
     local m = BoardMetrics.get()
     local _top, bottom = self:menuChromeHeight()
-    return BoardLayout.geometry(px, self.inner_dimen.w, self.inner_dimen.h - bottom, m.W)
+    return BoardLayout.geometry(px, self.inner_dimen.w, self.inner_dimen.h - bottom, m.LW)
 end
 
 -- The pages being edited, as they are currently drawn: the reader's own or
 -- the starter layout, fitted to this screen. A saved page that no longer fits
--- (a larger font, a shelf grown to two rows) is edited as shown, never as an
--- overfull grid the editor could not change.
+-- (a larger interface size, a shelf grown to two rows) is edited as shown,
+-- never as an overfull grid the editor could not change; the widgets it has
+-- no room for are kept aside as hidden.
 function BoardEdit:boardEditablePages(g)
     local pages = self:boardPages(g.cols)
     local out = {}
     for index = 1, BoardStore.PAGE_COUNT do
         local page = pages[index] or { base = {} }
-        local items = {}
+        local items, hidden = {}, {}
         local packed = BoardLayout.fitPage(g, page.base, page.extras)
         for _i, it in ipairs(packed.placed) do table.insert(items, copyItem(it)) end
-        out[index] = { id = page.id, items = items }
+        for _i, it in ipairs(packed.dropped) do table.insert(hidden, copyItem(it)) end
+        out[index] = { id = page.id, items = items, hidden = hidden }
     end
     return out
 end
 
+-- Hidden widgets are saved after the ones on screen, so a smaller interface
+-- size shows them again.
 function BoardEdit:boardSavePages(g, pages)
     local m = BoardMetrics.get()
-    self:persistSetting(BoardStore.SETTING_KEY, BoardStore.withCustomPages(self.settings, g.cols, pages, m.w > m.h))
+    local saved = {}
+    for index, page in ipairs(pages) do
+        local items = {}
+        for _i, it in ipairs(page.items or {}) do table.insert(items, it) end
+        for _i, it in ipairs(page.hidden or {}) do table.insert(items, it) end
+        saved[index] = { id = page.id, items = items }
+    end
+    self:persistSetting(BoardStore.SETTING_KEY, BoardStore.withCustomPages(self.settings, g.cols, saved, m.w > m.h))
 end
 
 function BoardEdit:boardPageFits(g, items)
@@ -436,6 +453,12 @@ end
 -- ------------------------------------------------------------- settings
 function BoardEdit:boardSetTiles(tiles)
     self:persistSetting(BoardStore.SETTING_KEY, BoardStore.withTiles(self.settings, tiles))
+    if self:dashboardMode() then self:updateItems(nil, true) end
+end
+
+function BoardEdit:boardSetColour(colour)
+    self:persistSetting(BoardStore.SETTING_KEY, BoardStore.withColour(self.settings, colour))
+    require("bookorbit_board_ui").clearSnapshots()
     if self:dashboardMode() then self:updateItems(nil, true) end
 end
 

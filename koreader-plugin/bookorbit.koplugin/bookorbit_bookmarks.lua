@@ -283,6 +283,12 @@ local function hasPending(to_apply)
     return to_apply and (#(to_apply.add or {}) > 0 or #(to_apply.delete or {}) > 0)
 end
 
+-- The server matches a copy whose bytes differ from the library file but cannot
+-- place its bookmarks, so nothing is exchanged and nothing failed.
+local function incompatibleResult()
+    return { uploaded = 0, applied = 0, deleted = 0, failed = 0, had_errors = false, incompatible = 1 }
+end
+
 --[[--
 Full bookmark exchange for one matched book. Blocking; callers run it from a
 step machine or a scheduled task.
@@ -303,6 +309,7 @@ nil, err for auth/network level failures.
 function BookOrbitBookmarks.exchangeBook(opts)
     local book = opts.state:getBook(opts.digest)
     if not book then return nil, "unmatched" end
+    if book.positionIncompatible then return incompatibleResult() end
 
     local bookmarks = opts.bookmarks or {}
     local keys = BookOrbitBookmarks.collectKeys(opts.key_bookmarks or bookmarks)
@@ -348,6 +355,12 @@ function BookOrbitBookmarks.exchangeBook(opts)
             if hash == opts.digest then
                 opts.state:setUnmatched(opts.digest)
                 return nil, "unmatched"
+            end
+        end
+        for _, hash in ipairs(body.positionIncompatible or {}) do
+            if hash == opts.digest then
+                opts.state:markPositionIncompatible(opts.digest)
+                return incompatibleResult()
             end
         end
         response = body.results and body.results[1] or nil

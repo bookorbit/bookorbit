@@ -7,6 +7,7 @@
  *   {token:modifier} a placeholder with a transform
  *   <...>            an optional group, dropped when a placeholder inside it is empty
  *   <a|b>            the same, with `b` used when `a` cannot be filled
+ *   <a|b|c>          `b` only when it fills, otherwise `c`
  *   /                a path separator
  */
 export type PatternPieceKind = 'literal' | 'token' | 'modifier' | 'optional' | 'fallback' | 'separator'

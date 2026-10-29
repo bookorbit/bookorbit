@@ -14,6 +14,7 @@ for _, name in ipairs({
 end
 package.loaded["ui/bidi"] = {}
 package.loaded["ui/renderimage"] = {}
+package.loaded["device"] = { screen = {} }
 package.loaded["bookorbit_board_icons"] = {}
 package.loaded["bookorbit_board_metrics"] = { INK = {}, px = function(n) return n end }
 
@@ -29,7 +30,8 @@ end
 
 assert(BoardUI.fits(function() return stack(58, true) end), "content may exactly fill the padded interior")
 assert(not BoardUI.fits(function() return stack(59, true) end), "content must not consume reserved bottom padding")
-assert(BoardUI.fits(function() return stack(59, false) end), "other widgets retain their existing fit policy")
+assert(BoardUI.fits(function() return stack(60, false) end), "other widgets may overhang the bottom padding by 2dp")
+assert(not BoardUI.fits(function() return stack(61, false) end), "no widget runs further into its bottom padding")
 local selected
 BoardUI.pick({
     function() selected = "crowded" return stack(70, true) end,

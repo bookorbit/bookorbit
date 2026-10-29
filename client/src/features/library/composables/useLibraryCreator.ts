@@ -3,6 +3,7 @@ import { api } from '@/lib/api'
 import {
   DEFAULT_FORMAT_PRIORITY,
   isFiveFieldCronExpression,
+  resolveRegexMetadataConfig,
   withoutImplicitReadAlongFormatPriority,
   withReadAlongFormatPriority,
 } from '@bookorbit/types'
@@ -81,6 +82,8 @@ export function useLibraryCreator() {
   const stats = ref<LibraryStats | null>(null)
   const error = ref<string | null>(null)
   const storedAddedAtSource = ref<AddedAtSource | null>(null)
+  /** The path rules the server has, which is what applying them to existing books uses. */
+  const storedRegexMetadata = ref<Library['regexMetadata']>(null)
   const latestCheck = new Map<string, number>()
   let checkSequence = 0
 
@@ -121,6 +124,7 @@ export function useLibraryCreator() {
 
   function initCreate() {
     storedAddedAtSource.value = null
+    storedRegexMetadata.value = null
     Object.assign(form, blankForm())
     mode.value = 'create'
     editingLibraryId.value = null
@@ -149,6 +153,7 @@ export function useLibraryCreator() {
     form.folders = []
     form.localFolders = []
     storedAddedAtSource.value = null
+    storedRegexMetadata.value = null
   }
 
   function applyLibrary(library: Library) {
@@ -163,7 +168,12 @@ export function useLibraryCreator() {
     form.watchLocalFolders = library.watchLocalFolders ?? true
     form.autoScanCronExpression = library.autoScanCronExpression ?? null
     form.metadataPrecedence = [...library.metadataPrecedence]
-    form.regexMetadata = library.regexMetadata ? { rules: library.regexMetadata.rules.map((rule) => ({ ...rule })) } : null
+    // A preset is shown with its current rules, which are what the server runs for it.
+    const regexMetadata = resolveRegexMetadataConfig(library.regexMetadata)
+    form.regexMetadata = regexMetadata
+      ? { ...(regexMetadata.preset ? { preset: regexMetadata.preset } : {}), rules: regexMetadata.rules.map((rule) => ({ ...rule })) }
+      : null
+    storedRegexMetadata.value = regexMetadata
     const missing = DEFAULT_FORMAT_PRIORITY.filter((f) => !library.formatPriority.includes(f))
     form.formatPriority = withReadAlongFormatPriority([...library.formatPriority, ...missing])
     form.allowedFormats = [...library.allowedFormats]
@@ -304,6 +314,7 @@ export function useLibraryCreator() {
   return {
     form,
     storedAddedAtSource,
+    storedRegexMetadata,
     mode,
     editingLibraryId,
     loading,

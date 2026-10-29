@@ -176,3 +176,14 @@ describe('acceptAgainstAnchor', () => {
     expect(providersOf(acceptAgainstAnchor(anchor, [audiobook]).accepted)).toEqual([MetadataProviderKey.ITUNES]);
   });
 });
+
+describe("the anchor and the book's medium", () => {
+  it("anchors on the record of the book's own medium when titles are otherwise close", () => {
+    const manga = candidate('jnovelclub', { providerId: 'manga', title: 'The Faraway Paladin (Manga) Volume 1', mediaKind: 'comic' });
+    const novel = candidate('jnovelclub', { providerId: 'novel', title: 'The Faraway Paladin: The Boy in the City of the Dead', mediaKind: 'ebook' });
+
+    const result = resolveCandidateAgreement([manga, novel], { title: 'The Faraway Paladin Volume 1', mediaKind: 'ebook' });
+
+    expect(result.anchor).toBe(novel);
+  });
+});

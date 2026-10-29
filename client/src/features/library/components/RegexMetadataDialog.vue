@@ -2,14 +2,14 @@
 import { useI18n } from 'vue-i18n'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from '@lucide/vue'
-import { REGEX_METADATA_GROUPS, REGEX_METADATA_LIMITS, type RegexMetadataConfig } from '@bookorbit/types'
+import { REGEX_METADATA_GROUPS, REGEX_METADATA_LIMITS, type OrganizationMode, type RegexMetadataConfig } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { formatNumber } from '@/i18n/formatters'
 import { useRegexMetadataEditor } from '../composables/useRegexMetadataEditor'
 
-const props = defineProps<{ config: RegexMetadataConfig | null; libraryId?: number }>()
+const props = defineProps<{ config: RegexMetadataConfig | null; libraryId?: number; organizationMode?: OrganizationMode }>()
 const emit = defineEmits<{ close: []; apply: [config: RegexMetadataConfig | null] }>()
 const { t } = useI18n()
 const {
@@ -34,6 +34,7 @@ const {
   removeRule,
   moveUp,
   moveDown,
+  applyFolderSeriesPreset,
   value,
   preview,
 } = useRegexMetadataEditor(props.config, props.libraryId)
@@ -88,6 +89,17 @@ function apply() {
           <ToggleSwitch v-model="enabled" aria-labelledby="regex-enable-label" />
           <span id="regex-enable-label">{{ t('library.creator.metadata.regex.enable') }}</span>
         </div>
+        <section
+          v-if="organizationMode === 'book_per_file'"
+          aria-labelledby="regex-preset-title"
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border p-3"
+        >
+          <div class="min-w-0 flex-1">
+            <h3 id="regex-preset-title" class="text-sm font-medium">{{ t('library.creator.metadata.regex.preset.title') }}</h3>
+            <p class="text-xs text-muted-foreground">{{ t('library.creator.metadata.regex.preset.hint') }}</p>
+          </div>
+          <Button variant="outline" size="sm" @click="applyFolderSeriesPreset">{{ t('library.creator.metadata.regex.preset.apply') }}</Button>
+        </section>
         <p class="text-xs text-muted-foreground">
           {{ t('library.creator.metadata.regex.groups') }} <code>{{ REGEX_METADATA_GROUPS.join(', ') }}</code>
         </p>

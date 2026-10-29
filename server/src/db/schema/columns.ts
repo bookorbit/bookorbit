@@ -10,6 +10,11 @@ import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
  * See `parsePgTimestamptz`. Columns the application stamps itself (created/updated marks,
  * job timestamps) are always near the present, so plain `timestamp()` remains fine there.
  */
+/** `bytea`, read and written as a Buffer, which is what node-postgres gives and takes. */
+export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});
+
 export const timestamptz = customType<{ data: Date; driverData: string }>({
   dataType: () => 'timestamp with time zone',
   toDriver: (value) => value.toISOString(),

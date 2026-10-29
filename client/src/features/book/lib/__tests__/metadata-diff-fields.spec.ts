@@ -11,6 +11,7 @@ import {
   classifyRating,
   classifyText,
   descriptionPlainText,
+  providerIdFieldFor,
   summarizeDifferences,
 } from '../metadata-diff-fields'
 
@@ -107,5 +108,14 @@ describe('summarizeDifferences', () => {
     }
 
     expect(summarizeDifferences(current, candidate, { amazon: 'B002KP6DXQ' })).toEqual({ fills: 1, changes: 2 })
+  })
+})
+
+describe('providerIdFieldFor', () => {
+  it('keeps the id field of a source that moved out, and gives other external providers none', () => {
+    expect(providerIdFieldFor('google')).toBe('googleBooksId')
+    expect(providerIdFieldFor('lubimyczytac')).toBe('lubimyczytacId')
+    expect(providerIdFieldFor('aladin')).toBe('aladinId')
+    expect(providerIdFieldFor('fantlab')).toBeUndefined()
   })
 })

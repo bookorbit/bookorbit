@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeIssueNumber, rankVolumes } from './comicvine.matching';
+import { normalizeIssueNumber, rankVolumes, resolveComicVineIssueQuery } from './comicvine.matching';
 import { ComicVineVolume } from './comicvine.types';
 
 function volume(id: number, name: string, startYear: string | null, countOfIssues: number): ComicVineVolume {
@@ -119,5 +119,43 @@ describe('rankVolumes', () => {
 
   it('returns an empty list unchanged', () => {
     expect(rankVolumes([], 'Anything', '1')).toEqual([]);
+  });
+
+  it('puts the run whose start year the series was named with first', () => {
+    const ranked = rankVolumes(AMAZING_SPIDER_MAN, 'Amazing Spider-Man', '5', 1963);
+
+    expect(ranked[0].id).toBe(1218);
+  });
+
+  it('never lets a matching year outrank a better name match', () => {
+    const ranked = rankVolumes(
+      [volume(1, 'The Amazing Spider-Man Annual', '2018', 5), volume(2, 'The Amazing Spider-Man', '2022', 93)],
+      'Amazing Spider-Man',
+      '5',
+      2018,
+    );
+
+    expect(ranked[0].id).toBe(2);
+  });
+});
+
+describe('resolveComicVineIssueQuery', () => {
+  it('searches a year-qualified series by its title and keeps the year for ranking', () => {
+    expect(resolveComicVineIssueQuery({ title: 'I Am Gotham', seriesName: 'Batman (2016)', seriesIndex: '1' })).toEqual({
+      seriesName: 'Batman',
+      issueNumber: '1',
+      startYear: 2016,
+    });
+  });
+
+  it('reads the year from an explicit issue target too', () => {
+    expect(resolveComicVineIssueQuery({ title: 'Witchblade (2018) #003' })).toEqual({ seriesName: 'Witchblade', issueNumber: '3', startYear: 2018 });
+  });
+
+  it('leaves a series without a run year alone', () => {
+    expect(resolveComicVineIssueQuery({ title: 'Some title', seriesName: 'Spider-Man 2099', seriesIndex: '12' })).toEqual({
+      seriesName: 'Spider-Man 2099',
+      issueNumber: '12',
+    });
   });
 });

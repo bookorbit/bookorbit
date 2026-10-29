@@ -16,22 +16,23 @@ describe('LookupMetadataDto', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
-  it('rejects unknown provider values', async () => {
-    const dto = plainToInstance(LookupMetadataDto, {
-      provider: 'not-a-provider',
-      id: 'vol-123',
-    });
-
-    await expect(validate(dto)).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          property: 'provider',
-          constraints: expect.objectContaining({
-            isEnum: expect.stringContaining('provider'),
+  it('rejects values that cannot be a provider key', async () => {
+    for (const provider of ['Not A Provider', 'autofill', 'x', 'a'.repeat(33)]) {
+      const dto = plainToInstance(LookupMetadataDto, { provider, id: 'vol-123' });
+      await expect(validate(dto)).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            property: 'provider',
+            constraints: expect.objectContaining({ isMetadataProviderKey: expect.stringContaining('provider') }),
           }),
-        }),
-      ]),
-    );
+        ]),
+      );
+    }
+  });
+
+  it('accepts an external provider key, leaving registration to the service', async () => {
+    const dto = plainToInstance(LookupMetadataDto, { provider: 'fantlab', id: 'e723' });
+    await expect(validate(dto)).resolves.toEqual([]);
   });
 
   it('requires id to be a non-empty string', async () => {

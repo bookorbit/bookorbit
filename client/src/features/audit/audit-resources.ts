@@ -26,6 +26,7 @@ const domainByResource: Record<AuditResource, AuditResourceDomain> = {
   [AuditResource.BookRequest]: 'content',
   [AuditResource.DownloadClient]: 'integrations',
   [AuditResource.RequestIndexer]: 'integrations',
+  [AuditResource.MetadataHttpProvider]: 'integrations',
   [AuditResource.Author]: 'people',
   [AuditResource.AppSettings]: 'settings',
   [AuditResource.Genre]: 'metadata',

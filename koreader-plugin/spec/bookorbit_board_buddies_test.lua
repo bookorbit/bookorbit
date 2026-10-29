@@ -11,10 +11,15 @@ end
 for _, name in ipairs({ "ui/font", "ui/widget/textwidget", "ui/renderimage", "logger", "bookorbit_board_icons", "bookorbit_board_ui" }) do
     package.loaded[name] = {}
 end
-package.loaded["device"] = { screen = {} }
-package.loaded["ffi/blitbuffer"] = {}
+local colour_screen = false
+local screen = { isColorEnabled = function() return colour_screen end, night_mode = false }
+package.loaded["device"] = { screen = screen }
+package.loaded["ffi/blitbuffer"] = {
+    Color8 = function(v) return { grey = v } end,
+    ColorRGB32 = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end,
+}
 package.loaded["bookorbit_board_metrics"] = {
-    INK = { black = 0, g5 = 85, g9 = 153, gc = 204, white = 255 },
+    INK = { black = 0, g4 = 68, g5 = 85, g9 = 153, gc = 204, white = 255 },
 }
 package.loaded["bookorbit_board_data"] = { formatDuration = function() return "30 min" end }
 package.loaded["gettext"] = function(value) return value end
@@ -26,49 +31,105 @@ local Art = require("bookorbit_board_art")
 local Decor = require("bookorbit_board_decor")
 local Edit = require("bookorbit_board_edit")
 local Store = require("bookorbit_board_store")
-local sprites = require("bookorbit_board_animal_sprites")
-local cat = require("bookorbit_board_sprites")
 local poses = { "read", "sleep", "party", "ribbon", "yawn", "wait" }
-local inks = { ["#"] = 0, d = 85, m = 153, l = 204, ["."] = 255 }
 
--- Exercise the actual rectangle renderer, including transparent cells and offsets.
-for animal, frames in pairs(sprites) do
+-- Every generated module is a known pet and every known pet has a module.
+local listed = {}
+for name in io.popen("ls koreader-plugin/bookorbit.koplugin/bookorbit_pets"):lines() do
+    listed[name:gsub("%.lua$", "")] = true
+end
+for _, name in ipairs(Decor.PETS) do
+    assert(listed[name], name .. " has a generated module")
+    listed[name] = nil
+end
+assert(next(listed) == nil, "no module for an unknown pet: " .. tostring(next(listed)))
+
+for _, name in ipairs(Decor.PETS) do
+    local pet = Decor.pet(name)
+    local count = 0
+    for ch, entry in pairs(pet.palette) do
+        count = count + 1
+        assert(#ch == 1 and ch ~= " ", name .. " palette characters")
+        assert(entry[1] >= 0 and entry[1] <= 0xFFFFFF and entry[1] % 1 == 0, name .. " colours")
+        assert(entry[2] >= 0 and entry[2] <= 255 and entry[2] % 17 == 0, name .. " greys are e-ink levels")
+    end
+    assert(count <= 90, name .. " palette size")
     local seen = {}
     for _, pose in ipairs(poses) do
-        local rows = frames[pose]
-        assert(#rows == 40, animal .. "/" .. pose .. " height")
+        local rows = pet[pose]
+        assert(#rows == 64, name .. "/" .. pose .. " height")
         local signature = table.concat(rows)
-        assert(not seen[signature], animal .. " must have six distinct poses")
+        assert(not seen[signature], name .. " must have six distinct poses")
         seen[signature] = true
         for _, row in ipairs(rows) do
-            assert(#row == 40 and not row:find("[^ #dml%.]"), animal .. "/" .. pose .. " palette and width")
+            assert(#row == 64, name .. "/" .. pose .. " width")
+            for x = 1, #row do
+                local ch = row:sub(x, x)
+                assert(ch == " " or pet.palette[ch], name .. "/" .. pose .. " uses only its palette")
+            end
         end
-        for _, scale in ipairs({ 1, 2, 3, 5, 8 }) do
-            local pixels = {}
-            local bb = { paintRect = function(_, x, y, w, h, ink)
-                assert(x % 1 == 0 and y % 1 == 0 and w % 1 == 0 and h % 1 == 0, "integer pixel edges")
-                assert(x >= 7 and y >= 11 and x + w <= 7 + 40 * scale and y + h <= 11 + 40 * scale, "no overflow")
-                for yy = y, y + h - 1 do
-                    for xx = x, x + w - 1 do pixels[yy * 1000 + xx] = ink end
-                end
-            end }
-            local sprite = Art.sprite(rows, scale)
-            assert(sprite:getSize().w == 40 * scale and sprite:getSize().h == 40 * scale)
-            sprite:paintTo(bb, 7, 11)
-            for y, row in ipairs(rows) do
-                for x = 1, #row do
-                    local expected = inks[row:sub(x, x)]
-                    for dy = 0, scale - 1 do
-                        for dx = 0, scale - 1 do
-                            assert(pixels[(11 + (y - 1) * scale + dy) * 1000 + 7 + (x - 1) * scale + dx] == expected,
-                                animal .. "/" .. pose .. " paints the authored pixel exactly")
-                        end
+    end
+end
+assert(Decor.pet("unknown") == Decor.pet("cat") and Decor.pet(nil) == Decor.pet("cat"), "unknown pets show the cat")
+
+-- Exercise the actual rectangle renderer at whole and half steps, including
+-- transparent cells and offsets: every pixel belongs to exactly its cell.
+local function edge(i, k) return math.floor(i * k + 1e-6) end
+local function paint(rows, palette, k)
+    local pixels = {}
+    local function fill(_, x, y, w, h, ink)
+        assert(x % 1 == 0 and y % 1 == 0 and w % 1 == 0 and h % 1 == 0, "integer pixel edges")
+        assert(w > 0 and h > 0, "no empty rectangles")
+        assert(x >= 7 and y >= 11 and x + w <= 7 + edge(64, k) and y + h <= 11 + edge(64, k), "no overflow")
+        for yy = y, y + h - 1 do
+            for xx = x, x + w - 1 do pixels[yy * 1000 + xx] = ink end
+        end
+    end
+    local sprite = Art.sprite(rows, k, palette)
+    assert(sprite:getSize().w == edge(64, k) and sprite:getSize().h == edge(64, k))
+    sprite:paintTo({ paintRect = fill, paintRectRGB32 = fill }, 7, 11)
+    return pixels
+end
+local function check(rows, palette, k, expect)
+    local pixels = paint(rows, palette, k)
+    for y, row in ipairs(rows) do
+        for x = 1, #row do
+            local ch = row:sub(x, x)
+            for py = edge(y - 1, k), edge(y, k) - 1 do
+                for px = edge(x - 1, k), edge(x, k) - 1 do
+                    local got = pixels[(11 + py) * 1000 + 7 + px]
+                    if ch == " " then
+                        assert(got == nil, "transparent cells stay unpainted")
+                    else
+                        assert(got and expect(palette[ch], got), "paints the authored cell exactly")
                     end
                 end
             end
         end
     end
 end
+local function greyOf(entry, ink) return ink.grey == entry[2] end
+for _, name in ipairs(Decor.PETS) do
+    local pet = Decor.pet(name)
+    for _, pose in ipairs(poses) do
+        for _, k in ipairs({ 1, 1.5 }) do check(pet[pose], pet.palette, k, greyOf) end
+    end
+end
+local cat = Decor.pet("cat")
+for _, k in ipairs({ 2, 2.5, 3 }) do check(cat.read, cat.palette, k, greyOf) end
+
+colour_screen = true
+check(cat.party, cat.palette, 1.5, function(entry, ink)
+    return ink.r * 65536 + ink.g * 256 + ink.b == entry[1] and ink.a == 255
+end)
+screen.night_mode = true
+check(cat.party, cat.palette, 2, function(entry, ink)
+    return (255 - ink.r) * 65536 + (255 - ink.g) * 256 + (255 - ink.b) == entry[1]
+end)
+colour_screen = false
+check(cat.party, cat.palette, 2, function(entry, ink) return ink.grey == 255 - entry[2] end)
+screen.night_mode = false
+check(cat.party, cat.palette, 2, greyOf)
 
 local noon = os.time({ year = 2026, month = 10, day = 17, hour = 12 })
 local d = { now = noon, continue_reading = {}, streak = { current = 0 } }
@@ -87,23 +148,25 @@ assert(Decor.buddyPose(d) == "ribbon")
 
 -- Gallery identity and persistence distinguish companions of the same widget type.
 assert(Edit.entryFor({ type = "buddy" }).props == nil, "existing buddies remain cats")
-for animal in pairs(sprites) do
-    local entry = Edit.entryFor({ type = "buddy", props = { animal = animal } })
-    assert(entry and entry.props.animal == animal, "the editor identifies " .. animal)
-    assert(entry.tab == "decor" and table.concat(entry.sizes, ",") == "L,M,S")
-    local catalog = {
-        settings = {}, board_edit = { pages = { { items = {} } } },
-        boardGeometry = function() return { cols = 4 } end,
-        boardPage = function() return 1 end,
-        boardPageFits = function() return true end,
-        updateItems = function() end,
-    }
-    Edit.boardEditRun(catalog, { kind = "sheet-add", entry = entry })
-    local item = catalog.board_edit.pages[1].items[1]
-    assert(item.props.animal == animal and item.props ~= entry.props, "adding copies the selected animal")
-    catalog.settings[Store.SETTING_KEY] = Store.withCustomPages({}, 4, catalog.board_edit.pages)
-    local pages = Store.pages(catalog.settings, 4, true)
-    assert(pages[1].base[1].props.animal == animal, "saved animal survives reload")
+for _, animal in ipairs(Decor.PETS) do
+    if animal ~= "cat" then
+        local entry = Edit.entryFor({ type = "buddy", props = { animal = animal } })
+        assert(entry and entry.props.animal == animal, "the editor identifies " .. animal)
+        assert(entry.tab == "decor" and table.concat(entry.sizes, ",") == "L,M,S")
+        local catalog = {
+            settings = {}, board_edit = { pages = { { items = {} } } },
+            boardGeometry = function() return { cols = 4 } end,
+            boardPage = function() return 1 end,
+            boardPageFits = function() return true end,
+            updateItems = function() end,
+        }
+        Edit.boardEditRun(catalog, { kind = "sheet-add", entry = entry })
+        local item = catalog.board_edit.pages[1].items[1]
+        assert(item.props.animal == animal and item.props ~= entry.props, "adding copies the selected animal")
+        catalog.settings[Store.SETTING_KEY] = Store.withCustomPages({}, 4, catalog.board_edit.pages)
+        local pages = Store.pages(catalog.settings, 4, true)
+        assert(pages[1].base[1].props.animal == animal, "saved animal survives reload")
+    end
 end
 
 -- Capture the sprite selected by the production widget without a font dependency.
@@ -116,22 +179,29 @@ UI.pick = function(variants) return variants[#variants]() end
 local metrics = package.loaded["bookorbit_board_metrics"]
 metrics.px = function(value) return value end
 metrics.lh1 = function() return 12 end
-local selected
-Art.sprite = function(rows, scale)
-    selected = rows
-    assert(scale == math.floor(scale) and scale >= 1)
-    assert(#rows[1] * scale <= 136 and #rows * scale <= 136, "small tile fits")
+local selected, selected_palette, selected_scale
+local real_sprite = Art.sprite
+Art.sprite = function(rows, scale, palette)
+    selected, selected_palette, selected_scale = rows, palette, scale
+    assert(scale * 2 == math.floor(scale * 2) and scale >= 1, "whole or half steps")
+    assert(edge(#rows[1], scale) <= 136 and edge(#rows, scale) <= 136, "small tile fits")
     return {}
 end
 package.loaded["bookorbit_board_decor"] = nil
 Decor = require("bookorbit_board_decor")
-local companions = { "dog", "rabbit", "owl", "penguin", "robot", "vampire", "dragon", "ghost", "cat", "unknown" }
+local companions = { "unknown" }
+for _, animal in ipairs(Decor.PETS) do table.insert(companions, animal) end
 for _, animal in ipairs(companions) do
     Decor.buddy({ d = d }, 160, 160, { animal = animal })
-    assert(selected == (sprites[animal] or cat).ribbon, "selected companion or safe cat fallback")
+    local pet = Decor.pet(animal)
+    assert(selected == pet.ribbon and selected_palette == pet.palette, "selected companion or safe cat fallback")
 end
 Decor.buddy({ d = d }, 160, 160)
-assert(selected == cat.ribbon, "legacy widget still renders the original cat")
+assert(selected == Decor.pet("cat").ribbon, "legacy widget still renders the cat")
+-- 104 px across holds 1.625 cells per pixel: a half step, not 1x.
+Decor.buddy({ d = d }, 128, 128, { animal = "witch" })
+assert(selected_scale == 1.5, "half steps fill tiles between whole sizes")
+Art.sprite = real_sprite
 
 -- A gallery page must not reuse the cat's cached picture for another character.
 for _, name in ipairs({ "ui/event", "ui/gesturerange", "ui/widget/container/inputcontainer", "ui/widget/verticalspan" }) do
@@ -162,4 +232,24 @@ for _, animal in ipairs(companions) do
         assert(rendered[animal] == 1, "each companion preview is independently cached")
     end
 end
+
+-- A colour screen gives each pet tile a dithered partial refresh of its own,
+-- after the tile has been painted; a black-and-white screen does not.
+local refreshes = {}
+package.loaded["ui/uimanager"].setDirty = function(_, target, refresh)
+    assert(target == nil and type(refresh) == "function", "a refresh only, nothing repainted")
+    table.insert(refreshes, refresh)
+end
+local pet_tile, clock_tile = { dimen = {} }, { dimen = { x = 0, y = 0, w = 5, h = 5 } }
+local board = { _board_tiles = { { item = { type = "clock" }, tile = clock_tile }, { item = { type = "buddy" }, tile = pet_tile } } }
+CatalogBoard.boardRefreshPets(board)
+assert(#refreshes == 0, "black and white needs no extra refresh")
+colour_screen = true
+CatalogBoard.boardRefreshPets(board)
+assert(#refreshes == 1, "one refresh per pet tile")
+assert(refreshes[1]() == nil, "nothing to refresh before the tile is painted")
+pet_tile.dimen = { x = 10, y = 20, w = 30, h = 40 }
+local mode, region, dither = refreshes[1]()
+assert(mode == "partial" and region == pet_tile.dimen and dither == true, "dithered partial over the pet tile")
+colour_screen = false
 print("bookorbit_board_buddies_test.lua: ok")

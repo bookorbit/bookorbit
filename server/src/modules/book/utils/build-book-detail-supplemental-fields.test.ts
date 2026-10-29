@@ -56,6 +56,8 @@ describe('buildBookDetailSupplementalFields', () => {
       durationSeconds: 5400,
       abridged: false,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
+      chaptersSource: null,
+      chaptersUpdatedAt: null,
     });
     expect(result.collections).toEqual([{ id: 9, name: 'Favorites' }]);
   });

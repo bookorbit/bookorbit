@@ -419,7 +419,10 @@ describe('Kobo download identity in KOReader (e2e)', { timeout: 180_000 }, () =>
     await ctx.db.insert(schema.koreaderBookHashLinks).values({ userId: user.userId, hash: deliveredHash, bookFileId: other.bookFileId });
     try {
       expect((await download()).statusCode).toBe(200);
-      expect((await match(deliveredHash)).matches).toEqual([{ hash: deliveredHash, bookId: other.bookId, bookFileId: other.bookFileId }]);
+      // The delivered bytes belong to the source book, so the linked file cannot place their positions.
+      expect((await match(deliveredHash)).matches).toEqual([
+        { hash: deliveredHash, bookId: other.bookId, bookFileId: other.bookFileId, positionCompatible: false },
+      ]);
       const response = await ctx.app.inject({
         method: 'PUT',
         url: '/api/v1/koreader/syncs/progress',

@@ -163,7 +163,7 @@ describe('BookTableFormatCell', () => {
     const wrapper = mountFormat([{ id: 1, format: 'epub', role: 'primary', sizeBytes: null, mediaOverlay: { available: true, durationSeconds: 42 } }])
     expect(wrapper.text()).toContain('EPUB')
     expect(wrapper.text()).not.toContain('NARR')
-    expect(wrapper.text()).toContain('Read-along EPUB')
+    expect(wrapper.text()).toContain('Read-aloud EPUB')
     expect(wrapper.find('.lucide-headphones').exists()).toBe(true)
   })
 

@@ -231,7 +231,10 @@ describe('DashboardWidgetRepository.countCompletedBooks', () => {
     expect(where.sql).toContain('"reading_attempts"."ended_on" >= $3');
     expect(where.sql).toContain('"reading_attempts"."ended_on" < $4');
     expect(where.sql).not.toContain('user_book_status');
-    expect(where.params).toEqual([1, 'completed', '2026-01-01', '2027-01-01', 3, 4]);
+    // A read whose book was deleted still counts, scoped by the library the book was in.
+    expect(where.sql).toContain('"reading_attempts"."book_library_id_snapshot" in');
+    expect(where.params).toEqual([1, 'completed', '2026-01-01', '2027-01-01', 3, 4, 3, 4]);
+    expect(query.leftJoin).toHaveBeenCalled();
   });
 
   it('does not query without accessible libraries', async () => {

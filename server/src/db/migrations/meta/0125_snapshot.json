@@ -1,5 +1,5 @@
 {
-  "id": "5b4700f9-21fc-4a7f-8578-f60d83b57cf4",
+  "id": "3a2888ab-3bdd-4f8f-8ac4-7c36e1b820d3",
   "prevId": "4079d419-26c9-441c-a14f-97b88011d07b",
   "version": "7",
   "dialect": "postgresql",
@@ -15371,7 +15371,7 @@
       "checkConstraints": {
         "download_clients_adapter_type_chk": {
           "name": "download_clients_adapter_type_chk",
-          "value": "\"download_clients\".\"adapter_type\" in ('qbittorrent', 'transmission', 'deluge', 'nzbget', 'sabnzbd', 'torbox')"
+          "value": "\"download_clients\".\"adapter_type\" in ('qbittorrent', 'transmission', 'deluge', 'nzbget', 'sabnzbd')"
         },
         "download_clients_priority_range_chk": {
           "name": "download_clients_priority_range_chk",
@@ -18255,7 +18255,7 @@
       "checkConstraints": {
         "book_file_hash_history_reason_chk": {
           "name": "book_file_hash_history_reason_chk",
-          "value": "\"book_file_hash_history\".\"reason\" in ('file_write', 'external_change', 'rescan', 'kobo_download')"
+          "value": "\"book_file_hash_history\".\"reason\" in ('file_write', 'external_change', 'rescan', 'kobo_download', 'read_aloud_replace')"
         }
       },
       "isRLSEnabled": false
@@ -20625,6 +20625,503 @@
       },
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.read_aloud_job_events": {
+      "name": "read_aloud_job_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "job_id": {
+          "name": "job_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "level": {
+          "name": "level",
+          "type": "varchar(5)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stage": {
+          "name": "stage",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "read_aloud_job_events_job_idx": {
+          "name": "read_aloud_job_events_job_idx",
+          "columns": [
+            {
+              "expression": "job_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "read_aloud_job_events_job_id_read_aloud_jobs_id_fk": {
+          "name": "read_aloud_job_events_job_id_read_aloud_jobs_id_fk",
+          "tableFrom": "read_aloud_job_events",
+          "tableTo": "read_aloud_jobs",
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "read_aloud_job_events_level_chk": {
+          "name": "read_aloud_job_events_level_chk",
+          "value": "\"read_aloud_job_events\".\"level\" in ('info', 'warn', 'error')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.read_aloud_jobs": {
+      "name": "read_aloud_jobs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_by_user_id": {
+          "name": "requested_by_user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "output_file_id": {
+          "name": "output_file_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replace_file_id": {
+          "name": "replace_file_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "stage": {
+          "name": "stage",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "progress": {
+          "name": "progress",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stage_current": {
+          "name": "stage_current",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stage_total": {
+          "name": "stage_total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stage_unit": {
+          "name": "stage_unit",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "input": {
+          "name": "input",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decisions": {
+          "name": "decisions",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"chapters\":{},\"audio\":[]}'::jsonb"
+        },
+        "resume_from": {
+          "name": "resume_from",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report": {
+          "name": "report",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warnings": {
+          "name": "warnings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device": {
+          "name": "device",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "lease_until": {
+          "name": "lease_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancel_requested": {
+          "name": "cancel_requested",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "publish_approved": {
+          "name": "publish_approved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "worker_event_seq": {
+          "name": "worker_event_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reminded_at": {
+          "name": "reminded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "work_expires_at": {
+          "name": "work_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "read_aloud_jobs_active_book_uidx": {
+          "name": "read_aloud_jobs_active_book_uidx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"read_aloud_jobs\".\"status\" in ('queued', 'processing', 'awaiting_review')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "read_aloud_jobs_due_idx": {
+          "name": "read_aloud_jobs_due_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "read_aloud_jobs_book_updated_idx": {
+          "name": "read_aloud_jobs_book_updated_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"updated_at\" desc",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "read_aloud_jobs_user_updated_idx": {
+          "name": "read_aloud_jobs_user_updated_idx",
+          "columns": [
+            {
+              "expression": "requested_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"updated_at\" desc",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "read_aloud_jobs_output_file_idx": {
+          "name": "read_aloud_jobs_output_file_idx",
+          "columns": [
+            {
+              "expression": "output_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "read_aloud_jobs_replace_file_idx": {
+          "name": "read_aloud_jobs_replace_file_idx",
+          "columns": [
+            {
+              "expression": "replace_file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "read_aloud_jobs_book_id_books_id_fk": {
+          "name": "read_aloud_jobs_book_id_books_id_fk",
+          "tableFrom": "read_aloud_jobs",
+          "tableTo": "books",
+          "columnsFrom": ["book_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "read_aloud_jobs_requested_by_user_id_users_id_fk": {
+          "name": "read_aloud_jobs_requested_by_user_id_users_id_fk",
+          "tableFrom": "read_aloud_jobs",
+          "tableTo": "users",
+          "columnsFrom": ["requested_by_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "read_aloud_jobs_output_file_id_book_files_id_fk": {
+          "name": "read_aloud_jobs_output_file_id_book_files_id_fk",
+          "tableFrom": "read_aloud_jobs",
+          "tableTo": "book_files",
+          "columnsFrom": ["output_file_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "read_aloud_jobs_replace_file_id_book_files_id_fk": {
+          "name": "read_aloud_jobs_replace_file_id_book_files_id_fk",
+          "tableFrom": "read_aloud_jobs",
+          "tableTo": "book_files",
+          "columnsFrom": ["replace_file_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "read_aloud_jobs_status_chk": {
+          "name": "read_aloud_jobs_status_chk",
+          "value": "\"read_aloud_jobs\".\"status\" in ('queued', 'processing', 'awaiting_review', 'completed', 'completed_with_warnings', 'failed', 'cancelled')"
+        },
+        "read_aloud_jobs_stage_chk": {
+          "name": "read_aloud_jobs_stage_chk",
+          "value": "\"read_aloud_jobs\".\"stage\" in ('queued', 'preparing_audio', 'downloading_model', 'generating_emissions', 'marking_up_ebook', 'aligning', 'validating', 'awaiting_review', 'publishing', 'completed')"
+        },
+        "read_aloud_jobs_stage_unit_chk": {
+          "name": "read_aloud_jobs_stage_unit_chk",
+          "value": "\"read_aloud_jobs\".\"stage_unit\" is null or \"read_aloud_jobs\".\"stage_unit\" in ('file', 'track', 'chapter')"
+        },
+        "read_aloud_jobs_progress_chk": {
+          "name": "read_aloud_jobs_progress_chk",
+          "value": "\"read_aloud_jobs\".\"progress\" between 0 and 100"
+        },
+        "read_aloud_jobs_attempt_nonnegative_chk": {
+          "name": "read_aloud_jobs_attempt_nonnegative_chk",
+          "value": "\"read_aloud_jobs\".\"attempt_count\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.storygraph_book_state": {

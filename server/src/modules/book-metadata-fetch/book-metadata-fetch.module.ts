@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 
+import { AudiobookChaptersModule } from '../audiobook-chapters/audiobook-chapters.module';
 import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
@@ -22,6 +23,7 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
 
 @Module({
   imports: [
+    AudiobookChaptersModule,
     forwardRef(() => BookModule),
     BookCoverStoreModule,
     BookMetadataLockModule,

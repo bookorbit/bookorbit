@@ -128,6 +128,23 @@ describe('RegexMetadataService', () => {
     expect(recovered.metadata.title).toBe('Recovered');
   });
 
+  it('does not mistake a stalled event loop for a slow expression', async () => {
+    const config = { rules: [{ pattern: '^(?<series>[^/]+)/', flags: '' }] };
+    await service.preview(config, 'warm/up.epub');
+
+    const pending = service.preview(config, 'Series/Book.epub');
+    // Holds the main thread past the time limit while the worker answers. Stalling in the check phase
+    // makes the next loop turn run the expired timer before it reads the answer, as a busy scan can.
+    setImmediate(() => {
+      const until = Date.now() + 300;
+      while (Date.now() < until) {
+        // busy
+      }
+    });
+
+    expect(await pending).toMatchObject({ matched: true, metadata: { seriesName: 'Series' }, diagnostics: [] });
+  });
+
   it('bounds queued work and resolves pending requests on shutdown', async () => {
     const config = { rules: [{ pattern: '^(?<title>.+)$', flags: '' }] };
     const tasks = Array.from({ length: 40 }, () => service.preview(config, 'Book.epub'));
@@ -200,6 +217,14 @@ describe('regex metadata precedence', () => {
   });
   it('fills missing values when the file source has priority', () => {
     expect(mergeRegexMetadata(base, { title: 'Regex', seriesIndex: '08' }, false)).toEqual({ ...base, seriesIndex: '08' });
+  });
+  it('lets a run-year series from the path name the same run more precisely than the file', () => {
+    expect(mergeRegexMetadata({ ...base, seriesName: 'Batman' }, { seriesName: 'Batman (2016)', seriesIndex: '3' }, false)).toMatchObject({
+      seriesName: 'Batman (2016)',
+    });
+    expect(mergeRegexMetadata({ ...base, seriesName: 'Detective Comics' }, { seriesName: 'Batman (2016)' }, false).seriesName).toBe(
+      'Detective Comics',
+    );
   });
   it('does not keep a lower-priority date when regex overrides the year', () => {
     expect(mergeRegexMetadata({ ...base, publishedDate: '2020-01-01', publishedYear: 2020 }, { publishedYear: 2024 }, true)).toMatchObject({

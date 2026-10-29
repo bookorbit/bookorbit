@@ -14,8 +14,9 @@ import {
 } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { compareAudioTracks } from '../../common/utils/book-media.utils';
+import { orderAudiobookTracks } from '../../common/utils/audiobook-chapters.utils';
 import type { BookmarkRow } from '../../db/schema';
+import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapters.service';
 import { BookService } from '../book/book.service';
 import type { CreateAudiobookBookmarkDto } from './dto/create-audiobook-bookmark.dto';
 import type { PutAudiobookPlaybackStateDto } from './dto/put-audiobook-playback-state.dto';
@@ -30,6 +31,7 @@ const DURATION_SLACK_MS = 1_000;
 
 interface ManifestContext {
   manifest: AudiobookManifest;
+  positionsKey: string;
   files: AudioFileRow[];
   libraryId: number;
   hasCompleteDurations: boolean;
@@ -40,6 +42,7 @@ export class AudiobookService {
   constructor(
     private readonly repo: AudiobookRepository,
     private readonly bookService: BookService,
+    private readonly audiobookChapters: AudiobookChaptersService,
   ) {}
 
   async getManifest(bookId: number, user: RequestUser): Promise<AudiobookManifest> {
@@ -77,8 +80,14 @@ export class AudiobookService {
 
   async putPlaybackState(bookId: number, dto: PutAudiobookPlaybackStateDto, user: RequestUser): Promise<AudiobookPlaybackState> {
     const context = await this.loadManifestContext(bookId, user);
-    if (dto.manifestRevision !== context.manifest.revision) {
-      throw new PreconditionFailedException('Audiobook manifest has changed');
+    let manifestRevision = dto.manifestRevision;
+    if (manifestRevision !== context.manifest.revision) {
+      // A chapter edit or a tag write changes the revision without moving any audio, and released
+      // iOS never recovers from a 412, so a revision with today's track layout is still accepted.
+      if (!(await this.audiobookChapters.isPositionCompatible(bookId, manifestRevision, context.positionsKey))) {
+        throw new PreconditionFailedException('Audiobook manifest has changed');
+      }
+      manifestRevision = context.manifest.revision;
     }
     const fileIndex = context.files.findIndex((file) => this.assetId(file.publicId) === dto.assetId);
     if (fileIndex < 0) throw new BadRequestException('assetId does not belong to this audiobook');
@@ -114,7 +123,7 @@ export class AudiobookService {
       percentage,
       capturedAt: new Date(dto.capturedAt),
       operationId: dto.operationId,
-      manifestRevision: dto.manifestRevision,
+      manifestRevision,
     };
     const saved =
       dto.baseRevision === 0
@@ -144,7 +153,7 @@ export class AudiobookService {
       completed: percentage >= 100,
       capturedAt: saved.capturedAt.toISOString(),
       revision: saved.revision,
-      manifestRevision: dto.manifestRevision,
+      manifestRevision,
     };
   }
 
@@ -165,13 +174,13 @@ export class AudiobookService {
     if (totalDurationMs > 0 && dto.positionMs > totalDurationMs + DURATION_SLACK_MS) {
       throw new BadRequestException('positionMs exceeds the audiobook duration');
     }
-    if (dto.chapterId && !context.manifest.chapters.some((chapter) => chapter.id === dto.chapterId)) {
-      throw new BadRequestException('chapterId does not belong to this audiobook manifest');
-    }
+    // Chapter ids change with every chapter edit, so a player still holding the previous manifest
+    // names one that no longer exists. The position is what matters; keep the bookmark without it.
+    const chapterId = dto.chapterId && context.manifest.chapters.some((chapter) => chapter.id === dto.chapterId) ? dto.chapterId : null;
     const row = await this.repo.createAudioBookmark(user.id, bookId, {
       clientId: dto.clientId,
       positionSeconds: (totalDurationMs > 0 ? Math.min(dto.positionMs, totalDurationMs) : dto.positionMs) / 1000,
-      chapterId: dto.chapterId ?? null,
+      chapterId,
       title: dto.title,
       note: dto.note ?? null,
     });
@@ -199,17 +208,10 @@ export class AudiobookService {
   private async loadManifestContext(bookId: number, user: RequestUser): Promise<ManifestContext> {
     await this.bookService.verifyBookAccess(bookId, user);
     const [detail, rows] = await Promise.all([this.bookService.getDetail(bookId, user), this.repo.findAudioFiles(bookId)]);
-    const files = rows.filter((row) => row.format !== null && isAudioFormat(row.format)).sort(compareAudioTracks);
-    if (files.length === 0) throw new NotFoundException('Book has no audiobook assets');
-
-    const revision = createHash('sha256')
-      .update(
-        JSON.stringify({
-          files: files.map((file) => [file.publicId, file.sizeBytes, file.durationSeconds, file.mtime?.toISOString(), file.updatedAt.toISOString()]),
-          chapters: detail.audioMetadata?.chapters ?? [],
-        }),
-      )
-      .digest('hex');
+    const files = orderAudiobookTracks(rows);
+    const current = await this.audiobookChapters.currentRevision(bookId, rows);
+    if (files.length === 0 || !current) throw new NotFoundException('Book has no audiobook assets');
+    const { revision, positionsKey } = current;
     const assets = files.map<AudiobookManifestAsset>((file, sequence) => ({
       assetId: this.assetId(file.publicId),
       fileId: file.id,
@@ -231,6 +233,7 @@ export class AudiobookService {
     const chapters = this.buildChapters(bookId, revision, detail.audioMetadata?.chapters ?? [], assets, totalDurationMs);
     return {
       libraryId: detail.libraryId,
+      positionsKey,
       files,
       hasCompleteDurations,
       manifest: {

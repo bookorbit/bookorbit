@@ -26,19 +26,11 @@ function makeConfig(overrides: Partial<ProviderConfigurations> = {}): ProviderCo
     comicvine: { enabled: true, apiKey: 'comicvine-secret-key' },
     ranobedb: { enabled: false },
     kobo: { enabled: false, country: 'us', language: 'en' },
-    lubimyczytac: { enabled: false },
-    aladin: { enabled: true, ttbKey: 'aladin-ttb-key' },
     ...overrides,
   }
 }
 
-const SECRET_FIELD_NAMES = [
-  'metadata-google-apiKey',
-  'metadata-amazon-cookie',
-  'metadata-hardcover-apiKey',
-  'metadata-comicvine-apiKey',
-  'metadata-aladin-ttbKey',
-]
+const SECRET_FIELD_NAMES = ['metadata-google-apiKey', 'metadata-amazon-cookie', 'metadata-hardcover-apiKey', 'metadata-comicvine-apiKey']
 
 function mountPanel(config: ProviderConfigurations = makeConfig(), statuses: ProviderStatus[] = []) {
   return mount(ProviderConfigPanel, { props: { config, statuses, saving: false } })
@@ -102,7 +94,6 @@ describe('ProviderConfigPanel secret fields', () => {
 
     expect((secretField(wrapper, 'metadata-google-apiKey').element as HTMLInputElement).value).toBe('google-secret-key')
     expect((secretField(wrapper, 'metadata-amazon-cookie').element as HTMLInputElement).value).toBe('amazon-session-cookie')
-    expect((secretField(wrapper, 'metadata-aladin-ttbKey').element as HTMLInputElement).value).toBe('aladin-ttb-key')
   })
 
   it('leaves non-secret fields unmasked', () => {

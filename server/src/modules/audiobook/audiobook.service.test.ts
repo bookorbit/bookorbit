@@ -1,7 +1,11 @@
+import { FileLockService } from '../../common/services/file-lock.service';
+import { createHash } from 'node:crypto';
+
 import { BadRequestException, ConflictException, PreconditionFailedException } from '@nestjs/common';
-import { AUDIOBOOK_MANIFEST_SCHEMA, AUDIOBOOK_MANIFEST_VERSION } from '@bookorbit/types';
+import { AUDIOBOOK_MANIFEST_SCHEMA, AUDIOBOOK_MANIFEST_VERSION, type AudiobookChapter } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapters.service';
 import { AudiobookService } from './audiobook.service';
 
 const FIRST_PUBLIC_ID = '11111111-1111-4111-8111-111111111111';
@@ -50,6 +54,23 @@ function makeFixture() {
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     },
   ];
+  const stored: { chapters: AudiobookChapter[] | null } = {
+    chapters: [
+      { title: 'Opening', startMs: 0 },
+      { title: 'Second Part', startMs: 10_125 },
+    ],
+  };
+  const revisions = new Map<string, string>();
+  const chaptersRepo = {
+    findTrackRows: vi.fn().mockImplementation(() => repo.findAudioFiles()),
+    findChapterState: vi.fn().mockImplementation(() => Promise.resolve({ chapters: stored.chapters, source: 'embedded' })),
+    writeChapters: vi.fn(),
+    recordManifestRevision: vi.fn().mockImplementation((_bookId: number, revision: string, positionsKey: string) => {
+      if (!revisions.has(revision)) revisions.set(revision, positionsKey);
+      return Promise.resolve();
+    }),
+    findPositionsKey: vi.fn().mockImplementation((_bookId: number, revision: string) => Promise.resolve(revisions.get(revision) ?? null)),
+  };
   const repo = {
     findAudioFiles: vi.fn().mockResolvedValue(files),
     findAsset: vi.fn(),
@@ -75,10 +96,7 @@ function makeFixture() {
       audioMetadata: {
         durationSeconds: 30.125,
         narrators: [{ name: 'Narrator' }],
-        chapters: [
-          { title: 'Opening', startMs: 0 },
-          { title: 'Second Part', startMs: 10_125 },
-        ],
+        chapters: stored.chapters,
       },
     }),
     autoUpdateReadStatusForProgress: vi.fn().mockResolvedValue(undefined),
@@ -87,7 +105,20 @@ function makeFixture() {
   return {
     repo,
     bookService,
-    service: new AudiobookService(repo as never, bookService as never),
+    stored,
+    chaptersRepo,
+    service: new AudiobookService(repo as never, bookService as never, new AudiobookChaptersService(chaptersRepo as never, new FileLockService())),
+  };
+}
+
+function writeFor(manifest: { assets: { assetId: string }[] }, manifestRevision: string, operationId: string) {
+  return {
+    assetId: manifest.assets[0]!.assetId,
+    positionMs: 1_000,
+    capturedAt: '2026-02-01T00:00:00.000Z',
+    operationId,
+    baseRevision: 0,
+    manifestRevision,
   };
 }
 
@@ -121,6 +152,72 @@ describe('AudiobookService', () => {
 
     expect(after.assets.map((asset) => asset.fileId)).toEqual([911, 912]);
     expect(after.revision).toBe(before.revision);
+  });
+
+  it('preserves the released revision formula in the legacy registry while serving an opaque layout revision', async () => {
+    const { service, repo, stored, chaptersRepo } = makeFixture();
+    const files = [...(await repo.findAudioFiles())].sort((left, right) => left.sortOrder - right.sortOrder);
+    const released = createHash('sha256')
+      .update(
+        JSON.stringify({
+          files: files.map((file) => [file.publicId, file.sizeBytes, file.durationSeconds, file.mtime?.toISOString(), file.updatedAt.toISOString()]),
+          chapters: stored.chapters,
+        }),
+      )
+      .digest('hex');
+
+    const manifest = await service.getManifest(30, makeUser());
+
+    expect(manifest.revision).toMatch(/^[0-9a-f]{64}$/);
+    expect(chaptersRepo.recordManifestRevision).toHaveBeenCalledWith(30, released, expect.any(String));
+  });
+
+  it('accepts a playback write from before a chapter edit and hands back the current revision', async () => {
+    const { service, repo, stored, bookService } = makeFixture();
+    const before = await service.getManifest(30, makeUser());
+    stored.chapters = [
+      { title: 'Prologue', startMs: 0 },
+      { title: 'Chapter One', startMs: 4_000 },
+    ];
+    const detail = await bookService.getDetail();
+    bookService.getDetail.mockResolvedValue({ ...detail, audioMetadata: { ...detail.audioMetadata, chapters: stored.chapters } });
+    const after = await service.getManifest(30, makeUser());
+    repo.createPlaybackState.mockResolvedValue({ capturedAt: new Date('2026-02-01T00:00:00.000Z'), revision: 1 });
+
+    const saved = await service.putPlaybackState(30, writeFor(before, before.revision, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'), makeUser());
+
+    expect(after.revision).not.toBe(before.revision);
+    expect(saved.manifestRevision).toBe(after.revision);
+    expect(repo.createPlaybackState).toHaveBeenCalledWith(7, 30, expect.objectContaining({ manifestRevision: after.revision }));
+  });
+
+  it('accepts a revision recorded just before a chapter write even if no client fetched it since', async () => {
+    const { service, repo, stored, chaptersRepo } = makeFixture();
+    await new AudiobookChaptersService(chaptersRepo as never, new FileLockService()).recordCurrentRevision(30);
+    const heldRevision = chaptersRepo.recordManifestRevision.mock.calls[0]![1] as string;
+    stored.chapters = [{ title: 'Only chapter', startMs: 0 }];
+    repo.createPlaybackState.mockResolvedValue({ capturedAt: new Date('2026-02-01T00:00:00.000Z'), revision: 1 });
+
+    const saved = await service.putPlaybackState(
+      30,
+      writeFor({ assets: [{ assetId: `aud_${FIRST_PUBLIC_ID}` }] }, heldRevision, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'),
+      makeUser(),
+    );
+
+    expect(saved.manifestRevision).not.toBe(heldRevision);
+    expect(saved.revision).toBe(1);
+  });
+
+  it('still rejects a revision whose track layout has since changed', async () => {
+    const { service, repo } = makeFixture();
+    const before = await service.getManifest(30, makeUser());
+    const files = await repo.findAudioFiles();
+    repo.findAudioFiles.mockResolvedValue(files.map((file) => (file.id === 12 ? { ...file, durationSeconds: 25 } : file)));
+
+    await expect(service.putPlaybackState(30, writeFor(before, before.revision, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'), makeUser())).rejects.toThrow(
+      PreconditionFailedException,
+    );
+    expect(repo.createPlaybackState).not.toHaveBeenCalled();
   });
 
   it('derives percentage and creates revision one from a matching manifest write', async () => {
@@ -326,6 +423,28 @@ describe('AudiobookService', () => {
     expect(bookmark.positionMs).toBe(30_125);
     expect(repo.createAudioBookmark).toHaveBeenCalledWith(7, 30, expect.objectContaining({ positionSeconds: 30.125 }));
     await expect(service.createBookmark(30, { ...dto, positionMs: 31_126 }, makeUser())).rejects.toThrow(BadRequestException);
+  });
+
+  it('keeps a bookmark whose chapter id belongs to an earlier manifest, without the chapter', async () => {
+    const { service, repo } = makeFixture();
+    repo.createAudioBookmark.mockResolvedValue({
+      clientId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      bookId: 30,
+      positionSeconds: 3,
+      chapterId: null,
+      title: 'Mark',
+      note: null,
+      createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+    });
+
+    await service.createBookmark(
+      30,
+      { clientId: 'ffffffff-ffff-4fff-8fff-ffffffffffff', positionMs: 3_000, title: 'Mark', chapterId: 'ch_stale' },
+      makeUser(),
+    );
+
+    expect(repo.createAudioBookmark).toHaveBeenCalledWith(7, 30, expect.objectContaining({ chapterId: null }));
   });
 
   it('resolves asset content through the access-checked file path', async () => {

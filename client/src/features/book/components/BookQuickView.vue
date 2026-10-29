@@ -106,8 +106,8 @@ const publishedDisplay = computed(() => (detail.value ? displayPublishedDate(det
 function providerLinkStyle(provider: string) {
   const color = getProviderColor(provider)
   return {
-    borderColor: `${color}66`,
-    backgroundColor: `${color}12`,
+    borderColor: `color-mix(in srgb, ${color} 40%, transparent)`,
+    backgroundColor: `color-mix(in srgb, ${color} 7%, transparent)`,
   }
 }
 

@@ -2,6 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import type { ReadingAttempt, ReadingAttemptListResponse, ReadingAttemptOutcome, UserBookStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { compareReadingOrder } from '@/features/book/lib/reading-attempt-order'
+import { updateReadRating } from '@/features/reading-history/api/reading-history.api'
 
 export type ReadingAttemptDraft = {
   startedOn: string | null
@@ -105,7 +106,25 @@ export function useReadingAttempts(bookIdRef: Ref<number>) {
     return true
   }
 
+  /**
+   * Rates one finished read. Resolves true when it was the book's latest finish, so the book's
+   * own rating changed with it, and null when the rating could not be saved.
+   */
+  async function rate(attemptId: number, rating: number | null): Promise<boolean | null> {
+    const index = attempts.value.findIndex((attempt) => attempt.id === attemptId)
+    if (index === -1) return null
+    const previous = attempts.value[index]!.rating
+    attempts.value[index] = { ...attempts.value[index]!, rating }
+    try {
+      return (await updateReadRating(attemptId, rating)).bookRatingChanged
+    } catch {
+      const current = attempts.value.findIndex((attempt) => attempt.id === attemptId)
+      if (current !== -1) attempts.value[current] = { ...attempts.value[current]!, rating: previous }
+      return null
+    }
+  }
+
   watch(bookIdRef, () => void load(), { immediate: true })
 
-  return { attempts, total, loading, saving, error, byId, ordinalById, load, save, startReread, remove }
+  return { attempts, total, loading, saving, error, byId, ordinalById, load, save, startReread, remove, rate }
 }

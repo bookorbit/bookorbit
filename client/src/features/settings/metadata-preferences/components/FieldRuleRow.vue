@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronRight, TriangleAlert } from '@lucide/vue'
 import type { FieldPreference, MetadataField, MetadataMergeStrategy, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
-import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { providerChipStyle, providerShortLabel as shortLabelFor } from '@/lib/provider-colors'
 import { Badge } from '@/components/ui/badge'
 import ProviderChipList from './ProviderChipList.vue'
 import ProviderAddMenu from './ProviderAddMenu.vue'
@@ -46,7 +46,7 @@ const detailId = computed(() => `field-rule-detail-${props.field}`)
 const mergeSummary = computed(() => t(`settings.metadata.mergeStrategy.${props.preference.mergeStrategy}.label`))
 
 function providerShortLabel(key: MetadataProviderKey): string {
-  return PROVIDER_SHORT_LABELS[key] ?? key
+  return shortLabelFor(key, props.statuses.find((entry) => entry.key === key)?.label)
 }
 
 function update(patch: Partial<FieldPreference>) {

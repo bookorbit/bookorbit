@@ -1,12 +1,13 @@
 import { Module, forwardRef } from '@nestjs/common';
 
+import { CommonModule } from '../../common/common.module';
+import { AudiobookChaptersModule } from '../audiobook-chapters/audiobook-chapters.module';
 import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { NotificationModule } from '../notification/notification.module';
 import { BulkRenameRepository } from './bulk-rename.repository';
-import { FileLockService } from './file-lock.service';
 import { FileRenameRepository } from './file-rename.repository';
 import { FileRenameService } from './file-rename.service';
 import { FileWriteRepository } from './file-write.repository';
@@ -23,13 +24,20 @@ import { PdfFormatWriter } from './formats/pdf/pdf-format-writer';
 import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
 
 @Module({
-  imports: [forwardRef(() => NotificationModule), AppSettingsModule, BookCoverStoreModule, MetadataModule, SelfWriteRegistryModule],
+  imports: [
+    CommonModule,
+    AudiobookChaptersModule,
+    forwardRef(() => NotificationModule),
+    AppSettingsModule,
+    BookCoverStoreModule,
+    MetadataModule,
+    SelfWriteRegistryModule,
+  ],
   providers: [
     FileWriteService,
     FileWriteRepository,
     FileRenameRepository,
     FileRenameService,
-    FileLockService,
     BulkRenameRepository,
     AudioMetadataEmbedder,
     EpubFormatWriter,
@@ -77,6 +85,6 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
     },
     FormatWriterRegistry,
   ],
-  exports: [FileWriteService, FileWriteRepository, FileRenameService, FileRenameRepository, BulkRenameRepository, FileLockService],
+  exports: [FileWriteService, FileWriteRepository, FileRenameService, FileRenameRepository, BulkRenameRepository, CommonModule],
 })
 export class FileWriteModule {}

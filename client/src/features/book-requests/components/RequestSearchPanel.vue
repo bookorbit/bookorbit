@@ -422,8 +422,8 @@ function providerFallback(provider: MetadataProviderKey): string {
 function providerSourceStyle(provider: MetadataProviderKey): Record<string, string> {
   const color = getProviderColor(provider)
   return {
-    borderColor: `${color}66`,
-    backgroundColor: `${color}12`,
+    borderColor: `color-mix(in srgb, ${color} 40%, transparent)`,
+    backgroundColor: `color-mix(in srgb, ${color} 7%, transparent)`,
   }
 }
 

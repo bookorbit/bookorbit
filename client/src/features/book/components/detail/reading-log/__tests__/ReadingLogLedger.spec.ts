@@ -29,6 +29,7 @@ function makeAttempt(overrides: Partial<ReadingAttempt> = {}): ReadingAttempt {
     origin: 'bookorbit',
     externalProvider: null,
     externalId: null,
+    rating: null,
     totalSessions: 1,
     totalSeconds: 1800,
     createdAt: '2026-04-01T00:00:00.000Z',

@@ -3,7 +3,7 @@ import type { ConfigType } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Permission } from '@bookorbit/types';
-import type { ProvisioningMethod, UserAttentionResponse, UserListSummary, UserSettings } from '@bookorbit/types';
+import type { ProvisioningMethod, UserAttentionResponse, UserLibraryGrant, UserListSummary, UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -420,6 +420,12 @@ export class UserService {
     const user = await this.userRepo.findByIdWithPermissions(userId);
     if (!user) throw new NotFoundException('User not found');
     return this.userRepo.findLibraryIdsByUserId(userId);
+  }
+
+  async getLibraryGrants(userId: number): Promise<UserLibraryGrant[]> {
+    const user = await this.userRepo.findByIdWithPermissions(userId);
+    if (!user) throw new NotFoundException('User not found');
+    return this.userRepo.findLibraryGrantsByUserId(userId);
   }
 
   async setLibraries(targetUserId: number, libraryIds: number[], requestingUser: RequestUser): Promise<void> {

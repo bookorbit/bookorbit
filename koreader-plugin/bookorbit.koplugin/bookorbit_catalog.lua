@@ -1124,7 +1124,6 @@ function BookOrbitCatalog:paramsForEntry(section, entry)
         else
             params.series = entry.id
         end
-        params.sort = "series"
     end
     return params
 end
@@ -1143,23 +1142,40 @@ function BookOrbitCatalog:fetchBookPage(params, title, push)
     local body, err = self:fetch(title and T(_("Opening %1…"), title) or _("Opening books…"), function()
         return self.client:catalogBooks(query)
     end)
+    local offline_saved_at
     if not body then
         if err ~= "cancelled" then
             -- Unreachable: the page this device saved for the same request.
             local saved = self:listSavedPage(query, err)
             if saved then
-                self:showBookPage(saved.body, query, title or _("Books"), push ~= false, { offline_saved_at = saved.saved_at or 0 })
-                return
+                body = saved.body
+                offline_saved_at = saved.saved_at or 0
+            else
+                self:showRetry(err, function()
+                    self:loadBooks(params, title, push)
+                end)
             end
-            self:showRetry(err, function()
+        end
+        if not body then return end
+    else
+        self:listSavePage(query, body)
+    end
+
+    local complete, complete_err, tail_saved_at = self:listFetchCompleteSeries(query, body, title)
+    if not complete then
+        if complete_err ~= "cancelled" then
+            self:showRetry(complete_err, function()
                 self:loadBooks(params, title, push)
             end)
         end
         return
     end
-
-    self:listSavePage(query, body)
-    self:showBookPage(body, query, title or _("Books"), push ~= false)
+    if tail_saved_at then
+        offline_saved_at = offline_saved_at and math.min(offline_saved_at, tail_saved_at) or tail_saved_at
+    end
+    local complete_series = query.seriesId ~= nil or query.series ~= nil
+    self:showBookPage(complete, query, title or _("Books"), push ~= false,
+        offline_saved_at and { offline_saved_at = offline_saved_at } or { complete = complete_series })
 end
 
 function BookOrbitCatalog:loadBooks(params, title, push)
@@ -1387,7 +1403,7 @@ function BookOrbitCatalog:showBookPage(body, query, title, push, opts)
         list_saved_at = opts.offline_saved_at,
     }, push)
 
-    if not opts.offline_saved_at then
+    if not opts.offline_saved_at and not opts.complete then
         if offset then
             if offset + size < total then self:prefetchNextPage(stored, nil, offset + size) end
         elseif page < page_count then
@@ -1399,7 +1415,7 @@ end
 function BookOrbitCatalog:showSortDialog(item)
     local dialog
     local buttons = {}
-    for _, sort in ipairs(SORTS) do
+    for _i, sort in ipairs(SORTS) do
         table.insert(buttons, {
             {
                 text = sort.text .. (item.current_sort == sort.id and " *" or ""),

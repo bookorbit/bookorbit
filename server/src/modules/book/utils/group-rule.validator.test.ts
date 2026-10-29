@@ -244,24 +244,21 @@ describe('validateGroupRule', () => {
     expect(() => validateGroupRule(rule)).toThrow(BadRequestException);
   });
 
-  it('rejects providers that do not expose community ratings', () => {
+  it('rejects a rating provider that cannot be a provider key', () => {
     const rule = {
       type: 'group',
       join: 'AND',
-      rules: [{ type: 'rule', field: 'communityRating', operator: 'gte', value: 4.5, provider: 'kobo' }],
+      rules: [{ type: 'rule', field: 'communityRating', operator: 'gte', value: 4.5, provider: 'Not A Provider' }],
     };
 
     expect(() => validateGroupRule(rule)).toThrow(BadRequestException);
   });
 
-  it('rejects unsupported providers on community rating count rules', () => {
-    const rule = {
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 1000, provider: 'kobo' }],
-    };
-
-    expect(() => validateGroupRule(rule)).toThrow(BadRequestException);
+  it("accepts an external provider's ratings on rating and count rules", () => {
+    for (const field of ['communityRating', 'communityRatingCount']) {
+      const rule = { type: 'group', join: 'AND', rules: [{ type: 'rule', field, operator: 'gte', value: 4, provider: 'fantlab' }] };
+      expect(() => validateGroupRule(rule)).not.toThrow();
+    }
   });
 
   it('accepts array values for includesAny operators', () => {

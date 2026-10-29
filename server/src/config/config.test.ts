@@ -24,6 +24,7 @@ function resetEnv(): void {
   delete process.env.SWAGGER_ENABLED;
   delete process.env.KOBO_CLOUDSCRAPER_PYTHON;
   delete process.env.KOREADER_PLUGIN_PATH;
+  delete process.env.METADATA_PROVIDER_DIRECTORY_URL;
   delete process.env.DATABASE_URL;
   delete process.env.JWT_SECRET;
   delete process.env.JWT_EXPIRES_IN;
@@ -69,6 +70,7 @@ describe('config', () => {
       version: 'Local build',
       githubReleasesRepo: 'bookorbit/bookorbit',
       githubReleasesToken: undefined,
+      metadataProviderDirectoryUrl: 'https://raw.githubusercontent.com/bookorbit/bookorbit-metadata-providers/main/directory.json',
       oidcAllowLocalIssuers: false,
       swaggerEnabled: false,
       koboCloudscraperPython: undefined,
@@ -88,6 +90,7 @@ describe('config', () => {
     process.env.GITHUB_RELEASES_REPO = 'acme/app';
     process.env.GITHUB_RELEASES_TOKEN = 'ghp_example';
     process.env.NATIVE_REDIRECT_URI = 'myfork://oauth2-callback';
+    process.env.METADATA_PROVIDER_DIRECTORY_URL = ' OFF ';
 
     expect(appConfig()).toEqual({
       nodeEnv: 'production',
@@ -97,6 +100,7 @@ describe('config', () => {
       version: 'v2.3.4',
       githubReleasesRepo: 'acme/app',
       githubReleasesToken: 'ghp_example',
+      metadataProviderDirectoryUrl: null,
       oidcAllowLocalIssuers: true,
       swaggerEnabled: true,
       koboCloudscraperPython: '/opt/bookorbit-python/bin/python',

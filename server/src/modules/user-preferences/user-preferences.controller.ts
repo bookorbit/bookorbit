@@ -57,6 +57,18 @@ export class UserPreferencesController {
     await this.userPreferencesService.upsertBookRequestPreferences(user.id, dto.settings);
   }
 
+  @Get('read-aloud')
+  async getReadAloudPreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getReadAloudPreferences(user.id);
+    return { settings };
+  }
+
+  @Put('read-aloud')
+  @HttpCode(204)
+  async upsertReadAloudPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertReadAloudPreferences(user.id, dto.settings);
+  }
+
   @Get('locale')
   async getLocalePreferences(@CurrentUser() user: RequestUser) {
     const settings = await this.userPreferencesService.getLocalePreferences(user.id);

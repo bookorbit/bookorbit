@@ -624,6 +624,38 @@ describe('metadata format extractors', () => {
     );
   });
 
+  // Applying path rules to a whole library reads only text fields; covers there are wasted work.
+  it('every extractor skips the cover when told to', async () => {
+    mockExtractEpubMetadata.mockResolvedValue(null);
+    mockParseMobiFile.mockResolvedValue(null);
+    mockParseFb2File.mockResolvedValue(null);
+    mockParsePdfFile.mockResolvedValue(null);
+    mockExtractAudioMetadata.mockResolvedValue(null);
+    mockReadFile.mockResolvedValueOnce(
+      `
+        <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+          <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>No Cover Read</dc:title></metadata>
+          <guide><reference type="cover" href="cover.jpg"/></guide>
+        </package>
+      ` as any,
+    );
+
+    await new EpubFormatExtractor().extract('/books/a.epub', { cover: false });
+    await new MobiFormatExtractor().extract('/books/a.mobi', { cover: false });
+    await new Fb2FormatExtractor().extract('/books/a.fb2', { cover: false });
+    await new PdfFormatExtractor({ extractCover: true }).extract('/books/a.pdf', { cover: false });
+    await new AudioFormatExtractor().extract('/books/a.m4b', { cover: false });
+    const opf = await new OpfFormatExtractor().extract('/books/metadata.opf', { cover: false });
+
+    expect(mockExtractEpubCover).not.toHaveBeenCalled();
+    expect(mockExtractMobiCover).not.toHaveBeenCalled();
+    expect(mockExtractFb2Cover).not.toHaveBeenCalled();
+    expect(mockParsePdfFile).toHaveBeenCalledWith('/books/a.pdf', expect.objectContaining({ extractCover: false }));
+    expect(mockExtractAudioMetadata).toHaveBeenCalledWith('/books/a.m4b', { cover: false });
+    expect(opf).toEqual(expect.objectContaining({ title: 'No Cover Read', cover: null }));
+    expect(mockReadFile).toHaveBeenCalledTimes(1);
+  });
+
   // Persisting an unreadable file as empty metadata would wipe whatever the book already had.
   it('AudioFormatExtractor returns null when the file cannot be read', async () => {
     mockExtractAudioMetadata.mockResolvedValue(null);

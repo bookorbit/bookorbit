@@ -2,7 +2,7 @@ import type { Rule, RuleField, RuleOperator, SortField } from '@bookorbit/types'
 import { isReadAlongFormatKey, parseCustomRuleFieldId, parseCustomSortFieldId } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
-import { PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
+import { providerShortLabel } from '@/lib/provider-colors'
 import { formatBytes } from '@/lib/formatting'
 import { formatKeyName } from './book-formats'
 
@@ -48,7 +48,7 @@ function communityRatingProviderLabel(rule: Rule): string {
   if (rule.field !== 'communityRating' && rule.field !== 'communityRatingCount') return ''
   const provider = rule.provider ?? 'any'
   if (provider === 'any') return t('book.filter.anyProvider')
-  return PROVIDER_SHORT_LABELS[provider] ?? provider
+  return providerShortLabel(provider)
 }
 
 export function ruleToParts(rule: Rule): { field: string; operator: string; value: string | null } {

@@ -1,6 +1,6 @@
 import { Readable } from 'stream';
 import type * as unzipper from 'unzipper';
-import { inspectDeliveryEpub } from './epub-delivery-validation';
+import { hasMultimediaEntries, inspectDeliveryEpub } from './epub-delivery-validation';
 
 function publication(opfAudioHref: string, smilAudioHref: string, prolog = '', textHref = 'chapter.xhtml#sentence'): unzipper.CentralDirectory {
   const content = new Map([
@@ -45,5 +45,18 @@ describe('delivery EPUB XML resource references', () => {
   it('rejects malformed fragment encoding', async () => {
     const zip = publication('audio%26chapter.mp3', 'audio%26chapter.mp3', '', 'chapter.xhtml#%ZZ');
     await expect(inspectDeliveryEpub(zip, 100, 4096)).rejects.toThrow('Invalid overlay fragment');
+  });
+});
+
+describe('hasMultimediaEntries', () => {
+  const files = (...paths: string[]) => paths.map((path) => ({ path })) as unknown as unzipper.File[];
+
+  it('finds narration by entry name, including a percent-encoded one', () => {
+    expect(hasMultimediaEntries(files('OPS/chapter.xhtml', 'OPS/Audio/track.M4A'))).toBe(true);
+    expect(hasMultimediaEntries(files('OPS/chapter.xhtml', 'OPS/overlay%2Esmil'))).toBe(true);
+  });
+
+  it('reports a text-only archive, even with a malformed name, as plain', () => {
+    expect(hasMultimediaEntries(files('OPS/chapter.xhtml', 'OPS/cover.jpg', 'OPS/100%.xhtml'))).toBe(false);
   });
 });
