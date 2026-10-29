@@ -241,6 +241,10 @@ function resetKeyCheck() {
 async function handleValidateKey() {
   const current = draft.value
   if (!current) return
+  // The answer only speaks for the fields as they were sent: an edit, or another draft opened,
+  // while the round trip is in flight makes it stale, and a stale "ok" would vouch for a key
+  // that was never tested.
+  const sent = { baseUrl: current.baseUrl, password: current.password }
   validating.value = true
   resetKeyCheck()
   try {
@@ -250,6 +254,7 @@ async function handleValidateKey() {
       username: current.username.trim(),
       password: current.password,
     })
+    if (draft.value !== current || current.baseUrl !== sent.baseUrl || current.password !== sent.password) return
     const client = t(`settings.system.requests.clientTypes.${current.adapterType}`)
     if (result.success) {
       keyCheck.value = 'ok'

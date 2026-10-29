@@ -89,6 +89,34 @@ function fillMapping(remotePath = '/downloads', localPath = '/data/torrents') {
   typeInto('#mapping-local-0', localPath)
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
+/** Holds one /validate answer back until the test releases it, simulating a slow round trip. */
+function holdValidationAnswer() {
+  const held = deferred<{ success: boolean; version?: string }>()
+  apiMock.mockImplementationOnce((url: string, init?: RequestInit) =>
+    String(url).endsWith('/validate') && init?.method === 'POST'
+      ? held.promise.then((result) => response(result))
+      : Promise.resolve(response({ clients: [], encryptionConfigured: true })),
+  )
+  return held
+}
+
+async function openTorboxCreate(wrapper: VueWrapper) {
+  await clickInPanel(wrapper, 'Add client')
+  const torbox = sheet().querySelector<HTMLInputElement>('input[name="download-client-type"][value="torbox"]')
+  if (torbox === null) throw new Error('no TorBox client option')
+  torbox.click()
+  clickInSheet('Continue')
+  await flushPromises()
+}
+
 describe('DownloadClientsPanel', () => {
   beforeEach(() => vi.clearAllMocks())
   afterEach(() => {
@@ -245,6 +273,74 @@ describe('DownloadClientsPanel', () => {
     clickInSheet('Validate key')
     await flushPromises()
     expect(sheet().textContent).toContain('invalid TorBox key')
+  })
+
+  it('ignores a key validation that lands after the key was edited', async () => {
+    const wrapper = await mountPanel()
+    await openTorboxCreate(wrapper)
+    typeInto('#download-client-password', 'typed-key')
+    await flushPromises()
+
+    const validation = holdValidationAnswer()
+    clickInSheet('Validate key')
+    typeInto('#download-client-password', 'a-different-key')
+    validation.resolve({ success: true, version: 'v1' })
+    await flushPromises()
+
+    expect(sheet().textContent).not.toContain('Connected to TorBox')
+    const validateButton = [...sheet().querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+      (button.textContent ?? '').includes('Validate key'),
+    )
+    expect(validateButton?.disabled).toBe(false)
+
+    apiMock.mockImplementation((url: string, init?: RequestInit) =>
+      Promise.resolve(
+        String(url).endsWith('/validate') && init?.method === 'POST'
+          ? response({ success: true, version: 'v2' })
+          : response({ clients: [], encryptionConfigured: true }),
+      ),
+    )
+    clickInSheet('Validate key')
+    await flushPromises()
+    expect(sheet().textContent).toContain('Connected to TorBox')
+  })
+
+  it('ignores a key validation that lands after the URL was edited', async () => {
+    const wrapper = await mountPanel()
+    await openTorboxCreate(wrapper)
+    typeInto('#download-client-password', 'typed-key')
+    await flushPromises()
+
+    const validation = holdValidationAnswer()
+    clickInSheet('Validate key')
+    typeInto('#download-client-url', 'https://torbox-proxy.example.com')
+    validation.resolve({ success: true, version: 'v1' })
+    await flushPromises()
+
+    expect(sheet().textContent).not.toContain('Connected to TorBox')
+  })
+
+  it('ignores a key validation that lands after another draft was opened', async () => {
+    const wrapper = await mountPanel()
+    await openTorboxCreate(wrapper)
+    typeInto('#download-client-password', 'typed-key')
+    await flushPromises()
+
+    const validation = holdValidationAnswer()
+    clickInSheet('Validate key')
+
+    await clickInPanel(wrapper, 'Add client')
+    const torbox = sheet().querySelector<HTMLInputElement>('input[name="download-client-type"][value="torbox"]')
+    if (torbox === null) throw new Error('no TorBox client option')
+    torbox.click()
+    clickInSheet('Continue')
+    await flushPromises()
+    typeInto('#download-client-password', 'second-key')
+
+    validation.resolve({ success: true, version: 'v1' })
+    await flushPromises()
+
+    expect(sheet().textContent).not.toContain('Connected to TorBox')
   })
 
   it('keeps the stored SABnzbd API key when saving an unrelated edit', async () => {
