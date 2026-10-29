@@ -335,6 +335,57 @@ describe('TorboxAdapter', () => {
     expect(api.requestDownloadLink).toHaveBeenCalledWith(config(), 99, 7);
   });
 
+  it('refuses a download link that is not https', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('http://example.com/book.epub');
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(Buffer.from('book'))));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).rejects.toThrow('TorBox download links must use https');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
+  });
+
+  it('refuses a redirect that downgrades the download link to http', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub');
+    const fetchMock = vi.fn((input: URL | string) =>
+      String(input) === 'https://example.com/book.epub'
+        ? Promise.resolve(new Response(null, { status: 302, headers: { location: 'http://example.com/downgraded.epub' } }))
+        : Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).rejects.toThrow('TorBox download links must use https');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
+  });
+
+  it('follows an https redirect to the file', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: URL | string) =>
+        String(input) === 'https://example.com/book.epub'
+          ? Promise.resolve(new Response(null, { status: 302, headers: { location: 'https://example.com/final.epub' } }))
+          : Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } })),
+      ),
+    );
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
+    await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('book');
+  });
+
   it('rejects a release whose listed size is over the staging ceiling before fetching anything', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([

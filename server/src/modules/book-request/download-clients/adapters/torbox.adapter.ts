@@ -392,7 +392,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
 
   /** Follows the CDN link by hand so every hop is checked the way every other fetch in BookOrbit is. */
   private async open(rawUrl: string, signal: AbortSignal): Promise<Response> {
-    let current = await ensureSafeUrl(rawUrl, { allowPrivate: false });
+    let current = this.ensureSecureTransport(await ensureSafeUrl(rawUrl, { allowPrivate: false }));
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       const response = await safeFetch(
@@ -405,7 +405,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
         const location = response.headers.get('location');
         if (response.body) await response.body.cancel().catch(() => undefined);
         if (!location) throw new Error('The TorBox download link redirected without a location');
-        current = await ensureSafeUrl(new URL(location, current).href, { allowPrivate: false });
+        current = this.ensureSecureTransport(await ensureSafeUrl(new URL(location, current).href, { allowPrivate: false }));
         continue;
       }
 
@@ -418,6 +418,16 @@ export class TorboxAdapter implements DownloadClientAdapter {
     }
 
     throw new Error('The TorBox download link redirected too many times');
+  }
+
+  /**
+   * A CDN link carries its auth token in the query string, so a plain-http hop, a downgrade
+   * redirect included, would send that token in cleartext. TorBox is a hosted service, never a
+   * LAN daemon, so there is no legitimate http download to let through.
+   */
+  private ensureSecureTransport(url: URL): URL {
+    if (url.protocol !== 'https:') throw new BadRequestException('TorBox download links must use https://');
+    return url;
   }
 
   private async cancelStaging(clientId: number, clientKey: string): Promise<void> {
