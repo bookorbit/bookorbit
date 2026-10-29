@@ -79,6 +79,19 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function trackedBody(chunks: Uint8Array[] = [new TextEncoder().encode('book')]) {
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk);
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  return { body, wasCancelled: () => cancelled };
+}
+
 describe('TorboxAdapter', () => {
   let appDataPath: string;
   let api: ReturnType<typeof apiMock>;
@@ -386,6 +399,40 @@ describe('TorboxAdapter', () => {
     await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('book');
   });
 
+  it('closes the CDN connection when TorBox answers with a web page', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub');
+    const tracked = trackedBody([new TextEncoder().encode('<html>login</html>')]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(tracked.body, { headers: { 'content-type': 'text/html; charset=utf-8' } }))),
+    );
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).rejects.toThrow('web page');
+    await vi.waitFor(() => expect(tracked.wasCancelled()).toBe(true));
+    await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
+  });
+
+  it('closes the CDN connection when a declared file is over the fetch ceiling', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub');
+    const tracked = trackedBody([new Uint8Array(4)]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(tracked.body, { headers: { 'content-length': String(MAX_STAGE_BYTES + 1) } }))),
+    );
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).rejects.toThrow('larger than the 8 GiB');
+    await vi.waitFor(() => expect(tracked.wasCancelled()).toBe(true));
+    await expect(stat(join(directory, 'book.epub.part'))).rejects.toThrow();
+  });
+
   it('rejects a release whose listed size is over the staging ceiling before fetching anything', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([
@@ -441,13 +488,15 @@ describe('TorboxAdapter', () => {
       ]),
     );
     api.requestDownloadLink.mockResolvedValue('https://example.com/bonus.epub');
+    const tracked = trackedBody([new Uint8Array(100)]);
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => Promise.resolve(new Response(Buffer.alloc(100), { headers: { 'content-length': '100' } }))),
+      vi.fn(() => Promise.resolve(new Response(tracked.body, { headers: { 'content-length': '100' } }))),
     );
 
     await expect(adapter.stage(CLIENT_KEY, config())).rejects.toBeInstanceOf(BadRequestException);
     await expect(stat(join(directory, 'bonus.epub.part'))).rejects.toThrow();
+    await vi.waitFor(() => expect(tracked.wasCancelled()).toBe(true));
   });
 
   it('gives colliding sanitized names distinct targets instead of overwriting', async () => {

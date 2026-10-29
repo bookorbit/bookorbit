@@ -333,14 +333,6 @@ export class TorboxAdapter implements DownloadClientAdapter {
 
     try {
       const response = await this.open(url, transfer);
-      const contentType = response.headers.get('content-type') ?? '';
-      if (HTML_CONTENT_TYPE.test(contentType)) throw new BadRequestException('TorBox answered with a web page rather than a file');
-
-      const declared = response.headers.get('content-length');
-      const declaredBytes = declared === null ? null : Number(declared);
-      if (declaredBytes !== null && Number.isFinite(declaredBytes) && declaredBytes > MAX_FILE_BYTES) {
-        throw new BadRequestException(`A file in this release is larger than the ${MAX_FILE_LABEL} BookOrbit will fetch`);
-      }
       if (!response.body) throw new BadRequestException('TorBox answered without a file body');
 
       const reader = response.body.getReader();
@@ -365,10 +357,24 @@ export class TorboxAdapter implements DownloadClientAdapter {
         }
       };
 
+      let completed = false;
       try {
+        const contentType = response.headers.get('content-type') ?? '';
+        if (HTML_CONTENT_TYPE.test(contentType)) throw new BadRequestException('TorBox answered with a web page rather than a file');
+
+        const declared = response.headers.get('content-length');
+        const declaredBytes = declared === null ? null : Number(declared);
+        if (declaredBytes !== null && Number.isFinite(declaredBytes) && declaredBytes > MAX_FILE_BYTES) {
+          throw new BadRequestException(`A file in this release is larger than the ${MAX_FILE_LABEL} BookOrbit will fetch`);
+        }
+
         await pipeline(Readable.from(counted()), createWriteStream(target), { signal: transfer });
+        completed = true;
       } finally {
         transfer.removeEventListener('abort', abortReader);
+        // Cancelling the reader is what closes the HTTP body: releaseLock alone leaves a refused
+        // or failed transfer's CDN connection draining in the background.
+        if (!completed) void reader.cancel().catch(() => undefined);
         try {
           reader.releaseLock();
         } catch {
