@@ -50,6 +50,20 @@ export const DOWNLOAD_CLIENT_STAGES_LOCALLY: Record<DownloadClientType, boolean>
   torbox: true,
 };
 
+/**
+ * A cloud client offers no way to hand a download back: removing it from BookOrbit deletes the
+ * item and its files on the client's side whatever the operator chose, so the UI must say that
+ * rather than promise a copy nothing can keep.
+ */
+export const DOWNLOAD_CLIENT_ALWAYS_DELETES_REMOTE: Record<DownloadClientType, boolean> = {
+  qbittorrent: false,
+  transmission: false,
+  deluge: false,
+  nzbget: false,
+  sabnzbd: false,
+  torbox: true,
+};
+
 export interface DownloadClientPathMapping {
   id: number;
   /** The prefix the download client reports, in its own filesystem namespace. */
@@ -267,6 +281,11 @@ export interface BookRequestDownloadItem {
   downloadClientId: number | null;
   downloadClientName: string | null;
   downloadClientColor: IndexerColor | null;
+  /**
+   * True when this attempt is held by a client that deletes it, files included, when removed:
+   * the operator is not offered a copy that client cannot keep.
+   */
+  alwaysDeletesRemote: boolean;
   source: BookRequestDownloadSource;
   /** Where the release came from, and null once that indexer row has been deleted. */
   indexerId: number | null;
@@ -308,6 +327,8 @@ export interface BookRequestSeedStatus {
   downloadClientId: number;
   downloadClientName: string | null;
   clientKey: string;
+  /** True when removing this torrent deletes it and its files on the client's side for good. */
+  alwaysDeletesRemote: boolean;
   /** False once the client has stopped the torrent, whether by goal, by pause or by error. */
   seeding: boolean;
   ratio: number | null;

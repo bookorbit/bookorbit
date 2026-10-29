@@ -96,6 +96,7 @@ describe('RequestSeedService.getSeedStatus', () => {
       downloadClientId: 4,
       downloadClientName: 'qbit',
       clientKey: INFO_HASH,
+      alwaysDeletesRemote: false,
       seeding: true,
       ratio: 1.4,
       ratioGoal: 2,
@@ -103,6 +104,17 @@ describe('RequestSeedService.getSeedStatus', () => {
       seedingTimeGoalMinutes: 4320,
       uploadedBytes: 900,
     });
+  });
+
+  /**
+   * A cloud client cannot hand a torrent back: removing it deletes the item and its files there.
+   * The panel has to know that before it offers a "keep the files" choice that cannot be honoured.
+   */
+  it('reports that a cloud client always deletes the remote copy', async () => {
+    const { service, clients } = makeService();
+    clients.resolveConfig.mockResolvedValue({ id: 4, adapterType: 'torbox' });
+
+    await expect(service.getSeedStatus(7)).resolves.toEqual(expect.objectContaining({ alwaysDeletesRemote: true }));
   });
 
   it('reports nothing for a request that was never grabbed', async () => {

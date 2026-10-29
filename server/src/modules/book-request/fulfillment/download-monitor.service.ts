@@ -347,6 +347,12 @@ export class DownloadMonitorService implements OnModuleDestroy {
           : 'downloading';
 
     const movedBytes = status.downloadedBytes > row.downloadedBytes;
+    // A finished cloud download waiting for a staging slot reports the same bytes every poll, so
+    // queue membership is what tells the stall watchdog the attempt is still alive. Running
+    // fetches are excluded on purpose: their own job reports growing bytes, and stamping those
+    // too would mask a transfer that has genuinely stalled.
+    const awaitingStagingSlot =
+      needsStaging && target !== DIRECT && row.clientKey !== null && this.stageQueue.isPending({ clientId: target, clientKey: row.clientKey });
     // Conditional on the attempt still being active, because this row was read before a poll that
     // can take twenty seconds to answer. A cancellation that landed inside that window has already
     // taken the attempt out of the active set, and writing this back would undo it: the request
@@ -359,7 +365,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
       downloadedBytes: status.downloadedBytes,
       totalBytes: status.totalBytes,
       contentPath: status.contentPath ?? row.contentPath,
-      ...(movedBytes ? { lastProgressAt: new Date() } : {}),
+      ...(movedBytes || awaitingStagingSlot ? { lastProgressAt: new Date() } : {}),
       ...(status.state === 'completed' && !needsStaging ? { completedAt: row.completedAt ?? new Date() } : {}),
       ...(row.source === 'direct_url' && status.state === 'completed' ? { directUrl: null, directEtag: null, directLastModified: null } : {}),
     });

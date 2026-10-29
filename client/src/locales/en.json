@@ -9564,7 +9564,8 @@
       "confirm": {
         "title": "Remove this torrent?",
         "description": "The torrent stops seeding. The downloaded files stay on disk.",
-        "descriptionWithFiles": "The torrent stops seeding and its downloaded files are deleted. The imported book stays in your library."
+        "descriptionWithFiles": "The torrent stops seeding and its downloaded files are deleted. The imported book stays in your library.",
+        "descriptionRemoteDelete": "The torrent stops seeding and the download client deletes it and its files there for good. The imported book stays in your library."
       }
     },
     "pipeline": {
@@ -9620,11 +9621,14 @@
     "confirm": {
       "cancelDownloadTitle": "Cancel this download?",
       "cancelDownloadDescription": "The active transfer stops and the request stays open so another release can be chosen. Client-managed data is kept; partial direct-download staging is deleted.",
+      "cancelDownloadDescriptionRemoteDelete": "The active transfer stops and the request stays open so another release can be chosen. The download client deletes the transfer and its files there for good.",
       "cancelTitle": "Stop this request?",
       "cancelDescription": "It moves to cancelled. Nobody waiting on it will get the book.",
       "cancelDescriptionWithDownload": "The active transfer is stopped. Data in the download client is kept; partial direct-download staging is deleted.",
+      "cancelDescriptionWithDownloadRemoteDelete": "The active transfer is stopped and removed from the download client, which deletes it and its files there for good.",
       "deleteTitle": "Delete this request?",
       "deleteDescription": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client with its files kept. Direct-download staging is cleaned automatically. Dismissing the request instead only hides it from your own list.",
+      "deleteDescriptionRemoteDelete": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client, which deletes it and its files there for good. Dismissing the request instead only hides it from your own list.",
       "discardImportTitle": "Discard this import?",
       "discardImportDescription": "The downloaded files are removed from the Book Dock and the request is marked failed. The torrent keeps seeding; stop it separately if you want it gone.",
       "leaveTitle": "Leave this request?",

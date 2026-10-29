@@ -130,16 +130,28 @@ export class TorboxAdapter implements DownloadClientAdapter {
     const key = normalizeKey(clientKey);
     await this.cancelStaging(config.id, key);
 
-    const found = await this.api.findByHashes(config, new Set([key]));
-    const torrent = found.get(key);
-    // Deleting is permanent on TorBox's side; that is the API's design, and a no-op if the item is
-    // already gone, so the local cleanup below is what the operator's choice actually controls.
-    if (torrent) await this.api.controlTorrent(config, torrent.torrentId, 'delete');
-
-    if (opts.deleteFiles) {
-      await rm(stagedClientDir(this.appDataPath, this.type, config.id, key), { recursive: true, force: true });
-      await rm(legacyStagedClientDir(this.appDataPath, this.type, key), { recursive: true, force: true });
+    try {
+      const found = await this.api.findByHashes(config, new Set([key]));
+      const torrent = found.get(key);
+      // Deleting is permanent on TorBox's side; that is the API's design, and a no-op if the item is
+      // already gone, so the local cleanup below is what the operator's choice actually controls.
+      if (torrent) await this.api.controlTorrent(config, torrent.torrentId, 'delete');
+    } catch (error) {
+      // The callers that swallow a TorBox refusal settle the attempt anyway, so this is the last
+      // moment anyone will look for these files: leaving them behind strands a whole release's
+      // worth of staging nothing will ever collect. Best-effort, because the refusal itself is
+      // what the caller needs to hear.
+      if (opts.deleteFiles) await this.cleanStaged(config.id, key).catch(() => undefined);
+      throw error;
     }
+
+    if (opts.deleteFiles) await this.cleanStaged(config.id, key);
+  }
+
+  /** Both staging layouts, so a release fetched before directories were isolated by client id goes too. */
+  private async cleanStaged(clientId: number, key: string): Promise<void> {
+    await rm(stagedClientDir(this.appDataPath, this.type, clientId, key), { recursive: true, force: true });
+    await rm(legacyStagedClientDir(this.appDataPath, this.type, key), { recursive: true, force: true });
   }
 
   async test(config: ResolvedClientConfig): Promise<DownloadClientTestResult> {

@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { bigint, boolean, check, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
-import type { IndexerColor, ReleaseUnitChoice } from '@bookorbit/types';
+import type { DownloadClientType, IndexerColor, ReleaseUnitChoice } from '@bookorbit/types';
 
 import { bookDockFiles } from './book-dock';
 import { bookRequests } from './book-requests';
@@ -20,7 +20,7 @@ export const downloadClients = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 100 }).notNull(),
     color: varchar('color', { length: 16 }).$type<IndexerColor>(),
-    adapterType: varchar('adapter_type', { length: 30 }).notNull(),
+    adapterType: varchar('adapter_type', { length: 30 }).$type<DownloadClientType>().notNull(),
     enabled: boolean('enabled').notNull().default(true),
     priority: integer('priority').notNull().default(1),
 

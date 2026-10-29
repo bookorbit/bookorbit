@@ -6,6 +6,7 @@ import { DownloadMonitorService } from './download-monitor.service';
 
 const HASH_A = 'a'.repeat(40);
 const HASH_B = 'b'.repeat(40);
+const HASH_C = 'c'.repeat(40);
 
 function row(overrides: Partial<BookRequestDownloadRow> = {}): BookRequestDownloadRow {
   return {
@@ -234,6 +235,63 @@ describe('DownloadMonitorService.tick', () => {
     expect(downloads.updateIf).not.toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'completed' }));
     expect(imports.importDownload).not.toHaveBeenCalled();
     expect(adapter.stage).toHaveBeenCalledWith(HASH_A, expect.anything());
+  });
+
+  /**
+   * A finished cloud download waiting its turn reports the same bytes every poll, so byte movement
+   * says nothing about whether it is alive. Queue membership does, and it is what keeps the stall
+   * watchdog from failing a download that is merely behind others in the staging queue.
+   */
+  it('heartbeats a cloud download waiting for a staging slot, but not one already fetching', async () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(60_000);
+    try {
+      const rows = [
+        row({ id: 11, clientKey: HASH_A, progressPercent: 100, downloadedBytes: 1000, totalBytes: 1000 }),
+        row({ id: 12, clientKey: HASH_B, progressPercent: 100, downloadedBytes: 1000, totalBytes: 1000 }),
+        row({ id: 13, clientKey: HASH_C, progressPercent: 100, downloadedBytes: 1000, totalBytes: 1000 }),
+      ];
+      const completed = (clientKey: string) =>
+        status({ clientKey, state: 'completed', contentPath: null, progressPercent: 100, downloadedBytes: 1000, totalBytes: 1000 });
+      const { service, downloads, adapter } = makeService({
+        stageCapable: true,
+        active: rows,
+        statuses: [completed(HASH_A), completed(HASH_B), completed(HASH_C)],
+      });
+
+      // Both slots held by fetches that never finish, so the third job can only wait.
+      const hangs: Array<() => void> = [];
+      const stage = (
+        adapter as unknown as {
+          stage: { mockImplementation: (impl: () => Promise<void>) => void; mockResolvedValue: (value: unknown) => void };
+        }
+      ).stage;
+      stage.mockImplementation(() => new Promise<void>((resolve) => hangs.push(resolve)));
+
+      await polled(service);
+
+      const first = downloads.updateIf.mock.calls.filter(([id]) => id === 13).map(([, , patch]) => patch);
+      expect(first.at(-1)).not.toHaveProperty('lastProgressAt');
+
+      now.mockReturnValue(66_000);
+      await polled(service);
+
+      const waiting = downloads.updateIf.mock.calls.filter(([id]) => id === 13).map(([, , patch]) => patch);
+      expect(waiting.at(-1)).toHaveProperty('lastProgressAt');
+
+      // The fetches actually running report their own bytes: stamping those too would paper over
+      // a transfer that has genuinely stalled.
+      for (const id of [11, 12]) {
+        const running = downloads.updateIf.mock.calls.filter(([callerId]) => callerId === id).map(([, , patch]) => patch);
+        expect(running.every((patch) => !('lastProgressAt' in patch))).toBe(true);
+      }
+
+      stage.mockResolvedValue({ contentPath: '/app-data/client-downloads/torbox/staged' });
+      for (const resolve of hangs) resolve();
+      await service.whenStagingSettles();
+    } finally {
+      now.mockRestore();
+    }
   });
 
   /**

@@ -686,6 +686,41 @@ describe('TorboxAdapter', () => {
     await expect(stat(directory)).rejects.toThrow();
   });
 
+  /**
+   * The callers that swallow a TorBox refusal settle the attempt anyway, so this is the last
+   * moment anyone looks for the staged files: leaving them behind strands a whole release.
+   */
+  it('still deletes its staged files when the remote lookup fails', async () => {
+    api.findByHashes.mockRejectedValue(new Error('torbox is down'));
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'book');
+
+    await expect(adapter.remove(CLIENT_KEY, config(), { deleteFiles: true })).rejects.toThrow('torbox is down');
+    await expect(stat(directory)).rejects.toThrow();
+  });
+
+  it('still deletes its staged files when the remote delete fails', async () => {
+    api.findByHashes.mockResolvedValue(new Map([[CLIENT_KEY, torrent()]]));
+    api.controlTorrent.mockRejectedValue(new Error('rate limited'));
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'book');
+
+    await expect(adapter.remove(CLIENT_KEY, config(), { deleteFiles: true })).rejects.toThrow('rate limited');
+    await expect(stat(directory)).rejects.toThrow();
+  });
+
+  it('keeps its staged files after a remote failure when the operator did not ask for their removal', async () => {
+    api.findByHashes.mockRejectedValue(new Error('torbox is down'));
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'book');
+
+    await expect(adapter.remove(CLIENT_KEY, config(), { deleteFiles: false })).rejects.toThrow('torbox is down');
+    await expect(stat(directory)).resolves.toBeTruthy();
+  });
+
   it('reports the TorBox user email during connection tests', async () => {
     await expect(adapter.test(config())).resolves.toEqual({ success: true, version: 'reader@example.com' });
     api.getUser.mockRejectedValue(new Error('connection refused'));

@@ -53,6 +53,11 @@ export class RequestStageQueue {
     return new Promise((resolve) => this.idleResolvers.push(resolve));
   }
 
+  /** True while this fetch is still waiting for a slot, which is what a caller can vouch for. */
+  isPending(job: Pick<StageJob, 'clientId' | 'clientKey'>): boolean {
+    return this.queued.has(stageKeyOf(job));
+  }
+
   private drain(): void {
     while (!this.stopped && this.running.size < this.concurrency && this.pending.length > 0) {
       const job = this.pending.shift()!;
@@ -82,6 +87,6 @@ export class RequestStageQueue {
   }
 }
 
-function stageKeyOf(job: StageJob): string {
+function stageKeyOf(job: Pick<StageJob, 'clientId' | 'clientKey'>): string {
   return `${job.clientId}:${job.clientKey}`;
 }

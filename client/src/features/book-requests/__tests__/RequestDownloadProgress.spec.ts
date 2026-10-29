@@ -11,6 +11,7 @@ function download(overrides: Partial<BookRequestDownloadItem> = {}): BookRequest
     downloadClientId: 5,
     downloadClientName: 'Direct download',
     downloadClientColor: null,
+    alwaysDeletesRemote: false,
     source: 'direct_url',
     indexerId: null,
     indexerName: null,

@@ -132,7 +132,16 @@ const confirmTitle = computed(() =>
 
 const confirmDescription = computed(() => {
   if (!confirming.value) return ''
-  if (confirming.value.action === 'delete') return t('bookRequests.confirm.deleteDescription')
+  if (confirming.value.action === 'delete') {
+    return t(
+      confirming.value.requests.some((request) => request.download?.alwaysDeletesRemote)
+        ? 'bookRequests.confirm.deleteDescriptionRemoteDelete'
+        : 'bookRequests.confirm.deleteDescription',
+    )
+  }
+  if (confirming.value.requests.some((request) => cancelStopsATransfer(request) && request.download?.alwaysDeletesRemote)) {
+    return t('bookRequests.confirm.cancelDescriptionWithDownloadRemoteDelete')
+  }
   return confirming.value.requests.some(cancelStopsATransfer)
     ? t('bookRequests.confirm.cancelDescriptionWithDownload')
     : t('bookRequests.confirm.cancelDescription')
