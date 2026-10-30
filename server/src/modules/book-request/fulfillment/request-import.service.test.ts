@@ -21,7 +21,7 @@ function download(contentPath: string, overrides: Partial<BookRequestDownloadRow
   return { id: 11, requestId: 7, downloadClientId: 1, contentPath, ...overrides } as BookRequestDownloadRow;
 }
 
-async function makeHarness(options: { useHardlinks?: boolean } = {}) {
+async function makeHarness(options: { useHardlinks?: boolean; stagesLocally?: boolean } = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'bookorbit-import-')));
   const bookDockPath = join(root, 'dock');
   const appDataPath = join(root, 'app-data');
@@ -63,19 +63,26 @@ async function makeHarness(options: { useHardlinks?: boolean } = {}) {
   const fulfillment = { failDownload: vi.fn().mockResolvedValue(undefined), holdForReview: vi.fn().mockResolvedValue(undefined) };
   const dockIngest = { ingestFromWatchedFolder: vi.fn().mockResolvedValue(null) };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
-  const removal = { cleanupStagedDirectDownload: vi.fn().mockResolvedValue(undefined) };
+  const removal = {
+    cleanupStagedDirectDownload: vi.fn().mockResolvedValue(undefined),
+    cleanupStagedClientDownload: vi.fn().mockResolvedValue(undefined),
+  };
   // The real containment check over a stubbed mapping, so these tests exercise the boundary the
   // importer actually applies rather than a mock that always agrees with it.
   const pathMappings = new PathMappingService({
     findPathMappings: vi.fn().mockResolvedValue([{ remotePath: downloadsPath, localPath: downloadsPath }]),
   } as never);
+  vi.spyOn(pathMappings, 'assertWithinRoot');
 
   const service = new RequestImportService(
     { getOrThrow: (key: string) => (key === 'storage.appDataPath' ? appDataPath : bookDockPath) } as never,
     downloads as never,
     requests as never,
     gateway as never,
-    { useHardlinks: vi.fn().mockResolvedValue(options.useHardlinks ?? true) } as never,
+    {
+      useHardlinks: vi.fn().mockResolvedValue(options.useHardlinks ?? true),
+      stagesLocally: vi.fn().mockResolvedValue(options.stagesLocally ?? false),
+    } as never,
     pathMappings as never,
     dockRepo as never,
     dockIngest as never,
@@ -100,6 +107,7 @@ async function makeHarness(options: { useHardlinks?: boolean } = {}) {
     appDataPath,
     downloadsPath,
     directDownloadsPath,
+    pathMappings,
   };
 }
 
@@ -209,6 +217,29 @@ describe('RequestImportService.importDownload', () => {
 
     expect(harness.removal.cleanupStagedDirectDownload).toHaveBeenCalledWith(direct);
     expect(await readFile(join(harness.bookDockPath, 'request-7-dune.epub'), 'utf8')).toBe('book');
+  });
+
+  it('imports a staged cloud download from BookOrbit client staging', async () => {
+    const harness = await makeHarness({ stagesLocally: true });
+    const stagedPath = join(harness.appDataPath, 'client-downloads', 'torbox', 'key');
+    const source = await makeFile(stagedPath, 'dune.epub');
+    const staged = download(source);
+
+    await expect(harness.service.importDownload(staged)).resolves.toBe(true);
+
+    expect(harness.pathMappings.assertWithinRoot).toHaveBeenCalledWith(join(harness.appDataPath, 'client-downloads'), source);
+    expect(await readFile(join(harness.bookDockPath, 'request-7-dune.epub'), 'utf8')).toBe('book');
+  });
+
+  it('refuses a staged cloud path outside BookOrbit client staging', async () => {
+    const harness = await makeHarness({ stagesLocally: true });
+    const outside = '/etc/dune.epub';
+    const staged = download(outside);
+
+    await expect(harness.service.importDownload(staged)).resolves.toBe(false);
+
+    expect(harness.pathMappings.assertWithinRoot).toHaveBeenCalledWith(join(harness.appDataPath, 'client-downloads'), outside);
+    expect(harness.fulfillment.failDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), expect.stringContaining('outside'));
   });
 
   /**

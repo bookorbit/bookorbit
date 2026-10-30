@@ -3763,12 +3763,13 @@
         "clientsEmpty": {
           "title": "No download client yet",
           "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch releases delivered by torrent or Usenet too.",
-          "note": "qBittorrent, Transmission, Deluge, NZBGet and SABnzbd are supported."
+          "note": "qBittorrent, Transmission, Deluge, NZBGet, SABnzbd and TorBox are supported."
         },
         "summary": "{type} - category {category}, priority {priority}",
         "disabled": "Disabled",
         "test": "Test connection",
         "testSaveFirst": "Save your changes before testing",
+        "validateKey": "Validate key",
         "testOk": "Connected to {client} {version}",
         "testOkNoVersion": "Connected to {client}",
         "lastTestOk": "Last tested {time}: connected",
@@ -3780,7 +3781,8 @@
           "transmission": "Transmission",
           "deluge": "Deluge",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd"
+          "sabnzbd": "SABnzbd",
+          "torbox": "TorBox"
         },
         "color": {
           "label": "Color",
@@ -3809,6 +3811,7 @@
           "allowPrivateAddressHint": "Needed when the client runs on your local network or the same machine.",
           "passwordBrief": "Stored encrypted.",
           "apiKeyBrief": "Found in SABnzbd under Config > General. Stored encrypted.",
+          "torboxApiKeyBrief": "Can be found at https://torbox.app/settings?section=account. Stored encrypted.",
           "useHardlinksBrief": "Imports without using the disk twice. Falls back to a copy across filesystems."
         },
         "mappings": {
@@ -4293,7 +4296,8 @@
           "transmission": "Your own Transmission. It has no categories, so the category becomes a subfolder of its download directory.",
           "deluge": "Your own Deluge. Sign in with the Web UI password; the category needs the Label plugin switched on.",
           "nzbget": "Your own NZBGet. BookOrbit sends NZB files over its JSON-RPC API.",
-          "sabnzbd": "Your own SABnzbd. BookOrbit sends NZB files using its API key."
+          "sabnzbd": "Your own SABnzbd. BookOrbit sends NZB files using its API key.",
+          "torbox": "Your own TorBox cloud account. BookOrbit sends torrents to it and fetches the finished files for import."
         },
         "searchHealth": {
           "failingOnce": "Last search failed",
@@ -9560,7 +9564,8 @@
       "confirm": {
         "title": "Remove this torrent?",
         "description": "The torrent stops seeding. The downloaded files stay on disk.",
-        "descriptionWithFiles": "The torrent stops seeding and its downloaded files are deleted. The imported book stays in your library."
+        "descriptionWithFiles": "The torrent stops seeding and its downloaded files are deleted. The imported book stays in your library.",
+        "descriptionRemoteDelete": "The torrent stops seeding and the download client deletes it and its files there for good. The imported book stays in your library."
       }
     },
     "pipeline": {
@@ -9616,11 +9621,14 @@
     "confirm": {
       "cancelDownloadTitle": "Cancel this download?",
       "cancelDownloadDescription": "The active transfer stops and the request stays open so another release can be chosen. Client-managed data is kept; partial direct-download staging is deleted.",
+      "cancelDownloadDescriptionRemoteDelete": "The active transfer stops and the request stays open so another release can be chosen. The download client deletes the transfer and its files there for good.",
       "cancelTitle": "Stop this request?",
       "cancelDescription": "It moves to cancelled. Nobody waiting on it will get the book.",
       "cancelDescriptionWithDownload": "The active transfer is stopped. Data in the download client is kept; partial direct-download staging is deleted.",
+      "cancelDescriptionWithDownloadRemoteDelete": "The active transfer is stopped and removed from the download client, which deletes it and its files there for good.",
       "deleteTitle": "Delete this request?",
       "deleteDescription": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client with its files kept. Direct-download staging is cleaned automatically. Dismissing the request instead only hides it from your own list.",
+      "deleteDescriptionRemoteDelete": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client, which deletes it and its files there for good. Dismissing the request instead only hides it from your own list.",
       "discardImportTitle": "Discard this import?",
       "discardImportDescription": "The downloaded files are removed from the Book Dock and the request is marked failed. The torrent keeps seeding; stop it separately if you want it gone.",
       "leaveTitle": "Leave this request?",

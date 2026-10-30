@@ -14,6 +14,7 @@ function attempt(overrides: Partial<BookRequestDownloadItem> = {}): BookRequestD
     downloadClientId: null,
     downloadClientName: null,
     downloadClientColor: null,
+    alwaysDeletesRemote: false,
     source: 'torrent_file',
     indexerId: 1,
     indexerName: 'MyAnonaMouse',
