@@ -90,7 +90,7 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
 
 <template>
   <header
-    class="fixed top-0 left-0 right-0 h-10 sm:h-11 z-50 flex items-center px-2 sm:px-3 gap-1 bg-background/90 backdrop-blur-md border-b border-border"
+    class="fixed top-0 left-0 right-0 h-[calc(2.5rem+env(safe-area-inset-top,0px))] sm:h-[calc(2.75rem+env(safe-area-inset-top,0px))] z-50 flex items-center pt-[env(safe-area-inset-top,0px)] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] gap-1 bg-background/90 backdrop-blur-md border-b border-border"
   >
     <!-- Left button group -->
     <div class="flex items-center gap-1 shrink-0">
