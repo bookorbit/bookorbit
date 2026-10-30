@@ -2958,16 +2958,6 @@ packages:
       '@nestjs/common': ^11.0.0 || ^12.0.0
       '@nestjs/core': ^11.0.0 || ^12.0.0
 
-  '@nestjs/schematics@12.0.10':
-    resolution: {integrity: sha512-3objKOOQDGxcckj92d7NNiYGVNoMoUqqw7eX8O/25ZL4V6ih/Hkx4WgOJ/H/2fkfag4UdiYN/GySHimn682+nQ==}
-    engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
-    peerDependencies:
-      prettier: ^3.0.0
-      typescript: '>=6.0.0'
-    peerDependenciesMeta:
-      prettier:
-        optional: true
-
   '@nestjs/schematics@12.0.11':
     resolution: {integrity: sha512-OaQOU8SZ7S+SYsJ3qQOQMAq4gm1hhQw2wGIgua2Jepoxn1YQfz/VdLejF3tLWjfnVbXtPGU1gTZiGPiiWTydTg==}
     engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
@@ -5653,8 +5643,8 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  devalue@5.9.0:
-    resolution: {integrity: sha512-RWrqdArjvPbsATEhOPUo6Wndc/iWnkWKlhIrdlF3zMMYo/c3CVtoaVAyLtWxz5h8nSlkHzxnzV2uLydPXmtF+A==}
+  devalue@5.9.4:
+    resolution: {integrity: sha512-sPAT4pztbu6586/hrhOnMKS17IJrvg12mXiSPSS3W5qDeN2RGgvZ0diZCm31dBbnevfVmujNO3IM2wrS4Y2Rhg==}
 
   dezalgo@1.0.4:
     resolution: {integrity: sha512-rXSP0bf+5n0Qonsb+SVVfNfIsimO4HEtmnIpPHY8Q1UCzKlQrDMfdobr8nJOOsRgWCyMRqeSBQzmWUMq7zvVig==}
@@ -12056,7 +12046,7 @@ snapshots:
       '@angular-devkit/schematics': 22.2.3(chokidar@5.0.0)
       '@angular-devkit/schematics-cli': 22.2.3(@types/node@26.6.5)(chokidar@5.0.0)
       '@inquirer/prompts': 8.7.3(@types/node@26.6.5)
-      '@nestjs/schematics': 12.0.10(chokidar@5.0.0)(prettier@3.9.10)(typescript@6.0.3)
+      '@nestjs/schematics': 12.0.11(chokidar@5.0.0)(prettier@3.9.10)(typescript@6.0.3)
       ansis: 4.4.0
       chokidar: 5.0.0
       cli-table3: 0.6.5
@@ -12170,19 +12160,6 @@ snapshots:
       '@nestjs/common': 12.3.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
       '@nestjs/core': 12.3.2(@nestjs/common@12.3.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/websockets@12.3.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       cron: 4.4.0
-
-  '@nestjs/schematics@12.0.10(chokidar@5.0.0)(prettier@3.9.10)(typescript@6.0.3)':
-    dependencies:
-      '@angular-devkit/core': 22.2.3(chokidar@5.0.0)
-      '@angular-devkit/schematics': 22.2.3(chokidar@5.0.0)
-      comment-json: 5.0.0
-      jsonc-parser: 3.3.1
-      pluralize: 8.0.0
-      typescript: 6.0.3
-    optionalDependencies:
-      prettier: 3.9.10
-    transitivePeerDependencies:
-      - chokidar
 
   '@nestjs/schematics@12.0.11(chokidar@5.0.0)(prettier@3.9.10)(typescript@6.0.3)':
     dependencies:
@@ -14836,7 +14813,7 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  devalue@5.9.0: {}
+  devalue@5.9.4: {}
 
   dezalgo@1.0.4:
     dependencies:
@@ -18126,7 +18103,7 @@ snapshots:
       aria-query: 5.3.1
       axobject-query: 4.1.0
       clsx: 2.1.1
-      devalue: 5.9.0
+      devalue: 5.9.4
       esm-env: 1.2.2
       esrap: 2.3.3(@typescript-eslint/types@8.72.1)
       is-reference: 3.0.3
