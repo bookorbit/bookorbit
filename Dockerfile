@@ -93,3 +93,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 ENTRYPOINT ["/sbin/tini", "-s", "--"]
 CMD ["sh", "/app/entrypoint.sh"]
+
+LABEL org.opencontainers.image.title="BookOrbit" \
+      org.opencontainers.image.description="Self-hosted library management and reading platform for ebooks, PDFs, audiobooks, and comics" \
+      org.opencontainers.image.url="https://bookorbit.app" \
+      org.opencontainers.image.documentation="https://github.com/bookorbit/bookorbit#quick-start-docker" \
+      org.opencontainers.image.source="https://github.com/bookorbit/bookorbit" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.version="${APP_VERSION}"
