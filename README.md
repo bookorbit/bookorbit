@@ -1,3 +1,21 @@
+BookOrbit fork: displayTitle from external providers
+
+A fork of bookorbit/bookorbit with one small change: external metadata providers can send an optional displayTitle on a search result, and BookOrbit reads it.
+
+Why
+
+BookOrbit's relevance check compares the searched title with each result's displayTitle (or title if there is none) and drops results that score too low. A file named with a romanized or native-language title (for example Gamer ga Isekai Konten shite Harem Jinsei e ...) shares almost no words with the series' English title, so a correct match was dropped. With displayTitle, a provider can send the name that fits the query for the check, while title and the series stay in English.
+
+The change
+
+Only http-metadata-provider.ts (under server/src/modules/metadata-fetch/providers/):
+
+MAPPING_VERSION goes from 3 to 4, so cached answers mapped the old way expire.
+displayTitle?: unknown; is added to SpecBookMetadata.
+toCandidate returns displayTitle: text(raw.displayTitle, MAX_TITLE).
+
+Providers that don't send the field are unaffected. BookOrbit may also show displayTitle as the result's label in the search list; the title applied to the book is still the provider's title.
+
 > [!IMPORTANT]
 > **Android beta testers needed:** The official BookOrbit Android app is in closed testing. [Join the Google Play beta](https://github.com/bookorbit/bookorbit/issues/2001) and stay enrolled for at least 14 days to help unlock its public release.
 
