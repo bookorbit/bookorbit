@@ -22,7 +22,7 @@ import type { MetadataSearchParams } from '../metadata-search-params';
 import { providerCacheContext } from '../provider-cache';
 
 /** Bump when the spec-to-candidate mapping below changes, so cached answers mapped the old way expire. */
-const MAPPING_VERSION = 3;
+const MAPPING_VERSION = 4;
 const MAX_MATCHES = 50;
 const MAX_TITLE = 1_000;
 const MAX_DESCRIPTION = 50_000;
@@ -34,6 +34,7 @@ interface SpecBookMetadata {
   mediaType?: unknown;
   providerId?: unknown;
   title?: unknown;
+  displayTitle?: unknown;
   subtitle?: unknown;
   author?: unknown;
   authors?: unknown;
@@ -211,6 +212,8 @@ export class HttpMetadataProvider implements MetadataProvider {
       provider: this.key,
       providerId,
       title,
+      // What the relevance check compares a search against, when the provider has a better name for it.
+      displayTitle: text(raw.displayTitle, MAX_TITLE),
       subtitle: text(raw.subtitle, MAX_TITLE),
       authors,
       narrators,
