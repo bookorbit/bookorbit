@@ -3130,6 +3130,8 @@
         "syncHighlightsHint": "Envoyez les passages surlignés réalisés dans BookOrbit ou KOReader à votre Kobo. Les passages surlignés Kobo sont importées dans BookOrbit même lorsque cette option est désactivée. Les annotations liées synchronisent les modifications et les suppressions dans les deux sens. Nécessite la livraison KEPUB ; le livre sur Kobo doit être le KEPUB téléchargé depuis BookOrbit.",
         "storeSync": "Inclure les titres du magasin Kobo",
         "storeSyncHint": "Envoyez aussi les livres de votre compte Kobo (y compris Kobo Plus et vos achats) en plus de votre bibliothèque BookOrbit. Sans cette option, seuls les livres BookOrbit sont envoyés vers l'appareil. Les titres du magasin sont téléchargés directement depuis Kobo et ne sont pas ajoutés à votre bibliothèque BookOrbit.",
+        "fullSizeCovers": "Couvertures en pleine résolution",
+        "fullSizeCoversHint": "Envoyer chaque couverture à la résolution de l'écran de votre Kobo, pour que les écrans de veille et les couvertures en plein écran restent nets. Option désactivée, les couvertures envoyées sont plus légères et se synchronisent plus vite. Une couverture déjà présente sur un Kobo ne change que lorsque celle du livre change.",
         "convertKepub": "Convertir en KEPUB",
         "convertKepubHint": "Envoyez des EPUB éligibles en tant que KEPUB. Cela reste activé lorsque la synchronisation de la progression ou les passages surlignés de BookOrbit-to-Kobo sont activées. Lors de la prochaine synchronisation Kobo, les livres concernés sont à nouveau proposés en téléchargement KEPUB ; supprimez toute ancienne copie de EPUB si Kobo continue de l'ouvrir.",
         "forceHyphenation": "Forcer la césure",
@@ -3404,6 +3406,12 @@
         "syncEnabled": "Synchronisation KOReader activée",
         "syncDisabled": "Synchronisation KOReader désactivée",
         "toggleSyncFailed": "Échec de la synchronisation",
+        "pluginLibrary": "Bibliothèque du plugin",
+        "hideAudioOnlyBooks": "Masquer les livres uniquement audio",
+        "hideAudioOnlyBooksHint": "KOReader ne peut pas lire l'audio : les livres qui n'ont que des fichiers audio n'apparaissent ni dans les listes, ni dans la recherche, ni dans les téléchargements du plugin, pas plus qu'une bibliothèque qui ne contient rien d'autre. Les livres qui ont aussi un ebook restent affichés.",
+        "audioOnlyBooksHidden": "Livres uniquement audio masqués dans le plugin",
+        "audioOnlyBooksShown": "Livres uniquement audio affichés dans le plugin",
+        "toggleAudioOnlyBooksFailed": "Échec de la mise à jour du paramètre de bibliothèque du plugin",
         "syncUrlCopied": "Synchroniser URL copié dans le presse-papiers",
         "syncUrlCopyFailed": "Échec de la copie de la synchronisation URL",
         "statusRefreshed": "Statut de synchronisation actualisé",
@@ -5067,7 +5075,8 @@
         "bulkRestored": "{count, plural, =0 {Restauré sans annotations} one {Restauré # annotation} other {Restauré # annotations} many {Restauré # annotations}}",
         "bulkRecolored": "{count, plural, =0 {Recoloré sans annotations} one {Recoloré # annotation} other {Recoloré # annotations} many {Recoloré # annotations}}",
         "bulkRestyled": "{count, plural, =0 {Aucune annotation restylée} one {# annotation restylée} other {# annotations restylées} many {# annotations restylées}}",
-        "noteSaved": "Remarque enregistrée"
+        "noteSaved": "Remarque enregistrée",
+        "purgePendingDeviceSync": "Un appareil synchronisé doit encore retirer cette annotation. Synchronisez cet appareil, puis supprimez-la définitivement."
       },
       "railTitle": "{marks} marques · {books} livres",
       "lastTwelveMonths": "12 derniers mois",
@@ -5112,10 +5121,16 @@
       },
       "activitySummary": "{count, plural, one {# passage surligné entre {from} et {to}} other {# passages surlignés entre {from} et {to}} many {# passages surlignés entre {from} et {to}}}",
       "book": "Livre",
-      "needsReview": "À vérifier"
+      "needsReview": "À vérifier",
+      "trashToggle": "{count, plural, one {Corbeille, # annotation} other {Corbeille, # annotations} many {Corbeille, # annotations}}",
+      "purgeDialog": {
+        "title": "Supprimer définitivement ?",
+        "description": "Cette annotation et sa remarque seront supprimées pour de bon. Elles ne pourront pas être restaurées depuis la corbeille."
+      }
     },
     "sources": {
       "web": "Web",
+      "bookorbit": "BookOrbit",
       "koreader": "KOReader",
       "kobo": "Kobo"
     },
@@ -5697,6 +5712,12 @@
       "errors": {
         "noToken": "Aucun jeton fourni"
       }
+    },
+    "reconnect": {
+      "heading": "En attente du serveur",
+      "description": "BookOrbit ne parvient pas à joindre son serveur pour le moment. Cette page reprendra d'elle-même dès que le serveur répondra.",
+      "retry": "Réessayer maintenant",
+      "retrying": "Nouvelle tentative..."
     }
   },
   "author": {
@@ -5737,7 +5758,10 @@
       "died": "Date de décès",
       "website": "Site web",
       "genres": "Genres",
-      "influences": "Influences"
+      "influences": "Influences",
+      "findMatch": "Trouver le bon auteur",
+      "source": "Source",
+      "pinned": "Épinglé"
     },
     "list": {
       "title": "Auteurs",
@@ -5809,7 +5833,17 @@
         "removing": "Suppression...",
         "removeImage": "Supprimer l'image",
         "imageHint": "PNG/JPEG/WEBP/GIF/BMP jusqu'à {size} Mo",
-        "saving": "Sauvegarde..."
+        "saving": "Sauvegarde...",
+        "website": "Site web",
+        "websitePlaceholder": "https://example.com",
+        "websiteInvalid": "Saisissez une adresse web, p. ex. example.com.",
+        "born": "Date de naissance",
+        "died": "Date de décès",
+        "lifeDatePlaceholder": "1965 ou 1965-03-14",
+        "lifeDateHint": "Les dates de naissance et de décès acceptent une année, ou une date complète au format année-mois-jour.",
+        "lifeDateInvalid": "Saisissez une année ou une date valide au format année-mois-jour.",
+        "genres": "Genres",
+        "influences": "Influences"
       },
       "merge": {
         "searchPlaceholder": "Rechercher des auteurs pour fusionner avec cet auteur",
@@ -5874,6 +5908,56 @@
       "actionsFor": "Actions pour {name}",
       "refreshing": "Actualisation des métadonnées de {name}",
       "deleting": "Suppression de {name}"
+    },
+    "match": {
+      "title": "Trouver le bon auteur",
+      "description": "Choisissez la personne derrière {name}, par une recherche par nom ou en collant un lien Goodreads ou Audible.",
+      "search": {
+        "label": "Nom",
+        "submit": "Rechercher"
+      },
+      "reference": {
+        "label": "Lien ou identifiant Goodreads ou Audible",
+        "placeholder": "goodreads.com/author/show/12345",
+        "submit": "Consulter",
+        "unrecognised": "Collez un lien d'auteur Goodreads ou Audible, un identifiant Goodreads ou un ASIN Audible.",
+        "notFound": "Aucun auteur ne porte cet identifiant.",
+        "failed": "La consultation a échoué. Réessayez dans un instant."
+      },
+      "results": {
+        "label": "Correspondances",
+        "count": "{count, plural, =0 {Aucune correspondance} one {# correspondance} other {# correspondances} many {# correspondances}}",
+        "searching": "Recherche...",
+        "empty": "Aucun auteur trouvé. Essayez une autre orthographe ou collez un lien.",
+        "failed": "La recherche a échoué. Réessayez dans un instant.",
+        "current": "Actuel",
+        "born": "Naissance : {year}",
+        "lifeSpan": "{born}–{died}"
+      },
+      "detail": {
+        "empty": "Choisissez une correspondance pour voir de qui il s'agit.",
+        "loading": "Chargement des détails...",
+        "noBio": "Aucune biographie.",
+        "viewOn": "Voir sur {provider}",
+        "back": "Retour aux correspondances",
+        "use": "Utiliser cet auteur",
+        "unpin": "Désépingler",
+        "pinnedHint": "Épinglé : les actualisations recherchent cet auteur par son identifiant au lieu de le chercher par son nom.",
+        "currentHint": "L'auteur est actuellement associé à cette personne. Choisissez « Utiliser cet auteur » pour épingler la correspondance."
+      },
+      "confirm": {
+        "title": "Utiliser cet auteur de {provider} ?",
+        "description": "La biographie, la photo, les dates, le site web, les genres et les influences seront remplacés par ceux de cet auteur, et les actualisations suivantes s'en tiendront à cette personne.",
+        "confirm": "Utiliser cet auteur"
+      },
+      "toast": {
+        "pinned": "Désormais associé à {name} sur {provider}",
+        "unpinned": "Désépinglé. Les actualisations recherchent de nouveau par nom.",
+        "notFound": "{provider} n'a plus aucun auteur avec cet identifiant.",
+        "providerDown": "Impossible de joindre {provider}. Réessayez dans un instant.",
+        "failed": "Impossible d'utiliser cet auteur.",
+        "unpinFailed": "Impossible de désépingler la correspondance."
+      }
     }
   },
   "book": {
@@ -6081,6 +6165,7 @@
         "before": "avant",
         "after": "après",
         "withinLast": "dans le dernier",
+        "moreThanAgo": "il y a plus de",
         "isMissing": "est manquant",
         "isPresent": "existe",
         "isUnread": "est non lu",
@@ -6103,6 +6188,7 @@
       "withinLastPlaceholder": "par ex. 7",
       "unit": {
         "days": "jours",
+        "daysAgo": "jours",
         "weeks": "semaines",
         "months": "mois",
         "megabytes": "Mo"
@@ -6446,6 +6532,13 @@
             "unavailable": "Indisponible",
             "epubCopiesOnly": "Exemplaires EPUB uniquement"
           },
+          "chip": {
+            "enabled": "Synchronisation active",
+            "partial": "Synchronisation partielle",
+            "disabled": "Synchronisation désactivée",
+            "unavailable": "Problème de synchronisation"
+          },
+          "chipAria": "Synchronisation de la progression audio-texte : {status}",
           "enabledDescription": "Les positions du livre audio, du lecteur web, de Kobo et de KOReader restent synchronisées.",
           "disabledDescription": "Chaque format conserve sa propre position de lecture.",
           "epubCopiesDescription": "Les positions du lecteur web, de Kobo et de KOReader restent synchronisées entre les exemplaires EPUB. Ajoutez des fichiers de livre audio correspondants pour synchroniser aussi le livre audio.",
@@ -8081,6 +8174,10 @@
       "noResultsHint": "Essayez un autre titre ou un autre auteur.",
       "noResultsIndexerHint": "Essayez un autre titre ou un autre auteur, ou cherchez « {title} » sur les indexeurs et choisissez une release vous-même.",
       "freeTextAction": "Chercher sur les indexeurs",
+      "noResultsRequestHint": "Essayez un autre titre ou un autre auteur, ou demandez « {title} » tel que saisi. Une note pour l'approbateur, dans « Plus d'options », l'aide à trouver le bon livre.",
+      "noResultsRequestAutoHint": "Essayez un autre titre ou un autre auteur, ou demandez « {title} » tel que saisi.",
+      "requestAnywayAction": "Demander quand même",
+      "searchAuthor": "Afficher les livres de {author}",
       "manualSearchAction": "Chercher manuellement sur les indexeurs",
       "yearUnknown": "Année inconnue",
       "sourceCount": "{count, plural, one {# source} other {# sources} many {# sources}}",
@@ -8462,6 +8559,8 @@
         "clientUnavailable": "Votre client de téléchargement n'a pas répondu pour une release précédente"
       },
       "singleFileNote": "Une release peut être un livre en plusieurs formats, un livre audio en plusieurs parties ou une archive - tout cela s’importe comme un seul livre. Une release contenant plusieurs livres distincts vous demande lequel garder.",
+      "holdForReview": "Vérifier le téléchargement avant son classement",
+      "releasePageLabel": "{title}, page de la release sur {indexer}",
       "searching": "Interrogation des indexeurs...",
       "refresh": "Chercher à nouveau",
       "cached": "Affichage de la dernière recherche. Relancez-la pour des résultats frais.",
@@ -8779,6 +8878,7 @@
       "scoreShort": "Le fichier importé a obtenu un score de {score} face à cette demande, sous les {threshold} nécessaires pour le classer automatiquement.",
       "scoreClears": "Le fichier importé a obtenu un score de {score}, qui atteint les {threshold} nécessaires pour le classer automatiquement.",
       "verificationOff": "La vérification des imports est inactive : ce fichier n'a donc jamais été noté face à la demande.",
+      "heldOnRequest": "Cette release a été envoyée pour vérification avant classement : elle vous attend.",
       "reason": {
         "isbn_match": "Son ISBN est celui qui avait été demandé.",
         "above_threshold": "Il ressemble au livre qui avait été demandé.",
@@ -8798,8 +8898,24 @@
       },
       "requested": "Demandé",
       "imported": "Importé",
+      "releasePage": "Ouvrir la page de la release",
       "absent": "Ni la demande ni le fichier n'en portent.",
       "notSet": "Non renseigné",
+      "editionTitle": "Ce que le fichier annonce",
+      "edition": {
+        "publisher": "Éditeur",
+        "published": "Date de publication",
+        "language": "Langue",
+        "pages": "Pages",
+        "isbn10": "ISBN-10",
+        "narrators": "Lu par",
+        "length": "Durée",
+        "version": "Version",
+        "chapters": "Chapitres"
+      },
+      "abridged": "Abrégée",
+      "unabridged": "Intégrale",
+      "importedCover": "Couverture trouvée dans le fichier importé",
       "filesTitle": "Ce qui est arrivé",
       "fileCount": "{count, plural, one {# fichier} other {# fichiers} many {# fichiers}}",
       "role": {
@@ -8809,6 +8925,8 @@
       },
       "fileAnyway": "Classer quand même",
       "fileAnywayHint": "Classe ce fichier dans la bibliothèque de destination et marque la demande comme disponible, exactement comme l'aurait fait un score suffisant.",
+      "fileIt": "Classer",
+      "fileItHint": "Classe ce fichier dans la bibliothèque de destination et marque la demande comme disponible.",
       "noDestination": "Cette demande n'a aucune bibliothèque de destination pourvue d'un dossier : il n'y a donc pas encore où classer le livre.",
       "openDock": "Ouvrir le Book Dock",
       "missingEntry": "Le fichier pour lequel cette demande était en attente n'est plus dans le Book Dock. Il a été classé ou écarté à la main : il ne reste donc rien à vérifier ici.",
@@ -9005,6 +9123,19 @@
         "dropped": "{name} déposé à la position {position} sur {total}",
         "cancelled": "Réorganisation annulée. {name} est revenu à la position {position} sur {total}.",
         "filteredHint": "Effacez le filtre pour réorganiser"
+      },
+      "customize": {
+        "open": "Personnaliser la barre latérale",
+        "title": "Personnaliser la barre latérale",
+        "hint": "Faites glisser pour réorganiser. Les pages masquées restent accessibles depuis la recherche.",
+        "reset": "Réinitialiser",
+        "done": "Terminé",
+        "resetDone": "Barre latérale réinitialisée",
+        "showInSidebar": "Afficher {name} dans la barre latérale",
+        "show": "Afficher",
+        "hide": "Masquer",
+        "alwaysShown": "{name} : affichage permanent",
+        "returnsWithWork": "S'affiche quand des éléments sont en attente"
       }
     },
     "selectionActionBar": {
@@ -11421,7 +11552,21 @@
     },
     "toast": {
       "linkedHighlightError": "Impossible d'ouvrir la position du passage surligné lié",
-      "resumed": "Reprise à {pct} % - {label}"
+      "resumed": "Reprise à {pct} % - {label}",
+      "newerPositionError": "Impossible d'ouvrir votre position la plus récente",
+      "highlightSaveFailed": "Impossible d'enregistrer le passage surligné",
+      "noteSaveFailed": "Impossible d'enregistrer la remarque",
+      "highlightDeleteFailed": "Impossible de supprimer le passage surligné",
+      "bookmarkSaveFailed": "Impossible d'ajouter le signet",
+      "bookmarkDeleteFailed": "Impossible de supprimer le signet",
+      "bookmarkUpdateFailed": "Impossible d'enregistrer le signet",
+      "marksLoadFailed": "Impossible de charger vos passages surlignés et signets"
+    },
+    "newerPositionDialog": {
+      "title": "Reprendre depuis un autre appareil ?",
+      "description": "Ce livre a été lu jusqu'à {remote} sur un autre appareil alors qu'il était ouvert ici à {local}.",
+      "follow": "Aller à {pct}",
+      "stay": "Rester à {pct}"
     },
     "header": {
       "goBack": "Retourner",
@@ -11563,6 +11708,7 @@
       "allChapters": "Tous les chapitres",
       "notesOnly": "Remarques uniquement",
       "deleteBookmark": "Supprimer le favori",
+      "editBookmark": "Modifier le signet",
       "deleteHighlight": "Supprimer le surlignage",
       "approximatePosition": "Synchronisé depuis l'appareil ; position exacte indisponible, passe au chapitre",
       "sort": {
@@ -11578,6 +11724,7 @@
       "translate": "Traduire",
       "define": "Définir",
       "deleteAnnotation": "Supprimer l'annotation",
+      "readFromHere": "Écouter à partir d'ici",
       "apply": "Appliquer",
       "color": "Couleur de l'annotation : {color}",
       "style": "Style de l'annotation : {style}",
@@ -11728,6 +11875,12 @@
       "hideControls": "Masquer les commandes",
       "stop": "Arrêter la narration",
       "error": "Erreur de lecture de la narration"
+    },
+    "bookmarkEdit": {
+      "title": "Modifier le signet",
+      "titleLabel": "Titre",
+      "noteLabel": "Remarque",
+      "notePlaceholder": "Remarque facultative"
     }
   },
   "scanner": {
