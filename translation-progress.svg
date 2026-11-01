@@ -16,7 +16,7 @@
   <rect width="458" height="736" x="1" y="1" class="card" />
 
   <text x="20" y="35" class="title">Translation Progress</text>
-  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 67% average</text>
+  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 68% average</text>
 
   <line x1="20" y1="51" x2="440" y2="51" class="grid" />
 
@@ -26,8 +26,8 @@
   <text x="440" y="78" text-anchor="end" class="pct-label">100%</text>
   <text x="20" y="103" class="lang-label">🇧🇷  Portuguese</text>
   <rect x="142" y="95" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="95" width="236" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="103" text-anchor="end" class="pct-label">96%</text>
+  <rect x="142" y="95" width="246" height="6" rx="3" class="bar-done" />
+  <text x="440" y="103" text-anchor="end" class="pct-label">100%</text>
   <text x="20" y="128" class="lang-label">🇭🇺  Hungarian</text>
   <rect x="142" y="120" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="120" width="231" height="6" rx="3" class="bar-progress" />
