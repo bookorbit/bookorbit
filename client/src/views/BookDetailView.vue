@@ -11,7 +11,7 @@ import { useBookDetail } from '@/features/book/composables/useBookDetail'
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
 import { useScanProgress } from '@/features/scanner/composables/useScanProgress'
 import { usePageTitle } from '@/composables/usePageTitle'
-import { normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
+import { hasChaptersTab, normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -56,11 +56,11 @@ const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metada
 const parentLibrary = computed(() =>
   detail.value?.libraryId != null && detail.value.libraryName ? { id: detail.value.libraryId, name: detail.value.libraryName } : null,
 )
-const hasAudio = computed(() => detail.value?.audioMetadata != null)
+const hasChapters = computed(() => hasChaptersTab(detail.value))
 
-// A chapters link to a book without audio (or one whose audio was removed) lands on the details.
+// A chapters link to a book without audio or read-along narration (or one whose audio was removed) lands on the details.
 watch([tab, detail], ([current, book]) => {
-  if (current === 'chapters' && book && book.id === bookId.value && !hasAudio.value) {
+  if (current === 'chapters' && book && book.id === bookId.value && !hasChapters.value) {
     void router.replace({ name: 'book-detail', params: { bookId: book.id }, query: { ...route.query, tab: 'details' } })
   }
 })
@@ -127,7 +127,7 @@ onMounted(() => {
   const warm = () => {
     void loadReadingLogTab()
     void loadHighlightsTab()
-    if (hasAudio.value) void loadChaptersTab()
+    if (hasChapters.value) void loadChaptersTab()
   }
   if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 2000 })
   else setTimeout(warm, 500)
@@ -167,7 +167,7 @@ function onChaptersChanged() {
     :cover-tint="coverTint"
     :can-edit-metadata="canEditMetadata"
     :parent-library="parentLibrary"
-    :has-audio="hasAudio"
+    :has-chapters="hasChapters"
   >
     <Transition name="content" mode="out-in">
       <div v-if="detail" key="detail" class="@container/book-detail h-full">
@@ -186,7 +186,7 @@ function onChaptersChanged() {
             @cover-changed="onCoverChanged"
           />
           <FilesTab v-else-if="tab === 'files'" :book="detail" @refetch="fetch(detail.id)" />
-          <ChaptersTab v-else-if="tab === 'chapters' && hasAudio" :book="detail" @changed="onChaptersChanged" />
+          <ChaptersTab v-else-if="tab === 'chapters' && hasChapters" :book="detail" @changed="onChaptersChanged" />
           <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" @saved="onMetadataSaved" @refetch="handleBookRefetch" />
           <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
         </KeepAlive>

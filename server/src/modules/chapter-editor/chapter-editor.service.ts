@@ -35,6 +35,7 @@ import {
   type BookChapterVersion,
   type BookChapterVersionSummary,
   type EmbeddedBookChapters,
+  type EpubMediaOverlayPlaylist,
 } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -120,7 +121,8 @@ export class ChapterEditorService {
 
   async getState(bookId: number, user: RequestUser): Promise<BookChaptersState> {
     await this.bookService.verifyBookAccess(bookId, user);
-    return this.buildState(bookId, await this.loadContext(bookId));
+    const context = await this.findContext(bookId);
+    return context ? this.buildState(bookId, context) : this.buildReadAlongState(bookId, user);
   }
 
   async save(bookId: number, dto: SaveBookChaptersDto, user: RequestUser): Promise<BookChaptersState> {
@@ -243,20 +245,22 @@ export class ChapterEditorService {
     }
 
     const playlist = await this.epubService.getMediaOverlayPlaylist(bookId, fileId, user);
-    const chapters = normalizeAudiobookChapters(
+    const chapters = this.readAlongChapters(playlist);
+    if (chapters.length === 0)
+      throw this.coded(ConflictException, BOOK_CHAPTERS_ERROR_CODES.ebookUnavailable, 'The read-along EPUB names no sections');
+    return { source, fileId, chapters, titlesOnly: false, runtimeMs: this.readAlongRuntimeMs(playlist) };
+  }
+
+  private readAlongChapters(playlist: EpubMediaOverlayPlaylist): AudiobookChapter[] {
+    return normalizeAudiobookChapters(
       playlist.sections
         .filter((section) => section.label?.trim())
         .map((section) => ({ title: section.label!.trim(), startMs: Math.round(section.startSeconds * 1000) })),
     );
-    if (chapters.length === 0)
-      throw this.coded(ConflictException, BOOK_CHAPTERS_ERROR_CODES.ebookUnavailable, 'The read-along EPUB names no sections');
-    return {
-      source,
-      fileId,
-      chapters,
-      titlesOnly: false,
-      runtimeMs: playlist.durationSeconds === null ? null : Math.round(playlist.durationSeconds * 1000),
-    };
+  }
+
+  private readAlongRuntimeMs(playlist: EpubMediaOverlayPlaylist): number | null {
+    return playlist.durationSeconds === null ? null : Math.round(playlist.durationSeconds * 1000);
   }
 
   /** Pauses near each point, for snapping chapter starts. A window whose audio will not decode is marked failed. */
@@ -387,12 +391,48 @@ export class ChapterEditorService {
     return { ...this.mapVersion(row), chapters: row.chapters };
   }
 
-  private async loadContext(bookId: number): Promise<EditorContext> {
+  private async findContext(bookId: number): Promise<EditorContext | null> {
     const [row, rows] = await Promise.all([this.repo.findChapterRow(bookId), this.repo.findTrackRows(bookId)]);
     const tracks = orderAudiobookTracks(rows);
-    if (tracks.length === 0) throw new NotFoundException('Book has no audio tracks');
+    if (tracks.length === 0) return null;
     const revision = computeChapterEditorRevision(row, rows);
     return { bookId, row, rows, tracks, revision };
+  }
+
+  private async loadContext(bookId: number): Promise<EditorContext> {
+    const context = await this.findContext(bookId);
+    if (!context) throw new NotFoundException('Book has no audio tracks');
+    return context;
+  }
+
+  /**
+   * A book with a read-along EPUB and no audio files has narration but nothing to cut, so its
+   * chapters are read off the EPUB for display. Every editing route still needs audio tracks.
+   */
+  private async buildReadAlongState(bookId: number, user: RequestUser): Promise<BookChaptersState> {
+    const sources = this.ebookSources(await this.repo.findEbookFiles(bookId));
+    if (sources.readAlongFileId === null) throw new NotFoundException('Book has no audio tracks');
+    const [playlist, audibleRegion] = await Promise.all([
+      this.epubService.getMediaOverlayPlaylist(bookId, sources.readAlongFileId, user),
+      this.defaultAudibleRegion(),
+    ]);
+    return {
+      chapters: this.readAlongChapters(playlist),
+      source: null,
+      derived: false,
+      locked: false,
+      revision: '',
+      updatedAt: null,
+      updatedBy: null,
+      totalDurationMs: this.readAlongRuntimeMs(playlist),
+      tracks: [],
+      audibleId: null,
+      versionCount: 0,
+      audibleRegion,
+      sources,
+      writeBack: { available: false, reason: null, fileCount: 0 },
+      readAlong: true,
+    };
   }
 
   private async buildState(bookId: number, context: EditorContext): Promise<BookChaptersState> {

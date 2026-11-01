@@ -17,6 +17,8 @@ const props = defineProps<{
   totalDurationMs: number | null
   /** Where the reader last listened, for the "you are here" marker. */
   listeningMs: number | null
+  /** True when a row can only open the reader where the book stands, because its start cannot be played from. */
+  openOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -251,7 +253,7 @@ defineExpose({ scrollToKey, commitPendingStarts })
             type="button"
             class="listen-grid listen-row h-9 w-full items-center rounded-[10px] px-2.5 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             :class="listenState(virtual.index) === 'now' ? 'bg-primary/15 shadow-[inset_2px_0_0_var(--primary)]' : 'hover:bg-muted/55'"
-            :aria-label="t('book.detail.chapters.playFrom', { title: row(virtual.index).title })"
+            :aria-label="t(openOnly ? 'book.detail.chapters.openInReader' : 'book.detail.chapters.playFrom', { title: row(virtual.index).title })"
             :aria-current="listenState(virtual.index) === 'now' ? 'true' : undefined"
             @click="handleListen(row(virtual.index).startMs)"
           >

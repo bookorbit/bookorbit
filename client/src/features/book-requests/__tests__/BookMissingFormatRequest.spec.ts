@@ -20,7 +20,7 @@ vi.mock('../composables/useBookRequestVisibility', () => ({
 
 import BookMissingFormatRequest from '../components/BookMissingFormatRequest.vue'
 
-function book(formats: string[]): BookDetail {
+function book(formats: string[], readAlong = false): BookDetail {
   return {
     id: 42,
     title: 'Dune',
@@ -30,7 +30,13 @@ function book(formats: string[]): BookDetail {
     seriesName: null,
     publishedYear: 1965,
     language: 'en',
-    files: formats.map((format, index) => ({ id: index + 1, format, role: 'content', filename: `dune.${format}` })),
+    files: formats.map((format, index) => ({
+      id: index + 1,
+      format,
+      role: 'content',
+      filename: `dune.${format}`,
+      ...(readAlong && format === 'epub' ? { mediaOverlay: { available: true, durationSeconds: 3600 } } : {}),
+    })),
   } as unknown as BookDetail
 }
 
@@ -40,8 +46,8 @@ function json(body: unknown, ok = true): Response {
 
 const NOTHING = { ownedBookId: null, existingRequestId: null, existingRequestStatus: null, alreadySubscribed: false }
 
-async function render(formats: string[]) {
-  const wrapper = mount(BookMissingFormatRequest, { props: { book: book(formats) }, global: { stubs: { RouterLink: RouterLinkStub } } })
+async function render(formats: string[], readAlong = false) {
+  const wrapper = mount(BookMissingFormatRequest, { props: { book: book(formats, readAlong) }, global: { stubs: { RouterLink: RouterLinkStub } } })
   await flushPromises()
   return wrapper
 }
@@ -61,6 +67,19 @@ describe('BookMissingFormatRequest', () => {
     const [path, init] = state.api.mock.calls[0]!
     expect(path).toBe('/api/v1/book-requests/availability')
     expect(JSON.parse(init!.body as string).items[0]).toMatchObject({ title: 'Dune', mediaKind: 'audiobook', isbn13: '9780441013593' })
+  })
+
+  it('does not ask for an audiobook when the EPUB already carries its narration', async () => {
+    const wrapper = await render(['epub'], true)
+
+    expect(wrapper.find('[role="group"]').exists()).toBe(false)
+    expect(state.api).not.toHaveBeenCalled()
+  })
+
+  it('still asks for an audiobook beside a plain EPUB', async () => {
+    const wrapper = await render(['epub', 'pdf'], false)
+
+    expect(wrapper.get('button').attributes('aria-label')).toBe('Request audiobook')
   })
 
   it('offers the ebook an audiobook is missing', async () => {

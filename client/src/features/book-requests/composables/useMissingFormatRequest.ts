@@ -2,6 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { BOOK_REQUEST_FORMATS_BY_MEDIA_KIND } from '@bookorbit/types'
 import type { BookDetail, BookRequestAvailability, BookRequestMediaKind, BookRequestSubmitResult, CreateBookRequestPayload } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { hasReadAlong } from '@/features/book/lib/file-capabilities'
 import { pairHalfState, type PairHalfState } from '../requestPair'
 import { submitFailure, type SubmitFailure } from './useRequestSubmission'
 
@@ -23,11 +24,11 @@ export function useMissingFormatRequest(book: Ref<BookDetail | null>, enabled: R
 
   const missing = computed<BookRequestMediaKind | null>(() => {
     if (!book.value) return null
-    const formats = book.value.files
-      .filter((file) => file.role === 'content' || file.role === 'primary')
-      .map((file) => file.format?.toLowerCase() ?? '')
+    const files = book.value.files.filter((file) => file.role === 'content' || file.role === 'primary')
+    const formats = files.map((file) => file.format?.toLowerCase() ?? '')
     const hasReadable = formats.some((format) => BOOK_REQUEST_FORMATS_BY_MEDIA_KIND.ebook.includes(format))
-    const hasAudio = formats.some((format) => BOOK_REQUEST_FORMATS_BY_MEDIA_KIND.audiobook.includes(format))
+    // A read-along EPUB carries its narration, so the book already has the audio half.
+    const hasAudio = formats.some((format) => BOOK_REQUEST_FORMATS_BY_MEDIA_KIND.audiobook.includes(format)) || files.some(hasReadAlong)
     if (hasReadable && !hasAudio) return 'audiobook'
     if (hasAudio && !hasReadable) return 'ebook'
     return null
