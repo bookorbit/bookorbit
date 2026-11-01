@@ -49,6 +49,7 @@ function slotRatio(slot: BookCoverSlot): number | null {
 
 const sourceLine = computed(() => {
   const { source, updatedBy, updatedAt } = props.state
+  if (props.state.readAlong) return t('book.detail.chapters.source.readAlong')
   if (source === 'manual') {
     const when = updatedAt ? formatRelativeTimeFromNow(updatedAt) : null
     if (updatedBy && when) return t('book.detail.chapters.source.manualBy', { name: updatedBy.name, when })
@@ -113,6 +114,7 @@ function handleDone() {
 
     <div class="hero-actions flex shrink-0 items-center gap-2 border-s border-border ps-4">
       <span
+        v-if="!state.readAlong"
         class="inline-flex h-[18px] items-center gap-1 rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
         :class="state.locked ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'"
         :title="state.locked ? t('book.detail.chapters.protectedHint') : t('book.detail.chapters.unprotectedHint')"

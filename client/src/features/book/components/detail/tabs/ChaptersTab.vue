@@ -76,7 +76,9 @@ const TOOLS: { tool: ChapterTool; key: string }[] = [
 ]
 
 const bookId = computed(() => props.book.id)
-const canEdit = computed(() => hasLibraryPermission(Permission.LibraryEditMetadata, props.book.libraryId, 'editor'))
+// A book with only a read-along EPUB has narration to list but no audio files to cut.
+const hasAudioFiles = computed(() => props.book.audioMetadata != null)
+const canEdit = computed(() => hasAudioFiles.value && hasLibraryPermission(Permission.LibraryEditMetadata, props.book.libraryId, 'editor'))
 
 const store = useBookChapters(bookId)
 const { state, loading, loadError, busy } = store
@@ -93,6 +95,7 @@ const listeningMs = ref<number | null>(null)
 
 const showSkeleton = useDeferredLoading(computed(() => loading.value && state.value === null))
 const trackChapters = computed(() => (state.value ? chaptersFromTracks(state.value.tracks) : null))
+const readAlong = computed(() => state.value?.readAlong === true)
 
 // ── Loading ──────────────────────────────────────────────────────────────────
 
@@ -117,6 +120,10 @@ async function refresh(options: { silent?: boolean } = {}) {
 
 /** The listener's place in the book, for the "you are here" marker. Derived from the saved percentage. */
 async function loadListening() {
+  if (!hasAudioFiles.value) {
+    listeningMs.value = null
+    return
+  }
   try {
     const response = await api(`/api/v1/audiobooks/${bookId.value}/playback-state`)
     if (!response.ok) return
@@ -400,6 +407,12 @@ function handleSettle() {
 }
 
 function openInReader(startMs: number) {
+  if (readAlong.value) {
+    const readAlongFileId = state.value?.sources.readAlongFileId
+    if (readAlongFileId != null)
+      void router.push({ name: 'reader', params: { bookId: bookId.value, fileId: readAlongFileId }, query: { format: 'epub' } })
+    return
+  }
   const fileId = state.value?.tracks[0]?.fileId
   const format = props.book.files.find((file) => file.id === fileId)?.format
   if (fileId === undefined || !format) return
@@ -921,6 +934,7 @@ function handleKeydown(event: KeyboardEvent) {
           :issues-by-key="issuesByKey"
           :total-duration-ms="totalDurationMs"
           :listening-ms="editing ? null : listeningMs"
+          :open-only="readAlong"
           @activate="handleActivate"
           @toggle-select="handleToggleSelect"
           @update-title="handleUpdateTitle"
@@ -1037,7 +1051,7 @@ function handleKeydown(event: KeyboardEvent) {
           </template>
           <template #band>
             <ChapterListenBand
-              v-if="!editing && totalDurationMs && rows.length"
+              v-if="!editing && !readAlong && totalDurationMs && rows.length"
               :rows="rows"
               :total-duration-ms="totalDurationMs"
               :listening-ms="listeningMs"
