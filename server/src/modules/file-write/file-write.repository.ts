@@ -276,7 +276,7 @@ export class FileWriteRepository {
       publishedDate: meta.publishedDate,
       publishedYear: meta.publishedYear,
       language: meta.language,
-      pageCount: meta.pageCount,
+      pageCount: typeof meta.pageCount === 'number' && meta.pageCount > 0 ? meta.pageCount : null,
       seriesName: meta.seriesName,
       seriesIndex: meta.seriesIndex,
       isbn10: meta.isbn10,

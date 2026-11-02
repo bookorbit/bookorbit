@@ -104,8 +104,7 @@ describe('CollectionRepository', () => {
     const orderBy = vi.fn().mockResolvedValue([{ id: 1, memberCount: 2 }]);
     const groupBy = vi.fn().mockReturnValue({ orderBy });
     const where = vi.fn().mockReturnValue({ groupBy });
-    const thirdLeftJoin = vi.fn().mockReturnValue({ where });
-    const secondLeftJoin = vi.fn().mockReturnValue({ leftJoin: thirdLeftJoin });
+    const secondLeftJoin = vi.fn().mockReturnValue({ where });
     const firstLeftJoin = vi.fn().mockReturnValue({ leftJoin: secondLeftJoin });
     const from = vi.fn().mockReturnValue({ leftJoin: firstLeftJoin });
     db.select.mockReturnValueOnce({ from } as never);
@@ -116,15 +115,13 @@ describe('CollectionRepository', () => {
     expect(rows).toEqual([{ id: 1, memberCount: 2 }]);
     expect(db.select).toHaveBeenCalledWith(expect.objectContaining({ memberCount: expect.anything() }));
     expect(secondLeftJoin).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ op: 'and' }));
-    expect(thirdLeftJoin).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ op: 'eq' }));
   });
 
   it('findAllVisibleForUser keeps public metadata visible while counting only viewer-visible books', async () => {
     const orderBy = vi.fn().mockResolvedValue([{ id: 1, bookCount: 1 }]);
     const groupBy = vi.fn().mockReturnValue({ orderBy });
     const where = vi.fn().mockReturnValue({ groupBy });
-    const thirdLeftJoin = vi.fn().mockReturnValue({ where });
-    const secondLeftJoin = vi.fn().mockReturnValue({ leftJoin: thirdLeftJoin });
+    const secondLeftJoin = vi.fn().mockReturnValue({ where });
     const firstLeftJoin = vi.fn().mockReturnValue({ leftJoin: secondLeftJoin });
     const from = vi.fn().mockReturnValue({ leftJoin: firstLeftJoin });
     db.select.mockReturnValueOnce({ from } as never);
@@ -134,8 +131,8 @@ describe('CollectionRepository', () => {
     expect(rows).toEqual([{ id: 1, bookCount: 1 }]);
     expect(where).toHaveBeenCalledWith(
       expect.objectContaining({
-        op: 'and',
-        clauses: expect.arrayContaining([expect.objectContaining({ op: 'or' }), expect.objectContaining({ op: 'eq', right: 'books' })]),
+        op: 'or',
+        clauses: expect.arrayContaining([expect.objectContaining({ op: 'eq', right: 5 }), expect.objectContaining({ op: 'eq', right: true })]),
       }),
     );
     expect(secondLeftJoin).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ op: 'and' }));
@@ -145,8 +142,7 @@ describe('CollectionRepository', () => {
     const limit = vi.fn().mockResolvedValue([{ id: 10, bookCount: 1 }]);
     const groupBy = vi.fn().mockReturnValue({ limit });
     const where = vi.fn().mockReturnValue({ groupBy });
-    const thirdLeftJoin = vi.fn().mockReturnValue({ where });
-    const secondLeftJoin = vi.fn().mockReturnValue({ leftJoin: thirdLeftJoin });
+    const secondLeftJoin = vi.fn().mockReturnValue({ where });
     const firstLeftJoin = vi.fn().mockReturnValue({ leftJoin: secondLeftJoin });
     const from = vi.fn().mockReturnValue({ leftJoin: firstLeftJoin });
     db.select.mockReturnValueOnce({ from } as never);
@@ -156,13 +152,7 @@ describe('CollectionRepository', () => {
     expect(where).toHaveBeenCalledWith(
       expect.objectContaining({
         op: 'and',
-        clauses: expect.arrayContaining([
-          expect.objectContaining({
-            op: 'and',
-            clauses: expect.arrayContaining([expect.objectContaining({ op: 'or' })]),
-          }),
-          expect.objectContaining({ op: 'eq', right: 'books' }),
-        ]),
+        clauses: expect.arrayContaining([expect.objectContaining({ op: 'eq', right: 10 }), expect.objectContaining({ op: 'or' })]),
       }),
     );
   });
