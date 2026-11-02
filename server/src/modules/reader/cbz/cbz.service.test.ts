@@ -198,6 +198,24 @@ describe('CbzService', () => {
     expect(result.mimeType).toBe('image/jpeg');
   });
 
+  it('streams a complete base filename before a filename that extends its stem', async () => {
+    const rawStream = { kind: 'raw-stream' };
+
+    bookService.verifyFileAccess.mockResolvedValue({ format: 'cbz', absolutePath: '/books/prefix.cbz' });
+    mockCbzFile(
+      buildCbzBuffer([
+        { name: 'IMG_0004_Seite_001_1L.jpg', data: Buffer.from([4]), compression: 8 },
+        { name: 'IMG.jpg', data: Buffer.from([1]), compression: 0 },
+      ]),
+    );
+    mockCreateReadStream.mockReturnValue(rawStream as unknown as ReturnType<typeof createReadStream>);
+
+    const result = served(await service.streamPage(24, 0, user));
+
+    expect(mockCreateInflateRaw).not.toHaveBeenCalled();
+    expect(result.stream).toBe(rawStream);
+  });
+
   it('streams STORED CBZ entries without inflate', async () => {
     const rawStream = { kind: 'raw-stream' };
 
@@ -259,6 +277,28 @@ describe('CbzService', () => {
     expect(streamed.mimeType).toBe('image/jpeg');
     await expect(service.getPageCount(6, user)).resolves.toBe(2);
     expect(mockReadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('streams a complete CBR base filename before a filename that extends its stem', async () => {
+    const extract = vi.fn(() => ({
+      files: [{ fileHeader: { flags: { directory: false } }, extraction: Uint8Array.from([1]) }],
+    }));
+    bookService.verifyFileAccess.mockResolvedValue({ format: 'cbr', absolutePath: '/books/prefix.cbr' });
+    mockReadFile.mockResolvedValue(Buffer.from('rar-bytes') as unknown as Awaited<ReturnType<typeof readFile>>);
+    mockCreateExtractorFromData
+      .mockResolvedValueOnce({
+        getFileList: () => ({
+          fileHeaders: [
+            { name: 'IMG_0004_Seite_001_1L.jpg', flags: { directory: false } },
+            { name: 'IMG.jpg', flags: { directory: false } },
+          ],
+        }),
+      } as any)
+      .mockResolvedValueOnce({ extract } as any);
+
+    await service.streamPage(25, 0, user);
+
+    expect(extract).toHaveBeenCalledWith({ files: ['IMG.jpg'] });
   });
 
   it('throws when CBR extraction does not produce the requested file', async () => {
