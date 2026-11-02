@@ -7696,10 +7696,12 @@
           "migration": "Imported from Audiobookshelf",
           "manual": "Edited in BookOrbit",
           "manualBy": "Edited by {name} {when}",
+          "readAlong": "From the read-along narration in the EPUB, view only",
           "none": "No chapters yet"
         },
         "youAreHere": "You are here",
         "playFrom": "Listen from {title}",
+        "openInReader": "Open {title} in the reader",
         "selectRow": "Select chapter {index}",
         "selectedCount": "{count, plural, one {# selected} other {# selected}}",
         "selectAll": "Select all",

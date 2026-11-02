@@ -242,11 +242,73 @@ describe('KoboSyncController', () => {
       expect(resources(controllerWithAppUrl('http://localhost:6263'), koboRequest('192.168.1.67')).image_host).toBe('http://192.168.1.67:3000');
     });
 
-    it('lets an explicit port or forwarded headers win over APP_URL', () => {
+    it('lets an explicit port, a forwarded port, or a forwarded scheme APP_URL does not share win over APP_URL', () => {
       const controller = controllerWithAppUrl('http://192.168.1.67:3010');
 
       expect(resources(controller, koboRequest('192.168.1.67:3000')).image_host).toBe('http://192.168.1.67:3000');
       expect(resources(controller, koboRequest('192.168.1.67', { 'x-forwarded-proto': 'https' })).image_host).toBe('https://192.168.1.67');
+      expect(resources(controller, koboRequest('192.168.1.67', { 'x-forwarded-host': '192.168.1.67', 'x-forwarded-port': '8080' })).image_host).toBe(
+        'http://192.168.1.67:8080',
+      );
+    });
+
+    describe("behind a forwarding proxy that repeats the Kobo's port-less Host (#2036)", () => {
+      const funnel = { 'x-forwarded-host': 'reader.tail1234.ts.net', 'x-forwarded-proto': 'https', 'x-forwarded-for': '203.0.113.9' };
+      const appUrl = 'https://reader.tail1234.ts.net:8443';
+
+      it('takes the public port from APP_URL, as Tailscale Funnel on a non-standard port needs', () => {
+        const res = resources(controllerWithAppUrl(appUrl), koboRequest('reader.tail1234.ts.net', funnel));
+
+        expect(res.image_host).toBe(appUrl);
+        expect(res.image_url_template).toBe(`${appUrl}/api/v1/kobo/abc/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg`);
+        expect(res.library_sync).toBe(`${appUrl}/api/v1/kobo/abc/v1/library/sync`);
+        expect(res.reading_state).toBe(`${appUrl}/api/v1/kobo/abc/v1/library/{Ids}/state`);
+        expect(res.reading_services_host).toBe(appUrl);
+      });
+
+      it('matches the host without regard to case', () => {
+        expect(
+          resources(controllerWithAppUrl(appUrl), koboRequest('READER.tail1234.ts.net', { ...funnel, 'x-forwarded-host': 'READER.tail1234.ts.net' }))
+            .image_host,
+        ).toBe(appUrl);
+      });
+
+      it('uses APP_URL when the proxy forwards only the host', () => {
+        expect(
+          resources(controllerWithAppUrl(appUrl), koboRequest('reader.tail1234.ts.net', { 'x-forwarded-host': 'reader.tail1234.ts.net' })).image_host,
+        ).toBe(appUrl);
+      });
+
+      it('keeps the forwarded origin when APP_URL names another host or another scheme', () => {
+        expect(resources(controllerWithAppUrl('https://other.example.com:8443'), koboRequest('reader.tail1234.ts.net', funnel)).image_host).toBe(
+          'https://reader.tail1234.ts.net',
+        );
+        expect(resources(controllerWithAppUrl('http://reader.tail1234.ts.net:8443'), koboRequest('reader.tail1234.ts.net', funnel)).image_host).toBe(
+          'https://reader.tail1234.ts.net',
+        );
+      });
+
+      it('leaves a client that sends the port itself alone', () => {
+        const withPort = { ...funnel, 'x-forwarded-host': 'reader.tail1234.ts.net:9443' };
+
+        expect(resources(controllerWithAppUrl(appUrl), koboRequest('reader.tail1234.ts.net:9443', withPort)).image_host).toBe(
+          'https://reader.tail1234.ts.net:9443',
+        );
+      });
+
+      it('builds library sync download links from the same origin', async () => {
+        syncService.getDelta.mockResolvedValue({ entitlements: [], hasMore: false, syncToken: 'token' });
+        settingsService.getSettings.mockResolvedValue({ storeSync: false });
+
+        await controllerWithAppUrl(appUrl).librarySync(
+          { deviceId: 5, deviceToken: 'abc' } as never,
+          { id: 9 } as never,
+          koboRequest('reader.tail1234.ts.net', funnel) as never,
+          makeReply() as never,
+        );
+
+        expect(syncService.getDelta).toHaveBeenCalledWith(9, 5, 'abc', appUrl);
+      });
     });
 
     it('builds library sync download links from the same origin', async () => {

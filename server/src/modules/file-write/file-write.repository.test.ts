@@ -136,6 +136,18 @@ describe('FileWriteRepository', () => {
     await expect(repo.loadPayload(11)).resolves.toBeNull();
   });
 
+  it('loadPayload normalizes an unknown zero page count to null', async () => {
+    const metadataChain = chain([{ title: 'Unknown length', pageCount: 0 }]);
+    const emptyRelatedRows = chain([]);
+    const db = {
+      select: vi.fn().mockReturnValue(emptyRelatedRows).mockReturnValueOnce(metadataChain),
+    };
+
+    const repo = new FileWriteRepository(db as never);
+
+    await expect(repo.loadPayload(12)).resolves.toMatchObject({ pageCount: null });
+  });
+
   it('loadPayload maps metadata, authors, genres, and tags', async () => {
     const meta = {
       title: 'Dune',

@@ -291,6 +291,60 @@ describe('ChapterEditorService.getState', () => {
     await expect(service.getState(BOOK_ID, USER)).rejects.toThrow(NotFoundException);
   });
 
+  it('refuses a book whose only EPUB has no narration', async () => {
+    const { service, epubService } = makeService({ tracks: [], ebookFiles: [ebookFile(30, false)] });
+
+    await expect(service.getState(BOOK_ID, USER)).rejects.toThrow(NotFoundException);
+    expect(epubService.getMediaOverlayPlaylist).not.toHaveBeenCalled();
+  });
+
+  it('shows the narration of a read-along EPUB with no audio files as chapters that cannot be edited', async () => {
+    const { service, epubService, bookService } = makeService({ tracks: [], row: null, ebookFiles: [ebookFile(31, true)] });
+    epubService.getMediaOverlayPlaylist.mockResolvedValue({
+      durationSeconds: 3_600.4,
+      sections: [
+        { index: 0, label: null, startSeconds: 0 },
+        { index: 1, label: ' Chapter One ', startSeconds: 12.3456 },
+        { index: 2, label: 'Chapter Two', startSeconds: 1_800 },
+      ],
+    });
+
+    const state = await service.getState(BOOK_ID, USER);
+
+    expect(bookService.verifyBookAccess).toHaveBeenCalledWith(BOOK_ID, USER);
+    expect(epubService.getMediaOverlayPlaylist).toHaveBeenCalledWith(BOOK_ID, 31, USER);
+    expect(state).toMatchObject({
+      readAlong: true,
+      chapters: [
+        { title: 'Chapter One', startMs: 12_346 },
+        { title: 'Chapter Two', startMs: 1_800_000 },
+      ],
+      source: null,
+      derived: false,
+      locked: false,
+      totalDurationMs: 3_600_400,
+      tracks: [],
+      versionCount: 0,
+      sources: { ebookFileId: 31, readAlongFileId: 31 },
+      writeBack: { available: false, reason: null, fileCount: 0 },
+    });
+  });
+
+  it('keeps the audio files as the source of chapters when the book has both', async () => {
+    const { service, epubService } = makeService({ ebookFiles: [ebookFile(31, true)] });
+
+    const state = await service.getState(BOOK_ID, USER);
+
+    expect(state.readAlong).toBeUndefined();
+    expect(epubService.getMediaOverlayPlaylist).not.toHaveBeenCalled();
+  });
+
+  it('still refuses to edit a read-along EPUB, which has no audio tracks to cut', async () => {
+    const { service } = makeService({ tracks: [], ebookFiles: [ebookFile(31, true)] });
+
+    await expect(service.save(BOOK_ID, { chapters: [{ title: 'One', startMs: 0 }], baseRevision: '' }, USER)).rejects.toThrow(NotFoundException);
+  });
+
   it('changes the revision whenever the stored list, its source or its save time changes', async () => {
     const base = await currentRevision(makeService().service);
 

@@ -4,7 +4,7 @@ ARG NODE_IMAGE=node:26.12.1-trixie-slim
 
 FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
-RUN npm install -g pnpm@11.22.0
+RUN npm install -g pnpm@11.28.9
 
 # The image runs on CPU only: without this, onnxruntime-node downloads its CUDA provider on
 # linux/x64, which cannot load here (no CUDA or cuDNN libraries) and only adds size.
