@@ -401,10 +401,10 @@ function CatalogLists:listPaging(context)
         end
         return windowPaging(self:listStart(context), context.page_size, context.total, context.has_next)
     end
-    if kind == "seriespage" or kind == "authorpage" then
+    if kind == "seriespage" or kind == "authorpage" or kind == "shelves" then
         return { page = context.local_page or 1, pages = context.local_pages or 1 }
     end
-    if kind == "search" or kind == "shelves" then return { page = 1, pages = 1 } end
+    if kind == "search" then return { page = 1, pages = 1 } end
     if (kind == "books" or kind == "reading") and context.page_size and context.total then
         return windowPaging(self:listStart(context), context.page_size, context.total)
     end
@@ -424,7 +424,7 @@ function CatalogLists:listGoPage(page)
     local p = self:listPaging(context)
     if page < 1 or (p.pages and page > p.pages) then return true end
     if page == p.page then return true end
-    if kind == "seriespage" or kind == "authorpage" then
+    if kind == "seriespage" or kind == "authorpage" or kind == "shelves" then
         context.local_page = page
         self:updateItems(nil, true)
         return true
@@ -1270,7 +1270,18 @@ function CatalogLists:listBody(kind, context)
             return list or {}
         end
         local m = { libraries = tag(shelves.libraries, "libraries"), collections = tag(shelves.collections, "collections"), scopes = tag(shelves["smart-scopes"], "smart-scopes") }
-        return function(f) return ListPages.shelvesBody(m, f) end, nil
+        local f = ListView.frame(sw, sh, { toolbar = false, offline = context.list_offline })
+        local layout = ListPages.shelvesLayout(m, f)
+        context.local_pages = #layout.pages
+        context.local_page = math.min(context.local_page or 1, #layout.pages)
+        m.local_page = context.local_page
+        context.visible_shelves = {}
+        for _ci, chunks in ipairs(layout.pages[context.local_page]) do
+            for _i, chunk in ipairs(chunks) do
+                for i = chunk.from, chunk.to do table.insert(context.visible_shelves, layout.groups[chunk.section][3][i]) end
+            end
+        end
+        return function(body_f) return ListPages.shelvesBody(m, body_f) end, m
     end
     if kind == "search" then
         local m = { results = context.results, query = context.query, scope = context.scope or "all", screen_w = sw, screen_h = sh,
@@ -1427,8 +1438,7 @@ function CatalogLists:listThumbnailBooks(kind, context)
     for _i, b in ipairs(context.books or {}) do addBook(b) end
     local entries = context.entries or {}
     if kind == "shelves" then
-        entries = {}
-        for _s, list in pairs(context.shelves or {}) do for _i, e in ipairs(list) do table.insert(entries, e) end end
+        entries = context.visible_shelves or {}
     elseif kind == "search" then
         entries = {}
         for _i, e in ipairs(context.results.authors or {}) do table.insert(entries, e) end
