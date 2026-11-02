@@ -10,6 +10,7 @@ import {
 import type { BookRequestMediaKind, ReleaseCandidateItem, ReleaseScoreReason, ReleaseTier } from '@bookorbit/types';
 
 import { normalizeIsbn, normalizeMetadataIsbn } from '../../../common/text-match/isbn-normalize';
+import { inferSeriesPositionFromTitle, sameSeriesPosition } from '../../../common/text-match/series-position-match';
 import { normalizeTitleText, significantTokens, symmetricTitleSimilarity, tokenizeTitleText } from '../../../common/text-match/title-match';
 import type { ReleaseCandidate } from './indexer-adapter';
 
@@ -118,6 +119,8 @@ const RELEASE_TITLE_NOISE = new Set([
 export interface ScoringRequest {
   title: string;
   authors: string[];
+  seriesName: string | null;
+  seriesIndex: number | null;
   isbn13: string | null;
   isbn10: string | null;
   isbns: string[];
@@ -238,6 +241,12 @@ function matchReason(candidate: ReleaseCandidate, request: ScoringRequest): Rele
   const titleScore = titleSimilarity(candidate, request);
   const authors = request.authors.filter(Boolean);
   const authorScore = authors.length > 0 ? authorSimilarity(candidate, authors) : null;
+  const candidateSeriesIndex = [candidate.bookTitle, candidate.title]
+    .filter((title): title is string => Boolean(title?.trim()))
+    .map((title) => inferSeriesPositionFromTitle(title, request.seriesName))
+    .find((position) => position !== null);
+  const seriesMismatch =
+    request.seriesIndex !== null && candidateSeriesIndex !== undefined && !sameSeriesPosition(request.seriesIndex, candidateSeriesIndex);
 
   const requestedIsbns = [...request.isbns, normalizeMetadataIsbn(request.isbn13), normalizeMetadataIsbn(request.isbn10)].filter(Boolean);
   if (requestedIsbns.length > 0 && (titleScore > 0 || (authorScore ?? 0) > 0)) {
@@ -249,6 +258,10 @@ function matchReason(candidate: ReleaseCandidate, request: ScoringRequest): Rele
       return { code: 'isbnMatch', points: WEIGHTS.match };
     }
   }
+
+  // A known different volume must stay below the minimum auto-grab floor even when every other
+  // signal is perfect. It remains visible in the picker for a person who deliberately wants it.
+  if (seriesMismatch) return { code: 'titleMatch', points: 0 };
 
   const combined = authorScore === null ? titleScore : titleScore * TITLE_WEIGHT + authorScore * AUTHOR_WEIGHT;
   return {

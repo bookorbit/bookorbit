@@ -22,6 +22,12 @@ import type {
 } from '@bookorbit/types';
 
 import { normalizeMetadataIsbn } from '../../../common/text-match/isbn-normalize';
+import {
+  inferSeriesPositionFromTitle,
+  parseSeriesPosition,
+  sameSeriesName,
+  sameSeriesPosition,
+} from '../../../common/text-match/series-position-match';
 import { mainTitlePart, symmetricTitleSimilarity } from '../../../common/text-match/title-match';
 import type { RequestUser } from '../../../common/types/request-user';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
@@ -519,7 +525,7 @@ export class RequestVerificationService implements OnModuleInit {
  * gained a "Book 1 (Unabridged)" suffix, not that something somewhere came to 65.
  */
 export function verifyAgainstRequest(
-  request: Pick<BookRequestRow, 'title' | 'subtitle' | 'authors' | 'isbn13'>,
+  request: Pick<BookRequestRow, 'title' | 'subtitle' | 'authors' | 'seriesName' | 'seriesIndex' | 'isbn13'>,
   fetched: BookDockMetadata | null,
   embedded: BookDockMetadata | null,
   threshold: number = DEFAULT_VERIFICATION_THRESHOLD,
@@ -562,6 +568,17 @@ export function verifyAgainstRequest(
 
   const isbnVerdict: BookRequestVerificationVerdict = requestedIsbn && importedIsbn ? 'mismatch' : 'unknown';
 
+  const importedSeriesIndex = resolveImportedSeriesIndex(request.seriesName, importedTitle, fetched, embedded);
+  if (request.seriesIndex !== null && importedSeriesIndex !== null && !sameSeriesPosition(request.seriesIndex, importedSeriesIndex)) {
+    return {
+      score: 0,
+      passed: false,
+      reason: `imported series position ${importedSeriesIndex} does not match requested position ${request.seriesIndex}`,
+      code: 'below_threshold',
+      rows: rows(isbnVerdict),
+    };
+  }
+
   if (!importedTitle) {
     return { score: 0, passed: false, reason: 'the imported file has no readable title to compare', code: 'no_title', rows: rows(isbnVerdict) };
   }
@@ -591,6 +608,35 @@ export function verifyAgainstRequest(
     code: passed ? 'above_threshold' : 'below_threshold',
     rows: rows(isbnVerdict),
   };
+}
+
+function resolveImportedSeriesIndex(
+  requestedSeriesName: string | null,
+  importedTitle: string,
+  fetched: BookDockMetadata | null,
+  embedded: BookDockMetadata | null,
+): number | null {
+  for (const metadata of [fetched, embedded]) {
+    if (!metadata) continue;
+
+    if (requestedSeriesName) {
+      const membership = metadata.seriesMemberships?.find((item) => sameSeriesName(item.seriesName, requestedSeriesName));
+      const membershipIndex = parseSeriesPosition(membership?.seriesIndex);
+      if (membershipIndex !== null) return membershipIndex;
+
+      if (sameSeriesName(metadata.seriesName, requestedSeriesName)) {
+        const primaryIndex = parseSeriesPosition(metadata.seriesIndex);
+        if (primaryIndex !== null) return primaryIndex;
+      }
+
+      if (metadata.seriesName || metadata.seriesMemberships?.length) continue;
+    }
+
+    const unnamedIndex = parseSeriesPosition(metadata.seriesIndex);
+    if (unnamedIndex !== null) return unnamedIndex;
+  }
+
+  return inferSeriesPositionFromTitle(importedTitle, requestedSeriesName);
 }
 
 /**

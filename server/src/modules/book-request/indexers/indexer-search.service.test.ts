@@ -237,6 +237,23 @@ describe('IndexerSearchService', () => {
     expect(result.releases[0].score).toBeGreaterThan(result.releases[1].score);
   });
 
+  it('keeps a different series volume below the auto-grab score floor', async () => {
+    const torznab = {
+      search: vi
+        .fn()
+        .mockResolvedValue([
+          release({ guid: 'wrong', title: 'Example Title 3 - Author Name [EPUB]' }),
+          release({ guid: 'right', title: 'Example Title 1 - Author Name [EPUB]' }),
+        ]),
+    };
+    const { service } = makeService([indexer()], { torznab });
+
+    const result = await service.search(request({ title: 'Example Title', authors: ['Author Name'], seriesName: 'Example Title', seriesIndex: 1 }));
+
+    expect(result.releases.map((item) => item.guid)).toEqual(['right', 'wrong']);
+    expect(result.releases.find((item) => item.guid === 'wrong')?.score).toBeLessThan(50);
+  });
+
   it('records the outcome of every source that took part in a real search', async () => {
     const torznab = { search: vi.fn().mockResolvedValue([release()]) };
     const archive = { search: vi.fn().mockRejectedValue(new Error('tracker is offline')) };

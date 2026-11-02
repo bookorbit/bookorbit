@@ -502,10 +502,13 @@ function prepareScoringRequest(
   const requestIdentifiers = bookRequestSearchIsbns(request);
   const activeIsbn = overrides?.isbn !== undefined ? overrides.isbn : (requestIdentifiers[0] ?? null);
   const availableIsbns = activeIsbn && !requestIdentifiers.includes(activeIsbn) ? [activeIsbn, ...requestIdentifiers] : requestIdentifiers;
+  const usesRequestTitle = overrides?.title === undefined;
   return {
     scoringRequest: {
       title: overrides?.title ?? request.title,
       authors: overrides?.authors ?? request.authors ?? [],
+      seriesName: usesRequestTitle ? request.seriesName : null,
+      seriesIndex: usesRequestTitle ? request.seriesIndex : null,
       isbn13: activeIsbn,
       isbn10: null,
       isbns: activeIsbn ? [activeIsbn] : [],

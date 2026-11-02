@@ -78,7 +78,7 @@ export function normalizeTitleText(value: string): string {
 }
 
 export function tokenizeTitleText(value: string): string[] {
-  return value.split(' ').filter((token) => token.length > 1);
+  return value.split(' ').filter((token) => token.length > 1 || /^\p{N}$/u.test(token));
 }
 
 /**
