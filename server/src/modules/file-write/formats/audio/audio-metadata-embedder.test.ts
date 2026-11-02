@@ -213,8 +213,16 @@ describe('AudioMetadataEmbedder', () => {
   it('adds MP3-specific ID3v2 compatibility args', () => {
     const args = testing.buildFfmpegArgs('/books/audio/book.mp3', '/books/audio/cover.jpg', '/books/audio/out.mp3', 'mp3', []);
 
+    expect(args).toContain('-copyts');
+    expect(args.indexOf('-copyts')).toBeLessThan(args.indexOf('-i'));
     expect(args).toContain('-id3v2_version');
     expect(args[args.indexOf('-id3v2_version') + 1]).toBe('3');
+  });
+
+  it.each(['m4b', 'm4a', 'flac'])('does not add MP3 timestamp handling to %s output', (format) => {
+    const args = testing.buildFfmpegArgs(`/books/audio/book.${format}`, null, `/books/audio/out.${format}`, format, []);
+
+    expect(args).not.toContain('-copyts');
   });
 
   it.each(['m4b', 'm4a'])('enables extended metadata tags for %s output', (format) => {

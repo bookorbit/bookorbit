@@ -113,7 +113,14 @@ function buildFfmpegArgs(
   metadata: AudioMetadataArg[],
   options?: { useMp4MetadataTags?: boolean; muxer?: string; chaptersPath?: string | null },
 ): string[] {
-  const args = ['-v', 'error', '-y', '-i', filePath];
+  const normalizedFormat = format.toLowerCase();
+  const args = ['-v', 'error', '-y'];
+  if (normalizedFormat === FORMAT_MP3) {
+    // MP3 encoder delay gives the input a positive start time that FFmpeg otherwise subtracts
+    // from carried chapters on every remux.
+    args.push('-copyts');
+  }
+  args.push('-i', filePath);
   const chaptersPath = options?.chaptersPath ?? null;
 
   if (coverPath) {
@@ -134,7 +141,7 @@ function buildFfmpegArgs(
   const chaptersInput = chaptersPath ? (coverPath ? 2 : 1) : 0;
   args.push('-map_metadata', '0', '-map_chapters', String(chaptersInput), '-c', 'copy');
 
-  if (format.toLowerCase() === FORMAT_MP3) {
+  if (normalizedFormat === FORMAT_MP3) {
     args.push('-id3v2_version', '3');
   }
 
