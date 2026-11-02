@@ -103,9 +103,7 @@ const statusLabels = computed<Record<CompletionStatus, string>>(() => ({
   has_gaps: t('series.status.gaps'),
 }))
 
-const libraryOptions = computed(() =>
-  libraries.value.filter((library) => library.type !== 'podcasts').map((library) => ({ id: library.id, name: library.name })),
-)
+const libraryOptions = computed(() => libraries.value.map((library) => ({ id: library.id, name: library.name })))
 const foldedCount = computed(() => formatNumber(total.value))
 
 const activeFilterCount = computed(() => {

@@ -4586,18 +4586,6 @@
       "seeAllLibraries": "Zobrazit všechny knihovny ({count})",
       "seeAllSmartScopes": "Zobrazit všechny chytré rozsahy ({count})",
       "seeAllCollections": "Zobrazit všechny kolekce ({count})",
-      "podcasts": "Podcasts",
-      "newPodcastLibrary": "New Podcast Library",
-      "noPodcastLibraries": "No podcast libraries yet",
-      "filterPodcastLibraries": "Filter podcast libraries",
-      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
-      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
-      "queue": "Queue",
-      "mode": {
-        "books": "Books",
-        "podcasts": "Podcasts",
-        "switcherAria": "Switch between books and podcasts"
-      },
       "updateAvailable": "Aktualizovat {version}",
       "zones": {
         "browse": "Procházet"
@@ -4717,8 +4705,7 @@
       "sort": {
         "custom": "Vlastní objednávka",
         "name": "Název",
-        "bookCount": "Počet knih",
-        "showCount": "Show count"
+        "bookCount": "Počet knih"
       },
       "ascending": "Vzestupně",
       "descending": "sestupně",
@@ -4727,9 +4714,7 @@
       "noMatches": "Žádné shody",
       "noMatchesHint": "Vyzkoušejte jiný hledaný výraz.",
       "bookCount": "Knihy: {count}",
-      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Vytvořte knihovnu, abyste mohli začít přidávat knihy.",
-      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Chytré rozsahy ukládají často používanou sadu filtrů.",
       "collectionsEmptyHint": "Sbírky skupinových knih, které si vyberete ručně."
     }
@@ -4775,7 +4760,6 @@
       "empty": {
         "continueReading": "Zatím neprobíhají žádné knihy. Začněte číst jednu a uvidíte ji zde.",
         "continueListening": "Zatím žádné audioboky neprobíhají. Začněte naslouchat jedné a uvidíte to zde.",
-        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "Žádné knihy označené ještě nechtějí přečíst.",
         "upNextInSeries": "Zatím žádná další série nevybírá. Dokončete objem pro další povrch.",
         "recentlyAdded": "Zatím v knihovně nejsou žádné knihy.",
@@ -4807,7 +4791,6 @@
         "recentlyAdded": "Nedávno přidané",
         "continueReading": "Pokračovat ve čtení",
         "continueListening": "Pokračovat v poslechu",
-        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Chcete přečíst",
         "upNextInSeries": "Další v řadě",
         "random": "Objevte něco nového",
@@ -5114,15 +5097,7 @@
     }
   },
   "errors": {
-    "network": "Could not reach BookOrbit. Check your connection, then try again.",
-    "codes": {
-      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
-      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
-      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
-      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
-      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
-      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
-    }
+    "network": "Could not reach BookOrbit. Check your connection, then try again."
   },
   "hardcover": {
     "settings": {
@@ -5356,9 +5331,7 @@
         "browseDescription": "Vyberte jednu nebo více složek bez opuštění prohlížeče.",
         "selectedTitle": "Vybrané složky",
         "addFolders": "Přidat složky",
-        "manualEntry": "Zadejte cestu ručně",
         "absolutePath": "Absolutní cesta k serveru",
-        "addFolder": "Přidat složku",
         "removeFolder": "Odstranit {folder}",
         "manualCheckHint": "Ruční cesty jsou zkontrolovány společně s ostatními vybranými složkami.",
         "pathPlaceholder": "/cesta/do/do",
@@ -6679,7 +6652,6 @@
       "retry": "Opakovat"
     },
     "bookView": {
-      "sort": "Seřadit",
       "sortOn": "Zapnuto",
       "resetSort": "Obnovit pořadí na výchozí",
       "filters": "Filtry",
@@ -6859,7 +6831,6 @@
   "titles": {
     "dashboard": "Nástěnka",
     "libraries": "Knihovny",
-    "podcastLibraries": "Podcast Libraries",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader synchronizace",

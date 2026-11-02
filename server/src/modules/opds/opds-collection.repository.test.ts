@@ -40,7 +40,7 @@ describe('OpdsCollectionRepository', () => {
     expect(text).toContain('exists (select 1 from "user_library_access"');
     expect(text).toContain('"user_library_access"."library_id" = "books"."library_id"');
     expect(text).toContain('("collections"."user_id" = $3 or "collections"."is_public" = $4)');
-    expect(params).toEqual(['present', 7, 7, true, 'books']);
+    expect(params).toEqual(['present', 7, 7, true]);
   });
 
   it('applies include and exclude content filters inside the book join', () => {
@@ -60,10 +60,10 @@ describe('OpdsCollectionRepository', () => {
     expect(bookJoin).toContain(' or exists');
     expect(bookJoin).toContain('not exists (select 1 from "book_tags"');
     expect(bookJoin).toContain('not exists (select 1 from "book_genres"');
-    expect(params).toEqual(['present', 7, 11, 12, 13, 14, 7, true, 'books']);
+    expect(params).toEqual(['present', 7, 11, 12, 13, 14, 7, true]);
   });
 
-  it('lets superusers count every library but still excludes foreign private and podcast collections', () => {
+  it('lets superusers count every library but still excludes foreign private collections', () => {
     const filters = { ...EMPTY_CONTENT_FILTER_RULES, excludeTagIds: [13] };
     const { sql, params } = repository.findVisibleForUser(7, true, filters).toSQL();
 
@@ -72,8 +72,7 @@ describe('OpdsCollectionRepository', () => {
     expect(sql).toContain('"books"."status"');
     expect(sql).toContain('"collections"."user_id"');
     expect(sql).toContain('"collections"."is_public"');
-    expect(sql).toContain('"collections"."media_type"');
-    expect(params).toEqual(['present', 7, true, 'books']);
+    expect(params).toEqual(['present', 7, true]);
   });
 
   it('uses the same visibility for dashboard totals without joining memberships', async () => {
@@ -84,6 +83,6 @@ describe('OpdsCollectionRepository', () => {
     const [{ text }, params] = query.mock.calls[0] as [{ text: string }, unknown[]];
     expect(text).toContain('("collections"."user_id" = $1 or "collections"."is_public" = $2)');
     expect(text).not.toContain('join');
-    expect(params).toEqual([7, true, 'books']);
+    expect(params).toEqual([7, true]);
   });
 });

@@ -22,6 +22,7 @@ import {
   FORMAT_TO_GROUP,
   IDENTIFIER_INPUT_KIND_BY_FIELD,
   getPrimaryBookFile,
+  isKnownMetadataProviderKey,
   isValidSeriesIndex,
   parseSeriesIndex,
   isComicFormat,
@@ -202,7 +203,9 @@ const visibleProviderIdFields = computed(() => filterProviderIdFields(availableM
 const externalProviderIdRows = computed(() => {
   const rows = new Map<string, { key: string; label: string; registered: boolean }>()
   for (const provider of availableMetadataProviders.value ?? []) {
-    if (provider.source === 'external') rows.set(provider.key, { key: provider.key, label: provider.label, registered: true })
+    if (provider.source === 'external' && !isKnownMetadataProviderKey(provider.key)) {
+      rows.set(provider.key, { key: provider.key, label: provider.label, registered: true })
+    }
   }
   for (const key of Object.keys(form.externalProviderIds)) {
     if (!rows.has(key)) rows.set(key, { key, label: key, registered: false })

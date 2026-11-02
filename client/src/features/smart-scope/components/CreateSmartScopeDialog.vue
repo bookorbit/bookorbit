@@ -3,20 +3,10 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { X } from '@lucide/vue'
-import type { MediaType } from '@bookorbit/types'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
-import { DEFAULT_PLAYLIST_RULES } from '@/features/podcast/lib/podcast-playlist-rules'
 import IconPicker from '@/components/IconPicker.vue'
 
-const props = withDefaults(
-  defineProps<{
-    open: boolean
-    /** Podcast scopes are created against one library and carry episode rules instead of a rule tree. */
-    mediaType?: MediaType
-    libraryId?: number | null
-  }>(),
-  { mediaType: 'books', libraryId: null },
-)
+defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const router = useRouter()
@@ -31,10 +21,6 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const trimmedName = computed(() => name.value.trim())
 const trimmedIcon = computed(() => icon.value.trim())
-const isPodcastScope = computed(() => props.mediaType === 'podcasts')
-/** A Kobo holds no podcasts, so the sync option is meaningless on a podcast scope. */
-const showKoboSync = computed(() => !isPodcastScope.value)
-const dialogTitle = computed(() => (isPodcastScope.value ? t('smartScope.createDialog.podcastTitle') : t('smartScope.createDialog.title')))
 
 async function submit() {
   if (!trimmedName.value) {
@@ -53,17 +39,14 @@ async function submit() {
       icon: trimmedIcon.value,
       defaultSort: [],
       isPublic: isPublic.value,
-      syncToKobo: showKoboSync.value ? syncToKobo.value : false,
-      ...(isPodcastScope.value
-        ? { mediaType: 'podcasts' as const, libraryId: props.libraryId ?? undefined, filter: { ...DEFAULT_PLAYLIST_RULES } }
-        : {}),
+      syncToKobo: syncToKobo.value,
     })
     name.value = ''
     icon.value = ''
     isPublic.value = false
     syncToKobo.value = false
     emit('close')
-    router.push({ name: isPodcastScope.value ? 'podcast-playlist' : 'smartScope', params: { id: smartScope.id } })
+    router.push({ name: 'smartScope', params: { id: smartScope.id } })
   } catch {
     error.value = t('smartScope.createDialog.createFailed')
   } finally {
@@ -78,7 +61,7 @@ async function submit() {
       <div class="absolute inset-0 bg-scrim" @click="emit('close')" />
       <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <div class="flex items-center justify-between mb-5">
-          <h2 class="text-base font-semibold text-foreground">{{ dialogTitle }}</h2>
+          <h2 class="text-base font-semibold text-foreground">{{ t('smartScope.createDialog.title') }}</h2>
           <button @click="emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">
             <X :size="18" />
           </button>
@@ -106,7 +89,7 @@ async function submit() {
             <span class="text-sm text-foreground">{{ t('smartScope.visibleToAll') }}</span>
           </label>
 
-          <label v-if="showKoboSync" class="flex items-center gap-2.5 cursor-pointer select-none">
+          <label class="flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" v-model="syncToKobo" class="h-4 w-4 rounded-xs border border-input accent-primary" />
             <span class="text-sm text-foreground">{{ t('smartScope.syncToKobo') }}</span>
           </label>

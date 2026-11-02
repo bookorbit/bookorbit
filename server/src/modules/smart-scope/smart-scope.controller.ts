@@ -136,18 +136,4 @@ export class SmartScopeController {
   queryJumpBuckets(@Param('id', ParseIntPipe) id: number, @Body(JumpBucketsQueryPipe) query: JumpBucketsQuery, @CurrentUser() user: RequestUser) {
     return this.smartScopeService.queryJumpBuckets(id, user, query);
   }
-
-  /** Podcast scopes match episodes, so they page through this rather than /books. */
-  @Get(':id/episodes')
-  queryEpisodes(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: RequestUser,
-    @Query('page', new OptionalIntQueryPipe(0)) page: number,
-    @Query('size', new OptionalIntQueryPipe(50)) size: number,
-    @Query('q') q?: string,
-  ) {
-    this.validateSizeQuery(size);
-    this.validatePageQuery(page, size);
-    return this.smartScopeService.queryEpisodes(id, user, page, size, q);
-  }
 }

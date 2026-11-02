@@ -787,10 +787,8 @@ export class KoboSyncService {
   }
 
   private async buildTagItems(userId: number, eligibleIds: Set<number>, smartScopeMatchCache: SmartScopeMatchCache): Promise<unknown[]> {
-    // Book collections only. A Kobo tag is a set of book entitlements, so a podcast collection
-    // would emit an empty tag; the schema also refuses the sync flag on one.
     const collections = await this.db.query.collections.findMany({
-      where: and(eq(schema.collections.userId, userId), eq(schema.collections.syncToKobo, true), eq(schema.collections.mediaType, 'books')),
+      where: and(eq(schema.collections.userId, userId), eq(schema.collections.syncToKobo, true)),
     });
 
     const collectionIds = collections.map((c) => c.id);
@@ -878,9 +876,7 @@ export class KoboSyncService {
         // A scope without a filter matches zero books everywhere else in the app
         // (SmartScopeService.findAll/prepareBooksQuery), so mirror that here rather
         // than syncing the whole library for an unconfigured scope.
-        // Kobo holds books. The scope query already excludes podcast scopes, whose rules are not a
-        // GroupRule; this second check keeps that guarantee local to where the filter is read.
-        if (!scope.filter || scope.mediaType !== 'books') {
+        if (!scope.filter) {
           return [scope.id, { name: scope.name, bookIds: [], where: undefined }];
         }
         const where = this.queryBuilder.buildWhere(scope.filter as GroupRule, { accessibleLibraryIds: libraryIds, userId, timeZone });

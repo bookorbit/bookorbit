@@ -84,9 +84,7 @@ const hasLibraries = computed(() => libraries.value.length > 0)
 const showSkeleton = computed(() => !overview.loaded.value && !overview.error.value && hasLibraries.value)
 
 function subscribeAll() {
-  for (const library of libraries.value) {
-    if (library.type !== 'podcasts') subscribeLibrary(library.id)
-  }
+  for (const library of libraries.value) subscribeLibrary(library.id)
 }
 
 /** This page announces finished scans with their outcome, so the generic "books added" toast stands down. */

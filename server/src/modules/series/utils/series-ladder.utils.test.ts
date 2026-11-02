@@ -90,6 +90,7 @@ describe('buildVolumeLadder', () => {
     expect(ladder.truncated).toBe(true);
     expect(ladder.gaps).toEqual([]);
     expect(ladder.next?.bookId).toBe(1);
+    expect(ladder.counts).toBeNull();
   });
 
   it('caps a very long ladder and says so', () => {
@@ -98,6 +99,15 @@ describe('buildVolumeLadder', () => {
 
     expect(ladder.volumes).toHaveLength(60);
     expect(ladder.truncated).toBe(true);
+  });
+
+  it('counts every volume of a capped ladder, not just the drawn rungs', () => {
+    const members = Array.from({ length: 80 }, (_, i) => member(i + 1, String(i + 1), i < 60 ? 'read' : i === 60 ? 'reading' : null));
+    members.push(member(81, '1'), member(82, null, 'read'));
+    const ladder = build(members);
+
+    expect(ladder.counts).toEqual({ ownedVolumeCount: 81, readVolumeCount: 61, readingVolumeCount: 1 });
+    expect(ladder.counts).toEqual(countSeriesVolumes({ members, bookCount: members.length, expectedBookCount: null }));
   });
 
   describe('next volume', () => {
@@ -130,6 +140,7 @@ describe('countSeriesVolumes', () => {
     expect(countSeriesVolumes({ members, bookCount: 4, expectedBookCount: 7 })).toEqual({
       ownedVolumeCount: 2,
       readVolumeCount: 1,
+      readingVolumeCount: 1,
     });
   });
 
@@ -139,6 +150,7 @@ describe('countSeriesVolumes', () => {
     expect(countSeriesVolumes({ members, bookCount: 5, expectedBookCount: null })).toEqual({
       ownedVolumeCount: 3,
       readVolumeCount: 2,
+      readingVolumeCount: 1,
     });
   });
 
@@ -148,6 +160,7 @@ describe('countSeriesVolumes', () => {
     expect(countSeriesVolumes({ members, bookCount: 5, expectedBookCount: null })).toEqual({
       ownedVolumeCount: 5,
       readVolumeCount: 3,
+      readingVolumeCount: 0,
     });
   });
 
@@ -157,6 +170,7 @@ describe('countSeriesVolumes', () => {
     expect(countSeriesVolumes({ members, bookCount: 3, expectedBookCount: null })).toEqual({
       ownedVolumeCount: 3,
       readVolumeCount: 2,
+      readingVolumeCount: 0,
     });
   });
 
@@ -164,6 +178,7 @@ describe('countSeriesVolumes', () => {
     expect(countSeriesVolumes({ members: [], bookCount: 0, expectedBookCount: null })).toEqual({
       ownedVolumeCount: 0,
       readVolumeCount: 0,
+      readingVolumeCount: 0,
     });
   });
 });

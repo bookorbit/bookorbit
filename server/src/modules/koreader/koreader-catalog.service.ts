@@ -153,6 +153,7 @@ const MANIFEST_CURSOR_CONTRACT_CHANGED = Symbol('manifest-cursor-contract-change
 const NATURAL_SORT_ORDER: Record<KoreaderCatalogSort, KoreaderCatalogSortOrder> = {
   title: 'asc',
   author: 'asc',
+  published: 'asc',
   series: 'asc',
   recently_added: 'desc',
   recently_updated: 'desc',
@@ -1562,6 +1563,8 @@ export class KoreaderCatalogService {
         return descending ? 'title_desc' : 'title_asc';
       case 'author':
         return descending ? 'author_desc' : 'author_asc';
+      case 'published':
+        return descending ? 'published_desc' : 'published_asc';
       case 'recently_updated':
         return descending ? 'updated' : 'updated_asc';
       case 'recently_read':

@@ -11,7 +11,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
-import { DEFAULT_FORMAT_PRIORITY, type LibraryType } from '@bookorbit/types';
+import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
 
 import { AppModule } from '../../src/app.module';
 import { GlobalExceptionFilter } from '../../src/common/filters/http-exception.filter';
@@ -161,7 +161,6 @@ export async function closeE2EContext(ctx: E2EContext): Promise<void> {
 export interface SeedLibraryInput {
   rootPath: string;
   mode: OrganizationMode;
-  type?: LibraryType;
   allowedFormats?: string[];
   excludePatterns?: string[];
   watch?: boolean;
@@ -172,7 +171,6 @@ export async function seedLibrary(db: Db, input: SeedLibraryInput): Promise<{ li
   const [library] = await db
     .insert(libraries)
     .values({
-      type: input.type ?? 'books',
       name: input.name ?? `e2e-${input.mode}-${randomUUID()}`,
       watch: input.watch ?? false,
       organizationMode: input.mode,

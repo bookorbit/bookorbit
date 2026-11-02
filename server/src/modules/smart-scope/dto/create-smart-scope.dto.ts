@@ -1,16 +1,14 @@
 import { Transform, Type } from 'class-transformer';
-import type { MediaType, SmartScopeFilter, SortField, SortSpec } from '@bookorbit/types';
-import { ICON_VALUE_MAX_LENGTH, MEDIA_TYPES, isSortField } from '@bookorbit/types';
+import type { SmartScopeFilter, SortField, SortSpec } from '@bookorbit/types';
+import { ICON_VALUE_MAX_LENGTH, isSortField } from '@bookorbit/types';
 import {
   IsArray,
   IsBoolean,
   IsIn,
-  IsInt,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
-  Min,
   MaxLength,
   ValidateNested,
   registerDecorator,
@@ -61,23 +59,10 @@ export class CreateSmartScopeDto {
   @MaxLength(ICON_VALUE_MAX_LENGTH)
   icon: string;
 
-  /** Defaults to books, so existing book-scope callers need no change. */
-  @IsOptional()
-  @IsIn(MEDIA_TYPES)
-  mediaType?: MediaType;
-
-  /** Required for podcast scopes, which evaluate episodes inside one library. */
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  libraryId?: number;
-
-  /** A book rule tree or a podcast rule set; the service validates against mediaType. */
   @IsOptional()
   @IsObject()
   filter?: SmartScopeFilter;
 
-  /** Book sort fields only. Podcast scopes carry their sort inside the rules. */
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

@@ -4,22 +4,12 @@ import { Permission } from '@bookorbit/types'
 import { PERMISSION_GROUPS, RESTRICTION_PERMISSIONS, detectPermissionSelection, permissionsInGroup, presetPermissions } from '../permission-presets'
 
 describe('permission-presets', () => {
-  const podcastPermissions: Permission[] = [
-    Permission.PodcastManageFeeds,
-    Permission.PodcastDownload,
-    Permission.PodcastEditMetadata,
-    Permission.PodcastManageRetention,
-    Permission.PodcastPurge,
-  ]
-
   // The user form renders permissions by walking the groups, so a permission missing from every
   // group is not merely unlabelled: nobody but a superuser can ever hold it.
-  it('offers every enabled permission in exactly one group', () => {
+  it('offers every permission in exactly one group', () => {
     const grouped = [...PERMISSION_GROUPS.flatMap(permissionsInGroup), ...RESTRICTION_PERMISSIONS]
-    const enabled = Object.values(Permission).filter((permission) => !podcastPermissions.includes(permission))
 
-    expect([...grouped].sort()).toEqual(enabled.sort())
-    expect(PERMISSION_GROUPS.map((group) => group.id)).not.toContain('podcasts')
+    expect([...grouped].sort()).toEqual(Object.values(Permission).sort())
   })
 
   it('keeps demo_restricted separate from granting permissions', () => {

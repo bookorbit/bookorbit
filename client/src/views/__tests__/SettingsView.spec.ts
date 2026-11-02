@@ -70,7 +70,7 @@ describe('SettingsView shell', () => {
   })
 
   it('leaves the description line out for a page without one', () => {
-    expect(mountView('settings-podcasts').find('[data-testid="settings-page-description"]').exists()).toBe(false)
+    expect(mountView('settings-unlisted').find('[data-testid="settings-page-description"]').exists()).toBe(false)
   })
 
   it('keeps the teleport target for page header actions', () => {

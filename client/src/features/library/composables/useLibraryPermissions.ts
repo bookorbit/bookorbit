@@ -22,7 +22,7 @@ export function useLibraryPermissions() {
   function hasPermissionInAnyLibrary(permission: string, required: AccessLevel = 'viewer'): boolean {
     if (!hasPermission(permission)) return false
     if (isSuperuser.value) return true
-    return libraries.value.some((library) => library.type === 'books' && hasLibraryPermission(permission, library.id, required))
+    return libraries.value.some((library) => hasLibraryPermission(permission, library.id, required))
   }
 
   return { hasLibraryPermission, hasPermissionInAnyLibrary }

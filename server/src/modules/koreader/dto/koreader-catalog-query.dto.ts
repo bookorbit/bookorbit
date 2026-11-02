@@ -17,6 +17,7 @@ import { KOREADER_DEVICE_ID_REGEX } from './koreader-device-param.dto';
 export const KOREADER_CATALOG_SORTS = [
   'title',
   'author',
+  'published',
   'recently_added',
   'recently_updated',
   'recently_read',

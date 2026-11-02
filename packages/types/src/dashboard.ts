@@ -4,7 +4,6 @@ export const SCROLLER_TYPE = {
   RECENTLY_ADDED: "recently-added",
   CONTINUE_READING: "continue-reading",
   CONTINUE_LISTENING: "continue-listening",
-  CONTINUE_PODCASTS: "continue-podcasts",
   WANT_TO_READ: "want-to-read",
   UP_NEXT_IN_SERIES: "up-next-in-series",
   RANDOM: "random",
@@ -13,31 +12,6 @@ export const SCROLLER_TYPE = {
 
 export type ScrollerType = (typeof SCROLLER_TYPE)[keyof typeof SCROLLER_TYPE];
 export const SCROLLER_TYPES = Object.values(SCROLLER_TYPE) as ReadonlyArray<ScrollerType>;
-
-/**
- * Shelves whose rows are books, which is every shelf `GET /dashboard/scrollers/:type` can serve.
- * Podcast shelves resolve through the podcast module's own cross-library endpoint instead, so the
- * dashboard route rejects them rather than reaching into podcast tables.
- */
-export const BOOK_SCROLLER_TYPE = {
-  RECENTLY_ADDED: SCROLLER_TYPE.RECENTLY_ADDED,
-  CONTINUE_READING: SCROLLER_TYPE.CONTINUE_READING,
-  CONTINUE_LISTENING: SCROLLER_TYPE.CONTINUE_LISTENING,
-  WANT_TO_READ: SCROLLER_TYPE.WANT_TO_READ,
-  UP_NEXT_IN_SERIES: SCROLLER_TYPE.UP_NEXT_IN_SERIES,
-  RANDOM: SCROLLER_TYPE.RANDOM,
-  SMART_SCOPE: SCROLLER_TYPE.SMART_SCOPE,
-} as const;
-
-export type BookScrollerType = (typeof BOOK_SCROLLER_TYPE)[keyof typeof BOOK_SCROLLER_TYPE];
-export const BOOK_SCROLLER_TYPES = Object.values(BOOK_SCROLLER_TYPE) as ReadonlyArray<BookScrollerType>;
-
-export const PODCAST_SCROLLER_TYPES = [SCROLLER_TYPE.CONTINUE_PODCASTS] as const;
-export type PodcastScrollerType = (typeof PODCAST_SCROLLER_TYPES)[number];
-
-export function isPodcastScrollerType(type: ScrollerType): type is PodcastScrollerType {
-  return (PODCAST_SCROLLER_TYPES as ReadonlyArray<ScrollerType>).includes(type);
-}
 
 export const DASHBOARD_SCROLLER_BATCH_MAX = 8;
 
@@ -72,7 +46,7 @@ export interface DashboardScrollerResponse {
 
 export interface DashboardScrollerBatchItem {
   id: string;
-  type: BookScrollerType;
+  type: ScrollerType;
   limit: number;
   smartScopeId?: number;
 }

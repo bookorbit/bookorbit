@@ -82,19 +82,14 @@ describe('overlapStatus', () => {
 
 describe('toggleFolder', () => {
   it('folds picks inside a newly ticked parent and reports them', () => {
-    expect(toggleFolder(['/books/Ebooks/Fiction/Jane Austen', '/media'], '/books/Ebooks', true)).toEqual({
+    expect(toggleFolder(['/books/Ebooks/Fiction/Jane Austen', '/media'], '/books/Ebooks')).toEqual({
       selected: ['/books/Ebooks', '/media'],
       folded: ['/books/Ebooks/Fiction/Jane Austen'],
     })
   })
 
   it('unticks a ticked folder', () => {
-    expect(toggleFolder(['/books', '/media'], '/books/', true)).toEqual({ selected: ['/media'], folded: [] })
-  })
-
-  it('keeps one folder in single mode', () => {
-    expect(toggleFolder(['/books/Podcasts'], '/media/nas', false)).toEqual({ selected: ['/media/nas'], folded: [] })
-    expect(toggleFolder(['/media/nas'], '/media/nas', false)).toEqual({ selected: [], folded: [] })
+    expect(toggleFolder(['/books', '/media'], '/books/')).toEqual({ selected: ['/media'], folded: [] })
   })
 })
 
@@ -108,23 +103,17 @@ describe('booksAs', () => {
 
 describe('attentionFor', () => {
   it('flags merging folders only in Folder as Book, and split audiobooks only in File as Book', () => {
-    expect(attentionFor(summary({ mergedFolders: 2 }), null, 'book_per_folder', 'books')).toEqual({ kind: 'merge' })
-    expect(attentionFor(summary({ mergedFolders: 2 }), null, 'book_per_file', 'books')).toBeNull()
-    expect(attentionFor(summary({ splitAudioFolders: 1 }), null, 'book_per_file', 'books')).toEqual({ kind: 'split' })
+    expect(attentionFor(summary({ mergedFolders: 2 }), null, 'book_per_folder')).toEqual({ kind: 'merge' })
+    expect(attentionFor(summary({ mergedFolders: 2 }), null, 'book_per_file')).toBeNull()
+    expect(attentionFor(summary({ splitAudioFolders: 1 }), null, 'book_per_file')).toEqual({ kind: 'split' })
   })
 
   it('puts overlaps first, as contains or overlap', () => {
     const contains = folderStatus('/books', context({ selected: ['/books'] }))
     const inside = folderStatus('/books/Comics/Saga', context({ selected: ['/books/Comics/Saga'] }))
 
-    expect(attentionFor(summary({ mergedFolders: 3 }), contains, 'book_per_folder', 'books')).toMatchObject({ kind: 'contains' })
-    expect(attentionFor(summary(), inside, 'book_per_folder', 'books')).toMatchObject({ kind: 'overlap' })
-  })
-
-  it('asks podcast storage for an empty folder, and nothing of local podcast folders', () => {
-    expect(attentionFor(summary({ files: 0, folders: 1 }), null, 'book_per_folder', 'podcastStorage')).toEqual({ kind: 'notEmpty' })
-    expect(attentionFor(summary({ files: 0, folders: 0 }), null, 'book_per_folder', 'podcastStorage')).toBeNull()
-    expect(attentionFor(summary({ mergedFolders: 4 }), null, 'book_per_folder', 'podcastLocal')).toBeNull()
+    expect(attentionFor(summary({ mergedFolders: 3 }), contains, 'book_per_folder')).toMatchObject({ kind: 'contains' })
+    expect(attentionFor(summary(), inside, 'book_per_folder')).toMatchObject({ kind: 'overlap' })
   })
 })
 

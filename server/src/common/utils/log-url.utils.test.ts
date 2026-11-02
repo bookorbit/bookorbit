@@ -4,13 +4,11 @@ import { redactUrlCredentials } from './log-url.utils';
 
 describe('redactUrlCredentials', () => {
   it('leaves a url without a query string untouched', () => {
-    expect(redactUrlCredentials('/api/v1/podcast-episodes/12/stream')).toBe('/api/v1/podcast-episodes/12/stream');
+    expect(redactUrlCredentials('/api/v1/books/12/stream')).toBe('/api/v1/books/12/stream');
   });
 
-  it('redacts a podcast stream ticket', () => {
-    expect(redactUrlCredentials('/api/v1/podcast-episodes/12/stream?ticket=eyJhbGciOi.signed.value')).toBe(
-      '/api/v1/podcast-episodes/12/stream?ticket=[REDACTED]',
-    );
+  it('redacts a stream ticket', () => {
+    expect(redactUrlCredentials('/api/v1/books/12/stream?ticket=eyJhbGciOi.signed.value')).toBe('/api/v1/books/12/stream?ticket=[REDACTED]');
   });
 
   it('redacts opds image tokens and keeps other parameters', () => {

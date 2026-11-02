@@ -77,6 +77,8 @@ type OpdsSortOrder =
   | 'title_desc'
   | 'author_asc'
   | 'author_desc'
+  | 'published_asc'
+  | 'published_desc'
   | 'series_asc'
   | 'series_desc';
 
@@ -94,6 +96,16 @@ const OPDS_SORT_MAP: Record<Exclude<OpdsSortOrder, LastReadSortOrder>, SQL[]> = 
   title_desc: [sql`${bookMetadata.title} DESC NULLS LAST`, sql`${books.id} ASC`],
   author_asc: [sql`${books.primaryAuthorSortName} ASC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
   author_desc: [sql`${books.primaryAuthorSortName} DESC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
+  published_asc: [
+    sql`coalesce(${bookMetadata.publishedDate}, make_date(${bookMetadata.publishedYear}, 1, 1)) ASC NULLS LAST`,
+    sql`${bookMetadata.title} ASC NULLS LAST`,
+    sql`${books.id} ASC`,
+  ],
+  published_desc: [
+    sql`coalesce(${bookMetadata.publishedDate}, make_date(${bookMetadata.publishedYear}, 1, 1)) DESC NULLS LAST`,
+    sql`${bookMetadata.title} ASC NULLS LAST`,
+    sql`${books.id} ASC`,
+  ],
   series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, ...seriesIndexOrderBy(bookMetadata.seriesIndex, 'ASC'), sql`${books.id} ASC`],
   series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, ...seriesIndexOrderBy(bookMetadata.seriesIndex, 'DESC'), sql`${books.id} ASC`],
 };
@@ -360,7 +372,7 @@ export class OpdsBookService {
 
     if (filters?.collectionId) {
       const [collection] = await this.collectionRepository.findById(filters.collectionId);
-      if (!collection || collection.mediaType !== 'books' || (collection.userId !== userId && !collection.isPublic)) {
+      if (!collection || (collection.userId !== userId && !collection.isPublic)) {
         throw new ForbiddenException('No access to this collection');
       }
     }
@@ -1154,7 +1166,7 @@ export class OpdsBookService {
     const [row] = await this.db
       .select({ total: count() })
       .from(smartScopes)
-      .where(and(eq(smartScopes.mediaType, 'books'), or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true))));
+      .where(or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true)));
     return Number(row?.total ?? 0);
   }
 
@@ -1248,7 +1260,7 @@ export class OpdsBookService {
         icon: smartScopes.icon,
       })
       .from(smartScopes)
-      .where(and(eq(smartScopes.mediaType, 'books'), or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true))))
+      .where(or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true)))
       .orderBy(smartScopes.name);
   }
 
@@ -1358,8 +1370,6 @@ export class OpdsBookService {
     const [smartScope] = await this.db.select().from(smartScopes).where(eq(smartScopes.id, smartScopeId)).limit(1);
     if (!smartScope) return null;
     if (!smartScope.isPublic && smartScope.userId !== userId) return null;
-    // OPDS serves books. A podcast scope's rules are not a GroupRule and would not survive buildWhere.
-    if (smartScope.mediaType !== 'books') return null;
 
     const where = this.queryBuilder.buildWhere(smartScope.filter as GroupRule | null, {
       accessibleLibraryIds: accessibleIds,

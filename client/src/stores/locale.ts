@@ -1,49 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, isSupportedLocale, type Locale } from '@bookorbit/types'
+import { DEFAULT_LOCALE, isSupportedLocale, matchSupportedLocale, type Locale } from '@bookorbit/types'
 import { storage } from '@/services/storage'
 import { activateI18nLocale, loadLocaleMessages } from '@/i18n'
 
 const STORAGE_KEY = 'locale'
 
-function canonicalizeLocale(value: string): string | null {
-  try {
-    return Intl.getCanonicalLocales(value)[0] ?? null
-  } catch {
-    return null
-  }
-}
-
-export function matchSupportedLocale(candidates: readonly string[]): Locale | null {
-  const supportedByCanonical = new Map<string, Locale>()
-  const supportedByLanguageAndScript = new Map<string, Locale>()
-  for (const locale of SUPPORTED_LOCALES) {
-    const canonical = canonicalizeLocale(locale)
-    if (!canonical) continue
-    supportedByCanonical.set(canonical.toLowerCase(), locale)
-    const maximized = new Intl.Locale(canonical).maximize()
-    if (maximized.script) {
-      supportedByLanguageAndScript.set(`${maximized.language.toLowerCase()}-${maximized.script.toLowerCase()}`, locale)
-    }
-  }
-
-  for (const candidate of candidates) {
-    const canonical = canonicalizeLocale(candidate)
-    if (!canonical) continue
-    const exact = supportedByCanonical.get(canonical.toLowerCase())
-    if (exact) return exact
-    const maximized = new Intl.Locale(canonical).maximize()
-    const language = maximized.language.toLowerCase()
-    if (maximized.script) {
-      const scriptMatch = supportedByLanguageAndScript.get(`${language}-${maximized.script.toLowerCase()}`)
-      if (scriptMatch) return scriptMatch
-    }
-    const baseLocale = supportedByCanonical.get(language)
-    if (baseLocale) return baseLocale
-  }
-
-  return null
-}
+// The server negotiates `Accept-Language` with the same matcher, so it lives with the locale list.
+export { matchSupportedLocale }
 
 export function detectInitialLocale(): Locale {
   const stored = storage.get<string>(STORAGE_KEY, '')

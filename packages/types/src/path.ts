@@ -81,7 +81,6 @@ export interface FolderPickerLibrary {
   id: number;
   name: string;
   icon: string | null;
-  type: string;
   folders: string[];
 }
 

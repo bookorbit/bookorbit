@@ -2,14 +2,13 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, Loader2, RefreshCw, Settings2, Sparkles } from '@lucide/vue'
-import { isPodcastScrollerType, type BookScrollerType } from '@bookorbit/types'
+import type { ScrollerType } from '@bookorbit/types'
 
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { getDashboardGreetingLabel } from '@/features/dashboard/lib/greeting'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
-import DashboardPodcastScroller from '@/features/dashboard/components/DashboardPodcastScroller.vue'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
 import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.vue'
@@ -37,19 +36,24 @@ const enabledScrollers = computed(() =>
   (Array.isArray(scrollers.value) ? scrollers.value : []).filter((s) => s.enabled).sort((a, b) => a.order - b.order),
 )
 
-// Book shelves and the podcast shelf render through different components and load from different
-// endpoints, so the split resolves here rather than as a type check in the template.
-type DashboardShelf =
-  | { kind: 'podcast'; key: string; title: string; limit: number }
-  | { kind: 'book'; key: string; title: string; limit: number; rows: number; type: BookScrollerType; smartScopeId?: number }
+interface DashboardShelf {
+  key: string
+  title: string
+  limit: number
+  rows: number
+  type: ScrollerType
+  smartScopeId?: number
+}
 
 const shelves = computed<DashboardShelf[]>(() =>
-  enabledScrollers.value.map((scroller) => {
-    const key = `${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}-${scroller.rows}`
-    const title = shelfTitle(scroller)
-    if (isPodcastScrollerType(scroller.type)) return { kind: 'podcast', key, title, limit: scroller.limit }
-    return { kind: 'book', key, title, limit: scroller.limit, rows: scroller.rows, type: scroller.type, smartScopeId: scroller.smartScopeId }
-  }),
+  enabledScrollers.value.map((scroller) => ({
+    key: `${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}-${scroller.rows}`,
+    title: shelfTitle(scroller),
+    limit: scroller.limit,
+    rows: scroller.rows,
+    type: scroller.type,
+    smartScopeId: scroller.smartScopeId,
+  })),
 )
 
 const shelfLayoutClass = computed(() =>
@@ -160,15 +164,7 @@ onUnmounted(() => {
           <DashboardWidgetRow :key="`widgets-${dashboardRevision}`" class="animate-fade-up" />
           <div v-if="enabledScrollers.length > 0" :class="shelfLayoutClass">
             <template v-for="(shelf, index) in shelves" :key="`${dashboardRevision}-${shelf.key}`">
-              <DashboardPodcastScroller
-                v-if="shelf.kind === 'podcast'"
-                :title="shelf.title"
-                :limit="shelf.limit"
-                class="min-w-0 animate-fade-up"
-                :style="{ animationDelay: `${index * 100}ms` }"
-              />
               <DashboardScroller
-                v-else
                 :type="shelf.type"
                 :title="shelf.title"
                 :limit="shelf.limit"

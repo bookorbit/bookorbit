@@ -93,7 +93,7 @@ describe('BookUploadModal destination', () => {
   })
 
   it('requires a choice with multiple libraries and resets the folder when changing library', async () => {
-    libraries.value.push(makeLibrary({ id: 4, name: 'Comics', folders: [{ id: 40, path: '/comics', role: 'downloads', createdAt: '2026-01-01' }] }))
+    libraries.value.push(makeLibrary({ id: 4, name: 'Comics', folders: [{ id: 40, path: '/comics', createdAt: '2026-01-01' }] }))
     mountUpload()
     await flushPromises()
     expect(uploadButton().attributes('disabled')).toBeDefined()
@@ -124,15 +124,6 @@ describe('BookUploadModal destination', () => {
     expect(wrapper.text()).toContain('Comics')
     await uploadButton().trigger('click')
     expect(startUpload).toHaveBeenCalledExactlyOnceWith(4, 30)
-  })
-
-  it('excludes podcast libraries from the sole-library calculation', async () => {
-    libraries.value.unshift(makeLibrary({ id: 1, type: 'podcasts', name: 'Podcasts' }))
-    mountUpload()
-    await flushPromises()
-    expect(wrapper.text()).not.toContain('Podcasts')
-    await uploadButton().trigger('click')
-    expect(startUpload).toHaveBeenCalledExactlyOnceWith(3, 30)
   })
 
   it.each(['empty', 'folderless', 'failed', 'unavailable'])('keeps upload disabled for a %s destination', async (scenario) => {

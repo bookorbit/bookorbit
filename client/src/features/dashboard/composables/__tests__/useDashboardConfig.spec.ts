@@ -197,14 +197,50 @@ describe('useDashboardConfig', () => {
       ['random', 'Discover Something New', true, 2],
       ['continue-reading', 'Continue Reading', true, 3],
       ['continue-listening', 'Continue Listening', true, 4],
-      ['want-to-read', 'Want to Read', false, 6],
-      ['up-next-in-series', 'Up Next in Series', false, 7],
+      ['want-to-read', 'Want to Read', false, 5],
+      ['up-next-in-series', 'Up Next in Series', false, 6],
     ])
 
     addScroller('smart-scope')
 
     expect(scrollers.value).toHaveLength(7)
     expect(DEFAULT_SCROLLERS).toHaveLength(6)
+  })
+
+  it('drops stored shelves of a type this client no longer has and never writes them back', async () => {
+    const retired = { id: '7', type: 'retired-shelf', label: 'Retired', enabled: true, order: 2, limit: 20, rows: 1 }
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        scrollers: [{ id: '1', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20, rows: 1 }, retired],
+        shelfLayout: 'wide',
+      }),
+    )
+    const { useDashboardConfig } = await import('../useDashboardConfig')
+    const local = useDashboardConfig()
+
+    expect(local.scrollers.value.map((scroller) => scroller.type)).toEqual(['recently-added'])
+    local.saveScrollers(local.scrollers.value)
+    expect(storedConfig().scrollers.map((scroller) => scroller.type)).toEqual(['recently-added'])
+
+    localStorage.clear()
+    vi.resetModules()
+    signedIn({
+      dashboardShelfConfig: {
+        syncAcrossSessions: true,
+        shelfLayout: 'wide',
+        scrollers: [
+          retired,
+          { id: '2', type: 'random', label: 'Discover', enabled: true, order: 1, limit: 20, rows: 1 },
+        ] as unknown as ScrollerConfig[],
+      },
+    })
+    const synced = (await import('../useDashboardConfig')).useDashboardConfig()
+
+    expect(synced.scrollers.value.map((scroller) => scroller.type)).toEqual(['random'])
+    await synced.saveShelfSettings(synced.scrollers.value, 'wide')
+    const body = JSON.parse(String(mocks.api.mock.calls[0]![1]?.body))
+    expect(body.settings.dashboardShelfConfig.scrollers.map((scroller: ScrollerConfig) => scroller.type)).toEqual(['random'])
   })
 
   it('prunes shelves that reference deleted smart scopes', async () => {

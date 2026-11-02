@@ -63,6 +63,7 @@ export class SeriesService {
         bookCount: row.bookCount,
         expectedBookCount: row.expectedBookCount,
       });
+      const counts = ladder.counts ?? { ownedVolumeCount: row.bookCount, readVolumeCount: row.readCount, readingVolumeCount: row.readingCount };
 
       return {
         id: row.id,
@@ -75,6 +76,9 @@ export class SeriesService {
         lastAddedAt: row.lastAddedAt ?? null,
         libraryNames: row.libraryNames,
         expectedBookCount: normalizeSeriesTotalBooks(row.expectedBookCount) ?? null,
+        ownedVolumeCount: counts.ownedVolumeCount,
+        readVolumeCount: counts.readVolumeCount,
+        readingVolumeCount: counts.readingVolumeCount,
         volumes: ladder.volumes,
         volumesTruncated: ladder.truncated,
         gaps: ladder.gaps.slice(0, SERIES_GAP_PREVIEW_LIMIT),
@@ -191,7 +195,8 @@ export class SeriesService {
       name: detail.name,
       bookCount: detail.bookCount,
       readCount: detail.readCount,
-      ...volumeCounts,
+      ownedVolumeCount: volumeCounts.ownedVolumeCount,
+      readVolumeCount: volumeCounts.readVolumeCount,
       authors: detail.authors,
       possibleGaps,
       expectedBookCount: detail.expectedBookCount ?? null,

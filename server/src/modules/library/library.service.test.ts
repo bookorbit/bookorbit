@@ -13,24 +13,15 @@ vi.mock('../scanner/lib/classify', () => ({
   isPrimaryFormat: vi.fn(),
 }));
 
-vi.mock('@bookorbit/types', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@bookorbit/types')>();
-  return {
-    ...actual,
-    APP_FEATURES: Object.freeze({ ...actual.APP_FEATURES, podcasts: true }),
-  };
-});
-
 import { BadRequestException, ConflictException, ForbiddenException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES, FOLDER_SERIES_REGEX_METADATA } from '@bookorbit/types';
-import { readdir, realpath, rm, stat } from 'fs/promises';
+import { readdir, rm, stat } from 'fs/promises';
 
 import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { LibraryService } from './library.service';
 
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
-const mockRealpath = realpath as MockedFunction<typeof realpath>;
 const mockRm = rm as MockedFunction<typeof rm>;
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockIsPrimaryFormat = isPrimaryFormat as MockedFunction<typeof isPrimaryFormat>;
@@ -59,13 +50,6 @@ describe('LibraryService', () => {
     findByName: vi.fn(),
     insert: vi.fn(),
     insertFolders: vi.fn(),
-    insertPodcastSettings: vi.fn(),
-    findPodcastMediaFiles: vi.fn(),
-    findPodcastCleanupJobs: vi.fn(),
-    findPodcastIds: vi.fn(),
-    hasPodcastMediaFiles: vi.fn(),
-    hasBlockingPodcastStorageJobs: vi.fn(),
-    cancelPodcastJobs: vi.fn(),
     update: vi.fn(),
     deleteFolder: vi.fn(),
     findBookIdsByLibrary: vi.fn(),
@@ -120,18 +104,12 @@ describe('LibraryService', () => {
       readingEvents,
     );
 
-    libraryRepo.findPodcastIds.mockResolvedValue([]);
-    libraryRepo.findById.mockResolvedValue([{ id: 1, type: 'books' }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 1 }]);
     libraryRepo.findByIds.mockImplementation((ids: number[]) => Promise.resolve(ids.map((id) => ({ id }))));
     mockStat.mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
-    mockRealpath.mockImplementation((path) => Promise.resolve(path.toString()));
     mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockRm.mockResolvedValue(undefined);
     mockIsPrimaryFormat.mockReturnValue(false);
-    libraryRepo.cancelPodcastJobs.mockResolvedValue(0);
-    libraryRepo.hasPodcastMediaFiles.mockResolvedValue(false);
-    libraryRepo.hasBlockingPodcastStorageJobs.mockResolvedValue(false);
-    libraryRepo.findPodcastCleanupJobs.mockResolvedValue([]);
     pathPolicy.assertWithinBrowseRoot.mockImplementation((path: string) => Promise.resolve(path));
     pathPolicy.resolveBrowsePath.mockImplementation((path: string) => Promise.resolve(path));
   });
@@ -207,11 +185,10 @@ describe('LibraryService', () => {
     await expect(service.findOne(111)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('rejects regex validation for podcast libraries', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'podcasts' }]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
-    await expect(service.validateRegexMetadata({ config: { rules: [{ pattern: '(?<title>.+)', flags: '' }] }, libraryId: 2 })).rejects.toThrow(
-      'Regex metadata is only available for book libraries',
+  it('rejects regex validation for a library that does not exist', async () => {
+    libraryRepo.findById.mockResolvedValue([]);
+    await expect(service.validateRegexMetadata({ config: { rules: [{ pattern: '(?<title>.+)', flags: '' }] }, libraryId: 2 })).rejects.toBeInstanceOf(
+      NotFoundException,
     );
   });
 
@@ -220,7 +197,7 @@ describe('LibraryService', () => {
     const second = { pattern: '(?<series>.+)', flags: '' };
     const config = { rules: [first, second] };
     beforeEach(() => {
-      libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: config }]);
+      libraryRepo.findById.mockResolvedValue([{ id: 2, icon: 'BookOpen', regexMetadata: config }]);
       libraryRepo.update.mockResolvedValue([{ id: 2 }]);
       libraryRepo.findFoldersByLibrary.mockResolvedValue([]);
     });
@@ -228,7 +205,7 @@ describe('LibraryService', () => {
     it.each([null, { rules: [{ flags: 'i', pattern: first.pattern }, second] }])(
       'does not revalidate or rewrite unchanged rules: %j',
       async (unchanged) => {
-        libraryRepo.findById.mockResolvedValue([{ id: 2, type: 'books', icon: 'BookOpen', regexMetadata: unchanged === null ? null : config }]);
+        libraryRepo.findById.mockResolvedValue([{ id: 2, icon: 'BookOpen', regexMetadata: unchanged === null ? null : config }]);
         await service.update(2, plainToInstance(UpdateLibraryDto, { coverAspectRatio: '1/1', regexMetadata: unchanged }));
         expect(regexMetadata.validate).not.toHaveBeenCalled();
         expect(libraryRepo.update).toHaveBeenCalledWith(2, { coverAspectRatio: '1/1' });
@@ -254,9 +231,7 @@ describe('LibraryService', () => {
     });
 
     it('treats a re-sent preset as unchanged after the preset itself changed', async () => {
-      libraryRepo.findById.mockResolvedValue([
-        { id: 2, type: 'books', icon: 'BookOpen', regexMetadata: { preset: 'folder_series', rules: [first] } },
-      ]);
+      libraryRepo.findById.mockResolvedValue([{ id: 2, icon: 'BookOpen', regexMetadata: { preset: 'folder_series', rules: [first] } }]);
       await service.update(2, plainToInstance(UpdateLibraryDto, { coverAspectRatio: '1/1', regexMetadata: FOLDER_SERIES_REGEX_METADATA }));
       expect(regexMetadata.validate).not.toHaveBeenCalled();
       expect(libraryRepo.update).toHaveBeenCalledWith(2, { coverAspectRatio: '1/1' });
@@ -289,7 +264,7 @@ describe('LibraryService', () => {
   it.each([undefined, ['regex', 'embedded']])('preserves regex configuration with precedence %j on create', async (metadataPrecedence) => {
     const config = { rules: [{ pattern: '(?<title>.+)', flags: '' }] };
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Regex', icon: 'BookOpen' }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Regex', icon: 'BookOpen' }]);
     libraryRepo.insertFolders.mockResolvedValue([]);
     await service.create({ name: 'Regex', icon: 'BookOpen', folders: ['/a'], regexMetadata: config, metadataPrecedence });
     expect(libraryRepo.insert).toHaveBeenCalledWith(
@@ -302,7 +277,7 @@ describe('LibraryService', () => {
 
   it('create applies defaults, inserts folders, and starts an async scan', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Sci-Fi', icon: 'BookOpen' }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Sci-Fi', icon: 'BookOpen' }]);
     libraryRepo.insertFolders.mockResolvedValue([
       { id: 11, path: '/a' },
       { id: 12, path: '/b' },
@@ -343,8 +318,8 @@ describe('LibraryService', () => {
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(5);
     expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
     expect(libraryRepo.insertFolders).toHaveBeenCalledWith([
-      { libraryId: 5, path: '/a', role: 'downloads' },
-      { libraryId: 5, path: '/b', role: 'downloads' },
+      { libraryId: 5, path: '/a' },
+      { libraryId: 5, path: '/b' },
     ]);
     expect(result.folders).toEqual([
       { id: 11, path: '/a' },
@@ -354,7 +329,7 @@ describe('LibraryService', () => {
 
   it('create passes file write defaults to insert', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Sci-Fi', icon: 'BookOpen' }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Sci-Fi', icon: 'BookOpen' }]);
     libraryRepo.insertFolders.mockResolvedValue([{ id: 11, path: '/a' }]);
 
     await service.create({ name: 'Sci-Fi', icon: 'BookOpen', folders: ['/a'] } as any);
@@ -381,7 +356,7 @@ describe('LibraryService', () => {
 
   it('create stores the all-files write scope when asked', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Mixed', icon: 'BookOpen' }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, name: 'Mixed', icon: 'BookOpen' }]);
     libraryRepo.insertFolders.mockResolvedValue([{ id: 11, path: '/a' }]);
 
     await service.create({ name: 'Mixed', icon: 'BookOpen', folders: ['/a'], fileWriteAllFiles: true } as any);
@@ -399,16 +374,9 @@ describe('LibraryService', () => {
     expect(libraryRepo.update).toHaveBeenCalledWith(10, { fileWriteEnabled: true });
   });
 
-  it('update rejects the all-files write scope for podcast libraries', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast' }]);
-
-    await expect(service.update(12, { fileWriteAllFiles: true } as any)).rejects.toThrow('fileWriteAllFiles is only supported for book libraries');
-    expect(libraryRepo.update).not.toHaveBeenCalled();
-  });
-
   it('create starts watcher immediately when watch is enabled', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 6, type: 'books', name: 'Watched', icon: 'BookOpen', watch: true }]);
+    libraryRepo.insert.mockResolvedValue([{ id: 6, name: 'Watched', icon: 'BookOpen', watch: true }]);
     libraryRepo.insertFolders.mockResolvedValue([
       { id: 21, path: '/watch-a' },
       { id: 22, path: '/watch-b' },
@@ -433,79 +401,6 @@ describe('LibraryService', () => {
     } as any);
 
     expect(scanScheduler.syncSchedule).toHaveBeenCalledWith(6, '0 4 * * *');
-  });
-
-  it('create enables local-folder watching for podcasts without starting book scanning', async () => {
-    libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 7, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watch: false, watchLocalFolders: true }]);
-    libraryRepo.insertFolders.mockResolvedValue([{ id: 23, path: '/podcasts', role: 'downloads' }]);
-
-    await service.create({ type: 'podcasts', name: 'Podcasts', icon: 'Podcast', folders: ['/podcasts'] } as any);
-
-    expect(libraryRepo.insertPodcastSettings).toHaveBeenCalledWith(7);
-    expect(libraryRepo.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ watch: false, watchLocalFolders: true, coverAspectRatio: '1/1', fileWriteEnabled: false }),
-    );
-    expect(scannerService.startScanAsync).not.toHaveBeenCalled();
-    expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
-  });
-
-  it('create rejects book-only settings for podcast libraries', async () => {
-    await expect(
-      service.create({ type: 'podcasts', name: 'Podcasts', icon: 'Podcast', folders: ['/podcasts'], autoScanCronExpression: '0 * * * *' } as any),
-    ).rejects.toThrow('autoScanCronExpression is only supported for book libraries');
-
-    expect(libraryRepo.insert).not.toHaveBeenCalled();
-  });
-
-  it('create rejects podcast-only watcher settings for book libraries', async () => {
-    await expect(service.create({ name: 'Books', icon: 'BookOpen', folders: ['/books'], watchLocalFolders: true } as any)).rejects.toThrow(
-      'watchLocalFolders is only supported for podcast libraries',
-    );
-
-    expect(libraryRepo.insert).not.toHaveBeenCalled();
-  });
-
-  it('create rejects podcast libraries with more than one storage folder', async () => {
-    libraryRepo.findByName.mockResolvedValue([]);
-
-    await expect(
-      service.create({ type: 'podcasts', name: 'Podcasts', icon: 'Podcast', folders: ['/podcasts-a', '/podcasts-b'] } as any),
-    ).rejects.toThrow('Podcast libraries require exactly one storage folder');
-
-    expect(libraryRepo.insert).not.toHaveBeenCalled();
-  });
-
-  it('create stores podcast local folders alongside the downloads root', async () => {
-    libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 7, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watch: false }]);
-    libraryRepo.insertFolders.mockResolvedValue([
-      { id: 23, path: '/podcasts', role: 'downloads' },
-      { id: 24, path: '/archive', role: 'local' },
-    ]);
-
-    await service.create({ type: 'podcasts', name: 'Podcasts', icon: 'Podcast', folders: ['/podcasts'], localFolders: ['/archive'] } as any);
-
-    expect(libraryRepo.insertFolders).toHaveBeenCalledWith([
-      { libraryId: 7, path: '/podcasts', role: 'downloads' },
-      { libraryId: 7, path: '/archive', role: 'local' },
-    ]);
-  });
-
-  it('create allows podcast local-folder watching to be disabled', async () => {
-    libraryRepo.findByName.mockResolvedValue([]);
-    libraryRepo.insert.mockResolvedValue([{ id: 7, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watchLocalFolders: false }]);
-    libraryRepo.insertFolders.mockResolvedValue([{ id: 23, path: '/podcasts', role: 'downloads' }]);
-
-    await service.create({
-      type: 'podcasts',
-      name: 'Podcasts',
-      icon: 'Podcast',
-      folders: ['/podcasts'],
-      watchLocalFolders: false,
-    } as any);
-
-    expect(libraryRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ watchLocalFolders: false }));
   });
 
   it('create rejects duplicate library names', async () => {
@@ -536,18 +431,18 @@ describe('LibraryService', () => {
     libraryRepo.update.mockResolvedValue([{ id: 3, name: 'Updated' }]);
     libraryRepo.findFoldersByLibrary
       .mockResolvedValueOnce([
-        { id: 1, path: '/keep', role: 'downloads' },
-        { id: 2, path: '/remove', role: 'downloads' },
+        { id: 1, path: '/keep' },
+        { id: 2, path: '/remove' },
       ])
       .mockResolvedValueOnce([
-        { id: 1, path: '/keep', role: 'downloads' },
-        { id: 3, path: '/add', role: 'downloads' },
+        { id: 1, path: '/keep' },
+        { id: 3, path: '/add' },
       ]);
 
     await service.update(3, { folders: ['/keep', '/add'] } as any);
 
     expect(libraryRepo.deleteFolder).toHaveBeenCalledWith(2);
-    expect(libraryRepo.insertFolders).toHaveBeenCalledWith([{ libraryId: 3, path: '/add', role: 'downloads' }]);
+    expect(libraryRepo.insertFolders).toHaveBeenCalledWith([{ libraryId: 3, path: '/add' }]);
     expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
     expect(fileWatcherService.stopWatcher).not.toHaveBeenCalled();
   });
@@ -564,7 +459,7 @@ describe('LibraryService', () => {
   });
 
   it('update starts watcher when watch toggles on', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 7, type: 'books', name: 'Current', icon: 'BookOpen', watch: false }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 7, name: 'Current', icon: 'BookOpen', watch: false }]);
     libraryRepo.update.mockResolvedValue([{ id: 7, name: 'Current', watch: true }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 31, path: '/watched' }]);
 
@@ -575,7 +470,7 @@ describe('LibraryService', () => {
   });
 
   it('update stops watcher when watch toggles off', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 8, type: 'books', name: 'Current', icon: 'BookOpen', watch: true }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Current', icon: 'BookOpen', watch: true }]);
     libraryRepo.update.mockResolvedValue([{ id: 8, name: 'Current', watch: false }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 41, path: '/watched' }]);
 
@@ -586,7 +481,7 @@ describe('LibraryService', () => {
   });
 
   it('update rebinds watcher when folders change and watch remains on', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 9, type: 'books', name: 'Current', icon: 'BookOpen', watch: true }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 9, name: 'Current', icon: 'BookOpen', watch: true }]);
     libraryRepo.update.mockResolvedValue([{ id: 9, name: 'Current', watch: true }]);
     libraryRepo.findFoldersByLibrary
       .mockResolvedValueOnce([
@@ -604,7 +499,7 @@ describe('LibraryService', () => {
   });
 
   it('update triggers a background scan when format selection settings change', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 10, type: 'books', name: 'Current', icon: 'BookOpen', watch: false }]);
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false }]);
     libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', watch: false }]);
     libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
 
@@ -623,66 +518,6 @@ describe('LibraryService', () => {
 
     expect(scanScheduler.syncSchedule).toHaveBeenNthCalledWith(1, 10, '0 6 * * *');
     expect(scanScheduler.syncSchedule).toHaveBeenNthCalledWith(2, 10, null);
-  });
-
-  it('update rejects book-only settings for podcast libraries', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watch: false }]);
-
-    await expect(service.update(12, { autoScanCronExpression: '0 * * * *' } as any)).rejects.toThrow(
-      'autoScanCronExpression is only supported for book libraries',
-    );
-
-    expect(libraryRepo.update).not.toHaveBeenCalled();
-  });
-
-  it('update changes podcast local-folder watching without invoking the book watcher', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watch: false, watchLocalFolders: true }]);
-    libraryRepo.update.mockResolvedValue([{ id: 12, name: 'Podcasts', watchLocalFolders: false }]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/podcasts', role: 'downloads' }]);
-
-    await service.update(12, { watchLocalFolders: false } as any);
-
-    expect(libraryRepo.update).toHaveBeenCalledWith(12, { watchLocalFolders: false });
-    expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
-    expect(fileWatcherService.stopWatcher).not.toHaveBeenCalled();
-  });
-
-  it('update refuses a podcast storage-folder change while downloaded media exists', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watch: false }]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/podcasts-old', role: 'downloads' }]);
-    libraryRepo.hasPodcastMediaFiles.mockResolvedValue(true);
-
-    await expect(service.update(12, { folders: ['/podcasts-new'] } as any)).rejects.toThrow(
-      'Remove downloaded podcast files before changing the podcast storage folder',
-    );
-
-    expect(libraryRepo.hasBlockingPodcastStorageJobs).not.toHaveBeenCalled();
-    expect(libraryRepo.update).not.toHaveBeenCalled();
-  });
-
-  it('update adds a podcast local folder while downloaded media exists', async () => {
-    // Nothing was ever written to a local root, so attaching one is not the storage move the
-    // downloaded-media guard exists to refuse.
-    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watch: false }]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/podcasts', role: 'downloads' }]);
-    libraryRepo.hasPodcastMediaFiles.mockResolvedValue(true);
-    libraryRepo.update.mockResolvedValue([{ id: 12, name: 'Podcasts' }]);
-
-    await service.update(12, { localFolders: ['/archive'] } as any);
-
-    expect(libraryRepo.insertFolders).toHaveBeenCalledWith([{ libraryId: 12, path: '/archive', role: 'local' }]);
-    expect(libraryRepo.deleteFolder).not.toHaveBeenCalled();
-  });
-
-  it('update refuses a podcast storage-folder change while storage work is active', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 12, type: 'podcasts', name: 'Podcasts', icon: 'Podcast', watch: false }]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/podcasts-old', role: 'downloads' }]);
-    libraryRepo.hasBlockingPodcastStorageJobs.mockResolvedValue(true);
-
-    await expect(service.update(12, { folders: ['/podcasts-new'] } as any)).rejects.toThrow('Podcast storage work is in progress');
-
-    expect(libraryRepo.cancelPodcastJobs).not.toHaveBeenCalled();
-    expect(libraryRepo.update).not.toHaveBeenCalled();
   });
 
   it('update rejects organization mode changes after creation', async () => {
@@ -792,106 +627,6 @@ describe('LibraryService', () => {
     const notify = vi.spyOn(readingEvents, 'notifyChanged');
     await expect(service.remove(1)).rejects.toThrow('Delete failed');
     expect(notify).not.toHaveBeenCalled();
-  });
-
-  it('remove deletes downloaded podcast files before deleting the library', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Podcasts', type: 'podcasts' }]);
-    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/podcasts' }]);
-    mockStat.mockResolvedValue({ isFile: () => true } as Awaited<ReturnType<typeof stat>>);
-    libraryRepo.findPodcastMediaFiles
-      .mockResolvedValueOnce([
-        { episodeId: 10, localPath: '/podcasts/one.mp3' },
-        { episodeId: 11, localPath: '/podcasts/two.mp3' },
-      ])
-      .mockResolvedValueOnce([]);
-
-    libraryRepo.findPodcastIds.mockResolvedValueOnce([{ id: 3 }]).mockResolvedValueOnce([]);
-
-    await service.remove(8);
-
-    expect(mockRm).toHaveBeenCalledWith('/podcasts/one.mp3', { force: true });
-    expect(mockRm).toHaveBeenCalledWith('/podcasts/two.mp3', { force: true });
-    expect(mockRm).toHaveBeenCalledWith('/books/podcast-artwork/3', { recursive: true, force: true });
-    expect(mockRm).toHaveBeenCalledWith('/books/podcast-feeds/3.xml.gz', { force: true });
-    expect(libraryRepo.delete).toHaveBeenCalledWith(8);
-  });
-
-  it('remove also deletes orphan files recorded by merge cleanup jobs', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Podcasts', type: 'podcasts' }]);
-    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/podcasts' }]);
-    libraryRepo.findPodcastMediaFiles.mockResolvedValue([]);
-    libraryRepo.findPodcastCleanupJobs.mockResolvedValueOnce([{ id: 21, payload: { path: '/podcasts/orphan.mp3' } }]).mockResolvedValueOnce([]);
-    mockStat.mockResolvedValue({ isFile: () => true } as Awaited<ReturnType<typeof stat>>);
-
-    await service.remove(8);
-
-    expect(mockRm).toHaveBeenCalledWith('/podcasts/orphan.mp3', { force: true });
-    expect(libraryRepo.delete).toHaveBeenCalledWith(8);
-  });
-
-  it('remove refuses to delete a podcast media path outside its storage folder', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Podcasts', type: 'podcasts' }]);
-    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/podcasts' }]);
-    libraryRepo.findPodcastMediaFiles.mockResolvedValueOnce([{ episodeId: 10, localPath: '/path/to/outside-library/secret.mp3' }]);
-    mockStat.mockResolvedValue({ isFile: () => true } as Awaited<ReturnType<typeof stat>>);
-
-    await expect(service.remove(8)).rejects.toThrow('outside its library storage folder');
-
-    expect(mockRm).not.toHaveBeenCalledWith('/path/to/outside-library/secret.mp3', { force: true });
-    expect(libraryRepo.delete).not.toHaveBeenCalled();
-  });
-
-  it('remove waits for active podcast jobs to stop before deleting files or database rows', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 8, name: 'Podcasts', type: 'podcasts' }]);
-    libraryRepo.cancelPodcastJobs.mockResolvedValue(1);
-
-    await expect(service.remove(8)).rejects.toThrow('Podcast jobs are still stopping');
-
-    expect(libraryRepo.findPodcastMediaFiles).not.toHaveBeenCalled();
-    expect(libraryRepo.delete).not.toHaveBeenCalled();
-  });
-
-  /**
-   * An unmounted drive or a folder renamed on disk left `realpath` throwing a raw ENOENT out of the
-   * delete path, which surfaced as a 500 and made the library permanently undeletable.
-   */
-  it('remove still deletes a podcast library whose storage folder is gone from disk', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 9, name: 'Podcasts', type: 'podcasts' }]);
-    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/gone' }]);
-    mockRealpath.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
-    libraryRepo.findPodcastMediaFiles.mockResolvedValue([]);
-    libraryRepo.findPodcastIds.mockResolvedValue([]);
-
-    await expect(service.remove(9)).resolves.not.toThrow();
-
-    expect(libraryRepo.delete).toHaveBeenCalledWith(9);
-  });
-
-  it('remove names the missing storage folder rather than crashing when media rows still point into it', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 9, name: 'Podcasts', type: 'podcasts' }]);
-    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/gone' }]);
-    mockRealpath.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
-    libraryRepo.findPodcastMediaFiles.mockResolvedValueOnce([{ episodeId: 10, localPath: '/gone/one.mp3' }]).mockResolvedValueOnce([]);
-
-    await expect(service.remove(9)).rejects.toThrow(ConflictException);
-
-    expect(libraryRepo.delete).not.toHaveBeenCalled();
-  });
-
-  it('remove still raises a storage failure that is not a missing folder', async () => {
-    libraryRepo.findById.mockResolvedValue([{ id: 9, name: 'Podcasts', type: 'podcasts' }]);
-    libraryRepo.findBookIdsByLibrary.mockResolvedValue([]);
-    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/denied' }]);
-    mockRealpath.mockRejectedValue(Object.assign(new Error('EACCES'), { code: 'EACCES' }));
-
-    await expect(service.remove(9)).rejects.toThrow();
-
-    expect(libraryRepo.delete).not.toHaveBeenCalled();
   });
 
   it('remove throws when library does not exist', async () => {

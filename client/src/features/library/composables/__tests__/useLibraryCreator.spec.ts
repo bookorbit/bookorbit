@@ -172,7 +172,6 @@ describe('useLibraryCreator', () => {
 
     creator.initEdit({
       id: 1,
-      type: 'books',
       name: 'Main Library',
       icon: 'BookOpen',
       displayOrder: 0,
@@ -206,7 +205,7 @@ describe('useLibraryCreator', () => {
       fileWriteReadAlongEnabled: false,
       fileWriteReadAlongMaxFileSizeMb: 1000,
       fileRenameEnabled: true,
-      folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2026-01-01T00:00:00.000Z' }],
+      folders: [{ id: 1, path: '/books', createdAt: '2026-01-01T00:00:00.000Z' }],
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
@@ -279,34 +278,10 @@ describe('useLibraryCreator', () => {
       fileWriteAudioEnabled: true,
       fileWriteAudioMaxFileSizeMb: 750,
     })
+    expect(payload).not.toHaveProperty('type')
     expect(payload).not.toHaveProperty('localFolders')
     expect(payload).not.toHaveProperty('watchLocalFolders')
     expect(creator.loading.value).toBe(false)
-  })
-
-  it('sends the podcast local-folder watcher setting without book automation fields', async () => {
-    const { useLibraryCreator } = await import('../useLibraryCreator')
-    const creator = useLibraryCreator()
-    const saved = makeLibrary({ id: 13, type: 'podcasts', name: 'Podcasts', watchLocalFolders: false })
-    apiMock.mockResolvedValue(jsonResponse(saved, 201))
-
-    creator.form.type = 'podcasts'
-    creator.form.name = 'Podcasts'
-    creator.form.icon = 'Podcast'
-    creator.form.folders = ['/podcasts/downloads']
-    creator.form.localFolders = ['/podcasts/local']
-    creator.form.watchLocalFolders = false
-
-    await expect(creator.save()).resolves.toEqual(saved)
-
-    const payload = JSON.parse(apiMock.mock.calls[0]?.[1]?.body as string)
-    expect(payload).toMatchObject({
-      type: 'podcasts',
-      localFolders: ['/podcasts/local'],
-      watchLocalFolders: false,
-    })
-    expect(payload).not.toHaveProperty('watch')
-    expect(payload).not.toHaveProperty('autoScanCronExpression')
   })
 
   it('trims user-entered values and surfaces save connection failures', async () => {
@@ -376,7 +351,6 @@ function jsonResponse(body: unknown, status = 200): Response {
 function makeLibrary(overrides: Partial<Library> = {}): Library {
   return {
     id: 1,
-    type: 'books',
     name: 'Main Library',
     icon: 'BookOpen',
     displayOrder: 0,
@@ -410,7 +384,7 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     fileWriteReadAlongEnabled: false,
     fileWriteReadAlongMaxFileSizeMb: 1000,
     fileRenameEnabled: true,
-    folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2026-01-01T00:00:00.000Z' }],
+    folders: [{ id: 1, path: '/books', createdAt: '2026-01-01T00:00:00.000Z' }],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,

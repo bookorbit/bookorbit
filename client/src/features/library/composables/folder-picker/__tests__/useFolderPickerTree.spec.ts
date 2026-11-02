@@ -36,7 +36,7 @@ function fakeData(
 
 const server = {
   '/': [entry('/books', { mount: true }), entry('/usr', { system: true }), entry('/mnt', { hasChildren: false })],
-  '/books': [entry('/books/Manga'), entry('/books/Ebooks'), entry('/books/Podcasts', { hasChildren: false })],
+  '/books': [entry('/books/Manga'), entry('/books/Ebooks'), entry('/books/Periodicals', { hasChildren: false })],
   '/books/Ebooks': [entry('/books/Ebooks/Science Fiction')],
 }
 
@@ -49,7 +49,7 @@ describe('useFolderPickerTree', () => {
       ['/books', 0],
       ['/books/Ebooks', 1],
       ['/books/Manga', 1],
-      ['/books/Podcasts', 1],
+      ['/books/Periodicals', 1],
       ['/mnt', 0],
     ])
     expect(tree.hiddenSystemCount.value).toBe(1)
@@ -78,7 +78,7 @@ describe('useFolderPickerTree', () => {
   })
 
   it('sorts by most books and hides folders without books when asked', () => {
-    const tree = useFolderPickerTree(fakeData(server, { '/books/Manga': 180, '/books/Ebooks': 210, '/books/Podcasts': 0 }))
+    const tree = useFolderPickerTree(fakeData(server, { '/books/Manga': 180, '/books/Ebooks': 210, '/books/Periodicals': 0 }))
     tree.expanded.value = new Set(['/books'])
     tree.sort.value = 'books'
     tree.hideEmpty.value = true
@@ -88,7 +88,7 @@ describe('useFolderPickerTree', () => {
 
   it('keeps a folder whose count stopped short at zero, since it may hold books', () => {
     const tree = useFolderPickerTree(
-      fakeData(server, { '/books/Manga': 0, '/books/Ebooks': 0, '/books/Podcasts': 0 }, { truncatedCounts: ['/books/Ebooks'] }),
+      fakeData(server, { '/books/Manga': 0, '/books/Ebooks': 0, '/books/Periodicals': 0 }, { truncatedCounts: ['/books/Ebooks'] }),
     )
     tree.expanded.value = new Set(['/books'])
     tree.hideEmpty.value = true
@@ -103,7 +103,7 @@ describe('useFolderPickerTree', () => {
     expect(tree.rows.value.map((row) => [row.type, row.path]).slice(1, 5)).toEqual([
       ['folder', '/books/Ebooks'],
       ['folder', '/books/Manga'],
-      ['folder', '/books/Podcasts'],
+      ['folder', '/books/Periodicals'],
       ['more', '/books'],
     ])
   })
@@ -143,7 +143,7 @@ describe('useFolderPickerTree', () => {
 
     expect(tree.hasChildren('/books/Manga')).toBe(false)
     expect(tree.hasChildren('/books/Ebooks')).toBe(true)
-    expect(tree.hasChildren('/books/Podcasts')).toBe(false)
+    expect(tree.hasChildren('/books/Periodicals')).toBe(false)
   })
 
   it('reveals a folder by opening its parents and focusing it', () => {

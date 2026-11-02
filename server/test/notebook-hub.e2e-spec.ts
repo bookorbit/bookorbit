@@ -307,7 +307,7 @@ describe('Notebook hub (e2e)', { timeout: 180_000 }, () => {
       const { body } = await get<NotebookEntriesResponse>(owner, '/notebook/entries?limit=2');
       expect((await get(owner, `/notebook/entries?sort=oldest&cursor=${body.nextCursor}`)).status).toBe(400);
       expect((await get(owner, '/notebook/entries?cursor=not-a-cursor')).status).toBe(400);
-      expect((await get(owner, '/notebook/entries?kinds=highlight,podcast')).status).toBe(400);
+      expect((await get(owner, '/notebook/entries?kinds=highlight,doodle')).status).toBe(400);
       expect((await get(owner, '/notebook/entries?limit=101')).status).toBe(400);
     });
 

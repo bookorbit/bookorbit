@@ -3,12 +3,11 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { X } from '@lucide/vue'
-import type { MediaType } from '@bookorbit/types'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
-const props = withDefaults(defineProps<{ open: boolean; mediaType?: MediaType }>(), { mediaType: 'books' })
+defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const router = useRouter()
@@ -22,8 +21,6 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const trimmedName = computed(() => name.value.trim())
 const trimmedIcon = computed(() => icon.value.trim())
-const isPodcastCollection = computed(() => props.mediaType === 'podcasts')
-const dialogTitle = computed(() => (isPodcastCollection.value ? t('collection.createDialog.podcastTitle') : t('collection.createDialog.title')))
 
 async function submit() {
   if (!trimmedName.value) {
@@ -37,14 +34,12 @@ async function submit() {
   saving.value = true
   error.value = null
   try {
-    const collection = isPublic.value
-      ? await createCollection(trimmedName.value, trimmedIcon.value, undefined, true, props.mediaType)
-      : await createCollection(trimmedName.value, trimmedIcon.value, undefined, props.mediaType)
+    const collection = await createCollection(trimmedName.value, trimmedIcon.value, undefined, isPublic.value || undefined)
     name.value = ''
     icon.value = ''
     isPublic.value = false
     emit('close')
-    router.push({ name: isPodcastCollection.value ? 'podcast-collection' : 'collection', params: { id: collection.id } })
+    router.push({ name: 'collection', params: { id: collection.id } })
   } catch {
     error.value = t('collection.dialog.createFailed')
   } finally {
@@ -59,7 +54,7 @@ async function submit() {
       <div class="absolute inset-0 bg-scrim" @click="emit('close')" />
       <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <div class="flex items-center justify-between mb-5">
-          <h2 class="text-base font-semibold text-foreground">{{ dialogTitle }}</h2>
+          <h2 class="text-base font-semibold text-foreground">{{ t('collection.createDialog.title') }}</h2>
           <button @click="emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">
             <X :size="18" />
           </button>

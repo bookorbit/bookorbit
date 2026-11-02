@@ -11,14 +11,10 @@ const { t, locale } = useI18n()
 const CUSTOM = '__custom__'
 const NEVER = '__never__'
 
-const props = withDefaults(
-  defineProps<{
-    watch: boolean
-    autoScanCronExpression: string | null
-    showAutoScanSchedule?: boolean
-  }>(),
-  { showAutoScanSchedule: true },
-)
+const props = defineProps<{
+  watch: boolean
+  autoScanCronExpression: string | null
+}>()
 
 const emit = defineEmits<{
   'update:watch': [value: boolean]
@@ -84,7 +80,7 @@ function handleCronInput(event: Event) {
       <ToggleSwitch :model-value="watch" :aria-label="t('library.creator.schedule.watchFolders.title')" @update:model-value="handleWatchUpdate" />
     </div>
 
-    <div v-if="showAutoScanSchedule" class="flex items-start gap-3.5 px-4 py-3.5">
+    <div class="flex items-start gap-3.5 px-4 py-3.5">
       <CalendarClock :size="17" class="mt-0.5 shrink-0 text-foreground" aria-hidden="true" />
       <div class="min-w-0 flex-1">
         <label for="library-scan-preset" class="text-sm font-semibold text-foreground">{{ t('library.creator.schedule.autoScanSchedule') }}</label>

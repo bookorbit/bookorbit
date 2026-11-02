@@ -1,6 +1,21 @@
-import { Body, Controller, DefaultValuePipe, Get, HttpCode, HttpStatus, Param, ParseEnumPipe, ParseIntPipe, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseEnumPipe,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import type { Locale } from '@bookorbit/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestLocale } from '../../common/decorators/request-locale.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { DashboardService } from './dashboard.service';
 import { DashboardWidgetService } from './dashboard-widget.service';
@@ -33,8 +48,9 @@ export class DashboardController {
 
   @Post('widgets/batch')
   @HttpCode(HttpStatus.OK)
-  getWidgets(@CurrentUser() user: RequestUser, @Body() dto: DashboardWidgetBatchDto) {
-    return this.widgetService.getWidgets([...new Set(dto.widgets)], user);
+  @Header('Vary', 'Accept-Language')
+  getWidgets(@CurrentUser() user: RequestUser, @Body() dto: DashboardWidgetBatchDto, @RequestLocale() locale: Locale) {
+    return this.widgetService.getWidgets([...new Set(dto.widgets)], user, locale);
   }
 
   @Post('refresh')
@@ -74,8 +90,9 @@ export class DashboardController {
   }
 
   @Get('widgets/monthly-challenge')
-  getMonthlyChallenge(@CurrentUser() user: RequestUser) {
-    return this.widgetService.getMonthlyChallenge(user);
+  @Header('Vary', 'Accept-Language')
+  getMonthlyChallenge(@CurrentUser() user: RequestUser, @RequestLocale() locale: Locale) {
+    return this.widgetService.getMonthlyChallenge(user, locale);
   }
 
   @Get('widgets/year-projection')

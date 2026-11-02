@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ReadingHistoryItem } from '@bookorbit/types'
 import { filtersFromQuery, queryFromFilters } from '../composables/useReadingHistoryFilters'
-import { exportFileName, toCsv, toMarkdown } from '../lib/history-export'
+import { canvasToBlob, exportFileName, toCsv, toMarkdown } from '../lib/history-export'
 import { readSpanDays } from '../lib/history-format'
 import { historyRouteForChartClick } from '../lib/chart-month-link'
 import { fitTiles, withAlpha } from '../lib/share-poster'
@@ -116,6 +116,24 @@ describe('reading history export', () => {
   it('names the file after the period, safe on every platform', () => {
     expect(exportFileName('Q3 2026', 'md')).toBe('reading-history-q3-2026.md')
     expect(exportFileName('All time', 'csv')).toBe('reading-history-all-time.csv')
+  })
+
+  it('waits for the canvas export callback when toBlob returns undefined', async () => {
+    const blob = new Blob(['poster'], { type: 'image/png' })
+    const canvas = {
+      toBlob(callback: BlobCallback) {
+        queueMicrotask(() => callback(blob))
+      },
+    } as HTMLCanvasElement
+
+    await expect(canvasToBlob(canvas, 'image/png')).resolves.toBe(blob)
+  })
+
+  it('rejects when the canvas is unavailable or produces no data', async () => {
+    const canvas = { toBlob: (callback: BlobCallback) => callback(null) } as HTMLCanvasElement
+
+    await expect(canvasToBlob(null, 'image/png')).rejects.toThrow('Canvas is unavailable')
+    await expect(canvasToBlob(canvas, 'image/png')).rejects.toThrow('Canvas export returned no data')
   })
 })
 

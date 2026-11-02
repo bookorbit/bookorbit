@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **Android beta testers needed:** The official BookOrbit Android app is in closed testing. [Join the Google Play beta](https://github.com/bookorbit/bookorbit/issues/2001) and stay enrolled for at least 14 days to help unlock its public release.
+
 <div align="center">
 
 <h1>
@@ -19,7 +22,7 @@ A self-hosted library and reading platform for ebooks, PDFs, audiobooks, and com
 [![App Store](https://img.shields.io/badge/App_Store-download-0D96F6?style=flat-square&logo=appstore&logoColor=white)](https://apps.apple.com/us/app/bookorbit-the-official-app/id6811807346)
 ![Android coming soon](https://img.shields.io/badge/Android-coming_soon-3DDC84?style=flat-square&logo=android&logoColor=white)
 [![Crowdin](https://img.shields.io/badge/Crowdin-translate-2E3340?style=flat-square&logo=crowdin&logoColor=white)](https://crowdin.com/project/bookorbit)
-[![Contributing](https://img.shields.io/badge/Contributing-guide-orange?style=flat-square&logo=handshake&logoColor=white)](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md)
+[![Contributing](https://img.shields.io/badge/Contributing-guide-orange?style=flat-square&logo=handshake&logoColor=white)](https://github.com/bookorbit/bookorbit/blob/main/CONTRIBUTING.md)
 
 ![BookOrbit dashboard showing reading stats, widgets, and book shelves](docs/images/dashboard-overview.png)
 
@@ -38,7 +41,9 @@ A self-hosted library and reading platform for ebooks, PDFs, audiobooks, and com
 
 ---
 
-## What is BookOrbit?
+<a id="what-is-bookorbit"></a>
+
+## 📚 What is BookOrbit?
 
 **[BookOrbit](https://bookorbit.app)** organizes your books and lets you enjoy them anywhere: on iPhone, Apple Watch, the web, Kobo, or KOReader. Your reading progress, highlights, and status stay synchronized, so you can start a chapter in one place and continue in another.
 
@@ -46,7 +51,9 @@ Around that core sit 14 metadata providers, reading statistics and achievements,
 
 [![Visit Website](https://img.shields.io/badge/Visit%20Website-bookorbit.app-4169E1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://bookorbit.app)
 
-## Live Demo
+<a id="live-demo"></a>
+
+## 🚀 Live Demo
 
 Try the live instance before you install. No account required.
 
@@ -54,7 +61,9 @@ Try the live instance before you install. No account required.
 
 > **Note:** The demo includes a sample library of public domain books. Some administrative features are limited in the public demo. Self-hosting BookOrbit provides the full experience.
 
-## BookOrbit for iPhone and Apple Watch
+<a id="bookorbit-for-iphone-and-apple-watch"></a>
+
+## 📱 BookOrbit for iPhone and Apple Watch
 
 Take your library anywhere with the official native BookOrbit app. Read ebooks, PDFs, and comics; stream or download audiobooks; use text to speech; and keep reading offline. The app connects directly to your self-hosted BookOrbit server, while Apple Watch brings downloaded audiobooks and synchronized playback progress to your wrist.
 
@@ -82,7 +91,9 @@ Take your library anywhere with the official native BookOrbit app. Read ebooks, 
 
 </details>
 
-## Features
+<a id="features"></a>
+
+## ✨ Features
 
 ### Reading Experience & Sync
 
@@ -107,7 +118,9 @@ Take your library anywhere with the official native BookOrbit app. Read ebooks, 
 - **Content Delivery**: OPDS support for compatible apps, Send-to-Kindle via email, and browser drag-and-drop uploads.
 - **Automated Ingestion**: Configure a Book Dock drop folder for hands-free importing.
 
-## Quick Start (Docker)
+<a id="quick-start-docker"></a>
+
+## 🐳 Quick Start (Docker)
 
 ```bash
 mkdir bookorbit && cd bookorbit
@@ -139,19 +152,25 @@ Open `http://your-server-ip:3000` and complete setup using your `SETUP_BOOTSTRAP
 
 For the full installation guide including reverse proxy setup, host file permissions, secrets from mounted files, external databases, OIDC hardening, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation)**.
 
-## Managed Hosting
+<a id="managed-hosting"></a>
+
+## ☁️ Managed Hosting
 
 Prefer a hosted instance without managing Docker or servers? [Zenith offers BookOrbit hosting](https://zenith.hosting/host/bookorbit) with a web file browser for uploads, access controls, and resource usage insights.
 
 [![Deploy with Zenith](https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg)](https://zenith.hosting/host/bookorbit)
 
-## How I Actually Use BookOrbit
+<a id="how-i-actually-use-bookorbit"></a>
+
+## 📖 How I Actually Use BookOrbit
 
 One read-along EPUB3 per book: listened to on iPhone, carried offline to Apple Watch for runs, read on a Kobo through KOReader, and picked up again on the laptop. One file, one reading position, no reconciling an audiobook against an ebook.
 
 Read the full walkthrough at **[bookorbit.app/my-workflow](https://bookorbit.app/my-workflow)**.
 
-## KOReader Plugin
+<a id="koreader-plugin"></a>
+
+## 🔄 KOReader Plugin
 
 The BookOrbit plugin for KOReader adds progress sync, two-way annotation sync, and a native catalog browser: navigate, search, and download books from your library without leaving the device.
 
@@ -165,7 +184,9 @@ The BookOrbit plugin for KOReader adds progress sync, two-way annotation sync, a
 
 The download is pre-configured with your server URL and credentials, so there is no manual entry on the device. For full setup and sync options, see **[bookorbit.app/koreader-plugin](https://bookorbit.app/koreader-plugin)**.
 
-## Documentation and Contributing
+<a id="documentation-and-contributing"></a>
+
+## 🛠️ Documentation and Contributing
 
 Full documentation lives at **[bookorbit.app](https://bookorbit.app/what-is-bookorbit)**: libraries, metadata, readers, Kobo sync, OPDS, users and permissions, OIDC and more.
 
@@ -178,9 +199,28 @@ Full documentation lives at **[bookorbit.app](https://bookorbit.app/what-is-book
 **Contributing**
 
 - **Local development**: architecture, first-time setup, running, testing and conventions in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-- **Contributing**: branch naming, test expectations, the PR checklist and commit format in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+- **Contributing**: branch naming, test expectations, the PR checklist and commit format in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Unsupported Storage Configurations
+<a id="support-bookorbit"></a>
+
+## ❤️ Support BookOrbit
+
+BookOrbit is built and maintained independently. Behind what appears to be a single product is a growing ecosystem: the core server and web application, Kobo and KOReader integrations, native iPhone and Apple Watch apps, and an Android app currently in development.
+
+Each part requires its own engineering, testing, compatibility, release, and support work. Keeping the entire ecosystem moving at its current pace, without compromising quality, requires considerable time, focus, and energy. Support helps make that pace sustainable and creates more room for thoughtful development.
+
+If BookOrbit is valuable to you and you would like to support its continued development, you can:
+
+- [Get the official iPhone and Apple Watch app](https://apps.apple.com/us/app/bookorbit-the-official-app/id6811807346)
+- [Support BookOrbit on Ko-fi](https://ko-fi.com/neonbookorbit)
+- [Contribute through Open Collective](https://opencollective.com/bookorbit)
+- [Star BookOrbit on GitHub](https://github.com/bookorbit/bookorbit)
+
+Financial support is entirely optional. Using BookOrbit, recommending it to others, or starring the repository also makes a meaningful difference.
+
+<a id="unsupported-storage-configurations"></a>
+
+## ⚠️ Unsupported Storage Configurations
 
 > [!WARNING]
 > **NAS and network storage configurations are not supported.** BookOrbit requires a local filesystem with dependable semantics for every writable path, including book libraries, import folders, application data, and PostgreSQL data. Do not place these paths on SMB/CIFS, NFS, FUSE or cloud mounts, distributed filesystems, or similar storage, even when the storage is mounted as an ordinary directory.
@@ -189,11 +229,15 @@ Full documentation lives at **[bookorbit.app](https://bookorbit.app/what-is-book
 >
 > Such configurations may work in a particular environment, but using them is entirely at your own risk. No support is provided for them. Please do not open GitHub issues for problems encountered with these configurations unless the problem can be reproduced using supported local storage.
 
-## Repository Activity
+<a id="repository-activity"></a>
+
+## 📈 Repository Activity
 
 ![BookOrbit repository activity: commits, issues, and pull requests over the last 30 days](https://repobeats.axiom.co/api/embed/f572f532340ae02697af0a164e3839818071be2c.svg)
 
-## Translations
+<a id="translations"></a>
+
+## 🌐 Translations
 
 Help translate BookOrbit into your language on [Crowdin](https://crowdin.com/project/bookorbit).
 
@@ -201,13 +245,16 @@ When adding user-facing text in code, add the Vue I18n key only to `client/src/l
 
 [![Translation progress](https://raw.githubusercontent.com/bookorbit/bookorbit/generated-charts/translation-progress.svg)](https://crowdin.com/project/bookorbit)
 
-## Star History
+<a id="star-history"></a>
+
+## ⭐ Star History
 
 [![BookOrbit GitHub star history](https://raw.githubusercontent.com/bookorbit/bookorbit/generated-charts/star-history.svg)](https://github.com/bookorbit/bookorbit/stargazers)
 
-## Support
+<a id="help-and-community"></a>
 
-- **Support development:** [Open Collective](https://opencollective.com/bookorbit)
+## 💬 Help and Community
+
 - **Questions and help:** [Ask in GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=question.yml) or [browse help requests](https://github.com/bookorbit/bookorbit/issues?q=is%3Aissue%20label%3Asupport).
 - **Community conversations:** [Start a conversation](https://github.com/bookorbit/bookorbit/issues/new?template=discussion.yml) or [browse community topics](https://github.com/bookorbit/bookorbit/issues?q=is%3Aissue%20label%3Adiscussion).
 - **Bug reports:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=bug_report.yml)
@@ -216,11 +263,17 @@ When adding user-facing text in code, add the Vue I18n key only to `client/src/l
 
 Questions are welcome, even if you are unsure whether something is a bug. Share workflows, your setup, or companion apps in community conversations. See the [community guide](docs/COMMUNITY.md) for choosing a category and how topics are handled.
 
-## A Note on the API
+<a id="a-note-on-the-api"></a>
+<a id="api-compatibility"></a>
 
-BookOrbit is under very active development, with new features and improvements landing often. Its API grows alongside the official apps and is shaped around what they need, so it changes at the same pace. Care is taken to keep released app versions working, but the API is not a stable public interface and carries no compatibility guarantees. The official apps, OPDS, Kobo sync, and the KOReader plugin are the supported ways to connect, so for the smoothest experience start there.
+## 🔌 API Compatibility
 
-## License and Attribution
+> [!IMPORTANT]
+> BookOrbit's API evolves alongside its official clients. Backwards compatibility is maintained for released official apps, but the API is not currently a stable public integration surface, and compatibility with third-party clients is not guaranteed. For the most reliable experience, use the official apps, OPDS, Kobo sync, or the KOReader plugin.
+
+<a id="license-and-attribution"></a>
+
+## ⚖️ License and Attribution
 
 Copyright (C) 2025-2026 neon and BookOrbit contributors.
 

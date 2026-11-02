@@ -22,10 +22,8 @@ function makePrefs(providers: MetadataProviderKey[] = [key('goodreads'), key('go
 }
 
 const LIBRARIES = [
-  { id: 1, name: 'Novels', type: 'books' },
-  { id: 2, name: 'Comics', type: 'books' },
-  // Has no field rules; the server refuses to answer for it.
-  { id: 3, name: 'Shows', type: 'podcasts' },
+  { id: 1, name: 'Novels' },
+  { id: 2, name: 'Comics' },
 ]
 
 const requests: { url: string; method: string; body: unknown }[] = []
@@ -89,7 +87,7 @@ afterEach(() => {
 })
 
 describe('useFieldRuleScopes', () => {
-  it('starts on the global scope and lists every book library after it', async () => {
+  it('starts on the global scope and lists every library after it', async () => {
     const { api } = await setup()
     expect(api.activeScopeId.value).toBe(GLOBAL_SCOPE)
     expect(api.scopes.value.map((scope) => scope.name)).toEqual(['Global defaults', 'Novels', 'Comics'])

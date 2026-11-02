@@ -54,27 +54,24 @@ describe('Metadata editor access migration (e2e)', { timeout: 60_000 }, () => {
         migrationFiles.filter((filename) => filename < BACKFILL_MIGRATION),
       );
       await target.query(`
-        INSERT INTO libraries (id, type, name) VALUES (1, 'books', 'Fiction'), (2, 'books', 'Comics'), (3, 'podcasts', 'Shows');
+        INSERT INTO libraries (id, name) VALUES (1, 'Fiction'), (2, 'Comics');
         INSERT INTO users (id, username, name, password_hash, is_superuser, active) VALUES
           (1, 'upgraded', 'Upgraded', 'x', false, true),
           (2, 'configured', 'Configured', 'x', false, true),
           (3, 'reader', 'Reader', 'x', false, true),
           (4, 'superuser', 'Superuser', 'x', true, true),
-          (5, 'podcast-owner', 'Podcast owner', 'x', false, true),
           (6, 'suspended', 'Suspended', 'x', false, false);
         INSERT INTO user_permissions (user_id, permission_name) VALUES
           (1, 'library_edit_metadata'), (1, 'library_download'),
           (2, 'library_edit_metadata'),
           (3, 'library_download'),
           (4, 'library_edit_metadata'),
-          (5, 'library_edit_metadata'),
           (6, 'library_edit_metadata');
         INSERT INTO user_library_access (user_id, library_id, access_level) VALUES
-          (1, 1, 'viewer'), (1, 2, 'viewer'), (1, 3, 'viewer'),
+          (1, 1, 'viewer'), (1, 2, 'viewer'),
           (2, 1, 'editor'), (2, 2, 'viewer'),
           (3, 1, 'viewer'),
           (4, 1, 'viewer'),
-          (5, 1, 'viewer'), (5, 3, 'owner'),
           (6, 1, 'viewer');
       `);
 
@@ -93,13 +90,10 @@ describe('Metadata editor access migration (e2e)', { timeout: 60_000 }, () => {
       expect(grants.rows).toEqual([
         { username: 'upgraded', library: 'Fiction', accessLevel: 'editor' },
         { username: 'upgraded', library: 'Comics', accessLevel: 'editor' },
-        { username: 'upgraded', library: 'Shows', accessLevel: 'viewer' },
         { username: 'configured', library: 'Fiction', accessLevel: 'editor' },
         { username: 'configured', library: 'Comics', accessLevel: 'viewer' },
         { username: 'reader', library: 'Fiction', accessLevel: 'viewer' },
         { username: 'superuser', library: 'Fiction', accessLevel: 'viewer' },
-        { username: 'podcast-owner', library: 'Fiction', accessLevel: 'editor' },
-        { username: 'podcast-owner', library: 'Shows', accessLevel: 'owner' },
         { username: 'suspended', library: 'Fiction', accessLevel: 'editor' },
       ]);
     } finally {

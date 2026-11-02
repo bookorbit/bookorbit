@@ -17,8 +17,8 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 vi.mock('../useLibraries', () => ({ useLibraries: () => ({ libraries }) }))
 const { useLibraryPermissions } = await import('../useLibraryPermissions')
 
-function library(id: number, accessLevel?: AccessLevel | null, type: Library['type'] = 'books'): Library {
-  return { id, type, accessLevel } as Library
+function library(id: number, accessLevel?: AccessLevel | null): Library {
+  return { id, accessLevel } as Library
 }
 
 beforeEach(() => {
@@ -78,11 +78,11 @@ describe('useLibraryPermissions', () => {
     expect(hasLibraryPermission(Permission.ManageLibraries, 3, 'owner')).toBe(true)
   })
 
-  it('reports whether any book library grants the permission at the required level', () => {
+  it('reports whether any library grants the permission at the required level', () => {
     const { hasPermissionInAnyLibrary } = useLibraryPermissions()
     expect(hasPermissionInAnyLibrary(Permission.LibraryEditMetadata, 'editor')).toBe(true)
 
-    libraries.value = [library(1, 'viewer'), library(2, 'editor', 'podcasts')]
+    libraries.value = [library(1, 'viewer'), library(2, 'viewer')]
     expect(hasPermissionInAnyLibrary(Permission.LibraryEditMetadata, 'editor')).toBe(false)
 
     state.superuser = true

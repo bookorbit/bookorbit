@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { DEFAULT_LOCALE, type Locale } from '@bookorbit/types';
 
 import type {
   CurrentlyReadingWidgetData,
@@ -20,6 +21,7 @@ import type {
   YearProjectionWidgetData,
 } from '@bookorbit/types';
 
+import { serverText } from '../../common/i18n/server-text';
 import type { RequestUser } from '../../common/types/request-user';
 import { StatsCache } from '../../common/cache/stats-cache';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
@@ -261,44 +263,55 @@ export class DashboardWidgetService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async getMonthlyChallenge(user: RequestUser): Promise<MonthlyChallengeWidgetData> {
+  async getMonthlyChallenge(user: RequestUser, locale: Locale = DEFAULT_LOCALE): Promise<MonthlyChallengeWidgetData> {
     const accessibleLibraryIds = await this.getLibraryIds(user);
     const clock = this.readerClock(user);
     this.readingAttemptEvents.flushPendingChanges(user.id);
-    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), this.calendarCacheKey('monthly-challenge', clock), async () => {
-      const contentFilters = this.getContentFilters(user);
-      const { year, month } = clock;
-      const monthStartDay = `${clock.today.slice(0, 7)}-01`;
-      const monthStart = toTimeZoneStartOfDay(monthStartDay, clock.timeZone);
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
+    // The cache holds the English result and the language is applied on the way out, so one entry
+    // serves every language a user's clients ask in.
+    const challenge = await this.staleCache.get(
+      this.cacheOwnerKey(user, accessibleLibraryIds),
+      this.calendarCacheKey('monthly-challenge', clock),
+      async () => {
+        const contentFilters = this.getContentFilters(user);
+        const { year, month } = clock;
+        const monthStartDay = `${clock.today.slice(0, 7)}-01`;
+        const monthStart = toTimeZoneStartOfDay(monthStartDay, clock.timeZone);
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
 
-      const data = await this.widgetRepo.getChallengePatternData(
-        user.id,
-        accessibleLibraryIds,
-        { start: monthStart, startDay: monthStartDay, today: clock.today },
-        sixMonthsAgo,
-        contentFilters,
-      );
-      const eligible = findEligibleChallenges(data);
-      const challengeType = selectChallenge(eligible, user.id, year, month);
+        const data = await this.widgetRepo.getChallengePatternData(
+          user.id,
+          accessibleLibraryIds,
+          { start: monthStart, startDay: monthStartDay, today: clock.today },
+          sixMonthsAgo,
+          contentFilters,
+        );
+        const eligible = findEligibleChallenges(data);
+        const challengeType = selectChallenge(eligible, user.id, year, month);
 
-      const result = computeChallengeResult(
-        challengeType,
-        {
-          shortBooksCompleted: data.shortBooksCompleted,
-          newGenresRead: data.newGenresRead,
-          oldestInProgressFinished: data.oldestInProgressFinished,
-          maxStreakThisMonth: data.maxStreakThisMonth,
-          newAuthorsRead: data.newAuthorsRead,
-          pagesReadThisMonth: data.pagesReadThisMonth,
-        },
-        year,
-        month,
-      );
+        const result = computeChallengeResult(
+          challengeType,
+          {
+            shortBooksCompleted: data.shortBooksCompleted,
+            newGenresRead: data.newGenresRead,
+            oldestInProgressFinished: data.oldestInProgressFinished,
+            maxStreakThisMonth: data.maxStreakThisMonth,
+            newAuthorsRead: data.newAuthorsRead,
+            pagesReadThisMonth: data.pagesReadThisMonth,
+          },
+          year,
+          month,
+        );
 
-      return { challengeType, ...result };
-    });
+        return { challengeType, ...result };
+      },
+    );
+    return {
+      ...challenge,
+      title: serverText(locale, `monthlyChallenge.${challenge.challengeType}.title`, challenge.title),
+      description: serverText(locale, `monthlyChallenge.${challenge.challengeType}.description`, challenge.description),
+    };
   }
 
   async getYearProjection(user: RequestUser): Promise<YearProjectionWidgetData> {
@@ -398,13 +411,13 @@ export class DashboardWidgetService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private readonly widgetLoaders: Record<WidgetType, (user: RequestUser) => Promise<DashboardWidgetBatchResult['data']>> = {
+  private readonly widgetLoaders: Record<WidgetType, (user: RequestUser, locale: Locale) => Promise<DashboardWidgetBatchResult['data']>> = {
     'reading-goal': (user) => this.getReadingGoal(user),
     'currently-reading': (user) => this.getCurrentlyReading(user),
     'reading-streak': (user) => this.getReadingStreak(user),
     'library-overview': (user) => this.getLibraryOverview(user),
     'highlight-of-the-day': (user) => this.getHighlightOfTheDay(user),
-    'monthly-challenge': (user) => this.getMonthlyChallenge(user),
+    'monthly-challenge': (user, locale) => this.getMonthlyChallenge(user, locale),
     'year-projection': (user) => this.getYearProjection(user),
     'neglected-gems': (user) => this.getNeglectedGems(user),
     'reading-dna': (user) => this.getReadingDna(user),
@@ -421,14 +434,14 @@ export class DashboardWidgetService implements OnModuleInit, OnModuleDestroy {
    * retry, so a request lost in that crowd leaves a tile stuck on "Failed to load" for the life of
    * the page. Failures are reported per widget rather than failing the batch.
    */
-  async getWidgets(types: readonly WidgetType[], user: RequestUser): Promise<DashboardWidgetBatchResponse> {
+  async getWidgets(types: readonly WidgetType[], user: RequestUser, locale: Locale = DEFAULT_LOCALE): Promise<DashboardWidgetBatchResponse> {
     const startedAt = Date.now();
     this.logger.debug(`[dashboard.widget_batch] [start] userId=${user.id} widgetCount=${types.length} - widget batch started`);
 
     const items = await mapWithConcurrency(types, WIDGET_QUERY_CONCURRENCY, async (type): Promise<DashboardWidgetBatchResult> => {
       const widgetStartedAt = Date.now();
       try {
-        return { type, data: await this.widgetLoaders[type](user), failed: false };
+        return { type, data: await this.widgetLoaders[type](user, locale), failed: false };
       } catch (error) {
         const errorClass = error instanceof Error ? error.constructor.name : typeof error;
         const message = sanitizeLogValue(error instanceof Error ? error.message : error);

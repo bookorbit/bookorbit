@@ -3,8 +3,8 @@ import { FolderMinus, LoaderCircle, Plus } from '@lucide/vue'
 import type { Collection } from '@bookorbit/types'
 
 /**
- * The membership rows shared by the book and podcast "add to collection" sheets. Each sheet keeps
- * its own loading and mutation flow; only the row, its state classes and its icons live here.
+ * The membership rows of the "add to collection" sheet. The sheet keeps its own loading and
+ * mutation flow; only the row, its state classes and its icons live here.
  */
 const props = withDefaults(
   defineProps<{

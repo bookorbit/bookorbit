@@ -15,11 +15,7 @@ export class OpdsCollectionRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   findById(id: number) {
-    return this.db
-      .select({ userId: collections.userId, isPublic: collections.isPublic, mediaType: collections.mediaType })
-      .from(collections)
-      .where(eq(collections.id, id))
-      .limit(1);
+    return this.db.select({ userId: collections.userId, isPublic: collections.isPublic }).from(collections).where(eq(collections.id, id)).limit(1);
   }
 
   // bookClauses narrow which member books a collection's count includes, never which collections list.
@@ -50,6 +46,6 @@ export class OpdsCollectionRepository {
   }
 
   private visibleForUser(userId: number) {
-    return and(or(eq(collections.userId, userId), eq(collections.isPublic, true)), eq(collections.mediaType, 'books'));
+    return or(eq(collections.userId, userId), eq(collections.isPublic, true))!;
   }
 }

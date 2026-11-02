@@ -50,7 +50,7 @@ import {
 } from '@bookorbit/types';
 
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
-import { bookCustomMetadataValues, bookMetadata, books } from '../../db/schema';
+import { bookCustomMetadataValues, bookMetadata, books, collections } from '../../db/schema';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
 
@@ -61,7 +61,7 @@ function makeBuilder() {
   const db = {
     select: vi.fn().mockReturnValue({ from: sqFrom }),
   };
-  return { builder: new BookQueryBuilder(db as never, new BookSortBuilder()), db };
+  return { builder: new BookQueryBuilder(db as never, new BookSortBuilder()), db, sqInnerJoin };
 }
 
 function wrapRule(rule: Record<string, unknown>) {
@@ -1160,13 +1160,28 @@ describe('tagRuleToSql', () => {
 });
 
 describe('collectionRuleToSql', () => {
-  it('includesAny produces user-scoped EXISTS subquery', () => {
-    const { builder } = makeBuilder();
+  it('includesAny matches collections owned by the user or shared publicly', () => {
+    const { builder, sqInnerJoin } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'collection', operator: 'includesAny', value: ['Reading'] }) as never,
       USER_CTX,
     ) as any;
     expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
+    expect(sqInnerJoin).toHaveBeenCalledWith(
+      collections,
+      expect.objectContaining({
+        type: 'and',
+        clauses: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'or',
+            clauses: [
+              expect.objectContaining({ type: 'eq', left: collections.userId, right: USER_CTX.userId }),
+              expect.objectContaining({ type: 'eq', left: collections.isPublic, right: true }),
+            ],
+          }),
+        ]),
+      }),
+    );
   });
 
   it('excludesAll with values produces not(EXISTS)', () => {

@@ -1,8 +1,9 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
-import type { AchievementCatalogueResponse, AchievementCelebrationClaim, AchievementHintsResponse } from '@bookorbit/types';
+import { Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import type { AchievementCatalogueResponse, AchievementCelebrationClaim, AchievementHintsResponse, Locale } from '@bookorbit/types';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestLocale } from '../../common/decorators/request-locale.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AchievementService } from './achievement.service';
 import { AchievementBackfillService, type BackfillResult } from './achievement-backfill.service';
@@ -18,8 +19,9 @@ export class AchievementController {
   ) {}
 
   @Get()
-  async getCatalogue(@CurrentUser() user: RequestUser): Promise<AchievementCatalogueResponse> {
-    return this.service.getCatalogue(user);
+  @Header('Vary', 'Accept-Language')
+  async getCatalogue(@CurrentUser() user: RequestUser, @RequestLocale() locale: Locale): Promise<AchievementCatalogueResponse> {
+    return this.service.getCatalogue(user, locale);
   }
 
   @Get('hints')
@@ -28,8 +30,9 @@ export class AchievementController {
   }
 
   @Post('celebrations/claim')
-  async claimCelebration(@CurrentUser() user: RequestUser): Promise<AchievementCelebrationClaim | null> {
-    return this.service.claimCelebration(user);
+  @Header('Vary', 'Accept-Language')
+  async claimCelebration(@CurrentUser() user: RequestUser, @RequestLocale() locale: Locale): Promise<AchievementCelebrationClaim | null> {
+    return this.service.claimCelebration(user, locale);
   }
 
   @Post('celebrations/:claimId/acknowledge')

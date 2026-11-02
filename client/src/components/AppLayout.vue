@@ -35,9 +35,6 @@ const GRID_VIEW_NAMES = [
   'SeriesDetailView',
   'AuthorDetailView',
   'LibrariesView',
-  'PodcastLibrariesView',
-  'PodcastCollectionView',
-  'PodcastScopeView',
   'SmartScopesView',
   'CollectionsView',
 ]
@@ -61,13 +58,9 @@ const viewKey = computed(() => {
            pages that do not open with their own title row. -->
       <MobileShellBar />
 
-      <!--
-        Independent View Area: every page scrolls here. The bottom padding is the
-        floating podcast player's measured height, so scrolled-to-bottom content clears it without a
-        document-level scrollbar.
-      -->
+      <!-- Independent View Area: every page scrolls here, without a document-level scrollbar. -->
       <div
-        class="app-shell-scroll ps-(--shell-content-gutter) pe-(--shell-gap) pt-(--shell-gap) pb-[var(--podcast-mini-player-clearance,0px)] flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent"
+        class="app-shell-scroll ps-(--shell-content-gutter) pe-(--shell-gap) pt-(--shell-gap) flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent"
       >
         <router-view v-slot="{ Component }">
           <Transition name="page" mode="out-in">

@@ -14,9 +14,7 @@ const finalizeError = ref<string | null>(null)
 const finalizeMock = vi.fn<(...args: unknown[]) => Promise<void>>()
 const resetMock = vi.fn<() => void>()
 const fetchLibrariesMock = vi.fn<() => Promise<void>>()
-const libraryOptions = ref([
-  makeLibrary({ id: 2, name: 'Main', folders: [{ id: 3, path: '/books', role: 'downloads', createdAt: '2026-01-01T00:00:00.000Z' }] }),
-])
+const libraryOptions = ref([makeLibrary({ id: 2, name: 'Main', folders: [{ id: 3, path: '/books', createdAt: '2026-01-01T00:00:00.000Z' }] })])
 const librariesLoaded = ref(true)
 const librariesLoading = ref(false)
 const librariesError = ref<string | null>(null)
@@ -83,9 +81,7 @@ function mountDialog() {
 describe('BookDockFinalizeDialog', () => {
   beforeEach(() => {
     i18n.global.locale.value = 'en'
-    libraryOptions.value = [
-      makeLibrary({ id: 2, name: 'Main', folders: [{ id: 3, path: '/books', role: 'downloads', createdAt: '2026-01-01T00:00:00.000Z' }] }),
-    ]
+    libraryOptions.value = [makeLibrary({ id: 2, name: 'Main', folders: [{ id: 3, path: '/books', createdAt: '2026-01-01T00:00:00.000Z' }] })]
     selectionSummary.value = { total: 2, withDestination: 0, withoutDestination: 2 }
     librariesLoaded.value = true
     librariesLoading.value = false
@@ -231,13 +227,11 @@ describe('BookDockFinalizeDialog', () => {
     expect(finalizeMock).toHaveBeenCalledWith({ fileIds: [10, 11], defaultLibraryId: 2, defaultFolderId: 4 })
   })
 
-  it('preserves the first-library default with multiple choices and excludes podcasts', async () => {
-    libraryOptions.value.unshift(makeLibrary({ id: 1, type: 'podcasts', name: 'Podcasts' }))
+  it('preserves the first-library default with multiple choices', async () => {
     libraryOptions.value.push(makeLibrary({ id: 5, name: 'Comics' }))
     const wrapper = mountDialog()
     await flushPromises()
     expect(wrapper.get<HTMLSelectElement>('select').element.value).toBe('2')
-    expect(wrapper.text()).not.toContain('Podcasts')
     await wrapper.get('select').setValue('5')
     await flushPromises()
     await startButton(wrapper).trigger('click')

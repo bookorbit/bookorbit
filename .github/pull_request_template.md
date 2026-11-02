@@ -89,6 +89,6 @@ AI assistance is welcome on this project; unreviewed AI output is not. See the
 - [ ] I disclosed all AI assistance, limitations, and unverified behavior.
 - [ ] The required tests and `pnpm verify` pass against the evidence commit.
 - [ ] No unintended files, secrets, personal configuration, or unapproved dependencies are included.
-- [ ] I followed the [contribution guidelines](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md) and [commit guidelines](https://github.com/bookorbit/bookorbit/blob/main/docs/COMMIT_GUIDELINES.md).
+- [ ] I followed the [contribution guidelines](https://github.com/bookorbit/bookorbit/blob/main/CONTRIBUTING.md) and [commit guidelines](https://github.com/bookorbit/bookorbit/blob/main/docs/COMMIT_GUIDELINES.md).
 
 </details>

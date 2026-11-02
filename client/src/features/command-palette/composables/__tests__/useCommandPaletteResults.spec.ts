@@ -39,31 +39,29 @@ vi.mock('@/composables/useSidebarNav', async () => {
 
 vi.mock('@/composables/useSidebarSections', () => ({
   SIDEBAR_SECTIONS: [
-    { kind: 'library', medium: 'books', icon: {}, routeName: 'library' },
-    { kind: 'smartScope', medium: 'books', icon: {}, routeName: 'smartScope' },
-    { kind: 'collection', medium: 'books', icon: {}, routeName: 'collection' },
-    { kind: 'library', medium: 'podcasts', icon: {}, routeName: 'podcast-library' },
+    { kind: 'library', icon: {}, routeName: 'library' },
+    { kind: 'smartScope', icon: {}, routeName: 'smartScope' },
+    { kind: 'collection', icon: {}, routeName: 'collection' },
   ],
 }))
 
 vi.mock('@/features/library/composables/useLibraries', async () => {
   const { ref: vueRef } = await import('vue')
   const libraries = vueRef([
-    { id: 1, name: 'Novels', type: 'books', bookCount: 454 },
-    { id: 2, name: 'Comics', type: 'books', bookCount: 10 },
-    { id: 9, name: 'Shows', type: 'podcasts', bookCount: null },
+    { id: 1, name: 'Novels', bookCount: 454 },
+    { id: 2, name: 'Comics', bookCount: 10 },
   ])
   return { useLibraries: () => ({ libraries }) }
 })
 
 vi.mock('@/features/smart-scope/composables/useSmartScopes', async () => {
   const { ref: vueRef } = await import('vue')
-  return { useSmartScopes: () => ({ bookScopes: vueRef([{ id: 2, name: 'Kobo', bookCount: 172 }]) }) }
+  return { useSmartScopes: () => ({ smartScopes: vueRef([{ id: 2, name: 'Kobo', bookCount: 172 }]) }) }
 })
 
 vi.mock('@/features/collection/composables/useCollections', async () => {
   const { ref: vueRef } = await import('vue')
-  return { useCollections: () => ({ bookCollections: vueRef([{ id: 8, name: 'Autumn Reads', bookCount: 2 }]) }) }
+  return { useCollections: () => ({ collections: vueRef([{ id: 8, name: 'Autumn Reads', bookCount: 2 }]) }) }
 })
 
 vi.mock('@/features/auth/composables/usePermissions', async () => {

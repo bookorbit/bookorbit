@@ -74,7 +74,6 @@ const copyMock = vi.hoisted(() => vi.fn<(text: string) => Promise<boolean>>())
 function makeLibrary(overrides: Partial<Library> = {}): Library {
   return {
     id: 1,
-    type: 'books',
     name: 'Test Library',
     icon: null,
     displayOrder: 0,
@@ -108,7 +107,7 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     fileWriteReadAlongEnabled: false,
     fileWriteReadAlongMaxFileSizeMb: 1000,
     fileRenameEnabled: false,
-    folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }],
+    folders: [{ id: 1, path: '/books', createdAt: '2024-01-01T00:00:00.000Z' }],
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
@@ -245,7 +244,7 @@ describe('LibrariesSettings ledger', () => {
     it('cuts a long path from the start so the folder that names the library stays visible', async () => {
       librariesRef.value = [
         makeLibrary({
-          folders: [{ id: 1, path: '/mnt/user/media/bookorbit/books/Novels', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }],
+          folders: [{ id: 1, path: '/mnt/user/media/bookorbit/books/Novels', createdAt: '2024-01-01T00:00:00.000Z' }],
         }),
       ]
       const wrapper = await mountLoaded()
@@ -264,17 +263,13 @@ describe('LibrariesSettings ledger', () => {
     })
 
     it('prints the whole folder path in the ledger rather than hiding it behind a hover', async () => {
-      librariesRef.value = [
-        makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }] }),
-      ]
+      librariesRef.value = [makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', createdAt: '2024-01-01T00:00:00.000Z' }] })]
       const wrapper = await mountLoaded()
       expect(tableText(wrapper)).toContain('/srv/media/books/novels')
     })
 
     it('keeps the identifying tail of the path on the narrower mobile card', async () => {
-      librariesRef.value = [
-        makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }] }),
-      ]
+      librariesRef.value = [makeLibrary({ folders: [{ id: 1, path: '/srv/media/books/novels', createdAt: '2024-01-01T00:00:00.000Z' }] })]
       const wrapper = await mountLoaded()
       expect(wrapper.get('[data-testid="libraries-ledger-cards"]').text()).toContain('…/books/novels')
     })
@@ -282,7 +277,7 @@ describe('LibrariesSettings ledger', () => {
 
   describe('folders badge', () => {
     it('leaves the count out for a single folder, which the path line already shows', async () => {
-      librariesRef.value = [makeLibrary({ folders: [{ id: 1, path: '/books', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }] })]
+      librariesRef.value = [makeLibrary({ folders: [{ id: 1, path: '/books', createdAt: '2024-01-01T00:00:00.000Z' }] })]
       const wrapper = await mountLoaded()
       expect(tableText(wrapper)).not.toContain('1 folder')
     })
@@ -291,9 +286,9 @@ describe('LibrariesSettings ledger', () => {
       librariesRef.value = [
         makeLibrary({
           folders: [
-            { id: 1, path: '/books/a', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
-            { id: 2, path: '/books/b', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
-            { id: 3, path: '/books/c', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 1, path: '/books/a', createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 2, path: '/books/b', createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 3, path: '/books/c', createdAt: '2024-01-01T00:00:00.000Z' },
           ],
         }),
       ]
@@ -306,8 +301,8 @@ describe('LibrariesSettings ledger', () => {
       librariesRef.value = [
         makeLibrary({
           folders: [
-            { id: 1, path: '/books/fiction', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
-            { id: 2, path: '/books/nonfiction', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 1, path: '/books/fiction', createdAt: '2024-01-01T00:00:00.000Z' },
+            { id: 2, path: '/books/nonfiction', createdAt: '2024-01-01T00:00:00.000Z' },
           ],
         }),
       ]
@@ -554,8 +549,8 @@ describe('LibrariesSettings ledger', () => {
   describe('filtering and sorting', () => {
     beforeEach(() => {
       librariesRef.value = [
-        makeLibrary({ id: 1, name: 'Novels', folders: [{ id: 1, path: '/srv/novels', role: 'downloads', createdAt: '2024-01-01T00:00:00.000Z' }] }),
-        makeLibrary({ id: 2, name: 'Comics', folders: [{ id: 2, path: '/srv/comics', role: 'downloads', createdAt: '2024-01-01T00:00:00.000Z' }] }),
+        makeLibrary({ id: 1, name: 'Novels', folders: [{ id: 1, path: '/srv/novels', createdAt: '2024-01-01T00:00:00.000Z' }] }),
+        makeLibrary({ id: 2, name: 'Comics', folders: [{ id: 2, path: '/srv/comics', createdAt: '2024-01-01T00:00:00.000Z' }] }),
       ]
       overviewRef.value = [makeEntry({ libraryId: 1, totalBooks: 381 }), makeEntry({ libraryId: 2, totalBooks: 23 })]
     })
@@ -767,7 +762,7 @@ describe('LibrariesSettings ledger', () => {
       librariesRef.value = [
         makeLibrary({
           id: 4,
-          folders: [{ id: 9, path: '/mnt/user/media/bookorbit/books/Novels', role: 'downloads' as const, createdAt: '2024-01-01T00:00:00.000Z' }],
+          folders: [{ id: 9, path: '/mnt/user/media/bookorbit/books/Novels', createdAt: '2024-01-01T00:00:00.000Z' }],
         }),
       ]
       copyMock.mockResolvedValue(true)

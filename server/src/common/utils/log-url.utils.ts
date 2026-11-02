@@ -2,7 +2,7 @@ const SENSITIVE_QUERY_KEYS = new Set(['ticket', 'token', 't']);
 
 /**
  * Replaces credential-bearing query values before a URL reaches a log line or an error body.
- * `ticket` grants podcast audio access and `t`/`token` grant OPDS image access, so neither may be
+ * `ticket` grants stream access and `t`/`token` grant OPDS image access, so none of them may be
  * written to disk where the rest of the request line is already recorded.
  */
 export function redactUrlCredentials(url: string): string {

@@ -2,8 +2,6 @@
  * Capabilities this server supports, advertised so a client can tell a newer server from an
  * older one before sending a field or calling a route the older one would reject. Append only:
  * a released client reads this list, so a value is never renamed or removed.
- *
- * Named apart from `APP_FEATURES` in app-features.ts, which holds the build-time feature flags.
  */
 export const SERVER_FEATURES = [
   "annotation-stars",

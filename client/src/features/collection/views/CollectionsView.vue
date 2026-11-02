@@ -8,7 +8,7 @@ import { useCollections } from '@/features/collection/composables/useCollections
 defineOptions({ name: 'CollectionsView' })
 
 const { t } = useI18n()
-const { bookCollections, loading, fetchCollections } = useCollections()
+const { collections, loading, fetchCollections } = useCollections()
 
 const createOpen = ref(false)
 
@@ -32,7 +32,7 @@ onMounted(() => {
       :title="t('titles.collections')"
       title-icon="FolderOpen"
       fallback-icon="FolderOpen"
-      :items="bookCollections"
+      :items="collections"
       route-name="collection"
       :loading="loading"
       :search-placeholder="t('components.sidebar.filterCollectionsPlaceholder')"

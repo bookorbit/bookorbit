@@ -132,7 +132,7 @@ describe('CatalogService', () => {
     expect(catalogRepository.listLanguages).not.toHaveBeenCalled();
   });
 
-  it('keeps collection searches scoped directly by owner id', async () => {
+  it('delegates readable collection searches by viewer id', async () => {
     const { service, catalogRepository, libraryService } = makeService();
     catalogRepository.searchCollections.mockResolvedValue([{ name: 'Favorites' }]);
 

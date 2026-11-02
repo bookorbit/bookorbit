@@ -6,7 +6,7 @@ import {
   type RouteLocationNormalizedLoaded,
   type RouteRecordRaw,
 } from 'vue-router'
-import { APP_FEATURES, Permission } from '@bookorbit/types'
+import { Permission } from '@bookorbit/types'
 import { normalizeEmailTab } from '@/features/email/lib/email-tabs'
 import { normalizeMetadataTab, type MetadataTab } from '@/features/settings/lib/metadata-tabs'
 import { normalizeReaderTab, type ReaderTab } from '@/features/settings/lib/reader-tabs'
@@ -136,63 +136,6 @@ function resolveLegacyIntegrationRoute(tab: unknown): string | null {
       return null
   }
 }
-
-const PODCAST_SETTINGS_ROUTES: RouteRecordRaw[] = APP_FEATURES.podcasts
-  ? [
-      {
-        path: 'podcasts',
-        name: 'settings-podcasts',
-        component: () => import('@/features/settings/PodcastSettings.vue'),
-        meta: { maxWidth: 'max-w-4xl', title: () => t('titles.podcasts') },
-      },
-    ]
-  : []
-
-const PODCAST_APP_ROUTES: RouteRecordRaw[] = APP_FEATURES.podcasts
-  ? [
-      {
-        path: '/podcasts/libraries',
-        name: 'podcast-libraries',
-        component: () => import('@/features/podcast/views/PodcastLibrariesView.vue'),
-        meta: { title: () => t('titles.podcastLibraries') },
-      },
-      {
-        path: '/podcasts/playlist/:id',
-        name: 'podcast-playlist',
-        component: () => import('@/features/podcast/views/PodcastScopeView.vue'),
-        meta: { title: (to) => fallbackById('titles.podcastScope', numericParam(to, 'id')) },
-      },
-      {
-        path: '/podcasts/collection/:id',
-        name: 'podcast-collection',
-        component: () => import('@/features/podcast/views/PodcastCollectionView.vue'),
-        meta: { title: (to) => fallbackById('titles.podcastCollection', numericParam(to, 'id')) },
-      },
-      {
-        path: '/podcasts/library/:id',
-        name: 'podcast-library',
-        component: () => import('@/features/podcast/views/PodcastLibraryView.vue'),
-        meta: { title: (to) => fallbackById('titles.podcasts', numericParam(to, 'id')) },
-      },
-      {
-        path: '/podcasts/:podcastId',
-        name: 'podcast-show',
-        component: () => import('@/features/podcast/views/PodcastShowView.vue'),
-        meta: { title: (to) => fallbackById('titles.podcast', numericParam(to, 'podcastId')) },
-      },
-    ]
-  : []
-
-const PODCAST_STANDALONE_ROUTES: RouteRecordRaw[] = APP_FEATURES.podcasts
-  ? [
-      {
-        path: '/listen/podcast/:episodeId',
-        name: 'podcast-player',
-        component: () => import('@/features/podcast/views/PodcastPlayerView.vue'),
-        meta: { title: (to) => `${t('podcast.actions.listen')} · ${fallbackById('titles.podcastEpisode', numericParam(to, 'episodeId'))}` },
-      },
-    ]
-  : []
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -480,7 +423,6 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/features/tts/TtsSettings.vue'),
             meta: { title: () => t('titles.tts') },
           },
-          ...PODCAST_SETTINGS_ROUTES,
 
           // ── Server ─────────────────────────────────────────────────────────
           {
@@ -666,7 +608,6 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/views/HomeView.vue'),
         meta: { titleRow: true, title: (to) => fallbackById('titles.library', numericParam(to, 'id')) },
       },
-      ...PODCAST_APP_ROUTES,
       {
         path: '/smart-scope/:id',
         name: 'smartScope',
@@ -793,7 +734,6 @@ export const routes: RouteRecordRaw[] = [
       title: (to) => `${t('titles.readPrefix')} · ${fallbackById('titles.book', numericParam(to, 'bookId'))}`,
     },
   },
-  ...PODCAST_STANDALONE_ROUTES,
   {
     path: '/login',
     name: 'login',

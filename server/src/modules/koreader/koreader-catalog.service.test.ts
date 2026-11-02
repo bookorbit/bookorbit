@@ -876,6 +876,12 @@ describe('KoreaderCatalogService', () => {
 
     await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'recently_read', order: 'asc' }));
     expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(11, 'last_read_asc', 1, 20, {}, false, user.contentFilters);
+
+    await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'published' }));
+    expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(11, 'published_asc', 1, 20, {}, false, user.contentFilters);
+
+    await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'published', order: 'desc' }));
+    expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(11, 'published_desc', 1, 20, {}, false, user.contentFilters);
   });
 
   it('reports when a book was last opened, the newest across its files', async () => {

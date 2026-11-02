@@ -22,9 +22,8 @@ export function arrangeIds(defaults: readonly string[], stored: readonly string[
 }
 
 /**
- * Writes a reordered subset back into the full order. Ids outside the subset (rows another media
- * mode or permission hides right now) keep their slots, so reordering what is on screen never
- * scrambles what is not.
+ * Writes a reordered subset back into the full order. Ids outside the subset (rows a permission
+ * hides right now) keep their slots, so reordering what is on screen never scrambles what is not.
  */
 export function mergeSubsetOrder(full: readonly string[], subset: readonly string[]): string[] {
   const inSubset = new Set(subset)

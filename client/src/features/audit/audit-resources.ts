@@ -18,8 +18,6 @@ const domainByResource: Record<AuditResource, AuditResourceDomain> = {
   [AuditResource.User]: 'people',
   [AuditResource.Library]: 'content',
   [AuditResource.Book]: 'content',
-  [AuditResource.Podcast]: 'content',
-  [AuditResource.PodcastEpisode]: 'content',
   [AuditResource.Collection]: 'content',
   [AuditResource.SmartScope]: 'content',
   [AuditResource.BookDockFile]: 'content',

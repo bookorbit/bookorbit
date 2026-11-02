@@ -6,7 +6,6 @@ function makeCollection(id: number, isOwner: boolean): Collection {
   return {
     id,
     userId: isOwner ? 7 : 99,
-    mediaType: 'books',
     name: `Collection ${id}`,
     icon: 'FolderOpen',
     description: null,
@@ -15,7 +14,6 @@ function makeCollection(id: number, isOwner: boolean): Collection {
     syncToKobo: false,
     displayOrder: id,
     bookCount: 0,
-    podcastCount: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   }

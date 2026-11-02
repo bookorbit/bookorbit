@@ -27,8 +27,9 @@ export function useBookSelectionPermissions(books: Ref<BookCard[]>, selectedIds:
     const query = querySelection?.value
     if (query) {
       if (query.libraryId != null) return hasLibraryPermission(Permission.LibraryEditMetadata, query.libraryId, 'editor')
-      const bookLibraries = libraries.value.filter((library) => library.type === 'books')
-      return bookLibraries.length > 0 && bookLibraries.every((library) => hasLibraryPermission(Permission.LibraryEditMetadata, library.id, 'editor'))
+      return (
+        libraries.value.length > 0 && libraries.value.every((library) => hasLibraryPermission(Permission.LibraryEditMetadata, library.id, 'editor'))
+      )
     }
     if (selectedIds.value.size === 0) return false
     return [...selectedIds.value].every(

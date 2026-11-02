@@ -75,7 +75,7 @@ export class UploadSessionRepository {
     return this.db
       .select({ id: libraries.id, name: libraries.name, allowedFormats: libraries.allowedFormats, organizationMode: libraries.organizationMode })
       .from(libraries)
-      .where(and(inArray(libraries.id, libraryIds), eq(libraries.type, 'books')));
+      .where(inArray(libraries.id, libraryIds));
   }
 
   findCapabilityFolders(libraryIds: number[]) {
@@ -104,7 +104,6 @@ export class UploadSessionRepository {
     const [row] = await this.db
       .select({
         libraryId: books.libraryId,
-        libraryType: libraries.type,
         allowedFormats: libraries.allowedFormats,
         organizationMode: libraries.organizationMode,
         // Needed by validateTarget: a book whose folder path is a file cannot receive another file,

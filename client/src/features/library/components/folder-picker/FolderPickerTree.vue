@@ -220,7 +220,7 @@ defineExpose({ focusRow, ensureVisible, scrollToTop, focusField })
         :class="picker.phone.value ? 'px-1 py-1' : 'px-2 py-1.5'"
         role="tree"
         :aria-label="t('library.folderBrowser.tree.label')"
-        :aria-multiselectable="picker.multiple.value"
+        aria-multiselectable="true"
         @update="onUpdate"
         @keydown="onKeydown"
       >

@@ -13,7 +13,7 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { fetchReadingHistoryPage, fetchReadingHistorySummary } from '../api/reading-history.api'
 import { formatHours, formatMonthName } from '../lib/history-format'
-import { saveBlob } from '../lib/history-export'
+import { canvasToBlob, saveBlob } from '../lib/history-export'
 import { POSTER_SIZES, drawPoster, type PosterLook, type PosterShape, type PosterTile } from '../lib/share-poster'
 
 type SharePeriod = 'year' | 'quarter' | 'month'
@@ -240,10 +240,7 @@ watch(books, (list) => {
 watch([books, shape, look, showTitles, showRereads, showRatings, imageVersion, canvas, loading], () => void nextTick(scheduleDraw))
 
 function posterBlob(): Promise<Blob> {
-  return new Promise(
-    (resolve, reject) =>
-      canvas.value?.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('empty'))), 'image/png') ?? reject(new Error('no canvas')),
-  )
+  return canvasToBlob(canvas.value, 'image/png')
 }
 
 function fileName() {

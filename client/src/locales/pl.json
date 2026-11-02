@@ -4777,18 +4777,6 @@
       "seeAllLibraries": "Zobacz wszystkie biblioteki ({count})",
       "seeAllSmartScopes": "Zobacz wszystkie inteligentne zakresy ({count})",
       "seeAllCollections": "Zobacz wszystkie kolekcje ({count})",
-      "podcasts": "Podcasts",
-      "newPodcastLibrary": "New Podcast Library",
-      "noPodcastLibraries": "No podcast libraries yet",
-      "filterPodcastLibraries": "Filter podcast libraries",
-      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
-      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
-      "queue": "Queue",
-      "mode": {
-        "books": "Books",
-        "podcasts": "Podcasts",
-        "switcherAria": "Switch between books and podcasts"
-      },
       "updateAvailable": "Aktualizuj {version}",
       "zones": {
         "browse": "Przeglądaj"
@@ -4883,11 +4871,6 @@
       "description": "Ten {entity} nie istnieje lub został usunięty.",
       "goBack": "Wróć"
     },
-    "media": {
-      "volume": "Volume",
-      "mute": "Mute",
-      "unmute": "Unmute"
-    },
     "themePicker": {
       "light": "Światło",
       "dark": "Ciemny",
@@ -4913,8 +4896,7 @@
       "sort": {
         "custom": "Kolejność niestandardowa",
         "name": "Nazwa",
-        "bookCount": "Liczba książek",
-        "showCount": "Show count"
+        "bookCount": "Liczba książek"
       },
       "ascending": "Rosnąco",
       "descending": "Malejąco",
@@ -4923,9 +4905,7 @@
       "noMatches": "Brak dopasowań",
       "noMatchesHint": "Spróbuj innego wyszukiwanego hasła.",
       "bookCount": "Książki: {count}",
-      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Utwórz bibliotekę, aby zacząć dodawać książki.",
-      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Inteligentne zakresy zapisują zestaw często używanych filtrów.",
       "collectionsEmptyHint": "Kolekcje grupują książki wybrane ręcznie."
     }
@@ -5288,15 +5268,7 @@
     }
   },
   "errors": {
-    "network": "Could not reach BookOrbit. Check your connection, then try again.",
-    "codes": {
-      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
-      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
-      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
-      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
-      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
-      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
-    }
+    "network": "Could not reach BookOrbit. Check your connection, then try again."
   },
   "hardcover": {
     "settings": {
@@ -5532,9 +5504,7 @@
         "browseDescription": "Wybierz jeden lub więcej folderów bez opuszczania przeglądarki.",
         "selectedTitle": "Wybrane foldery",
         "addFolders": "Dodaj foldery",
-        "manualEntry": "Wprowadź ścieżkę ręcznie",
         "absolutePath": "Bezwzględna ścieżka serwera",
-        "addFolder": "Dodaj folder",
         "removeFolder": "Usuń {folder}",
         "manualCheckHint": "Ręczne ścieżki są sprawdzane razem z resztą wybranych folderów.",
         "pathPlaceholder": "/ścieżka/do/książek",
@@ -6887,7 +6857,6 @@
       "retry": "Spróbuj ponownie"
     },
     "bookView": {
-      "sort": "Sortuj",
       "sortOn": "Włączone",
       "resetSort": "Zresetuj sortowanie do ustawień domyślnych",
       "shuffle": "Losowo",
@@ -7064,7 +7033,6 @@
   "titles": {
     "dashboard": "Pulpit nawigacyjny",
     "libraries": "Biblioteki",
-    "podcastLibraries": "Podcast Libraries",
     "opds": "OPDS",
     "koboSync": "Kobo Synchronizacja",
     "koreaderSync": "KOReader Synchronizacja",

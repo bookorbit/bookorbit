@@ -111,13 +111,13 @@ function onDoubleClick() {
     </button>
     <span v-else class="size-5 shrink-0" />
     <input
-      :type="picker.multiple.value ? 'checkbox' : 'radio'"
+      type="checkbox"
       tabindex="-1"
       class="size-3.5 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed"
       :checked="checked"
       :disabled="status?.block"
       :indeterminate="mixedCount > 0"
-      :aria-label="picker.multiple.value ? t('library.folderBrowser.tree.select', { name }) : t('library.folderBrowser.tree.use', { name })"
+      :aria-label="t('library.folderBrowser.tree.select', { name })"
       @click="onToggle"
     />
     <button

@@ -36,11 +36,8 @@ function defaultSections(): Record<SidebarSectionId, SidebarSectionState> {
     reading: { open: true },
     browse: { open: true },
     libraries: { open: true, cap: SIDEBAR_DEFAULT_CAP },
-    podcasts: { open: true, cap: SIDEBAR_DEFAULT_CAP },
     smartScopes: { open: true, cap: SIDEBAR_DEFAULT_CAP },
     collections: { open: true, cap: SIDEBAR_DEFAULT_CAP },
-    podcastScopes: { open: true, cap: SIDEBAR_DEFAULT_CAP },
-    podcastCollections: { open: true, cap: SIDEBAR_DEFAULT_CAP },
   }
 }
 

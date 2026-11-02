@@ -20,8 +20,8 @@ const props = defineProps<{
 const { t } = useI18n()
 const router = useRouter()
 const { libraries } = useLibraries()
-const { bookScopes } = useSmartScopes()
-const { bookCollections } = useCollections()
+const { smartScopes } = useSmartScopes()
+const { collections } = useCollections()
 
 const open = ref(false)
 const query = ref('')
@@ -46,21 +46,19 @@ const groups = computed(() => {
     {
       kind: 'library',
       label: t('components.browseHeader.switcher.libraries'),
-      items: libraries.value
-        .filter((library) => library.type !== 'podcasts')
-        .map((library) => ({
-          kind: 'library',
-          id: library.id,
-          name: library.name,
-          icon: library.icon ?? null,
-          fallback: 'BookCopy',
-          count: entityCount(library),
-        })),
+      items: libraries.value.map((library) => ({
+        kind: 'library',
+        id: library.id,
+        name: library.name,
+        icon: library.icon ?? null,
+        fallback: 'BookCopy',
+        count: entityCount(library),
+      })),
     },
     {
       kind: 'smartScope',
       label: t('components.browseHeader.switcher.smartScopes'),
-      items: bookScopes.value.map((scope) => ({
+      items: smartScopes.value.map((scope) => ({
         kind: 'smartScope',
         id: scope.id,
         name: scope.name,
@@ -72,7 +70,7 @@ const groups = computed(() => {
     {
       kind: 'collection',
       label: t('components.browseHeader.switcher.collections'),
-      items: bookCollections.value.map((collection) => ({
+      items: collections.value.map((collection) => ({
         kind: 'collection',
         id: collection.id,
         name: collection.name,

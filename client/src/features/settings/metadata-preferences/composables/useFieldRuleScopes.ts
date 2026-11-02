@@ -48,12 +48,7 @@ function draftKey(id: FieldRuleScopeId): string {
  */
 export function useFieldRuleScopes() {
   const { t } = useI18n()
-  const { libraries: allLibraries, fetchLibraries } = useLibraries()
-  /**
-   * Field rules belong to book libraries. A podcast library has none, and the server refuses to
-   * answer for one, so listing it gave a tab that spun forever.
-   */
-  const libraries = computed(() => allLibraries.value.filter((library) => library.type === 'books'))
+  const { libraries, fetchLibraries } = useLibraries()
   const prefs = useMetadataPreferences()
 
   const activeScopeId = ref<FieldRuleScopeId>(GLOBAL_SCOPE)

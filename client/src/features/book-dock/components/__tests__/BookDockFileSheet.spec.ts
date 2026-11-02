@@ -5,7 +5,7 @@ import type { BookDockFile, Library, MetadataCandidate } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import BookDockFileSheet from '../BookDockFileSheet.vue'
 
-type LibraryOption = Pick<Library, 'id' | 'name' | 'type'> & {
+type LibraryOption = Pick<Library, 'id' | 'name'> & {
   folders: Array<Pick<Library['folders'][number], 'id' | 'path'>>
 }
 
@@ -389,7 +389,6 @@ describe('BookDockFileSheet', () => {
   it('persists the visible default destination when finishing metadata edits', async () => {
     mocks.libraries.push({
       id: 7,
-      type: 'books',
       name: 'Novels',
       folders: [{ id: 70, path: '/library/novels' }],
     })
@@ -413,7 +412,6 @@ describe('BookDockFileSheet', () => {
   it('does not save an unchanged destination again when finishing', async () => {
     mocks.libraries.push({
       id: 7,
-      type: 'books',
       name: 'Novels',
       folders: [{ id: 70, path: '/library/novels' }],
     })
@@ -431,13 +429,11 @@ describe('BookDockFileSheet', () => {
     mocks.libraries.push(
       {
         id: 7,
-        type: 'books',
         name: 'Novels',
         folders: [{ id: 70, path: '/library/novels' }],
       },
       {
         id: 8,
-        type: 'books',
         name: 'Comics',
         folders: [{ id: 80, path: '/library/comics' }],
       },
@@ -465,7 +461,6 @@ describe('BookDockFileSheet', () => {
   it('keeps the sheet open when the visible destination cannot be saved', async () => {
     mocks.libraries.push({
       id: 7,
-      type: 'books',
       name: 'Novels',
       folders: [{ id: 70, path: '/library/novels' }],
     })
@@ -482,7 +477,7 @@ describe('BookDockFileSheet', () => {
   })
   it('selects a delayed sole library and persists it only when Done is clicked', async () => {
     mocks.fetchLibraries.mockImplementation(async () => {
-      libraryOptions.value = [{ id: 7, type: 'books', name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] }]
+      libraryOptions.value = [{ id: 7, name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] }]
     })
     mocks.setTarget.mockResolvedValue(makeFile({ targetLibraryId: 7, targetFolderId: 70 }))
     const wrapper = mountSheet(makeFile())
@@ -501,7 +496,6 @@ describe('BookDockFileSheet', () => {
   it('preserves a saved non-first folder and offers the other folders', async () => {
     mocks.libraries.push({
       id: 7,
-      type: 'books',
       name: 'Novels',
       folders: [
         { id: 70, path: '/books/first' },
@@ -519,8 +513,8 @@ describe('BookDockFileSheet', () => {
 
   it('uses the next file destination when switching files in an open sheet', async () => {
     mocks.libraries.push(
-      { id: 7, type: 'books', name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] },
-      { id: 8, type: 'books', name: 'Comics', folders: [{ id: 80, path: '/books/comics' }] },
+      { id: 7, name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] },
+      { id: 8, name: 'Comics', folders: [{ id: 80, path: '/books/comics' }] },
     )
     const wrapper = mountSheet(makeFile({ targetLibraryId: 7, targetFolderId: 70 }))
     await wrapper.setProps({ file: makeFile({ id: 2, targetLibraryId: 8, targetFolderId: 80 }) })
@@ -537,7 +531,7 @@ describe('BookDockFileSheet', () => {
   })
 
   it('does not overwrite an unavailable saved destination with the sole library', async () => {
-    mocks.libraries.push({ id: 7, type: 'books', name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] })
+    mocks.libraries.push({ id: 7, name: 'Novels', folders: [{ id: 70, path: '/books/novels' }] })
     const wrapper = mountSheet(makeFile({ targetLibraryId: 99, targetFolderId: 990 }))
     await flushPromises()
     expect(wrapper.get<HTMLSelectElement>('select').element.value).toBe('')

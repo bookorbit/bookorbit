@@ -9,7 +9,7 @@ const VALID = {
   docsUrl: 'https://github.com/bookorbit/bookorbit-metadata-providers/tree/main/providers/mangabaka',
   homepage: 'https://mangabaka.org',
   color: '#E30047',
-  mediaTypes: ['book', 'comic', 'podcast'],
+  mediaTypes: ['book', 'comic', 'magazine'],
   languages: ['ja', 'en-US', 'not a language'],
 };
 

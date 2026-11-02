@@ -40,9 +40,9 @@ describe('arrangeIds', () => {
 
 describe('mergeSubsetOrder', () => {
   it('writes the subset into its own slots and leaves the rest where they were', () => {
-    // Podcast-only rows (podcast-queue) are off screen in books mode and must not move.
-    const full = ['dashboard', 'book-dock', 'podcast-queue', 'tools']
-    expect(mergeSubsetOrder(full, ['dashboard', 'tools', 'book-dock'])).toEqual(['dashboard', 'tools', 'podcast-queue', 'book-dock'])
+    // Rows a permission hides (book-requests) are off screen and must not move.
+    const full = ['dashboard', 'book-dock', 'book-requests', 'tools']
+    expect(mergeSubsetOrder(full, ['dashboard', 'tools', 'book-dock'])).toEqual(['dashboard', 'tools', 'book-requests', 'book-dock'])
   })
 
   it('returns the full order unchanged for an unchanged subset', () => {

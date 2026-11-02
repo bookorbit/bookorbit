@@ -20,7 +20,7 @@ describe('PathService folder picker routes', () => {
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'path-folders-'));
     await mkdir(join(root, 'books', 'Ebooks', 'Fiction'), { recursive: true });
-    await mkdir(join(root, 'books', 'Podcasts'), { recursive: true });
+    await mkdir(join(root, 'books', 'Magazines'), { recursive: true });
     await mkdir(join(root, 'books', '.hidden'), { recursive: true });
     await mkdir(join(root, 'data', 'covers'), { recursive: true });
     await writeFile(join(root, 'books', 'Loose.epub'), 'x');
@@ -46,7 +46,7 @@ describe('PathService folder picker routes', () => {
       expect(listing.state).toBe('ok');
       expect(listing.entries.map((entry) => [entry.name, entry.hasChildren, entry.system, entry.appData])).toEqual([
         ['Ebooks', true, false, false],
-        ['Podcasts', false, false, false],
+        ['Magazines', false, false, false],
       ]);
     });
 
@@ -160,9 +160,9 @@ describe('PathService folder picker routes', () => {
   describe('getPlaces', () => {
     it('groups every library’s folders and offers the root when nothing is mounted separately', async () => {
       pathRepository.findLibraryFolders.mockResolvedValue([
-        { libraryId: 1, name: 'Novels', icon: 'BookOpen', type: 'books', path: join(root, 'books', 'Ebooks', 'Fiction') },
-        { libraryId: 2, name: 'Podcasts', icon: null, type: 'podcasts', path: join(root, 'books', 'Podcasts') },
-        { libraryId: 1, name: 'Novels', icon: 'BookOpen', type: 'books', path: join(root, 'books', 'Extra') },
+        { libraryId: 1, name: 'Novels', icon: 'BookOpen', path: join(root, 'books', 'Ebooks', 'Fiction') },
+        { libraryId: 2, name: 'Magazines', icon: null, path: join(root, 'books', 'Magazines') },
+        { libraryId: 1, name: 'Novels', icon: 'BookOpen', path: join(root, 'books', 'Extra') },
       ]);
 
       await expect(service.getPlaces()).resolves.toEqual({
@@ -174,10 +174,9 @@ describe('PathService folder picker routes', () => {
             id: 1,
             name: 'Novels',
             icon: 'BookOpen',
-            type: 'books',
             folders: [join(root, 'books', 'Ebooks', 'Fiction'), join(root, 'books', 'Extra')],
           },
-          { id: 2, name: 'Podcasts', icon: null, type: 'podcasts', folders: [join(root, 'books', 'Podcasts')] },
+          { id: 2, name: 'Magazines', icon: null, folders: [join(root, 'books', 'Magazines')] },
         ],
       });
     });

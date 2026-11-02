@@ -46,7 +46,7 @@ describe('NotebookEntriesQueryDto', () => {
   });
 
   it('rejects an unknown kind or origin', async () => {
-    expect((await check(NotebookEntriesQueryDto, { kinds: 'highlight,podcast' })).errors).toHaveLength(1);
+    expect((await check(NotebookEntriesQueryDto, { kinds: 'highlight,doodle' })).errors).toHaveLength(1);
     expect((await check(NotebookEntriesQueryDto, { origins: 'web,apple' })).errors).toHaveLength(1);
   });
 

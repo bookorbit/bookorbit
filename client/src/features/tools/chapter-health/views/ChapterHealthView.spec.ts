@@ -6,10 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const permissions = ref<string[]>(['library_edit_metadata'])
 const libraries = ref([
-  { id: 1, name: 'Audiobooks', type: 'books', accessLevel: 'owner' },
-  { id: 2, name: 'Kids', type: 'books', accessLevel: 'editor' },
-  { id: 3, name: 'Shows', type: 'podcasts', accessLevel: 'owner' },
-  { id: 4, name: 'Shared', type: 'books', accessLevel: 'viewer' },
+  { id: 1, name: 'Audiobooks', accessLevel: 'owner' },
+  { id: 2, name: 'Kids', accessLevel: 'editor' },
+  { id: 4, name: 'Shared', accessLevel: 'viewer' },
 ])
 const fetchLibraries = vi.fn<() => Promise<void>>()
 
@@ -214,7 +213,7 @@ describe('ChapterHealthView', () => {
     expect(toast.success).not.toHaveBeenCalled()
   })
 
-  it('narrows to one book library, leaving podcast libraries and ones the user cannot edit out', async () => {
+  it('narrows to one library, leaving out ones the user cannot edit', async () => {
     await mountView()
 
     const select = wrapper!.get('select')

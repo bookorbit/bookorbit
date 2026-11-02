@@ -21,11 +21,6 @@ export interface SidebarEntity {
   name: string
   icon?: string | null
   bookCount?: number | null
-  podcastCount?: number | null
-  episodeCount?: number | null
-  /** Libraries discriminate on `type`; scopes and collections on `mediaType`. */
-  type?: string
-  mediaType?: 'books' | 'podcasts'
 }
 
 const props = withDefaults(

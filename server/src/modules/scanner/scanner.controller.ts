@@ -4,14 +4,12 @@ import { Controller, DefaultValuePipe, Get, HttpCode, HttpStatus, Param, ParseIn
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { RequireLibraryType } from '../../common/decorators/require-library-type.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { RegexMetadataReapplyService } from './regex-metadata-reapply.service';
 import { ScannerService } from './scanner.service';
 
 @Controller('scanner')
-@RequireLibraryType('books')
 export class ScannerController {
   constructor(
     private readonly scannerService: ScannerService,

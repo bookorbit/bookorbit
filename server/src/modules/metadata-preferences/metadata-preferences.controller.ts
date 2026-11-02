@@ -2,7 +2,6 @@ import { Controller, Body, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { Permission } from '@bookorbit/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { RequireLibraryType } from '../../common/decorators/require-library-type.decorator';
 import { UpdateGlobalPreferencesDto } from './dto/update-global-preferences.dto';
 import { UpdateLibraryOverridesDto } from './dto/update-library-overrides.dto';
 import { MetadataPreferencesService } from './metadata-preferences.service';
@@ -24,14 +23,12 @@ export class MetadataPreferencesController {
   }
 
   @Get('libraries/:id')
-  @RequireLibraryType('books')
   getForLibrary(@Param('id', ParseIntPipe) id: number) {
     return this.service.getForLibrary(id);
   }
 
   @Put('libraries/:id')
   @HttpCode(HttpStatus.OK)
-  @RequireLibraryType('books')
   setLibraryOverrides(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLibraryOverridesDto) {
     return this.service.setLibraryOverrides(id, dto.overrides);
   }
@@ -44,7 +41,6 @@ export class MetadataPreferencesController {
 
   @Delete('libraries/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequireLibraryType('books')
   resetLibraryToGlobal(@Param('id', ParseIntPipe) id: number) {
     return this.service.resetLibraryToGlobal(id);
   }

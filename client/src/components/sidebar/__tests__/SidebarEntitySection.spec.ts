@@ -8,11 +8,8 @@ const sections = reactive<Record<SidebarSectionId, { open: boolean; cap?: Sideba
   reading: { open: true },
   browse: { open: true },
   libraries: { open: true, cap: 8 },
-  podcasts: { open: true, cap: 8 },
   smartScopes: { open: true, cap: 8 },
   collections: { open: true, cap: 8 },
-  podcastScopes: { open: true, cap: 8 },
-  podcastCollections: { open: true, cap: 8 },
 })
 
 vi.mock('@/composables/useSidebarPrefs', () => ({
@@ -130,24 +127,20 @@ describe('SidebarEntitySection', () => {
       return mountSection(0, { items: [{ id: 1, displayOrder: 0, name: 'Library', icon: null, ...item }] })
     }
 
-    it('counts books for a book library', () => {
-      expect(rowNames(mountRow({ type: 'books', bookCount: 7 }))).toEqual(['Library7'])
-    })
-
-    it('counts shows for a podcast library, which holds no books', () => {
-      expect(rowNames(mountRow({ type: 'podcasts', bookCount: 0, podcastCount: 2 }))).toEqual(['Library2'])
+    it('counts books for a library', () => {
+      expect(rowNames(mountRow({ bookCount: 7 }))).toEqual(['Library7'])
     })
 
     it('renders no badge when the entity carries no count', () => {
-      expect(rowNames(mountRow({ type: 'podcasts', bookCount: 0, podcastCount: null }))).toEqual(['Library'])
+      expect(rowNames(mountRow({ bookCount: null }))).toEqual(['Library'])
     })
   })
 
   describe('activity', () => {
     const scanning = { pct: 42, barWidth: '42%', label: '42 of 100 files' }
     const libraries = [
-      { id: 1, displayOrder: 0, name: 'Novels', icon: null, type: 'books', bookCount: 7 },
-      { id: 2, displayOrder: 1, name: 'Comics', icon: null, type: 'books', bookCount: 3 },
+      { id: 1, displayOrder: 0, name: 'Novels', icon: null, bookCount: 7 },
+      { id: 2, displayOrder: 1, name: 'Comics', icon: null, bookCount: 3 },
     ]
 
     it('replaces the count with the run percentage and adds its progress line', () => {

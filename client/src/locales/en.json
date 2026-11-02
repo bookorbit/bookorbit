@@ -1731,8 +1731,7 @@
         "hardcover": "Hardcover",
         "admin": "Admin",
         "system": "System",
-        "account": "Account",
-        "podcasts": "Podcasts"
+        "account": "Account"
       }
     },
     "integrations": {
@@ -4799,7 +4798,6 @@
       "presetClearAll": "Clear All",
       "permissionGroups": {
         "content": "Content",
-        "podcasts": "Podcasts",
         "devicesAccess": "Devices & Access",
         "email": "Email",
         "administration": "Administration",
@@ -5400,8 +5398,6 @@
       "User": "User",
       "Library": "Library",
       "Book": "Book",
-      "Podcast": "Podcast",
-      "PodcastEpisode": "Podcast episode",
       "Collection": "Collection",
       "SmartScope": "Smart scope",
       "BookDockFile": "Book Dock file",
@@ -5468,17 +5464,6 @@
       "LibraryBulkRename": "Rename library files",
       "LibraryRecomputeAddedAt": "Recompute date added",
       "LibraryReapplyRegexMetadata": "Apply path rules to existing books",
-      "PodcastCreate": "Create podcast",
-      "PodcastUpdate": "Update podcast",
-      "PodcastArchive": "Archive podcast",
-      "PodcastRestore": "Restore podcast",
-      "PodcastPurge": "Purge podcast",
-      "PodcastMerge": "Merge podcasts",
-      "PodcastDownload": "Download podcast episode",
-      "PodcastDownloadRemove": "Remove podcast download",
-      "PodcastRetentionUpdate": "Update podcast retention",
-      "PodcastOpmlImport": "Import podcast OPML",
-      "PodcastOpmlExport": "Export podcast OPML",
       "BookUpload": "Upload book",
       "BookMetadataUpdate": "Update book metadata",
       "BookMetadataLocksUpdate": "Update metadata locks",
@@ -7711,10 +7696,12 @@
           "migration": "Imported from Audiobookshelf",
           "manual": "Edited in BookOrbit",
           "manualBy": "Edited by {name} {when}",
+          "readAlong": "From the read-along narration in the EPUB, view only",
           "none": "No chapters yet"
         },
         "youAreHere": "You are here",
         "playFrom": "Listen from {title}",
+        "openInReader": "Open {title} in the reader",
         "selectRow": "Select chapter {index}",
         "selectedCount": "{count, plural, one {# selected} other {# selected}}",
         "selectAll": "Select all",
@@ -9805,7 +9792,6 @@
     },
     "createDialog": {
       "title": "New Collection",
-      "podcastTitle": "New Podcast Collection",
       "namePlaceholder": "e.g. Favorites"
     },
     "editDialog": {
@@ -9939,30 +9925,6 @@
       "seeAllLibraries": "See all libraries ({count})",
       "seeAllSmartScopes": "See all smart scopes ({count})",
       "seeAllCollections": "See all collections ({count})",
-      "podcasts": "Podcasts",
-      "newPodcastLibrary": "New Podcast Library",
-      "noPodcastLibraries": "No podcast libraries yet",
-      "filterPodcastLibraries": "Filter podcast libraries",
-      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
-      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
-      "podcastScopes": "Podcast Scopes",
-      "newPodcastScope": "New Podcast Scope",
-      "noPodcastScopes": "No podcast scopes yet",
-      "filterPodcastScopes": "Filter podcast scopes",
-      "filterPodcastScopesPlaceholder": "Filter podcast scopes...",
-      "seeAllPodcastScopes": "See all podcast scopes ({count})",
-      "podcastCollections": "Podcast Collections",
-      "newPodcastCollection": "New Podcast Collection",
-      "noPodcastCollections": "No podcast collections yet",
-      "filterPodcastCollections": "Filter podcast collections",
-      "filterPodcastCollectionsPlaceholder": "Filter podcast collections...",
-      "seeAllPodcastCollections": "See all podcast collections ({count})",
-      "queue": "Queue",
-      "mode": {
-        "books": "Books",
-        "podcasts": "Podcasts",
-        "switcherAria": "Switch between books and podcasts"
-      },
       "updateAvailable": "Update {version}",
       "updateTooltip": "{version} update available",
       "openUpdateRelease": "Open the {version} release on GitHub",
@@ -9990,15 +9952,7 @@
         "hide": "Hide",
         "alwaysShown": "{name} is always shown",
         "returnsWithWork": "Shows when work is waiting"
-      },
-      "podcastImportProgress": "{processed} / {total} files",
-      "podcastImportCounting": "Counting files…",
-      "playlists": "Smart Playlists",
-      "newPlaylist": "New Smart Playlist",
-      "noPlaylists": "No smart playlists yet",
-      "filterPlaylists": "Filter smart playlists",
-      "filterPlaylistsPlaceholder": "Filter smart playlists...",
-      "seeAllPlaylists": "See all smart playlists ({count})"
+      }
     },
     "selectionActionBar": {
       "setReadingStatus": "Set reading status",
@@ -10156,11 +10110,6 @@
       "description": "This {entity} doesn't exist or has been deleted.",
       "goBack": "Go back"
     },
-    "media": {
-      "volume": "Volume",
-      "mute": "Mute",
-      "unmute": "Unmute"
-    },
     "themePicker": {
       "light": "Light",
       "dark": "Dark",
@@ -10209,8 +10158,7 @@
       "sort": {
         "custom": "Custom order",
         "name": "Name",
-        "bookCount": "Book count",
-        "showCount": "Show count"
+        "bookCount": "Book count"
       },
       "ascending": "Ascending",
       "descending": "Descending",
@@ -10219,9 +10167,7 @@
       "noMatches": "No matches",
       "noMatchesHint": "Try a different search term.",
       "bookCount": "Books: {count}",
-      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Create a library to start adding books.",
-      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
       "collectionsEmptyHint": "Collections group books you pick by hand."
     },
@@ -10315,7 +10261,6 @@
       "empty": {
         "continueReading": "No books in progress yet. Start reading one to see it here.",
         "continueListening": "No audiobooks in progress yet. Start listening to one to see it here.",
-        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "No books marked want to read yet.",
         "upNextInSeries": "No next-in-series picks yet. Finish a volume to surface the next one.",
         "recentlyAdded": "No books in your library yet.",
@@ -10348,7 +10293,6 @@
         "recentlyAdded": "Recently Added",
         "continueReading": "Continue Reading",
         "continueListening": "Continue Listening",
-        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Want to Read",
         "upNextInSeries": "Up Next in Series",
         "random": "Discover Something New",
@@ -10987,12 +10931,6 @@
   "errors": {
     "network": "Could not reach BookOrbit. Check your connection, then try again.",
     "codes": {
-      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
-      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
-      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
-      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
-      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
-      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room.",
       "CHAPTERS_STALE": "Someone else changed these chapters. Reload to see their version.",
       "CHAPTERS_EMPTY_TITLE": "Every chapter needs a title.",
       "CHAPTERS_FIRST_NOT_ZERO": "The first chapter has to start at 0:00.",
@@ -11273,16 +11211,6 @@
           "more": "More icons"
         },
         "identity": "Identity",
-        "podcastName": "Podcast library name",
-        "podcastPlaceholder": "My Podcasts",
-        "podcastDefaultName": "Podcasts",
-        "type": {
-          "title": "Library type",
-          "books": "Books",
-          "booksHint": "Ebooks, comics, and audiobooks",
-          "podcasts": "Podcasts",
-          "podcastsHint": "RSS feeds and managed episode storage"
-        },
         "cover": {
           "portraitTitle": "Portrait 2:3",
           "portraitHint": "Ebooks and mixed libraries",
@@ -11307,9 +11235,7 @@
         "browseDescription": "Select one or more folders without leaving the browser.",
         "selectedTitle": "Selected folders",
         "addFolders": "Add folders",
-        "manualEntry": "Enter a path manually",
         "absolutePath": "Absolute server path",
-        "addFolder": "Add folder",
         "removeFolder": "Remove {folder}",
         "manualCheckHint": "Manual paths are checked together with the rest of the selected folders.",
         "pathPlaceholder": "/path/to/books",
@@ -11323,26 +11249,14 @@
         "runPrescanHint": "Run a prescan to validate paths before saving.",
         "scanning": "Scanning…",
         "prescan": "Prescan",
-        "local": {
-          "title": "Existing podcast folders",
-          "optional": "Optional",
-          "description": "Folders you already keep podcasts in. BookOrbit reads them where they are, and never renames, moves, or deletes anything inside.",
-          "addTitle": "Add an existing podcast folder",
-          "addDescription": "Every folder directly inside becomes a show.",
-          "add": "Add another folder",
-          "remove": "Remove {folder}"
-        },
         "listTitle": "Folders",
-        "storageTitle": "Storage folder",
         "matchingFiles": "{count, plural, one {# matching file} other {# matching files}}",
         "bookCount": "{count, plural, one {# book} other {# books}}",
         "checkAll": "Check folders again",
         "checkAgain": "Check {folder} again",
         "checkHint": "Each folder is checked as soon as you add it. A folder another library already reads is flagged, because both libraries would import the same files.",
         "emptyHint": "Paste a server path below, or browse for one.",
-        "emptyPodcastHint": "Choose where downloaded podcast episodes will be stored.",
         "pastePlaceholder": "Paste a server path, e.g. /books/Sci-Fi",
-        "pastePodcastPlaceholder": "Paste a server path, e.g. /podcasts",
         "browse": "Browse...",
         "status": {
           "checking": "Checking",
@@ -11816,8 +11730,6 @@
         "metadataFile": "{format} leads · Book file first",
         "metadataOpf": "{format} leads · metadata.opf first",
         "reading": "Started {start} · Finished {finish}",
-        "watching": "Watching folders",
-        "notWatching": "Not watching",
         "watchingScheduled": "Watching · {schedule}",
         "watchingOnly": "Watching · No schedule",
         "scheduledOnly": "Not watching · {schedule}",
@@ -11835,8 +11747,6 @@
         "nameRequired": "Enter a library name.",
         "iconRequired": "Choose an icon.",
         "folderRequired": "Add at least one folder.",
-        "podcastStorageFolder": "Choose exactly one storage folder for podcasts.",
-        "podcastFolderOverlap": "Existing podcast folders must sit outside the storage folder.",
         "cronInvalid": "Enter a valid 5-field cron expression.",
         "readingStartRange": "Reading start must be between 0.05% and 5%.",
         "fileSizeRange": "File-size limits must be whole numbers from 1 to 10,000 MB.",
@@ -11876,10 +11786,7 @@
     },
     "folderBrowser": {
       "title": "Choose folders",
-      "titleStorage": "Choose a storage folder",
       "subtitle": "For {name} · {mode}",
-      "subtitleStorage": "For {name} · one folder; each show gets its own folder inside",
-      "subtitleLocal": "For {name} · folders that already hold episodes",
       "unnamedLibrary": "the new library",
       "close": "Close",
       "mode": {
@@ -11936,7 +11843,6 @@
         "expand": "Expand {name}",
         "collapse": "Collapse {name}",
         "select": "Select {name}",
-        "use": "Use {name}",
         "readsThis": "{name} reads this folder",
         "thisLibrary": "This library",
         "librariesInside": "{names} {count, plural, one {reads a folder} other {read folders}} inside",
@@ -11952,30 +11858,24 @@
       },
       "count": {
         "books": "{count, plural, one {# book} other {# books}}",
-        "episodes": "{count, plural, one {# episode} other {# episodes}}",
         "atLeast": "{count}+",
         "more": "+{count} more"
       },
       "plan": {
         "label": "What this library will read",
         "willRead": "{name} will read",
-        "storage": "Episodes will download to",
         "newFolders": "{count, plural, one {# new folder} other {# new folders}}",
         "already": "already · {books}",
         "emptyTitle": "Nothing picked yet",
         "emptyHint": "Tick folders in the tree. A ticked folder brings everything inside it.",
-        "emptyStorageTitle": "No folder chosen yet",
-        "emptyStorageHint": "Tick one folder in the tree, or make a new one.",
         "rowSize": "{books} · {size}",
         "show": "Show {name} in the tree",
         "showTitle": "Show in the tree",
         "remove": "Remove {name}",
-        "empty": "Empty",
         "fit": {
           "folder": "Each folder holds one book.",
           "file": "Each file is one book.",
-          "empty": "Empty for now.",
-          "storage": "Empty: a clean place for episodes."
+          "empty": "Empty for now."
         },
         "attention": {
           "containsOne": "Contains {folder}, which {library} reads. Those books would be in two libraries.",
@@ -11985,7 +11885,6 @@
           "merge": "{count, plural, one {# folder here holds} other {# folders here hold}} several books: as Folder as Book each becomes 1 book.",
           "split": "{count, plural, one {# audiobook here is} other {# audiobooks here are}} in parts: as File as Book each part becomes its own book.",
           "locked": "Organization is fixed once a library exists.",
-          "notEmpty": "Not empty: episodes would sit beside {what}. An empty folder keeps them apart.",
           "leaveOutOne": "Leave out {folder}",
           "leaveOutMany": "Leave them out",
           "remove": "Remove",
@@ -11998,13 +11897,8 @@
         "preview": {
           "label": "Looking at",
           "ticks": "{key} ticks it",
-          "use": "Use this",
           "wouldAdd": "Would add {books} · {size}",
           "empty": "Empty for now",
-          "holds": "Holds {what}",
-          "storageEmpty": "Empty: a clean place for episodes",
-          "storageTip": "Episodes would sit beside what is here. An empty folder keeps them apart.",
-          "storageFine": "Each show gets its own folder inside.",
           "merge": "Several books share a folder here: as Folder as Book each such folder is 1 book.",
           "split": "Audiobooks in parts: as File as Book each part is its own book."
         },
@@ -12018,11 +11912,7 @@
           "folderTitle": "Each folder that holds books is one book",
           "fileTitle": "Each file is one book",
           "locked": "{mode}, fixed since {name} was created"
-        },
-        "holdsBooks": "{count, plural, one {# book} other {# books}}",
-        "holdsEpisodes": "{count, plural, one {# episode} other {# episodes}}",
-        "holdsFolders": "{count, plural, one {# folder} other {# folders}}",
-        "holdsBoth": "{books} and {folders}"
+        }
       },
       "reason": {
         "denied": "BookOrbit can't read this folder. Give the user BookOrbit runs as read access, then reopen it.",
@@ -12053,7 +11943,6 @@
         "addCount": "Add {count, plural, one {# folder} other {# folders}}",
         "addShort": "Add",
         "addShortCount": "Add {count}",
-        "use": "Use folder",
         "nothingPicked": "Nothing picked yet",
         "seePlan": "See the plan"
       },
@@ -13065,6 +12954,8 @@
     "period": {
       "year": "Year",
       "allTime": "All time",
+      "newerYears": "Show newer years",
+      "olderYears": "Show older years",
       "quarterGroup": "Quarter",
       "quarter": "Q{quarter}",
       "quarterYear": "Q{quarter} {year}"
@@ -13463,7 +13354,6 @@
     },
     "createDialog": {
       "title": "New Smart Scope",
-      "podcastTitle": "New Smart Playlist",
       "createFailed": "Failed to create Smart Scope"
     },
     "saveAsDialog": {
@@ -13494,7 +13384,6 @@
     },
     "errors": {
       "load": "Failed to load your smart scopes",
-      "loadEpisodes": "Failed to load episodes for this smart playlist",
       "save": "Failed to save the smart scope",
       "delete": "Failed to delete the smart scope",
       "reorder": "Failed to reorder smart scopes",
@@ -14292,7 +14181,6 @@
       "retry": "Retry"
     },
     "bookView": {
-      "sort": "Sort",
       "sortOn": "On",
       "resetSort": "Reset sort to default",
       "shuffle": "Shuffle",
@@ -14442,35 +14330,6 @@
         "noMatchHint": "Try adjusting the filter rules.",
         "edit": "Edit SmartScope"
       }
-    },
-    "podcastScope": {
-      "title": "Smart playlist",
-      "entity": "smart playlist",
-      "loadFailed": "Could not load episodes for this playlist.",
-      "loadMoreFailed": "Could not load more episodes.",
-      "retry": "Retry",
-      "editRules": "Edit rules",
-      "saveFailed": "Could not save the playlist rules.",
-      "deleteFailed": "Could not delete this playlist.",
-      "empty": {
-        "title": "No matching episodes",
-        "hint": "Adjust the rules to match more episodes."
-      }
-    },
-    "podcastCollection": {
-      "title": "Podcast collection",
-      "entity": "podcast collection",
-      "loadFailed": "Could not load shows in this collection.",
-      "remove": "Remove",
-      "removeAria": "Remove {name} from this collection",
-      "removed": "Removed {name}",
-      "removeFailed": "Could not remove that show.",
-      "empty": {
-        "title": "No shows yet",
-        "hint": "Add shows to this collection from a podcast library."
-      },
-      "loadMoreFailed": "Could not load more shows.",
-      "retry": "Retry"
     }
   },
   "whatsNew": {
@@ -14503,825 +14362,9 @@
     "previousImage": "Previous image",
     "nextImage": "Next image"
   },
-  "podcast": {
-    "actions": {
-      "add": "Add",
-      "cancel": "Cancel",
-      "save": "Save",
-      "play": "Play",
-      "pause": "Pause",
-      "playEpisode": "Play episode",
-      "listen": "Listen",
-      "remove": "Remove",
-      "episodeActions": "Episode actions",
-      "removeFromQueue": "Remove from queue",
-      "addToQueue": "Add to queue",
-      "playNext": "Play next",
-      "retryDownload": "Retry download",
-      "download": "Download",
-      "removeDownload": "Remove download",
-      "markUnplayed": "Mark unplayed",
-      "markPlayed": "Mark played",
-      "follow": "Follow",
-      "unfollow": "Unfollow",
-      "followPodcast": "Follow podcast",
-      "unfollowPodcast": "Unfollow podcast",
-      "resume": "Resume",
-      "playLatest": "Play latest",
-      "moveToTop": "Move to top",
-      "playFromHere": "Play from here",
-      "moveDown": "Move down",
-      "clearQueue": "Clear queue",
-      "clearAll": "Clear all",
-      "search": "Search",
-      "clearPlayed": "Clear played",
-      "downloadSelected": "Download selected",
-      "removeSelectedDownloads": "Remove selected downloads",
-      "markSelectedPlayed": "Mark selected played",
-      "removeSelectedFromQueue": "Remove selected from queue",
-      "selectEpisode": "Select {title}",
-      "playNamedEpisode": "Play {title}",
-      "listenToEpisode": "Listen to {title}",
-      "resumeEpisode": "Resume {title}",
-      "playLatestEpisode": "Play latest episode {title}",
-      "episodeDetails": "Episode details",
-      "episodeDetailsNamed": "Episode details for {title}",
-      "editEpisodeMetadata": "Edit metadata",
-      "openFullPlayer": "Open full player",
-      "reorderEpisode": "Reorder {title}",
-      "playAll": "Play all",
-      "resumeNamed": "Resume {title}",
-      "queueAll": "Queue all",
-      "markAllPlayed": "Mark all played",
-      "latestCount": "Latest {count}",
-      "downloadLatest": "Download latest",
-      "removeAllDownloads": "Remove all downloads",
-      "pin": "Pin",
-      "unpin": "Unpin",
-      "pinEpisode": "Pin episode",
-      "unpinEpisode": "Unpin episode"
-    },
-    "status": {
-      "nowPlaying": "Now playing",
-      "paused": "Paused",
-      "downloaded": "Downloaded",
-      "downloadQueued": "Download queued",
-      "downloading": "Downloading",
-      "downloadFailed": "Download failed",
-      "unavailable": "Unavailable",
-      "played": "Played",
-      "following": "Following",
-      "playbackProgress": "Playback progress",
-      "downloadProgress": "Download progress",
-      "removedFromFeed": "No longer in feed",
-      "inQueue": "In queue",
-      "feedFailing": "Feed failing",
-      "archived": "Archived",
-      "localShow": "Local",
-      "localShowDescription": "This show has no feed. Its episodes are the files in its folder.",
-      "missing": "Missing",
-      "missingDescription": "This show's folder is no longer on disk. It is kept here in case the folder comes back; delete the show to remove it for good."
-    },
-    "selection": {
-      "select": "Select",
-      "selectAll": "Select all",
-      "count": "{count} selected",
-      "toggleShow": "Select {title}"
-    },
-    "bulkDelete": {
-      "title": "Delete selected shows",
-      "action": "Delete",
-      "confirmPhrase": "DELETE",
-      "description": "This permanently deletes {count} shows and everything BookOrbit knows about them, including your listening history. This cannot be undone.",
-      "descriptionWithFiles": "This permanently deletes {count} shows, everything BookOrbit knows about them, and {size} of downloaded files. Your own folders are never touched. This cannot be undone.",
-      "queued": "Deleting {count} shows",
-      "queuedWithFailures": "Deleting {count} shows, {failed} could not be started",
-      "errors": {
-        "prepare": "Could not work out what deleting these shows would remove",
-        "delete": "Could not delete the selected shows"
-      }
-    },
-    "views": {
-      "queue": "Queue"
-    },
-    "labels": {
-      "episodeCount": "{count} episodes",
-      "unknownPublisher": "Unknown publisher",
-      "durationHoursMinutes": "{hours}h {minutes}m",
-      "durationMinutes": "{minutes}m",
-      "durationSeconds": "{seconds}s",
-      "durationUnavailable": "Duration unavailable",
-      "unknownDate": "Unknown date",
-      "seasonEpisode": "S{season} E{episode}",
-      "season": "S{season}",
-      "episode": "E{episode}",
-      "episodeTypeTrailer": "Trailer",
-      "episodeTypeBonus": "Bonus",
-      "pinnedHint": "Pinned episodes are protected from storage retention removal.",
-      "explicit": "Explicit",
-      "lastListened": "Listened {time}",
-      "timeLeft": "{time} left",
-      "remainingClock": "-{time}",
-      "pinnedEpisode": "Pinned episode",
-      "newEpisodeCount": "{count} new",
-      "unplayedShort": "{count} unplayed"
-    },
-    "acquisition": {
-      "title": "Automatic downloads",
-      "never": "Never",
-      "newEpisodes": "New episodes",
-      "recentEpisodes": "Recent episodes",
-      "maximumNewest": "Maximum newest episodes",
-      "publishedWithinDays": "Published within the last (days)",
-      "remoteDescription": "Stream episodes by default. You can still download individual episodes for offline listening.",
-      "newestDescription": "Automatically download the selected number of newest episodes that are not already stored or queued. Saving this rule also checks episodes already in the feed.",
-      "windowDescription": "Download existing and newly discovered episodes published in this period. Episodes without a publication date are skipped. Changing this rule does not remove older downloads, but storage retention can remove unpinned downloads when space is needed."
-    },
-    "cleanup": {
-      "title": "Delete after listening",
-      "keep": "Keep downloads",
-      "afterFinished": "Delete after finished",
-      "delayHours": "Delete this many hours after the last listener finishes",
-      "keepDescription": "Downloaded episodes stay on disk until storage retention needs the space.",
-      "afterFinishedDescription": "Delete a downloaded episode once every listener who started it has finished it and the delay has passed. Marking it unplayed, pinning it, or putting it back in a queue during that window cancels the deletion."
-    },
-    "player": {
-      "miniPlayer": "Podcast mini player",
-      "openFullPlayer": "Open full player",
-      "expandMiniPlayer": "Expand mini player",
-      "collapseMiniPlayer": "Collapse to compact player",
-      "stopAndClose": "Stop and close player",
-      "sleepActive": "Sleep timer active: {value}",
-      "previousEpisode": "Previous episode",
-      "nextEpisode": "Next episode",
-      "backSeconds": "Back {count} seconds",
-      "forwardSeconds": "Forward {count} seconds",
-      "episodePosition": "Episode position",
-      "toggleTimeDisplay": "Toggle remaining and total time",
-      "positionValue": "{elapsed} elapsed of {duration}",
-      "playingAnnouncement": "Playing {title} from {podcast}",
-      "pausedAnnouncement": "Paused {title} from {podcast}",
-      "volume": "Volume",
-      "positionValueWithChapter": "{elapsed} elapsed of {duration}, chapter {chapter}"
-    },
-    "bookmarks": {
-      "title": "Bookmarks",
-      "empty": "No bookmarks",
-      "closeForm": "Close bookmark form",
-      "saveAt": "Save at {time}",
-      "titlePlaceholder": "Bookmark title",
-      "notePlaceholder": "Optional note",
-      "save": "Save bookmark",
-      "edit": "Edit bookmark",
-      "delete": "Delete bookmark",
-      "titleLabel": "Bookmark title",
-      "noteLabel": "Bookmark note",
-      "editTitleLabel": "Edit bookmark title",
-      "editNoteLabel": "Edit bookmark note",
-      "defaultTitle": "Bookmark at {time}"
-    },
-    "library": {
-      "episodes": "Episodes",
-      "shows": "Shows",
-      "latest": "Latest",
-      "inProgress": "In progress",
-      "unplayed": "Unplayed",
-      "finished": "Finished",
-      "health": "Health",
-      "search": "Search podcasts",
-      "clearSearch": "Clear podcast search",
-      "import": "Import",
-      "importOpml": "Import OPML",
-      "importDescription": "Import an OPML subscription list",
-      "addFeed": "Add feed",
-      "settings": "Podcast settings",
-      "views": "Podcast views",
-      "loading": "Loading podcasts...",
-      "noMatchingShows": "No matching shows",
-      "ready": "Your podcast library is ready",
-      "tryDifferentSearch": "Try a different title or publisher.",
-      "readyDescription": "Add an RSS feed or import an OPML file to start building your listening library.",
-      "loadMoreShows": "Load more shows",
-      "upNext": "Up next",
-      "emptyQueue": "Your queue is empty",
-      "emptyQueueDescription": "Add an episode from a show to keep your next listen within easy reach.",
-      "loadMore": "Load more",
-      "lastSuccess": "Last success",
-      "failureCount": "{count} failures: {error}",
-      "unknownError": "Unknown error",
-      "healthy": "Healthy",
-      "noFeeds": "No feeds to monitor",
-      "noFeedsDescription": "Add a podcast feed to see its refresh status here.",
-      "noMatchingEpisodes": "No matching episodes",
-      "noEpisodesLatest": "No episodes yet",
-      "noEpisodesDownloaded": "No downloaded episodes",
-      "noEpisodesInProgress": "No episodes in progress",
-      "noEpisodesUnplayed": "No unplayed episodes",
-      "noEpisodesFinished": "No finished episodes",
-      "noEpisodesPinned": "No pinned episodes",
-      "pinned": "Pinned",
-      "continueListening": "Continue listening",
-      "viewAllContinue": "View all",
-      "noEpisodesDescription": "New episodes from your shows will appear here.",
-      "loadMoreEpisodes": "Load more episodes",
-      "addPodcastFeed": "Add podcast feed",
-      "rssUrl": "RSS feed URL",
-      "preview": "Preview",
-      "addPodcast": "Add podcast",
-      "storage": "Podcast storage",
-      "currentlyUsing": "Currently using {size}",
-      "libraryQuotaGb": "Library quota (GB)",
-      "freeSpaceReserveGb": "Free-space reserve (GB)",
-      "defaultRefreshMinutes": "Default refresh (minutes)",
-      "finishRemainingSeconds": "Finish with seconds remaining",
-      "exportOpml": "Export OPML",
-      "exportDescription": "Export this library as an OPML subscription list",
-      "importOpmlDescription": "Choose an OPML file and the download policy to apply to every feed in it.",
-      "opmlFile": "OPML file",
-      "chooseOpmlFile": "Choose file",
-      "noOpmlFileChosen": "No file chosen",
-      "importPolicyHint": "This applies to every imported feed. You can change it per show afterwards.",
-      "searchShows": "Search shows",
-      "searchEpisodes": "Search episodes",
-      "searchHealth": "Search feed health",
-      "manageFeeds": "Manage feeds",
-      "feedHealth": "Feed health",
-      "feedsNeedAttention": "Feeds need attention",
-      "episodeFilters": "Episode filters",
-      "previewing": "Previewing...",
-      "addingPodcast": "Adding...",
-      "openShow": "Open {title}",
-      "retryFeed": "Refresh {title}",
-      "reparseFeed": "Reparse the stored feed for {title}",
-      "confirmClearQueue": "Remove every queued episode?",
-      "importProgress": "Import progress",
-      "jobsQueued": "{count} queued",
-      "jobsProcessing": "{count} processing",
-      "jobsFailed": "{count} failed",
-      "retryUnhealthy": "Retry unhealthy feeds",
-      "followedOnly": "Following only",
-      "queueDuration": "{duration} total",
-      "confirmClearPlayed": "Remove every played episode from the queue?",
-      "searchQueue": "Search your queue",
-      "noMatchingQueueEpisodes": "No matching queued episodes",
-      "showAllEpisodes": "Show all episodes",
-      "browseShows": "Browse shows",
-      "browseEpisodes": "Browse episodes",
-      "allLoaded": "All {total} loaded",
-      "addFeedDescription": "Search the podcast directory or paste an RSS feed URL, preview the show, then choose how its episodes are acquired.",
-      "searchDirectory": "Search the podcast directory",
-      "searchDirectoryPlaceholder": "Show or publisher name",
-      "searchDirectoryEmpty": "No shows in the directory match that search.",
-      "searchDirectoryHint": "Choose a result to preview it, or paste a feed URL below.",
-      "inLibrary": "In library",
-      "openExistingShow": "Open {title}, already in your library",
-      "pasteFeedUrl": "Or paste a feed URL",
-      "selectAllLoaded": "Select every loaded episode",
-      "reorderLoadedHint": "Reordering applies to the episodes loaded so far.",
-      "retryUnhealthyLoaded": "Retry loaded failing feeds",
-      "manageFeedsUnhealthy": "Manage feeds: failing feeds need attention",
-      "localImportTitle": "Importing podcasts from your folders",
-      "localImportDoneTitle": "Import finished",
-      "localImportCounting": "Looking through your folders…",
-      "localImportProgress": "{processed} of {total} files",
-      "localImportDone": "{processed} files imported",
-      "importingTitle": "Importing your podcasts",
-      "importingHint": "Shows appear here as their files are read."
-    },
-    "import": {
-      "title": "Import local files",
-      "description": "Match audio already in this library's folder to episodes from the feeds you follow.",
-      "placementHint": "Put the files inside this library's folder first. BookOrbit adopts them where they are: nothing is copied, renamed, or moved.",
-      "scan": "Scan for files",
-      "running": "Scanning...",
-      "progress": "{current} of {total} files scanned",
-      "apply": "Import matched files",
-      "applyWithChoices": "Import matched files and your choices",
-      "applied": "Adopted {count} files.",
-      "quota": "{adopt} to adopt, {headroom} of the quota still free",
-      "truncated": "Some lists are shortened. The counts above are complete.",
-      "chooseEpisode": "Choose the episode",
-      "leaveUnresolved": "Leave for later",
-      "noDate": "No date",
-      "fileCount": "{count} files",
-      "subscribe": "Subscribe",
-      "subscribed": "Subscribed",
-      "suggestedFeedsHint": "These folders name a feed you do not follow yet. Subscribe, then scan again to match their files.",
-      "rescanHint": "Scan again to match the files in the folders you just subscribed to.",
-      "duplicateDiffers": "A different file is already attached to this episode",
-      "duplicateSame": "This episode already has this file",
-      "unreadableFolders": "{count} folders could not be read.",
-      "groups": {
-        "matched": "Matched",
-        "ambiguous": "Needs a decision",
-        "unmatched": "No match",
-        "duplicates": "Already attached",
-        "skipped": "Skipped",
-        "suggestedFeeds": "Feeds to subscribe to",
-        "unclaimedFolders": "Folders with no feed"
-      },
-      "signals": {
-        "episode_guid": "Episode ID in the file's tags",
-        "episode_id_suffix": "BookOrbit ID in the file name",
-        "enclosure_file_name": "File name matches the feed's",
-        "title_and_date": "Title and date",
-        "title_and_duration": "Title and length",
-        "manual": "Your choice"
-      },
-      "scopes": {
-        "request": "Show you selected",
-        "folder_suffix": "Show folder name",
-        "feed_url_tag": "Feed address in the file's tags",
-        "feed_sidecar": "Saved feed in the folder",
-        "title_similarity": "Similar show title",
-        "library": "No show identified"
-      },
-      "reasons": {
-        "show_unresolved": "No show could be identified for this file",
-        "no_episode_candidate": "The show matched, but no episode did",
-        "single_fuzzy_signal": "Only one signal pointed at an episode",
-        "multiple_candidates": "Several episodes fit equally well",
-        "empty_file": "The file is empty",
-        "unsupported_format": "Not a supported audio file",
-        "symlink": "Symbolic links are not imported",
-        "unreadable": "The file could not be read",
-        "outside_library_root": "The file resolves outside the library folder",
-        "attach_conflict": "The episode gained a file while the scan was running",
-        "quota_exceeded": "Importing these files would exceed this library's storage quota. Raise the quota or import fewer files."
-      },
-      "sources": {
-        "feed_sidecar": "Saved feed file",
-        "metadata_json": "metadata.json",
-        "feed_url_tag": "File tags"
-      },
-      "errors": {
-        "status": "Failed to read the import status",
-        "start": "Failed to start the import",
-        "subscribe": "Failed to subscribe to this feed",
-        "createLocalShow": "Failed to create a local show from this folder"
-      },
-      "messages": {
-        "subscribed": "Podcast added. Scan again to match its files.",
-        "localShowCreated": "Local show created. Its episodes are being imported.",
-        "localShowUpdated": "Importing the new files in this folder."
-      },
-      "createLocalShow": "Create local show",
-      "addLocalEpisodes": "Add new episodes",
-      "localShowCreated": "Created",
-      "unclaimedFoldersHint": "These folders name no feed. Turn one into a local show and every audio file in it becomes an episode.",
-      "localRescanHint": "Scan again to pick up anything else that changed in the folders you just imported."
-    },
-    "messages": {
-      "podcastAdded": "Podcast added",
-      "feedsQueued": "Queued {count} podcast feeds",
-      "settingsSaved": "Podcast settings saved",
-      "downloadQueued": "Episode download queued",
-      "downloadRemoved": "Episode download removed",
-      "refreshQueued": "Podcast refresh queued",
-      "reparseQueued": "Podcast reparse queued",
-      "mergeQueued": "Podcast merge queued",
-      "showDeleted": "{title} deleted",
-      "queueCleared": "Podcast queue cleared",
-      "playerClosed": "Player closed",
-      "feedsRefreshQueued": "Queued refresh for {count} feeds",
-      "finishedQueueCleared": "Played episodes removed from the queue",
-      "bulkQueueActionCompleted": "Updated {count} selected episodes",
-      "bulkQueueActionFailed": "Updated {completed} episodes, {failed} failed",
-      "bulkQueued": "Queued {completed} episodes; {skipped} were already queued or exceeded the queue limit",
-      "bulkMarkedPlayed": "Marked {count} episodes played",
-      "bulkDownloadsQueued": "Queued {count} episode downloads",
-      "bulkDownloadsRemoved": "Removed {count} episode downloads",
-      "bulkDownloadsRemovedWithFailures": "Removed {completed} downloads; {failed} failed",
-      "queueRestored": "Restored {count} episodes to the queue",
-      "playlistSaved": "Playlist saved",
-      "playlistDeleted": "Playlist deleted",
-      "playlistQueued": "Queued {completed} episodes, skipped {skipped}",
-      "playlistQueueEmpty": "No episodes matched this playlist",
-      "detailsSaved": "Show details saved",
-      "episodeDetailsSaved": "Episode details saved",
-      "artworkUpdated": "Artwork updated",
-      "artworkRemoved": "Custom artwork removed",
-      "localFileDeleted": "Episode file deleted",
-      "opmlOmittedLocalShows": "Left {count} local shows out of the export: OPML can only describe feeds."
-    },
-    "fullPlayer": {
-      "queueNowPlaying": "Now playing #{position} · {count} remaining",
-      "queuedCount": "{count} queued",
-      "mediaUnavailable": "Media unavailable",
-      "streaming": "Streaming",
-      "backToPodcast": "Back to podcast",
-      "loading": "Loading episode...",
-      "tryAgain": "Try again",
-      "nowListening": "Now listening",
-      "retry": "Retry",
-      "restart": "Restart",
-      "durationUnavailable": "Duration unavailable",
-      "previousQueued": "Previous queued episode",
-      "nextQueued": "Next queued episode",
-      "startingPlayback": "Starting playback",
-      "speed": "Speed",
-      "playbackSpeed": "Playback speed",
-      "sleep": "Sleep",
-      "off": "Off",
-      "endOfChapter": "End of chapter",
-      "endOfEpisode": "End of episode",
-      "minutesLeft": "{count}m left",
-      "aboutEpisode": "About this episode",
-      "showLess": "Show less",
-      "showMore": "Show more",
-      "chapters": "Chapters",
-      "previousChapter": "Previous chapter",
-      "nextChapter": "Next chapter",
-      "removeNamedFromQueue": "Remove {title} from queue",
-      "queueClear": "Your queue is clear.",
-      "transcripts": "Transcripts",
-      "transcript": "Transcript",
-      "sleepMinutes": "{count} min",
-      "speedValue": "{rate}x",
-      "cyclePlaybackSpeed": "Cycle playback speed",
-      "choosePlaybackSpeed": "Choose playback speed",
-      "moreSpeeds": "More",
-      "showSpeedOverride": "This speed is remembered for this show.",
-      "clearSpeedOverride": "Use default speed for this show",
-      "extendSleepLabel": "Add {count} more minutes to the sleep timer",
-      "sleepTimer": "Sleep timer",
-      "sleepRemaining": "{count}m",
-      "fineTuneSpeed": "Fine adjustment",
-      "decreaseSpeed": "Decrease playback speed",
-      "increaseSpeed": "Increase playback speed",
-      "extendSleep": "Add {count} min",
-      "bookmarkTooltip": "Bookmark: {title}",
-      "openQueue": "Open queue",
-      "openChapterLink": "Open chapter link for {title}"
-    },
-    "show": {
-      "loading": "Loading podcast...",
-      "noAlerts": "No alerts",
-      "immediate": "Immediate",
-      "dailyDigest": "Daily digest",
-      "weeklyDigest": "Weekly digest",
-      "refreshFeed": "Refresh feed",
-      "refreshInterval": "Refresh interval in minutes",
-      "restore": "Restore",
-      "archive": "Archive",
-      "deletePermanently": "Delete permanently",
-      "mergeSource": "Merge another podcast ID into this show",
-      "queueMerge": "Queue merge",
-      "confirmMerge": "Merge podcast {id} into this podcast? The source podcast will be permanently removed.",
-      "confirmDelete": "Permanently delete {title}, its {episodes} episodes, and all listening state? This cannot be undone.",
-      "confirmDeleteWithDownloads": "Permanently delete {title}, its {episodes} episodes, {files} downloaded files ({size}), and all listening state? This cannot be undone.",
-      "back": "Back",
-      "notificationMode": "Notification frequency",
-      "readMore": "Read more",
-      "searchEpisodes": "Search this show's episodes",
-      "clearEpisodeSearch": "Clear episode search",
-      "episodeFilter": "Episode filter",
-      "episodeSort": "Episode sort order",
-      "newestFirst": "Newest first",
-      "oldestFirst": "Oldest first",
-      "noEpisodes": "No matching episodes",
-      "noEpisodesDescription": "Try another search, filter, or sort order.",
-      "dangerZone": "Danger zone",
-      "dangerZoneActions": "Archive, delete, or merge this feed. Deleting cannot be undone.",
-      "mergeTitle": "Merge duplicate show",
-      "mergeDescription": "Find the source show to merge into this one. The source will be permanently removed.",
-      "searchMergeSource": "Search for a duplicate show",
-      "mergeSelected": "Merge “{title}” into this show",
-      "fromDate": "From",
-      "toDate": "To",
-      "feedFailingTitle": "Feed needs attention",
-      "feedFailingDetail": "{count} consecutive refresh failures. Last successful refresh: {lastSuccess}",
-      "archivedTitle": "This show is archived",
-      "archivedDescription": "Archived shows stop refreshing and do not download new episodes.",
-      "downloadLatestCount": "Number of latest episodes to download",
-      "confirmRemoveAllDownloads": "Remove every downloaded episode for this show? Streamed episodes and listening progress are kept.",
-      "refreshCompleted": "Updated, {count} new episodes",
-      "refreshFailed": "Refresh failed: {error}",
-      "manageTitle": "Manage show",
-      "manageActionsDescription": "Archiving, deleting, and merging are handled separately so routine settings stay safe to change.",
-      "openManageActions": "Archive, delete, or merge",
-      "archiveOrDelete": "Archiving is reversible and keeps every episode. Deleting removes the show, its episodes, and any downloaded files for good.",
-      "deleteRequiresOwner": "Archiving hides this show and stops its refreshes. Only a library owner with permission to delete podcasts can remove it permanently.",
-      "settingsDescription": "Choose how episodes are acquired and how often the feed is checked.",
-      "updatedAgo": "Updated {time}",
-      "checksEvery": "Checks every {time}",
-      "visitWebsite": "Visit website",
-      "backToLibrary": "Back to {library}",
-      "categoryOverflow": "+{count}",
-      "moreCategories": "Show {count} more categories",
-      "allCategories": "All categories",
-      "serial": "Serial",
-      "daysShort": "{count} d",
-      "hoursShort": "{count} h",
-      "minutesShort": "{count} min",
-      "moreActions": "More show actions",
-      "dates": "Dates",
-      "anyDate": "Any",
-      "dateRange": "{from} - {to}",
-      "dateFilter": "Episode publication dates",
-      "clearDates": "Clear dates",
-      "seasonHeader": "Season {season}",
-      "localSettingsHint": "This show has no feed, so it has no refresh or download settings."
-    },
-    "edit": {
-      "title": "Edit details",
-      "description": "Anything you change here is locked so the next feed refresh cannot overwrite it.",
-      "titleLabel": "Show title",
-      "authorLabel": "Publisher",
-      "authorPlaceholder": "Who publishes this show",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "What this show is about",
-      "descriptionHint": "Formatting from the feed is replaced by the plain text you enter here.",
-      "siteUrlLabel": "Website",
-      "siteUrlPlaceholder": "https://example.com/show",
-      "languageLabel": "Language",
-      "languagePlaceholder": "en-us",
-      "categoriesLabel": "Categories",
-      "categoriesPlaceholder": "Add a category and press Enter",
-      "removeCategory": "Remove category {category}",
-      "categoryLimit": "You can keep up to {count} categories.",
-      "explicitLabel": "Explicit",
-      "explicitHint": "Marks this show as containing explicit content.",
-      "artworkTitle": "Artwork",
-      "artworkHint": "PNG, JPEG, WebP, GIF, or AVIF up to 10 MB. Custom artwork replaces the feed image everywhere.",
-      "artworkUrlLabel": "Image address",
-      "artworkUrlPlaceholder": "https://example.com/artwork.png",
-      "chooseImage": "Choose image",
-      "useImage": "Use this image",
-      "removeCustomArtwork": "Remove custom artwork",
-      "lockField": "Lock {field} against feed refreshes",
-      "unlockField": "Unlock {field} so the feed can update it",
-      "willLockField": "{field} will be locked when you save",
-      "willLockHint": "This field will be locked when you save.",
-      "localDescription": "This show has no feed, so your edits are permanent and nothing can overwrite them."
-    },
-    "episodeEdit": {
-      "title": "Edit episode",
-      "description": "Anything you change here is locked so the next feed refresh cannot overwrite it.",
-      "lockHint": "Edited fields are protected from feed updates.",
-      "titleLabel": "Episode title",
-      "subtitleLabel": "Subtitle",
-      "subtitlePlaceholder": "A short line under the title",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "What this episode covers",
-      "descriptionHint": "Formatting from the feed is replaced by the plain text you enter here.",
-      "publishedAtLabel": "Published",
-      "seasonLabel": "Season",
-      "seasonPlaceholder": "2",
-      "episodeLabel": "Episode number",
-      "episodePlaceholder": "14",
-      "episodeTypeLabel": "Episode type",
-      "episodeTypeNone": "Not set",
-      "episodeTypeFull": "Full episode",
-      "episodeTypeTrailer": "Trailer",
-      "episodeTypeBonus": "Bonus",
-      "episodeTypeFromFeed": "{value} (from the feed)",
-      "durationLabel": "Duration",
-      "durationPlaceholder": "Minutes",
-      "durationHint": "In minutes. Leave it empty to remove the duration.",
-      "durationInvalid": "Enter a duration in minutes greater than zero.",
-      "explicitLabel": "Explicit",
-      "explicitHint": "Marks this episode as containing explicit content.",
-      "localHint": "This episode came from a file rather than a feed, so your edits are permanent and nothing can overwrite them."
-    },
-    "errors": {
-      "createBookmark": "Failed to create bookmark",
-      "updateBookmark": "Failed to update bookmark",
-      "deleteBookmark": "Failed to delete bookmark",
-      "feedPreview": "Feed preview failed",
-      "directorySearch": "Directory search is unavailable right now. Paste the feed URL instead.",
-      "invalidEpisodeLimit": "Enter a valid maximum number of episodes",
-      "invalidEpisodeWindow": "Enter a valid recent episode window",
-      "invalidCleanupDelay": "Cleanup delay must be from 0 to 8,760 hours",
-      "addPodcast": "Failed to add podcast",
-      "opmlTooLarge": "OPML files cannot exceed 5 MB",
-      "opmlImport": "OPML import failed",
-      "opmlExport": "OPML export failed",
-      "loadSettings": "Failed to load podcast settings",
-      "invalidStorage": "Storage values must be nonnegative numbers",
-      "invalidRefresh": "Default refresh must be from 5 to 10,080 minutes",
-      "invalidCompletion": "Completion threshold must be from 0 to 3,600 seconds",
-      "saveSettings": "Failed to save podcast settings",
-      "markPlayed": "Failed to mark episode played",
-      "restartEpisode": "Failed to restart episode",
-      "queueDownload": "Failed to queue episode download",
-      "removeDownload": "Failed to remove episode download",
-      "addToQueue": "Failed to add episode to queue",
-      "removeFromQueue": "Failed to remove episode from queue",
-      "loadPodcast": "Failed to load podcast",
-      "loadEpisodes": "Failed to load podcast episodes",
-      "queueNext": "Failed to queue episode next",
-      "follow": "Failed to follow podcast",
-      "unfollow": "Failed to unfollow podcast",
-      "updateEpisode": "Failed to update episode",
-      "refresh": "Failed to queue podcast refresh",
-      "reparse": "Failed to queue podcast reparse",
-      "reparseNoSnapshot": "BookOrbit has no stored copy of this feed yet. Refresh it first.",
-      "updatePodcast": "Failed to update podcast",
-      "archive": "Failed to archive podcast",
-      "prepareDelete": "Failed to prepare the show deletion",
-      "deleteShow": "Failed to delete the show",
-      "restore": "Failed to restore podcast",
-      "merge": "Failed to queue podcast merge",
-      "libraryAccess": "Failed to load library access",
-      "reorderQueue": "Failed to reorder podcast queue",
-      "clearQueue": "Failed to clear podcast queue",
-      "podcastNotFound": "Podcast not found",
-      "loadPodcasts": "Failed to load podcasts",
-      "loadQueue": "Failed to load podcast queue",
-      "loadHealth": "Failed to load feed health",
-      "loadPlaybackSettings": "Failed to load podcast playback settings",
-      "invalidPlaybackRate": "Playback rate must be from 0.5 to 3",
-      "invalidSkipBackward": "Skip backward must be from 5 to 120 seconds",
-      "invalidSkipForward": "Skip forward must be from 5 to 120 seconds",
-      "invalidDateRange": "The start date must be before the end date",
-      "episodeNotFound": "Podcast episode not found",
-      "loadEpisode": "Failed to load podcast episode",
-      "refreshPlaybackContext": "Failed to refresh playback context",
-      "streamUnavailable": "Unable to load this podcast episode",
-      "bulkAction": "Failed to update podcast episodes",
-      "invalidVolume": "Volume must be from 0 to 100 percent",
-      "restoreQueue": "Failed to restore podcast queue",
-      "loadPlaylists": "Failed to load your playlists",
-      "savePlaylist": "Failed to save the playlist",
-      "deletePlaylist": "Failed to delete the playlist",
-      "queuePlaylist": "Failed to queue the playlist",
-      "playlistNameRequired": "Name the playlist before saving it",
-      "playlistLimitReached": "You have reached the saved playlist limit",
-      "playlistDurationRange": "The shortest duration must be below the longest",
-      "updatePinned": "Failed to update pinned state",
-      "titleRequired": "Show title cannot be empty",
-      "episodeTitleRequired": "Episode title cannot be empty",
-      "updateArtwork": "Failed to update artwork",
-      "removeArtwork": "Failed to remove custom artwork"
-    },
-    "settingsPage": {
-      "title": "Podcast settings",
-      "subtitle": "Manage your playback defaults and storage behavior for each podcast library.",
-      "loading": "Loading podcast settings...",
-      "saving": "Saving...",
-      "playbackTitle": "Playback defaults",
-      "playbackDescription": "These preferences follow your account across devices. Playback speeds remembered for individual shows are preserved.",
-      "defaultPlaybackRate": "Default playback speed",
-      "skipBackwardSeconds": "Skip backward (seconds)",
-      "skipForwardSeconds": "Skip forward (seconds)",
-      "playbackSaved": "Podcast playback settings saved",
-      "playbackSaveFailed": "Failed to save podcast playback settings",
-      "libraryTitle": "Library defaults and storage",
-      "libraryDescription": "Choose a podcast library to view its storage limits and default refresh behavior.",
-      "library": "Podcast library",
-      "noLibraries": "You do not have access to a podcast library yet.",
-      "loadingLibrary": "Loading library settings...",
-      "readOnlyLibrary": "Only library owners with podcast retention permission can change these settings.",
-      "showSettingsHint": "Automatic download rules and refresh overrides remain in each show's settings.",
-      "defaultVolume": "Default volume",
-      "gigabytesUnit": "GB"
-    },
-    "queueReorder": {
-      "lifted": "{title} lifted at position {position} of {total}",
-      "moved": "{title} moved to position {position} of {total}",
-      "dropped": "{title} dropped at position {position} of {total}",
-      "cancelled": "Reordering {title} cancelled"
-    },
-    "sort": {
-      "label": "Sort",
-      "showLabel": "Sort shows",
-      "episodeLabel": "Sort episodes",
-      "showTitle": "Title A to Z",
-      "showRecent": "Recently updated",
-      "showUnplayed": "Most unplayed",
-      "shortest": "Shortest first",
-      "longest": "Longest first",
-      "recentlyListened": "Recently listened"
-    },
-    "announce": {
-      "queued": "{title} added to the queue",
-      "queuedNext": "{title} will play next",
-      "unqueued": "{title} removed from the queue",
-      "downloadReady": "{title} finished downloading",
-      "downloadFailed": "{title} failed to download",
-      "evictedSpace": "{title} download removed to free storage",
-      "evictedPlayed": "{title} download removed after listening",
-      "sleepExpired": "Sleep timer ended, playback paused",
-      "sleepExtended": "Sleep timer extended by {count} minutes",
-      "sleepChapterUnavailable": "Sleep timer cancelled, this episode has no chapters"
-    },
-    "shortcuts": {
-      "title": "Podcast keyboard shortcuts",
-      "description": "These work while an episode is loaded. Space and the arrow keys act on the player page or the mini player, and bookmarks can only be added from the player page.",
-      "open": "Keyboard shortcuts",
-      "togglePlayback": "Play or pause",
-      "skipBackward": "Skip backward",
-      "skipForward": "Skip forward",
-      "next": "Next episode",
-      "previous": "Previous episode",
-      "speedDown": "Decrease playback speed",
-      "speedUp": "Increase playback speed",
-      "mute": "Mute or unmute",
-      "volumeUp": "Increase volume",
-      "volumeDown": "Decrease volume",
-      "bookmark": "Add bookmark",
-      "help": "Show this list",
-      "spaceKey": "Space",
-      "groups": {
-        "playback": "Playback",
-        "navigation": "Navigation",
-        "tools": "Tools"
-      }
-    },
-    "playlists": {
-      "title": "Playlists",
-      "builtInLabel": "Built in",
-      "savedLabel": "Saved",
-      "choose": "Choose a playlist",
-      "search": "Search playlist episodes",
-      "summary": "{count} episodes, {duration}",
-      "summaryShortest": "Shortest",
-      "summaryLongest": "Longest",
-      "summaryPublishedWithin": "Published within",
-      "create": "New playlist",
-      "createTitle": "New smart playlist",
-      "editTitle": "Edit smart playlist",
-      "editorDescription": "Choose which episodes this smart playlist collects. The rules are re-evaluated every time you open it, so new episodes appear automatically.",
-      "edit": "Edit rules",
-      "adjustRules": "Adjust rules",
-      "saveAs": "Save as playlist",
-      "save": "Save playlist",
-      "delete": "Delete playlist",
-      "deleteConfirmTitle": "Delete this playlist?",
-      "deleteConfirmDescription": "\"{name}\" and its rules will be removed. The episodes it collects are not affected.",
-      "nameLabel": "Playlist name",
-      "namePlaceholder": "Morning commute",
-      "filterLabel": "Episodes",
-      "sortLabel": "Order",
-      "minDuration": "Shortest (minutes)",
-      "maxDuration": "Longest (minutes)",
-      "publishedWithin": "Published within (days)",
-      "showsLabel": "Shows",
-      "showsDescription": "Leave this empty to include every show in the library.",
-      "searchShows": "Search shows to add",
-      "removeShow": "Remove {title}",
-      "showLimit": "A playlist can target up to {count} shows.",
-      "copyOf": "{name} copy",
-      "empty": "Nothing matches this playlist yet",
-      "emptyDescription": "Adjust the rules, or come back once new episodes arrive.",
-      "builtIn": {
-        "quick": "Quick listens",
-        "continue": "Continue listening",
-        "downloaded": "Downloaded",
-        "fresh": "Fresh this week"
-      },
-      "nameRequired": "Name the playlist before saving it"
-    },
-    "downloadWidget": {
-      "title": "Downloads",
-      "progress": "{completed} of {total} downloaded",
-      "progressWithFailures": "{completed} of {total} downloaded; {failed} failed",
-      "progressWithCancelled": "{completed} of {total} downloaded; {cancelled} cancelled",
-      "complete": "Downloads complete: {count}",
-      "expand": "Expand download progress",
-      "collapse": "Collapse download progress",
-      "overallProgress": "Overall download progress",
-      "unknownPodcast": "Podcast",
-      "unknownEpisode": "Episode",
-      "batchProgress": "{completed} of {total} complete",
-      "dismiss": "Dismiss download progress",
-      "bytes": "{received} of {total}",
-      "episodeProgress": "Download progress for {title}",
-      "status": {
-        "queued": "Queued",
-        "downloading": "Downloading",
-        "completed": "Downloaded",
-        "failed": "Failed",
-        "cancelled": "Cancelled"
-      }
-    },
-    "collections": {
-      "addAction": "Add to collection",
-      "addTitle": "Add to collection",
-      "addDescription": "Choose a podcast collection for {title}.",
-      "added": "Added to {name}",
-      "addFailed": "Could not add the show to that collection.",
-      "createFailed": "Could not create the collection.",
-      "alreadyIn": "Already in this collection",
-      "none": "No podcast collections yet. Create one below.",
-      "newPlaceholder": "Sci-fi podcasts",
-      "newLabel": "New collection name",
-      "create": "Create",
-      "newCollection": "New collection",
-      "existing": "Collections",
-      "inCollection": "In this collection",
-      "showCount": "{count} shows",
-      "removed": "Removed from {name}",
-      "removeFailed": "Could not remove the show from that collection."
-    }
-  },
   "titles": {
     "dashboard": "Dashboard",
     "libraries": "Libraries",
-    "podcastLibraries": "Podcast Libraries",
-    "podcastScope": "Smart Playlist",
-    "podcastCollection": "Podcast Collection",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader Sync",
@@ -15350,9 +14393,6 @@
     "collection": "Collection",
     "author": "Author",
     "book": "Book",
-    "podcasts": "Podcasts",
-    "podcast": "Podcast",
-    "podcastEpisode": "Episode",
     "seriesItem": "Series",
     "appearance": {
       "theme": "Display",
@@ -15587,5 +14627,394 @@
       "tab": "tab"
     },
     "resultCount": "{count, plural, =0 {No results} one {# result} other {# results}}"
+  },
+  "serverText": {
+    "achievements": {
+      "books_finished_1": {
+        "name": "Ink Initiate",
+        "description": "Finish your first book"
+      },
+      "books_finished_2": {
+        "name": "Spine Scout",
+        "description": "Finish 10 books"
+      },
+      "books_finished_3": {
+        "name": "Story Stalwart",
+        "description": "Finish 35 books"
+      },
+      "books_finished_4": {
+        "name": "Grand Archivist",
+        "description": "Finish 100 books"
+      },
+      "pages_read_1": {
+        "name": "First Leaves",
+        "description": "Read 500 pages"
+      },
+      "pages_read_2": {
+        "name": "Chapter Weaver",
+        "description": "Read 5,000 pages"
+      },
+      "pages_read_3": {
+        "name": "Tome Tactician",
+        "description": "Read 25,000 pages"
+      },
+      "pages_read_4": {
+        "name": "Grand Lexicon",
+        "description": "Read 100,000 pages"
+      },
+      "hours_read_1": {
+        "name": "Hour Initiate",
+        "description": "Read for 10 hours"
+      },
+      "hours_read_2": {
+        "name": "Timebound Reader",
+        "description": "Read for 100 hours"
+      },
+      "hours_read_3": {
+        "name": "Chronicle Veteran",
+        "description": "Read for 500 hours"
+      },
+      "hours_read_4": {
+        "name": "Timeless Scholar",
+        "description": "Read for 1,000 hours"
+      },
+      "marathoner": {
+        "name": "Marathoner",
+        "description": "Complete a reading session of 90 minutes or more"
+      },
+      "all_nighter": {
+        "name": "All-nighter",
+        "description": "Read between 1am and 4am"
+      },
+      "early_bird": {
+        "name": "Early Bird",
+        "description": "Start a reading session between 5am and 7am"
+      },
+      "long_book_1": {
+        "name": "Story Stretch",
+        "description": "Finish a book with 300 or more pages"
+      },
+      "page_turner": {
+        "name": "Page Pathfinder",
+        "description": "Finish a book with 500 or more pages"
+      },
+      "long_book_3": {
+        "name": "Epic Voyager",
+        "description": "Finish a book with 750 or more pages"
+      },
+      "tome_tamer": {
+        "name": "Tome Sovereign",
+        "description": "Finish a book with 1,000 or more pages"
+      },
+      "sprint": {
+        "name": "Sprint",
+        "description": "Finish a book in a single day"
+      },
+      "binge_reader": {
+        "name": "Binge Reader",
+        "description": "Finish 3 or more books in a single week"
+      },
+      "library_builder_1": {
+        "name": "Shelf Seed",
+        "description": "Have 50 books in your library"
+      },
+      "library_builder_2": {
+        "name": "Collection Architect",
+        "description": "Have 250 books in your library"
+      },
+      "library_builder_3": {
+        "name": "Stack Sovereign",
+        "description": "Have 1,000 books in your library"
+      },
+      "library_builder_4": {
+        "name": "Library of Alexandria",
+        "description": "Have 5,000 books in your library"
+      },
+      "annotator_1": {
+        "name": "Note Taker",
+        "description": "Create 10 annotations"
+      },
+      "annotator_2": {
+        "name": "Active Annotator",
+        "description": "Create 50 annotations"
+      },
+      "annotator_3": {
+        "name": "Prolific Annotator",
+        "description": "Create 200 annotations"
+      },
+      "annotator_4": {
+        "name": "Master Annotator",
+        "description": "Create 500 annotations"
+      },
+      "multi_format": {
+        "name": "Multi-Format",
+        "description": "Own books in 3 or more different formats"
+      },
+      "curator": {
+        "name": "Curator",
+        "description": "Create 10 or more collections"
+      },
+      "genre_explorer_1": {
+        "name": "Genre Curious",
+        "description": "Finish books in 5 different genres"
+      },
+      "genre_explorer_2": {
+        "name": "Genre Adventurer",
+        "description": "Finish books in 10 different genres"
+      },
+      "genre_explorer_3": {
+        "name": "Genre Connoisseur",
+        "description": "Finish books in 15 different genres"
+      },
+      "genre_explorer_4": {
+        "name": "Genre Master",
+        "description": "Finish books in 20 different genres"
+      },
+      "polyglot_1": {
+        "name": "Bilingual",
+        "description": "Finish books in 2 different languages"
+      },
+      "polyglot_2": {
+        "name": "Trilingual",
+        "description": "Finish books in 3 different languages"
+      },
+      "polyglot_3": {
+        "name": "Multilingual",
+        "description": "Finish books in 5 different languages"
+      },
+      "polyglot_4": {
+        "name": "Polyglot",
+        "description": "Finish books in 7 different languages"
+      },
+      "old_soul": {
+        "name": "Old Soul",
+        "description": "Finish a book published before 1900"
+      },
+      "new_release": {
+        "name": "New Release",
+        "description": "Finish a book published in the current year"
+      },
+      "century_span": {
+        "name": "Century Span",
+        "description": "Finish books from 3 or more different centuries"
+      },
+      "author_deep_dive": {
+        "name": "Author Deep Dive",
+        "description": "Read 5 or more books by the same author"
+      },
+      "streak_1": {
+        "name": "Getting Started",
+        "description": "Maintain a 7-day reading streak"
+      },
+      "streak_2": {
+        "name": "Habitual",
+        "description": "Maintain a 30-day reading streak"
+      },
+      "streak_3": {
+        "name": "Unstoppable",
+        "description": "Maintain a 100-day reading streak"
+      },
+      "streak_4": {
+        "name": "Year-Long Flame",
+        "description": "Maintain a 365-day reading streak"
+      },
+      "year_round_reader": {
+        "name": "Year-Round Reader",
+        "description": "Read in all 12 months of a calendar year"
+      },
+      "reborn": {
+        "name": "Reborn",
+        "description": "Finish a book you had abandoned for over 6 months"
+      },
+      "comeback_kid": {
+        "name": "Comeback Kid",
+        "description": "Resume reading after a 30-day break"
+      },
+      "bookmarked": {
+        "name": "Bookmarked",
+        "description": "Create your first annotation or highlight"
+      },
+      "new_year_reader": {
+        "name": "New Year Reader",
+        "description": "Complete a reading session on January 1st"
+      },
+      "monthly_reader_2": {
+        "name": "Monthly Machine",
+        "description": "Finish 10 books in a single calendar month"
+      },
+      "slow_burn": {
+        "name": "Slow Burn",
+        "description": "Take over 90 days from start to finish a book"
+      },
+      "one_sitting": {
+        "name": "One Sitting",
+        "description": "Cover 90% or more of a book in a single reading session"
+      },
+      "decade_sampler": {
+        "name": "Decade Sampler",
+        "description": "Finish books published in 5 different decades"
+      },
+      "short_story_fan": {
+        "name": "Short Story Fan",
+        "description": "Finish 5 books with fewer than 100 pages"
+      },
+      "thick_and_thin": {
+        "name": "Thick and Thin",
+        "description": "Finish at least one book under 100 pages and one over 800 pages"
+      },
+      "trilogy_master": {
+        "name": "Trilogy Master",
+        "description": "Finish a complete 3-book series"
+      },
+      "genre_devotee": {
+        "name": "Genre Devotee",
+        "description": "Finish 10 books in the same genre"
+      },
+      "seasonal_reader": {
+        "name": "Four Seasons",
+        "description": "Read in all 4 seasons within a single year"
+      },
+      "perfect_month": {
+        "name": "Perfect Month",
+        "description": "Read every day of a calendar month"
+      },
+      "consistent_reader": {
+        "name": "Consistency Is Key",
+        "description": "Read at least 30 minutes every day for 14 consecutive days"
+      },
+      "weekend_rhythm": {
+        "name": "Weekend Rhythm",
+        "description": "Read on 8 consecutive weekends"
+      },
+      "weekend_warrior": {
+        "name": "Weekend Warrior",
+        "description": "Read for 5 or more hours in a single weekend"
+      },
+      "yearly_finisher_12": {
+        "name": "Yearly Closer",
+        "description": "Finish 12 books in a single calendar year"
+      },
+      "note_keeper": {
+        "name": "Note Keeper",
+        "description": "Create 25 annotations that include a note"
+      },
+      "deep_dive_session": {
+        "name": "Deep Dive",
+        "description": "Create 10 annotations in a single day"
+      },
+      "first_series": {
+        "name": "Series Begun",
+        "description": "Finish your first book that belongs to a named series"
+      },
+      "category_sweeper": {
+        "name": "Category Sweeper",
+        "description": "Earn at least one achievement in all 4 categories"
+      },
+      "power_hour": {
+        "name": "Power Hour",
+        "description": "Read 75 or more pages in a single reading session"
+      },
+      "speed_reader": {
+        "name": "Speed Reader",
+        "description": "Read 100 or more pages in a single day"
+      },
+      "old_friend": {
+        "name": "Old Friend",
+        "description": "Finish a book you were re-reading"
+      },
+      "dnf_self_aware": {
+        "name": "It's Not You, It's Me",
+        "description": "Mark a book as abandoned"
+      },
+      "first_verdict": {
+        "name": "First Verdict",
+        "description": "Rate your first book"
+      },
+      "critic_1": {
+        "name": "Fledgling Critic",
+        "description": "Rate 10 books"
+      },
+      "critic_2": {
+        "name": "Seasoned Critic",
+        "description": "Rate 50 books"
+      },
+      "critic_3": {
+        "name": "Esteemed Critic",
+        "description": "Rate 200 books"
+      },
+      "critic_4": {
+        "name": "Definitive Critic",
+        "description": "Rate 500 books"
+      },
+      "standing_ovation": {
+        "name": "Standing Ovation",
+        "description": "Give a book a 5-star rating"
+      },
+      "across_the_board": {
+        "name": "Across the Board",
+        "description": "Use all five star ratings at least once"
+      },
+      "tough_crowd": {
+        "name": "Tough Crowd",
+        "description": "Give 10 books a rating of 2 stars or lower"
+      },
+      "wordsmith": {
+        "name": "Wordsmith",
+        "description": "Write a note longer than 280 characters"
+      },
+      "box_of_crayons": {
+        "name": "Box of Crayons",
+        "description": "Use all 5 highlight colors"
+      },
+      "synced_up": {
+        "name": "Synced Up",
+        "description": "Sync reading progress from a Kobo or KOReader device for the first time"
+      },
+      "full_orbit": {
+        "name": "Full Orbit",
+        "description": "Log reading from three different reading sources"
+      },
+      "two_worlds": {
+        "name": "Two Worlds",
+        "description": "Read the same book from two or more different sources"
+      }
+    },
+    "achievementCategories": {
+      "reading": "Reading",
+      "library": "Library",
+      "exploration": "Exploration",
+      "dedication": "Dedication",
+      "devices": "Devices"
+    },
+    "achievementSecret": {
+      "name": "Secret Achievement",
+      "description": "Keep reading to reveal this achievement."
+    },
+    "monthlyChallenge": {
+      "short-read": {
+        "title": "Quick Read",
+        "description": "Finish a book under 200 pages this month"
+      },
+      "genre-explorer": {
+        "title": "Genre Explorer",
+        "description": "Read a book in a genre new to you this month"
+      },
+      "finish-oldest": {
+        "title": "Clear the Backlog",
+        "description": "Finish your oldest in-progress book"
+      },
+      "streak-builder": {
+        "title": "Streak Builder",
+        "description": "Read for 5 consecutive days this month"
+      },
+      "new-author": {
+        "title": "New Voice",
+        "description": "Read a book by an author new to you this month"
+      },
+      "page-milestone": {
+        "title": "Page Turner",
+        "description": "Read 500 pages this month"
+      }
+    }
   }
 }

@@ -8,16 +8,6 @@ export interface DisplayOrderEntry {
 }
 
 /**
- * Scopes and collections share one displayOrder sequence per user across both media, so a reorder
- * inside one section has to rewrite the whole run: books take the low slots, podcasts follow.
- * Renumbering a single section from zero would collide with the other section's slots, and the
- * server's `(displayOrder, name)` ordering would then silently reshuffle it by name.
- */
-export function mergedMediaOrder(books: Identified[], podcasts: Identified[]): DisplayOrderEntry[] {
-  return [...books, ...podcasts].map((entry, index) => ({ id: entry.id, displayOrder: index }))
-}
-
-/**
  * The reordered entries the user actually owns, in their new order.
  *
  * Shared scopes appear in the list but belong to their owner. The reorder endpoint updates only
@@ -31,28 +21,14 @@ export function ownedInOrder(order: DisplayOrderEntry[], owned: Identified[]): I
 
 export type PersistOrder = (order: DisplayOrderEntry[]) => Promise<void>
 
-interface MediaOrderSources {
-  /** The rows the user may reorder in each medium, read at persist time. */
-  books: () => Identified[]
-  podcasts: () => Identified[]
-  reorder: PersistOrder
-}
-
 /**
- * One persist function per medium for a list whose books and podcasts share a displayOrder run.
- * Each keeps the other medium's current order and rewrites the whole run in one request.
+ * Persists a reordered section: only the rows the user may reorder, read at persist time, and
+ * renumbered from zero with no gaps.
  */
-export function mediaOrderPersisters(sources: MediaOrderSources): { books: PersistOrder; podcasts: PersistOrder } {
-  return {
-    async books(order) {
-      const books = ownedInOrder(order, sources.books())
-      if (books.length === 0) return
-      await sources.reorder(mergedMediaOrder(books, sources.podcasts()))
-    },
-    async podcasts(order) {
-      const podcasts = ownedInOrder(order, sources.podcasts())
-      if (podcasts.length === 0) return
-      await sources.reorder(mergedMediaOrder(sources.books(), podcasts))
-    },
+export function orderPersister(owned: () => Identified[], reorder: PersistOrder): PersistOrder {
+  return async (order) => {
+    const entries = ownedInOrder(order, owned())
+    if (entries.length === 0) return
+    await reorder(entries.map((entry, index) => ({ id: entry.id, displayOrder: index })))
   }
 }

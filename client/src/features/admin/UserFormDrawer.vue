@@ -14,7 +14,7 @@ import {
   X,
   type LucideIcon,
 } from '@lucide/vue'
-import { Permission, type LibraryType } from '@bookorbit/types'
+import { Permission } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import Badge from '@/components/ui/badge/Badge.vue'
@@ -28,7 +28,6 @@ import { useUserForm, type UserFormSection, type UserFormTarget } from './compos
 interface LibraryOption {
   id: number
   name: string
-  type?: LibraryType
   bookCount?: number
 }
 
@@ -187,16 +186,16 @@ const libraryReach = computed(() => {
 })
 
 /**
- * Edit metadata only works on book libraries where the account is Editor or Owner, which is set on
+ * Edit metadata only works on libraries where the account is Editor or Owner, which is set on
  * each library rather than here. Say so wherever that leaves the permission short of the selection.
  */
 const permissionNotes = computed(() => {
   if (isSuperuserTarget.value || !selectedPermissionNames.value.has(Permission.LibraryEditMetadata)) return {}
-  const bookLibraries = props.libraries.filter((library) => library.type !== 'podcasts' && selectedLibraryIds.value.has(library.id))
-  const viewerOnly = bookLibraries.filter((library) => !editorLibraryIds.value.has(library.id))
-  if (bookLibraries.length > 0 && viewerOnly.length === 0) return {}
+  const selectedLibraries = props.libraries.filter((library) => selectedLibraryIds.value.has(library.id))
+  const viewerOnly = selectedLibraries.filter((library) => !editorLibraryIds.value.has(library.id))
+  if (selectedLibraries.length > 0 && viewerOnly.length === 0) return {}
   const note =
-    viewerOnly.length === bookLibraries.length
+    viewerOnly.length === selectedLibraries.length
       ? { text: t('adminFeature.userForm.permissionNotes.editMetadataNowhere'), warning: true }
       : {
           text: t('adminFeature.userForm.permissionNotes.editMetadataExcept', { libraries: formatList(viewerOnly.map((library) => library.name)) }),

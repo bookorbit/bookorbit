@@ -82,36 +82,45 @@ function Pages.listBody(m, f)
 end
 
 -- --------------------------------------------------------------- shelves
--- Libraries, collections and scopes on one page; wide screens set the
--- sections in two columns.
-function Pages.shelvesBody(m, f)
+-- Libraries, collections and scopes. Wide screens set the sections in two
+-- columns; more shelves than a screen holds at a readable row run on to
+-- further pages, a section that continues repeating its heading.
+function Pages.shelvesLayout(m, f)
     local groups = {
         { _("Libraries"), "library", m.libraries or {} },
         { _("Collections"), "folder-open", m.collections or {} },
         { _("SmartScopes"), "aperture", m.scopes or {} },
     }
     local wide = ListView.screenW() >= 760
-    local gap_s = px(14)
-    local columns = wide and { { groups[1] }, { groups[2], groups[3] } } or { groups }
-    local col_w = wide and math.floor((f.w - px(28)) / 2) or f.w
-    local rh = px(72)
-    for _i, cg in ipairs(columns) do
-        local heads, rows = #cg, 0
-        for _j, g in ipairs(cg) do rows = rows + #g[3] end
-        rh = math.min(rh, math.floor((f.content_h - heads * px(36) - (heads - 1) * gap_s) / math.max(1, rows)))
-    end
+    local layout = ListData.shelfPages({ #groups[1][3], #groups[2][3], #groups[3][3] }, {
+        content_h = f.content_h, head_h = px(36), gap = px(14), row_h = px(72), min_row_h = px(56),
+        columns = wide and { { 1 }, { 2, 3 } } or { { 1, 2, 3 } }, cols = wide and 2 or 1,
+    })
+    layout.groups, layout.wide = groups, wide
+    return layout
+end
+
+function Pages.shelvesBody(m, f)
+    local layout = Pages.shelvesLayout(m, f)
+    local page = math.max(1, math.min(#layout.pages, m.local_page or 1))
+    local col_w = layout.wide and math.floor((f.w - px(28)) / 2) or f.w
+    local rh = layout.row_h
     local col_els = {}
-    for _i, cg in ipairs(columns) do
-        local kids = {}
-        for gi, g in ipairs(cg) do
-            if gi > 1 then table.insert(kids, space(nil, gap_s)) end
-            table.insert(kids, ListView.sectionHead(col_w, { icon = g[2], label = g[1], count = #g[3] }))
-            for i, s in ipairs(g[3]) do
-                local inner = vstack({ w = col_w, h = rh }, { i > 1 and ListView.rule(col_w) or false, flex(0), ListView.shelfRow(col_w, rh, s), flex(0) })
-                table.insert(kids, region(inner, { kind = "open-shelf", shelf = s }, "shelf-" .. g[1] .. "-" .. i, "shelf-" .. s.section .. "-" .. tostring(s.id)))
+    for _ci, chunks in ipairs(layout.pages[page]) do
+        if #chunks > 0 then
+            local kids = {}
+            for ki, chunk in ipairs(chunks) do
+                local g = layout.groups[chunk.section]
+                if ki > 1 then table.insert(kids, space(nil, px(14))) end
+                table.insert(kids, ListView.sectionHead(col_w, { icon = g[2], label = g[1], count = #g[3] }))
+                for i = chunk.from, chunk.to do
+                    local s = g[3][i]
+                    local inner = vstack({ w = col_w, h = rh }, { i > chunk.from and ListView.rule(col_w) or false, flex(0), ListView.shelfRow(col_w, rh, s), flex(0) })
+                    table.insert(kids, region(inner, { kind = "open-shelf", shelf = s }, "shelf-" .. g[1] .. "-" .. i, "shelf-" .. s.section .. "-" .. tostring(s.id)))
+                end
             end
+            table.insert(col_els, vstack({ w = col_w }, kids))
         end
-        table.insert(col_els, vstack({ w = col_w }, kids))
     end
     return hstack({ w = f.w, valign = "top", gap = px(28) }, col_els)
 end
@@ -121,8 +130,8 @@ end
 -- with the list alone (landscape keeps the summary column on every page).
 -- A grid shrinks its covers to keep a series on one page only down to three
 -- quarters of the All books size; past that it pages at full size.
-function Pages.seriesLayout(screen_w, screen_h, view, n, offline)
-    local f = ListView.frame(screen_w, screen_h, { toolbar = false, offline = offline })
+function Pages.seriesLayout(screen_w, screen_h, view, n, offline, toolbar)
+    local f = ListView.frame(screen_w, screen_h, { toolbar = toolbar == true, offline = offline })
     local side = BoardMetrics.get().w > BoardMetrics.get().h
     local side_w = side and math.floor(f.w * 0.38 + 0.5) or f.w
     local list_w = side and (f.w - side_w - px(28)) or f.w
@@ -155,7 +164,7 @@ end
 -- puts the summary beside the books.
 function Pages.seriesBody(m, f)
     local all_books = m.entries
-    local layout = Pages.seriesLayout(m.screen_w, m.screen_h, m.view, #all_books, m.offline ~= nil)
+    local layout = Pages.seriesLayout(m.screen_w, m.screen_h, m.view, #all_books, m.offline ~= nil, m.toolbar == true)
     local page = math.max(1, math.min(layout.pages, m.local_page or 1))
     local books = {}
     local start = page == 1 and 1 or (layout.first + (page - 2) * layout.rest + 1)
@@ -255,6 +264,8 @@ function Pages.seriesBody(m, f)
         local short = ListData.distinctTitles(books)
         content = ListView.cellsGrid(list_w, g, books, function(b)
             return ListView.bookCell(g, b, {
+                select = m.select,
+                selected = m.selected and m.selected(b),
                 title = function(x) return x.seriesIndex and (tostring(x.seriesIndex) .. ". " .. (short[x.id] or x.title or "")) or (short[x.id] or x.title or "") end,
                 meta = function(x)
                     local st = ListData.stateOf(x)
@@ -272,7 +283,12 @@ function Pages.seriesBody(m, f)
         content = ListView.indexList(list_w, list_h, {
             entries = books, rows_per_col = rows.n, row_h = rows.rh, cols = 1, gutter = 34, rail = false,
             groupOf = function(b) return "#" .. tostring(b.seriesIndex or "") end, group_rules = false,
-            row = function(w, hh, b) return ListView.bookRow(w, hh, b, { context = "series" }) end, action = m.action,
+            row = function(w, hh, b) return ListView.bookRow(w, hh, b, {
+                select = m.select,
+                selected = m.selected and m.selected(b),
+                context = "series",
+            }) end,
+            action = m.action,
         })
     end
     local list = vstack({ w = list_w }, { head, space(nil, px(8)), content })

@@ -57,8 +57,8 @@ describe('useBookDestination', () => {
     expect(state.hasDestination.value).toBe(true)
   })
 
-  it('uses a cached list immediately and excludes podcast libraries', () => {
-    load([makeLibrary({ id: 1, type: 'podcasts' }), makeLibrary()])
+  it('uses a cached list immediately', () => {
+    load([makeLibrary()])
     const state = destination()
     expect(state.libraries.value.map((library) => library.id)).toEqual([3])
     expect(state.libraryId.value).toBe(3)
@@ -80,7 +80,7 @@ describe('useBookDestination', () => {
     expect(state.folderId.value).toBe(30)
   })
 
-  it.each([[], [makeLibrary({ type: 'podcasts' })], [makeLibrary({ folders: [] })]].map((items) => ({ items })))(
+  it.each([[], [makeLibrary({ folders: [] })]].map((items) => ({ items })))(
     'does not report a destination for an empty library or folder list',
     ({ items }) => {
       load(items)
@@ -110,7 +110,7 @@ describe('useBookDestination', () => {
   })
 
   it('changes folders with the selected library and keeps manual selections after refresh', async () => {
-    const second = makeLibrary({ id: 4, folders: [{ id: 40, path: '/comics', role: 'downloads', createdAt: '2026-01-01' }] })
+    const second = makeLibrary({ id: 4, folders: [{ id: 40, path: '/comics', createdAt: '2026-01-01' }] })
     second.folders.push({ ...second.folders[0]!, id: 41 })
     load([makeLibrary(), second])
     const state = destination()
@@ -183,7 +183,7 @@ describe('useBookDestination', () => {
   })
 
   it('resets both carried IDs when switching Dock files', async () => {
-    load([makeLibrary(), makeLibrary({ id: 4, folders: [{ id: 40, path: '/comics', role: 'downloads', createdAt: '2026-01-01' }] })])
+    load([makeLibrary(), makeLibrary({ id: 4, folders: [{ id: 40, path: '/comics', createdAt: '2026-01-01' }] })])
     const state = destination({ defaultToFirstLibrary: true })
     state.reset(4, 40)
     await nextTick()

@@ -62,7 +62,7 @@ function requestHistory() {
           <Pencil />
           {{ t('settings.admin.libraries.editLibrary') }}
         </DropdownMenuItem>
-        <DropdownMenuItem v-if="library.type !== 'podcasts'" @click="requestDuplicate">
+        <DropdownMenuItem @click="requestDuplicate">
           <Copy />
           {{ t('settings.admin.libraries.duplicateSettings') }}
         </DropdownMenuItem>

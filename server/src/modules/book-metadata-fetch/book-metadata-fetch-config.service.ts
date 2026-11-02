@@ -95,7 +95,6 @@ export class BookMetadataFetchConfigService {
           lastQueuedCount: libraries.bookMetadataFetchLastQueuedCount,
         })
         .from(libraries)
-        .where(eq(libraries.type, 'books'))
         // The sidebar's order, so the tabs read the same way as Field Rules'.
         .orderBy(asc(libraries.displayOrder), asc(libraries.name)),
     ]);
@@ -113,7 +112,7 @@ export class BookMetadataFetchConfigService {
   }
 
   async bookLibraryIds(): Promise<number[]> {
-    const rows = await this.db.select({ id: libraries.id }).from(libraries).where(eq(libraries.type, 'books')).orderBy(asc(libraries.id));
+    const rows = await this.db.select({ id: libraries.id }).from(libraries).orderBy(asc(libraries.id));
     return rows.map((row) => row.id);
   }
 

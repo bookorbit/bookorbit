@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, nextTick, reactive, ref, type PropType } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import type { BookCard, SeriesBooksPage, SeriesDetail } from '@bookorbit/types'
+import type { BookCard, SeriesDetail } from '@bookorbit/types'
 import SeriesDetailView from './SeriesDetailView.vue'
 import SeriesCompletionBar from '../components/SeriesCompletionBar.vue'
 
 const GROUP_BY_MEDIA_STORAGE_KEY = 'bookorbit:series-detail:group-by-media'
 
 class MockIntersectionObserver {
+  static instances: MockIntersectionObserver[] = []
+  constructor() {
+    MockIntersectionObserver.instances.push(this)
+  }
   observe = vi.fn<(target: Element) => void>()
   unobserve = vi.fn<(target: Element) => void>()
   disconnect = vi.fn<() => void>()
@@ -303,6 +307,7 @@ describe('SeriesDetailView', () => {
     mocks.api.mockReset()
     mocks.api.mockResolvedValue({ ok: false })
 
+    MockIntersectionObserver.instances = []
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
   })
 
@@ -541,32 +546,41 @@ describe('SeriesDetailView', () => {
     expect(secondStyle).toBe(style)
   })
 
-  it('ignores stale lead preview responses after route id becomes invalid', async () => {
-    let resolveLeadPreview!: (value: SeriesBooksPage) => void
-    mocks.fetchSeriesBooks.mockImplementationOnce(
-      () =>
-        new Promise<SeriesBooksPage>((resolve) => {
-          resolveLeadPreview = resolve
-        }),
-    )
+  it('keeps its loaded books when the route moves on and back while the view is kept alive', async () => {
+    mountView()
+    await flushPromises()
+    mocks.loadBooks.mockClear()
+    mocks.fetchSeriesBooks.mockClear()
 
-    const wrapper = mountView()
-    await nextTick()
-
-    mocks.route.params.seriesId = 'invalid'
-    await nextTick()
-
-    resolveLeadPreview({
-      items: [makeBook({ id: 7, seriesIndex: '1', hasCover: true })],
-      total: 1,
-      page: 0,
-      size: 8,
-      seriesInfo: makeSeriesInfo(),
-    })
+    mocks.route.params.seriesId = ''
+    await flushPromises()
+    mocks.route.params.seriesId = '99'
+    await flushPromises()
+    mocks.route.params.seriesId = '42'
     await flushPromises()
 
-    expect(mocks.api).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="lead-cover-artwork"]').exists()).toBe(false)
+    expect(mocks.loadBooks).not.toHaveBeenCalled()
+    expect(mocks.fetchSeriesBooks).not.toHaveBeenCalled()
+  })
+
+  it('observes the replacement sentinel when the books section remounts', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    const observer = MockIntersectionObserver.instances[0]!
+    const firstSentinel = wrapper.get('[data-testid="series-books-sentinel"]').element
+    expect(observer.observe).toHaveBeenLastCalledWith(firstSentinel)
+
+    mocks.seriesInfo.value = null
+    await flushPromises()
+    expect(observer.unobserve).toHaveBeenCalledWith(firstSentinel)
+
+    mocks.seriesInfo.value = makeSeriesInfo()
+    await flushPromises()
+
+    const nextSentinel = wrapper.get('[data-testid="series-books-sentinel"]').element
+    expect(nextSentinel).not.toBe(firstSentinel)
+    expect(observer.observe).toHaveBeenLastCalledWith(nextSentinel)
   })
 
   it('loads all books and navigates to edit metadata, preserving the setBookContext when navigating away', async () => {

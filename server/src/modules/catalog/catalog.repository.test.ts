@@ -2,6 +2,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ type: 'and', clauses })),
   desc: vi.fn((value: unknown) => ({ type: 'desc', value })),
   eq: vi.fn((left: unknown, right: unknown) => ({ type: 'eq', left, right })),
+  or: vi.fn((...clauses: unknown[]) => ({ type: 'or', clauses })),
   inArray: vi.fn((column: unknown, values: unknown[]) => ({ type: 'inArray', column, values })),
   isNotNull: vi.fn((value: unknown) => ({ type: 'isNotNull', value })),
   sql: vi.fn((parts: TemplateStringsArray, ...values: unknown[]) => ({ type: 'sql', parts, values })),
@@ -17,7 +18,7 @@ vi.mock('../../common/utils/content-filter-sql.utils', () => ({
   buildContentFilterClauses: vi.fn(() => [{ type: 'contentFilter' }]),
 }));
 
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, or } from 'drizzle-orm';
 
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 import { accentInsensitiveExactMatchRank, accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
@@ -172,13 +173,14 @@ describe('CatalogRepository', () => {
     expect(buildContentFilterClauses).not.toHaveBeenCalled();
   });
 
-  it('keeps collection lookup user-scoped and wildcard-safe', async () => {
+  it('searches owned and public collections with wildcard-safe matching', async () => {
     const { repository, selectChain } = makeRepository([{ name: 'Favorites' }]);
 
     await expect(repository.searchCollections(42, ' sci_fi% ')).resolves.toEqual([{ name: 'Favorites' }]);
 
     expect(eq).toHaveBeenCalledWith(collections.userId, 42);
-    expect(eq).toHaveBeenCalledWith(collections.mediaType, 'books');
+    expect(eq).toHaveBeenCalledWith(collections.isPublic, true);
+    expect(or).toHaveBeenCalledWith(expect.anything(), expect.anything());
     expect(accentInsensitiveIlike).toHaveBeenCalledWith(collections.name, '%sci\\_fi\\%%');
     expect(and).toHaveBeenCalled();
     expect(selectChain.from).toHaveBeenCalledWith(collections);

@@ -14,8 +14,6 @@ export interface EntityIndexItem {
   name: string
   icon?: string | null
   bookCount?: number | null
-  podcastCount?: number | null
-  type?: string
 }
 
 type SortField = 'custom' | 'name' | 'bookCount'
@@ -34,10 +32,8 @@ const props = withDefaults(
     loading?: boolean
     canAdd?: boolean
     addLabel?: string
-    /** Indexes of non-book entities relabel the count sort to match what they actually count. */
-    countSortLabel?: string
   }>(),
-  { loading: false, canAdd: false, addLabel: undefined, countSortLabel: undefined },
+  { loading: false, canAdd: false, addLabel: undefined },
 )
 
 const emit = defineEmits<{ add: [] }>()
@@ -54,7 +50,7 @@ const order = ref<SortDirection>('asc')
 const sortLabels = computed<Record<SortField, string>>(() => ({
   custom: t('components.entityIndex.sort.custom'),
   name: t('components.entityIndex.sort.name'),
-  bookCount: props.countSortLabel ?? t('components.entityIndex.sort.bookCount'),
+  bookCount: t('components.entityIndex.sort.bookCount'),
 }))
 
 const isDefaultSort = computed(() => sort.value === 'custom' && order.value === 'asc')
@@ -109,8 +105,7 @@ function itemRoute(id: number) {
 }
 
 function itemCountText(item: EntityIndexItem): string {
-  const count = entityCount(item) ?? 0
-  return item.type === 'podcasts' ? t('components.entityIndex.showCount', { count }) : t('components.entityIndex.bookCount', { count })
+  return t('components.entityIndex.bookCount', { count: entityCount(item) ?? 0 })
 }
 </script>
 

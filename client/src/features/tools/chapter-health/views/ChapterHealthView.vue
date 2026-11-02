@@ -23,10 +23,8 @@ const { hasLibraryPermission } = useLibraryPermissions()
 const health = useChapterHealth()
 
 const canUseTool = computed(() => hasPermission('library_edit_metadata'))
-/** The tool changes chapters, so it offers only the book libraries the user may edit. */
-const bookLibraries = computed(() =>
-  libraries.value.filter((library) => library.type !== 'podcasts' && hasLibraryPermission('library_edit_metadata', library.id, 'editor')),
-)
+/** The tool changes chapters, so it offers only the libraries the user may edit. */
+const editableLibraries = computed(() => libraries.value.filter((library) => hasLibraryPermission('library_edit_metadata', library.id, 'editor')))
 const enqueueing = ref(false)
 const showSkeleton = computed(() => health.loadingList.value && health.items.value.length === 0)
 const selectable = computed(() => health.canLookUp.value)
@@ -138,7 +136,7 @@ async function handleDismiss(bookId: number) {
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <ChapterHealthCategoryTabs :model-value="health.category.value" :summary="health.summary.value" @update:model-value="handleCategoryChange" />
-      <label v-if="bookLibraries.length > 1" class="flex items-center gap-2 text-sm text-muted-foreground">
+      <label v-if="editableLibraries.length > 1" class="flex items-center gap-2 text-sm text-muted-foreground">
         {{ t('tools.chapterHealth.library') }}
         <select
           class="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
@@ -146,7 +144,7 @@ async function handleDismiss(bookId: number) {
           @change="handleLibraryChange"
         >
           <option value="">{{ t('tools.chapterHealth.allLibraries') }}</option>
-          <option v-for="library in bookLibraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+          <option v-for="library in editableLibraries" :key="library.id" :value="library.id">{{ library.name }}</option>
         </select>
       </label>
     </div>

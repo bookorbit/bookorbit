@@ -25,7 +25,7 @@ import {
   Users,
   X,
 } from '@lucide/vue'
-import { APP_FEATURES, isReadAlongFormatKey, type CoverAspectRatio, type Library, type LibraryType, type OrganizationMode } from '@bookorbit/types'
+import { isReadAlongFormatKey, type CoverAspectRatio, type Library, type OrganizationMode } from '@bookorbit/types'
 import AppIcon from '@/components/AppIcon.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useModal } from '@/composables/useModal'
@@ -49,8 +49,6 @@ const { t } = useI18n()
 
 const props = defineProps<{
   library?: Library | null
-  /** Create mode only: pre-selects the library type (e.g. from the podcast sidebar section). */
-  initialType?: LibraryType
   /** The section to open on, e.g. from an Edit button beside that part of the library. */
   initialSection?: LibraryCreatorSectionId
   /** Create mode only: a library whose settings seed the new one. Its folders and access are not copied. */
@@ -86,7 +84,6 @@ const SECTION_COMPONENTS: Record<LibraryCreatorSectionId, Component> = {
   fileWrite: LibraryCreatorFileWrite,
   access: LibraryCreatorAccess,
 }
-const BOOK_SECTIONS: LibraryCreatorSectionId[] = ['details', 'folders', 'scanner', 'metadata', 'reading', 'schedule', 'fileWrite', 'access']
 
 const creator = useLibraryCreator()
 const { form, mode, editingLibraryId, loading, folderChecks, stats, error, validationErrors } = creator
@@ -113,15 +110,11 @@ const pendingLeave = ref<(() => void) | null>(null)
 const createdLibrary = ref<Library | null>(null)
 
 const creating = computed(() => mode.value === 'create')
-const podcast = computed(() => form.type === 'podcasts')
 const isDirty = computed(() => !initializing.value && initialFormSnapshot.value !== JSON.stringify(form))
 const requiredSetupValid = computed(() => !validationErrors.value.details && !validationErrors.value.folders)
 const showActionsMenu = computed(() => Boolean(props.library) && !creating.value && !createdLibrary.value)
 
-const sectionIds = computed<LibraryCreatorSectionId[]>(() => {
-  if (podcast.value) return creating.value ? ['details', 'folders', 'schedule'] : ['details', 'folders', 'schedule', 'access']
-  return BOOK_SECTIONS
-})
+const SECTION_IDS: LibraryCreatorSectionId[] = ['details', 'folders', 'scanner', 'metadata', 'reading', 'schedule', 'fileWrite', 'access']
 
 const modeLabel = computed(() =>
   form.organizationMode === 'book_per_file'
@@ -171,7 +164,6 @@ function summaryFor(id: LibraryCreatorSectionId): string {
     case 'details':
       if (!form.name.trim()) return t('library.creator.summary.needsName')
       if (!form.icon?.trim()) return t('library.creator.summary.needsIcon')
-      if (podcast.value) return form.name
       return form.coverAspectRatio === '1/1'
         ? t('library.creator.summary.detailsSquare', { name: form.name })
         : t('library.creator.summary.detailsPortrait', { name: form.name })
@@ -179,8 +171,7 @@ function summaryFor(id: LibraryCreatorSectionId): string {
       if (form.folders.length === 0) return t('library.creator.summary.needsFolder')
       if (checkedFileCount.value !== null)
         return t('library.creator.summary.foldersFiles', { folders: form.folders.length, files: checkedFileCount.value })
-      if (stats.value && !podcast.value)
-        return t('library.creator.summary.foldersBooks', { folders: form.folders.length, books: stats.value.totalBooks })
+      if (stats.value) return t('library.creator.summary.foldersBooks', { folders: form.folders.length, books: stats.value.totalBooks })
       return t('library.creator.summary.folders', { folders: form.folders.length })
     case 'scanner':
       return form.allowedFormats.length === 0
@@ -195,10 +186,8 @@ function summaryFor(id: LibraryCreatorSectionId): string {
     case 'reading':
       return t('library.creator.summary.reading', { start: percent(form.readingThreshold), finish: percent(form.markAsFinishedPercentComplete) })
     case 'schedule': {
-      const watching = podcast.value ? form.watchLocalFolders : form.watch
-      if (podcast.value) return watching ? t('library.creator.summary.watching') : t('library.creator.summary.notWatching')
-      if (watching && scheduleLabel.value) return t('library.creator.summary.watchingScheduled', { schedule: scheduleLabel.value })
-      if (watching) return t('library.creator.summary.watchingOnly')
+      if (form.watch && scheduleLabel.value) return t('library.creator.summary.watchingScheduled', { schedule: scheduleLabel.value })
+      if (form.watch) return t('library.creator.summary.watchingOnly')
       if (scheduleLabel.value) return t('library.creator.summary.scheduledOnly', { schedule: scheduleLabel.value })
       return t('library.creator.summary.manualOnly')
     }
@@ -229,7 +218,7 @@ interface SectionEntry {
 }
 
 const sections = computed<SectionEntry[]>(() =>
-  sectionIds.value.map((id) => ({
+  SECTION_IDS.map((id) => ({
     id,
     label: t(`library.creator.nav.${id}`),
     summary: summaryFor(id),
@@ -242,7 +231,6 @@ const sections = computed<SectionEntry[]>(() =>
 const activeEntry = computed(() => sections.value.find((section) => section.id === activeSection.value) ?? null)
 const activeDescription = computed(() => {
   if (!activeSection.value) return ''
-  if (activeSection.value === 'schedule' && podcast.value) return t('library.creator.schedule.watchFolders.hint')
   return t(`library.creator.nav.descriptions.${activeSection.value}`)
 })
 const ActiveComponent = computed(() => (activeSection.value ? SECTION_COMPONENTS[activeSection.value] : null))
@@ -254,7 +242,6 @@ const headerTitle = computed(() => {
 })
 const headerSubtitle = computed(() => {
   if (creating.value) return t('library.creator.sheet.createHint')
-  if (podcast.value) return t('library.creator.summary.folders', { folders: form.folders.length })
   if (stats.value)
     return t('library.creator.sheet.editSubtitle', { books: stats.value.totalBooks, folders: form.folders.length, mode: modeLabel.value })
   return t('library.creator.sheet.editSubtitleNoBooks', { folders: form.folders.length, mode: modeLabel.value })
@@ -269,11 +256,9 @@ const displayedError = computed(() => {
 const createHint = computed(() => (requiredSetupValid.value ? t('library.creator.sheet.readyHint') : t('library.creator.sheet.needsHint')))
 
 const sectionProps = computed(() => ({
-  details: { name: form.name, icon: form.icon, coverAspectRatio: form.coverAspectRatio, type: form.type, typeLocked: !creating.value },
+  details: { name: form.name, icon: form.icon, coverAspectRatio: form.coverAspectRatio },
   folders: {
     folders: form.folders,
-    localFolders: form.localFolders,
-    libraryType: form.type,
     checks: folderChecks.value,
     stats: stats.value,
     libraryName: form.name,
@@ -315,9 +300,8 @@ const sectionProps = computed(() => ({
     markAsFinishedPercentComplete: form.markAsFinishedPercentComplete,
   },
   schedule: {
-    watch: podcast.value ? form.watchLocalFolders : form.watch,
+    watch: form.watch,
     autoScanCronExpression: form.autoScanCronExpression,
-    showAutoScanSchedule: !podcast.value,
   },
   fileWrite: {
     fileRenameEnabled: form.fileRenameEnabled,
@@ -415,7 +399,7 @@ function requestClose() {
 }
 
 function goToFirstInvalidSection(): boolean {
-  const invalid = sectionIds.value.find((id) => validationErrors.value[id])
+  const invalid = SECTION_IDS.find((id) => validationErrors.value[id])
   if (!invalid) return false
   activeSection.value = invalid
   return true
@@ -467,17 +451,6 @@ function runRemove() {
   if (library) leaveThen(() => emit('remove', library))
 }
 
-function handleTypeUpdate(value: LibraryType) {
-  const availableType = APP_FEATURES.podcasts ? value : 'books'
-  form.type = availableType
-  if (availableType === 'podcasts') {
-    form.coverAspectRatio = '1/1'
-    form.watchLocalFolders = true
-    if (!form.name.trim()) form.name = t('library.creator.details.podcastDefaultName')
-    if (!form.icon) form.icon = 'Podcast'
-  }
-}
-
 function handleFoldersUpdate(value: string[]) {
   const added = value.filter((folder) => !form.folders.includes(folder))
   form.folders = value
@@ -501,8 +474,7 @@ function handleReapplyRegexMetadata() {
 }
 
 function handleWatchUpdate(value: boolean) {
-  if (podcast.value) form.watchLocalFolders = value
-  else form.watch = value
+  form.watch = value
 }
 
 function handleWriteCoverUpdate(value: boolean) {
@@ -511,11 +483,9 @@ function handleWriteCoverUpdate(value: boolean) {
 
 const sectionListeners = {
   'update:name': (value: string) => (form.name = value),
-  'update:type': handleTypeUpdate,
   'update:icon': (value: string | null) => (form.icon = value),
   'update:coverAspectRatio': (value: CoverAspectRatio) => (form.coverAspectRatio = value),
   'update:folders': handleFoldersUpdate,
-  'update:localFolders': (value: string[]) => (form.localFolders = value),
   'update:organizationMode': (value: OrganizationMode) => (form.organizationMode = value),
   'update:addedAtSource': (value: Library['addedAtSource']) => (form.addedAtSource = value),
   recompute: handleRecomputeAddedAt,
@@ -581,11 +551,10 @@ async function initialize() {
     return
   }
   creator.initCreate()
-  if (props.initialType && props.initialType !== form.type) handleTypeUpdate(props.initialType)
 }
 
 function startingSection(): LibraryCreatorSectionId | null {
-  const requested = props.initialSection && sectionIds.value.includes(props.initialSection) ? props.initialSection : null
+  const requested = props.initialSection && SECTION_IDS.includes(props.initialSection) ? props.initialSection : null
   if (requested) return requested
   return isWide.value ? 'details' : null
 }
@@ -831,11 +800,11 @@ onMounted(async () => {
                   <RefreshCw :size="14" aria-hidden="true" />
                   {{ t('library.creator.sheet.scanNow') }}
                 </DropdownMenuItem>
-                <DropdownMenuItem v-if="library.type !== 'podcasts'" @click="runRefreshCovers">
+                <DropdownMenuItem @click="runRefreshCovers">
                   <Images :size="14" aria-hidden="true" />
                   {{ t('settings.admin.libraries.refreshCovers') }}
                 </DropdownMenuItem>
-                <DropdownMenuItem v-if="library.type !== 'podcasts'" :disabled="!library.fileWriteEnabled" @click="runSyncFiles">
+                <DropdownMenuItem :disabled="!library.fileWriteEnabled" @click="runSyncFiles">
                   <FileCode :size="14" aria-hidden="true" />
                   {{ t('settings.admin.libraries.syncMetadataToFiles') }}
                 </DropdownMenuItem>

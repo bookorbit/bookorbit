@@ -166,6 +166,9 @@ export async function fetchWithAuthProxyRecovery(input: RequestInfo | URL, init?
 async function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers)
   if (_accessToken) headers.set('Authorization', `Bearer ${_accessToken}`)
+  // Text the server writes (achievement names, the monthly challenge) follows the language picked
+  // in Settings, not the browser's, so the page never mixes two.
+  if (!headers.has('Accept-Language')) headers.set('Accept-Language', i18n.global.locale.value)
   try {
     return await fetchWithAuthProxyRecovery(input, { ...init, headers, credentials: 'include' })
   } catch (reason) {

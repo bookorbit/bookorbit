@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { primeServerTextCatalog, resetServerTextCache } from '../../common/i18n/server-text';
 import { AchievementService } from './achievement.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BACKFILL, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from './achievement-events.service';
 
@@ -206,6 +207,58 @@ describe('AchievementService', () => {
       expect(item?.iconName).toBe('lock');
       expect(item?.threshold).toBeNull();
       expect(item?.context).toBeNull();
+    });
+
+    describe('in another language', () => {
+      const visible = {
+        key: 'books_finished_1',
+        groupKey: 'books_finished',
+        tier: 1,
+        category: 'reading',
+        name: 'Ink Initiate',
+        description: 'Finish your first book',
+        iconName: 'book-open',
+        rarity: 'common',
+        threshold: 1,
+        hidden: false,
+        sortOrder: 1,
+      };
+      const secret = { ...visible, key: 'secret_1', groupKey: null, tier: null, name: 'Secret', description: 'Hidden thing', hidden: true };
+
+      beforeEach(() => {
+        primeServerTextCatalog('de', {
+          achievements: { books_finished_1: { name: 'Tinten-Neuling', description: 'Beende dein erstes Buch' } },
+          achievementCategories: { reading: 'Lesen' },
+          achievementSecret: { name: 'Geheimer Erfolg', description: 'Lies weiter, um ihn zu enthüllen.' },
+        });
+        repo.findUserAchievements.mockResolvedValue([]);
+      });
+
+      afterEach(() => resetServerTextCache());
+
+      it('translates names, descriptions, category labels and the secret placeholder', async () => {
+        repo.findAllAchievements.mockResolvedValue([visible, secret]);
+
+        const result = await service.getCatalogue({ id: 1, isSuperuser: false } as never, 'de');
+        const reading = result.categories.find((c) => c.key === 'reading');
+
+        expect(reading?.label).toBe('Lesen');
+        expect(reading?.achievements.map((item) => [item.name, item.description])).toEqual([
+          ['Tinten-Neuling', 'Beende dein erstes Buch'],
+          ['Geheimer Erfolg', 'Lies weiter, um ihn zu enthüllen.'],
+        ]);
+        expect(result.categories.find((c) => c.key === 'library')?.label).toBe('Library');
+      });
+
+      it('keeps the stored English when a request names no language', async () => {
+        repo.findAllAchievements.mockResolvedValue([visible]);
+
+        const result = await service.getCatalogue({ id: 1, isSuperuser: false } as never);
+        const reading = result.categories.find((c) => c.key === 'reading');
+
+        expect(reading?.label).toBe('Reading');
+        expect(reading?.achievements[0]?.name).toBe('Ink Initiate');
+      });
     });
   });
 

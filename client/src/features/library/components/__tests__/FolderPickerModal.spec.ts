@@ -47,7 +47,7 @@ function server(input: RequestInfo | URL, init?: RequestInit) {
       root: '/',
       mounts: ['/books'],
       appDataPath: '/data',
-      libraries: [{ id: 7, name: 'Novels', icon: 'BookOpen', type: 'books', folders: ['/books/Fiction'] }],
+      libraries: [{ id: 7, name: 'Novels', icon: 'BookOpen', folders: ['/books/Fiction'] }],
     })
   if (url.pathname === '/api/v1/path/listing')
     return json({ path, state: path === '/proc' ? 'blocked' : 'ok', entries: LISTINGS[path] ?? [], truncated: false })
@@ -275,20 +275,6 @@ describe('FolderPickerModal', () => {
     expect(wrapper.text()).toContain('Looking at')
     expect(wrapper.text()).toContain('Would add 45 books')
     expect(wrapper.text()).toContain('Ann Leckie/Ancillary Justice.epub')
-  })
-
-  it('chooses one storage folder for podcasts', async () => {
-    const wrapper = mountPicker({ kind: 'podcastStorage', multiple: false, libraryName: 'History Podcasts' })
-    await settle()
-
-    expect(wrapper.find('h2').text()).toBe('Choose a storage folder')
-    expect(row(wrapper, '/books/Unsorted').find('input').attributes('type')).toBe('radio')
-    await row(wrapper, '/books/Unsorted').find('input').trigger('click')
-    await row(wrapper, '/books/Science Fiction').find('input').trigger('click')
-    await settle()
-    await button(wrapper, 'Use folder').trigger('click')
-
-    expect(wrapper.emitted('select')).toEqual([[['/books/Science Fiction']]])
   })
 
   it('completes a typed path with Tab and closes the list with Escape without closing the dialog', async () => {

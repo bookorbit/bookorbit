@@ -36,4 +36,7 @@ plugin.settings.last_error = { event = "annotation_sync", at = 2 }
 assert(Sheet.data(plugin, catalog).sync_error, "actual sync failure is shown")
 plugin.settings.last_sync = { event = "connection_test", at = 3 }
 assert(Sheet.data(plugin, catalog).sync_error, "legacy connection timestamp cannot suppress sync failure")
+plugin.ui = { document = {} }
+plugin.openBookTitle = function() return "Open book" end
+assert(Sheet.data(plugin, catalog).book == "Open book", "an open reader book exposes both exit destinations")
 print("bookorbit_menu_sheet_state_test.lua: ok")

@@ -68,6 +68,11 @@ export interface BookChaptersState {
   audibleRegion: AudibleRegion;
   sources: BookChapterSources;
   writeBack: BookChapterWriteBack;
+  /**
+   * True when the book has no audio files and the chapters are read off a read-along EPUB's
+   * narration instead. That list can be shown but not edited, saved or written.
+   */
+  readAlong?: boolean;
 }
 
 export interface SaveBookChaptersRequest {

@@ -198,7 +198,7 @@ export interface TestKoreaderConnectionResult {
 export type KoreaderCatalogSection =
   "libraries" | "collections" | "smart-scopes" | "authors" | "series" | "search" | "recent" | "all-books" | "continue-reading";
 
-export type KoreaderCatalogSort = "title" | "author" | "recently_added" | "recently_updated" | "recently_read" | "series";
+export type KoreaderCatalogSort = "title" | "author" | "published" | "recently_added" | "recently_updated" | "recently_read" | "series";
 
 export type KoreaderCatalogSortOrder = "asc" | "desc";
 
@@ -591,6 +591,7 @@ export type KoreaderPluginCapability =
   | "readAloudDeliveryVariants"
   | "readAloudDeliverySettings"
   | "catalogListsV2"
+  | "catalogPublishedSort"
   | "sidecarState"
   | "annotationPendingBooks";
 

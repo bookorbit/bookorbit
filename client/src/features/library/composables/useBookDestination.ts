@@ -9,7 +9,7 @@ interface BookDestinationOptions {
 
 export function useBookDestination(options: BookDestinationOptions = {}) {
   const source = useLibraries()
-  const libraries = computed(() => source.libraries.value.filter((library) => library.type === 'books'))
+  const libraries = source.libraries
   const libraryId = ref<number | null>(options.libraryId ?? null)
   const folderId = ref<number | null>(options.folderId ?? null)
   const selectedLibrary = computed(() => libraries.value.find((library) => library.id === libraryId.value))

@@ -1,6 +1,6 @@
 import { inject, type ComputedRef, type InjectionKey, type Ref } from 'vue'
 import type { OrganizationMode } from '@bookorbit/types'
-import type { FolderPickerKind, FolderStatus, PickerLibrary } from './folder-picker-rules'
+import type { FolderStatus, PickerLibrary } from './folder-picker-rules'
 import type { FolderPickerData } from './useFolderPickerData'
 import type { FolderPickerSelection } from './useFolderPickerSelection'
 import type { FolderPickerTree } from './useFolderPickerTree'
@@ -9,8 +9,6 @@ export interface FolderPickerContext {
   data: FolderPickerData
   tree: FolderPickerTree
   selection: FolderPickerSelection
-  kind: ComputedRef<FolderPickerKind>
-  multiple: ComputedRef<boolean>
   /** Every library with folders, this one included and marked `self`. */
   libraries: ComputedRef<PickerLibrary[]>
   others: ComputedRef<PickerLibrary[]>
@@ -33,10 +31,8 @@ export interface FolderPickerContext {
   submitNewFolder: () => Promise<void>
   cancelNewFolder: () => void
   booksIn: (path: string) => number | null
-  /** "3 books", or "3 episodes" when choosing for podcasts. */
+  /** "3 books". */
   countLabel: (count: number) => string
-  /** "3 books" as what a folder holds, or "3 episodes" for podcasts. */
-  holdsLabel: (count: number) => string
   /** Why ticking a folder would put books in two libraries, for a status that warns. */
   describeOverlap: (path: string, status: FolderStatus) => string
 }

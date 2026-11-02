@@ -32,7 +32,7 @@ describe('DashboardWidgetBatchDto', () => {
   });
 
   it('rejects an unknown widget type', async () => {
-    const dto = plainToInstance(DashboardWidgetBatchDto, { widgets: ['reading-goal', 'podcast-streak'] });
+    const dto = plainToInstance(DashboardWidgetBatchDto, { widgets: ['reading-goal', 'mystery-widget'] });
 
     expect(constraintNames(await validate(dto))).toContain('isIn');
   });

@@ -7,9 +7,8 @@ import {
   withoutImplicitReadAlongFormatPriority,
   withReadAlongFormatPriority,
 } from '@bookorbit/types'
-import type { AddedAtSource, CoverAspectRatio, Library, LibraryStats, LibraryType, OrganizationMode, PrescanResult } from '@bookorbit/types'
+import type { AddedAtSource, CoverAspectRatio, Library, LibraryStats, OrganizationMode, PrescanResult } from '@bookorbit/types'
 import { i18n } from '@/i18n'
-import { coveringFolderPath, normalizeFolderPath } from './folder-paths'
 
 export { DEFAULT_FORMAT_PRIORITY }
 
@@ -32,15 +31,12 @@ const FILE_SIZE_MAX_MB = 10_000
 
 function blankForm() {
   return {
-    type: 'books' as LibraryType,
     name: '',
     icon: null as string | null,
     displayOrder: 0,
     coverAspectRatio: '2/3' as CoverAspectRatio,
     folders: [] as string[],
-    localFolders: [] as string[],
     watch: false,
-    watchLocalFolders: true,
     autoScanCronExpression: null as string | null,
     metadataPrecedence: [...DEFAULT_METADATA_PRECEDENCE],
     regexMetadata: null as Library['regexMetadata'],
@@ -92,10 +88,6 @@ export function useLibraryCreator() {
     if (!form.name.trim()) errors.details = t('library.creator.errors.nameRequired')
     else if (!form.icon?.trim()) errors.details = t('library.creator.errors.iconRequired')
     if (form.folders.length === 0) errors.folders = t('library.creator.errors.folderRequired')
-    else if (form.type === 'podcasts' && form.folders.length !== 1) errors.folders = t('library.creator.errors.podcastStorageFolder')
-    else if (form.type === 'podcasts' && overlappingPodcastFolder(form.folders, form.localFolders)) {
-      errors.folders = t('library.creator.errors.podcastFolderOverlap')
-    }
     if (form.autoScanCronExpression && !isFiveFieldCronExpression(form.autoScanCronExpression)) {
       errors.schedule = t('library.creator.errors.cronInvalid')
     }
@@ -151,21 +143,17 @@ export function useLibraryCreator() {
     form.name = name
     form.displayOrder = blankForm().displayOrder
     form.folders = []
-    form.localFolders = []
     storedAddedAtSource.value = null
     storedRegexMetadata.value = null
   }
 
   function applyLibrary(library: Library) {
-    form.type = library.type
     form.name = library.name
     form.icon = library.icon ?? null
     form.displayOrder = library.displayOrder
     form.coverAspectRatio = library.coverAspectRatio
-    form.folders = library.folders.filter((f) => f.role !== 'local').map((f) => f.path)
-    form.localFolders = library.folders.filter((f) => f.role === 'local').map((f) => f.path)
+    form.folders = library.folders.map((f) => f.path)
     form.watch = library.watch
-    form.watchLocalFolders = library.watchLocalFolders ?? true
     form.autoScanCronExpression = library.autoScanCronExpression ?? null
     form.metadataPrecedence = [...library.metadataPrecedence]
     // A preset is shown with its current rules, which are what the server runs for it.
@@ -243,7 +231,7 @@ export function useLibraryCreator() {
   }
 
   async function loadStats(): Promise<void> {
-    if (editingLibraryId.value === null || form.type !== 'books') return
+    if (editingLibraryId.value === null) return
     try {
       const res = await api(`/api/v1/libraries/${editingLibraryId.value}/stats`)
       if (res.ok) stats.value = (await res.json()) as LibraryStats
@@ -261,43 +249,25 @@ export function useLibraryCreator() {
     error.value = null
     loading.value = true
     try {
-      const sharedPayload = {
-        type: form.type,
+      const payload = {
+        ...form,
         name: form.name.trim(),
         icon: form.icon!.trim(),
-        displayOrder: form.displayOrder,
-        coverAspectRatio: form.coverAspectRatio,
         folders: [...new Set(form.folders.map((path) => path.trim()))],
+        formatPriority: withoutImplicitReadAlongFormatPriority(form.formatPriority),
       }
-      const payload =
-        form.type === 'podcasts'
-          ? {
-              ...sharedPayload,
-              localFolders: [...new Set(form.localFolders.map((path) => path.trim()))],
-              watchLocalFolders: form.watchLocalFolders,
-            }
-          : {
-              ...form,
-              ...sharedPayload,
-              formatPriority: withoutImplicitReadAlongFormatPriority(form.formatPriority),
-              localFolders: undefined,
-              watchLocalFolders: undefined,
-            }
-      let res: Response
-      if (mode.value === 'create') {
-        res = await api('/api/v1/libraries', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-      } else {
-        const { type: _type, ...updatePayload } = payload
-        res = await api(`/api/v1/libraries/${editingLibraryId.value}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatePayload),
-        })
-      }
+      const res =
+        mode.value === 'create'
+          ? await api('/api/v1/libraries', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
+          : await api(`/api/v1/libraries/${editingLibraryId.value}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
       if (!res.ok) {
         error.value = await responseError(res, t('library.creator.errors.saveFailed'))
         return null
@@ -329,18 +299,6 @@ export function useLibraryCreator() {
     loadStats,
     save,
   }
-}
-
-/**
- * Whether a storage folder and an existing-podcasts folder overlap. The server refuses the same
- * pairing; catching it here means the wizard says so before the save round-trip.
- */
-function overlappingPodcastFolder(folders: string[], localFolders: string[]): boolean {
-  const storage = folders.map(normalizeFolderPath)
-  return localFolders.some((candidate) => {
-    const local = normalizeFolderPath(candidate)
-    return storage.some((path) => path === local || coveringFolderPath(local, [path]) !== null || coveringFolderPath(path, [local]) !== null)
-  })
 }
 
 async function responseError(response: Response, fallback: string): Promise<string> {

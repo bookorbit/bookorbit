@@ -2,12 +2,11 @@ import { readdir } from 'fs/promises';
 import { join } from 'path';
 
 /**
- * Generic recursive directory traversal shared by the book scanner and the podcast importer.
+ * Generic recursive directory traversal behind the book scanner.
  *
- * Only the traversal itself lives here: what a directory's files *mean* differs per library type,
- * so each caller receives the entries through `visit` and does its own grouping. Behaviour that is
- * genuinely common stays here - dotfile and symlink skips, the path-length ceiling, tolerating an
- * unreadable directory instead of failing the whole walk, and bounding how many directories are
+ * Only the traversal itself lives here: callers receive the entries through `visit` and do their own
+ * grouping. The behaviour lives here - dotfile and symlink skips, the path-length ceiling, tolerating
+ * an unreadable directory instead of failing the whole walk, and bounding how many directories are
  * read at once so a deep tree cannot exhaust the file descriptor table.
  */
 

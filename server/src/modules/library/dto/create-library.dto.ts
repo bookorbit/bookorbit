@@ -19,7 +19,7 @@ import {
 } from 'class-validator';
 import { IsOptionalNotNull } from './optional-not-null.decorator';
 import { Transform } from 'class-transformer';
-import { ICON_VALUE_MAX_LENGTH, type AddedAtSource, type CoverAspectRatio, type LibraryType, type OrganizationMode } from '@bookorbit/types';
+import { ICON_VALUE_MAX_LENGTH, type AddedAtSource, type CoverAspectRatio, type OrganizationMode } from '@bookorbit/types';
 
 import {
   LIBRARY_ADDED_AT_SOURCES,
@@ -39,10 +39,6 @@ function trimString(value: unknown): unknown {
 }
 
 export class CreateLibraryDto {
-  @ValidateIf((_, value) => value !== undefined)
-  @IsIn(['books', 'podcasts'])
-  type?: LibraryType;
-
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -65,18 +61,6 @@ export class CreateLibraryDto {
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
   folders: string[];
-
-  /** Podcast-only: roots holding podcast folders the user already has. Never written to. */
-  @IsOptionalNotNull()
-  @IsArray()
-  @IsString({ each: true })
-  @IsNotEmpty({ each: true })
-  localFolders?: string[];
-
-  /** Podcast-only: automatically discover changes beneath local podcast roots. */
-  @IsOptionalNotNull()
-  @IsBoolean()
-  watchLocalFolders?: boolean;
 
   @IsOptionalNotNull()
   @IsIn(LIBRARY_COVER_ASPECT_RATIOS)

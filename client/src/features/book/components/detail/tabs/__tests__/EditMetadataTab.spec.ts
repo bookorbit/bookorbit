@@ -225,6 +225,21 @@ describe('EditMetadataTab cover tiles', () => {
     expect(body.metadata).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' })
   })
 
+  it('renders a moved external provider only through its compatibility ID field', async () => {
+    vi.mocked(api).mockImplementation(async (url) => {
+      if (String(url).includes('/metadata-fetch/providers')) {
+        return json([{ key: 'lubimyczytac', label: 'LubimyCzytac', identifiable: true, source: 'external' }])
+      }
+      return json({})
+    })
+    const wrapper = mountTab(makeBook({ providerIds: { lubimyczytac: '5212514/nie-zapomnij-nakarmic' } }))
+    await flushPromises()
+
+    expect(wrapper.get<HTMLInputElement>('#provider-id-lubimyczytacId').element.value).toBe('5212514/nie-zapomnij-nakarmic')
+    expect(wrapper.find('#provider-id-external-lubimyczytac').exists()).toBe(false)
+    expect(wrapper.text()).toContain('1/1')
+  })
+
   // Issue #1624: identifiers pasted from Amazon carry hyphens and invisible characters.
   it('saves pasted identifiers cleaned instead of truncated', async () => {
     vi.mocked(api).mockImplementation(async (url, init) => {

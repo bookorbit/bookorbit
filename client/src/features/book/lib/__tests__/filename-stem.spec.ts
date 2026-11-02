@@ -19,8 +19,8 @@ describe('commonStem', () => {
   })
 
   it('cuts a stem that ends at a separator to the whole token', () => {
-    const names = ['Show - Episode 01.mp3', 'Show - Episode 02.mp3', 'Show - Episode 03.mp3', 'Show - Episode 10.mp3']
-    expect(commonStem(names)).toBe('Show - Episode')
+    const names = ['Book - Chapter 01.mp3', 'Book - Chapter 02.mp3', 'Book - Chapter 03.mp3', 'Book - Chapter 10.mp3']
+    expect(commonStem(names)).toBe('Book - Chapter')
     expect(stemTail(names[0], commonStem(names))).toBe('01.mp3')
   })
 

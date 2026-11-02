@@ -8,17 +8,17 @@ import { useFolderPickerSelection } from '../useFolderPickerSelection'
 
 const novels: PickerLibrary = { id: 1, name: 'Novels', icon: null, folders: ['/books/Ebooks/Fiction'] }
 
-function setup(options: { multiple?: boolean; own?: string[]; denied?: string[]; uncounted?: string[] } = {}) {
+function setup(options: { own?: string[]; denied?: string[]; uncounted?: string[] } = {}) {
   const listings = shallowReactive(new Map<string, FolderListing>())
   const summaries = shallowReactive(new Map<string, FolderSummary>())
   for (const path of options.denied ?? []) listings.set(path, { path, state: 'denied', entries: [], truncated: false })
   const tree: Record<string, string[]> = {
-    '/books': ['/books/Ebooks', '/books/Unsorted', '/books/Podcasts'],
+    '/books': ['/books/Ebooks', '/books/Unsorted', '/books/Periodicals'],
     '/books/Ebooks': ['/books/Ebooks/Fiction', '/books/Ebooks/Science Fiction', '/books/Ebooks/Cookbooks'],
   }
   const files: Record<string, number> = {
     '/books/Unsorted': 12,
-    '/books/Podcasts': 0,
+    '/books/Periodicals': 0,
     '/books/Ebooks/Science Fiction': 45,
     '/books/Ebooks/Cookbooks': 8,
   }
@@ -49,7 +49,6 @@ function setup(options: { multiple?: boolean; own?: string[]; denied?: string[];
     data,
     own: () => options.own ?? [],
     others: () => [novels],
-    multiple: () => options.multiple ?? true,
     appDataPath: () => '/data',
     mode,
     onModeChange,
@@ -113,14 +112,6 @@ describe('useFolderPickerSelection', () => {
     expect(selection.notice.value).toEqual({ key: 'library.folderBrowser.reason.ownCovered', params: { path: '/books/Ebooks' } })
   })
 
-  it('keeps one folder in single mode', () => {
-    const { selection } = setup({ multiple: false })
-    selection.toggle('/books/Podcasts')
-    selection.toggle('/media/nas')
-
-    expect(selection.selected.value).toEqual(['/media/nas'])
-  })
-
   it('undoes a removal and a mode switch', () => {
     const { selection, mode, onModeChange } = setup()
     selection.toggle('/books/Unsorted')
@@ -159,11 +150,11 @@ describe('useFolderPickerSelection', () => {
   })
 
   it('keeps a folder whose count could not be had rather than dropping its books', async () => {
-    const { selection } = setup({ uncounted: ['/books/Podcasts'] })
+    const { selection } = setup({ uncounted: ['/books/Periodicals'] })
     selection.toggle('/books')
 
     await selection.leaveOut('/books')
 
-    expect(selection.selected.value).toContain('/books/Podcasts')
+    expect(selection.selected.value).toContain('/books/Periodicals')
   })
 })

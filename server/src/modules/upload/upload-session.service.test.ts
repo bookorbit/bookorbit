@@ -57,8 +57,7 @@ describe('UploadSessionService', () => {
       findCapabilityLibraries: vi.fn(() => [{ id: 1, name: 'Main', allowedFormats: ['epub', 'pdf'], organizationMode: 'book_per_folder' }]),
       findCapabilityFolders: vi.fn(() => [{ id: 2, libraryId: 1, path: '/books/Main Shelf' }]),
       findLibrary: vi.fn((id: number) => {
-        if (id === 1) return { id: 1, type: 'books', allowedFormats: ['epub', 'pdf'], organizationMode: 'book_per_folder' };
-        if (id === 3) return { id: 3, type: 'podcasts', allowedFormats: [], organizationMode: 'book_per_folder' };
+        if (id === 1) return { id: 1, allowedFormats: ['epub', 'pdf'], organizationMode: 'book_per_folder' };
         return null;
       }),
       folderBelongsToLibrary: vi.fn((folderId: number, libraryId: number) => folderId === 2 && libraryId === 1),
@@ -69,7 +68,6 @@ describe('UploadSessionService', () => {
           return {
             id: 9,
             libraryId: 1,
-            libraryType: 'books',
             allowedFormats: ['epub', 'pdf'],
             organizationMode: 'book_per_folder',
             folderPath: root,
@@ -79,7 +77,6 @@ describe('UploadSessionService', () => {
           return {
             id: 8,
             libraryId: 1,
-            libraryType: 'books',
             allowedFormats: ['epub', 'pdf'],
             organizationMode: 'book_per_folder',
             folderPath: join(root, 'a-book-that-is-a-file.cbz'),
@@ -204,13 +201,6 @@ describe('UploadSessionService', () => {
     await service.create(dto, user);
 
     await expect(service.create({ ...dto, sizeBytes: 11 }, user)).rejects.toBeInstanceOf(ConflictException);
-  });
-
-  it('refuses a library that does not hold books', async () => {
-    await expect(service.create({ ...createDto(), target: { kind: 'library', libraryId: 3 } } as any, user)).rejects.toMatchObject({
-      response: { errorCode: UploadErrorCode.InvalidTarget },
-    });
-    expect(repo.create).not.toHaveBeenCalled();
   });
 
   it('enforces upload permission and library-folder ownership before creating files', async () => {

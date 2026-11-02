@@ -10,7 +10,6 @@ vi.mock('@/lib/api', () => ({
 function makeLibrary(overrides: Partial<Library> = {}): Library {
   return {
     id: 3,
-    type: 'books',
     name: 'Main Library',
     icon: null,
     displayOrder: 0,

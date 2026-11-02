@@ -11,17 +11,16 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock('@/features/library/composables/useLibraries', () => ({
   useLibraries: () => ({
     libraries: ref([
-      { id: 1, name: 'Novels', type: 'books', icon: null, bookCount: 454 },
-      { id: 2, name: 'Audiobooks', type: 'books', icon: null, bookCount: 4 },
-      { id: 9, name: 'Shows', type: 'podcasts', icon: null, podcastCount: 3 },
+      { id: 1, name: 'Novels', icon: null, bookCount: 454 },
+      { id: 2, name: 'Audiobooks', icon: null, bookCount: 4 },
     ]),
   }),
 }))
 vi.mock('@/features/smart-scope/composables/useSmartScopes', () => ({
-  useSmartScopes: () => ({ bookScopes: ref([{ id: 2, name: 'Kobo', icon: null, mediaType: 'books', bookCount: 172 }]) }),
+  useSmartScopes: () => ({ smartScopes: ref([{ id: 2, name: 'Kobo', icon: null, bookCount: 172 }]) }),
 }))
 vi.mock('@/features/collection/composables/useCollections', () => ({
-  useCollections: () => ({ bookCollections: ref([{ id: 8, name: 'Autumn Reads', icon: null, mediaType: 'books', bookCount: 2 }]) }),
+  useCollections: () => ({ collections: ref([{ id: 8, name: 'Autumn Reads', icon: null, bookCount: 2 }]) }),
 }))
 
 const passthrough = { template: '<div><slot /></div>' }
@@ -41,7 +40,7 @@ afterEach(() => {
 })
 
 describe('BrowseTitleSwitcher', () => {
-  it('lists the book libraries, scopes and collections, with the current place marked', () => {
+  it('lists the libraries, scopes and collections, with the current place marked', () => {
     const wrapper = mountSwitcher()
 
     const items = wrapper.findAll('[data-switch-item]')
@@ -52,7 +51,6 @@ describe('BrowseTitleSwitcher', () => {
       ['Autumn Reads', '2'],
     ])
     expect(items[0]!.attributes('aria-current')).toBe('page')
-    expect(wrapper.text()).not.toContain('Shows')
   })
 
   it('narrows the list as the reader types', async () => {

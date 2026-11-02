@@ -33,4 +33,4 @@ Do not report security vulnerabilities in public issues. Follow the private repo
 - If a conversation produces actionable work, create a linked bug report or feature request and keep the community conversation available for context. An idea being discussed does not mean it is approved for implementation.
 - Other inactive issues, including help requests, receive a stale warning after 60 days and close after another 14 days without activity. If help is still needed, leave an update before closure or request reopening afterward. Maintainers can use `pinned` to exempt a topic from stale closure.
 
-Before implementing a change, follow the approval and assignment process in [CONTRIBUTING.md](CONTRIBUTING.md). Those requirements apply to code contributions, not to asking for help or joining a conversation.
+Before implementing a change, follow the approval and assignment process in [CONTRIBUTING.md](../CONTRIBUTING.md). Those requirements apply to code contributions, not to asking for help or joining a conversation.

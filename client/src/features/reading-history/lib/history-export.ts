@@ -123,3 +123,11 @@ export function saveBlob(blob: Blob, fileName: string) {
   link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 30_000)
 }
+
+export function canvasToBlob(canvas: HTMLCanvasElement | null, type: string): Promise<Blob> {
+  if (!canvas) return Promise.reject(new Error('Canvas is unavailable'))
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Canvas export returned no data'))), type)
+  })
+}

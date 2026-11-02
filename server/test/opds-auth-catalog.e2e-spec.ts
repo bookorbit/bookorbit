@@ -521,13 +521,12 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
           })),
         )
         .returning({ id: schema.books.id });
-      const [publicCollection, ownCollection, emptyCollection, podcastCollection] = await ctx.db
+      const [publicCollection, ownCollection, emptyCollection] = await ctx.db
         .insert(schema.collections)
         .values([
           { userId: intruder.userId, name: `public-collection-${randomUUID()}`, isPublic: true },
           { userId: reader.userId, name: `private-own-${randomUUID()}` },
           { userId: intruder.userId, name: `public-empty-${randomUUID()}`, isPublic: true },
-          { userId: intruder.userId, name: `public-podcast-${randomUUID()}`, isPublic: true, mediaType: 'podcasts' as const },
         ])
         .returning();
       await ctx.db.insert(schema.collectionBooks).values(
@@ -548,7 +547,6 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
         expect(navigation.body).toContain(`collectionId=${publicCollection.id}`);
         expect(navigation.body).toContain('<content type="text">1 books</content>');
         expect(navigation.body).not.toContain(`collectionId=${foreignCollectionId}`);
-        expect(navigation.body).not.toContain(`collectionId=${podcastCollection.id}`);
 
         const section = await koreaderGet('/api/v1/koreader/plugin/catalog/sections/collections');
         expect(section.statusCode).toBe(200);
@@ -574,8 +572,6 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
         }
         const privateCatalog = await koreaderGet(`/api/v1/koreader/plugin/catalog/books?collectionId=${foreignCollectionId}`);
         expect(privateCatalog.statusCode).toBe(403);
-        const podcastCatalog = await opdsGet(`/api/v1/opds/catalog?collectionId=${podcastCollection.id}`, credentials);
-        expect(podcastCatalog.statusCode).toBe(403);
 
         const emptyNavigation = await opdsGet('/api/v1/opds/collections', {
           username: noLibraryOpds.row.username,
@@ -596,9 +592,7 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
         const revokedDashboard = await koreaderGet('/api/v1/koreader/plugin/catalog/dashboard');
         expect(revokedDashboard.json().browseCounts.collections).toBe(2);
       } finally {
-        await ctx.db
-          .delete(schema.collections)
-          .where(inArray(schema.collections.id, [publicCollection.id, ownCollection.id, emptyCollection.id, podcastCollection.id]));
+        await ctx.db.delete(schema.collections).where(inArray(schema.collections.id, [publicCollection.id, ownCollection.id, emptyCollection.id]));
         await ctx.db.delete(schema.books).where(
           inArray(
             schema.books.id,

@@ -47,7 +47,6 @@ function makeService() {
   const smartScopeService = {
     executeSmartScope: vi.fn(),
     executeSmartScopeBookIds: vi.fn(),
-    findOne: vi.fn().mockResolvedValue({ mediaType: 'books' }),
   };
 
   const coverStore = { enrichCardFaces: vi.fn().mockResolvedValue(undefined) };
@@ -117,16 +116,6 @@ describe('DashboardService', () => {
 
     expect(smartScopeService.executeSmartScopeBookIds).toHaveBeenCalledWith(5, user, 12, [11], { excludeAudioOnly: true });
     expect(smartScopeService.executeSmartScope).not.toHaveBeenCalled();
-  });
-
-  it('selects nothing for a smart scope that does not hold books', async () => {
-    const { service, libraryService, smartScopeService } = makeService();
-    smartScopeService.findOne.mockResolvedValue({ mediaType: 'podcasts' });
-    libraryService.findAccessibleLibraryIds.mockResolvedValue([10]);
-
-    await expect(service.getSmartScopeBookIds(5, makeUser(), 12)).resolves.toEqual([]);
-
-    expect(smartScopeService.executeSmartScopeBookIds).not.toHaveBeenCalled();
   });
 
   it('rejects smartScope scroller calls when smartScopeId is missing or invalid', async () => {

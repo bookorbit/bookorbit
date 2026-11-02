@@ -1078,8 +1078,7 @@ export class BookQueryBuilder {
         .from(collectionBooks)
         .innerJoin(
           collections,
-          // Book collections only: a podcast collection sharing a name must never widen a book filter.
-          and(eq(collectionBooks.collectionId, collections.id), eq(collections.userId, userId), eq(collections.mediaType, 'books')),
+          and(eq(collectionBooks.collectionId, collections.id), or(eq(collections.userId, userId), eq(collections.isPublic, true))),
         )
         .where(and(...predicates)!);
       return sql`exists (${sq})`;

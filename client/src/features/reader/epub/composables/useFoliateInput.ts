@@ -200,6 +200,7 @@ export function useFoliateInput(
       'click',
       (e: MouseEvent) => {
         if (Date.now() - lastTouchTime < 500) return
+        if (!longHoldTimeout) return
         const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null
         if (!iframe) return
         const rect = iframe.getBoundingClientRect()
@@ -264,7 +265,6 @@ export function useFoliateInput(
     setTimeout(() => {
       if (isTapNavigationSuppressed()) return
       if (Date.now() - lastClickTime < DOUBLE_CLICK_MS) return
-      if (!longHoldTimeout) return
       if (isNavigating) return
 
       const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0

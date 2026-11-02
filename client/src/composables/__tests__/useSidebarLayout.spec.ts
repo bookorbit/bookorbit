@@ -11,7 +11,7 @@ vi.mock('@/composables/useSidebarPrefs', () => ({
 }))
 
 vi.mock('@/composables/useSidebarSections', () => ({
-  SIDEBAR_SECTIONS: [{ id: 'libraries' }, { id: 'smartScopes' }, { id: 'collections' }, { id: 'podcasts' }],
+  SIDEBAR_SECTIONS: [{ id: 'libraries' }, { id: 'smartScopes' }, { id: 'collections' }],
 }))
 
 vi.mock('@/composables/useSidebarNav', () => ({
@@ -22,7 +22,6 @@ vi.mock('@/composables/useSidebarNav', () => ({
     { id: 'book-dock', zone: 'primary' },
     { id: 'book-requests', zone: 'primary' },
     { id: 'tools', zone: 'primary' },
-    { id: 'podcast-queue', zone: 'primary' },
     { id: 'authors', zone: 'browse' },
     { id: 'series', zone: 'browse' },
     { id: 'annotations', zone: 'reading' },
@@ -51,7 +50,7 @@ describe('useSidebarLayout', () => {
   })
 
   it("keeps today's group order by default: Browse, the list sections, then Reading", () => {
-    expect(SIDEBAR_DEFAULT_GROUP_ORDER).toEqual(['browse', 'libraries', 'smartScopes', 'collections', 'podcasts', 'reading'])
+    expect(SIDEBAR_DEFAULT_GROUP_ORDER).toEqual(['browse', 'libraries', 'smartScopes', 'collections', 'reading'])
   })
 
   describe('hiding', () => {
@@ -117,12 +116,27 @@ describe('useSidebarLayout', () => {
       ])
     })
 
-    it('stores a row move without disturbing rows the current mode does not show', () => {
+    it('stores a row move without disturbing rows a permission keeps off screen', () => {
       const { moveRows } = useSidebarLayout()
 
-      moveRows('primary', ['dashboard', 'tools', 'book-dock', 'book-requests'])
+      moveRows('primary', ['dashboard', 'tools', 'book-dock'])
 
-      expect(layout.rowOrder.primary).toEqual(['dashboard', 'tools', 'book-dock', 'book-requests', 'podcast-queue'])
+      expect(layout.rowOrder.primary).toEqual(['dashboard', 'tools', 'book-requests', 'book-dock'])
+    })
+
+    it('ignores stored ids of groups and rows that no longer exist', () => {
+      const { arrangeGroups, arrangeRows } = useSidebarLayout()
+      layout.groupOrder = ['retired-group', 'reading', 'other-retired-group', 'browse']
+      layout.rowOrder = { primary: ['retired-row', 'tools', 'dashboard'] }
+      const groups = [{ id: 'browse' }, { id: 'libraries' }, { id: 'smartScopes' }, { id: 'collections' }, { id: 'reading' }]
+
+      expect(ids(arrangeGroups(groups))).toEqual(['reading', 'browse', 'libraries', 'smartScopes', 'collections'])
+      expect(ids(arrangeRows('primary', [entry('dashboard'), entry('book-dock'), entry('book-requests'), entry('tools')]))).toEqual([
+        'dashboard',
+        'tools',
+        'book-dock',
+        'book-requests',
+      ])
     })
 
     it('ignores ids that do not belong to the zone', () => {
@@ -140,8 +154,7 @@ describe('useSidebarLayout', () => {
       moveGroups(['reading', 'browse', 'libraries', 'smartScopes', 'collections'])
 
       expect(ids(arrangeGroups(groups))).toEqual(['reading', 'browse', 'libraries', 'smartScopes', 'collections'])
-      // `podcasts` is off screen in books mode and keeps its slot; the moved groups fill the others.
-      expect(layout.groupOrder).toEqual(['reading', 'browse', 'libraries', 'smartScopes', 'podcasts', 'collections'])
+      expect(layout.groupOrder).toEqual(['reading', 'browse', 'libraries', 'smartScopes', 'collections'])
     })
   })
 

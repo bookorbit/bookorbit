@@ -54,11 +54,11 @@ end
 function CatalogDetail.detailSeriesParams(detail)
     if not detail then return nil end
     if detail.seriesId then
-        return { seriesId = tonumber(detail.seriesId), sort = "title" }
+        return { seriesId = tonumber(detail.seriesId), sort = "series" }
     end
     local name = cleanInlineText(detail.seriesName)
     if not name then return nil end
-    return { series = name, sort = "title" }
+    return { series = name, sort = "series" }
 end
 
 function CatalogDetail.detailSeriesText(detail)

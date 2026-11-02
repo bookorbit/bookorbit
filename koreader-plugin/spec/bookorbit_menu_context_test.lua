@@ -16,7 +16,9 @@ package.loaded["ffi/util"] = {
 }
 
 local ticks = {}
+local sent_events = {}
 package.loaded["device"] = { model = "test-device" }
+package.loaded["ui/event"] = { new = function(_, name) return { name = name } end }
 package.loaded["ui/widget/infomessage"] = { new = function(_, opts) return opts end }
 package.loaded["ui/widget/inputdialog"] = {}
 package.loaded["ui/network/manager"] = {
@@ -26,6 +28,7 @@ package.loaded["ui/widget/notification"] = {}
 package.loaded["ui/uimanager"] = {
     nextTick = function(_, callback) table.insert(ticks, callback) end,
     tickAfterNext = function(_, callback) table.insert(ticks, callback) end,
+    sendEvent = function(_, event) table.insert(sent_events, event.name) end,
     show = function() end,
 }
 package.loaded["ffi/sha2"] = { md5 = function(value) return value end }
@@ -166,15 +169,18 @@ local function run(action)
 end
 run({ kind = "home" })
 run({ kind = "exit" })
+run({ kind = "files" })
 run({ kind = "search" })
 run({ kind = "link", link = "authors" })
 run({ kind = "list-options" })
-assertEqual(table.concat(events, ","), "home,exit,search,link:authors,list-options", "catalog actions reach the catalog")
-assertEqual(closes, 5, "every action closes the sheet first")
+assertEqual(table.concat(events, ","), "home,exit,exit,search,link:authors,list-options", "catalog actions reach the catalog")
+assertEqual(table.concat(sent_events, ","), "Home", "Files asks KOReader to open its file browser")
+assertEqual(sheet_plugin.skip_return_home_once, true, "Files bypasses the BookOrbit home preference once")
+assertEqual(closes, 6, "every action closes the sheet first")
 
 -- Sync now keeps the sheet open: its tile shows the run, then the outcome.
 run({ kind = "sync" })
-assertEqual(closes, 5, "Sync now leaves the sheet open")
+assertEqual(closes, 6, "Sync now leaves the sheet open")
 assertEqual(sheet_calls[1][1], "startSweep", "Sync now starts a library sync")
 local sweep = sheet_calls[1][2]
 assertEqual(sweep.quiet, true, "the sync reports to the sheet, not a dialog")

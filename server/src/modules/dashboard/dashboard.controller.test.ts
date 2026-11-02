@@ -88,9 +88,9 @@ describe('DashboardController', () => {
       const mockResult = { items: [{ type: 'reading-goal' as const, data: null, failed: false }] };
       widgetService.getWidgets.mockResolvedValue(mockResult);
 
-      const result = await controller.getWidgets(user, { widgets: ['reading-goal', 'reading-dna'] });
+      const result = await controller.getWidgets(user, { widgets: ['reading-goal', 'reading-dna'] }, 'de');
 
-      expect(widgetService.getWidgets).toHaveBeenCalledWith(['reading-goal', 'reading-dna'], user);
+      expect(widgetService.getWidgets).toHaveBeenCalledWith(['reading-goal', 'reading-dna'], user, 'de');
       expect(result).toBe(mockResult);
     });
 
@@ -99,9 +99,9 @@ describe('DashboardController', () => {
       const user = makeUser();
       widgetService.getWidgets.mockResolvedValue({ items: [] });
 
-      await controller.getWidgets(user, { widgets: ['reading-goal', 'reading-goal', 'reading-dna'] });
+      await controller.getWidgets(user, { widgets: ['reading-goal', 'reading-goal', 'reading-dna'] }, 'en');
 
-      expect(widgetService.getWidgets).toHaveBeenCalledWith(['reading-goal', 'reading-dna'], user);
+      expect(widgetService.getWidgets).toHaveBeenCalledWith(['reading-goal', 'reading-dna'], user, 'en');
     });
 
     it('refresh clears cached widgets for the current user', () => {
@@ -171,10 +171,21 @@ describe('DashboardController', () => {
       expect(result).toEqual(mockResult);
     });
 
+    it('getMonthlyChallenge passes the request language to widgetService', async () => {
+      const { controller, widgetService } = makeController();
+      const user = makeUser();
+      const mockResult = { challengeType: 'page-milestone', progress: 0, target: 500 };
+      widgetService.getMonthlyChallenge.mockResolvedValue(mockResult);
+
+      const result = await controller.getMonthlyChallenge(user, 'fr');
+
+      expect(widgetService.getMonthlyChallenge).toHaveBeenCalledWith(user, 'fr');
+      expect(result).toEqual(mockResult);
+    });
+
     it.each([
       ['getHighlightOfTheDay', { text: 'quote', bookId: 1 }],
       ['getHighlights', [{ text: 'quote', bookId: 1 }]],
-      ['getMonthlyChallenge', { challengeType: 'page-milestone', progress: 0, target: 500 }],
       ['getYearProjection', { projectedBooks: 30, daysRemaining: 200 }],
       ['getNeglectedGems', { gems: [] }],
       ['getReadingDna', { archetype: 'Reader', booksAnalyzed: 10 }],

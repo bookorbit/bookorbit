@@ -25,7 +25,6 @@ import {
   Mail,
   Palette,
   PanelBottom,
-  Podcast,
   Rss,
   ScrollText,
   Server,
@@ -45,7 +44,7 @@ import {
   Wrench,
   Zap,
 } from '@lucide/vue'
-import { APP_FEATURES, Permission } from '@bookorbit/types'
+import { Permission } from '@bookorbit/types'
 
 export interface SettingsNavContext {
   isSuperuser: boolean
@@ -223,17 +222,6 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
           },
         ],
       },
-      ...(APP_FEATURES.podcasts
-        ? [
-            {
-              id: 'podcasts',
-              routeName: 'settings-podcasts',
-              labelKey: 'settings.common.nav.podcasts',
-              icon: Podcast,
-              keywords: 'podcast show episode feed download playback queue',
-            },
-          ]
-        : []),
       {
         id: 'notifications',
         routeName: 'settings-notifications',

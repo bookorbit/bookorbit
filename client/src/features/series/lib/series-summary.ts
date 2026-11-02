@@ -4,10 +4,10 @@ import type { SeriesSummary, SeriesVolumeSlot } from '@bookorbit/types'
  * What a row actually shows, derived once so the grid card and the list row can never
  * disagree about a series.
  *
- * The volume counts come from the ladder rather than from `bookCount`, because a library holding
- * the same volume twice - one ebook, one audiobook - owns two books and one volume, and "3 of 7"
- * only reads correctly when it counts volumes. When there is no ladder to count, the book counts
- * stand in.
+ * The volume counts are the server's logical-volume counts rather than `bookCount`, because a
+ * library holding the same volume twice - one ebook, one audiobook - owns two books and one
+ * volume, and "3 of 7" only reads correctly when it counts volumes. They are not counted from
+ * `volumes`, which is capped and would stop a long series at the cap.
  */
 export type SeriesRowFacts = {
   ownedVolumes: number
@@ -23,10 +23,9 @@ export type SeriesRowFacts = {
 }
 
 export function seriesRowFacts(series: SeriesSummary): SeriesRowFacts {
-  const slots = series.volumes
-  const owned = slots.length > 0 ? slots.filter((slot) => slot.bookId !== null).length : series.bookCount
-  const read = slots.length > 0 ? slots.filter((slot) => slot.status === 'read').length : series.readCount
-  const reading = slots.length > 0 ? slots.filter((slot) => slot.status === 'reading').length : series.readingCount
+  const owned = series.ownedVolumeCount
+  const read = series.readVolumeCount
+  const reading = series.readingVolumeCount
 
   return {
     ownedVolumes: owned,
@@ -37,7 +36,7 @@ export function seriesRowFacts(series: SeriesSummary): SeriesRowFacts {
     isStarted: read > 0 || reading > 0,
     isSingleVolume: owned === 1,
     hasGaps: series.gapCount > 0,
-    isNumbered: slots.some((slot) => slot.index !== null),
+    isNumbered: series.volumes.some((slot) => slot.index !== null),
   }
 }
 

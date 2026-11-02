@@ -65,12 +65,10 @@ describe('BookDockSetDestinationDialog', () => {
   })
 
   it('keeps the existing first-library default and updates the folder when choosing another', async () => {
-    libraries.value.unshift(makeLibrary({ id: 1, type: 'podcasts', name: 'Podcasts' }))
-    libraries.value.push(makeLibrary({ id: 4, name: 'Comics', folders: [{ id: 40, path: '/comics', role: 'downloads', createdAt: '2026-01-01' }] }))
+    libraries.value.push(makeLibrary({ id: 4, name: 'Comics', folders: [{ id: 40, path: '/comics', createdAt: '2026-01-01' }] }))
     mountDialog()
     await flushPromises()
     expect(wrapper.get<HTMLSelectElement>('select').element.value).toBe('3')
-    expect(wrapper.text()).not.toContain('Podcasts')
     await wrapper.get('select').setValue('4')
     await applyButton().trigger('click')
     expect(JSON.parse((api.mock.calls[0]![1] as RequestInit).body as string)).toMatchObject({ targetLibraryId: 4, targetFolderId: 40 })

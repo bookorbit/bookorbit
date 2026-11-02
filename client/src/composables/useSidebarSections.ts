@@ -1,12 +1,11 @@
-import { computed, type Component, type ComputedRef } from 'vue'
+import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { Aperture, BookCopy, FolderOpen, Podcast } from '@lucide/vue'
-import { APP_FEATURES, type LibraryType, type SidebarCappedSectionId } from '@bookorbit/types'
+import { Aperture, BookCopy, FolderOpen } from '@lucide/vue'
+import type { SidebarCappedSectionId } from '@bookorbit/types'
 import type { SidebarEntity } from '@/components/sidebar/SidebarEntitySection.vue'
-import { mediaOrderPersisters, type PersistOrder } from '@/components/sidebar/sidebar-order'
+import { orderPersister, type PersistOrder } from '@/components/sidebar/sidebar-order'
 import { formatNumber } from '@/i18n/formatters'
-import { useMediaMode } from '@/composables/useMediaMode'
 import { useSidebarLibraryActivity, type SidebarItemActivity } from '@/composables/useSidebarLibraryActivity'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -19,8 +18,6 @@ export type SidebarListKind = 'library' | 'smartScope' | 'collection'
 interface SidebarSectionDefinition {
   id: SidebarCappedSectionId
   kind: SidebarListKind
-  /** The media mode the section belongs to. */
-  medium: LibraryType
   icon: Component
   routeName: string
   /** Omit when the section has no index page; the see-all link is then suppressed. */
@@ -40,7 +37,6 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionDefinition[] = [
   {
     id: 'libraries',
     kind: 'library',
-    medium: 'books',
     icon: BookCopy,
     routeName: 'library',
     indexRouteName: 'libraries',
@@ -57,7 +53,6 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionDefinition[] = [
   {
     id: 'smartScopes',
     kind: 'smartScope',
-    medium: 'books',
     icon: Aperture,
     routeName: 'smartScope',
     indexRouteName: 'smart-scopes',
@@ -74,7 +69,6 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionDefinition[] = [
   {
     id: 'collections',
     kind: 'collection',
-    medium: 'books',
     icon: FolderOpen,
     routeName: 'collection',
     indexRouteName: 'collections',
@@ -86,52 +80,6 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionDefinition[] = [
       filterPlaceholder: 'components.sidebar.filterCollectionsPlaceholder',
       seeAll: 'components.sidebar.seeAllCollections',
       add: 'components.sidebar.newCollection',
-    },
-  },
-  {
-    id: 'podcasts',
-    kind: 'library',
-    medium: 'podcasts',
-    icon: Podcast,
-    routeName: 'podcast-library',
-    indexRouteName: 'podcast-libraries',
-    copy: {
-      label: 'components.sidebar.podcasts',
-      empty: 'components.sidebar.noPodcastLibraries',
-      filter: 'components.sidebar.filterPodcastLibraries',
-      filterPlaceholder: 'components.sidebar.filterPodcastLibrariesPlaceholder',
-      seeAll: 'components.sidebar.seeAllPodcastLibraries',
-      add: 'components.sidebar.newPodcastLibrary',
-    },
-  },
-  {
-    id: 'podcastScopes',
-    kind: 'smartScope',
-    medium: 'podcasts',
-    icon: Aperture,
-    routeName: 'podcast-playlist',
-    copy: {
-      label: 'components.sidebar.playlists',
-      empty: 'components.sidebar.noPlaylists',
-      filter: 'components.sidebar.filterPlaylists',
-      filterPlaceholder: 'components.sidebar.filterPlaylistsPlaceholder',
-      seeAll: 'components.sidebar.seeAllPlaylists',
-      add: 'components.sidebar.newPlaylist',
-    },
-  },
-  {
-    id: 'podcastCollections',
-    kind: 'collection',
-    medium: 'podcasts',
-    icon: FolderOpen,
-    routeName: 'podcast-collection',
-    copy: {
-      label: 'components.sidebar.collections',
-      empty: 'components.sidebar.noPodcastCollections',
-      filter: 'components.sidebar.filterPodcastCollections',
-      filterPlaceholder: 'components.sidebar.filterPodcastCollectionsPlaceholder',
-      seeAll: 'components.sidebar.seeAllPodcastCollections',
-      add: 'components.sidebar.newPodcastCollection',
     },
   },
 ]
@@ -156,7 +104,6 @@ export interface SidebarSectionProps {
 export interface SidebarSection {
   id: SidebarCappedSectionId
   kind: SidebarListKind
-  medium: LibraryType
   icon: Component
   props: SidebarSectionProps
   /** The rest is expanded-list only: rail popovers neither reorder, anchor the tour, nor show progress. */
@@ -169,42 +116,25 @@ export interface SidebarSection {
 export function useSidebarSections() {
   const { t } = useI18n()
   const route = useRoute()
-  const { mode } = useMediaMode()
   const { hasPermission } = usePermissions()
   const { libraries, reorderLibraries } = useLibraries()
-  const { bookScopes, podcastScopes, reorderSmartScopes } = useSmartScopes()
-  const { bookCollections, podcastCollections, reorderCollections } = useCollections()
+  const { smartScopes, reorderSmartScopes } = useSmartScopes()
+  const { collections, reorderCollections } = useCollections()
   const { activityFor } = useSidebarLibraryActivity()
 
-  const bookLibraries = computed(() => libraries.value.filter((library) => library.type !== 'podcasts'))
-  const podcastLibraries = computed(() => libraries.value.filter((library) => library.type === 'podcasts'))
-  /** Books-only users never see the mode switcher; the library creator is their entry point into podcasts. */
-  const podcastsAvailable = computed(() => APP_FEATURES.podcasts && podcastLibraries.value.length > 0)
   const canManageLibraries = computed(() => hasPermission('manage_libraries'))
 
-  const lists: Record<SidebarListKind, Record<LibraryType, ComputedRef<SidebarEntity[]>>> = {
-    library: { books: bookLibraries, podcasts: podcastLibraries },
-    smartScope: { books: bookScopes, podcasts: podcastScopes },
-    collection: { books: bookCollections, podcasts: podcastCollections },
+  const lists: Record<SidebarListKind, () => SidebarEntity[]> = {
+    library: () => libraries.value,
+    smartScope: () => smartScopes.value,
+    collection: () => collections.value,
   }
 
   // Shared scopes and collections belong to their owner, so their display order is not this user's to persist.
-  const persistOrder: Record<SidebarListKind, Record<LibraryType, PersistOrder>> = {
-    library: mediaOrderPersisters({
-      books: () => bookLibraries.value,
-      podcasts: () => podcastLibraries.value,
-      reorder: reorderLibraries,
-    }),
-    smartScope: mediaOrderPersisters({
-      books: () => bookScopes.value.filter((scope) => scope.isOwner),
-      podcasts: () => podcastScopes.value.filter((scope) => scope.isOwner),
-      reorder: reorderSmartScopes,
-    }),
-    collection: mediaOrderPersisters({
-      books: () => bookCollections.value.filter(canMutateCollection),
-      podcasts: () => podcastCollections.value.filter(canMutateCollection),
-      reorder: reorderCollections,
-    }),
+  const persistOrder: Record<SidebarListKind, PersistOrder> = {
+    library: orderPersister(() => libraries.value, reorderLibraries),
+    smartScope: orderPersister(() => smartScopes.value.filter((scope) => scope.isOwner), reorderSmartScopes),
+    collection: orderPersister(() => collections.value.filter(canMutateCollection), reorderCollections),
   }
 
   function activeIdFor(routeName: string): number | null {
@@ -212,18 +142,12 @@ export function useSidebarSections() {
     return route.name === routeName && id ? Number(id) : null
   }
 
-  function canAdd(definition: SidebarSectionDefinition): boolean {
-    if (definition.kind === 'library') return canManageLibraries.value
-    return definition.medium === 'books' || podcastsAvailable.value
-  }
-
   function resolve(definition: SidebarSectionDefinition): SidebarSection {
-    const items = lists[definition.kind][definition.medium].value
+    const items = lists[definition.kind]()
     const isLibrary = definition.kind === 'library'
     return {
       id: definition.id,
       kind: definition.kind,
-      medium: definition.medium,
       icon: definition.icon,
       props: {
         sectionId: definition.id,
@@ -237,17 +161,17 @@ export function useSidebarSections() {
         filterLabel: t(definition.copy.filter),
         filterPlaceholder: t(definition.copy.filterPlaceholder),
         seeAllLabel: t(definition.copy.seeAll, { count: formatNumber(items.length) }),
-        canAdd: canAdd(definition),
+        canAdd: isLibrary ? canManageLibraries.value : true,
         addLabel: t(definition.copy.add),
       },
       tourId: definition.tourId,
       canReorder: isLibrary ? canManageLibraries.value : true,
-      persistOrder: persistOrder[definition.kind][definition.medium],
+      persistOrder: persistOrder[definition.kind],
       activity: isLibrary ? activityFor : undefined,
     }
   }
 
-  const sections = computed(() => SIDEBAR_SECTIONS.filter((definition) => definition.medium === mode.value).map(resolve))
+  const sections = computed(() => SIDEBAR_SECTIONS.map(resolve))
 
-  return { sections, podcastLibraries, podcastsAvailable }
+  return { sections }
 }

@@ -5,14 +5,14 @@ import EmptyState from '../EmptyState.vue'
 describe('EmptyState', () => {
   it('renders the icon, title, hint, and actions', () => {
     const wrapper = mount(EmptyState, {
-      props: { icon: 'ListMusic', title: 'No episodes yet', hint: 'Follow a show to see its episodes here.' },
-      slots: { actions: '<button type="button">Browse shows</button>' },
+      props: { icon: 'ListMusic', title: 'No books yet', hint: 'Add a library to see its books here.' },
+      slots: { actions: '<button type="button">Add a library</button>' },
     })
 
     expect(wrapper.find('.lucide-list-music').exists()).toBe(true)
-    expect(wrapper.get('h2').text()).toBe('No episodes yet')
-    expect(wrapper.get('p').text()).toBe('Follow a show to see its episodes here.')
-    expect(wrapper.get('button').text()).toBe('Browse shows')
+    expect(wrapper.get('h2').text()).toBe('No books yet')
+    expect(wrapper.get('p').text()).toBe('Add a library to see its books here.')
+    expect(wrapper.get('button').text()).toBe('Add a library')
   })
 
   it('collapses to the title alone when nothing else is supplied', () => {

@@ -87,11 +87,7 @@ export class BookDockRepository {
 
   /** Whether a book library with this id exists. An app setting can outlive the library it names. */
   async bookLibraryExists(libraryId: number): Promise<boolean> {
-    const [row] = await this.db
-      .select({ id: libraries.id })
-      .from(libraries)
-      .where(and(eq(libraries.id, libraryId), eq(libraries.type, 'books')))
-      .limit(1);
+    const [row] = await this.db.select({ id: libraries.id }).from(libraries).where(eq(libraries.id, libraryId)).limit(1);
     return row !== undefined;
   }
 

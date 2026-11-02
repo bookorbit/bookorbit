@@ -10,6 +10,7 @@ import {
   setAccessToken,
   setOnAuthFailure,
 } from '@/lib/api'
+import { setI18nLocale } from '@/i18n'
 
 /** A token shaped like a real JWT, so the client can read `exp` out of it. Never verified here. */
 function signedToken(expiresInSeconds: number): string {
@@ -152,6 +153,37 @@ describe('api wrapper', () => {
       const refused = await refreshAccessToken().catch((reason: unknown) => reason)
       expect(refused).toBeInstanceOf(Error)
       expect(refused).not.toBeInstanceOf(NetworkError)
+    })
+  })
+
+  describe('language', () => {
+    afterEach(async () => {
+      await setI18nLocale('en')
+    })
+
+    it('asks for server text in the language picked in Settings', async () => {
+      const languages: (string | null)[] = []
+      globalThis.fetch = vi.fn<typeof fetch>((_input: RequestInfo | URL, init?: RequestInit) => {
+        languages.push(new Headers(init?.headers).get('Accept-Language'))
+        return Promise.resolve(new Response('', { status: 200 }))
+      }) as never
+      await setI18nLocale('nl')
+
+      await api('/api/v1/achievements')
+
+      expect(languages).toEqual(['nl'])
+    })
+
+    it('keeps an Accept-Language the caller set itself', async () => {
+      const languages: (string | null)[] = []
+      globalThis.fetch = vi.fn<typeof fetch>((_input: RequestInfo | URL, init?: RequestInit) => {
+        languages.push(new Headers(init?.headers).get('Accept-Language'))
+        return Promise.resolve(new Response('', { status: 200 }))
+      }) as never
+
+      await api('/api/v1/achievements', { headers: { 'Accept-Language': 'de' } })
+
+      expect(languages).toEqual(['de'])
     })
   })
 

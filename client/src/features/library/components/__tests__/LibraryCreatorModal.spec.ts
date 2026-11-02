@@ -1,4 +1,4 @@
-import { flushPromises, mount, shallowMount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, shallowMount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Library } from '@bookorbit/types'
 import { i18n } from '@/i18n'
@@ -7,7 +7,6 @@ import LibraryCreatorDetails from '../LibraryCreatorDetails.vue'
 import LibraryCreatorFolders from '../LibraryCreatorFolders.vue'
 import LibraryCreatorModal from '../LibraryCreatorModal.vue'
 import LibraryCreatorScanner from '../LibraryCreatorScanner.vue'
-import LibraryCreatorSchedule from '../LibraryCreatorSchedule.vue'
 
 const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>())
 
@@ -37,7 +36,7 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     id: 9,
     name: 'Fantasy',
     icon: 'Swords',
-    folders: [{ id: 1, path: '/books', role: 'downloads', createdAt: '2026-01-01T00:00:00.000Z' }],
+    folders: [{ id: 1, path: '/books', createdAt: '2026-01-01T00:00:00.000Z' }],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -188,17 +187,6 @@ describe('LibraryCreatorModal', () => {
     wrapper.unmount()
   })
 
-  it('clamps attempted podcast creation to a book library', async () => {
-    const wrapper = await mountCreator()
-
-    const details = wrapper.getComponent(LibraryCreatorDetails)
-    details.vm.$emit('update:type', 'podcasts')
-    await wrapper.vm.$nextTick()
-
-    expect(details.props('type')).toBe('books')
-    wrapper.unmount()
-  })
-
   it('shows sections as a drill-in list on narrow screens', async () => {
     stubViewport(false)
     const wrapper = await mountCreator()
@@ -259,14 +247,5 @@ describe('LibraryCreatorModal', () => {
     await footerButton(wrapper, 'Done').trigger('click')
     expect(wrapper.emitted('saved')).toEqual([[created]])
     wrapper.unmount()
-  })
-
-  it('renders only folder watching when scan scheduling is unavailable', () => {
-    const wrapper = mount(LibraryCreatorSchedule, {
-      props: { watch: true, autoScanCronExpression: null, showAutoScanSchedule: false },
-    })
-
-    expect(wrapper.text()).toContain('Watch folders')
-    expect(wrapper.text()).not.toContain('Auto-scan schedule')
   })
 })

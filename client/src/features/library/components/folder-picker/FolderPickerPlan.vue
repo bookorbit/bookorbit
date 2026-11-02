@@ -17,24 +17,21 @@ const { t } = useI18n()
 const picker = useFolderPickerContext()
 
 const selected = computed(() => picker.selection.selected.value)
-const storage = computed(() => picker.kind.value === 'podcastStorage')
 const wide = computed(() => props.width >= 480)
-const suggestions = computed(() => {
-  if (picker.kind.value !== 'books') return []
-  return (picker.data.unclaimed.value?.folders ?? [])
+const suggestions = computed(() =>
+  (picker.data.unclaimed.value?.folders ?? [])
     .map((folder) => ({ ...folder, path: normalizeFolderPath(folder.path) }))
     .filter(
       (folder) =>
         !selected.value.some((path) => isAtOrInside(folder.path, path)) && !picker.own.value.some((path) => isAtOrInside(folder.path, path)),
     )
-    .slice(0, selected.value.length ? 3 : 5)
-})
+    .slice(0, selected.value.length ? 3 : 5),
+)
 
 function ownBooks(path: string): string {
   const summary = picker.data.summaries.get(path)
   if (!summary) return ''
-  const count = picker.kind.value === 'books' ? booksAs(summary, picker.mode.value) : summary.files
-  return t('library.folderBrowser.plan.already', { books: picker.countLabel(count) })
+  return t('library.folderBrowser.plan.already', { books: picker.countLabel(booksAs(summary, picker.mode.value)) })
 }
 
 function onReveal(path: string) {
@@ -66,9 +63,9 @@ watch(
       <FolderPickerPreview v-if="picker.phone.value" />
       <div class="flex items-center gap-2 pb-2">
         <h4 class="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {{ storage ? t('library.folderBrowser.plan.storage') : t('library.folderBrowser.plan.willRead', { name: picker.libraryName.value }) }}
+          {{ t('library.folderBrowser.plan.willRead', { name: picker.libraryName.value }) }}
         </h4>
-        <span v-if="selected.length && !storage" class="ms-auto flex items-center gap-1 text-xs text-muted-foreground">
+        <span v-if="selected.length" class="ms-auto flex items-center gap-1 text-xs text-muted-foreground">
           {{ t('library.folderBrowser.plan.newFolders', { count: selected.length }) }}
         </span>
       </div>
@@ -84,10 +81,10 @@ watch(
       </ul>
       <div v-else class="rounded-lg border border-dashed border-border px-4 py-5 text-center">
         <p class="text-sm font-medium text-foreground">
-          {{ storage ? t('library.folderBrowser.plan.emptyStorageTitle') : t('library.folderBrowser.plan.emptyTitle') }}
+          {{ t('library.folderBrowser.plan.emptyTitle') }}
         </p>
         <p class="mt-1 text-xs text-muted-foreground">
-          {{ storage ? t('library.folderBrowser.plan.emptyStorageHint') : t('library.folderBrowser.plan.emptyHint') }}
+          {{ t('library.folderBrowser.plan.emptyHint') }}
         </p>
       </div>
       <div v-if="suggestions.length" class="mt-5">

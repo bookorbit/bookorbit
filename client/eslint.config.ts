@@ -27,12 +27,11 @@ export default defineConfigWithVueTs(
     files: ['src/**/__tests__/*', 'src/**/*.spec.ts', 'src/**/*.test.ts'],
   },
 
-  // Named handlers only: an inline arrow in a template cannot be named, reused or tested, and the
-  // podcast feature was swept clean of them. The rest of the app still carries several hundred, so
-  // widening this is its own task rather than a side effect of one feature's refactor.
+  // Named handlers only: an inline arrow in a template cannot be named, reused or tested. The rest
+  // of the app still carries several hundred, so widening this is its own task rather than a side
+  // effect of one feature's refactor.
   {
     files: [
-      'src/features/podcast/**/*.vue',
       'src/components/FormSheet.vue',
       'src/features/collection/components/CollectionMembershipList.vue',
       'src/features/book/components/metadata-match/*.vue',

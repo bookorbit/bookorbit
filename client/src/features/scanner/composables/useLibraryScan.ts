@@ -2,7 +2,6 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { Library } from '@bookorbit/types'
 import { api } from '@/lib/api'
-import { jsonBody } from '@/lib/api-json'
 import { useScanProgress } from './useScanProgress'
 
 /**
@@ -13,19 +12,16 @@ export function useLibraryScan() {
   const { t } = useI18n()
   const { subscribeLibrary } = useScanProgress()
 
-  function request(library: Pick<Library, 'id' | 'type'>): Promise<Response> {
-    if (library.type === 'podcasts') {
-      return api(`/api/v1/podcast-libraries/${library.id}/import-scan`, jsonBody('POST', { dryRun: false }))
-    }
+  function request(library: Pick<Library, 'id'>): Promise<Response> {
     return api(`/api/v1/scanner/libraries/${library.id}/scan`, { method: 'POST' })
   }
 
-  async function scanLibrary(library: Pick<Library, 'id' | 'type' | 'name'>): Promise<boolean> {
+  async function scanLibrary(library: Pick<Library, 'id' | 'name'>): Promise<boolean> {
     try {
       const res = await request(library)
       if (res.ok) {
         toast.success(t('settings.admin.libraries.scanStarted', { name: library.name }))
-        if (library.type !== 'podcasts') subscribeLibrary(library.id)
+        subscribeLibrary(library.id)
         return true
       }
       toast.error(t('settings.admin.libraries.scanStartFailed', { name: library.name }))

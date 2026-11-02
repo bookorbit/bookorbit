@@ -4457,18 +4457,6 @@
       "seeAllLibraries": "Se alle biblioteker ({count})",
       "seeAllSmartScopes": "Se alle smarte skoper ({count})",
       "seeAllCollections": "Se alle samlinger ({count})",
-      "podcasts": "Podcasts",
-      "newPodcastLibrary": "New Podcast Library",
-      "noPodcastLibraries": "No podcast libraries yet",
-      "filterPodcastLibraries": "Filter podcast libraries",
-      "filterPodcastLibrariesPlaceholder": "Filter podcast libraries...",
-      "seeAllPodcastLibraries": "See all podcast libraries ({count})",
-      "queue": "Queue",
-      "mode": {
-        "books": "Books",
-        "podcasts": "Podcasts",
-        "switcherAria": "Switch between books and podcasts"
-      },
       "updateAvailable": "Opdater {version}",
       "zones": {
         "browse": "Gennemse"
@@ -4588,8 +4576,7 @@
       "sort": {
         "custom": "Tilpasset ordre",
         "name": "Navn",
-        "bookCount": "Antal bøger",
-        "showCount": "Show count"
+        "bookCount": "Antal bøger"
       },
       "ascending": "Stigende",
       "descending": "Faldende",
@@ -4598,9 +4585,7 @@
       "noMatches": "Ingen match",
       "noMatchesHint": "Prøv et andet søgeord.",
       "bookCount": "Bøger: {count}",
-      "showCount": "Shows: {count}",
       "librariesEmptyHint": "Opret et bibliotek for at begynde at tilføje bøger.",
-      "podcastLibrariesEmptyHint": "Create a podcast library to start following shows.",
       "smartScopesEmptyHint": "Smart scopes gemme et sæt filtre, du bruger ofte.",
       "collectionsEmptyHint": "Samlinger gruppebøger, du vælger i hånden."
     }
@@ -4646,7 +4631,6 @@
       "empty": {
         "continueReading": "Ingen bøger i gang endnu. Begynd at læse en for at se den her.",
         "continueListening": "Ingen audiobooks i gang endnu. Begynd at lytte til en for at se det her.",
-        "continuePodcasts": "No podcast episodes in progress yet. Start one to see it here.",
         "wantToRead": "Ingen bøger markeret ønsker at læse endnu.",
         "upNextInSeries": "Ingen næste-serie plukker endnu. Afslut et volumen til overfladen den næste.",
         "recentlyAdded": "Ingen bøger i dit bibliotek endnu.",
@@ -4678,7 +4662,6 @@
         "recentlyAdded": "Senest Tilføjet",
         "continueReading": "Fortsæt Læsning",
         "continueListening": "Fortsæt Lytning",
-        "continuePodcasts": "Continue Podcasts",
         "wantToRead": "Vil du læse",
         "upNextInSeries": "Næste i serie",
         "random": "Opdag Noget Nyt",
@@ -4988,15 +4971,7 @@
     }
   },
   "errors": {
-    "network": "Could not reach BookOrbit. Check your connection, then try again.",
-    "codes": {
-      "PODCAST_LOCAL_NO_REFRESH": "This show has no feed, so there is nothing to refresh.",
-      "PODCAST_LOCAL_NO_DOWNLOAD": "This episode is one of your own files, so there is nothing to download. Your copy is already the only one.",
-      "PODCAST_LOCAL_FILE_NOT_REMOVABLE": "This episode is one of your own files, so BookOrbit will not delete it. Remove it from the folder yourself.",
-      "PODCAST_LOCAL_MEDIA_MISSING": "The only copy of this episode is no longer on disk, so it cannot be played.",
-      "PODCAST_LOCAL_FOLDER_EMPTY": "This folder holds no audio BookOrbit can import, so it cannot become a show.",
-      "PODCAST_STORAGE_FULL": "This podcast library is out of storage. Free some space or raise its quota, then try again. Files that belong to local shows are never removed to make room."
-    }
+    "network": "Could not reach BookOrbit. Check your connection, then try again."
   },
   "hardcover": {
     "settings": {
@@ -5232,9 +5207,7 @@
         "browseDescription": "Vælg en eller flere mapper uden at forlade browseren.",
         "selectedTitle": "Valgte mapper",
         "addFolders": "Tilføj mapper",
-        "manualEntry": "Indtast en sti manuelt",
         "absolutePath": "Absolut serversti",
-        "addFolder": "Tilføj mappe",
         "removeFolder": "Fjern {folder}",
         "manualCheckHint": "Manuelle stier kontrolleres sammen med resten af de valgte mapper.",
         "pathPlaceholder": "/sti/til/bøger",
@@ -6559,7 +6532,6 @@
       "retry": "Forsøg igen"
     },
     "bookView": {
-      "sort": "Sortér",
       "sortOn": "Til",
       "resetSort": "Nulstil sortering til standard",
       "filters": "Filtre",
@@ -6739,7 +6711,6 @@
   "titles": {
     "dashboard": "Instrumentbræt",
     "libraries": "Biblioteker",
-    "podcastLibraries": "Podcast Libraries",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader Synkronisering",

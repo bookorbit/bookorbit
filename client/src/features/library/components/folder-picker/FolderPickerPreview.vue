@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, CircleCheck, Database, Lightbulb, Lock, Plus, TriangleAlert } from '@lucide/vue'
+import { CircleCheck, Database, Lock, Plus, TriangleAlert } from '@lucide/vue'
 import { formatBytes } from '@/lib/formatting'
 import { leafName, overlapStatus } from '../../composables/folder-picker/folder-picker-rules'
 import { useFolderPickerContext } from '../../composables/folder-picker/folder-picker-context'
@@ -31,8 +31,6 @@ const inspection = computed(() => (path.value ? picker.data.inspections.get(path
 const failed = computed(() => !!path.value && picker.data.failedInspections.has(path.value))
 const books = computed(() => (path.value ? picker.booksIn(path.value) : null))
 const overlap = computed(() => (path.value ? overlapStatus(path.value, picker.others.value) : null))
-const storage = computed(() => picker.kind.value === 'podcastStorage')
-const bookLibrary = computed(() => picker.kind.value === 'books')
 
 const blockReason = computed(() => {
   const current = status.value
@@ -42,19 +40,9 @@ const blockReason = computed(() => {
   return { icon: CircleCheck, text: t('library.folderBrowser.reason.own', { name: leafName(path.value) }) }
 })
 
-const held = computed(() => {
-  const found = inspection.value
-  if (!found) return ''
-  const parts = [
-    found.files ? picker.holdsLabel(found.files) : '',
-    found.folders ? t('library.folderBrowser.plan.holdsFolders', { count: found.folders }) : '',
-  ].filter(Boolean)
-  return parts.length === 2 ? t('library.folderBrowser.plan.holdsBoth', { books: parts[0]!, folders: parts[1]! }) : (parts[0] ?? '')
-})
-
 const fit = computed(() => {
   const found = inspection.value
-  if (!bookLibrary.value || !found?.files) return null
+  if (!found?.files) return null
   if (picker.mode.value === 'book_per_folder' && found.mergedFolders > 0) return { warn: true, text: t('library.folderBrowser.plan.preview.merge') }
   if (picker.mode.value === 'book_per_file' && found.splitAudioFolders > 0) return { warn: true, text: t('library.folderBrowser.plan.preview.split') }
   return {
@@ -111,9 +99,8 @@ onBeforeUnmount(() => {
           class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
           @click="onAdd"
         >
-          <Check v-if="!picker.multiple.value" :size="13" aria-hidden="true" />
-          <Plus v-else :size="13" aria-hidden="true" />
-          {{ picker.multiple.value ? t('library.folderBrowser.plan.add') : t('library.folderBrowser.plan.preview.use') }}
+          <Plus :size="13" aria-hidden="true" />
+          {{ t('library.folderBrowser.plan.add') }}
         </button>
       </div>
       <p v-if="blockReason" class="mt-1.5 flex items-start gap-1.5 text-xs text-muted-foreground">
@@ -126,16 +113,7 @@ onBeforeUnmount(() => {
         <span class="block h-2.5 w-56 animate-pulse rounded-full bg-muted" />
       </div>
       <template v-else>
-        <p v-if="storage" class="mt-1 text-xs text-muted-foreground">
-          {{ held ? t('library.folderBrowser.plan.preview.holds', { what: held }) : t('library.folderBrowser.plan.preview.storageEmpty') }}
-        </p>
-        <i18n-t
-          v-else-if="books"
-          keypath="library.folderBrowser.plan.preview.wouldAdd"
-          tag="p"
-          scope="global"
-          class="mt-1 text-xs text-muted-foreground"
-        >
+        <i18n-t v-if="books" keypath="library.folderBrowser.plan.preview.wouldAdd" tag="p" scope="global" class="mt-1 text-xs text-muted-foreground">
           <template #books>
             <span class="font-medium text-foreground">{{ picker.countLabel(books) }}</span>
           </template>
@@ -147,11 +125,6 @@ onBeforeUnmount(() => {
           <TriangleAlert v-if="fit.warn" :size="13" class="mt-px shrink-0 text-warning" aria-hidden="true" />
           <CircleCheck v-else :size="13" class="mt-px shrink-0 text-success" aria-hidden="true" />
           <span>{{ fit.text }}</span>
-        </p>
-        <p v-if="storage" class="mt-1.5 flex items-start gap-1.5 text-xs text-foreground">
-          <Lightbulb v-if="held" :size="13" class="mt-px shrink-0 text-warning" aria-hidden="true" />
-          <CircleCheck v-else :size="13" class="mt-px shrink-0 text-success" aria-hidden="true" />
-          <span>{{ held ? t('library.folderBrowser.plan.preview.storageTip') : t('library.folderBrowser.plan.preview.storageFine') }}</span>
         </p>
         <p v-if="overlap" class="mt-1 flex items-start gap-1.5 text-xs text-foreground">
           <TriangleAlert :size="13" class="mt-px shrink-0 text-warning" aria-hidden="true" />

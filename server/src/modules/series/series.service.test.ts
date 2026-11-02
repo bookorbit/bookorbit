@@ -225,6 +225,36 @@ describe('SeriesService', () => {
       expect(item.volumesTruncated).toBe(true);
       expect(item.gapCount).toBe(0);
       expect(item.nextBookId).toBe(31);
+      expect(item).toMatchObject({ ownedVolumeCount: 900, readVolumeCount: 0, readingVolumeCount: 0 });
+    });
+
+    it('reports the true volume counts for a series longer than the ladder cap', async () => {
+      seriesRepo.findPage.mockResolvedValue({
+        items: [
+          summaryRow({
+            id: 10,
+            name: 'Hellblazer',
+            bookCount: 300,
+            readCount: 60,
+            members: Array.from({ length: 300 }, (_, i) => ({
+              bookId: 100 + i,
+              seriesIndex: String(i + 1),
+              title: `Issue ${i + 1}`,
+              status: i < 60 ? 'read' : null,
+            })),
+          }),
+        ],
+        total: 1,
+        facets: { ...EMPTY_FACETS, all: 1, inProgress: 1 },
+        page: 0,
+        size: 50,
+      });
+
+      const item = (await service.findAll(reqUser(), {})).items[0]!;
+
+      expect(item.volumes).toHaveLength(60);
+      expect(item.volumesTruncated).toBe(true);
+      expect(item).toMatchObject({ ownedVolumeCount: 300, readVolumeCount: 60, readingVolumeCount: 0 });
     });
 
     it('scopes to specific library when libraryId provided', async () => {

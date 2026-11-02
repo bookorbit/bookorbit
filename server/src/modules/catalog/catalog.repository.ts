@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
@@ -107,7 +107,7 @@ export class CatalogRepository {
     return this.db
       .select({ name: collections.name })
       .from(collections)
-      .where(and(eq(collections.userId, userId), eq(collections.mediaType, 'books'), accentInsensitiveIlike(collections.name, pattern)))
+      .where(and(or(eq(collections.userId, userId), eq(collections.isPublic, true)), accentInsensitiveIlike(collections.name, pattern)))
       .orderBy(collections.name)
       .limit(COLLECTION_SEARCH_LIMIT);
   }

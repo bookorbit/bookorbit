@@ -237,7 +237,7 @@ export class PathService {
     const rows = (await this.pathRepository?.findLibraryFolders()) ?? [];
     const libraries = new Map<number, FolderPickerLibrary>();
     for (const row of rows) {
-      const library = libraries.get(row.libraryId) ?? { id: row.libraryId, name: row.name, icon: row.icon, type: row.type, folders: [] };
+      const library = libraries.get(row.libraryId) ?? { id: row.libraryId, name: row.name, icon: row.icon, folders: [] };
       library.folders.push(row.path);
       libraries.set(row.libraryId, library);
     }

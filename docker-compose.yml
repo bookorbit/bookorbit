@@ -20,7 +20,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?required}
       POSTGRES_DB: ${POSTGRES_DB?required}
       JWT_SECRET: ${JWT_SECRET?required}
-      PODCAST_ENCRYPTION_KEY: ${PODCAST_ENCRYPTION_KEY:-}
       SETUP_BOOTSTRAP_TOKEN: ${SETUP_BOOTSTRAP_TOKEN?required}
       APP_URL: ${APP_URL?required}
       CLIENT_URL: ${CLIENT_URL:-${APP_URL?required}}

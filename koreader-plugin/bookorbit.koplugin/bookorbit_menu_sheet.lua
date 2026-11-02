@@ -200,6 +200,14 @@ function MenuSheet.body(d, w, o)
     local third = d.book and tile(last_w, th, "book-open", _("Back to book"), d.book, { kind = "exit" }, true)
         or tile(last_w, th, "folder-open", _("Files"), _("Close BookOrbit"), { kind = "exit" })
     local tiles = hstack({ w = w, gap = gap }, { first, second, third })
+    local file_browser = d.book and MenuUI.group(w, {
+        MenuUI.row(MenuUI.rowsIn(w), {
+            icon = "folder-open",
+            label = _("File browser"),
+            sub = _("Close this book and open KOReader files"),
+            action = { kind = "files" },
+        }),
+    }) or nil
 
     -- side_rows: a short screen sets the rows beside Go to, not under it.
     local nav_w = o.side_rows and math.floor((w - px(20)) * 0.6) or w
@@ -251,6 +259,8 @@ function MenuSheet.body(d, w, o)
         banner or false,
         banner and space(nil, px(12)) or false,
         tiles,
+        file_browser and space(nil, px(10)) or false,
+        file_browser or false,
         space(nil, px(16)),
         o.side_rows and hstack({ w = w, gap = px(20), valign = "top" }, {
             MenuUI.section(nav_w, _("Go to"), navGrid(nav_w, d, 2)),

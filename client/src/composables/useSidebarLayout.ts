@@ -70,7 +70,7 @@ export function useSidebarLayout() {
     return [...groups].sort((a, b) => rank(a) - rank(b))
   }
 
-  /** Stores the new order of the rows on screen; rows another mode or permission hides keep their slots. */
+  /** Stores the new order of the rows on screen; rows a permission hides keep their slots. */
   function moveRows(zoneId: string, ordered: readonly string[]) {
     const full = arrangeIds(defaultRowIds(zoneId), layout.rowOrder[zoneId])
     layout.rowOrder = {

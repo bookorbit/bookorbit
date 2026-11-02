@@ -1,9 +1,6 @@
 import type { FolderSummary, OrganizationMode } from '@bookorbit/types'
 import { consolidateFolderPaths, normalizeFolderPath } from '../folder-paths'
 
-/** What the picker is choosing folders for. */
-export type FolderPickerKind = 'books' | 'podcastStorage' | 'podcastLocal'
-
 export interface PickerLibrary {
   id: number | null
   name: string
@@ -104,9 +101,8 @@ export interface ToggleResult {
   folded: string[]
 }
 
-export function toggleFolder(selected: string[], path: string, multiple: boolean): ToggleResult {
+export function toggleFolder(selected: string[], path: string): ToggleResult {
   const normalized = normalizeFolderPath(path)
-  if (!multiple) return { selected: selected[0] === normalized ? [] : [normalized], folded: [] }
   if (selected.includes(normalized)) return { selected: selected.filter((folder) => folder !== normalized), folded: [] }
   const folded = selected.filter((folder) => isInside(folder, normalized))
   return { selected: consolidateFolderPaths([...selected, normalized]).sort(), folded }
@@ -118,7 +114,7 @@ export function booksAs(summary: FolderSummary | undefined, mode: OrganizationMo
   return mode === 'book_per_file' ? summary.files : summary.folderBooks
 }
 
-export type AttentionKind = 'contains' | 'overlap' | 'merge' | 'split' | 'notEmpty'
+export type AttentionKind = 'contains' | 'overlap' | 'merge' | 'split'
 
 export interface Attention {
   kind: AttentionKind
@@ -126,15 +122,9 @@ export interface Attention {
 }
 
 /** What a picked folder needs before it is added, or null when it is fine as it is. */
-export function attentionFor(
-  summary: FolderSummary | undefined,
-  status: FolderStatus | null,
-  mode: OrganizationMode,
-  kind: FolderPickerKind,
-): Attention | null {
-  if (kind === 'podcastStorage') return summary && (summary.files > 0 || summary.folders > 0) ? { kind: 'notEmpty' } : null
+export function attentionFor(summary: FolderSummary | undefined, status: FolderStatus | null, mode: OrganizationMode): Attention | null {
   if (status?.warn) return { kind: status.over === 'contains' ? 'contains' : 'overlap', status }
-  if (kind !== 'books' || !summary) return null
+  if (!summary) return null
   if (mode === 'book_per_folder' && summary.mergedFolders > 0) return { kind: 'merge' }
   if (mode === 'book_per_file' && summary.splitAudioFolders > 0) return { kind: 'split' }
   return null

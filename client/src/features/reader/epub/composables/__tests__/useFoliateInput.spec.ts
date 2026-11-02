@@ -551,6 +551,53 @@ describe('useFoliateInput', () => {
     }
   })
 
+  it.each([
+    { holdMs: 250, expectedNavigationCount: 1 },
+    { holdMs: 500, expectedNavigationCount: 0 },
+  ])('handles a $holdMs ms pointer hold before the delayed click-zone action', ({ holdMs, expectedNavigationCount }) => {
+    vi.useFakeTimers()
+
+    const next = vi.fn<() => void>()
+    const view: ViewLike = {
+      prev: vi.fn<() => void>(),
+      next,
+      getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
+    }
+    const input = useFoliateInput(() => view, undefined, vi.fn<() => void>(), vi.fn<() => void>())
+    const doc = makeDocTarget()
+    input.attachIframeClicks(doc)
+
+    const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(navigator, 'maxTouchPoints')
+    const originalOntouchstart = Object.getOwnPropertyDescriptor(window, 'ontouchstart')
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      configurable: true,
+      get: () => 0,
+    })
+    Reflect.deleteProperty(window as unknown as Record<string, unknown>, 'ontouchstart')
+
+    const postMessage = vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+
+    doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    vi.advanceTimersByTime(holdMs)
+    doc.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 95, clientY: 100 }))
+    const message = postMessage.mock.calls[0]?.[0]
+    if (message) window.dispatchEvent(new MessageEvent('message', { data: message, origin: window.location.origin }))
+    vi.advanceTimersByTime(300)
+
+    expect(postMessage).toHaveBeenCalledTimes(expectedNavigationCount)
+    expect(next).toHaveBeenCalledTimes(expectedNavigationCount)
+
+    postMessage.mockRestore()
+    input.cleanup()
+
+    if (originalMaxTouchPoints) {
+      Object.defineProperty(navigator, 'maxTouchPoints', originalMaxTouchPoints)
+    }
+    if (originalOntouchstart) {
+      Object.defineProperty(window, 'ontouchstart', originalOntouchstart)
+    }
+  })
+
   it('ignores a page-turn click message that arrives after annotation tap suppression starts', () => {
     vi.useFakeTimers()
 

@@ -1109,7 +1109,7 @@ function BookOrbitCatalog:titleForSection(section)
 end
 
 function BookOrbitCatalog:paramsForEntry(section, entry)
-    local params = { sort = "title" }
+    local params = { sort = section == "series" and "series" or "title" }
     if section == "libraries" then
         params.libraryId = tonumber(entry.id)
     elseif section == "collections" then

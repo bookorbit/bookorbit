@@ -438,6 +438,14 @@ function MainMenu:onMenuSheetAction(page, catalog, action)
         after(function() if catalog and catalog.goDashboard then catalog:goDashboard() end end)
     elseif kind == "exit" then
         after(function() if catalog then catalog:onCloseAllMenus() end end)
+    elseif kind == "files" then
+        self.skip_return_home_once = true
+        after(function()
+            if catalog then catalog:onCloseAllMenus() end
+            UIManager:nextTick(function()
+                UIManager:sendEvent(require("ui/event"):new("Home"))
+            end)
+        end)
     elseif kind == "search" then
         after(function() if catalog then catalog:onSearchButtonTap() end end)
     elseif kind == "link" then

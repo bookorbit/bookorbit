@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, count, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { APP_FEATURES, NOTIFICATION_TYPE_META, NotificationType } from '@bookorbit/types';
+import { NOTIFICATION_TYPE_META, NotificationType } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { notifications, users, userPermissions, userLibraryAccess } from '../../db/schema';
@@ -10,13 +10,6 @@ import type { NewNotification, Notification } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
-const PODCAST_NOTIFICATION_TYPES = [
-  NotificationType.PodcastEpisodePublished,
-  NotificationType.PodcastFeedUnhealthy,
-  NotificationType.PodcastDownloadFailed,
-];
-
-const visibleNotificationCondition = APP_FEATURES.podcasts ? undefined : notInArray(notifications.type, PODCAST_NOTIFICATION_TYPES);
 const BOOK_REQUEST_NOTIFICATION_TYPES = Object.values(NotificationType).filter((type) => NOTIFICATION_TYPE_META[type]?.category === 'bookRequests');
 
 @Injectable()
@@ -45,7 +38,7 @@ export class NotificationRepository {
 
   async findByUser(userId: number, limit: number, offset: number): Promise<{ items: Notification[]; total: number }> {
     const requestCondition = await this.requestVisibilityCondition(userId);
-    const condition = and(eq(notifications.userId, userId), visibleNotificationCondition, requestCondition);
+    const condition = and(eq(notifications.userId, userId), requestCondition);
     const [items, [{ value: total }]] = await Promise.all([
       this.db
         .select()
@@ -64,7 +57,7 @@ export class NotificationRepository {
     const [{ value }] = await this.db
       .select({ value: count() })
       .from(notifications)
-      .where(and(eq(notifications.userId, userId), eq(notifications.read, false), visibleNotificationCondition, requestCondition));
+      .where(and(eq(notifications.userId, userId), eq(notifications.read, false), requestCondition));
     return value;
   }
 
@@ -79,7 +72,7 @@ export class NotificationRepository {
     const result = await this.db
       .update(notifications)
       .set({ read: true, updatedAt: sql`${notifications.updatedAt}` })
-      .where(and(eq(notifications.id, id), eq(notifications.userId, userId), visibleNotificationCondition));
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
     return (result.rowCount ?? 0) > 0;
   }
 
@@ -88,20 +81,18 @@ export class NotificationRepository {
     const result = await this.db
       .update(notifications)
       .set({ read: true, updatedAt: sql`${notifications.updatedAt}` })
-      .where(and(eq(notifications.userId, userId), eq(notifications.read, false), visibleNotificationCondition, requestCondition));
+      .where(and(eq(notifications.userId, userId), eq(notifications.read, false), requestCondition));
     return result.rowCount ?? 0;
   }
 
   async deleteOne(id: number, userId: number): Promise<boolean> {
-    const result = await this.db
-      .delete(notifications)
-      .where(and(eq(notifications.id, id), eq(notifications.userId, userId), visibleNotificationCondition));
+    const result = await this.db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
     return (result.rowCount ?? 0) > 0;
   }
 
   async deleteAllForUser(userId: number): Promise<number> {
     const requestCondition = await this.requestVisibilityCondition(userId);
-    const result = await this.db.delete(notifications).where(and(eq(notifications.userId, userId), visibleNotificationCondition, requestCondition));
+    const result = await this.db.delete(notifications).where(and(eq(notifications.userId, userId), requestCondition));
     return result.rowCount ?? 0;
   }
 
@@ -167,30 +158,6 @@ export class NotificationRepository {
 
     const rows = await this.db.selectDistinct({ userId: sql<number>`user_id` }).from(sql`(${byPermission} UNION ${superusers}) as combined`);
     return rows.map((r) => r.userId);
-  }
-
-  async findUserIdsWithLibraryPermission(libraryId: number, permission: string): Promise<number[]> {
-    const byAccessAndPermission = this.db
-      .select({ userId: userLibraryAccess.userId })
-      .from(userLibraryAccess)
-      .innerJoin(userPermissions, eq(userPermissions.userId, userLibraryAccess.userId))
-      .innerJoin(users, eq(users.id, userLibraryAccess.userId))
-      .where(
-        and(
-          eq(userLibraryAccess.libraryId, libraryId),
-          inArray(userLibraryAccess.accessLevel, ['editor', 'owner']),
-          eq(userPermissions.permissionName, permission),
-          eq(users.active, true),
-        ),
-      );
-
-    const superusers = this.db
-      .select({ userId: users.id })
-      .from(users)
-      .where(and(eq(users.isSuperuser, true), eq(users.active, true)));
-
-    const rows = await this.db.selectDistinct({ userId: sql<number>`user_id` }).from(sql`(${byAccessAndPermission} UNION ${superusers}) as combined`);
-    return rows.map((row) => row.userId);
   }
 
   async findAllActiveUserIds(): Promise<number[]> {

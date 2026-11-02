@@ -95,6 +95,15 @@ describe('KoreaderCatalogSectionQueryDto', () => {
   });
 });
 
+describe('KoreaderCatalogBooksQueryDto sorting', () => {
+  it('accepts publication-date sorting in either direction', async () => {
+    for (const order of ['asc', 'desc']) {
+      const dto = plainToInstance(KoreaderCatalogBooksQueryDto, { sort: 'published', order });
+      await expect(validate(dto), order).resolves.toHaveLength(0);
+    }
+  });
+});
+
 describe('KoreaderCatalogBooksQueryDto buckets flag', () => {
   it.each([
     ['1', true],

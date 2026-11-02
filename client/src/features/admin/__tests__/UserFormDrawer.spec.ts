@@ -20,9 +20,8 @@ vi.mock('@/components/ui/sheet', () => ({
 }))
 
 const LIBRARIES = [
-  { id: 1, name: 'Novels', type: 'books' as const, bookCount: 120 },
-  { id: 2, name: 'Comics', type: 'books' as const, bookCount: 30 },
-  { id: 3, name: 'Podcasts', type: 'podcasts' as const, bookCount: 0 },
+  { id: 1, name: 'Novels', bookCount: 120 },
+  { id: 2, name: 'Comics', bookCount: 30 },
 ]
 
 const USER = {
@@ -98,7 +97,7 @@ describe('UserFormDrawer sections', () => {
     const nav = wrapper.find('nav').text()
 
     expect(nav).toContain('Profile')
-    expect(nav).toContain('1 of 3')
+    expect(nav).toContain('1 of 2')
     expect(nav).toContain('2 granted')
     expect(nav).toContain('None')
   })
@@ -211,11 +210,11 @@ describe('UserFormDrawer permissions', () => {
       return id ? wrapper.find(`[id="${id}"]`) : undefined
     }
 
-    it('warns that the permission does nothing while every book library is Viewer only', async () => {
+    it('warns that the permission does nothing while every selected library is Viewer only', async () => {
       stubApi({
         grants: [
           { libraryId: 1, accessLevel: 'viewer' },
-          { libraryId: 3, accessLevel: 'owner' },
+          { libraryId: 2, accessLevel: 'viewer' },
         ],
       })
       const wrapper = await mountDrawer({ user: editor })

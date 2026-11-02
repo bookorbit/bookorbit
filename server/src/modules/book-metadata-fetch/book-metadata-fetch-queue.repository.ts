@@ -338,7 +338,6 @@ export class BookMetadataFetchQueueRepository {
       })
       .from(bookMetadata)
       .innerJoin(books, eq(books.id, bookMetadata.bookId))
-      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .where(scope);
 
     // Inlined, not bound: Postgres matches the GROUP BY to the select list textually, and two sets of
@@ -351,7 +350,6 @@ export class BookMetadataFetchQueueRepository {
       .select({ bin, cnt: count() })
       .from(bookMetadata)
       .innerJoin(books, eq(books.id, bookMetadata.bookId))
-      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .where(and(scope, isNotNull(bookMetadata.metadataScore)))
       .groupBy(bin);
     const scoreBins = Array.from({ length: SCORE_BIN_COUNT }, () => 0);
@@ -405,16 +403,10 @@ export class BookMetadataFetchQueueRepository {
         })
         .from(bookMetadata)
         .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .innerJoin(libraries, eq(libraries.id, books.libraryId))
         .where(where)
         .orderBy(sql`${bookMetadata.metadataScore} ASC NULLS FIRST`, asc(bookMetadata.bookId))
         .limit(limit),
-      this.db
-        .select({ cnt: count() })
-        .from(bookMetadata)
-        .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .innerJoin(libraries, eq(libraries.id, books.libraryId))
-        .where(where),
+      this.db.select({ cnt: count() }).from(bookMetadata).innerJoin(books, eq(books.id, bookMetadata.bookId)).where(where),
     ]);
 
     return {
@@ -436,7 +428,7 @@ export class BookMetadataFetchQueueRepository {
   }
 
   private previewScopeClause(libraryIds?: readonly number[]): SQL {
-    const parts: SQL[] = [eq(books.status, 'present'), eq(libraries.type, 'books')];
+    const parts: SQL[] = [eq(books.status, 'present')];
     if (libraryIds) parts.push(libraryIds.length > 0 ? inArray(books.libraryId, [...libraryIds]) : sql`false`);
     return and(...parts)!;
   }

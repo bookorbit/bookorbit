@@ -93,3 +93,78 @@ export interface LocalePreferences {
 export function isSupportedLocale(value: unknown): value is Locale {
   return typeof value === "string" && (SUPPORTED_LOCALES as readonly string[]).includes(value);
 }
+
+function canonicalizeLocale(value: string): string | null {
+  try {
+    return Intl.getCanonicalLocales(value)[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The supported locale that best serves a ranked list of language tags, or null when none does.
+ * An exact tag wins, then the same language and script (`zh-TW` and `zh-Hant-HK` both reach
+ * `zh-Hant`), then the bare language (`pt-BR` reaches `pt`).
+ */
+export function matchSupportedLocale(candidates: readonly string[]): Locale | null {
+  const supportedByCanonical = new Map<string, Locale>();
+  const supportedByLanguageAndScript = new Map<string, Locale>();
+  for (const locale of SUPPORTED_LOCALES) {
+    const canonical = canonicalizeLocale(locale);
+    if (!canonical) continue;
+    supportedByCanonical.set(canonical.toLowerCase(), locale);
+    const maximized = new Intl.Locale(canonical).maximize();
+    if (maximized.script) {
+      supportedByLanguageAndScript.set(`${maximized.language.toLowerCase()}-${maximized.script.toLowerCase()}`, locale);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const canonical = canonicalizeLocale(candidate);
+    if (!canonical) continue;
+    const exact = supportedByCanonical.get(canonical.toLowerCase());
+    if (exact) return exact;
+    const maximized = new Intl.Locale(canonical).maximize();
+    const language = maximized.language.toLowerCase();
+    if (maximized.script) {
+      const scriptMatch = supportedByLanguageAndScript.get(`${language}-${maximized.script.toLowerCase()}`);
+      if (scriptMatch) return scriptMatch;
+    }
+    const baseLocale = supportedByCanonical.get(language);
+    if (baseLocale) return baseLocale;
+  }
+
+  return null;
+}
+
+/**
+ * The language tags of an `Accept-Language` header, most preferred first. The `*` wildcard and
+ * tags weighted `q=0` are dropped; a weight that is not a number counts as 1, and equal weights
+ * keep the order they were sent in.
+ */
+export function parseAcceptLanguage(header: string | null | undefined): string[] {
+  if (!header) return [];
+  const entries: { tag: string; quality: number; index: number }[] = [];
+  header.split(",").forEach((part, index) => {
+    const [rawTag, ...parameters] = part.split(";");
+    const tag = rawTag?.trim();
+    if (!tag || tag === "*") return;
+    let quality = 1;
+    for (const parameter of parameters) {
+      const [name, value] = parameter.split("=").map((piece) => piece.trim());
+      if (name?.toLowerCase() !== "q") continue;
+      const parsed = Number(value);
+      quality = Number.isFinite(parsed) ? parsed : 1;
+    }
+    if (quality <= 0) return;
+    entries.push({ tag, quality, index });
+  });
+  entries.sort((left, right) => right.quality - left.quality || left.index - right.index);
+  return entries.map((entry) => entry.tag);
+}
+
+/** The supported locale an `Accept-Language` header asks for, or null when it names none. */
+export function localeFromAcceptLanguage(header: string | null | undefined): Locale | null {
+  return matchSupportedLocale(parseAcceptLanguage(header));
+}

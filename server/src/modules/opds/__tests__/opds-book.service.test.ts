@@ -106,7 +106,7 @@ describe('OpdsBookService', () => {
   });
 
   it('handles getBooksPage access checks and smartScope delegation', async () => {
-    const { service } = makeService([[{ userId: 999, isPublic: false, mediaType: 'books' }], [{ userId: 7, isPublic: false, mediaType: 'books' }]]);
+    const { service } = makeService([[{ userId: 999, isPublic: false }], [{ userId: 7, isPublic: false }]]);
     const accessSpy = vi.spyOn(service, 'getAccessibleLibraryIds');
     const privateService = testable(service);
     const smartScopeSpy = vi.spyOn(privateService, 'buildSmartScopeWhere');
@@ -256,10 +256,9 @@ describe('OpdsBookService', () => {
   });
 
   it.each([
-    { userId: 7, isPublic: false, mediaType: 'books', allowed: true },
-    { userId: 999, isPublic: true, mediaType: 'books', allowed: true },
-    { userId: 999, isPublic: false, mediaType: 'books', allowed: false },
-    { userId: 7, isPublic: true, mediaType: 'podcasts', allowed: false },
+    { userId: 7, isPublic: false, allowed: true },
+    { userId: 999, isPublic: true, allowed: true },
+    { userId: 999, isPublic: false, allowed: false },
     undefined,
   ])('checks collection access for both catalog pages and counts: %j', async (collection) => {
     const { service, collectionRepository } = makeService();
@@ -369,7 +368,7 @@ describe('OpdsBookService', () => {
   });
 
   it('applies text search inside smartScope when q is provided', async () => {
-    const { service } = makeService([[{ id: 3, userId: 7, mediaType: 'books', isPublic: false, filter: null }]]);
+    const { service } = makeService([[{ id: 3, userId: 7, isPublic: false, filter: null }]]);
     const privateService = testable(service);
     const searchSpy = vi.spyOn(privateService, 'buildCatalogSearchClause');
 
@@ -380,7 +379,7 @@ describe('OpdsBookService', () => {
   });
 
   it('omits text search clause inside smartScope when q is absent', async () => {
-    const { service } = makeService([[{ id: 3, userId: 7, mediaType: 'books', isPublic: false, filter: null }]]);
+    const { service } = makeService([[{ id: 3, userId: 7, isPublic: false, filter: null }]]);
     const privateService = testable(service);
     const searchSpy = vi.spyOn(privateService, 'buildCatalogSearchClause');
 
@@ -390,23 +389,15 @@ describe('OpdsBookService', () => {
   });
 
   it('returns no smartScope books when smartScope is missing or private to another user', async () => {
-    const { service } = makeService([[], [{ id: 5, userId: 99, mediaType: 'books', isPublic: false, filter: null }]]);
+    const { service } = makeService([[], [{ id: 5, userId: 99, isPublic: false, filter: null }]]);
     const privateService = testable(service);
 
     await expect(privateService.buildSmartScopeWhere(7, 5, [1])).resolves.toBeNull();
     await expect(privateService.buildSmartScopeWhere(7, 5, [1])).resolves.toBeNull();
-  });
-
-  it('returns no smartScope books for a podcast scope, whose rules are not a book rule tree', async () => {
-    const { service, queryBuilder } = makeService([[{ id: 11, userId: 7, mediaType: 'podcasts', isPublic: false, filter: { filter: 'unplayed' } }]]);
-    const privateService = testable(service);
-
-    await expect(privateService.buildSmartScopeWhere(7, 11, [1])).resolves.toBeNull();
-    expect(queryBuilder.buildWhere).not.toHaveBeenCalled();
   });
 
   it('builds smartScope filters and delegates smartScope pagination', async () => {
-    const { service, queryBuilder } = makeService([[{ id: 9, userId: 7, mediaType: 'books', isPublic: false, filter: { op: 'and' } }]], {
+    const { service, queryBuilder } = makeService([[{ id: 9, userId: 7, isPublic: false, filter: { op: 'and' } }]], {
       buildWhere: vi.fn().mockReturnValue({ kind: 'where' }),
     });
     const privateService = testable(service);
@@ -879,6 +870,8 @@ describe('OpdsBookService', () => {
       'title_desc',
       'author_asc',
       'author_desc',
+      'published_asc',
+      'published_desc',
       'series_asc',
       'series_desc',
     ] as const;
@@ -912,6 +905,19 @@ describe('OpdsBookService', () => {
     // Metadata, the reader's status and the aggregate.
     expect(ids.leftJoin).toHaveBeenCalledTimes(3);
     expect(orderText(ids)).toMatch(/DESC NULLS LAST, "user_book_status"."updated_at" DESC NULLS LAST, "books"."id" ASC$/);
+  });
+
+  it.each([
+    ['published_asc', 'ASC'],
+    ['published_desc', 'DESC'],
+  ] as const)('sorts %s by full date, then year fallback, with undated books last and stable ties', async (sortOrder, direction) => {
+    const { service, db } = makeService([[], [{ total: 0 }]]);
+
+    await testable(service).paginatedBookQuery({ kind: 'where' }, sortOrder, 1, 25, 7);
+
+    expect(orderText(selectChains(db)[0]!)).toBe(
+      `coalesce("book_metadata"."published_date", make_date("book_metadata"."published_year", 1, 1)) ${direction} NULLS LAST, "book_metadata"."title" ASC NULLS LAST, "books"."id" ASC`,
+    );
   });
 
   it('maps metadata, authors, and files into ordered OPDS entries', async () => {

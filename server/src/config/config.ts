@@ -103,15 +103,6 @@ export const bookRequestConfig = registerAs('bookRequest', () => ({
   encryptionKey: process.env.BOOK_REQUEST_ENCRYPTION_KEY ?? '',
 }));
 
-export const podcastConfig = registerAs('podcast', () => ({
-  encryptionKey: process.env.PODCAST_ENCRYPTION_KEY?.trim() || process.env.JWT_SECRET || 'change-me-in-production',
-  maxFeedBytes: parsePositiveInteger(process.env.PODCAST_MAX_FEED_BYTES, 10 * 1024 * 1024),
-  maxEpisodeBytes: parsePositiveInteger(process.env.PODCAST_MAX_EPISODE_BYTES, 2 * 1024 * 1024 * 1024),
-  maxConcurrentDownloads: parsePositiveInteger(process.env.PODCAST_MAX_CONCURRENT_DOWNLOADS, 2),
-  requestTimeoutMs: parsePositiveInteger(process.env.PODCAST_REQUEST_TIMEOUT_MS, 30_000),
-  maxDownloadDurationMs: parsePositiveInteger(process.env.PODCAST_MAX_DOWNLOAD_DURATION_MS, 6 * 60 * 60_000),
-}));
-
 export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({
   stateTtlMs: parsePositiveInteger(process.env.OIDC_STATE_TTL_SECS, 300) * 1000,
   discoveryCacheTtlMs: parsePositiveInteger(process.env.OIDC_DISCOVERY_CACHE_TTL_SECS, 3600) * 1000,

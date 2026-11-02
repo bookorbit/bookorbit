@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import {
   DASHBOARD_SCROLLER_BATCH_MAX,
   type BookCard,
-  type BookScrollerType,
+  type ScrollerType,
   type DashboardScrollerBatchRequest,
   type DashboardScrollerBatchResponse,
   type DashboardScrollerBatchResult,
@@ -54,7 +54,7 @@ async function flushBatch(): Promise<void> {
   }
 }
 
-function requestScroller(type: BookScrollerType, limit: number, smartScopeId?: number): Promise<DashboardScrollerBatchResult> {
+function requestScroller(type: ScrollerType, limit: number, smartScopeId?: number): Promise<DashboardScrollerBatchResult> {
   return new Promise((resolve, reject) => {
     requestSequence += 1
     pendingRequests.push({
@@ -71,7 +71,7 @@ function requestScroller(type: BookScrollerType, limit: number, smartScopeId?: n
   })
 }
 
-export function useDashboardScroller(type: BookScrollerType, limit = 20, smartScopeId?: number) {
+export function useDashboardScroller(type: ScrollerType, limit = 20, smartScopeId?: number) {
   const books = ref<BookCard[]>([])
   const loading = ref(true)
   const error = ref(false)

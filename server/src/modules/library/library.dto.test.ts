@@ -49,23 +49,6 @@ describe('Library DTO validation', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('CreateLibraryDto accepts known library types and rejects null or unknown types', async () => {
-    const base = { name: 'Podcasts', icon: 'Podcast', folders: ['/podcasts'] };
-
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, type: 'podcasts' }))).toBe(false);
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, type: null }))).toBe(true);
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, type: 'music' }))).toBe(true);
-  });
-
-  it('library DTOs validate the podcast local-folder watcher setting as a boolean', async () => {
-    const base = { type: 'podcasts', name: 'Podcasts', icon: 'Podcast', folders: ['/podcasts'] };
-
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, watchLocalFolders: true }))).toBe(false);
-    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, watchLocalFolders: 'yes' }))).toBe(true);
-    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { watchLocalFolders: false }))).toBe(false);
-    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { watchLocalFolders: 0 }))).toBe(true);
-  });
-
   it('CreateLibraryDto requires a non-empty icon and UpdateLibraryDto rejects empty icons when provided', async () => {
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', folders: ['/books/scifi'] }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', icon: '   ', folders: ['/books/scifi'] }))).toBe(true);
@@ -152,8 +135,6 @@ describe('Library DTO validation', () => {
   describe('null on settings that cannot be null', () => {
     const NOT_NULL_FIELDS = [
       'displayOrder',
-      'localFolders',
-      'watchLocalFolders',
       'coverAspectRatio',
       'watch',
       'metadataPrecedence',

@@ -1,16 +1,6 @@
 import { resolve } from 'path';
 
-import {
-  appConfig,
-  authConfig,
-  dbConfig,
-  emailConfig,
-  fileWriteConfig,
-  migrationConfig,
-  oidcRuntimeConfig,
-  podcastConfig,
-  storageConfig,
-} from './config';
+import { appConfig, authConfig, dbConfig, emailConfig, fileWriteConfig, migrationConfig, oidcRuntimeConfig, storageConfig } from './config';
 
 const ORIGINAL_ENV = process.env;
 
@@ -39,12 +29,6 @@ function resetEnv(): void {
   delete process.env.EMAIL_ENCRYPTION_KEY;
   delete process.env.MIGRATION_ENCRYPTION_KEY;
   delete process.env.MIGRATION_IMPORT_ROOT;
-  delete process.env.PODCAST_ENCRYPTION_KEY;
-  delete process.env.PODCAST_MAX_FEED_BYTES;
-  delete process.env.PODCAST_MAX_EPISODE_BYTES;
-  delete process.env.PODCAST_MAX_CONCURRENT_DOWNLOADS;
-  delete process.env.PODCAST_REQUEST_TIMEOUT_MS;
-  delete process.env.PODCAST_MAX_DOWNLOAD_DURATION_MS;
   delete process.env.OIDC_STATE_TTL_SECS;
   delete process.env.OIDC_DISCOVERY_CACHE_TTL_SECS;
   delete process.env.OIDC_JWKS_CACHE_TTL_SECS;
@@ -222,36 +206,6 @@ describe('config', () => {
     expect(fileWriteConfig()).toEqual({
       debounceMs: 3000,
       maxConcurrentWrites: 2,
-    });
-  });
-
-  it('uses stable podcast defaults and falls back to the JWT secret in development', () => {
-    process.env.JWT_SECRET = 'jwt-secret-for-podcasts';
-
-    expect(podcastConfig()).toEqual({
-      encryptionKey: 'jwt-secret-for-podcasts',
-      maxFeedBytes: 10 * 1024 * 1024,
-      maxEpisodeBytes: 2 * 1024 * 1024 * 1024,
-      maxConcurrentDownloads: 2,
-      requestTimeoutMs: 30_000,
-      maxDownloadDurationMs: 6 * 60 * 60_000,
-    });
-  });
-
-  it('reads dedicated podcast security and resource settings', () => {
-    process.env.PODCAST_ENCRYPTION_KEY = ' dedicated-podcast-key ';
-    process.env.PODCAST_MAX_FEED_BYTES = '2048';
-    process.env.PODCAST_MAX_EPISODE_BYTES = '4096';
-    process.env.PODCAST_MAX_CONCURRENT_DOWNLOADS = '4';
-    process.env.PODCAST_REQUEST_TIMEOUT_MS = '15000';
-
-    expect(podcastConfig()).toEqual({
-      encryptionKey: 'dedicated-podcast-key',
-      maxFeedBytes: 2048,
-      maxEpisodeBytes: 4096,
-      maxConcurrentDownloads: 4,
-      requestTimeoutMs: 15_000,
-      maxDownloadDurationMs: 6 * 60 * 60_000,
     });
   });
 

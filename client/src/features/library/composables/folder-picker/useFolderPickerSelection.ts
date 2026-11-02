@@ -14,7 +14,6 @@ interface SelectionOptions {
   data: FolderPickerData
   own: () => string[]
   others: () => PickerLibrary[]
-  multiple: () => boolean
   appDataPath: () => string | null
   mode: Ref<OrganizationMode>
   onModeChange: (mode: OrganizationMode) => void
@@ -64,7 +63,7 @@ export function useFolderPickerSelection(options: SelectionOptions) {
       notice.value = blockedNotice(path, current)
       return
     }
-    const result = toggleFolder(selected.value, path, options.multiple())
+    const result = toggleFolder(selected.value, path)
     selected.value = result.selected
     lastTick.value = normalizeFolderPath(path)
     notice.value = result.folded.length
@@ -78,12 +77,12 @@ export function useFolderPickerSelection(options: SelectionOptions) {
   /** Shift-click: tick every sibling from the last ticked folder to this one. */
   function tickRange(path: string, siblings: string[]) {
     const run = lastTick.value ? rangeBetween(siblings, lastTick.value, normalizeFolderPath(path)) : []
-    if (!options.multiple() || run.length === 0) return toggle(path)
+    if (run.length === 0) return toggle(path)
     undo.value = null
     let ticked = 0
     for (const folder of run) {
       if (selected.value.includes(folder) || status(folder)?.block) continue
-      selected.value = toggleFolder(selected.value, folder, true).selected
+      selected.value = toggleFolder(selected.value, folder).selected
       ticked += 1
     }
     lastTick.value = normalizeFolderPath(path)

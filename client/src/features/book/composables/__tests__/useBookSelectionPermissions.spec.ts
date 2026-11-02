@@ -16,9 +16,9 @@ beforeEach(() => {
   permissions.value = [Permission.LibraryEditMetadata]
   isSuperuser.value = false
   libraries.value = [
-    { id: 7, type: 'books', accessLevel: 'editor' },
-    { id: 8, type: 'books', accessLevel: 'viewer' },
-    { id: 9, type: 'books', accessLevel: 'owner' },
+    { id: 7, accessLevel: 'editor' },
+    { id: 8, accessLevel: 'viewer' },
+    { id: 9, accessLevel: 'owner' },
   ] as Library[]
 })
 
@@ -67,16 +67,6 @@ describe('metadata permissions for bulk selections', () => {
     expect(ctx.canEditSelectionMetadata.value).toBe(true)
     libraries.value = []
     expect(ctx.canEditSelectionMetadata.value).toBe(false)
-  })
-
-  it('ignores podcast libraries when checking an unscoped book query', () => {
-    const ctx = context()
-    libraries.value = [
-      { id: 7, type: 'books', accessLevel: 'editor' },
-      { id: 10, type: 'podcasts', accessLevel: 'viewer' },
-    ] as Library[]
-    ctx.query.value = { total: 10000 } as QuerySelectionState
-    expect(ctx.canEditSelectionMetadata.value).toBe(true)
   })
 
   it('reacts to global permission revocation and library-role downgrade', () => {

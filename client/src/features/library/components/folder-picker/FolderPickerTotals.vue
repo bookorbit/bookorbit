@@ -13,7 +13,7 @@ const { t } = useI18n()
 const picker = useFolderPickerContext()
 
 const selected = computed(() => picker.selection.selected.value)
-const shown = computed(() => picker.kind.value === 'books' && selected.value.length > 0)
+const shown = computed(() => selected.value.length > 0)
 const total = (mode: OrganizationMode) => selected.value.reduce((sum, path) => sum + booksAs(picker.data.summaries.get(path), mode), 0)
 /** Until every picked folder is counted, a partial total would read as the answer. */
 const counted = computed(() => selected.value.every((path) => picker.data.summaries.has(path)))

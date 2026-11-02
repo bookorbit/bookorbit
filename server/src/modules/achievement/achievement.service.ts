@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { NotificationType, ACHIEVEMENT_CATEGORY_LABELS } from '@bookorbit/types';
+import { DEFAULT_LOCALE, NotificationType, ACHIEVEMENT_CATEGORY_LABELS, type Locale } from '@bookorbit/types';
 import type {
   AchievementCatalogueResponse,
   AchievementCategoryGroup,
@@ -8,6 +8,7 @@ import type {
   AchievementCategory,
   AchievementCelebrationClaim,
 } from '@bookorbit/types';
+import { serverText } from '../../common/i18n/server-text';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { getYearInTimeZone, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
@@ -61,7 +62,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     return this.seedPromise;
   }
 
-  async getCatalogue(user: RequestUser): Promise<AchievementCatalogueResponse> {
+  async getCatalogue(user: RequestUser, locale: Locale = DEFAULT_LOCALE): Promise<AchievementCatalogueResponse> {
     const userId = user.id;
     const [allAchievements, userAchievements] = await Promise.all([this.repo.findAllAchievements(), this.repo.findUserAchievements(userId)]);
 
@@ -87,7 +88,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       const items = grouped.get(category);
       if (!items) continue;
 
-      items.push(this.toItem(achievement, earned, progressMap.get(achievement.key) ?? null, accessibleBookIds));
+      items.push(this.toItem(achievement, earned, progressMap.get(achievement.key) ?? null, accessibleBookIds, locale));
     }
 
     let totalEarned = 0;
@@ -102,7 +103,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
 
       categories.push({
         key: cat,
-        label: ACHIEVEMENT_CATEGORY_LABELS[cat],
+        label: serverText(locale, `achievementCategories.${cat}`, ACHIEVEMENT_CATEGORY_LABELS[cat]),
         earnedCount,
         totalCount: items.length,
         achievements: items,
@@ -112,7 +113,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     return { categories, totalEarned, totalAvailable };
   }
 
-  async claimCelebration(user: RequestUser): Promise<AchievementCelebrationClaim | null> {
+  async claimCelebration(user: RequestUser, locale: Locale = DEFAULT_LOCALE): Promise<AchievementCelebrationClaim | null> {
     if (!(await this.userService.isAchievementEnabled(user.id))) return null;
 
     const claimedAt = new Date();
@@ -125,7 +126,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     return {
       claimId,
       expiresAt: expiresAt.toISOString(),
-      achievement: this.toItem(claimed.achievement, claimed.award, null, accessibleBookIds),
+      achievement: this.toItem(claimed.achievement, claimed.award, null, accessibleBookIds, locale),
     };
   }
 
@@ -202,6 +203,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     earned: UserAchievementRow | undefined,
     currentProgress: number | null,
     accessibleBookIds: Set<number>,
+    locale: Locale,
   ): AchievementItem {
     const lockedSecret = achievement.hidden && !earned;
     const context = earned?.contextJson && typeof earned.contextJson === 'object' ? (earned.contextJson as Record<string, unknown>) : null;
@@ -214,8 +216,12 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       groupKey: lockedSecret ? null : achievement.groupKey,
       tier: lockedSecret ? null : achievement.tier,
       category: achievement.category as AchievementCategory,
-      name: lockedSecret ? 'Secret Achievement' : achievement.name,
-      description: lockedSecret ? 'Keep reading to reveal this achievement.' : achievement.description,
+      name: lockedSecret
+        ? serverText(locale, 'achievementSecret.name', 'Secret Achievement')
+        : serverText(locale, `achievements.${achievement.key}.name`, achievement.name),
+      description: lockedSecret
+        ? serverText(locale, 'achievementSecret.description', 'Keep reading to reveal this achievement.')
+        : serverText(locale, `achievements.${achievement.key}.description`, achievement.description),
       iconName: lockedSecret ? 'lock' : achievement.iconName,
       rarity: lockedSecret ? 'common' : (achievement.rarity as AchievementItem['rarity']),
       threshold: lockedSecret ? null : achievement.threshold,

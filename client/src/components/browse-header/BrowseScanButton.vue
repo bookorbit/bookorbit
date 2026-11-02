@@ -13,7 +13,7 @@ import { outlineButton } from './browse-header'
  * progress bar that used to sit above the grid.
  */
 const props = defineProps<{
-  library: Pick<Library, 'id' | 'type' | 'name'>
+  library: Pick<Library, 'id' | 'name'>
 }>()
 
 const { t } = useI18n()

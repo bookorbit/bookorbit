@@ -19,6 +19,9 @@ function summary(overrides: Partial<SeriesSummary> = {}): SeriesSummary {
     lastAddedAt: null,
     libraryNames: [],
     expectedBookCount: null,
+    ownedVolumeCount: 1,
+    readVolumeCount: 0,
+    readingVolumeCount: 0,
     volumes: [],
     volumesTruncated: false,
     gaps: [],
@@ -31,51 +34,40 @@ function summary(overrides: Partial<SeriesSummary> = {}): SeriesSummary {
 }
 
 describe('seriesRowFacts', () => {
-  it('counts volumes off the ladder, so two editions of one volume count once', () => {
-    const facts = seriesRowFacts(
-      summary({
-        bookCount: 4,
-        readCount: 1,
-        volumes: [slot({ index: 1, bookId: 1, status: 'read' }), slot({ index: 2, bookId: 2, status: 'unread' })],
-      }),
-    )
+  it('reports volumes rather than books, so two editions of one volume count once', () => {
+    const facts = seriesRowFacts(summary({ bookCount: 4, readCount: 2, ownedVolumeCount: 2, readVolumeCount: 1 }))
 
     expect(facts.ownedVolumes).toBe(2)
     expect(facts.readVolumes).toBe(1)
     expect(facts.percentRead).toBe(50)
   })
 
-  it('does not count a missing rung as something the library owns', () => {
+  it('counts a series past the capped ladder instead of stopping at the cap', () => {
+    const volumes = Array.from({ length: 60 }, (_, i) => slot({ index: i + 1, bookId: i + 1, status: 'read' }))
     const facts = seriesRowFacts(
-      summary({
-        bookCount: 2,
-        volumes: [
-          slot({ index: 1, bookId: 1, status: 'read' }),
-          slot({ index: 2, bookId: null, title: null, status: 'missing' }),
-          slot({ index: 3, bookId: 3, status: 'unread' }),
-        ],
-        gaps: [2],
-        gapCount: 1,
-      }),
+      summary({ bookCount: 300, readCount: 60, ownedVolumeCount: 300, readVolumeCount: 60, volumes, volumesTruncated: true }),
     )
 
-    expect(facts.ownedVolumes).toBe(2)
-    expect(facts.hasGaps).toBe(true)
+    expect(facts.ownedVolumes).toBe(300)
+    expect(facts.readVolumes).toBe(60)
+    expect(facts.percentRead).toBe(20)
     expect(facts.isComplete).toBe(false)
   })
 
-  it('falls back to the book counts when there is no ladder to count', () => {
-    const facts = seriesRowFacts(summary({ bookCount: 9, readCount: 4, readingCount: 1, volumes: [], volumesTruncated: true }))
+  it('reports the volumes in progress', () => {
+    const facts = seriesRowFacts(summary({ ownedVolumeCount: 9, readVolumeCount: 4, readingVolumeCount: 1 }))
 
-    expect(facts.ownedVolumes).toBe(9)
-    expect(facts.readVolumes).toBe(4)
     expect(facts.readingVolumes).toBe(1)
+    expect(facts.isStarted).toBe(true)
+  })
+
+  it('flags gaps from the gap count', () => {
+    expect(seriesRowFacts(summary({ gaps: [2], gapCount: 1 })).hasGaps).toBe(true)
   })
 
   it('is complete only when every owned volume is read', () => {
-    const read = [slot({ index: 1, bookId: 1, status: 'read' }), slot({ index: 2, bookId: 2, status: 'read' })]
-    expect(seriesRowFacts(summary({ volumes: read })).isComplete).toBe(true)
-    expect(seriesRowFacts(summary({ volumes: [], bookCount: 0, readCount: 0 })).isComplete).toBe(false)
+    expect(seriesRowFacts(summary({ ownedVolumeCount: 2, readVolumeCount: 2 })).isComplete).toBe(true)
+    expect(seriesRowFacts(summary({ ownedVolumeCount: 0, readVolumeCount: 0, bookCount: 0 })).isComplete).toBe(false)
   })
 })
 

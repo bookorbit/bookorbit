@@ -8,7 +8,7 @@ BookOrbit has three layers of tests:
 
 Each layer has a specific job and its own tooling. Do not test the same behavior at multiple layers.
 
-For testing expectations by change type, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For testing expectations by change type, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 For the development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ---

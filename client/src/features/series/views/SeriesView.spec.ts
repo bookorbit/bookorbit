@@ -38,6 +38,9 @@ function makeSeries(overrides: Partial<SeriesSummary> = {}): SeriesSummary {
     lastAddedAt: null,
     libraryNames: ['Novels'],
     expectedBookCount: null,
+    ownedVolumeCount: 2,
+    readVolumeCount: 1,
+    readingVolumeCount: 0,
     volumes: [
       { index: 1, bookId: 10, title: 'One', status: 'read' },
       { index: 2, bookId: null, title: null, status: 'missing' },

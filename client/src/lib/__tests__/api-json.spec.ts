@@ -40,7 +40,7 @@ describe('unreachable server', () => {
   it('reaches JSON callers already translated, so rendering reason.message cannot leak it', async () => {
     globalThis.fetch = vi.fn<typeof fetch>().mockRejectedValue(networkFailure())
 
-    const reason = await apiJson('/api/v1/anything', undefined, 'podcast.errors.savePlaylist').catch((error: unknown) => error)
+    const reason = await apiJson('/api/v1/anything', undefined, 'smartScope.errors.save').catch((error: unknown) => error)
 
     expect(reason).toBeInstanceOf(NetworkError)
     expect((reason as Error).message).not.toContain('Failed to fetch')
@@ -49,18 +49,18 @@ describe('unreachable server', () => {
   it('reaches bodyless callers the same way', async () => {
     globalThis.fetch = vi.fn<typeof fetch>().mockRejectedValue(networkFailure())
 
-    const reason = await apiSend('/api/v1/anything', { method: 'DELETE' }, 'podcast.errors.removeDownload').catch((error: unknown) => error)
+    const reason = await apiSend('/api/v1/anything', { method: 'DELETE' }, 'smartScope.errors.delete').catch((error: unknown) => error)
 
     expect(reason).toBeInstanceOf(NetworkError)
     expect((reason as Error).message).not.toContain('Failed to fetch')
   })
 
   it('lets a caller name the action that failed rather than repeating a generic network message', () => {
-    expect(errorMessage(new NetworkError('Failed to fetch'), 'podcast.errors.savePlaylist')).not.toContain('Failed to fetch')
+    expect(errorMessage(new NetworkError('Failed to fetch'), 'smartScope.errors.save')).not.toContain('Failed to fetch')
   })
 
   it('still shows text a caller threw deliberately, which is already translated', () => {
-    expect(errorMessage(new Error('Pick at least one show'), 'podcast.errors.savePlaylist')).toBe('Pick at least one show')
+    expect(errorMessage(new Error('Pick at least one rule'), 'smartScope.errors.save')).toBe('Pick at least one rule')
   })
 
   it('leaves non-network rejections alone', async () => {

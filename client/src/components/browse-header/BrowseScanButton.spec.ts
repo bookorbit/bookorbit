@@ -14,7 +14,7 @@ vi.mock('@/features/scanner/composables/useScanProgress', () => ({
   useScanProgress: () => ({ getProgress: () => mocks.progress.value }),
 }))
 
-const library = { id: 1, type: 'books' as const, name: 'Novels' }
+const library = { id: 1, name: 'Novels' }
 
 function running(processed: number, total: number): ScanProgressEvent {
   return { jobId: 7, libraryId: 1, status: 'running', processed, total, added: 0, updated: 0, missing: 0 }

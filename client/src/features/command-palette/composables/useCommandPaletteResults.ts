@@ -79,8 +79,8 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
   const { showBookRequests } = useBookRequestVisibility()
   const { zones } = useSidebarNav()
   const { libraries } = useLibraries()
-  const { bookScopes } = useSmartScopes()
-  const { bookCollections } = useCollections()
+  const { smartScopes } = useSmartScopes()
+  const { collections } = useCollections()
   const themeStore = useThemeStore()
   const { startCustomizing } = useSidebarCustomizeMode()
 
@@ -164,11 +164,11 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
       })),
     )
     const lists: Record<SidebarListKind, { id: number; name: string; icon?: string | null; bookCount?: number | null }[]> = {
-      library: libraries.value.filter((library) => library.type !== 'podcasts'),
-      smartScope: bookScopes.value,
-      collection: bookCollections.value,
+      library: libraries.value,
+      smartScope: smartScopes.value,
+      collection: collections.value,
     }
-    const entities = SIDEBAR_SECTIONS.filter((definition) => definition.medium === 'books').flatMap((definition) =>
+    const entities = SIDEBAR_SECTIONS.flatMap((definition) =>
       lists[definition.kind].map((entity) => ({
         kind: 'place' as const,
         key: `${definition.kind}:${entity.id}`,

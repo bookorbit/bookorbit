@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BookCopy, CircleCheck, CircleMinus, FolderOpen, Lightbulb, ListTree, TriangleAlert, X } from '@lucide/vue'
+import { BookCopy, CircleCheck, CircleMinus, FolderOpen, ListTree, TriangleAlert, X } from '@lucide/vue'
 import { formatList } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import { attentionFor, leafName } from '../../composables/folder-picker/folder-picker-rules'
@@ -18,20 +18,16 @@ const status = computed(() => picker.selection.status(props.path))
 const summary = computed(() => picker.data.summaries.get(props.path))
 const inspection = computed(() => picker.data.inspections.get(props.path))
 const books = computed(() => picker.booksIn(props.path))
-const attention = computed(() => attentionFor(summary.value, status.value, picker.mode.value, picker.kind.value))
+const attention = computed(() => attentionFor(summary.value, status.value, picker.mode.value))
 const name = computed(() => leafName(props.path))
 
 const countLine = computed(() => {
   if (books.value === null) return ''
-  const count =
-    picker.kind.value === 'podcastStorage' && !books.value && !summary.value?.folders
-      ? t('library.folderBrowser.plan.empty')
-      : picker.countLabel(books.value)
+  const count = picker.countLabel(books.value)
   return inspection.value?.bytes ? t('library.folderBrowser.plan.rowSize', { books: count, size: formatBytes(inspection.value.bytes) }) : count
 })
 
 const fitText = computed(() => {
-  if (picker.kind.value === 'podcastStorage') return t('library.folderBrowser.plan.fit.storage')
   if (!summary.value?.files) return t('library.folderBrowser.plan.fit.empty')
   return picker.mode.value === 'book_per_file' ? t('library.folderBrowser.plan.fit.file') : t('library.folderBrowser.plan.fit.folder')
 })
@@ -48,14 +44,6 @@ const issue = computed<{ text: string; icon: typeof X; actions: Action[] } | nul
   if (!found) return null
   const locked = picker.modeLocked.value
   const lockNote = locked ? ` ${t('library.folderBrowser.plan.attention.locked')}` : ''
-  if (found.kind === 'notEmpty') {
-    const held = [
-      summary.value?.files ? picker.holdsLabel(summary.value.files) : '',
-      summary.value?.folders ? t('library.folderBrowser.plan.holdsFolders', { count: summary.value.folders }) : '',
-    ].filter(Boolean)
-    const what = held.length === 2 ? t('library.folderBrowser.plan.holdsBoth', { books: held[0]!, folders: held[1]! }) : (held[0] ?? '')
-    return { text: t('library.folderBrowser.plan.attention.notEmpty', { what }), icon: Lightbulb, actions: [] }
-  }
   if (found.kind === 'contains') {
     const libraries = found.status?.libraries ?? []
     const single = libraries.length === 1 ? libraries[0]! : null

@@ -6,7 +6,6 @@ import type {
   CoverSearchPreferences,
   DisplayPreferences,
   LocalePreferences,
-  PodcastPlaylistPreferences,
   ServerFontPreferences,
   ThemePreferences,
 } from '@bookorbit/types';
@@ -28,25 +27,6 @@ const validThemePreferences: ThemePreferences = {
   radius: 'rounded',
   background: 'vinyl',
   brightness: 35,
-};
-
-const validPodcastPlaylistPreferences: PodcastPlaylistPreferences = {
-  playlists: [
-    {
-      id: 'playlist-1',
-      name: 'Morning commute',
-      libraryId: 4,
-      rules: {
-        filter: 'unplayed',
-        sort: 'shortest',
-        minDurationMinutes: null,
-        maxDurationMinutes: 30,
-        publishedWithinDays: 14,
-        podcastIds: [8, 9],
-        followedOnly: true,
-      },
-    },
-  ],
 };
 
 const addedAccentIds: readonly Accent[] = [
@@ -922,40 +902,5 @@ describe('UserPreferencesService', () => {
       const overCap = { ...atCap, '#ABCDEF': 'One too many' };
       await expect(service.upsertAnnotationColorNamePreferences(11, { names: overCap })).rejects.toBeInstanceOf(BadRequestException);
     });
-  });
-
-  it('getPodcastPlaylistPreferences returns an empty list when nothing is stored', async () => {
-    await expect(service.getPodcastPlaylistPreferences(7)).resolves.toEqual({ playlists: [] });
-    expect(repo.findByCategory).toHaveBeenCalledWith(7, 'podcast-playlists');
-  });
-
-  it('getPodcastPlaylistPreferences falls back to an empty list when the stored payload no longer validates', async () => {
-    repo.findByCategory.mockResolvedValueOnce({ data: { playlists: [{ id: 'a', name: 'Legacy' }] } } as never);
-
-    await expect(service.getPodcastPlaylistPreferences(7)).resolves.toEqual({ playlists: [] });
-  });
-
-  it('upsertPodcastPlaylistPreferences persists validated playlists', async () => {
-    await expect(service.upsertPodcastPlaylistPreferences(11, validPodcastPlaylistPreferences)).resolves.toBeUndefined();
-    expect(repo.upsert).toHaveBeenCalledWith(11, 'podcast-playlists', validPodcastPlaylistPreferences);
-  });
-
-  it('upsertPodcastPlaylistPreferences rejects duplicate playlist ids', async () => {
-    const [playlist] = validPodcastPlaylistPreferences.playlists;
-
-    await expect(service.upsertPodcastPlaylistPreferences(11, { playlists: [playlist, playlist] })).rejects.toBeInstanceOf(BadRequestException);
-    expect(repo.upsert).not.toHaveBeenCalled();
-  });
-
-  it('upsertPodcastPlaylistPreferences rejects an unknown sort and out-of-range durations', async () => {
-    const [playlist] = validPodcastPlaylistPreferences.playlists;
-
-    await expect(
-      service.upsertPodcastPlaylistPreferences(11, { playlists: [{ ...playlist, rules: { ...playlist!.rules, sort: 'random' } }] }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    await expect(
-      service.upsertPodcastPlaylistPreferences(11, { playlists: [{ ...playlist, rules: { ...playlist!.rules, maxDurationMinutes: 2000 } }] }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(repo.upsert).not.toHaveBeenCalled();
   });
 });

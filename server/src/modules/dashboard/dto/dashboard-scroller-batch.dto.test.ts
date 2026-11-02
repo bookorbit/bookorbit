@@ -38,7 +38,7 @@ describe('DashboardScrollerBatchDto', () => {
 
   it('rejects an invalid nested scroller type', async () => {
     const dto = plainToInstance(DashboardScrollerBatchDto, {
-      items: [{ id: 'invalid-type', type: 'continue-podcasts', limit: 20 }],
+      items: [{ id: 'invalid-type', type: 'mystery-shelf', limit: 20 }],
     });
 
     expect(constraintNames(await validate(dto))).toContain('isIn');

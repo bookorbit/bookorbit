@@ -36,11 +36,8 @@ describe('useSidebarPrefs', () => {
         reading: { open: true },
         browse: { open: true },
         libraries: { open: true, cap: 8 },
-        podcasts: { open: true, cap: 8 },
         smartScopes: { open: true, cap: 8 },
         collections: { open: true, cap: 8 },
-        podcastScopes: { open: true, cap: 8 },
-        podcastCollections: { open: true, cap: 8 },
       })
     })
 
@@ -70,6 +67,21 @@ describe('useSidebarPrefs', () => {
       const { parseSidebarConfig } = await loadModule()
 
       expect(parseSidebarConfig({ sections: { browse: { open: false, cap: 20 } } }).browse).toEqual({ open: false })
+    })
+
+    it('drops stored sections this client no longer has', async () => {
+      const { parseSidebarConfig } = await loadModule()
+
+      const parsed = parseSidebarConfig({
+        sections: {
+          libraries: { open: false, cap: 12 },
+          retiredSection: { open: false, cap: 5 },
+          otherRetiredSection: { open: true, cap: 8 },
+        },
+      })
+
+      expect(Object.keys(parsed)).toEqual(['reading', 'browse', 'libraries', 'smartScopes', 'collections'])
+      expect(parsed.libraries).toEqual({ open: false, cap: 12 })
     })
   })
 
@@ -174,11 +186,8 @@ describe('useSidebarPrefs', () => {
                   reading: { open: true },
                   browse: { open: true },
                   libraries: { open: true, cap: 8 },
-                  podcasts: { open: true, cap: 8 },
                   smartScopes: { open: true, cap: 8 },
                   collections: { open: false, cap: 20 },
-                  podcastScopes: { open: true, cap: 8 },
-                  podcastCollections: { open: true, cap: 8 },
                 },
               },
               sidebarLayout: { hidden: [], groupOrder: [], rowOrder: {} },

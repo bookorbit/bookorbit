@@ -8,7 +8,7 @@ import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScope
 defineOptions({ name: 'SmartScopesView' })
 
 const { t } = useI18n()
-const { bookScopes, loading, fetchSmartScopes } = useSmartScopes()
+const { smartScopes, loading, fetchSmartScopes } = useSmartScopes()
 
 const createOpen = ref(false)
 
@@ -32,7 +32,7 @@ onMounted(() => {
       :title="t('titles.smartScopes')"
       title-icon="Aperture"
       fallback-icon="Aperture"
-      :items="bookScopes"
+      :items="smartScopes"
       route-name="smartScope"
       :loading="loading"
       :search-placeholder="t('components.sidebar.filterSmartScopesPlaceholder')"
