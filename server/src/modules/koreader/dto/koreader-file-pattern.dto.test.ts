@@ -50,8 +50,8 @@ describe('UpdateKoreaderFilePatternDto', () => {
 });
 
 describe('KoreaderDeviceParamDto', () => {
-  it('accepts a bounded device id', async () => {
-    await expect(validate(plainToInstance(KoreaderDeviceParamDto, { deviceId: 'device-1' }))).resolves.toHaveLength(0);
+  it.each(['device-1', 'GanCao_11673992'])('accepts a bounded device id: %s', async (deviceId) => {
+    await expect(validate(plainToInstance(KoreaderDeviceParamDto, { deviceId }))).resolves.toHaveLength(0);
   });
 
   it.each(['', 'device/one', 'device\nlog-entry', 'x'.repeat(101)])('rejects an invalid device id', async (deviceId) => {
