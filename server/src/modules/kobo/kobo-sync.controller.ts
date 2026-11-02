@@ -79,12 +79,14 @@ function buildBaseUrl(req: FastifyRequest, appUrl: string): string {
     if (port) {
       const isDefault = (proto === 'http' && port === '80') || (proto === 'https' && port === '443');
       if (!isDefault) host = host + ':' + port;
-    } else if (!hasForwarded) {
-      const appOrigin = appOriginForHost(appUrl, host);
+    } else {
+      const appOrigin = appOriginForHost(appUrl, host, fwdProto);
       if (appOrigin) return appOrigin;
-      const localPort = req.socket?.localPort;
-      const isDefault = (proto === 'http' && localPort === 80) || (proto === 'https' && localPort === 443);
-      if (localPort && !isDefault) host = host + ':' + String(localPort);
+      if (!hasForwarded) {
+        const localPort = req.socket?.localPort;
+        const isDefault = (proto === 'http' && localPort === 80) || (proto === 'https' && localPort === 443);
+        if (localPort && !isDefault) host = host + ':' + String(localPort);
+      }
     }
   }
 
@@ -93,13 +95,18 @@ function buildBaseUrl(req: FastifyRequest, appUrl: string): string {
 
 /**
  * A Kobo leaves the port out of its Host header, and behind a published port mapping the port the
- * server listens on is not the one the Kobo reached (#1281). APP_URL names the reachable origin, so
- * it is used when it is for the same host; any other host keeps the listening port.
+ * server listens on is not the one the Kobo reached (#1281). A forwarding proxy such as Tailscale
+ * Funnel repeats that port-less Host in X-Forwarded-Host and adds no X-Forwarded-Port, so the
+ * public port is lost the same way (#2036). APP_URL names the reachable origin, so it is used when
+ * it is for the same host and, if the proxy named a scheme, the same scheme; any other host keeps
+ * the listening port.
  */
-function appOriginForHost(appUrl: string, host: string): string | null {
+function appOriginForHost(appUrl: string, host: string, forwardedProto: string | undefined): string | null {
   try {
     const url = new URL(appUrl);
-    return url.hostname.toLowerCase() === host.toLowerCase() ? url.origin : null;
+    if (url.hostname.toLowerCase() !== host.toLowerCase()) return null;
+    if (forwardedProto && url.protocol !== `${forwardedProto.toLowerCase()}:`) return null;
+    return url.origin;
   } catch {
     return null;
   }
