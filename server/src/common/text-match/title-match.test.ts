@@ -96,6 +96,10 @@ describe('title-match', () => {
       expect(scoreTitleMatch('Foundatun', 'Foundation')).toBeGreaterThan(0);
     });
 
+    it('does not let a volume digit in the query dilute the words a candidate shares', () => {
+      expect(scoreTitleMatch('The Faraway Paladin Volume 1', 'The Faraway Paladin: The Boy in the City of the Dead')).toBe(4);
+    });
+
     it('returns zero when either side is empty after normalization', () => {
       expect(scoreTitleMatch('', 'Dune')).toBe(0);
       expect(scoreTitleMatch('Dune', '???')).toBe(0);
