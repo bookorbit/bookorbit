@@ -320,6 +320,63 @@ function ListData.fillRows(h, min_row)
     return { n = n, rh = math.floor(h / n) }
 end
 
+-- Libraries, collections and scopes over as many pages as their rows need.
+-- sizes: the rows each section holds. o: content_h, head_h, gap, row_h (the
+-- natural row), min_row_h, columns (the section numbers each column of a
+-- single page holds) and cols (how many columns a paged page runs).
+-- Everything stays on one page while its rows can keep min_row_h; past that
+-- the sections flow through the columns at min_row_h, a section that runs on
+-- repeating its heading. { pages = { [page] = { [col] = { { section, from,
+-- to } } } }, row_h }. An empty section keeps its heading and has to = 0.
+function ListData.shelfPages(sizes, o)
+    local rh = o.row_h
+    for _i, col in ipairs(o.columns) do
+        local rows = 0
+        for _j, s in ipairs(col) do rows = rows + sizes[s] end
+        local avail = o.content_h - #col * o.head_h - (#col - 1) * o.gap
+        rh = math.min(rh, math.floor(avail / math.max(1, rows)))
+    end
+    if rh >= o.min_row_h then
+        local page = {}
+        for ci, col in ipairs(o.columns) do
+            page[ci] = {}
+            for _j, s in ipairs(col) do table.insert(page[ci], { section = s, from = 1, to = sizes[s] }) end
+        end
+        return { pages = { page }, row_h = rh }
+    end
+
+    rh = o.min_row_h
+    local function blank()
+        local page = {}
+        for ci = 1, o.cols do page[ci] = {} end
+        return page
+    end
+    local pages = { blank() }
+    local p, c, used = 1, 1, 0
+    for s, n in ipairs(sizes) do
+        local from = 1
+        repeat
+            local gap = used > 0 and o.gap or 0
+            local room = math.floor((o.content_h - used - gap - o.head_h) / rh)
+            if room < 1 and used > 0 then
+                if c < o.cols then
+                    c = c + 1
+                else
+                    c, p = 1, p + 1
+                    pages[p] = blank()
+                end
+                used, gap = 0, 0
+                room = math.floor((o.content_h - o.head_h) / rh)
+            end
+            local take = math.min(n - from + 1, math.max(1, room))
+            table.insert(pages[p][c], { section = s, from = from, to = from + take - 1 })
+            used = used + gap + o.head_h + take * rh
+            from = from + take
+        until from > n
+    end
+    return { pages = pages, row_h = rh }
+end
+
 -- The page holding a 0-based index, 1-based.
 function ListData.pageOf(index, per)
     if not index or not per or per < 1 then return 1 end
