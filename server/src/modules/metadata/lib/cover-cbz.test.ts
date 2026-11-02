@@ -133,6 +133,15 @@ describe('extractCbzCover', () => {
     await expect(extractCbzCover('/book.cbz')).resolves.toEqual(Buffer.from([0x02]));
   });
 
+  it('chooses a complete base filename before a filename that extends its stem', async () => {
+    mockZip([
+      { name: 'IMG_0004_Seite_001_1L.jpg', data: Buffer.from([0x04]) },
+      { name: 'IMG.jpg', data: Buffer.from([0x01]) },
+    ]);
+
+    await expect(extractCbzCover('/book.cbz')).resolves.toEqual(Buffer.from([0x01]));
+  });
+
   it('skips hidden image files and returns first visible image', async () => {
     mockZip([
       { name: '.hidden.jpg', data: Buffer.from([0xaa]) },

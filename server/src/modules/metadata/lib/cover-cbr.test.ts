@@ -33,6 +33,23 @@ describe('extractCbrCover', () => {
     await expect(extractCbrCover('/book.cbr')).resolves.toEqual(Buffer.from([7, 7, 7]));
   });
 
+  it('chooses a complete base filename before a filename that extends its stem', async () => {
+    const extract = vi.fn(() => ({ files: [{ fileHeader: { flags: { directory: false } }, extraction: Uint8Array.from([1]) }] }));
+    mockCreateExtractor
+      .mockResolvedValueOnce({
+        getFileList: () => ({
+          fileHeaders: [
+            { name: 'IMG_0004_Seite_001_1L.jpg', flags: { directory: false } },
+            { name: 'IMG.jpg', flags: { directory: false } },
+          ],
+        }),
+      } as any)
+      .mockResolvedValueOnce({ extract } as any);
+
+    await expect(extractCbrCover('/book.cbr')).resolves.toEqual(Buffer.from([1]));
+    expect(extract).toHaveBeenCalledWith({ files: ['IMG.jpg'] });
+  });
+
   it('returns null when archive has no visible image files', async () => {
     mockCreateExtractor.mockResolvedValue({
       getFileList: () => ({ fileHeaders: [{ name: 'notes.txt', flags: { directory: false } }] }),
