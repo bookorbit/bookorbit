@@ -134,7 +134,6 @@ jobs:
           platforms: linux/amd64
           build-args: APP_VERSION=sha-${{ needs.prepare.outputs.source_sha_short }}
           labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.created=${{ needs.prepare.outputs.created }}
           cache-from: type=gha,scope=container-image-yml-amd64
           cache-to: type=gha,mode=max,scope=container-image-yml-amd64
@@ -191,7 +190,6 @@ jobs:
           platforms: linux/arm64
           build-args: APP_VERSION=sha-${{ needs.prepare.outputs.source_sha_short }}
           labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.created=${{ needs.prepare.outputs.created }}
           cache-from: type=gha,scope=container-image-yml-arm64
           cache-to: type=gha,mode=max,scope=container-image-yml-arm64

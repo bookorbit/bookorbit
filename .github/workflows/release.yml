@@ -358,7 +358,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           build-args: APP_VERSION=v${{ needs.release.outputs.version }}
           labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.created=${{ steps.image-meta.outputs.created }}
           cache-from: |
             type=gha,scope=container-image-yml-amd64
@@ -377,7 +376,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:latest
           build-args: APP_VERSION=v${{ needs.release.outputs.version }}
           labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.created=${{ steps.image-meta.outputs.created }}
           cache-from: type=gha,scope=release-read-aloud-worker
           cache-to: type=gha,mode=max,scope=release-read-aloud-worker

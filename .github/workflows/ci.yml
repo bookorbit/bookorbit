@@ -685,7 +685,6 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pr-meta.outputs.scan_tag }}
           platforms: linux/amd64
           labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.pr-meta.outputs.scan_tag }}
             org.opencontainers.image.created=${{ steps.pr-meta.outputs.created }}
           cache-from: type=gha,scope=ci-yml-pr-image
@@ -711,7 +710,6 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-read-aloud-worker:${{ steps.pr-meta.outputs.scan_tag }}
           platforms: linux/amd64
           labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.pr-meta.outputs.scan_tag }}
             org.opencontainers.image.created=${{ steps.pr-meta.outputs.created }}
           cache-from: type=gha,scope=ci-yml-pr-read-aloud-worker
@@ -778,7 +776,6 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pr-meta.outputs.publish_tag }}
           platforms: linux/amd64,linux/arm64
           labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.pr-meta.outputs.publish_tag }}
             org.opencontainers.image.created=${{ steps.pr-meta.outputs.created }}
           cache-from: type=gha,scope=ci-yml-pr-image
