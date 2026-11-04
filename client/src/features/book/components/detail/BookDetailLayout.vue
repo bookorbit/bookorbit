@@ -8,10 +8,10 @@ const props = withDefaults(
     bookId: number
     canEditMetadata?: boolean
     coverTint?: CoverTint | null
-    hasAudio?: boolean
+    hasChapters?: boolean
     parentLibrary?: { id: number; name: string } | null
   }>(),
-  { coverTint: null, hasAudio: false, parentLibrary: null },
+  { coverTint: null, hasChapters: false, parentLibrary: null },
 )
 
 const tintVars = computed(() => coverTintVars(props.coverTint))
@@ -25,7 +25,7 @@ const tintVars = computed(() => coverTintVars(props.coverTint))
     ]"
     :style="tintVars"
   >
-    <BookDetailHeader :book-id="bookId" :can-edit-metadata="canEditMetadata" :has-audio="hasAudio" :parent-library="parentLibrary" />
+    <BookDetailHeader :book-id="bookId" :can-edit-metadata="canEditMetadata" :has-chapters="hasChapters" :parent-library="parentLibrary" />
     <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:px-6 sm:py-4">
       <slot />
     </main>

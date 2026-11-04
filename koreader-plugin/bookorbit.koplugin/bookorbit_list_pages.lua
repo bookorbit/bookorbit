@@ -82,36 +82,45 @@ function Pages.listBody(m, f)
 end
 
 -- --------------------------------------------------------------- shelves
--- Libraries, collections and scopes on one page; wide screens set the
--- sections in two columns.
-function Pages.shelvesBody(m, f)
+-- Libraries, collections and scopes. Wide screens set the sections in two
+-- columns; more shelves than a screen holds at a readable row run on to
+-- further pages, a section that continues repeating its heading.
+function Pages.shelvesLayout(m, f)
     local groups = {
         { _("Libraries"), "library", m.libraries or {} },
         { _("Collections"), "folder-open", m.collections or {} },
         { _("SmartScopes"), "aperture", m.scopes or {} },
     }
     local wide = ListView.screenW() >= 760
-    local gap_s = px(14)
-    local columns = wide and { { groups[1] }, { groups[2], groups[3] } } or { groups }
-    local col_w = wide and math.floor((f.w - px(28)) / 2) or f.w
-    local rh = px(72)
-    for _i, cg in ipairs(columns) do
-        local heads, rows = #cg, 0
-        for _j, g in ipairs(cg) do rows = rows + #g[3] end
-        rh = math.min(rh, math.floor((f.content_h - heads * px(36) - (heads - 1) * gap_s) / math.max(1, rows)))
-    end
+    local layout = ListData.shelfPages({ #groups[1][3], #groups[2][3], #groups[3][3] }, {
+        content_h = f.content_h, head_h = px(36), gap = px(14), row_h = px(72), min_row_h = px(56),
+        columns = wide and { { 1 }, { 2, 3 } } or { { 1, 2, 3 } }, cols = wide and 2 or 1,
+    })
+    layout.groups, layout.wide = groups, wide
+    return layout
+end
+
+function Pages.shelvesBody(m, f)
+    local layout = Pages.shelvesLayout(m, f)
+    local page = math.max(1, math.min(#layout.pages, m.local_page or 1))
+    local col_w = layout.wide and math.floor((f.w - px(28)) / 2) or f.w
+    local rh = layout.row_h
     local col_els = {}
-    for _i, cg in ipairs(columns) do
-        local kids = {}
-        for gi, g in ipairs(cg) do
-            if gi > 1 then table.insert(kids, space(nil, gap_s)) end
-            table.insert(kids, ListView.sectionHead(col_w, { icon = g[2], label = g[1], count = #g[3] }))
-            for i, s in ipairs(g[3]) do
-                local inner = vstack({ w = col_w, h = rh }, { i > 1 and ListView.rule(col_w) or false, flex(0), ListView.shelfRow(col_w, rh, s), flex(0) })
-                table.insert(kids, region(inner, { kind = "open-shelf", shelf = s }, "shelf-" .. g[1] .. "-" .. i, "shelf-" .. s.section .. "-" .. tostring(s.id)))
+    for _ci, chunks in ipairs(layout.pages[page]) do
+        if #chunks > 0 then
+            local kids = {}
+            for ki, chunk in ipairs(chunks) do
+                local g = layout.groups[chunk.section]
+                if ki > 1 then table.insert(kids, space(nil, px(14))) end
+                table.insert(kids, ListView.sectionHead(col_w, { icon = g[2], label = g[1], count = #g[3] }))
+                for i = chunk.from, chunk.to do
+                    local s = g[3][i]
+                    local inner = vstack({ w = col_w, h = rh }, { i > chunk.from and ListView.rule(col_w) or false, flex(0), ListView.shelfRow(col_w, rh, s), flex(0) })
+                    table.insert(kids, region(inner, { kind = "open-shelf", shelf = s }, "shelf-" .. g[1] .. "-" .. i, "shelf-" .. s.section .. "-" .. tostring(s.id)))
+                end
             end
+            table.insert(col_els, vstack({ w = col_w }, kids))
         end
-        table.insert(col_els, vstack({ w = col_w }, kids))
     end
     return hstack({ w = f.w, valign = "top", gap = px(28) }, col_els)
 end

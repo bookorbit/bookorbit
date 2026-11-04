@@ -14,7 +14,17 @@
     "previous": "Forrige",
     "retry": "Forsøg igen",
     "yes": "Ja",
-    "no": "Nej"
+    "no": "Nej",
+    "show": "Vis",
+    "hide": "Skjul",
+    "undo": "Fortryd",
+    "pagination": {
+      "label": "Paginering",
+      "pageOf": "Side {page} af {totalPages}",
+      "previousPage": "Forrige side",
+      "nextPage": "Næste side",
+      "goToPage": "Gå til side {page}"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -97,9 +107,23 @@
       },
       "theme": {
         "title": "Tema",
+        "style": {
+          "label": "Udseende",
+          "hint": "Det overordnede udseende af appen. Tilstand, accent, hjørner og baggrund beholder deres indstillinger.",
+          "bookorbit": {
+            "description": "Tonede flader, glaspaneler og overskrifter med seriffer."
+          },
+          "nostalgia": {
+            "label": "Nostalgisk",
+            "description": "Neutrale flader, systemskrift, flade paneler og en glød i toppen."
+          }
+        },
         "colorScheme": {
           "label": "Farve skema",
           "hint": "Lys eller mørk grænseflade"
+        },
+        "surfacePalette": {
+          "label": "Overflade"
         },
         "accents": {
           "grey": "Grå",

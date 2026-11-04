@@ -7,7 +7,15 @@ import { RequestVerificationService, verifyAgainstRequest } from './request-veri
 type RequestSnapshot = Parameters<typeof verifyAgainstRequest>[0];
 
 function request(overrides: Partial<RequestSnapshot> = {}): RequestSnapshot {
-  return { title: 'Dune', subtitle: null, authors: ['Frank Herbert'], isbn13: null, ...overrides } as RequestSnapshot;
+  return {
+    title: 'Dune',
+    subtitle: null,
+    authors: ['Frank Herbert'],
+    seriesName: null,
+    seriesIndex: null,
+    isbn13: null,
+    ...overrides,
+  } as RequestSnapshot;
 }
 
 function metadata(overrides: Partial<BookDockMetadata> = {}): BookDockMetadata {
@@ -84,6 +92,37 @@ describe('verifyAgainstRequest', () => {
 
   it('scores on title alone when the imported file names no author', () => {
     const outcome = verifyAgainstRequest(request(), metadata({ authors: [] }), null);
+    expect(outcome).toMatchObject({ passed: true, score: 100 });
+  });
+
+  it('holds a different volume when the imported metadata states its series position', () => {
+    const outcome = verifyAgainstRequest(
+      request({ title: 'Example Title', authors: ['Author Name'], seriesName: 'Example Title', seriesIndex: 1 }),
+      metadata({ title: 'Example Title 3', authors: ['Author Name'], seriesName: 'Example Title', seriesIndex: '3' }),
+      null,
+    );
+
+    expect(outcome).toMatchObject({ passed: false, score: 0, code: 'below_threshold' });
+    expect(outcome.reason).toContain('position 3 does not match requested position 1');
+  });
+
+  it('holds a different volume inferred from the imported title', () => {
+    const outcome = verifyAgainstRequest(
+      request({ title: 'Example Title', authors: ['Author Name'], seriesName: 'Example Title', seriesIndex: 1 }),
+      metadata({ title: 'Example Title Vol. 3', authors: ['Author Name'], seriesName: null, seriesIndex: null }),
+      null,
+    );
+
+    expect(outcome).toMatchObject({ passed: false, score: 0 });
+  });
+
+  it('keeps an unnumbered matching title eligible for normal verification', () => {
+    const outcome = verifyAgainstRequest(
+      request({ title: 'Example Title', authors: ['Author Name'], seriesName: 'Example Title', seriesIndex: 1 }),
+      metadata({ title: 'Example Title', authors: ['Author Name'], seriesName: null, seriesIndex: null }),
+      null,
+    );
+
     expect(outcome).toMatchObject({ passed: true, score: 100 });
   });
 });

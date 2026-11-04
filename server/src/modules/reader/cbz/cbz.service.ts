@@ -7,6 +7,7 @@ import { createSevenZipTempId, getSevenZip } from '../../../common/sevenzip';
 import { imageContentTypeFromPath } from '../../../common/image-content-type';
 import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 import { createCbzZipEntryReadStream, readCbzZipIndex, type CbzZipEntry } from '../../../common/cbz-zip-reader';
+import { compareArchiveEntryNames } from '../../../common/archive-entry-sort';
 import { compareComicPagePaths, listExtractedFiles, pathBasename, removeExtractedTree } from './cb7-extraction';
 
 import type { RequestUser } from '../../../common/types/request-user';
@@ -23,10 +24,6 @@ function isImage(name: string): boolean {
 
 function isHidden(name: string): boolean {
   return name.split('/').some((p) => p.startsWith('.'));
-}
-
-function naturalSort(a: string, b: string): number {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
 
 function mimeForExt(name: string): string {
@@ -58,7 +55,7 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
 // ── Freshness ──────────────────────────────────────────────────────────────────
 
 /** Bump when page listing or ordering changes, so a revalidation cannot keep a page from the old order. */
-const PAGE_ETAG_VERSION = 1;
+const PAGE_ETAG_VERSION = 2;
 
 type ComicFormat = 'cbz' | 'cbr' | 'cb7';
 
@@ -189,7 +186,7 @@ export class CbzService {
     const entries = index.entries
       .filter((entry) => !entry.name.endsWith('/') && !isHidden(entry.name) && isImage(entry.name))
       .filter((entry) => (entry.compression === 0 || entry.compression === 8) && entry.compressedSize > 0)
-      .sort((a, b) => naturalSort(a.name, b.name));
+      .sort((a, b) => compareArchiveEntryNames(a.name, b.name));
     this.zipIndex.set(fileId, { stamp, value: entries });
     return entries;
   }
@@ -221,7 +218,7 @@ export class CbzService {
       }
     }
 
-    pages.sort(naturalSort);
+    pages.sort(compareArchiveEntryNames);
     const value = { buffer: ab, pages };
     this.rarCache.set(fileId, { stamp, value });
     return value;
