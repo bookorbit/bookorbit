@@ -729,7 +729,7 @@ export class BookController {
   })
   async bulkSetStatus(@Body() dto: BulkSetStatusDto, @CurrentUser() user: RequestUser) {
     const ids = await this.bookService.resolveSelectionToIds(dto, user);
-    return this.bookService.bulkSetStatus(ids, dto.status, user);
+    return this.bookService.bulkSetStatus(ids, dto, user);
   }
 
   @Post('bulk-set-rating')

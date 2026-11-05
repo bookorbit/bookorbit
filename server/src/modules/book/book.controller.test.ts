@@ -137,6 +137,7 @@ function makeController() {
     bulkReExtractCover: vi.fn(),
     reExtractCover: vi.fn(),
     bulkSetMetadata: vi.fn(),
+    bulkSetStatus: vi.fn(),
     bulkEditMetadata: vi.fn(),
     bulkUpdateTags: vi.fn(),
     getExportFiles: vi.fn(),
@@ -478,6 +479,18 @@ describe('BookController', () => {
     expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ bookId: 9, success: true })}\n\n`);
     expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, processed: 1, failed: 0 })}\n\n`);
     expect(raw.end).toHaveBeenCalled();
+  });
+
+  it('forwards explicit reading dates through the bulk status route', async () => {
+    const { controller, bookService } = makeController();
+    const user = makeUser();
+    const dto = { bookIds: [7, 9], status: 'read' as const, startedAt: '2026-01-01', finishedAt: null };
+    bookService.resolveSelectionToIds.mockResolvedValue([7, 9]);
+
+    await controller.bulkSetStatus(dto, user);
+
+    expect(bookService.resolveSelectionToIds).toHaveBeenCalledWith(dto, user);
+    expect(bookService.bulkSetStatus).toHaveBeenCalledWith([7, 9], dto, user);
   });
 
   it.each(['bulkRefreshMetadata', 'bulkReExtractCover'] as const)('rejects an unauthorized %s selection before starting SSE', async (method) => {

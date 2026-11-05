@@ -39,6 +39,12 @@ const globalStubs = {
     TooltipTrigger: { template: '<div><slot /></div>' },
     TooltipContent: { template: '<div><slot /></div>' },
     TooltipProvider: { template: '<div><slot /></div>' },
+    BulkReadingStateDialog: {
+      props: ['open'],
+      emits: ['confirm'],
+      template:
+        '<button v-if="open" data-testid="bulk-reading-state-confirm-stub" @click="$emit(\'confirm\', { status: \'read\', finishedAt: null })">Confirm reading state</button>',
+    },
   },
 }
 
@@ -121,7 +127,7 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.find('[data-testid="action-add-to-collection"]').exists()).toBe(true)
   })
 
-  it('emits add/send/download/metadata-export/status/rating actions from default controls', async () => {
+  it('emits add/send/download/metadata-export/reading-state/rating actions from default controls', async () => {
     const wrapper = mountBar()
 
     await wrapper.find('[data-testid="action-add-to-collection"]').trigger('click')
@@ -142,11 +148,8 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.emitted('download')?.[0]).toEqual(['primary'])
 
     await wrapper.find('[data-testid="action-bulk-set-status"]').trigger('click')
-    await wrapper
-      .findAll('button')
-      .find((btn) => btn.text().includes('Reading'))
-      ?.trigger('click')
-    expect(wrapper.emitted('set-status')?.[0]).toEqual(['reading'])
+    await wrapper.find('[data-testid="bulk-reading-state-confirm-stub"]').trigger('click')
+    expect(wrapper.emitted('set-status')?.[0]).toEqual([{ status: 'read', finishedAt: null }])
 
     await wrapper.find('[data-testid="action-bulk-set-rating"]').trigger('click')
     await nextTick()

@@ -6374,6 +6374,32 @@
         "clear": "Clear"
       }
     },
+    "bulkReadingState": {
+      "title": "{count, plural, =0 {Update reading state} one {Update reading state for # book} other {Update reading state for # books}}",
+      "description": "Set a shared reading status and choose whether reading dates should be changed.",
+      "status": "Reading status",
+      "startedAt": "Date started",
+      "finishedAt": "Date finished",
+      "dateAction": "Date action",
+      "setDate": "Set date",
+      "clearDate": "Clear date",
+      "noFinishDate": "No finish date",
+      "clearStartedHint": "The start date will be removed from every selected book.",
+      "noFinishDateHint": "Completed reads stay undated and are not added to today's statistics.",
+      "close": "Close bulk reading state editor",
+      "cancel": "Cancel",
+      "apply": "Apply changes",
+      "updated": "{count, plural, one {Updated reading state for # book} other {Updated reading state for # books}}",
+      "failed": "Failed to update reading state",
+      "errors": {
+        "startRequired": "Choose a start date.",
+        "finishRequired": "Choose a finish date.",
+        "startFuture": "The start date cannot be in the future.",
+        "finishFuture": "The finish date cannot be in the future.",
+        "finishBeforeStart": "The finish date must be on or after the start date.",
+        "statusConflict": "Reading dates cannot be set for this reading status."
+      }
+    },
     "export": {
       "title": "Export Metadata",
       "scope": "Scope",

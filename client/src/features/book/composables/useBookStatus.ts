@@ -46,6 +46,8 @@ export type ReadStatusPatch = {
   finishedAt?: string | null
 }
 
+export type BulkReadingStatePatch = ReadStatusPatch & { status: ReadStatus }
+
 export class ReadStatusUpdateError extends Error {
   constructor(
     message: string,

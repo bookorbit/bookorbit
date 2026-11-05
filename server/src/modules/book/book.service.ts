@@ -2697,12 +2697,39 @@ export class BookService {
     };
   }
 
-  async bulkSetStatus(bookIds: number[], status: ReadStatus, user: RequestUser): Promise<void> {
+  async bulkSetStatus(bookIds: number[], dto: Pick<SetStatusDto, 'status' | 'startedAt' | 'finishedAt'>, user: RequestUser): Promise<void> {
+    if (dto.status === undefined) throw new BadRequestException('status is required');
+    const status = dto.status;
     const event = 'book.bulk.set_status';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} status=${status} - bulk set status started`);
     await this.verifyLibraryAccessForBookIds(bookIds, user);
-    await this.userBookStatusService.bulkSetManual(user.id, bookIds, status);
+    const timeZone = this.resolveUserTimeZone(user);
+    const datePatch: { startedAt?: Date | null; finishedAt?: Date | null } = {};
+    const dateKeys: { startedOn?: string | null; endedOn?: string | null } = {};
+
+    if (dto.startedAt !== undefined) {
+      if (dto.startedAt === null) {
+        datePatch.startedAt = null;
+        dateKeys.startedOn = null;
+      } else {
+        const normalized = this.parseManualReadDateInput(dto.startedAt, 'startedAt', timeZone);
+        datePatch.startedAt = normalized.date;
+        dateKeys.startedOn = normalized.dateKey;
+      }
+    }
+    if (dto.finishedAt !== undefined) {
+      if (dto.finishedAt === null) {
+        datePatch.finishedAt = null;
+        dateKeys.endedOn = null;
+      } else {
+        const normalized = this.parseManualReadDateInput(dto.finishedAt, 'finishedAt', timeZone);
+        datePatch.finishedAt = normalized.date;
+        dateKeys.endedOn = normalized.dateKey;
+      }
+    }
+
+    await this.userBookStatusService.bulkSetManual(user.id, bookIds, status, datePatch, dateKeys, timeZone);
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} status=${status} durationMs=${Date.now() - startedAt} - bulk set status completed`,
     );

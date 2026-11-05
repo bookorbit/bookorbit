@@ -38,8 +38,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
-import { STATUS_ICONS, STATUS_OPTIONS } from '@/features/book/composables/useBookStatus'
-import type { ReadStatus } from '@bookorbit/types'
+import BulkReadingStateDialog from '@/features/book/components/BulkReadingStateDialog.vue'
+import type { BulkReadingStatePatch } from '@/features/book/composables/useBookStatus'
 import {
   BULK_EDITABLE_ARRAY_FIELDS,
   BULK_EDITABLE_FIELD_OPTIONS,
@@ -87,7 +87,7 @@ const emit = defineEmits<{
   'export-metadata': []
   'refresh-metadata': [options: IgnoreCacheOptions]
   're-extract-cover': []
-  'set-status': [status: ReadStatus]
+  'set-status': [patch: BulkReadingStatePatch]
   'set-rating': [rating: number | null]
   'set-field': [field: BulkEditableField, value: BulkEditableValue]
   'lock-metadata': [locked: boolean]
@@ -109,6 +109,7 @@ const fieldMenuOpen = ref(false)
 const refreshConfirmOpen = ref(false)
 const refreshIgnoreCache = ref(false)
 const refreshConfirmButton = ref<HTMLButtonElement | null>(null)
+const readingStateOpen = ref(false)
 const bulkField = ref<BulkEditableField>('publisher')
 const fieldValue = ref('')
 const slots = useSlots()
@@ -151,8 +152,17 @@ function onConfirmDelete() {
   deleteInput.value = ''
 }
 
-function onSetStatus(status: ReadStatus) {
-  emit('set-status', status)
+function openReadingStateEditor() {
+  readingStateOpen.value = true
+}
+
+function handleReadingStateOpenChange(open: boolean) {
+  readingStateOpen.value = open
+}
+
+function handleReadingStateConfirm(patch: BulkReadingStatePatch) {
+  emit('set-status', patch)
+  readingStateOpen.value = false
 }
 
 function onSetRating(rating: number | null) {
@@ -248,6 +258,7 @@ watch(
       exportMenuOpen.value = false
       ratingMenuOpen.value = false
       refreshConfirmOpen.value = false
+      readingStateOpen.value = false
       deleteInput.value = ''
       resetFieldEditor()
     }
@@ -292,24 +303,15 @@ watch(
             <Tooltip v-if="canBulkActions">
               <TooltipTrigger as-child>
                 <span class="inline-flex shrink-0">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger as-child>
-                      <button
-                        data-testid="action-bulk-set-status"
-                        :disabled="count === 0"
-                        :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
-                        :aria-label="t('components.selectionActionBar.setReadingStatus')"
-                      >
-                        <BookOpen :size="ICON_SIZE" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="top" align="center" class="w-48">
-                      <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="onSetStatus(opt.value)">
-                        <component :is="STATUS_ICONS[opt.value]" :size="14" />
-                        <span>{{ opt.label }}</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <button
+                    data-testid="action-bulk-set-status"
+                    :disabled="count === 0"
+                    :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                    :aria-label="t('components.selectionActionBar.setReadingStatus')"
+                    @click="openReadingStateEditor"
+                  >
+                    <BookOpen :size="ICON_SIZE" />
+                  </button>
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top">{{ t('components.selectionActionBar.setReadingStatus') }}</TooltipContent>
@@ -630,4 +632,10 @@ watch(
       </div>
     </div>
   </Transition>
+  <BulkReadingStateDialog
+    :open="readingStateOpen"
+    :book-count="count"
+    @update:open="handleReadingStateOpenChange"
+    @confirm="handleReadingStateConfirm"
+  />
 </template>

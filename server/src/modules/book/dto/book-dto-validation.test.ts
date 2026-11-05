@@ -66,7 +66,9 @@ describe('Book DTO validation', () => {
 
   it('validates bulk action DTOs with bookIds and query selection', async () => {
     expect((await errorsFor(BulkSetStatusDto, { bookIds: [1], status: 'read' })).length).toBe(0);
+    expect((await errorsFor(BulkSetStatusDto, { bookIds: [1], status: 'read', startedAt: '2026-01-01', finishedAt: null })).length).toBe(0);
     expect((await errorsFor(BulkSetStatusDto, { query: { libraryId: 5 }, status: 'read' })).length).toBe(0);
+    expect((await errorsFor(BulkSetStatusDto, { bookIds: [1], status: 'read', finishedAt: 'not-a-date' })).length).toBeGreaterThan(0);
     expect((await errorsFor(BulkSetRatingDto, { bookIds: [1], rating: 4 })).length).toBe(0);
     expect((await errorsFor(BulkSetRatingDto, { query: {}, rating: 4 })).length).toBe(0);
     expect((await errorsFor(BulkSetMetadataDto, { bookIds: [1], field: 'language', value: 'fr' })).length).toBe(0);
