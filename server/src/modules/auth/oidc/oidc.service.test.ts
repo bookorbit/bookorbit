@@ -23,7 +23,7 @@ const PROVIDER = {
   updatedAt: new Date(),
 };
 
-function makeService() {
+function makeService(options: { extraRedirectUris?: string[] } = {}) {
   const providerService = {
     findBySlugOrFail: vi.fn().mockResolvedValue(PROVIDER),
     findByIdOrFail: vi.fn().mockResolvedValue(PROVIDER),
@@ -82,7 +82,11 @@ function makeService() {
   const auditEvents = {
     emit: vi.fn(),
   };
-  const appConfiguration = { appUrl: APP_URL, nativeRedirectUri: NATIVE_REDIRECT_URI };
+  const appConfiguration = {
+    appUrl: APP_URL,
+    nativeRedirectUri: NATIVE_REDIRECT_URI,
+    oidcExtraRedirectUris: options.extraRedirectUris ?? [],
+  };
   const authenticationPolicy = {
     isPasswordLoginEnabled: vi.fn().mockReturnValue(true),
   };
@@ -209,6 +213,24 @@ describe('OidcService', () => {
       await expect(service.handleCallback({ ...BASE_CALLBACK, redirectUri: 'evil://oauth2-callback' }, {} as never)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('accepts a redirect URI with surrounding whitespace', async () => {
+      const { service, identityRepo, userService } = makeService();
+      identityRepo.findByProviderAndSubject.mockResolvedValue({ userId: 5 });
+      userService.findById.mockResolvedValue({ id: 5, username: 'u1', active: true, permissions: [] });
+      await expect(service.handleCallback({ ...BASE_CALLBACK, redirectUri: `  ${VALID_REDIRECT_URI}  ` }, {} as never)).resolves.toMatchObject({
+        mode: 'login',
+      });
+    });
+
+    it('accepts an extra web redirect URI configured via OIDC_EXTRA_REDIRECT_URIS', async () => {
+      const { service, identityRepo, userService } = makeService({ extraRedirectUris: ['https://books.vpn/oauth2-callback'] });
+      identityRepo.findByProviderAndSubject.mockResolvedValue({ userId: 5 });
+      userService.findById.mockResolvedValue({ id: 5, username: 'u1', active: true, permissions: [] });
+      await expect(
+        service.handleCallback({ ...BASE_CALLBACK, redirectUri: 'https://books.vpn/oauth2-callback' }, {} as never),
+      ).resolves.toMatchObject({ mode: 'login' });
     });
 
     it('rejects callback when extracted subject is missing', async () => {

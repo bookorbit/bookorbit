@@ -59,4 +59,40 @@ describe('isAllowedRedirectUri', () => {
     expect(isAllowedRedirectUri('', POLICY)).toBe(false);
     expect(isAllowedRedirectUri('not a uri', POLICY)).toBe(false);
   });
+
+  describe('extraRedirectUris', () => {
+    it('accepts an extra web origin by origin + pathname', () => {
+      const policy = { ...POLICY, extraRedirectUris: ['https://books.lan/oauth2-callback'] };
+      expect(isAllowedRedirectUri('https://books.lan/oauth2-callback', policy)).toBe(true);
+      expect(isAllowedRedirectUri('https://books.lan/oauth2-callback?redirect=/library', policy)).toBe(true);
+    });
+
+    it('rejects a different path on an allowed extra origin', () => {
+      const policy = { ...POLICY, extraRedirectUris: ['https://books.lan/oauth2-callback'] };
+      expect(isAllowedRedirectUri('https://books.lan/somewhere-else', policy)).toBe(false);
+    });
+
+    it('accepts an extra custom scheme by exact match only', () => {
+      const policy = { ...POLICY, extraRedirectUris: ['myfork2://oauth2-callback'] };
+      expect(isAllowedRedirectUri('myfork2://oauth2-callback', policy)).toBe(true);
+      expect(isAllowedRedirectUri('myfork2://oauth2-callback/', policy)).toBe(false);
+    });
+
+    it('does not let an extra custom scheme collapse into another via origin+pathname normalization', () => {
+      const policy = { ...POLICY, extraRedirectUris: ['evil://oauth2-callback'] };
+      expect(isAllowedRedirectUri('bookorbit://oauth2-callback', policy)).toBe(true); // still the real nativeRedirectUri
+      expect(isAllowedRedirectUri('anything-else://oauth2-callback', policy)).toBe(false);
+    });
+
+    it('rejects a lookalike scheme that merely starts with "http"', () => {
+      const policy = { ...POLICY, extraRedirectUris: ['httpfoo://oauth2-callback'] };
+      expect(isAllowedRedirectUri('httpfoo://oauth2-callback', policy)).toBe(true); // exact match, not origin-normalized
+      expect(isAllowedRedirectUri('httpfoo://elsewhere', policy)).toBe(false);
+    });
+
+    it('rejects everything when extraRedirectUris is empty or absent', () => {
+      expect(isAllowedRedirectUri('https://books.lan/oauth2-callback', POLICY)).toBe(false);
+      expect(isAllowedRedirectUri('https://books.lan/oauth2-callback', { ...POLICY, extraRedirectUris: [] })).toBe(false);
+    });
+  });
 });
