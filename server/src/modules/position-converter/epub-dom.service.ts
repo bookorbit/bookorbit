@@ -125,6 +125,10 @@ interface SpineCacheEntry {
   spine: EpubSpine;
 }
 
+function versionOf(entry: SpineCacheEntry): string {
+  return `${entry.format}:${entry.mtimeMs}:${entry.absolutePath}`;
+}
+
 @Injectable()
 export class EpubDomService {
   private readonly logger = new Logger(EpubDomService.name);
@@ -141,6 +145,41 @@ export class EpubDomService {
   async getSpineHrefs(bookFileId: number): Promise<string[] | null> {
     const entry = await this.getSpineEntry(bookFileId);
     return entry ? entry.spine.hrefs : null;
+  }
+
+  /** Identifies the file's current contents, so a cache derived from them can tell when it is stale. */
+  async getFileVersion(bookFileId: number): Promise<string | null> {
+    const entry = await this.getSpineEntry(bookFileId);
+    return entry ? versionOf(entry) : null;
+  }
+
+  /**
+   * Reads the collapsed text of every spine document in one pass over the archive, in spine order.
+   * Stops once `maxChars` have been read, so an enormous file cannot exhaust memory.
+   */
+  async readChapterTexts(
+    bookFileId: number,
+    maxChars = Number.POSITIVE_INFINITY,
+  ): Promise<{ version: string; chapters: Array<{ chapterIndex: number; text: string }> } | null> {
+    const entry = await this.getSpineEntry(bookFileId);
+    if (!entry) return null;
+
+    try {
+      const zip = await unzipper.Open.file(entry.absolutePath);
+      const chapters: Array<{ chapterIndex: number; text: string }> = [];
+      let total = 0;
+      for (const [chapterIndex, href] of entry.spine.hrefs.entries()) {
+        if (total >= maxChars) break;
+        const doc = await loadChapterFromZip(zip, href, entry.format === 'kepub');
+        if (!doc) continue;
+        chapters.push({ chapterIndex, text: doc.index.collapsed });
+        total += doc.index.collapsed.length;
+      }
+      return { version: versionOf(entry), chapters };
+    } catch (error) {
+      this.logFail(bookFileId, error);
+      return null;
+    }
   }
 
   async getChapter(bookFileId: number, chapterIndex: number): Promise<ChapterDocument | null> {

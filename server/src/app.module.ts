@@ -102,6 +102,7 @@ import { SearchModule } from './modules/search/search.module';
 import { WatchDownloadModule } from './modules/watch-download/watch-download.module';
 import { AppAttestModule } from './modules/app-attest/app-attest.module';
 import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
+import { PageLocatorModule } from './modules/page-locator/page-locator.module';
 
 @Module({
   imports: [
@@ -214,6 +215,7 @@ import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
     WatchDownloadModule,
     AppAttestModule,
     ReadAloudModule,
+    PageLocatorModule,
   ],
   providers: [{ provide: APP_INTERCEPTOR, useClass: AuditInterceptor }, ...GLOBAL_GUARDS.map((useClass) => ({ provide: APP_GUARD, useClass }))],
 })

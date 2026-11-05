@@ -90,6 +90,7 @@ export * from "./cover-search-preferences";
 export * from "./cron";
 export * from "./tts";
 export * from "./watch-download";
+export * from "./page-locator";
 export * from "./regex-metadata";
 export * from "./delivery";
 export * from "./djvu";

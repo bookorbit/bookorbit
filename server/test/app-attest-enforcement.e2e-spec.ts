@@ -57,6 +57,7 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['POST', '/tts/synthesize/captioned'],
   ['POST', '/watch-downloads'],
   ['POST', '/watch-downloads/media-overlay'],
+  ['POST', '/mobile/books/files/1/locate-text'],
 ];
 
 const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [

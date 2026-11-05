@@ -1186,5 +1186,17 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/page-locator/page-locator.controller.ts",
+    "className": "PageLocatorController",
+    "methodName": "locateText",
+    "httpMethod": "POST",
+    "path": "/mobile/books/files/:fileId/locate-text",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

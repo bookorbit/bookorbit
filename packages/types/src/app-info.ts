@@ -49,6 +49,8 @@ export const SERVER_FEATURES = [
    * kind, several files saved in one request, and `editedAt` so the newer of two saves wins.
    */
   "reading-progress",
+  /** `POST /mobile/books/files/:fileId/locate-text` finds where text recognised on a photographed page appears in an EPUB. */
+  "locate-text",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
