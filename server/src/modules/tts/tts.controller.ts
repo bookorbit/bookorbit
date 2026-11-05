@@ -3,6 +3,7 @@ import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { PreviewVoiceDto, SynthesizeDto } from './dto/synthesize.dto';
 import { UpdateTtsPreferencesDto } from './dto/tts-preferences.dto';
 import { SaveTtsPositionDto } from './dto/tts-position.dto';
@@ -41,6 +42,7 @@ export class TtsController {
    * that do not need them.
    */
   @Post('synthesize/captioned')
+  @RequireAppAttest()
   @HttpCode(200)
   synthesizeCaptioned(@Body() dto: SynthesizeDto) {
     return this.ttsService.synthesizeCaptioned(dto);

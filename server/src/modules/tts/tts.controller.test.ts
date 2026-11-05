@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
+import { AppAttestGuard } from '../app-attest/app-attest.guard';
 import { TtsController } from './tts.controller';
 import { TtsService } from './tts.service';
 import type { RequestUser } from '../../common/types/request-user';
@@ -33,7 +34,10 @@ describe('TtsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TtsController],
       providers: [{ provide: TtsService, useValue: mockTtsService }],
-    }).compile();
+    })
+      .overrideGuard(AppAttestGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<TtsController>(TtsController);
     vi.clearAllMocks();

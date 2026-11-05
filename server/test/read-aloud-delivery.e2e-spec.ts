@@ -142,7 +142,7 @@ describe('Read-aloud delivery contracts (e2e)', { timeout: 180_000 }, () => {
     ).toBe(403);
     expect((await request('PATCH', url, {})).statusCode).toBe(400);
     expect((await request('PATCH', url, { readAloudDelivery: 'unknown' })).statusCode).toBe(400);
-    expect((await request('PATCH', '/api/v1/koreader/devices/bad_device/delivery-settings', { readAloudDelivery: null })).statusCode).toBe(400);
+    expect((await request('PATCH', '/api/v1/koreader/devices/bad.device/delivery-settings', { readAloudDelivery: null })).statusCode).toBe(400);
     const read = await ctx.app.inject({ method: 'GET', url: '/api/v1/koreader/plugin/delivery-settings/delivery-device-b', headers: koHeaders() });
     expect(read.json().readAloudDelivery).toBe('audioless_epub');
   });

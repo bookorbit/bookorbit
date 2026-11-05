@@ -10,6 +10,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { BookService } from '../book/book.service';
 import { EpubService } from '../reader/epub/epub.service';
 import { CreateWatchDownloadDto } from './dto/create-watch-download.dto';
@@ -34,12 +35,14 @@ export class WatchDownloadController {
   ) {}
 
   @Post()
+  @RequireAppAttest()
   @RequirePermission(Permission.LibraryDownload)
   create(@Body() dto: CreateWatchDownloadDto, @CurrentUser() user: RequestUser) {
     return this.watchDownloads.issue(dto.bookId, dto.fileIds, user);
   }
 
   @Post('media-overlay')
+  @RequireAppAttest()
   @RequirePermission(Permission.LibraryDownload)
   createMediaOverlay(@Body() dto: CreateWatchMediaOverlayDownloadDto, @CurrentUser() user: RequestUser) {
     return this.watchDownloads.issueMediaOverlay(dto.bookId, dto.fileId, dto.hrefs, user);

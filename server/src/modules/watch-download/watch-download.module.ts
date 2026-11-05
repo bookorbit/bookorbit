@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 
 import { CommonModule } from '../../common/common.module';
+import { AppAttestModule } from '../app-attest/app-attest.module';
 import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
 import { EpubModule } from '../reader/epub/epub.module';
@@ -18,6 +19,7 @@ import { WatchDownloadService } from './watch-download.service';
         signOptions: { algorithm: 'HS256' },
       }),
     }),
+    AppAttestModule,
     AuthModule,
     BookModule,
     CommonModule,

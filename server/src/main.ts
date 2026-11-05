@@ -21,6 +21,7 @@ import {
   parseTrustProxy,
   buildHelmetOptions,
   buildEmptyJsonBodyStream,
+  markEmptyBodyInjected,
   registerConditionalHsts,
   registerDeclaredBodyLimits,
   registerDeclaredCompressionOptOuts,
@@ -35,7 +36,8 @@ async function bootstrap() {
   const allowCloudflareInsights = parseBooleanEnv(process.env.CSP_ALLOW_CLOUDFLARE_INSIGHTS, false);
 
   const adapter = new FastifyAdapter({ logger: false, trustProxy: parseTrustProxy(process.env.TRUST_PROXY), maxParamLength: 1000 });
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true });
+  // Raw JSON bytes are what App Attest assertions hash for routes that take a body.
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
 
   const fastify = adapter.getInstance();
@@ -48,6 +50,7 @@ async function bootstrap() {
   // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.
   fastify.addHook('preParsing', (request, _reply, payload, done) => {
     if (shouldInjectEmptyJsonBody(request.method, request.headers)) {
+      markEmptyBodyInjected(request);
       done(null, buildEmptyJsonBodyStream(request.headers));
       return;
     }

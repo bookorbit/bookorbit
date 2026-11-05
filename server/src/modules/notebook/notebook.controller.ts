@@ -11,6 +11,7 @@ import type {
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import {
   NotebookBooksQueryDto,
   NotebookEntriesQueryDto,
@@ -27,26 +28,31 @@ export class NotebookController {
   constructor(private readonly notebookService: NotebookService) {}
 
   @Get('entries')
+  @RequireAppAttest()
   entries(@CurrentUser() user: RequestUser, @Query() query: NotebookEntriesQueryDto): Promise<NotebookEntriesResponse> {
     return this.notebookService.entries(user, query);
   }
 
   @Get('overview')
+  @RequireAppAttest()
   overview(@CurrentUser() user: RequestUser, @Query() query: NotebookOverviewQueryDto): Promise<NotebookOverview> {
     return this.notebookService.overview(user, query);
   }
 
   @Get('books')
+  @RequireAppAttest()
   books(@CurrentUser() user: RequestUser, @Query() query: NotebookBooksQueryDto): Promise<NotebookBooksResponse> {
     return this.notebookService.books(user, query);
   }
 
   @Get('review')
+  @RequireAppAttest()
   review(@CurrentUser() user: RequestUser, @Query() query: NotebookReviewQueryDto): Promise<NotebookReviewResponse> {
     return this.notebookService.review(user, query);
   }
 
   @Get('on-this-day')
+  @RequireAppAttest()
   onThisDay(@CurrentUser() user: RequestUser, @Query() query: NotebookOnThisDayQueryDto): Promise<NotebookOnThisDayResponse> {
     return this.notebookService.onThisDay(user, query);
   }

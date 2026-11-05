@@ -15,6 +15,7 @@ import * as schema from '../../../src/db/schema';
 import { bookFiles, books, fileWriteLog, libraries, libraryFolders, scanJobs } from '../../../src/db/schema';
 import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
 import { createMetadataWriteFixtureRoot, type MetadataWriteFixtureRoot } from './metadata-write-fixture-builder';
+import { allowAppAttest } from '../allow-app-attest';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -91,9 +92,11 @@ export async function createMetadataWriteE2EContext(): Promise<MetadataWriteE2EC
   process.env.FILE_WRITE_DEBOUNCE_MS = '25';
   process.env.FILE_WRITE_MAX_CONCURRENT_WRITES = '1';
 
-  const moduleFixture = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+  const moduleFixture = await allowAppAttest(
+    Test.createTestingModule({
+      imports: [AppModule],
+    }),
+  ).compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
+import { AppAttestModule } from '../app-attest/app-attest.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { BookMetadataFetchModule } from '../book-metadata-fetch/book-metadata-fetch.module';
 import { FileWriteModule } from '../file-write/file-write.module';
@@ -22,6 +23,7 @@ import { UploadSessionService } from './upload-session.service';
 
 @Module({
   imports: [
+    AppAttestModule,
     AppSettingsModule,
     BookCoverStoreModule,
     LibraryModule,

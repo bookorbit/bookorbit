@@ -4,12 +4,14 @@ import type { BookJournalEntry } from '@bookorbit/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { BookJournalService } from './book-journal.service';
 import { BookJournalQueryDto } from './dto/book-journal-query.dto';
 import { CreateBookJournalEntryDto } from './dto/create-book-journal-entry.dto';
 import { UpdateBookJournalEntryDto } from './dto/update-book-journal-entry.dto';
 
 @Controller('books/:bookId/journal')
+@RequireAppAttest()
 export class BookJournalController {
   constructor(private readonly journalService: BookJournalService) {}
 

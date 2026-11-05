@@ -100,6 +100,7 @@ import { ChapterHealthModule } from './modules/chapter-health/chapter-health.mod
 import { TtsModule } from './modules/tts/tts.module';
 import { SearchModule } from './modules/search/search.module';
 import { WatchDownloadModule } from './modules/watch-download/watch-download.module';
+import { AppAttestModule } from './modules/app-attest/app-attest.module';
 import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
 
 @Module({
@@ -211,6 +212,7 @@ import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
     TtsModule,
     SearchModule,
     WatchDownloadModule,
+    AppAttestModule,
     ReadAloudModule,
   ],
   providers: [{ provide: APP_INTERCEPTOR, useClass: AuditInterceptor }, ...GLOBAL_GUARDS.map((useClass) => ({ provide: APP_GUARD, useClass }))],
