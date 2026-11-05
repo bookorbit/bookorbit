@@ -48,6 +48,7 @@ function makeService(
     adapter?: Record<string, unknown>;
     registry?: Record<string, unknown>;
     managers?: Record<string, unknown>;
+    downloads?: Record<string, unknown>;
   } = {},
 ) {
   const repo = {
@@ -96,13 +97,18 @@ function makeService(
     findById: vi.fn().mockResolvedValue(undefined),
     ...overrides.managers,
   };
+  const downloads = {
+    findActiveDirectByIndexer: vi.fn().mockResolvedValue([]),
+    ...overrides.downloads,
+  };
   return {
-    service: new IndexerConfigService(repo as never, credentials as never, registry as never, managers as never),
+    service: new IndexerConfigService(repo as never, credentials as never, registry as never, managers as never, downloads as never),
     repo,
     credentials,
     registry,
     adapter,
     managers,
+    downloads,
   };
 }
 
@@ -600,6 +606,13 @@ describe('IndexerConfigService', () => {
     const { service, repo } = makeService({ repo: { findById: vi.fn().mockResolvedValue(indexerRow({ adapterType: 'demo-tracker' })) } });
 
     await expect(service.remove(9)).rejects.toThrow(/deleted with its plugin/i);
+    expect(repo.delete).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete a source with a direct download still in flight', async () => {
+    const { service, repo } = makeService({ downloads: { findActiveDirectByIndexer: vi.fn().mockResolvedValue([{ id: 5 }]) } });
+
+    await expect(service.remove(9)).rejects.toThrow(/direct download still running/i);
     expect(repo.delete).not.toHaveBeenCalled();
   });
 

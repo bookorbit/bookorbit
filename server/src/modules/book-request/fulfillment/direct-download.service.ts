@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import { BOOK_FORMATS } from '@bookorbit/types';
+import { BOOK_FORMATS, type NetworkProfile } from '@bookorbit/types';
 
 import { storageConfig } from '../../../config/config';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
@@ -14,6 +14,7 @@ import { safeFetch } from '../../../common/utils/safe-fetch';
 import { ensureSafeUrl } from '../../../common/utils/ssrf.utils';
 import type { BookRequestDownloadRow } from '../../../db/schema';
 import type { DownloadStatus } from '../download-clients/download-client-adapter';
+import { IndexerConfigService } from '../indexers/indexer-config.service';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 
 /**
@@ -111,6 +112,12 @@ interface Progress {
 export interface DirectDownloadRequest {
   downloadId: number;
   fileUrl: string;
+  /**
+   * The source that named this file. Its network profile is what the transfer must egress through,
+   * so a direct download never falls back to the server's default route when its source asked for a
+   * proxy. Null only for a URL an operator pasted by hand, which has no source to inherit from.
+   */
+  indexerId: number | null;
   fileName?: string;
   /** What the source declared the file to be, which is what names a file that arrived without one. */
   format?: string | null;
@@ -151,6 +158,7 @@ export class DirectDownloadService {
   constructor(
     @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
     private readonly downloads: BookRequestDownloadRepository,
+    private readonly indexers: IndexerConfigService,
   ) {}
 
   private get root(): string {
@@ -159,12 +167,13 @@ export class DirectDownloadService {
 
   async add(release: DirectDownloadRequest): Promise<{ clientKey: string }> {
     const url = await ensureSafeUrl(release.fileUrl, { allowPrivate: ALLOW_PRIVATE });
+    const profile = await this.profileFor(release.indexerId);
 
     const directory = join(this.root, release.clientKey);
     const target = safeJoin(directory, stagedDirectFileName(release.fileName, release.format));
 
     await mkdir(directory, { recursive: true });
-    this.start(release.downloadId, release.clientKey, url, target, directory, 0, null, null);
+    this.start(release.downloadId, release.clientKey, url, target, directory, 0, null, null, profile);
 
     return { clientKey: release.clientKey };
   }
@@ -181,6 +190,18 @@ export class DirectDownloadService {
       return false;
     }
 
+    // A deleted source leaves `indexer_id` NULL (ON DELETE SET NULL) and, with it, the routing
+    // provenance a direct file inherits. Resuming on the default route would move the same bytes the
+    // operator had routed through a proxy, so a transfer whose source is gone fails rather than
+    // silently fall back to direct egress.
+    if (download.indexerId === null) return false;
+    let profile: NetworkProfile | null;
+    try {
+      profile = await this.profileFor(download.indexerId);
+    } catch {
+      return false;
+    }
+
     const url = await ensureSafeUrl(download.directUrl, { allowPrivate: ALLOW_PRIVATE });
     const directory = join(this.root, download.clientKey);
     const target = safeJoin(directory, download.directFileName);
@@ -192,11 +213,19 @@ export class DirectDownloadService {
     if (existingBytes > MAX_FILE_BYTES) return false;
 
     await mkdir(directory, { recursive: true });
-    this.start(download.id, download.clientKey, url, target, directory, existingBytes, validator, download.totalBytes);
+    this.start(download.id, download.clientKey, url, target, directory, existingBytes, validator, download.totalBytes, profile);
     this.logger.log(
       `[direct_download.resume] [start] downloadId=${download.id} key=${download.clientKey} bytes=${existingBytes} - resuming an interrupted direct download`,
     );
     return true;
+  }
+
+  /**
+   * The egress a direct file inherits from the source that named it, so the search and the transfer
+   * leave by the same route. Null for a URL pasted by hand, which has no source to inherit from.
+   */
+  private async profileFor(indexerId: number | null): Promise<NetworkProfile | null> {
+    return indexerId === null ? null : (await this.indexers.resolveConfig(indexerId)).networkProfile;
   }
 
   private start(
@@ -208,6 +237,7 @@ export class DirectDownloadService {
     offset: number,
     validator: string | null,
     expectedBytes: number | null,
+    profile: NetworkProfile | null,
   ): void {
     this.progress.set(clientKey, {
       state: 'downloading',
@@ -220,7 +250,7 @@ export class DirectDownloadService {
 
     // Deliberately not awaited: `add` hands the work over the way a torrent client does, and the
     // poll loop is what reports on it from here.
-    const task = this.run(downloadId, clientKey, url, target, controller.signal, offset, validator, expectedBytes)
+    const task = this.run(downloadId, clientKey, url, target, controller.signal, offset, validator, expectedBytes, profile)
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
@@ -349,8 +379,9 @@ export class DirectDownloadService {
     offset: number,
     validator: string | null,
     expectedBytes: number | null,
+    profile: NetworkProfile | null,
   ): Promise<void> {
-    const response = await this.open(url, signal, offset > 0 ? { Range: `bytes=${offset}-`, 'If-Range': validator as string } : {});
+    const response = await this.open(url, signal, profile, offset > 0 ? { Range: `bytes=${offset}-`, 'If-Range': validator as string } : {});
     const responseMeta = validateDownloadResponse(response, offset, expectedBytes, validator);
     const totalBytes = responseMeta.totalBytes;
     if (totalBytes !== null && totalBytes > MAX_FILE_BYTES) {
@@ -473,10 +504,10 @@ export class DirectDownloadService {
    * socket open until the agent times it out: five hops through a chain of mirrors would otherwise
    * leave five sockets and five buffers behind per grab.
    */
-  private async open(url: URL, signal: AbortSignal, headers: Record<string, string> = {}): Promise<Response> {
+  private async open(url: URL, signal: AbortSignal, profile: NetworkProfile | null, headers: Record<string, string> = {}): Promise<Response> {
     let current = url;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const response = await this.openHop(current, signal, headers);
+      const response = await this.openHop(current, signal, profile, headers);
 
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
@@ -508,7 +539,7 @@ export class DirectDownloadService {
    *
    * The body is not left unbounded: `run` holds it to an idle timeout and a total ceiling.
    */
-  private async openHop(url: URL, signal: AbortSignal, headers: Record<string, string>): Promise<Response> {
+  private async openHop(url: URL, signal: AbortSignal, profile: NetworkProfile | null, headers: Record<string, string>): Promise<Response> {
     const connect = new AbortController();
     const deadline = setTimeout(() => connect.abort(new Error(`That URL did not answer within ${CONNECT_TIMEOUT_MS}ms`)), CONNECT_TIMEOUT_MS);
     try {
@@ -521,8 +552,10 @@ export class DirectDownloadService {
         },
         // Pinned, because the URL came from an indexer or a plugin rather than from an operator:
         // this is exactly the caller the resolve-twice window in `safeFetch` is not acceptable
-        // for, so the address that passed policy is the address the socket opens to.
-        { allowPrivate: ALLOW_PRIVATE, profile: null, pinResolvedAddress: true },
+        // for, so the address that passed policy is the address the socket opens to. The profile is
+        // the source's own routing: its proxy, when configured, is the egress the operator chose for
+        // it, so the file bytes inherit the search's route.
+        { allowPrivate: ALLOW_PRIVATE, profile, pinResolvedAddress: true },
       );
     } finally {
       clearTimeout(deadline);
