@@ -1,6 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
-import { MAX_INDEXER_SEED_TIME_MINUTES } from '@bookorbit/types';
-import type { NetworkProfile } from '@bookorbit/types';
+import { DEFAULT_INDEXER_CATEGORIES, MAX_INDEXER_SEED_TIME_MINUTES } from '@bookorbit/types';
+import type { IndexerCategoryMap, NetworkProfile } from '@bookorbit/types';
 
 import { readBoundedText, ResponseTooLargeError } from '../../../common/utils/bounded-response';
 import { safeFetch } from '../../../common/utils/safe-fetch';
@@ -28,6 +28,7 @@ export interface ProwlarrIndexer {
   priority: number | null;
   seedRatioGoal: number | null;
   seedTimeMinutes: number | null;
+  categories: IndexerCategoryMap;
 }
 
 @Injectable()
@@ -51,6 +52,7 @@ export class ProwlarrClient {
       const protocol = typeof value.protocol === 'string' ? value.protocol.toLowerCase() : '';
       if (id === null || id <= 0 || !name || (protocol !== 'torrent' && protocol !== 'usenet')) continue;
       const fields = Array.isArray(value.fields) ? value.fields : [];
+      const adapterType = protocol === 'torrent' ? 'torznab' : 'newznab';
       rows.push({
         id,
         name,
@@ -60,6 +62,7 @@ export class ProwlarrClient {
         priority: finiteInteger(value.priority),
         seedRatioGoal: protocol === 'torrent' ? positiveFiniteNumber(fieldValue(fields, 'torrentBaseSettings.seedRatio')) : null,
         seedTimeMinutes: protocol === 'torrent' ? seedTimeMinutes(fieldValue(fields, 'torrentBaseSettings.seedTime')) : null,
+        categories: categoryMap(value.capabilities, DEFAULT_INDEXER_CATEGORIES[adapterType]),
       });
     }
     return rows;
@@ -117,6 +120,30 @@ export class ProwlarrClient {
       throw new BadGatewayException(`Could not reach Prowlarr: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+}
+
+function categoryMap(value: unknown, fallback: IndexerCategoryMap): IndexerCategoryMap {
+  if (!isRecord(value) || !Array.isArray(value.categories)) return fallback;
+  const ids = new Set<number>();
+  collectCategoryIds(value.categories, ids);
+  return {
+    ebook: preferredCategory(ids, 7020, 7000),
+    audiobook: preferredCategory(ids, 3030, 3000),
+  };
+}
+
+function collectCategoryIds(values: unknown[], ids: Set<number>): void {
+  for (const value of values) {
+    if (!isRecord(value)) continue;
+    const id = finiteInteger(value.id);
+    if (id !== null && id > 0) ids.add(id);
+    if (Array.isArray(value.subCategories)) collectCategoryIds(value.subCategories, ids);
+  }
+}
+
+function preferredCategory(ids: ReadonlySet<number>, specific: number, parent: number): number[] {
+  if (ids.has(specific)) return [specific];
+  return ids.has(parent) ? [parent] : [];
 }
 
 function endpoint(base: URL, path: string): URL {

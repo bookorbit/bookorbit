@@ -1,5 +1,4 @@
 import { BadGatewayException, BadRequestException, ConflictException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DEFAULT_INDEXER_CATEGORIES } from '@bookorbit/types';
 import type {
   IndexerManagerItem,
   IndexerManagerListResult,
@@ -144,10 +143,7 @@ export class IndexerManagerService {
     const started = Date.now();
     try {
       const discovered = await this.prowlarr.indexers(this.resolveConnection(current.manager));
-      const outcome = await this.repo.syncProwlarrSources(current.manager, discovered, {
-        torrent: DEFAULT_INDEXER_CATEGORIES.torznab,
-        usenet: DEFAULT_INDEXER_CATEGORIES.newznab,
-      });
+      const outcome = await this.repo.syncProwlarrSources(current.manager, discovered);
       this.logger.log(
         `[request_indexer_manager.sync] [end] managerId=${id} discovered=${discovered.length} created=${outcome.created} updated=${outcome.updated} unavailable=${outcome.unavailable} durationMs=${Date.now() - started} - synchronized Prowlarr indexers`,
       );

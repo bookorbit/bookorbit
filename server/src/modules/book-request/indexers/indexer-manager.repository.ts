@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { INDEXER_COLORS } from '@bookorbit/types';
-import type { IndexerCategoryMap, IndexerColor } from '@bookorbit/types';
+import type { IndexerColor } from '@bookorbit/types';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
@@ -112,7 +112,6 @@ export class IndexerManagerRepository {
   async syncProwlarrSources(
     manager: RequestIndexerManagerRow,
     discovered: ProwlarrIndexer[],
-    categories: Record<'torrent' | 'usenet', IndexerCategoryMap>,
   ): Promise<{ created: number; updated: number; unavailable: number }> {
     return this.db.transaction(async (tx) => {
       const existing = await tx.select().from(requestIndexers).where(eq(requestIndexers.managerId, manager.id));
@@ -158,7 +157,7 @@ export class IndexerManagerRepository {
               managerMetadata: metadata,
               allowPrivateAddress: manager.allowPrivateAddress,
               networkProfile: manager.networkProfile,
-              categories: categories[source.protocol],
+              categories: source.categories,
               applyTrackerSeedGoals: source.protocol !== 'torrent' || manager.inheritSeedLimits,
               seedRatioGoal: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedRatioGoal : null,
               seedTimeMinutes: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedTimeMinutes : null,
@@ -184,7 +183,7 @@ export class IndexerManagerRepository {
           applyTrackerSeedGoals: source.protocol !== 'torrent' || manager.inheritSeedLimits,
           seedRatioGoal: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedRatioGoal : null,
           seedTimeMinutes: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedTimeMinutes : null,
-          categories: categories[source.protocol],
+          categories: source.categories,
           disabledMediaKinds: [],
           isbnSearchDisabled: adapterType === 'torznab',
           settings: null,
