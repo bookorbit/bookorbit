@@ -38,6 +38,12 @@ vi.mock('../useFoliateInput', () => ({
   useFoliateInput: () => inputMock,
 }))
 
+const alignmentMock = vi.hoisted(() => ({
+  markBookAlignment: vi.fn<(doc: Document) => void>(),
+}))
+
+vi.mock('../../lib/book-alignment', () => alignmentMock)
+
 import { api, getAccessToken } from '@/lib/api'
 import { useFoliate } from '../useFoliate'
 
@@ -53,6 +59,7 @@ describe('useFoliate.open', () => {
     inputMock.cleanup.mockReset()
     inputMock.attachIframeClicks.mockReset()
     inputMock.suppressNextTapNavigation.mockReset()
+    alignmentMock.markBookAlignment.mockReset()
 
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -212,6 +219,33 @@ describe('useFoliate.open', () => {
     const detail = { data: 'body { font-size: medium }' }
     book.transformTarget.dispatchEvent(new CustomEvent('css', { detail }))
     expect(detail.data).toBe('body { font-size: medium }')
+  })
+
+  it('marks the book alignment in each loaded chapter of a reflowable EPUB', async () => {
+    ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce({
+      type: 'book',
+      rendition: { layout: 'reflowable' },
+    })
+    const foliate = useFoliate(() => container)
+    await foliate.open(1, 2, 'epub', null, undefined)
+    const doc = document.implementation.createHTMLDocument('chapter')
+
+    viewEl?.dispatchEvent(new CustomEvent('load', { detail: { doc, index: 0 } }))
+
+    expect(alignmentMock.markBookAlignment).toHaveBeenCalledWith(doc)
+  })
+
+  it('leaves fixed-layout pages unmarked because they get no reader text styles', async () => {
+    ;(window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook.mockResolvedValueOnce({
+      type: 'book',
+      rendition: { layout: 'pre-paginated' },
+    })
+    const foliate = useFoliate(() => container)
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    viewEl?.dispatchEvent(new CustomEvent('load', { detail: { doc: document.implementation.createHTMLDocument('page'), index: 0 } }))
+
+    expect(alignmentMock.markBookAlignment).not.toHaveBeenCalled()
   })
 
   it('tracks whether the opened EPUB is fixed-layout', async () => {

@@ -177,6 +177,16 @@ describe('useReaderState', () => {
     expect(css).toContain('hyphens: none;')
   })
 
+  it('leaves elements marked with the book alignment out of the reader alignment rule', () => {
+    const state = useReaderState()
+
+    const css = state.generateCSS()
+
+    expect(css).toContain(':is(p, li, blockquote, dd):where(:not([data-bookorbit-book-align]))')
+    expect(css).toContain('text-align: justify !important;')
+    expect(css).not.toMatch(/p, li, blockquote, dd \{[^}]*text-align/)
+  })
+
   it('sets the publisher font-size scale on the root beside the reader text size', () => {
     const state = useReaderState()
     state.setFontSize(20)

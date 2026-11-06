@@ -18,6 +18,7 @@ import { themes } from '../constants/themes'
 import type { Theme, ThemeMode } from '../constants/themes'
 import { MEDIA_OVERLAY_HIGHLIGHT_CSS_VARIABLE } from '../../media-overlay/lib/media-overlay-highlight'
 import { readerFontScaleDeclarations } from '../lib/publisher-font-sizes'
+import { readerTextAlignRule } from '../lib/book-alignment'
 import type { FoliateRenderer } from './useFoliate'
 
 export interface ReaderState {
@@ -273,9 +274,9 @@ export function useReaderState() {
       }
       p, li, blockquote, dd {
           line-height: ${lh} !important;
-          text-align: ${j ? 'justify' : 'start'} !important;
           hyphens: ${h ? 'auto' : 'none'};
       }
+      ${readerTextAlignRule(j)}
       ${paragraphSpacingRule}
       ${inlineSpacingRule}
       ${textIndentRule}
