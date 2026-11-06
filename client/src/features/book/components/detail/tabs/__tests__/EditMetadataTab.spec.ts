@@ -556,3 +556,73 @@ describe('EditMetadataTab cover tiles', () => {
     expect(wrapper.emitted('coverChanged')).toEqual([['audio']])
   })
 })
+
+describe('EditMetadataTab audiobook fields', () => {
+  const AUDIO_FIELDS = ['narrators', 'durationSeconds', 'abridged']
+
+  function makeFile(id: number, format: string, role: string) {
+    return {
+      id,
+      format,
+      role,
+      sizeBytes: 1,
+      absolutePath: `/books/Dune/Dune.${format}`,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      filename: `Dune.${format}`,
+      durationSeconds: null,
+    }
+  }
+
+  function renderedAudioFields(wrapper: ReturnType<typeof mountTab>) {
+    return AUDIO_FIELDS.filter((field) => wrapper.find(`[data-field="${field}"]`).exists())
+  }
+
+  beforeEach(() => {
+    vi.mocked(api).mockReset()
+    vi.mocked(api).mockImplementation(async (url, init) => {
+      if (init?.method === 'PATCH') return json({ book: makeBook(), write: null, libraryAutoWriteEnabled: false })
+      if (String(url).includes('/metadata-fetch/providers')) return json([])
+      return json({})
+    })
+  })
+
+  // Issue #2073: a folder holding both an ebook and an audiobook hid the narrator field.
+  it('shows the audiobook fields when the audiobook is not the primary file', async () => {
+    const wrapper = mountTab(
+      makeBook({
+        files: [makeFile(1, 'epub', 'primary'), makeFile(2, 'm4b', 'content')],
+        audioMetadata: { narrators: [{ id: 3, name: 'Scott Brick' }], durationSeconds: 3600, abridged: false, chapters: null },
+      } as Partial<BookDetail>),
+    )
+    await flushPromises()
+
+    expect(renderedAudioFields(wrapper)).toEqual(AUDIO_FIELDS)
+  })
+
+  it('saves narrators edited on a book whose primary file is an ebook', async () => {
+    const wrapper = mountTab(makeBook({ files: [makeFile(1, 'epub', 'primary'), makeFile(2, 'm4b', 'content')] } as Partial<BookDetail>))
+    await flushPromises()
+
+    wrapper.get('[data-field="narrators"]').getComponent({ name: 'ChipInput' }).vm.$emit('update:modelValue', ['Simon Vance'])
+    await flushPromises()
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+
+    const body = JSON.parse(patchCalls()[0]![1]!.body as string)
+    expect(body.metadata.audioMetadata).toEqual({ narrators: ['Simon Vance'] })
+  })
+
+  it('shows the audiobook fields for an audiobook-only book', async () => {
+    const wrapper = mountTab(makeBook({ files: [makeFile(1, 'm4b', 'primary')] } as Partial<BookDetail>))
+    await flushPromises()
+
+    expect(renderedAudioFields(wrapper)).toEqual(AUDIO_FIELDS)
+  })
+
+  it('hides the audiobook fields for an ebook-only book', async () => {
+    const wrapper = mountTab(makeBook({ files: [makeFile(1, 'epub', 'primary')] } as Partial<BookDetail>))
+    await flushPromises()
+
+    expect(renderedAudioFields(wrapper)).toEqual([])
+  })
+})

@@ -19,7 +19,6 @@ import { toast } from 'vue-sonner'
 import type { BookCommunityRating, BookDetail, BookMetadataLockField, CoverMedium, MetadataProviderInfo, WriteResult } from '@bookorbit/types'
 import {
   BOOK_FILE_WRITE_FIELD_LABELS,
-  FORMAT_TO_GROUP,
   IDENTIFIER_INPUT_KIND_BY_FIELD,
   getPrimaryBookFile,
   isKnownMetadataProviderKey,
@@ -122,7 +121,6 @@ const COMIC_FIELD_MAP = {
 } as const
 
 const primaryFile = computed(() => getPrimaryBookFile(props.book.files))
-const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const isPrimaryComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 const fileWriteStatus = computed(() => props.book.fileWriteStatus ?? null)
 const fileWriteWritableFormats = computed(() => fileWriteStatus.value?.writableFormats ?? [])
@@ -165,7 +163,7 @@ const FIELD_CONTROL_CLASS =
   'w-full h-10 sm:h-8 rounded-lg border border-input bg-background px-3 pr-11 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'
 const FIELD_CONTROL_MONO_CLASS = `${FIELD_CONTROL_CLASS} font-mono`
 
-const { form, saving, error, isDirty, syncFromBook, reset, save } = useMetadataEditor()
+const { form, saving, error, isDirty, includeAudioMetadata, syncFromBook, reset, save } = useMetadataEditor()
 const {
   lockedFields,
   updating: updatingLocks,
@@ -1167,7 +1165,7 @@ function handleCoverChanged(medium: CoverMedium | null) {
               </MetadataFieldLabel>
 
               <MetadataFieldLabel
-                v-if="isPrimaryAudio"
+                v-if="includeAudioMetadata"
                 :label="t('book.detail.editMetadata.narratorsLabel')"
                 field="narrators"
                 :locked="isLocked('narrators')"
@@ -1347,7 +1345,7 @@ function handleCoverChanged(medium: CoverMedium | null) {
                 </MetadataFieldLabel>
 
                 <MetadataFieldLabel
-                  v-if="isPrimaryAudio"
+                  v-if="includeAudioMetadata"
                   :label="t('book.detail.editMetadata.durationLabel')"
                   field="durationSeconds"
                   :locked="isLocked('durationSeconds')"
@@ -1365,7 +1363,7 @@ function handleCoverChanged(medium: CoverMedium | null) {
                 </MetadataFieldLabel>
 
                 <MetadataFieldLabel
-                  v-if="isPrimaryAudio"
+                  v-if="includeAudioMetadata"
                   :label="t('book.detail.editMetadata.abridgedLabel')"
                   field="abridged"
                   :locked="isLocked('abridged')"
