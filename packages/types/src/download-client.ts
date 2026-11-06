@@ -6,7 +6,7 @@ import type { IndexerColor, ReleaseUnitChoice } from "./indexer";
  * deliberately absent: it has no address, no credentials and nothing to choose, so making it a
  * configurable client type would only ask an operator to create a record of nothing.
  */
-export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "nzbget", "sabnzbd"] as const;
+export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "rtorrent", "nzbget", "sabnzbd"] as const;
 export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
 
 /**
@@ -20,6 +20,7 @@ export const DOWNLOAD_CLIENT_DELIVERY: Record<DownloadClientType, DownloadDelive
   qbittorrent: "torrent",
   transmission: "torrent",
   deluge: "torrent",
+  rtorrent: "torrent",
   nzbget: "usenet",
   sabnzbd: "usenet",
 };
@@ -31,6 +32,7 @@ export const DOWNLOAD_CLIENT_CREDENTIAL_KIND: Record<DownloadClientType, Downloa
   qbittorrent: "usernamePassword",
   transmission: "usernamePassword",
   deluge: "usernamePassword",
+  rtorrent: "usernamePassword",
   nzbget: "usernamePassword",
   sabnzbd: "apiKey",
 };

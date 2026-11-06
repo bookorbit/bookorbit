@@ -33,6 +33,8 @@ import { PathMappingService } from './download-clients/path-mapping.service';
 import { QbittorrentAdapter } from './download-clients/adapters/qbittorrent.adapter';
 import { TransmissionAdapter } from './download-clients/adapters/transmission.adapter';
 import { DelugeAdapter } from './download-clients/adapters/deluge.adapter';
+import { RtorrentAdapter } from './download-clients/adapters/rtorrent.adapter';
+import { DownloadContentRemovalService } from './download-clients/download-content-removal.service';
 import { NzbgetAdapter } from './download-clients/adapters/nzbget.adapter';
 import { SabnzbdAdapter } from './download-clients/adapters/sabnzbd.adapter';
 import { INDEXER_ADAPTERS } from './indexers/indexer-adapter';
@@ -114,9 +116,11 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     DownloadClientReconciliationService,
     DownloadClientRegistry,
     PathMappingService,
+    DownloadContentRemovalService,
     QbittorrentAdapter,
     TransmissionAdapter,
     DelugeAdapter,
+    RtorrentAdapter,
     NzbgetAdapter,
     SabnzbdAdapter,
     {
@@ -125,10 +129,11 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
         qbittorrent: QbittorrentAdapter,
         transmission: TransmissionAdapter,
         deluge: DelugeAdapter,
+        rtorrent: RtorrentAdapter,
         nzbget: NzbgetAdapter,
         sabnzbd: SabnzbdAdapter,
-      ) => [qbittorrent, transmission, deluge, nzbget, sabnzbd],
-      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, NzbgetAdapter, SabnzbdAdapter],
+      ) => [qbittorrent, transmission, deluge, rtorrent, nzbget, sabnzbd],
+      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, RtorrentAdapter, NzbgetAdapter, SabnzbdAdapter],
     },
 
     IndexerRepository,

@@ -932,6 +932,13 @@
       "when": 1793339549312,
       "tag": "0132_drop_podcasts",
       "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1793956021917,
+      "tag": "0133_add_rtorrent_download_client",
+      "breakpoints": true
     }
   ]
 }

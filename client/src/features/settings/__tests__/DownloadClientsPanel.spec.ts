@@ -128,6 +128,7 @@ describe('DownloadClientsPanel', () => {
       'qbittorrent',
       'transmission',
       'deluge',
+      'rtorrent',
       'nzbget',
       'sabnzbd',
     ])
@@ -166,6 +167,43 @@ describe('DownloadClientsPanel', () => {
     await flushPromises()
     const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'POST')
     expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({ adapterType: 'sabnzbd', password: 'secret-key', username: '' })
+  })
+
+  it('asks for the XML-RPC endpoint, with an optional login, when adding rTorrent', async () => {
+    const wrapper = await mountPanel()
+    await clickInPanel(wrapper, 'Add client')
+
+    const rtorrent = sheet().querySelector<HTMLInputElement>('input[name="download-client-type"][value="rtorrent"]')
+    if (rtorrent === null) throw new Error('no rTorrent client option')
+    rtorrent.click()
+    clickInSheet('Continue')
+    await flushPromises()
+
+    const url = sheet().querySelector<HTMLInputElement>('#download-client-url')
+    expect(url?.placeholder).toBe('http://localhost:8000/RPC2')
+    const hintId = url?.getAttribute('aria-describedby') ?? ''
+    expect(hintId).not.toBe('')
+    expect(sheet().querySelector(`[id="${hintId}"]`)?.textContent).toContain('plugins/httprpc/action.php')
+    expect(sheet().querySelector('#download-client-username')).not.toBeNull()
+
+    typeInto('#download-client-name', 'Seedbox')
+    typeInto('#download-client-url', 'http://rtorrent:8000/RPC2')
+    fillMapping()
+    clickInSheet('Save')
+    await flushPromises()
+    const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'POST')
+    expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({ adapterType: 'rtorrent', baseUrl: 'http://rtorrent:8000/RPC2' })
+  })
+
+  it('keeps the plain address placeholder and no endpoint hint for other clients', async () => {
+    const wrapper = await mountPanel()
+    await clickInPanel(wrapper, 'Add client')
+    clickInSheet('Continue')
+    await flushPromises()
+
+    const url = sheet().querySelector<HTMLInputElement>('#download-client-url')
+    expect(url?.placeholder).toBe('http://localhost:8080')
+    expect(sheet().textContent).not.toContain('XML-RPC endpoint')
   })
 
   it('keeps the stored SABnzbd API key when saving an unrelated edit', async () => {
