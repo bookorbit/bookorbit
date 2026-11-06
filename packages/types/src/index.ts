@@ -92,6 +92,7 @@ export * from "./tts";
 export * from "./watch-download";
 export * from "./page-locator";
 export * from "./year-review";
+export * from "./visual-match";
 export * from "./regex-metadata";
 export * from "./delivery";
 export * from "./djvu";

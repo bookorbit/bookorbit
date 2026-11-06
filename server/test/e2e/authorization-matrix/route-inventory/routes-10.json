@@ -1210,5 +1210,17 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/visual-match/visual-match.controller.ts",
+    "className": "VisualMatchController",
+    "methodName": "match",
+    "httpMethod": "POST",
+    "path": "/mobile/visual-match",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

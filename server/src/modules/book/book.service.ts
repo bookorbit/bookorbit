@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdtemp, rm, stat, rename } from 'fs/promises';
-import { inArray, type SQL } from 'drizzle-orm';
+import { and, inArray, type SQL } from 'drizzle-orm';
 
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { chapterProvenance, normalizeAudiobookChapters, resolveStoredAudiobookChapters } from '../../common/utils/audiobook-chapters.utils';
@@ -57,6 +57,7 @@ import type {
   AccessLevel,
   AudiobookChapter,
   AudiobookChapterSource,
+  BookCard,
   BookCommunityRating,
   BookKoboState,
   BookMetadataRefreshPreviewFields,
@@ -1225,6 +1226,30 @@ export class BookService {
       contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
     return this.executeBooksQuery(user.id, where, query);
+  }
+
+  /** Every book this user may see: their libraries and, unless a superuser, their content filters. */
+  async accessibleBooksWhere(user: RequestUser): Promise<SQL | undefined> {
+    const libs = await this.libraryService.findAll(user);
+    return this.queryBuilder.buildWhere(undefined, {
+      accessibleLibraryIds: libs.map((l) => l.id),
+      userId: user.id,
+      timeZone: this.resolveUserTimeZone(user),
+      contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
+    });
+  }
+
+  /** Cards for these books in the order given, without any this user may not see. */
+  async findCardsByIds(user: RequestUser, ids: number[]): Promise<BookCard[]> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return [];
+    const where = and(await this.accessibleBooksWhere(user), inArray(books.id, unique));
+    const page = await this.executeBooksQuery(user.id, where, {
+      sort: [{ field: 'title', dir: 'asc' }],
+      pagination: { page: 0, size: unique.length },
+    });
+    const byId = new Map(page.items.map((card) => [card.id, card]));
+    return unique.flatMap((id) => byId.get(id) ?? []);
   }
 
   /**

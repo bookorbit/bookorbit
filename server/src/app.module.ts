@@ -104,6 +104,7 @@ import { AppAttestModule } from './modules/app-attest/app-attest.module';
 import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
 import { PageLocatorModule } from './modules/page-locator/page-locator.module';
 import { YearReviewModule } from './modules/year-review/year-review.module';
+import { VisualMatchModule } from './modules/visual-match/visual-match.module';
 
 @Module({
   imports: [
@@ -218,6 +219,7 @@ import { YearReviewModule } from './modules/year-review/year-review.module';
     ReadAloudModule,
     PageLocatorModule,
     YearReviewModule,
+    VisualMatchModule,
   ],
   providers: [{ provide: APP_INTERCEPTOR, useClass: AuditInterceptor }, ...GLOBAL_GUARDS.map((useClass) => ({ provide: APP_GUARD, useClass }))],
 })

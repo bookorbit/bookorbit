@@ -53,6 +53,11 @@ export const SERVER_FEATURES = [
   "locate-text",
   /** `GET /mobile/year-review/:year`: a reader's year, for the app's Year in Review story. */
   "year-review",
+  /**
+   * `POST /mobile/visual-match` names the books in the reader's libraries that text recognised on a
+   * photographed cover or spine, or its barcode, points to.
+   */
+  "visual-match",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
