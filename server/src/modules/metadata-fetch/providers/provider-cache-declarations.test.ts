@@ -302,7 +302,7 @@ describe('provider cache declarations', () => {
     it('declares the current mapping version', () => {
       const bumped: Partial<Record<MetadataProviderKey, number>> = {
         [MetadataProviderKey.AUDIBLE]: 2,
-        [MetadataProviderKey.COMICVINE]: 3,
+        [MetadataProviderKey.COMICVINE]: 4,
         [MetadataProviderKey.HARDCOVER]: 2,
       };
       expect(specOf(testCase.key).version).toBe(bumped[testCase.key] ?? 1);

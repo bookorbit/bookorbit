@@ -62,7 +62,7 @@ export class ComicVineProvider implements IdentifiableProvider {
   private readonly logger = new Logger(ComicVineProvider.name);
 
   readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
-    version: 3,
+    version: 4,
     trustEmpty: true,
     // The issue endpoint answers an unknown id with 404.
     authoritativeLookupStatuses: [404],

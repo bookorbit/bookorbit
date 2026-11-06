@@ -90,6 +90,22 @@ describe('BookDockFileRow metadata refetch action', () => {
   })
 })
 
+describe('BookDockFileRow match badge', () => {
+  it('shows a zero score for a fetched result instead of calling it no match', () => {
+    const text = mountUnitRow({ fetchedMetadata: { title: 'Another Book' }, confidence: 0 }).text()
+
+    expect(text).toContain('0% match')
+    expect(text).not.toContain('No match')
+  })
+
+  it('reports no match when nothing was fetched', () => {
+    const text = mountUnitRow({ confidence: null }).text()
+
+    expect(text).toContain('No match')
+    expect(text).not.toContain('% match')
+  })
+})
+
 describe('BookDockFileRow with a multi-file unit', () => {
   const TRACKS = [
     unitFile({ fileName: 'track-01.mp3', sortOrder: 0 }),
