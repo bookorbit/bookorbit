@@ -126,7 +126,9 @@ describe('AudibleProvider', () => {
     );
     expect(mockFetchWithThrottle).toHaveBeenCalledWith(expect.stringContaining('keywords=Dune+Frank+Herbert'), expect.any(Object));
     expect(mockFetchWithThrottle).toHaveBeenCalledWith(
-      expect.stringContaining('response_groups=product_desc%2Cmedia%2Cproduct_attrs%2Cseries%2Cproduct_plan_details%2Ccategory_ladders%2Crating'),
+      expect.stringContaining(
+        'response_groups=product_desc%2Cproduct_extended_attrs%2Cmedia%2Cproduct_attrs%2Cseries%2Cproduct_plan_details%2Ccategory_ladders%2Crating',
+      ),
       expect.any(Object),
     );
     expect(mockBuildRequestSignal).toHaveBeenCalled();
@@ -192,7 +194,9 @@ describe('AudibleProvider', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(mockFetchWithThrottle).toHaveBeenCalledWith(
-      expect.stringContaining('response_groups=product_desc%2Cmedia%2Cproduct_attrs%2Cseries%2Cproduct_plan_details%2Ccategory_ladders%2Crating'),
+      expect.stringContaining(
+        'response_groups=product_desc%2Cproduct_extended_attrs%2Cmedia%2Cproduct_attrs%2Cseries%2Cproduct_plan_details%2Ccategory_ladders%2Crating',
+      ),
       expect.any(Object),
     );
   });
