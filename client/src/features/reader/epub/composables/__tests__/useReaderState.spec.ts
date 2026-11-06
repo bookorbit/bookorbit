@@ -96,6 +96,12 @@ describe('useReaderState', () => {
     expect(state.generateCSS()).not.toContain('.media-active')
   })
 
+  it('preserves publisher footnote visibility', () => {
+    const state = useReaderState()
+
+    expect(state.generateCSS()).not.toMatch(/footnote[^}]*display:\s*none/)
+  })
+
   it('applies renderer attributes and CSS in paginated flow', () => {
     const state = useReaderState()
     state.setFlow('paginated')

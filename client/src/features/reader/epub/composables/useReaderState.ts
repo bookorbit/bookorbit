@@ -202,7 +202,6 @@ export function useReaderState() {
 
     return `
       ${fontFaceBlock}
-      @namespace epub "http://www.idpf.org/2007/ops";
       @media print {
           html {
               column-width: auto !important;
@@ -226,9 +225,6 @@ export function useReaderState() {
           }
           a:any-link:hover {
               text-decoration-color: unset;
-          }
-          aside[epub|type~="footnote"] {
-              display: none;
           }
       }
       html {
