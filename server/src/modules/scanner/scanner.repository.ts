@@ -325,9 +325,15 @@ export class ScannerRepository {
 
   async updateBookFile(id: number, data: Partial<typeof bookFiles.$inferInsert>) {
     return this.db.transaction(async (tx) => {
-      if (data.fileHash) {
-        const [previous] = await tx.select({ fileHash: bookFiles.fileHash }).from(bookFiles).where(eq(bookFiles.id, id)).for('update');
-        if (previous?.fileHash && previous.fileHash !== data.fileHash) {
+      let previousBookId: number | null = null;
+      if (data.fileHash || data.bookId !== undefined) {
+        const [previous] = await tx
+          .select({ fileHash: bookFiles.fileHash, bookId: bookFiles.bookId })
+          .from(bookFiles)
+          .where(eq(bookFiles.id, id))
+          .for('update');
+        previousBookId = previous?.bookId ?? null;
+        if (data.fileHash && previous?.fileHash && previous.fileHash !== data.fileHash) {
           await recordBookFileHashHistory(tx, id, previous.fileHash, 'rescan');
           // Positions from the replaced bytes cannot be interpreted in the new DOM.
           await tx
@@ -357,8 +363,65 @@ export class ScannerRepository {
         .set({ ...data, updatedAt: new Date() })
         .where(eq(bookFiles.id, id))
         .returning();
+      if (file && data.bookId !== undefined && previousBookId !== null && previousBookId !== data.bookId) {
+        await this.moveAudiobookProgressForReassignedFile(tx, id, previousBookId, data.bookId);
+      }
       return file;
     });
+  }
+
+  private async moveAudiobookProgressForReassignedFile(
+    tx: DbTransaction,
+    fileId: number,
+    previousBookId: number,
+    destinationBookId: number,
+  ): Promise<void> {
+    const sourceRows = await tx
+      .select()
+      .from(audiobookProgress)
+      .where(and(eq(audiobookProgress.bookId, previousBookId), eq(audiobookProgress.currentFileId, fileId)))
+      .for('update');
+
+    for (const source of sourceRows) {
+      const [destination] = await tx
+        .select()
+        .from(audiobookProgress)
+        .where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, destinationBookId)))
+        .for('update')
+        .limit(1);
+
+      if (!destination) {
+        await tx
+          .update(audiobookProgress)
+          .set({
+            bookId: destinationBookId,
+            revision: sql`${audiobookProgress.revision} + 1`,
+            operationId: null,
+            manifestRevision: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, previousBookId)));
+        continue;
+      }
+
+      if (source.capturedAt > destination.capturedAt) {
+        await tx
+          .update(audiobookProgress)
+          .set({
+            currentFileId: source.currentFileId,
+            positionSeconds: source.positionSeconds,
+            percentage: source.percentage,
+            capturedAt: source.capturedAt,
+            revision: sql`${audiobookProgress.revision} + 1`,
+            operationId: null,
+            manifestRevision: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, destinationBookId)));
+      }
+
+      await tx.delete(audiobookProgress).where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, previousBookId)));
+    }
   }
 
   async findBookFileByAbsolutePath(absolutePath: string, libraryId?: number) {

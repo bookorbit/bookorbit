@@ -2582,6 +2582,29 @@ export class ScannerService implements OnApplicationBootstrap {
     return !(await pathsReferToSameEntry(existingPath, candidatePath));
   }
 
+  private async isBookMissingOnDisk(bookId: number): Promise<boolean> {
+    const files = (await this.scannerRepo.findBookFilesByBookId(bookId)).filter((file) => file.role === 'content');
+    if (files.length === 0) return false;
+
+    for (let i = 0; i < files.length; i += MISSING_FILE_STAT_BATCH_SIZE) {
+      const batch = files.slice(i, i + MISSING_FILE_STAT_BATCH_SIZE);
+      const missing = await Promise.all(
+        batch.map(async (file) => {
+          try {
+            const fileStat = await stat(file.absolutePath);
+            return !fileStat.isFile();
+          } catch (err) {
+            const code = (err as NodeJS.ErrnoException).code;
+            return code === 'ENOENT' || code === 'ENOTDIR';
+          }
+        }),
+      );
+      if (missing.some((value) => !value)) return false;
+    }
+
+    return true;
+  }
+
   private async filterBookIdsMissingOnDisk(bookIds: number[]): Promise<number[]> {
     if (bookIds.length === 0) return [];
 
@@ -2669,7 +2692,7 @@ export class ScannerService implements OnApplicationBootstrap {
       }
     }
 
-    if (sourceBookId == null) return null;
+    if (sourceBookId == null || !(await this.isBookMissingOnDisk(sourceBookId))) return null;
 
     const moved = await this.scannerRepo.moveBookToLibrary(sourceBookId, libraryId, libraryFolderId, candidate.folderPath);
     if (!moved) return null;

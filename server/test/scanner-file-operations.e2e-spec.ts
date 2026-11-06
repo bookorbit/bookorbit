@@ -202,6 +202,39 @@ const structuralScenarios: StructuralScenario[] = [
     },
   },
   {
+    id: 'manual-partial-audiobook-tracks-move-to-new-folder',
+    trigger: 'manual',
+    libraries: [{ key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' }],
+    entries: [
+      file('lib-a/Source One/keep-one.mp3'),
+      file('lib-a/Source One/move-one.mp3'),
+      file('lib-a/Source Two/keep-two.mp3'),
+      file('lib-a/Source Two/move-two.mp3'),
+    ],
+    operations: [
+      { type: 'move', from: 'lib-a/Source One/move-one.mp3', to: 'lib-a/Topic/from-one.mp3' },
+      { type: 'move', from: 'lib-a/Source Two/move-two.mp3', to: 'lib-a/Topic/from-two.mp3' },
+    ],
+    expected: {
+      a: {
+        statusByFolder: {
+          'Source One': 'present',
+          'Source Two': 'present',
+          Topic: 'present',
+        },
+        fileOwners: {
+          'Source One/keep-one.mp3': 'Source One',
+          'Source Two/keep-two.mp3': 'Source Two',
+          'Topic/from-one.mp3': 'Topic',
+          'Topic/from-two.mp3': 'Topic',
+        },
+        absentFilePaths: ['Source One/move-one.mp3', 'Source Two/move-two.mp3'],
+        presentCount: 3,
+        missingCount: 0,
+      },
+    },
+  },
+  {
     id: 'manual-cross-library-file-move',
     trigger: 'manual',
     libraries: [
@@ -1328,6 +1361,87 @@ const statefulScenarios: StatefulScenario[] = [
       expect(sourceAfter.status).toBe('missing');
 
       await assertStatefulUnchanged(context.db, sourceBook.id, sourceBook.primaryFileId, seeded.snapshot);
+      await assertNoIntegrityViolations(context.db);
+    },
+  },
+  {
+    id: 'stateful-partial-audiobook-move-carries-playback-state',
+    trigger: 'manual',
+    fixturePrefix: 'scanner-file-ops-stateful-partial-audio-',
+    fixtureEntries: [file('lib-a/Source/01-move.mp3'), file('lib-a/Source/02-keep.mp3')],
+    run: async (context, fixture) => {
+      const requestedRootA = join(fixture.rootPath, 'lib-a');
+      await mkdir(requestedRootA, { recursive: true });
+      const rootA = await realpath(requestedRootA);
+      const library = await seedLibrary(context.db, {
+        rootPath: rootA,
+        mode: 'book_per_folder',
+        watch: false,
+        name: `scanner-file-ops-stateful-partial-audio-${randomUUID()}`,
+      });
+
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+      const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Source'));
+      const [movedFile] = await context.db
+        .select()
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.absolutePath, join(rootA, 'Source', '01-move.mp3')))
+        .limit(1);
+      if (!movedFile) throw new Error('Expected moved track to be registered');
+
+      const [userId] = await createRegularUsers(context.db);
+      const capturedAt = new Date('2026-01-02T03:04:05.000Z');
+      await context.db.insert(schema.audiobookProgress).values({
+        userId,
+        bookId: sourceBook.id,
+        currentFileId: movedFile.id,
+        percentage: 42.5,
+        positionSeconds: 23.5,
+        capturedAt,
+      });
+      await context.db.insert(schema.readingSessions).values({
+        userId,
+        bookFileId: movedFile.id,
+        bookId: sourceBook.id,
+        sessionId: `partial-audio-${randomUUID()}`,
+        sessionType: 'listen',
+        startedAt: new Date('2026-01-02T02:00:00.000Z'),
+        endedAt: new Date('2026-01-02T02:05:00.000Z'),
+        durationSeconds: 300,
+        endProgress: 42.5,
+      });
+
+      await applyOperation(fixture.rootPath, {
+        type: 'move',
+        from: 'lib-a/Source/01-move.mp3',
+        to: 'lib-a/Topic/01-move.mp3',
+      });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+      const sourceAfter = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Source'));
+      const destinationBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Topic'));
+      expect(sourceAfter.id).toBe(sourceBook.id);
+      expect(destinationBook.id).not.toBe(sourceBook.id);
+
+      const [movedFileAfter] = await context.db.select().from(schema.bookFiles).where(eq(schema.bookFiles.id, movedFile.id)).limit(1);
+      expect(movedFileAfter).toMatchObject({
+        id: movedFile.id,
+        bookId: destinationBook.id,
+        absolutePath: join(rootA, 'Topic', '01-move.mp3'),
+      });
+
+      const progressRows = await context.db.select().from(schema.audiobookProgress).where(eq(schema.audiobookProgress.userId, userId));
+      expect(progressRows).toHaveLength(1);
+      expect(progressRows[0]).toMatchObject({
+        bookId: destinationBook.id,
+        currentFileId: movedFile.id,
+        positionSeconds: 23.5,
+        capturedAt,
+      });
+
+      const [historicalSession] = await context.db.select().from(schema.readingSessions).where(eq(schema.readingSessions.userId, userId)).limit(1);
+      expect(historicalSession).toMatchObject({ bookId: sourceBook.id, bookFileId: movedFile.id });
       await assertNoIntegrityViolations(context.db);
     },
   },

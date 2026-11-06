@@ -2749,6 +2749,207 @@ describe('missing book restoration', () => {
 });
 
 describe('cross-library transfer', () => {
+  it('creates a destination book when only some tracks moved out of an existing source book', async () => {
+    const movedTrack = makeFileStat({
+      absolutePath: '/library/Topic/moved.mp3',
+      relPath: 'Topic/moved.mp3',
+      ino: 4242n,
+      format: 'mp3',
+    });
+    const remainingTrack = makeFileStat({
+      absolutePath: '/library/Source/remaining.mp3',
+      relPath: 'Source/remaining.mp3',
+      ino: 4343n,
+      format: 'mp3',
+    });
+    const oldMovedTrack = makeBookFile({
+      id: 500,
+      bookId: 42,
+      absolutePath: '/library/Source/moved.mp3',
+      relPath: 'Source/moved.mp3',
+      ino: 4242n,
+      format: 'mp3',
+    });
+    const oldRemainingTrack = makeBookFile({
+      id: 501,
+      bookId: 42,
+      absolutePath: remainingTrack.absolutePath,
+      relPath: remainingTrack.relPath,
+      ino: remainingTrack.ino,
+      format: 'mp3',
+    });
+
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 42, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Source', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([oldMovedTrack, oldRemainingTrack]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([oldMovedTrack, oldRemainingTrack]),
+      findBookFileWithContextByIno: vi.fn().mockResolvedValue({
+        file: oldMovedTrack,
+        libraryId: 1,
+        bookStatus: 'present',
+        folderPath: '/library/Source',
+        libraryFolderPath: '/library',
+      }),
+      createBook: vi.fn().mockResolvedValue({
+        id: 99,
+        libraryId: 1,
+        libraryFolderId: 1,
+        folderPath: '/library/Topic',
+        status: 'processing',
+      }),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Topic', [movedTrack]), makeCandidate('/library/Source', [remainingTrack])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    mockStat.mockImplementation((path) => {
+      if (String(path) === oldMovedTrack.absolutePath) {
+        return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      }
+      return Promise.resolve({ isFile: () => true, ino: 4343n, size: 1024, mtime: new Date('2024-01-01') } as any);
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.moveBookToLibrary).not.toHaveBeenCalled();
+    expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/Topic' }));
+    expect(repo.updateBookFile).toHaveBeenCalledWith(
+      500,
+      expect.objectContaining({
+        bookId: 99,
+        absolutePath: '/library/Topic/moved.mp3',
+        relPath: 'Topic/moved.mp3',
+      }),
+    );
+  });
+
+  it('does not transfer a partially moved source book through the hash fallback', async () => {
+    const movedTrack = makeFileStat({
+      absolutePath: '/library/Topic/moved.mp3',
+      relPath: 'Topic/moved.mp3',
+      ino: 9999n,
+      format: 'mp3',
+    });
+    const oldMovedTrack = makeBookFile({
+      id: 500,
+      bookId: 42,
+      absolutePath: '/library/Source/moved.mp3',
+      relPath: 'Source/moved.mp3',
+      ino: 4242n,
+      fileHash: 'transfer-hash',
+      format: 'mp3',
+    });
+    const remainingTrack = makeBookFile({
+      id: 501,
+      bookId: 42,
+      absolutePath: '/library/Source/remaining.mp3',
+      relPath: 'Source/remaining.mp3',
+      ino: 4343n,
+      format: 'mp3',
+    });
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 42, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Source', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([oldMovedTrack, remainingTrack]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([oldMovedTrack, remainingTrack]),
+      findBookFileWithContextByHash: vi.fn().mockResolvedValue({
+        file: oldMovedTrack,
+        libraryId: 1,
+        bookStatus: 'present',
+        folderPath: '/library/Source',
+        libraryFolderPath: '/library',
+      }),
+      findBookFileByHash: vi.fn().mockResolvedValue(oldMovedTrack),
+      createBook: vi.fn().mockResolvedValue({
+        id: 99,
+        libraryId: 1,
+        libraryFolderId: 1,
+        folderPath: '/library/Topic',
+        status: 'processing',
+      }),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [
+        makeCandidate('/library/Topic', [movedTrack]),
+        makeCandidate('/library/Source', [
+          makeFileStat({
+            absolutePath: remainingTrack.absolutePath,
+            relPath: remainingTrack.relPath,
+            ino: remainingTrack.ino,
+            format: 'mp3',
+          }),
+        ]),
+      ],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    mockFingerprint.mockResolvedValue('transfer-hash');
+    mockStat.mockImplementation((path) => {
+      if (String(path) === oldMovedTrack.absolutePath) {
+        return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      }
+      return Promise.resolve({ isFile: () => true, ino: 4343n, size: 1024, mtime: new Date('2024-01-01') } as any);
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.moveBookToLibrary).not.toHaveBeenCalled();
+    expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/Topic' }));
+  });
+
+  it('does not transfer a source book when its old content cannot be checked', async () => {
+    const destinationFile = makeFileStat({
+      absolutePath: '/dest/Inbox/book.epub',
+      relPath: 'Inbox/book.epub',
+      ino: 4343n,
+    });
+    const sourceFile = makeBookFile({
+      id: 510,
+      bookId: 55,
+      libraryFolderId: 10,
+      absolutePath: '/source/Book/book.epub',
+      relPath: 'Book/book.epub',
+      ino: 4343n,
+    });
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 22, path: '/dest', libraryId: 2 }]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([sourceFile]),
+      findBookFileWithContextByIno: vi.fn().mockResolvedValue({
+        file: sourceFile,
+        libraryId: 1,
+        bookStatus: 'present',
+        folderPath: '/source/Book',
+        libraryFolderPath: '/source',
+      }),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/dest/Inbox', [destinationFile])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    mockStat.mockRejectedValue(Object.assign(new Error('EACCES'), { code: 'EACCES' }));
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(2, 'manual');
+    await done;
+
+    expect(repo.moveBookToLibrary).not.toHaveBeenCalled();
+  });
+
   it('transfers a missing source book into the destination library via inode match', async () => {
     const destinationFile = makeFileStat({
       absolutePath: '/dest/Inbox/book.epub',
@@ -2769,6 +2970,7 @@ describe('cross-library transfer', () => {
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 20, path: '/dest', libraryId: 2 }]),
       findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
       findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([sourceFile]),
       findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue({
         file: sourceFile,
         libraryId: 1,
@@ -2835,6 +3037,7 @@ describe('cross-library transfer', () => {
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 22, path: '/dest', libraryId: 2 }]),
       findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
       findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([sourceFile]),
       findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
       findBookFileWithContextByIno: vi.fn().mockResolvedValue({
         file: sourceFile,
@@ -2894,6 +3097,7 @@ describe('cross-library transfer', () => {
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 22, path: '/dest', libraryId: 2 }]),
       findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
       findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([sourceFile]),
       findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
       findBookFileWithContextByIno: vi.fn().mockResolvedValue({
         file: sourceFile,
@@ -2945,6 +3149,7 @@ describe('cross-library transfer', () => {
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 21, path: '/dest', libraryId: 3 }]),
       findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
       findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([sourceFile]),
       findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
       findMissingBookFileWithContextByHash: vi.fn().mockResolvedValue({
         file: sourceFile,
@@ -3011,6 +3216,7 @@ describe('cross-library transfer', () => {
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 20, path: '/dest', libraryId: 2 }]),
       findBooksByLibraryFolder: vi.fn().mockResolvedValue([]),
       findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([sourceFile]),
       findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue({
         file: sourceFile,
         libraryId: 1,
@@ -3799,6 +4005,13 @@ describe('book_per_file mode — scanBookFolder', () => {
       relPath: 'Moved/Alpha.epub',
       ino: 3001n,
     });
+    const sourceFile = makeBookFile({
+      id: 9,
+      bookId: 7,
+      absolutePath: '/library/Alpha.epub',
+      relPath: 'Alpha.epub',
+      ino: 3001n,
+    });
     const repo = makeRepo({
       findLibrarySettings: vi.fn().mockResolvedValue({
         allowedFormats: [],
@@ -3810,17 +4023,10 @@ describe('book_per_file mode — scanBookFolder', () => {
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
       findBooksByFolderPath: vi.fn().mockResolvedValue([]),
       findBookFilesByBookIds: vi.fn().mockResolvedValue([]),
+      findBookFilesByBookId: vi.fn().mockResolvedValue([sourceFile]),
       findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
       findBookFileWithContextByIno: vi.fn().mockResolvedValue({
-        file: {
-          id: 9,
-          bookId: 7,
-          absolutePath: '/library/Alpha.epub',
-          ino: 3001n,
-          sizeBytes: 1024,
-          mtime: new Date('2024-01-01'),
-          fileHash: null,
-        },
+        file: sourceFile,
         libraryId: 1,
         bookStatus: 'present',
         folderPath: '/library/Alpha.epub',
