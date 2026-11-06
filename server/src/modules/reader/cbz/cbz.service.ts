@@ -1,14 +1,15 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleDestroy, UnprocessableEntityException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { Readable } from 'stream';
-import { readFile, stat } from 'fs/promises';
-import { createExtractorFromData, UnrarError } from 'node-unrar-js';
-import { createSevenZipTempId, getSevenZip } from '../../../common/sevenzip';
+import { createReadStream } from 'fs';
+import { mkdtemp, rm, stat } from 'fs/promises';
+import { tmpdir } from 'os';
+import { extname, join } from 'path';
+import { createExtractorFromFile, UnrarError } from 'node-unrar-js';
 import { imageContentTypeFromPath } from '../../../common/image-content-type';
 import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 import { createCbzZipEntryReadStream, readCbzZipIndex, type CbzZipEntry } from '../../../common/cbz-zip-reader';
 import { compareArchiveEntryNames } from '../../../common/archive-entry-sort';
-import { compareComicPagePaths, listExtractedFiles, pathBasename, removeExtractedTree } from './cb7-extraction';
+import { cb7PagePath, extractCb7ToDisk, removeCb7Extraction } from './cb7-disk-extraction';
 
 import type { RequestUser } from '../../../common/types/request-user';
 import { BookService } from '../../book/book.service';
@@ -45,11 +46,6 @@ function unreadableCbrArchive(err: Error): UnprocessableEntityException {
 
 function unreadableCbrPage(err: Error): UnprocessableEntityException {
   return new UnprocessableEntityException(`CBR page is unreadable: ${err.message}`);
-}
-
-// Buffer.buffer is a shared pool; slice out only the bytes for this buffer.
-function toArrayBuffer(buf: Buffer): ArrayBuffer {
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 }
 
 // ── Freshness ──────────────────────────────────────────────────────────────────
@@ -92,16 +88,20 @@ export function matchesIfNoneMatch(header: string | undefined, etag: string): bo
 // ── Service ────────────────────────────────────────────────────────────────────
 
 interface RarCache {
-  buffer: ArrayBuffer;
   pages: string[];
 }
 
 interface SevenZipPages {
-  /** This extraction's own folder in the shared WASM filesystem. */
+  /** This extraction's private folder on temporary disk storage. */
   dir: string;
   /** Paths relative to `dir`, in reading order. */
   pages: string[];
+  sizeBytes: number;
+  activeReaders: number;
+  evicted: boolean;
 }
+
+const SEVEN_Z_CACHE_MAX_BYTES = 512 * 1024 * 1024;
 
 export type ComicPageResult =
   { notModified: true; etag: string } | { notModified: false; etag: string; stream: NodeJS.ReadableStream; mimeType: string };
@@ -113,17 +113,31 @@ interface OpenedComic {
 }
 
 @Injectable()
-export class CbzService {
+export class CbzService implements OnModuleDestroy {
   // CBZ: byte-offset index per fileId
   private readonly zipIndex = new Map<number, Stamped<CbzZipEntry[]>>();
-  // CBR: archive ArrayBuffer + sorted page names per fileId
+  // CBR: sorted page names per fileId; archive and extracted page bytes stay on disk
   private readonly rarCache = new Map<number, Stamped<RarCache>>();
-  // CB7: extracted folder + sorted page paths per fileId (extracted files live in WASM VFS)
+  // CB7: byte-bounded extracted folders on temporary disk storage
   private readonly sevenZPages = new Map<number, Stamped<SevenZipPages>>();
+  private sevenZCacheBytes = 0;
+  private readonly rarTempDirs = new Set<string>();
   // Resolved actual format per fileId (magic bytes override stored extension)
   private readonly resolvedFormat = new Map<number, Stamped<ComicFormat>>();
 
   constructor(private readonly bookService: BookService) {}
+
+  async onModuleDestroy(): Promise<void> {
+    const rarDirs = [...this.rarTempDirs];
+    const sevenZipEntries = [...this.sevenZPages.values()];
+    this.rarTempDirs.clear();
+    this.sevenZPages.clear();
+    this.sevenZCacheBytes = 0;
+    await Promise.all([
+      ...rarDirs.map((dir) => rm(dir, { recursive: true, force: true }).catch(() => {})),
+      ...sevenZipEntries.map((entry) => removeCb7Extraction(entry.value.dir)),
+    ]);
+  }
 
   private async openComic(fileId: number, user: RequestUser): Promise<OpenedComic> {
     const file = await this.bookService.verifyFileAccess(fileId, user);
@@ -161,7 +175,10 @@ export class CbzService {
     this.rarCache.delete(fileId);
     this.sevenZPages.delete(fileId);
     this.resolvedFormat.delete(fileId);
-    if (sevenZip) removeExtractedTree((await getSevenZip()).FS, sevenZip.value.dir);
+    if (sevenZip) {
+      this.sevenZCacheBytes -= sevenZip.value.sizeBytes;
+      await this.disposeSevenZip(sevenZip.value);
+    }
   }
 
   private async resolveFormat(fileId: number, absolutePath: string, storedFmt: ComicFormat, stamp: FileStamp): Promise<ComicFormat> {
@@ -197,12 +214,9 @@ export class CbzService {
     const cached = this.rarCache.get(fileId);
     if (cached && sameStamp(cached.stamp, stamp)) return cached.value;
 
-    const buf = await readFile(filePath);
-    const ab = toArrayBuffer(buf);
-
     const pages: string[] = [];
     try {
-      const extractor = await createExtractorFromData({ data: ab });
+      const extractor = await createExtractorFromFile({ filepath: filePath });
       const { fileHeaders } = extractor.getFileList();
       for (const h of fileHeaders) {
         if (!h.flags.directory && isImage(h.name) && !isHidden(h.name)) {
@@ -219,80 +233,93 @@ export class CbzService {
     }
 
     pages.sort(compareArchiveEntryNames);
-    const value = { buffer: ab, pages };
+    const value = { pages };
     this.rarCache.set(fileId, { stamp, value });
     return value;
   }
 
-  private async extractRarPage(buffer: ArrayBuffer, pageName: string): Promise<Uint8Array> {
-    // Generators MUST be fully drained to avoid WASM memory leak
-    let result: Uint8Array | undefined;
+  private async extractRarPage(filePath: string, pageName: string): Promise<NodeJS.ReadableStream> {
+    const tempDir = await mkdtemp(join(tmpdir(), 'bookorbit-cbr-'));
+    this.rarTempDirs.add(tempDir);
+    const extractedName = `page${extname(pageName)}`;
+    let found = false;
     try {
-      const extractor = await createExtractorFromData({ data: buffer });
+      const extractor = await createExtractorFromFile({ filepath: filePath, targetPath: tempDir, filenameTransform: () => extractedName });
       // Pass an array so the extractor stops after the first match and never
       // hits the malformed end-of-archive marker present in some RAR 1.5 files.
       const { files } = extractor.extract({ files: [pageName] });
       for (const file of files) {
-        if (!file.fileHeader.flags.directory) result = file.extraction;
+        if (!file.fileHeader.flags.directory) found = true;
       }
     } catch (err) {
+      await this.removeRarTempDir(tempDir);
       if (isUnrarError(err)) {
         throw unreadableCbrPage(err);
       }
       throw err;
     }
-    if (result === undefined) throw new NotFoundException(`Page not found in RAR archive`);
-    return result;
+    if (!found) {
+      await this.removeRarTempDir(tempDir);
+      throw new NotFoundException(`Page not found in RAR archive`);
+    }
+
+    const stream = createReadStream(join(tempDir, extractedName));
+    stream.once('close', () => void this.removeRarTempDir(tempDir));
+    return stream;
+  }
+
+  private async removeRarTempDir(tempDir: string): Promise<void> {
+    this.rarTempDirs.delete(tempDir);
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 
   // ── CB7 ──────────────────────────────────────────────────────────────────────
 
   private async getSevenZPages(fileId: number, filePath: string, stamp: FileStamp): Promise<SevenZipPages> {
     const cached = this.sevenZPages.get(fileId);
-    if (cached && sameStamp(cached.stamp, stamp)) return cached.value;
-
-    const sz = await getSevenZip();
-    const buf = await readFile(filePath);
-
-    // A folder per extraction, so a rebuild after the file changed never shares a tree with
-    // requests still reading the previous one.
-    const dir = `/${createSevenZipTempId(`comic${fileId}`)}`;
-    const archivePath = `${dir}.7z`;
-
-    try {
-      const fd = sz.FS.open(archivePath, 'w+');
-      sz.FS.write(fd, buf, 0, buf.length);
-      sz.FS.close(fd);
-      sz.FS.mkdir(dir);
-
-      // callMain is synchronous - blocks the event loop while 7z extracts.
-      // Acceptable for a local single-user server; revisit with worker_threads if needed.
-      // `x` keeps folders: `e` flattened them, so two pages sharing a name overwrote each other.
-      sz.callMain(['x', archivePath, `-o${dir}`, '-y']);
-    } catch (err) {
-      removeExtractedTree(sz.FS, dir);
-      throw err;
-    } finally {
-      try {
-        sz.FS.unlink(archivePath);
-      } catch {
-        // never written
-      }
+    if (cached && sameStamp(cached.stamp, stamp)) {
+      this.sevenZPages.delete(fileId);
+      this.sevenZPages.set(fileId, cached);
+      return cached.value;
     }
 
-    // Only the file name decides hidden, as it did when the archive was extracted flat.
-    const pages = listExtractedFiles(sz.FS, dir)
-      .filter((path) => {
-        const name = pathBasename(path);
-        return isImage(name) && !name.startsWith('.');
-      })
-      .sort(compareComicPagePaths);
+    const extracted = await extractCb7ToDisk(filePath);
 
     const previous = this.sevenZPages.get(fileId);
-    const value = { dir, pages };
+    const value = { ...extracted, activeReaders: 0, evicted: false };
     this.sevenZPages.set(fileId, { stamp, value });
-    if (previous && previous.value.dir !== dir) removeExtractedTree(sz.FS, previous.value.dir);
+    this.sevenZCacheBytes += value.sizeBytes;
+    if (previous && previous.value.dir !== value.dir) {
+      this.sevenZCacheBytes -= previous.value.sizeBytes;
+      await this.disposeSevenZip(previous.value);
+    }
+    await this.evictSevenZipCache();
     return value;
+  }
+
+  private async evictSevenZipCache(): Promise<void> {
+    while (this.sevenZCacheBytes > SEVEN_Z_CACHE_MAX_BYTES && this.sevenZPages.size > 1) {
+      const oldest = this.sevenZPages.entries().next().value as [number, Stamped<SevenZipPages>] | undefined;
+      if (!oldest) return;
+      this.sevenZPages.delete(oldest[0]);
+      this.sevenZCacheBytes -= oldest[1].value.sizeBytes;
+      await this.disposeSevenZip(oldest[1].value);
+    }
+  }
+
+  private async disposeSevenZip(value: SevenZipPages): Promise<void> {
+    value.evicted = true;
+    if (value.activeReaders === 0) await removeCb7Extraction(value.dir);
+  }
+
+  private streamSevenZipPage(value: SevenZipPages, pageIndex: number): NodeJS.ReadableStream {
+    value.activeReaders++;
+    const stream = createReadStream(cb7PagePath(value.dir, value.pages[pageIndex]));
+    stream.once('close', () => {
+      value.activeReaders--;
+      if (value.evicted && value.activeReaders === 0) void removeCb7Extraction(value.dir);
+    });
+    return stream;
   }
 
   // ── Public API ────────────────────────────────────────────────────────────────
@@ -324,20 +351,19 @@ export class CbzService {
     }
 
     if (comic.format === 'cbr') {
-      const { buffer, pages } = await this.getRarCache(fileId, comic.absolutePath, comic.stamp);
+      const { pages } = await this.getRarCache(fileId, comic.absolutePath, comic.stamp);
       if (pageIndex < 0 || pageIndex >= pages.length) {
         throw new NotFoundException(`Page ${pageIndex} out of range`);
       }
-      const data = await this.extractRarPage(buffer, pages[pageIndex]);
-      return { notModified: false, etag, stream: Readable.from(Buffer.from(data)), mimeType: mimeForExt(pages[pageIndex]) };
+      const stream = await this.extractRarPage(comic.absolutePath, pages[pageIndex]);
+      return { notModified: false, etag, stream, mimeType: mimeForExt(pages[pageIndex]) };
     }
 
-    const sz = await getSevenZip();
-    const { dir, pages } = await this.getSevenZPages(fileId, comic.absolutePath, comic.stamp);
+    const value = await this.getSevenZPages(fileId, comic.absolutePath, comic.stamp);
+    const { pages } = value;
     if (pageIndex < 0 || pageIndex >= pages.length) {
       throw new NotFoundException(`Page ${pageIndex} out of range`);
     }
-    const data = sz.FS.readFile(`${dir}/${pages[pageIndex]}`);
-    return { notModified: false, etag, stream: Readable.from(Buffer.from(data)), mimeType: mimeForExt(pages[pageIndex]) };
+    return { notModified: false, etag, stream: this.streamSevenZipPage(value, pageIndex), mimeType: mimeForExt(pages[pageIndex]) };
   }
 }

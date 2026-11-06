@@ -4,6 +4,9 @@
 import { randomUUID } from 'crypto';
 
 export interface SevenZipFS {
+  filesystems: { NODEFS: unknown };
+  mount(type: unknown, opts: { root: string }, mountpoint: string): unknown;
+  unmount(mountpoint: string): void;
   open(path: string, flags: string): number;
   write(fd: number, buf: Uint8Array, offset: number, length: number): number;
   close(fd: number): void;
