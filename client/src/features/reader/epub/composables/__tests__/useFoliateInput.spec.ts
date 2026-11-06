@@ -55,6 +55,24 @@ function makeTouchEvent(type: string, touches: TouchLike[], changedTouches = tou
   return event
 }
 
+function linkTo(href: string | null): HTMLAnchorElement {
+  const a = document.createElement('a')
+  if (href !== null) a.setAttribute('href', href)
+  return a
+}
+
+function elementInside(parent: Element): HTMLElement {
+  const child = document.createElement('span')
+  parent.appendChild(child)
+  return child
+}
+
+// The fake iframe document is a bare EventTarget, so the element an event lands on is set by hand.
+function withTarget<T extends Event>(event: T, target: EventTarget): T {
+  Object.defineProperty(event, 'target', { value: target })
+  return event
+}
+
 describe('useFoliateInput', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -360,6 +378,58 @@ describe('useFoliateInput', () => {
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'foliate-click' }), window.location.origin)
 
     postMessage.mockRestore()
+    input.cleanup()
+  })
+
+  it('does not report a click on a followed link as a page-turn click', () => {
+    const postMessage = vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+    const view: ViewLike = { prev: vi.fn<() => void>(), next: vi.fn<() => void>(), getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect }
+    const input = useFoliateInput(() => view, vi.fn<() => void>(), vi.fn<() => void>(), vi.fn<() => void>())
+    const doc = makeDocTarget()
+    input.attachIframeClicks(doc)
+
+    doc.dispatchEvent(new Event('mousedown'))
+    doc.dispatchEvent(withTarget(new MouseEvent('click', { clientX: 10, clientY: 50 }), elementInside(linkTo('chapter2.xhtml'))))
+    expect(postMessage).not.toHaveBeenCalled()
+
+    doc.dispatchEvent(new Event('mousedown'))
+    doc.dispatchEvent(withTarget(new MouseEvent('click', { clientX: 10, clientY: 50 }), elementInside(linkTo(null))))
+    expect(postMessage).toHaveBeenCalledTimes(1)
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'foliate-click' }), window.location.origin)
+
+    postMessage.mockRestore()
+    input.cleanup()
+  })
+
+  it('does not report a tap on a followed link as a page-turn tap', () => {
+    const postMessage = vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+    const view: ViewLike = { prev: vi.fn<() => void>(), next: vi.fn<() => void>(), getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect }
+    const input = useFoliateInput(() => view, vi.fn<() => void>(), vi.fn<() => void>(), vi.fn<() => void>())
+    const doc = makeDocTarget()
+    input.attachIframeClicks(doc)
+    const link = elementInside(linkTo('chapter2.xhtml'))
+
+    doc.dispatchEvent(withTarget(makeTouchEvent('touchstart', [{ clientX: 10, clientY: 50 }]), link))
+    doc.dispatchEvent(withTarget(makeTouchEvent('touchend', [], [{ clientX: 10, clientY: 50 }]), link))
+
+    expect(postMessage).not.toHaveBeenCalled()
+
+    postMessage.mockRestore()
+    input.cleanup()
+  })
+
+  it('still turns the page for a swipe that starts on a link', () => {
+    const view: ViewLike = { prev: vi.fn<() => void>(), next: vi.fn<() => void>(), getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect }
+    const input = useFoliateInput(() => view, vi.fn<() => void>(), vi.fn<() => void>(), vi.fn<() => void>())
+    const doc = makeDocTarget()
+    input.attachIframeClicks(doc)
+    const link = elementInside(linkTo('chapter2.xhtml'))
+
+    doc.dispatchEvent(withTarget(makeTouchEvent('touchstart', [{ clientX: 90, clientY: 50 }]), link))
+    doc.dispatchEvent(withTarget(makeTouchEvent('touchend', [], [{ clientX: 10, clientY: 50 }]), link))
+
+    expect(view.next).toHaveBeenCalledTimes(1)
+
     input.cleanup()
   })
 
