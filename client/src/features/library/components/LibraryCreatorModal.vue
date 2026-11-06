@@ -597,7 +597,7 @@ onMounted(async () => {
             <ChevronLeft :size="18" class="rtl:rotate-180" aria-hidden="true" />
           </button>
           <span class="flex size-9.5 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary" aria-hidden="true">
-            <AppIcon :icon="form.icon || 'Library'" fallback="Library" :size="18" />
+            <AppIcon :icon="form.icon" :fallback="LibraryIcon" :size="18" />
           </span>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">

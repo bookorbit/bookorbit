@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowUpDown, Plus, Search, X } from '@lucide/vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -22,10 +23,10 @@ type SortDirection = 'asc' | 'desc'
 const props = withDefaults(
   defineProps<{
     title: string
-    titleIcon: string
+    titleIcon: Component
     items: EntityIndexItem[]
     routeName: string
-    fallbackIcon: string
+    fallbackIcon: Component
     searchPlaceholder: string
     emptyTitle: string
     emptyHint: string
@@ -211,7 +212,7 @@ function itemCountText(item: EntityIndexItem): string {
           class="flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <AppIcon :icon="item.icon || fallbackIcon" :fallback="fallbackIcon" :size="18" />
+            <AppIcon :icon="item.icon" :fallback="fallbackIcon" :size="18" />
           </span>
           <span class="flex min-w-0 flex-col gap-0.5">
             <span class="truncate text-sm font-medium text-foreground">{{ item.name }}</span>

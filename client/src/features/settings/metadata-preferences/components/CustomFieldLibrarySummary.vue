@@ -36,7 +36,7 @@ const moreTitle = computed(() =>
   </span>
   <span v-else class="inline-flex min-w-0 items-center gap-2.5">
     <span v-for="library in shown" :key="library.id" class="inline-flex min-w-0 items-center gap-1.5 text-foreground">
-      <AppIcon :icon="library.icon" fallback="Library" :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+      <AppIcon :icon="library.icon" :fallback="LibraryIcon" :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
       <span class="truncate">{{ library.name }}</span>
     </span>
     <span v-if="more > 0" class="shrink-0 rounded-xs bg-foreground/8 px-1 text-xs tabular-nums text-muted-foreground" :title="moreTitle">

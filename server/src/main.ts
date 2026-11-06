@@ -12,7 +12,7 @@ import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { appConfig } from './config/config';
 import { DEV_CLIENT_ORIGIN } from './config/dev-client-origin';
 import { setupSwaggerDocs } from './swagger';
@@ -29,6 +29,7 @@ import {
   shouldInjectEmptyJsonBody,
   shouldServeSpaFallback,
 } from './common/utils/bootstrap.utils';
+import { applyStaticCacheHeaders } from './common/utils/static-cache.utils';
 
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
 
@@ -123,9 +124,11 @@ async function bootstrap() {
       });
     };
 
+    const publicRoot = join(__dirname, '..', 'public');
     await app.register(fastifyStatic as never, {
-      root: join(__dirname, '..', 'public'),
+      root: publicRoot,
       prefix: '/',
+      setHeaders: (reply: FastifyReply, filePath: string) => applyStaticCacheHeaders(reply, publicRoot, filePath),
     });
   }
 

@@ -2,7 +2,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate } from '@/i18n/formatters'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { CalendarRange } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { UserReadingSessionTimeline, UserReadingSessionTimelineItem, ReadingSessionSourceBucket } from '@bookorbit/types'
@@ -81,7 +81,7 @@ const persistLoading = ref(false)
 const dragEnabled = ref(false)
 const dragState = ref<DragState | null>(null)
 const dragPreview = ref<DragPreview | null>(null)
-const chartRef = ref<InstanceType<typeof VChart> | null>(null)
+const chartRef = ref<InstanceType<typeof AppChart> | null>(null)
 const option = shallowRef({})
 
 const timeline = ref<UserReadingSessionTimeline>({
@@ -373,7 +373,7 @@ function handleChartMouseDown(params: { seriesId?: string; dataIndex?: number; e
   if (!Number.isFinite(dataIndex) || dataIndex < 0 || dataIndex >= segments.value.length) return
 
   const pointer = extractPointerOffset(params.event)
-  const chart = chartRef.value
+  const chart = chartRef.value?.instance
   if (!pointer || !chart) return
 
   const dataCoord = chart.convertFromPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [pointer.x, pointer.y]) as [number, number] | null
@@ -397,7 +397,7 @@ function handleChartMouseDown(params: { seriesId?: string; dataIndex?: number; e
 
 function handleZrMouseMove(event: { offsetX: number; offsetY: number }) {
   const state = dragState.value
-  const chart = chartRef.value
+  const chart = chartRef.value?.instance
   if (!state || !chart) return
 
   const point = chart.convertFromPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [event.offsetX, event.offsetY]) as [number, number] | null
@@ -780,7 +780,7 @@ function getIsoWeekStart(year: number, week: number): Date {
           :description="t('statistics.charts.readingSessionTimeline.noSessionsDescription')"
         />
 
-        <VChart
+        <AppChart
           v-else
           ref="chartRef"
           :option="option"

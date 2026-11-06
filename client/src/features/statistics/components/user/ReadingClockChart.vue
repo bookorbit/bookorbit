@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { Clock } from '@lucide/vue'
 import type { ReadingSessionSourceBucket } from '@bookorbit/types'
 
@@ -140,7 +140,7 @@ watchEffect(() => {
       <div v-if="peakHour" class="text-muted-foreground mb-1 text-center text-xs">
         Peak: <span class="text-foreground font-medium">{{ HOUR_LABELS[peakHour.hour] }}</span>
       </div>
-      <VChart :option autoresize style="height: calc(100% - 20px)" />
+      <AppChart :option autoresize style="height: calc(100% - 20px)" />
     </template>
   </ChartCard>
 </template>

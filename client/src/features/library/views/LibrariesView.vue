@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { BookCopy } from '@lucide/vue'
 import EntityIndexView from '@/components/entity-index/EntityIndexView.vue'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -41,8 +42,8 @@ onMounted(() => {
     <LibraryCreatorModal v-if="createOpen" @close="closeCreate" @saved="onLibrarySaved" />
     <EntityIndexView
       :title="t('titles.libraries')"
-      title-icon="BookCopy"
-      fallback-icon="BookCopy"
+      :title-icon="BookCopy"
+      :fallback-icon="BookCopy"
       :items="libraries"
       route-name="library"
       :loading="loading"

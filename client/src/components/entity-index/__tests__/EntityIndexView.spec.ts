@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { BookCopy } from '@lucide/vue'
 import EntityIndexView from '../EntityIndexView.vue'
 import type { EntityIndexItem } from '../EntityIndexView.vue'
 
@@ -7,10 +8,10 @@ function mountView(items: EntityIndexItem[]) {
   return mount(EntityIndexView, {
     props: {
       title: 'Libraries',
-      titleIcon: 'BookCopy',
+      titleIcon: BookCopy,
       items,
       routeName: 'library',
-      fallbackIcon: 'BookCopy',
+      fallbackIcon: BookCopy,
       searchPlaceholder: 'Filter libraries...',
       emptyTitle: 'No libraries yet',
       emptyHint: 'Create a library to start adding books.',

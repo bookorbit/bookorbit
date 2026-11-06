@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { applyStaticCacheHeaders, IMMUTABLE_CACHE_CONTROL } from './utils/static-cache.utils';
 
 describe('@fastify/static production compatibility', () => {
   let app: FastifyInstance | undefined;
@@ -44,6 +45,37 @@ describe('@fastify/static production compatibility', () => {
     expect(assetResponse.body).toBe('globalThis.bookOrbit = true;');
     expect(fallbackResponse.statusCode).toBe(200);
     expect(fallbackResponse.body).toBe('<main>BookOrbit</main>');
+  });
+
+  it('caches hashed build output forever and keeps fixed-name files revalidating', async () => {
+    await mkdir(join(publicRoot, 'assets', 'foliate'), { recursive: true });
+    await mkdir(join(publicRoot, 'assets', 'lucide', '1.62.0'), { recursive: true });
+    await writeFile(join(publicRoot, 'assets', 'index-AbCd1234.js'), 'export {};');
+    await writeFile(join(publicRoot, 'assets', 'foliate', 'view.js'), 'export {};');
+    await writeFile(join(publicRoot, 'assets', 'lucide', '1.62.0', 'folder-open.svg'), '<svg/>');
+    await writeFile(join(publicRoot, 'sw.js'), 'self;');
+
+    app = Fastify();
+    await app.register(fastifyStatic, {
+      root: publicRoot,
+      prefix: '/',
+      setHeaders: (reply, filePath) => applyStaticCacheHeaders(reply, publicRoot, filePath),
+    });
+    app.setNotFoundHandler((_request, reply) => reply.sendFile('index.html'));
+    await app.ready();
+
+    const cacheControl = async (url: string) => {
+      const response = await app!.inject({ method: 'GET', url });
+      expect(response.statusCode).toBe(200);
+      return response.headers['cache-control'];
+    };
+
+    expect(await cacheControl('/assets/index-AbCd1234.js')).toBe(IMMUTABLE_CACHE_CONTROL);
+    expect(await cacheControl('/assets/lucide/1.62.0/folder-open.svg')).toBe(IMMUTABLE_CACHE_CONTROL);
+    expect(await cacheControl('/assets/foliate/view.js')).toBe('public, max-age=0');
+    expect(await cacheControl('/index.html')).toBe('public, max-age=0');
+    expect(await cacheControl('/sw.js')).toBe('public, max-age=0');
+    expect(await cacheControl('/library/books/1')).toBe('public, max-age=0');
   });
 
   it.each(['/foo/../deep/secret.txt', '/foo/%2E%2E/deep/secret.txt', '/assets/../../outside.txt'])(

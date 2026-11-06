@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { Tag } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 
@@ -93,6 +93,6 @@ watchEffect(() => {
       :title="t('statistics.empty.notEnoughData')"
       :description="t('statistics.charts.genreReadingTime.notEnoughData', { count: MIN_GENRES })"
     />
-    <VChart v-else :option autoresize style="height: 100%" />
+    <AppChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

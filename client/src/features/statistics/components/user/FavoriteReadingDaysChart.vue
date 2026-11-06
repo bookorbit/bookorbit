@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { CalendarDays } from '@lucide/vue'
 import type { ReadingSessionSourceBucket } from '@bookorbit/types'
 
@@ -113,6 +113,6 @@ watchEffect(() => {
       :title="t('statistics.empty.notEnoughData')"
       :description="t('statistics.charts.favoriteReadingDays.notEnoughData', { count: MIN_EVENTS })"
     />
-    <VChart v-else :option autoresize style="height: 100%" />
+    <AppChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

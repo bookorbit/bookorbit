@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Clock, CornerDownLeft, Folder, HardDrive, Search, X } from '@lucide/vue'
+import { Clock, CornerDownLeft, Folder, HardDrive, Library as LibraryIcon, Search, X } from '@lucide/vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { normalizeFolderPath } from '../../composables/folder-paths'
 import { isAtOrInside, leafName, parentPath } from '../../composables/folder-picker/folder-picker-rules'
@@ -383,7 +383,7 @@ defineExpose({ focus })
             >
               <HardDrive v-if="option.icon === 'mount'" :size="15" class="shrink-0 text-primary" aria-hidden="true" />
               <Clock v-else-if="option.icon === 'recent'" :size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-              <AppIcon v-else :icon="option.libraryIcon" fallback="Library" :size="15" class="shrink-0 text-primary" />
+              <AppIcon v-else :icon="option.libraryIcon" :fallback="LibraryIcon" :size="15" class="shrink-0 text-primary" />
               <span
                 class="min-w-0 flex-1 truncate text-foreground"
                 :class="option.named ? 'text-sm' : 'font-mono text-[12.5px]'"

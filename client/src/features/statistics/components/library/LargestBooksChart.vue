@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { HardDrive } from '@lucide/vue'
 
 import { formatBytes } from '@/lib/formatting'
@@ -89,6 +89,6 @@ watchEffect(() => {
 
 <template>
   <ChartCard :title="t('statistics.charts.largestBooks.title')" :icon="HardDrive" :color-index="2" :loading :error :empty="!data.items.length">
-    <VChart :option autoresize style="height: 100%" />
+    <AppChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

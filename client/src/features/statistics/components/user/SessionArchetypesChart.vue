@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { Layers } from '@lucide/vue'
 
 import { useUserSessionArchetypes } from '../../composables/useUserSessionArchetypes'
@@ -99,6 +99,6 @@ watchEffect(() => {
 
 <template>
   <ChartCard :title="t('statistics.charts.sessionArchetypes.title')" :icon="Layers" :color-index="8" :loading :error :empty="isEmpty()">
-    <VChart :option autoresize style="height: 100%" />
+    <AppChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>
