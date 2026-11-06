@@ -7,6 +7,7 @@ import {
   coverPhrases,
   normalizeCoverText,
   normalizeIsbn,
+  numberLines,
   rankCandidates,
   trigramSimilarity,
   type VisualMatchCandidate,
@@ -167,6 +168,97 @@ describe('rankCandidates', () => {
   it('keeps at most the limit', () => {
     const many = Array.from({ length: 8 }, (_, index) => book(100 + index, 'Project Hail Mary', ['Andy Weir']));
     expect(rankCandidates(many, ['PROJECT HAIL MARY'], 4)).toHaveLength(4);
+  });
+});
+
+describe('rankCandidates on spines', () => {
+  const SHELF: VisualMatchCandidate[] = [
+    ...LIBRARY,
+    book(30, 'Circe', ['Madeline Miller']),
+    book(31, 'The Song of Achilles', ['Madeline Miller']),
+    book(32, '1984', ['George Orwell']),
+    book(33, 'Animal Farm', ['George Orwell']),
+    book(34, 'Nineteen Eighty-Four', ['George Orwell']),
+    book(35, '11/22/63', ['Stephen King']),
+    book(36, 'Children of Dune', ['Frank Herbert']),
+    book(37, 'Leviathan Wakes', ['James S. A. Corey']),
+    book(38, 'The Way of Kings', ['Brandon Sanderson']),
+  ];
+  const spine = (lines: string[]) => ids(lines, SHELF);
+
+  it('reads a title, a surname and a publisher’s imprint on separate lines', () => {
+    expect(spine(['DUNE', 'HERBERT', 'ACE'])).toEqual([3]);
+    expect(spine(['The Name of the Wind', 'Rothfuss', 'DAW'])).toEqual([1]);
+    expect(spine(['PROJECT HAIL MARY', 'ANDY WEIR'])).toEqual([7]);
+    expect(spine(['Circe', 'Madeline Miller'])).toEqual([30]);
+    expect(spine(['LEVIATHAN WAKES', 'COREY', 'ORBIT'])).toEqual([37]);
+    expect(spine(['THE WAY OF KINGS', 'SANDERSON', '1', 'TOR'])).toEqual([38]);
+    expect(spine(['MILLER', 'CIRCE'])).toEqual([30]);
+  });
+
+  it('reads a title and its author run together on one line', () => {
+    expect(spine(['DUNE FRANK HERBERT'])).toEqual([3]);
+    expect(spine(['THE NAME OF THE WIND ROTHFUSS'])).toEqual([1]);
+    expect(spine(['Project Hail Mary Andy Weir'])).toEqual([7]);
+    expect(spine(['NINETEEN EIGHTY-FOUR ORWELL'])).toEqual([34]);
+    expect(spine(['CIRCE MADELINE MILLER'])).toEqual([30]);
+    expect(spine(['DUNE HERBERT'])).toEqual([3]);
+    expect(spine(['DUNE MESSIAH FRANK HERBERT'])).toEqual([4]);
+    expect(spine(['CHILDREN OF DUNE FRANK HERBERT'])).toEqual([36]);
+  });
+
+  it('reads the title in full once the author is taken out of its line', () => {
+    const [merged] = rankCandidates(SHELF, ['DUNE FRANK HERBERT'], 4);
+    expect(merged).toMatchObject({ bookId: 3, titleScore: 1 });
+    expect(merged.authorScore).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it('takes out only the candidate’s own author, so a short title with another author on its line stays unmatched', () => {
+    // Brian Herbert's name is not Frank Herbert's: "brian" stays beside "dune", so the title is not read in full.
+    expect(spine(['DUNE BRIAN HERBERT'])).toEqual([]);
+    // On its own line the surname alone still confirms Frank Herbert, as it does for any spine.
+    expect(spine(['DUNE', 'BRIAN HERBERT'])).toEqual([3]);
+    expect(spine(['DUNE FRANK'])).toEqual([]);
+    expect(spine(['EMMA', 'JANE'])).toEqual([]);
+  });
+
+  it('does not take the author’s name alone, on one line or two', () => {
+    expect(spine(['STEPHEN KING'])).toEqual([]);
+    expect(spine(['FRANK HERBERT', 'ACE'])).toEqual([]);
+    expect(spine(['HERBERT'])).toEqual([]);
+  });
+
+  it('reads a title that is a number beside its author, and never a number alone', () => {
+    expect(spine(['1984', 'ORWELL', 'PENGUIN'])).toEqual([32]);
+    expect(spine(['1984 ORWELL'])).toEqual([32]);
+    expect(spine(['11/22/63', 'KING'])).toEqual([35]);
+    expect(spine(['1984'])).toEqual([]);
+    expect(spine(['1984', 'PENGUIN'])).toEqual([]);
+  });
+
+  it('reads a title stored with a series note in brackets that the spine leaves off', () => {
+    const series = [
+      book(40, 'Claim Me Now (Heron Harbor Book 2)', ['Lea Nolan']),
+      book(41, 'Inner System (Gene Soldiers Book 6)', ['James David Victor']),
+      book(42, 'Troy (Greek Myths 3)', ['Stephen Fry']),
+      book(20, 'Resident Evil', ['S. D. Perry']),
+      book(21, 'Resident Evil 4 (Underworld)', ['S. D. Perry']),
+    ];
+    expect(ids(['CLAIM ME NOW', 'NOLAN', 'ORBIT'], series)).toEqual([40]);
+    expect(ids(['INNER SYSTEM VICTOR'], series)).toEqual([41]);
+    expect(ids(['RESIDENT EVIL 4', 'PERRY'], series)[0]).toBe(21);
+    // Without its note "Troy" is a short title, so the bare form is not offered and the author is still needed.
+    expect(ids(['TROY'], series)).toEqual([]);
+  });
+
+  it('still finds a spine with misread letters run together', () => {
+    expect(spine(['PR0JECT HAIL MARV ANDY WElR'])).toEqual([7]);
+  });
+});
+
+describe('numberLines', () => {
+  it('keeps lines that are only a number of two digits or more', () => {
+    expect(numberLines(['1984', '11/22/63', '7', 'DUNE', 'Vol. 2', '1984'])).toEqual(['1984', '11 22 63']);
   });
 });
 

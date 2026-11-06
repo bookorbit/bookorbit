@@ -1222,5 +1222,17 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/visual-match/shelf-match.controller.ts",
+    "className": "ShelfMatchController",
+    "methodName": "match",
+    "httpMethod": "POST",
+    "path": "/mobile/shelf-match",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

@@ -7,6 +7,10 @@
  * the author's name, sometimes a quote naming another book. So a title is compared with every run
  * of up to three adjacent lines, an author with every single line, and a title alone only counts
  * when it is long enough not to be a common word.
+ *
+ * A spine is shorter still: the title, often only the author's surname, a publisher's imprint, and
+ * often all of it read as one line. So a title is also compared with each run of lines once that
+ * book's own author is taken out of it.
  */
 
 export interface VisualMatchCandidate {
@@ -213,11 +217,20 @@ function wordAgreement(part: readonly string[], whole: readonly string[]): WordA
   return { coverage: total === 0 ? 0 : found / total, complete };
 }
 
-/** The forms a cover may print: the main title, the full title, and the title with its subtitle. */
+/** A note in brackets closing a stored title, which a cover or spine leaves off: "(Heron Harbor Book 2)". */
+const TRAILING_NOTE = /\s*[([][^()[\]]*[)\]]\s*$/;
+
+/**
+ * The forms a cover may print: the main title, the full title, and the title with its subtitle.
+ * The main title without a closing note in brackets is one more, unless that leaves a short title,
+ * which must keep needing its author.
+ */
 function titleForms(candidate: VisualMatchCandidate): string[] {
   const title = candidate.title ?? '';
   const main = title.split(/\s*[:\u2014\u2013]\s+|\s+-\s+/)[0] ?? title;
+  const bare = normalizeCoverText(main.replace(TRAILING_NOTE, ''));
   const forms = [main, title, candidate.subtitle ? `${title} ${candidate.subtitle}` : ''].map(normalizeCoverText).filter(Boolean);
+  if (bare && !isShortTitle(bare)) forms.push(bare);
   return [...new Set(forms)];
 }
 
@@ -242,12 +255,37 @@ function formScore(form: string, phrase: string): number {
   return Math.max(trigram, equal, contained);
 }
 
-/** How well the best run of lines reads as this title. */
+/** The words of a book's own author names, initials aside. */
+function authorWords(authors: readonly string[]): string[] {
+  return [...new Set(authors.flatMap((author) => tokens(normalizeCoverText(author)).filter((word) => word.length > 1)))];
+}
+
+/**
+ * The phrase without the words that read as one of `names`, or null when it holds none of them or
+ * nothing else. A spine read as one line runs title and author together ("dune frank herbert"), and
+ * a short title is never found inside a longer line, so it is compared with what is left once that
+ * book's own author is taken out. Only the candidate's authors are taken out, never other words.
+ */
+function withoutAuthorWords(phrase: string, names: readonly string[]): string | null {
+  if (names.length === 0) return null;
+  const words = tokens(phrase);
+  const kept = words.filter((word) => !names.some((name) => wordSimilarity(word, name) >= WORD_READ));
+  return kept.length === 0 || kept.length === words.length ? null : kept.join(' ');
+}
+
+/** How well the best run of lines, with or without the book's own author in it, reads as this title. */
 export function titleScore(candidate: VisualMatchCandidate, phrases: readonly CoverPhrase[]): number {
+  const names = authorWords(candidate.authors);
+  const texts = new Set<string>();
+  for (const phrase of phrases) {
+    texts.add(phrase.text);
+    const titleOnly = withoutAuthorWords(phrase.text, names);
+    if (titleOnly) texts.add(titleOnly);
+  }
   let best = 0;
   for (const form of titleForms(candidate)) {
-    for (const phrase of phrases) {
-      best = Math.max(best, formScore(form, phrase.text));
+    for (const text of texts) {
+      best = Math.max(best, formScore(form, text));
       if (best >= 1) return 1;
     }
   }
@@ -282,14 +320,39 @@ export function authorScore(authors: readonly string[], lines: readonly string[]
   return Math.min(1, best);
 }
 
-/** One candidate against the photo, or null when it cannot be the book shown. */
-export function scoreCandidate(candidate: VisualMatchCandidate, lines: readonly string[], phrases: readonly CoverPhrase[]): VisualMatchScore | null {
+/**
+ * Lines that are only a number, at least two digits long. `coverLines` drops them, because on a
+ * cover or spine a number is a year, a price or a series number far more often than a title, but a
+ * few titles are one ("1984", "11/22/63").
+ */
+export function numberLines(rawLines: readonly string[]): string[] {
+  const numbers = new Set<string>();
+  for (const raw of rawLines) {
+    const line = normalizeCoverText(raw);
+    if (/^\d[\d ]*$/.test(line) && line.replace(/ /g, '').length >= 2) numbers.add(line);
+  }
+  return [...numbers];
+}
+
+/**
+ * One candidate against the photo, or null when it cannot be the book shown. A line holding only
+ * the candidate's numeric title counts as the title read in full, but only beside its author.
+ */
+export function scoreCandidate(
+  candidate: VisualMatchCandidate,
+  lines: readonly string[],
+  phrases: readonly CoverPhrase[],
+  numbers: readonly string[] = [],
+): VisualMatchScore | null {
   const forms = titleForms(candidate);
   if (forms.length === 0) return null;
-  const title = titleScore(candidate, phrases);
-  if (title < MIN_TITLE_SCORE) return null;
+  const numbered = numbers.length > 0 && forms.some((form) => numbers.includes(form));
+  let title = titleScore(candidate, phrases);
+  if (title < MIN_TITLE_SCORE && !numbered) return null;
   const author = authorScore(candidate.authors, lines);
   const confirmed = author >= AUTHOR_CONFIRMED;
+  if (numbered && confirmed) title = 1;
+  if (title < MIN_TITLE_SCORE) return null;
   if (!confirmed && isShortTitle(forms[0])) return null;
   const score = confirmed ? 0.7 * title + 0.3 * author : 0.85 * title;
   if (score < MIN_MATCH_SCORE) return null;
@@ -306,8 +369,9 @@ export function rankCandidates(candidates: readonly VisualMatchCandidate[], rawL
   const lines = coverLines(rawLines);
   if (lines.length === 0) return [];
   const phrases = coverPhrases(lines);
+  const numbers = numberLines(rawLines);
   const scored = candidates
-    .map((candidate) => scoreCandidate(candidate, lines, phrases))
+    .map((candidate) => scoreCandidate(candidate, lines, phrases, numbers))
     .filter((score): score is VisualMatchScore => score !== null)
     .sort((a, b) => b.score - a.score || b.titleLength - a.titleLength);
   const best = scored[0]?.score ?? 0;

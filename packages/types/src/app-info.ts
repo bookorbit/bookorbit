@@ -58,6 +58,11 @@ export const SERVER_FEATURES = [
    * photographed cover or spine, or its barcode, points to.
    */
   "visual-match",
+  /**
+   * `POST /mobile/shelf-match` names, for each spine in a photographed shelf, the books in the
+   * reader's libraries that the text recognised on it points to.
+   */
+  "shelf-match",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
