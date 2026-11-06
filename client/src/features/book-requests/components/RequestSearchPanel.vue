@@ -111,6 +111,7 @@ const {
 /** What the toggle offers: each medium on its own, then both together beside the two it combines. */
 type SearchChoice = BookRequestMediaKind | 'pair'
 const SEARCH_CHOICES: readonly SearchChoice[] = [...BOOK_REQUEST_MEDIA_KINDS, 'pair']
+const MAX_REQUEST_METADATA_SOURCES = 20
 const searchChoice = computed<SearchChoice>(() => (pairMode.value ? 'pair' : mediaKind.value))
 
 /**
@@ -471,8 +472,13 @@ function candidateLanguage(candidate: MetadataCandidate): string {
   return candidate.language ? formatLanguageName(candidate.language) : t('bookRequests.search.identifiers.notProvided')
 }
 
-function requestMetadataSources(group: CandidateGroup): BookRequestMetadataSource[] {
-  return group.candidates.map((candidate) => ({
+function requestMetadataSources(group: CandidateGroup, selected: MetadataCandidate): BookRequestMetadataSource[] {
+  const candidates = [
+    selected,
+    ...group.candidates.filter((candidate) => candidate.provider !== selected.provider || candidate.providerId !== selected.providerId),
+  ].slice(0, MAX_REQUEST_METADATA_SOURCES)
+
+  return candidates.map((candidate) => ({
     providerKey: candidate.provider,
     providerId: candidate.providerId,
     providerLabel: candidateProviderLabel(candidate),
@@ -750,7 +756,7 @@ async function requestGroupChoice(group: CandidateGroup, candidate: MetadataCand
     isbn13: isbn,
     providerKey: candidate.provider,
     providerId: candidate.providerId,
-    metadataSources: requestMetadataSources(group),
+    metadataSources: requestMetadataSources(group, candidate),
     ...requestExtras(),
   })
   if (!result) {
@@ -807,7 +813,7 @@ async function requestPairGroup(group: CandidateGroup): Promise<void> {
     isbn13: isbn,
     providerKey: candidate.provider,
     providerId: candidate.providerId,
-    metadataSources: requestMetadataSources(group),
+    metadataSources: requestMetadataSources(group, candidate),
     note: note.value.trim() || null,
   }
 
