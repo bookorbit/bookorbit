@@ -1198,5 +1198,17 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/year-review/year-review.controller.ts",
+    "className": "YearReviewController",
+    "methodName": "getYear",
+    "httpMethod": "GET",
+    "path": "/mobile/year-review/:year",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

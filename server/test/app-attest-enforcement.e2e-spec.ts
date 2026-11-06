@@ -58,6 +58,7 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['POST', '/watch-downloads'],
   ['POST', '/watch-downloads/media-overlay'],
   ['POST', '/mobile/books/files/1/locate-text'],
+  ['GET', '/mobile/year-review/2026'],
 ];
 
 const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [

@@ -51,6 +51,8 @@ export const SERVER_FEATURES = [
   "reading-progress",
   /** `POST /mobile/books/files/:fileId/locate-text` finds where text recognised on a photographed page appears in an EPUB. */
   "locate-text",
+  /** `GET /mobile/year-review/:year`: a reader's year, for the app's Year in Review story. */
+  "year-review",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
