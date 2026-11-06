@@ -80,6 +80,20 @@ class PdfRequiresBookFileConstraint implements ValidatorConstraintInterface {
   }
 }
 
+// A PDF that denies text extraction still allows highlighting, so its highlights can have no text.
+@ValidatorConstraint({ name: 'textRequiredForCfi', async: false })
+class TextRequiredForCfiConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown, args: ValidationArguments): boolean {
+    const dto = args.object as CreateAnnotationDto;
+    if (dto.pdf != null) return true;
+    return typeof value === 'string' && value !== '';
+  }
+
+  defaultMessage(): string {
+    return 'text should not be empty';
+  }
+}
+
 export class CreateAnnotationDto {
   @IsOptional()
   @IsString()
@@ -102,8 +116,8 @@ export class CreateAnnotationDto {
   // when cfi/pdf are absent (an @IsOptional property short-circuits its own validators).
   @Validate(ExactlyOneLocationConstraint)
   @Validate(PdfRequiresBookFileConstraint)
+  @Validate(TextRequiredForCfiConstraint)
   @IsString()
-  @IsNotEmpty()
   text!: string;
 
   @IsOptional()

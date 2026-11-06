@@ -110,7 +110,7 @@ async function handleCopy() {
   >
     <div class="flex flex-col gap-1 rounded-lg border border-border bg-card p-1.5 text-card-foreground shadow-xl">
       <div class="flex gap-1">
-        <Tooltip>
+        <Tooltip v-if="props.selectedText">
           <TooltipTrigger as-child>
             <button
               class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"

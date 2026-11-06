@@ -5073,6 +5073,7 @@
   },
   "annotations": {
     "unknownBook": "Unknown book",
+    "textUnavailable": "Text not available for this highlight",
     "styles": {
       "highlight": "Highlight",
       "underline": "Underline",

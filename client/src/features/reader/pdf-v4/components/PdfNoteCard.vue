@@ -34,7 +34,8 @@ function handleDelete() {
       class="block w-full min-w-0 px-3 py-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
       @click="handleNavigate"
     >
-      <span class="line-clamp-3 break-words text-xs leading-relaxed text-foreground">{{ props.annotation.text }}</span>
+      <span v-if="props.annotation.text" class="line-clamp-3 break-words text-xs leading-relaxed text-foreground">{{ props.annotation.text }}</span>
+      <span v-else class="block text-xs italic leading-relaxed text-muted-foreground">{{ t('annotations.textUnavailable') }}</span>
       <span
         v-if="props.annotation.note"
         class="mt-1.5 flex items-start gap-1.5 border-t border-dashed border-border pt-1.5 text-[11px] text-muted-foreground"

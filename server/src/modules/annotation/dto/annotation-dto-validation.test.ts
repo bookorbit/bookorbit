@@ -52,6 +52,31 @@ describe('Annotation DTO validation', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('accepts a pdf create payload with empty text, as sent for a PDF that denies text extraction', async () => {
+    const errors = await errorsFor(CreateAnnotationDto, {
+      pdf: { page: 9, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+      bookFileId: 46,
+      text: '',
+    });
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('still requires text to be a string on a pdf create payload', async () => {
+    const errors = await errorsFor(CreateAnnotationDto, {
+      pdf: { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+      bookFileId: 46,
+    });
+
+    expect(errors.map((error) => error.property)).toContain('text');
+  });
+
+  it('keeps the empty-text message for a cfi create payload', async () => {
+    const errors = await errorsFor(CreateAnnotationDto, { cfi: 'epubcfi(/6/4!/4/2/1:0)', text: '' });
+
+    expect(errors.flatMap((error) => Object.values(error.constraints ?? {}))).toEqual(['text should not be empty']);
+  });
+
   it('rejects a create payload missing both cfi and pdf', async () => {
     expect((await errorsFor(CreateAnnotationDto, { text: 'ok' })).length).toBeGreaterThan(0);
   });
