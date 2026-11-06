@@ -1,16 +1,17 @@
-import { getBookMediaProfile, type BookCard } from '@bookorbit/types'
+import { getBookMediaProfile, type BookCard, type ConcreteBookMediaKind } from '@bookorbit/types'
 
 export const SERIES_BOOK_MEDIA_GROUP_DEFS = [
-  { key: 'books', label: 'Books' },
-  { key: 'audiobooks', label: 'Audiobooks' },
-  { key: 'comics', label: 'Comics' },
-] as const
+  { key: 'books', label: 'Books', mediaKind: 'ebook' },
+  { key: 'audiobooks', label: 'Audiobooks', mediaKind: 'audiobook' },
+  { key: 'comics', label: 'Comics', mediaKind: 'comic' },
+] as const satisfies readonly { key: string; label: string; mediaKind: ConcreteBookMediaKind }[]
 
 export type SeriesBookMediaGroupKey = (typeof SERIES_BOOK_MEDIA_GROUP_DEFS)[number]['key']
 
 export type SeriesBookMediaGroup = {
   key: SeriesBookMediaGroupKey
   label: string
+  mediaKind: ConcreteBookMediaKind
   books: BookCard[]
 }
 

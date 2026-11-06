@@ -710,6 +710,7 @@ defineOptions({ name: 'SeriesDetailView' })
                   :grid-gap="gridGap"
                   :square-cover-scale="SERIES_SQUARE_COVER_SCALE"
                   :virtualized="false"
+                  :media-kind="group.mediaKind"
                   @action="handleBookAction"
                   @update:book="handleBookUpdate"
                 />

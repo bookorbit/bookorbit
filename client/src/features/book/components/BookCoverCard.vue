@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { BookCard, BookFileRef, CoverAspectRatio } from '@bookorbit/types'
-import { getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import type { BookCard, BookFileRef, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
+import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import BookFormatChip from './BookFormatChip.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
+import { cardMediaView } from '../lib/card-media'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -69,6 +70,8 @@ const props = defineProps<{
   coverAspectRatio?: CoverAspectRatio
   /** Opt-in: only views that host the destination sheet should offer this. */
   allowMoveToLibrary?: boolean
+  /** The medium the surrounding grid shows, such as a series' Audiobooks group. */
+  mediaKind?: ConcreteBookMediaKind | null
 }>()
 
 type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
@@ -86,17 +89,27 @@ const formatEntries = computed(() => bookFormatEntries(props.book.files))
 /** One file per edition: an audiobook downloads as a whole and opens from its first track. */
 const downloadableFiles = computed(() => formatEntries.value.map((entry) => entry.files[0]!))
 const openableFiles = computed(() => downloadableFiles.value.filter((file) => READER_OPENABLE_FORMATS.has(file.format!.toLowerCase())))
-const primaryFile = computed(() => openableFiles.value.find((f) => f.role === 'primary') ?? openableFiles.value[0] ?? null)
+const mediaView = computed(() => cardMediaView(props.book, props.mediaKind))
+const primaryFile = computed(() => {
+  const kind = mediaView.value?.kind
+  const fileOfKind = kind ? openableFiles.value.find((f) => getBookMediaKind(f.format) === kind) : undefined
+  return fileOfKind ?? openableFiles.value.find((f) => f.role === 'primary') ?? openableFiles.value[0] ?? null
+})
 const primaryDownloadFile = computed(() => downloadableFiles.value[0] ?? null)
 const mediaProfile = computed(() => getBookMediaProfile(formatEntries.value.flatMap((entry) => entry.files)))
-const formatOverlayKey = computed(() => formatEntries.value[0]?.key ?? null)
-const isAudiobook = computed(() => mediaProfile.value.primaryMediaKind === 'audiobook')
-const isComic = computed(() => mediaProfile.value.primaryMediaKind === 'comic')
+const formatOverlayKey = computed(() => {
+  const kind = mediaView.value?.kind
+  const entry = kind ? formatEntries.value.find((e) => getBookMediaKind(e.files[0]?.format) === kind) : formatEntries.value[0]
+  return entry?.key ?? null
+})
+const displayMediaKind = computed(() => mediaView.value?.kind ?? mediaProfile.value.primaryMediaKind)
+const isAudiobook = computed(() => displayMediaKind.value === 'audiobook')
+const isComic = computed(() => displayMediaKind.value === 'comic')
 
 const isMultiTrackAudio = computed(() => formatEntries.value.some((entry) => entry.audio && entry.files.length > 1))
 
 const { coverUrl, bumpVersion } = useCoverVersions()
-const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.coverVersion))
+const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.coverVersion, mediaView.value?.coverMedium))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 const { isRefreshing } = useRefreshingBooks()
@@ -130,7 +143,7 @@ const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metada
 const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } = useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed<CoverAspectRatio>(
-  () => props.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value,
+  () => props.coverAspectRatio ?? mediaView.value?.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value,
 )
 const showSendDialog = ref(false)
 
