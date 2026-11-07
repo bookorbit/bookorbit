@@ -10,7 +10,7 @@ import {
 
 /** Params every spec provider takes; the rest are BookOrbit extensions a provider opts into. */
 const BASE_SEARCH_PARAMS = ['query', 'author', 'mediaType'] as const;
-const EXTENSION_SEARCH_PARAMS = new Set(['isbn', 'language', 'limit']);
+const EXTENSION_SEARCH_PARAMS = new Set(['isbn', 'language', 'limit', 'series', 'seriesIndex']);
 const MEDIA_TYPES = new Set<MetadataHttpProviderMediaType>(['book', 'audiobook', 'comic']);
 const FIELDS = new Set<string>(ALL_METADATA_FIELDS);
 
