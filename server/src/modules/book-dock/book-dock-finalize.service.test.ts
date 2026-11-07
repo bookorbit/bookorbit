@@ -8,7 +8,7 @@ vi.mock('fs/promises', () => ({
   rmdir: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { access, lstat, readdir, readFile, stat, unlink } from 'fs/promises';
 import { DatabaseError } from 'pg';
 
@@ -20,6 +20,7 @@ import {
 } from '@bookorbit/types';
 import type { BookDockFileRow } from '../../db/schema/book-dock';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
+import { joinError } from './book-dock-join.service';
 
 const mockAccess = vi.mocked(access);
 const mockLstat = vi.mocked(lstat);
@@ -78,6 +79,7 @@ function makeService() {
     moveToPath: vi.fn().mockResolvedValue(undefined),
   };
   const processor = {
+    withFolderBookLock: vi.fn((_libraryId: number, _folderPath: string, work: () => Promise<unknown>) => work()),
     createUnitBookRecords: vi.fn().mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] }),
     deleteUnitBookRecords: vi.fn().mockResolvedValue(undefined),
     reconcileCoversAsync: vi.fn(),
@@ -102,6 +104,11 @@ function makeService() {
   const fileWriteService = {
     scheduleWrite: vi.fn(),
   };
+  const joinService = {
+    resolveRequested: vi.fn(),
+    canJoinIn: vi.fn().mockResolvedValue(true),
+    suggest: vi.fn().mockResolvedValue(new Map()),
+  };
 
   const service = new BookDockFinalizeService(
     db as never,
@@ -121,6 +128,8 @@ function makeService() {
     fileWriteService as never,
     undefined as never,
     seriesMemberships as never,
+    undefined as never,
+    joinService as never,
   );
 
   return {
@@ -141,6 +150,7 @@ function makeService() {
     seriesMemberships,
     notificationService,
     fileWriteService,
+    joinService,
   };
 }
 
@@ -972,6 +982,8 @@ describe('BookDockFinalizeService', () => {
           sortOrder: 0,
         },
       ]);
+      // Each file is its own book here, so there is no shared folder whose book needs locking.
+      expect(processor.withFolderBookLock).not.toHaveBeenCalled();
     });
 
     it.each(['book_per_folder', 'book_per_file'])('keeps unrelated root imports separate in %s mode', async (organizationMode) => {
@@ -2087,6 +2099,387 @@ describe('BookDockFinalizeService', () => {
       ];
       expect(row.selectedMetadata?.coverUrl).toBe('https://covers.example/picked.jpg');
       expect(overrides.get(9)?.lookedUpCoverUrl).toBeNull();
+    });
+  });
+
+  describe('a book a person picked to add the file to', () => {
+    const REQUESTER = {
+      id: 7,
+      isSuperuser: false,
+      permissions: [],
+      contentFilters: { includeTagIds: [], includeGenreIds: [], excludeTagIds: [], excludeGenreIds: [] },
+    } as never;
+    const summary = { bookId: 42, title: 'Dune', authors: ['Frank Herbert'] };
+    const target = (overrides: Record<string, unknown> = {}) => ({
+      bookId: 42,
+      libraryId: 5,
+      libraryFolderId: 9,
+      folderPath: '/library/Frank Herbert/Dune',
+      storedAsFile: false,
+      summary,
+      ...overrides,
+    });
+    const pdfRow = (overrides: Record<string, unknown> = {}) =>
+      makeRow({ fileName: 'dune.pdf', absolutePath: '/tmp/dune.pdf', format: 'pdf', ...overrides }) as unknown as BookDockFileRow;
+
+    function stubLibrary(service: BookDockFinalizeService, library: Record<string, unknown> = {}) {
+      const findLibrary = vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
+        id: 5,
+        name: 'Main',
+        allowedFormats: [],
+        fileNamingPattern: null,
+        organizationMode: 'book_per_folder',
+        ...library,
+      } as never);
+      const findFolder = vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
+      vi.spyOn(service as never, 'resolveDestination').mockResolvedValue('/library/Frank Herbert/Dune Deluxe/Dune Deluxe.pdf' as never);
+      vi.spyOn(service as never, 'cleanupBookDockRecord').mockResolvedValue(undefined as never);
+      return { findLibrary, findFolder };
+    }
+
+    const joinOverride = [{ fileId: 1, joinBook: { bookId: 42 } }];
+
+    it("files into the book's own folder, taking the library and folder from the book", async () => {
+      const { service, repo, joinService, processor, storage } = makeService();
+      const { findLibrary, findFolder } = stubLibrary(service);
+      const applyMetadata = vi.spyOn(service as never, 'applyMetadata').mockResolvedValue(undefined as never);
+      const applyJoined = vi.spyOn(service as never, 'applyJoinedMetadata').mockResolvedValue(undefined as never);
+      repo.findByIds.mockResolvedValue([pdfRow()]);
+      joinService.resolveRequested.mockResolvedValue(target());
+      processor.createUnitBookRecords.mockResolvedValueOnce({ bookIds: [42], createdBookIds: [], attachedFileIds: [900] });
+
+      const result = await service.finalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(result.results[0]).toMatchObject({ fileId: 1, success: true, bookId: 42 });
+      expect(joinService.resolveRequested).toHaveBeenCalledWith(42, REQUESTER, ['pdf']);
+      expect(findLibrary).toHaveBeenCalledWith(5);
+      expect(findFolder).toHaveBeenCalledWith(9, 5);
+      expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/dune.pdf', '/library/Frank Herbert/Dune/Dune Deluxe.pdf');
+      expect(processor.createUnitBookRecords).toHaveBeenCalledWith(5, 9, [expect.objectContaining({ folderPath: '/library/Frank Herbert/Dune' })]);
+      expect(applyJoined).toHaveBeenCalledWith(42, expect.objectContaining({ id: 1 }), null, null);
+      expect(applyMetadata).not.toHaveBeenCalled();
+      // The file lands and is recorded under the joined book's lock, and only while it is still that book's folder.
+      expect(processor.withFolderBookLock).toHaveBeenCalledExactlyOnceWith(5, '/library/Frank Herbert/Dune', expect.any(Function), 42);
+      expect(processor.withFolderBookLock.mock.invocationCallOrder[0]).toBeLessThan(storage.moveToPath.mock.invocationCallOrder[0]!);
+    });
+
+    it('moves nothing when the book to join no longer owns its folder', async () => {
+      const { service, repo, joinService, processor, storage } = makeService();
+      stubLibrary(service);
+      repo.findByIds.mockResolvedValue([pdfRow()]);
+      joinService.resolveRequested.mockResolvedValue(target());
+      processor.withFolderBookLock.mockRejectedValueOnce(
+        new ConflictException('The book this file belongs with moved while the file was being added. Try again.'),
+      );
+
+      const result = await service.finalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(result.results[0]).toMatchObject({ fileId: 1, success: false, message: expect.stringContaining('moved') });
+      expect(storage.moveToPath).not.toHaveBeenCalled();
+      expect(processor.createUnitBookRecords).not.toHaveBeenCalled();
+      expect(repo.deleteById).not.toHaveBeenCalled();
+    });
+
+    it("prefers the book's folder over the folder the file was headed for", async () => {
+      const { service, repo, joinService } = makeService();
+      const { findFolder } = stubLibrary(service);
+      repo.findByIds.mockResolvedValue([pdfRow({ targetLibraryId: 5, targetFolderId: 3 })]);
+      joinService.resolveRequested.mockResolvedValue(target());
+
+      await service.previewFinalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(findFolder).toHaveBeenCalledWith(9, 5);
+    });
+
+    it('previews the join with the book it joins and counts it', async () => {
+      const { service, repo, joinService } = makeService();
+      stubLibrary(service);
+      repo.findByIds.mockResolvedValue([pdfRow()]);
+      joinService.resolveRequested.mockResolvedValue(target());
+
+      const preview = await service.previewFinalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(preview).toMatchObject({ total: 1, ready: 1, joining: 1, blocked: 0 });
+      expect(preview.items[0]).toEqual(
+        expect.objectContaining({
+          fileId: 1,
+          status: 'ready',
+          newName: 'Frank Herbert/Dune/Dune Deluxe.pdf',
+          libraryId: 5,
+          canJoinBook: true,
+          joinsBook: summary,
+        }),
+      );
+      expect(preview.items[0]).not.toHaveProperty('suggestedJoinBook');
+      expect(joinService.suggest).toHaveBeenCalledWith([], REQUESTER);
+    });
+
+    it.each([
+      ['a book in another library', { targetLibraryId: 6, targetFolderId: 10 }, {}, target(), 'BOOK_DOCK_JOIN_OTHER_LIBRARY'],
+      ['a library that keeps one book per file', {}, { organizationMode: 'book_per_file' }, target(), 'BOOK_DOCK_JOIN_FILE_PER_BOOK'],
+      ['a book with no folder of its own', {}, {}, target({ folderPath: '/library' }), 'BOOK_DOCK_JOIN_ROOT_LEVEL'],
+      [
+        'a book sitting loose at the library root as its own file',
+        {},
+        {},
+        target({ folderPath: '/library/Dune.epub', storedAsFile: true }),
+        'BOOK_DOCK_JOIN_ROOT_LEVEL',
+      ],
+    ])('holds the file rather than filing it elsewhere for %s', async (_label, rowOverrides, library, joinTarget, errorCode) => {
+      const { service, repo, joinService, storage, processor } = makeService();
+      stubLibrary(service, rowOverrides.targetLibraryId ? { id: 6, ...library } : library);
+      repo.findByIds.mockResolvedValue([pdfRow(rowOverrides)]);
+      joinService.resolveRequested.mockResolvedValue(joinTarget);
+
+      const preview = await service.previewFinalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+      const result = await service.finalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(preview).toMatchObject({ ready: 0, blocked: 1 });
+      expect(preview.items[0]).toMatchObject({ fileId: 1, status: 'invalid_target', errorCode });
+      expect(result.results[0]).toMatchObject({ fileId: 1, success: false, errorCode });
+      expect(storage.moveToPath).not.toHaveBeenCalled();
+      expect(processor.createUnitBookRecords).not.toHaveBeenCalled();
+    });
+
+    it('reports a refused access check as access denied with its code', async () => {
+      const { service, repo, joinService, storage } = makeService();
+      stubLibrary(service);
+      repo.findByIds.mockResolvedValue([pdfRow()]);
+      joinService.resolveRequested.mockRejectedValue(joinError('BOOK_DOCK_JOIN_FORBIDDEN', 'You cannot edit the book this file was meant to join'));
+
+      const preview = await service.previewFinalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(preview.items[0]).toMatchObject({ status: 'access_denied', errorCode: 'BOOK_DOCK_JOIN_FORBIDDEN' });
+      expect(storage.moveToPath).not.toHaveBeenCalled();
+    });
+
+    it('checks every content format of a unit for a second audio set', async () => {
+      const { service, repo, joinService } = makeService();
+      stubLibrary(service);
+      repo.findByIds.mockResolvedValue([pdfRow({ fileName: 'dune.epub', format: 'epub' })]);
+      repo.findUnitFiles.mockResolvedValue([
+        { absolutePath: '/tmp/dune/dune.epub', fileName: 'dune.epub', format: 'epub', role: 'content', sortOrder: 0 },
+        { absolutePath: '/tmp/dune/dune.m4b', fileName: 'dune.m4b', format: 'M4B', role: 'content', sortOrder: 1 },
+        { absolutePath: '/tmp/dune/cover.jpg', fileName: 'cover.jpg', format: null, role: 'cover', sortOrder: null },
+      ]);
+      joinService.resolveRequested.mockResolvedValue(target());
+
+      await service.previewFinalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        joinOverride,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(joinService.resolveRequested).toHaveBeenCalledWith(42, REQUESTER, ['epub', 'm4b']);
+    });
+
+    it('suggests a matching book for a file headed for a library that can take it', async () => {
+      const { service, repo, joinService } = makeService();
+      stubLibrary(service);
+      const row = pdfRow({ targetLibraryId: 5, targetFolderId: 9, embeddedMetadata: { title: 'Dune', authors: ['Frank Herbert'] } });
+      repo.findByIds.mockResolvedValue([row]);
+      const suggestion = { ...summary, reason: 'title_author' };
+      joinService.suggest.mockResolvedValue(new Map([[1, suggestion]]));
+
+      const preview = await service.previewFinalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+
+      expect(preview.items[0]).toEqual(expect.objectContaining({ status: 'ready', canJoinBook: true, suggestedJoinBook: suggestion }));
+      expect(preview.joining).toBe(0);
+      expect(joinService.suggest).toHaveBeenCalledWith(
+        [{ fileId: 1, libraryId: 5, metadata: { title: 'Dune', authors: ['Frank Herbert'] }, formats: ['pdf'] }],
+        REQUESTER,
+      );
+      expect(joinService.resolveRequested).not.toHaveBeenCalled();
+    });
+
+    it('offers no join where the requester cannot edit and asks nothing without a requester', async () => {
+      const { service, repo, joinService } = makeService();
+      stubLibrary(service);
+      repo.findByIds.mockResolvedValue([pdfRow({ targetLibraryId: 5, targetFolderId: 9 })]);
+      joinService.canJoinIn.mockResolvedValue(false);
+
+      const preview = await service.previewFinalize(
+        7,
+        false,
+        false,
+        [1],
+        false,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        REQUESTER,
+      );
+      expect(preview.items[0]).toEqual(expect.objectContaining({ canJoinBook: false }));
+      expect(joinService.suggest).toHaveBeenCalledWith([], REQUESTER);
+
+      joinService.canJoinIn.mockClear();
+      const unattended = await service.previewFinalize(7, true, true, [1], false, [], undefined, undefined);
+      expect(unattended.items[0]).not.toHaveProperty('canJoinBook');
+      expect(joinService.canJoinIn).not.toHaveBeenCalled();
+    });
+
+    /** Issue 1568: a file whose pattern led to an existing book's folder overwrote that book's metadata. */
+    it('gives a book the import did not create only what the new format adds', async () => {
+      const { service, processor } = makeService();
+      stubLibrary(service);
+      const applyMetadata = vi.spyOn(service as never, 'applyMetadata').mockResolvedValue(undefined as never);
+      const applyJoined = vi.spyOn(service as never, 'applyJoinedMetadata').mockResolvedValue(undefined as never);
+      processor.createUnitBookRecords.mockResolvedValueOnce({ bookIds: [42], createdBookIds: [], attachedFileIds: [900] });
+
+      const result = await (service as any).finalizeFile(pdfRow({ targetLibraryId: 5, targetFolderId: 9 }), undefined, undefined, new Map(), 0, true);
+
+      expect(result).toMatchObject({ success: true, bookId: 42 });
+      expect(applyJoined).toHaveBeenCalledWith(42, expect.objectContaining({ id: 1 }), null, null);
+      expect(applyMetadata).not.toHaveBeenCalled();
+    });
+
+    it('still gives a book the import created the full metadata', async () => {
+      const { service, processor } = makeService();
+      stubLibrary(service);
+      const applyMetadata = vi.spyOn(service as never, 'applyMetadata').mockResolvedValue(undefined as never);
+      const applyJoined = vi.spyOn(service as never, 'applyJoinedMetadata').mockResolvedValue(undefined as never);
+      processor.createUnitBookRecords.mockResolvedValueOnce({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] });
+
+      await (service as any).finalizeFile(pdfRow({ targetLibraryId: 5, targetFolderId: 9 }), undefined, undefined, new Map(), 0, true);
+
+      expect(applyMetadata).toHaveBeenCalledWith(101, expect.objectContaining({ id: 1 }), true, null);
+      expect(applyJoined).not.toHaveBeenCalled();
     });
   });
 

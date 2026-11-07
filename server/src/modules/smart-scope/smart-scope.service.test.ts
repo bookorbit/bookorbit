@@ -825,7 +825,7 @@ describe('SmartScopeService', () => {
         sort: [{ field: 'title', dir: 'asc' }],
         pagination: { page: 1, size: 25 },
       },
-      { seriesSelectionFilter: undefined },
+      { seriesSelectionFilter: undefined, viewer: expect.objectContaining({ id: 12 }) },
     );
     expect(result).toEqual({ items: [], total: 0, page: 1, size: 25 });
   });
@@ -877,7 +877,7 @@ describe('SmartScopeService', () => {
         q: 'needle',
         collapseSeries: true,
       },
-      { seriesSelectionFilter: requestFilter },
+      { seriesSelectionFilter: requestFilter, viewer: expect.objectContaining({ id: 12 }) },
     );
   });
 
@@ -1062,7 +1062,7 @@ describe('SmartScopeService', () => {
             rules: [smartScope.filter, requestFilter],
           },
         },
-        { seriesSelectionFilter: requestFilter },
+        { seriesSelectionFilter: requestFilter, viewer: expect.objectContaining({ id: 12 }) },
       );
     });
 
@@ -1096,7 +1096,7 @@ describe('SmartScopeService', () => {
           filter: smartScope.filter,
           collapseSeries: true,
         }),
-        { seriesSelectionFilter: undefined },
+        { seriesSelectionFilter: undefined, viewer: expect.objectContaining({ id: 12 }) },
       );
     });
 
@@ -1127,7 +1127,7 @@ describe('SmartScopeService', () => {
           filter: smartScope.filter,
           sort: [{ field: 'title', dir: 'asc' }],
         },
-        { seriesSelectionFilter: undefined },
+        { seriesSelectionFilter: undefined, viewer: expect.objectContaining({ id: 12 }) },
       );
     });
 

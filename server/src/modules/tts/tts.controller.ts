@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Put
 import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { PreviewVoiceDto, SynthesizeDto } from './dto/synthesize.dto';
@@ -75,17 +76,20 @@ export class TtsController {
     return this.ttsService.saveUserPreferences(user.id, dto);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get('preferences/book/:bookId')
   getBookPreferences(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
     return this.ttsService.getEffectiveBookPreferences(user.id, bookId, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Put('preferences/book/:bookId')
   @HttpCode(200)
   saveBookPreferences(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: UpdateTtsPreferencesDto, @CurrentUser() user: RequestUser) {
     return this.ttsService.saveBookPreferences(user.id, bookId, dto, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Delete('preferences/book/:bookId')
   @HttpCode(204)
   async deleteBookPreferences(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {

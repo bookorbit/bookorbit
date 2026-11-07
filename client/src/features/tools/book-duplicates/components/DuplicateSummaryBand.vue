@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BOOK_DUPLICATE_MATCH_REASONS, type BookDuplicateGroup, type BookDuplicateMatchReason } from '@bookorbit/types'
+import {
+  BOOK_DUPLICATE_MATCH_REASONS,
+  BOOK_DUPLICATE_REASONS_BY_KIND,
+  type BookDuplicateGroup,
+  type BookDuplicateKind,
+  type BookDuplicateMatchReason,
+} from '@bookorbit/types'
 
 import { formatBytes } from '@/lib/formatting'
 import { formatNumber } from '@/i18n/formatters'
 
 const props = defineProps<{
+  kind: BookDuplicateKind
   groups: BookDuplicateGroup[]
   totalGroups: number
   totalExtraCopies: number | null
@@ -23,16 +30,20 @@ const REASON_COLORS: Record<BookDuplicateMatchReason, string> = {
   isbn: 'var(--pill-info)',
   exact_metadata: 'var(--pill-source-indigo)',
   fuzzy_metadata: 'var(--pill-warning)',
+  same_work: 'var(--pill-success)',
+  title_author: 'var(--pill-info)',
+  series_position: 'var(--pill-warning)',
 }
 
 /** Counts describe the loaded page; the totals beside them describe the whole scan. */
 const reasonCounts = computed<Record<BookDuplicateMatchReason, number>>(() => {
-  const counts = { file_hash: 0, isbn: 0, exact_metadata: 0, fuzzy_metadata: 0 }
+  const counts = Object.fromEntries(BOOK_DUPLICATE_MATCH_REASONS.map((reason) => [reason, 0])) as Record<BookDuplicateMatchReason, number>
   for (const group of props.groups) for (const reason of group.reasons) counts[reason] += 1
   return counts
 })
 
-const reasons = BOOK_DUPLICATE_MATCH_REASONS
+const reasons = computed(() => BOOK_DUPLICATE_REASONS_BY_KIND[props.kind])
+const groupLabel = computed(() => (props.kind === 'other_format' ? 'tools.bookDuplicates.summary.pairs' : 'tools.bookDuplicates.summary.groups'))
 
 function handleFilter(reason: BookDuplicateMatchReason): void {
   emit('filter', props.activeReason === reason ? undefined : reason)
@@ -47,13 +58,13 @@ function handleClear(): void {
   <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
     <p class="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[13px] text-muted-foreground" aria-live="polite">
       <span class="text-[15px] font-bold tabular-nums text-foreground">{{ formatNumber(totalGroups) }}</span>
-      <span>{{ t('tools.bookDuplicates.summary.groups', totalGroups) }}</span>
-      <template v-if="totalExtraCopies !== null">
+      <span>{{ t(groupLabel, totalGroups) }}</span>
+      <template v-if="kind === 'duplicate' && totalExtraCopies !== null">
         <span aria-hidden="true">&middot;</span>
         <span class="text-[15px] font-bold tabular-nums text-foreground">{{ formatNumber(totalExtraCopies) }}</span>
         <span>{{ t('tools.bookDuplicates.summary.extraCopies', totalExtraCopies) }}</span>
       </template>
-      <template v-if="totalReclaimableBytes !== null">
+      <template v-if="kind === 'duplicate' && totalReclaimableBytes !== null">
         <span aria-hidden="true">&middot;</span>
         <span class="text-[15px] font-bold tabular-nums text-[var(--pill-success)]">{{ formatBytes(totalReclaimableBytes) }}</span>
         <span>{{ t('tools.bookDuplicates.summary.reclaimable') }}</span>

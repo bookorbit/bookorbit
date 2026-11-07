@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { BookCard } from '@bookorbit/types'
@@ -8,6 +8,7 @@ import { useBookSelectionPermissions } from './useBookSelectionPermissions'
 import { useBookNavigation } from './useBookNavigation'
 import { useDeleteBook } from './useDeleteBook'
 import { useBookBulkActions, type QuerySelectionState } from './useBookBulkActions'
+import { hasLinkedBooks, type LinkSeedBook } from '../lib/book-link'
 
 interface BookTableShellOptions {
   viewType?: 'library' | 'collection' | 'smartScope'
@@ -28,7 +29,7 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
   const { setBookContext } = useBookNavigation()
   const tableControls = useTableViewControls()
   const selection = useBookViewSelection(books, selectionMode)
-  const { canEditSelectionMetadata } = useBookSelectionPermissions(books, selection.selectedIds, querySelection)
+  const { canEditSelectionMetadata, mergeSelection, linkSelection } = useBookSelectionPermissions(books, selection.selectedIds, querySelection)
 
   const {
     pendingId: deleteBookId,
@@ -57,6 +58,28 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
   const sendBookOpen = ref(false)
   const quickViewBookId = ref<number | null>(null)
   const quickViewOpen = ref(false)
+  const mergeOpen = ref(false)
+  /** Captured when the sheet opens, in grid order; the live selection changes once the merge lands. */
+  const mergeBookIds = ref<number[]>([])
+  const linkOpen = ref(false)
+  /** Captured when the sheet opens, in grid order: the first book becomes the main book of a new link. */
+  const linkBookIds = ref<number[]>([])
+  const linkBooks = ref<BookCard[]>([])
+  const linkSeedBooks = ref<LinkSeedBook[]>([])
+
+  /**
+   * A selected card stands for a book linked with others. Deleting it removes that book only, which
+   * the confirmation says (G6). A query selection resolves every matching book, so it never applies.
+   */
+  const selectionHasLinked = computed(() => {
+    if (querySelection?.value) return false
+    const selected = selection.selectedIds.value
+    return books.value.some((book) => selected.has(book.id) && hasLinkedBooks(book))
+  })
+  const pendingDeleteLinked = computed(() => {
+    const id = deleteBookId.value
+    return id !== null && hasLinkedBooks(books.value.find((book) => book.id === id))
+  })
 
   function handleBookAction(book: BookCard, action: BookActionType): void {
     if (action === 'quick-view') {
@@ -99,10 +122,63 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
     selection.exitSelectionMode()
   }
 
+  function openMergeForSelection(): void {
+    if (mergeSelection.value?.disabledReason !== null) return
+    const selected = selection.selectedIds.value
+    const loaded = books.value.filter((book) => selected.has(book.id)).map((book) => book.id)
+    const loadedIds = new Set(loaded)
+    mergeBookIds.value = [...loaded, ...[...selected].filter((id) => !loadedIds.has(id))]
+    mergeOpen.value = true
+  }
+
+  function setMergeOpen(open: boolean): void {
+    mergeOpen.value = open
+  }
+
+  function openLinkForSelection(): void {
+    if (linkSelection.value?.disabledReason !== null) return
+    const selected = selection.selectedIds.value
+    const loaded = books.value.filter((book) => selected.has(book.id))
+    const loadedIds = new Set(loaded.map((book) => book.id))
+    linkBooks.value = loaded
+    linkSeedBooks.value = []
+    linkBookIds.value = [...loadedIds, ...[...selected].filter((id) => !loadedIds.has(id))]
+    linkOpen.value = true
+  }
+
+  function setLinkOpen(open: boolean): void {
+    linkOpen.value = open
+  }
+
+  /** A merge blocker suggested Link: open it for the same books, the kept one first, which may span libraries. */
+  function switchMergeToLink(bookIds: number[], seeds: LinkSeedBook[] = []): void {
+    mergeOpen.value = false
+    const wanted = new Set(bookIds)
+    linkBooks.value = books.value.filter((book) => wanted.has(book.id))
+    linkSeedBooks.value = seeds
+    linkBookIds.value = [...bookIds]
+    linkOpen.value = true
+  }
+
   return {
     ...tableControls,
     ...selection,
     canEditSelectionMetadata,
+    mergeSelection,
+    mergeOpen,
+    mergeBookIds,
+    openMergeForSelection,
+    setMergeOpen,
+    linkSelection,
+    linkOpen,
+    linkBookIds,
+    linkBooks,
+    linkSeedBooks,
+    openLinkForSelection,
+    setLinkOpen,
+    switchMergeToLink,
+    selectionHasLinked,
+    pendingDeleteLinked,
     deleteBookId,
     deletingBook,
     promptDelete,

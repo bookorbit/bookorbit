@@ -817,6 +817,12 @@ describe('Authorization matrix (e2e)', () => {
           path: '/book-request-fulfilment/download-clients',
           token: 'allPerms',
         },
+        [Permission.LibraryMergeBooks]: {
+          method: 'GET',
+          path: '/books/merge/jobs/:jobId',
+          params: { jobId: '2147483000' },
+          token: 'allPerms',
+        },
       };
 
       const failures: MatrixFailure[] = [];

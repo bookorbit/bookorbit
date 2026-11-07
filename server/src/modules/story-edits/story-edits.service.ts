@@ -18,6 +18,14 @@ export class StoryEditsService {
     private readonly bookService: BookService,
   ) {}
 
+  /**
+   * After a merge moved another book's corrections onto this one: new revisions for every reader's
+   * rows, so devices read them past any cursor they already hold. Returns how many readers.
+   */
+  resyncBook(bookId: number): Promise<number> {
+    return this.repo.redrawRevisions(bookId);
+  }
+
   /** Rows changed after `since`, oldest change first, tombstones included. */
   async list(bookId: number, user: RequestUser, query: StoryEditsQueryDto): Promise<StoryEditsPage> {
     await this.bookService.verifyBookAccess(bookId, user);

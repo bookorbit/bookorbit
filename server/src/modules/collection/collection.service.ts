@@ -289,7 +289,7 @@ export class CollectionService {
     );
     try {
       const where = await this.buildBooksWhere(id, user, query);
-      const page = await this.bookService.executeBooksQuery(user.id, where, query, { defaultCollectionId: id });
+      const page = await this.bookService.executeBooksQuery(user.id, where, query, { defaultCollectionId: id, viewer: user });
 
       this.logger.log(
         `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${page.total} itemCount=${page.items.length} - query collection books completed`,

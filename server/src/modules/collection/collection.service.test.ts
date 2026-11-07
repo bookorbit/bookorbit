@@ -519,7 +519,7 @@ describe('CollectionService', () => {
           sort: [{ field: 'collectionOrder', dir: 'asc' }],
           pagination: { page: 0, size: 50 },
         },
-        { defaultCollectionId: 10 },
+        { defaultCollectionId: 10, viewer: expect.objectContaining({ id: 1 }) },
       );
     });
 
@@ -558,7 +558,7 @@ describe('CollectionService', () => {
           collapseSeries: true,
           q: 'science',
         }),
-        { defaultCollectionId: 10 },
+        { defaultCollectionId: 10, viewer: expect.objectContaining({ id: 1 }) },
       );
       expect(result).toEqual({ items: [{ id: 2 }, { id: 1 }], total: 2, page: 0, size: 50 });
     });

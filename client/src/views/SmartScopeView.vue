@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, provide, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -63,12 +63,18 @@ import type { BulkEditFields } from '@/features/book/composables/useBulkEditMeta
 import {
   normalizeCoverAspectRatio,
   type BookCard,
+  type BookMergedEvent,
   type ConcreteBookMediaKind,
   type CoverAspectRatio,
   type GroupRule,
   type SortSpec,
 } from '@bookorbit/types'
+import { useBookMergeSync } from '@/features/book/composables/useBookMergeSync'
+import { useBookLinkSync } from '@/features/book/composables/useBookLinkSync'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+
+const MergeBooksSheet = defineAsyncComponent(() => import('@/features/book/components/merge/MergeBooksSheet.vue'))
+const LinkBooksSheet = defineAsyncComponent(() => import('@/features/book/components/link/LinkBooksSheet.vue'))
 
 const { t } = useI18n()
 const route = useRoute()
@@ -100,6 +106,7 @@ const {
   booksProxy: books,
   slots,
   total,
+  bookTotal,
   loading,
   initialized: booksInitialized,
   error: booksError,
@@ -134,6 +141,7 @@ const {
   railEnabled: showJumpRails,
   railViewport: mainRef,
   collapseEnabled: effectiveCollapseEnabled,
+  collapseLinked: true,
   q: debouncedQuery,
   enabled: scopeQueryReady,
 })
@@ -254,6 +262,21 @@ const {
   selectedIds,
   selectedCount,
   canEditSelectionMetadata,
+  mergeSelection,
+  mergeOpen,
+  mergeBookIds,
+  openMergeForSelection,
+  setMergeOpen,
+  linkSelection,
+  linkOpen,
+  linkBookIds,
+  linkBooks,
+  linkSeedBooks,
+  openLinkForSelection,
+  setLinkOpen,
+  switchMergeToLink,
+  selectionHasLinked,
+  pendingDeleteLinked,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -304,6 +327,40 @@ const {
 // selection needs clearing here.
 function handleBooksMoved() {
   exitSelectionMode()
+}
+
+function refreshAfterMerge() {
+  resetBooks()
+  refreshBuckets()
+}
+
+const { applyMerged } = useBookMergeSync({ books, deselect: deselectAll, refresh: refreshAfterMerge })
+
+function handleBooksMerged(event: BookMergedEvent) {
+  applyMerged(event)
+  exitSelectionMode()
+}
+
+function refreshAfterLinkChange() {
+  resetBooks()
+  refreshBuckets()
+}
+
+// Books from any library can sit here, and with linked books collapsed a link anywhere can fold or
+// split a card, so every link change reloads the listing.
+function linkChangeAffectsView(): boolean {
+  return true
+}
+
+const { scheduleRefresh: scheduleLinkRefresh } = useBookLinkSync({
+  books,
+  refresh: refreshAfterLinkChange,
+  affectsScope: linkChangeAffectsView,
+})
+
+function handleBooksLinked() {
+  exitSelectionMode()
+  scheduleLinkRefresh()
 }
 
 const metadataExportOpen = ref(false)
@@ -382,7 +439,7 @@ const headerFacts = computed<HeaderFact[]>(() => {
   const scopeTotal = smartScope.value?.bookCount ?? null
   if (typeof scopeTotal === 'number') {
     if (isNarrowed.value && !effectiveCollapseEnabled.value && booksInitialized.value) {
-      facts.push({ key: 'count', text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(total.value), total: scopeTotal }) })
+      facts.push({ key: 'count', text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(bookTotal.value), total: scopeTotal }) })
     } else {
       facts.push({ key: 'count', text: t('components.browseHeader.facts.books', { count: scopeTotal }) })
     }
@@ -530,7 +587,12 @@ defineOptions({ name: 'SmartScopeView' })
       @set-field="handleBulkSetField"
       @lock-metadata="handleBulkSetMetadataLock"
       @delete="handleDeleteSelected"
+      :merge="mergeSelection"
+      :link="linkSelection"
+      :linked-selected="selectionHasLinked"
       @move-to-library="openMoveForSelection"
+      @merge="openMergeForSelection"
+      @link="openLinkForSelection"
       @exit="exitSelectionMode"
     />
 
@@ -539,7 +601,7 @@ defineOptions({ name: 'SmartScopeView' })
       view-type="smartScope"
       :selected-book-ids="[...selectedIds]"
       :selected-count="selectedCount"
-      :total-count="total"
+      :total-count="bookTotal"
       :sort="tableSort"
       :visible-columns="visibleExportColumns"
       default-scope="selected"
@@ -576,7 +638,32 @@ defineOptions({ name: 'SmartScopeView' })
       @sent="exitSelectionMode"
     />
 
-    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelBookDelete" />
+    <DeleteBookDialog
+      :open="deleteBookId !== null"
+      :deleting="deletingBook"
+      :linked="pendingDeleteLinked"
+      @confirm="confirmDelete"
+      @cancel="cancelBookDelete"
+    />
+
+    <LinkBooksSheet
+      v-if="linkBookIds.length > 0"
+      :open="linkOpen"
+      :book-ids="linkBookIds"
+      :books="linkBooks"
+      :seed-books="linkSeedBooks"
+      @update:open="setLinkOpen"
+      @linked="handleBooksLinked"
+    />
+
+    <MergeBooksSheet
+      v-if="mergeBookIds.length > 0"
+      :open="mergeOpen"
+      :book-ids="mergeBookIds"
+      @update:open="setMergeOpen"
+      @link-instead="switchMergeToLink"
+      @merged="handleBooksMerged"
+    />
 
     <ConfirmDialog
       :open="confirmDeleteOpen"
@@ -860,7 +947,7 @@ defineOptions({ name: 'SmartScopeView' })
           <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
             <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">
-              {{ t('views.bookView.allBooksLoaded', { count: formatNumber(total) }) }}
+              {{ t('views.bookView.allBooksLoaded', { count: formatNumber(bookTotal) }) }}
             </span>
           </div>
 

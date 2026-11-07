@@ -20,6 +20,7 @@ import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { normalizeKoboLanguage, selectKoboIsbn } from './kobo-metadata.utils';
 import { KoboReadingStateService } from './kobo-reading-state.service';
 import { encodeSyncToken } from './kobo-sync-token';
+import { KoboTombstoneRepository, type KoboPendingRemoval } from '../kobo-tombstone.repository';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -142,6 +143,7 @@ export class KoboSyncService {
     private readonly queryBuilder: BookQueryBuilder,
     private readonly smartScopeService: SmartScopeService,
     private readonly metadataExtractionService: MetadataExtractionService,
+    private readonly tombstones: KoboTombstoneRepository,
     @Optional() private readonly deliveries?: KoboDeliveryService,
   ) {}
 
@@ -157,10 +159,20 @@ export class KoboSyncService {
     // Reconciling costs a pass over the whole library, so a device still working through its
     // pending rows skips it: those rows already say what it is owed, and whatever changed while
     // it paged is picked up by the reconcile that opens its next sync.
-    if (snapshot && (await this.hasPendingSnapshotBooks(snapshot.id))) {
-      return this.getPageFromSnapshot(userId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () =>
-        this.fetchEligibleBookIds(userId, true, smartScopeMatchCache),
-      );
+    if (snapshot) {
+      const [rowsPending, removalsPending] = await Promise.all([
+        this.hasPendingSnapshotBooks(snapshot.id),
+        this.tombstones.hasPending(userId, deviceId),
+      ]);
+      if (rowsPending || removalsPending) {
+        const page = await this.getPageFromSnapshot(userId, deviceId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () =>
+          this.fetchEligibleBookIds(userId, true, smartScopeMatchCache),
+        );
+        // Removals of deleted books skip the reconcile as well, but a device owed nothing else would
+        // then end this sync without what changed since its last one, so it is sent back for a page
+        // that opens with the reconcile.
+        return rowsPending ? page : { ...page, hasMore: true };
+      }
     }
 
     const hadDeviceSnapshot = snapshot ? true : await this.hasDeviceSnapshot(userId);
@@ -178,9 +190,10 @@ export class KoboSyncService {
     } else {
       await this.reconcileSnapshot(snapshot.id, eligibleSnapshotRows);
     }
+    await this.tombstones.prune(userId);
 
     const eligibleIds = new Set(eligibleSnapshotRows.map((row) => row.bookId));
-    return this.getPageFromSnapshot(userId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () => Promise.resolve(eligibleIds));
+    return this.getPageFromSnapshot(userId, deviceId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () => Promise.resolve(eligibleIds));
   }
 
   async getBookMetadata(userId: number, bookId: number, deviceToken: string, baseUrl: string): Promise<unknown[]> {
@@ -483,6 +496,10 @@ export class KoboSyncService {
         `);
       }
 
+      // Every row the device did not remove itself is sent IsRemoved, delivered or not: a delivered
+      // book loses `synced` whenever the device is owed an update for it (a status set on the web, a
+      // failed re-delivery), so the flag cannot tell a book on the device from one never sent. A
+      // removal for a book the device never had is ignored; skipping one strands the book for good.
       await tx.execute(sql`
         UPDATE ${schema.koboSnapshotBooks} AS sb
         SET pending_delete = true,
@@ -490,7 +507,6 @@ export class KoboSyncService {
         WHERE sb.snapshot_id = ${snapshotId}
           AND sb.pending_delete = false
           AND sb.removed_by_device = false
-          AND (sb.synced = true OR sb.needs_legacy_numeric_removal = true)
           AND NOT EXISTS (SELECT 1 FROM kobo_eligible_books_tmp e WHERE e.book_id = sb.book_id)
       `);
 
@@ -498,7 +514,7 @@ export class KoboSyncService {
         DELETE FROM ${schema.koboSnapshotBooks} AS sb
         WHERE sb.snapshot_id = ${snapshotId}
           AND sb.pending_delete = false
-          AND (sb.removed_by_device = true OR (sb.synced = false AND sb.needs_legacy_numeric_removal = false))
+          AND sb.removed_by_device = true
           AND NOT EXISTS (SELECT 1 FROM kobo_eligible_books_tmp e WHERE e.book_id = sb.book_id)
       `);
 
@@ -614,6 +630,7 @@ export class KoboSyncService {
    */
   private async getPageFromSnapshot(
     userId: number,
+    deviceId: number,
     snapshotId: number,
     deviceToken: string,
     baseUrl: string,
@@ -621,6 +638,10 @@ export class KoboSyncService {
     resolveEligibleIds: EligibleIdsResolver,
   ): Promise<{ entitlements: unknown[]; hasMore: boolean; syncToken: string }> {
     const syncToken = encodeSyncToken();
+
+    const pendingRemovals = await this.tombstones.findPending(userId, deviceId, SYNC_PAGE_SIZE + 1);
+    const removals = pendingRemovals.slice(0, SYNC_PAGE_SIZE);
+    const rowCapacity = SYNC_PAGE_SIZE - removals.length;
 
     const pending = await this.db
       .select()
@@ -637,19 +658,29 @@ export class KoboSyncService {
         ),
       )
       .orderBy(asc(schema.koboSnapshotBooks.bookId))
-      .limit(SYNC_PAGE_SIZE + 1);
+      .limit(rowCapacity + 1);
 
-    const hasMore = pending.length > SYNC_PAGE_SIZE;
-    const page = pending.slice(0, SYNC_PAGE_SIZE);
+    const hasMore = pendingRemovals.length > SYNC_PAGE_SIZE || pending.length > rowCapacity;
+    const page = pending.slice(0, rowCapacity);
 
-    if (page.length === 0) {
+    if (removals.length === 0 && page.length === 0) {
       const tagItems = await this.buildTagItems(userId, await resolveEligibleIds(), smartScopeMatchCache);
       return { entitlements: tagItems, hasMore: false, syncToken };
     }
 
+    const entitlements: unknown[] = removals.flatMap((removal) => this.buildTombstoneRemovals(removal));
+    if (removals.length > 0) {
+      await this.tombstones.markServed(
+        userId,
+        deviceId,
+        removals.map((removal) => removal.entitlementId),
+      );
+      await this.tombstones.prune(userId);
+    }
+    if (page.length === 0) return { entitlements, hasMore, syncToken };
+
     const snapshot = await this.db.query.koboLibrarySnapshots.findFirst({ where: eq(schema.koboLibrarySnapshots.id, snapshotId) });
 
-    const entitlements: unknown[] = [];
     const identitiesById = await this.bookIdentityService.findByBookIds(
       userId,
       page.map((row) => row.bookId),
@@ -664,7 +695,11 @@ export class KoboSyncService {
     );
 
     for (const row of page) {
-      if (row.pendingDelete) {
+      const book = row.pendingDelete ? null : (booksById.get(row.bookId) ?? null);
+      // A row waiting for an update can leave the synced set before the update is sent. Only the
+      // reconcile turns such a row into a removal, and it does not run while any row is pending, so
+      // the row is removed here; skipping it kept it pending and stopped every later reconcile.
+      if (!book) {
         const identity = identitiesById.get(row.bookId) ?? null;
         if (identity) {
           if (row.needsLegacyNumericRemoval) {
@@ -680,9 +715,6 @@ export class KoboSyncService {
           .where(and(eq(schema.koboSnapshotBooks.snapshotId, snapshotId), eq(schema.koboSnapshotBooks.bookId, row.bookId)));
         continue;
       }
-
-      const book = booksById.get(row.bookId) ?? null;
-      if (!book) continue;
 
       try {
         if (this.deliveries && snapshot) {
@@ -896,6 +928,12 @@ export class KoboSyncService {
       .leftJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.books.id))
       .where(where);
     return rows.map((row) => row.id);
+  }
+
+  /** The numeric id goes first, as for a pending delete, when the device may still know the book by it. */
+  private buildTombstoneRemovals(removal: KoboPendingRemoval): unknown[] {
+    const removed = this.buildRemovedEntitlement(removal.entitlementId);
+    return removal.legacyBookId === null ? [removed] : [this.buildRemovedEntitlement(removal.legacyBookId), removed];
   }
 
   private buildRemovedEntitlement(bookId: number | string) {

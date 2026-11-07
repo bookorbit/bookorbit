@@ -1,4 +1,4 @@
-import type { BookMissingEvent, BookTransferredEvent, CoverRefreshedEvent, ScanProgressEvent } from '@bookorbit/types';
+import type { BookMergedEvent, BookMissingEvent, BookTransferredEvent, CoverRefreshedEvent, ScanProgressEvent } from '@bookorbit/types';
 
 import { ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
 import { ScanGateway } from './scan.gateway';
@@ -369,5 +369,27 @@ describe('remaining emit methods', () => {
 
     expect(to).toHaveBeenCalledWith(['library:3', 'library:8']);
     expect(emit).toHaveBeenCalledWith('book:transferred', event);
+  });
+
+  it('emits a merge to the destination library room and every library a merged book left', () => {
+    const { gateway } = makeGateway();
+    const { server, to, emit } = mockServer();
+    gateway['server'] = server as any;
+
+    const event: BookMergedEvent = { libraryId: 3, targetBookId: 2, sourceBookIds: [4, 5], sourceLibraryIds: [8, 3, 9] };
+    gateway.emitBookMerged(event);
+
+    expect(to).toHaveBeenCalledWith(['library:3', 'library:8', 'library:9']);
+    expect(emit).toHaveBeenCalledWith('book:merged', event);
+  });
+
+  it('emits a same-library merge to that library room only', () => {
+    const { gateway } = makeGateway();
+    const { server, to } = mockServer();
+    gateway['server'] = server as any;
+
+    gateway.emitBookMerged({ libraryId: 3, targetBookId: 2, sourceBookIds: [4] });
+
+    expect(to).toHaveBeenCalledWith(['library:3']);
   });
 });

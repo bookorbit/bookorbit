@@ -49,6 +49,24 @@ export class StoryEditsRepository {
    * 11 committed, advance its cursor past it, and never see 10 once it commits. Serialising a
    * user's writes makes revision order and commit order the same, and makes the cap count exact.
    */
+  /**
+   * Gives every row on the book a new revision, one reader at a time under the writers' lock, so a
+   * device whose cursor already passed the rows' old revisions still reads them. Returns the readers.
+   */
+  async redrawRevisions(bookId: number): Promise<number> {
+    const readers = await this.db.selectDistinct({ userId: storyEdits.userId }).from(storyEdits).where(eq(storyEdits.bookId, bookId));
+    for (const { userId } of readers) {
+      await this.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(${STORY_EDITS_WRITE_LOCK_NAMESPACE}, ${userId})`);
+        await tx
+          .update(storyEdits)
+          .set({ revision: sql`nextval(pg_get_serial_sequence('story_edits', 'revision'))` })
+          .where(and(eq(storyEdits.userId, userId), eq(storyEdits.bookId, bookId)));
+      });
+    }
+    return readers.length;
+  }
+
   async write(values: StoryEditWrite, perBookMax: number): Promise<StoryEditWriteOutcome> {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(${STORY_EDITS_WRITE_LOCK_NAMESPACE}, ${values.userId})`);

@@ -24,12 +24,13 @@ function candidate(overrides: Partial<BookDuplicateCandidate> & { id: number }):
     addedAt: '2026-08-24T07:55:31.000Z',
     updatedAt: null,
     hasCover: true,
+    bookPerFile: false,
     ...overrides,
   }
 }
 
 function group(books: BookDuplicateCandidate[]): BookDuplicateGroup {
-  return { id: 1, reasons: ['exact_metadata'], maxTitleSimilarity: 1, reclaimableBytes: 0, books, pairs: [] }
+  return { id: 1, kind: 'duplicate', reasons: ['exact_metadata'], maxTitleSimilarity: 1, reclaimableBytes: 0, books, pairs: [] }
 }
 
 describe('recommendKeeper', () => {
@@ -48,7 +49,7 @@ describe('recommendKeeper', () => {
     const readCopy = candidate({
       id: 1,
       metadataScore: 60,
-      readingProgress: 0.19,
+      readingProgress: 19,
       files: [{ id: 1, format: 'epub', sizeBytes: 1_000, path: 'a.epub' }],
     })
     const bigger = candidate({ id: 2, metadataScore: 95, files: [{ id: 2, format: 'epub', sizeBytes: 900_000, path: 'b.epub' }] })
@@ -56,12 +57,12 @@ describe('recommendKeeper', () => {
     for (const rule of ['metadata', 'size', 'formats', 'oldest', 'newest'] as const) {
       expect(recommendKeeper(group([bigger, readCopy]), rule).keeperId).toBe(1)
     }
-    expect(recommendKeeper(group([bigger, readCopy]), 'metadata').reasons[0]).toEqual({ code: 'reading', percent: 0.19 })
+    expect(recommendKeeper(group([bigger, readCopy]), 'metadata').reasons[0]).toEqual({ code: 'reading', percent: 19 })
   })
 
   it('falls back to the rule when two copies both carry reading state, so the row can warn', () => {
-    const readA = candidate({ id: 1, metadataScore: 70, readingProgress: 0.2 })
-    const readB = candidate({ id: 2, metadataScore: 90, readingProgress: 0.4 })
+    const readA = candidate({ id: 1, metadataScore: 70, readingProgress: 20 })
+    const readB = candidate({ id: 2, metadataScore: 90, readingProgress: 40 })
 
     const result = recommendKeeper(group([readA, readB]), 'metadata')
 

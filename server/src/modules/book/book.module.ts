@@ -5,6 +5,7 @@ import { AchievementModule } from '../achievement/achievement.module';
 import { AppAttestModule } from '../app-attest/app-attest.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AudiobookChaptersModule } from '../audiobook-chapters/audiobook-chapters.module';
+import { BookAliasModule } from '../book-alias/book-alias.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
@@ -28,6 +29,7 @@ import { BookReadService } from './book-read.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
 import { BookController } from './book.controller';
+import { BookLinkMembersRepository } from './book-link-members.repository';
 import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
 import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfill.service';
@@ -40,6 +42,7 @@ import { ReadingProgressService } from './reading-progress.service';
     forwardRef(() => LibraryModule),
     AppAttestModule,
     AudiobookChaptersModule,
+    BookAliasModule,
     BookMetadataLockModule,
     BookCoverStoreModule,
     CustomMetadataModule,
@@ -60,6 +63,7 @@ import { ReadingProgressService } from './reading-progress.service';
   providers: [
     BookService,
     BookRepository,
+    BookLinkMembersRepository,
     BookReadService,
     BookSortBuilder,
     BookQueryBuilder,

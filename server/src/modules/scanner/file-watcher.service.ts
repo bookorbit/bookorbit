@@ -478,6 +478,8 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
   }
 
   private async process(type: EventType, path: string, libraryId: number): Promise<void> {
+    // A folder of another library nested inside this one is that library's to handle.
+    if (!(await this.scannerService.ownsPath(libraryId, path))) return;
     let result: FileEventResult;
     if (type === 'create') {
       result = await this.processor.handleCreate(path, libraryId);

@@ -88,7 +88,8 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
   const needle = computed(() => trimmed.value.toLocaleLowerCase())
   const isSearching = computed(() => trimmed.value.length >= PALETTE_MIN_QUERY)
 
-  const books = useGlobalSearch(query)
+  // One result per title: linked books (an ebook and its audiobook) share a row.
+  const books = useGlobalSearch(query, { collapseLinked: true })
 
   const authors = ref<AuthorSummary[]>([])
   const authorTotal = ref(0)
@@ -247,7 +248,7 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
   const tabs = computed<PaletteTabOption[]>(() => {
     if (!isSearching.value) return []
     const options: PaletteTabOption[] = [
-      { id: 'books', label: t('commandPalette.tabs.books'), count: books.total.value },
+      { id: 'books', label: t('commandPalette.tabs.books'), count: books.bookTotal.value },
       { id: 'authors', label: t('commandPalette.tabs.authors'), count: authorTotal.value },
       { id: 'series', label: t('commandPalette.tabs.series'), count: seriesTotal.value },
       { id: 'settings', label: t('commandPalette.tabs.settings'), count: settingsHits.value.length },
@@ -280,7 +281,7 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
     const authorItems: PaletteItem[] = authors.value.map((author) => ({ kind: 'author', key: `author:${author.id}`, author }))
     const seriesItems: PaletteItem[] = series.value.map((entry) => ({ kind: 'series', key: `series:${entry.id}`, series: entry }))
 
-    if (tab.value === 'books') return [{ id: 'books', label: t('commandPalette.sections.books'), count: books.total.value, items: bookItems }]
+    if (tab.value === 'books') return [{ id: 'books', label: t('commandPalette.sections.books'), count: books.bookTotal.value, items: bookItems }]
     if (tab.value === 'authors') return [{ id: 'authors', label: t('commandPalette.sections.authors'), count: authorTotal.value, items: authorItems }]
     if (tab.value === 'series') return [{ id: 'series', label: t('commandPalette.sections.series'), count: seriesTotal.value, items: seriesItems }]
     if (tab.value === 'settings')
@@ -290,8 +291,8 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
     if (bookItems.length) {
       const ranked = rankBooks(books.results.value, trimmed.value).slice(0, ALL_TAB_LIMITS.books)
       const items: PaletteItem[] = ranked.map((book) => ({ kind: 'book', key: `book:${book.id}`, book }))
-      if (books.total.value > ALL_TAB_LIMITS.books) items.push(moreRow(t('commandPalette.showAllBooks', { count: books.total.value }), 'books'))
-      result.push({ id: 'books', label: t('commandPalette.sections.books'), count: books.total.value, items })
+      if (books.total.value > ALL_TAB_LIMITS.books) items.push(moreRow(t('commandPalette.showAllBooks', { count: books.bookTotal.value }), 'books'))
+      result.push({ id: 'books', label: t('commandPalette.sections.books'), count: books.bookTotal.value, items })
     }
     if (authorItems.length) {
       const items = authorItems.slice(0, ALL_TAB_LIMITS.authors)

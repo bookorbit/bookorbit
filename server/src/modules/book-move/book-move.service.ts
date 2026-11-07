@@ -24,6 +24,7 @@ import type {
 } from '@bookorbit/types';
 import { BOOK_MOVE_DETAIL_LIMIT, BOOK_MOVE_PREVIEW_SAMPLE_LIMIT, NotificationType } from '@bookorbit/types';
 
+import { LibraryOperationGate, type LibraryOperationRelease } from '../../common/services/library-operation-gate.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -58,7 +59,6 @@ interface ResolvedPlan {
 @Injectable()
 export class BookMoveService implements OnApplicationBootstrap {
   private readonly logger = new Logger(BookMoveService.name);
-  private readonly busyLibraries = new Set<number>();
 
   constructor(
     private readonly moveRepo: BookMoveRepository,
@@ -70,6 +70,7 @@ export class BookMoveService implements OnApplicationBootstrap {
     private readonly fileWatcherService: FileWatcherService,
     private readonly scanGateway: ScanGateway,
     private readonly notificationService: NotificationService,
+    private readonly libraryGate: LibraryOperationGate,
   ) {}
 
   /**
@@ -96,7 +97,7 @@ export class BookMoveService implements OnApplicationBootstrap {
   }
 
   isBusy(libraryId: number): boolean {
-    return this.busyLibraries.has(libraryId);
+    return this.libraryGate.current(libraryId) === 'book_move';
   }
 
   async preview(dto: MovePreviewDto, user: RequestUser): Promise<BookMovePreviewResult> {
@@ -110,35 +111,41 @@ export class BookMoveService implements OnApplicationBootstrap {
     const { target } = resolved;
 
     const involvedLibraryIds = [...new Set([target.libraryId, ...resolved.sourceLibraryIds])];
-    this.assertLibrariesAvailable(involvedLibraryIds);
+    const releaseGate = this.acquireLibraries(involvedLibraryIds);
 
     const overrides = new Map((dto.overrides ?? []).map((override) => [override.bookId, override.policy]));
     const work = this.selectWork(resolved.outcomes, dto.collisionPolicy, overrides);
 
-    for (const libraryId of involvedLibraryIds) this.busyLibraries.add(libraryId);
-
-    const jobId = await this.moveRepo.createJob({
-      startedBy: user.id,
-      targetLibraryId: target.libraryId,
-      targetFolderId: target.folderId,
-      sourceLibraryIds: resolved.sourceLibraryIds,
-      totalBooks: work.length,
-    });
+    let jobId: number;
+    try {
+      jobId = await this.moveRepo.createJob({
+        startedBy: user.id,
+        targetLibraryId: target.libraryId,
+        targetFolderId: target.folderId,
+        sourceLibraryIds: resolved.sourceLibraryIds,
+        totalBooks: work.length,
+      });
+    } catch (error) {
+      releaseGate();
+      throw error;
+    }
 
     this.logger.log(
       `[${MOVE_EVENT}] [start] jobId=${jobId} userId=${user.id} toLibraryId=${target.libraryId} toFolderId=${target.folderId} ` +
         `sourceLibraryIds=${resolved.sourceLibraryIds.join(',')} bookCount=${work.length} - book move started`,
     );
 
-    const stoppedWatchers = await this.stopWatchers(involvedLibraryIds);
-
     let succeeded = 0;
     let merged = 0;
     let failed = 0;
     let skipped = 0;
     const movedByLibrary = new Map<number, number[]>();
+    const stoppedWatchers: number[] = [];
 
     try {
+      // Inside the try, so a failure here still frees the libraries and restarts what it stopped.
+      await this.stopWatchers(involvedLibraryIds, stoppedWatchers);
+
       for (const item of work) {
         if (options.isCancelled()) break;
 
@@ -153,6 +160,7 @@ export class BookMoveService implements OnApplicationBootstrap {
             plan: item.plan,
             target,
             mergeDuplicateBookId: item.mergeDuplicateBookId,
+            userId: user.id,
           });
 
           if (result.status === 'success' || result.status === 'merged') {
@@ -198,28 +206,32 @@ export class BookMoveService implements OnApplicationBootstrap {
       this.emitTransfers(movedByLibrary, target.libraryId);
       throw error;
     } finally {
-      for (const libraryId of involvedLibraryIds) this.busyLibraries.delete(libraryId);
+      releaseGate();
       await this.restartWatchers(stoppedWatchers);
     }
   }
 
-  private assertLibrariesAvailable(libraryIds: number[]): void {
+  private acquireLibraries(libraryIds: number[]): LibraryOperationRelease {
+    const release = this.libraryGate.tryAcquireAll(libraryIds, 'book_move');
+    if (release) return release;
     for (const libraryId of libraryIds) {
-      if (this.busyLibraries.has(libraryId)) {
-        throw new ConflictException(`A move is already running for library ${libraryId}.`);
-      }
-      if (this.scannerService.isScanRunning(libraryId)) {
+      const holder = this.libraryGate.current(libraryId);
+      if (holder === 'book_move') throw new ConflictException(`A move is already running for library ${libraryId}.`);
+      if (holder === 'scan') {
         throw new ConflictException(`A scan is running for library ${libraryId}. Wait for it to finish before moving books.`);
       }
+      if (holder) throw new ConflictException(`Another operation is running for library ${libraryId}. Wait for it to finish before moving books.`);
     }
+    throw new ConflictException('A library operation is already running.');
   }
 
-  private async stopWatchers(libraryIds: number[]): Promise<number[]> {
+  /** Records each library before stopping it, so one whose stop fails part-way is restarted too. */
+  private async stopWatchers(libraryIds: number[], stopped: number[]): Promise<void> {
     const watched = await this.moveRepo.findWatchedLibraryIds(libraryIds);
     for (const libraryId of watched) {
+      stopped.push(libraryId);
       await this.fileWatcherService.stopWatcher(libraryId);
     }
-    return watched;
   }
 
   private async restartWatchers(libraryIds: number[]): Promise<void> {

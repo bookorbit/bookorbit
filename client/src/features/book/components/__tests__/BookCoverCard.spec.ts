@@ -212,6 +212,33 @@ describe('BookCoverCard - present state', () => {
     expect(wrapper.find('.lucide-headphones').exists()).toBe(true)
   })
 
+  it('adds a linked book format to the badges, marked as linked (G1)', () => {
+    cardOverlays.value = ['format']
+    const wrapper = mountCard({
+      ...presentBook,
+      linked: { groupId: 1, memberCount: 2, books: [{ bookId: 50, libraryId: 4, formats: ['m4b'], mediaKind: 'audiobook' }] },
+    })
+
+    const badges = wrapper.findAll('[data-testid="card-format-badge"]')
+    expect(badges.map((badge) => badge.text())).toEqual([expect.stringContaining('EPUB'), expect.stringContaining('M4B')])
+    expect(badges[0]!.attributes('data-linked')).toBeUndefined()
+    expect(badges[1]!.attributes('data-linked')).toBe('true')
+  })
+
+  it('shows every own format of a multi-format book, primary first', () => {
+    cardOverlays.value = ['format']
+    const wrapper = mountCard({
+      ...presentBook,
+      files: [
+        { id: 10, format: 'epub', role: 'primary', sizeBytes: null },
+        { id: 11, format: 'pdf', role: 'content', sizeBytes: null },
+      ],
+    })
+
+    const badges = wrapper.findAll('[data-testid="card-format-badge"]')
+    expect(badges.map((badge) => badge.text())).toEqual([expect.stringContaining('EPUB'), expect.stringContaining('PDF')])
+  })
+
   it('opens the reader on desktop card click by default', async () => {
     const wrapper = mountCard(presentBook)
 

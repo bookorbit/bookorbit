@@ -44,11 +44,49 @@ describe('selectPrimaryAttempt', () => {
     expect(selectPrimaryAttempt([closed, open])?.id).toBe(2);
   });
 
-  it('falls back to the highest id when no attempt is open', () => {
+  it('falls back to the highest id when no attempt is open and none is dated', () => {
     const first = attempt({ id: 3, outcome: 'completed' });
     const second = attempt({ id: 7, outcome: 'completed' });
 
     expect(selectPrimaryAttempt([second, first])?.id).toBe(7);
+  });
+
+  it('picks the most recently ended read over a higher-id older one, as the status projection does', () => {
+    const recent = attempt({ id: 4, outcome: 'completed', startedOn: '2025-03-01', endedOn: '2025-03-20' });
+    const mergedOlder = attempt({ id: 90, outcome: 'completed', startedOn: '2019-01-02', endedOn: '2019-02-10' });
+
+    expect(selectPrimaryAttempt([recent, mergedOlder])?.id).toBe(4);
+    expect(selectPrimaryAttempt([mergedOlder, recent])?.id).toBe(4);
+  });
+
+  it('falls back to the start date when a read has no end date', () => {
+    const startedLater = attempt({ id: 2, outcome: 'abandoned', startedOn: '2024-06-01', endedOn: null });
+    const endedEarlier = attempt({ id: 9, outcome: 'completed', startedOn: '2024-01-01', endedOn: '2024-05-01' });
+
+    expect(selectPrimaryAttempt([endedEarlier, startedLater])?.id).toBe(2);
+  });
+
+  it('ranks an undated read behind every dated one, whatever its id', () => {
+    const dated = attempt({ id: 3, outcome: 'completed', startedOn: null, endedOn: '2021-07-04' });
+    const undated = attempt({ id: 12, outcome: 'completed' });
+
+    expect(selectPrimaryAttempt([undated, dated])?.id).toBe(3);
+    expect(selectPrimaryAttempt([dated, undated])?.id).toBe(3);
+  });
+
+  it('breaks a date tie on the higher id', () => {
+    const lower = attempt({ id: 5, outcome: 'completed', endedOn: '2023-10-10' });
+    const higher = attempt({ id: 6, outcome: 'skimmed', startedOn: '2023-10-10' });
+
+    expect(selectPrimaryAttempt([higher, lower])?.id).toBe(6);
+    expect(selectPrimaryAttempt([lower, higher])?.id).toBe(6);
+  });
+
+  it('keeps the open attempt primary even when a closed one is dated later', () => {
+    const open = attempt({ id: 1, outcome: null, startedOn: '2020-01-01' });
+    const closed = attempt({ id: 40, outcome: 'completed', startedOn: '2025-01-01', endedOn: '2025-02-01' });
+
+    expect(selectPrimaryAttempt([closed, open])?.id).toBe(1);
   });
 
   it('lets a skimmed or abandoned attempt be primary, since both map to a Hardcover status', () => {

@@ -24,6 +24,7 @@ import type {
   RegexMetadataConfig,
   WriteResult,
 } from '@bookorbit/types';
+import { LibraryOperationGate } from '../../common/services/library-operation-gate.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import type { RequestUser } from '../../common/types/request-user';
@@ -78,6 +79,7 @@ export class LibraryService {
     private readonly scanScheduler: LibraryScanSchedulerService,
     private readonly regexMetadata: RegexMetadataService,
     private readonly readingAttemptEvents: ReadingAttemptEventsService,
+    private readonly libraryGate: LibraryOperationGate,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -168,6 +170,7 @@ export class LibraryService {
     await this.regexMetadata.validate(regexMetadata);
     await this.assertNameAvailable(dto.name);
     const folderPaths = await this.assertFolderPathsWithinBrowseRoot(dto.folders);
+    await this.assertFoldersDoNotOverlap(folderPaths);
     const icon = normalizeIconValue(dto.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
@@ -211,6 +214,7 @@ export class LibraryService {
     });
 
     const folders = await this.libraryRepo.insertFolders(folderPaths.map((path) => ({ libraryId: library.id, path })));
+    this.scannerService.forgetLibraryRoots();
 
     if (library.watch) {
       await this.fileWatcherService.startWatcher(
@@ -254,6 +258,7 @@ export class LibraryService {
     if (!regexMetadataChanged) delete fields.regexMetadata;
     else fields.regexMetadata = incomingRegexMetadata;
     const folderPaths = rawFolderPaths === undefined ? undefined : await this.assertFolderPathsWithinBrowseRoot(rawFolderPaths);
+    if (folderPaths !== undefined) await this.assertFoldersDoNotOverlap(folderPaths, id);
     const icon = fields.icon !== undefined ? normalizeIconValue(fields.icon) : normalizeIconValue(existing.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
@@ -277,6 +282,7 @@ export class LibraryService {
       if (toAdd.length > 0) {
         await this.libraryRepo.insertFolders(toAdd.map((path) => ({ libraryId: id, path })));
       }
+      if (toRemove.length > 0 || toAdd.length > 0) this.scannerService.forgetLibraryRoots();
     }
 
     const folders = await this.libraryRepo.findFoldersByLibrary(id);
@@ -309,6 +315,15 @@ export class LibraryService {
   async remove(id: number) {
     const [existing] = await this.libraryRepo.findById(id);
     if (!existing) throw new NotFoundException('Library not found');
+    // Held for the whole delete, so a scan, move, rename or merge cannot start on rows and files
+    // that are going away, and one already running is not cut off halfway through its writes.
+    const releaseGate = this.libraryGate.tryAcquire(id, 'library_delete');
+    if (!releaseGate) {
+      throw new ConflictException({
+        message: 'Another operation is running in this library. Try again when it finishes.',
+        errorCode: 'LIBRARY_BUSY',
+      });
+    }
     const event = 'library.delete';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] libraryId=${id} - library deletion started`);
@@ -316,6 +331,7 @@ export class LibraryService {
       await this.fileWatcherService.stopWatcher(id);
       const bookRows = await this.libraryRepo.findBookIdsByLibrary(id);
       await this.libraryRepo.delete(id);
+      this.scannerService.forgetLibraryRoots();
       this.readingAttemptEvents.notifyChanged(null);
       this.scanScheduler.removeSchedule(id);
       await this.cleanupCoverDirectories(bookRows.map(({ id: bookId }) => bookId));
@@ -326,6 +342,8 @@ export class LibraryService {
         `[${event}] [fail] libraryId=${id} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(message)}" - library deletion failed`,
       );
       throw error;
+    } finally {
+      releaseGate();
     }
   }
 
@@ -518,7 +536,36 @@ export class LibraryService {
   }
 
   private async assertFolderPathsWithinBrowseRoot(paths: string[]): Promise<string[]> {
-    return Promise.all(paths.map((path) => this.pathPolicy.assertWithinBrowseRoot(path)));
+    const resolved = await Promise.all(paths.map((path) => this.pathPolicy.assertWithinBrowseRoot(path)));
+    return [...new Set(resolved)];
+  }
+
+  /**
+   * A file can belong to one book in one library, so a folder this request adds may not sit inside
+   * another library folder, contain one, or repeat one, in this library or any other. Folders the
+   * library already has are not re-checked: a library saved before this rule keeps saving until an
+   * admin moves its folders apart, and the scanner settles who owns what in the meantime.
+   */
+  private async assertFoldersDoNotOverlap(paths: string[], libraryId?: number): Promise<void> {
+    const existing = await this.libraryRepo.findAllFolderPaths();
+    const current = new Set(existing.filter((folder) => folder.libraryId === libraryId).map((folder) => folder.path));
+    const otherLibraries = existing.filter((folder) => folder.libraryId !== libraryId);
+
+    for (const path of paths) {
+      if (current.has(path)) continue;
+      const inAnotherLibrary = otherLibraries.find((folder) => pathsOverlap(path, folder.path));
+      const inThisLibrary = paths.find((other) => other !== path && pathsOverlap(path, other));
+      if (!inAnotherLibrary && inThisLibrary === undefined) continue;
+      throw new ConflictException({
+        message: 'Library folders cannot sit inside one another or be shared between libraries.',
+        errorCode: 'LIBRARY_FOLDER_OVERLAP',
+        errorMeta: {
+          path,
+          overlapPath: inAnotherLibrary?.path ?? inThisLibrary,
+          ...(inAnotherLibrary ? { overlapLibrary: inAnotherLibrary.libraryName } : {}),
+        },
+      });
+    }
   }
 
   private async cleanupCoverDirectories(bookIds: number[]): Promise<void> {

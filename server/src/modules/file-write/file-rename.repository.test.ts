@@ -1,6 +1,3 @@
-import type { SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
-
 import { FileRenameRepository } from './file-rename.repository';
 
 describe('FileRenameRepository', () => {
@@ -214,91 +211,6 @@ describe('FileRenameRepository', () => {
 
     await expect(repo.findFolderOwners(3, ['/library/Frank Herbert/Dune'])).resolves.toEqual(new Map());
     expect(db.select).toHaveBeenCalledTimes(1);
-  });
-
-  it('applyExistingFolderMerge reassigns files, deletes the source book, and fills a missing target primary', async () => {
-    const setCalls: unknown[] = [];
-    const deleteWhere = vi.fn().mockResolvedValue(undefined);
-    const tx = {
-      execute: vi.fn().mockResolvedValue(undefined),
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        for: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ libraryFolderId: 7, primaryFileId: null }]),
-      }),
-      update: vi.fn().mockImplementation(() => ({
-        set: vi.fn().mockImplementation((values: unknown) => {
-          setCalls.push(values);
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
-      delete: vi.fn().mockReturnValue({ where: deleteWhere }),
-    };
-    const db = {
-      transaction: vi.fn().mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx)),
-    };
-
-    const repo = new FileRenameRepository(db as never);
-
-    await repo.applyExistingFolderMerge({
-      sourceBookId: 5,
-      targetBookId: 99,
-      fallbackPrimaryFileId: 10,
-      updates: [
-        { id: 10, absolutePath: '/library/Author/Book/Book.epub', relPath: 'Author/Book/Book.epub' },
-        { id: 11, absolutePath: '/library/Author/Book/old.opf', relPath: 'Author/Book/old.opf' },
-      ],
-    });
-
-    expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(setCalls).toEqual([
-      expect.objectContaining({ bookId: 99, libraryFolderId: 7, absolutePath: '/library/Author/Book/Book.epub', relPath: 'Author/Book/Book.epub' }),
-      expect.objectContaining({ bookId: 99, libraryFolderId: 7, absolutePath: '/library/Author/Book/old.opf', relPath: 'Author/Book/old.opf' }),
-      expect.objectContaining({ primaryFileId: 10, status: 'present' }),
-    ]);
-    // The source copy's reads go first: a merged-away duplicate's reads are not history.
-    const dialect = new PgDialect();
-    const statements = tx.execute.mock.calls.map(([query]) => dialect.sqlToQuery(query as SQL).sql);
-    expect(statements).toHaveLength(2);
-    expect(statements[0]).toContain('delete from "reading_attempts"');
-    expect(statements[1]).toContain('delete from "books"');
-    expect(tx.delete).not.toHaveBeenCalled();
-  });
-
-  it('applyExistingFolderMerge does not replace an existing target primary file', async () => {
-    const setCalls: unknown[] = [];
-    const tx = {
-      execute: vi.fn().mockResolvedValue(undefined),
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        for: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ libraryFolderId: 7, primaryFileId: 42 }]),
-      }),
-      update: vi.fn().mockImplementation(() => ({
-        set: vi.fn().mockImplementation((values: unknown) => {
-          setCalls.push(values);
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
-      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-    };
-    const db = {
-      transaction: vi.fn().mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx)),
-    };
-
-    const repo = new FileRenameRepository(db as never);
-
-    await repo.applyExistingFolderMerge({
-      sourceBookId: 5,
-      targetBookId: 99,
-      fallbackPrimaryFileId: 10,
-      updates: [{ id: 10, absolutePath: '/library/Author/Book/Book.epub', relPath: 'Author/Book/Book.epub' }],
-    });
-
-    expect(setCalls.at(-1)).toEqual(expect.not.objectContaining({ primaryFileId: 10 }));
-    expect(setCalls.at(-1)).toEqual(expect.objectContaining({ status: 'present' }));
   });
 
   it('checkPathTakenByOtherBook only flags collisions from other books', async () => {

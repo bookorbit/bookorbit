@@ -118,7 +118,7 @@ export class KoboAnalyticsService {
       return;
     }
 
-    const bookId = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, volumeid);
+    const bookId = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, volumeid, { followMerges: true });
     if (bookId === null) {
       this.logger.debug(
         `[kobo.analytics.rating] [ignore] invalid volumeid userId=${user.id} eventId=${ev.Id} volumeid="${sanitizeLogValue(volumeid)}" event="${formatAnalyticsPayload(ev, 800)}"`,
@@ -140,7 +140,7 @@ export class KoboAnalyticsService {
       return;
     }
 
-    const bookId = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, volumeid);
+    const bookId = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, volumeid, { followMerges: true });
     if (bookId === null) {
       this.logger.debug(
         `[kobo.analytics.session] [ignore] invalid volumeid userId=${user.id} eventId=${ev.Id} volumeid="${sanitizeLogValue(volumeid)}" event="${formatAnalyticsPayload(ev, 800)}"`,

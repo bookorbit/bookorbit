@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
 import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import BookFormatChip from './BookFormatChip.vue'
+import BookCardFormatBadges from './BookCardFormatBadges.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { cardMediaView } from '../lib/card-media'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
@@ -102,6 +102,13 @@ const formatOverlayKey = computed(() => {
   const entry = kind ? formatEntries.value.find((e) => getBookMediaKind(e.files[0]?.format) === kind) : formatEntries.value[0]
   return entry?.key ?? null
 })
+/** Every edition the card offers, the one its media view leads with first; linked formats follow. */
+const ownFormatKeys = computed(() => {
+  const keys = formatEntries.value.map((entry) => entry.key)
+  const lead = formatOverlayKey.value
+  return lead ? [lead, ...keys.filter((key) => key !== lead)] : keys
+})
+const hasFormatBadges = computed(() => ownFormatKeys.value.length > 0 || (props.book.linked?.books.length ?? 0) > 0)
 const displayMediaKind = computed(() => mediaView.value?.kind ?? mediaProfile.value.primaryMediaKind)
 const isAudiobook = computed(() => displayMediaKind.value === 'audiobook')
 const isComic = computed(() => displayMediaKind.value === 'comic')
@@ -149,7 +156,7 @@ const showSendDialog = ref(false)
 
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
-const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && formatOverlayKey.value != null)
+const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && hasFormatBadges.value)
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
 const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
 const metadataLocked = computed(() => props.book.hasMetadataLocks)
@@ -515,17 +522,13 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             <span class="text-[9px] font-bold text-white leading-none">{{ Math.round(book.rating!) }}</span>
           </div>
 
-          <!-- Bottom-right overlay: format badge -->
+          <!-- Bottom-right overlay: format badges, the card's own then its linked books' -->
           <div
             v-if="showFormatOverlay && !selectionMode"
-            class="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-0.5 pointer-events-none transition-opacity duration-150"
+            class="absolute bottom-1.5 right-1.5 z-10 flex max-w-[70%] items-center gap-0.5 pointer-events-none transition-opacity duration-150"
             :class="overlayFadeClass"
           >
-            <BookFormatChip
-              :format-key="formatOverlayKey!"
-              variant="solid"
-              class="gap-0.5 rounded-xs px-1.5 py-0.5 text-[8px] font-semibold tracking-widest opacity-90"
-            />
+            <BookCardFormatBadges :own-keys="ownFormatKeys" :linked="book.linked" />
           </div>
 
           <!-- Reading progress bar - bottom edge -->

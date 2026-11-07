@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, provide, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -58,8 +58,13 @@ import { useInfiniteScrollSentinel } from '@/composables/useInfiniteScrollSentin
 import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
-import { normalizeCoverAspectRatio, type BookCard, type ConcreteBookMediaKind, type CoverAspectRatio } from '@bookorbit/types'
+import { normalizeCoverAspectRatio, type BookCard, type BookMergedEvent, type ConcreteBookMediaKind, type CoverAspectRatio } from '@bookorbit/types'
+import { useBookMergeSync } from '@/features/book/composables/useBookMergeSync'
+import { useBookLinkSync } from '@/features/book/composables/useBookLinkSync'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+
+const MergeBooksSheet = defineAsyncComponent(() => import('@/features/book/components/merge/MergeBooksSheet.vue'))
+const LinkBooksSheet = defineAsyncComponent(() => import('@/features/book/components/link/LinkBooksSheet.vue'))
 
 const { t } = useI18n()
 const route = useRoute()
@@ -112,6 +117,7 @@ const {
   booksProxy: books,
   slots,
   total,
+  bookTotal,
   loading,
   initialized: booksInitialized,
   error: booksError,
@@ -146,6 +152,7 @@ const {
   railEnabled: showJumpRails,
   railViewport: mainRef,
   collapseEnabled: effectiveCollapseEnabled,
+  collapseLinked: true,
   q: debouncedQuery,
   defaultSort: COLLECTION_DEFAULT_SORT,
 })
@@ -249,6 +256,21 @@ const {
   selectedIds,
   selectedCount,
   canEditSelectionMetadata,
+  mergeSelection,
+  mergeOpen,
+  mergeBookIds,
+  openMergeForSelection,
+  setMergeOpen,
+  linkSelection,
+  linkOpen,
+  linkBookIds,
+  linkBooks,
+  linkSeedBooks,
+  openLinkForSelection,
+  setLinkOpen,
+  switchMergeToLink,
+  selectionHasLinked,
+  pendingDeleteLinked,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -301,6 +323,40 @@ function handleBooksMoved() {
   exitSelectionMode()
 }
 
+function refreshAfterMerge() {
+  resetBooks()
+  refreshBuckets()
+}
+
+const { applyMerged } = useBookMergeSync({ books, deselect: deselectAll, refresh: refreshAfterMerge })
+
+function handleBooksMerged(event: BookMergedEvent) {
+  applyMerged(event)
+  exitSelectionMode()
+}
+
+function refreshAfterLinkChange() {
+  resetBooks()
+  refreshBuckets()
+}
+
+// Books from any library can sit here, and with linked books collapsed a link anywhere can fold or
+// split a card, so every link change reloads the listing.
+function linkChangeAffectsView(): boolean {
+  return true
+}
+
+const { scheduleRefresh: scheduleLinkRefresh } = useBookLinkSync({
+  books,
+  refresh: refreshAfterLinkChange,
+  affectsScope: linkChangeAffectsView,
+})
+
+function handleBooksLinked() {
+  exitSelectionMode()
+  scheduleLinkRefresh()
+}
+
 const metadataExportOpen = ref(false)
 const visibleExportColumns = computed(() => {
   if (!tableRef.value) return []
@@ -351,7 +407,10 @@ const headerFacts = computed<HeaderFact[]>(() => {
   const collectionTotal = collection.value?.bookCount ?? null
   if (typeof collectionTotal === 'number') {
     if (isNarrowed.value && !effectiveCollapseEnabled.value && booksInitialized.value) {
-      facts.push({ key: 'count', text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(total.value), total: collectionTotal }) })
+      facts.push({
+        key: 'count',
+        text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(bookTotal.value), total: collectionTotal }),
+      })
     } else {
       facts.push({ key: 'count', text: t('components.browseHeader.facts.books', { count: collectionTotal }) })
     }
@@ -513,7 +572,12 @@ defineOptions({ name: 'CollectionView' })
       @set-field="handleBulkSetField"
       @lock-metadata="handleBulkSetMetadataLock"
       @delete="handleDeleteSelected"
+      :merge="mergeSelection"
+      :link="linkSelection"
+      :linked-selected="selectionHasLinked"
       @move-to-library="openMoveForSelection"
+      @merge="openMergeForSelection"
+      @link="openLinkForSelection"
       @exit="exitSelectionMode"
     />
 
@@ -522,7 +586,7 @@ defineOptions({ name: 'CollectionView' })
       view-type="collection"
       :selected-book-ids="[...selectedIds]"
       :selected-count="selectedCount"
-      :total-count="total"
+      :total-count="bookTotal"
       :sort="tableSort"
       :visible-columns="visibleExportColumns"
       default-scope="selected"
@@ -566,7 +630,32 @@ defineOptions({ name: 'CollectionView' })
       @update:open="sendBookOpen = $event"
       @sent="exitSelectionMode"
     />
-    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+    <DeleteBookDialog
+      :open="deleteBookId !== null"
+      :deleting="deletingBook"
+      :linked="pendingDeleteLinked"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
+
+    <LinkBooksSheet
+      v-if="linkBookIds.length > 0"
+      :open="linkOpen"
+      :book-ids="linkBookIds"
+      :books="linkBooks"
+      :seed-books="linkSeedBooks"
+      @update:open="setLinkOpen"
+      @linked="handleBooksLinked"
+    />
+
+    <MergeBooksSheet
+      v-if="mergeBookIds.length > 0"
+      :open="mergeOpen"
+      :book-ids="mergeBookIds"
+      @update:open="setMergeOpen"
+      @link-instead="switchMergeToLink"
+      @merged="handleBooksMerged"
+    />
 
     <ConfirmDialog
       :open="confirmDeleteOpen"
@@ -810,7 +899,7 @@ defineOptions({ name: 'CollectionView' })
         <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
           <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
           <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">{{
-            t('views.bookView.allBooksLoaded', { count: formatNumber(total) })
+            t('views.bookView.allBooksLoaded', { count: formatNumber(bookTotal) })
           }}</span>
         </div>
 

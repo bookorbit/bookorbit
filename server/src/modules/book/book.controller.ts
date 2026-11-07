@@ -28,6 +28,7 @@ import { fileValidators, planFileResponse, type FileConditionalHeaders } from '.
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
+import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { RequireAppAttest } from '../app-attest/app-attest.guard';
@@ -341,6 +342,7 @@ export class BookController {
     }
   }
 
+  @ResolvesMergedBook({ params: ['id'] })
   @Get(':id/cover')
   @RouteConfig({ compress: false })
   async getCover(
@@ -369,6 +371,7 @@ export class BookController {
     reply.send(createReadStream(coverPath));
   }
 
+  @ResolvesMergedBook({ params: ['id'] })
   @Get(':id/thumbnail')
   @RouteConfig({ compress: false })
   async getThumbnail(
@@ -576,6 +579,7 @@ export class BookController {
     await this.bookService.deleteFile(fileId, user);
   }
 
+  @ResolvesMergedBook({ params: ['id'] })
   @Get(':id/audio-progress')
   async getAudioProgress(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return (await this.bookService.getAudioProgress(user.id, id, user)) ?? null;
@@ -587,6 +591,7 @@ export class BookController {
     await this.bookService.saveAudioProgress(user.id, id, dto, user);
   }
 
+  @ResolvesMergedBook({ params: ['id'] })
   @Patch(':id/personal-note')
   updatePersonalNote(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePersonalNoteDto, @CurrentUser() user: RequestUser) {
     return this.bookService.updatePersonalNote(id, dto, user);
@@ -710,6 +715,7 @@ export class BookController {
     return this.bookService.updateReadAloudSyncMode(id, dto.mode, user);
   }
 
+  @ResolvesMergedBook({ params: ['id'] })
   @Patch(':id/status')
   setReadStatus(@Param('id', ParseIntPipe) id: number, @Body() dto: SetStatusDto, @CurrentUser() user: RequestUser) {
     return this.bookService.setReadStatus(id, dto, user);

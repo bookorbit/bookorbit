@@ -23,6 +23,16 @@ export class FileLockService {
       }
     }
   }
+
+  isLocked(path: string): boolean {
+    return this.locks.has(path);
+  }
+
+  /** Runs `fn` under the lock only when nobody holds or waits for it; otherwise returns null without waiting. */
+  tryWithLock<T>(path: string, fn: () => Promise<T>): Promise<T> | null {
+    if (this.locks.has(path)) return null;
+    return this.withLock(path, fn);
+  }
 }
 
 export function bookOperationLockKey(bookId: number): string {

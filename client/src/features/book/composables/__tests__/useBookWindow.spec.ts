@@ -236,6 +236,28 @@ describe('useBookWindow', () => {
     expect((window.slots.value[1] as BookCard).id).toBe(1)
   })
 
+  it('counts books from bookTotal when linked books are collapsed, and falls back to total', async () => {
+    fetchMock.mockImplementation((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as { pagination: { page: number } }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...pageFor(body.pagination.page, 40), bookTotal: 55 }) })
+    })
+    const { window, query } = makeWindow()
+    await flush()
+
+    expect(window.total.value).toBe(40)
+    expect(window.bookTotal.value).toBe(55)
+
+    window.removeBooks([1])
+    expect(window.bookTotal.value).toBe(54)
+    window.prependBooks([makeBook(900)])
+    expect(window.bookTotal.value).toBe(55)
+
+    mockBlocks(30)
+    query.value = { sort: [{ field: 'title', dir: 'desc' }] }
+    await flush()
+    expect(window.bookTotal.value).toBe(30)
+  })
+
   it('discards in-flight block writes after a removal shifts indexes', async () => {
     mockBlocks(300)
     const { window } = makeWindow()

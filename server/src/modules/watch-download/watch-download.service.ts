@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Permission, isAudioFormat } from '@bookorbit/types';
 import type { AuthenticationMethod, WatchDownloadTicketResponse, WatchMediaOverlayDownloadTicketResponse } from '@bookorbit/types';
@@ -6,6 +6,7 @@ import type { AuthenticationMethod, WatchDownloadTicketResponse, WatchMediaOverl
 import type { RequestUser } from '../../common/types/request-user';
 import { PermissionService } from '../../common/services/permission.service';
 import { AuthService } from '../auth/auth.service';
+import { BookAliasService } from '../book-alias/book-alias.service';
 import { BookService } from '../book/book.service';
 import { EpubService } from '../reader/epub/epub.service';
 
@@ -48,6 +49,7 @@ export class WatchDownloadService {
     private readonly bookService: BookService,
     private readonly permissionService: PermissionService,
     private readonly epubService: EpubService,
+    @Optional() private readonly bookAlias?: BookAliasService,
   ) {}
 
   async issue(bookId: number, requestedFileIds: number[], user: RequestUser): Promise<WatchDownloadTicketResponse> {
@@ -159,13 +161,18 @@ export class WatchDownloadService {
 
   async authorize(rawAuthorization: string | undefined, expectedBookId?: number, expectedFileId?: number): Promise<RequestUser> {
     const claims = await this.verifiedClaims(rawAuthorization);
-    if (expectedBookId !== undefined && claims.bookId !== expectedBookId) {
+    if (expectedBookId !== undefined && claims.bookId !== expectedBookId && !(await this.wasMergedInto(claims.bookId, expectedBookId))) {
       throw new NotFoundException('Book is not included in this Watch download');
     }
     if (expectedFileId !== undefined && !claims.fileIds.includes(expectedFileId)) {
       throw new NotFoundException('File is not included in this Watch download');
     }
     return this.validatedUser(claims);
+  }
+
+  /** A ticket minted before its book was merged still covers the book the request was aliased to. */
+  private async wasMergedInto(ticketBookId: number, bookId: number): Promise<boolean> {
+    return ((await this.bookAlias?.resolveOne(ticketBookId)) ?? null) === bookId;
   }
 
   /** Resolves a ticket index back to the href the ticket was minted for. */

@@ -21,6 +21,7 @@ import type { MockedFunction } from 'vitest';
 import type { Dirent } from 'fs';
 import { readdir, stat } from 'fs/promises';
 
+import { LibraryOperationGate } from '../../common/services/library-operation-gate.service';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { ScannerService } from './scanner.service';
@@ -81,7 +82,7 @@ function makeBookFile(overrides: Record<string, unknown> = {}) {
 }
 
 function makeRepo(overrides: Record<string, unknown> = {}) {
-  return {
+  const repo: Record<string, unknown> = {
     failAllRunningJobs: vi.fn().mockResolvedValue(undefined),
     findRecentScanJobs: vi.fn().mockResolvedValue([]),
     findLatestScanJobs: vi.fn().mockResolvedValue([]),
@@ -138,6 +139,10 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     clearDirScanState: vi.fn().mockResolvedValue(1),
     ...overrides,
   };
+  // Every library's folders, which a test sets up through the one library it scans.
+  repo.findAllLibraryRoots ??= vi.fn(async () => (await (repo.findLibraryFolders as () => Promise<unknown[]>)()) ?? []);
+  repo.findBooksToClaim ??= vi.fn().mockResolvedValue([]);
+  return repo;
 }
 
 const mockGateway = {
@@ -173,6 +178,7 @@ function makeService(
   const achievementEvents = { emit: vi.fn() };
   const selfWriteRegistry = new SelfWriteRegistry();
   const regexMetadata = { evaluate: vi.fn() };
+  const libraryGate = new LibraryOperationGate();
   const service = new ScannerService(
     repo as any,
     mockMetadata as any,
@@ -182,11 +188,12 @@ function makeService(
     selfWriteRegistry,
     coverStore as any,
     regexMetadata as any,
+    libraryGate,
     autoFetchOrchestrator as any,
     achievementEvents as any,
     coverReconciler as any,
   );
-  return { service, jobStore, notificationService, achievementEvents, selfWriteRegistry, regexMetadata };
+  return { service, jobStore, notificationService, achievementEvents, selfWriteRegistry, regexMetadata, libraryGate };
 }
 
 /**
@@ -308,6 +315,83 @@ describe('startScan — preconditions', () => {
 
     const result = await service.startScan(1, 'manual');
     expect(result).toHaveProperty('jobId', 100);
+  });
+
+  it('refuses to start while another operation holds the library, and leaves that holder in place', async () => {
+    const repo = makeRepo();
+    const { service, libraryGate } = makeService(repo);
+    const releaseMove = libraryGate.tryAcquire(1, 'book_move')!;
+
+    await expect(service.startScan(1, 'manual')).rejects.toThrow(ConflictException);
+    expect(libraryGate.current(1)).toBe('book_move');
+    expect(repo.createScanJob).not.toHaveBeenCalled();
+
+    releaseMove();
+  });
+
+  it('holds the library for the whole scan and frees it when the scan finishes', async () => {
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service, libraryGate } = makeService(repo);
+
+    await service.startScan(1, 'manual');
+    expect(libraryGate.current(1)).toBe('scan');
+
+    await done;
+    await vi.waitFor(() => expect(libraryGate.isHeld(1)).toBe(false));
+  });
+
+  it('frees the library when the scan fails to start after taking it', async () => {
+    const repo = makeRepo({ findLibraryFolders: vi.fn().mockResolvedValue([]) });
+    const { service, libraryGate } = makeService(repo);
+
+    await expect(service.startScan(1, 'manual')).rejects.toThrow(NotFoundException);
+    expect(libraryGate.isHeld(1)).toBe(false);
+  });
+});
+
+describe('library operation gate: deferred scans', () => {
+  it('defers a watcher full scan until the operation releases the library', async () => {
+    const repo = makeRepo();
+    const { service, libraryGate } = makeService(repo);
+    const startScanSpy = vi.spyOn(service, 'startScan').mockResolvedValue({ jobId: 1 });
+    const release = libraryGate.tryAcquire(1, 'book_merge')!;
+
+    service.startScanAsync(1);
+    service.startScanAsync(1);
+    expect(startScanSpy).not.toHaveBeenCalled();
+
+    release();
+    await vi.waitFor(() => expect(startScanSpy).toHaveBeenCalledTimes(1));
+  });
+
+  it('runs a targeted directory scan after a move, exactly once, instead of dropping it', async () => {
+    const repo = makeRepo();
+    const { service, libraryGate } = makeService(repo);
+    const scanDirectory = vi.spyOn(service as any, 'scanBookDirectory').mockResolvedValue(undefined);
+    const release = libraryGate.tryAcquire(1, 'book_move')!;
+
+    service.scanBookDirectoryAsync('/library/Book', 1);
+    service.scanBookDirectoryAsync('/library/Book', 1);
+    service.scanBookDirectoryAsync('/library/Other', 2);
+    await vi.waitFor(() => expect(scanDirectory).toHaveBeenCalledWith('/library/Other', 2));
+    expect(scanDirectory).not.toHaveBeenCalledWith('/library/Book', 1);
+
+    release();
+    await vi.waitFor(() => expect(scanDirectory).toHaveBeenCalledWith('/library/Book', 1));
+    expect(scanDirectory.mock.calls.filter(([path]) => path === '/library/Book')).toHaveLength(1);
+  });
+
+  it('does not defer targeted scans behind a full scan, which keeps its own skip rule', async () => {
+    const repo = makeRepo();
+    const { service, libraryGate } = makeService(repo);
+    const scanDirectory = vi.spyOn(service as any, 'scanBookDirectory').mockResolvedValue(undefined);
+    const release = libraryGate.tryAcquire(1, 'scan')!;
+
+    service.scanBookDirectoryAsync('/library/Book', 1);
+    await vi.waitFor(() => expect(scanDirectory).toHaveBeenCalledWith('/library/Book', 1));
+
+    release();
   });
 });
 
@@ -679,7 +763,7 @@ describe('excludePatterns', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(mockFindCandidates).toHaveBeenCalledWith('/library', ['#recycle', '*.bak'], expect.any(Function), undefined);
+    expect(mockFindCandidates).toHaveBeenCalledWith('/library', ['#recycle', '*.bak'], expect.any(Function), undefined, new Set());
   });
 });
 
@@ -1652,6 +1736,34 @@ describe('format priority', () => {
     await done;
 
     expect(repo.updateBookPrimaryFile).toHaveBeenCalledWith(1, 12);
+  });
+
+  it('keeps the current primary when another file of the same format is listed first', async () => {
+    const merged = makeFileStat({ absolutePath: '/library/Book/a-merged-copy.epub', relPath: 'Book/a-merged-copy.epub', ino: 21n });
+    const current = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 22n });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Book', [merged, current])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi.fn().mockResolvedValue([{ id: 1, status: 'present', folderPath: '/library/Book', primaryFileId: 22 }]),
+      findBookFilesByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([
+          makeBookFile({ id: 21, absolutePath: merged.absolutePath, relPath: merged.relPath, ino: merged.ino }),
+          makeBookFile({ id: 22, absolutePath: current.absolutePath, relPath: current.relPath, ino: current.ino, sortOrder: 1 }),
+        ]),
+    });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.updateBookPrimaryFile).toHaveBeenCalledWith(1, 22);
   });
 });
 
@@ -3791,7 +3903,7 @@ describe('targeted book scan', () => {
     await (service as any).scanBookDirectory('/library/AJ Carter', 1);
 
     expect(mockBuildSingleCandidate).toHaveBeenCalledWith('/library/AJ Carter', '/library', expect.any(Array), expect.any(Function));
-    expect(mockFindCandidates).toHaveBeenCalledWith('/library/AJ Carter', expect.any(Array), expect.any(Function));
+    expect(mockFindCandidates).toHaveBeenCalledWith('/library/AJ Carter', expect.any(Array), expect.any(Function), undefined, new Set());
     expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/AJ Carter/Book', libraryId: 1 }));
     expect(repo.createBookFile).toHaveBeenCalledWith(expect.objectContaining({ relPath: 'AJ Carter/Book/book.epub' }));
   });
@@ -3815,7 +3927,7 @@ describe('book_per_file mode — runScan', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function), undefined);
+    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function), undefined, new Set());
     expect(mockFindCandidates).not.toHaveBeenCalled();
   });
 
@@ -3845,7 +3957,7 @@ describe('book_per_file mode — runScan', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library', ['samples', '*.bak'], expect.any(Function), undefined);
+    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library', ['samples', '*.bak'], expect.any(Function), undefined, new Set());
   });
 
   it('creates one book per loose-file candidate', async () => {
@@ -4351,7 +4463,7 @@ describe('incremental scan — dir state', () => {
     await done;
 
     expect(repo.findDirScanStateSnapshot).toHaveBeenCalledWith(1);
-    expect(mockFindCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function), storedMtimes);
+    expect(mockFindCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function), storedMtimes, new Set());
   });
 
   it('persists dir mtimes after successful scan', async () => {
@@ -4986,5 +5098,146 @@ describe('regex metadata outside a scan', () => {
       await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('rules_unavailable');
       await expect(service.applyLibraryRulesToBook(book, [primary] as never, rules)).resolves.toBe('rules_invalid');
     });
+  });
+});
+
+// ── Nested library folders ────────────────────────────────────────────────────
+
+describe('nested library folders', () => {
+  const outer = { id: 1, path: '/library', libraryId: 1 };
+  const inner = { id: 2, path: '/library/comics', libraryId: 2 };
+
+  it('walks the outer folder without the folder of the library nested inside it', async () => {
+    const repo = makeRepo({ findAllLibraryRoots: vi.fn().mockResolvedValue([outer, inner]) });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockFindCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function), undefined, new Set(['/library/comics']));
+    expect(repo.findBooksToClaim).not.toHaveBeenCalled();
+  });
+
+  it('moves a book the outer library filed under the nested folder into the nested library before scanning it', async () => {
+    const candidate = makeCandidate('/library/comics/Saga', [
+      makeFileStat({ absolutePath: '/library/comics/Saga/saga.cbz', relPath: 'Saga/saga.cbz', format: 'cbz' }),
+    ]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+    const order: string[] = [];
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([inner]),
+      findAllLibraryRoots: vi.fn().mockResolvedValue([outer, inner]),
+      findBooksToClaim: vi.fn().mockResolvedValue([{ id: 42, libraryId: 1, folderPath: '/library/comics/Saga' }]),
+      moveBookToLibrary: vi.fn().mockImplementation(() => {
+        order.push('claim');
+        return Promise.resolve({
+          id: 42,
+          libraryId: 2,
+          libraryFolderId: 2,
+          folderPath: '/library/comics/Saga',
+          status: 'present',
+          primaryFileId: 7,
+          previousLibraryId: 1,
+          libraryChanged: true,
+        });
+      }),
+      findBooksByLibraryFolder: vi.fn().mockImplementation(() => {
+        order.push('load');
+        return Promise.resolve([]);
+      }),
+    });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+
+    await service.startScan(2, 'manual');
+    await done;
+
+    expect(repo.findBooksToClaim).toHaveBeenCalledWith([1], 2, ['/library/comics/Saga']);
+    expect(repo.moveBookToLibrary).toHaveBeenCalledWith(42, 2, 2, '/library/comics/Saga');
+    expect(order).toEqual(['claim', 'load']);
+    expect(mockGateway.emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 1, toLibraryId: 2, bookIds: [42] });
+  });
+
+  it('leaves a book alone while another operation holds the outer library, and skips its folder this scan', async () => {
+    const candidate = makeCandidate('/library/comics/Saga', [
+      makeFileStat({ absolutePath: '/library/comics/Saga/saga.cbz', relPath: 'Saga/saga.cbz', format: 'cbz' }),
+    ]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([inner]),
+      findAllLibraryRoots: vi.fn().mockResolvedValue([outer, inner]),
+      findBooksToClaim: vi.fn().mockResolvedValue([{ id: 42, libraryId: 1, folderPath: '/library/comics/Saga' }]),
+    });
+    const done = awaitScan(repo);
+    const { service, libraryGate } = makeService(repo);
+    const release = libraryGate.tryAcquire(1, 'book_merge');
+
+    await service.startScan(2, 'manual');
+    await done;
+    release?.();
+
+    expect(repo.moveBookToLibrary).not.toHaveBeenCalled();
+    expect(repo.createBook).not.toHaveBeenCalled();
+  });
+
+  it('ignores a targeted scan of a path that a nested library owns', async () => {
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([outer]),
+      findAllLibraryRoots: vi.fn().mockResolvedValue([outer, inner]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookFolder('/library/comics/Saga/saga.cbz', 1);
+    await (service as any).scanBookDirectory('/library/comics/Saga', 1);
+
+    expect(mockBuildSingleCandidate).not.toHaveBeenCalled();
+    expect(mockFindCandidates).not.toHaveBeenCalled();
+    expect(repo.createBook).not.toHaveBeenCalled();
+  });
+
+  it('answers whether a library owns a path, reading the folders once for a burst of events', async () => {
+    const repo = makeRepo({ findAllLibraryRoots: vi.fn().mockResolvedValue([outer, inner]) });
+    const { service } = makeService(repo);
+
+    await expect(Promise.all([service.ownsPath(1, '/library/Dune/dune.epub'), service.ownsPath(1, '/library/Emma/emma.epub')])).resolves.toEqual([
+      true,
+      true,
+    ]);
+    await expect(service.ownsPath(2, '/library/comics/Saga/saga.cbz')).resolves.toBe(true);
+    expect(repo.findAllLibraryRoots).toHaveBeenCalledTimes(1);
+
+    service.forgetLibraryRoots();
+    await service.ownsPath(1, '/library/Dune/dune.epub');
+    expect(repo.findAllLibraryRoots).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops an event under a folder another library owns only after reading the folders again', async () => {
+    const repo = makeRepo({ findAllLibraryRoots: vi.fn().mockResolvedValue([outer, inner]) });
+    const { service } = makeService(repo);
+    await service.ownsPath(1, '/library/Dune/dune.epub');
+
+    await expect(service.ownsPath(1, '/library/comics/Saga/saga.cbz')).resolves.toBe(false);
+    expect(repo.findAllLibraryRoots).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an event for its library when the remembered folders are out of date', async () => {
+    const replacement = { id: 3, path: '/library/comics', libraryId: 3 };
+    const repo = makeRepo({
+      findAllLibraryRoots: vi.fn().mockResolvedValueOnce([outer, inner]).mockResolvedValue([outer, replacement]),
+    });
+    const { service } = makeService(repo);
+    await service.ownsPath(1, '/library/Dune/dune.epub');
+
+    await expect(service.ownsPath(3, '/library/comics/Saga/saga.cbz')).resolves.toBe(true);
+    await expect(service.ownsPath(2, '/library/comics/Saga/saga.cbz')).resolves.toBe(false);
+  });
+
+  it('leaves a path under no known library folder to the library that saw it', async () => {
+    const repo = makeRepo({ findAllLibraryRoots: vi.fn().mockResolvedValue([outer, inner]) });
+    const { service } = makeService(repo);
+
+    await expect(service.ownsPath(1, '/private/library/Dune/dune.epub')).resolves.toBe(true);
+    expect(repo.findAllLibraryRoots).toHaveBeenCalledTimes(1);
   });
 });

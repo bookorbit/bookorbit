@@ -10,5 +10,6 @@ import { StoryEditsService } from './story-edits.service';
   imports: [AppAttestModule, BookModule],
   controllers: [StoryEditsController],
   providers: [StoryEditsService, StoryEditsRepository],
+  exports: [StoryEditsService],
 })
 export class StoryEditsModule {}

@@ -5,7 +5,8 @@ import { useI18n } from 'vue-i18n'
 import type { BookDuplicateCandidate } from '@bookorbit/types'
 
 import { formatBytes } from '@/lib/formatting'
-import { formatDate, formatNumber, formatPercent } from '@/i18n/formatters'
+import { formatDate, formatNumber } from '@/i18n/formatters'
+import { formatCopyProgress } from '../utils/copy-progress'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 import { copyBytes, copyFormats } from '../utils/duplicate-keeper'
 import type { DuplicateField } from '../utils/duplicate-diff'
@@ -74,7 +75,7 @@ function formatChipStyle(format: string): Record<string, string> {
         class="inline-flex h-5 items-center gap-1 rounded-full bg-[color-mix(in_oklch,var(--pill-warning)_15%,transparent)] px-2 text-[10.5px] font-semibold text-[var(--pill-warning)]"
       >
         <BookOpen class="size-3" aria-hidden="true" />
-        {{ t('tools.bookDuplicates.fields.percentRead', { percent: formatPercent(book.readingProgress) }) }}
+        {{ t('tools.bookDuplicates.fields.percentRead', { percent: formatCopyProgress(book.readingProgress) }) }}
       </span>
       <span v-else class="text-muted-foreground">{{ emptyLabel }}</span>
     </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { formatBytes as formatFileSize } from '@/lib/formatting'
@@ -8,9 +8,12 @@ import {
   BookOpen,
   Check,
   ChevronDown,
+  Combine,
+  Crown,
   Eye,
   Library,
   Headphones,
+  Link2,
   Lock,
   MoreVertical,
   Pencil,
@@ -21,8 +24,10 @@ import {
   FolderInput,
   Trash2,
   TriangleAlert,
+  Unlink,
   X,
 } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '@/features/book/lib/book-formats'
 import { providerIconPathSafe } from '@/features/book/lib/provider-icons'
@@ -33,10 +38,11 @@ import { readingDateToDateKey } from '@/features/book/lib/reading-date'
 import { getProviderColor, providerShortLabel } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { useBookCoverAspectRatio } from '@/features/book/composables/useBookCoverAspectRatio'
-import { FORMAT_TO_GROUP, getPrimaryBookFile, READER_OPENABLE_FORMATS, isComicFormat } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, getPrimaryBookFile, Permission, READER_OPENABLE_FORMATS, isComicFormat } from '@bookorbit/types'
 import type {
   BookDetail,
   BookKoboState,
+  BookMergedEvent,
   CoverMedium,
   CustomMetadataBookValue,
   ReadAloudProgressSync,
@@ -61,6 +67,9 @@ import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
 import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/composables/usePersonalNote'
 import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import BookLinkedChips from '@/features/book/components/link/BookLinkedChips.vue'
+import { useBookLinkActions } from '@/features/book/composables/useBookLinkActions'
+import type { LinkSeedBook } from '@/features/book/lib/book-link'
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import ResetReadingStateDialog from '@/features/book/components/ResetReadingStateDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
@@ -117,14 +126,31 @@ type SeriesDisplayLink = {
   label: string
 }
 
+const MergeBooksSheet = defineAsyncComponent(() => import('@/features/book/components/merge/MergeBooksSheet.vue'))
+const LinkBooksSheet = defineAsyncComponent(() => import('@/features/book/components/link/LinkBooksSheet.vue'))
+
 const props = defineProps<{ book: BookDetail }>()
-const emit = defineEmits<{ saved: [BookDetail]; moved: [] }>()
+const emit = defineEmits<{ saved: [BookDetail]; moved: []; merged: [BookMergedEvent]; 'links-changed': [] }>()
 const { t } = useI18n()
 const router = useRouter()
 const { user } = useAuth()
 
 const addToCollectionOpen = ref(false)
 const moveToLibraryOpen = ref(false)
+const mergeOpen = ref(false)
+// The sheet mounts on first use and stays, so a merge still running keeps reporting after it closes.
+const mergeRequested = ref(false)
+const mergeBookIds = computed(() => [props.book.id])
+const linkOpen = ref(false)
+const linkRequested = ref(false)
+const linkActions = useBookLinkActions()
+const linkedBooks = computed(() => props.book.linkedBooks ?? [])
+const isLinked = computed(() => linkedBooks.value.length > 0)
+/** Books a merge blocker handed over to Link; otherwise Link starts from this book with the picker. */
+const linkSeedIds = ref<number[] | null>(null)
+const linkSeedBooks = ref<LinkSeedBook[]>([])
+const linkBookIds = computed(() => linkSeedIds.value ?? [props.book.id])
+const linkExcludedIds = computed(() => linkedBooks.value.map((book) => book.bookId))
 const scoreBreakdownOpen = ref(false)
 const mobileScoreBreakdownOpen = ref(false)
 const moreMenuOpen = ref(false)
@@ -271,7 +297,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', scheduleGenreOverflowMeasure)
 })
 
-const { hasPermission } = usePermissions()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { hasLibraryPermission } = useLibraryPermissions()
 const { load: loadLocks, isLocked } = useMetadataLocks()
 watch(
@@ -285,6 +311,21 @@ const canViewKobo = computed(() => hasPermission('kobo_sync'))
 const canViewKoreader = computed(() => hasPermission('koreader_sync'))
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const canManageReadingState = computed(() => hasPermission('library_edit_metadata'))
+const canMergeBook = computed(
+  () => !isDemoRestrictedAccount.value && hasLibraryPermission(Permission.LibraryMergeBooks, props.book?.libraryId, 'editor'),
+)
+// Linking shares Merge's permission and editor rule; the server checks every other book's library too.
+const canLinkBook = canMergeBook
+const canUnlinkBook = computed(() => canLinkBook.value && isLinked.value)
+/** Offered on a linked book that is not its group's main book, including a group left without one (G11). */
+const canMakeMainBook = computed(
+  () =>
+    canLinkBook.value &&
+    isLinked.value &&
+    props.book.linkGroupId != null &&
+    // Servers with `linkIsLead` say so directly; older ones only show the main book when it is visible.
+    (props.book.linkIsLead !== undefined ? !props.book.linkIsLead : linkedBooks.value.some((book) => book.isLead)),
+)
 const resetReadingStateBookId = computed(() => props.book.id)
 const {
   open: resetReadingStateDialogOpen,
@@ -1032,6 +1073,73 @@ function handleBookMoved() {
   emit('moved')
 }
 
+function handleMergeFromMenu() {
+  moreMenuOpen.value = false
+  mobileMoreMenuOpen.value = false
+  mergeRequested.value = true
+  mergeOpen.value = true
+}
+
+function handleMergeOpenChange(open: boolean) {
+  mergeOpen.value = open
+}
+
+function handleBooksMerged(event: BookMergedEvent) {
+  emit('merged', event)
+}
+
+function closeMoreMenus() {
+  moreMenuOpen.value = false
+  mobileMoreMenuOpen.value = false
+}
+
+function handleLinkFromMenu() {
+  closeMoreMenus()
+  linkSeedIds.value = null
+  linkSeedBooks.value = []
+  linkRequested.value = true
+  linkOpen.value = true
+}
+
+/** The blocked merge's books, already chosen: Link lists them instead of asking for them again. */
+function handleMergeLinkInstead(bookIds: number[], books: LinkSeedBook[] = []) {
+  mergeOpen.value = false
+  linkSeedIds.value = bookIds.includes(props.book.id) ? bookIds : [props.book.id, ...bookIds]
+  linkSeedBooks.value = books
+  linkRequested.value = true
+  linkOpen.value = true
+}
+
+function handleLinkOpenChange(open: boolean) {
+  linkOpen.value = open
+}
+
+function handleBooksLinked() {
+  emit('links-changed')
+}
+
+async function handleUnlinkFromMenu() {
+  closeMoreMenus()
+  if (await linkActions.unlink(props.book.id)) {
+    toast.success(t('book.link.toast.unlinked'))
+    emit('links-changed')
+  } else if (linkActions.error.value) {
+    toast.error(linkActions.error.value)
+  }
+}
+
+async function handleMakeMainFromMenu() {
+  closeMoreMenus()
+  const groupId = props.book.linkGroupId
+  if (groupId == null) return
+  if (await linkActions.makeLead(groupId, props.book.id)) {
+    toast.success(t('book.link.toast.madeMain'))
+    emit('links-changed')
+  } else if (linkActions.error.value) {
+    toast.error(linkActions.error.value)
+  }
+}
+
 function handleDeleteFromMenu() {
   moreMenuOpen.value = false
   mobileMoreMenuOpen.value = false
@@ -1353,6 +1461,7 @@ watch(
         <div class="min-w-0 flex-1 @min-[46rem]/book-detail:hidden">
           <h1 class="text-lg font-bold leading-snug break-words sm:text-xl">{{ book.title ?? t('book.detail.details.untitled') }}</h1>
           <p v-if="book.subtitle" class="mt-1 text-sm leading-snug text-muted-foreground break-words">{{ book.subtitle }}</p>
+          <BookLinkedChips v-if="isLinked" :books="linkedBooks" class="mt-2" />
           <p v-if="authorLinks.length" class="mt-2 text-[13px] break-words">
             <span class="text-muted-foreground">{{ t('book.detail.details.by') }}</span>
             <span class="ml-1 font-semibold">
@@ -1500,7 +1609,7 @@ watch(
               <Send class="size-3.5" />
             </button>
             <Popover
-              v-if="canManageReadingState || canEditMetadata || hasPermission('library_delete_books')"
+              v-if="canManageReadingState || canEditMetadata || canMergeBook || canLinkBook || hasPermission('library_delete_books')"
               :open="moreMenuOpen"
               @update:open="(v) => (moreMenuOpen = v)"
             >
@@ -1511,29 +1620,67 @@ watch(
                   <MoreVertical class="size-3.5" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent class="w-44 p-1" align="end">
+              <PopoverContent class="w-max min-w-44 max-w-[min(18rem,calc(100vw-2rem))] p-1" align="end">
                 <button
                   v-if="canManageReadingState"
-                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
                   @click="handleOpenResetReadingState"
                 >
-                  <RotateCcw class="size-3.5" />
+                  <RotateCcw class="size-3.5 shrink-0" />
                   Reset reading state
                 </button>
                 <button
                   v-if="canEditMetadata"
-                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm hover:bg-muted transition-colors"
                   @click="handleMoveFromMenu"
                 >
-                  <FolderInput class="size-3.5" />
+                  <FolderInput class="size-3.5 shrink-0" />
                   {{ t('book.move.action') }}
                 </button>
                 <button
+                  v-if="canMergeBook"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
+                  data-testid="detail-merge-book"
+                  @click="handleMergeFromMenu"
+                >
+                  <Combine class="size-3.5 shrink-0" aria-hidden="true" />
+                  {{ t('book.merge.detailAction') }}
+                </button>
+                <button
+                  v-if="canLinkBook"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
+                  data-testid="detail-link-book"
+                  @click="handleLinkFromMenu"
+                >
+                  <Link2 class="size-3.5 shrink-0" aria-hidden="true" />
+                  {{ t('book.link.detailAction') }}
+                </button>
+                <button
+                  v-if="canMakeMainBook"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  :disabled="linkActions.pending.value"
+                  data-testid="detail-make-main-book"
+                  @click="handleMakeMainFromMenu"
+                >
+                  <Crown class="size-3.5 shrink-0" aria-hidden="true" />
+                  {{ t('book.link.makeMain') }}
+                </button>
+                <button
+                  v-if="canUnlinkBook"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  :disabled="linkActions.pending.value"
+                  data-testid="detail-unlink-book"
+                  @click="handleUnlinkFromMenu"
+                >
+                  <Unlink class="size-3.5 shrink-0" aria-hidden="true" />
+                  {{ t('book.link.unlink') }}
+                </button>
+                <button
                   v-if="hasPermission('library_delete_books')"
-                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded-xs text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm text-destructive hover:bg-destructive/10 transition-colors"
                   @click="handleDeleteFromMenu"
                 >
-                  <Trash2 class="size-3.5" />
+                  <Trash2 class="size-3.5 shrink-0" />
                   Delete book
                 </button>
               </PopoverContent>
@@ -1573,6 +1720,7 @@ watch(
           </Popover>
         </div>
         <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1 leading-snug">{{ book.subtitle }}</p>
+        <BookLinkedChips v-if="isLinked" :books="linkedBooks" class="mt-2" />
 
         <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-3">
           <p v-if="authorLinks.length" class="text-sm">
@@ -2285,7 +2433,7 @@ watch(
     :book-files="book.files"
   />
 
-  <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+  <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" :linked="isLinked" @confirm="confirmDelete" @cancel="cancelDelete" />
 
   <MoveToLibrarySheet
     :open="moveToLibraryOpen"
@@ -2294,6 +2442,28 @@ watch(
     :current-library-id="book.libraryId"
     @update:open="handleMoveOpenChange"
     @moved="handleBookMoved"
+  />
+
+  <LinkBooksSheet
+    v-if="linkRequested"
+    :open="linkOpen"
+    :book-ids="linkBookIds"
+    :seed-books="linkSeedBooks"
+    :exclude-ids="linkExcludedIds"
+    :picker="linkSeedIds === null"
+    @update:open="handleLinkOpenChange"
+    @linked="handleBooksLinked"
+  />
+
+  <MergeBooksSheet
+    v-if="mergeRequested"
+    :open="mergeOpen"
+    :book-ids="mergeBookIds"
+    :keeper-id="book.id"
+    :picker-library-id="book.libraryId"
+    @update:open="handleMergeOpenChange"
+    @merged="handleBooksMerged"
+    @link-instead="handleMergeLinkInstead"
   />
 
   <ResetReadingStateDialog

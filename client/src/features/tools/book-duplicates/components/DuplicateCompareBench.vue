@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { Check } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import type { BookDuplicateGroup } from '@bookorbit/types'
+import type { BookDuplicateAction, BookDuplicateGroup } from '@bookorbit/types'
 
 import { differingFields, largestCopyId, bestMetadataId, rankedReasons, sharedFields, type DuplicateField } from '../utils/duplicate-diff'
 import { copyFolderLabel } from '../utils/duplicate-keeper'
@@ -12,7 +12,7 @@ import DuplicateCopyCard from './DuplicateCopyCard.vue'
 import DuplicateFieldValue from './DuplicateFieldValue.vue'
 import DuplicatePathDiff from './DuplicatePathDiff.vue'
 
-const props = defineProps<{ group: BookDuplicateGroup; keeperId: number; recommendedId: number }>()
+const props = defineProps<{ group: BookDuplicateGroup; keeperId: number; recommendedId: number; action?: BookDuplicateAction | null }>()
 const emit = defineEmits<{ keep: [bookId: number] }>()
 
 const { t } = useI18n()
@@ -89,6 +89,7 @@ function handleKeep(bookId: number): void {
               :index="index"
               :keeper="book.id === keeperId"
               :recommended="book.id === recommendedId"
+              :action="action"
               @keep="handleKeep"
             />
           </th>
@@ -143,6 +144,7 @@ function handleKeep(bookId: number): void {
         :index="index"
         :keeper="book.id === keeperId"
         :recommended="book.id === recommendedId"
+        :action="action"
         @keep="handleKeep"
       >
         <dl class="mt-0.5 grid gap-0">

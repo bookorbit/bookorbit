@@ -68,6 +68,17 @@ export const SERVER_FEATURES = [
    * and terms by revision cursor, and `PUT /mobile/books/:bookId/story-edits/:id` writes one.
    */
   "story-edits",
+  /**
+   * `POST /books/merge/preview`, `POST /books/merge` and `GET /books/merge/jobs/:jobId`; a merged-away
+   * book id answers 404 with `errorCode: "BOOK_MERGED"` and `errorMeta.targetBookId`, and queued writes
+   * to it land on the kept book.
+   */
+  "book-merge",
+  /**
+   * `POST /books/links`, `PATCH /books/links/:groupId`, `DELETE /books/:id/link`; book queries accept
+   * `collapseLinked`, cards carry `linked` and `BooksPage.bookTotal`, and book detail `linkedBooks`.
+   */
+  "book-links",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

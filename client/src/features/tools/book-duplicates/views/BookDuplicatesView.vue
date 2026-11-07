@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { AlertCircle, CopyCheck, Loader2, Search, Trash2 } from '@lucide/vue'
+import { AlertCircle, CopyCheck, ListChecks, Loader2, Search } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import type { BookDuplicateGroup, BookDuplicateGroupSort } from '@bookorbit/types'
+import { toast } from 'vue-sonner'
+import {
+  BOOK_DUPLICATE_KINDS,
+  BOOK_DUPLICATE_RESOLUTION_MAX_GROUPS,
+  type BookDuplicateAction,
+  type BookDuplicateBookAction,
+  type BookDuplicateGroup,
+  type BookDuplicateGroupSort,
+  type BookDuplicateKind,
+} from '@bookorbit/types'
 
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { useLibraries } from '@/features/library/composables/useLibraries'
-import { usePermissions } from '@/features/auth/composables/usePermissions'
+import type { BookMergeJobState } from '@/features/book/composables/useBookMerge'
+import { mergedSourceIds } from '@/features/book/lib/book-merge'
 import { formatBytes } from '@/lib/formatting'
 import { formatNumber } from '@/i18n/formatters'
 import { useBookDuplicates } from '../../composables/useBookDuplicates'
@@ -20,7 +30,6 @@ import DuplicateSummaryBand from '../components/DuplicateSummaryBand.vue'
 
 const { t } = useI18n()
 const { libraries, fetchLibraries } = useLibraries()
-const { hasPermission } = usePermissions()
 const duplicates = useBookDuplicates()
 
 const selectedLibraryId = ref('')
@@ -28,9 +37,13 @@ const similarityPercent = ref(85)
 const focusedGroupId = ref<number | null>(null)
 const reviewOpen = ref(false)
 const reviewGroups = ref<BookDuplicateGroup[]>([])
+const reviewAllGroups = ref(false)
 const ledger = ref<HTMLElement | null>(null)
 
-const canUseTool = computed(() => hasPermission('library_delete_books'))
+const canUseTool = computed(() => duplicates.canUseTool.value)
+const kinds = BOOK_DUPLICATE_KINDS
+/** The latest copy of each group under review, so a changed action or keeper shows at once. */
+const reviewedGroups = computed(() => reviewGroups.value.map((group) => groups.value.find((candidate) => candidate.id === group.id) ?? group))
 const groups = computed(() => duplicates.visibleGroups.value)
 const showEmpty = computed(() => duplicates.scanFinished.value && duplicates.loaded.value && groups.value.length === 0)
 const keepRules = DUPLICATE_KEEP_RULES
@@ -63,40 +76,71 @@ function handleSortChange(value: string | number): void {
 }
 
 function handleReviewSelection(): void {
+  duplicates.resolution.reset()
   reviewGroups.value = duplicates.selectedGroups.value
+  reviewAllGroups.value = duplicates.allGroupsSelected.value
   reviewOpen.value = true
 }
 
 function handleReviewGroup(groupId: number): void {
   const group = groups.value.find((candidate) => candidate.id === groupId)
   if (!group) return
+  duplicates.resolution.reset()
   reviewGroups.value = [group]
+  reviewAllGroups.value = false
   reviewOpen.value = true
 }
 
 function handleCancelReview(): void {
-  if (duplicates.deleting.value) return
+  if (duplicates.resolving.value) return
   reviewOpen.value = false
   reviewGroups.value = []
+  reviewAllGroups.value = false
+  duplicates.resolution.reset()
 }
 
-async function handleConfirmReview(): Promise<void> {
-  const bookIds = reviewGroups.value.flatMap((group) =>
-    group.books.filter((book) => book.id !== duplicates.keeperIdFor(group)).map((book) => book.id),
-  )
-  const deleted = await duplicates.discardBooks(bookIds)
-  if (deleted) {
+function handleConfirmReview(options: { removeIdenticalCopies: boolean }): void {
+  void duplicates.resolveGroups(reviewedGroups.value, { allGroups: reviewAllGroups.value, removeIdenticalCopies: options.removeIdenticalCopies })
+}
+
+function handleBookAction(groupId: number, bookId: number, action: BookDuplicateBookAction): void {
+  duplicates.setBookAction(groupId, bookId, action)
+}
+
+function handleMerged(job: BookMergeJobState): void {
+  const merged = mergedSourceIds(job).length
+  if (job.status === 'done' && merged === job.sourceBookIds.length) {
+    toast.success(t('tools.bookDuplicates.resolution.success', { count: 1 }, 1))
     reviewOpen.value = false
     reviewGroups.value = []
-  }
+  } else if (merged > 0) toast.warning(t('book.merge.toast.partial', { merged, total: job.sourceBookIds.length }))
+  else toast.error(t('book.merge.toast.failed'))
+  duplicates.clearSelection()
+  void duplicates.fetchGroups()
+}
+
+function handleLinkInstead(groupId: number): void {
+  duplicates.setAction(groupId, 'link')
+}
+
+function handleAction(groupId: number, action: BookDuplicateAction | null): void {
+  duplicates.setAction(groupId, action)
+}
+
+function handleKindChange(kind: BookDuplicateKind): void {
+  void duplicates.setKind(kind)
+}
+
+function handleSelectAllGroups(): void {
+  duplicates.selectAllGroups()
 }
 
 function handleDismiss(groupId: number): void {
   void duplicates.dismissGroup(groupId)
 }
 
-function handleRestore(bookIdA: number, bookIdB: number): void {
-  void duplicates.restoreDismissal(bookIdA, bookIdB)
+function handleRestore(bookIdA: number, bookIdB: number, kind: BookDuplicateKind): void {
+  void duplicates.restoreDismissal(bookIdA, bookIdB, kind)
 }
 
 function handleKeep(groupId: number, bookId: number): void {
@@ -227,7 +271,29 @@ function handleKeydown(event: KeyboardEvent): void {
     </div>
 
     <template v-if="duplicates.scanFinished.value">
+      <div class="flex shrink-0 gap-1 border-b border-border" role="tablist" :aria-label="t('tools.bookDuplicates.kinds.label')">
+        <button
+          v-for="kind in kinds"
+          :key="kind"
+          type="button"
+          role="tab"
+          class="-mb-px border-b-2 px-3 py-1.5 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          :class="duplicates.kind.value === kind ? 'border-primary text-primary' : 'border-transparent text-foreground hover:text-primary'"
+          :aria-selected="duplicates.kind.value === kind"
+          :data-testid="`duplicate-kind-${kind}`"
+          @click="handleKindChange(kind)"
+        >
+          {{ t(`tools.bookDuplicates.kinds.${kind}`) }}
+          <span
+            v-if="kind === 'other_format' && duplicates.scan.value?.totalOtherFormatPairs"
+            class="ms-1 rounded-full bg-muted px-1.5 text-[11px] font-bold tabular-nums text-muted-foreground"
+            >{{ formatNumber(duplicates.scan.value.totalOtherFormatPairs) }}</span
+          >
+        </button>
+      </div>
+
       <DuplicateSummaryBand
+        :kind="duplicates.kind.value"
         :groups="groups"
         :total-groups="duplicates.total.value"
         :total-extra-copies="duplicates.scan.value?.totalExtraCopies ?? null"
@@ -292,7 +358,7 @@ function handleKeydown(event: KeyboardEvent): void {
           <span>{{ t('tools.bookDuplicates.columns.book') }}</span>
           <span class="duplicate-cell-copies text-center">{{ t('tools.bookDuplicates.columns.copies') }}</span>
           <span class="duplicate-cell-library">{{ t('tools.bookDuplicates.columns.libraries') }}</span>
-          <span class="duplicate-cell-free text-end">{{ t('tools.bookDuplicates.columns.frees') }}</span>
+          <span class="duplicate-cell-free text-end">{{ t('tools.bookDuplicates.columns.reclaimable') }}</span>
           <span class="duplicate-cell-keeper">{{ t('tools.bookDuplicates.columns.keeping') }}</span>
           <span />
         </div>
@@ -307,11 +373,15 @@ function handleKeydown(event: KeyboardEvent): void {
             :selected="duplicates.selectedGroupIds.value.has(group.id)"
             :expanded="duplicates.expandedGroupIds.value.has(group.id)"
             :focused="focusedGroupId === group.id"
+            :action="duplicates.actionFor(group)"
+            :actions="duplicates.actionsFor(group)"
+            :merge-unavailable-reason="duplicates.permissions.value.canMerge ? duplicates.mergeAvailabilityFor(group).reason : null"
             @select="handleSelect"
             @expand="handleExpand"
             @keep="handleKeep"
             @dismiss="handleDismiss"
-            @delete-group="handleReviewGroup"
+            @action="handleAction"
+            @review="handleReviewGroup"
           />
         </ul>
       </div>
@@ -323,18 +393,29 @@ function handleKeydown(event: KeyboardEvent): void {
       >
         <template v-if="duplicates.selectedGroupIds.value.size > 0">
           <p aria-live="polite">
-            {{
-              t('tools.bookDuplicates.selection.summary', {
-                groups: formatNumber(duplicates.selectedGroupIds.value.size),
-                copies: formatNumber(duplicates.selectionCopyCount.value),
-                size: formatBytes(duplicates.selectionBytes.value),
-              })
-            }}
+            {{ t('tools.bookDuplicates.selection.groups', { count: duplicates.selectionGroupCount.value }, duplicates.selectionGroupCount.value) }}
+            <template v-if="duplicates.selectionBytes.value > 0">
+              {{ t('tools.bookDuplicates.selection.frees', { size: formatBytes(duplicates.selectionBytes.value) }) }}
+            </template>
+            <span v-if="duplicates.allGroupsCapped.value" class="block text-muted-foreground" data-testid="duplicate-selection-capped">
+              {{ t('tools.bookDuplicates.selection.capped', { max: formatNumber(BOOK_DUPLICATE_RESOLUTION_MAX_GROUPS) }) }}
+            </span>
           </p>
+          <Button
+            v-if="duplicates.canSelectAllGroups.value"
+            variant="link"
+            size="sm"
+            data-testid="duplicate-select-all-groups"
+            @click="handleSelectAllGroups"
+          >
+            {{ t('tools.bookDuplicates.selection.selectAllGroups', { count: duplicates.total.value }, duplicates.total.value) }}
+          </Button>
           <Button class="ms-auto" variant="ghost" size="sm" @click="handleClearSelection">{{ t('tools.bookDuplicates.selection.clear') }}</Button>
-          <Button variant="destructive" size="sm" :disabled="duplicates.deleting.value" @click="handleReviewSelection">
-            <Trash2 aria-hidden="true" />
-            {{ t('tools.bookDuplicates.selection.review', { count: duplicates.selectionCopyCount.value }, duplicates.selectionCopyCount.value) }}
+          <Button size="sm" :disabled="duplicates.resolving.value" @click="handleReviewSelection">
+            <ListChecks aria-hidden="true" />
+            {{
+              t('tools.bookDuplicates.selection.reviewGroups', { count: duplicates.selectionGroupCount.value }, duplicates.selectionGroupCount.value)
+            }}
           </Button>
         </template>
         <template v-else>
@@ -385,18 +466,29 @@ function handleKeydown(event: KeyboardEvent): void {
       </div>
       <div class="space-y-1">
         <p class="text-base font-semibold text-foreground">{{ t('tools.bookDuplicates.initial.title') }}</p>
-        <p class="max-w-md text-sm text-muted-foreground">{{ t('tools.bookDuplicates.initial.description') }}</p>
+        <p class="max-w-md text-sm text-muted-foreground">{{ t('tools.bookDuplicates.initial.descriptionActions') }}</p>
       </div>
       <DismissedDuplicatesSection :dismissals="duplicates.dismissals.value" @restore="handleRestore" />
     </section>
 
     <DuplicateReviewSheet
       :open="reviewOpen"
-      :groups="reviewGroups"
+      :groups="reviewedGroups"
+      :all-groups="reviewAllGroups"
+      :total-groups="duplicates.total.value"
       :keeper-for="duplicates.keeperIdFor"
-      :deleting="duplicates.deleting.value"
+      :action-for="duplicates.actionFor"
+      :actions-for="duplicates.actionsFor"
+      :book-action-for="duplicates.bookActionFor"
+      :can-delete="duplicates.permissions.value.canDelete"
+      :job="duplicates.resolution.job.value"
+      :running="duplicates.resolving.value"
+      :error="duplicates.resolution.error.value"
       @confirm="handleConfirmReview"
       @cancel="handleCancelReview"
+      @book-action="handleBookAction"
+      @merged="handleMerged"
+      @link-instead="handleLinkInstead"
     />
   </div>
 </template>

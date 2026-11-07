@@ -1,5 +1,10 @@
 import { realignAudioTrackOrder } from '../../db/audio-track-order';
-import { recordBookFileHashHistory, deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
+import {
+  bumpKoreaderHashRevisions,
+  recordBookFileHashHistory,
+  deleteBookFilesWithHashInvalidation,
+  deleteBooksWithHashInvalidation,
+} from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -24,6 +29,7 @@ import {
   users,
 } from '../../db/schema';
 import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
+import type { LibraryRoot } from './lib/library-roots';
 
 type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -31,6 +37,8 @@ type MoveBookToLibraryResult = Pick<typeof books.$inferSelect, 'id' | 'libraryId
   previousLibraryId: number;
   libraryChanged: boolean;
 };
+
+const CLAIM_LOOKUP_BATCH_SIZE = 1000;
 
 @Injectable()
 export class ScannerRepository {
@@ -102,6 +110,40 @@ export class ScannerRepository {
 
   async findLibraryFolders(libraryId: number) {
     return this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
+  }
+
+  /** Every library's folders, which decide who owns a path when folders overlap. */
+  async findAllLibraryRoots(): Promise<LibraryRoot[]> {
+    return this.db.select({ id: libraryFolders.id, libraryId: libraryFolders.libraryId, path: libraryFolders.path }).from(libraryFolders);
+  }
+
+  /**
+   * Books filed under one of `fromFolderIds` at one of these folder paths, which now belong to a
+   * folder of `libraryId`. One that library already has a book at is left where it is: moving it
+   * would collide with that book.
+   */
+  async findBooksToClaim(
+    fromFolderIds: readonly number[],
+    libraryId: number,
+    folderPaths: readonly string[],
+  ): Promise<Array<{ id: number; libraryId: number; folderPath: string }>> {
+    if (fromFolderIds.length === 0 || folderPaths.length === 0) return [];
+    const found: Array<{ id: number; libraryId: number; folderPath: string }> = [];
+    for (let index = 0; index < folderPaths.length; index += CLAIM_LOOKUP_BATCH_SIZE) {
+      const batch = folderPaths.slice(index, index + CLAIM_LOOKUP_BATCH_SIZE);
+      const rows = await this.db
+        .select({ id: books.id, libraryId: books.libraryId, folderPath: books.folderPath })
+        .from(books)
+        .where(
+          and(
+            inArray(books.libraryFolderId, [...fromFolderIds]),
+            inArray(books.folderPath, batch),
+            sql`not exists (select 1 from ${books} mine where mine.library_id = ${libraryId} and mine.folder_path = ${books.folderPath} and mine.id <> ${books.id})`,
+          ),
+        );
+      found.push(...rows);
+    }
+    return found;
   }
 
   async findLibrarySettings(libraryId: number) {
@@ -519,6 +561,7 @@ export class ScannerRepository {
           status: books.status,
           primaryFileId: books.primaryFileId,
         });
+      if (book && libraryChanged) await bumpKoreaderHashRevisions(tx, [current.libraryId, libraryId]);
       return book ? { ...book, previousLibraryId: current.libraryId, libraryChanged } : null;
     });
   }
@@ -673,6 +716,8 @@ export class ScannerRepository {
     sourceFileId: number;
     duplicateBookId: number;
     duplicateFileId: number;
+    /** Folds the duplicate into the moved book when readers have data on it; false leaves it to be deleted. */
+    absorbDuplicate?: (tx: DbTransaction) => Promise<boolean>;
   }): Promise<{ bookId: number; libraryId: number; duplicateBookId: number } | null> {
     return this.db.transaction(async (tx) => {
       const [source] = await tx
@@ -700,7 +745,8 @@ export class ScannerRepository {
         .limit(1);
       if (!duplicate || duplicate.bookId === input.sourceBookId) return null;
 
-      await deleteBooksWithHashInvalidation(tx, eq(books.id, input.duplicateBookId));
+      const absorbed = input.absorbDuplicate ? await input.absorbDuplicate(tx) : false;
+      if (!absorbed) await deleteBooksWithHashInvalidation(tx, eq(books.id, input.duplicateBookId));
       await tx
         .update(books)
         .set({

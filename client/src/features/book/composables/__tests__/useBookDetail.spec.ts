@@ -162,4 +162,29 @@ describe('useBookDetail', () => {
     expect(detailState.error.value).toBeNull()
     expect(detailState.loading.value).toBe(false)
   })
+  it('reports the kept book when a 404 says the id was merged away', async () => {
+    mocks.api.mockResolvedValue(makeResponse({ errorCode: 'BOOK_MERGED', errorMeta: { targetBookId: 88 } }, 404))
+    const detailState = useBookDetail()
+
+    await detailState.fetch(20)
+
+    expect(detailState.mergedInto.value).toBe(88)
+    expect(detailState.notFound.value).toBe(false)
+    expect(detailState.detail.value).toBeNull()
+    expect(detailState.loading.value).toBe(false)
+  })
+
+  it('treats a 404 without a usable merge target as not found', async () => {
+    mocks.api.mockResolvedValueOnce(makeResponse({ errorCode: 'BOOK_MERGED', errorMeta: { targetBookId: 'x' } }, 404))
+    const detailState = useBookDetail()
+
+    await detailState.fetch(20)
+    expect(detailState.mergedInto.value).toBeNull()
+    expect(detailState.notFound.value).toBe(true)
+
+    mocks.api.mockResolvedValueOnce({ ok: false, status: 404, json: async () => Promise.reject(new Error('not json')) } as unknown as Response)
+    await detailState.fetch(21)
+    expect(detailState.mergedInto.value).toBeNull()
+    expect(detailState.notFound.value).toBe(true)
+  })
 })

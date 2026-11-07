@@ -1,15 +1,25 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
+import { BookAliasService } from '../../book-alias/book-alias.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const LEGACY_ENTITLEMENT_RE = /^\d+$/;
 const LEGACY_COVER_RE = /^\d+(?:-\d+)?$/;
+
+export interface KoboIdResolveOptions {
+  /**
+   * A legacy numeric id is the book id itself, so after a merge it names a book that is gone.
+   * Progress, annotations and covers follow it to the book it was merged into; removal, metadata
+   * and download must not, or a device dropping the old tile would drop the kept book with it.
+   */
+  followMerges?: boolean;
+}
 
 export type KoboBookIdentity = {
   bookId: number;
@@ -20,7 +30,10 @@ export type KoboBookIdentity = {
 
 @Injectable()
 export class KoboBookIdentityService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Optional() private readonly aliases?: BookAliasService,
+  ) {}
 
   async ensureForBook(userId: number, bookId: number, needsLegacyNumericRemoval: boolean): Promise<KoboBookIdentity> {
     const identities = await this.ensureForBooks(userId, [bookId], needsLegacyNumericRemoval);
@@ -62,7 +75,7 @@ export class KoboBookIdentityService {
     return new Map(rows.map((row) => [row.bookId, row]));
   }
 
-  async resolveBookIdByEntitlementId(userId: number, entitlementId: string): Promise<number | null> {
+  async resolveBookIdByEntitlementId(userId: number, entitlementId: string, options: KoboIdResolveOptions = {}): Promise<number | null> {
     if (UUID_RE.test(entitlementId)) {
       const [row] = await this.db
         .select({ bookId: schema.koboBookEntitlements.bookId })
@@ -73,13 +86,13 @@ export class KoboBookIdentityService {
     }
 
     if (LEGACY_ENTITLEMENT_RE.test(entitlementId)) {
-      return Number(entitlementId);
+      return this.legacyBookId(Number(entitlementId), options);
     }
 
     return null;
   }
 
-  async resolveBookIdByCoverImageId(userId: number, coverImageId: string): Promise<number | null> {
+  async resolveBookIdByCoverImageId(userId: number, coverImageId: string, options: KoboIdResolveOptions = {}): Promise<number | null> {
     const baseCoverImageId = this.baseCoverImageId(coverImageId);
     if (UUID_RE.test(baseCoverImageId)) {
       const [row] = await this.db
@@ -91,7 +104,7 @@ export class KoboBookIdentityService {
     }
 
     if (LEGACY_COVER_RE.test(coverImageId)) {
-      return Number(coverImageId.split('-')[0]);
+      return this.legacyBookId(Number(coverImageId.split('-')[0]), options);
     }
 
     return null;
@@ -109,6 +122,11 @@ export class KoboBookIdentityService {
 
   buildVersionedCoverImageId(coverImageId: string, version: Date | null): string {
     return version ? `${coverImageId}_${version.getTime()}` : coverImageId;
+  }
+
+  private async legacyBookId(bookId: number, options: KoboIdResolveOptions): Promise<number> {
+    if (!options.followMerges || !this.aliases) return bookId;
+    return (await this.aliases.resolveOne(bookId)) ?? bookId;
   }
 
   private baseCoverImageId(coverImageId: string): string {

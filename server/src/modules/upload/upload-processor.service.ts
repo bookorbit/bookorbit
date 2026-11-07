@@ -1,12 +1,13 @@
 import { realignAudioTrackOrder } from '../../db/audio-track-order';
 import { deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
-import { Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import { basename } from 'path';
 import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { isAudioFormat } from '@bookorbit/types';
 import type { FileRole as BookFileRole } from '../scanner/lib/classify';
+import { FileLockService, bookOperationLockKey } from '../../common/services/file-lock.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
 import { naturalCompare } from '../../common/utils/natural-sort.utils';
@@ -95,6 +96,10 @@ const METADATA_FORMATS = new Set([
   'flac',
 ]);
 
+function joinTargetMoved(): ConflictException {
+  return new ConflictException('The book this file belongs with moved while the file was being added. Try again.');
+}
+
 @Injectable()
 export class UploadProcessorService {
   private readonly logger = new Logger(UploadProcessorService.name);
@@ -103,10 +108,44 @@ export class UploadProcessorService {
     @Inject(DB) private readonly db: Db,
     private readonly metadataService: MetadataService,
     private readonly coverStore: BookCoverStore,
+    private readonly fileLocks: FileLockService,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
     @Optional() private readonly scanner?: ScannerService,
   ) {}
+
+  /**
+   * Runs `work`, which places files into `folderPath` and records them, holding the lock of the book
+   * that already owns that folder: the one write-back, rename and merge take, so none of them moves
+   * or rewrites the folder between a file landing in it and its row. A folder no book owns needs no
+   * lock; the row lock in `upsertBookFile` orders two imports creating the same book there.
+   *
+   * `expectedBookId` is a book the caller resolved earlier and means to join. If the folder belongs
+   * to anything else by now, nothing is placed. The lock is not re-entrant: never call this while
+   * holding a book lock.
+   */
+  async withFolderBookLock<T>(libraryId: number, folderPath: string, work: () => Promise<T>, expectedBookId?: number): Promise<T> {
+    const bookId = await this.findBookIdAtFolder(libraryId, folderPath);
+    if (expectedBookId !== undefined && bookId !== expectedBookId) throw joinTargetMoved();
+    if (bookId === null) return work();
+
+    return this.fileLocks.withLock(bookOperationLockKey(bookId), async () => {
+      // A rename or merge may have moved the book while this waited. A folder left with no book is
+      // free to file into; one another book took since is not.
+      const current = await this.findBookIdAtFolder(libraryId, folderPath);
+      if (current !== bookId && (current !== null || expectedBookId !== undefined)) throw joinTargetMoved();
+      return work();
+    });
+  }
+
+  private async findBookIdAtFolder(libraryId: number, folderPath: string): Promise<number | null> {
+    const [row] = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), eq(books.folderPath, folderPath)))
+      .limit(1);
+    return row?.id ?? null;
+  }
 
   /** A file joined or left these books, so their cover slots are brought back in line with it. */
   reconcileCoversAsync(bookIds: readonly number[]): void {

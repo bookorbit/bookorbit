@@ -197,6 +197,50 @@ export const koboBookEntitlements = pgTable(
   ],
 );
 
+/**
+ * An entitlement whose book row was deleted. The delete cascades the entitlement and every device
+ * snapshot row, which is what sync reads to send `IsRemoved`, so the removal is kept here instead,
+ * without a key to the book.
+ */
+export const koboEntitlementTombstones = pgTable(
+  'kobo_entitlement_tombstones',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    entitlementId: uuid('entitlement_id').notNull(),
+    // Set when a device may still know the book by its numeric id from before random entitlement ids.
+    legacyBookId: integer('legacy_book_id'),
+    removedAt: timestamp('removed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.entitlementId] }), index('kobo_entitlement_tombstones_user_removed_at_idx').on(t.userId, t.removedAt)],
+);
+
+/** A tombstone one device has not been sent yet. Sync deletes the row in the request that serves it. */
+export const koboDeviceEntitlementTombstones = pgTable(
+  'kobo_device_entitlement_tombstones',
+  {
+    userId: integer('user_id').notNull(),
+    deviceId: integer('device_id').notNull(),
+    entitlementId: uuid('entitlement_id').notNull(),
+    legacyNumericRemoval: boolean('legacy_numeric_removal').notNull().default(false),
+  },
+  (t) => [
+    primaryKey({ columns: [t.deviceId, t.entitlementId] }),
+    foreignKey({
+      columns: [t.deviceId, t.userId],
+      foreignColumns: [koboDevices.id, koboDevices.userId],
+      name: 'kobo_device_entitlement_tombstones_owner_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [t.userId, t.entitlementId],
+      foreignColumns: [koboEntitlementTombstones.userId, koboEntitlementTombstones.entitlementId],
+      name: 'kobo_device_entitlement_tombstones_tombstone_fk',
+    }).onDelete('cascade'),
+    index('kobo_device_entitlement_tombstones_user_entitlement_idx').on(t.userId, t.entitlementId),
+  ],
+);
+
 export const koboReadingStates = pgTable(
   'kobo_reading_states',
   {

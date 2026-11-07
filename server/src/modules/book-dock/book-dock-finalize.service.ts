@@ -26,6 +26,9 @@ import type {
   BookDockFinalizePreviewResult,
   BookDockFinalizePreviewStatus,
   BookDockFinalizeResult,
+  BookDockJoinBook,
+  BookDockJoinErrorCode,
+  BookDockJoinSuggestion,
   BookDockMetadata,
   ComicMetadataFields,
   MetadataSeriesMembership,
@@ -43,6 +46,7 @@ import {
 } from '@bookorbit/types';
 import type { BookRequestImportFormats, CoverMedium } from '@bookorbit/types';
 import type { FileRole } from '../scanner/lib/classify';
+import type { RequestUser } from '../../common/types/request-user';
 import { ProviderIdStore } from '../metadata-fetch/provider-ids/provider-id.store';
 import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
@@ -69,6 +73,14 @@ import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import {
+  BookDockJoinService,
+  hasFolderOfItsOwn,
+  joinError,
+  joinErrorCodeOf,
+  type JoinSuggestionInput,
+  type ResolvedJoinTarget,
+} from './book-dock-join.service';
 import { normalizeBookDockMetadata } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue } from './book-dock-work-queue';
@@ -79,7 +91,16 @@ type LibraryRow = typeof libraries.$inferSelect;
 type LibraryFolderRow = typeof libraryFolders.$inferSelect;
 type NamingLibrary = { name?: string | null; fileNamingPattern?: string | null; organizationMode?: string | null };
 
-type JoinBook = { bookId: number; folderPath: string; coverUrl?: string | null };
+type JoinBook = { bookId: number; folderPath: string; coverUrl?: string | null; storedAsFile?: boolean };
+
+/** A per-file override as a finalize request states it. */
+export type FinalizeRequestOverride = {
+  fileId: number;
+  libraryId?: number;
+  folderId?: number;
+  targetFileName?: string;
+  joinBook?: { bookId: number };
+};
 
 type FinalizeOverrideEntry = {
   libraryId?: number;
@@ -92,9 +113,17 @@ type FinalizeOverrideEntry = {
    * files carry none of their own.
    */
   joinBook?: JoinBook;
+  /**
+   * A book a person picked for this file. Unlike `joinBook`, which another module resolved and
+   * vouches for, this is checked against the person before anything moves, and a refusal holds the
+   * file instead of filing it somewhere else.
+   */
+  requestedJoinBookId?: number;
   /** A cover the metadata lookup found by itself, rather than one a person picked. See `applyMetadata`. */
   lookedUpCoverUrl?: string | null;
 };
+
+type PreviewJoinInfo = { canJoinBook: boolean; suggestedJoinBook?: BookDockJoinSuggestion };
 
 const BATCH_SIZE = 100;
 const PREVIEW_ITEM_LIMIT = 200;
@@ -172,6 +201,9 @@ type FinalizeCandidateAnalysis = {
   bookFolderPath?: string;
   /** The existing book this file was placed into the folder of, when it was asked to join one. */
   joinBook?: JoinBook;
+  /** How a book a person picked reads in the preview. */
+  joinSummary?: BookDockJoinBook;
+  errorCode?: BookDockJoinErrorCode;
   lookedUpCoverUrl?: string | null;
 };
 
@@ -259,6 +291,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
     @Optional() private readonly providerIdStore?: ProviderIdStore,
+    @Optional() private readonly joinService?: BookDockJoinService,
   ) {
     this.autoFinalizeQueue = new BookDockWorkQueue(
       AUTO_FINALIZE_QUEUE_CONCURRENCY,
@@ -292,14 +325,15 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     excludedIds: number[] | undefined,
     defaultLibraryId: number | undefined,
     defaultFolderId: number | undefined,
-    overrides?: Array<{ fileId: number } & FinalizeOverrideEntry>,
+    overrides?: FinalizeRequestOverride[],
     status?: string,
     search?: string,
     needsReview?: boolean,
     readyToFile?: boolean,
+    requester?: RequestUser,
   ): Promise<BookDockFinalizeResult> {
     const ids = selectAll ? [] : dedupeIds(fileIds ?? []);
-    const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
+    const overrideMap = toOverrideMap(overrides);
 
     const results: BookDockFinalizeFileResult[] = [];
     let succeeded = 0;
@@ -321,7 +355,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         });
         if (rows.length === 0) break;
 
-        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
         for (const analysis of prepared.analyses) {
           const result = await this.finalizePreparedCandidate(analysis, prepared.existingDestinations);
           results.push(result);
@@ -335,7 +369,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
         const rows = await this.repo.findByIds(batch, userId, canManageAll);
-        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
         const analysisById = new Map(prepared.analyses.map((analysis) => [analysis.fileId, analysis]));
 
         for (const fileId of batch) {
@@ -407,41 +441,50 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       // Every file of the unit, or the single file that is the whole unit. Moved one at a time and
       // remembered as they land, so a failure part-way can put back exactly what was moved.
       const moved: Array<{ from: string; to: string }> = [];
-      try {
-        for (const file of placement) {
-          await this.storage.moveToPath(file.sourcePath, file.destPath);
-          moved.push({ from: file.destPath, to: file.sourcePath });
+      const placeAndRecord = async () => {
+        try {
+          for (const file of placement) {
+            await this.storage.moveToPath(file.sourcePath, file.destPath);
+            moved.push({ from: file.destPath, to: file.sourcePath });
+          }
+          const persistedPath = (await resolveExistingPathSpelling(destPath, folder.path)) ?? destPath;
+          // The primary is first and the siblings after, because the book row that carries
+          // `primaryFileId` is the one created for the first file. Ordering here is the whole
+          // mechanism by which a 31-track audiobook points at track one rather than at whichever
+          // row happened to insert first.
+          const records = await this.createUnitBookRecord(library, folder, placement, persistedPath, format, preparedAnalysis.bookFolderPath);
+          return { persistedPath, records };
+        } catch (err) {
+          await this.undoMoves(moved);
+          throw err;
         }
-      } catch (err) {
-        await this.undoMoves(moved);
-        throw err;
-      }
-
-      const persistedDestPath = (await resolveExistingPathSpelling(destPath, folder.path)) ?? destPath;
+      };
+      // A folder-per-book unit shares one folder, which may already be a book's: this file joining
+      // it, or the naming pattern leading there. The files land in it under that book's lock.
+      const sharedFolder = library.organizationMode === 'book_per_file' ? undefined : preparedAnalysis.bookFolderPath;
+      const { persistedPath: persistedDestPath, records: written } = sharedFolder
+        ? await this.processor.withFolderBookLock(library.id, sharedFolder, placeAndRecord, analysis.joinBook?.bookId)
+        : await placeAndRecord();
 
       let bookId: number;
-      let written: UnitBookRecords | null = null;
       try {
-        // The primary is first and the siblings after, because the book row that carries
-        // `primaryFileId` is the one created for the first file. Ordering here is the whole
-        // mechanism by which a 31-track audiobook points at track one rather than at whichever
-        // row happened to insert first.
-        written = await this.createUnitBookRecord(library, folder, placement, persistedDestPath, format, preparedAnalysis.bookFolderPath);
         bookId = written.bookIds[0]!;
         // Several ids only in a loose-file library, where each format is its own book. They are the
         // same work, so they get the same metadata rather than one of them getting all of it.
         for (const created of written.bookIds) {
-          // A book this file was asked to join keeps the metadata it already has; the new format
-          // brings only what belongs to that format.
-          if (created === analysis.joinBook?.bookId && !written.createdBookIds.includes(created)) {
-            await this.applyJoinedMetadata(created, row, analysis.joinBook.coverUrl ?? null, analysis.lookedUpCoverUrl ?? null);
+          // Only a book this import created takes the file's metadata. One already on the shelf,
+          // whether this file was asked to join it or the naming pattern just led to its folder,
+          // keeps what it has, and the new format brings only what belongs to that format (#1568).
+          if (!written.createdBookIds.includes(created)) {
+            const requestedCoverUrl = created === analysis.joinBook?.bookId ? (analysis.joinBook.coverUrl ?? null) : null;
+            await this.applyJoinedMetadata(created, row, requestedCoverUrl, analysis.lookedUpCoverUrl ?? null);
           } else await this.applyMetadata(created, row, created === bookId, analysis.lookedUpCoverUrl ?? null);
         }
       } catch (err) {
         // The books committed before the failure, and metadata runs against services that cannot
         // join that transaction, so the compensation is explicit: take back exactly what this unit
         // wrote, then put the files back where they came from.
-        if (written) await this.undoUnitBookRecords(written, row.id);
+        await this.undoUnitBookRecords(written, row.id);
         await this.undoMoves(moved);
         throw err;
       }
@@ -457,6 +500,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       }
       existingDestinations.set(this.destinationKey(library.id, destPath), bookId);
       existingDestinations.set(this.destinationKey(library.id, persistedDestPath), bookId);
+      if (analysis.joinSummary) {
+        this.logger.log(
+          `[book_dock.join_book] [end] fileId=${row.id} bookId=${analysis.joinSummary.bookId} landedBookId=${bookId} files=${placement.length} - filed as another format of an existing book`,
+        );
+      }
 
       const newName = persistedDestPath.substring(folder.path.length + 1);
       return { fileId: row.id, fileName: row.fileName, newName, success: true, bookId };
@@ -476,14 +524,16 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     excludedIds: number[] | undefined,
     defaultLibraryId: number | undefined,
     defaultFolderId: number | undefined,
-    overrides?: Array<{ fileId: number } & FinalizeOverrideEntry>,
+    overrides?: FinalizeRequestOverride[],
     status?: string,
     search?: string,
     needsReview?: boolean,
     readyToFile?: boolean,
+    requester?: RequestUser,
   ): Promise<BookDockFinalizePreviewResult> {
     const summary = createFinalizePreviewSummary();
-    const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
+    const overrideMap = toOverrideMap(overrides);
+    const joinAccess = new Map<number, Promise<boolean>>();
 
     await this.processFinalizeSelection(
       userId,
@@ -496,11 +546,15 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       needsReview,
       readyToFile,
       async (rows, missingIds) => {
-        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
+        const analyses: FinalizeCandidateAnalysis[] = [];
         for (const candidate of prepared.analyses) {
-          const analysis = await this.classifyDestination(candidate, prepared.existingDestinations);
-          addFinalizePreviewAnalysis(summary, analysis);
+          analyses.push(await this.classifyDestination(candidate, prepared.existingDestinations));
         }
+        // Only what the preview lists is worth a lookup: past the item limit nobody sees it.
+        const listed = analyses.slice(0, Math.max(0, PREVIEW_ITEM_LIMIT - summary.items.length));
+        const joinInfo = await this.describeJoins(listed, requester, joinAccess);
+        for (const analysis of analyses) addFinalizePreviewAnalysis(summary, analysis, joinInfo.get(analysis.fileId));
         for (const fileId of missingIds) {
           addFinalizePreviewItem(summary, {
             fileId,
@@ -524,16 +578,17 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     excludedIds: number[] | undefined,
     defaultLibraryId: number | undefined,
     defaultFolderId: number | undefined,
-    overrides?: Array<{ fileId: number } & FinalizeOverrideEntry>,
+    overrides?: FinalizeRequestOverride[],
     status?: string,
     search?: string,
     needsReview?: boolean,
     readyToFile?: boolean,
+    requester?: RequestUser,
   ): Promise<BookDockDiscardDuplicatesResult> {
     const startedAt = Date.now();
     this.logger.log(`[book_dock.discard_duplicates] [start] userId=${userId} selectAll=${selectAll === true} - duplicate discard started`);
 
-    const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
+    const overrideMap = toOverrideMap(overrides);
     let total = 0;
     let discarded = 0;
     const discardedFileIds: number[] = [];
@@ -551,7 +606,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         readyToFile,
         async (rows, missingIds) => {
           total += rows.length + missingIds.length;
-          const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+          const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
           const duplicateRows: BookDockFileRow[] = [];
 
           for (const candidate of prepared.analyses) {
@@ -593,11 +648,16 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     overrideMap: Map<number, FinalizeOverrideEntry>,
     userId: number,
     isSuperuser: boolean,
+    requester?: RequestUser,
   ): Promise<FinalizeCandidateAnalysis> {
     try {
       const override = overrideMap.get(row.id);
-      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
-      const folderId = override?.folderId ?? row.targetFolderId ?? defaultFolderId ?? null;
+      const requestedJoin =
+        override?.requestedJoinBookId !== undefined ? await this.resolveRequestedJoin(override.requestedJoinBookId, row, requester) : null;
+      // The book decides the folder: its own lives under exactly one of the library's folders. A
+      // file with no destination of its own takes the book's library too.
+      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? requestedJoin?.libraryId ?? null;
+      const folderId = requestedJoin?.libraryFolderId ?? override?.folderId ?? row.targetFolderId ?? defaultFolderId ?? null;
 
       if (libraryId === null || folderId === null) {
         return {
@@ -611,6 +671,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       const library = await this.findLibraryOrFail(libraryId);
       await this.libraryService.verifyUserAccess(userId, libraryId, isSuperuser);
+      if (requestedJoin && requestedJoin.libraryId !== libraryId) {
+        throw joinError('BOOK_DOCK_JOIN_OTHER_LIBRARY', 'The book this file was meant to join is in a different library');
+      }
+      if (requestedJoin && library.organizationMode !== 'book_per_folder') {
+        throw joinError('BOOK_DOCK_JOIN_FILE_PER_BOOK', `"${library.name}" stores one book per file, so a file cannot be added to an existing book`);
+      }
 
       const folder = await this.findFolderOrFail(folderId, libraryId);
       const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
@@ -638,7 +704,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       // the pattern gave it, so the scan and the importer agree it is one book. The pattern's own
       // folder would follow this file's metadata, and an m4b tagged "Dune (Unabridged)" names a
       // different folder from the epub called "Dune".
-      const joinBook = this.resolveJoinBook(override?.joinBook, library, folder);
+      const requestedJoinBook = requestedJoin
+        ? { bookId: requestedJoin.bookId, folderPath: requestedJoin.folderPath, storedAsFile: requestedJoin.storedAsFile }
+        : undefined;
+      const joinBook = this.resolveJoinBook(requestedJoinBook ?? override?.joinBook, library, folder);
+      if (requestedJoin && !joinBook) {
+        throw joinError('BOOK_DOCK_JOIN_ROOT_LEVEL', 'The book this file was meant to join has no folder of its own to share');
+      }
       if (joinBook) destPath = join(joinBook.folderPath, basename(destPath));
 
       const { files: placement, bookFolderPath } = this.resolvePlacement(row, reduced.files, destPath, folder.path, library);
@@ -661,19 +733,70 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         placement,
         bookFolderPath,
         ...(joinBook ? { joinBook } : {}),
+        ...(requestedJoin ? { joinSummary: requestedJoin.summary } : {}),
         ...(override?.lookedUpCoverUrl ? { lookedUpCoverUrl: override.lookedUpCoverUrl } : {}),
       };
     } catch (error) {
       const status = classifyFinalizePreviewError(error);
       if (status === 'error') this.logFinalizeFailure(row.id, 'target_resolution', error);
+      const errorCode = joinErrorCodeOf(error);
       return {
         fileId: row.id,
         fileName: row.fileName,
         row,
         status,
         message: resolveFinalizeErrorMessage(error),
+        ...(errorCode ? { errorCode } : {}),
       };
     }
+  }
+
+  private async resolveRequestedJoin(bookId: number, row: BookDockFileRow, requester: RequestUser | undefined): Promise<ResolvedJoinTarget> {
+    if (!this.joinService) throw new Error('Joining an existing book is not available');
+    const unitFiles = await this.repo.findUnitFiles(row.id);
+    const contentFormats = unitFiles.length
+      ? unitFiles.filter((file) => file.role === 'content').map((file) => file.format ?? extname(file.fileName).slice(1))
+      : [row.format ?? extname(row.fileName).slice(1)];
+    return this.joinService.resolveRequested(
+      bookId,
+      requester,
+      contentFormats.map((format) => format.toLowerCase()),
+    );
+  }
+
+  /**
+   * What the preview says about adding each listed file to an existing book: whether it may, and
+   * which book it looks like another format of. One suggestion lookup per batch, not per file.
+   */
+  private async describeJoins(
+    analyses: FinalizeCandidateAnalysis[],
+    requester: RequestUser | undefined,
+    access: Map<number, Promise<boolean>>,
+  ): Promise<Map<number, PreviewJoinInfo>> {
+    const info = new Map<number, PreviewJoinInfo>();
+    if (!requester || !this.joinService) return info;
+
+    const inputs: JoinSuggestionInput[] = [];
+    for (const analysis of analyses) {
+      if (!analysis.library) continue;
+      const canJoinBook = await this.joinService.canJoinIn(analysis.library, requester, access);
+      info.set(analysis.fileId, { canJoinBook });
+      if (!canJoinBook || analysis.status !== 'ready' || analysis.joinBook) continue;
+      inputs.push({
+        fileId: analysis.fileId,
+        libraryId: analysis.library.id,
+        metadata: normalizeBookDockMetadata(analysis.row.selectedMetadata ?? analysis.row.embeddedMetadata),
+        formats: (analysis.placement ?? [])
+          .filter((file) => file.role === 'content')
+          .map((file) => (file.format ?? extname(file.destPath).slice(1)).toLowerCase()),
+      });
+    }
+
+    for (const [fileId, suggestion] of await this.joinService.suggest(inputs, requester)) {
+      const entry = info.get(fileId);
+      if (entry) entry.suggestedJoinBook = suggestion;
+    }
+    return info;
   }
 
   private async prepareFinalizeBatch(
@@ -683,10 +806,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     overrideMap: Map<number, FinalizeOverrideEntry>,
     userId: number,
     isSuperuser: boolean,
+    requester?: RequestUser,
   ): Promise<{ analyses: FinalizeCandidateAnalysis[]; existingDestinations: Map<string, number> }> {
     const analyses: FinalizeCandidateAnalysis[] = [];
     for (const row of rows) {
-      analyses.push(await this.resolveFinalizeCandidate(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser));
+      analyses.push(await this.resolveFinalizeCandidate(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester));
     }
 
     const destinationPaths = analyses.filter((analysis) => analysis.status === 'ready' && analysis.destPath).map((analysis) => analysis.destPath!);
@@ -700,15 +824,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
   /**
    * The book to join, when joining one is possible: the library keeps one book per folder, and the
-   * book's folder is a real folder inside the one being filed into. A book sitting loose at the
-   * folder root is its own file, so another format placed beside it would be a book of its own.
+   * book has a folder of its own inside the one being filed into (see `hasFolderOfItsOwn`).
    */
   private resolveJoinBook(joinBook: FinalizeOverrideEntry['joinBook'], library: LibraryRow, folder: LibraryFolderRow): JoinBook | null {
     if (!joinBook || library.organizationMode !== 'book_per_folder') return null;
-    const root = resolve(folder.path);
-    const bookFolder = resolve(joinBook.folderPath);
-    if (bookFolder === root || !bookFolder.startsWith(root + sep)) return null;
-    return joinBook;
+    return hasFolderOfItsOwn(joinBook, folder.path) ? joinBook : null;
   }
 
   /**
@@ -947,6 +1067,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       newName: analysis.newName,
       success: false,
       message: analysis.message,
+      ...(analysis.errorCode ? { errorCode: analysis.errorCode } : {}),
     };
   }
 
@@ -1506,6 +1627,7 @@ function createFinalizePreviewSummary(): BookDockFinalizePreviewResult {
   return {
     total: 0,
     ready: 0,
+    joining: 0,
     duplicates: 0,
     destinationConflicts: 0,
     missingDestination: 0,
@@ -1516,7 +1638,7 @@ function createFinalizePreviewSummary(): BookDockFinalizePreviewResult {
   };
 }
 
-function addFinalizePreviewAnalysis(summary: BookDockFinalizePreviewResult, analysis: FinalizeCandidateAnalysis): void {
+function addFinalizePreviewAnalysis(summary: BookDockFinalizePreviewResult, analysis: FinalizeCandidateAnalysis, join?: PreviewJoinInfo): void {
   addFinalizePreviewItem(summary, {
     fileId: analysis.fileId,
     fileName: analysis.fileName,
@@ -1524,11 +1646,17 @@ function addFinalizePreviewAnalysis(summary: BookDockFinalizePreviewResult, anal
     status: analysis.status,
     existingBookId: analysis.existingBookId,
     message: analysis.message,
+    ...(analysis.errorCode ? { errorCode: analysis.errorCode } : {}),
+    ...(analysis.library ? { libraryId: analysis.library.id } : {}),
+    ...(join ? { canJoinBook: join.canJoinBook } : {}),
+    ...(analysis.joinSummary && analysis.status === 'ready' ? { joinsBook: analysis.joinSummary } : {}),
+    ...(join?.suggestedJoinBook ? { suggestedJoinBook: join.suggestedJoinBook } : {}),
   });
 }
 
 function addFinalizePreviewItem(summary: BookDockFinalizePreviewResult, item: BookDockFinalizePreviewItem): void {
   summary.total++;
+  if (item.status === 'ready' && item.joinsBook) summary.joining = (summary.joining ?? 0) + 1;
   if (item.status === 'ready') summary.ready++;
   else if (item.status === 'duplicate') summary.duplicates++;
   else if (item.status === 'destination_conflict') summary.destinationConflicts++;
@@ -1890,6 +2018,12 @@ function shouldAutoFinalize(row: BookDockFileRow, mode: BookDockAutoFinalizeMeta
     return row.status === 'ready';
   }
   return row.confidence !== null && row.confidence >= threshold;
+}
+
+function toOverrideMap(overrides: FinalizeRequestOverride[] | undefined): Map<number, FinalizeOverrideEntry> {
+  return new Map(
+    (overrides ?? []).map(({ joinBook, ...rest }) => [rest.fileId, joinBook ? { ...rest, requestedJoinBookId: joinBook.bookId } : rest]),
+  );
 }
 
 function dedupeIds(ids: number[]): number[] {

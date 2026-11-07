@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { CommonModule } from '../../common/common.module';
 import { AppAttestModule } from '../app-attest/app-attest.module';
 import { AuthModule } from '../auth/auth.module';
+import { BookAliasModule } from '../book-alias/book-alias.module';
 import { BookModule } from '../book/book.module';
 import { EpubModule } from '../reader/epub/epub.module';
 import { WatchDownloadController } from './watch-download.controller';
@@ -21,6 +22,7 @@ import { WatchDownloadService } from './watch-download.service';
     }),
     AppAttestModule,
     AuthModule,
+    BookAliasModule,
     BookModule,
     CommonModule,
     EpubModule,

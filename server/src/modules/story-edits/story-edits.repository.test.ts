@@ -30,6 +30,7 @@ function makeDb(...results: unknown[]) {
   };
   const db = {
     select: vi.fn().mockImplementation(next('select')),
+    selectDistinct: vi.fn().mockImplementation(next('select')),
     insert: vi.fn().mockImplementation(next('insert')),
     update: vi.fn().mockImplementation(next('update')),
     execute: vi.fn().mockResolvedValue(undefined),
@@ -90,6 +91,35 @@ describe('StoryEditsRepository', () => {
       expect(where.params).toEqual([8, 5, 40]);
       expect(compiled(query.orderBy.mock.calls[0][0]).sql).toBe('"story_edits"."revision" asc');
       expect(query.limit).toHaveBeenCalledWith(201);
+    });
+  });
+
+  describe('redrawRevisions', () => {
+    it("draws new revisions for each reader's rows on the book, each under that reader's write lock", async () => {
+      const db = makeDb([{ userId: 7 }, { userId: 8 }]);
+      const repo = new StoryEditsRepository(db as never);
+
+      await expect(repo.redrawRevisions(5)).resolves.toBe(2);
+
+      expect(db.transaction).toHaveBeenCalledTimes(2);
+      expect(db.execute.mock.calls.map(([fragment]) => compiled(fragment).params)).toEqual([
+        [STORY_EDITS_WRITE_LOCK_NAMESPACE, 7],
+        [STORY_EDITS_WRITE_LOCK_NAMESPACE, 8],
+      ]);
+      const updates = db.calls.filter((call) => call.kind === 'update').map((call) => call.query);
+      expect(updates).toHaveLength(2);
+      expect(compiled((updates[0]!.set.mock.calls[0][0] as { revision: unknown }).revision).sql).toBe(
+        `nextval(pg_get_serial_sequence('story_edits', 'revision'))`,
+      );
+      expect(compiled(updates[1]!.where.mock.calls[0][0]).params).toEqual([8, 5]);
+    });
+
+    it('does nothing for a book without corrections', async () => {
+      const db = makeDb([]);
+      const repo = new StoryEditsRepository(db as never);
+
+      await expect(repo.redrawRevisions(5)).resolves.toBe(0);
+      expect(db.transaction).not.toHaveBeenCalled();
     });
   });
 

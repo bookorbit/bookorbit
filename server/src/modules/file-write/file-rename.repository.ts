@@ -1,4 +1,3 @@
-import { deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -214,48 +213,9 @@ export class FileRenameRepository {
     return owners;
   }
 
-  async applyExistingFolderMerge(input: {
-    sourceBookId: number;
-    targetBookId: number;
-    updates: BookFilePathUpdate[];
-    fallbackPrimaryFileId: number | null;
-  }): Promise<void> {
-    if (input.sourceBookId === input.targetBookId) return;
-
-    await this.db.transaction(async (tx) => {
-      const now = new Date();
-      const [target] = await tx
-        .select({ libraryFolderId: books.libraryFolderId, primaryFileId: books.primaryFileId })
-        .from(books)
-        .where(eq(books.id, input.targetBookId))
-        .for('update')
-        .limit(1);
-      if (!target) return;
-
-      for (const update of input.updates) {
-        await tx
-          .update(bookFiles)
-          .set({
-            bookId: input.targetBookId,
-            libraryFolderId: target.libraryFolderId,
-            absolutePath: update.absolutePath,
-            relPath: update.relPath,
-            updatedAt: now,
-          })
-          .where(eq(bookFiles.id, update.id));
-      }
-
-      await deleteBooksWithHashInvalidation(tx, eq(books.id, input.sourceBookId));
-
-      await tx
-        .update(books)
-        .set({
-          ...(target?.primaryFileId == null && input.fallbackPrimaryFileId != null ? { primaryFileId: input.fallbackPrimaryFileId } : {}),
-          status: 'present',
-          updatedAt: now,
-        })
-        .where(eq(books.id, input.targetBookId));
-    });
+  /** Runs a rename-merge's database half: the caller passes the transaction to `BookConsolidationService`. */
+  transaction<T>(work: (tx: Parameters<Parameters<Db['transaction']>[0]>[0]) => Promise<T>): Promise<T> {
+    return this.db.transaction(work);
   }
 
   async checkPathTakenByOtherBook(absolutePath: string, currentBookId: number): Promise<boolean> {

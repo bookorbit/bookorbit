@@ -27,8 +27,8 @@ import { tmpdir } from 'os';
 
 import { eq } from 'drizzle-orm';
 
+import { LibraryOperationGate } from '../src/common/services/library-operation-gate.service';
 import * as schema from '../src/db/schema';
-import { BulkRenameService } from '../src/modules/library/bulk-rename.service';
 import {
   authHeader,
   closeFileRenameE2EContext,
@@ -846,15 +846,15 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
       const books = await findAllBooksInLibrary(ctx, lib.libraryId);
       await setBookMetadata(ctx, books[0].bookId, { title: 'Concurrent Test' });
 
-      // Simulate by patching the running set via the service
-      const bulkRenameService = ctx.app.get(BulkRenameService) as { runningLibraries: Set<number> };
-      bulkRenameService.runningLibraries.add(lib.libraryId);
-
-      const result = await executeBulkRename(ctx, lib.libraryId);
-      expect(result.statusCode).toBe(400);
-
-      // Cleanup
-      bulkRenameService.runningLibraries.delete(lib.libraryId);
+      // A run in progress holds the library's operation gate.
+      const release = ctx.app.get(LibraryOperationGate).tryAcquire(lib.libraryId, 'bulk_rename');
+      expect(release).not.toBeNull();
+      try {
+        const result = await executeBulkRename(ctx, lib.libraryId);
+        expect(result.statusCode).toBe(400);
+      } finally {
+        release?.();
+      }
     });
   });
 
@@ -1073,6 +1073,35 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
       const after = await findAllBooksInLibrary(ctx, lib.libraryId);
       expect(after.map((b) => b.bookId)).toEqual([ebook.bookId, ebook.bookId]);
       expect(after.map((b) => b.relPath).sort()).toEqual(['Frank Herbert/Dune/Dune.epub', 'Frank Herbert/Dune/Dune.pdf']);
+    });
+
+    it('a rename that folds a format into its work keeps that book’s reading status, annotations, shelves and alias', async () => {
+      const lib = await createLibrary(ctx, { mode: 'book_per_folder', fileRenameEnabled: false, fileNamingPattern: '{authors}/{title}/{title}' });
+      await createEpubFile(join(lib.folderPath, 'Ursula K. Le Guin/The Dispossessed/The Dispossessed.epub'), 'The Dispossessed');
+      await createPdfFile(join(lib.folderPath, 'Incoming/scan.pdf'), 'The Dispossessed');
+      await triggerAndWaitForScan(ctx, lib.libraryId);
+
+      const books = await findAllBooksInLibrary(ctx, lib.libraryId);
+      const ebook = books.find((b) => b.absolutePath.endsWith('.epub'))!;
+      const pdf = books.find((b) => b.absolutePath.endsWith('scan.pdf'))!;
+      for (const book of [ebook, pdf]) await setBookMetadata(ctx, book.bookId, { title: 'The Dispossessed', authors: ['Ursula K. Le Guin'] });
+
+      const [admin] = await ctx.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.isSuperuser, true)).limit(1);
+      await ctx.db.insert(schema.userBookStatus).values({ userId: admin.id, bookId: pdf.bookId, status: 'read', source: 'manual' });
+      await ctx.db.insert(schema.annotations).values({ userId: admin.id, bookId: pdf.bookId, text: 'Anarres' });
+      const [shelf] = await ctx.db.insert(schema.collections).values({ userId: admin.id, name: 'Rename merge shelf' }).returning();
+      await ctx.db.insert(schema.collectionBooks).values({ collectionId: shelf.id, bookId: pdf.bookId });
+
+      expect((await writeAndRename(ctx, pdf.bookId)).rename.status).toBe('success');
+
+      const [status] = await ctx.db.select().from(schema.userBookStatus).where(eq(schema.userBookStatus.bookId, ebook.bookId));
+      expect(status).toMatchObject({ userId: admin.id, status: 'read' });
+      const notes = await ctx.db.select().from(schema.annotations).where(eq(schema.annotations.bookId, ebook.bookId));
+      expect(notes.map((note) => note.text)).toEqual(['Anarres']);
+      const shelved = await ctx.db.select().from(schema.collectionBooks).where(eq(schema.collectionBooks.collectionId, shelf.id));
+      expect(shelved.map((row) => row.bookId)).toEqual([ebook.bookId]);
+      const [alias] = await ctx.db.select().from(schema.bookMerges).where(eq(schema.bookMerges.sourceBookId, pdf.bookId));
+      expect(alias).toMatchObject({ targetBookId: ebook.bookId, mergedByUserId: admin.id });
     });
 
     it('bulk preview holds back series volumes that would share one folder, and the run renames none of them', async () => {

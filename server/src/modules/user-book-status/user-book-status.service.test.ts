@@ -672,6 +672,18 @@ describe('kobo status projection', () => {
     expect(mockKoboProjection.project).not.toHaveBeenCalled();
   });
 
+  it('projects a given status for another module only when two-way sync is on, and reports failure', async () => {
+    mockKoboProjection.isEnabled.mockResolvedValueOnce(false);
+    await service.projectKoboStatus(1, [10], 'read');
+    expect(mockKoboProjection.project).not.toHaveBeenCalled();
+
+    await service.projectKoboStatus(1, [10], 'read');
+    expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'read');
+
+    mockKoboProjection.project.mockRejectedValueOnce(new Error('deadlock'));
+    await expect(service.projectKoboStatus(1, [10], 'read')).rejects.toThrow('deadlock');
+  });
+
   describe('with reading attempts enabled', () => {
     const mockAttempts = {
       applyManualStatus: vi.fn(),

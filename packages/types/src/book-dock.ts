@@ -130,11 +130,62 @@ export interface BookDockSummary {
   paused: boolean;
 }
 
+/**
+ * Why a file could not be added to the book it was asked to join. Stable, so clients can show
+ * their own copy; new codes may be added, so an unknown one must read as a generic refusal.
+ */
+export const BOOK_DOCK_JOIN_ERROR_CODES = [
+  /** The book does not exist, or the requester cannot see it. */
+  "BOOK_DOCK_JOIN_BOOK_NOT_FOUND",
+  /** The book's files are missing from disk, so there is no folder to add to. */
+  "BOOK_DOCK_JOIN_BOOK_MISSING",
+  /** The requester can see the book but cannot edit its library. */
+  "BOOK_DOCK_JOIN_FORBIDDEN",
+  /** The book lives in a different library from the one the file is being filed into. */
+  "BOOK_DOCK_JOIN_OTHER_LIBRARY",
+  /** The library stores one book per file, so a second format cannot share a book. */
+  "BOOK_DOCK_JOIN_FILE_PER_BOOK",
+  /** The book sits loose at the library folder root and has no folder of its own to share. */
+  "BOOK_DOCK_JOIN_ROOT_LEVEL",
+  /** Both the book and the file hold audio; two audio sets in one book play as one doubled timeline. */
+  "BOOK_DOCK_JOIN_AUDIO_CONFLICT",
+] as const;
+
+export type BookDockJoinErrorCode = (typeof BOOK_DOCK_JOIN_ERROR_CODES)[number];
+
+export function isBookDockJoinErrorCode(value: unknown): value is BookDockJoinErrorCode {
+  return typeof value === "string" && (BOOK_DOCK_JOIN_ERROR_CODES as readonly string[]).includes(value);
+}
+
+/** An existing book a docked file joins or could join. */
+export interface BookDockJoinBook {
+  bookId: number;
+  title: string | null;
+  authors: string[];
+}
+
+/**
+ * What a suggestion was matched on: an ISBN, a work-level Hardcover or Open Library id, or the title
+ * with an agreeing author. New reasons may be added; show an unknown one as a plain match.
+ */
+export type BookDockJoinSuggestionReason = "isbn" | "work_id" | "title_author";
+
+export interface BookDockJoinSuggestion extends BookDockJoinBook {
+  reason: BookDockJoinSuggestionReason;
+}
+
 export interface BookDockFinalizeOverride {
   fileId: number;
   libraryId?: number;
   folderId?: number;
   targetFileName?: string;
+  /**
+   * Add this file to an existing book as another format, in that book's own folder. The server
+   * works out the folder from the book; the library must be the one the file is filed into and must
+   * keep one book per folder. Servers that predate this reject the field, so send it only when a
+   * finalize preview item carried `canJoinBook`.
+   */
+  joinBook?: { bookId: number };
 }
 
 export interface BookDockFinalizeRequest {
@@ -157,6 +208,8 @@ export interface BookDockFinalizeFileResult {
   isDuplicate?: boolean;
   existingBookId?: number;
   message?: string;
+  /** Set when a requested join was refused. */
+  errorCode?: BookDockJoinErrorCode;
 }
 
 export interface BookDockFinalizeResult {
@@ -185,11 +238,26 @@ export interface BookDockFinalizePreviewItem {
   status: BookDockFinalizePreviewStatus;
   existingBookId?: number;
   message?: string;
+  /** Set when a requested join was refused. */
+  errorCode?: BookDockJoinErrorCode;
+  /** The library the file is headed for, once its destination resolved. */
+  libraryId?: number;
+  /** Whether this file may be added to an existing book: a folder-per-book library the requester can edit. */
+  canJoinBook?: boolean;
+  /** The existing book this file will be added to. Present only when the request named it in `joinBook`. */
+  joinsBook?: BookDockJoinBook;
+  /**
+   * An existing book in the target library this file looks like another format of. Only a
+   * suggestion: nothing joins it until a request names it in `joinBook`.
+   */
+  suggestedJoinBook?: BookDockJoinSuggestion;
 }
 
 export interface BookDockFinalizePreviewResult {
   total: number;
   ready: number;
+  /** The subset of `ready` that will be added to an existing book. Absent on older servers. */
+  joining?: number;
   duplicates: number;
   destinationConflicts: number;
   missingDestination: number;

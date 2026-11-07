@@ -29,17 +29,35 @@ export interface HardcoverReadTarget {
 
 /**
  * Mirrors the `active ?? latest` rule that rebuildProjection uses to decide which attempt drives
- * user_book_status. The book-level dates the sync pushes to Hardcover are that attempt's dates, so
- * both sides must agree on the choice or the sync links a read to the wrong attempt.
+ * user_book_status, with `latest` ordered as findLatest orders it: the read that ended, or began,
+ * most recently, undated reads ranking oldest, then the higher id. The book-level dates the sync
+ * pushes to Hardcover are that attempt's dates, so both sides must agree on the choice or the sync
+ * links a read to the wrong attempt.
  */
-export function selectPrimaryAttempt<T extends { id: number; outcome: ReadingAttemptOutcome | null }>(attempts: readonly T[]): T | null {
-  let active: T | null = null;
-  let latest: T | null = null;
+export function selectPrimaryAttempt<T extends Pick<ReadingAttemptForSync, 'id' | 'startedOn' | 'endedOn' | 'outcome'>>(
+  attempts: readonly T[],
+): T | null {
+  let primary: T | null = null;
   for (const attempt of attempts) {
-    if (attempt.outcome === null && (active === null || attempt.id > active.id)) active = attempt;
-    if (latest === null || attempt.id > latest.id) latest = attempt;
+    if (primary === null || outranks(attempt, primary)) primary = attempt;
   }
-  return active ?? latest;
+  return primary;
+}
+
+function outranks(
+  candidate: Pick<ReadingAttemptForSync, 'id' | 'startedOn' | 'endedOn' | 'outcome'>,
+  current: Pick<ReadingAttemptForSync, 'id' | 'startedOn' | 'endedOn' | 'outcome'>,
+): boolean {
+  const candidateActive = candidate.outcome === null;
+  if (candidateActive !== (current.outcome === null)) return candidateActive;
+  const candidateDate = candidate.endedOn ?? candidate.startedOn;
+  const currentDate = current.endedOn ?? current.startedOn;
+  if (candidateDate !== currentDate) {
+    if (candidateDate === null) return false;
+    if (currentDate === null) return true;
+    return candidateDate > currentDate;
+  }
+  return candidate.id > current.id;
 }
 
 export function attemptOwnedReadId(attempt: Pick<ReadingAttemptForSync, 'externalProvider' | 'externalId'>): number | null {

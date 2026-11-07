@@ -416,7 +416,7 @@ describe('KoboAnalyticsService', () => {
       device,
     );
 
-    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, entitlementId);
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, entitlementId, { followMerges: true });
     expect(resolver.resolveBookFileId).toHaveBeenCalledWith(7, 2, 9);
     expect(readingSessionService.save).toHaveBeenCalledWith(
       100,
@@ -478,7 +478,7 @@ describe('KoboAnalyticsService', () => {
       device,
     );
 
-    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, '1');
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, '1', { followMerges: true });
     expect(bookService.bulkSetRating).toHaveBeenCalledWith([1], 4, user);
     expect(readingSessionService.save).not.toHaveBeenCalled();
   });
@@ -561,7 +561,7 @@ describe('KoboAnalyticsService', () => {
       device,
     );
 
-    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, 'unknown-entitlement');
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, 'unknown-entitlement', { followMerges: true });
     expect(bookService.bulkSetRating).not.toHaveBeenCalled();
   });
 

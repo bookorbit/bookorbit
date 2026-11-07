@@ -16,6 +16,7 @@ import { CoverService } from '../cover/cover.service';
 import { BulkEditFieldsDto } from './dto/bulk-edit-metadata.dto';
 import { BookRepository } from './book.repository';
 import { BookReadService } from './book-read.service';
+import { BookAliasService } from '../book-alias/book-alias.service';
 import { BookService } from './book.service';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
@@ -121,6 +122,7 @@ async function createContext(role: AccessLevel | null = 'viewer') {
     [BookCoverStore, coverStore],
     [FileWriteService, fileWrite],
     [FileRenameService, fileRename],
+    [BookAliasService, { resolveOne: vi.fn().mockResolvedValue(null) }],
   ]);
   const module = await Test.createTestingModule({ providers: [BookService, LibraryService, CoverService] })
     .useMocker((token) => mocks.get(token) ?? {})

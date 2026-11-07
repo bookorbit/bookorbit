@@ -146,9 +146,11 @@ export async function createLibraryWithFolder(
     fileWriteCbxMaxFileSizeMb?: number;
     fileWriteEpubMaxFileSizeMb?: number;
     fileWritePdfMaxFileSizeMb?: number;
+    /** Where the library folder is created instead of the fixture's books folder, such as another filesystem. */
+    basePath?: string;
   } = {},
 ): Promise<CreatedLibrary> {
-  const folderPath = `${ctx.fixture.booksPath}/library-${randomUUID()}`;
+  const folderPath = `${options.basePath ?? ctx.fixture.booksPath}/library-${randomUUID()}`;
   await mkdir(folderPath, { recursive: true });
 
   const [library] = await ctx.db

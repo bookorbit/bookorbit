@@ -45,6 +45,8 @@ export function isDestructiveAuditAction(action: string): boolean {
     /\.(delete|purge|remove|revoke|clean)$/.test(action) ||
     action.endsWith('.remove_download') ||
     action === AuditAction.BookBulkDelete ||
+    action === AuditAction.BookMerge ||
+    action === AuditAction.BookDuplicatesResolve ||
     action === AuditAction.UserSuperuserDisable ||
     action === AuditAction.OidcIdentityUnlinked
   )

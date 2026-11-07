@@ -1,6 +1,10 @@
 import type {
   BookDuplicateDismissal,
   BookDuplicateGroupSort,
+  BookDuplicateKind,
+  BookDuplicateResolutionJob,
+  BookDuplicateResolutionRequest,
+  BookDuplicateResolutionStartResponse,
   BookDuplicateGroupsResponse,
   BookDuplicateMatchReason,
   BookDuplicateScan,
@@ -10,6 +14,7 @@ import type {
 } from '@bookorbit/types'
 
 import { api } from '@/lib/api'
+import { apiError } from '@/lib/api-json'
 
 async function expectJson<T>(response: Response, fallbackMessage: string): Promise<T> {
   if (!response.ok) throw new Error(fallbackMessage)
@@ -43,23 +48,16 @@ export async function getBookDuplicateGroups(
     reason?: BookDuplicateMatchReason
     sortBy?: BookDuplicateGroupSort
     order?: BookDuplicateSortOrder
+    kind?: BookDuplicateKind
   },
 ): Promise<BookDuplicateGroupsResponse> {
   const query = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize) })
+  if (params.kind && params.kind !== 'duplicate') query.set('kind', params.kind)
   if (params.reason) query.set('reason', params.reason)
   if (params.sortBy) query.set('sortBy', params.sortBy)
   if (params.order) query.set('order', params.order)
   const response = await api(`/api/v1/book-duplicates/scans/${scanId}/groups?${query.toString()}`)
   return expectJson(response, 'duplicate_scan_results_failed')
-}
-
-export async function deleteDuplicateBooks(bookIds: number[]): Promise<void> {
-  const response = await api('/api/v1/books', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bookIds }),
-  })
-  if (!response.ok) throw new Error('duplicate_delete_failed')
 }
 
 export async function dismissBookDuplicateGroup(payload: CreateBookDuplicateDismissalRequest): Promise<void> {
@@ -76,7 +74,24 @@ export async function getBookDuplicateDismissals(): Promise<BookDuplicateDismiss
   return expectJson(response, 'duplicate_dismissals_failed')
 }
 
-export async function restoreBookDuplicateDismissal(bookIdA: number, bookIdB: number): Promise<void> {
-  const response = await api(`/api/v1/book-duplicates/dismissals/${bookIdA}/${bookIdB}`, { method: 'DELETE' })
+export async function restoreBookDuplicateDismissal(bookIdA: number, bookIdB: number, kind: BookDuplicateKind = 'duplicate'): Promise<void> {
+  const query = kind === 'duplicate' ? '' : `?kind=${kind}`
+  const response = await api(`/api/v1/book-duplicates/dismissals/${bookIdA}/${bookIdB}${query}`, { method: 'DELETE' })
   if (!response.ok) throw new Error('duplicate_restore_failed')
+}
+
+export async function startBookDuplicateResolution(payload: BookDuplicateResolutionRequest): Promise<BookDuplicateResolutionStartResponse> {
+  const response = await api('/api/v1/book-duplicates/resolutions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) throw await apiError(response, 'tools.bookDuplicates.errors.resolve')
+  return response.json() as Promise<BookDuplicateResolutionStartResponse>
+}
+
+export async function getBookDuplicateResolution(jobId: number): Promise<BookDuplicateResolutionJob> {
+  const response = await api(`/api/v1/book-duplicates/resolutions/${jobId}`)
+  if (!response.ok) throw await apiError(response, 'tools.bookDuplicates.errors.status')
+  return response.json() as Promise<BookDuplicateResolutionJob>
 }

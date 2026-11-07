@@ -753,7 +753,7 @@ export class KoboAnnotationExchangeService {
   private async resolveBookIdByContentId(userId: number, contentId: string): Promise<number | null> {
     if (!UUID_RE.test(contentId)) return null;
     try {
-      return await this.bookIdentityService.resolveBookIdByEntitlementId(userId, contentId);
+      return await this.bookIdentityService.resolveBookIdByEntitlementId(userId, contentId, { followMerges: true });
     } catch (error) {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
       this.logger.warn(`[${GET_EVENT}] [fail] contentId=${sanitizeLogValue(contentId)} errorClass=${errorClass} - kobo content resolution failed`);

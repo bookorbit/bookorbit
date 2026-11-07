@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useEventListener, useMediaQuery } from '@vueuse/core'
-import { Check, ChevronUp, FolderTree, Info, Undo2, X } from '@lucide/vue'
+import { Check, ChevronUp, FolderTree, Info, TriangleAlert, Undo2, X } from '@lucide/vue'
 import type { OrganizationMode } from '@bookorbit/types'
 import { useModal } from '@/composables/useModal'
 import { formatList } from '@/i18n/formatters'
@@ -102,6 +102,12 @@ const selection = useFolderPickerSelection({
 })
 
 const selected = selection.selected
+/** Picked folders that overlap another library, which the server refuses until they are left out or removed. */
+const overlapping = computed(() => selected.value.filter((path) => selection.status(path)?.warn))
+const canAdd = computed(() => selected.value.length > 0 && overlapping.value.length === 0)
+const overlapMessage = computed(() =>
+  overlapping.value.length ? t('library.folderBrowser.footer.resolveOverlap', { count: overlapping.value.length }) : null,
+)
 const subtitle = computed(() =>
   t('library.folderBrowser.subtitle', {
     name: libraryName.value,
@@ -133,14 +139,13 @@ function describeOverlap(path: string, status: FolderStatus): string {
     const libs = status.libraries ?? []
     if (libs.length === 1) {
       const folder = libs[0]!.folders.find((own) => isInside(own, path)) ?? libs[0]!.folders[0]!
-      return t('library.folderBrowser.plan.attention.containsOne', { folder: leafName(folder), library: libs[0]!.name })
+      return t('library.folderBrowser.plan.attention.containsOneBlocked', { folder: leafName(folder), library: libs[0]!.name })
     }
-    return t('library.folderBrowser.plan.attention.containsMany', { libraries: formatList(libs.map((library) => library.name)) })
+    return t('library.folderBrowser.plan.attention.containsManyBlocked', { libraries: formatList(libs.map((library) => library.name)) })
   }
   const library = status.library?.name ?? ''
-  if (status.exact)
-    return t('library.folderBrowser.plan.attention.overlapExact', { library, count: data.summaries.get(normalizeFolderPath(path))?.files ?? 0 })
-  return t('library.folderBrowser.plan.attention.overlapInside', { library })
+  if (status.exact) return t('library.folderBrowser.plan.attention.overlapExactBlocked', { library })
+  return t('library.folderBrowser.plan.attention.overlapInsideBlocked', { library })
 }
 
 function flashRow(path: string) {
@@ -285,7 +290,7 @@ function onBackdrop() {
 }
 
 function confirm() {
-  if (selected.value.length === 0) return
+  if (!canAdd.value) return
   rememberRecentFolders(selected.value)
   emit('select', [...selected.value])
 }
@@ -446,6 +451,10 @@ onBeforeUnmount(() => {
               <Info :size="13" class="shrink-0 text-primary" aria-hidden="true" />
               <span class="truncate" role="status">{{ noticeMessage }}</span>
             </template>
+            <template v-else-if="overlapMessage">
+              <TriangleAlert :size="13" class="shrink-0 text-warning" aria-hidden="true" />
+              <span class="truncate text-foreground" role="status" :title="overlapMessage">{{ overlapMessage }}</span>
+            </template>
             <i18n-t v-else keypath="library.folderBrowser.footer.hints" scope="global">
               <template #move><PickerKbd>↑</PickerKbd><PickerKbd>↓</PickerKbd></template>
               <template #fold><PickerKbd>←</PickerKbd><PickerKbd>→</PickerKbd></template>
@@ -466,7 +475,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
-            :disabled="selected.length === 0"
+            :disabled="!canAdd"
             @click="confirm"
           >
             <Check :size="16" aria-hidden="true" />
@@ -534,14 +543,16 @@ onBeforeUnmount(() => {
             <span class="block truncate text-sm font-medium text-foreground">
               {{ selected.length ? countLabel(totalBooks) : t('library.folderBrowser.footer.nothingPicked') }}
             </span>
-            <span class="block truncate text-xs text-muted-foreground">{{ t('library.folderBrowser.footer.seePlan') }}</span>
+            <span class="block truncate text-xs text-muted-foreground" :role="overlapMessage ? 'status' : undefined">{{
+              overlapMessage ?? t('library.folderBrowser.footer.seePlan')
+            }}</span>
           </span>
           <ChevronUp :size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
         </button>
         <button
           type="button"
           class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
-          :disabled="selected.length === 0"
+          :disabled="!canAdd"
           @click="confirm"
         >
           <Check :size="16" aria-hidden="true" />

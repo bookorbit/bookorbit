@@ -275,6 +275,7 @@ export class SmartScopeService {
     try {
       const result = await this.bookService.executeBooksQuery(user.id, where, effectiveQuery, {
         seriesSelectionFilter: query.filter,
+        viewer: user,
       });
       const durationMs = Date.now() - start;
       if (durationMs >= 500) {

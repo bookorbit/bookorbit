@@ -8,6 +8,7 @@ import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { RequireAppAttest } from '../app-attest/app-attest.guard';
@@ -34,6 +35,7 @@ export class WatchDownloadController {
     private readonly epubService: EpubService,
   ) {}
 
+  @ResolvesMergedBook({ body: ['bookId'] })
   @Post()
   @RequireAppAttest()
   @RequirePermission(Permission.LibraryDownload)
@@ -41,6 +43,7 @@ export class WatchDownloadController {
     return this.watchDownloads.issue(dto.bookId, dto.fileIds, user);
   }
 
+  @ResolvesMergedBook({ body: ['bookId'] })
   @Post('media-overlay')
   @RequireAppAttest()
   @RequirePermission(Permission.LibraryDownload)
@@ -89,6 +92,7 @@ export class WatchDownloadController {
     this.sendRange(file.path, file.size, AUDIO_MIME_TYPES[file.format.toLowerCase()] ?? 'application/octet-stream', rangeHeader, reply);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get('books/:bookId/cover')
   @Public()
   async downloadCover(

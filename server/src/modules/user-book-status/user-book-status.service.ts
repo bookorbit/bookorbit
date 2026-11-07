@@ -237,6 +237,12 @@ export class UserBookStatusService {
     }
   }
 
+  /** Writes a status onto the user's Kobo reading state when two-way sync is on. Throws on failure. */
+  async projectKoboStatus(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
+    if (bookIds.length === 0 || !(await this.koboProjection.isEnabled(userId))) return;
+    await this.koboProjection.project(userId, bookIds, status);
+  }
+
   /**
    * Mirrors the new read status onto the Kobo reading state so devices pick it up on
    * the next sync. Best-effort: a Kobo projection failure must not fail the status change.
@@ -245,8 +251,7 @@ export class UserBookStatusService {
     if (bookIds.length === 0) return;
     const startedAt = Date.now();
     try {
-      if (!(await this.koboProjection.isEnabled(userId))) return;
-      await this.koboProjection.project(userId, bookIds, status);
+      await this.projectKoboStatus(userId, bookIds, status);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.warn(

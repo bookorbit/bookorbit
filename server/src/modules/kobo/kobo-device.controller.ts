@@ -186,7 +186,7 @@ export class KoboDeviceController {
     user: RequestUser,
     reply: FastifyReply,
   ) {
-    const id = await this.bookIdentityService.resolveBookIdByCoverImageId(user.id, bookId);
+    const id = await this.bookIdentityService.resolveBookIdByCoverImageId(user.id, bookId, { followMerges: true });
     if (id !== null) {
       await this.thumbnailService.serveThumbnail(user.id, id, coverRequest, ifNoneMatch, reply);
       return;
