@@ -61,6 +61,8 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['GET', '/mobile/year-review/2026'],
   ['POST', '/mobile/visual-match'],
   ['POST', '/mobile/shelf-match'],
+  ['GET', '/mobile/books/1/story-edits'],
+  ['PUT', `/mobile/books/1/story-edits/${ID}`],
 ];
 
 const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [

@@ -1234,5 +1234,29 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/story-edits/story-edits.controller.ts",
+    "className": "StoryEditsController",
+    "methodName": "list",
+    "httpMethod": "GET",
+    "path": "/mobile/books/:bookId/story-edits",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/story-edits/story-edits.controller.ts",
+    "className": "StoryEditsController",
+    "methodName": "put",
+    "httpMethod": "PUT",
+    "path": "/mobile/books/:bookId/story-edits/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

@@ -94,6 +94,7 @@ export * from "./page-locator";
 export * from "./year-review";
 export * from "./visual-match";
 export * from "./shelf-match";
+export * from "./story-edits";
 export * from "./regex-metadata";
 export * from "./delivery";
 export * from "./djvu";

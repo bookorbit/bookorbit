@@ -47,3 +47,4 @@ export * from './metadata-cache';
 export * from './metadata-http-providers';
 export * from './delivery';
 export * from './server-identity';
+export * from './story-edits';

@@ -63,6 +63,11 @@ export const SERVER_FEATURES = [
    * reader's libraries that the text recognised on it points to.
    */
   "shelf-match",
+  /**
+   * `GET /mobile/books/:bookId/story-edits` pages a reader's corrections to a book's people, places
+   * and terms by revision cursor, and `PUT /mobile/books/:bookId/story-edits/:id` writes one.
+   */
+  "story-edits",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
